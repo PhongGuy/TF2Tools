@@ -50,3 +50,6 @@ testem.log
 # System Files
 .DS_Store
 Thumbs.db
+
+# compiler
+compile-win.iss
