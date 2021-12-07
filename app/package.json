@@ -1,0 +1,10 @@
+{
+  "name": "TF2Tools",
+  "version": "1.0.23",
+  "main": "main.js",
+  "private": true,
+  "dependencies": {
+    "appdata-path": "^1.0.0",
+    "fs-extra": "^10.0.0"
+  }
+}

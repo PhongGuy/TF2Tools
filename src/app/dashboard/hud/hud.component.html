@@ -1,0 +1,62 @@
+<mat-card class="mb-2">
+    <mat-card-title>Huds</mat-card-title>
+    <mat-card-subtitle>Here is your collection of huds</mat-card-subtitle>
+    <mat-card-actions align="end">
+        <button mat-raised-button (click)="folderUpload.click()" color="primary">Add</button>
+        <input class="d-none" type="file" #folderUpload (change)="upload($event)" webkitdirectory mozdirectory />
+    </mat-card-actions>
+</mat-card>
+
+<h1 class="mt-5">Installed hud{{hudsInstalled > 1 ? 's' : ''}}</h1>
+<mat-accordion>
+    <mat-expansion-panel *ngFor="let hud of currentHuds" (opened)="true">
+        <mat-expansion-panel-header>
+            <mat-panel-title>
+                {{hud.folderName}}
+            </mat-panel-title>
+            <mat-panel-description>
+                {{hud.name}}
+            </mat-panel-description>
+        </mat-expansion-panel-header>
+        <p>Version: {{hud.version}}</p>
+        <mat-action-row>
+            <button mat-raised-button color="warn" (click)="uninstall(hud, false)">Uninstall</button>
+        </mat-action-row>
+    </mat-expansion-panel>
+</mat-accordion>
+
+<h1 class="mt-5">Library</h1>
+
+<mat-form-field class="w-100" appearance="fill">
+    <mat-label>Search</mat-label>
+    <input type="text" #searchLibrary placeholder="Pick one" aria-label="Number" matInput [formControl]="myControl"
+        [matAutocomplete]="auto">
+    <mat-autocomplete autoActiveFirstOption #auto="matAutocomplete">
+        <mat-option *ngFor="let option of filteredOptions | async" [value]="option.folderName">
+            {{option.folderName}}
+        </mat-option>
+    </mat-autocomplete>
+</mat-form-field>
+
+<mat-accordion>
+    <mat-expansion-panel *ngFor="let hud of filteredOptions | async">
+        <mat-expansion-panel-header>
+            <mat-panel-title>
+                {{hud.folderName}}
+            </mat-panel-title>
+            <mat-panel-description>
+                {{hud.name}}
+            </mat-panel-description>
+        </mat-expansion-panel-header>
+        <p>Version: {{hud.version}}</p>
+        <mat-action-row class="even-action-row">
+            <button mat-raised-button color="warn" (click)="uninstall(hud, true)">Remove</button>
+            <button mat-raised-button color="accent" (click)="rename(hud)">Rename</button>
+            <div class="col"></div>
+            <button mat-raised-button color="accent" (click)="add(hud)">Install</button>
+            <button mat-raised-button color="primary" (click)="replace(hud)">Replace</button>
+        </mat-action-row>
+    </mat-expansion-panel>
+</mat-accordion>
+
+<div class="mb-5"></div>

@@ -1,0 +1,108 @@
+@use '@angular/material' as mat;
+@include mat.core();
+
+// Define a light theme
+$light-primary: mat.define-palette(mat.$indigo-palette);
+$light-accent: mat.define-palette(mat.$pink-palette);
+$light-theme: mat.define-light-theme(( color: ( primary: $light-primary, accent: $light-accent, ) ));
+
+// Define a dark theme
+$dark-primary: mat.define-palette(mat.$blue-palette);
+$dark-accent: mat.define-palette(mat.$cyan-palette);
+$dark-theme: mat.define-dark-theme(( color: ( primary: $dark-primary, accent: $dark-accent, ) ));
+
+// Apply the dark theme by default
+@include mat.all-component-themes($dark-theme);
+
+// Apply the light theme only when the `.my-light-theme` CSS class is applied
+// to an ancestor element of the components (such as `body`).
+.my-light-theme {
+  @include mat.all-component-themes($light-theme);
+}
+@import url( 'https://fonts.googleapis.com/css2?family=Roboto&display=swap');
+
+body,
+html {
+  color: rgba(255, 255, 255, .78);
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: 'Roboto', sans-serif;
+}
+
+.toolbar {
+  padding: 0 16px 0 0 !important;
+  position: fixed;
+  z-index: 1;
+
+  & > span {
+    padding: 15px 0 15px 16px;
+    -webkit-app-region: drag;
+  }
+
+  .spacer {
+    flex: 1 1 auto;
+    height: 64px;
+    -webkit-app-region: drag;
+  }
+}
+
+.even-action-row {
+  padding: 16px 8px !important;
+
+  button {
+    margin-left: 4px !important;
+    margin-right: 4px !important;
+  }
+}
+
+.room {
+  top: 64px;
+  overflow: auto;
+  position: absolute;
+  padding-top: 16px;
+  right: 0;
+  left: 0;
+  bottom: 0;
+}
+
+mat-toolbar {
+  padding-bottom: 100px;
+}
+
+.blue-snackbar {
+  color: rgba(255, 255, 255, 0.77);
+  background: rgb(37 117 220);
+  font-weight: 500;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(13deg, #909090 14%,#909090 64%);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(13deg, #606060 14%,#606060 64%);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 10px;
+}
+
+button.active {
+  background: rgb(37 117 220);
+}
+
+.card-list {
+  padding: inherit !important;
+
+  mat-nav-list {
+    padding-top: 0 !important;
+  }
+}
