@@ -9,7 +9,7 @@
 
 <h1 class="mt-5">Installed hud{{hudsInstalled > 1 ? 's' : ''}}</h1>
 <mat-accordion>
-    <mat-expansion-panel *ngFor="let hud of currentHuds" (opened)="true">
+    <mat-expansion-panel *ngFor="let hud of currentHuds" expanded>
         <mat-expansion-panel-header>
             <mat-panel-title>
                 {{hud.folderName}}
