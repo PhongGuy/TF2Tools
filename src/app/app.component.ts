@@ -64,7 +64,7 @@ export class AppComponent implements OnInit {
                   item.name = data[0];
                   item.creator = creatorMaintainer[0].split('`').join('')
                   item.maintainer = creatorMaintainer[1] ? creatorMaintainer[1].split('*').join('') : '';
-                  item.screenshots = data[2];
+                  item.screenshots = data[2]; // https://imgur.com/account/settings/apps
                   item.repository = data[3];
                   item.page = data[4];
                   item.group = data[5];
