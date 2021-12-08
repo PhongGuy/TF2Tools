@@ -23,7 +23,8 @@ function createWindow(): BrowserWindow {
       webSecurity: false
     },
     backgroundColor: '#121212',
-    frame: false
+    frame: false,
+    show: false
   });
 
 
@@ -33,6 +34,10 @@ function createWindow(): BrowserWindow {
       electron: require(path.join(__dirname, '/../node_modules/electron'))
     });
     win.loadURL('http://localhost:4200');
+    win.once('ready-to-show', () => {
+      win.show()
+    });
+
   } else {
     // Path when running electron executable
     let pathIndex = './index.html';
@@ -47,6 +52,9 @@ function createWindow(): BrowserWindow {
       protocol: 'file:',
       slashes: true
     }));
+    win.once('ready-to-show', () => {
+      win.show()
+    });
   }
 
   // Emitted when the window is closed.
