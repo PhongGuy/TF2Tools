@@ -132,40 +132,37 @@ export class HudComponent implements OnInit {
             this.update();
           });
       }
-
     } else {
       console.log(false)
     }
   }
 
   upload(event: Event) {
-    const files: FileList = event.target['files'];
-    if (this.hudCheck(event.target['files'])) {
-      this.snack.show('Looking for huds...', null, 2000);
-      for (let i = 0; i < files.length; i++) {
-        if (files[i].name == 'info.vdf') {
-          const f = files[i].path.split('\\');
-          f.pop();
-          const path = f.join('\\');
-          const name = f.pop();
-          const dest = `${this.localHuds}\\${name}`;
-          if (!this.electron.fs.existsSync(dest)) {
-            this.electron.fs.copy(path, dest)
-              .then(() => {
-                this.snack.show(`Added ${name} to library`);
-                const data = this.electron.fs.readFileSync(`${dest}\\info.vdf`, { encoding: 'utf8', flag: 'r' }).split('"');
-                const l = { name: data[1], folderName: name, version: data[5], path: this.localHuds + '\\' + name };
-                this.library.push(l)
-              })
-              .catch(err => console.error(err));
-          } else {
-            this.snack.show(`${name} is already in library`);
-          }
+    const files: File[] = Array.from(event.target['files']);
+    const hudsFound = files.filter(i => i.name == 'info.vdf');
+    if (hudsFound.length > 0) {
+      hudsFound.forEach(hud => {
+        const path = hud.path.replace('\\info.vdf', '');
+        const name = path.split('\\').pop();
+        const dest = `${this.localHuds}\\${name}`
+
+        if (!this.electron.fs.existsSync(dest)) {
+          this.electron.fs.copy(path, dest)
+            .then(() => {
+              this.snack.show(`Added "${name}" to library`, null, hudsFound.length > 2 ? 1000 : 3000);
+              const data = this.electron.fs.readFileSync(hud.path, { encoding: 'utf8', flag: 'r' }).split('"');
+              const l = { name: data[1], folderName: name, version: data[5], path: this.localHuds + '\\' + name };
+              this.library.push(l);
+              this.myControl.setValue('');
+            }).catch(err => console.error(err));
+        } else {
+          this.snack.show(`${name} is already in library`);
         }
-      }
+      });
     } else {
-      this.snack.show('We could not find any hud here. Are you sure you selected the right folder and it has the info.vdf file.', null, 6000)
+      this.snack.show('We could not find any hud here. Are you sure you selected the right folder and it has the info.vdf file inside.', null, 6000)
     }
+
     this.folderUpload.nativeElement.value = null;
   }
 
