@@ -19,9 +19,9 @@ export class ElectronService {
   fs: typeof fs;
   appData: typeof getAppDataPath;
   path: typeof path;
-  dialog: typeof dialog
-  http: typeof http
-  https: typeof https
+  dialog: typeof dialog;
+  http: typeof http;
+  https: typeof https;
 
   constructor() {
     // Conditional imports

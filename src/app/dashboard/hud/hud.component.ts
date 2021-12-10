@@ -8,6 +8,7 @@ import { QuestionAnswerComponent } from '../../dialogs/question-answer/question-
 import { YesNoComponent } from '../../dialogs/yes-no/yes-no.component';
 import { Hud } from '../../models/hud';
 import { QuestionAnswer } from '../../models/questionAnswer';
+import { YesNo } from '../../models/yesNo';
 import { SnackService } from '../../services/snack.service';
 
 @Component({
@@ -17,13 +18,13 @@ import { SnackService } from '../../services/snack.service';
 })
 export class HudComponent implements OnInit {
 
+  @ViewChild('folderUpload') folderUpload: ElementRef;
+
   currentHuds: Hud[];
   hudsInstalled: number;
   library: Hud[];
   localHuds: string;
   notInLibrary: Hud[];
-
-  @ViewChild('folderUpload') folderUpload: ElementRef;
 
   myControl = new FormControl();
   filteredOptions: Observable<Hud[]>;
@@ -43,20 +44,8 @@ export class HudComponent implements OnInit {
 
     this.filteredOptions = this.myControl.valueChanges.pipe(
       startWith(''),
-      map(value => this._filter(value)),
+      map(value => this.hudFilter(value)),
     );
-  }
-
-  private _filter(value: string): Hud[] {
-    const filterValue = value.toLowerCase();
-
-    return this.library.filter(option => {
-      if (option.folderName.toLowerCase().includes(filterValue)) {
-        return true;
-      } else if (option.name.toLowerCase().includes(filterValue)) {
-        return true;
-      }
-    });
   }
 
   async update() {
@@ -66,9 +55,9 @@ export class HudComponent implements OnInit {
     }
 
     this.electron.fs.readdirSync(this.localHuds).forEach(customFiles => {
-      let info = this.localHuds + '/' + customFiles + '/info.vdf';
+      const info = this.localHuds + '/' + customFiles + '/info.vdf';
       if (this.electron.fs.existsSync(info)) {
-        const data = this.electron.fs.readFileSync(info, { encoding: 'utf8', flag: 'r' }).split('"')
+        const data = this.electron.fs.readFileSync(info, { encoding: 'utf8', flag: 'r' }).split('"');
         const h = { name: data[1], folderName: customFiles, version: data[5], path: this.localHuds + '\\' + customFiles };
         this.library.push(h);
       }
@@ -78,7 +67,7 @@ export class HudComponent implements OnInit {
     this.currentHuds = [];
     this.notInLibrary = [];
     this.electron.fs.readdirSync(this.app.customPath).forEach(customFiles => {
-      let info = this.app.customPath + '/' + customFiles + '/info.vdf';
+      const info = this.app.customPath + '/' + customFiles + '/info.vdf';
       if (this.electron.fs.existsSync(info)) {
         this.hudsInstalled++;
 
@@ -111,16 +100,20 @@ export class HudComponent implements OnInit {
 
       if (warning) {
 
+        const d: YesNo = new YesNo();
+        d.question = `Remove ${_hud.folderName}?`;
+        d.subQuestion = `Are you sure you want to remove ${_hud.folderName}? This cannot be undone!`;
+
         const dialogRef = this.dialog.open(YesNoComponent, {
           width: '450px',
-          data: { question: `Remove ${_hud.folderName}?`, subquestion: `Are you sure you want to remove ${_hud.folderName}? This cannot be undone!` }
+          data: d
         });
 
         dialogRef.afterClosed().subscribe(result => {
           if (result) {
             this.electron.fs.remove(_hud.path)
               .then(() => {
-                this.snack.show(`${_hud.folderName} was removed`)
+                this.snack.show(`${_hud.folderName} was removed`);
                 this.update();
               });
           }
@@ -128,23 +121,24 @@ export class HudComponent implements OnInit {
       } else {
         this.electron.fs.remove(_hud.path)
           .then(() => {
-            this.snack.show(`${_hud.folderName} was uninstalled`)
+            this.snack.show(`${_hud.folderName} was uninstalled`);
             this.update();
           });
       }
     } else {
-      console.log(false)
+      console.log(false);
     }
   }
 
   upload(event: Event) {
-    const files: File[] = Array.from(event.target['files']);
-    const hudsFound = files.filter(i => i.name == 'info.vdf');
+    const target = event.target as HTMLInputElement;
+    const files: File[] = Array.from(target.files);
+    const hudsFound = files.filter(i => i.name === 'info.vdf');
     if (hudsFound.length > 0) {
       hudsFound.forEach(hud => {
         const path = hud.path.replace('\\info.vdf', '');
         const name = path.split('\\').pop();
-        const dest = `${this.localHuds}\\${name}`
+        const dest = `${this.localHuds}\\${name}`;
 
         if (!this.electron.fs.existsSync(dest)) {
           this.electron.fs.copy(path, dest)
@@ -160,7 +154,8 @@ export class HudComponent implements OnInit {
         }
       });
     } else {
-      this.snack.show('We could not find any hud here. Are you sure you selected the right folder and it has the info.vdf file inside.', null, 6000)
+      const s = 'We could not find any hud here. Are you sure you selected the right folder and it has the info.vdf file inside.';
+      this.snack.show(s, null, 6000);
     }
 
     this.folderUpload.nativeElement.value = null;
@@ -190,31 +185,30 @@ export class HudComponent implements OnInit {
     });
   }
 
+  replace(_hud: Hud): void {
+
+  }
+
+  private hudFilter(value: string): Hud[] {
+    const filterValue = value.toLowerCase();
+
+    return this.library.filter(option => {
+      if (option.folderName.toLowerCase().includes(filterValue)) {
+        return true;
+      } else if (option.name.toLowerCase().includes(filterValue)) {
+        return true;
+      }
+    });
+  }
+
   private getNames(exclude: string): string[] {
     const names: string[] = [];
     this.library.forEach(a => {
       if (a.folderName !== exclude) {
         names.push(a.folderName);
       }
-    })
+    });
     return names;
-  }
-
-  replace(_hud: Hud): void {
-
-  }
-
-  private hudCheck(files: FileList): boolean {
-    var check: boolean = false;
-    if (files.length > 0) {
-      for (let i = 0; i < files.length; i++) {
-        if (files[i].name == 'info.vdf') {
-          check = true;
-          break;
-        }
-      }
-    }
-    return check;
   }
 
   private copy(path, dest) {

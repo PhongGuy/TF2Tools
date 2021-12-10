@@ -1,4 +1,3 @@
-
 export class Hud {
     name: string;
     folderName: string;

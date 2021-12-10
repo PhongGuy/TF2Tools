@@ -34,7 +34,7 @@ const materialcomponents = [
     MatAutocompleteModule,
     MatTooltipModule,
     MatSliderModule
-]
+];
 
 @NgModule({
     imports: [materialcomponents],

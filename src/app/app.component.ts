@@ -1,82 +1,59 @@
-import { HttpClient } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { TranslateService } from '@ngx-translate/core';
 import { ElectronService } from './core/services';
 import { HudList } from './models/hudList';
+import { Settings } from './models/settings';
+import { SnackService } from './services/snack.service';
 
 @Component({
-  selector: 'body',
+  selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent implements OnInit {
 
-  private defaultPath: string = 'C:/Program Files (x86)/Steam/steamapps/common/Team Fortress 2/tf';
-  public tfPath: string = '';
-  public customPath: string = '';
+  public tfPath = '';
+  public customPath = '';
   public appdata: string;
-  fullscreenIcon: string = 'fullscreen';
-  fullscreenTip: string = 'Maximize';
-  private fullscreen: boolean = false;
-
+  fullscreenIcon = 'fullscreen';
+  fullscreenTip = 'Maximize';
+  public settings: Settings = new Settings();
   public hudList: HudList[] = [];
+
+  private fullscreen = false;
+  private defaultPath = 'C:/Program Files (x86)/Steam/steamapps/common/Team Fortress 2/tf';
 
   constructor(
     private electron: ElectronService,
     private translate: TranslateService,
     private router: Router,
-    private http: HttpClient
+    private snack: SnackService
   ) {
     this.appdata = this.electron.appData('TF2Tools');
     this.translate.setDefaultLang('en');
+
     if (!this.electron.fs.existsSync(this.appdata)) {
       this.electron.fs.mkdir(this.appdata);
     }
+
+
     if (this.electron.fs.existsSync(this.defaultPath)) {
       this.tfPath = this.defaultPath;
-      this.customPath = this.defaultPath + '/custom'
+      this.customPath = this.defaultPath + '/custom';
       this.router.navigate(['dashboard/hud']);
     } else {
-      this.router.navigate(['setup']);
+      this.snack.show(`We do not support your system yet, please give me time :)`);
     }
+
   }
+
+  /**
+   * When we want to add mastercomfig, this is the url to the latest relese
+   * https://github.com/mastercomfig/mastercomfig/releases/latest/download/mastercomfig-low-preset.vpk
+   */
 
   ngOnInit() {
-    // this.downloadHudList();
-  }
-
-  downloadHudList() {
-    const list = this.electron.fs.createWriteStream("list.md");
-    this.electron.https.get("https://raw.githubusercontent.com/Hypnootize/TF2-HUDs-Megalist/master/Active%20Huds%20List.md", (response) => {
-      response.pipe(list)
-        .on('close', () => {
-          this.electron.fs.readFile('list.md', { encoding: 'utf8', flag: 'r' })
-            .then((f) => {
-              const h = f.split('--------	|	------------------------	|	-------	|	----------	|	-------	|	-----------	|	--------------	|	-------	|	---------------')[1].split('\n');
-
-              h.forEach(m => {
-                const data = m.split('	|	');
-                if (data[0] !== '') {
-                  const creatorMaintainer = data[1].split(' ');
-
-                  const item = new HudList();
-                  item.name = data[0];
-                  item.creator = creatorMaintainer[0].split('`').join('')
-                  item.maintainer = creatorMaintainer[1] ? creatorMaintainer[1].split('*').join('') : '';
-                  item.screenshots = data[2]; // https://imgur.com/account/settings/apps
-                  item.repository = data[3];
-                  item.page = data[4];
-                  item.group = data[5];
-                  item.discussion = data[6];
-                  item.discord = data[7]
-                  item.download = data[8];
-                  this.hudList.push(item);
-                }
-              });
-            });
-        });
-    });
   }
 
   minimize() {

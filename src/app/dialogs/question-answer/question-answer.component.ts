@@ -33,11 +33,11 @@ export class QuestionAnswerComponent implements OnInit {
 
   checkName(cant: string[]): ValidatorFn {
     return (control: AbstractControl): { [key: string]: boolean } | null => {
-      if (cant.filter(a => a == control.value).length !== 0) {
-        return { nameExists: true }
+      if (cant.filter(a => a === control.value).length !== 0) {
+        return { nameExists: true };
       }
-      return null
-    }
+      return null;
+    };
   }
 
   submit() {

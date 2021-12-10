@@ -1,4 +1,3 @@
-
 export class HudList {
     name: string;
     creator: string;

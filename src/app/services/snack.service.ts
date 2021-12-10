@@ -25,13 +25,14 @@ export class SnackService implements OnDestroy {
   ngOnDestroy() {
     this.subscription.unsubscribe();
   }
+
   /**
    * Add a message
+   *
    * @param message The message to show in the snackbar.
    * @param action The label for the snackbar action.
    * @param config Additional configuration options for the snackbar.
    * @param classOverride Adds a css class on the snackbar so you can add color.
-
    */
   show(
     message: string,
