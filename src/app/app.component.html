@@ -12,5 +12,6 @@
     </button>
 </mat-toolbar>
 <div class="room">
+    <mat-spinner *ngIf="loading"></mat-spinner>
     <router-outlet></router-outlet>
 </div>

@@ -106,3 +106,12 @@ button.active {
     padding-top: 0 !important;
   }
 }
+
+mat-spinner {
+  top: 50%;
+  margin-top: -50px;
+  margin-left: -50px;
+  left: 50%;
+  position: absolute!important;
+  z-index: 1;
+}
