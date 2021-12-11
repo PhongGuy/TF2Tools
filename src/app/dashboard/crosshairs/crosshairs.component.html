@@ -1,1 +1,43 @@
-<p>no crosshairs yet :(</p>
+<div class="container" *ngIf="app.path.vtf.length > 0">
+    <div class="row">
+        <div class="col-md-4">
+            <mat-form-field appearance="fill">
+                <mat-label>Choose a crosshair</mat-label>
+                <mat-select #crosshairSelected>
+                    <mat-option #crosshairSelected *ngFor="let food of app.path.vtf" [value]="food">
+                        {{food.replace('.vtf', '').split('\\').pop()}}
+                    </mat-option>
+                </mat-select>
+            </mat-form-field>
+            <button mat-raised-button color="primary">Apply</button>
+        </div>
+        <div class="col-md-3">
+            <img src="assets/vtf/png/{{crosshairSelected.value}}.png" alt="">
+        </div>
+        <div class="col-md-5"></div>
+    </div>
+    <div class="row">
+        <mat-tab-group mat-align-tabs="center">
+            <mat-tab label="Scout">Content</mat-tab>
+            <mat-tab label="Soldier">Content</mat-tab>
+            <mat-tab label="Pyro">Content</mat-tab>
+            <mat-tab label="Demoman">Content</mat-tab>
+            <mat-tab label="Heavy">Content</mat-tab>
+            <mat-tab label="Engineer">Content</mat-tab>
+            <mat-tab label="Medic">Content</mat-tab>
+            <mat-tab label="Sniper">Content</mat-tab>
+            <mat-tab label="Spy">Content</mat-tab>
+        </mat-tab-group>
+    </div>
+</div>
+
+<div *ngIf="app.path.vtf.length === 0">
+    <mat-card class="mb-2">
+        <mat-card-title>Crosshairs</mat-card-title>
+        <mat-card-subtitle>We could not find any vtf crosshairs, you can generate them to get started.
+        </mat-card-subtitle>
+        <mat-card-actions align="end">
+            <button mat-raised-button (click)="generate()" color="primary">Generate</button>
+        </mat-card-actions>
+    </mat-card>
+</div>
