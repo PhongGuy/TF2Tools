@@ -154,9 +154,8 @@ export class HitsoundComponent implements OnInit {
   }
 
   play(_hitsound: Hitsound) {
-    const audio = new Audio();
+    const audio = new Audio(_hitsound.path);
     audio.volume = this.volume / 100;
-    audio.src = _hitsound.path;
     audio.load();
     audio.play();
   }
