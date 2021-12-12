@@ -9,15 +9,15 @@ import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { CoreModule } from './core/core.module';
+import { CrosshairsComponent } from './dashboard/crosshairs/crosshairs.component';
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { HitsoundComponent } from './dashboard/hitsound/hitsound.component';
+import { MultipleWarningComponent } from './dashboard/hitsound/multiple-warning/multiple-warning.component';
 import { HudComponent } from './dashboard/hud/hud.component';
-import { MaterialModule } from './material';
-import { SharedModule } from './shared/shared.module';
+import { WeaponsSoundsComponent } from './dashboard/weapons-sounds/weapons-sounds.component';
 import { QuestionAnswerComponent } from './dialogs/question-answer/question-answer.component';
 import { YesNoComponent } from './dialogs/yes-no/yes-no.component';
-import { CrosshairsComponent } from './dashboard/crosshairs/crosshairs.component';
-import { WeaponsSoundsComponent } from './dashboard/weapons-sounds/weapons-sounds.component';
+import { MaterialModule } from './material';
 
 // AoT requires an exported function for factories
 const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new TranslateHttpLoader(http, './assets/i18n/', '.json');
@@ -31,7 +31,8 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new Transla
     QuestionAnswerComponent,
     YesNoComponent,
     CrosshairsComponent,
-    WeaponsSoundsComponent
+    WeaponsSoundsComponent,
+    MultipleWarningComponent
   ],
   imports: [
     BrowserModule,
@@ -39,7 +40,6 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new Transla
     FormsModule,
     HttpClientModule,
     CoreModule,
-    SharedModule,
     MaterialModule,
     AppRoutingModule,
     TranslateModule.forRoot({

@@ -28,10 +28,16 @@ export class QuestionAnswerComponent implements OnInit {
 
   ngOnInit(): void {
     this.matcher = new MyErrorStateMatcher();
-    this.input = new FormControl('', [Validators.required, this.checkName(this.data.cant)]);
+    this.input = new FormControl('', [Validators.required, this.checkName(this.data.cant), this.special()]);
   }
 
-  checkName(cant: string[]): ValidatorFn {
+  submit() {
+    if (!this.input.invalid) {
+      this.dialogRef.close(this.input.value);
+    }
+  }
+
+  private checkName(cant: string[]): ValidatorFn {
     return (control: AbstractControl): { [key: string]: boolean } | null => {
       if (cant.filter(a => a === control.value).length !== 0) {
         return { nameExists: true };
@@ -40,9 +46,13 @@ export class QuestionAnswerComponent implements OnInit {
     };
   }
 
-  submit() {
-    if (!this.input.invalid) {
-      this.dialogRef.close(this.input.value);
-    }
+  private special(): ValidatorFn {
+    return (control: AbstractControl): { [key: string]: boolean } | null => {
+      const nameRegexp = /[\\/:*?"<>|]+/g;
+      if (nameRegexp.test(control.value)) {
+        return { special: true };
+      }
+      return null;
+    };
   }
 }

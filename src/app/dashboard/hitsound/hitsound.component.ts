@@ -10,6 +10,7 @@ import { Hitsound } from '../../models/hitsound';
 import { QuestionAnswer } from '../../models/questionAnswer';
 import { YesNo } from '../../models/yesNo';
 import { SnackService } from '../../services/snack.service';
+import { MultipleWarningComponent } from './multiple-warning/multiple-warning.component';
 
 @Component({
   selector: 'app-hitsound',
@@ -23,14 +24,13 @@ export class HitsoundComponent implements OnInit {
   localHitsounds: string;
   library: Hitsound[];
   hitsounds: Hitsound[];
-  volume = 10;
 
   myControl = new FormControl();
   filteredOptions: Observable<Hitsound[]>;
 
   constructor(
     private electron: ElectronService,
-    private app: AppComponent,
+    public app: AppComponent,
     private dialog: MatDialog,
     private snack: SnackService
   ) {
@@ -38,6 +38,17 @@ export class HitsoundComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // update info in case user changed shit when TF2Tools was open
+    this.app.update('hitsounds');
+
+    // check if there is multiple hitsounds installed and warn user
+    if (this.app.path.hitsounds.length > 1) {
+      this.dialog.open(MultipleWarningComponent, {
+        width: '450px',
+        data: this.app.path.hitsounds
+      });
+    }
+
     this.update();
 
     this.filteredOptions = this.myControl.valueChanges.pipe(
@@ -54,10 +65,6 @@ export class HitsoundComponent implements OnInit {
       const h = { name: name.toString(), path: `${this.localHitsounds}\\${name}.wav` };
       this.library.push(h);
     });
-
-    // console.log(this.file.getAllFiles(this.app.customPath))
-
-
     this.myControl.setValue('');
   }
 
@@ -87,7 +94,8 @@ export class HitsoundComponent implements OnInit {
                 .then(() => {
                   this.snack.show(`${name} was added`);
                   this.update();
-                });
+                })
+                .catch(err => this.app.error(err));
             }
           });
         } else {
@@ -95,7 +103,8 @@ export class HitsoundComponent implements OnInit {
             .then(() => {
               this.snack.show(`${name} was added`);
               this.update();
-            });
+            })
+            .catch(err => this.app.error(err));
         }
       }
     }
@@ -122,7 +131,8 @@ export class HitsoundComponent implements OnInit {
             .then(() => {
               this.snack.show(`Renamed "${_hitsound.name}" to "${r}"`);
               this.update();
-            });
+            })
+            .catch(err => this.app.error(err));
         }
       });
 
@@ -147,17 +157,93 @@ export class HitsoundComponent implements OnInit {
         this.electron.fs.remove(_hitsound.path)
           .then(() => {
             this.snack.show(`${_hitsound.name} was removed`);
-            this.update();
-          });
+            if (_hitsound.name === 'hitsound' || _hitsound.name === 'killsound') {
+              this.app.update('hitsounds');
+            } else {
+              this.update();
+            }
+          })
+          .catch(err => this.app.error(err));
       }
     });
   }
 
-  play(_hitsound: Hitsound) {
+  removeFile(file: string, _name: string): void {
+    this.remove({ name: _name, path: file });
+  }
+
+  playFile(file: string): void {
+    this.play({ name: 'hitsound', path: file });
+  }
+
+  play(_hitsound: Hitsound): void {
+
+    if (_hitsound.name === 'hitsound') {
+      const p = _hitsound.path;
+      _hitsound.path = `${this.app.appTemp}\\${this.app.generateRandomString(8)}.wav`;
+      this.electron.fs.copySync(p, _hitsound.path);
+    }
+
     const audio = new Audio(_hitsound.path);
-    audio.volume = this.volume / 100;
+    audio.volume = this.app.settings.volume / 100;
     audio.load();
     audio.play();
+
+    if (_hitsound.name === 'hitsound') {
+      audio.addEventListener('ended', end => {
+        this.electron.fs.removeSync(_hitsound.path);
+      });
+    }
+  }
+
+  installHitsound(_hitsound: Hitsound): void {
+    const path = this.app.path.hitsounds[0];
+    if (path !== undefined) {
+      this.electron.fs.copy(_hitsound.path, path, { overwrite: true })
+        .then(() => {
+          this.snack.show(`Hitsound ${_hitsound.name} was installed`);
+          this.app.update('hitsounds');
+        })
+        .catch(err => {
+          this.app.error(err);
+        });
+    } else {
+      const defaultPath = `${this.app.path.custom}\\mycustomstuff\\sound\\ui`;
+      this.electron.fs.ensureDir(defaultPath)
+        .then(() => {
+          this.electron.fs.copy(_hitsound.path, `${defaultPath}\\hitsound.wav`)
+            .then(() => {
+              this.snack.show(`Hitsound ${_hitsound.name} was installed`);
+              this.app.update('hitsounds');
+            })
+            .catch(err => this.app.error(err));
+        })
+        .catch(err => this.app.error(err));
+    }
+  }
+
+  installkillsound(_killsound: Hitsound): void {
+    const path = this.app.path.killsounds[0];
+    if (path !== undefined) {
+      this.electron.fs.copy(_killsound.path, path, { overwrite: true })
+        .then(() => {
+          this.snack.show(`Killsound ${_killsound.name} was installed`);
+          this.app.update('hitsounds');
+        })
+        .catch(err => this.app.error(err));
+    } else {
+      const defaultPath = `${this.app.path.custom}\\mycustomstuff\\sound\\ui`;
+      this.electron.fs.ensureDir(defaultPath)
+        .then(() => {
+          this.electron.fs.copy(_killsound.path, `${defaultPath}\\killsound.wav`)
+            .then(() => {
+              this.snack.show(`Killsound ${_killsound.name} was installed`);
+              this.app.update('hitsounds');
+            })
+            .catch(err => this.app.error(err));
+        })
+        .catch(err => this.app.error(err));
+    }
   }
 
   private hitsoundFilter(value: string): Hitsound[] {

@@ -10,6 +10,9 @@
             <mat-error *ngIf="input.hasError('nameExists')">
                 That name already exists
             </mat-error>
+            <mat-error *ngIf="input.hasError('special')">
+                Can't use: \/:*?"<>|
+            </mat-error>
         </mat-form-field>
     </form>
 </div>

@@ -2,15 +2,46 @@
     <mat-card-title>Hitsounds</mat-card-title>
     <mat-card-subtitle>
         <p>Here is your collection of hitsounds</p>
-        <p>Test volume: {{volume}}</p>
+        <p>Test volume: {{app.settings.volume}}</p>
 
-        <mat-slider thumbLabel [(ngModel)]="volume" tickInterval="1" min="0" max="100" class="w-100"></mat-slider>
+        <mat-slider thumbLabel [(ngModel)]="app.settings.volume" tickInterval="1" min="0" max="100" class="w-100">
+        </mat-slider>
 
     </mat-card-subtitle>
     <mat-card-actions align="end">
         <button mat-raised-button (click)="folderUpload.click()" color="primary">Add</button>
         <input class="d-none" type="file" #folderUpload (change)="upload($event)" accept=".wav" />
     </mat-card-actions>
+</mat-card>
+
+<h1 class="mt-5">Installed hitsound{{app.path.hitsounds.length > 1 ? 's' : ''}}</h1>
+<mat-card class="card-list" *ngIf="app.path.hitsounds.length > 0">
+    <mat-nav-list>
+        <mat-list-item *ngFor="let sound of app.path.hitsounds" disableRipple="true">
+            <span matLine>hitsound</span>
+            <button mat-icon-button color="warn" matTooltip="Remove" (click)="removeFile(sound, 'hitsound')">
+                <mat-icon>delete</mat-icon>
+            </button>
+            <button mat-icon-button color="accent" matTooltip="Play" (click)="playFile(sound)">
+                <mat-icon>play_arrow</mat-icon>
+            </button>
+        </mat-list-item>
+    </mat-nav-list>
+</mat-card>
+
+<h1 class="mt-5">Installed killsound{{app.path.killsounds.length > 1 ? 's' : ''}}</h1>
+<mat-card class="card-list" *ngIf="app.path.killsounds.length > 0">
+    <mat-nav-list>
+        <mat-list-item *ngFor="let sound of app.path.killsounds" disableRipple="true">
+            <span matLine>killsound</span>
+            <button mat-icon-button color="warn" matTooltip="Remove" (click)="removeFile(sound, 'killsound')">
+                <mat-icon>delete</mat-icon>
+            </button>
+            <button mat-icon-button color="accent" matTooltip="Play" (click)="playFile(sound)">
+                <mat-icon>play_arrow</mat-icon>
+            </button>
+        </mat-list-item>
+    </mat-nav-list>
 </mat-card>
 
 <h1 class="mt-5">Library</h1>
@@ -39,10 +70,10 @@
             <button mat-icon-button color="accent" matTooltip="Play" (click)="play(sound)">
                 <mat-icon>play_arrow</mat-icon>
             </button>
-            <button mat-icon-button color="primary" matTooltip="Install as hitsound">
+            <button mat-icon-button color="primary" matTooltip="Install as hitsound" (click)="installHitsound(sound)">
                 <mat-icon>get_app</mat-icon>
             </button>
-            <button mat-icon-button color="primary" matTooltip="Install as killsound">
+            <button mat-icon-button color="primary" matTooltip="Install as killsound" (click)="installkillsound(sound)">
                 <mat-icon>get_app</mat-icon>
             </button>
         </mat-list-item>
