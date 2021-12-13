@@ -40,11 +40,11 @@
     "lint": "ng lint --fix"
   },
   "dependencies": {
-    "@angular/animations": "13.0.1",
+    "@angular/animations": "13.1.0",
     "@angular/cdk": "13.0.3",
     "@angular/common": "13.0.1",
     "@angular/compiler": "13.0.1",
-    "@angular/core": "13.0.1",
+    "@angular/core": "13.1.0",
     "@angular/forms": "13.0.1",
     "@angular/language-service": "13.1.0",
     "@angular/material": "13.0.3",
@@ -60,7 +60,7 @@
   },
   "devDependencies": {
     "@angular-builders/custom-webpack": "13.0.0",
-    "@angular-devkit/build-angular": "13.1.0",
+    "@angular-devkit/build-angular": "13.1.1",
     "@angular-eslint/builder": "13.0.1",
     "@angular-eslint/eslint-plugin": "13.0.1",
     "@angular-eslint/eslint-plugin-template": "13.0.1",
@@ -95,7 +95,7 @@
     "npm-run-all": "4.1.5",
     "playwright": "1.17.1",
     "ts-node": "10.4.0",
-    "typescript": "~4.4.4",
+    "typescript": "~4.5.3",
     "wait-on": "6.0.0",
     "webdriver-manager": "12.1.8"
   },
