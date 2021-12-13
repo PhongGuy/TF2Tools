@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
+import { BehaviorSubject } from 'rxjs';
 import { ElectronService } from './core/services';
-import { Paths } from './models/paths';
 import { Settings } from './models/settings';
 import { FileHelpService } from './services/file-help.service';
 import { SnackService } from './services/snack.service';
@@ -13,8 +13,8 @@ import { SnackService } from './services/snack.service';
 })
 export class AppComponent implements OnInit {
 
-  public path = new Paths();
   public settings = new Settings();
+  settingsUpdate: BehaviorSubject<Settings> = new BehaviorSubject<Settings>(this.settings);
 
   loading = true;
   public appdata: string;
@@ -22,8 +22,15 @@ export class AppComponent implements OnInit {
   fullscreenIcon = 'fullscreen';
   fullscreenTip = 'Maximize';
 
+  // things used through out the app
+  hitsounds: string[] = [];
+  killsounds: string[] = [];
+  vtf: string[] = [];
+  huds: string[] = [];
+  weponSounds = '';
+
   private fullscreen = false;
-  private defaultPath = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2';
+  private defaultPath = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\custom';
 
   constructor(
     private electron: ElectronService,
@@ -36,6 +43,32 @@ export class AppComponent implements OnInit {
 
     this.electron.fs.ensureDir(this.appdata);
     this.electron.fs.ensureDir(`${this.appdata}\\temp`);
+
+
+    if (this.electron.fs.existsSync(`${this.appdata}\\settings.json`)) {
+      const data = this.electron.fs.readFileSync(`${this.appdata}\\settings.json`, { encoding: 'utf8', flag: 'r' });
+      this.settings = JSON.parse(data) as Settings;
+    }
+
+    if (this.settings.customPath !== null) {
+      if (this.electron.fs.existsSync(this.settings.customPath)) {
+        this.router.navigate(['dashboard/hud']);
+      } else {
+        if (this.electron.fs.existsSync(this.defaultPath)) {
+          this.settings.customPath = this.defaultPath;
+          this.router.navigate(['dashboard/hud']);
+        } else {
+          this.router.navigate(['setup']);
+        }
+      }
+    } else {
+      if (this.electron.fs.existsSync(this.defaultPath)) {
+        this.settings.customPath = this.defaultPath;
+        this.router.navigate(['dashboard/hud']);
+      } else {
+        this.router.navigate(['setup']);
+      }
+    }
   }
 
   /**
@@ -44,88 +77,81 @@ export class AppComponent implements OnInit {
    */
 
   ngOnInit() {
-    this.update(null, true);
+    this.loading = false;
+    this.settingsUpdate.subscribe(a => {
+      this.electron.fs.writeFileSync(`${this.appdata}\\settings.json`, JSON.stringify(this.settings));
+    });
   }
 
-  async update(what: 'huds' | 'hitsounds' | 'vtf' | 'weaponSounds' | null = null, route = false) {
+  async update(what: 'huds' | 'hitsounds' | 'vtf' | 'weaponSounds' | null = null) {
 
     // reset
     if (what === 'huds') {
-      this.path.huds = [];
+      this.huds = [];
     } else if (what === 'hitsounds') {
-      this.path.hitsounds = [];
-      this.path.killsounds = [];
+      this.hitsounds = [];
+      this.killsounds = [];
     } else if (what === 'vtf') {
-      this.path.vtf = [];
+      this.vtf = [];
     } else if (what === 'weaponSounds') {
-      this.path.weponSounds = null;
+      this.weponSounds = null;
     } else {
-      this.path = new Paths();
+      this.huds = [];
+      this.hitsounds = [];
+      this.killsounds = [];
+      this.vtf = [];
+      this.weponSounds = null;
     }
 
-    // check where custom folder is
-    if (this.electron.fs.existsSync(this.defaultPath)) {
-      this.path.custom = `${this.defaultPath}/tf/custom`;
-      const customDir = this.fileHelp.getAllFiles(this.path.custom);
+    // get all files in the custom folder
+    const customDir = this.fileHelp.getAllFiles(this.settings.customPath);
 
+    // Find paths in customDir
+    customDir.forEach(file => {
 
-      // Find paths in customDir
-      customDir.forEach(file => {
-
-        // try to find huds
-        if (what === 'huds' || what === null) {
-          if (file.endsWith('info.vdf')) {
-            const hudPath = file.split('\\');
-            hudPath.pop();
-            this.path.huds.push(hudPath.join('\\'));
-          }
+      // try to find huds
+      if (what === 'huds' || what === null) {
+        if (file.endsWith('info.vdf')) {
+          const hudPath = file.split('\\');
+          hudPath.pop();
+          this.huds.push(hudPath.join('\\'));
         }
-
-        // try to find hitsounds
-        if (what === 'hitsounds' || what === null) {
-          if (file.endsWith('hitsound.wav')) {
-            this.path.hitsounds.push(file);
-          }
-
-          // try to find killsounds
-          if (file.endsWith('killsound.wav')) {
-            this.path.killsounds.push(file);
-          }
-        }
-
-        // try to find vtf crosshairs
-        if (what === 'vtf' || what === null) {
-          if (file.includes('materials\\vgui\\replay\\thumbnails') && file.endsWith('.vtf')) {
-            let err = 0;
-            for (const hud of this.path.huds) {
-              if (file.startsWith(hud)) {
-                err++;
-              }
-            }
-            if (err === 0) {
-              this.path.vtf.push(file);
-            }
-          }
-        }
-
-        // try to find weapon sounds
-        if (what === 'weaponSounds' || what === null) {
-          if (file.endsWith('game_sounds_weapons.txt')) {
-            this.path.weponSounds = file;
-          }
-        }
-      });
-      console.log(this.path);
-
-      if (route) {
-        this.router.navigate(['dashboard/hud']);
       }
-    } else {
-      // if we can't find it say no supported
-      this.snack.show('We dont support this platform yet', null, 9000);
-    }
-    this.loading = false;
 
+      // try to find hitsounds
+      if (what === 'hitsounds' || what === null) {
+        if (file.endsWith('hitsound.wav')) {
+          this.hitsounds.push(file);
+        }
+
+        // try to find killsounds
+        if (file.endsWith('killsound.wav')) {
+          this.killsounds.push(file);
+        }
+      }
+
+      // try to find vtf crosshairs
+      if (what === 'vtf' || what === null) {
+        if (file.includes('materials\\vgui\\replay\\thumbnails') && file.endsWith('.vtf')) {
+          let err = 0;
+          for (const hud of this.huds) {
+            if (file.startsWith(hud)) {
+              err++;
+            }
+          }
+          if (err === 0) {
+            this.vtf.push(file);
+          }
+        }
+      }
+
+      // try to find weapon sounds
+      if (what === 'weaponSounds' || what === null) {
+        if (file.endsWith('game_sounds_weapons.txt')) {
+          this.weponSounds = file;
+        }
+      }
+    });
   }
 
   minimize() {
@@ -151,6 +177,7 @@ export class AppComponent implements OnInit {
   }
 
   close() {
+    this.electron.fs.writeFileSync(`${this.appdata}\\settings.json`, JSON.stringify(this.settings));
     window.close();
   }
 

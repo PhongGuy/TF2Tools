@@ -42,10 +42,10 @@ export class HitsoundComponent implements OnInit {
     this.app.update('hitsounds');
 
     // check if there is multiple hitsounds installed and warn user
-    if (this.app.path.hitsounds.length > 1) {
+    if (this.app.hitsounds.length > 1) {
       this.dialog.open(MultipleWarningComponent, {
         width: '450px',
-        data: this.app.path.hitsounds
+        data: this.app.hitsounds
       });
     }
 
@@ -196,8 +196,12 @@ export class HitsoundComponent implements OnInit {
     }
   }
 
+  volumeChane() {
+    this.app.settingsUpdate.next(this.app.settings);
+  }
+
   installHitsound(_hitsound: Hitsound): void {
-    const path = this.app.path.hitsounds[0];
+    const path = this.app.hitsounds[0];
     if (path !== undefined) {
       this.electron.fs.copy(_hitsound.path, path, { overwrite: true })
         .then(() => {
@@ -208,7 +212,7 @@ export class HitsoundComponent implements OnInit {
           this.app.error(err);
         });
     } else {
-      const defaultPath = `${this.app.path.custom}\\mycustomstuff\\sound\\ui`;
+      const defaultPath = `${this.app.settings.customPath}\\mycustomstuff\\sound\\ui`;
       this.electron.fs.ensureDir(defaultPath)
         .then(() => {
           this.electron.fs.copy(_hitsound.path, `${defaultPath}\\hitsound.wav`)
@@ -223,7 +227,7 @@ export class HitsoundComponent implements OnInit {
   }
 
   installkillsound(_killsound: Hitsound): void {
-    const path = this.app.path.killsounds[0];
+    const path = this.app.killsounds[0];
     if (path !== undefined) {
       this.electron.fs.copy(_killsound.path, path, { overwrite: true })
         .then(() => {
@@ -232,7 +236,7 @@ export class HitsoundComponent implements OnInit {
         })
         .catch(err => this.app.error(err));
     } else {
-      const defaultPath = `${this.app.path.custom}\\mycustomstuff\\sound\\ui`;
+      const defaultPath = `${this.app.settings.customPath}\\mycustomstuff\\sound\\ui`;
       this.electron.fs.ensureDir(defaultPath)
         .then(() => {
           this.electron.fs.copy(_killsound.path, `${defaultPath}\\killsound.wav`)

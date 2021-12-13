@@ -5,6 +5,7 @@ import { DashboardComponent } from './dashboard/dashboard.component';
 import { HitsoundComponent } from './dashboard/hitsound/hitsound.component';
 import { HudComponent } from './dashboard/hud/hud.component';
 import { WeaponsSoundsComponent } from './dashboard/weapons-sounds/weapons-sounds.component';
+import { SetupComponent } from './setup/setup.component';
 
 const routes: Routes = [
   {
@@ -28,6 +29,10 @@ const routes: Routes = [
         component: WeaponsSoundsComponent
       }
     ]
+  },
+  {
+    path: 'setup',
+    component: SetupComponent
   }
 ];
 

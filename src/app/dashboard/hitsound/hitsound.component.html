@@ -4,7 +4,8 @@
         <p>Here is your collection of hitsounds</p>
         <p>Test volume: {{app.settings.volume}}</p>
 
-        <mat-slider thumbLabel [(ngModel)]="app.settings.volume" tickInterval="1" min="0" max="100" class="w-100">
+        <mat-slider thumbLabel [(ngModel)]="app.settings.volume" (change)="volumeChane()" tickInterval="1" min="0"
+            max="100" class="w-100">
         </mat-slider>
 
     </mat-card-subtitle>
@@ -14,10 +15,10 @@
     </mat-card-actions>
 </mat-card>
 
-<h1 class="mt-5">Installed hitsound{{app.path.hitsounds.length > 1 ? 's' : ''}}</h1>
-<mat-card class="card-list" *ngIf="app.path.hitsounds.length > 0">
+<h1 class="mt-5">Installed hitsound{{app.hitsounds.length > 1 ? 's' : ''}}</h1>
+<mat-card class="card-list" *ngIf="app.hitsounds.length > 0">
     <mat-nav-list>
-        <mat-list-item *ngFor="let sound of app.path.hitsounds" disableRipple="true">
+        <mat-list-item *ngFor="let sound of app.hitsounds" disableRipple="true">
             <span matLine>hitsound</span>
             <button mat-icon-button color="warn" matTooltip="Remove" (click)="removeFile(sound, 'hitsound')">
                 <mat-icon>delete</mat-icon>
@@ -29,10 +30,10 @@
     </mat-nav-list>
 </mat-card>
 
-<h1 class="mt-5">Installed killsound{{app.path.killsounds.length > 1 ? 's' : ''}}</h1>
-<mat-card class="card-list" *ngIf="app.path.killsounds.length > 0">
+<h1 class="mt-5">Installed killsound{{app.killsounds.length > 1 ? 's' : ''}}</h1>
+<mat-card class="card-list" *ngIf="app.killsounds.length > 0">
     <mat-nav-list>
-        <mat-list-item *ngFor="let sound of app.path.killsounds" disableRipple="true">
+        <mat-list-item *ngFor="let sound of app.killsounds" disableRipple="true">
             <span matLine>killsound</span>
             <button mat-icon-button color="warn" matTooltip="Remove" (click)="removeFile(sound, 'killsound')">
                 <mat-icon>delete</mat-icon>

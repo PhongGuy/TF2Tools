@@ -22,8 +22,8 @@ export class CrosshairsComponent implements OnInit {
   }
 
   generate(): void {
-    const vtfPath = `${this.app.path.custom}\\mycustomstuff\\materials\\vgui\\replay\\thumbnails`;
-    const scriptPath = `${this.app.path.custom}\\mycustomstuff\\scripts`;
+    const vtfPath = `${this.app.settings.customPath}\\mycustomstuff\\materials\\vgui\\replay\\thumbnails`;
+    const scriptPath = `${this.app.settings.customPath}\\mycustomstuff\\scripts`;
     this.electron.fs.ensureDir(vtfPath)
       .then(() => {
         this.snack.show('Adding vtf crosshairs', null, 2500);

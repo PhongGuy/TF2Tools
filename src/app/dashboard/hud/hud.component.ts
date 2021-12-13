@@ -66,13 +66,13 @@ export class HudComponent implements OnInit {
     this.hudsInstalled = 0;
     this.currentHuds = [];
     this.notInLibrary = [];
-    this.electron.fs.readdirSync(this.app.path.custom).forEach(customFiles => {
-      const info = this.app.path.custom + '/' + customFiles + '/info.vdf';
+    this.electron.fs.readdirSync(this.app.settings.customPath).forEach(customFiles => {
+      const info = this.app.settings.customPath + '/' + customFiles + '/info.vdf';
       if (this.electron.fs.existsSync(info)) {
         this.hudsInstalled++;
 
         const data = this.electron.fs.readFileSync(info, { encoding: 'utf8', flag: 'r' }).split('"');
-        const h = { name: data[1], folderName: customFiles, version: data[5], path: this.app.path.custom + '\\' + customFiles };
+        const h = { name: data[1], folderName: customFiles, version: data[5], path: this.app.settings.customPath + '\\' + customFiles };
         const l = { name: data[1], folderName: customFiles, version: data[5], path: this.localHuds + '\\' + customFiles };
 
         this.currentHuds.push(h);
@@ -87,7 +87,7 @@ export class HudComponent implements OnInit {
   }
 
   add(_hud: Hud) {
-    this.electron.fs.copy(_hud.path, `${this.app.path.custom}/${_hud.folderName}`)
+    this.electron.fs.copy(_hud.path, `${this.app.settings.customPath}/${_hud.folderName}`)
       .then(() => {
         this.snack.show(`${_hud.folderName} was installed`);
         this.update();

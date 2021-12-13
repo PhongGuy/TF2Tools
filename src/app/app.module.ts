@@ -18,6 +18,7 @@ import { WeaponsSoundsComponent } from './dashboard/weapons-sounds/weapons-sound
 import { QuestionAnswerComponent } from './dialogs/question-answer/question-answer.component';
 import { YesNoComponent } from './dialogs/yes-no/yes-no.component';
 import { MaterialModule } from './material';
+import { SetupComponent } from './setup/setup.component';
 
 // AoT requires an exported function for factories
 const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new TranslateHttpLoader(http, './assets/i18n/', '.json');
@@ -32,7 +33,8 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new Transla
     YesNoComponent,
     CrosshairsComponent,
     WeaponsSoundsComponent,
-    MultipleWarningComponent
+    MultipleWarningComponent,
+    SetupComponent
   ],
   imports: [
     BrowserModule,
