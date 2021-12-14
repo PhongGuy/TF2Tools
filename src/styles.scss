@@ -115,3 +115,18 @@ mat-spinner {
   position: absolute!important;
   z-index: 1;
 }
+
+.crosshairs {
+  display: flex;
+
+  img {
+    margin: auto;
+  }
+}
+
+.btns {
+  button {
+    margin-left: 4px !important;
+    margin-right: 4px !important;
+  }
+}

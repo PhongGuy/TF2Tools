@@ -3,18 +3,24 @@
         <div class="col-md-4">
             <mat-form-field appearance="fill">
                 <mat-label>Choose a crosshair</mat-label>
-                <mat-select #crosshairSelected>
-                    <mat-option #crosshairSelected *ngFor="let food of app.vtf" [value]="food">
+                <mat-select #crosshairSelected value="{{app.vtf[0].replace('.vtf', '').split('\\').pop()}}">
+                    <mat-option #crosshairSelected *ngFor="let food of app.vtf"
+                        [value]="food.replace('.vtf', '').split('\\').pop()">
                         {{food.replace('.vtf', '').split('\\').pop()}}
                     </mat-option>
                 </mat-select>
             </mat-form-field>
-            <button mat-raised-button color="primary">Apply</button>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-3 crosshairs">
             <img src="assets/vtf/png/{{crosshairSelected.value}}.png" alt="">
         </div>
         <div class="col-md-5"></div>
+    </div>
+    <div class="row">
+        <div class="btns">
+            <button mat-raised-button color="primary">Apply</button>
+            <button mat-raised-button color="primary">Apply</button>
+        </div>
     </div>
     <div class="row">
         <mat-tab-group mat-align-tabs="center">
