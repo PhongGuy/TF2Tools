@@ -502,4 +502,284 @@ export const tfWeapons: TfWeapons[] = [
             `The Gunslinger`,
         ]
     },
+    {
+        class: 'Engineer',
+        weaponClass: 'tf_weapon_wrench',
+        name: `Most Melee`,
+        slot: 'Melee',
+        weaponsAffected: [
+            `Wrench`,
+            `The Southern Hospitality`,
+            `Golden Wrench`,
+            `The Jag`,
+            `Saxxy`,
+            `The Eureka Effect`,
+            `Gold Frying Pan`,
+            `The Necro Smasher`,
+            `Nutcracker`,
+            `Prinny Machete`,
+        ]
+    },
+    {
+        class: 'Engineer',
+        weaponClass: 'tf_weapon_pistol',
+        name: `Pistols`,
+        slot: 'Secondary',
+        weaponsAffected: [
+            `Engineer's Pistol`,
+            `Lugermorph`,
+            `The C.A.P.P.E.R`,
+        ]
+    },
+    {
+        class: 'Engineer',
+        weaponClass: 'tf_weapon_shotgun_building_rescue',
+        name: `Rescue Ranger`,
+        slot: 'Primary',
+        weaponsAffected: [
+            `The Rescue Ranger`,
+        ]
+    },
+    {
+        class: 'Engineer',
+        weaponClass: 'tf_weapon_mechanical_arm',
+        name: `Short Circuit`,
+        slot: 'Secondary',
+        weaponsAffected: [
+            `Short Circuit`,
+        ]
+    },
+    {
+        class: 'Engineer',
+        weaponClass: 'tf_weapon_shotgun_primary',
+        name: `Shotguns`,
+        slot: 'Primary',
+        weaponsAffected: [
+            `Engineer's Shotgun`,
+            `The Widowmaker`,
+            `Panic Attack`,
+        ]
+    },
+    {
+        class: 'Engineer',
+        weaponClass: 'tf_weapon_sentry_revenge',
+        name: `The Frontier Justice`,
+        slot: 'Primary',
+        weaponsAffected: [
+            `The Frontier Justice`,
+        ]
+    },
+    {
+        class: 'Engineer',
+        weaponClass: 'tf_weapon_laser_pointer',
+        name: `Wranglers`,
+        slot: 'Secondary',
+        weaponsAffected: [
+            `The Wrangler`,
+            `The Giger Counter`,
+        ]
+    },
+    {
+        class: 'Medic',
+        weaponClass: 'tf_weapon_crossbow',
+        name: `Crusader's Crossbow`,
+        slot: 'Primary',
+        weaponsAffected: [
+            `Crusader's Crossbow`,
+        ]
+    },
+    {
+        class: 'Medic',
+        weaponClass: 'tf_weapon_medigun',
+        name: `Mediguns`,
+        slot: 'Secondary',
+        weaponsAffected: [
+            `Medi Gun`,
+            `The Kritzkrieg`,
+            `The Quick-Fix`,
+            `The Vaccinator`,
+        ]
+    },
+    {
+        class: 'Medic',
+        weaponClass: 'tf_weapon_bonesaw',
+        name: `Most Melee`,
+        slot: 'Melee',
+        weaponsAffected: [
+            `Bonesaw`,
+            `The Ubersaw`,
+            `The Vita-Saw`,
+            `Frying Pan`,
+            `Amputator`,
+            `The Solemn Vow`,
+            `Saxxy`,
+            `The Conscientious Objector`,
+            `The Freedom Staff`,
+            `The Bat Outta Hell`,
+            `The Memory Maker`,
+            `The Ham Shank`,
+            `Gold Frying Pan`,
+            `The Necro Smasher`,
+            `The Crossing Guard`,
+            `Prinny Machete`,
+        ]
+    },
+    {
+        class: 'Medic',
+        weaponClass: 'tf_weapon_syringegun_medic',
+        name: `Syringe Guns`,
+        slot: 'Primary',
+        weaponsAffected: [
+            `Syringe Gun`,
+            `The Blutsauger`,
+            `The Overdose`,
+        ]
+    },
+    {
+        class: 'Sniper',
+        weaponClass: 'tf_weapon_compound_bow',
+        name: `Bows`,
+        slot: 'Primary',
+        weaponsAffected: [
+            `The Huntsman`,
+            `The Fortified Compound`,
+        ]
+    },
+    {
+        class: 'Sniper',
+        weaponClass: 'tf_weapon_sniperrifle_classic',
+        name: `Classic`,
+        slot: 'Primary',
+        weaponsAffected: [
+            `The Classic`,
+        ]
+    },
+    {
+        class: 'Sniper',
+        weaponClass: 'tf_weapon_charged_smg',
+        name: `Cleaner's Carbine`,
+        slot: 'Secondary',
+        weaponsAffected: [
+            `The Cleaner's Carbine`,
+        ]
+    },
+    {
+        class: 'Sniper',
+        weaponClass: 'tf_weapon_jar',
+        name: `Jarate`,
+        slot: 'Secondary',
+        weaponsAffected: [
+            `Jarate`,
+            `The Self-Aware Beauty Mark`,
+        ]
+    },
+    {
+        class: 'Sniper',
+        weaponClass: 'tf_weapon_club',
+        name: `Most Melee`,
+        slot: 'Melee',
+        weaponsAffected: [
+            `Kukri`,
+            `The Tribalman's Shiv`,
+            `The Bushwacka`,
+            `Frying Pan`,
+            `The Shahanshah`,
+            `Saxxy`,
+            `The Conscientious Objector`,
+            `The Freedom Staff`,
+            `The Bat Outta Hell`,
+            `The Memory Maker`,
+            `The Ham Shank`,
+            `Gold Frying Pan`,
+            `The Necro Smasher`,
+            `The Crossing Guard`,
+            `Prinny Machete`,
+        ]
+    },
+    {
+        class: 'Sniper',
+        weaponClass: 'tf_weapon_sniperrifle',
+        name: `Rifles`,
+        slot: 'Primary',
+        weaponsAffected: [
+            `Sniper Rifle`,
+            `The Sydney Sleeper`,
+            `The Bazaar Bargain`,
+            `The Machina`,
+            `The Hitman's Heatmaker`,
+            `The AWPer Hand`,
+            `Shooting Star`,
+        ]
+    },
+    {
+        class: 'Sniper',
+        weaponClass: 'tf_weapon_smg',
+        name: `SMG`,
+        slot: 'Secondary',
+        weaponsAffected: [
+            `SMG`,
+        ]
+    },
+    {
+        class: 'Sniper',
+        weaponClass: 'tf_weapon_sniperrifle_decap',
+        name: `The Bazaar Bargain`,
+        slot: 'Primary',
+        weaponsAffected: [
+            `The Bazaar Bargain`,
+        ]
+    },
+    {
+        class: 'Spy',
+        weaponClass: 'tf_weapon_sapper',
+        name: `Other Sappers`,
+        slot: 'Secondary',
+        weaponsAffected: [
+            `The Red-Tape Recorder`,
+            `The Ap-Sap`,
+            `The Snack Attack`,
+        ]
+    },
+    {
+        class: 'Spy',
+        weaponClass: 'tf_weapon_knife',
+        name: `Most Melee`,
+        slot: 'Melee',
+        weaponsAffected: [
+            `Knife`,
+            `Your Eternal Reward`,
+            `Conniver's Kunai`,
+            `Saxxy`,
+            `The Big Earner`,
+            `The Wanga Prick`,
+            `The Sharp Dresser`,
+            `The Spy-cicle`,
+            `The Black Rose`,
+            `Gold Frying Pan`,
+            `Prinny Machete`,
+        ]
+    },
+    {
+        class: 'Spy',
+        weaponClass: 'tf_weapon_revolver',
+        name: `Revolvers`,
+        slot: 'Primary',
+        weaponsAffected: [
+            `Revolver`,
+            `The Ambassador`,
+            `Big Kill`,
+            `L'Etranger`,
+            `The Enforcer`,
+            `The Diamondback`,
+        ]
+    },
+    {
+        class: 'Spy',
+        weaponClass: 'tf_weapon_builder',
+        name: `Stock Sapper`,
+        slot: 'Secondary',
+        weaponsAffected: [
+            `Sapper`,
+        ]
+    },
 ];
