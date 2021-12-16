@@ -26,6 +26,7 @@ export class AppComponent implements OnInit {
   hitsounds: string[] = [];
   killsounds: string[] = [];
   vtf: string[] = [];
+  vtfScripts: string[] = [];
   huds: string[] = [];
   weponSounds = '';
 

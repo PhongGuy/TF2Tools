@@ -1,7 +1,7 @@
-<div class="container" *ngIf="app.vtf.length > 0">
+<div *ngIf="app.vtf.length > 0">
     <div class="row">
         <div class="col-md-4">
-            <mat-form-field appearance="fill">
+            <mat-form-field appearance="fill" class="w-100">
                 <mat-label>Choose a crosshair</mat-label>
                 <mat-select #crosshairSelected value="{{app.vtf[0].replace('.vtf', '').split('\\').pop()}}">
                     <mat-option #crosshairSelected *ngFor="let food of app.vtf"
@@ -10,29 +10,148 @@
                     </mat-option>
                 </mat-select>
             </mat-form-field>
+            <mat-form-field appearance="fill" class="w-100">
+                <mat-label>Choose a background</mat-label>
+                <mat-select #background [value]="app.settings.crosshairBackground"
+                    (valueChange)="changeBackground(background.value)">
+                    <mat-option value="">Black</mat-option>
+                    <mat-option value="assets/vtf/backgrounds/2fort.png">2fort</mat-option>
+                    <mat-option value="assets/vtf/backgrounds/badlands.png">Badlands</mat-option>
+                    <mat-option value="assets/vtf/backgrounds/process.png">Process</mat-option>
+                </mat-select>
+            </mat-form-field>
         </div>
-        <div class="col-md-3 crosshairs">
+        <div class="col-md-3 crosshairs" style="background-image: url({{background.value}});">
             <img src="assets/vtf/png/{{crosshairSelected.value}}.png" alt="">
         </div>
-        <div class="col-md-5"></div>
+        <div class="col-md-5 crosshairsChanges">
+            <!-- <p>Class{{selected.classes.length > 1 ? 'es' : ''}}: {{selected.classes.join(', ')}}</p> -->
+            <!-- <p>Weapon Class{{selected.weaponClasses.length > 1 ? 'es' : ''}}: {{selected.weaponClasses.join(', ')}}</p> -->
+            <p>Catego{{selected.names.length > 1 ? 'ries' : 'ry'}}:<br> {{selected.names.join(', ')}}</p>
+            <!-- <p>Slot{{selected.slots.length > 1 ? 's' : ''}}: {{selected.slots.join(', ')}}</p> -->
+            <!-- <p>Affected Weapon{{selected.weaponsAffected.length > 1 ? 's' : ''}}: {{selected.weaponsAffected.join('\<br>')}}</p> -->
+            <p>Affected Weapon{{selected.weaponsAffected.length > 1 ? 's' : ''}}:<br><span
+                    [innerHTML]="selected.weaponsAffected.join('\<br>')"></span></p>
+        </div>
     </div>
     <div class="row">
         <div class="btns">
-            <button mat-raised-button color="primary">Apply</button>
-            <button mat-raised-button color="primary">Apply</button>
+            <button mat-raised-button color="primary" (click)="apply()" [disabled]="selectedWeapons.length < 1">Apply to
+                selected</button>
+            <button mat-raised-button color="primary" (click)="applyAll('Primary')">Apply to all primary</button>
+            <button mat-raised-button color="primary" (click)="applyAll('Secondary')">Apply to all secondary</button>
+            <button mat-raised-button color="primary" (click)="applyAll('Melee')">Apply to all melee</button>
+            <button mat-raised-button color="primary" (click)="applyAll('All')">Apply to all weapons</button>
+            <br>
+            <button mat-raised-button (click)="applyAllClasses('Primary')">Apply to all primary on all classes</button>
+            <button mat-raised-button (click)="applyAllClasses('Secondary')">Apply to all secondary on all
+                classes</button>
+            <button mat-raised-button (click)="applyAllClasses('Melee')">Apply to all melee on all classes</button>
         </div>
     </div>
     <div class="row">
-        <mat-tab-group mat-align-tabs="center">
-            <mat-tab label="Scout">Content</mat-tab>
-            <mat-tab label="Soldier">Content</mat-tab>
-            <mat-tab label="Pyro">Content</mat-tab>
-            <mat-tab label="Demoman">Content</mat-tab>
-            <mat-tab label="Heavy">Content</mat-tab>
-            <mat-tab label="Engineer">Content</mat-tab>
-            <mat-tab label="Medic">Content</mat-tab>
-            <mat-tab label="Sniper">Content</mat-tab>
-            <mat-tab label="Spy">Content</mat-tab>
+        <mat-tab-group mat-align-tabs="center" #crosshairsTab (selectedTabChange)="unSelectAll()">
+            <mat-tab label="Scout">
+                <mat-selection-list #scout (selectionChange)="selectedItems(scout.selectedOptions.selected)">
+                    <mat-list-option *ngFor="let weapon of scoutWeapons" [value]="weapon">
+                        <div class="crossahirs-lits-items">
+                            <span>{{weapon.info.name}}</span>
+                            <!-- <img src="assets/vtf/weapons/{{name}}.png" alt=""
+                                *ngFor="let name of weapon.info.weaponsAffected"> -->
+                            <div class="col"></div>
+                            <span>{{weapon.crosshair}}</span>
+                        </div>
+                    </mat-list-option>
+                </mat-selection-list>
+            </mat-tab>
+            <mat-tab label="Soldier">
+                <mat-selection-list #soldier (selectionChange)="selectedItems(soldier.selectedOptions.selected)">
+                    <mat-list-option *ngFor="let weapon of soldierWeapons" [value]="weapon">
+                        <div class="crossahirs-lits-items">
+                            <span>{{weapon.info.name}}</span>
+                            <div class="col"></div>
+                            <span>{{weapon.crosshair}}</span>
+                        </div>
+                    </mat-list-option>
+                </mat-selection-list>
+            </mat-tab>
+            <mat-tab label="Pyro">
+                <mat-selection-list #pyro (selectionChange)="selectedItems(pyro.selectedOptions.selected)">
+                    <mat-list-option *ngFor="let weapon of pyroWeapons" [value]="weapon">
+                        <div class="crossahirs-lits-items">
+                            <span>{{weapon.info.name}}</span>
+                            <div class="col"></div>
+                            <span>{{weapon.crosshair}}</span>
+                        </div>
+                    </mat-list-option>
+                </mat-selection-list>
+            </mat-tab>
+            <mat-tab label="Demoman">
+                <mat-selection-list #demoman (selectionChange)="selectedItems(demoman.selectedOptions.selected)">
+                    <mat-list-option *ngFor="let weapon of demomanWeapons.sort()" [value]="weapon">
+                        <div class="crossahirs-lits-items">
+                            <span>{{weapon.info.name}}</span>
+                            <div class="col"></div>
+                            <span>{{weapon.crosshair}}</span>
+                        </div>
+                    </mat-list-option>
+                </mat-selection-list>
+            </mat-tab>
+            <mat-tab label="Heavy">
+                <mat-selection-list #heavy (selectionChange)="selectedItems(heavy.selectedOptions.selected)">
+                    <mat-list-option *ngFor="let weapon of heavyWeapons.sort()" [value]="weapon">
+                        <div class="crossahirs-lits-items">
+                            <span>{{weapon.info.name}}</span>
+                            <div class="col"></div>
+                            <span>{{weapon.crosshair}}</span>
+                        </div>
+                    </mat-list-option>
+                </mat-selection-list>
+            </mat-tab>
+            <mat-tab label="Engineer">
+                <mat-selection-list #engineer (selectionChange)="selectedItems(engineer.selectedOptions.selected)">
+                    <mat-list-option *ngFor="let weapon of engineerWeapons.sort()" [value]="weapon">
+                        <div class="crossahirs-lits-items">
+                            <span>{{weapon.info.name}}</span>
+                            <div class="col"></div>
+                            <span>{{weapon.crosshair}}</span>
+                        </div>
+                    </mat-list-option>
+                </mat-selection-list>
+            </mat-tab>
+            <mat-tab label="Medic">
+                <mat-selection-list #medic (selectionChange)="selectedItems(medic.selectedOptions.selected)">
+                    <mat-list-option *ngFor="let weapon of medicWeapons.sort()" [value]="weapon">
+                        <div class="crossahirs-lits-items">
+                            <span>{{weapon.info.name}}</span>
+                            <div class="col"></div>
+                            <span>{{weapon.crosshair}}</span>
+                        </div>
+                    </mat-list-option>
+                </mat-selection-list>
+            </mat-tab>
+            <mat-tab label="Sniper">
+                <mat-selection-list #sniper (selectionChange)="selectedItems(sniper.selectedOptions.selected)">
+                    <mat-list-option *ngFor="let weapon of sniperWeapons.sort()" [value]="weapon">
+                        <div class="crossahirs-lits-items">
+                            <span>{{weapon.info.name}}</span>
+                            <div class="col"></div>
+                            <span>{{weapon.crosshair}}</span>
+                        </div>
+                    </mat-list-option>
+                </mat-selection-list>
+            </mat-tab>
+            <mat-tab label="Spy">
+                <mat-selection-list #spy (selectionChange)="selectedItems(spy.selectedOptions.selected)">
+                    <mat-list-option *ngFor="let weapon of spyWeapons.sort()" [value]="weapon">
+                        <div class="crossahirs-lits-items">
+                            <span>{{weapon.info.name}}</span>
+                            <div class="col"></div>
+                            <span>{{weapon.crosshair}}</span>
+                        </div>
+                    </mat-list-option>
+                </mat-selection-list>
+            </mat-tab>
         </mat-tab-group>
     </div>
 </div>
