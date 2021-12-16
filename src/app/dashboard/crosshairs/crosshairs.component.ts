@@ -259,6 +259,9 @@ export class CrosshairsComponent implements OnInit {
     this.medicWeapons.sort(this.weaponSort);
     this.sniperWeapons.sort(this.weaponSort);
     this.spyWeapons.sort(this.weaponSort);
+
+    // unselect all
+    this.selectedItems([]);
   }
 
   private weaponSort(a: WeaponData, b: WeaponData) {
