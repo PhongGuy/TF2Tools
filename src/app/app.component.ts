@@ -48,7 +48,12 @@ export class AppComponent implements OnInit {
 
     if (this.electron.fs.existsSync(`${this.appdata}\\settings.json`)) {
       const data = this.electron.fs.readFileSync(`${this.appdata}\\settings.json`, { encoding: 'utf8', flag: 'r' });
-      this.settings = JSON.parse(data) as Settings;
+      const jsonSettings = JSON.parse(data) as Settings;
+      for (const k in this.settings) {
+        if (Object.prototype.hasOwnProperty.call(this.settings, k) && Object.prototype.hasOwnProperty.call(jsonSettings, k)) {
+          this.settings[k] = jsonSettings[k];
+        }
+      }
     }
 
     if (this.settings.customPath !== null) {
@@ -94,6 +99,7 @@ export class AppComponent implements OnInit {
       this.killsounds = [];
     } else if (what === 'vtf') {
       this.vtf = [];
+      this.vtfScripts = [];
     } else if (what === 'weaponSounds') {
       this.weponSounds = null;
     } else {
@@ -111,7 +117,7 @@ export class AppComponent implements OnInit {
     customDir.forEach(file => {
 
       // try to find huds
-      if (what === 'huds' || what === null) {
+      if (what === 'huds' || what === 'vtf' || what === null) {
         if (file.endsWith('info.vdf')) {
           const hudPath = file.split('\\');
           hudPath.pop();
@@ -143,6 +149,10 @@ export class AppComponent implements OnInit {
           if (err === 0) {
             this.vtf.push(file);
           }
+        }
+
+        if (file.includes('scripts\\tf_weapon') && file.endsWith('.txt')) {
+          this.vtfScripts.push(file);
         }
       }
 
