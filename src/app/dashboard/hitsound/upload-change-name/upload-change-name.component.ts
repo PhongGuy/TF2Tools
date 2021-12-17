@@ -40,7 +40,8 @@ export class UploadChangeNameComponent implements OnInit {
     }
   }
 
-  playFile(file: File) {
+  playFile(event: Event, file: File) {
+    event.preventDefault();
     const audio = new Audio(file.path);
     audio.volume = this.data.volume / 100;
     audio.load();

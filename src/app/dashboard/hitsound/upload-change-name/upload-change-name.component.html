@@ -4,6 +4,9 @@
         <mat-form-field appearance="fill" class="w-100">
             <mat-label>Name {{data.file.name}}</mat-label>
             <input matInput #answer [formControl]="input" [errorStateMatcher]="matcher" cdkFocusInitial>
+            <button mat-icon-button matSuffix (click)="playFile($event, data.file)" matTooltip="Play sound">
+                <mat-icon>play_arrow</mat-icon>
+            </button>
             <mat-error *ngIf="input.hasError('required')">
                 Name is <strong>required</strong>
             </mat-error>
@@ -17,9 +20,6 @@
     </form>
 </div>
 <div mat-dialog-actions>
-    <button mat-icon-button color="primary" matTooltip="Play" (click)="playFile(data.file)">
-        <mat-icon>play_arrow</mat-icon>
-    </button>
     <div class="col"></div>
     <button mat-button [mat-dialog-close]>Cancel</button>
     <button mat-button [mat-dialog-close]="answer.value" [disabled]="input.invalid">Ok</button>
