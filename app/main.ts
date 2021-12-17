@@ -70,7 +70,7 @@ function createWindow(): BrowserWindow {
   });
 
   ipcMain.on('fullscreen', () => {
-    win.fullScreen ? win.setFullScreen(false) : win.setFullScreen(true);
+    win.isMaximized() ? win.restore() : win.maximize();
   });
 
   return win;
