@@ -117,48 +117,6 @@ export class HitsoundComponent implements OnInit {
 
     this.folderUpload.nativeElement.value = null;
   }
-  // upload(event: Event) {
-  //   const target = event.target as HTMLInputElement;
-  //   const files: FileList = target.files;
-  //   if (files.length === 1 && files[0].name.split('.').pop() === 'wav') {
-  //     const name = files[0].name;
-  //     const path = files[0].path;
-  //     const dest = `${this.localHitsounds}\\${name}`;
-  //     if (this.electron.fs.existsSync(dest)) {
-  //       this.snack.show(`There is already a sound by that name in the library`);
-  //     } else {
-  //       if (name === 'hitsound.wav') {
-  //         const dialogRef = this.dialog.open(QuestionAnswerComponent, {
-  //           width: '450px',
-  //           data: {
-  //             question: 'Give the sound a name',
-  //             subQuestion: '',
-  //             cant: this.getNames(null)
-  //           } as QuestionAnswer
-  //         });
-
-  //         dialogRef.afterClosed().subscribe(r => {
-  //           if (typeof r === 'string') {
-  //             this.electron.fs.copy(path, `${this.localHitsounds}\\${r}.wav`)
-  //               .then(() => {
-  //                 this.snack.show(`${name} was added`);
-  //                 this.update();
-  //               })
-  //               .catch(err => this.app.error(err));
-  //           }
-  //         });
-  //       } else {
-  //         this.electron.fs.copy(path, dest)
-  //           .then(() => {
-  //             this.snack.show(`${name} was added`);
-  //             this.update();
-  //           })
-  //           .catch(err => this.app.error(err));
-  //       }
-  //     }
-  //   }
-  //   this.folderUpload.nativeElement.value = null;
-  // }
 
   rename(_hitsound: Hitsound) {
     if (this.electron.fs.existsSync(_hitsound.path)) {
