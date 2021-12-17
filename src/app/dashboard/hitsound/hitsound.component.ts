@@ -94,7 +94,7 @@ export class HitsoundComponent implements OnInit {
 
           await firstValueFrom(dialogRef.afterClosed())
             .then((newName) => {
-              if (newName !== undefined && typeof newName === 'string') {
+              if (typeof newName === 'string') {
                 this.electron.fs.copy(sound.path, `${this.localHitsounds}\\${newName}.wav`)
                   .then(() => {
                     this.snack.show(`${name} was added`);

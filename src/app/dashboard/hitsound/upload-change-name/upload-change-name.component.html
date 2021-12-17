@@ -21,6 +21,6 @@
         <mat-icon>play_arrow</mat-icon>
     </button>
     <div class="col"></div>
-    <button mat-button mat-dialog-close>Cancel</button>
+    <button mat-button [mat-dialog-close]>Cancel</button>
     <button mat-button [mat-dialog-close]="answer.value" [disabled]="input.invalid">Ok</button>
 </div>
