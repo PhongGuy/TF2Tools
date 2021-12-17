@@ -159,21 +159,10 @@ export class AppComponent implements OnInit {
   }
 
   fullscreenToggle() {
-    if (this.fullscreen) {
-      document.exitFullscreen()
-        .then(() => {
-          this.fullscreenIcon = 'fullscreen';
-          this.fullscreenTip = 'Maximize';
-          this.fullscreen = false;
-        });
-    } else {
-      document.documentElement.requestFullscreen()
-        .then(() => {
-          this.fullscreenIcon = 'fullscreen_exit';
-          this.fullscreenTip = 'Restore Down';
-          this.fullscreen = true;
-        });
-    }
+    this.electron.ipcRenderer.send('fullscreen');
+    this.fullscreen = this.fullscreen ? false : true;
+    this.fullscreenTip = this.fullscreen ? 'Restore Down' : 'Maximize';
+    this.fullscreenIcon = this.fullscreen ? 'fullscreen_exit' : 'fullscreen';
   }
 
   close() {
