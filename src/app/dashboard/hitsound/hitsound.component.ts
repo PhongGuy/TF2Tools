@@ -1,16 +1,18 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { FormControl } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
-import { map, Observable, startWith } from 'rxjs';
+import { firstValueFrom, map, Observable, startWith } from 'rxjs';
 import { AppComponent } from '../../app.component';
 import { ElectronService } from '../../core/services';
 import { QuestionAnswerComponent } from '../../dialogs/question-answer/question-answer.component';
 import { YesNoComponent } from '../../dialogs/yes-no/yes-no.component';
 import { Hitsound } from '../../models/hitsound';
 import { QuestionAnswer } from '../../models/questionAnswer';
+import { UploadChangeName } from '../../models/uploadChangeName';
 import { YesNo } from '../../models/yesNo';
 import { SnackService } from '../../services/snack.service';
 import { MultipleWarningComponent } from './multiple-warning/multiple-warning.component';
+import { UploadChangeNameComponent } from './upload-change-name/upload-change-name.component';
 
 @Component({
   selector: 'app-hitsound',
@@ -68,48 +70,95 @@ export class HitsoundComponent implements OnInit {
     this.myControl.setValue('');
   }
 
-  upload(event: Event) {
+  async upload(event: Event) {
     const target = event.target as HTMLInputElement;
-    const files: FileList = target.files;
-    if (files.length === 1 && files[0].name.split('.').pop() === 'wav') {
-      const name = files[0].name;
-      const path = files[0].path;
-      const dest = `${this.localHitsounds}\\${name}`;
-      if (this.electron.fs.existsSync(dest)) {
-        this.snack.show(`There is already a sound by that name in the library`);
-      } else {
-        if (name === 'hitsound.wav') {
-          const dialogRef = this.dialog.open(QuestionAnswerComponent, {
+    const files: File[] = Array.from(target.files);
+
+    for (const sound of files) {
+      if (sound.name.includes('.wav')) {
+        const name = sound.name.replace('.wav', '');
+        const dest = `${this.localHitsounds}\\${sound.name}`;
+        const exist = this.electron.fs.existsSync(dest);
+        await this.update();
+
+        if (name === 'hitsound' || name === 'killsound' || exist) {
+          const dialogRef = this.dialog.open(UploadChangeNameComponent, {
             width: '450px',
             data: {
-              question: 'Give the sound a name',
-              subQuestion: '',
-              cant: this.getNames(null)
-            } as QuestionAnswer
+              title: exist ? 'We found a sound by that name' : 'Give the sound a name',
+              cant: this.getNames(),
+              file: sound,
+              volume: this.app.settings.volume
+            } as UploadChangeName
           });
 
-          dialogRef.afterClosed().subscribe(r => {
-            if (typeof r === 'string') {
-              this.electron.fs.copy(path, `${this.localHitsounds}\\${r}.wav`)
-                .then(() => {
-                  this.snack.show(`${name} was added`);
-                  this.update();
-                })
-                .catch(err => this.app.error(err));
-            }
-          });
+          await firstValueFrom(dialogRef.afterClosed())
+            .then((newName) => {
+              if (newName !== undefined && typeof newName === 'string') {
+                this.electron.fs.copy(sound.path, `${this.localHitsounds}\\${newName}.wav`)
+                  .then(() => {
+                    this.snack.show(`${name} was added`);
+                    this.update();
+                  })
+                  .catch(err => this.app.error(err));
+              }
+            });
         } else {
-          this.electron.fs.copy(path, dest)
+          this.electron.fs.copy(sound.path, dest)
             .then(() => {
               this.snack.show(`${name} was added`);
               this.update();
             })
             .catch(err => this.app.error(err));
         }
+
       }
     }
+
     this.folderUpload.nativeElement.value = null;
   }
+  // upload(event: Event) {
+  //   const target = event.target as HTMLInputElement;
+  //   const files: FileList = target.files;
+  //   if (files.length === 1 && files[0].name.split('.').pop() === 'wav') {
+  //     const name = files[0].name;
+  //     const path = files[0].path;
+  //     const dest = `${this.localHitsounds}\\${name}`;
+  //     if (this.electron.fs.existsSync(dest)) {
+  //       this.snack.show(`There is already a sound by that name in the library`);
+  //     } else {
+  //       if (name === 'hitsound.wav') {
+  //         const dialogRef = this.dialog.open(QuestionAnswerComponent, {
+  //           width: '450px',
+  //           data: {
+  //             question: 'Give the sound a name',
+  //             subQuestion: '',
+  //             cant: this.getNames(null)
+  //           } as QuestionAnswer
+  //         });
+
+  //         dialogRef.afterClosed().subscribe(r => {
+  //           if (typeof r === 'string') {
+  //             this.electron.fs.copy(path, `${this.localHitsounds}\\${r}.wav`)
+  //               .then(() => {
+  //                 this.snack.show(`${name} was added`);
+  //                 this.update();
+  //               })
+  //               .catch(err => this.app.error(err));
+  //           }
+  //         });
+  //       } else {
+  //         this.electron.fs.copy(path, dest)
+  //           .then(() => {
+  //             this.snack.show(`${name} was added`);
+  //             this.update();
+  //           })
+  //           .catch(err => this.app.error(err));
+  //       }
+  //     }
+  //   }
+  //   this.folderUpload.nativeElement.value = null;
+  // }
 
   rename(_hitsound: Hitsound) {
     if (this.electron.fs.existsSync(_hitsound.path)) {
@@ -256,7 +305,7 @@ export class HitsoundComponent implements OnInit {
     return this.library.filter(option => option.name.toLowerCase().includes(filterValue));
   }
 
-  private getNames(exclude: string): string[] {
+  private getNames(exclude: string = null): string[] {
     const names: string[] = [];
     this.library.forEach(a => {
       if (a.name !== exclude) {
