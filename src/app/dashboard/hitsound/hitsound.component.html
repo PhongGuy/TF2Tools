@@ -11,7 +11,7 @@
     </mat-card-subtitle>
     <mat-card-actions align="end">
         <button mat-raised-button (click)="folderUpload.click()" color="primary">Add</button>
-        <input class="d-none" type="file" #folderUpload (change)="upload($event)" accept=".wav" />
+        <input class="d-none" type="file" #folderUpload (change)="upload($event)" accept=".wav" multiple />
     </mat-card-actions>
 </mat-card>
 

@@ -2,8 +2,8 @@ import { Component, Inject, OnInit } from '@angular/core';
 import { FormControl, FormGroupDirective, NgForm, Validators } from '@angular/forms';
 import { ErrorStateMatcher } from '@angular/material/core';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { QuestionAnswer } from '../../models/questionAnswer';
-import { ValidatorService } from '../../services/validators.service';
+import { UploadChangeName } from '../../../models/uploadChangeName';
+import { ValidatorService } from '../../../services/validators.service';
 
 /** Error when invalid control is dirty, touched, or submitted. */
 export class MyErrorStateMatcher implements ErrorStateMatcher {
@@ -14,18 +14,18 @@ export class MyErrorStateMatcher implements ErrorStateMatcher {
 }
 
 @Component({
-  selector: 'app-question-answer',
-  templateUrl: './question-answer.component.html',
-  styleUrls: ['./question-answer.component.scss']
+  selector: 'app-upload-change-name',
+  templateUrl: './upload-change-name.component.html',
+  styleUrls: ['./upload-change-name.component.scss']
 })
-export class QuestionAnswerComponent implements OnInit {
+export class UploadChangeNameComponent implements OnInit {
 
   input: FormControl;
   matcher: MyErrorStateMatcher;
 
   constructor(
-    public dialogRef: MatDialogRef<QuestionAnswerComponent>,
-    @Inject(MAT_DIALOG_DATA) public data: QuestionAnswer,
+    public dialogRef: MatDialogRef<UploadChangeNameComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: UploadChangeName,
     private validator: ValidatorService
   ) { }
 
@@ -38,5 +38,13 @@ export class QuestionAnswerComponent implements OnInit {
     if (!this.input.invalid) {
       this.dialogRef.close(this.input.value);
     }
+  }
+
+  playFile(event: Event, file: File) {
+    event.preventDefault();
+    const audio = new Audio(file.path);
+    audio.volume = this.data.volume / 100;
+    audio.load();
+    audio.play();
   }
 }
