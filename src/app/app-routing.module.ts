@@ -4,6 +4,7 @@ import { CrosshairsComponent } from './dashboard/crosshairs/crosshairs.component
 import { DashboardComponent } from './dashboard/dashboard.component';
 import { HitsoundComponent } from './dashboard/hitsound/hitsound.component';
 import { HudComponent } from './dashboard/hud/hud.component';
+import { SettingsComponent } from './dashboard/settings/settings.component';
 import { WeaponsSoundsComponent } from './dashboard/weapons-sounds/weapons-sounds.component';
 import { SetupComponent } from './setup/setup.component';
 
@@ -27,6 +28,10 @@ const routes: Routes = [
       {
         path: 'weapon-sounds',
         component: WeaponsSoundsComponent
+      },
+      {
+        path: 'settings',
+        component: SettingsComponent
       }
     ]
   },

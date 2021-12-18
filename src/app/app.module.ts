@@ -21,6 +21,7 @@ import { QuestionAnswerComponent } from './dialogs/question-answer/question-answ
 import { YesNoComponent } from './dialogs/yes-no/yes-no.component';
 import { MaterialModule } from './material';
 import { SetupComponent } from './setup/setup.component';
+import { SettingsComponent } from './dashboard/settings/settings.component';
 
 // AoT requires an exported function for factories
 const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new TranslateHttpLoader(http, './assets/i18n/', '.json');
@@ -37,7 +38,8 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new Transla
     WeaponsSoundsComponent,
     MultipleWarningComponent,
     SetupComponent,
-    UploadChangeNameComponent
+    UploadChangeNameComponent,
+    SettingsComponent
   ],
   imports: [
     BrowserModule,
