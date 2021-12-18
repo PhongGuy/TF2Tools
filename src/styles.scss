@@ -124,3 +124,33 @@ mat-spinner {
     height: 25px;
   }
 }
+.crosshairs {
+  display: flex;
+  max-height: 140px;
+  background-size: cover;
+
+  img {
+    margin: auto;
+  }
+}
+
+.btns {
+  button {
+    margin-left: 4px;
+    margin-right: 4px;
+    margin-bottom: 8px;
+  }
+}
+
+.crosshairsChanges {
+  max-height: 140px;
+  overflow: auto;
+}
+
+.crossahirs-lits-items {
+  display: flex;
+
+  img {
+    height: 30px;
+  }
+}

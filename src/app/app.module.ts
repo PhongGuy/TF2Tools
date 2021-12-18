@@ -1,6 +1,7 @@
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MAT_SELECT_CONFIG } from '@angular/material/select';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 // NG Translate
@@ -54,7 +55,11 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new Transla
       }
     })
   ],
-  providers: [],
+  providers: [
+    {
+      provide: MAT_SELECT_CONFIG, useValue: { disableOptionCentering: true }
+    }
+  ],
   bootstrap: [AppComponent]
 })
 export class AppModule { }
