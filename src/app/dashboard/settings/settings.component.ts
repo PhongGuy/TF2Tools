@@ -15,4 +15,8 @@ export class SettingsComponent implements OnInit {
   ngOnInit(): void {
   }
 
+  changelibrary(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const files: File[] = Array.from(target.files);
+  }
 }

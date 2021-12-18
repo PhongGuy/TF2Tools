@@ -1,1 +1,17 @@
 <h1 class="mt-0 mb-5">Settings</h1>
+
+<h3>Custom folder</h3>
+<mat-form-field class="w-100" appearance="fill">
+    <mat-label>Location</mat-label>
+    <input matInput type="text" disabled [value]="app.settings.customPath">
+</mat-form-field>
+
+<h3>Library location</h3>
+<mat-form-field class="w-100" appearance="fill">
+    <mat-label>Location</mat-label>
+    <input matInput type="text" disabled [value]="app.settings.libraryPath">
+</mat-form-field>
+<div align="end">
+    <input class="d-none" type="file" #library (change)="changelibrary($event)" webkitdirectory mozdirectory />
+    <button mat-raised-button color="primary" (click)="library.click()">Change location</button>
+</div>
