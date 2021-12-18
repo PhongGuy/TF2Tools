@@ -115,3 +115,12 @@ mat-spinner {
   position: absolute!important;
   z-index: 1;
 }
+
+.fixed-nav {
+  position: sticky;
+  top: 0;
+
+  .gab {
+    height: 25px;
+  }
+}

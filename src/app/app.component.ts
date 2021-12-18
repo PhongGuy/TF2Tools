@@ -1,5 +1,5 @@
-import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { NavigationEnd, Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 import { ElectronService } from './core/services';
 import { Settings } from './models/settings';
@@ -12,6 +12,8 @@ import { SnackService } from './services/snack.service';
   styleUrls: ['./app.component.scss']
 })
 export class AppComponent implements OnInit {
+
+  @ViewChild('room') room: ElementRef;
 
   public settings = new Settings();
   settingsUpdate: BehaviorSubject<Settings> = new BehaviorSubject<Settings>(this.settings);
@@ -77,7 +79,17 @@ export class AppComponent implements OnInit {
    */
 
   ngOnInit() {
+
+    // scroll to top when we change navigation
+    this.router.events.subscribe(event => {
+      if (event instanceof NavigationEnd) {
+        this.room.nativeElement.scrollTop = 0;
+      }
+    });
+
     this.loading = false;
+
+    // when we update settings we write them to json file
     this.settingsUpdate.subscribe(a => {
       this.electron.fs.writeFileSync(`${this.appdata}\\settings.json`, JSON.stringify(this.settings));
     });
@@ -154,10 +166,12 @@ export class AppComponent implements OnInit {
     });
   }
 
+  /** tell electron to minimize  */
   minimize() {
     this.electron.ipcRenderer.send('minimize');
   }
 
+  /** toggle between full screen and minimize */
   fullscreenToggle() {
     this.electron.ipcRenderer.send('fullscreen');
     this.fullscreen = this.fullscreen ? false : true;
@@ -165,6 +179,7 @@ export class AppComponent implements OnInit {
     this.fullscreenIcon = this.fullscreen ? 'fullscreen_exit' : 'fullscreen';
   }
 
+  /** write the settings to json and close the application */
   close() {
     this.electron.fs.writeFileSync(`${this.appdata}\\settings.json`, JSON.stringify(this.settings));
     window.close();
