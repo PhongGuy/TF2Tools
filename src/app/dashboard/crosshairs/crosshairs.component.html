@@ -38,15 +38,15 @@
         <div class="btns">
             <button mat-raised-button color="primary" (click)="apply()" [disabled]="selectedWeapons.length < 1">Apply to
                 selected</button>
-            <button mat-raised-button color="primary" (click)="applyAll('Primary')">Apply to all primary</button>
-            <button mat-raised-button color="primary" (click)="applyAll('Secondary')">Apply to all secondary</button>
-            <button mat-raised-button color="primary" (click)="applyAll('Melee')">Apply to all melee</button>
+            <button mat-raised-button color="primary" (click)="applyAll('Primary')">Apply to all primaries</button>
+            <button mat-raised-button color="primary" (click)="applyAll('Secondary')">Apply to all secondaries</button>
+            <button mat-raised-button color="primary" (click)="applyAll('Melee')">Apply to all melees</button>
             <button mat-raised-button color="primary" (click)="applyAll('All')">Apply to all weapons</button>
             <br>
-            <button mat-raised-button (click)="applyAllClasses('Primary')">Apply to all primary on all classes</button>
-            <button mat-raised-button (click)="applyAllClasses('Secondary')">Apply to all secondary on all
+            <button mat-raised-button (click)="applyAllClasses('Primary')">Apply to primary on all classes</button>
+            <button mat-raised-button (click)="applyAllClasses('Secondary')">Apply to secondary on all
                 classes</button>
-            <button mat-raised-button (click)="applyAllClasses('Melee')">Apply to all melee on all classes</button>
+            <button mat-raised-button (click)="applyAllClasses('Melee')">Apply to melee on all classes</button>
         </div>
     </div>
     <div class="row">

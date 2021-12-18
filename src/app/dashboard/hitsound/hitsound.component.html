@@ -1,8 +1,7 @@
 <mat-card class="mb-2">
     <mat-card-title>Hitsounds</mat-card-title>
     <mat-card-subtitle>
-        <p>Here is your collection of hitsounds</p>
-        <p>Test volume: {{app.settings.volume}}</p>
+        <p>Volume: {{app.settings.volume}}</p>
 
         <mat-slider thumbLabel [(ngModel)]="app.settings.volume" (change)="volumeChane()" tickInterval="1" min="0"
             max="100" class="w-100">

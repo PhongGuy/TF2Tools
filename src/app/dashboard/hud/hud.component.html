@@ -1,6 +1,5 @@
 <mat-card class="mb-2">
     <mat-card-title>Huds</mat-card-title>
-    <mat-card-subtitle>Here is your collection of huds</mat-card-subtitle>
     <mat-card-actions align="end">
         <button mat-raised-button (click)="folderUpload.click()" color="primary">Add huds to your library</button>
         <input class="d-none" type="file" #folderUpload (change)="upload($event)" webkitdirectory mozdirectory />
