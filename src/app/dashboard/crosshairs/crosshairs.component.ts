@@ -159,10 +159,10 @@ export class CrosshairsComponent implements OnInit {
 
     weaponsTab.forEach(weapon => {
       if (weapon !== crosshair) {
-        if (weapon.info.slot === slot || weapon.info.slot === 'All') {
+        if (weapon.info.slot === slot || slot === 'All') {
           const file = this.electron.fs.readFileSync(weapon.path, { encoding: 'utf8', flag: 'r' });
           this.electron.fs.writeFileSync(weapon.path, file.replace(`/thumbnails/${weapon.crosshair}`, `/thumbnails/${crosshair}`));
-          this.snack.show(`Updated ${weapon.info.name} to ${crosshair}`, null, 1000);
+          this.snack.show(`Updated ${weapon.info.name} to ${crosshair}`, null, 800);
         }
       }
     });
