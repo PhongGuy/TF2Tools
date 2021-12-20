@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as url from 'url';
@@ -71,6 +71,11 @@ function createWindow(): BrowserWindow {
 
   ipcMain.on('fullscreen', () => {
     win.isMaximized() ? win.restore() : win.maximize();
+  });
+
+  ipcMain.on('openDialog', async (event, args) => {
+    const reply = await dialog.showOpenDialog(args);
+    event.sender.send('openDialogResponse', reply);
   });
 
   return win;
