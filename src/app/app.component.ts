@@ -84,6 +84,11 @@ export class AppComponent implements OnInit {
    * https://github.com/mastercomfig/mastercomfig/releases/latest/download/mastercomfig-low-preset.vpk
    */
 
+  /**
+   * Wehn we want to add version update, this is the url to get the latest version
+   * https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest
+   */
+
   ngOnInit() {
 
     // scroll to top when we change navigation
