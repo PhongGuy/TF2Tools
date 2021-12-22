@@ -45,13 +45,19 @@ export class HudComponent implements OnInit {
 
     // temp, to move old files
     if (this.library.length === 0) {
-      const oldPath = this.electron.appData('TF2Tools\\huds');
+      let oldPath = this.electron.appData('TF2Tools\\huds');
       if (this.electron.fs.existsSync(oldPath)) {
         this.snack.show('Moving your files to new library...', null, 5000);
         this.electron.fs.move(oldPath, this.localHuds, { overwrite: true })
           .then(() => {
-            this.snack.show('Huds was moved to new library');
-            this.update();
+            oldPath = this.electron.appData('TF2Tools\\hitsounds');
+            if (this.electron.fs.existsSync(oldPath)) {
+              this.electron.fs.move(oldPath, `${this.app.settings.libraryPath}\\hitsounds`, { overwrite: true })
+                .then(() => {
+                  this.snack.show('Files was moved to new library');
+                  this.update();
+                });
+            }
           });
       }
     }

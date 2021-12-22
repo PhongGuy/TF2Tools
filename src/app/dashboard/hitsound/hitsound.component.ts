@@ -45,19 +45,6 @@ export class HitsoundComponent implements OnInit {
     this.app.update('hitsounds');
     this.update();
 
-    // temp, to move old files
-    if (this.library.length === 0) {
-      const oldPath = this.electron.appData('TF2Tools\\hitsounds');
-      if (this.electron.fs.existsSync(oldPath)) {
-        this.snack.show('Moving your files to new library...');
-        this.electron.fs.move(oldPath, this.localHitsounds, { overwrite: true })
-          .then(() => {
-            this.snack.show('Huds was moved to new library');
-            this.update();
-          });
-      }
-    }
-
     // check if there is multiple hitsounds installed and warn user
     if (this.app.hitsounds.length > 1) {
       this.dialog.open(MultipleWarningComponent, {
