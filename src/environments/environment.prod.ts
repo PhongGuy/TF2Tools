@@ -1,5 +1,5 @@
 export const APP_CONFIG = {
   production: true,
   environment: 'PROD',
-  src: ''
+  src: 'resources\\app\\'
 };
