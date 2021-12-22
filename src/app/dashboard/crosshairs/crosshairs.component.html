@@ -47,10 +47,12 @@
             <button mat-raised-button color="primary" (click)="applyAll('All')" matTooltip="Apply to all {{applyTo}}
                 weapons">Apply to all weapons</button>
             <br>
-            <button mat-raised-button (click)="applyAllClasses('Primary')">Apply to primary on all classes</button>
-            <button mat-raised-button (click)="applyAllClasses('Secondary')">Apply to secondary on all
+            <button mat-raised-button color="accent" (click)="applyAllClasses('Primary')">Apply to primary on all
                 classes</button>
-            <button mat-raised-button (click)="applyAllClasses('Melee')">Apply to melee on all classes</button>
+            <button mat-raised-button color="accent" (click)="applyAllClasses('Secondary')">Apply to secondary on all
+                classes</button>
+            <button mat-raised-button color="accent" (click)="applyAllClasses('Melee')">Apply to melee on all
+                classes</button>
         </div>
     </div>
     <div class="row">
