@@ -107,20 +107,7 @@ export class AppComponent implements OnInit {
       }
     });
 
-    // temp: this is a temp option, should be removed with the next version
-    if (!this.settings.libraryPath.includes('Library')) {
-      this.electron.fs.move(`${this.settings.libraryPath}\\huds`, `${this.defaultLibraryPath}\\huds`, { overwrite: true })
-        .then(() => {
-          this.electron.fs.move(`${this.settings.libraryPath}\\hitsounds`, `${this.defaultLibraryPath}\\hitsounds`, { overwrite: true })
-            .then(() => {
-              this.settings.libraryPath = this.defaultLibraryPath;
-              this.settingsUpdate.next(this.settings);
-              this.loading = false;
-            });
-        });
-    } else {
-      this.loading = false;
-    }
+    this.loading = false;
 
     // when we update settings we write them to json file
     this.settingsUpdate.subscribe(a => {

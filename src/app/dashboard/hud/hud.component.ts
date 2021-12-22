@@ -43,13 +43,27 @@ export class HudComponent implements OnInit {
   ngOnInit(): void {
     this.update();
 
+    // temp, to move old files
+    if (this.library.length === 0) {
+      const oldPath = this.electron.appData('TF2Tools\\huds');
+      if (this.electron.fs.existsSync(oldPath)) {
+        this.snack.show('Moving your files to new library...', null, 5000);
+        this.electron.fs.move(oldPath, this.localHuds, { overwrite: true })
+          .then(() => {
+            this.snack.show('Huds was moved to new library');
+            this.update();
+          });
+      }
+    }
+
+
     this.filteredOptions = this.myControl.valueChanges.pipe(
       startWith(''),
       map(value => this.hudFilter(value)),
     );
   }
 
-  async update() {
+  update() {
     this.library = [];
     if (!this.electron.fs.existsSync(this.localHuds)) {
       this.electron.fs.mkdirSync(this.localHuds);
