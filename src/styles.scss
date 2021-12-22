@@ -8,7 +8,7 @@ $light-theme: mat.define-light-theme(( color: ( primary: $light-primary, accent:
 
 // Define a dark theme
 $dark-primary: mat.define-palette(mat.$blue-palette);
-$dark-accent: mat.define-palette(mat.$cyan-palette);
+$dark-accent: mat.define-palette(mat.$teal-palette);
 $dark-theme: mat.define-dark-theme(( color: ( primary: $dark-primary, accent: $dark-accent, ) ));
 
 // Apply the dark theme by default
@@ -124,6 +124,7 @@ mat-spinner {
     height: 25px;
   }
 }
+
 .crosshairs {
   display: flex;
   max-height: 140px;
