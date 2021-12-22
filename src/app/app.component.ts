@@ -34,7 +34,7 @@ export class AppComponent implements OnInit {
   private appdata: string;
   private fullscreen = false;
   private defaultCustomPath = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\custom';
-  private defaultLibraryPath = this.electron.appData('TF2Tools');
+  private defaultLibraryPath = this.electron.appData('TF2Tools\\Library');
 
   constructor(
     private electron: ElectronService,
@@ -102,7 +102,20 @@ export class AppComponent implements OnInit {
       }
     });
 
-    this.loading = false;
+    // temp: this is a temp option, should be removed with the next version
+    if (!this.settings.libraryPath.includes('Library')) {
+      this.electron.fs.move(`${this.settings.libraryPath}\\huds`, `${this.defaultLibraryPath}\\huds`, { overwrite: true })
+        .then(() => {
+          this.electron.fs.move(`${this.settings.libraryPath}\\hitsounds`, `${this.defaultLibraryPath}\\hitsounds`, { overwrite: true })
+            .then(() => {
+              this.settings.libraryPath = this.defaultLibraryPath;
+              this.settingsUpdate.next(this.settings);
+              this.loading = false;
+            });
+        });
+    } else {
+      this.loading = false;
+    }
 
     // when we update settings we write them to json file
     this.settingsUpdate.subscribe(a => {
