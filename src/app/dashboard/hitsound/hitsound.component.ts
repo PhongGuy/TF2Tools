@@ -36,7 +36,8 @@ export class HitsoundComponent implements OnInit {
     private dialog: MatDialog,
     private snack: SnackService
   ) {
-    this.localHitsounds = this.electron.appData('TF2Tools/hitsounds');
+    this.localHitsounds = `${this.app.settings.libraryPath}\\hitsounds`;
+    this.electron.fs.ensureDir(this.localHitsounds);
   }
 
   ngOnInit(): void {

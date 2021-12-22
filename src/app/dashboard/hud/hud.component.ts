@@ -35,7 +35,8 @@ export class HudComponent implements OnInit {
     public dialog: MatDialog,
     private snack: SnackService
   ) {
-    this.localHuds = `${this.app.appdata}\\huds`;
+    this.localHuds = `${this.app.settings.libraryPath}\\huds`;
+    this.electron.fs.ensureDir(this.localHuds);
   }
 
   // first we need to look for a folder with info file in, we will assume that is the current hud.

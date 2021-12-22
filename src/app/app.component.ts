@@ -19,7 +19,6 @@ export class AppComponent implements OnInit {
   settingsUpdate: BehaviorSubject<Settings> = new BehaviorSubject<Settings>(this.settings);
 
   loading = true;
-  public appdata: string;
   public appTemp: string;
   fullscreenIcon = 'fullscreen';
   fullscreenTip = 'Maximize';
@@ -32,8 +31,10 @@ export class AppComponent implements OnInit {
   huds: string[] = [];
   weponSounds = '';
 
+  private appdata: string;
   private fullscreen = false;
-  private defaultPath = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\custom';
+  private defaultCustomPath = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\custom';
+  private defaultLibraryPath = this.electron.appData('TF2Tools\\Library');
 
   constructor(
     private electron: ElectronService,
@@ -58,20 +59,28 @@ export class AppComponent implements OnInit {
       }
     }
 
+    if (this.settings.libraryPath !== null) {
+      if (!this.electron.fs.existsSync(this.settings.libraryPath)) {
+        this.settings.libraryPath = this.defaultLibraryPath;
+      }
+    } else {
+      this.settings.libraryPath = this.defaultLibraryPath;
+    }
+
     if (this.settings.customPath !== null) {
       if (this.electron.fs.existsSync(this.settings.customPath)) {
         this.router.navigate(['dashboard/hud']);
       } else {
-        if (this.electron.fs.existsSync(this.defaultPath)) {
-          this.settings.customPath = this.defaultPath;
+        if (this.electron.fs.existsSync(this.defaultCustomPath)) {
+          this.settings.customPath = this.defaultCustomPath;
           this.router.navigate(['dashboard/hud']);
         } else {
           this.router.navigate(['setup']);
         }
       }
     } else {
-      if (this.electron.fs.existsSync(this.defaultPath)) {
-        this.settings.customPath = this.defaultPath;
+      if (this.electron.fs.existsSync(this.defaultCustomPath)) {
+        this.settings.customPath = this.defaultCustomPath;
         this.router.navigate(['dashboard/hud']);
       } else {
         this.router.navigate(['setup']);
@@ -98,7 +107,20 @@ export class AppComponent implements OnInit {
       }
     });
 
-    this.loading = false;
+    // temp: this is a temp option, should be removed with the next version
+    if (!this.settings.libraryPath.includes('Library')) {
+      this.electron.fs.move(`${this.settings.libraryPath}\\huds`, `${this.defaultLibraryPath}\\huds`, { overwrite: true })
+        .then(() => {
+          this.electron.fs.move(`${this.settings.libraryPath}\\hitsounds`, `${this.defaultLibraryPath}\\hitsounds`, { overwrite: true })
+            .then(() => {
+              this.settings.libraryPath = this.defaultLibraryPath;
+              this.settingsUpdate.next(this.settings);
+              this.loading = false;
+            });
+        });
+    } else {
+      this.loading = false;
+    }
 
     // when we update settings we write them to json file
     this.settingsUpdate.subscribe(a => {
