@@ -12,6 +12,6 @@
     <input matInput type="text" disabled [value]="app.settings.libraryPath">
 </mat-form-field>
 <div align="end">
-    <input class="d-none" type="file" #library (change)="changelibrary($event)" webkitdirectory mozdirectory />
-    <button mat-raised-button color="primary" (click)="library.click()">Change location</button>
+    <button mat-raised-button color="primary" (click)="changeLibrary()" [disabled]="app.loading">Change
+        location</button>
 </div>
