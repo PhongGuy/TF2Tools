@@ -74,7 +74,7 @@ function createWindow(): BrowserWindow {
   });
 
   ipcMain.on('openDialog', async (event, args) => {
-    const reply = await dialog.showOpenDialog(args);
+    const reply = await dialog.showOpenDialog(win, args);
     event.sender.send('openDialogResponse', reply);
   });
 
