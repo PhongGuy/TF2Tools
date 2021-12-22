@@ -47,6 +47,8 @@ export class CrosshairsComponent implements OnInit {
   sniperWeapons: WeaponData[] = [];
   spyWeapons: WeaponData[] = [];
 
+  applyTo = 'Scout';
+
   constructor(
     public app: AppComponent,
     private electron: ElectronService,
@@ -93,6 +95,26 @@ export class CrosshairsComponent implements OnInit {
     this.sniper.deselectAll();
     this.spy.deselectAll();
     this.selectedItems([]);
+
+    if (this.crosshairsTab.selectedIndex === 0) {
+      this.applyTo = 'Scout';
+    } else if (this.crosshairsTab.selectedIndex === 1) {
+      this.applyTo = 'Soldier';
+    } else if (this.crosshairsTab.selectedIndex === 2) {
+      this.applyTo = 'Pyro';
+    } else if (this.crosshairsTab.selectedIndex === 3) {
+      this.applyTo = 'Demoman';
+    } else if (this.crosshairsTab.selectedIndex === 4) {
+      this.applyTo = 'Heavy';
+    } else if (this.crosshairsTab.selectedIndex === 5) {
+      this.applyTo = 'Engineer';
+    } else if (this.crosshairsTab.selectedIndex === 6) {
+      this.applyTo = 'Medic';
+    } else if (this.crosshairsTab.selectedIndex === 7) {
+      this.applyTo = 'Sniper';
+    } else if (this.crosshairsTab.selectedIndex === 8) {
+      this.applyTo = 'Spy';
+    }
   }
 
   generate(): void {
