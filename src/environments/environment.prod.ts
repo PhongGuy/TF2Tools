@@ -1,5 +1,6 @@
 export const APP_CONFIG = {
   production: true,
   environment: 'PROD',
-  src: 'resources\\app\\'
+  src: 'resources\\app\\',
+  version: '4.1.0',
 };
