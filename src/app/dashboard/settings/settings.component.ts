@@ -1,5 +1,7 @@
+import { HttpClient } from '@angular/common/http';
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
+import { APP_CONFIG } from '../../../environments/environment';
 import { AppComponent } from '../../app.component';
 import { ElectronService } from '../../core/services';
 import { SnackService } from '../../services/snack.service';
@@ -11,14 +13,22 @@ import { SnackService } from '../../services/snack.service';
 })
 export class SettingsComponent implements OnInit, OnDestroy {
 
+  update = false;
+
   constructor(
     public app: AppComponent,
     private electron: ElectronService,
     private snack: SnackService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private http: HttpClient
   ) { }
 
   ngOnInit(): void {
+    this.http.get('https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest').subscribe((json: any) => {
+      if (APP_CONFIG.version !== json.tag_name.replace('v', '')) {
+        this.update = true;
+      }
+    });
   }
 
   async changeLibrary() {

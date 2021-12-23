@@ -12,7 +12,7 @@
                     sounds</button>
                 <div class="gab"></div>
                 <button mat-raised-button routerLink="settings" routerLinkActive="active"
-                    [disabled]="app.loading">Settings</button>
+                    [matBadgeHidden]="!app.updateAvailable" matBadge="1" [disabled]="app.loading">Settings</button>
             </div>
         </div>
         <div class="col-lg-10 col-md-9">

@@ -1,6 +1,8 @@
+import { HttpClient } from '@angular/common/http';
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
+import { APP_CONFIG } from '../environments/environment';
 import { ElectronService } from './core/services';
 import { Settings } from './models/settings';
 import { FileHelpService } from './services/file-help.service';
@@ -15,11 +17,11 @@ export class AppComponent implements OnInit {
 
   @ViewChild('room') room: ElementRef;
 
-  public settings = new Settings();
+  settings = new Settings();
   settingsUpdate: BehaviorSubject<Settings> = new BehaviorSubject<Settings>(this.settings);
 
   loading = true;
-  public appTemp: string;
+  appTemp: string;
   fullscreenIcon = 'fullscreen';
   fullscreenTip = 'Maximize';
 
@@ -31,6 +33,8 @@ export class AppComponent implements OnInit {
   huds: string[] = [];
   weponSounds = '';
 
+  updateAvailable = false;
+
   private appdata: string;
   private fullscreen = false;
   private defaultCustomPath = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\custom';
@@ -40,7 +44,8 @@ export class AppComponent implements OnInit {
     private electron: ElectronService,
     private router: Router,
     private snack: SnackService,
-    private fileHelp: FileHelpService
+    private fileHelp: FileHelpService,
+    private http: HttpClient
   ) {
     this.appdata = this.electron.appData('TF2Tools');
     this.appTemp = `${this.appdata}\\temp`;
@@ -113,6 +118,8 @@ export class AppComponent implements OnInit {
     this.settingsUpdate.subscribe(a => {
       this.electron.fs.writeFileSync(`${this.appdata}\\settings.json`, JSON.stringify(this.settings));
     });
+
+    this.checkUpdate();
   }
 
   async update(what: 'huds' | 'hitsounds' | 'vtf' | 'weaponSounds' | null = null) {
@@ -233,5 +240,12 @@ export class AppComponent implements OnInit {
     return result;
   }
 
-
+  private async checkUpdate() {
+    this.http.get('https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest').subscribe((json: any) => {
+      if (APP_CONFIG.version !== json.tag_name.replace('v', '')) {
+        this.snack.show('New version available');
+        this.updateAvailable = true;
+      }
+    });
+  }
 }
