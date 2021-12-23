@@ -139,18 +139,18 @@ export class AppComponent implements OnInit {
     // get all files in the custom folder
     const customDir = this.fileHelp.getAllFiles(this.settings.customPath);
 
-    // Find paths in customDir
-    customDir.forEach(file => {
-
-      // try to find huds
-      if (what === 'huds' || what === 'vtf' || what === null) {
+    // Try to find all huds
+    if (what === 'huds' || what === 'vtf' || what === null) {
+      customDir.forEach(file => {
         if (file.endsWith('info.vdf')) {
           const hudPath = file.split('\\');
           hudPath.pop();
           this.huds.push(hudPath.join('\\'));
         }
-      }
+      });
+    }
 
+    customDir.forEach(file => {
       // try to find hitsounds
       if (what === 'hitsounds' || what === null) {
         if (file.endsWith('hitsound.wav')) {
