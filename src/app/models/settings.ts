@@ -8,4 +8,6 @@ export class Settings {
     crosshairBackground = '';
     /** path to local library */
     libraryPath: string = null;
+    /** Move or copy huds */
+    moveOrCopy = true;
 }

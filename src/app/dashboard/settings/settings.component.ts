@@ -75,6 +75,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  updateSettings() {
+    this.app.settingsUpdate.next(this.app.settings);
+  }
+
   ngOnDestroy(): void {
     window.removeAllListeners();
   }

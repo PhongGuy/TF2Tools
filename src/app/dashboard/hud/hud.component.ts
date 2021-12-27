@@ -108,12 +108,21 @@ export class HudComponent implements OnInit {
   }
 
   add(_hud: Hud) {
-    this.electron.fs.copy(_hud.path, `${this.app.settings.customPath}/${_hud.folderName}`)
-      .then(() => {
-        this.snack.show(`${_hud.folderName} was installed`);
-        this.update();
-      })
-      .catch(err => console.error(err));
+    if (this.app.settings.moveOrCopy) {
+      this.electron.fs.move(_hud.path, `${this.app.settings.customPath}/${_hud.folderName}`, { overwrite: true })
+        .then(() => {
+          this.snack.show(`${_hud.folderName} was installed`);
+          this.update();
+        })
+        .catch(err => console.error(err));
+    } else {
+      this.electron.fs.copy(_hud.path, `${this.app.settings.customPath}/${_hud.folderName}`)
+        .then(() => {
+          this.snack.show(`${_hud.folderName} was installed`);
+          this.update();
+        })
+        .catch(err => console.error(err));
+    }
   }
 
   uninstall(_hud: Hud, warning: boolean) {
@@ -132,19 +141,38 @@ export class HudComponent implements OnInit {
 
         dialogRef.afterClosed().subscribe(result => {
           if (result) {
-            this.electron.fs.remove(_hud.path)
-              .then(() => {
-                this.snack.show(`${_hud.folderName} was removed`);
-                this.update();
-              });
+            if (this.app.settings.moveOrCopy) {
+              this.electron.fs.move(_hud.path, `${this.localHuds}\\${_hud.name}`, { overwrite: true })
+                .then(() => {
+                  this.snack.show(`${_hud.folderName} was removed`);
+                  this.update();
+                })
+                .catch(err => console.error(err));
+            } else {
+              this.electron.fs.remove(_hud.path)
+                .then(() => {
+                  this.snack.show(`${_hud.folderName} was removed`);
+                  this.update();
+                })
+                .catch(err => console.error(err));
+            }
           }
         });
       } else {
-        this.electron.fs.remove(_hud.path)
-          .then(() => {
-            this.snack.show(`${_hud.folderName} was uninstalled`);
-            this.update();
-          });
+        if (this.app.settings.moveOrCopy) {
+          this.electron.fs.move(_hud.path, `${this.localHuds}\\${_hud.name}`, { overwrite: true })
+            .then(() => {
+              this.snack.show(`${_hud.folderName} was uninstalled`);
+              this.update();
+            })
+            .catch(err => console.error(err));
+        } else {
+          this.electron.fs.remove(_hud.path)
+            .then(() => {
+              this.snack.show(`${_hud.folderName} was uninstalled`);
+              this.update();
+            });
+        }
       }
     } else {
       console.log(false);

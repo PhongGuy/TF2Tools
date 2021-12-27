@@ -24,3 +24,17 @@
     <button mat-raised-button color="primary" (click)="changeLibrary()" [disabled]="app.loading">Change
         location</button>
 </div>
+
+<h1>Huds</h1>
+<mat-card class="settings">
+
+    <div class="item">
+        <div class="info">
+            <h3>Save changes made in custom</h3>
+            <span>Save changes to huds you changed in custom when uninstalling</span>
+        </div>
+        <div class="col"></div>
+        <mat-slide-toggle [(ngModel)]="app.settings.moveOrCopy" (change)="updateSettings()"></mat-slide-toggle>
+    </div>
+
+</mat-card>
