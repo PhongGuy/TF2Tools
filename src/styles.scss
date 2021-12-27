@@ -155,3 +155,41 @@ mat-spinner {
     height: 30px;
   }
 }
+
+.settings {
+  margin-bottom: 35px;
+
+  .item {
+    display: flex;
+    font-weight: 400;
+
+    h1 {
+      margin: 0;
+    }
+  }
+
+  .item:not(:last-child) {
+    padding-bottom: 15px;
+  }
+
+  .item:not(:last-child),
+  .mat-form-field:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  .item:not(:first-child),
+  .mat-form-field:not(:first-child),
+  form:not(:first-child) {
+    padding-top: 16px;
+  }
+
+  .item h3 {
+    font-size: 16px;
+    margin: 0;
+  }
+
+  .item span {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+  }
+}

@@ -116,29 +116,15 @@ export class HudComponent implements OnInit {
       .catch(err => console.error(err));
   }
 
-  uninstall(_hud: Hud, warning: boolean) {
+  uninstall(_hud: Hud) {
     if (this.electron.fs.existsSync(_hud.path)) {
-
-      if (warning) {
-
-        const d: YesNo = new YesNo();
-        d.question = `Remove ${_hud.folderName}?`;
-        d.subQuestion = `Are you sure you want to remove ${_hud.folderName}? This cannot be undone!`;
-
-        const dialogRef = this.dialog.open(YesNoComponent, {
-          width: '450px',
-          data: d
-        });
-
-        dialogRef.afterClosed().subscribe(result => {
-          if (result) {
-            this.electron.fs.remove(_hud.path)
-              .then(() => {
-                this.snack.show(`${_hud.folderName} was removed`);
-                this.update();
-              });
-          }
-        });
+      if (this.app.settings.moveOrCopy) {
+        this.electron.fs.move(_hud.path, `${this.localHuds}\\${_hud.folderName}`, { overwrite: true })
+          .then(() => {
+            this.snack.show(`${_hud.folderName} was uninstalled`);
+            this.update();
+          })
+          .catch(err => console.error(err));
       } else {
         this.electron.fs.remove(_hud.path)
           .then(() => {
@@ -146,8 +132,30 @@ export class HudComponent implements OnInit {
             this.update();
           });
       }
-    } else {
-      console.log(false);
+    }
+  }
+
+  remove(_hud: Hud) {
+    if (this.electron.fs.existsSync(_hud.path)) {
+      const d: YesNo = new YesNo();
+      d.question = `Remove ${_hud.folderName}?`;
+      d.subQuestion = `Are you sure you want to remove ${_hud.folderName}? This cannot be undone!`;
+
+      const dialogRef = this.dialog.open(YesNoComponent, {
+        width: '450px',
+        data: d
+      });
+
+      dialogRef.afterClosed().subscribe(result => {
+        if (result) {
+          this.electron.fs.remove(_hud.path)
+            .then(() => {
+              this.snack.show(`${_hud.folderName} was removed`);
+              this.update();
+            })
+            .catch(err => console.error(err));
+        }
+      });
     }
   }
 
