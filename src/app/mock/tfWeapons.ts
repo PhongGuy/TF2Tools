@@ -1,5 +1,8 @@
 import { TfWeapons } from '../models/tf_weapons';
 
+/**
+ * All comp weapons
+ */
 export const tfWeapons: TfWeapons[] = [
     {
         class: 'Scout',
