@@ -4,6 +4,9 @@ import { AppComponent } from '../app.component';
 import { ElectronService } from '../core/services';
 import { SnackService } from '../services/snack.service';
 
+/**
+ * Setup
+ */
 @Component({
   selector: 'app-setup',
   templateUrl: './setup.component.html',
@@ -11,19 +14,41 @@ import { SnackService } from '../services/snack.service';
 })
 export class SetupComponent implements OnInit {
 
+  /**
+   * path `ElementRef`
+   */
   @ViewChild('path') path: ElementRef;
+  /**
+   * Sof setup component
+   */
   private s = 'Team Fortress 2\\tf\\custom';
 
+  /**
+   * Creates an instance of setup component.
+   *
+   * @param electron
+   * @param app
+   * @param snack
+   * @param router
+   */
   constructor(
     private electron: ElectronService,
-    public app: AppComponent,
+    private app: AppComponent,
     private snack: SnackService,
     private router: Router
   ) { }
 
+  /**
+   * on init
+   */
   ngOnInit(): void {
   }
 
+  /**
+   * Gets folder
+   *
+   * @param event
+   */
   getFolder(event: Event): void {
     // reset form
     this.app.loading = true;
