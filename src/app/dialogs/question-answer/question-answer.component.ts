@@ -1,24 +1,9 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { FormControl, FormGroupDirective, NgForm, Validators } from '@angular/forms';
-import { ErrorStateMatcher } from '@angular/material/core';
+import { FormControl, Validators } from '@angular/forms';
+import { ShowOnDirtyErrorStateMatcher } from '@angular/material/core';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { QuestionAnswer } from '../../models/questionAnswer';
 import { ValidatorService } from '../../services/validators.service';
-
-/** Error when invalid control is dirty, touched, or submitted. */
-export class MyErrorStateMatcher implements ErrorStateMatcher {
-  /**
-   * Determines whether error state is
-   *
-   * @param control
-   * @param form
-   * @returns true if error state
-   */
-  isErrorState(control: FormControl | null, form: FormGroupDirective | NgForm | null): boolean {
-    const isSubmitted = form && form.submitted;
-    return !!(control && control.invalid && (control.dirty || control.touched || isSubmitted));
-  }
-}
 
 /**
  * Component QuestionAnswerComponent
@@ -37,7 +22,7 @@ export class QuestionAnswerComponent implements OnInit {
   /**
    * Matcher of question answer component
    */
-  matcher: MyErrorStateMatcher;
+  matcher: ShowOnDirtyErrorStateMatcher;
 
   /**
    * Creates an instance of question answer component.
@@ -56,7 +41,7 @@ export class QuestionAnswerComponent implements OnInit {
    * on init
    */
   ngOnInit(): void {
-    this.matcher = new MyErrorStateMatcher();
+    this.matcher = new ShowOnDirtyErrorStateMatcher();
     this.input = new FormControl('', [Validators.required, this.validator.checkName(this.data.cant), this.validator.special()]);
   }
 
