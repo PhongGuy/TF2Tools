@@ -7,6 +7,7 @@ import { ValidatorService } from '../../services/validators.service';
 
 /** Error when invalid control is dirty, touched, or submitted. */
 export class MyErrorStateMatcher implements ErrorStateMatcher {
+  /** Check if error state */
   isErrorState(control: FormControl | null, form: FormGroupDirective | NgForm | null): boolean {
     const isSubmitted = form && form.submitted;
     return !!(control && control.invalid && (control.dirty || control.touched || isSubmitted));
@@ -34,6 +35,7 @@ export class QuestionAnswerComponent implements OnInit {
     this.input = new FormControl('', [Validators.required, this.validator.checkName(this.data.cant), this.validator.special()]);
   }
 
+  /** Submit input */
   submit() {
     if (!this.input.invalid) {
       this.dialogRef.close(this.input.value);
