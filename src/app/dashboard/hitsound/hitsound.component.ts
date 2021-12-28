@@ -14,6 +14,9 @@ import { SnackService } from '../../services/snack.service';
 import { MultipleWarningComponent } from './multiple-warning/multiple-warning.component';
 import { UploadChangeNameComponent } from './upload-change-name/upload-change-name.component';
 
+/**
+ * Hitsound component
+ */
 @Component({
   selector: 'app-hitsound',
   templateUrl: './hitsound.component.html',
@@ -21,15 +24,41 @@ import { UploadChangeNameComponent } from './upload-change-name/upload-change-na
 })
 export class HitsoundComponent implements OnInit {
 
+  /**
+   * folder upload `ElementRef`
+   */
   @ViewChild('folderUpload') folderUpload: ElementRef;
 
+  /**
+   * Local hitsounds of hitsound component
+   */
   localHitsounds: string;
+  /**
+   * Library  of hitsound component
+   */
   library: Hitsound[];
+  /**
+   * Hitsounds  of hitsound component
+   */
   hitsounds: Hitsound[];
 
+  /**
+   * My control of hitsound component
+   */
   myControl = new FormControl();
+  /**
+   * Filtered options of hitsound component
+   */
   filteredOptions: Observable<Hitsound[]>;
 
+  /**
+   * Creates an instance of hitsound component.
+   *
+   * @param electron
+   * @param app AppComponent
+   * @param dialog
+   * @param snack
+   */
   constructor(
     private electron: ElectronService,
     public app: AppComponent,
@@ -40,6 +69,9 @@ export class HitsoundComponent implements OnInit {
     this.electron.fs.ensureDir(this.localHitsounds);
   }
 
+  /**
+   * on init
+   */
   ngOnInit(): void {
     // update info in case user changed shit when TF2Tools was open
     this.app.update('hitsounds');
@@ -59,6 +91,9 @@ export class HitsoundComponent implements OnInit {
     );
   }
 
+  /**
+   * Descriptions hitsound component
+   */
   async update() {
     this.library = [];
     this.electron.fs.readdirSync(this.localHitsounds).forEach(file => {
@@ -70,6 +105,11 @@ export class HitsoundComponent implements OnInit {
     this.myControl.setValue('');
   }
 
+  /**
+   * Uploads hitsound component
+   *
+   * @param event
+   */
   async upload(event: Event) {
     const target = event.target as HTMLInputElement;
     const files: File[] = Array.from(target.files);
@@ -118,6 +158,11 @@ export class HitsoundComponent implements OnInit {
     this.folderUpload.nativeElement.value = null;
   }
 
+  /**
+   * Renames hitsound
+   *
+   * @param _hitsound
+   */
   rename(_hitsound: Hitsound) {
     if (this.electron.fs.existsSync(_hitsound.path)) {
 
@@ -148,6 +193,11 @@ export class HitsoundComponent implements OnInit {
     }
   }
 
+  /**
+   * Removes hitsound
+   *
+   * @param _hitsound
+   */
   remove(_hitsound: Hitsound) {
 
     const info = new YesNo();
@@ -175,14 +225,30 @@ export class HitsoundComponent implements OnInit {
     });
   }
 
+  /**
+   * Removes file
+   *
+   * @param file
+   * @param _name
+   */
   removeFile(file: string, _name: string): void {
     this.remove({ name: _name, path: file });
   }
 
+  /**
+   * Plays file
+   *
+   * @param file
+   */
   playFile(file: string): void {
     this.play({ name: 'hitsound', path: file });
   }
 
+  /**
+   * Plays hitsound
+   *
+   * @param _hitsound
+   */
   play(_hitsound: Hitsound): void {
 
     if (_hitsound.name === 'hitsound') {
@@ -203,10 +269,18 @@ export class HitsoundComponent implements OnInit {
     }
   }
 
-  volumeChane() {
+  /**
+   * Volumes change
+   */
+  volumeChange() {
     this.app.settingsUpdate.next(this.app.settings);
   }
 
+  /**
+   * Installs hitsound
+   *
+   * @param _hitsound
+   */
   installHitsound(_hitsound: Hitsound): void {
     const path = this.app.hitsounds[0];
     if (path !== undefined) {
@@ -233,7 +307,12 @@ export class HitsoundComponent implements OnInit {
     }
   }
 
-  installkillsound(_killsound: Hitsound): void {
+  /**
+   * Installs kill sound
+   *
+   * @param _killsound
+   */
+  installKillSound(_killsound: Hitsound): void {
     const path = this.app.killsounds[0];
     if (path !== undefined) {
       this.electron.fs.copy(_killsound.path, path, { overwrite: true })
@@ -257,12 +336,24 @@ export class HitsoundComponent implements OnInit {
     }
   }
 
+  /**
+   * Hitsounds filter
+   *
+   * @param value
+   * @returns filter
+   */
   private hitsoundFilter(value: string): Hitsound[] {
     const filterValue = value.toLowerCase();
 
     return this.library.filter(option => option.name.toLowerCase().includes(filterValue));
   }
 
+  /**
+   * Gets names
+   *
+   * @param [exclude]
+   * @returns names
+   */
   private getNames(exclude: string = null): string[] {
     const names: string[] = [];
     this.library.forEach(a => {
