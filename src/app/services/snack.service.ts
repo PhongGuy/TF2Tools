@@ -2,9 +2,21 @@ import { Injectable, OnDestroy } from '@angular/core';
 import { MatSnackBar, MatSnackBarConfig, MatSnackBarRef, SimpleSnackBar } from '@angular/material/snack-bar';
 import { Subscription } from 'rxjs';
 
+/**
+ * Snack bar message
+ */
 export class SnackBarMessage {
+  /**
+   * Message  of snack bar message
+   */
   message: string;
+  /**
+   * Action  of snack bar message
+   */
   action: string = null;
+  /**
+   * Config  of snack bar message
+   */
   config: MatSnackBarConfig = null;
 }
 
