@@ -2,41 +2,44 @@
  * Hud list
  */
 export class HudList {
+    /**
+     * Name of hud list
+     */
     name: string;
     /**
-     * Creatorof hud list
+     * Creator of hud list
      */
     creator: string;
     /**
-     * Maintainerof hud list
+     * Maintainer of hud list
      */
     maintainer: string;
     /**
-     * Screenshotsof hud list
+     * Screenshots of hud list
      */
     screenshots: string;
     /**
-     * Pageof hud list
+     * Page of hud list
      */
     page: string;
     /**
-     * Repositoryof hud list
+     * Repository of hud list
      */
     repository: string;
     /**
-     * Groupof hud list
+     * Group of hud list
      */
     group: string;
     /**
-     * Discussionof hud list
+     * Discussion of hud list
      */
     discussion: string;
     /**
-     * Downloadof hud list
+     * Download of hud list
      */
     download: string;
     /**
-     * Discordof hud list
+     * Discord of hud list
      */
     discord: string;
 }
