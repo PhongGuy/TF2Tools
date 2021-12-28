@@ -398,14 +398,14 @@ import { HitsoundComponent } from &#x27;./dashboard/hitsound/hitsound.component&
 import { MultipleWarningComponent } from &#x27;./dashboard/hitsound/multiple-warning/multiple-warning.component&#x27;;
 import { UploadChangeNameComponent } from &#x27;./dashboard/hitsound/upload-change-name/upload-change-name.component&#x27;;
 import { HudComponent } from &#x27;./dashboard/hud/hud.component&#x27;;
+import { SettingsComponent } from &#x27;./dashboard/settings/settings.component&#x27;;
 import { WeaponsSoundsComponent } from &#x27;./dashboard/weapons-sounds/weapons-sounds.component&#x27;;
 import { QuestionAnswerComponent } from &#x27;./dialogs/question-answer/question-answer.component&#x27;;
 import { YesNoComponent } from &#x27;./dialogs/yes-no/yes-no.component&#x27;;
 import { MaterialModule } from &#x27;./material&#x27;;
 import { SetupComponent } from &#x27;./setup/setup.component&#x27;;
-import { SettingsComponent } from &#x27;./dashboard/settings/settings.component&#x27;;
 
-// AoT requires an exported function for factories
+/** AoT requires an exported function for factories */
 const httpLoaderFactory &#x3D; (http: HttpClient): TranslateHttpLoader &#x3D;&gt; new TranslateHttpLoader(http, &#x27;./assets/i18n/&#x27;, &#x27;.json&#x27;);
 
 @NgModule({

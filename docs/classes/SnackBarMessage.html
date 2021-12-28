@@ -66,6 +66,13 @@
         </p>
 
 
+            <p class="comment">
+                <h3>Description</h3>
+            </p>
+            <p class="comment">
+                <p>Snack bar message</p>
+
+            </p>
 
 
 
@@ -134,10 +141,16 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="7" class="link-to-prism">src/app/services/snack.service.ts:7</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="16" class="link-to-prism">src/app/services/snack.service.ts:16</a></div>
                         </td>
                     </tr>
 
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Action  of snack bar message</p>
+</div>
+                </td>
+            </tr>
 
         </tbody>
     </table>
@@ -165,10 +178,16 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="8" class="link-to-prism">src/app/services/snack.service.ts:8</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="20" class="link-to-prism">src/app/services/snack.service.ts:20</a></div>
                         </td>
                     </tr>
 
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Config  of snack bar message</p>
+</div>
+                </td>
+            </tr>
 
         </tbody>
     </table>
@@ -191,10 +210,16 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="6" class="link-to-prism">src/app/services/snack.service.ts:6</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="12" class="link-to-prism">src/app/services/snack.service.ts:12</a></div>
                         </td>
                     </tr>
 
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Message  of snack bar message</p>
+</div>
+                </td>
+            </tr>
 
         </tbody>
     </table>
@@ -214,37 +239,72 @@
 import { MatSnackBar, MatSnackBarConfig, MatSnackBarRef, SimpleSnackBar } from &#x27;@angular/material/snack-bar&#x27;;
 import { Subscription } from &#x27;rxjs&#x27;;
 
+/**
+ * Snack bar message
+ */
 export class SnackBarMessage {
+  /**
+   * Message  of snack bar message
+   */
   message: string;
+  /**
+   * Action  of snack bar message
+   */
   action: string &#x3D; null;
+  /**
+   * Config  of snack bar message
+   */
   config: MatSnackBarConfig &#x3D; null;
 }
 
+/**
+ * Snack service
+ */
 @Injectable({
   providedIn: &#x27;root&#x27;
 })
 export class SnackService implements OnDestroy {
 
+  /**
+   * Message queue of snack service
+   */
   private messageQueue: Array&lt;any&gt; &#x3D; Array&lt;any&gt;();
+  /**
+   * Subscription  of snack service
+   */
   private subscription: Subscription;
+  /**
+   * Snack bar ref of snack service
+   */
   private snackBarRef: MatSnackBarRef&lt;SimpleSnackBar&gt;;
+  /**
+   * Determines whether instance visible is
+   */
   private isInstanceVisible &#x3D; false;
 
+  /**
+   * Creates an instance of snack service.
+   *
+   * @param snack
+   */
   constructor(
     private snack: MatSnackBar
   ) { }
 
+  /**
+   * on destroy
+   */
   ngOnDestroy() {
     this.subscription.unsubscribe();
   }
 
   /**
-   * Add a message
+   * Shows snack service
    *
    * @param message The message to show in the snackbar.
-   * @param action The label for the snackbar action.
-   * @param config Additional configuration options for the snackbar.
-   * @param classOverride Adds a css class on the snackbar so you can add color.
+   * @param [action] The label for the snackbar action.
+   * @param [duration] Additional configuration options for the snackbar.
+   * @param [classOverride] Adds a css class on the snackbar so you can add color.
    */
   show(
     message: string,
@@ -270,6 +330,11 @@ export class SnackService implements OnDestroy {
     }
   }
 
+  /**
+   * Shows next
+   *
+   * @returns
+   */
   private showNext() {
     if (this.messageQueue.length &#x3D;&#x3D;&#x3D; 0) {
       return;

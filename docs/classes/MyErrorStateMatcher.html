@@ -138,14 +138,16 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="10"
-                            class="link-to-prism">src/app/dialogs/question-answer/question-answer.component.ts:10</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="17"
+                            class="link-to-prism">src/app/dialogs/question-answer/question-answer.component.ts:17</a></div>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
+                    <div class="io-description"><p>Determines whether error state is</p>
+</div>
 
                     <div class="io-description">
                         <b>Parameters :</b>
@@ -193,7 +195,8 @@
 
                     </div>
                     <div class="io-description">
-                        
+                        <p>true if error state</p>
+
                     </div>
                 </td>
             </tr>
@@ -218,12 +221,22 @@ import { ValidatorService } from &#x27;../../services/validators.service&#x27;;
 
 /** Error when invalid control is dirty, touched, or submitted. */
 export class MyErrorStateMatcher implements ErrorStateMatcher {
+  /**
+   * Determines whether error state is
+   *
+   * @param control
+   * @param form
+   * @returns true if error state
+   */
   isErrorState(control: FormControl | null, form: FormGroupDirective | NgForm | null): boolean {
     const isSubmitted &#x3D; form &amp;&amp; form.submitted;
     return !!(control &amp;&amp; control.invalid &amp;&amp; (control.dirty || control.touched || isSubmitted));
   }
 }
 
+/**
+ * Component QuestionAnswerComponent
+ */
 @Component({
   selector: &#x27;app-question-answer&#x27;,
   templateUrl: &#x27;./question-answer.component.html&#x27;,
@@ -231,20 +244,39 @@ export class MyErrorStateMatcher implements ErrorStateMatcher {
 })
 export class QuestionAnswerComponent implements OnInit {
 
+  /**
+   * Input answer
+   */
   input: FormControl;
+  /**
+   * Matcher of question answer component
+   */
   matcher: MyErrorStateMatcher;
 
+  /**
+   * Creates an instance of question answer component.
+   *
+   * @param dialogRef
+   * @param data &#x60;QuestionAnswer&#x60;
+   * @param validator
+   */
   constructor(
-    public dialogRef: MatDialogRef&lt;QuestionAnswerComponent&gt;,
+    private dialogRef: MatDialogRef&lt;QuestionAnswerComponent&gt;,
     @Inject(MAT_DIALOG_DATA) public data: QuestionAnswer,
     private validator: ValidatorService
   ) { }
 
+  /**
+   * on init
+   */
   ngOnInit(): void {
     this.matcher &#x3D; new MyErrorStateMatcher();
     this.input &#x3D; new FormControl(&#x27;&#x27;, [Validators.required, this.validator.checkName(this.data.cant), this.validator.special()]);
   }
 
+  /**
+   * Submits question answer component
+   */
   submit() {
     if (!this.input.invalid) {
       this.dialogRef.close(this.input.value);

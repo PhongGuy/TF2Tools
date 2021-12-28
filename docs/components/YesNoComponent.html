@@ -69,6 +69,13 @@
 </p>
 
 
+    <p class="comment">
+        <h3>Description</h3>
+    </p>
+    <p class="comment">
+        <p>Yes No</p>
+
+    </p>
 
 
     <p class="comment">
@@ -176,12 +183,14 @@
                 </tr>
                         <tr>
                             <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="10" class="link-to-prism">src/app/dialogs/yes-no/yes-no.component.ts:10</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="13" class="link-to-prism">src/app/dialogs/yes-no/yes-no.component.ts:13</a></div>
                             </td>
                         </tr>
 
                 <tr>
                     <td class="col-md-4">
+                            <div class="io-description"><p>Creates an instance of yes no component.</p>
+</div>
                             <div>
                                     <b>Parameters :</b>
                                     <table class="params">
@@ -190,6 +199,7 @@
                                                 <td>Name</td>
                                                     <td>Type</td>
                                                 <td>Optional</td>
+                                                    <td>Description</td>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -204,6 +214,10 @@
                                                             No
                                                     </td>
                                                     
+                                                        <td>
+                                                                <p>YesNo</p>
+
+                                                        </td>
                                                 </tr>
                                         </tbody>
                                     </table>
@@ -243,14 +257,16 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="16"
-                            class="link-to-prism">src/app/dialogs/yes-no/yes-no.component.ts:16</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="27"
+                            class="link-to-prism">src/app/dialogs/yes-no/yes-no.component.ts:27</a></div>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
+                    <div class="io-description"><p>on init</p>
+</div>
 
                     <div class="io-description">
                         <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
@@ -295,10 +311,15 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="13" class="link-to-prism">src/app/dialogs/yes-no/yes-no.component.ts:13</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="21" class="link-to-prism">src/app/dialogs/yes-no/yes-no.component.ts:21</a></div>
                         </td>
                     </tr>
 
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description">YesNo</div>
+                </td>
+            </tr>
 
         </tbody>
     </table>
@@ -312,6 +333,9 @@
 import { MAT_DIALOG_DATA } from &#x27;@angular/material/dialog&#x27;;
 import { YesNo } from &#x27;../../models/yesNo&#x27;;
 
+/**
+ * Yes No
+ */
 @Component({
   selector: &#x27;app-yes-no&#x27;,
   templateUrl: &#x27;./yes-no.component.html&#x27;,
@@ -319,10 +343,18 @@ import { YesNo } from &#x27;../../models/yesNo&#x27;;
 })
 export class YesNoComponent implements OnInit {
 
+  /**
+   * Creates an instance of yes no component.
+   *
+   * @param data YesNo
+   */
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: YesNo
   ) { }
 
+  /**
+   * on init
+   */
   ngOnInit(): void {
   }
 
