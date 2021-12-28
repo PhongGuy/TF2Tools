@@ -3,7 +3,7 @@
     <mat-card-subtitle>
         <p>Volume: {{app.settings.volume}}</p>
 
-        <mat-slider thumbLabel [(ngModel)]="app.settings.volume" (change)="volumeChane()" tickInterval="1" min="0"
+        <mat-slider thumbLabel [(ngModel)]="app.settings.volume" (change)="volumeChange()" tickInterval="1" min="0"
             max="100" class="w-100">
         </mat-slider>
 
@@ -73,7 +73,7 @@
             <button mat-icon-button color="primary" matTooltip="Install as hitsound" (click)="installHitsound(sound)">
                 <mat-icon>get_app</mat-icon>
             </button>
-            <button mat-icon-button color="primary" matTooltip="Install as killsound" (click)="installkillsound(sound)">
+            <button mat-icon-button color="primary" matTooltip="Install as killsound" (click)="installKillSound(sound)">
                 <mat-icon>get_app</mat-icon>
             </button>
         </mat-list-item>

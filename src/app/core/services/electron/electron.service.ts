@@ -9,20 +9,53 @@ import * as http from 'http';
 import * as https from 'https';
 import * as path from 'path';
 
+/**
+ * Electron service
+ */
 @Injectable({
   providedIn: 'root'
 })
 export class ElectronService {
+  /**
+   * Ipc renderer of electron service
+   */
   ipcRenderer: typeof ipcRenderer;
+  /**
+   * Web frame of electron service
+   */
   webFrame: typeof webFrame;
+  /**
+   * Child process of electron service
+   */
   childProcess: typeof childProcess;
+  /**
+   * Fs  of electron service
+   */
   fs: typeof fs;
+  /**
+   * App data of electron service
+   */
   appData: typeof getAppDataPath;
+  /**
+   * Path of electron service
+   */
   path: typeof path;
+  /**
+   * Dialog electron service
+   */
   dialog: typeof dialog;
+  /**
+   * Http of electron service
+   */
   http: typeof http;
+  /**
+   * Https of electron service
+   */
   https: typeof https;
 
+  /**
+   * Creates an instance of electron service.
+   */
   constructor() {
     // Conditional imports
     if (this.isElectron) {
@@ -51,6 +84,9 @@ export class ElectronService {
     }
   }
 
+  /**
+   * Gets whether is electron
+   */
   get isElectron(): boolean {
     return !!(window && window.process && window.process.type);
   }

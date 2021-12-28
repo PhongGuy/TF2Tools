@@ -10,6 +10,9 @@ import { CrossahirSelected } from '../../models/crosshairSelected';
 import { WeaponData } from '../../models/weaponData';
 import { SnackService } from '../../services/snack.service';
 
+/**
+ * Crosshairs component
+ */
 @Component({
   selector: 'app-crosshairs',
   templateUrl: './crosshairs.component.html',
@@ -17,38 +20,120 @@ import { SnackService } from '../../services/snack.service';
 })
 export class CrosshairsComponent implements OnInit {
 
+  /**
+   * Crosshair selected `MatSelect`
+   */
   @ViewChild('crosshairSelected') crosshairSelected: MatSelect;
+  /**
+   * Crosshairs tab `MatTabGroup`
+   */
   @ViewChild('crosshairsTab') crosshairsTab: MatTabGroup;
+  /**
+   * Crosshair background `MatSelect`
+   */
   @ViewChild('background') background: MatSelect;
 
   // classes
+  /**
+   * Scout list `MatSelectionList`
+   */
   @ViewChild('scout') scout: MatSelectionList;
+  /**
+   * Soldier list `MatSelectionList`
+   */
   @ViewChild('soldier') soldier: MatSelectionList;
+  /**
+   * Pyro list `MatSelectionList`
+   */
   @ViewChild('pyro') pyro: MatSelectionList;
+  /**
+   * Demoman list `MatSelectionList`
+   */
   @ViewChild('demoman') demoman: MatSelectionList;
+  /**
+   * Heavy list `MatSelectionList`
+   */
   @ViewChild('heavy') heavy: MatSelectionList;
+  /**
+   * Engineer list `MatSelectionList`
+   */
   @ViewChild('engineer') engineer: MatSelectionList;
+  /**
+   * Medic list `MatSelectionList`
+   */
   @ViewChild('medic') medic: MatSelectionList;
+  /**
+   * Sniper list `MatSelectionList`
+   */
   @ViewChild('sniper') sniper: MatSelectionList;
+  /**
+   * Spy list `MatSelectionList`
+   */
   @ViewChild('spy') spy: MatSelectionList;
 
+  /**
+   * Selected of crosshairs component
+   */
   selected = new CrossahirSelected();
+  /**
+   * Selected weapons of crosshairs component
+   */
   selectedWeapons: WeaponData[] = [];
 
+  /**
+   * All weapons of crosshairs component
+   */
   allWeapons: WeaponData[] = [];
   // classes
+  /**
+   * Scout weapons of crosshairs component
+   */
   scoutWeapons: WeaponData[] = [];
+  /**
+   * Soldier weapons of crosshairs component
+   */
   soldierWeapons: WeaponData[] = [];
+  /**
+   * Pyro weapons of crosshairs component
+   */
   pyroWeapons: WeaponData[] = [];
+  /**
+   * Demoman weapons of crosshairs component
+   */
   demomanWeapons: WeaponData[] = [];
+  /**
+   * Heavy weapons of crosshairs component
+   */
   heavyWeapons: WeaponData[] = [];
+  /**
+   * Engineer weapons of crosshairs component
+   */
   engineerWeapons: WeaponData[] = [];
+  /**
+   * Medic weapons of crosshairs component
+   */
   medicWeapons: WeaponData[] = [];
+  /**
+   * Sniper weapons of crosshairs component
+   */
   sniperWeapons: WeaponData[] = [];
+  /**
+   * Spy weapons of crosshairs component
+   */
   spyWeapons: WeaponData[] = [];
 
+  /**
+   * Apply to
+   */
   applyTo = 'Scout';
 
+  /**
+   * Creates an instance of crosshairs component.
+   *
+   * @param app AppComponent
+   * @param electron
+   * @param snack
+   */
   constructor(
     public app: AppComponent,
     private electron: ElectronService,
@@ -56,11 +141,19 @@ export class CrosshairsComponent implements OnInit {
   ) {
   }
 
+  /**
+   * on init
+   */
   ngOnInit(): void {
     this.app.update('vtf');
     this.get();
   }
 
+  /**
+   * Selected items
+   *
+   * @param items
+   */
   selectedItems(items: MatListOption[]): void {
     this.selected = new CrossahirSelected();
     this.selectedWeapons = [];
@@ -84,6 +177,9 @@ export class CrosshairsComponent implements OnInit {
     });
   }
 
+  /**
+   * Un select all
+   */
   unSelectAll() {
     this.scout.deselectAll();
     this.soldier.deselectAll();
@@ -117,6 +213,9 @@ export class CrosshairsComponent implements OnInit {
     }
   }
 
+  /**
+   * Generates vtf crosshairs
+   */
   generate(): void {
     const vtfPath = `${this.app.settings.customPath}\\mycustomstuff\\materials\\vgui\\replay\\thumbnails`;
     const scriptPath = `${this.app.settings.customPath}\\mycustomstuff\\scripts`;
@@ -141,6 +240,9 @@ export class CrosshairsComponent implements OnInit {
       .catch((err) => this.app.error(err));
   }
 
+  /**
+   * Applys to weapons
+   */
   apply(): void {
     const crosshair = this.crosshairSelected.value;
     this.selectedWeapons.forEach(weapon => {
@@ -155,6 +257,11 @@ export class CrosshairsComponent implements OnInit {
     });
   }
 
+  /**
+   * Applys to all weapons
+   *
+   * @param slot
+   */
   applyAll(slot: 'Primary' | 'Secondary' | 'Melee' | 'All'): void {
     const crosshair = this.crosshairSelected.value;
     let weaponsTab: WeaponData[] = [];
@@ -192,6 +299,11 @@ export class CrosshairsComponent implements OnInit {
     this.get();
   }
 
+  /**
+   * Applys to all weapons on all classes
+   *
+   * @param slot
+   */
   applyAllClasses(slot: 'Primary' | 'Secondary' | 'Melee' | 'All'): void {
     const crosshair = this.crosshairSelected.value;
     this.allWeapons.forEach(weapon => {
@@ -207,11 +319,19 @@ export class CrosshairsComponent implements OnInit {
     this.get();
   }
 
+  /**
+   * Changes background
+   *
+   * @param v
+   */
   changeBackground(v: string) {
     this.app.settings.crosshairBackground = v;
     this.app.settingsUpdate.next(this.app.settings);
   }
 
+  /**
+   * Gets crosshairs component
+   */
   private get(): void {
 
     this.scoutWeapons = [];
@@ -286,6 +406,13 @@ export class CrosshairsComponent implements OnInit {
     this.selectedItems([]);
   }
 
+  /**
+   * Weapons sort
+   *
+   * @param a
+   * @param b
+   * @returns
+   */
   private weaponSort(a: WeaponData, b: WeaponData) {
     if (a.info.slot === 'Primary' && b.info.slot !== 'Primary') {
       return -1;

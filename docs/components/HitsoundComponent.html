@@ -1,0 +1,2008 @@
+<!doctype html>
+<html class="no-js" lang="">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <title>TF2Tools</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+	   <link rel="stylesheet" href="../styles/style.css">
+        <link rel="stylesheet" href="../styles/dark.css">
+        <link rel="stylesheet" href="../styles/material.css">
+    </head>
+    <body>
+
+        <div class="navbar navbar-default navbar-fixed-top visible-xs">
+            <a href="../" class="navbar-brand">TF2Tools</a>
+            <button type="button" class="btn btn-default btn-menu ion-ios-menu" id="btn-menu"></button>
+        </div>
+
+        <div class="xs-menu menu" id="mobile-menu">
+                <div id="book-search-input" role="search"><input type="text" placeholder="Type to search"></div>            <compodoc-menu></compodoc-menu>
+        </div>
+
+        <div class="container-fluid main">
+           <div class="row main">
+               <div class="hidden-xs menu">
+                   <compodoc-menu mode="normal"></compodoc-menu>
+               </div>
+               <!-- START CONTENT -->
+               <div class="content component">
+                   <div class="content-data">
+
+
+
+
+<ol class="breadcrumb">
+  <li>Components</li>
+  <li
+  >
+  HitsoundComponent</li>
+</ol>
+
+<ul class="nav nav-tabs" role="tablist">
+        <li class="active">
+            <a href="#info" role="tab" id="info-tab" data-toggle="tab" data-link="info">Info</a>
+        </li>
+        <li >
+            <a href="#source" role="tab" id="source-tab" data-toggle="tab" data-link="source">Source</a>
+        </li>
+        <li >
+            <a href="#templateData" role="tab" id="templateData-tab" data-toggle="tab" data-link="template">Template</a>
+        </li>
+        <li >
+            <a href="#styleData" role="tab" id="styleData-tab" data-toggle="tab" data-link="style">Styles</a>
+        </li>
+        <li >
+            <a href="#tree" role="tab" id="tree-tab" data-toggle="tab" data-link="dom-tree">DOM Tree</a>
+        </li>
+</ul>
+
+<div class="tab-content">
+    <div class="tab-pane fade active in" id="c-info"><p class="comment">
+    <h3>File</h3>
+</p>
+<p class="comment">
+    <code>src/app/dashboard/hitsound/hitsound.component.ts</code>
+</p>
+
+
+    <p class="comment">
+        <h3>Description</h3>
+    </p>
+    <p class="comment">
+        <p>Hitsound component</p>
+
+    </p>
+
+
+    <p class="comment">
+        <h3>Implements</h3>
+    </p>
+    <p class="comment">
+                    <code><a href="https://angular.io/api/core/OnInit" target="_blank" >OnInit</a></code>
+    </p>
+
+
+<section>
+    <h3>Metadata</h3>
+    <table class="table table-sm table-hover metadata">
+        <tbody>
+
+
+
+
+
+
+
+
+
+
+
+            <tr>
+                <td class="col-md-3">selector</td>
+                <td class="col-md-9"><code>app-hitsound</code></td>
+            </tr>
+
+            <tr>
+                <td class="col-md-3">styleUrls</td>
+                <td class="col-md-9"><code>./hitsound.component.scss</code></td>
+            </tr>
+
+
+
+            <tr>
+                <td class="col-md-3">templateUrl</td>
+                <td class="col-md-9"><code>./hitsound.component.html</code></td>
+            </tr>
+
+
+
+
+
+
+
+
+        </tbody>
+    </table>
+</section>
+
+    <section>
+    <h3 id="index">Index</h3>
+    <table class="table table-sm table-bordered index-table">
+        <tbody>
+                <tr>
+                    <td class="col-md-4">
+                        <h6><b>Properties</b></h6>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <ul class="index-list">
+                            <li>
+                                    <span class="modifier">Public</span>
+                                <a href="#app" >app</a>
+                            </li>
+                            <li>
+                                <a href="#filteredOptions" >filteredOptions</a>
+                            </li>
+                            <li>
+                                <a href="#folderUpload" >folderUpload</a>
+                            </li>
+                            <li>
+                                <a href="#hitsounds" >hitsounds</a>
+                            </li>
+                            <li>
+                                <a href="#library" >library</a>
+                            </li>
+                            <li>
+                                <a href="#localHitsounds" >localHitsounds</a>
+                            </li>
+                            <li>
+                                <a href="#myControl" >myControl</a>
+                            </li>
+                        </ul>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="col-md-4">
+                        <h6><b>Methods</b></h6>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <ul class="index-list">
+                            <li>
+                                    <span class="modifier">Private</span>
+                                <a href="#getNames" >getNames</a>
+                            </li>
+                            <li>
+                                    <span class="modifier">Private</span>
+                                <a href="#hitsoundFilter" >hitsoundFilter</a>
+                            </li>
+                            <li>
+                                <a href="#installHitsound" >installHitsound</a>
+                            </li>
+                            <li>
+                                <a href="#installKillSound" >installKillSound</a>
+                            </li>
+                            <li>
+                                <a href="#ngOnInit" >ngOnInit</a>
+                            </li>
+                            <li>
+                                <a href="#play" >play</a>
+                            </li>
+                            <li>
+                                <a href="#playFile" >playFile</a>
+                            </li>
+                            <li>
+                                <a href="#remove" >remove</a>
+                            </li>
+                            <li>
+                                <a href="#removeFile" >removeFile</a>
+                            </li>
+                            <li>
+                                <a href="#rename" >rename</a>
+                            </li>
+                            <li>
+                                    <span class="modifier">Async</span>
+                                <a href="#update" >update</a>
+                            </li>
+                            <li>
+                                    <span class="modifier">Async</span>
+                                <a href="#upload" >upload</a>
+                            </li>
+                            <li>
+                                <a href="#volumeChange" >volumeChange</a>
+                            </li>
+                        </ul>
+                    </td>
+                </tr>
+
+
+
+
+
+        </tbody>
+    </table>
+</section>
+
+    <section>
+    <h3 id="constructor">Constructor</h3>
+        <table class="table table-sm table-bordered">
+            <tbody>
+                <tr>
+                    <td class="col-md-4">
+<code>constructor(electron: <a href="../injectables/ElectronService.html" target="_self">ElectronService</a>, app: <a href="../components/AppComponent.html" target="_self">AppComponent</a>, dialog: MatDialog, snack: <a href="../injectables/SnackService.html" target="_self">SnackService</a>)</code>
+                    </td>
+                </tr>
+                        <tr>
+                            <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="52" class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:52</a></div>
+                            </td>
+                        </tr>
+
+                <tr>
+                    <td class="col-md-4">
+                            <div class="io-description"><p>Creates an instance of hitsound component.</p>
+</div>
+                            <div>
+                                    <b>Parameters :</b>
+                                    <table class="params">
+                                        <thead>
+                                            <tr>
+                                                <td>Name</td>
+                                                    <td>Type</td>
+                                                <td>Optional</td>
+                                                    <td>Description</td>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                                <tr>
+                                                        <td>electron</td>
+                                                  
+                                                        <td>
+                                                                        <code><a href="../injectables/ElectronService.html" target="_self" >ElectronService</a></code>
+                                                        </td>
+                                                  
+                                                    <td>
+                                                            No
+                                                    </td>
+                                                    
+                                                        <td>
+                                                        </td>
+                                                </tr>
+                                                <tr>
+                                                        <td>app</td>
+                                                  
+                                                        <td>
+                                                                        <code><a href="../components/AppComponent.html" target="_self" >AppComponent</a></code>
+                                                        </td>
+                                                  
+                                                    <td>
+                                                            No
+                                                    </td>
+                                                    
+                                                        <td>
+                                                                <p>AppComponent</p>
+
+                                                        </td>
+                                                </tr>
+                                                <tr>
+                                                        <td>dialog</td>
+                                                  
+                                                        <td>
+                                                                    <code>MatDialog</code>
+                                                        </td>
+                                                  
+                                                    <td>
+                                                            No
+                                                    </td>
+                                                    
+                                                        <td>
+                                                        </td>
+                                                </tr>
+                                                <tr>
+                                                        <td>snack</td>
+                                                  
+                                                        <td>
+                                                                        <code><a href="../injectables/SnackService.html" target="_self" >SnackService</a></code>
+                                                        </td>
+                                                  
+                                                    <td>
+                                                            No
+                                                    </td>
+                                                    
+                                                        <td>
+                                                        </td>
+                                                </tr>
+                                        </tbody>
+                                    </table>
+                            </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+</section>
+
+
+
+
+
+    <section>
+    
+    <h3 id="methods">
+        Methods
+    </h3>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="getNames"></a>
+                    <span class="name">
+                        <span class="modifier">Private</span>
+                        <span ><b>getNames</b></span>
+                        <a href="#getNames"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>getNames(exclude: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="357"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:357</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Gets names</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                    <td>Default value</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>exclude</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+                                    <td>
+                                        <code>null</code>
+                                    </td>
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>    <code>string[]</code>
+
+                    </div>
+                    <div class="io-description">
+                        <p>names</p>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="hitsoundFilter"></a>
+                    <span class="name">
+                        <span class="modifier">Private</span>
+                        <span ><b>hitsoundFilter</b></span>
+                        <a href="#hitsoundFilter"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>hitsoundFilter(value: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="345"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:345</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Hitsounds filter</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>value</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="../classes/Hitsound.html" target="_self" >Hitsound[]</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        <p>filter</p>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="installHitsound"></a>
+                    <span class="name">
+                        <span ><b>installHitsound</b></span>
+                        <a href="#installHitsound"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>installHitsound(_hitsound: <a href="../classes/Hitsound.html" target="_self">Hitsound</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="284"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:284</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Installs hitsound</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>_hitsound</td>
+                                    <td>
+                                                <code><a href="../classes/Hitsound.html" target="_self" >Hitsound</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="installKillSound"></a>
+                    <span class="name">
+                        <span ><b>installKillSound</b></span>
+                        <a href="#installKillSound"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>installKillSound(_killsound: <a href="../classes/Hitsound.html" target="_self">Hitsound</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="315"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:315</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Installs kill sound</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>_killsound</td>
+                                    <td>
+                                                <code><a href="../classes/Hitsound.html" target="_self" >Hitsound</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ngOnInit"></a>
+                    <span class="name">
+                        <span ><b>ngOnInit</b></span>
+                        <a href="#ngOnInit"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>ngOnInit()</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="75"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:75</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>on init</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="play"></a>
+                    <span class="name">
+                        <span ><b>play</b></span>
+                        <a href="#play"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>play(_hitsound: <a href="../classes/Hitsound.html" target="_self">Hitsound</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="252"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:252</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Plays hitsound</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>_hitsound</td>
+                                    <td>
+                                                <code><a href="../classes/Hitsound.html" target="_self" >Hitsound</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="playFile"></a>
+                    <span class="name">
+                        <span ><b>playFile</b></span>
+                        <a href="#playFile"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>playFile(file: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="243"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:243</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Plays file</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>file</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="remove"></a>
+                    <span class="name">
+                        <span ><b>remove</b></span>
+                        <a href="#remove"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>remove(_hitsound: <a href="../classes/Hitsound.html" target="_self">Hitsound</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="201"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:201</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Removes hitsound</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>_hitsound</td>
+                                    <td>
+                                                <code><a href="../classes/Hitsound.html" target="_self" >Hitsound</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="removeFile"></a>
+                    <span class="name">
+                        <span ><b>removeFile</b></span>
+                        <a href="#removeFile"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>removeFile(file: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>, _name: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="234"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:234</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Removes file</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>file</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                                <tr>
+                                    <td>_name</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="rename"></a>
+                    <span class="name">
+                        <span ><b>rename</b></span>
+                        <a href="#rename"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>rename(_hitsound: <a href="../classes/Hitsound.html" target="_self">Hitsound</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="166"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:166</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Renames hitsound</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>_hitsound</td>
+                                    <td>
+                                                <code><a href="../classes/Hitsound.html" target="_self" >Hitsound</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="update"></a>
+                    <span class="name">
+                        <span class="modifier">Async</span>
+                        <span ><b>update</b></span>
+                        <a href="#update"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>update()</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="97"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:97</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Descriptions hitsound component</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >any</a></code>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="upload"></a>
+                    <span class="name">
+                        <span class="modifier">Async</span>
+                        <span ><b>upload</b></span>
+                        <a href="#upload"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>upload(event: <a href="https://angular.io/api/router/Event" target="_blank">Event</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="113"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:113</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Uploads hitsound component</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>event</td>
+                                    <td>
+                                                <code><a href="https://angular.io/api/router/Event" target="_blank" >Event</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >any</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="volumeChange"></a>
+                    <span class="name">
+                        <span ><b>volumeChange</b></span>
+                        <a href="#volumeChange"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>volumeChange()</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="275"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:275</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Volumes change</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+    <section>
+    
+    <h3 id="inputs">
+        Properties
+    </h3>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="app"></a>
+                    <span class="name">
+                            <span class="modifier">Public</span>
+                        <span ><b>app</b></span>
+                        <a href="#app"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../components/AppComponent.html" target="_self" >AppComponent</a></code>
+
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="64" class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:64</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description">AppComponent</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="filteredOptions"></a>
+                    <span class="name">
+                        <span ><b>filteredOptions</b></span>
+                        <a href="#filteredOptions"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/Hitsound.html" target="_self" >Observable&lt;Hitsound[]&gt;</a></code>
+
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="52" class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:52</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Filtered options of hitsound component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="folderUpload"></a>
+                    <span class="name">
+                        <span ><b>folderUpload</b></span>
+                        <a href="#folderUpload"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="https://angular.io/api/core/ElementRef" target="_blank" >ElementRef</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;folderUpload&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="30" class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:30</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>folder upload <code>ElementRef</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="hitsounds"></a>
+                    <span class="name">
+                        <span ><b>hitsounds</b></span>
+                        <a href="#hitsounds"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/Hitsound.html" target="_self" >Hitsound[]</a></code>
+
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="43" class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:43</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Hitsounds  of hitsound component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="library"></a>
+                    <span class="name">
+                        <span ><b>library</b></span>
+                        <a href="#library"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/Hitsound.html" target="_self" >Hitsound[]</a></code>
+
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="39" class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:39</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Library  of hitsound component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="localHitsounds"></a>
+                    <span class="name">
+                        <span ><b>localHitsounds</b></span>
+                        <a href="#localHitsounds"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="35" class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:35</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Local hitsounds of hitsound component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="myControl"></a>
+                    <span class="name">
+                        <span ><b>myControl</b></span>
+                        <a href="#myControl"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>new FormControl()</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="48" class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:48</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>My control of hitsound component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+</section>
+
+</div>
+
+
+    <div class="tab-pane fade  tab-source-code" id="c-source">
+        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { Component, ElementRef, OnInit, ViewChild } from &#x27;@angular/core&#x27;;
+import { FormControl } from &#x27;@angular/forms&#x27;;
+import { MatDialog } from &#x27;@angular/material/dialog&#x27;;
+import { firstValueFrom, map, Observable, startWith } from &#x27;rxjs&#x27;;
+import { AppComponent } from &#x27;../../app.component&#x27;;
+import { ElectronService } from &#x27;../../core/services&#x27;;
+import { QuestionAnswerComponent } from &#x27;../../dialogs/question-answer/question-answer.component&#x27;;
+import { YesNoComponent } from &#x27;../../dialogs/yes-no/yes-no.component&#x27;;
+import { Hitsound } from &#x27;../../models/hitsound&#x27;;
+import { QuestionAnswer } from &#x27;../../models/questionAnswer&#x27;;
+import { UploadChangeName } from &#x27;../../models/uploadChangeName&#x27;;
+import { YesNo } from &#x27;../../models/yesNo&#x27;;
+import { SnackService } from &#x27;../../services/snack.service&#x27;;
+import { MultipleWarningComponent } from &#x27;./multiple-warning/multiple-warning.component&#x27;;
+import { UploadChangeNameComponent } from &#x27;./upload-change-name/upload-change-name.component&#x27;;
+
+/**
+ * Hitsound component
+ */
+@Component({
+  selector: &#x27;app-hitsound&#x27;,
+  templateUrl: &#x27;./hitsound.component.html&#x27;,
+  styleUrls: [&#x27;./hitsound.component.scss&#x27;]
+})
+export class HitsoundComponent implements OnInit {
+
+  /**
+   * folder upload &#x60;ElementRef&#x60;
+   */
+  @ViewChild(&#x27;folderUpload&#x27;) folderUpload: ElementRef;
+
+  /**
+   * Local hitsounds of hitsound component
+   */
+  localHitsounds: string;
+  /**
+   * Library  of hitsound component
+   */
+  library: Hitsound[];
+  /**
+   * Hitsounds  of hitsound component
+   */
+  hitsounds: Hitsound[];
+
+  /**
+   * My control of hitsound component
+   */
+  myControl &#x3D; new FormControl();
+  /**
+   * Filtered options of hitsound component
+   */
+  filteredOptions: Observable&lt;Hitsound[]&gt;;
+
+  /**
+   * Creates an instance of hitsound component.
+   *
+   * @param electron
+   * @param app AppComponent
+   * @param dialog
+   * @param snack
+   */
+  constructor(
+    private electron: ElectronService,
+    public app: AppComponent,
+    private dialog: MatDialog,
+    private snack: SnackService
+  ) {
+    this.localHitsounds &#x3D; &#x60;${this.app.settings.libraryPath}\\hitsounds&#x60;;
+    this.electron.fs.ensureDir(this.localHitsounds);
+  }
+
+  /**
+   * on init
+   */
+  ngOnInit(): void {
+    // update info in case user changed shit when TF2Tools was open
+    this.app.update(&#x27;hitsounds&#x27;);
+    this.update();
+
+    // check if there is multiple hitsounds installed and warn user
+    if (this.app.hitsounds.length &gt; 1) {
+      this.dialog.open(MultipleWarningComponent, {
+        width: &#x27;450px&#x27;,
+        data: this.app.hitsounds
+      });
+    }
+
+    this.filteredOptions &#x3D; this.myControl.valueChanges.pipe(
+      startWith(&#x27;&#x27;),
+      map(value &#x3D;&gt; this.hitsoundFilter(value)),
+    );
+  }
+
+  /**
+   * Descriptions hitsound component
+   */
+  async update() {
+    this.library &#x3D; [];
+    this.electron.fs.readdirSync(this.localHitsounds).forEach(file &#x3D;&gt; {
+      const name &#x3D; file.split(&#x27;.&#x27;);
+      name.pop();
+      const h &#x3D; { name: name.toString(), path: &#x60;${this.localHitsounds}\\${name}.wav&#x60; };
+      this.library.push(h);
+    });
+    this.myControl.setValue(&#x27;&#x27;);
+  }
+
+  /**
+   * Uploads hitsound component
+   *
+   * @param event
+   */
+  async upload(event: Event) {
+    const target &#x3D; event.target as HTMLInputElement;
+    const files: File[] &#x3D; Array.from(target.files);
+
+    for (const sound of files) {
+      if (sound.name.includes(&#x27;.wav&#x27;)) {
+        const name &#x3D; sound.name.replace(&#x27;.wav&#x27;, &#x27;&#x27;);
+        const dest &#x3D; &#x60;${this.localHitsounds}\\${sound.name}&#x60;;
+        const exist &#x3D; this.electron.fs.existsSync(dest);
+        await this.update();
+
+        if (name &#x3D;&#x3D;&#x3D; &#x27;hitsound&#x27; || name &#x3D;&#x3D;&#x3D; &#x27;killsound&#x27; || exist) {
+          const dialogRef &#x3D; this.dialog.open(UploadChangeNameComponent, {
+            width: &#x27;450px&#x27;,
+            data: {
+              title: exist ? &#x27;We found a sound by that name&#x27; : &#x27;Give the sound a name&#x27;,
+              cant: this.getNames(),
+              file: sound,
+              volume: this.app.settings.volume
+            } as UploadChangeName
+          });
+
+          await firstValueFrom(dialogRef.afterClosed())
+            .then((newName) &#x3D;&gt; {
+              if (typeof newName &#x3D;&#x3D;&#x3D; &#x27;string&#x27;) {
+                this.electron.fs.copy(sound.path, &#x60;${this.localHitsounds}\\${newName}.wav&#x60;)
+                  .then(() &#x3D;&gt; {
+                    this.snack.show(&#x60;${name} was added&#x60;);
+                    this.update();
+                  })
+                  .catch(err &#x3D;&gt; this.app.error(err));
+              }
+            });
+        } else {
+          this.electron.fs.copy(sound.path, dest)
+            .then(() &#x3D;&gt; {
+              this.snack.show(&#x60;${name} was added&#x60;);
+              this.update();
+            })
+            .catch(err &#x3D;&gt; this.app.error(err));
+        }
+
+      }
+    }
+
+    this.folderUpload.nativeElement.value &#x3D; null;
+  }
+
+  /**
+   * Renames hitsound
+   *
+   * @param _hitsound
+   */
+  rename(_hitsound: Hitsound) {
+    if (this.electron.fs.existsSync(_hitsound.path)) {
+
+      const dialogRef &#x3D; this.dialog.open(QuestionAnswerComponent, {
+        width: &#x27;450px&#x27;,
+        data: {
+          question: &#x60;Rename ${_hitsound.name}&#x60;,
+          subQuestion: &#x27;&#x27;,
+          cant: this.getNames(_hitsound.name)
+        } as QuestionAnswer
+      });
+
+      dialogRef.afterClosed().subscribe(r &#x3D;&gt; {
+        if (typeof r &#x3D;&#x3D;&#x3D; &#x27;string&#x27;) {
+          const path &#x3D; _hitsound.path.split(&#x27;\\&#x27;);
+          path.pop();
+          this.electron.fs.rename(_hitsound.path, &#x60;${path.join(&#x27;\\&#x27;)}\\${r}.wav&#x60;)
+            .then(() &#x3D;&gt; {
+              this.snack.show(&#x60;Renamed &quot;${_hitsound.name}&quot; to &quot;${r}&quot;&#x60;);
+              this.update();
+            })
+            .catch(err &#x3D;&gt; this.app.error(err));
+        }
+      });
+
+    } else {
+      this.snack.show(&#x60;${_hitsound.name} could not be found?&#x60;);
+    }
+  }
+
+  /**
+   * Removes hitsound
+   *
+   * @param _hitsound
+   */
+  remove(_hitsound: Hitsound) {
+
+    const info &#x3D; new YesNo();
+    info.question &#x3D; &#x60;Remove ${_hitsound.name}?&#x60;;
+    info.subQuestion &#x3D; &#x60;Are you sure you want to remove ${_hitsound.name}? This cannot be undone!&#x60;;
+
+    const dialogRef &#x3D; this.dialog.open(YesNoComponent, {
+      width: &#x27;450px&#x27;,
+      data: info
+    });
+
+    dialogRef.afterClosed().subscribe(result &#x3D;&gt; {
+      if (result) {
+        this.electron.fs.remove(_hitsound.path)
+          .then(() &#x3D;&gt; {
+            this.snack.show(&#x60;${_hitsound.name} was removed&#x60;);
+            if (_hitsound.name &#x3D;&#x3D;&#x3D; &#x27;hitsound&#x27; || _hitsound.name &#x3D;&#x3D;&#x3D; &#x27;killsound&#x27;) {
+              this.app.update(&#x27;hitsounds&#x27;);
+            } else {
+              this.update();
+            }
+          })
+          .catch(err &#x3D;&gt; this.app.error(err));
+      }
+    });
+  }
+
+  /**
+   * Removes file
+   *
+   * @param file
+   * @param _name
+   */
+  removeFile(file: string, _name: string): void {
+    this.remove({ name: _name, path: file });
+  }
+
+  /**
+   * Plays file
+   *
+   * @param file
+   */
+  playFile(file: string): void {
+    this.play({ name: &#x27;hitsound&#x27;, path: file });
+  }
+
+  /**
+   * Plays hitsound
+   *
+   * @param _hitsound
+   */
+  play(_hitsound: Hitsound): void {
+
+    if (_hitsound.name &#x3D;&#x3D;&#x3D; &#x27;hitsound&#x27;) {
+      const p &#x3D; _hitsound.path;
+      _hitsound.path &#x3D; &#x60;${this.app.appTemp}\\${this.app.generateRandomString(8)}.wav&#x60;;
+      this.electron.fs.copySync(p, _hitsound.path);
+    }
+
+    const audio &#x3D; new Audio(_hitsound.path);
+    audio.volume &#x3D; this.app.settings.volume / 100;
+    audio.load();
+    audio.play();
+
+    if (_hitsound.name &#x3D;&#x3D;&#x3D; &#x27;hitsound&#x27;) {
+      audio.addEventListener(&#x27;ended&#x27;, end &#x3D;&gt; {
+        this.electron.fs.removeSync(_hitsound.path);
+      });
+    }
+  }
+
+  /**
+   * Volumes change
+   */
+  volumeChange() {
+    this.app.settingsUpdate.next(this.app.settings);
+  }
+
+  /**
+   * Installs hitsound
+   *
+   * @param _hitsound
+   */
+  installHitsound(_hitsound: Hitsound): void {
+    const path &#x3D; this.app.hitsounds[0];
+    if (path !&#x3D;&#x3D; undefined) {
+      this.electron.fs.copy(_hitsound.path, path, { overwrite: true })
+        .then(() &#x3D;&gt; {
+          this.snack.show(&#x60;Hitsound ${_hitsound.name} was installed&#x60;);
+          this.app.update(&#x27;hitsounds&#x27;);
+        })
+        .catch(err &#x3D;&gt; {
+          this.app.error(err);
+        });
+    } else {
+      const defaultPath &#x3D; &#x60;${this.app.settings.customPath}\\mycustomstuff\\sound\\ui&#x60;;
+      this.electron.fs.ensureDir(defaultPath)
+        .then(() &#x3D;&gt; {
+          this.electron.fs.copy(_hitsound.path, &#x60;${defaultPath}\\hitsound.wav&#x60;)
+            .then(() &#x3D;&gt; {
+              this.snack.show(&#x60;Hitsound ${_hitsound.name} was installed&#x60;);
+              this.app.update(&#x27;hitsounds&#x27;);
+            })
+            .catch(err &#x3D;&gt; this.app.error(err));
+        })
+        .catch(err &#x3D;&gt; this.app.error(err));
+    }
+  }
+
+  /**
+   * Installs kill sound
+   *
+   * @param _killsound
+   */
+  installKillSound(_killsound: Hitsound): void {
+    const path &#x3D; this.app.killsounds[0];
+    if (path !&#x3D;&#x3D; undefined) {
+      this.electron.fs.copy(_killsound.path, path, { overwrite: true })
+        .then(() &#x3D;&gt; {
+          this.snack.show(&#x60;Killsound ${_killsound.name} was installed&#x60;);
+          this.app.update(&#x27;hitsounds&#x27;);
+        })
+        .catch(err &#x3D;&gt; this.app.error(err));
+    } else {
+      const defaultPath &#x3D; &#x60;${this.app.settings.customPath}\\mycustomstuff\\sound\\ui&#x60;;
+      this.electron.fs.ensureDir(defaultPath)
+        .then(() &#x3D;&gt; {
+          this.electron.fs.copy(_killsound.path, &#x60;${defaultPath}\\killsound.wav&#x60;)
+            .then(() &#x3D;&gt; {
+              this.snack.show(&#x60;Killsound ${_killsound.name} was installed&#x60;);
+              this.app.update(&#x27;hitsounds&#x27;);
+            })
+            .catch(err &#x3D;&gt; this.app.error(err));
+        })
+        .catch(err &#x3D;&gt; this.app.error(err));
+    }
+  }
+
+  /**
+   * Hitsounds filter
+   *
+   * @param value
+   * @returns filter
+   */
+  private hitsoundFilter(value: string): Hitsound[] {
+    const filterValue &#x3D; value.toLowerCase();
+
+    return this.library.filter(option &#x3D;&gt; option.name.toLowerCase().includes(filterValue));
+  }
+
+  /**
+   * Gets names
+   *
+   * @param [exclude]
+   * @returns names
+   */
+  private getNames(exclude: string &#x3D; null): string[] {
+    const names: string[] &#x3D; [];
+    this.library.forEach(a &#x3D;&gt; {
+      if (a.name !&#x3D;&#x3D; exclude) {
+        names.push(a.name);
+      }
+    });
+    return names;
+  }
+
+}
+</code></pre>
+    </div>
+
+    <div class="tab-pane fade " id="c-templateData">
+        <pre class="line-numbers"><code class="language-html">&lt;mat-card class&#x3D;&quot;mb-2&quot;&gt;
+    &lt;mat-card-title&gt;Hitsounds&lt;/mat-card-title&gt;
+    &lt;mat-card-subtitle&gt;
+        &lt;p&gt;Volume: {{app.settings.volume}}&lt;/p&gt;
+
+        &lt;mat-slider thumbLabel [(ngModel)]&#x3D;&quot;app.settings.volume&quot; (change)&#x3D;&quot;volumeChange()&quot; tickInterval&#x3D;&quot;1&quot; min&#x3D;&quot;0&quot;
+            max&#x3D;&quot;100&quot; class&#x3D;&quot;w-100&quot;&gt;
+        &lt;/mat-slider&gt;
+
+    &lt;/mat-card-subtitle&gt;
+    &lt;mat-card-actions align&#x3D;&quot;end&quot;&gt;
+        &lt;button mat-raised-button (click)&#x3D;&quot;folderUpload.click()&quot; color&#x3D;&quot;primary&quot;&gt;Add sounds to your library&lt;/button&gt;
+        &lt;input class&#x3D;&quot;d-none&quot; type&#x3D;&quot;file&quot; #folderUpload (change)&#x3D;&quot;upload($event)&quot; accept&#x3D;&quot;.wav&quot; multiple /&gt;
+    &lt;/mat-card-actions&gt;
+&lt;/mat-card&gt;
+
+&lt;h1 class&#x3D;&quot;mt-5&quot;&gt;Installed hitsound{{app.hitsounds.length &gt; 1 ? &#x27;s&#x27; : &#x27;&#x27;}}&lt;/h1&gt;
+&lt;mat-card class&#x3D;&quot;card-list&quot; *ngIf&#x3D;&quot;app.hitsounds.length &gt; 0&quot;&gt;
+    &lt;mat-nav-list&gt;
+        &lt;mat-list-item *ngFor&#x3D;&quot;let sound of app.hitsounds&quot; disableRipple&#x3D;&quot;true&quot;&gt;
+            &lt;span matLine&gt;hitsound&lt;/span&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;warn&quot; matTooltip&#x3D;&quot;Remove&quot; (click)&#x3D;&quot;removeFile(sound, &#x27;hitsound&#x27;)&quot;&gt;
+                &lt;mat-icon&gt;delete&lt;/mat-icon&gt;
+            &lt;/button&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;accent&quot; matTooltip&#x3D;&quot;Play&quot; (click)&#x3D;&quot;playFile(sound)&quot;&gt;
+                &lt;mat-icon&gt;play_arrow&lt;/mat-icon&gt;
+            &lt;/button&gt;
+        &lt;/mat-list-item&gt;
+    &lt;/mat-nav-list&gt;
+&lt;/mat-card&gt;
+
+&lt;h1 class&#x3D;&quot;mt-5&quot;&gt;Installed killsound{{app.killsounds.length &gt; 1 ? &#x27;s&#x27; : &#x27;&#x27;}}&lt;/h1&gt;
+&lt;mat-card class&#x3D;&quot;card-list&quot; *ngIf&#x3D;&quot;app.killsounds.length &gt; 0&quot;&gt;
+    &lt;mat-nav-list&gt;
+        &lt;mat-list-item *ngFor&#x3D;&quot;let sound of app.killsounds&quot; disableRipple&#x3D;&quot;true&quot;&gt;
+            &lt;span matLine&gt;killsound&lt;/span&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;warn&quot; matTooltip&#x3D;&quot;Remove&quot; (click)&#x3D;&quot;removeFile(sound, &#x27;killsound&#x27;)&quot;&gt;
+                &lt;mat-icon&gt;delete&lt;/mat-icon&gt;
+            &lt;/button&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;accent&quot; matTooltip&#x3D;&quot;Play&quot; (click)&#x3D;&quot;playFile(sound)&quot;&gt;
+                &lt;mat-icon&gt;play_arrow&lt;/mat-icon&gt;
+            &lt;/button&gt;
+        &lt;/mat-list-item&gt;
+    &lt;/mat-nav-list&gt;
+&lt;/mat-card&gt;
+
+&lt;h1 class&#x3D;&quot;mt-5&quot;&gt;Library&lt;/h1&gt;
+
+&lt;mat-form-field class&#x3D;&quot;w-100&quot; appearance&#x3D;&quot;fill&quot;&gt;
+    &lt;mat-label&gt;Search&lt;/mat-label&gt;
+    &lt;input type&#x3D;&quot;text&quot; #searchLibrary placeholder&#x3D;&quot;Pick one&quot; aria-label&#x3D;&quot;Number&quot; matInput [formControl]&#x3D;&quot;myControl&quot;
+        [matAutocomplete]&#x3D;&quot;auto&quot;&gt;
+    &lt;mat-autocomplete autoActiveFirstOption #auto&#x3D;&quot;matAutocomplete&quot;&gt;
+        &lt;mat-option *ngFor&#x3D;&quot;let option of filteredOptions | async&quot; [value]&#x3D;&quot;option.name&quot;&gt;
+            {{option.name}}
+        &lt;/mat-option&gt;
+    &lt;/mat-autocomplete&gt;
+&lt;/mat-form-field&gt;
+
+&lt;mat-card class&#x3D;&quot;card-list&quot;&gt;
+    &lt;mat-nav-list&gt;
+        &lt;mat-list-item *ngFor&#x3D;&quot;let sound of filteredOptions | async&quot; disableRipple&#x3D;&quot;true&quot;&gt;
+            &lt;span matLine&gt;{{ sound.name }}&lt;/span&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;warn&quot; matTooltip&#x3D;&quot;Remove&quot; (click)&#x3D;&quot;remove(sound)&quot;&gt;
+                &lt;mat-icon&gt;delete&lt;/mat-icon&gt;
+            &lt;/button&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;accent&quot; matTooltip&#x3D;&quot;Rename&quot; (click)&#x3D;&quot;rename(sound)&quot;&gt;
+                &lt;mat-icon&gt;drive_file_rename_outline&lt;/mat-icon&gt;
+            &lt;/button&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;accent&quot; matTooltip&#x3D;&quot;Play&quot; (click)&#x3D;&quot;play(sound)&quot;&gt;
+                &lt;mat-icon&gt;play_arrow&lt;/mat-icon&gt;
+            &lt;/button&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;primary&quot; matTooltip&#x3D;&quot;Install as hitsound&quot; (click)&#x3D;&quot;installHitsound(sound)&quot;&gt;
+                &lt;mat-icon&gt;get_app&lt;/mat-icon&gt;
+            &lt;/button&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;primary&quot; matTooltip&#x3D;&quot;Install as killsound&quot; (click)&#x3D;&quot;installKillSound(sound)&quot;&gt;
+                &lt;mat-icon&gt;get_app&lt;/mat-icon&gt;
+            &lt;/button&gt;
+        &lt;/mat-list-item&gt;
+    &lt;/mat-nav-list&gt;
+&lt;/mat-card&gt;
+
+
+
+
+&lt;div class&#x3D;&quot;mb-5&quot;&gt;&lt;/div&gt;
+</code></pre>
+    </div>
+
+    <div class="tab-pane fade " id="c-styleData">
+                <p class="comment">
+                    <code>./hitsound.component.scss</code>
+                </p>
+                <pre class="line-numbers"><code class="language-scss"></code></pre>
+    </div>
+
+    <div class="tab-pane fade " id="c-tree">
+        <div id="tree-container"></div>
+        <div class="tree-legend">
+            <div class="title">
+                <b>Legend</b>
+            </div>
+            <div>
+                <div class="color htmlelement"></div><span>Html element</span>
+            </div>
+            <div>
+                <div class="color component"></div><span>Component</span>
+            </div>
+            <div>
+                <div class="color directive"></div><span>Html element with directive</span>
+            </div>
+        </div>
+    </div>
+
+    
+</div>
+
+<script src="../js/libs/vis.min.js"></script>
+<script src="../js/libs/htmlparser.js"></script>
+<script src="../js/libs/deep-iterator.js"></script>
+<script>
+        var COMPONENT_TEMPLATE = '<div><mat-card class="mb-2">    <mat-card-title>Hitsounds</mat-card-title>    <mat-card-subtitle>        <p>Volume: {{app.settings.volume}}</p>        <mat-slider thumbLabel [(ngModel)]="app.settings.volume" (change)="volumeChange()" tickInterval="1" min="0"            max="100" class="w-100">        </mat-slider>    </mat-card-subtitle>    <mat-card-actions align="end">        <button mat-raised-button (click)="folderUpload.click()" color="primary">Add sounds to your library</button>        <input class="d-none" type="file" #folderUpload (change)="upload($event)" accept=".wav" multiple />    </mat-card-actions></mat-card><h1 class="mt-5">Installed hitsound{{app.hitsounds.length > 1 ? \'s\' : \'\'}}</h1><mat-card class="card-list" *ngIf="app.hitsounds.length > 0">    <mat-nav-list>        <mat-list-item *ngFor="let sound of app.hitsounds" disableRipple="true">            <span matLine>hitsound</span>            <button mat-icon-button color="warn" matTooltip="Remove" (click)="removeFile(sound, \'hitsound\')">                <mat-icon>delete</mat-icon>            </button>            <button mat-icon-button color="accent" matTooltip="Play" (click)="playFile(sound)">                <mat-icon>play_arrow</mat-icon>            </button>        </mat-list-item>    </mat-nav-list></mat-card><h1 class="mt-5">Installed killsound{{app.killsounds.length > 1 ? \'s\' : \'\'}}</h1><mat-card class="card-list" *ngIf="app.killsounds.length > 0">    <mat-nav-list>        <mat-list-item *ngFor="let sound of app.killsounds" disableRipple="true">            <span matLine>killsound</span>            <button mat-icon-button color="warn" matTooltip="Remove" (click)="removeFile(sound, \'killsound\')">                <mat-icon>delete</mat-icon>            </button>            <button mat-icon-button color="accent" matTooltip="Play" (click)="playFile(sound)">                <mat-icon>play_arrow</mat-icon>            </button>        </mat-list-item>    </mat-nav-list></mat-card><h1 class="mt-5">Library</h1><mat-form-field class="w-100" appearance="fill">    <mat-label>Search</mat-label>    <input type="text" #searchLibrary placeholder="Pick one" aria-label="Number" matInput [formControl]="myControl"        [matAutocomplete]="auto">    <mat-autocomplete autoActiveFirstOption #auto="matAutocomplete">        <mat-option *ngFor="let option of filteredOptions | async" [value]="option.name">            {{option.name}}        </mat-option>    </mat-autocomplete></mat-form-field><mat-card class="card-list">    <mat-nav-list>        <mat-list-item *ngFor="let sound of filteredOptions | async" disableRipple="true">            <span matLine>{{ sound.name }}</span>            <button mat-icon-button color="warn" matTooltip="Remove" (click)="remove(sound)">                <mat-icon>delete</mat-icon>            </button>            <button mat-icon-button color="accent" matTooltip="Rename" (click)="rename(sound)">                <mat-icon>drive_file_rename_outline</mat-icon>            </button>            <button mat-icon-button color="accent" matTooltip="Play" (click)="play(sound)">                <mat-icon>play_arrow</mat-icon>            </button>            <button mat-icon-button color="primary" matTooltip="Install as hitsound" (click)="installHitsound(sound)">                <mat-icon>get_app</mat-icon>            </button>            <button mat-icon-button color="primary" matTooltip="Install as killsound" (click)="installKillSound(sound)">                <mat-icon>get_app</mat-icon>            </button>        </mat-list-item>    </mat-nav-list></mat-card><div class="mb-5"></div></div>'
+    var COMPONENTS = [{'name': 'AppComponent', 'selector': 'app-root'},{'name': 'CrosshairsComponent', 'selector': 'app-crosshairs'},{'name': 'DashboardComponent', 'selector': 'app-dashboard'},{'name': 'HitsoundComponent', 'selector': 'app-hitsound'},{'name': 'HudComponent', 'selector': 'app-hud'},{'name': 'MultipleWarningComponent', 'selector': 'app-multiple-warning'},{'name': 'QuestionAnswerComponent', 'selector': 'app-question-answer'},{'name': 'SettingsComponent', 'selector': 'app-settings'},{'name': 'SetupComponent', 'selector': 'app-setup'},{'name': 'UploadChangeNameComponent', 'selector': 'app-upload-change-name'},{'name': 'WeaponsSoundsComponent', 'selector': 'app-weapons-sounds'},{'name': 'YesNoComponent', 'selector': 'app-yes-no'}];
+    var DIRECTIVES = [];
+    var ACTUAL_COMPONENT = {'name': 'HitsoundComponent'};
+</script>
+<script src="../js/tree.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                   </div><div class="search-results">
+    <div class="has-results">
+        <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+        <ul class="search-results-list"></ul>
+    </div>
+    <div class="no-results">
+        <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+    </div>
+</div>
+</div>
+               <!-- END CONTENT -->
+           </div>
+       </div>
+
+          <label class="dark-mode-switch">
+               <input type="checkbox">
+               <span class="slider">
+                    <svg class="slider-icon" viewBox="0 0 24 24" fill="none" height="20" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" width="20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+                    </svg>
+               </span>
+          </label>
+
+       <script>
+            var COMPODOC_CURRENT_PAGE_DEPTH = 1;
+            var COMPODOC_CURRENT_PAGE_CONTEXT = 'component';
+            var COMPODOC_CURRENT_PAGE_URL = 'HitsoundComponent.html';
+            var MAX_SEARCH_RESULTS = 15;
+       </script>
+
+       <script src="../js/libs/custom-elements.min.js"></script>
+       <script src="../js/libs/lit-html.js"></script>
+
+       <script src="../js/menu-wc.js" defer></script>
+       <script nomodule src="../js/menu-wc_es5.js" defer></script>
+
+       <script src="../js/libs/bootstrap-native.js"></script>
+
+       <script src="../js/libs/es6-shim.min.js"></script>
+       <script src="../js/libs/EventDispatcher.js"></script>
+       <script src="../js/libs/promise.min.js"></script>
+       <script src="../js/libs/zepto.min.js"></script>
+
+       <script src="../js/compodoc.js"></script>
+
+       <script src="../js/tabs.js"></script>
+       <script src="../js/menu.js"></script>
+       <script src="../js/libs/clipboard.min.js"></script>
+       <script src="../js/libs/prism.js"></script>
+       <script src="../js/sourceCode.js"></script>
+          <script src="../js/search/search.js"></script>
+          <script src="../js/search/lunr.min.js"></script>
+          <script src="../js/search/search-lunr.js"></script>
+          <script src="../js/search/search_index.js"></script>
+       <script src="../js/lazy-load-graphs.js"></script>
+
+
+    </body>
+</html>

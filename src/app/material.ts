@@ -20,6 +20,9 @@ import { MatTabsModule } from '@angular/material/tabs';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 
+/**
+ * Export and Import material components
+ */
 const materialcomponents = [
     ReactiveFormsModule,
     FormsModule,

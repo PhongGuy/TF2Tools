@@ -16,14 +16,14 @@ import { HitsoundComponent } from './dashboard/hitsound/hitsound.component';
 import { MultipleWarningComponent } from './dashboard/hitsound/multiple-warning/multiple-warning.component';
 import { UploadChangeNameComponent } from './dashboard/hitsound/upload-change-name/upload-change-name.component';
 import { HudComponent } from './dashboard/hud/hud.component';
+import { SettingsComponent } from './dashboard/settings/settings.component';
 import { WeaponsSoundsComponent } from './dashboard/weapons-sounds/weapons-sounds.component';
 import { QuestionAnswerComponent } from './dialogs/question-answer/question-answer.component';
 import { YesNoComponent } from './dialogs/yes-no/yes-no.component';
 import { MaterialModule } from './material';
 import { SetupComponent } from './setup/setup.component';
-import { SettingsComponent } from './dashboard/settings/settings.component';
 
-// AoT requires an exported function for factories
+/** AoT requires an exported function for factories */
 const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new TranslateHttpLoader(http, './assets/i18n/', '.json');
 
 @NgModule({

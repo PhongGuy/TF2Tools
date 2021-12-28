@@ -11,6 +11,9 @@ import { QuestionAnswer } from '../../models/questionAnswer';
 import { YesNo } from '../../models/yesNo';
 import { SnackService } from '../../services/snack.service';
 
+/**
+ * Hud
+ */
 @Component({
   selector: 'app-hud',
   templateUrl: './hud.component.html',
@@ -18,28 +21,64 @@ import { SnackService } from '../../services/snack.service';
 })
 export class HudComponent implements OnInit {
 
+  /**
+   * Folder upload `ElementRef`
+   */
   @ViewChild('folderUpload') folderUpload: ElementRef;
 
+  /**
+   * Current huds of hud component
+   */
   currentHuds: Hud[];
+  /**
+   * Huds installed of hud component
+   */
   hudsInstalled: number;
+  /**
+   * Library  of hud component
+   */
   library: Hud[];
+  /**
+   * Local huds of hud component
+   */
   localHuds: string;
+  /**
+   * Not in library of hud component
+   */
   notInLibrary: Hud[];
 
+  /**
+   * My control of hud component
+   */
   myControl = new FormControl();
+  /**
+   * Filtered options of hud component
+   */
   filteredOptions: Observable<Hud[]>;
 
+  /**
+   * Creates an instance of hud component.
+   *
+   * @param electron
+   * @param app
+   * @param dialog
+   * @param snack
+   */
   constructor(
     private electron: ElectronService,
     private app: AppComponent,
-    public dialog: MatDialog,
+    private dialog: MatDialog,
     private snack: SnackService
   ) {
     this.localHuds = `${this.app.settings.libraryPath}\\huds`;
     this.electron.fs.ensureDir(this.localHuds);
   }
 
-  // first we need to look for a folder with info file in, we will assume that is the current hud.
+  /**
+   * on init
+   *
+   * @description first we need to look for a folder with info file in, we will assume that is the current hud.
+   */
   ngOnInit(): void {
     this.update();
 
@@ -69,6 +108,9 @@ export class HudComponent implements OnInit {
     );
   }
 
+  /**
+   * Updates hud component
+   */
   update() {
     this.library = [];
     if (!this.electron.fs.existsSync(this.localHuds)) {
@@ -107,6 +149,11 @@ export class HudComponent implements OnInit {
     this.myControl.setValue('');
   }
 
+  /**
+   * Adds hud
+   *
+   * @param _hud
+   */
   add(_hud: Hud) {
     this.electron.fs.copy(_hud.path, `${this.app.settings.customPath}/${_hud.folderName}`)
       .then(() => {
@@ -116,6 +163,11 @@ export class HudComponent implements OnInit {
       .catch(err => console.error(err));
   }
 
+  /**
+   * Uninstalls hud
+   *
+   * @param _hud
+   */
   uninstall(_hud: Hud) {
     if (this.electron.fs.existsSync(_hud.path)) {
       if (this.app.settings.moveOrCopy) {
@@ -135,6 +187,11 @@ export class HudComponent implements OnInit {
     }
   }
 
+  /**
+   * Removes hud
+   *
+   * @param _hud
+   */
   remove(_hud: Hud) {
     if (this.electron.fs.existsSync(_hud.path)) {
       const d: YesNo = new YesNo();
@@ -159,6 +216,11 @@ export class HudComponent implements OnInit {
     }
   }
 
+  /**
+   * Uploads huds
+   *
+   * @param event
+   */
   upload(event: Event) {
     const target = event.target as HTMLInputElement;
     const files: File[] = Array.from(target.files);
@@ -190,6 +252,11 @@ export class HudComponent implements OnInit {
     this.folderUpload.nativeElement.value = null;
   }
 
+  /**
+   * Renames hud
+   *
+   * @param _hud
+   */
   rename(_hud: Hud): void {
     const dialogRef = this.dialog.open(QuestionAnswerComponent, {
       width: '450px',
@@ -214,10 +281,24 @@ export class HudComponent implements OnInit {
     });
   }
 
+  /**
+   * Replaces hud component
+   *
+   * TODO: replace the installed hud with `_hud`
+   *
+   * @param _hud
+   *
+   */
   replace(_hud: Hud): void {
 
   }
 
+  /**
+   * Huds filter
+   *
+   * @param value
+   * @returns filter
+   */
   private hudFilter(value: string): Hud[] {
     const filterValue = value.toLowerCase();
 
@@ -230,6 +311,12 @@ export class HudComponent implements OnInit {
     });
   }
 
+  /**
+   * Gets names
+   *
+   * @param exclude
+   * @returns names
+   */
   private getNames(exclude: string): string[] {
     const names: string[] = [];
     this.library.forEach(a => {
@@ -238,11 +325,5 @@ export class HudComponent implements OnInit {
       }
     });
     return names;
-  }
-
-  private copy(path, dest) {
-    this.electron.fs.copy(path, dest)
-      .then(() => this.update())
-      .catch(err => console.error(err));
   }
 }

@@ -1,0 +1,2667 @@
+<!doctype html>
+<html class="no-js" lang="">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="x-ua-compatible" content="ie=edge">
+        <title>TF2Tools</title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
+        <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
+	   <link rel="stylesheet" href="../styles/style.css">
+        <link rel="stylesheet" href="../styles/dark.css">
+        <link rel="stylesheet" href="../styles/material.css">
+    </head>
+    <body>
+
+        <div class="navbar navbar-default navbar-fixed-top visible-xs">
+            <a href="../" class="navbar-brand">TF2Tools</a>
+            <button type="button" class="btn btn-default btn-menu ion-ios-menu" id="btn-menu"></button>
+        </div>
+
+        <div class="xs-menu menu" id="mobile-menu">
+                <div id="book-search-input" role="search"><input type="text" placeholder="Type to search"></div>            <compodoc-menu></compodoc-menu>
+        </div>
+
+        <div class="container-fluid main">
+           <div class="row main">
+               <div class="hidden-xs menu">
+                   <compodoc-menu mode="normal"></compodoc-menu>
+               </div>
+               <!-- START CONTENT -->
+               <div class="content component">
+                   <div class="content-data">
+
+
+
+
+<ol class="breadcrumb">
+  <li>Components</li>
+  <li
+  >
+  CrosshairsComponent</li>
+</ol>
+
+<ul class="nav nav-tabs" role="tablist">
+        <li class="active">
+            <a href="#info" role="tab" id="info-tab" data-toggle="tab" data-link="info">Info</a>
+        </li>
+        <li >
+            <a href="#source" role="tab" id="source-tab" data-toggle="tab" data-link="source">Source</a>
+        </li>
+        <li >
+            <a href="#templateData" role="tab" id="templateData-tab" data-toggle="tab" data-link="template">Template</a>
+        </li>
+        <li >
+            <a href="#styleData" role="tab" id="styleData-tab" data-toggle="tab" data-link="style">Styles</a>
+        </li>
+        <li >
+            <a href="#tree" role="tab" id="tree-tab" data-toggle="tab" data-link="dom-tree">DOM Tree</a>
+        </li>
+</ul>
+
+<div class="tab-content">
+    <div class="tab-pane fade active in" id="c-info"><p class="comment">
+    <h3>File</h3>
+</p>
+<p class="comment">
+    <code>src/app/dashboard/crosshairs/crosshairs.component.ts</code>
+</p>
+
+
+    <p class="comment">
+        <h3>Description</h3>
+    </p>
+    <p class="comment">
+        <p>Crosshairs component</p>
+
+    </p>
+
+
+    <p class="comment">
+        <h3>Implements</h3>
+    </p>
+    <p class="comment">
+                    <code><a href="https://angular.io/api/core/OnInit" target="_blank" >OnInit</a></code>
+    </p>
+
+
+<section>
+    <h3>Metadata</h3>
+    <table class="table table-sm table-hover metadata">
+        <tbody>
+
+
+
+
+
+
+
+
+
+
+
+            <tr>
+                <td class="col-md-3">selector</td>
+                <td class="col-md-9"><code>app-crosshairs</code></td>
+            </tr>
+
+            <tr>
+                <td class="col-md-3">styleUrls</td>
+                <td class="col-md-9"><code>./crosshairs.component.scss</code></td>
+            </tr>
+
+
+
+            <tr>
+                <td class="col-md-3">templateUrl</td>
+                <td class="col-md-9"><code>./crosshairs.component.html</code></td>
+            </tr>
+
+
+
+
+
+
+
+
+        </tbody>
+    </table>
+</section>
+
+    <section>
+    <h3 id="index">Index</h3>
+    <table class="table table-sm table-bordered index-table">
+        <tbody>
+                <tr>
+                    <td class="col-md-4">
+                        <h6><b>Properties</b></h6>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <ul class="index-list">
+                            <li>
+                                <a href="#allWeapons" >allWeapons</a>
+                            </li>
+                            <li>
+                                    <span class="modifier">Public</span>
+                                <a href="#app" >app</a>
+                            </li>
+                            <li>
+                                <a href="#applyTo" >applyTo</a>
+                            </li>
+                            <li>
+                                <a href="#background" >background</a>
+                            </li>
+                            <li>
+                                <a href="#crosshairSelected" >crosshairSelected</a>
+                            </li>
+                            <li>
+                                <a href="#crosshairsTab" >crosshairsTab</a>
+                            </li>
+                            <li>
+                                <a href="#demoman" >demoman</a>
+                            </li>
+                            <li>
+                                <a href="#demomanWeapons" >demomanWeapons</a>
+                            </li>
+                            <li>
+                                <a href="#engineer" >engineer</a>
+                            </li>
+                            <li>
+                                <a href="#engineerWeapons" >engineerWeapons</a>
+                            </li>
+                            <li>
+                                <a href="#heavy" >heavy</a>
+                            </li>
+                            <li>
+                                <a href="#heavyWeapons" >heavyWeapons</a>
+                            </li>
+                            <li>
+                                <a href="#medic" >medic</a>
+                            </li>
+                            <li>
+                                <a href="#medicWeapons" >medicWeapons</a>
+                            </li>
+                            <li>
+                                <a href="#pyro" >pyro</a>
+                            </li>
+                            <li>
+                                <a href="#pyroWeapons" >pyroWeapons</a>
+                            </li>
+                            <li>
+                                <a href="#scout" >scout</a>
+                            </li>
+                            <li>
+                                <a href="#scoutWeapons" >scoutWeapons</a>
+                            </li>
+                            <li>
+                                <a href="#selected" >selected</a>
+                            </li>
+                            <li>
+                                <a href="#selectedWeapons" >selectedWeapons</a>
+                            </li>
+                            <li>
+                                <a href="#sniper" >sniper</a>
+                            </li>
+                            <li>
+                                <a href="#sniperWeapons" >sniperWeapons</a>
+                            </li>
+                            <li>
+                                <a href="#soldier" >soldier</a>
+                            </li>
+                            <li>
+                                <a href="#soldierWeapons" >soldierWeapons</a>
+                            </li>
+                            <li>
+                                <a href="#spy" >spy</a>
+                            </li>
+                            <li>
+                                <a href="#spyWeapons" >spyWeapons</a>
+                            </li>
+                        </ul>
+                    </td>
+                </tr>
+
+                <tr>
+                    <td class="col-md-4">
+                        <h6><b>Methods</b></h6>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <ul class="index-list">
+                            <li>
+                                <a href="#apply" >apply</a>
+                            </li>
+                            <li>
+                                <a href="#applyAll" >applyAll</a>
+                            </li>
+                            <li>
+                                <a href="#applyAllClasses" >applyAllClasses</a>
+                            </li>
+                            <li>
+                                <a href="#changeBackground" >changeBackground</a>
+                            </li>
+                            <li>
+                                <a href="#generate" >generate</a>
+                            </li>
+                            <li>
+                                    <span class="modifier">Private</span>
+                                <a href="#get" >get</a>
+                            </li>
+                            <li>
+                                <a href="#ngOnInit" >ngOnInit</a>
+                            </li>
+                            <li>
+                                <a href="#selectedItems" >selectedItems</a>
+                            </li>
+                            <li>
+                                <a href="#unSelectAll" >unSelectAll</a>
+                            </li>
+                            <li>
+                                    <span class="modifier">Private</span>
+                                <a href="#weaponSort" >weaponSort</a>
+                            </li>
+                        </ul>
+                    </td>
+                </tr>
+
+
+
+
+
+        </tbody>
+    </table>
+</section>
+
+    <section>
+    <h3 id="constructor">Constructor</h3>
+        <table class="table table-sm table-bordered">
+            <tbody>
+                <tr>
+                    <td class="col-md-4">
+<code>constructor(app: <a href="../components/AppComponent.html" target="_self">AppComponent</a>, electron: <a href="../injectables/ElectronService.html" target="_self">ElectronService</a>, snack: <a href="../injectables/SnackService.html" target="_self">SnackService</a>)</code>
+                    </td>
+                </tr>
+                        <tr>
+                            <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="128" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:128</a></div>
+                            </td>
+                        </tr>
+
+                <tr>
+                    <td class="col-md-4">
+                            <div class="io-description"><p>Creates an instance of crosshairs component.</p>
+</div>
+                            <div>
+                                    <b>Parameters :</b>
+                                    <table class="params">
+                                        <thead>
+                                            <tr>
+                                                <td>Name</td>
+                                                    <td>Type</td>
+                                                <td>Optional</td>
+                                                    <td>Description</td>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                                <tr>
+                                                        <td>app</td>
+                                                  
+                                                        <td>
+                                                                        <code><a href="../components/AppComponent.html" target="_self" >AppComponent</a></code>
+                                                        </td>
+                                                  
+                                                    <td>
+                                                            No
+                                                    </td>
+                                                    
+                                                        <td>
+                                                                <p>AppComponent</p>
+
+                                                        </td>
+                                                </tr>
+                                                <tr>
+                                                        <td>electron</td>
+                                                  
+                                                        <td>
+                                                                        <code><a href="../injectables/ElectronService.html" target="_self" >ElectronService</a></code>
+                                                        </td>
+                                                  
+                                                    <td>
+                                                            No
+                                                    </td>
+                                                    
+                                                        <td>
+                                                        </td>
+                                                </tr>
+                                                <tr>
+                                                        <td>snack</td>
+                                                  
+                                                        <td>
+                                                                        <code><a href="../injectables/SnackService.html" target="_self" >SnackService</a></code>
+                                                        </td>
+                                                  
+                                                    <td>
+                                                            No
+                                                    </td>
+                                                    
+                                                        <td>
+                                                        </td>
+                                                </tr>
+                                        </tbody>
+                                    </table>
+                            </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+</section>
+
+
+
+
+
+    <section>
+    
+    <h3 id="methods">
+        Methods
+    </h3>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="apply"></a>
+                    <span class="name">
+                        <span ><b>apply</b></span>
+                        <a href="#apply"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>apply()</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="246"
+                            class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:246</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Applys to weapons</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="applyAll"></a>
+                    <span class="name">
+                        <span ><b>applyAll</b></span>
+                        <a href="#applyAll"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>applyAll(slot: "Primary" | "Secondary" | "Melee" | "All")</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="265"
+                            class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:265</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Applys to all weapons</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>slot</td>
+                                    <td>
+                                            <code>&quot;Primary&quot; | &quot;Secondary&quot; | &quot;Melee&quot; | &quot;All&quot;</code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="applyAllClasses"></a>
+                    <span class="name">
+                        <span ><b>applyAllClasses</b></span>
+                        <a href="#applyAllClasses"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>applyAllClasses(slot: "Primary" | "Secondary" | "Melee" | "All")</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="307"
+                            class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:307</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Applys to all weapons on all classes</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>slot</td>
+                                    <td>
+                                            <code>&quot;Primary&quot; | &quot;Secondary&quot; | &quot;Melee&quot; | &quot;All&quot;</code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="changeBackground"></a>
+                    <span class="name">
+                        <span ><b>changeBackground</b></span>
+                        <a href="#changeBackground"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>changeBackground(v: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="327"
+                            class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:327</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Changes background</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>v</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="generate"></a>
+                    <span class="name">
+                        <span ><b>generate</b></span>
+                        <a href="#generate"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>generate()</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="219"
+                            class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:219</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Generates vtf crosshairs</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="get"></a>
+                    <span class="name">
+                        <span class="modifier">Private</span>
+                        <span ><b>get</b></span>
+                        <a href="#get"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>get()</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="335"
+                            class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:335</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Gets crosshairs component</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ngOnInit"></a>
+                    <span class="name">
+                        <span ><b>ngOnInit</b></span>
+                        <a href="#ngOnInit"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>ngOnInit()</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="147"
+                            class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:147</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>on init</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="selectedItems"></a>
+                    <span class="name">
+                        <span ><b>selectedItems</b></span>
+                        <a href="#selectedItems"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>selectedItems(items: MatListOption[])</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="157"
+                            class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:157</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Selected items</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>items</td>
+                                    <td>
+                                            <code>MatListOption[]</code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="unSelectAll"></a>
+                    <span class="name">
+                        <span ><b>unSelectAll</b></span>
+                        <a href="#unSelectAll"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>unSelectAll()</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="183"
+                            class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:183</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Un select all</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="weaponSort"></a>
+                    <span class="name">
+                        <span class="modifier">Private</span>
+                        <span ><b>weaponSort</b></span>
+                        <a href="#weaponSort"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>weaponSort(a: <a href="../classes/WeaponData.html" target="_self">WeaponData</a>, b: <a href="../classes/WeaponData.html" target="_self">WeaponData</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="416"
+                            class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:416</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Weapons sort</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>a</td>
+                                    <td>
+                                                <code><a href="../classes/WeaponData.html" target="_self" >WeaponData</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                                <tr>
+                                    <td>b</td>
+                                    <td>
+                                                <code><a href="../classes/WeaponData.html" target="_self" >WeaponData</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>    <code>-1 | 0</code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+    <section>
+    
+    <h3 id="inputs">
+        Properties
+    </h3>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="allWeapons"></a>
+                    <span class="name">
+                        <span ><b>allWeapons</b></span>
+                        <a href="#allWeapons"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/WeaponData.html" target="_self" >WeaponData[]</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>[]</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="86" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:86</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>All weapons of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="app"></a>
+                    <span class="name">
+                            <span class="modifier">Public</span>
+                        <span ><b>app</b></span>
+                        <a href="#app"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../components/AppComponent.html" target="_self" >AppComponent</a></code>
+
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="138" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:138</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description">AppComponent</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="applyTo"></a>
+                    <span class="name">
+                        <span ><b>applyTo</b></span>
+                        <a href="#applyTo"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>&#x27;Scout&#x27;</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="128" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:128</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Apply to</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="background"></a>
+                    <span class="name">
+                        <span ><b>background</b></span>
+                        <a href="#background"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatSelect</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;background&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="34" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:34</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Crosshair background <code>MatSelect</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="crosshairSelected"></a>
+                    <span class="name">
+                        <span ><b>crosshairSelected</b></span>
+                        <a href="#crosshairSelected"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatSelect</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;crosshairSelected&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="26" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:26</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Crosshair selected <code>MatSelect</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="crosshairsTab"></a>
+                    <span class="name">
+                        <span ><b>crosshairsTab</b></span>
+                        <a href="#crosshairsTab"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatTabGroup</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;crosshairsTab&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="30" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:30</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Crosshairs tab <code>MatTabGroup</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="demoman"></a>
+                    <span class="name">
+                        <span ><b>demoman</b></span>
+                        <a href="#demoman"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatSelectionList</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;demoman&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="52" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:52</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Demoman list <code>MatSelectionList</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="demomanWeapons"></a>
+                    <span class="name">
+                        <span ><b>demomanWeapons</b></span>
+                        <a href="#demomanWeapons"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/WeaponData.html" target="_self" >WeaponData[]</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>[]</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="103" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:103</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Demoman weapons of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="engineer"></a>
+                    <span class="name">
+                        <span ><b>engineer</b></span>
+                        <a href="#engineer"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatSelectionList</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;engineer&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="60" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:60</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Engineer list <code>MatSelectionList</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="engineerWeapons"></a>
+                    <span class="name">
+                        <span ><b>engineerWeapons</b></span>
+                        <a href="#engineerWeapons"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/WeaponData.html" target="_self" >WeaponData[]</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>[]</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="111" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:111</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Engineer weapons of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="heavy"></a>
+                    <span class="name">
+                        <span ><b>heavy</b></span>
+                        <a href="#heavy"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatSelectionList</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;heavy&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="56" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:56</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Heavy list <code>MatSelectionList</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="heavyWeapons"></a>
+                    <span class="name">
+                        <span ><b>heavyWeapons</b></span>
+                        <a href="#heavyWeapons"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/WeaponData.html" target="_self" >WeaponData[]</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>[]</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="107" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:107</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Heavy weapons of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="medic"></a>
+                    <span class="name">
+                        <span ><b>medic</b></span>
+                        <a href="#medic"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatSelectionList</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;medic&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="64" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:64</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Medic list <code>MatSelectionList</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="medicWeapons"></a>
+                    <span class="name">
+                        <span ><b>medicWeapons</b></span>
+                        <a href="#medicWeapons"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/WeaponData.html" target="_self" >WeaponData[]</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>[]</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="115" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:115</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Medic weapons of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="pyro"></a>
+                    <span class="name">
+                        <span ><b>pyro</b></span>
+                        <a href="#pyro"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatSelectionList</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;pyro&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="48" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:48</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Pyro list <code>MatSelectionList</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="pyroWeapons"></a>
+                    <span class="name">
+                        <span ><b>pyroWeapons</b></span>
+                        <a href="#pyroWeapons"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/WeaponData.html" target="_self" >WeaponData[]</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>[]</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="99" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:99</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Pyro weapons of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="scout"></a>
+                    <span class="name">
+                        <span ><b>scout</b></span>
+                        <a href="#scout"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatSelectionList</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;scout&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="40" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:40</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Scout list <code>MatSelectionList</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="scoutWeapons"></a>
+                    <span class="name">
+                        <span ><b>scoutWeapons</b></span>
+                        <a href="#scoutWeapons"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/WeaponData.html" target="_self" >WeaponData[]</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>[]</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="91" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:91</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Scout weapons of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="selected"></a>
+                    <span class="name">
+                        <span ><b>selected</b></span>
+                        <a href="#selected"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>new CrossahirSelected()</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="77" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:77</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Selected of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="selectedWeapons"></a>
+                    <span class="name">
+                        <span ><b>selectedWeapons</b></span>
+                        <a href="#selectedWeapons"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/WeaponData.html" target="_self" >WeaponData[]</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>[]</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="81" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:81</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Selected weapons of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="sniper"></a>
+                    <span class="name">
+                        <span ><b>sniper</b></span>
+                        <a href="#sniper"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatSelectionList</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;sniper&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="68" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:68</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Sniper list <code>MatSelectionList</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="sniperWeapons"></a>
+                    <span class="name">
+                        <span ><b>sniperWeapons</b></span>
+                        <a href="#sniperWeapons"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/WeaponData.html" target="_self" >WeaponData[]</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>[]</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="119" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:119</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Sniper weapons of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="soldier"></a>
+                    <span class="name">
+                        <span ><b>soldier</b></span>
+                        <a href="#soldier"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatSelectionList</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;soldier&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="44" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:44</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Soldier list <code>MatSelectionList</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="soldierWeapons"></a>
+                    <span class="name">
+                        <span ><b>soldierWeapons</b></span>
+                        <a href="#soldierWeapons"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/WeaponData.html" target="_self" >WeaponData[]</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>[]</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="95" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:95</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Soldier weapons of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="spy"></a>
+                    <span class="name">
+                        <span ><b>spy</b></span>
+                        <a href="#spy"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>MatSelectionList</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;spy&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="72" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:72</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Spy list <code>MatSelectionList</code></p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="spyWeapons"></a>
+                    <span class="name">
+                        <span ><b>spyWeapons</b></span>
+                        <a href="#spyWeapons"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>        <code><a href="../classes/WeaponData.html" target="_self" >WeaponData[]</a></code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Default value : </i><code>[]</code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="123" class="link-to-prism">src/app/dashboard/crosshairs/crosshairs.component.ts:123</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Spy weapons of crosshairs component</p>
+</div>
+                </td>
+            </tr>
+
+        </tbody>
+    </table>
+</section>
+
+</div>
+
+
+    <div class="tab-pane fade  tab-source-code" id="c-source">
+        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { Component, OnInit, ViewChild } from &#x27;@angular/core&#x27;;
+import { MatListOption, MatSelectionList } from &#x27;@angular/material/list&#x27;;
+import { MatSelect } from &#x27;@angular/material/select&#x27;;
+import { MatTabGroup } from &#x27;@angular/material/tabs&#x27;;
+import { APP_CONFIG } from &#x27;../../../environments/environment&#x27;;
+import { AppComponent } from &#x27;../../app.component&#x27;;
+import { ElectronService } from &#x27;../../core/services&#x27;;
+import { tfWeapons } from &#x27;../../mock/tfWeapons&#x27;;
+import { CrossahirSelected } from &#x27;../../models/crosshairSelected&#x27;;
+import { WeaponData } from &#x27;../../models/weaponData&#x27;;
+import { SnackService } from &#x27;../../services/snack.service&#x27;;
+
+/**
+ * Crosshairs component
+ */
+@Component({
+  selector: &#x27;app-crosshairs&#x27;,
+  templateUrl: &#x27;./crosshairs.component.html&#x27;,
+  styleUrls: [&#x27;./crosshairs.component.scss&#x27;]
+})
+export class CrosshairsComponent implements OnInit {
+
+  /**
+   * Crosshair selected &#x60;MatSelect&#x60;
+   */
+  @ViewChild(&#x27;crosshairSelected&#x27;) crosshairSelected: MatSelect;
+  /**
+   * Crosshairs tab &#x60;MatTabGroup&#x60;
+   */
+  @ViewChild(&#x27;crosshairsTab&#x27;) crosshairsTab: MatTabGroup;
+  /**
+   * Crosshair background &#x60;MatSelect&#x60;
+   */
+  @ViewChild(&#x27;background&#x27;) background: MatSelect;
+
+  // classes
+  /**
+   * Scout list &#x60;MatSelectionList&#x60;
+   */
+  @ViewChild(&#x27;scout&#x27;) scout: MatSelectionList;
+  /**
+   * Soldier list &#x60;MatSelectionList&#x60;
+   */
+  @ViewChild(&#x27;soldier&#x27;) soldier: MatSelectionList;
+  /**
+   * Pyro list &#x60;MatSelectionList&#x60;
+   */
+  @ViewChild(&#x27;pyro&#x27;) pyro: MatSelectionList;
+  /**
+   * Demoman list &#x60;MatSelectionList&#x60;
+   */
+  @ViewChild(&#x27;demoman&#x27;) demoman: MatSelectionList;
+  /**
+   * Heavy list &#x60;MatSelectionList&#x60;
+   */
+  @ViewChild(&#x27;heavy&#x27;) heavy: MatSelectionList;
+  /**
+   * Engineer list &#x60;MatSelectionList&#x60;
+   */
+  @ViewChild(&#x27;engineer&#x27;) engineer: MatSelectionList;
+  /**
+   * Medic list &#x60;MatSelectionList&#x60;
+   */
+  @ViewChild(&#x27;medic&#x27;) medic: MatSelectionList;
+  /**
+   * Sniper list &#x60;MatSelectionList&#x60;
+   */
+  @ViewChild(&#x27;sniper&#x27;) sniper: MatSelectionList;
+  /**
+   * Spy list &#x60;MatSelectionList&#x60;
+   */
+  @ViewChild(&#x27;spy&#x27;) spy: MatSelectionList;
+
+  /**
+   * Selected of crosshairs component
+   */
+  selected &#x3D; new CrossahirSelected();
+  /**
+   * Selected weapons of crosshairs component
+   */
+  selectedWeapons: WeaponData[] &#x3D; [];
+
+  /**
+   * All weapons of crosshairs component
+   */
+  allWeapons: WeaponData[] &#x3D; [];
+  // classes
+  /**
+   * Scout weapons of crosshairs component
+   */
+  scoutWeapons: WeaponData[] &#x3D; [];
+  /**
+   * Soldier weapons of crosshairs component
+   */
+  soldierWeapons: WeaponData[] &#x3D; [];
+  /**
+   * Pyro weapons of crosshairs component
+   */
+  pyroWeapons: WeaponData[] &#x3D; [];
+  /**
+   * Demoman weapons of crosshairs component
+   */
+  demomanWeapons: WeaponData[] &#x3D; [];
+  /**
+   * Heavy weapons of crosshairs component
+   */
+  heavyWeapons: WeaponData[] &#x3D; [];
+  /**
+   * Engineer weapons of crosshairs component
+   */
+  engineerWeapons: WeaponData[] &#x3D; [];
+  /**
+   * Medic weapons of crosshairs component
+   */
+  medicWeapons: WeaponData[] &#x3D; [];
+  /**
+   * Sniper weapons of crosshairs component
+   */
+  sniperWeapons: WeaponData[] &#x3D; [];
+  /**
+   * Spy weapons of crosshairs component
+   */
+  spyWeapons: WeaponData[] &#x3D; [];
+
+  /**
+   * Apply to
+   */
+  applyTo &#x3D; &#x27;Scout&#x27;;
+
+  /**
+   * Creates an instance of crosshairs component.
+   *
+   * @param app AppComponent
+   * @param electron
+   * @param snack
+   */
+  constructor(
+    public app: AppComponent,
+    private electron: ElectronService,
+    private snack: SnackService,
+  ) {
+  }
+
+  /**
+   * on init
+   */
+  ngOnInit(): void {
+    this.app.update(&#x27;vtf&#x27;);
+    this.get();
+  }
+
+  /**
+   * Selected items
+   *
+   * @param items
+   */
+  selectedItems(items: MatListOption[]): void {
+    this.selected &#x3D; new CrossahirSelected();
+    this.selectedWeapons &#x3D; [];
+    items.forEach(d &#x3D;&gt; {
+      const weapon &#x3D; d.value as WeaponData;
+      this.selectedWeapons.push(weapon);
+      if (!this.selected.classes.includes(weapon.info.class)) {
+        this.selected.classes.push(weapon.info.class);
+      }
+      this.selected.names.push(weapon.info.name);
+      weapon.info.weaponsAffected.forEach(effcted &#x3D;&gt; {
+        this.selected.weaponsAffected.push(effcted);
+      });
+
+      // this.selected.weaponClasses.push(weapon.info.weaponClass);
+      // if (!this.selected.slots.includes(weapon.info.slot)) {
+      //   this.selected.slots.push(weapon.info.slot);
+      // }
+
+      this.crosshairSelected.value &#x3D; weapon.crosshair;
+    });
+  }
+
+  /**
+   * Un select all
+   */
+  unSelectAll() {
+    this.scout.deselectAll();
+    this.soldier.deselectAll();
+    this.pyro.deselectAll();
+    this.demoman.deselectAll();
+    this.heavy.deselectAll();
+    this.engineer.deselectAll();
+    this.medic.deselectAll();
+    this.sniper.deselectAll();
+    this.spy.deselectAll();
+    this.selectedItems([]);
+
+    if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 0) {
+      this.applyTo &#x3D; &#x27;Scout&#x27;;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 1) {
+      this.applyTo &#x3D; &#x27;Soldier&#x27;;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 2) {
+      this.applyTo &#x3D; &#x27;Pyro&#x27;;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 3) {
+      this.applyTo &#x3D; &#x27;Demoman&#x27;;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 4) {
+      this.applyTo &#x3D; &#x27;Heavy&#x27;;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 5) {
+      this.applyTo &#x3D; &#x27;Engineer&#x27;;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 6) {
+      this.applyTo &#x3D; &#x27;Medic&#x27;;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 7) {
+      this.applyTo &#x3D; &#x27;Sniper&#x27;;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 8) {
+      this.applyTo &#x3D; &#x27;Spy&#x27;;
+    }
+  }
+
+  /**
+   * Generates vtf crosshairs
+   */
+  generate(): void {
+    const vtfPath &#x3D; &#x60;${this.app.settings.customPath}\\mycustomstuff\\materials\\vgui\\replay\\thumbnails&#x60;;
+    const scriptPath &#x3D; &#x60;${this.app.settings.customPath}\\mycustomstuff\\scripts&#x60;;
+    this.electron.fs.ensureDir(vtfPath)
+      .then(() &#x3D;&gt; {
+        this.snack.show(&#x27;Adding vtf crosshairs&#x27;, null, 2500);
+        this.electron.fs.copy(&#x60;${APP_CONFIG.src}assets/vtf/materials/vgui/replay/thumbnails&#x60;, vtfPath, { overwrite: true })
+          .then(() &#x3D;&gt; {
+            this.electron.fs.ensureDir(scriptPath)
+              .then(() &#x3D;&gt; {
+                this.electron.fs.copy(&#x60;${APP_CONFIG.src}assets/vtf/scripts&#x60;, scriptPath, { overwrite: false })
+                  .then(() &#x3D;&gt; {
+                    this.snack.show(&#x27;vtf crosshairs was generated&#x27;);
+                    this.app.update();
+                  })
+                  .catch((err) &#x3D;&gt; this.app.error(err));
+              })
+              .catch((err) &#x3D;&gt; this.app.error(err));
+          })
+          .catch((err) &#x3D;&gt; this.app.error(err));
+      })
+      .catch((err) &#x3D;&gt; this.app.error(err));
+  }
+
+  /**
+   * Applys to weapons
+   */
+  apply(): void {
+    const crosshair &#x3D; this.crosshairSelected.value;
+    this.selectedWeapons.forEach(weapon &#x3D;&gt; {
+      const file &#x3D; this.electron.fs.readFileSync(weapon.path, { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; });
+      this.electron.fs.writeFile(weapon.path, file.replace(&#x60;/thumbnails/${weapon.crosshair}&#x60;, &#x60;/thumbnails/${crosshair}&#x60;))
+        .then(() &#x3D;&gt; {
+          this.snack.show(&#x60;Updated ${weapon.info.name} to ${crosshair}&#x60;);
+          this.app.update(&#x27;vtf&#x27;);
+          this.get();
+        })
+        .catch((err) &#x3D;&gt; this.app.error(err));
+    });
+  }
+
+  /**
+   * Applys to all weapons
+   *
+   * @param slot
+   */
+  applyAll(slot: &#x27;Primary&#x27; | &#x27;Secondary&#x27; | &#x27;Melee&#x27; | &#x27;All&#x27;): void {
+    const crosshair &#x3D; this.crosshairSelected.value;
+    let weaponsTab: WeaponData[] &#x3D; [];
+
+    if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 0) {
+      weaponsTab &#x3D; this.scoutWeapons;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 1) {
+      weaponsTab &#x3D; this.soldierWeapons;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 2) {
+      weaponsTab &#x3D; this.pyroWeapons;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 3) {
+      weaponsTab &#x3D; this.demomanWeapons;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 4) {
+      weaponsTab &#x3D; this.heavyWeapons;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 5) {
+      weaponsTab &#x3D; this.engineerWeapons;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 6) {
+      weaponsTab &#x3D; this.medicWeapons;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 7) {
+      weaponsTab &#x3D; this.sniperWeapons;
+    } else if (this.crosshairsTab.selectedIndex &#x3D;&#x3D;&#x3D; 8) {
+      weaponsTab &#x3D; this.spyWeapons;
+    }
+
+    weaponsTab.forEach(weapon &#x3D;&gt; {
+      if (weapon !&#x3D;&#x3D; crosshair) {
+        if (weapon.info.slot &#x3D;&#x3D;&#x3D; slot || slot &#x3D;&#x3D;&#x3D; &#x27;All&#x27;) {
+          const file &#x3D; this.electron.fs.readFileSync(weapon.path, { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; });
+          this.electron.fs.writeFileSync(weapon.path, file.replace(&#x60;/thumbnails/${weapon.crosshair}&#x60;, &#x60;/thumbnails/${crosshair}&#x60;));
+          this.snack.show(&#x60;Updated ${weapon.info.name} to ${crosshair}&#x60;, null, 800);
+        }
+      }
+    });
+    this.app.update(&#x27;vtf&#x27;);
+    this.get();
+  }
+
+  /**
+   * Applys to all weapons on all classes
+   *
+   * @param slot
+   */
+  applyAllClasses(slot: &#x27;Primary&#x27; | &#x27;Secondary&#x27; | &#x27;Melee&#x27; | &#x27;All&#x27;): void {
+    const crosshair &#x3D; this.crosshairSelected.value;
+    this.allWeapons.forEach(weapon &#x3D;&gt; {
+      if (weapon !&#x3D;&#x3D; crosshair) {
+        if (weapon.info.slot &#x3D;&#x3D;&#x3D; slot || weapon.info.slot &#x3D;&#x3D;&#x3D; &#x27;All&#x27;) {
+          const file &#x3D; this.electron.fs.readFileSync(weapon.path, { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; });
+          this.electron.fs.writeFileSync(weapon.path, file.replace(&#x60;/thumbnails/${weapon.crosshair}&#x60;, &#x60;/thumbnails/${crosshair}&#x60;));
+        }
+      }
+    });
+    this.snack.show(&#x60;Updated ${slot} weapons to ${crosshair} on all classes&#x60;, null, 4000);
+    this.app.update(&#x27;vtf&#x27;);
+    this.get();
+  }
+
+  /**
+   * Changes background
+   *
+   * @param v
+   */
+  changeBackground(v: string) {
+    this.app.settings.crosshairBackground &#x3D; v;
+    this.app.settingsUpdate.next(this.app.settings);
+  }
+
+  /**
+   * Gets crosshairs component
+   */
+  private get(): void {
+
+    this.scoutWeapons &#x3D; [];
+    this.soldierWeapons &#x3D; [];
+    this.pyroWeapons &#x3D; [];
+    this.demomanWeapons &#x3D; [];
+    this.heavyWeapons &#x3D; [];
+    this.engineerWeapons &#x3D; [];
+    this.medicWeapons &#x3D; [];
+    this.sniperWeapons &#x3D; [];
+    this.spyWeapons &#x3D; [];
+
+    this.app.vtfScripts.forEach(path &#x3D;&gt; {
+      // read script file
+      const read &#x3D; this.electron.fs.readFileSync(path, { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; });
+      const name &#x3D; path.replace(&#x27;.txt&#x27;, &#x27;&#x27;).split(&#x27;\\&#x27;).pop();
+
+      const crosshair &#x3D; read
+        .replace(/\t/g, &#x27;&#x27;)
+        .replace(/\r/g, &#x27;&#x27;)
+        .split(&#x27;\n&#x27;)
+        .filter(a &#x3D;&gt; a.includes(&#x27;vgui/replay/thumbnails&#x27;))
+        .join(&#x27;&#x27;)
+        .replace(/&quot;file&quot;&quot;vgui\/replay\/thumbnails\//g, &#x27;&#x27;)
+        .replace(/&quot;/g, &#x27;&#x27;);
+
+      const newWeapon &#x3D; new WeaponData();
+      newWeapon.crosshair &#x3D; crosshair;
+      newWeapon.path &#x3D; path;
+
+      tfWeapons.forEach((v, k) &#x3D;&gt; {
+        if (name &#x3D;&#x3D;&#x3D; v.weaponClass) {
+          newWeapon.info &#x3D; v;
+
+          if (v.class &#x3D;&#x3D;&#x3D; &#x27;Scout&#x27;) {
+            this.scoutWeapons.push(newWeapon);
+          } else if (v.class &#x3D;&#x3D;&#x3D; &#x27;Soldier&#x27;) {
+            this.soldierWeapons.push(newWeapon);
+          } else if (v.class &#x3D;&#x3D;&#x3D; &#x27;Pyro&#x27;) {
+            this.pyroWeapons.push(newWeapon);
+          } else if (v.class &#x3D;&#x3D;&#x3D; &#x27;Demoman&#x27;) {
+            this.demomanWeapons.push(newWeapon);
+          } else if (v.class &#x3D;&#x3D;&#x3D; &#x27;Heavy&#x27;) {
+            this.heavyWeapons.push(newWeapon);
+          } else if (v.class &#x3D;&#x3D;&#x3D; &#x27;Engineer&#x27;) {
+            this.engineerWeapons.push(newWeapon);
+          } else if (v.class &#x3D;&#x3D;&#x3D; &#x27;Medic&#x27;) {
+            this.medicWeapons.push(newWeapon);
+          } else if (v.class &#x3D;&#x3D;&#x3D; &#x27;Sniper&#x27;) {
+            this.sniperWeapons.push(newWeapon);
+          } else if (v.class &#x3D;&#x3D;&#x3D; &#x27;Spy&#x27;) {
+            this.spyWeapons.push(newWeapon);
+          }
+
+          // add all to one
+          this.allWeapons.push(newWeapon);
+        }
+      });
+    });
+
+    this.scoutWeapons.sort(this.weaponSort);
+    this.soldierWeapons.sort(this.weaponSort);
+    this.pyroWeapons.sort(this.weaponSort);
+    this.demomanWeapons.sort(this.weaponSort);
+    this.heavyWeapons.sort(this.weaponSort);
+    this.engineerWeapons.sort(this.weaponSort);
+    this.medicWeapons.sort(this.weaponSort);
+    this.sniperWeapons.sort(this.weaponSort);
+    this.spyWeapons.sort(this.weaponSort);
+
+    // unselect all
+    this.selectedItems([]);
+  }
+
+  /**
+   * Weapons sort
+   *
+   * @param a
+   * @param b
+   * @returns
+   */
+  private weaponSort(a: WeaponData, b: WeaponData) {
+    if (a.info.slot &#x3D;&#x3D;&#x3D; &#x27;Primary&#x27; &amp;&amp; b.info.slot !&#x3D;&#x3D; &#x27;Primary&#x27;) {
+      return -1;
+    }
+    if (a.info.slot &#x3D;&#x3D;&#x3D; &#x27;Secondary&#x27; &amp;&amp; b.info.slot !&#x3D;&#x3D; &#x27;Primary&#x27; &amp;&amp; b.info.slot !&#x3D;&#x3D; &#x27;Secondary&#x27;) {
+      return -1;
+    }
+    return 0;
+
+  }
+}
+</code></pre>
+    </div>
+
+    <div class="tab-pane fade " id="c-templateData">
+        <pre class="line-numbers"><code class="language-html">&lt;div *ngIf&#x3D;&quot;app.vtf.length &gt; 0&quot;&gt;
+    &lt;div class&#x3D;&quot;row&quot;&gt;
+        &lt;div class&#x3D;&quot;col-md-4&quot;&gt;
+            &lt;mat-form-field appearance&#x3D;&quot;fill&quot; class&#x3D;&quot;w-100&quot;&gt;
+                &lt;mat-label&gt;Choose a crosshair&lt;/mat-label&gt;
+                &lt;mat-select #crosshairSelected value&#x3D;&quot;{{app.vtf[0].replace(&#x27;.vtf&#x27;, &#x27;&#x27;).split(&#x27;\\&#x27;).pop()}}&quot;&gt;
+                    &lt;mat-option #crosshairSelected *ngFor&#x3D;&quot;let food of app.vtf&quot;
+                        [value]&#x3D;&quot;food.replace(&#x27;.vtf&#x27;, &#x27;&#x27;).split(&#x27;\\&#x27;).pop()&quot;&gt;
+                        {{food.replace(&#x27;.vtf&#x27;, &#x27;&#x27;).split(&#x27;\\&#x27;).pop()}}
+                    &lt;/mat-option&gt;
+                &lt;/mat-select&gt;
+            &lt;/mat-form-field&gt;
+            &lt;mat-form-field appearance&#x3D;&quot;fill&quot; class&#x3D;&quot;w-100&quot;&gt;
+                &lt;mat-label&gt;Choose a background&lt;/mat-label&gt;
+                &lt;mat-select #background [value]&#x3D;&quot;app.settings.crosshairBackground&quot;
+                    (valueChange)&#x3D;&quot;changeBackground(background.value)&quot;&gt;
+                    &lt;mat-option value&#x3D;&quot;&quot;&gt;Black&lt;/mat-option&gt;
+                    &lt;mat-option value&#x3D;&quot;assets/vtf/backgrounds/2fort.png&quot;&gt;2fort&lt;/mat-option&gt;
+                    &lt;mat-option value&#x3D;&quot;assets/vtf/backgrounds/badlands.png&quot;&gt;Badlands&lt;/mat-option&gt;
+                    &lt;mat-option value&#x3D;&quot;assets/vtf/backgrounds/process.png&quot;&gt;Process&lt;/mat-option&gt;
+                &lt;/mat-select&gt;
+            &lt;/mat-form-field&gt;
+        &lt;/div&gt;
+        &lt;div class&#x3D;&quot;col-md-3 crosshairs&quot; style&#x3D;&quot;background-image: url({{background.value}});&quot;&gt;
+            &lt;img src&#x3D;&quot;assets/vtf/png/{{crosshairSelected.value}}.png&quot; alt&#x3D;&quot;&quot;&gt;
+        &lt;/div&gt;
+        &lt;div class&#x3D;&quot;col-md-5 crosshairsChanges&quot;&gt;
+            &lt;!-- &lt;p&gt;Class{{selected.classes.length &gt; 1 ? &#x27;es&#x27; : &#x27;&#x27;}}: {{selected.classes.join(&#x27;, &#x27;)}}&lt;/p&gt; --&gt;
+            &lt;!-- &lt;p&gt;Weapon Class{{selected.weaponClasses.length &gt; 1 ? &#x27;es&#x27; : &#x27;&#x27;}}: {{selected.weaponClasses.join(&#x27;, &#x27;)}}&lt;/p&gt; --&gt;
+            &lt;p&gt;Catego{{selected.names.length &gt; 1 ? &#x27;ries&#x27; : &#x27;ry&#x27;}}:&lt;br&gt; {{selected.names.join(&#x27;, &#x27;)}}&lt;/p&gt;
+            &lt;!-- &lt;p&gt;Slot{{selected.slots.length &gt; 1 ? &#x27;s&#x27; : &#x27;&#x27;}}: {{selected.slots.join(&#x27;, &#x27;)}}&lt;/p&gt; --&gt;
+            &lt;!-- &lt;p&gt;Affected Weapon{{selected.weaponsAffected.length &gt; 1 ? &#x27;s&#x27; : &#x27;&#x27;}}: {{selected.weaponsAffected.join(&#x27;\&lt;br&gt;&#x27;)}}&lt;/p&gt; --&gt;
+            &lt;p&gt;Affected Weapon{{selected.weaponsAffected.length &gt; 1 ? &#x27;s&#x27; : &#x27;&#x27;}}:&lt;br&gt;&lt;span
+                    [innerHTML]&#x3D;&quot;selected.weaponsAffected.join(&#x27;\&lt;br&gt;&#x27;)&quot;&gt;&lt;/span&gt;&lt;/p&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class&#x3D;&quot;row&quot;&gt;
+        &lt;div class&#x3D;&quot;btns&quot;&gt;
+            &lt;button mat-raised-button color&#x3D;&quot;primary&quot; (click)&#x3D;&quot;apply()&quot; [disabled]&#x3D;&quot;selectedWeapons.length &lt; 1&quot;&gt;Apply to
+                selected&lt;/button&gt;
+            &lt;button mat-raised-button color&#x3D;&quot;primary&quot; (click)&#x3D;&quot;applyAll(&#x27;Primary&#x27;)&quot; matTooltip&#x3D;&quot;Apply to all {{applyTo}}
+                primaries&quot;&gt;Apply to all primaries&lt;/button&gt;
+            &lt;button mat-raised-button color&#x3D;&quot;primary&quot; (click)&#x3D;&quot;applyAll(&#x27;Secondary&#x27;)&quot; matTooltip&#x3D;&quot;Apply to all {{applyTo}}
+                secondaries&quot;&gt;Apply to all secondaries&lt;/button&gt;
+            &lt;button mat-raised-button color&#x3D;&quot;primary&quot; (click)&#x3D;&quot;applyAll(&#x27;Melee&#x27;)&quot; matTooltip&#x3D;&quot;Apply to all {{applyTo}}
+                melees&quot;&gt;Apply to all melees&lt;/button&gt;
+            &lt;button mat-raised-button color&#x3D;&quot;primary&quot; (click)&#x3D;&quot;applyAll(&#x27;All&#x27;)&quot; matTooltip&#x3D;&quot;Apply to all {{applyTo}}
+                weapons&quot;&gt;Apply to all weapons&lt;/button&gt;
+            &lt;br&gt;
+            &lt;button mat-raised-button color&#x3D;&quot;accent&quot; (click)&#x3D;&quot;applyAllClasses(&#x27;Primary&#x27;)&quot;&gt;Apply to primary on all
+                classes&lt;/button&gt;
+            &lt;button mat-raised-button color&#x3D;&quot;accent&quot; (click)&#x3D;&quot;applyAllClasses(&#x27;Secondary&#x27;)&quot;&gt;Apply to secondary on all
+                classes&lt;/button&gt;
+            &lt;button mat-raised-button color&#x3D;&quot;accent&quot; (click)&#x3D;&quot;applyAllClasses(&#x27;Melee&#x27;)&quot;&gt;Apply to melee on all
+                classes&lt;/button&gt;
+        &lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class&#x3D;&quot;row&quot;&gt;
+        &lt;mat-tab-group mat-align-tabs&#x3D;&quot;center&quot; #crosshairsTab (selectedTabChange)&#x3D;&quot;unSelectAll()&quot;&gt;
+            &lt;mat-tab label&#x3D;&quot;Scout&quot;&gt;
+                &lt;mat-selection-list #scout (selectionChange)&#x3D;&quot;selectedItems(scout.selectedOptions.selected)&quot;&gt;
+                    &lt;mat-list-option *ngFor&#x3D;&quot;let weapon of scoutWeapons&quot; [value]&#x3D;&quot;weapon&quot;&gt;
+                        &lt;div class&#x3D;&quot;crossahirs-lits-items&quot;&gt;
+                            &lt;span&gt;{{weapon.info.name}}&lt;/span&gt;
+                            &lt;!-- &lt;img src&#x3D;&quot;assets/vtf/weapons/{{name}}.png&quot; alt&#x3D;&quot;&quot;
+                                *ngFor&#x3D;&quot;let name of weapon.info.weaponsAffected&quot;&gt; --&gt;
+                            &lt;div class&#x3D;&quot;col&quot;&gt;&lt;/div&gt;
+                            &lt;span&gt;{{weapon.crosshair}}&lt;/span&gt;
+                        &lt;/div&gt;
+                    &lt;/mat-list-option&gt;
+                &lt;/mat-selection-list&gt;
+            &lt;/mat-tab&gt;
+            &lt;mat-tab label&#x3D;&quot;Soldier&quot;&gt;
+                &lt;mat-selection-list #soldier (selectionChange)&#x3D;&quot;selectedItems(soldier.selectedOptions.selected)&quot;&gt;
+                    &lt;mat-list-option *ngFor&#x3D;&quot;let weapon of soldierWeapons&quot; [value]&#x3D;&quot;weapon&quot;&gt;
+                        &lt;div class&#x3D;&quot;crossahirs-lits-items&quot;&gt;
+                            &lt;span&gt;{{weapon.info.name}}&lt;/span&gt;
+                            &lt;div class&#x3D;&quot;col&quot;&gt;&lt;/div&gt;
+                            &lt;span&gt;{{weapon.crosshair}}&lt;/span&gt;
+                        &lt;/div&gt;
+                    &lt;/mat-list-option&gt;
+                &lt;/mat-selection-list&gt;
+            &lt;/mat-tab&gt;
+            &lt;mat-tab label&#x3D;&quot;Pyro&quot;&gt;
+                &lt;mat-selection-list #pyro (selectionChange)&#x3D;&quot;selectedItems(pyro.selectedOptions.selected)&quot;&gt;
+                    &lt;mat-list-option *ngFor&#x3D;&quot;let weapon of pyroWeapons&quot; [value]&#x3D;&quot;weapon&quot;&gt;
+                        &lt;div class&#x3D;&quot;crossahirs-lits-items&quot;&gt;
+                            &lt;span&gt;{{weapon.info.name}}&lt;/span&gt;
+                            &lt;div class&#x3D;&quot;col&quot;&gt;&lt;/div&gt;
+                            &lt;span&gt;{{weapon.crosshair}}&lt;/span&gt;
+                        &lt;/div&gt;
+                    &lt;/mat-list-option&gt;
+                &lt;/mat-selection-list&gt;
+            &lt;/mat-tab&gt;
+            &lt;mat-tab label&#x3D;&quot;Demoman&quot;&gt;
+                &lt;mat-selection-list #demoman (selectionChange)&#x3D;&quot;selectedItems(demoman.selectedOptions.selected)&quot;&gt;
+                    &lt;mat-list-option *ngFor&#x3D;&quot;let weapon of demomanWeapons.sort()&quot; [value]&#x3D;&quot;weapon&quot;&gt;
+                        &lt;div class&#x3D;&quot;crossahirs-lits-items&quot;&gt;
+                            &lt;span&gt;{{weapon.info.name}}&lt;/span&gt;
+                            &lt;div class&#x3D;&quot;col&quot;&gt;&lt;/div&gt;
+                            &lt;span&gt;{{weapon.crosshair}}&lt;/span&gt;
+                        &lt;/div&gt;
+                    &lt;/mat-list-option&gt;
+                &lt;/mat-selection-list&gt;
+            &lt;/mat-tab&gt;
+            &lt;mat-tab label&#x3D;&quot;Heavy&quot;&gt;
+                &lt;mat-selection-list #heavy (selectionChange)&#x3D;&quot;selectedItems(heavy.selectedOptions.selected)&quot;&gt;
+                    &lt;mat-list-option *ngFor&#x3D;&quot;let weapon of heavyWeapons.sort()&quot; [value]&#x3D;&quot;weapon&quot;&gt;
+                        &lt;div class&#x3D;&quot;crossahirs-lits-items&quot;&gt;
+                            &lt;span&gt;{{weapon.info.name}}&lt;/span&gt;
+                            &lt;div class&#x3D;&quot;col&quot;&gt;&lt;/div&gt;
+                            &lt;span&gt;{{weapon.crosshair}}&lt;/span&gt;
+                        &lt;/div&gt;
+                    &lt;/mat-list-option&gt;
+                &lt;/mat-selection-list&gt;
+            &lt;/mat-tab&gt;
+            &lt;mat-tab label&#x3D;&quot;Engineer&quot;&gt;
+                &lt;mat-selection-list #engineer (selectionChange)&#x3D;&quot;selectedItems(engineer.selectedOptions.selected)&quot;&gt;
+                    &lt;mat-list-option *ngFor&#x3D;&quot;let weapon of engineerWeapons.sort()&quot; [value]&#x3D;&quot;weapon&quot;&gt;
+                        &lt;div class&#x3D;&quot;crossahirs-lits-items&quot;&gt;
+                            &lt;span&gt;{{weapon.info.name}}&lt;/span&gt;
+                            &lt;div class&#x3D;&quot;col&quot;&gt;&lt;/div&gt;
+                            &lt;span&gt;{{weapon.crosshair}}&lt;/span&gt;
+                        &lt;/div&gt;
+                    &lt;/mat-list-option&gt;
+                &lt;/mat-selection-list&gt;
+            &lt;/mat-tab&gt;
+            &lt;mat-tab label&#x3D;&quot;Medic&quot;&gt;
+                &lt;mat-selection-list #medic (selectionChange)&#x3D;&quot;selectedItems(medic.selectedOptions.selected)&quot;&gt;
+                    &lt;mat-list-option *ngFor&#x3D;&quot;let weapon of medicWeapons.sort()&quot; [value]&#x3D;&quot;weapon&quot;&gt;
+                        &lt;div class&#x3D;&quot;crossahirs-lits-items&quot;&gt;
+                            &lt;span&gt;{{weapon.info.name}}&lt;/span&gt;
+                            &lt;div class&#x3D;&quot;col&quot;&gt;&lt;/div&gt;
+                            &lt;span&gt;{{weapon.crosshair}}&lt;/span&gt;
+                        &lt;/div&gt;
+                    &lt;/mat-list-option&gt;
+                &lt;/mat-selection-list&gt;
+            &lt;/mat-tab&gt;
+            &lt;mat-tab label&#x3D;&quot;Sniper&quot;&gt;
+                &lt;mat-selection-list #sniper (selectionChange)&#x3D;&quot;selectedItems(sniper.selectedOptions.selected)&quot;&gt;
+                    &lt;mat-list-option *ngFor&#x3D;&quot;let weapon of sniperWeapons.sort()&quot; [value]&#x3D;&quot;weapon&quot;&gt;
+                        &lt;div class&#x3D;&quot;crossahirs-lits-items&quot;&gt;
+                            &lt;span&gt;{{weapon.info.name}}&lt;/span&gt;
+                            &lt;div class&#x3D;&quot;col&quot;&gt;&lt;/div&gt;
+                            &lt;span&gt;{{weapon.crosshair}}&lt;/span&gt;
+                        &lt;/div&gt;
+                    &lt;/mat-list-option&gt;
+                &lt;/mat-selection-list&gt;
+            &lt;/mat-tab&gt;
+            &lt;mat-tab label&#x3D;&quot;Spy&quot;&gt;
+                &lt;mat-selection-list #spy (selectionChange)&#x3D;&quot;selectedItems(spy.selectedOptions.selected)&quot;&gt;
+                    &lt;mat-list-option *ngFor&#x3D;&quot;let weapon of spyWeapons.sort()&quot; [value]&#x3D;&quot;weapon&quot;&gt;
+                        &lt;div class&#x3D;&quot;crossahirs-lits-items&quot;&gt;
+                            &lt;span&gt;{{weapon.info.name}}&lt;/span&gt;
+                            &lt;div class&#x3D;&quot;col&quot;&gt;&lt;/div&gt;
+                            &lt;span&gt;{{weapon.crosshair}}&lt;/span&gt;
+                        &lt;/div&gt;
+                    &lt;/mat-list-option&gt;
+                &lt;/mat-selection-list&gt;
+            &lt;/mat-tab&gt;
+        &lt;/mat-tab-group&gt;
+    &lt;/div&gt;
+&lt;/div&gt;
+
+&lt;div *ngIf&#x3D;&quot;app.vtf.length &#x3D;&#x3D;&#x3D; 0&quot;&gt;
+    &lt;mat-card class&#x3D;&quot;mb-2&quot;&gt;
+        &lt;mat-card-title&gt;Crosshairs&lt;/mat-card-title&gt;
+        &lt;mat-card-subtitle&gt;We could not find any vtf crosshairs, you can generate them to get started.
+        &lt;/mat-card-subtitle&gt;
+        &lt;mat-card-actions align&#x3D;&quot;end&quot;&gt;
+            &lt;button mat-raised-button (click)&#x3D;&quot;generate()&quot; color&#x3D;&quot;primary&quot;&gt;Generate&lt;/button&gt;
+        &lt;/mat-card-actions&gt;
+    &lt;/mat-card&gt;
+&lt;/div&gt;
+</code></pre>
+    </div>
+
+    <div class="tab-pane fade " id="c-styleData">
+                <p class="comment">
+                    <code>./crosshairs.component.scss</code>
+                </p>
+                <pre class="line-numbers"><code class="language-scss"></code></pre>
+    </div>
+
+    <div class="tab-pane fade " id="c-tree">
+        <div id="tree-container"></div>
+        <div class="tree-legend">
+            <div class="title">
+                <b>Legend</b>
+            </div>
+            <div>
+                <div class="color htmlelement"></div><span>Html element</span>
+            </div>
+            <div>
+                <div class="color component"></div><span>Component</span>
+            </div>
+            <div>
+                <div class="color directive"></div><span>Html element with directive</span>
+            </div>
+        </div>
+    </div>
+
+    
+</div>
+
+<script src="../js/libs/vis.min.js"></script>
+<script src="../js/libs/htmlparser.js"></script>
+<script src="../js/libs/deep-iterator.js"></script>
+<script>
+        var COMPONENT_TEMPLATE = '<div><div *ngIf="app.vtf.length > 0">    <div class="row">        <div class="col-md-4">            <mat-form-field appearance="fill" class="w-100">                <mat-label>Choose a crosshair</mat-label>                <mat-select #crosshairSelected value="{{app.vtf[0].replace(\'.vtf\', \'\').split(\'\\\').pop()}}">                    <mat-option #crosshairSelected *ngFor="let food of app.vtf"                        [value]="food.replace(\'.vtf\', \'\').split(\'\\\').pop()">                        {{food.replace(\'.vtf\', \'\').split(\'\\\').pop()}}                    </mat-option>                </mat-select>            </mat-form-field>            <mat-form-field appearance="fill" class="w-100">                <mat-label>Choose a background</mat-label>                <mat-select #background [value]="app.settings.crosshairBackground"                    (valueChange)="changeBackground(background.value)">                    <mat-option value="">Black</mat-option>                    <mat-option value="assets/vtf/backgrounds/2fort.png">2fort</mat-option>                    <mat-option value="assets/vtf/backgrounds/badlands.png">Badlands</mat-option>                    <mat-option value="assets/vtf/backgrounds/process.png">Process</mat-option>                </mat-select>            </mat-form-field>        </div>        <div class="col-md-3 crosshairs" style="background-image: url({{background.value}});">            <img src="assets/vtf/png/{{crosshairSelected.value}}.png" alt="">        </div>        <div class="col-md-5 crosshairsChanges">            <!-- <p>Class{{selected.classes.length > 1 ? \'es\' : \'\'}}: {{selected.classes.join(\', \')}}</p> -->            <!-- <p>Weapon Class{{selected.weaponClasses.length > 1 ? \'es\' : \'\'}}: {{selected.weaponClasses.join(\', \')}}</p> -->            <p>Catego{{selected.names.length > 1 ? \'ries\' : \'ry\'}}:<br> {{selected.names.join(\', \')}}</p>            <!-- <p>Slot{{selected.slots.length > 1 ? \'s\' : \'\'}}: {{selected.slots.join(\', \')}}</p> -->            <!-- <p>Affected Weapon{{selected.weaponsAffected.length > 1 ? \'s\' : \'\'}}: {{selected.weaponsAffected.join(\'\<br>\')}}</p> -->            <p>Affected Weapon{{selected.weaponsAffected.length > 1 ? \'s\' : \'\'}}:<br><span                    [innerHTML]="selected.weaponsAffected.join(\'\<br>\')"></span></p>        </div>    </div>    <div class="row">        <div class="btns">            <button mat-raised-button color="primary" (click)="apply()" [disabled]="selectedWeapons.length < 1">Apply to                selected</button>            <button mat-raised-button color="primary" (click)="applyAll(\'Primary\')" matTooltip="Apply to all {{applyTo}}                primaries">Apply to all primaries</button>            <button mat-raised-button color="primary" (click)="applyAll(\'Secondary\')" matTooltip="Apply to all {{applyTo}}                secondaries">Apply to all secondaries</button>            <button mat-raised-button color="primary" (click)="applyAll(\'Melee\')" matTooltip="Apply to all {{applyTo}}                melees">Apply to all melees</button>            <button mat-raised-button color="primary" (click)="applyAll(\'All\')" matTooltip="Apply to all {{applyTo}}                weapons">Apply to all weapons</button>            <br>            <button mat-raised-button color="accent" (click)="applyAllClasses(\'Primary\')">Apply to primary on all                classes</button>            <button mat-raised-button color="accent" (click)="applyAllClasses(\'Secondary\')">Apply to secondary on all                classes</button>            <button mat-raised-button color="accent" (click)="applyAllClasses(\'Melee\')">Apply to melee on all                classes</button>        </div>    </div>    <div class="row">        <mat-tab-group mat-align-tabs="center" #crosshairsTab (selectedTabChange)="unSelectAll()">            <mat-tab label="Scout">                <mat-selection-list #scout (selectionChange)="selectedItems(scout.selectedOptions.selected)">                    <mat-list-option *ngFor="let weapon of scoutWeapons" [value]="weapon">                        <div class="crossahirs-lits-items">                            <span>{{weapon.info.name}}</span>                            <!-- <img src="assets/vtf/weapons/{{name}}.png" alt=""                                *ngFor="let name of weapon.info.weaponsAffected"> -->                            <div class="col"></div>                            <span>{{weapon.crosshair}}</span>                        </div>                    </mat-list-option>                </mat-selection-list>            </mat-tab>            <mat-tab label="Soldier">                <mat-selection-list #soldier (selectionChange)="selectedItems(soldier.selectedOptions.selected)">                    <mat-list-option *ngFor="let weapon of soldierWeapons" [value]="weapon">                        <div class="crossahirs-lits-items">                            <span>{{weapon.info.name}}</span>                            <div class="col"></div>                            <span>{{weapon.crosshair}}</span>                        </div>                    </mat-list-option>                </mat-selection-list>            </mat-tab>            <mat-tab label="Pyro">                <mat-selection-list #pyro (selectionChange)="selectedItems(pyro.selectedOptions.selected)">                    <mat-list-option *ngFor="let weapon of pyroWeapons" [value]="weapon">                        <div class="crossahirs-lits-items">                            <span>{{weapon.info.name}}</span>                            <div class="col"></div>                            <span>{{weapon.crosshair}}</span>                        </div>                    </mat-list-option>                </mat-selection-list>            </mat-tab>            <mat-tab label="Demoman">                <mat-selection-list #demoman (selectionChange)="selectedItems(demoman.selectedOptions.selected)">                    <mat-list-option *ngFor="let weapon of demomanWeapons.sort()" [value]="weapon">                        <div class="crossahirs-lits-items">                            <span>{{weapon.info.name}}</span>                            <div class="col"></div>                            <span>{{weapon.crosshair}}</span>                        </div>                    </mat-list-option>                </mat-selection-list>            </mat-tab>            <mat-tab label="Heavy">                <mat-selection-list #heavy (selectionChange)="selectedItems(heavy.selectedOptions.selected)">                    <mat-list-option *ngFor="let weapon of heavyWeapons.sort()" [value]="weapon">                        <div class="crossahirs-lits-items">                            <span>{{weapon.info.name}}</span>                            <div class="col"></div>                            <span>{{weapon.crosshair}}</span>                        </div>                    </mat-list-option>                </mat-selection-list>            </mat-tab>            <mat-tab label="Engineer">                <mat-selection-list #engineer (selectionChange)="selectedItems(engineer.selectedOptions.selected)">                    <mat-list-option *ngFor="let weapon of engineerWeapons.sort()" [value]="weapon">                        <div class="crossahirs-lits-items">                            <span>{{weapon.info.name}}</span>                            <div class="col"></div>                            <span>{{weapon.crosshair}}</span>                        </div>                    </mat-list-option>                </mat-selection-list>            </mat-tab>            <mat-tab label="Medic">                <mat-selection-list #medic (selectionChange)="selectedItems(medic.selectedOptions.selected)">                    <mat-list-option *ngFor="let weapon of medicWeapons.sort()" [value]="weapon">                        <div class="crossahirs-lits-items">                            <span>{{weapon.info.name}}</span>                            <div class="col"></div>                            <span>{{weapon.crosshair}}</span>                        </div>                    </mat-list-option>                </mat-selection-list>            </mat-tab>            <mat-tab label="Sniper">                <mat-selection-list #sniper (selectionChange)="selectedItems(sniper.selectedOptions.selected)">                    <mat-list-option *ngFor="let weapon of sniperWeapons.sort()" [value]="weapon">                        <div class="crossahirs-lits-items">                            <span>{{weapon.info.name}}</span>                            <div class="col"></div>                            <span>{{weapon.crosshair}}</span>                        </div>                    </mat-list-option>                </mat-selection-list>            </mat-tab>            <mat-tab label="Spy">                <mat-selection-list #spy (selectionChange)="selectedItems(spy.selectedOptions.selected)">                    <mat-list-option *ngFor="let weapon of spyWeapons.sort()" [value]="weapon">                        <div class="crossahirs-lits-items">                            <span>{{weapon.info.name}}</span>                            <div class="col"></div>                            <span>{{weapon.crosshair}}</span>                        </div>                    </mat-list-option>                </mat-selection-list>            </mat-tab>        </mat-tab-group>    </div></div><div *ngIf="app.vtf.length === 0">    <mat-card class="mb-2">        <mat-card-title>Crosshairs</mat-card-title>        <mat-card-subtitle>We could not find any vtf crosshairs, you can generate them to get started.        </mat-card-subtitle>        <mat-card-actions align="end">            <button mat-raised-button (click)="generate()" color="primary">Generate</button>        </mat-card-actions>    </mat-card></div></div>'
+    var COMPONENTS = [{'name': 'AppComponent', 'selector': 'app-root'},{'name': 'CrosshairsComponent', 'selector': 'app-crosshairs'},{'name': 'DashboardComponent', 'selector': 'app-dashboard'},{'name': 'HitsoundComponent', 'selector': 'app-hitsound'},{'name': 'HudComponent', 'selector': 'app-hud'},{'name': 'MultipleWarningComponent', 'selector': 'app-multiple-warning'},{'name': 'QuestionAnswerComponent', 'selector': 'app-question-answer'},{'name': 'SettingsComponent', 'selector': 'app-settings'},{'name': 'SetupComponent', 'selector': 'app-setup'},{'name': 'UploadChangeNameComponent', 'selector': 'app-upload-change-name'},{'name': 'WeaponsSoundsComponent', 'selector': 'app-weapons-sounds'},{'name': 'YesNoComponent', 'selector': 'app-yes-no'}];
+    var DIRECTIVES = [];
+    var ACTUAL_COMPONENT = {'name': 'CrosshairsComponent'};
+</script>
+<script src="../js/tree.js"></script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                   </div><div class="search-results">
+    <div class="has-results">
+        <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+        <ul class="search-results-list"></ul>
+    </div>
+    <div class="no-results">
+        <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+    </div>
+</div>
+</div>
+               <!-- END CONTENT -->
+           </div>
+       </div>
+
+          <label class="dark-mode-switch">
+               <input type="checkbox">
+               <span class="slider">
+                    <svg class="slider-icon" viewBox="0 0 24 24" fill="none" height="20" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" width="20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+                    </svg>
+               </span>
+          </label>
+
+       <script>
+            var COMPODOC_CURRENT_PAGE_DEPTH = 1;
+            var COMPODOC_CURRENT_PAGE_CONTEXT = 'component';
+            var COMPODOC_CURRENT_PAGE_URL = 'CrosshairsComponent.html';
+            var MAX_SEARCH_RESULTS = 15;
+       </script>
+
+       <script src="../js/libs/custom-elements.min.js"></script>
+       <script src="../js/libs/lit-html.js"></script>
+
+       <script src="../js/menu-wc.js" defer></script>
+       <script nomodule src="../js/menu-wc_es5.js" defer></script>
+
+       <script src="../js/libs/bootstrap-native.js"></script>
+
+       <script src="../js/libs/es6-shim.min.js"></script>
+       <script src="../js/libs/EventDispatcher.js"></script>
+       <script src="../js/libs/promise.min.js"></script>
+       <script src="../js/libs/zepto.min.js"></script>
+
+       <script src="../js/compodoc.js"></script>
+
+       <script src="../js/tabs.js"></script>
+       <script src="../js/menu.js"></script>
+       <script src="../js/libs/clipboard.min.js"></script>
+       <script src="../js/libs/prism.js"></script>
+       <script src="../js/sourceCode.js"></script>
+          <script src="../js/search/search.js"></script>
+          <script src="../js/search/lunr.min.js"></script>
+          <script src="../js/search/search-lunr.js"></script>
+          <script src="../js/search/search_index.js"></script>
+       <script src="../js/lazy-load-graphs.js"></script>
+
+
+    </body>
+</html>

@@ -1,4 +1,4 @@
-
+/** This is the app settings used throughout the app */
 export class Settings {
     /** path to custom folder */
     customPath: string = null;

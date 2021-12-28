@@ -1,18 +1,13 @@
 import { Component, Inject, OnInit } from '@angular/core';
-import { FormControl, FormGroupDirective, NgForm, Validators } from '@angular/forms';
-import { ErrorStateMatcher } from '@angular/material/core';
+import { FormControl, Validators } from '@angular/forms';
+import { ShowOnDirtyErrorStateMatcher } from '@angular/material/core';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { QuestionAnswer } from '../../models/questionAnswer';
 import { ValidatorService } from '../../services/validators.service';
 
-/** Error when invalid control is dirty, touched, or submitted. */
-export class MyErrorStateMatcher implements ErrorStateMatcher {
-  isErrorState(control: FormControl | null, form: FormGroupDirective | NgForm | null): boolean {
-    const isSubmitted = form && form.submitted;
-    return !!(control && control.invalid && (control.dirty || control.touched || isSubmitted));
-  }
-}
-
+/**
+ * Component QuestionAnswerComponent
+ */
 @Component({
   selector: 'app-question-answer',
   templateUrl: './question-answer.component.html',
@@ -20,20 +15,39 @@ export class MyErrorStateMatcher implements ErrorStateMatcher {
 })
 export class QuestionAnswerComponent implements OnInit {
 
+  /**
+   * Input answer
+   */
   input: FormControl;
-  matcher: MyErrorStateMatcher;
+  /**
+   * Matcher of question answer component
+   */
+  matcher: ShowOnDirtyErrorStateMatcher;
 
+  /**
+   * Creates an instance of question answer component.
+   *
+   * @param dialogRef
+   * @param data `QuestionAnswer`
+   * @param validator
+   */
   constructor(
-    public dialogRef: MatDialogRef<QuestionAnswerComponent>,
+    private dialogRef: MatDialogRef<QuestionAnswerComponent>,
     @Inject(MAT_DIALOG_DATA) public data: QuestionAnswer,
     private validator: ValidatorService
   ) { }
 
+  /**
+   * on init
+   */
   ngOnInit(): void {
-    this.matcher = new MyErrorStateMatcher();
+    this.matcher = new ShowOnDirtyErrorStateMatcher();
     this.input = new FormControl('', [Validators.required, this.validator.checkName(this.data.cant), this.validator.special()]);
   }
 
+  /**
+   * Submits question answer component
+   */
   submit() {
     if (!this.input.invalid) {
       this.dialogRef.close(this.input.value);
