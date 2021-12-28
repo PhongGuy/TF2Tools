@@ -8,38 +8,106 @@ import { Settings } from './models/settings';
 import { FileHelpService } from './services/file-help.service';
 import { SnackService } from './services/snack.service';
 
+/**
+ * This is the main app component
+ */
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
 })
+
 export class AppComponent implements OnInit {
-
+  /**
+   * View child room
+   *
+   * @param ´ElementRef´
+   */
   @ViewChild('room') room: ElementRef;
-
+  /**
+   * Settings used in app
+   */
   settings = new Settings();
+  /**
+   * Settings update of app component
+   */
   settingsUpdate: BehaviorSubject<Settings> = new BehaviorSubject<Settings>(this.settings);
-
+  /**
+   * Loading  of app component
+   *
+   * @param boolean Show spinner or not
+   */
   loading = true;
-  appTemp: string;
+  /**
+   * Fullscreen icon of app component
+   */
   fullscreenIcon = 'fullscreen';
+  /**
+   * Fullscreen tooltip of app component
+   */
   fullscreenTip = 'Maximize';
-
-  // things used through out the app
+  /**
+   * Hitsounds found
+   */
   hitsounds: string[] = [];
+  /**
+   * Killsounds found
+   */
   killsounds: string[] = [];
+  /**
+   * Vtf found
+   */
   vtf: string[] = [];
+  /**
+   * Vtf scripts found
+   */
   vtfScripts: string[] = [];
+  /**
+   * Huds found
+   */
   huds: string[] = [];
+  /**
+   * Wepon sound found
+   */
   weponSounds = '';
-
+  /**
+   * Update available of app component
+   *
+   * @param boolean if update is available
+   */
   updateAvailable = false;
-
+  /**
+   * App temp of app component
+   */
+  appTemp: string;
+  /**
+   * Appdata  of app component
+   */
   private appdata: string;
+  /**
+   * Fullscreen
+   *
+   * @param boolean if app is fullscreen
+   */
   private fullscreen = false;
+  /**
+   * Default custom path
+   */
   private defaultCustomPath = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\custom';
+  /**
+   * Default library path
+   */
   private defaultLibraryPath = this.electron.appData('TF2Tools\\Library');
 
+  /**
+   * Creates an instance of app component.
+   *
+   * @param electron
+   * @param router
+   * @param snack
+   * @param fileHelp
+   * @param http
+   */
   constructor(
     private electron: ElectronService,
     private router: Router,
@@ -94,17 +162,9 @@ export class AppComponent implements OnInit {
   }
 
   /**
-   * When we want to add mastercomfig, this is the url to the latest relese
-   * https://github.com/mastercomfig/mastercomfig/releases/latest/download/mastercomfig-low-preset.vpk
+   * on init
    */
-
-  /**
-   * Wehn we want to add version update, this is the url to get the latest version
-   * https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest
-   */
-
   ngOnInit() {
-
     // scroll to top when we change navigation
     this.router.events.subscribe(event => {
       if (event instanceof NavigationEnd) {
@@ -122,6 +182,11 @@ export class AppComponent implements OnInit {
     this.checkUpdate();
   }
 
+  /**
+   * Update custom files
+   *
+   * @param [what]
+   */
   async update(what: 'huds' | 'hitsounds' | 'vtf' | 'weaponSounds' | null = null) {
 
     // reset
@@ -217,11 +282,22 @@ export class AppComponent implements OnInit {
     window.close();
   }
 
+  /**
+   * Log app errors
+   *
+   * @param err
+   */
   error(err: any): void {
     console.error(err);
     this.snack.show(err);
   }
 
+  /**
+   * Generates random string
+   *
+   * @param length
+   * @returns `string`
+   */
   generateRandomString(length) {
     let result = ''; let seeds;
 
@@ -240,6 +316,9 @@ export class AppComponent implements OnInit {
     return result;
   }
 
+  /**
+   * Checks for new release
+   */
   private async checkUpdate() {
     this.http.get('https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest').subscribe((json: any) => {
       if (APP_CONFIG.version !== json.tag_name.replace('v', '')) {
