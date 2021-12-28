@@ -6,15 +6,29 @@ import { AppComponent } from '../../app.component';
 import { ElectronService } from '../../core/services';
 import { SnackService } from '../../services/snack.service';
 
+/**
+ * Settings
+ */
 @Component({
   selector: 'app-settings',
   templateUrl: './settings.component.html',
   styleUrls: ['./settings.component.scss']
 })
 export class SettingsComponent implements OnInit, OnDestroy {
-
+  /**
+   * If update available
+   */
   update = false;
 
+  /**
+   * Creates an instance of settings component.
+   *
+   * @param app AppComponent
+   * @param electron
+   * @param snack
+   * @param dialog
+   * @param http
+   */
   constructor(
     public app: AppComponent,
     private electron: ElectronService,
@@ -23,6 +37,9 @@ export class SettingsComponent implements OnInit, OnDestroy {
     private http: HttpClient
   ) { }
 
+  /**
+   * on init
+   */
   ngOnInit(): void {
     this.http.get('https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest').subscribe((json: any) => {
       if (APP_CONFIG.version !== json.tag_name.replace('v', '')) {
@@ -31,6 +48,9 @@ export class SettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Changes library
+   */
   async changeLibrary() {
     this.app.loading = true;
     this.electron.ipcRenderer.send('openDialog', {
@@ -75,10 +95,16 @@ export class SettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Updates settings
+   */
   updateSettings() {
     this.app.settingsUpdate.next(this.app.settings);
   }
 
+  /**
+   * on destroy
+   */
   ngOnDestroy(): void {
     window.removeAllListeners();
   }
