@@ -87,10 +87,12 @@ export class HudComponent implements OnInit {
       let oldPath = this.electron.appData('TF2Tools\\huds');
       if (this.electron.fs.existsSync(oldPath)) {
         this.snack.show('Moving your files to new library...', null, 5000);
+        this.app.log.next(`Trying to move files from "${oldPath}" => "${this.localHuds}"`);
         this.electron.fs.move(oldPath, this.localHuds, { overwrite: true })
           .then(() => {
             oldPath = this.electron.appData('TF2Tools\\hitsounds');
             if (this.electron.fs.existsSync(oldPath)) {
+              this.app.log.next(`Trying to move your hitsounds from "${oldPath}" => "${this.app.settings.libraryPath}\\hitsounds"`);
               this.electron.fs.move(oldPath, `${this.app.settings.libraryPath}\\hitsounds`, { overwrite: true })
                 .then(() => {
                   this.snack.show('Files was moved to new library');
@@ -113,9 +115,7 @@ export class HudComponent implements OnInit {
    */
   update() {
     this.library = [];
-    if (!this.electron.fs.existsSync(this.localHuds)) {
-      this.electron.fs.mkdirSync(this.localHuds);
-    }
+    this.electron.fs.ensureDir(this.localHuds);
 
     this.electron.fs.readdirSync(this.localHuds).forEach(customFiles => {
       const info = this.localHuds + '/' + customFiles + '/info.vdf';
@@ -155,12 +155,13 @@ export class HudComponent implements OnInit {
    * @param _hud
    */
   add(_hud: Hud) {
-    this.electron.fs.copy(_hud.path, `${this.app.settings.customPath}/${_hud.folderName}`)
+    this.app.log.next(`Installing hud: *COPY* "${_hud.path}" => "${this.app.settings.customPath}\\${_hud.folderName}"`);
+    this.electron.fs.copy(_hud.path, `${this.app.settings.customPath}\\${_hud.folderName}`)
       .then(() => {
         this.snack.show(`${_hud.folderName} was installed`);
         this.update();
       })
-      .catch(err => console.error(err));
+      .catch(err => this.app.error(err));
   }
 
   /**
@@ -171,13 +172,15 @@ export class HudComponent implements OnInit {
   uninstall(_hud: Hud) {
     if (this.electron.fs.existsSync(_hud.path)) {
       if (this.app.settings.moveOrCopy) {
+        this.app.log.next(`Uninstalling hud: *MOVE* "${_hud.path}" => "${this.localHuds}\\${_hud.folderName}"`);
         this.electron.fs.move(_hud.path, `${this.localHuds}\\${_hud.folderName}`, { overwrite: true })
           .then(() => {
             this.snack.show(`${_hud.folderName} was uninstalled`);
             this.update();
           })
-          .catch(err => console.error(err));
+          .catch(err => this.app.error(err));
       } else {
+        this.app.log.next(`Uninstalling hud: *DELETE* "${_hud.path}"`);
         this.electron.fs.remove(_hud.path)
           .then(() => {
             this.snack.show(`${_hud.folderName} was uninstalled`);
@@ -205,12 +208,13 @@ export class HudComponent implements OnInit {
 
       dialogRef.afterClosed().subscribe(result => {
         if (result) {
+          this.app.log.next(`Remove hud: *DELETE* "${_hud.path}"`);
           this.electron.fs.remove(_hud.path)
             .then(() => {
               this.snack.show(`${_hud.folderName} was removed`);
               this.update();
             })
-            .catch(err => console.error(err));
+            .catch(err => this.app.error(err));
         }
       });
     }
@@ -232,14 +236,16 @@ export class HudComponent implements OnInit {
         const dest = `${this.localHuds}\\${name}`;
 
         if (!this.electron.fs.existsSync(dest)) {
+          this.app.log.next(`Uploading hud: *COPY* "${path}" => "${dest}"`);
           this.electron.fs.copy(path, dest)
             .then(() => {
+              this.app.log.next(`Successfully uploaded ${name}`);
               this.snack.show(`Added "${name}" to library`, null, hudsFound.length > 2 ? 1000 : 3000);
               const data = this.electron.fs.readFileSync(hud.path, { encoding: 'utf8', flag: 'r' }).split('"');
               const l = { name: data[1], folderName: name, version: data[5], path: this.localHuds + '\\' + name };
               this.library.push(l);
               this.myControl.setValue('');
-            }).catch(err => console.error(err));
+            }).catch(err => this.app.error(err));
         } else {
           this.snack.show(`${name} is already in library`);
         }
@@ -271,12 +277,13 @@ export class HudComponent implements OnInit {
       if (typeof result === 'string') {
         const path = _hud.path.split('\\');
         const name = path.pop();
+        this.app.log.next(`Renaming hud: *RENAME* "${_hud.folderName}" => "${name}"`);
         this.electron.fs.rename(_hud.path, `${path.join('\\')}\\${result}`)
           .then(() => {
             this.snack.show(`Updated "${name}" to "${result}"`);
             this.update();
           })
-          .catch(err => console.error(err));
+          .catch(err => this.app.error(err));
       }
     });
   }
