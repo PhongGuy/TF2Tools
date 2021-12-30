@@ -60,7 +60,7 @@
             <mat-tab label="Scout">
                 <mat-selection-list #scout (selectionChange)="selectedItems(scout.selectedOptions.selected)">
                     <mat-list-option *ngFor="let weapon of scoutWeapons" [value]="weapon">
-                        <div class="crossahirs-lits-items">
+                        <div class="crosshairs-items">
                             <span>{{weapon.info.name}}</span>
                             <!-- <img src="assets/vtf/weapons/{{name}}.png" alt=""
                                 *ngFor="let name of weapon.info.weaponsAffected"> -->
@@ -73,7 +73,7 @@
             <mat-tab label="Soldier">
                 <mat-selection-list #soldier (selectionChange)="selectedItems(soldier.selectedOptions.selected)">
                     <mat-list-option *ngFor="let weapon of soldierWeapons" [value]="weapon">
-                        <div class="crossahirs-lits-items">
+                        <div class="crosshairs-items">
                             <span>{{weapon.info.name}}</span>
                             <div class="col"></div>
                             <span>{{weapon.crosshair}}</span>
@@ -84,7 +84,7 @@
             <mat-tab label="Pyro">
                 <mat-selection-list #pyro (selectionChange)="selectedItems(pyro.selectedOptions.selected)">
                     <mat-list-option *ngFor="let weapon of pyroWeapons" [value]="weapon">
-                        <div class="crossahirs-lits-items">
+                        <div class="crosshairs-items">
                             <span>{{weapon.info.name}}</span>
                             <div class="col"></div>
                             <span>{{weapon.crosshair}}</span>
@@ -95,7 +95,7 @@
             <mat-tab label="Demoman">
                 <mat-selection-list #demoman (selectionChange)="selectedItems(demoman.selectedOptions.selected)">
                     <mat-list-option *ngFor="let weapon of demomanWeapons.sort()" [value]="weapon">
-                        <div class="crossahirs-lits-items">
+                        <div class="crosshairs-items">
                             <span>{{weapon.info.name}}</span>
                             <div class="col"></div>
                             <span>{{weapon.crosshair}}</span>
@@ -106,7 +106,7 @@
             <mat-tab label="Heavy">
                 <mat-selection-list #heavy (selectionChange)="selectedItems(heavy.selectedOptions.selected)">
                     <mat-list-option *ngFor="let weapon of heavyWeapons.sort()" [value]="weapon">
-                        <div class="crossahirs-lits-items">
+                        <div class="crosshairs-items">
                             <span>{{weapon.info.name}}</span>
                             <div class="col"></div>
                             <span>{{weapon.crosshair}}</span>
@@ -117,7 +117,7 @@
             <mat-tab label="Engineer">
                 <mat-selection-list #engineer (selectionChange)="selectedItems(engineer.selectedOptions.selected)">
                     <mat-list-option *ngFor="let weapon of engineerWeapons.sort()" [value]="weapon">
-                        <div class="crossahirs-lits-items">
+                        <div class="crosshairs-items">
                             <span>{{weapon.info.name}}</span>
                             <div class="col"></div>
                             <span>{{weapon.crosshair}}</span>
@@ -128,7 +128,7 @@
             <mat-tab label="Medic">
                 <mat-selection-list #medic (selectionChange)="selectedItems(medic.selectedOptions.selected)">
                     <mat-list-option *ngFor="let weapon of medicWeapons.sort()" [value]="weapon">
-                        <div class="crossahirs-lits-items">
+                        <div class="crosshairs-items">
                             <span>{{weapon.info.name}}</span>
                             <div class="col"></div>
                             <span>{{weapon.crosshair}}</span>
@@ -139,7 +139,7 @@
             <mat-tab label="Sniper">
                 <mat-selection-list #sniper (selectionChange)="selectedItems(sniper.selectedOptions.selected)">
                     <mat-list-option *ngFor="let weapon of sniperWeapons.sort()" [value]="weapon">
-                        <div class="crossahirs-lits-items">
+                        <div class="crosshairs-items">
                             <span>{{weapon.info.name}}</span>
                             <div class="col"></div>
                             <span>{{weapon.crosshair}}</span>
@@ -150,7 +150,7 @@
             <mat-tab label="Spy">
                 <mat-selection-list #spy (selectionChange)="selectedItems(spy.selectedOptions.selected)">
                     <mat-list-option *ngFor="let weapon of spyWeapons.sort()" [value]="weapon">
-                        <div class="crossahirs-lits-items">
+                        <div class="crosshairs-items">
                             <span>{{weapon.info.name}}</span>
                             <div class="col"></div>
                             <span>{{weapon.crosshair}}</span>

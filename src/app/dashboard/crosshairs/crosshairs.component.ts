@@ -6,7 +6,7 @@ import { APP_CONFIG } from '../../../environments/environment';
 import { AppComponent } from '../../app.component';
 import { ElectronService } from '../../core/services';
 import { tfWeapons } from '../../mock/tfWeapons';
-import { CrossahirSelected } from '../../models/crosshairSelected';
+import { CrosshairSelected } from '../../models/crosshairSelected';
 import { WeaponData } from '../../models/weaponData';
 import { SnackService } from '../../services/snack.service';
 
@@ -74,7 +74,7 @@ export class CrosshairsComponent implements OnInit {
   /**
    * Selected of crosshairs component
    */
-  selected = new CrossahirSelected();
+  selected = new CrosshairSelected();
   /**
    * Selected weapons of crosshairs component
    */
@@ -155,7 +155,7 @@ export class CrosshairsComponent implements OnInit {
    * @param items
    */
   selectedItems(items: MatListOption[]): void {
-    this.selected = new CrossahirSelected();
+    this.selected = new CrosshairSelected();
     this.selectedWeapons = [];
     items.forEach(d => {
       const weapon = d.value as WeaponData;

@@ -17,7 +17,7 @@ $dark-theme: mat.define-dark-theme(( color: ( primary: $dark-primary, accent: $d
 // Apply the light theme only when the `.my-light-theme` CSS class is applied
 // to an ancestor element of the components (such as `body`).
 .my-light-theme {
-  @include mat.all-component-themes($light-theme);
+  @include mat.all-component-colors($light-theme);
 }
 @import url( 'https://fonts.googleapis.com/css2?family=Roboto&display=swap');
 
@@ -148,7 +148,7 @@ mat-spinner {
   overflow: auto;
 }
 
-.crossahirs-lits-items {
+.crosshairs-items {
   display: flex;
 
   img {

@@ -1,28 +1,28 @@
 /**
- * Crossahir selected
+ * Crosshair selected
  */
-export class CrossahirSelected {
+export class CrosshairSelected {
     /**
-     * Classes  of crossahir selected
+     * Classes  of crosshair selected
      */
     classes: string[] = [];
     /**
-     * Weapon classes of crossahir selected
+     * Weapon classes of crosshair selected
      */
     /**
-     * Weapon classes of crossahir selected
+     * Weapon classes of crosshair selected
      */
     weaponClasses: string[] = [];
     /**
-     * Names  of crossahir selected
+     * Names  of crosshair selected
      */
     names: string[] = [];
     /**
-     * Slots  of crossahir selected
+     * Slots  of crosshair selected
      */
     slots: string[] = [];
     /**
-     * Weapons affected of crossahir selected
+     * Weapons affected of crosshair selected
      */
     weaponsAffected: string[] = [];
 }
