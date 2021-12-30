@@ -3,19 +3,19 @@
  */
 export class UploadChangeName {
     /**
-     * Title  of upload change name
+     * Title of upload change name
      */
     title: string;
     /**
-     * Cant  of upload change name
+     * Cant of upload change name
      */
     cant: string[];
     /**
-     * File  of upload change name
+     * File of upload change name
      */
     file: File;
     /**
-     * Volume  of upload change name
+     * Volume of upload change name
      */
     volume: number;
 }

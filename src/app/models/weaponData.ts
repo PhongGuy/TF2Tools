@@ -4,15 +4,15 @@ import { TfWeapons } from './tf_weapons';
  */
 export class WeaponData {
     /**
-     * Info  of weapon data
+     * Info of weapon data
      */
     info: TfWeapons;
     /**
-     * Crosshair  of weapon data
+     * Crosshair of weapon data
      */
     crosshair: string;
     /**
-     * Path  of weapon data
+     * Path of weapon data
      */
     path: string;
 }

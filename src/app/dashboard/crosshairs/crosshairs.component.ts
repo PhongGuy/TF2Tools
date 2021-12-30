@@ -163,8 +163,8 @@ export class CrosshairsComponent implements OnInit {
         this.selected.classes.push(weapon.info.class);
       }
       this.selected.names.push(weapon.info.name);
-      weapon.info.weaponsAffected.forEach(effcted => {
-        this.selected.weaponsAffected.push(effcted);
+      weapon.info.weaponsAffected.forEach(effected => {
+        this.selected.weaponsAffected.push(effected);
       });
 
       // this.selected.weaponClasses.push(weapon.info.weaponClass);
@@ -240,7 +240,7 @@ export class CrosshairsComponent implements OnInit {
   }
 
   /**
-   * Applys to weapons
+   * Applies to weapons
    */
   apply(): void {
     const crosshair = this.crosshairSelected.value;
@@ -258,7 +258,7 @@ export class CrosshairsComponent implements OnInit {
   }
 
   /**
-   * Applys to all weapons
+   * Applies to all weapons
    *
    * @param slot
    */
@@ -301,7 +301,7 @@ export class CrosshairsComponent implements OnInit {
   }
 
   /**
-   * Applys to all weapons on all classes
+   * Applies to all weapons on all classes
    *
    * @param slot
    */

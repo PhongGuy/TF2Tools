@@ -3,7 +3,7 @@
  */
 export class QuestionAnswer {
     /**
-     * Questionof question answer
+     * Question of question answer
      */
     question: string;
     /**
@@ -11,7 +11,7 @@ export class QuestionAnswer {
      */
     subQuestion: string;
     /**
-     * Cantof question answer
+     * Cant of question answer
      */
     cant: string[] = [];
 }

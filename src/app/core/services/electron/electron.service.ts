@@ -29,7 +29,7 @@ export class ElectronService {
    */
   childProcess: typeof childProcess;
   /**
-   * Fs  of electron service
+   * Fs of electron service
    */
   fs: typeof fs;
   /**

@@ -75,9 +75,9 @@ export class AppComponent implements OnInit {
    */
   huds: string[] = [];
   /**
-   * Wepon sound found
+   * Weapon sounds of app component
    */
-  weponSounds = '';
+  weaponSounds = '';
   /**
    * Update available of app component
    *
@@ -217,13 +217,13 @@ export class AppComponent implements OnInit {
       this.vtf = [];
       this.vtfScripts = [];
     } else if (what === 'weaponSounds') {
-      this.weponSounds = null;
+      this.weaponSounds = null;
     } else {
       this.huds = [];
       this.hitsounds = [];
       this.killsounds = [];
       this.vtf = [];
-      this.weponSounds = null;
+      this.weaponSounds = null;
     }
 
     // get all files in the custom folder
@@ -275,7 +275,7 @@ export class AppComponent implements OnInit {
       // try to find weapon sounds
       if (what === 'weaponSounds' || what === null) {
         if (file.endsWith('game_sounds_weapons.txt')) {
-          this.weponSounds = file;
+          this.weaponSounds = file;
         }
       }
     });
@@ -328,7 +328,7 @@ export class AppComponent implements OnInit {
         Math.floor(Math.random() * 25) + 97
       ];
 
-      //Choise randomly from seeds, convert to char and append to result
+      //Choose randomly from seeds, convert to char and append to result
       result += String.fromCharCode(seeds[Math.floor(Math.random() * 3)]);
     }
 

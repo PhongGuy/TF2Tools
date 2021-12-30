@@ -3,7 +3,7 @@
  */
 export class YesNo {
     /**
-     * Questionof yes no
+     * Question of yes no
      */
     question: string;
     /**
