@@ -92,7 +92,7 @@ export class HitsoundComponent implements OnInit {
   }
 
   /**
-   * Descriptions hitsound component
+   * Updates hitsound component
    */
   async update() {
     this.library = [];
@@ -179,6 +179,7 @@ export class HitsoundComponent implements OnInit {
         if (typeof r === 'string') {
           const path = _hitsound.path.split('\\');
           path.pop();
+          this.app.log.next(`Renaming hitsound: *RENAME* "${_hitsound.path}" => "${path.join('\\')}\\${r}.wav"`);
           this.electron.fs.rename(_hitsound.path, `${path.join('\\')}\\${r}.wav`)
             .then(() => {
               this.snack.show(`Renamed "${_hitsound.name}" to "${r}"`);
@@ -211,6 +212,7 @@ export class HitsoundComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
+        this.app.log.next(`Remove hitsound *DELETE* "${_hitsound.path}"`);
         this.electron.fs.remove(_hitsound.path)
           .then(() => {
             this.snack.show(`${_hitsound.name} was removed`);
@@ -284,6 +286,7 @@ export class HitsoundComponent implements OnInit {
   installHitsound(_hitsound: Hitsound): void {
     const path = this.app.hitsounds[0];
     if (path !== undefined) {
+      this.app.log.next(`Installing hitsound: *COPY* "${_hitsound.path}" => "${path}"`);
       this.electron.fs.copy(_hitsound.path, path, { overwrite: true })
         .then(() => {
           this.snack.show(`Hitsound ${_hitsound.name} was installed`);
@@ -296,6 +299,7 @@ export class HitsoundComponent implements OnInit {
       const defaultPath = `${this.app.settings.customPath}\\mycustomstuff\\sound\\ui`;
       this.electron.fs.ensureDir(defaultPath)
         .then(() => {
+          this.app.log.next(`Installing hitsound: *COPY* "${_hitsound.path}" => "${defaultPath}\\hitsound.wav"`);
           this.electron.fs.copy(_hitsound.path, `${defaultPath}\\hitsound.wav`)
             .then(() => {
               this.snack.show(`Hitsound ${_hitsound.name} was installed`);
@@ -315,6 +319,7 @@ export class HitsoundComponent implements OnInit {
   installKillSound(_killsound: Hitsound): void {
     const path = this.app.killsounds[0];
     if (path !== undefined) {
+      this.app.log.next(`Installing killsound: *COPY* "${_killsound.path}" => "${path}"`);
       this.electron.fs.copy(_killsound.path, path, { overwrite: true })
         .then(() => {
           this.snack.show(`Killsound ${_killsound.name} was installed`);
@@ -325,6 +330,7 @@ export class HitsoundComponent implements OnInit {
       const defaultPath = `${this.app.settings.customPath}\\mycustomstuff\\sound\\ui`;
       this.electron.fs.ensureDir(defaultPath)
         .then(() => {
+          this.app.log.next(`Installing killsound: *COPY* "${_killsound.path}" => "${defaultPath}\\killsound.wav"`);
           this.electron.fs.copy(_killsound.path, `${defaultPath}\\killsound.wav`)
             .then(() => {
               this.snack.show(`Killsound ${_killsound.name} was installed`);

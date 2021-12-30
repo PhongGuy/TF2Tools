@@ -20,6 +20,8 @@ export class SettingsComponent implements OnInit, OnDestroy {
    */
   update = false;
 
+  log: string[] = [];
+
   /**
    * Creates an instance of settings component.
    *
@@ -48,6 +50,11 @@ export class SettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  getLog() {
+    const logs = this.electron.fs.readFileSync(this.electron.appData('TF2Tools\\log.txt'), { encoding: 'utf8', flag: 'r' });
+    return logs.split('\n');
+  }
+
   /**
    * Changes library
    */
@@ -68,8 +75,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
           path = `${path}\\TF2Tools\\Library`;
           this.electron.fs.ensureDirSync(path);
           this.snack.show('Moving your library. This can take some time if you have a big library.', null, 6000);
+          this.app.log.next(`Trying to move your library. ${this.app.settings.libraryPath} => ${path}`);
           this.electron.fs.move(this.app.settings.libraryPath, path, { overwrite: true })
             .then(() => {
+              this.app.log.next(`Successfully moved your library`);
               this.app.settings.libraryPath = path;
               this.app.settingsUpdate.next(this.app.settings);
               this.snack.show('Your library was moved!');
@@ -79,6 +88,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
         } else {
           this.app.loading = false;
+          this.app.log.next(`Failed to moved your library`);
           this.snack.show('That is not a location we can use');
         }
       } else {

@@ -1,6 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
+import * as moment from 'moment';
 import { BehaviorSubject } from 'rxjs';
 import { APP_CONFIG } from '../environments/environment';
 import { ElectronService } from './core/services';
@@ -24,6 +25,7 @@ export class AppComponent implements OnInit {
    * @param ´ElementRef´
    */
   @ViewChild('room') room: ElementRef;
+
   /**
    * Settings used in app
    */
@@ -32,6 +34,12 @@ export class AppComponent implements OnInit {
    * Settings update of app component
    */
   settingsUpdate: BehaviorSubject<Settings> = new BehaviorSubject<Settings>(this.settings);
+
+  /**
+   * Log of app component
+   */
+  log: BehaviorSubject<string> = new BehaviorSubject<string>('');
+
   /**
    * Loading  of app component
    *
@@ -172,7 +180,17 @@ export class AppComponent implements OnInit {
       }
     });
 
+    // stop loading when we loaded
     this.loading = false;
+
+    this.log.subscribe(data => {
+      if (data.length > 0) {
+        const log = `${moment().format('DD-MM-YYYY HH:mm:ss')}:: ${data}\n`;
+        this.electron.fs.appendFile(`${this.appdata}\\log.txt`, log).then(() => {
+          console.log(log);
+        });
+      }
+    });
 
     // when we update settings we write them to json file
     this.settingsUpdate.subscribe(a => {
@@ -290,6 +308,7 @@ export class AppComponent implements OnInit {
   error(err: any): void {
     console.error(err);
     this.snack.show(err);
+    this.log.next(err.toString());
   }
 
   /**
