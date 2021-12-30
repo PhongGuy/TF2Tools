@@ -359,8 +359,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="357"
-                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:357</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="363"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:363</a></div>
                 </td>
             </tr>
 
@@ -437,8 +437,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="345"
-                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:345</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="351"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:351</a></div>
                 </td>
             </tr>
 
@@ -509,8 +509,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="284"
-                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:284</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="286"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:286</a></div>
                 </td>
             </tr>
 
@@ -580,8 +580,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="315"
-                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:315</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="319"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:319</a></div>
                 </td>
             </tr>
 
@@ -690,8 +690,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="252"
-                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:252</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="254"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:254</a></div>
                 </td>
             </tr>
 
@@ -761,8 +761,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="243"
-                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:243</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="245"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:245</a></div>
                 </td>
             </tr>
 
@@ -832,8 +832,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="201"
-                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:201</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="202"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:202</a></div>
                 </td>
             </tr>
 
@@ -903,8 +903,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="234"
-                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:234</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="236"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:236</a></div>
                 </td>
             </tr>
 
@@ -1067,7 +1067,7 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-description"><p>Descriptions hitsound component</p>
+                    <div class="io-description"><p>Updates hitsound component</p>
 </div>
 
                     <div class="io-description">
@@ -1171,8 +1171,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="275"
-                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:275</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="277"
+                            class="link-to-prism">src/app/dashboard/hitsound/hitsound.component.ts:277</a></div>
                 </td>
             </tr>
 
@@ -1528,7 +1528,7 @@ export class HitsoundComponent implements OnInit {
   }
 
   /**
-   * Descriptions hitsound component
+   * Updates hitsound component
    */
   async update() {
     this.library &#x3D; [];
@@ -1615,6 +1615,7 @@ export class HitsoundComponent implements OnInit {
         if (typeof r &#x3D;&#x3D;&#x3D; &#x27;string&#x27;) {
           const path &#x3D; _hitsound.path.split(&#x27;\\&#x27;);
           path.pop();
+          this.app.log.next(&#x60;Renaming hitsound: *RENAME* &quot;${_hitsound.path}&quot; &#x3D;&gt; &quot;${path.join(&#x27;\\&#x27;)}\\${r}.wav&quot;&#x60;);
           this.electron.fs.rename(_hitsound.path, &#x60;${path.join(&#x27;\\&#x27;)}\\${r}.wav&#x60;)
             .then(() &#x3D;&gt; {
               this.snack.show(&#x60;Renamed &quot;${_hitsound.name}&quot; to &quot;${r}&quot;&#x60;);
@@ -1647,6 +1648,7 @@ export class HitsoundComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(result &#x3D;&gt; {
       if (result) {
+        this.app.log.next(&#x60;Remove hitsound *DELETE* &quot;${_hitsound.path}&quot;&#x60;);
         this.electron.fs.remove(_hitsound.path)
           .then(() &#x3D;&gt; {
             this.snack.show(&#x60;${_hitsound.name} was removed&#x60;);
@@ -1720,6 +1722,7 @@ export class HitsoundComponent implements OnInit {
   installHitsound(_hitsound: Hitsound): void {
     const path &#x3D; this.app.hitsounds[0];
     if (path !&#x3D;&#x3D; undefined) {
+      this.app.log.next(&#x60;Installing hitsound: *COPY* &quot;${_hitsound.path}&quot; &#x3D;&gt; &quot;${path}&quot;&#x60;);
       this.electron.fs.copy(_hitsound.path, path, { overwrite: true })
         .then(() &#x3D;&gt; {
           this.snack.show(&#x60;Hitsound ${_hitsound.name} was installed&#x60;);
@@ -1732,6 +1735,7 @@ export class HitsoundComponent implements OnInit {
       const defaultPath &#x3D; &#x60;${this.app.settings.customPath}\\mycustomstuff\\sound\\ui&#x60;;
       this.electron.fs.ensureDir(defaultPath)
         .then(() &#x3D;&gt; {
+          this.app.log.next(&#x60;Installing hitsound: *COPY* &quot;${_hitsound.path}&quot; &#x3D;&gt; &quot;${defaultPath}\\hitsound.wav&quot;&#x60;);
           this.electron.fs.copy(_hitsound.path, &#x60;${defaultPath}\\hitsound.wav&#x60;)
             .then(() &#x3D;&gt; {
               this.snack.show(&#x60;Hitsound ${_hitsound.name} was installed&#x60;);
@@ -1751,6 +1755,7 @@ export class HitsoundComponent implements OnInit {
   installKillSound(_killsound: Hitsound): void {
     const path &#x3D; this.app.killsounds[0];
     if (path !&#x3D;&#x3D; undefined) {
+      this.app.log.next(&#x60;Installing killsound: *COPY* &quot;${_killsound.path}&quot; &#x3D;&gt; &quot;${path}&quot;&#x60;);
       this.electron.fs.copy(_killsound.path, path, { overwrite: true })
         .then(() &#x3D;&gt; {
           this.snack.show(&#x60;Killsound ${_killsound.name} was installed&#x60;);
@@ -1761,6 +1766,7 @@ export class HitsoundComponent implements OnInit {
       const defaultPath &#x3D; &#x60;${this.app.settings.customPath}\\mycustomstuff\\sound\\ui&#x60;;
       this.electron.fs.ensureDir(defaultPath)
         .then(() &#x3D;&gt; {
+          this.app.log.next(&#x60;Installing killsound: *COPY* &quot;${_killsound.path}&quot; &#x3D;&gt; &quot;${defaultPath}\\killsound.wav&quot;&#x60;);
           this.electron.fs.copy(_killsound.path, &#x60;${defaultPath}\\killsound.wav&#x60;)
             .then(() &#x3D;&gt; {
               this.snack.show(&#x60;Killsound ${_killsound.name} was installed&#x60;);

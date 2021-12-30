@@ -3,5 +3,5 @@ export const APP_CONFIG = {
   production: false,
   environment: 'LOCAL',
   src: '',
-  version: '4.3.0',
+  version: '4.4.0',
 };

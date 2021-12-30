@@ -410,8 +410,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="320"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:320</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="327"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:327</a></div>
                 </td>
             </tr>
 
@@ -484,8 +484,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="302"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:302</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="309"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:309</a></div>
                 </td>
             </tr>
 
@@ -595,8 +595,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="195"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:195</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="198"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:198</a></div>
                 </td>
             </tr>
 
@@ -666,8 +666,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="260"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:260</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="266"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:266</a></div>
                 </td>
             </tr>
 
@@ -737,8 +737,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="292"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:292</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="299"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:299</a></div>
                 </td>
             </tr>
 
@@ -809,8 +809,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="171"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:171</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="172"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:172</a></div>
                 </td>
             </tr>
 
@@ -880,8 +880,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="114"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:114</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="116"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:116</a></div>
                 </td>
             </tr>
 
@@ -919,8 +919,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="224"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:224</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="228"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:228</a></div>
                 </td>
             </tr>
 
@@ -1335,10 +1335,12 @@ export class HudComponent implements OnInit {
       let oldPath &#x3D; this.electron.appData(&#x27;TF2Tools\\huds&#x27;);
       if (this.electron.fs.existsSync(oldPath)) {
         this.snack.show(&#x27;Moving your files to new library...&#x27;, null, 5000);
+        this.app.log.next(&#x60;Trying to move files from &quot;${oldPath}&quot; &#x3D;&gt; &quot;${this.localHuds}&quot;&#x60;);
         this.electron.fs.move(oldPath, this.localHuds, { overwrite: true })
           .then(() &#x3D;&gt; {
             oldPath &#x3D; this.electron.appData(&#x27;TF2Tools\\hitsounds&#x27;);
             if (this.electron.fs.existsSync(oldPath)) {
+              this.app.log.next(&#x60;Trying to move your hitsounds from &quot;${oldPath}&quot; &#x3D;&gt; &quot;${this.app.settings.libraryPath}\\hitsounds&quot;&#x60;);
               this.electron.fs.move(oldPath, &#x60;${this.app.settings.libraryPath}\\hitsounds&#x60;, { overwrite: true })
                 .then(() &#x3D;&gt; {
                   this.snack.show(&#x27;Files was moved to new library&#x27;);
@@ -1361,9 +1363,7 @@ export class HudComponent implements OnInit {
    */
   update() {
     this.library &#x3D; [];
-    if (!this.electron.fs.existsSync(this.localHuds)) {
-      this.electron.fs.mkdirSync(this.localHuds);
-    }
+    this.electron.fs.ensureDir(this.localHuds);
 
     this.electron.fs.readdirSync(this.localHuds).forEach(customFiles &#x3D;&gt; {
       const info &#x3D; this.localHuds + &#x27;/&#x27; + customFiles + &#x27;/info.vdf&#x27;;
@@ -1403,12 +1403,13 @@ export class HudComponent implements OnInit {
    * @param _hud
    */
   add(_hud: Hud) {
-    this.electron.fs.copy(_hud.path, &#x60;${this.app.settings.customPath}/${_hud.folderName}&#x60;)
+    this.app.log.next(&#x60;Installing hud: *COPY* &quot;${_hud.path}&quot; &#x3D;&gt; &quot;${this.app.settings.customPath}\\${_hud.folderName}&quot;&#x60;);
+    this.electron.fs.copy(_hud.path, &#x60;${this.app.settings.customPath}\\${_hud.folderName}&#x60;)
       .then(() &#x3D;&gt; {
         this.snack.show(&#x60;${_hud.folderName} was installed&#x60;);
         this.update();
       })
-      .catch(err &#x3D;&gt; console.error(err));
+      .catch(err &#x3D;&gt; this.app.error(err));
   }
 
   /**
@@ -1419,13 +1420,15 @@ export class HudComponent implements OnInit {
   uninstall(_hud: Hud) {
     if (this.electron.fs.existsSync(_hud.path)) {
       if (this.app.settings.moveOrCopy) {
+        this.app.log.next(&#x60;Uninstalling hud: *MOVE* &quot;${_hud.path}&quot; &#x3D;&gt; &quot;${this.localHuds}\\${_hud.folderName}&quot;&#x60;);
         this.electron.fs.move(_hud.path, &#x60;${this.localHuds}\\${_hud.folderName}&#x60;, { overwrite: true })
           .then(() &#x3D;&gt; {
             this.snack.show(&#x60;${_hud.folderName} was uninstalled&#x60;);
             this.update();
           })
-          .catch(err &#x3D;&gt; console.error(err));
+          .catch(err &#x3D;&gt; this.app.error(err));
       } else {
+        this.app.log.next(&#x60;Uninstalling hud: *DELETE* &quot;${_hud.path}&quot;&#x60;);
         this.electron.fs.remove(_hud.path)
           .then(() &#x3D;&gt; {
             this.snack.show(&#x60;${_hud.folderName} was uninstalled&#x60;);
@@ -1453,12 +1456,13 @@ export class HudComponent implements OnInit {
 
       dialogRef.afterClosed().subscribe(result &#x3D;&gt; {
         if (result) {
+          this.app.log.next(&#x60;Remove hud: *DELETE* &quot;${_hud.path}&quot;&#x60;);
           this.electron.fs.remove(_hud.path)
             .then(() &#x3D;&gt; {
               this.snack.show(&#x60;${_hud.folderName} was removed&#x60;);
               this.update();
             })
-            .catch(err &#x3D;&gt; console.error(err));
+            .catch(err &#x3D;&gt; this.app.error(err));
         }
       });
     }
@@ -1480,14 +1484,16 @@ export class HudComponent implements OnInit {
         const dest &#x3D; &#x60;${this.localHuds}\\${name}&#x60;;
 
         if (!this.electron.fs.existsSync(dest)) {
+          this.app.log.next(&#x60;Uploading hud: *COPY* &quot;${path}&quot; &#x3D;&gt; &quot;${dest}&quot;&#x60;);
           this.electron.fs.copy(path, dest)
             .then(() &#x3D;&gt; {
+              this.app.log.next(&#x60;Successfully uploaded ${name}&#x60;);
               this.snack.show(&#x60;Added &quot;${name}&quot; to library&#x60;, null, hudsFound.length &gt; 2 ? 1000 : 3000);
               const data &#x3D; this.electron.fs.readFileSync(hud.path, { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; }).split(&#x27;&quot;&#x27;);
               const l &#x3D; { name: data[1], folderName: name, version: data[5], path: this.localHuds + &#x27;\\&#x27; + name };
               this.library.push(l);
               this.myControl.setValue(&#x27;&#x27;);
-            }).catch(err &#x3D;&gt; console.error(err));
+            }).catch(err &#x3D;&gt; this.app.error(err));
         } else {
           this.snack.show(&#x60;${name} is already in library&#x60;);
         }
@@ -1519,12 +1525,13 @@ export class HudComponent implements OnInit {
       if (typeof result &#x3D;&#x3D;&#x3D; &#x27;string&#x27;) {
         const path &#x3D; _hud.path.split(&#x27;\\&#x27;);
         const name &#x3D; path.pop();
+        this.app.log.next(&#x60;Renaming hud: *RENAME* &quot;${_hud.folderName}&quot; &#x3D;&gt; &quot;${name}&quot;&#x60;);
         this.electron.fs.rename(_hud.path, &#x60;${path.join(&#x27;\\&#x27;)}\\${result}&#x60;)
           .then(() &#x3D;&gt; {
             this.snack.show(&#x60;Updated &quot;${name}&quot; to &quot;${result}&quot;&#x60;);
             this.update();
           })
-          .catch(err &#x3D;&gt; console.error(err));
+          .catch(err &#x3D;&gt; this.app.error(err));
       }
     });
   }
