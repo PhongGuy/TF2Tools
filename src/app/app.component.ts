@@ -200,87 +200,6 @@ export class AppComponent implements OnInit {
     this.checkUpdate();
   }
 
-  /**
-   * Update custom files
-   *
-   * @param [what]
-   */
-  async update(what: 'huds' | 'hitsounds' | 'vtf' | 'weaponSounds' | null = null) {
-
-    // reset
-    if (what === 'huds') {
-      this.huds = [];
-    } else if (what === 'hitsounds') {
-      this.hitsounds = [];
-      this.killsounds = [];
-    } else if (what === 'vtf') {
-      this.vtf = [];
-      this.vtfScripts = [];
-    } else if (what === 'weaponSounds') {
-      this.weaponSounds = null;
-    } else {
-      this.huds = [];
-      this.hitsounds = [];
-      this.killsounds = [];
-      this.vtf = [];
-      this.weaponSounds = null;
-    }
-
-    // get all files in the custom folder
-    const customDir = this.fileHelp.getAllFiles(this.settings.customPath);
-
-    // Try to find all huds
-    if (what === 'huds' || what === 'vtf' || what === null) {
-      customDir.forEach(file => {
-        if (file.endsWith('info.vdf')) {
-          const hudPath = file.split('\\');
-          hudPath.pop();
-          this.huds.push(hudPath.join('\\'));
-        }
-      });
-    }
-
-    customDir.forEach(file => {
-      // try to find hitsounds
-      if (what === 'hitsounds' || what === null) {
-        if (file.endsWith('hitsound.wav')) {
-          this.hitsounds.push(file);
-        }
-
-        // try to find killsounds
-        if (file.endsWith('killsound.wav')) {
-          this.killsounds.push(file);
-        }
-      }
-
-      // try to find vtf crosshairs
-      if (what === 'vtf' || what === null) {
-        if (file.includes('materials\\vgui\\replay\\thumbnails') && file.endsWith('.vtf')) {
-          let err = 0;
-          for (const hud of this.huds) {
-            if (file.startsWith(hud)) {
-              err++;
-            }
-          }
-          if (err === 0) {
-            this.vtf.push(file);
-          }
-        }
-
-        if (file.includes('scripts\\tf_weapon') && file.endsWith('.txt')) {
-          this.vtfScripts.push(file);
-        }
-      }
-
-      // try to find weapon sounds
-      if (what === 'weaponSounds' || what === null) {
-        if (file.endsWith('game_sounds_weapons.txt')) {
-          this.weaponSounds = file;
-        }
-      }
-    });
-  }
-
   /** tell electron to minimize  */
   minimize() {
     this.electron.ipcRenderer.send('minimize');
@@ -333,6 +252,153 @@ export class AppComponent implements OnInit {
     }
 
     return result;
+  }
+
+  /**
+   * Update custom files
+   *
+   * @param [what]
+   */
+  update(what: 'huds' | 'hitsounds' | 'vtf' | 'weaponSounds' | null = null) {
+
+    // reset
+    this.resetFoundValuesInCustom(what);
+
+    // get all files in the custom folder
+    const customDir = this.fileHelp.getAllFiles(this.settings.customPath);
+
+    // Try to find all huds
+    if (what === 'huds' || what === 'vtf' || what === null) {
+      this.huds = this.findAllHudsInCustomFolder(customDir);
+    }
+
+    customDir.forEach(file => {
+      // try to find hitsounds
+      if (what === 'hitsounds' || what === null) {
+        this.findAllHitsoundsInCustomFolder(file);
+
+        // try to find killsounds
+        this.findAllKillSoundsInCustomFolder(file);
+      }
+
+      // try to find vtf crosshairs
+      if (what === 'vtf' || what === null) {
+        this.findAllVtfCrosshairsInCustomFolder(file);
+
+        this.findAllWeaponScriptsInCustomFolder(file);
+      }
+
+      // try to find weapon sounds
+      if (what === 'weaponSounds' || what === null) {
+        this.findWeaponSoundInCustomFolder(file);
+      }
+    });
+  }
+
+  /**
+   * Resets found values in custom
+   *
+   * @param what
+   */
+  private resetFoundValuesInCustom(what: string) {
+    if (what === 'huds') {
+      this.huds = [];
+    } else if (what === 'hitsounds') {
+      this.hitsounds = [];
+      this.killsounds = [];
+    } else if (what === 'vtf') {
+      this.vtf = [];
+      this.vtfScripts = [];
+    } else if (what === 'weaponSounds') {
+      this.weaponSounds = null;
+    } else {
+      this.huds = [];
+      this.hitsounds = [];
+      this.killsounds = [];
+      this.vtf = [];
+      this.weaponSounds = null;
+    }
+  }
+
+  /**
+   * Finds weapon sound in custom folder
+   *
+   * @param file
+   */
+  private findWeaponSoundInCustomFolder(file: string) {
+    if (file.endsWith('game_sounds_weapons.txt')) {
+      this.weaponSounds = file;
+    }
+  }
+
+  /**
+   * Finds all weapon scripts in custom folder
+   *
+   * @param file
+   */
+  private findAllWeaponScriptsInCustomFolder(file: string) {
+    if (file.includes('scripts\\tf_weapon') && file.endsWith('.txt')) {
+      this.vtfScripts.push(file);
+    }
+  }
+
+  /**
+   * Finds all vtf crosshairs in custom folder
+   *
+   * @param file
+   */
+  private findAllVtfCrosshairsInCustomFolder(file: string) {
+    if (file.includes('materials\\vgui\\replay\\thumbnails') && file.endsWith('.vtf')) {
+      let err = 0;
+      for (const hud of this.huds) {
+        if (file.startsWith(hud)) {
+          err++;
+        }
+      }
+      if (err === 0) {
+        this.vtf.push(file);
+      }
+    }
+  }
+
+  /**
+   * Finds all kill sounds in custom folder
+   *
+   * @param file
+   */
+  private findAllKillSoundsInCustomFolder(file: string) {
+    if (file.endsWith('killsound.wav')) {
+      this.killsounds.push(file);
+    }
+  }
+
+  /**
+   * Finds all hitsounds in custom folder
+   *
+   * @param file
+   */
+  private findAllHitsoundsInCustomFolder(file: string) {
+    if (file.endsWith('hitsound.wav')) {
+      this.hitsounds.push(file);
+    }
+  }
+
+  /**
+   * Finds all huds in custom folder
+   *
+   * @param customDir
+   * @returns all huds in custom folder
+   */
+  private findAllHudsInCustomFolder(customDir: string[]): string[] {
+    const hudsFound: string[] = [];
+    customDir.forEach(file => {
+      if (file.endsWith('info.vdf')) {
+        const hudPath = file.split('\\');
+        hudPath.pop();
+        hudsFound.push(hudPath.join('\\'));
+      }
+    });
+    return hudsFound;
   }
 
   /**
