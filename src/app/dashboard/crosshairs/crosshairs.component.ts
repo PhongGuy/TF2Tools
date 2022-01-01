@@ -314,6 +314,12 @@ export class CrosshairsComponent implements OnInit {
     this.app.settingsUpdate.next(this.app.settings);
   }
 
+  /**
+   * Slots to plural
+   *
+   * @param slot
+   * @returns to plural
+   */
   private slotToPlural(slot: 'Primary' | 'Secondary' | 'Melee' | 'All'): string {
     if (slot === 'Primary') { return 'Primaries'; }
     if (slot === 'Secondary') { return 'Secondaries'; }
