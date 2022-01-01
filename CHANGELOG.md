@@ -1,5 +1,6 @@
 ## 4.4.0 (2021-12-30)
 
+* [Bumped Version] 4.4.0 ([c5fa067](https://github.com/PhongGuy/TF2Tools/commit/c5fa067))
 * add CHANGELOG.md ([672d0d2](https://github.com/PhongGuy/TF2Tools/commit/672d0d2))
 * added doc to APP_CONFIG ([7e4f58c](https://github.com/PhongGuy/TF2Tools/commit/7e4f58c))
 * added doc to AppComponent ([916db5e](https://github.com/PhongGuy/TF2Tools/commit/916db5e))
