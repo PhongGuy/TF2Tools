@@ -191,25 +191,7 @@ export class CrosshairsComponent implements OnInit {
     this.spy.deselectAll();
     this.selectedItems([]);
 
-    if (this.crosshairsTab.selectedIndex === 0) {
-      this.applyTo = 'Scout';
-    } else if (this.crosshairsTab.selectedIndex === 1) {
-      this.applyTo = 'Soldier';
-    } else if (this.crosshairsTab.selectedIndex === 2) {
-      this.applyTo = 'Pyro';
-    } else if (this.crosshairsTab.selectedIndex === 3) {
-      this.applyTo = 'Demoman';
-    } else if (this.crosshairsTab.selectedIndex === 4) {
-      this.applyTo = 'Heavy';
-    } else if (this.crosshairsTab.selectedIndex === 5) {
-      this.applyTo = 'Engineer';
-    } else if (this.crosshairsTab.selectedIndex === 6) {
-      this.applyTo = 'Medic';
-    } else if (this.crosshairsTab.selectedIndex === 7) {
-      this.applyTo = 'Sniper';
-    } else if (this.crosshairsTab.selectedIndex === 8) {
-      this.applyTo = 'Spy';
-    }
+    this.applyTo = this.getClassNameFromSelectedTab();
   }
 
   /**
@@ -292,10 +274,10 @@ export class CrosshairsComponent implements OnInit {
           const file = this.electron.fs.readFileSync(weapon.path, { encoding: 'utf8', flag: 'r' });
           this.app.log.next(`Installing crosshair: *CHANGE* "${weapon.crosshair}" => "${crosshair}" in "${weapon.path}"`);
           this.electron.fs.writeFileSync(weapon.path, file.replace(`/thumbnails/${weapon.crosshair}`, `/thumbnails/${crosshair}`));
-          this.snack.show(`Updated ${weapon.info.name} to ${crosshair}`, null, 800);
         }
       }
     });
+    this.snack.show(`Updated all ${this.getClassNameFromSelectedTab()} ${this.slotToPlural(slot).toLowerCase()} to ${crosshair}`);
     this.app.update('vtf');
     this.get();
   }
@@ -330,6 +312,46 @@ export class CrosshairsComponent implements OnInit {
     this.app.settings.crosshairBackground = v;
     this.app.log.next(`Crosshair background: *CHANGE* "${v}"`);
     this.app.settingsUpdate.next(this.app.settings);
+  }
+
+  /**
+   * Slots to plural
+   *
+   * @param slot
+   * @returns to plural
+   */
+  private slotToPlural(slot: 'Primary' | 'Secondary' | 'Melee' | 'All'): string {
+    if (slot === 'Primary') { return 'Primaries'; }
+    if (slot === 'Secondary') { return 'Secondaries'; }
+    if (slot === 'Melee') { return 'Melees'; }
+  }
+
+  /**
+   * Gets class name from selected tab
+   *
+   * @returns class name from selected tab
+   */
+  private getClassNameFromSelectedTab(): string {
+    if (this.crosshairsTab.selectedIndex === 0) {
+      return 'Scout';
+    } else if (this.crosshairsTab.selectedIndex === 1) {
+      return 'Soldier';
+    } else if (this.crosshairsTab.selectedIndex === 2) {
+      return 'Pyro';
+    } else if (this.crosshairsTab.selectedIndex === 3) {
+      return 'Demoman';
+    } else if (this.crosshairsTab.selectedIndex === 4) {
+      return 'Heavy';
+    } else if (this.crosshairsTab.selectedIndex === 5) {
+      return 'Engineer';
+    } else if (this.crosshairsTab.selectedIndex === 6) {
+      return 'Medic';
+    } else if (this.crosshairsTab.selectedIndex === 7) {
+      return 'Sniper';
+    } else if (this.crosshairsTab.selectedIndex === 8) {
+      return 'Spy';
+    }
+    return 'Unknown';
   }
 
   /**
