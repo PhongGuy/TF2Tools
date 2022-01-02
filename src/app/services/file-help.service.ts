@@ -1,22 +1,19 @@
-import { Injectable } from '@angular/core';
-import { ElectronService } from '../core/services';
+import { Injectable } from "@angular/core";
+import { ElectronService } from "../core/services";
 
 /**
  * File Help Service
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class FileHelpService {
-
   /**
    * Creates an instance of file help service.
    *
    * @param electron
    */
-  constructor(
-    private electron: ElectronService
-  ) { }
+  constructor(private electron: ElectronService) {}
 
   /**
    * Gets all files
@@ -28,11 +25,11 @@ export class FileHelpService {
   getAllFiles(dirPath, arrayOfFiles = []): string[] {
     const files = this.electron.fs.readdirSync(dirPath);
 
-    files.forEach(file => {
-      if (this.electron.fs.statSync(dirPath + '/' + file).isDirectory()) {
-        arrayOfFiles = this.getAllFiles(dirPath + '/' + file, arrayOfFiles);
+    files.forEach((file) => {
+      if (this.electron.fs.statSync(dirPath + "/" + file).isDirectory()) {
+        arrayOfFiles = this.getAllFiles(dirPath + "/" + file, arrayOfFiles);
       } else {
-        arrayOfFiles.push(this.electron.path.join(dirPath, '/', file));
+        arrayOfFiles.push(this.electron.path.join(dirPath, "/", file));
       }
     });
 

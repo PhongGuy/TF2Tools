@@ -1,6 +1,11 @@
-import { Injectable, OnDestroy } from '@angular/core';
-import { MatSnackBar, MatSnackBarConfig, MatSnackBarRef, SimpleSnackBar } from '@angular/material/snack-bar';
-import { Subscription } from 'rxjs';
+import { Injectable, OnDestroy } from "@angular/core";
+import {
+  MatSnackBar,
+  MatSnackBarConfig,
+  MatSnackBarRef,
+  SimpleSnackBar,
+} from "@angular/material/snack-bar";
+import { Subscription } from "rxjs";
 
 /**
  * Snack bar message
@@ -24,10 +29,9 @@ export class SnackBarMessage {
  * Snack service
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class SnackService implements OnDestroy {
-
   /**
    * Message queue of snack service
    */
@@ -50,9 +54,7 @@ export class SnackService implements OnDestroy {
    *
    * @param snack
    */
-  constructor(
-    private snack: MatSnackBar
-  ) { }
+  constructor(private snack: MatSnackBar) {}
 
   /**
    * on destroy
@@ -73,12 +75,12 @@ export class SnackService implements OnDestroy {
     message: string,
     action?: string,
     duration?: number,
-    classOverride: string = 'blue-snackbar'
+    classOverride: string = "blue-snackbar"
   ): void {
     const config = new MatSnackBarConfig();
-    config.duration = (duration ? duration : 3000);
-    config.verticalPosition = 'bottom';
-    config.horizontalPosition = 'left';
+    config.duration = duration ? duration : 3000;
+    config.verticalPosition = "bottom";
+    config.horizontalPosition = "left";
     config.panelClass = [classOverride];
 
     const sbMessage = new SnackBarMessage();

@@ -1,27 +1,26 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { Router } from '@angular/router';
-import { AppComponent } from '../app.component';
-import { ElectronService } from '../core/services';
-import { SnackService } from '../services/snack.service';
+import { Component, ElementRef, OnInit, ViewChild } from "@angular/core";
+import { Router } from "@angular/router";
+import { AppComponent } from "../app.component";
+import { ElectronService } from "../core/services";
+import { SnackService } from "../services/snack.service";
 
 /**
  * Setup
  */
 @Component({
-  selector: 'app-setup',
-  templateUrl: './setup.component.html',
-  styleUrls: ['./setup.component.scss']
+  selector: "app-setup",
+  templateUrl: "./setup.component.html",
+  styleUrls: ["./setup.component.scss"],
 })
 export class SetupComponent implements OnInit {
-
   /**
    * path `ElementRef`
    */
-  @ViewChild('path') path: ElementRef;
+  @ViewChild("path") path: ElementRef;
   /**
    * Sof setup component
    */
-  private s = 'Team Fortress 2\\tf\\custom';
+  private s = "Team Fortress 2\\tf\\custom";
 
   /**
    * Creates an instance of setup component.
@@ -36,13 +35,12 @@ export class SetupComponent implements OnInit {
     private app: AppComponent,
     private snack: SnackService,
     private router: Router
-  ) { }
+  ) {}
 
   /**
    * on init
    */
-  ngOnInit(): void {
-  }
+  ngOnInit(): void {}
 
   /**
    * Gets folder
@@ -64,9 +62,9 @@ export class SetupComponent implements OnInit {
         this.path.nativeElement.value = `${split[0]}\\${this.s}`;
         this.app.settings.customPath = path;
         this.app.settingsUpdate.next(this.app.settings);
-        this.router.navigate(['dashboard/hud']);
+        this.router.navigate(["dashboard/hud"]);
       } else {
-        this.snack.show('This is not a tf2 custom folder', null, 5000);
+        this.snack.show("This is not a tf2 custom folder", null, 5000);
       }
     }
     this.app.loading = false;

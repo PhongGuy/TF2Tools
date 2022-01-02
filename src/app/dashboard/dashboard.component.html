@@ -1,22 +1,54 @@
 <div class="container">
-    <div class="row">
-        <div class="col-lg-2 col-md-3">
-            <div class="fixed-nav">
-                <button mat-raised-button routerLink="hud" routerLinkActive="active"
-                    [disabled]="app.loading">Huds</button>
-                <button mat-raised-button routerLink="hitsound" routerLinkActive="active"
-                    [disabled]="app.loading">Kill/hitsounds</button>
-                <button mat-raised-button routerLink="crosshairs" routerLinkActive="active"
-                    [disabled]="app.loading">Crosshairs</button>
-                <button mat-raised-button routerLink="weapon-sounds" routerLinkActive="active" disabled>Weapon
-                    sounds</button>
-                <div class="gab"></div>
-                <button mat-raised-button routerLink="settings" routerLinkActive="active"
-                    [matBadgeHidden]="!app.updateAvailable" matBadge="1" [disabled]="app.loading">Settings</button>
-            </div>
-        </div>
-        <div class="col-lg-10 col-md-9">
-            <router-outlet></router-outlet>
-        </div>
+  <div class="row">
+    <div class="col-lg-2 col-md-3">
+      <div class="fixed-nav">
+        <button
+          mat-raised-button
+          routerLink="hud"
+          routerLinkActive="active"
+          [disabled]="app.loading"
+        >
+          Huds
+        </button>
+        <button
+          mat-raised-button
+          routerLink="hitsound"
+          routerLinkActive="active"
+          [disabled]="app.loading"
+        >
+          Kill/hitsounds
+        </button>
+        <button
+          mat-raised-button
+          routerLink="crosshairs"
+          routerLinkActive="active"
+          [disabled]="app.loading"
+        >
+          Crosshairs
+        </button>
+        <button
+          mat-raised-button
+          routerLink="weapon-sounds"
+          routerLinkActive="active"
+          disabled
+        >
+          Weapon sounds
+        </button>
+        <div class="gab"></div>
+        <button
+          mat-raised-button
+          routerLink="settings"
+          routerLinkActive="active"
+          [matBadgeHidden]="!app.updateAvailable"
+          matBadge="1"
+          [disabled]="app.loading"
+        >
+          Settings
+        </button>
+      </div>
     </div>
+    <div class="col-lg-10 col-md-9">
+      <router-outlet></router-outlet>
+    </div>
+  </div>
 </div>

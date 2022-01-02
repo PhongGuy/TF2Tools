@@ -1,18 +1,17 @@
-import { Injectable } from '@angular/core';
-import { AbstractControl, ValidatorFn } from '@angular/forms';
+import { Injectable } from "@angular/core";
+import { AbstractControl, ValidatorFn } from "@angular/forms";
 
 /**
  * Validator service
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class ValidatorService {
-
   /**
    * Creates an instance of validator service.
    */
-  constructor() { }
+  constructor() {}
 
   /**
    * Checks name
@@ -22,7 +21,7 @@ export class ValidatorService {
    */
   checkName(cant: string[]): ValidatorFn {
     return (control: AbstractControl): { [key: string]: boolean } | null => {
-      if (cant.filter(a => a === control.value).length !== 0) {
+      if (cant.filter((a) => a === control.value).length !== 0) {
         return { nameExists: true };
       }
       return null;

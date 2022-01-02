@@ -1,16 +1,16 @@
-import { Component } from '@angular/core';
+import { Component } from "@angular/core";
 
 /**
  * Multiple warning component
  */
 @Component({
-  selector: 'app-multiple-warning',
-  templateUrl: './multiple-warning.component.html',
-  styleUrls: ['./multiple-warning.component.scss']
+  selector: "app-multiple-warning",
+  templateUrl: "./multiple-warning.component.html",
+  styleUrls: ["./multiple-warning.component.scss"],
 })
 export class MultipleWarningComponent {
   /**
    * Creates an instance of multiple warning component.
    */
-  constructor() { }
+  constructor() {}
 }
