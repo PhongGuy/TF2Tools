@@ -1,30 +1,29 @@
-import { HttpClient } from '@angular/common/http';
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { NavigationEnd, Router } from '@angular/router';
-import * as moment from 'moment';
-import { BehaviorSubject } from 'rxjs';
-import { APP_CONFIG } from '../environments/environment';
-import { ElectronService } from './core/services';
-import { Settings } from './models/settings';
-import { FileHelpService } from './services/file-help.service';
-import { SnackService } from './services/snack.service';
+import { HttpClient } from "@angular/common/http";
+import { Component, ElementRef, OnInit, ViewChild } from "@angular/core";
+import { NavigationEnd, Router } from "@angular/router";
+import * as moment from "moment";
+import { BehaviorSubject } from "rxjs";
+import { APP_CONFIG } from "../environments/environment";
+import { ElectronService } from "./core/services";
+import { Settings } from "./models/settings";
+import { FileHelpService } from "./services/file-help.service";
+import { SnackService } from "./services/snack.service";
 
 /**
  * This is the main app component
  */
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss']
+  selector: "app-root",
+  templateUrl: "./app.component.html",
+  styleUrls: ["./app.component.scss"],
 })
-
 export class AppComponent implements OnInit {
   /**
    * View child room
    *
    * @param ´ElementRef´
    */
-  @ViewChild('room') room: ElementRef;
+  @ViewChild("room") room: ElementRef;
 
   /**
    * Settings used in app
@@ -33,12 +32,14 @@ export class AppComponent implements OnInit {
   /**
    * Settings update of app component
    */
-  settingsUpdate: BehaviorSubject<Settings> = new BehaviorSubject<Settings>(this.settings);
+  settingsUpdate: BehaviorSubject<Settings> = new BehaviorSubject<Settings>(
+    this.settings
+  );
 
   /**
    * Log of app component
    */
-  log: BehaviorSubject<string> = new BehaviorSubject<string>('');
+  log: BehaviorSubject<string> = new BehaviorSubject<string>("");
 
   /**
    * Loading  of app component
@@ -49,11 +50,11 @@ export class AppComponent implements OnInit {
   /**
    * Fullscreen icon of app component
    */
-  fullscreenIcon = 'fullscreen';
+  fullscreenIcon = "fullscreen";
   /**
    * Fullscreen tooltip of app component
    */
-  fullscreenTip = 'Maximize';
+  fullscreenTip = "Maximize";
   /**
    * Hitsounds found
    */
@@ -77,7 +78,7 @@ export class AppComponent implements OnInit {
   /**
    * Weapon sounds of app component
    */
-  weaponSounds = '';
+  weaponSounds = "";
   /**
    * Update available of app component
    *
@@ -101,11 +102,12 @@ export class AppComponent implements OnInit {
   /**
    * Default custom path
    */
-  private defaultCustomPath = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\custom';
+  private defaultCustomPath =
+    "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Team Fortress 2\\tf\\custom";
   /**
    * Default library path
    */
-  private defaultLibraryPath = this.electron.appData('TF2Tools\\Library');
+  private defaultLibraryPath = this.electron.appData("TF2Tools\\Library");
 
   /**
    * Creates an instance of app component.
@@ -123,18 +125,23 @@ export class AppComponent implements OnInit {
     private fileHelp: FileHelpService,
     private http: HttpClient
   ) {
-    this.appdata = this.electron.appData('TF2Tools');
+    this.appdata = this.electron.appData("TF2Tools");
     this.appTemp = `${this.appdata}\\temp`;
 
     this.electron.fs.ensureDir(this.appdata);
     this.electron.fs.ensureDir(`${this.appdata}\\temp`);
 
-
     if (this.electron.fs.existsSync(`${this.appdata}\\settings.json`)) {
-      const data = this.electron.fs.readFileSync(`${this.appdata}\\settings.json`, { encoding: 'utf8', flag: 'r' });
+      const data = this.electron.fs.readFileSync(
+        `${this.appdata}\\settings.json`,
+        { encoding: "utf8", flag: "r" }
+      );
       const jsonSettings = JSON.parse(data) as Settings;
       for (const k in this.settings) {
-        if (Object.prototype.hasOwnProperty.call(this.settings, k) && Object.prototype.hasOwnProperty.call(jsonSettings, k)) {
+        if (
+          Object.prototype.hasOwnProperty.call(this.settings, k) &&
+          Object.prototype.hasOwnProperty.call(jsonSettings, k)
+        ) {
           this.settings[k] = jsonSettings[k];
         }
       }
@@ -150,21 +157,21 @@ export class AppComponent implements OnInit {
 
     if (this.settings.customPath !== null) {
       if (this.electron.fs.existsSync(this.settings.customPath)) {
-        this.router.navigate(['dashboard/hud']);
+        this.router.navigate(["dashboard/hud"]);
       } else {
         if (this.electron.fs.existsSync(this.defaultCustomPath)) {
           this.settings.customPath = this.defaultCustomPath;
-          this.router.navigate(['dashboard/hud']);
+          this.router.navigate(["dashboard/hud"]);
         } else {
-          this.router.navigate(['setup']);
+          this.router.navigate(["setup"]);
         }
       }
     } else {
       if (this.electron.fs.existsSync(this.defaultCustomPath)) {
         this.settings.customPath = this.defaultCustomPath;
-        this.router.navigate(['dashboard/hud']);
+        this.router.navigate(["dashboard/hud"]);
       } else {
-        this.router.navigate(['setup']);
+        this.router.navigate(["setup"]);
       }
     }
   }
@@ -174,7 +181,7 @@ export class AppComponent implements OnInit {
    */
   ngOnInit() {
     // scroll to top when we change navigation
-    this.router.events.subscribe(event => {
+    this.router.events.subscribe((event) => {
       if (event instanceof NavigationEnd) {
         this.room.nativeElement.scrollTop = 0;
       }
@@ -183,18 +190,23 @@ export class AppComponent implements OnInit {
     // stop loading when we loaded
     this.loading = false;
 
-    this.log.subscribe(data => {
+    this.log.subscribe((data) => {
       if (data.length > 0) {
-        const log = `${moment().format('DD-MM-YYYY HH:mm:ss')}:: ${data}\n`;
-        this.electron.fs.appendFile(`${this.appdata}\\log.txt`, log).then(() => {
-          console.log(log);
-        });
+        const log = `${moment().format("DD-MM-YYYY HH:mm:ss")}:: ${data}\n`;
+        this.electron.fs
+          .appendFile(`${this.appdata}\\log.txt`, log)
+          .then(() => {
+            console.log(log);
+          });
       }
     });
 
     // when we update settings we write them to json file
-    this.settingsUpdate.subscribe(a => {
-      this.electron.fs.writeFileSync(`${this.appdata}\\settings.json`, JSON.stringify(this.settings));
+    this.settingsUpdate.subscribe((a) => {
+      this.electron.fs.writeFileSync(
+        `${this.appdata}\\settings.json`,
+        JSON.stringify(this.settings)
+      );
     });
 
     this.checkUpdate();
@@ -202,20 +214,23 @@ export class AppComponent implements OnInit {
 
   /** tell electron to minimize  */
   minimize() {
-    this.electron.ipcRenderer.send('minimize');
+    this.electron.ipcRenderer.send("minimize");
   }
 
   /** toggle between full screen and minimize */
   fullscreenToggle() {
-    this.electron.ipcRenderer.send('fullscreen');
+    this.electron.ipcRenderer.send("fullscreen");
     this.fullscreen = this.fullscreen ? false : true;
-    this.fullscreenTip = this.fullscreen ? 'Restore Down' : 'Maximize';
-    this.fullscreenIcon = this.fullscreen ? 'fullscreen_exit' : 'fullscreen';
+    this.fullscreenTip = this.fullscreen ? "Restore Down" : "Maximize";
+    this.fullscreenIcon = this.fullscreen ? "fullscreen_exit" : "fullscreen";
   }
 
   /** write the settings to json and close the application */
   close() {
-    this.electron.fs.writeFileSync(`${this.appdata}\\settings.json`, JSON.stringify(this.settings));
+    this.electron.fs.writeFileSync(
+      `${this.appdata}\\settings.json`,
+      JSON.stringify(this.settings)
+    );
     window.close();
   }
 
@@ -237,14 +252,15 @@ export class AppComponent implements OnInit {
    * @returns `string`
    */
   generateRandomString(length) {
-    let result = ''; let seeds;
+    let result = "";
+    let seeds;
 
     for (let i = 0; i < length - 1; i++) {
       //Generate seeds array, that will be the bag from where randomly select generated char
       seeds = [
         Math.floor(Math.random() * 10) + 48,
         Math.floor(Math.random() * 25) + 65,
-        Math.floor(Math.random() * 25) + 97
+        Math.floor(Math.random() * 25) + 97,
       ];
 
       //Choose randomly from seeds, convert to char and append to result
@@ -259,8 +275,7 @@ export class AppComponent implements OnInit {
    *
    * @param [what]
    */
-  update(what: 'huds' | 'hitsounds' | 'vtf' | 'weaponSounds' | null = null) {
-
+  update(what: "huds" | "hitsounds" | "vtf" | "weaponSounds" | null = null) {
     // reset
     this.resetFoundValuesInCustom(what);
 
@@ -268,13 +283,13 @@ export class AppComponent implements OnInit {
     const customDir = this.fileHelp.getAllFiles(this.settings.customPath);
 
     // Try to find all huds
-    if (what === 'huds' || what === 'vtf' || what === null) {
+    if (what === "huds" || what === "vtf" || what === null) {
       this.huds = this.findAllHudsInCustomFolder(customDir);
     }
 
-    customDir.forEach(file => {
+    customDir.forEach((file) => {
       // try to find hitsounds
-      if (what === 'hitsounds' || what === null) {
+      if (what === "hitsounds" || what === null) {
         this.findAllHitsoundsInCustomFolder(file);
 
         // try to find killsounds
@@ -282,14 +297,14 @@ export class AppComponent implements OnInit {
       }
 
       // try to find vtf crosshairs
-      if (what === 'vtf' || what === null) {
+      if (what === "vtf" || what === null) {
         this.findAllVtfCrosshairsInCustomFolder(file);
 
         this.findAllWeaponScriptsInCustomFolder(file);
       }
 
       // try to find weapon sounds
-      if (what === 'weaponSounds' || what === null) {
+      if (what === "weaponSounds" || what === null) {
         this.findWeaponSoundInCustomFolder(file);
       }
     });
@@ -301,15 +316,15 @@ export class AppComponent implements OnInit {
    * @param what
    */
   private resetFoundValuesInCustom(what: string) {
-    if (what === 'huds') {
+    if (what === "huds") {
       this.huds = [];
-    } else if (what === 'hitsounds') {
+    } else if (what === "hitsounds") {
       this.hitsounds = [];
       this.killsounds = [];
-    } else if (what === 'vtf') {
+    } else if (what === "vtf") {
       this.vtf = [];
       this.vtfScripts = [];
-    } else if (what === 'weaponSounds') {
+    } else if (what === "weaponSounds") {
       this.weaponSounds = null;
     } else {
       this.huds = [];
@@ -326,7 +341,7 @@ export class AppComponent implements OnInit {
    * @param file
    */
   private findWeaponSoundInCustomFolder(file: string) {
-    if (file.endsWith('game_sounds_weapons.txt')) {
+    if (file.endsWith("game_sounds_weapons.txt")) {
       this.weaponSounds = file;
     }
   }
@@ -337,7 +352,7 @@ export class AppComponent implements OnInit {
    * @param file
    */
   private findAllWeaponScriptsInCustomFolder(file: string) {
-    if (file.includes('scripts\\tf_weapon') && file.endsWith('.txt')) {
+    if (file.includes("scripts\\tf_weapon") && file.endsWith(".txt")) {
       this.vtfScripts.push(file);
     }
   }
@@ -348,7 +363,10 @@ export class AppComponent implements OnInit {
    * @param file
    */
   private findAllVtfCrosshairsInCustomFolder(file: string) {
-    if (file.includes('materials\\vgui\\replay\\thumbnails') && file.endsWith('.vtf')) {
+    if (
+      file.includes("materials\\vgui\\replay\\thumbnails") &&
+      file.endsWith(".vtf")
+    ) {
       let err = 0;
       for (const hud of this.huds) {
         if (file.startsWith(hud)) {
@@ -367,7 +385,7 @@ export class AppComponent implements OnInit {
    * @param file
    */
   private findAllKillSoundsInCustomFolder(file: string) {
-    if (file.endsWith('killsound.wav')) {
+    if (file.endsWith("killsound.wav")) {
       this.killsounds.push(file);
     }
   }
@@ -378,7 +396,7 @@ export class AppComponent implements OnInit {
    * @param file
    */
   private findAllHitsoundsInCustomFolder(file: string) {
-    if (file.endsWith('hitsound.wav')) {
+    if (file.endsWith("hitsound.wav")) {
       this.hitsounds.push(file);
     }
   }
@@ -391,11 +409,11 @@ export class AppComponent implements OnInit {
    */
   private findAllHudsInCustomFolder(customDir: string[]): string[] {
     const hudsFound: string[] = [];
-    customDir.forEach(file => {
-      if (file.endsWith('info.vdf')) {
-        const hudPath = file.split('\\');
+    customDir.forEach((file) => {
+      if (file.endsWith("info.vdf")) {
+        const hudPath = file.split("\\");
         hudPath.pop();
-        hudsFound.push(hudPath.join('\\'));
+        hudsFound.push(hudPath.join("\\"));
       }
     });
     return hudsFound;
@@ -405,11 +423,13 @@ export class AppComponent implements OnInit {
    * Checks for new release
    */
   private async checkUpdate() {
-    this.http.get('https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest').subscribe((json: any) => {
-      if (APP_CONFIG.version !== json.tag_name.replace('v', '')) {
-        this.snack.show('New version available');
-        this.updateAvailable = true;
-      }
-    });
+    this.http
+      .get("https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest")
+      .subscribe((json: any) => {
+        if (APP_CONFIG.version !== json.tag_name.replace("v", "")) {
+          this.snack.show("New version available");
+          this.updateAvailable = true;
+        }
+      });
   }
 }

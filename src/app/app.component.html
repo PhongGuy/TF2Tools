@@ -1,17 +1,21 @@
 <mat-toolbar class="toolbar">
-    <span clasS="">TF2 Tools</span>
-    <div class="spacer"></div>
-    <button mat-icon-button (click)="minimize()" matTooltip="Minimize">
-        <mat-icon>remove</mat-icon>
-    </button>
-    <button mat-icon-button (click)="fullscreenToggle()" [matTooltip]="fullscreenTip">
-        <mat-icon>{{fullscreenIcon}}</mat-icon>
-    </button>
-    <button mat-icon-button color="warn" (click)="close()" matTooltip="Close">
-        <mat-icon>close</mat-icon>
-    </button>
+  <span clasS="">TF2 Tools</span>
+  <div class="spacer"></div>
+  <button mat-icon-button (click)="minimize()" matTooltip="Minimize">
+    <mat-icon>remove</mat-icon>
+  </button>
+  <button
+    mat-icon-button
+    (click)="fullscreenToggle()"
+    [matTooltip]="fullscreenTip"
+  >
+    <mat-icon>{{ fullscreenIcon }}</mat-icon>
+  </button>
+  <button mat-icon-button color="warn" (click)="close()" matTooltip="Close">
+    <mat-icon>close</mat-icon>
+  </button>
 </mat-toolbar>
 <div class="room" #room>
-    <mat-spinner *ngIf="loading"></mat-spinner>
-    <router-outlet></router-outlet>
+  <mat-spinner *ngIf="loading"></mat-spinner>
+  <router-outlet></router-outlet>
 </div>

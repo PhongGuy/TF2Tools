@@ -1,19 +1,19 @@
-import { Injectable } from '@angular/core';
-import { getAppDataPath } from 'appdata-path';
-import * as childProcess from 'child_process';
+import { Injectable } from "@angular/core";
+import { getAppDataPath } from "appdata-path";
+import * as childProcess from "child_process";
 // If you import a module but never use any of the imported values other than as TypeScript types,
 // the resulting javascript file will look as if you never imported the module at all.
-import { dialog, ipcRenderer, webFrame } from 'electron';
-import * as fs from 'fs-extra';
-import * as http from 'http';
-import * as https from 'https';
-import * as path from 'path';
+import { dialog, ipcRenderer, webFrame } from "electron";
+import * as fs from "fs-extra";
+import * as http from "http";
+import * as https from "https";
+import * as path from "path";
 
 /**
  * Electron service
  */
 @Injectable({
-  providedIn: 'root'
+  providedIn: "root",
 })
 export class ElectronService {
   /**
@@ -59,16 +59,16 @@ export class ElectronService {
   constructor() {
     // Conditional imports
     if (this.isElectron) {
-      this.ipcRenderer = window.require('electron').ipcRenderer;
-      this.webFrame = window.require('electron').webFrame;
-      this.dialog = window.require('electron').dialog;
+      this.ipcRenderer = window.require("electron").ipcRenderer;
+      this.webFrame = window.require("electron").webFrame;
+      this.dialog = window.require("electron").dialog;
 
-      this.childProcess = window.require('child_process');
-      this.fs = window.require('fs-extra');
-      this.http = window.require('http');
-      this.https = window.require('https');
-      this.appData = window.require('appdata-path');
-      this.path = window.require('path');
+      this.childProcess = window.require("child_process");
+      this.fs = window.require("fs-extra");
+      this.http = window.require("http");
+      this.https = window.require("https");
+      this.appData = window.require("appdata-path");
+      this.path = window.require("path");
 
       // Notes :
       // * A NodeJS's dependency imported with 'window.require' MUST BE present in `dependencies` of both `app/package.json`

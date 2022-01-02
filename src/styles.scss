@@ -1,15 +1,29 @@
-@use '@angular/material' as mat;
+@use "@angular/material" as mat;
 @include mat.core();
 
 // Define a light theme
 $light-primary: mat.define-palette(mat.$indigo-palette);
 $light-accent: mat.define-palette(mat.$pink-palette);
-$light-theme: mat.define-light-theme(( color: ( primary: $light-primary, accent: $light-accent, ) ));
+$light-theme: mat.define-light-theme(
+  (
+    color: (
+      primary: $light-primary,
+      accent: $light-accent,
+    ),
+  )
+);
 
 // Define a dark theme
 $dark-primary: mat.define-palette(mat.$blue-palette);
 $dark-accent: mat.define-palette(mat.$teal-palette);
-$dark-theme: mat.define-dark-theme(( color: ( primary: $dark-primary, accent: $dark-accent, ) ));
+$dark-theme: mat.define-dark-theme(
+  (
+    color: (
+      primary: $dark-primary,
+      accent: $dark-accent,
+    ),
+  )
+);
 
 // Apply the dark theme by default
 @include mat.all-component-themes($dark-theme);
@@ -19,15 +33,15 @@ $dark-theme: mat.define-dark-theme(( color: ( primary: $dark-primary, accent: $d
 .my-light-theme {
   @include mat.all-component-colors($light-theme);
 }
-@import url( 'https://fonts.googleapis.com/css2?family=Roboto&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Roboto&display=swap");
 
 body,
 html {
-  color: rgba(255, 255, 255, .78);
+  color: rgba(255, 255, 255, 0.78);
   margin: 0;
   padding: 0;
   height: 100%;
-  font-family: 'Roboto', sans-serif;
+  font-family: "Roboto", sans-serif;
 }
 
 .toolbar {
@@ -82,12 +96,12 @@ mat-toolbar {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(13deg, #909090 14%,#909090 64%);
+  background: linear-gradient(13deg, #909090 14%, #909090 64%);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(13deg, #606060 14%,#606060 64%);
+  background: linear-gradient(13deg, #606060 14%, #606060 64%);
 }
 
 ::-webkit-scrollbar-track {
@@ -112,7 +126,7 @@ mat-spinner {
   margin-top: -50px;
   margin-left: -50px;
   left: 50%;
-  position: absolute!important;
+  position: absolute !important;
   z-index: 1;
 }
 

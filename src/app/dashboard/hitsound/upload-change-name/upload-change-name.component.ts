@@ -1,20 +1,19 @@
-import { Component, Inject, OnInit } from '@angular/core';
-import { FormControl, Validators } from '@angular/forms';
-import { ShowOnDirtyErrorStateMatcher } from '@angular/material/core';
-import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { UploadChangeName } from '../../../models/uploadChangeName';
-import { ValidatorService } from '../../../services/validators.service';
+import { Component, Inject, OnInit } from "@angular/core";
+import { FormControl, Validators } from "@angular/forms";
+import { ShowOnDirtyErrorStateMatcher } from "@angular/material/core";
+import { MatDialogRef, MAT_DIALOG_DATA } from "@angular/material/dialog";
+import { UploadChangeName } from "../../../models/uploadChangeName";
+import { ValidatorService } from "../../../services/validators.service";
 
 /**
  * Upload change name
  */
 @Component({
-  selector: 'app-upload-change-name',
-  templateUrl: './upload-change-name.component.html',
-  styleUrls: ['./upload-change-name.component.scss']
+  selector: "app-upload-change-name",
+  templateUrl: "./upload-change-name.component.html",
+  styleUrls: ["./upload-change-name.component.scss"],
 })
 export class UploadChangeNameComponent implements OnInit {
-
   /**
    * Input answer
    */
@@ -35,14 +34,18 @@ export class UploadChangeNameComponent implements OnInit {
     private dialogRef: MatDialogRef<UploadChangeNameComponent>,
     @Inject(MAT_DIALOG_DATA) public data: UploadChangeName,
     private validator: ValidatorService
-  ) { }
+  ) {}
 
   /**
    * on init
    */
   ngOnInit(): void {
     this.matcher = new ShowOnDirtyErrorStateMatcher();
-    this.input = new FormControl('', [Validators.required, this.validator.checkName(this.data.cant), this.validator.special()]);
+    this.input = new FormControl("", [
+      Validators.required,
+      this.validator.checkName(this.data.cant),
+      this.validator.special(),
+    ]);
   }
 
   /**
