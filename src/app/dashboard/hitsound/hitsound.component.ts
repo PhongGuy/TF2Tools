@@ -163,7 +163,7 @@ export class HitsoundComponent implements OnInit {
    *
    * @param _hitsound
    */
-  rename(_hitsound: Hitsound) {
+  rename(_hitsound: Hitsound): void  {
     if (this.electron.fs.existsSync(_hitsound.path)) {
 
       const dialogRef = this.dialog.open(QuestionAnswerComponent, {
@@ -199,7 +199,7 @@ export class HitsoundComponent implements OnInit {
    *
    * @param _hitsound
    */
-  remove(_hitsound: Hitsound) {
+  remove(_hitsound: Hitsound): void  {
 
     const info = new YesNo();
     info.question = `Remove ${_hitsound.name}?`;
@@ -274,7 +274,7 @@ export class HitsoundComponent implements OnInit {
   /**
    * Volumes change
    */
-  volumeChange() {
+  volumeChange(): void  {
     this.app.settingsUpdate.next(this.app.settings);
   }
 

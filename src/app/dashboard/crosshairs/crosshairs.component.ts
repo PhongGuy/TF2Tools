@@ -179,7 +179,7 @@ export class CrosshairsComponent implements OnInit {
   /**
    * Un select all
    */
-  unSelectAll() {
+  unSelectAll(): void  {
     this.scout.deselectAll();
     this.soldier.deselectAll();
     this.pyro.deselectAll();
@@ -308,7 +308,7 @@ export class CrosshairsComponent implements OnInit {
    *
    * @param v
    */
-  changeBackground(v: string) {
+  changeBackground(v: string): void  {
     this.app.settings.crosshairBackground = v;
     this.app.log.next(`Crosshair background: *CHANGE* "${v}"`);
     this.app.settingsUpdate.next(this.app.settings);
