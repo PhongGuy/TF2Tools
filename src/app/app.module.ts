@@ -26,6 +26,9 @@ import { SetupComponent } from './setup/setup.component';
 /** AoT requires an exported function for factories */
 const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new TranslateHttpLoader(http, './assets/i18n/', '.json');
 
+/**
+ * App Module
+ */
 @NgModule({
   declarations: [
     AppComponent,

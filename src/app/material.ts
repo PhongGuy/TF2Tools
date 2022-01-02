@@ -47,6 +47,9 @@ const materialcomponents = [
     MatSlideToggleModule
 ];
 
+/**
+ * Material Module
+ */
 @NgModule({
     imports: [materialcomponents],
     exports: [materialcomponents],

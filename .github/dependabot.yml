@@ -9,6 +9,16 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    # Raise pull requests for version updates
+    # to pip against the `develop` branch
+    target-branch: "develop"
+    # Labels on pull requests for security and version updates
+    labels:
+      - "npm"
+      - "dependencies"
+    # Add assignees
+    assignees:
+      - "PhongGuy"
     # Allow up to 10 open pull requests for npm dependencies
     open-pull-requests-limit: 10
 
@@ -16,5 +26,15 @@ updates:
     directory: "/app"
     schedule:
       interval: "daily"
+    # Raise pull requests for version updates
+    # to pip against the `develop` branch
+    target-branch: "develop"
+    # Labels on pull requests for security and version updates
+    labels:
+      - "npm"
+      - "dependencies"
+    # Add assignees
+    assignees:
+      - "PhongGuy"
     # Allow up to 10 open pull requests for npm dependencies
     open-pull-requests-limit: 10
