@@ -1,5 +1,11 @@
 version = 1
 
+exclude_patterns = [
+  "docs/**",
+  ".github/**",
+  ".vscode/**"
+]
+
 [[analyzers]]
 name = "javascript"
 enabled = true
