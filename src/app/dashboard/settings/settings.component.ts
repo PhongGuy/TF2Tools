@@ -50,6 +50,11 @@ export class SettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Gets log
+   *
+   * @returns
+   */
   getLog() {
     const logs = this.electron.fs.readFileSync(this.electron.appData('TF2Tools\\log.txt'), { encoding: 'utf8', flag: 'r' });
     return logs.split('\n');
@@ -108,7 +113,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   /**
    * Updates settings
    */
-  updateSettings(): void  {
+  updateSettings(): void {
     this.app.settingsUpdate.next(this.app.settings);
   }
 
