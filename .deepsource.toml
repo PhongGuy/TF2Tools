@@ -12,7 +12,3 @@ enabled = true
 
   [analyzers.meta]
   plugins = ["angular"]
-
-[[transformers]]
-name = "standardjs"
-enabled = true
