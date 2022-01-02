@@ -50,7 +50,12 @@ export class SettingsComponent implements OnInit, OnDestroy {
     });
   }
 
-  getLog() {
+  /**
+   * Gets log
+   *
+   * @returns
+   */
+  getLog(): string[] {
     const logs = this.electron.fs.readFileSync(this.electron.appData('TF2Tools\\log.txt'), { encoding: 'utf8', flag: 'r' });
     return logs.split('\n');
   }
