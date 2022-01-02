@@ -108,7 +108,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   /**
    * Updates settings
    */
-  updateSettings() {
+  updateSettings(): void  {
     this.app.settingsUpdate.next(this.app.settings);
   }
 

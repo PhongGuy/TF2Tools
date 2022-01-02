@@ -48,7 +48,7 @@ export class UploadChangeNameComponent implements OnInit {
   /**
    * Submits upload change name component
    */
-  submit() {
+  submit(): void  {
     if (!this.input.invalid) {
       this.dialogRef.close(this.input.value);
     }
@@ -60,7 +60,7 @@ export class UploadChangeNameComponent implements OnInit {
    * @param event
    * @param file
    */
-  playFile(event: Event, file: File) {
+  playFile(event: Event, file: File): void  {
     event.preventDefault();
     const audio = new Audio(file.path);
     audio.volume = this.data.volume / 100;
