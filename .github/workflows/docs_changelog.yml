@@ -37,13 +37,26 @@ jobs:
     - name: Run docs
       run: npm run docs
 
+    - name: Commit changes
+      run: |
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git commit -m "Updated docs and changelog [skip ci]" -a
+
+    - name: Push changes
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: docs
+
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v3
-      commit-message: Updated docs and changelog [skip ci]
-      committer: 41898282+github-actions[bot]@users.noreply.github.com
-      author: github-actions[bot]
-      branch: docs
-      delete-branch: true
-      title: Update docs and changelog
-      labels: documentation, chore
-      assignees: PhongGuy
+      with:
+        commit-message: Updated docs and changelog [skip ci]
+        committer: 41898282+github-actions[bot]@users.noreply.github.com
+        author: github-actions[bot]
+        branch: docs
+        delete-branch: true
+        title: Update docs and changelog
+        labels: documentation, chore
+        assignees: PhongGuy
