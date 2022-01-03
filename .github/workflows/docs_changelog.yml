@@ -21,14 +21,15 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2
+      with:
+        persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal access token.
+        fetch-depth: 0 # otherwise, there would be errors pushing refs to the destination repository.
 
-    - name: Setup npm
+    - name: Install Dependencies
       uses: actions/setup-node@v2
       with:
         node-version: "16"
-
-    - name: Install Dependencies
-      run: npm i
+    - run: npm i
 
     - name: Run changelog
       run: npm run changelog
@@ -36,13 +37,14 @@ jobs:
     - name: Run docs
       run: npm run docs
 
+    - name: Commit changes
+      run: |
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git commit -m "Updated docs and changelog [skip ci]" -a
+
     - name: Push changes
-      uses: github-actions-x/commit@v2.8
+      uses: ad-m/github-push-action@master
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        push-branch: main
-        commit-message: Updated docs and changelog
-        force-add: 'true'
-        files: docs/ changelog.md
-        name: github-actions[bot]
-        email: 41898282+github-actions[bot]@users.noreply.github.com
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.ref }}
