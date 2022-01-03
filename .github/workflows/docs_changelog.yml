@@ -1,0 +1,48 @@
+# This is a basic workflow to help you get started with Actions
+name: 'Update docs & changelog'
+
+# Controls when the action will run.
+on:
+  # Triggers the workflow on push or pull request events but only for the master branch
+  push:
+    branches:
+      - main
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build:
+
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Setup npm
+      uses: actions/setup-node@v2
+      with:
+        node-version: "16"
+
+    - name: Install Dependencies
+      run: npm i
+
+    - name: Run changelog
+      run: npm run changelog
+
+    - name: Run docs
+      run: npm run docs
+
+    - name: Push changes
+      uses: github-actions-x/commit@v2.8
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        push-branch: main
+        commit-message: Updated docs and changelog
+        force-add: 'true'
+        files: docs/ changelog.md
+        name: github-actions[bot]
+        email: 41898282+github-actions[bot]@users.noreply.github.com
