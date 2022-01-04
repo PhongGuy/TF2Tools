@@ -294,7 +294,7 @@ export class SnackService implements OnDestroy {
   /**
    * on destroy
    */
-  ngOnDestroy() {
+  ngOnDestroy(): void  {
     this.subscription.unsubscribe();
   }
 

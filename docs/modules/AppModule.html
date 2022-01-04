@@ -302,6 +302,13 @@
 
 
 
+        <p class="comment">
+            <h3>Description</h3>
+        </p>
+        <p class="comment">
+            <p>App Module</p>
+
+        </p>
 
 
         <div class="container-fluid module">
@@ -408,6 +415,9 @@ import { SetupComponent } from &#x27;./setup/setup.component&#x27;;
 /** AoT requires an exported function for factories */
 const httpLoaderFactory &#x3D; (http: HttpClient): TranslateHttpLoader &#x3D;&gt; new TranslateHttpLoader(http, &#x27;./assets/i18n/&#x27;, &#x27;.json&#x27;);
 
+/**
+ * App Module
+ */
 @NgModule({
   declarations: [
     AppComponent,

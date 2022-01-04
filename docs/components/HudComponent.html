@@ -1361,7 +1361,7 @@ export class HudComponent implements OnInit {
   /**
    * Updates hud component
    */
-  update() {
+  update(): void  {
     this.library &#x3D; [];
     this.electron.fs.ensureDir(this.localHuds);
 
@@ -1402,7 +1402,7 @@ export class HudComponent implements OnInit {
    *
    * @param _hud
    */
-  add(_hud: Hud) {
+  add(_hud: Hud): void  {
     this.app.log.next(&#x60;Installing hud: *COPY* &quot;${_hud.path}&quot; &#x3D;&gt; &quot;${this.app.settings.customPath}\\${_hud.folderName}&quot;&#x60;);
     this.electron.fs.copy(_hud.path, &#x60;${this.app.settings.customPath}\\${_hud.folderName}&#x60;)
       .then(() &#x3D;&gt; {
@@ -1417,7 +1417,7 @@ export class HudComponent implements OnInit {
    *
    * @param _hud
    */
-  uninstall(_hud: Hud) {
+  uninstall(_hud: Hud): void  {
     if (this.electron.fs.existsSync(_hud.path)) {
       if (this.app.settings.moveOrCopy) {
         this.app.log.next(&#x60;Uninstalling hud: *MOVE* &quot;${_hud.path}&quot; &#x3D;&gt; &quot;${this.localHuds}\\${_hud.folderName}&quot;&#x60;);
@@ -1443,7 +1443,7 @@ export class HudComponent implements OnInit {
    *
    * @param _hud
    */
-  remove(_hud: Hud) {
+  remove(_hud: Hud): void  {
     if (this.electron.fs.existsSync(_hud.path)) {
       const d: YesNo &#x3D; new YesNo();
       d.question &#x3D; &#x60;Remove ${_hud.folderName}?&#x60;;
@@ -1473,7 +1473,7 @@ export class HudComponent implements OnInit {
    *
    * @param event
    */
-  upload(event: Event) {
+  upload(event: Event): void  {
     const target &#x3D; event.target as HTMLInputElement;
     const files: File[] &#x3D; Array.from(target.files);
     const hudsFound &#x3D; files.filter(i &#x3D;&gt; i.name &#x3D;&#x3D;&#x3D; &#x27;info.vdf&#x27;);

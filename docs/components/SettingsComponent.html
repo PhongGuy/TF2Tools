@@ -335,8 +335,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="61"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:61</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="66"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:66</a></div>
                 </td>
             </tr>
 
@@ -374,18 +374,25 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="53"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:53</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="58"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:58</a></div>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
+                    <div class="io-description"><p>Gets log</p>
+</div>
 
+                    <div>
+                    </div>
                     <div class="io-description">
                         <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >any</a></code>
 
+                    </div>
+                    <div class="io-description">
+                        
                     </div>
                 </td>
             </tr>
@@ -411,8 +418,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="118"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:118</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="123"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:123</a></div>
                 </td>
             </tr>
 
@@ -489,8 +496,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="111"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:111</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="116"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:116</a></div>
                 </td>
             </tr>
 
@@ -666,6 +673,11 @@ export class SettingsComponent implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * Gets log
+   *
+   * @returns
+   */
   getLog() {
     const logs &#x3D; this.electron.fs.readFileSync(this.electron.appData(&#x27;TF2Tools\\log.txt&#x27;), { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; });
     return logs.split(&#x27;\n&#x27;);
@@ -724,7 +736,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   /**
    * Updates settings
    */
-  updateSettings() {
+  updateSettings(): void {
     this.app.settingsUpdate.next(this.app.settings);
   }
 
