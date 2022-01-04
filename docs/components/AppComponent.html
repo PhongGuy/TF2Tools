@@ -2265,7 +2265,7 @@ export class AppComponent implements OnInit {
   /**
    * on init
    */
-  ngOnInit() {
+  ngOnInit(): void  {
     // scroll to top when we change navigation
     this.router.events.subscribe(event &#x3D;&gt; {
       if (event instanceof NavigationEnd) {
@@ -2294,12 +2294,12 @@ export class AppComponent implements OnInit {
   }
 
   /** tell electron to minimize  */
-  minimize() {
+  minimize(): void  {
     this.electron.ipcRenderer.send(&#x27;minimize&#x27;);
   }
 
   /** toggle between full screen and minimize */
-  fullscreenToggle() {
+  fullscreenToggle(): void  {
     this.electron.ipcRenderer.send(&#x27;fullscreen&#x27;);
     this.fullscreen &#x3D; this.fullscreen ? false : true;
     this.fullscreenTip &#x3D; this.fullscreen ? &#x27;Restore Down&#x27; : &#x27;Maximize&#x27;;
@@ -2307,7 +2307,7 @@ export class AppComponent implements OnInit {
   }
 
   /** write the settings to json and close the application */
-  close() {
+  close(): void  {
     this.electron.fs.writeFileSync(&#x60;${this.appdata}\\settings.json&#x60;, JSON.stringify(this.settings));
     window.close();
   }
@@ -2329,7 +2329,7 @@ export class AppComponent implements OnInit {
    * @param length
    * @returns &#x60;string&#x60;
    */
-  generateRandomString(length) {
+  generateRandomString(length): string  {
     let result &#x3D; &#x27;&#x27;; let seeds;
 
     for (let i &#x3D; 0; i &lt; length - 1; i++) {
@@ -2352,7 +2352,7 @@ export class AppComponent implements OnInit {
    *
    * @param [what]
    */
-  update(what: &#x27;huds&#x27; | &#x27;hitsounds&#x27; | &#x27;vtf&#x27; | &#x27;weaponSounds&#x27; | null &#x3D; null) {
+  update(what: &#x27;huds&#x27; | &#x27;hitsounds&#x27; | &#x27;vtf&#x27; | &#x27;weaponSounds&#x27; | null &#x3D; null): void  {
 
     // reset
     this.resetFoundValuesInCustom(what);

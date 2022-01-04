@@ -519,7 +519,7 @@ export class QuestionAnswerComponent implements OnInit {
   /**
    * Submits question answer component
    */
-  submit() {
+  submit(): void  {
     if (!this.input.invalid) {
       this.dialogRef.close(this.input.value);
     }
