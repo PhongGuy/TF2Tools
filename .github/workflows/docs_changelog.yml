@@ -37,13 +37,14 @@ jobs:
     - name: Run docs
       run: npm run docs
 
-    - name: Create Pull Request
-      uses: peter-evans/create-pull-request@v3
+    - name: Commit changes
+      run: |
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git commit -m "Updated docs and changelog" -a
+
+    - name: Push changes
+      uses: ad-m/github-push-action@master
       with:
-        commit-message: Update docs and changelog to reflect release changes
-        title: Update docs and changelog
-        body: Update docs and changelog to reflect release changes
-        labels: documentation, chore
-        assignees: PhongGuy
+        github_token: ${{ secrets.GITHUB_TOKEN }}
         branch: docs
-        base: main
