@@ -20,8 +20,6 @@ export class SettingsComponent implements OnInit, OnDestroy {
    */
   update = false;
 
-  log: string[] = [];
-
   /**
    * Creates an instance of settings component.
    *
@@ -55,7 +53,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
    *
    * @returns
    */
-  getLog() {
+  getLog(): string[] {
     const logs = this.electron.fs.readFileSync(this.electron.appData('TF2Tools\\log.txt'), { encoding: 'utf8', flag: 'r' });
     return logs.split('\n');
   }
@@ -63,7 +61,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   /**
    * Changes library
    */
-  async changeLibrary() {
+  async changeLibrary(): Promise<void> {
     this.app.loading = true;
     this.electron.ipcRenderer.send('openDialog', {
       title: 'Chose location',

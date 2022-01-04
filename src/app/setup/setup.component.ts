@@ -1,7 +1,6 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { Component, ElementRef, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { AppComponent } from '../app.component';
-import { ElectronService } from '../core/services';
 import { SnackService } from '../services/snack.service';
 
 /**
@@ -12,7 +11,7 @@ import { SnackService } from '../services/snack.service';
   templateUrl: './setup.component.html',
   styleUrls: ['./setup.component.scss']
 })
-export class SetupComponent implements OnInit {
+export class SetupComponent {
 
   /**
    * path `ElementRef`
@@ -26,23 +25,15 @@ export class SetupComponent implements OnInit {
   /**
    * Creates an instance of setup component.
    *
-   * @param electron
    * @param app
    * @param snack
    * @param router
    */
   constructor(
-    private electron: ElectronService,
     private app: AppComponent,
     private snack: SnackService,
     private router: Router
   ) { }
-
-  /**
-   * on init
-   */
-  ngOnInit(): void {
-  }
 
   /**
    * Gets folder
