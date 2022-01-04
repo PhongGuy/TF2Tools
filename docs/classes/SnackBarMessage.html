@@ -62,7 +62,7 @@
             <h3>File</h3>
         </p>
         <p class="comment">
-            <code>src/app/services/snack.service.ts</code>
+            <code>src/app/models/snackBarMessage.ts</code>
         </p>
 
 
@@ -141,7 +141,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="16" class="link-to-prism">src/app/services/snack.service.ts:16</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="14" class="link-to-prism">src/app/models/snackBarMessage.ts:14</a></div>
                         </td>
                     </tr>
 
@@ -178,7 +178,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="20" class="link-to-prism">src/app/services/snack.service.ts:20</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="18" class="link-to-prism">src/app/models/snackBarMessage.ts:18</a></div>
                         </td>
                     </tr>
 
@@ -210,7 +210,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="12" class="link-to-prism">src/app/services/snack.service.ts:12</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="10" class="link-to-prism">src/app/models/snackBarMessage.ts:10</a></div>
                         </td>
                     </tr>
 
@@ -235,125 +235,24 @@
 
 
     <div class="tab-pane fade  tab-source-code" id="c-source">
-        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { Injectable, OnDestroy } from &#x27;@angular/core&#x27;;
-import { MatSnackBar, MatSnackBarConfig, MatSnackBarRef, SimpleSnackBar } from &#x27;@angular/material/snack-bar&#x27;;
-import { Subscription } from &#x27;rxjs&#x27;;
+        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { MatSnackBarConfig } from &#x27;@angular/material/snack-bar&#x27;;
 
 /**
  * Snack bar message
  */
 export class SnackBarMessage {
-  /**
-   * Message  of snack bar message
-   */
-  message: string;
-  /**
-   * Action  of snack bar message
-   */
-  action: string &#x3D; null;
-  /**
-   * Config  of snack bar message
-   */
-  config: MatSnackBarConfig &#x3D; null;
-}
-
-/**
- * Snack service
- */
-@Injectable({
-  providedIn: &#x27;root&#x27;
-})
-export class SnackService implements OnDestroy {
-
-  /**
-   * Message queue of snack service
-   */
-  private messageQueue: Array&lt;any&gt; &#x3D; Array&lt;any&gt;();
-  /**
-   * Subscription  of snack service
-   */
-  private subscription: Subscription;
-  /**
-   * Snack bar ref of snack service
-   */
-  private snackBarRef: MatSnackBarRef&lt;SimpleSnackBar&gt;;
-  /**
-   * Determines whether instance visible is
-   */
-  private isInstanceVisible &#x3D; false;
-
-  /**
-   * Creates an instance of snack service.
-   *
-   * @param snack
-   */
-  constructor(
-    private snack: MatSnackBar
-  ) { }
-
-  /**
-   * on destroy
-   */
-  ngOnDestroy(): void  {
-    this.subscription.unsubscribe();
-  }
-
-  /**
-   * Shows snack service
-   *
-   * @param message The message to show in the snackbar.
-   * @param [action] The label for the snackbar action.
-   * @param [duration] Additional configuration options for the snackbar.
-   * @param [classOverride] Adds a css class on the snackbar so you can add color.
-   */
-  show(
-    message: string,
-    action?: string,
-    duration?: number,
-    classOverride: string &#x3D; &#x27;blue-snackbar&#x27;
-  ): void {
-    const config &#x3D; new MatSnackBarConfig();
-    config.duration &#x3D; (duration ? duration : 3000);
-    config.verticalPosition &#x3D; &#x27;bottom&#x27;;
-    config.horizontalPosition &#x3D; &#x27;left&#x27;;
-    config.panelClass &#x3D; [classOverride];
-
-    const sbMessage &#x3D; new SnackBarMessage();
-    sbMessage.message &#x3D; message;
-    sbMessage.action &#x3D; action;
-    sbMessage.config &#x3D; config;
-
-    this.messageQueue.push(sbMessage);
-
-    if (!this.isInstanceVisible) {
-      this.showNext();
-    }
-  }
-
-  /**
-   * Shows next
-   *
-   * @returns
-   */
-  private showNext() {
-    if (this.messageQueue.length &#x3D;&#x3D;&#x3D; 0) {
-      return;
-    }
-
-    const message &#x3D; this.messageQueue.shift();
-    this.isInstanceVisible &#x3D; true;
-
-    this.snackBarRef &#x3D; this.snack.open(
-      message.message,
-      message.action,
-      message.config
-    );
-
-    this.snackBarRef.afterDismissed().subscribe(() &#x3D;&gt; {
-      this.isInstanceVisible &#x3D; false;
-      this.showNext();
-    });
-  }
+    /**
+     * Message  of snack bar message
+     */
+    message: string;
+    /**
+     * Action  of snack bar message
+     */
+    action: string &#x3D; null;
+    /**
+     * Config  of snack bar message
+     */
+    config: MatSnackBarConfig &#x3D; null;
 }
 </code></pre>
     </div>

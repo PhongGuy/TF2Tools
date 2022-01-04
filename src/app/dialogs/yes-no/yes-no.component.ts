@@ -1,4 +1,4 @@
-import { Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { YesNo } from '../../models/yesNo';
 
@@ -10,7 +10,7 @@ import { YesNo } from '../../models/yesNo';
   templateUrl: './yes-no.component.html',
   styleUrls: ['./yes-no.component.scss']
 })
-export class YesNoComponent implements OnInit {
+export class YesNoComponent {
 
   /**
    * Creates an instance of yes no component.
@@ -20,11 +20,5 @@ export class YesNoComponent implements OnInit {
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: YesNo
   ) { }
-
-  /**
-   * on init
-   */
-  ngOnInit(): void {
-  }
 
 }

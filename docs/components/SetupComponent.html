@@ -78,12 +78,6 @@
     </p>
 
 
-    <p class="comment">
-        <h3>Implements</h3>
-    </p>
-    <p class="comment">
-                    <code><a href="https://angular.io/api/core/OnInit" target="_blank" >OnInit</a></code>
-    </p>
 
 
 <section>
@@ -163,9 +157,6 @@
                             <li>
                                 <a href="#getFolder" >getFolder</a>
                             </li>
-                            <li>
-                                <a href="#ngOnInit" >ngOnInit</a>
-                            </li>
                         </ul>
                     </td>
                 </tr>
@@ -184,12 +175,12 @@
             <tbody>
                 <tr>
                     <td class="col-md-4">
-<code>constructor(electron: <a href="../injectables/ElectronService.html" target="_self">ElectronService</a>, app: <a href="../components/AppComponent.html" target="_self">AppComponent</a>, snack: <a href="../injectables/SnackService.html" target="_self">SnackService</a>, router: <a href="https://angular.io/api/router/Router" target="_blank">Router</a>)</code>
+<code>constructor(app: <a href="../components/AppComponent.html" target="_self">AppComponent</a>, snack: <a href="../injectables/SnackService.html" target="_self">SnackService</a>, router: <a href="https://angular.io/api/router/Router" target="_blank">Router</a>)</code>
                     </td>
                 </tr>
                         <tr>
                             <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="24" class="link-to-prism">src/app/setup/setup.component.ts:24</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="23" class="link-to-prism">src/app/setup/setup.component.ts:23</a></div>
                             </td>
                         </tr>
 
@@ -208,18 +199,6 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                                <tr>
-                                                        <td>electron</td>
-                                                  
-                                                        <td>
-                                                                        <code><a href="../injectables/ElectronService.html" target="_self" >ElectronService</a></code>
-                                                        </td>
-                                                  
-                                                    <td>
-                                                            No
-                                                    </td>
-                                                    
-                                                </tr>
                                                 <tr>
                                                         <td>app</td>
                                                   
@@ -294,8 +273,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="52"
-                            class="link-to-prism">src/app/setup/setup.component.ts:52</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="43"
+                            class="link-to-prism">src/app/setup/setup.component.ts:43</a></div>
                 </td>
             </tr>
 
@@ -345,45 +324,6 @@
             </tr>
         </tbody>
     </table>
-    <table class="table table-sm table-bordered">
-        <tbody>
-            <tr>
-                <td class="col-md-4">
-                    <a name="ngOnInit"></a>
-                    <span class="name">
-                        <span ><b>ngOnInit</b></span>
-                        <a href="#ngOnInit"><span class="icon ion-ios-link"></span></a>
-                    </span>
-                </td>
-            </tr>
-            <tr>
-                <td class="col-md-4">
-<code>ngOnInit()</code>
-                </td>
-            </tr>
-
-
-            <tr>
-                <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="44"
-                            class="link-to-prism">src/app/setup/setup.component.ts:44</a></div>
-                </td>
-            </tr>
-
-
-            <tr>
-                <td class="col-md-4">
-                    <div class="io-description"><p>on init</p>
-</div>
-
-                    <div class="io-description">
-                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
-
-                    </div>
-                </td>
-            </tr>
-        </tbody>
-    </table>
 </section>
     <section>
     
@@ -418,7 +358,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="20" class="link-to-prism">src/app/setup/setup.component.ts:20</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="19" class="link-to-prism">src/app/setup/setup.component.ts:19</a></div>
                         </td>
                     </tr>
 
@@ -456,7 +396,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="24" class="link-to-prism">src/app/setup/setup.component.ts:24</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="23" class="link-to-prism">src/app/setup/setup.component.ts:23</a></div>
                         </td>
                     </tr>
 
@@ -475,10 +415,9 @@
 
 
     <div class="tab-pane fade  tab-source-code" id="c-source">
-        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { Component, ElementRef, OnInit, ViewChild } from &#x27;@angular/core&#x27;;
+        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { Component, ElementRef, ViewChild } from &#x27;@angular/core&#x27;;
 import { Router } from &#x27;@angular/router&#x27;;
 import { AppComponent } from &#x27;../app.component&#x27;;
-import { ElectronService } from &#x27;../core/services&#x27;;
 import { SnackService } from &#x27;../services/snack.service&#x27;;
 
 /**
@@ -489,7 +428,7 @@ import { SnackService } from &#x27;../services/snack.service&#x27;;
   templateUrl: &#x27;./setup.component.html&#x27;,
   styleUrls: [&#x27;./setup.component.scss&#x27;]
 })
-export class SetupComponent implements OnInit {
+export class SetupComponent {
 
   /**
    * path &#x60;ElementRef&#x60;
@@ -503,23 +442,15 @@ export class SetupComponent implements OnInit {
   /**
    * Creates an instance of setup component.
    *
-   * @param electron
    * @param app
    * @param snack
    * @param router
    */
   constructor(
-    private electron: ElectronService,
     private app: AppComponent,
     private snack: SnackService,
     private router: Router
   ) { }
-
-  /**
-   * on init
-   */
-  ngOnInit(): void {
-  }
 
   /**
    * Gets folder

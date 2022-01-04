@@ -1,24 +1,7 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import { MatSnackBar, MatSnackBarConfig, MatSnackBarRef, SimpleSnackBar } from '@angular/material/snack-bar';
 import { Subscription } from 'rxjs';
-
-/**
- * Snack bar message
- */
-export class SnackBarMessage {
-  /**
-   * Message  of snack bar message
-   */
-  message: string;
-  /**
-   * Action  of snack bar message
-   */
-  action: string = null;
-  /**
-   * Config  of snack bar message
-   */
-  config: MatSnackBarConfig = null;
-}
+import { SnackBarMessage } from '../models/SnackBarMessage';
 
 /**
  * Snack service
@@ -57,7 +40,7 @@ export class SnackService implements OnDestroy {
   /**
    * on destroy
    */
-  ngOnDestroy(): void  {
+  ngOnDestroy(): void {
     this.subscription.unsubscribe();
   }
 
@@ -98,7 +81,7 @@ export class SnackService implements OnDestroy {
    *
    * @returns
    */
-  private showNext() {
+  private showNext(): void {
     if (this.messageQueue.length === 0) {
       return;
     }
