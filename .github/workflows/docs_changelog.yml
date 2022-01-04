@@ -40,8 +40,8 @@ jobs:
     - name: Create Pull Request
       uses: peter-evans/create-pull-request@v3
       with:
-        commit-message: Updated docs and changelog [skip ci]
-        title: Update docs and changelog [skip ci]
+        commit-message: Update docs and changelog to reflect release changes
+        title: Update docs and changelog
         body: Update docs and changelog to reflect release changes
         labels: documentation, chore
         assignees: PhongGuy
