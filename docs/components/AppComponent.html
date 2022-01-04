@@ -423,7 +423,7 @@
 </div>
 
                     <div class="io-description">
-                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >any</a></code>
+                        <b>Returns : </b>    <code>Promise&lt;void&gt;</code>
 
                     </div>
                 </td>
@@ -2265,7 +2265,7 @@ export class AppComponent implements OnInit {
   /**
    * on init
    */
-  ngOnInit(): void  {
+  ngOnInit(): void {
     // scroll to top when we change navigation
     this.router.events.subscribe(event &#x3D;&gt; {
       if (event instanceof NavigationEnd) {
@@ -2294,12 +2294,12 @@ export class AppComponent implements OnInit {
   }
 
   /** tell electron to minimize  */
-  minimize(): void  {
+  minimize(): void {
     this.electron.ipcRenderer.send(&#x27;minimize&#x27;);
   }
 
   /** toggle between full screen and minimize */
-  fullscreenToggle(): void  {
+  fullscreenToggle(): void {
     this.electron.ipcRenderer.send(&#x27;fullscreen&#x27;);
     this.fullscreen &#x3D; this.fullscreen ? false : true;
     this.fullscreenTip &#x3D; this.fullscreen ? &#x27;Restore Down&#x27; : &#x27;Maximize&#x27;;
@@ -2307,7 +2307,7 @@ export class AppComponent implements OnInit {
   }
 
   /** write the settings to json and close the application */
-  close(): void  {
+  close(): void {
     this.electron.fs.writeFileSync(&#x60;${this.appdata}\\settings.json&#x60;, JSON.stringify(this.settings));
     window.close();
   }
@@ -2329,7 +2329,7 @@ export class AppComponent implements OnInit {
    * @param length
    * @returns &#x60;string&#x60;
    */
-  generateRandomString(length): string  {
+  generateRandomString(length): string {
     let result &#x3D; &#x27;&#x27;; let seeds;
 
     for (let i &#x3D; 0; i &lt; length - 1; i++) {
@@ -2352,7 +2352,7 @@ export class AppComponent implements OnInit {
    *
    * @param [what]
    */
-  update(what: &#x27;huds&#x27; | &#x27;hitsounds&#x27; | &#x27;vtf&#x27; | &#x27;weaponSounds&#x27; | null &#x3D; null): void  {
+  update(what: &#x27;huds&#x27; | &#x27;hitsounds&#x27; | &#x27;vtf&#x27; | &#x27;weaponSounds&#x27; | null &#x3D; null): void {
 
     // reset
     this.resetFoundValuesInCustom(what);
@@ -2393,7 +2393,7 @@ export class AppComponent implements OnInit {
    *
    * @param what
    */
-  private resetFoundValuesInCustom(what: string) {
+  private resetFoundValuesInCustom(what: string): void {
     if (what &#x3D;&#x3D;&#x3D; &#x27;huds&#x27;) {
       this.huds &#x3D; [];
     } else if (what &#x3D;&#x3D;&#x3D; &#x27;hitsounds&#x27;) {
@@ -2418,7 +2418,7 @@ export class AppComponent implements OnInit {
    *
    * @param file
    */
-  private findWeaponSoundInCustomFolder(file: string) {
+  private findWeaponSoundInCustomFolder(file: string): void {
     if (file.endsWith(&#x27;game_sounds_weapons.txt&#x27;)) {
       this.weaponSounds &#x3D; file;
     }
@@ -2429,7 +2429,7 @@ export class AppComponent implements OnInit {
    *
    * @param file
    */
-  private findAllWeaponScriptsInCustomFolder(file: string) {
+  private findAllWeaponScriptsInCustomFolder(file: string): void {
     if (file.includes(&#x27;scripts\\tf_weapon&#x27;) &amp;&amp; file.endsWith(&#x27;.txt&#x27;)) {
       this.vtfScripts.push(file);
     }
@@ -2440,7 +2440,7 @@ export class AppComponent implements OnInit {
    *
    * @param file
    */
-  private findAllVtfCrosshairsInCustomFolder(file: string) {
+  private findAllVtfCrosshairsInCustomFolder(file: string): void {
     if (file.includes(&#x27;materials\\vgui\\replay\\thumbnails&#x27;) &amp;&amp; file.endsWith(&#x27;.vtf&#x27;)) {
       let err &#x3D; 0;
       for (const hud of this.huds) {
@@ -2459,7 +2459,7 @@ export class AppComponent implements OnInit {
    *
    * @param file
    */
-  private findAllKillSoundsInCustomFolder(file: string) {
+  private findAllKillSoundsInCustomFolder(file: string): void {
     if (file.endsWith(&#x27;killsound.wav&#x27;)) {
       this.killsounds.push(file);
     }
@@ -2470,7 +2470,7 @@ export class AppComponent implements OnInit {
    *
    * @param file
    */
-  private findAllHitsoundsInCustomFolder(file: string) {
+  private findAllHitsoundsInCustomFolder(file: string): void {
     if (file.endsWith(&#x27;hitsound.wav&#x27;)) {
       this.hitsounds.push(file);
     }
@@ -2497,7 +2497,7 @@ export class AppComponent implements OnInit {
   /**
    * Checks for new release
    */
-  private async checkUpdate() {
+  private async checkUpdate(): Promise&lt;void&gt; {
     this.http.get(&#x27;https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest&#x27;).subscribe((json: any) &#x3D;&gt; {
       if (APP_CONFIG.version !&#x3D;&#x3D; json.tag_name.replace(&#x27;v&#x27;, &#x27;&#x27;)) {
         this.snack.show(&#x27;New version available&#x27;);
