@@ -41,7 +41,8 @@ jobs:
       uses: peter-evans/create-pull-request@v3
       with:
         commit-message: Updated docs and changelog [skip ci]
-        title: Update docs and changelog
+        title: Update docs and changelog [skip ci]
+        body: Update docs and changelog to reflect release changes
         labels: documentation, chore
         assignees: PhongGuy
         branch: docs
