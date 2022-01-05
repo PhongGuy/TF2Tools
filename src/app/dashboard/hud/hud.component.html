@@ -7,22 +7,16 @@
 </mat-card>
 
 <h1 class="mt-5">Installed hud{{hudsInstalled > 1 ? 's' : ''}}</h1>
-<mat-accordion>
-    <mat-expansion-panel *ngFor="let hud of currentHuds" expanded>
-        <mat-expansion-panel-header>
-            <mat-panel-title>
-                {{hud.folderName}}
-            </mat-panel-title>
-            <mat-panel-description>
-                {{hud.name}}
-            </mat-panel-description>
-        </mat-expansion-panel-header>
-        <p>Version: {{hud.version}}</p>
-        <mat-action-row>
-            <button mat-raised-button color="warn" (click)="uninstall(hud)">Uninstall</button>
-        </mat-action-row>
-    </mat-expansion-panel>
-</mat-accordion>
+<mat-card class="card-list">
+    <mat-nav-list>
+        <mat-list-item *ngFor="let hud of currentHuds" disableRipple="true">
+            <span matLine>{{hud.folderName}}</span>
+            <button mat-icon-button color="warn" matTooltip="Uninstall" (click)="uninstall(hud)">
+                <mat-icon>delete</mat-icon>
+            </button>
+        </mat-list-item>
+    </mat-nav-list>
+</mat-card>
 
 <h1 class="mt-5">Library</h1>
 
@@ -37,23 +31,19 @@
     </mat-autocomplete>
 </mat-form-field>
 
-<mat-accordion>
-    <mat-expansion-panel *ngFor="let hud of filteredOptions | async">
-        <mat-expansion-panel-header>
-            <mat-panel-title>
-                {{hud.folderName}}
-            </mat-panel-title>
-            <mat-panel-description>
-                {{hud.name}}
-            </mat-panel-description>
-        </mat-expansion-panel-header>
-        <p>Version: {{hud.version}}</p>
-        <mat-action-row class="even-action-row">
-            <button mat-raised-button color="warn" (click)="remove(hud)">Remove</button>
-            <button mat-raised-button color="accent" (click)="rename(hud)">Rename</button>
-            <div class="col"></div>
-            <button mat-raised-button color="accent" (click)="add(hud)">Install</button>
-            <button mat-raised-button color="primary" (click)="replace(hud)" disabled>Replace</button>
-        </mat-action-row>
-    </mat-expansion-panel>
-</mat-accordion>
+<mat-card class="card-list">
+    <mat-nav-list>
+        <mat-list-item *ngFor="let hud of filteredOptions | async" disableRipple="true">
+            <span matLine>{{ hud.folderName }}</span>
+            <button mat-icon-button color="warn" matTooltip="Remove" (click)="remove(hud)">
+                <mat-icon>delete</mat-icon>
+            </button>
+            <button mat-icon-button color="accent" matTooltip="Rename" (click)="rename(hud)">
+                <mat-icon>drive_file_rename_outline</mat-icon>
+            </button>
+            <button mat-icon-button color="primary" matTooltip="Install" (click)="add(hud)">
+                <mat-icon>get_app</mat-icon>
+            </button>
+        </mat-list-item>
+    </mat-nav-list>
+</mat-card>
