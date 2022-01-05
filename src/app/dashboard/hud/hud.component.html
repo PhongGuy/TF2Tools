@@ -8,14 +8,14 @@
 
 <h1 class="mt-5">Installed hud{{hudsInstalled > 1 ? 's' : ''}}</h1>
 <mat-card class="card-list">
-    <mat-nav-list>
+    <mat-list>
         <mat-list-item *ngFor="let hud of currentHuds" disableRipple="true">
             <span matLine>{{hud.folderName}}</span>
             <button mat-icon-button color="warn" matTooltip="Uninstall" (click)="uninstall(hud)">
                 <mat-icon>delete</mat-icon>
             </button>
         </mat-list-item>
-    </mat-nav-list>
+    </mat-list>
 </mat-card>
 
 <h1 class="mt-5">Library</h1>
@@ -32,8 +32,8 @@
 </mat-form-field>
 
 <mat-card class="card-list">
-    <mat-nav-list>
-        <mat-list-item *ngFor="let hud of filteredOptions | async" disableRipple="true">
+    <mat-list>
+        <mat-list-item *ngFor="let hud of filteredOptions | async">
             <span matLine>{{ hud.folderName }}</span>
             <button mat-icon-button color="warn" matTooltip="Remove" (click)="remove(hud)">
                 <mat-icon>delete</mat-icon>
@@ -45,5 +45,5 @@
                 <mat-icon>get_app</mat-icon>
             </button>
         </mat-list-item>
-    </mat-nav-list>
+    </mat-list>
 </mat-card>

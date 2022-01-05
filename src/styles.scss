@@ -102,8 +102,13 @@ button.active {
 .card-list {
   padding: inherit !important;
 
+  mat-list,
   mat-nav-list {
     padding-top: 0 !important;
+
+    mat-list-item:hover {
+      background: rgba(255, 255, 255, 0.04);
+    }
   }
 }
 
