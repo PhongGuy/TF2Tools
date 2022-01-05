@@ -16,7 +16,7 @@
 
 <h1 class="mt-5">Installed hitsound{{app.hitsounds.length > 1 ? 's' : ''}}</h1>
 <mat-card class="card-list" *ngIf="app.hitsounds.length > 0">
-    <mat-nav-list>
+    <mat-list>
         <mat-list-item *ngFor="let sound of app.hitsounds" disableRipple="true">
             <span matLine>hitsound</span>
             <button mat-icon-button color="warn" matTooltip="Remove" (click)="removeFile(sound, 'hitsound')">
@@ -26,12 +26,12 @@
                 <mat-icon>play_arrow</mat-icon>
             </button>
         </mat-list-item>
-    </mat-nav-list>
+    </mat-list>
 </mat-card>
 
 <h1 class="mt-5">Installed killsound{{app.killsounds.length > 1 ? 's' : ''}}</h1>
 <mat-card class="card-list" *ngIf="app.killsounds.length > 0">
-    <mat-nav-list>
+    <mat-list>
         <mat-list-item *ngFor="let sound of app.killsounds" disableRipple="true">
             <span matLine>killsound</span>
             <button mat-icon-button color="warn" matTooltip="Remove" (click)="removeFile(sound, 'killsound')">
@@ -41,7 +41,7 @@
                 <mat-icon>play_arrow</mat-icon>
             </button>
         </mat-list-item>
-    </mat-nav-list>
+    </mat-list>
 </mat-card>
 
 <h1 class="mt-5">Library</h1>
@@ -58,7 +58,7 @@
 </mat-form-field>
 
 <mat-card class="card-list">
-    <mat-nav-list>
+    <mat-list>
         <mat-list-item *ngFor="let sound of filteredOptions | async" disableRipple="true">
             <span matLine>{{ sound.name }}</span>
             <button mat-icon-button color="warn" matTooltip="Remove" (click)="remove(sound)">
@@ -77,5 +77,5 @@
                 <mat-icon>get_app</mat-icon>
             </button>
         </mat-list-item>
-    </mat-nav-list>
+    </mat-list>
 </mat-card>
