@@ -5,8 +5,7 @@ import { Component } from '@angular/core';
  */
 @Component({
   selector: 'app-multiple-warning',
-  templateUrl: './multiple-warning.component.html',
-  styleUrls: ['./multiple-warning.component.scss']
+  templateUrl: './multiple-warning.component.html'
 })
 export class MultipleWarningComponent {
   /**

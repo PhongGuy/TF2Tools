@@ -15,8 +15,7 @@ import { SnackService } from '../../services/snack.service';
  */
 @Component({
   selector: 'app-crosshairs',
-  templateUrl: './crosshairs.component.html',
-  styleUrls: ['./crosshairs.component.scss']
+  templateUrl: './crosshairs.component.html'
 })
 export class CrosshairsComponent implements OnInit {
 

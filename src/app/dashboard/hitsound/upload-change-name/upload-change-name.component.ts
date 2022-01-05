@@ -10,8 +10,7 @@ import { ValidatorService } from '../../../services/validators.service';
  */
 @Component({
   selector: 'app-upload-change-name',
-  templateUrl: './upload-change-name.component.html',
-  styleUrls: ['./upload-change-name.component.scss']
+  templateUrl: './upload-change-name.component.html'
 })
 export class UploadChangeNameComponent implements OnInit {
 
@@ -48,7 +47,7 @@ export class UploadChangeNameComponent implements OnInit {
   /**
    * Submits upload change name component
    */
-  submit(): void  {
+  submit(): void {
     if (!this.input.invalid) {
       this.dialogRef.close(this.input.value);
     }
@@ -60,7 +59,7 @@ export class UploadChangeNameComponent implements OnInit {
    * @param event
    * @param file
    */
-  playFile(event: Event, file: File): void  {
+  playFile(event: Event, file: File): void {
     event.preventDefault();
     const audio = new Audio(file.path);
     audio.volume = this.data.volume / 100;

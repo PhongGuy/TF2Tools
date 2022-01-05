@@ -37,7 +37,8 @@
     "e2e": "npm run build:prod && playwright test -c e2e/playwright.config.ts e2e/",
     "e2e:show-trace": "playwright show-trace e2e/tracing/trace.zip",
     "version": "node version",
-    "lint": "ng lint --fix",
+    "lint": "ng lint",
+    "lint:fix": "ng lint --fix",
     "docs": "npx compodoc -p tsconfig.json src -n \"TF2Tools\" -d docs --theme material --customFavicon src/favicon.ico",
     "changelog": "conventional-changelog -i CHANGELOG.md -s -r 0"
   },

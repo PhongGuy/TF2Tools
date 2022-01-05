@@ -10,8 +10,7 @@ import { ValidatorService } from '../../services/validators.service';
  */
 @Component({
   selector: 'app-question-answer',
-  templateUrl: './question-answer.component.html',
-  styleUrls: ['./question-answer.component.scss']
+  templateUrl: './question-answer.component.html'
 })
 export class QuestionAnswerComponent implements OnInit {
 
@@ -48,7 +47,7 @@ export class QuestionAnswerComponent implements OnInit {
   /**
    * Submits question answer component
    */
-  submit(): void  {
+  submit(): void {
     if (!this.input.invalid) {
       this.dialogRef.close(this.input.value);
     }

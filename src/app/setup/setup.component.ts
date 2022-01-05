@@ -8,8 +8,7 @@ import { SnackService } from '../services/snack.service';
  */
 @Component({
   selector: 'app-setup',
-  templateUrl: './setup.component.html',
-  styleUrls: ['./setup.component.scss']
+  templateUrl: './setup.component.html'
 })
 export class SetupComponent {
 
