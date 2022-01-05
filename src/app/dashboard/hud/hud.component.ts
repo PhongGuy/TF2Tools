@@ -290,13 +290,13 @@ export class HudComponent implements OnInit {
   /**
    * Replaces hud component
    *
-   * TODO: replace the installed hud with `_hud`
-   *
    * @param _hud
-   *
    */
   replace(_hud: Hud): void {
-
+    this.currentHuds.forEach(hud => {
+      this.uninstall(hud);
+    });
+    this.add(_hud);
   }
 
   /**
