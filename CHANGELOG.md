@@ -1,3 +1,18 @@
+## 4.5.0 (2022-01-05)
+
+* [Bumped Version] 4.5.0 ([0c7e349](https://github.com/PhongGuy/TF2Tools/commit/0c7e349))
+* added lint fix and normal lint ([0f6ab05](https://github.com/PhongGuy/TF2Tools/commit/0f6ab05))
+* added replace to huds ([5901c5f](https://github.com/PhongGuy/TF2Tools/commit/5901c5f))
+* Bump @types/node from 17.0.7 to 17.0.8 ([ceaaac9](https://github.com/PhongGuy/TF2Tools/commit/ceaaac9))
+* Bump @typescript-eslint/parser from 5.8.1 to 5.9.0 ([b96b65b](https://github.com/PhongGuy/TF2Tools/commit/b96b65b))
+* Change the look of huds to single line instead of dropdown ([9c8daac](https://github.com/PhongGuy/TF2Tools/commit/9c8daac)), closes [#122](https://github.com/PhongGuy/TF2Tools/issues/122)
+* changed mat-nav-list to mat-list ([dc9adb2](https://github.com/PhongGuy/TF2Tools/commit/dc9adb2))
+* remove files not used ([bb274bb](https://github.com/PhongGuy/TF2Tools/commit/bb274bb))
+* update changelog ([2c7a05c](https://github.com/PhongGuy/TF2Tools/commit/2c7a05c))
+* update docs ([2e155a2](https://github.com/PhongGuy/TF2Tools/commit/2e155a2))
+
+
+
 ## <small>4.4.2 (2022-01-04)</small>
 
 * (JS-D1001) Documentation comments not found for functions and classes ([8555972](https://github.com/PhongGuy/TF2Tools/commit/8555972)), closes [#91](https://github.com/PhongGuy/TF2Tools/issues/91)
