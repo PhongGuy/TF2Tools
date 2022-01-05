@@ -7,8 +7,7 @@ import { YesNo } from '../../models/yesNo';
  */
 @Component({
   selector: 'app-yes-no',
-  templateUrl: './yes-no.component.html',
-  styleUrls: ['./yes-no.component.scss']
+  templateUrl: './yes-no.component.html'
 })
 export class YesNoComponent {
 

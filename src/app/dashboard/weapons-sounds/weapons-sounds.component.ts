@@ -5,8 +5,7 @@ import { Component } from '@angular/core';
  */
 @Component({
   selector: 'app-weapons-sounds',
-  templateUrl: './weapons-sounds.component.html',
-  styleUrls: ['./weapons-sounds.component.scss']
+  templateUrl: './weapons-sounds.component.html'
 })
 export class WeaponsSoundsComponent {
 

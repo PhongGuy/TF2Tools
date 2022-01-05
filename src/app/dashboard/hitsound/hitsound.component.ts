@@ -19,8 +19,7 @@ import { UploadChangeNameComponent } from './upload-change-name/upload-change-na
  */
 @Component({
   selector: 'app-hitsound',
-  templateUrl: './hitsound.component.html',
-  styleUrls: ['./hitsound.component.scss']
+  templateUrl: './hitsound.component.html'
 })
 export class HitsoundComponent implements OnInit {
 
@@ -163,7 +162,7 @@ export class HitsoundComponent implements OnInit {
    *
    * @param _hitsound
    */
-  rename(_hitsound: Hitsound): void  {
+  rename(_hitsound: Hitsound): void {
     if (this.electron.fs.existsSync(_hitsound.path)) {
 
       const dialogRef = this.dialog.open(QuestionAnswerComponent, {
@@ -199,7 +198,7 @@ export class HitsoundComponent implements OnInit {
    *
    * @param _hitsound
    */
-  remove(_hitsound: Hitsound): void  {
+  remove(_hitsound: Hitsound): void {
 
     const info = new YesNo();
     info.question = `Remove ${_hitsound.name}?`;
@@ -274,7 +273,7 @@ export class HitsoundComponent implements OnInit {
   /**
    * Volumes change
    */
-  volumeChange(): void  {
+  volumeChange(): void {
     this.app.settingsUpdate.next(this.app.settings);
   }
 
