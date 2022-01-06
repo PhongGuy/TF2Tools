@@ -82,7 +82,6 @@
         <h3>Implements</h3>
     </p>
     <p class="comment">
-                    <code><a href="https://angular.io/api/core/OnInit" target="_blank" >OnInit</a></code>
                     <code><a href="https://angular.io/api/core/OnDestroy" target="_blank" >OnDestroy</a></code>
     </p>
 
@@ -146,9 +145,6 @@
                                     <span class="modifier">Public</span>
                                 <a href="#app" >app</a>
                             </li>
-                            <li>
-                                <a href="#update" >update</a>
-                            </li>
                         </ul>
                     </td>
                 </tr>
@@ -166,13 +162,13 @@
                                 <a href="#changeLibrary" >changeLibrary</a>
                             </li>
                             <li>
+                                <a href="#getGitHubBody" >getGitHubBody</a>
+                            </li>
+                            <li>
                                 <a href="#getLog" >getLog</a>
                             </li>
                             <li>
                                 <a href="#ngOnDestroy" >ngOnDestroy</a>
-                            </li>
-                            <li>
-                                <a href="#ngOnInit" >ngOnInit</a>
                             </li>
                             <li>
                                 <a href="#updateSettings" >updateSettings</a>
@@ -195,12 +191,12 @@
             <tbody>
                 <tr>
                     <td class="col-md-4">
-<code>constructor(app: <a href="../components/AppComponent.html" target="_self">AppComponent</a>, electron: <a href="../injectables/ElectronService.html" target="_self">ElectronService</a>, snack: <a href="../injectables/SnackService.html" target="_self">SnackService</a>, dialog: MatDialog, http: <a href="https://angular.io/api/common/http/HttpClient" target="_blank">HttpClient</a>)</code>
+<code>constructor(app: <a href="../components/AppComponent.html" target="_self">AppComponent</a>, electron: <a href="../injectables/ElectronService.html" target="_self">ElectronService</a>, snack: <a href="../injectables/SnackService.html" target="_self">SnackService</a>)</code>
                     </td>
                 </tr>
                         <tr>
                             <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="21" class="link-to-prism">src/app/dashboard/settings/settings.component.ts:21</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="14" class="link-to-prism">src/app/dashboard/settings/settings.component.ts:14</a></div>
                             </td>
                         </tr>
 
@@ -216,7 +212,6 @@
                                                 <td>Name</td>
                                                     <td>Type</td>
                                                 <td>Optional</td>
-                                                    <td>Description</td>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -231,10 +226,6 @@
                                                             No
                                                     </td>
                                                     
-                                                        <td>
-                                                                <p>AppComponent</p>
-
-                                                        </td>
                                                 </tr>
                                                 <tr>
                                                         <td>electron</td>
@@ -247,8 +238,6 @@
                                                             No
                                                     </td>
                                                     
-                                                        <td>
-                                                        </td>
                                                 </tr>
                                                 <tr>
                                                         <td>snack</td>
@@ -261,36 +250,6 @@
                                                             No
                                                     </td>
                                                     
-                                                        <td>
-                                                        </td>
-                                                </tr>
-                                                <tr>
-                                                        <td>dialog</td>
-                                                  
-                                                        <td>
-                                                                    <code>MatDialog</code>
-                                                        </td>
-                                                  
-                                                    <td>
-                                                            No
-                                                    </td>
-                                                    
-                                                        <td>
-                                                        </td>
-                                                </tr>
-                                                <tr>
-                                                        <td>http</td>
-                                                  
-                                                        <td>
-                                                                        <code><a href="https://angular.io/api/common/http/HttpClient" target="_blank" >HttpClient</a></code>
-                                                        </td>
-                                                  
-                                                    <td>
-                                                            No
-                                                    </td>
-                                                    
-                                                        <td>
-                                                        </td>
                                                 </tr>
                                         </tbody>
                                     </table>
@@ -332,8 +291,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="64"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:64</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="60"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:60</a></div>
                 </td>
             </tr>
 
@@ -346,6 +305,75 @@
                     <div class="io-description">
                         <b>Returns : </b>    <code>Promise&lt;void&gt;</code>
 
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="getGitHubBody"></a>
+                    <span class="name">
+                        <span ><b>getGitHubBody</b></span>
+                        <a href="#getGitHubBody"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>getGitHubBody(body: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="39"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:39</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>body</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
                     </div>
                 </td>
             </tr>
@@ -371,8 +399,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="56"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:56</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="34"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:34</a></div>
                 </td>
             </tr>
 
@@ -415,8 +443,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="121"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:121</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="117"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:117</a></div>
                 </td>
             </tr>
 
@@ -424,45 +452,6 @@
             <tr>
                 <td class="col-md-4">
                     <div class="io-description"><p>on destroy</p>
-</div>
-
-                    <div class="io-description">
-                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
-
-                    </div>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-    <table class="table table-sm table-bordered">
-        <tbody>
-            <tr>
-                <td class="col-md-4">
-                    <a name="ngOnInit"></a>
-                    <span class="name">
-                        <span ><b>ngOnInit</b></span>
-                        <a href="#ngOnInit"><span class="icon ion-ios-link"></span></a>
-                    </span>
-                </td>
-            </tr>
-            <tr>
-                <td class="col-md-4">
-<code>ngOnInit()</code>
-                </td>
-            </tr>
-
-
-            <tr>
-                <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="43"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:43</a></div>
-                </td>
-            </tr>
-
-
-            <tr>
-                <td class="col-md-4">
-                    <div class="io-description"><p>on init</p>
 </div>
 
                     <div class="io-description">
@@ -493,8 +482,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="114"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:114</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="110"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:110</a></div>
                 </td>
             </tr>
 
@@ -538,46 +527,10 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="33" class="link-to-prism">src/app/dashboard/settings/settings.component.ts:33</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="24" class="link-to-prism">src/app/dashboard/settings/settings.component.ts:24</a></div>
                         </td>
                     </tr>
 
-            <tr>
-                <td class="col-md-4">
-                    <div class="io-description">AppComponent</div>
-                </td>
-            </tr>
-
-        </tbody>
-    </table>
-    <table class="table table-sm table-bordered">
-        <tbody>
-            <tr>
-                <td class="col-md-4">
-                    <a name="update"></a>
-                    <span class="name">
-                        <span ><b>update</b></span>
-                        <a href="#update"><span class="icon ion-ios-link"></span></a>
-                    </span>
-                </td>
-            </tr>
-                <tr>
-                    <td class="col-md-4">
-                        <i>Default value : </i><code>false</code>
-                    </td>
-                </tr>
-                    <tr>
-                        <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="21" class="link-to-prism">src/app/dashboard/settings/settings.component.ts:21</a></div>
-                        </td>
-                    </tr>
-
-            <tr>
-                <td class="col-md-4">
-                    <div class="io-description"><p>If update available</p>
-</div>
-                </td>
-            </tr>
 
         </tbody>
     </table>
@@ -587,10 +540,7 @@
 
 
     <div class="tab-pane fade  tab-source-code" id="c-source">
-        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { HttpClient } from &#x27;@angular/common/http&#x27;;
-import { Component, OnDestroy, OnInit } from &#x27;@angular/core&#x27;;
-import { MatDialog } from &#x27;@angular/material/dialog&#x27;;
-import { APP_CONFIG } from &#x27;../../../environments/environment&#x27;;
+        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { Component, OnDestroy } from &#x27;@angular/core&#x27;;
 import { AppComponent } from &#x27;../../app.component&#x27;;
 import { ElectronService } from &#x27;../../core/services&#x27;;
 import { SnackService } from &#x27;../../services/snack.service&#x27;;
@@ -603,39 +553,20 @@ import { SnackService } from &#x27;../../services/snack.service&#x27;;
   templateUrl: &#x27;./settings.component.html&#x27;,
   styleUrls: [&#x27;./settings.component.scss&#x27;]
 })
-export class SettingsComponent implements OnInit, OnDestroy {
-  /**
-   * If update available
-   */
-  update &#x3D; false;
+export class SettingsComponent implements OnDestroy {
 
   /**
    * Creates an instance of settings component.
    *
-   * @param app AppComponent
+   * @param app
    * @param electron
    * @param snack
-   * @param dialog
-   * @param http
    */
   constructor(
     public app: AppComponent,
     private electron: ElectronService,
-    private snack: SnackService,
-    private dialog: MatDialog,
-    private http: HttpClient
+    private snack: SnackService
   ) { }
-
-  /**
-   * on init
-   */
-  ngOnInit(): void {
-    this.http.get(&#x27;https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest&#x27;).subscribe((json: any) &#x3D;&gt; {
-      if (APP_CONFIG.version !&#x3D;&#x3D; json.tag_name.replace(&#x27;v&#x27;, &#x27;&#x27;)) {
-        this.update &#x3D; true;
-      }
-    });
-  }
 
   /**
    * Gets log
@@ -645,6 +576,24 @@ export class SettingsComponent implements OnInit, OnDestroy {
   getLog(): string[] {
     const logs &#x3D; this.electron.fs.readFileSync(this.electron.appData(&#x27;TF2Tools\\log.txt&#x27;), { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; });
     return logs.split(&#x27;\n&#x27;);
+  }
+
+  getGitHubBody(body: string): string {
+
+    const r &#x3D; [];
+    body
+      .replace(/\r/g, &#x27;&#x27;)
+      .split(&#x27;\n&#x27;)
+      .filter(line &#x3D;&gt; !line.includes(&#x27;by @dependabot&#x27;))
+      .filter(line &#x3D;&gt; !line.includes(&#x27;Full Changelog&#x27;))
+      .filter(line &#x3D;&gt; !line.includes(&#x60;## What&#x27;s Changed&#x60;))
+      .filter(line &#x3D;&gt; line)
+      .forEach(line &#x3D;&gt; {
+        const temp &#x3D; line.split(&#x27;by @&#x27;);
+        r.push(temp[0]);
+      });
+
+    return r.join(&#x27;\n&#x27;);
   }
 
   /**
@@ -717,9 +666,10 @@ export class SettingsComponent implements OnInit, OnDestroy {
     <div class="tab-pane fade " id="c-templateData">
         <pre class="line-numbers"><code class="language-html">&lt;h1 class&#x3D;&quot;mt-0 mb-3&quot;&gt;Settings&lt;/h1&gt;
 
-&lt;mat-card *ngIf&#x3D;&quot;update&quot;&gt;
+&lt;mat-card *ngIf&#x3D;&quot;app.gitHub.update&quot;&gt;
     &lt;mat-card-title&gt;Update available&lt;/mat-card-title&gt;
-    &lt;mat-card-subtitle&gt;A new TF2Tools update is now available&lt;/mat-card-subtitle&gt;
+    &lt;mat-card-subtitle&gt;{{app.gitHub.release.name}} is now available!&lt;/mat-card-subtitle&gt;
+    &lt;mat-card-content [innerText]&#x3D;&quot;getGitHubBody(app.gitHub.release.body)&quot;&gt;&lt;/mat-card-content&gt;
     &lt;mat-card-actions align&#x3D;&quot;end&quot;&gt;
         &lt;a href&#x3D;&quot;https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.zip&quot; mat-button color&#x3D;&quot;primary&quot;
             download&gt;Download&lt;/a&gt;
@@ -815,7 +765,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
 <script src="../js/libs/htmlparser.js"></script>
 <script src="../js/libs/deep-iterator.js"></script>
 <script>
-        var COMPONENT_TEMPLATE = '<div><h1 class="mt-0 mb-3">Settings</h1><mat-card *ngIf="update">    <mat-card-title>Update available</mat-card-title>    <mat-card-subtitle>A new TF2Tools update is now available</mat-card-subtitle>    <mat-card-actions align="end">        <a href="https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.zip" mat-button color="primary"            download>Download</a>    </mat-card-actions></mat-card><h3>Custom folder</h3><mat-form-field class="w-100" appearance="fill">    <mat-label>Location</mat-label>    <input matInput type="text" disabled [value]="app.settings.customPath"></mat-form-field><h3>Library location</h3><mat-form-field class="w-100" appearance="fill">    <mat-label>Location</mat-label>    <input matInput type="text" disabled [value]="app.settings.libraryPath"></mat-form-field><div align="end">    <button mat-raised-button color="primary" (click)="changeLibrary()" [disabled]="app.loading">Change        location</button></div><h1>Huds</h1><mat-card class="settings">    <div class="item">        <div class="info">            <h3>Save hud edits on uninstall</h3>            <span>Save recent customizations edits on hud when uninstalling</span>        </div>        <div class="col"></div>        <mat-slide-toggle [(ngModel)]="app.settings.moveOrCopy" (change)="updateSettings()"></mat-slide-toggle>    </div></mat-card><h1>Log</h1><mat-accordion>    <mat-expansion-panel>        <mat-expansion-panel-header>            Show logs        </mat-expansion-panel-header>        <ng-template matExpansionPanelContent>            <p class="log-info" *ngFor="let i of getLog()">{{ i }}</p>        </ng-template>    </mat-expansion-panel></mat-accordion></div>'
+        var COMPONENT_TEMPLATE = '<div><h1 class="mt-0 mb-3">Settings</h1><mat-card *ngIf="app.gitHub.update">    <mat-card-title>Update available</mat-card-title>    <mat-card-subtitle>{{app.gitHub.release.name}} is now available!</mat-card-subtitle>    <mat-card-content [innerText]="getGitHubBody(app.gitHub.release.body)"></mat-card-content>    <mat-card-actions align="end">        <a href="https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.zip" mat-button color="primary"            download>Download</a>    </mat-card-actions></mat-card><h3>Custom folder</h3><mat-form-field class="w-100" appearance="fill">    <mat-label>Location</mat-label>    <input matInput type="text" disabled [value]="app.settings.customPath"></mat-form-field><h3>Library location</h3><mat-form-field class="w-100" appearance="fill">    <mat-label>Location</mat-label>    <input matInput type="text" disabled [value]="app.settings.libraryPath"></mat-form-field><div align="end">    <button mat-raised-button color="primary" (click)="changeLibrary()" [disabled]="app.loading">Change        location</button></div><h1>Huds</h1><mat-card class="settings">    <div class="item">        <div class="info">            <h3>Save hud edits on uninstall</h3>            <span>Save recent customizations edits on hud when uninstalling</span>        </div>        <div class="col"></div>        <mat-slide-toggle [(ngModel)]="app.settings.moveOrCopy" (change)="updateSettings()"></mat-slide-toggle>    </div></mat-card><h1>Log</h1><mat-accordion>    <mat-expansion-panel>        <mat-expansion-panel-header>            Show logs        </mat-expansion-panel-header>        <ng-template matExpansionPanelContent>            <p class="log-info" *ngFor="let i of getLog()">{{ i }}</p>        </ng-template>    </mat-expansion-panel></mat-accordion></div>'
     var COMPONENTS = [{'name': 'AppComponent', 'selector': 'app-root'},{'name': 'CrosshairsComponent', 'selector': 'app-crosshairs'},{'name': 'DashboardComponent', 'selector': 'app-dashboard'},{'name': 'HitsoundComponent', 'selector': 'app-hitsound'},{'name': 'HudComponent', 'selector': 'app-hud'},{'name': 'MultipleWarningComponent', 'selector': 'app-multiple-warning'},{'name': 'QuestionAnswerComponent', 'selector': 'app-question-answer'},{'name': 'SettingsComponent', 'selector': 'app-settings'},{'name': 'SetupComponent', 'selector': 'app-setup'},{'name': 'UploadChangeNameComponent', 'selector': 'app-upload-change-name'},{'name': 'WeaponsSoundsComponent', 'selector': 'app-weapons-sounds'},{'name': 'YesNoComponent', 'selector': 'app-yes-no'}];
     var DIRECTIVES = [];
     var ACTUAL_COMPONENT = {'name': 'SettingsComponent'};
