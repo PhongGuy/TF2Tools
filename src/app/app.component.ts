@@ -5,7 +5,9 @@ import * as moment from 'moment';
 import { BehaviorSubject } from 'rxjs';
 import { APP_CONFIG } from '../environments/environment';
 import { ElectronService } from './core/services';
+import { LatestRelease } from './models/latestRelease';
 import { Settings } from './models/settings';
+import { Update } from './models/update';
 import { FileHelpService } from './services/file-help.service';
 import { SnackService } from './services/snack.service';
 
@@ -78,11 +80,9 @@ export class AppComponent implements OnInit {
    */
   weaponSounds = '';
   /**
-   * Update available of app component
-   *
-   * @param boolean if update is available
+   * GitHub of app component
    */
-  updateAvailable = false;
+  gitHub = new Update();
   /**
    * App temp of app component
    */
@@ -166,6 +166,7 @@ export class AppComponent implements OnInit {
         this.router.navigate(['setup']);
       }
     }
+
   }
 
   /**
@@ -196,7 +197,21 @@ export class AppComponent implements OnInit {
       this.electron.fs.writeFileSync(`${this.appdata}\\settings.json`, JSON.stringify(this.settings));
     });
 
-    this.checkUpdate();
+    this.checkForUpdate();
+    setInterval(this.checkForUpdate, 1000 * 60 * 60);
+  }
+
+  /**
+   * Checks for update from github
+   */
+  checkForUpdate(): void {
+    this.http.get('https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest').subscribe((json: LatestRelease) => {
+      if (APP_CONFIG.version !== json.tag_name.replace('v', '') && json.draft === false && json.prerelease === false) {
+        this.snack.show('New version available');
+        this.gitHub.update = true;
+        this.gitHub.release = json;
+      }
+    });
   }
 
   /** tell electron to minimize  */
@@ -398,17 +413,5 @@ export class AppComponent implements OnInit {
       }
     });
     return hudsFound;
-  }
-
-  /**
-   * Checks for new release
-   */
-  private async checkUpdate(): Promise<void> {
-    this.http.get('https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest').subscribe((json: any) => {
-      if (APP_CONFIG.version !== json.tag_name.replace('v', '')) {
-        this.snack.show('New version available');
-        this.updateAvailable = true;
-      }
-    });
   }
 }
