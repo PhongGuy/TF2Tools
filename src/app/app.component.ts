@@ -197,12 +197,14 @@ export class AppComponent implements OnInit {
       this.electron.fs.writeFileSync(`${this.appdata}\\settings.json`, JSON.stringify(this.settings));
     });
 
+    // check for update on startup
     this.checkForUpdate();
+    // check for update every hour(given that its open)
     setInterval(this.checkForUpdate, 1000 * 60 * 60);
   }
 
   /**
-   * Checks for update from github
+   * Checks for update from github and adds release to `gitHub` if its not a draft or prerelease
    */
   checkForUpdate(): void {
     this.http.get('https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest').subscribe((json: LatestRelease) => {

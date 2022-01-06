@@ -142,6 +142,9 @@ customElements.define('compodoc-menu', class extends HTMLElement {
                                 <a href="classes/HudList.html" data-type="entity-link" >HudList</a>
                             </li>
                             <li class="link">
+                                <a href="classes/LatestRelease.html" data-type="entity-link" >LatestRelease</a>
+                            </li>
+                            <li class="link">
                                 <a href="classes/QuestionAnswer.html" data-type="entity-link" >QuestionAnswer</a>
                             </li>
                             <li class="link">
@@ -152,6 +155,9 @@ customElements.define('compodoc-menu', class extends HTMLElement {
                             </li>
                             <li class="link">
                                 <a href="classes/TfWeapons.html" data-type="entity-link" >TfWeapons</a>
+                            </li>
+                            <li class="link">
+                                <a href="classes/Update.html" data-type="entity-link" >Update</a>
                             </li>
                             <li class="link">
                                 <a href="classes/UploadChangeName.html" data-type="entity-link" >UploadChangeName</a>
@@ -186,6 +192,22 @@ customElements.define('compodoc-menu', class extends HTMLElement {
                                 </li>
                             </ul>
                         </li>
+                    <li class="chapter">
+                        <div class="simple menu-toggler" data-toggle="collapse" ${ isNormalMode ? 'data-target="#interfaces-links"' :
+                            'data-target="#xs-interfaces-links"' }>
+                            <span class="icon ion-md-information-circle-outline"></span>
+                            <span>Interfaces</span>
+                            <span class="icon ion-ios-arrow-down"></span>
+                        </div>
+                        <ul class="links collapse " ${ isNormalMode ? ' id="interfaces-links"' : 'id="xs-interfaces-links"' }>
+                            <li class="link">
+                                <a href="interfaces/Asset.html" data-type="entity-link" >Asset</a>
+                            </li>
+                            <li class="link">
+                                <a href="interfaces/Author.html" data-type="entity-link" >Author</a>
+                            </li>
+                        </ul>
+                    </li>
                     <li class="chapter">
                         <div class="simple menu-toggler" data-toggle="collapse" ${ isNormalMode ? 'data-target="#miscellaneous-links"'
                             : 'data-target="#xs-miscellaneous-links"' }>
