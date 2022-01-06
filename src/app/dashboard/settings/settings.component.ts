@@ -1,7 +1,4 @@
-import { HttpClient } from '@angular/common/http';
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
-import { APP_CONFIG } from '../../../environments/environment';
+import { Component, OnDestroy } from '@angular/core';
 import { AppComponent } from '../../app.component';
 import { ElectronService } from '../../core/services';
 import { SnackService } from '../../services/snack.service';
@@ -14,39 +11,20 @@ import { SnackService } from '../../services/snack.service';
   templateUrl: './settings.component.html',
   styleUrls: ['./settings.component.scss']
 })
-export class SettingsComponent implements OnInit, OnDestroy {
-  /**
-   * If update available
-   */
-  update = false;
+export class SettingsComponent implements OnDestroy {
 
   /**
    * Creates an instance of settings component.
    *
-   * @param app AppComponent
+   * @param app
    * @param electron
    * @param snack
-   * @param dialog
-   * @param http
    */
   constructor(
     public app: AppComponent,
     private electron: ElectronService,
-    private snack: SnackService,
-    private dialog: MatDialog,
-    private http: HttpClient
+    private snack: SnackService
   ) { }
-
-  /**
-   * on init
-   */
-  ngOnInit(): void {
-    this.http.get('https://api.github.com/repos/PhongGuy/TF2Tools/releases/latest').subscribe((json: any) => {
-      if (APP_CONFIG.version !== json.tag_name.replace('v', '')) {
-        this.update = true;
-      }
-    });
-  }
 
   /**
    * Gets log
@@ -56,6 +34,24 @@ export class SettingsComponent implements OnInit, OnDestroy {
   getLog(): string[] {
     const logs = this.electron.fs.readFileSync(this.electron.appData('TF2Tools\\log.txt'), { encoding: 'utf8', flag: 'r' });
     return logs.split('\n');
+  }
+
+  getGitHubBody(body: string): string {
+
+    const r = [];
+    body
+      .replace(/\r/g, '')
+      .split('\n')
+      .filter(line => !line.includes('by @dependabot'))
+      .filter(line => !line.includes('Full Changelog'))
+      .filter(line => !line.includes(`## What's Changed`))
+      .filter(line => line)
+      .forEach(line => {
+        const temp = line.split('by @');
+        r.push(temp[0]);
+      });
+
+    return r.join('\n');
   }
 
   /**
