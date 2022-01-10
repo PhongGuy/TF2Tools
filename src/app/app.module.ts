@@ -1,12 +1,9 @@
-import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { HttpClientModule } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MAT_SELECT_CONFIG } from '@angular/material/select';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-// NG Translate
-import { TranslateLoader, TranslateModule } from '@ngx-translate/core';
-import { TranslateHttpLoader } from '@ngx-translate/http-loader';
 import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { CoreModule } from './core/core.module';
@@ -22,9 +19,6 @@ import { QuestionAnswerComponent } from './dialogs/question-answer/question-answ
 import { YesNoComponent } from './dialogs/yes-no/yes-no.component';
 import { MaterialModule } from './material';
 import { SetupComponent } from './setup/setup.component';
-
-/** AoT requires an exported function for factories */
-const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new TranslateHttpLoader(http, './assets/i18n/', '.json');
 
 /**
  * App Module
@@ -51,14 +45,7 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new Transla
     HttpClientModule,
     CoreModule,
     MaterialModule,
-    AppRoutingModule,
-    TranslateModule.forRoot({
-      loader: {
-        provide: TranslateLoader,
-        useFactory: httpLoaderFactory,
-        deps: [HttpClient]
-      }
-    })
+    AppRoutingModule
   ],
   providers: [
     {
