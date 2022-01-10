@@ -3,9 +3,8 @@ name: autoupdate
 
 # Controls when the action will run.
 on:
-  push:
-    branches:
-      - main
+  # This will trigger on all pushes to all branches.
+  push: {}
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -18,4 +17,7 @@ jobs:
     steps:
       - uses: docker://chinthakagodawita/autoupdate-action:v1
         env:
-          GITHUB_TOKEN: '${{ secrets.AUTO_UPDATE }}'
+          GITHUB_TOKEN: "${{ secrets.AUTO_UPDATE }}"
+          PR_FILTER: "labelled"
+          PR_LABELS: "autoupdate"
+          EXCLUDED_LABELS: "wontfix"
