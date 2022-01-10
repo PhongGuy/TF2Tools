@@ -1,6 +1,7 @@
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { NgModule } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MAT_DIALOG_DEFAULT_OPTIONS } from '@angular/material/dialog';
 import { MAT_SELECT_CONFIG } from '@angular/material/select';
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
@@ -61,9 +62,8 @@ const httpLoaderFactory = (http: HttpClient): TranslateHttpLoader => new Transla
     })
   ],
   providers: [
-    {
-      provide: MAT_SELECT_CONFIG, useValue: { disableOptionCentering: true }
-    }
+    { provide: MAT_SELECT_CONFIG, useValue: { disableOptionCentering: true } },
+    { provide: MAT_DIALOG_DEFAULT_OPTIONS, useValue: { width: '450px' } },
   ],
   bootstrap: [AppComponent]
 })
