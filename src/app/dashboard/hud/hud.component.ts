@@ -201,7 +201,6 @@ export class HudComponent implements OnInit {
       d.subQuestion = `Are you sure you want to remove ${_hud.folderName}? This cannot be undone!`;
 
       const dialogRef = this.dialog.open(YesNoComponent, {
-        width: '450px',
         data: d
       });
 
@@ -264,7 +263,6 @@ export class HudComponent implements OnInit {
    */
   rename(_hud: Hud): void {
     const dialogRef = this.dialog.open(QuestionAnswerComponent, {
-      width: '450px',
       data: {
         question: `Rename ${_hud.folderName}`,
         subQuestion: '',
