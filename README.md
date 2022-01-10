@@ -6,7 +6,7 @@ TF2Tools will help you change hud, hitsound and kill sound by the click of a but
 
 You upload all of your local huds, now you can switch huds easily.
 
-![image](https://user-images.githubusercontent.com/36205789/146427172-2e7a0e92-89fb-4d23-8ef1-9196ebe59ba0.png)
+![image](https://user-images.githubusercontent.com/36205789/148740670-62bc2bb8-20a9-4300-8d65-54fad03a0778.png)
 
 ## Hit/kill sound
 
@@ -18,7 +18,7 @@ You upload your collection of hitsounds and kill sounds. (has to be wav files) N
 
 You can change your vtf crosshairs, choose a background and see how it looks.
 
-![image](https://user-images.githubusercontent.com/36205789/146426963-9af13b47-6767-4f91-861e-c816ffd80873.png)
+![image](https://user-images.githubusercontent.com/36205789/148741114-e1622439-0793-4f0a-bd6d-994d480de1b6.png)
 
 # Download
 
