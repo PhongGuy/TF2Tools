@@ -79,7 +79,6 @@ export class HitsoundComponent implements OnInit {
     // check if there is multiple hitsounds installed and warn user
     if (this.app.hitsounds.length > 1) {
       this.dialog.open(MultipleWarningComponent, {
-        width: '450px',
         data: this.app.hitsounds
       });
     }
@@ -122,7 +121,6 @@ export class HitsoundComponent implements OnInit {
 
         if (name === 'hitsound' || name === 'killsound' || exist) {
           const dialogRef = this.dialog.open(UploadChangeNameComponent, {
-            width: '450px',
             data: {
               title: exist ? 'We found a sound by that name' : 'Give the sound a name',
               cant: this.getNames(),
@@ -166,7 +164,6 @@ export class HitsoundComponent implements OnInit {
     if (this.electron.fs.existsSync(_hitsound.path)) {
 
       const dialogRef = this.dialog.open(QuestionAnswerComponent, {
-        width: '450px',
         data: {
           question: `Rename ${_hitsound.name}`,
           subQuestion: '',
@@ -205,7 +202,6 @@ export class HitsoundComponent implements OnInit {
     info.subQuestion = `Are you sure you want to remove ${_hitsound.name}? This cannot be undone!`;
 
     const dialogRef = this.dialog.open(YesNoComponent, {
-      width: '450px',
       data: info
     });
 
