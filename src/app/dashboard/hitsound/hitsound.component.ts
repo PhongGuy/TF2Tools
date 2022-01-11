@@ -10,6 +10,7 @@ import { Hitsound } from '../../models/hitsound';
 import { QuestionAnswer } from '../../models/questionAnswer';
 import { UploadChangeName } from '../../models/uploadChangeName';
 import { YesNo } from '../../models/yesNo';
+import { LogService } from '../../services/log.service';
 import { SnackService } from '../../services/snack.service';
 import { MultipleWarningComponent } from './multiple-warning/multiple-warning.component';
 import { UploadChangeNameComponent } from './upload-change-name/upload-change-name.component';
@@ -62,10 +63,12 @@ export class HitsoundComponent implements OnInit {
     private electron: ElectronService,
     public app: AppComponent,
     private dialog: MatDialog,
-    private snack: SnackService
+    private snack: SnackService,
+    private log: LogService
   ) {
     this.localHitsounds = `${this.app.settings.libraryPath}\\hitsounds`;
     this.electron.fs.ensureDir(this.localHitsounds);
+    this.log.scope('HITSOUND');
   }
 
   /**
@@ -94,6 +97,7 @@ export class HitsoundComponent implements OnInit {
    */
   async update() {
     this.library = [];
+    this.log.info('READ', `Looking for hitsounds in ${this.localHitsounds}`);
     this.electron.fs.readdirSync(this.localHitsounds).forEach(file => {
       const name = file.split('.');
       name.pop();
@@ -137,7 +141,7 @@ export class HitsoundComponent implements OnInit {
                     this.snack.show(`${name} was added`);
                     this.update();
                   })
-                  .catch(err => this.app.error(err));
+                  .catch(err => this.log.error('COPY', err));
               }
             });
         } else {
@@ -146,7 +150,7 @@ export class HitsoundComponent implements OnInit {
               this.snack.show(`${name} was added`);
               this.update();
             })
-            .catch(err => this.app.error(err));
+            .catch(err => this.log.error('COPY', err));
         }
 
       }
@@ -175,13 +179,13 @@ export class HitsoundComponent implements OnInit {
         if (typeof r === 'string') {
           const path = _hitsound.path.split('\\');
           path.pop();
-          this.app.log.next(`Renaming hitsound: *RENAME* "${_hitsound.path}" => "${path.join('\\')}\\${r}.wav"`);
+          this.log.info('RENAME', `Renaming "${_hitsound.path}" => "${path.join('\\')}\\${r}.wav"`);
           this.electron.fs.rename(_hitsound.path, `${path.join('\\')}\\${r}.wav`)
             .then(() => {
               this.snack.show(`Renamed "${_hitsound.name}" to "${r}"`);
               this.update();
             })
-            .catch(err => this.app.error(err));
+            .catch(err => this.log.error('RENAME', err));
         }
       });
 
@@ -207,7 +211,7 @@ export class HitsoundComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
-        this.app.log.next(`Remove hitsound *DELETE* "${_hitsound.path}"`);
+        this.log.info('REMOVE', `Removing "${_hitsound.path}"`);
         this.electron.fs.remove(_hitsound.path)
           .then(() => {
             this.snack.show(`${_hitsound.name} was removed`);
@@ -217,7 +221,7 @@ export class HitsoundComponent implements OnInit {
               this.update();
             }
           })
-          .catch(err => this.app.error(err));
+          .catch(err => this.log.error('REMOVE', err));
       }
     });
   }
@@ -281,28 +285,26 @@ export class HitsoundComponent implements OnInit {
   installHitsound(_hitsound: Hitsound): void {
     const path = this.app.hitsounds[0];
     if (path !== undefined) {
-      this.app.log.next(`Installing hitsound: *COPY* "${_hitsound.path}" => "${path}"`);
+      this.log.info('COPY', `Installing "${_hitsound.path}" => "${path}"`);
       this.electron.fs.copy(_hitsound.path, path, { overwrite: true })
         .then(() => {
           this.snack.show(`Hitsound ${_hitsound.name} was installed`);
           this.app.update('hitsounds');
         })
-        .catch(err => {
-          this.app.error(err);
-        });
+        .catch(err => this.log.error('COPY', err));
     } else {
       const defaultPath = `${this.app.settings.customPath}\\mycustomstuff\\sound\\ui`;
       this.electron.fs.ensureDir(defaultPath)
         .then(() => {
-          this.app.log.next(`Installing hitsound: *COPY* "${_hitsound.path}" => "${defaultPath}\\hitsound.wav"`);
+          this.log.info('COPY', `Installing "${_hitsound.path}" => "${defaultPath}\\hitsound.wav"`);
           this.electron.fs.copy(_hitsound.path, `${defaultPath}\\hitsound.wav`)
             .then(() => {
               this.snack.show(`Hitsound ${_hitsound.name} was installed`);
               this.app.update('hitsounds');
             })
-            .catch(err => this.app.error(err));
+            .catch(err => this.log.error('COPY', err));
         })
-        .catch(err => this.app.error(err));
+        .catch(err => this.log.error('ENSURE', err));
     }
   }
 
@@ -314,26 +316,26 @@ export class HitsoundComponent implements OnInit {
   installKillSound(_killsound: Hitsound): void {
     const path = this.app.killsounds[0];
     if (path !== undefined) {
-      this.app.log.next(`Installing killsound: *COPY* "${_killsound.path}" => "${path}"`);
+      this.log.info('COPY', `Installing "${_killsound.path}" => "${path}"`);
       this.electron.fs.copy(_killsound.path, path, { overwrite: true })
         .then(() => {
           this.snack.show(`Killsound ${_killsound.name} was installed`);
           this.app.update('hitsounds');
         })
-        .catch(err => this.app.error(err));
+        .catch(err => this.log.error('COPY', err));
     } else {
       const defaultPath = `${this.app.settings.customPath}\\mycustomstuff\\sound\\ui`;
       this.electron.fs.ensureDir(defaultPath)
         .then(() => {
-          this.app.log.next(`Installing killsound: *COPY* "${_killsound.path}" => "${defaultPath}\\killsound.wav"`);
+          this.log.info('COPY', `Installing "${_killsound.path}" => "${defaultPath}\\killsound.wav"`);
           this.electron.fs.copy(_killsound.path, `${defaultPath}\\killsound.wav`)
             .then(() => {
               this.snack.show(`Killsound ${_killsound.name} was installed`);
               this.app.update('hitsounds');
             })
-            .catch(err => this.app.error(err));
+            .catch(err => this.log.error('COPY', err));
         })
-        .catch(err => this.app.error(err));
+        .catch(err => this.log.error('ENSURE', err));
     }
   }
 

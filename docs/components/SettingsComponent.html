@@ -73,7 +73,7 @@
         <h3>Description</h3>
     </p>
     <p class="comment">
-        <p>Settings</p>
+        <p>Settings Component</p>
 
     </p>
 
@@ -145,6 +145,9 @@
                                     <span class="modifier">Public</span>
                                 <a href="#app" >app</a>
                             </li>
+                            <li>
+                                <a href="#autosize" >autosize</a>
+                            </li>
                         </ul>
                     </td>
                 </tr>
@@ -171,6 +174,9 @@
                                 <a href="#ngOnDestroy" >ngOnDestroy</a>
                             </li>
                             <li>
+                                <a href="#triggerResize" >triggerResize</a>
+                            </li>
+                            <li>
                                 <a href="#updateSettings" >updateSettings</a>
                             </li>
                         </ul>
@@ -191,12 +197,12 @@
             <tbody>
                 <tr>
                     <td class="col-md-4">
-<code>constructor(app: <a href="../components/AppComponent.html" target="_self">AppComponent</a>, electron: <a href="../injectables/ElectronService.html" target="_self">ElectronService</a>, snack: <a href="../injectables/SnackService.html" target="_self">SnackService</a>)</code>
+<code>constructor(app: <a href="../components/AppComponent.html" target="_self">AppComponent</a>, electron: <a href="../injectables/ElectronService.html" target="_self">ElectronService</a>, snack: <a href="../injectables/SnackService.html" target="_self">SnackService</a>, log: <a href="../injectables/LogService.html" target="_self">LogService</a>, ngZone: <a href="https://angular.io/api/core/NgZone" target="_blank">NgZone</a>)</code>
                     </td>
                 </tr>
                         <tr>
                             <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="14" class="link-to-prism">src/app/dashboard/settings/settings.component.ts:14</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="22" class="link-to-prism">src/app/dashboard/settings/settings.component.ts:22</a></div>
                             </td>
                         </tr>
 
@@ -251,6 +257,30 @@
                                                     </td>
                                                     
                                                 </tr>
+                                                <tr>
+                                                        <td>log</td>
+                                                  
+                                                        <td>
+                                                                        <code><a href="../injectables/LogService.html" target="_self" >LogService</a></code>
+                                                        </td>
+                                                  
+                                                    <td>
+                                                            No
+                                                    </td>
+                                                    
+                                                </tr>
+                                                <tr>
+                                                        <td>ngZone</td>
+                                                  
+                                                        <td>
+                                                                        <code><a href="https://angular.io/api/core/NgZone" target="_blank" >NgZone</a></code>
+                                                        </td>
+                                                  
+                                                    <td>
+                                                            No
+                                                    </td>
+                                                    
+                                                </tr>
                                         </tbody>
                                     </table>
                             </div>
@@ -291,8 +321,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="60"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:60</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="89"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:89</a></div>
                 </td>
             </tr>
 
@@ -330,14 +360,16 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="39"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:39</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="69"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:69</a></div>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
+                    <div class="io-description"><p>Gets GitHub body</p>
+</div>
 
                     <div class="io-description">
                         <b>Parameters :</b>
@@ -373,7 +405,8 @@
 
                     </div>
                     <div class="io-description">
-                        
+                        <p>git hub body</p>
+
                     </div>
                 </td>
             </tr>
@@ -399,8 +432,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="34"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:34</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="56"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:56</a></div>
                 </td>
             </tr>
 
@@ -413,7 +446,7 @@
                     <div>
                     </div>
                     <div class="io-description">
-                        <b>Returns : </b>    <code>string[]</code>
+                        <b>Returns : </b>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
 
                     </div>
                     <div class="io-description">
@@ -443,8 +476,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="117"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:117</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="145"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:145</a></div>
                 </td>
             </tr>
 
@@ -452,6 +485,45 @@
             <tr>
                 <td class="col-md-4">
                     <div class="io-description"><p>on destroy</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="triggerResize"></a>
+                    <span class="name">
+                        <span ><b>triggerResize</b></span>
+                        <a href="#triggerResize"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>triggerResize()</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="46"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:46</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Triggers resize of logs view</p>
 </div>
 
                     <div class="io-description">
@@ -482,8 +554,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="110"
-                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:110</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="138"
+                            class="link-to-prism">src/app/dashboard/settings/settings.component.ts:138</a></div>
                 </td>
             </tr>
 
@@ -527,10 +599,51 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="24" class="link-to-prism">src/app/dashboard/settings/settings.component.ts:24</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="34" class="link-to-prism">src/app/dashboard/settings/settings.component.ts:34</a></div>
                         </td>
                     </tr>
 
+
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="autosize"></a>
+                    <span class="name">
+                        <span ><b>autosize</b></span>
+                        <a href="#autosize"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <i>Type : </i>    <code>CdkTextareaAutosize</code>
+
+                    </td>
+                </tr>
+                <tr>
+                    <td class="col-md-4">
+                        <b>Decorators : </b>
+                        <br />
+                        <code>
+                            @ViewChild(&#x27;autosize&#x27;)<br />
+                        </code>
+                    </td>
+                </tr>
+                    <tr>
+                        <td class="col-md-4">
+                                <div class="io-line">Defined in <a href="" data-line="22" class="link-to-prism">src/app/dashboard/settings/settings.component.ts:22</a></div>
+                        </td>
+                    </tr>
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>View child of autosize</p>
+</div>
+                </td>
+            </tr>
 
         </tbody>
     </table>
@@ -540,13 +653,16 @@
 
 
     <div class="tab-pane fade  tab-source-code" id="c-source">
-        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { Component, OnDestroy } from &#x27;@angular/core&#x27;;
+        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { CdkTextareaAutosize } from &#x27;@angular/cdk/text-field&#x27;;
+import { Component, NgZone, OnDestroy, ViewChild } from &#x27;@angular/core&#x27;;
+import { take } from &#x27;rxjs&#x27;;
 import { AppComponent } from &#x27;../../app.component&#x27;;
 import { ElectronService } from &#x27;../../core/services&#x27;;
+import { LogService } from &#x27;../../services/log.service&#x27;;
 import { SnackService } from &#x27;../../services/snack.service&#x27;;
 
 /**
- * Settings
+ * Settings Component
  */
 @Component({
   selector: &#x27;app-settings&#x27;,
@@ -556,30 +672,56 @@ import { SnackService } from &#x27;../../services/snack.service&#x27;;
 export class SettingsComponent implements OnDestroy {
 
   /**
+   * View child of autosize
+   */
+  @ViewChild(&#x27;autosize&#x27;) autosize: CdkTextareaAutosize;
+
+  /**
    * Creates an instance of settings component.
    *
    * @param app
    * @param electron
    * @param snack
+   * @param log
+   * @param ngZone
    */
   constructor(
     public app: AppComponent,
     private electron: ElectronService,
-    private snack: SnackService
-  ) { }
+    private snack: SnackService,
+    private log: LogService,
+    private ngZone: NgZone
+  ) {
+    this.log.scope(&#x27;SETTINGS&#x27;);
+  }
+
+  /**
+   * Triggers resize of logs view
+   */
+  triggerResize() {
+    // Wait for changes to be applied, then trigger textarea resize.
+    this.ngZone.onStable.pipe(take(1)).subscribe(() &#x3D;&gt; this.autosize.resizeToFitContent(true));
+  }
 
   /**
    * Gets log
    *
    * @returns
    */
-  getLog(): string[] {
-    const logs &#x3D; this.electron.fs.readFileSync(this.electron.appData(&#x27;TF2Tools\\log.txt&#x27;), { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; });
-    return logs.split(&#x27;\n&#x27;);
+  getLog(): string {
+    const logs &#x3D; this.electron.fs.readFileSync(this.electron.appData(&#x27;TF2Tools\\log.log&#x27;), { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; });
+    const logData &#x3D; logs.split(&#x27;\n&#x27;);
+    console.log(logData.length);
+    return logData.reverse().join(&#x27;\n&#x27;);
   }
 
+  /**
+   * Gets GitHub body
+   *
+   * @param body
+   * @returns git hub body
+   */
   getGitHubBody(body: string): string {
-
     const r &#x3D; [];
     body
       .replace(/\r/g, &#x27;&#x27;)
@@ -616,20 +758,19 @@ export class SettingsComponent implements OnDestroy {
           path &#x3D; &#x60;${path}\\TF2Tools\\Library&#x60;;
           this.electron.fs.ensureDirSync(path);
           this.snack.show(&#x27;Moving your library. This can take some time if you have a big library.&#x27;, null, 6000);
-          this.app.log.next(&#x60;Trying to move your library. ${this.app.settings.libraryPath} &#x3D;&gt; ${path}&#x60;);
+          this.log.info(&#x27;MOVE&#x27;, &#x60;Trying to move library. &quot;${this.app.settings.libraryPath}&quot; &#x3D;&gt; &quot;${path}&quot;&#x60;);
           this.electron.fs.move(this.app.settings.libraryPath, path, { overwrite: true })
             .then(() &#x3D;&gt; {
-              this.app.log.next(&#x60;Successfully moved your library&#x60;);
+              this.log.info(&#x27;MOVE&#x27;, &#x60;Successfully moved your library&#x60;);
               this.app.settings.libraryPath &#x3D; path;
               this.app.settingsUpdate.next(this.app.settings);
               this.snack.show(&#x27;Your library was moved!&#x27;);
               this.app.loading &#x3D; false;
             })
-            .catch(err &#x3D;&gt; this.app.error(err));
+            .catch(err &#x3D;&gt; this.log.error(&#x27;MOVE&#x27;, err));
 
         } else {
           this.app.loading &#x3D; false;
-          this.app.log.next(&#x60;Failed to moved your library&#x60;);
           this.snack.show(&#x27;That is not a location we can use&#x27;);
         }
       } else {
@@ -707,18 +848,11 @@ export class SettingsComponent implements OnDestroy {
 &lt;/mat-card&gt;
 
 &lt;h1&gt;Log&lt;/h1&gt;
-&lt;mat-accordion&gt;
-    &lt;mat-expansion-panel&gt;
-        &lt;mat-expansion-panel-header&gt;
-            Show logs
-        &lt;/mat-expansion-panel-header&gt;
-
-        &lt;ng-template matExpansionPanelContent&gt;
-            &lt;p class&#x3D;&quot;log-info&quot; *ngFor&#x3D;&quot;let i of getLog()&quot;&gt;{{ i }}&lt;/p&gt;
-        &lt;/ng-template&gt;
-
-    &lt;/mat-expansion-panel&gt;
-&lt;/mat-accordion&gt;
+&lt;p&gt;Use logs to report a problem. This will help us understand what is wrong.&lt;/p&gt;
+&lt;mat-form-field class&#x3D;&quot;w-100 h-30&quot; appearance&#x3D;&quot;fill&quot;&gt;
+    &lt;mat-label&gt;TF2Tools/log&lt;/mat-label&gt;
+    &lt;textarea matInput [value]&#x3D;&quot;getLog()&quot; cdkTextareaAutosize #autosize&#x3D;&quot;cdkTextareaAutosize&quot; disabled&gt;&lt;/textarea&gt;
+&lt;/mat-form-field&gt;
 </code></pre>
     </div>
 
@@ -734,8 +868,13 @@ export class SettingsComponent implements OnDestroy {
   &amp;:hover {
     background: #8f8f8f2b;
     border-radius: 5px;
-
   }
+}
+
+textarea {
+  font-size: 12px;
+  max-height: 350px;
+  min-height: 150px;
 }
 </code></pre>
     </div>
@@ -765,12 +904,13 @@ export class SettingsComponent implements OnDestroy {
 <script src="../js/libs/htmlparser.js"></script>
 <script src="../js/libs/deep-iterator.js"></script>
 <script>
-        var COMPONENT_TEMPLATE = '<div><h1 class="mt-0 mb-3">Settings</h1><mat-card *ngIf="app.gitHub.update">    <mat-card-title>Update available</mat-card-title>    <mat-card-subtitle>{{app.gitHub.release.name}} is now available!</mat-card-subtitle>    <mat-card-content [innerText]="getGitHubBody(app.gitHub.release.body)"></mat-card-content>    <mat-card-actions align="end">        <a href="https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.zip" mat-button color="primary"            download>Download</a>    </mat-card-actions></mat-card><h3>Custom folder</h3><mat-form-field class="w-100" appearance="fill">    <mat-label>Location</mat-label>    <input matInput type="text" disabled [value]="app.settings.customPath"></mat-form-field><h3>Library location</h3><mat-form-field class="w-100" appearance="fill">    <mat-label>Location</mat-label>    <input matInput type="text" disabled [value]="app.settings.libraryPath"></mat-form-field><div align="end">    <button mat-raised-button color="primary" (click)="changeLibrary()" [disabled]="app.loading">Change        location</button></div><h1>Huds</h1><mat-card class="settings">    <div class="item">        <div class="info">            <h3>Save hud edits on uninstall</h3>            <span>Save recent customizations edits on hud when uninstalling</span>        </div>        <div class="col"></div>        <mat-slide-toggle [(ngModel)]="app.settings.moveOrCopy" (change)="updateSettings()"></mat-slide-toggle>    </div></mat-card><h1>Log</h1><mat-accordion>    <mat-expansion-panel>        <mat-expansion-panel-header>            Show logs        </mat-expansion-panel-header>        <ng-template matExpansionPanelContent>            <p class="log-info" *ngFor="let i of getLog()">{{ i }}</p>        </ng-template>    </mat-expansion-panel></mat-accordion></div>'
+        var COMPONENT_TEMPLATE = '<div><h1 class="mt-0 mb-3">Settings</h1><mat-card *ngIf="app.gitHub.update">    <mat-card-title>Update available</mat-card-title>    <mat-card-subtitle>{{app.gitHub.release.name}} is now available!</mat-card-subtitle>    <mat-card-content [innerText]="getGitHubBody(app.gitHub.release.body)"></mat-card-content>    <mat-card-actions align="end">        <a href="https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.zip" mat-button color="primary"            download>Download</a>    </mat-card-actions></mat-card><h3>Custom folder</h3><mat-form-field class="w-100" appearance="fill">    <mat-label>Location</mat-label>    <input matInput type="text" disabled [value]="app.settings.customPath"></mat-form-field><h3>Library location</h3><mat-form-field class="w-100" appearance="fill">    <mat-label>Location</mat-label>    <input matInput type="text" disabled [value]="app.settings.libraryPath"></mat-form-field><div align="end">    <button mat-raised-button color="primary" (click)="changeLibrary()" [disabled]="app.loading">Change        location</button></div><h1>Huds</h1><mat-card class="settings">    <div class="item">        <div class="info">            <h3>Save hud edits on uninstall</h3>            <span>Save recent customizations edits on hud when uninstalling</span>        </div>        <div class="col"></div>        <mat-slide-toggle [(ngModel)]="app.settings.moveOrCopy" (change)="updateSettings()"></mat-slide-toggle>    </div></mat-card><h1>Log</h1><p>Use logs to report a problem. This will help us understand what is wrong.</p><mat-form-field class="w-100 h-30" appearance="fill">    <mat-label>TF2Tools/log</mat-label>    <textarea matInput [value]="getLog()" cdkTextareaAutosize #autosize="cdkTextareaAutosize" disabled></textarea></mat-form-field></div>'
     var COMPONENTS = [{'name': 'AppComponent', 'selector': 'app-root'},{'name': 'CrosshairsComponent', 'selector': 'app-crosshairs'},{'name': 'DashboardComponent', 'selector': 'app-dashboard'},{'name': 'HitsoundComponent', 'selector': 'app-hitsound'},{'name': 'HudComponent', 'selector': 'app-hud'},{'name': 'MultipleWarningComponent', 'selector': 'app-multiple-warning'},{'name': 'QuestionAnswerComponent', 'selector': 'app-question-answer'},{'name': 'SettingsComponent', 'selector': 'app-settings'},{'name': 'SetupComponent', 'selector': 'app-setup'},{'name': 'UploadChangeNameComponent', 'selector': 'app-upload-change-name'},{'name': 'WeaponsSoundsComponent', 'selector': 'app-weapons-sounds'},{'name': 'YesNoComponent', 'selector': 'app-yes-no'}];
     var DIRECTIVES = [];
     var ACTUAL_COMPONENT = {'name': 'SettingsComponent'};
 </script>
 <script src="../js/tree.js"></script>
+
 
 
 

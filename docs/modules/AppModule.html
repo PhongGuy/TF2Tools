@@ -387,15 +387,13 @@
 
 
     <div class="tab-pane fade  tab-source-code" id="c-source">
-        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { HttpClient, HttpClientModule } from &#x27;@angular/common/http&#x27;;
+        <pre class="line-numbers compodoc-sourcecode"><code class="language-typescript">import { HttpClientModule } from &#x27;@angular/common/http&#x27;;
 import { NgModule } from &#x27;@angular/core&#x27;;
 import { FormsModule } from &#x27;@angular/forms&#x27;;
+import { MAT_DIALOG_DEFAULT_OPTIONS } from &#x27;@angular/material/dialog&#x27;;
 import { MAT_SELECT_CONFIG } from &#x27;@angular/material/select&#x27;;
 import { BrowserModule } from &#x27;@angular/platform-browser&#x27;;
 import { BrowserAnimationsModule } from &#x27;@angular/platform-browser/animations&#x27;;
-// NG Translate
-import { TranslateLoader, TranslateModule } from &#x27;@ngx-translate/core&#x27;;
-import { TranslateHttpLoader } from &#x27;@ngx-translate/http-loader&#x27;;
 import { AppRoutingModule } from &#x27;./app-routing.module&#x27;;
 import { AppComponent } from &#x27;./app.component&#x27;;
 import { CoreModule } from &#x27;./core/core.module&#x27;;
@@ -411,9 +409,6 @@ import { QuestionAnswerComponent } from &#x27;./dialogs/question-answer/question
 import { YesNoComponent } from &#x27;./dialogs/yes-no/yes-no.component&#x27;;
 import { MaterialModule } from &#x27;./material&#x27;;
 import { SetupComponent } from &#x27;./setup/setup.component&#x27;;
-
-/** AoT requires an exported function for factories */
-const httpLoaderFactory &#x3D; (http: HttpClient): TranslateHttpLoader &#x3D;&gt; new TranslateHttpLoader(http, &#x27;./assets/i18n/&#x27;, &#x27;.json&#x27;);
 
 /**
  * App Module
@@ -440,19 +435,11 @@ const httpLoaderFactory &#x3D; (http: HttpClient): TranslateHttpLoader &#x3D;&gt
     HttpClientModule,
     CoreModule,
     MaterialModule,
-    AppRoutingModule,
-    TranslateModule.forRoot({
-      loader: {
-        provide: TranslateLoader,
-        useFactory: httpLoaderFactory,
-        deps: [HttpClient]
-      }
-    })
+    AppRoutingModule
   ],
   providers: [
-    {
-      provide: MAT_SELECT_CONFIG, useValue: { disableOptionCentering: true }
-    }
+    { provide: MAT_SELECT_CONFIG, useValue: { disableOptionCentering: true } },
+    { provide: MAT_DIALOG_DEFAULT_OPTIONS, useValue: { width: &#x27;450px&#x27; } },
   ],
   bootstrap: [AppComponent]
 })
@@ -460,6 +447,7 @@ export class AppModule { }
 </code></pre>
     </div>
 </div>
+
 
 
 
