@@ -1,7 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
-import * as moment from 'moment';
 import { BehaviorSubject } from 'rxjs';
 import { APP_CONFIG } from '../environments/environment';
 import { ElectronService } from './core/services';
@@ -9,6 +8,7 @@ import { LatestRelease } from './models/latestRelease';
 import { Settings } from './models/settings';
 import { Update } from './models/update';
 import { FileHelpService } from './services/file-help.service';
+import { LogService } from './services/log.service';
 import { SnackService } from './services/snack.service';
 
 /**
@@ -35,11 +35,6 @@ export class AppComponent implements OnInit {
    * Settings update of app component
    */
   settingsUpdate: BehaviorSubject<Settings> = new BehaviorSubject<Settings>(this.settings);
-
-  /**
-   * Log of app component
-   */
-  log: BehaviorSubject<string> = new BehaviorSubject<string>('');
 
   /**
    * Loading  of app component
@@ -120,7 +115,8 @@ export class AppComponent implements OnInit {
     private router: Router,
     private snack: SnackService,
     private fileHelp: FileHelpService,
-    private http: HttpClient
+    private http: HttpClient,
+    private log: LogService
   ) {
     this.appdata = this.electron.appData('TF2Tools');
     this.appTemp = `${this.appdata}\\temp`;
@@ -183,15 +179,6 @@ export class AppComponent implements OnInit {
     // stop loading when we loaded
     this.loading = false;
 
-    this.log.subscribe(data => {
-      if (data.length > 0) {
-        const log = `${moment().format('DD-MM-YYYY HH:mm:ss')}:: ${data}\n`;
-        this.electron.fs.appendFile(`${this.appdata}\\log.txt`, log).then(() => {
-          console.log(log);
-        });
-      }
-    });
-
     // when we update settings we write them to json file
     this.settingsUpdate.subscribe(a => {
       this.electron.fs.writeFileSync(`${this.appdata}\\settings.json`, JSON.stringify(this.settings));
@@ -232,18 +219,8 @@ export class AppComponent implements OnInit {
   /** write the settings to json and close the application */
   close(): void {
     this.electron.fs.writeFileSync(`${this.appdata}\\settings.json`, JSON.stringify(this.settings));
+    this.log.cleanup();
     window.close();
-  }
-
-  /**
-   * Log app errors
-   *
-   * @param err
-   */
-  error(err: any): void {
-    console.error(err);
-    this.snack.show(err);
-    this.log.next(err.toString());
   }
 
   /**

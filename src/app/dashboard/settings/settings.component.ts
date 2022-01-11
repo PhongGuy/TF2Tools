@@ -1,6 +1,7 @@
 import { Component, OnDestroy } from '@angular/core';
 import { AppComponent } from '../../app.component';
 import { ElectronService } from '../../core/services';
+import { LogService } from '../../services/log.service';
 import { SnackService } from '../../services/snack.service';
 
 /**
@@ -74,20 +75,19 @@ export class SettingsComponent implements OnDestroy {
           path = `${path}\\TF2Tools\\Library`;
           this.electron.fs.ensureDirSync(path);
           this.snack.show('Moving your library. This can take some time if you have a big library.', null, 6000);
-          this.app.log.next(`Trying to move your library. ${this.app.settings.libraryPath} => ${path}`);
+          this.log.info('MOVE', `Trying to move library. "${this.app.settings.libraryPath}" => "${path}"`);
           this.electron.fs.move(this.app.settings.libraryPath, path, { overwrite: true })
             .then(() => {
-              this.app.log.next(`Successfully moved your library`);
+              this.log.info('MOVE', `Successfully moved your library`);
               this.app.settings.libraryPath = path;
               this.app.settingsUpdate.next(this.app.settings);
               this.snack.show('Your library was moved!');
               this.app.loading = false;
             })
-            .catch(err => this.app.error(err));
+            .catch(err => this.log.error('MOVE', err));
 
         } else {
           this.app.loading = false;
-          this.app.log.next(`Failed to moved your library`);
           this.snack.show('That is not a location we can use');
         }
       } else {

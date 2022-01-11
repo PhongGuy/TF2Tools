@@ -8,6 +8,7 @@ import { ElectronService } from '../../core/services';
 import { tfWeapons } from '../../mock/tfWeapons';
 import { CrosshairSelected } from '../../models/crosshairSelected';
 import { WeaponData } from '../../models/weaponData';
+import { LogService } from '../../services/log.service';
 import { SnackService } from '../../services/snack.service';
 
 /**
@@ -137,7 +138,10 @@ export class CrosshairsComponent implements OnInit {
     public app: AppComponent,
     private electron: ElectronService,
     private snack: SnackService,
-  ) { }
+    private log: LogService
+  ) {
+    this.log.scope('CROSSHAIRS');
+  }
 
   /**
    * on init
@@ -211,13 +215,13 @@ export class CrosshairsComponent implements OnInit {
                     this.snack.show('vtf crosshairs was generated');
                     this.app.update();
                   })
-                  .catch((err) => this.app.error(err));
+                  .catch((err) => this.log.error('COPY', err));
               })
-              .catch((err) => this.app.error(err));
+              .catch((err) => this.log.error('ENSURE', err));
           })
-          .catch((err) => this.app.error(err));
+          .catch((err) => this.log.error('COPY', err));
       })
-      .catch((err) => this.app.error(err));
+      .catch((err) => this.log.error('ENSURE', err));
   }
 
   /**
@@ -227,14 +231,14 @@ export class CrosshairsComponent implements OnInit {
     const crosshair = this.crosshairSelected.value;
     this.selectedWeapons.forEach(weapon => {
       const file = this.electron.fs.readFileSync(weapon.path, { encoding: 'utf8', flag: 'r' });
-      this.app.log.next(`Installing crosshair: *CHANGE* "${weapon.crosshair}" => "${crosshair}" in "${weapon.path}"`);
+      this.log.info('CHANGE', `Installing "${weapon.crosshair}" => "${crosshair}" in "${weapon.path}"`);
       this.electron.fs.writeFile(weapon.path, file.replace(`/thumbnails/${weapon.crosshair}`, `/thumbnails/${crosshair}`))
         .then(() => {
           this.snack.show(`Updated ${weapon.info.name} to ${crosshair}`);
           this.app.update('vtf');
           this.get();
         })
-        .catch((err) => this.app.error(err));
+        .catch((err) => this.log.error('WRITE', err));
     });
   }
 
@@ -271,7 +275,7 @@ export class CrosshairsComponent implements OnInit {
       if (weapon !== crosshair) {
         if (weapon.info.slot === slot || slot === 'All') {
           const file = this.electron.fs.readFileSync(weapon.path, { encoding: 'utf8', flag: 'r' });
-          this.app.log.next(`Installing crosshair: *CHANGE* "${weapon.crosshair}" => "${crosshair}" in "${weapon.path}"`);
+          this.log.info('CHANGE', `Installing "${weapon.crosshair}" => "${crosshair}" in "${weapon.path}"`);
           this.electron.fs.writeFileSync(weapon.path, file.replace(`/thumbnails/${weapon.crosshair}`, `/thumbnails/${crosshair}`));
         }
       }
@@ -292,7 +296,7 @@ export class CrosshairsComponent implements OnInit {
       if (weapon !== crosshair) {
         if (weapon.info.slot === slot || weapon.info.slot === 'All') {
           const file = this.electron.fs.readFileSync(weapon.path, { encoding: 'utf8', flag: 'r' });
-          this.app.log.next(`Installing crosshair: *CHANGE* "${weapon.crosshair}" => "${crosshair}" in "${weapon.path}"`);
+          this.log.info('WRITE', `Installing "${weapon.crosshair}" => "${crosshair}" in "${weapon.path}"`);
           this.electron.fs.writeFileSync(weapon.path, file.replace(`/thumbnails/${weapon.crosshair}`, `/thumbnails/${crosshair}`));
         }
       }
@@ -309,7 +313,7 @@ export class CrosshairsComponent implements OnInit {
    */
   changeBackground(v: string): void {
     this.app.settings.crosshairBackground = v;
-    this.app.log.next(`Crosshair background: *CHANGE* "${v}"`);
+    this.log.info('CHANGE', `Crosshair background: "${v}"`);
     this.app.settingsUpdate.next(this.app.settings);
   }
 
