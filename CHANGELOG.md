@@ -1,3 +1,48 @@
+## <small>4.6.1 (2022-01-11)</small>
+
+* [Bumped Version] 4.6.1 ([35a2424](https://github.com/PhongGuy/TF2Tools/commit/35a2424))
+* added GitHub Action/Auto Update ([fa868af](https://github.com/PhongGuy/TF2Tools/commit/fa868af))
+* added LogService ([2d826dc](https://github.com/PhongGuy/TF2Tools/commit/2d826dc))
+* added new logs ([1288ac1](https://github.com/PhongGuy/TF2Tools/commit/1288ac1))
+* added option to run workflow manually ([d393c6b](https://github.com/PhongGuy/TF2Tools/commit/d393c6b))
+* audit fix ([35b5cd6](https://github.com/PhongGuy/TF2Tools/commit/35b5cd6))
+* Bump @compodoc/compodoc from 1.1.16 to 1.1.17 ([d8ffe3e](https://github.com/PhongGuy/TF2Tools/commit/d8ffe3e))
+* Bump @compodoc/compodoc from 1.1.17 to 1.1.18 ([c29299f](https://github.com/PhongGuy/TF2Tools/commit/c29299f))
+* Bump @playwright/test from 1.17.1 to 1.17.2 ([d66e658](https://github.com/PhongGuy/TF2Tools/commit/d66e658))
+* Bump @typescript-eslint/eslint-plugin from 5.9.0 to 5.9.1 ([b513671](https://github.com/PhongGuy/TF2Tools/commit/b513671))
+* Bump @typescript-eslint/parser from 5.9.0 to 5.9.1 ([f0fc320](https://github.com/PhongGuy/TF2Tools/commit/f0fc320))
+* Bump eslint-plugin-jsdoc from 37.5.1 to 37.5.2 ([6c9bd48](https://github.com/PhongGuy/TF2Tools/commit/6c9bd48))
+* Bump eslint-plugin-jsdoc from 37.5.2 to 37.6.1 ([f8e6319](https://github.com/PhongGuy/TF2Tools/commit/f8e6319))
+* Bump karma from 6.3.9 to 6.3.10 ([aabb0bf](https://github.com/PhongGuy/TF2Tools/commit/aabb0bf))
+* Bump playwright from 1.17.1 to 1.17.2 ([5b5a784](https://github.com/PhongGuy/TF2Tools/commit/5b5a784))
+* Bump rxjs from 7.5.1 to 7.5.2 ([6e9f57b](https://github.com/PhongGuy/TF2Tools/commit/6e9f57b))
+* changed how logs are displayed in settings ([d0c748f](https://github.com/PhongGuy/TF2Tools/commit/d0c748f))
+* Remove @ngx-translate ([403e4ec](https://github.com/PhongGuy/TF2Tools/commit/403e4ec)), closes [#133](https://github.com/PhongGuy/TF2Tools/issues/133)
+* Set default width of dialogs instead of writing it multible times ([57a2769](https://github.com/PhongGuy/TF2Tools/commit/57a2769)), closes [#134](https://github.com/PhongGuy/TF2Tools/issues/134)
+* Update autoupdate.yml ([32cc3d4](https://github.com/PhongGuy/TF2Tools/commit/32cc3d4))
+* Update autoupdate.yml ([1c03382](https://github.com/PhongGuy/TF2Tools/commit/1c03382))
+* Update autoupdate.yml ([c85bbeb](https://github.com/PhongGuy/TF2Tools/commit/c85bbeb))
+* Update README.md with how the app looks now ([957b6ac](https://github.com/PhongGuy/TF2Tools/commit/957b6ac)), closes [#135](https://github.com/PhongGuy/TF2Tools/issues/135)
+* updated autoupdate ([6593bfd](https://github.com/PhongGuy/TF2Tools/commit/6593bfd))
+* updated autoupdate ([0f55a2c](https://github.com/PhongGuy/TF2Tools/commit/0f55a2c))
+* updated autoupdate ([fef84d6](https://github.com/PhongGuy/TF2Tools/commit/fef84d6))
+* updated docs ([16682c2](https://github.com/PhongGuy/TF2Tools/commit/16682c2))
+
+
+
+## 4.6.0 (2022-01-06)
+
+* [Bumped Version] 4.6.0 ([ec65664](https://github.com/PhongGuy/TF2Tools/commit/ec65664))
+* 4.5.0 ([1c18de6](https://github.com/PhongGuy/TF2Tools/commit/1c18de6))
+* 4.6.0 ([d9b6b1c](https://github.com/PhongGuy/TF2Tools/commit/d9b6b1c))
+* change how updates are handled ([12ec3a3](https://github.com/PhongGuy/TF2Tools/commit/12ec3a3))
+* updated changelog ([d1bb7cc](https://github.com/PhongGuy/TF2Tools/commit/d1bb7cc))
+* updated docs ([b99f00c](https://github.com/PhongGuy/TF2Tools/commit/b99f00c))
+* updated docs ([a08ad35](https://github.com/PhongGuy/TF2Tools/commit/a08ad35))
+* updated how updates are shown and added body of changes ([5556f22](https://github.com/PhongGuy/TF2Tools/commit/5556f22))
+
+
+
 ## 4.5.0 (2022-01-05)
 
 * [Bumped Version] 4.5.0 ([0c7e349](https://github.com/PhongGuy/TF2Tools/commit/0c7e349))
