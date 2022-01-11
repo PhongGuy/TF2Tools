@@ -41,15 +41,8 @@
 </mat-card>
 
 <h1>Log</h1>
-<mat-accordion>
-    <mat-expansion-panel>
-        <mat-expansion-panel-header>
-            Show logs
-        </mat-expansion-panel-header>
-
-        <ng-template matExpansionPanelContent>
-            <p class="log-info" *ngFor="let i of getLog()">{{ i }}</p>
-        </ng-template>
-
-    </mat-expansion-panel>
-</mat-accordion>
+<p>Use logs to report a problem. This will help us understand what is wrong.</p>
+<mat-form-field class="w-100 h-30" appearance="fill">
+    <mat-label>TF2Tools/log</mat-label>
+    <textarea matInput [value]="getLog()" cdkTextareaAutosize #autosize="cdkTextareaAutosize" disabled></textarea>
+</mat-form-field>

@@ -1,4 +1,6 @@
-import { Component, OnDestroy } from '@angular/core';
+import { CdkTextareaAutosize } from '@angular/cdk/text-field';
+import { Component, NgZone, OnDestroy, ViewChild } from '@angular/core';
+import { take } from 'rxjs';
 import { AppComponent } from '../../app.component';
 import { ElectronService } from '../../core/services';
 import { LogService } from '../../services/log.service';
@@ -14,6 +16,8 @@ import { SnackService } from '../../services/snack.service';
 })
 export class SettingsComponent implements OnDestroy {
 
+  @ViewChild('autosize') autosize: CdkTextareaAutosize;
+
   /**
    * Creates an instance of settings component.
    *
@@ -24,17 +28,28 @@ export class SettingsComponent implements OnDestroy {
   constructor(
     public app: AppComponent,
     private electron: ElectronService,
-    private snack: SnackService
-  ) { }
+    private snack: SnackService,
+    private log: LogService,
+    private ngZone: NgZone
+  ) {
+    this.log.scope('SETTINGS');
+  }
+
+  triggerResize() {
+    // Wait for changes to be applied, then trigger textarea resize.
+    this.ngZone.onStable.pipe(take(1)).subscribe(() => this.autosize.resizeToFitContent(true));
+  }
 
   /**
    * Gets log
    *
    * @returns
    */
-  getLog(): string[] {
-    const logs = this.electron.fs.readFileSync(this.electron.appData('TF2Tools\\log.txt'), { encoding: 'utf8', flag: 'r' });
-    return logs.split('\n');
+  getLog(): string {
+    const logs = this.electron.fs.readFileSync(this.electron.appData('TF2Tools\\log.log'), { encoding: 'utf8', flag: 'r' });
+    const logData = logs.split('\n');
+    console.log(logData.length);
+    return logData.reverse().join('\n');
   }
 
   getGitHubBody(body: string): string {
