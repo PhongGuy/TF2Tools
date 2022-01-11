@@ -20,11 +20,16 @@ export class LogService {
    */
   private scopeWhat = 'undefined';
 
+  /**
+   * Creates an instance of log service.
+   *
+   * @param electron
+   */
   constructor(
     private electron: ElectronService
   ) {
     this.logPath = this.electron.appData('TF2Tools\\log.log');
-    this.electron.fs.ensureFile(this.electron.appData('TF2Tools\\log.log'));
+    this.electron.fs.ensureFile(this.logPath);
   }
 
   /**

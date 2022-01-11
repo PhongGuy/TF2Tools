@@ -7,7 +7,7 @@ import { LogService } from '../../services/log.service';
 import { SnackService } from '../../services/snack.service';
 
 /**
- * Settings
+ * Settings Component
  */
 @Component({
   selector: 'app-settings',
@@ -16,6 +16,9 @@ import { SnackService } from '../../services/snack.service';
 })
 export class SettingsComponent implements OnDestroy {
 
+  /**
+   * View child of autosize
+   */
   @ViewChild('autosize') autosize: CdkTextareaAutosize;
 
   /**
@@ -24,6 +27,8 @@ export class SettingsComponent implements OnDestroy {
    * @param app
    * @param electron
    * @param snack
+   * @param log
+   * @param ngZone
    */
   constructor(
     public app: AppComponent,
@@ -35,6 +40,9 @@ export class SettingsComponent implements OnDestroy {
     this.log.scope('SETTINGS');
   }
 
+  /**
+   * Triggers resize of logs view
+   */
   triggerResize() {
     // Wait for changes to be applied, then trigger textarea resize.
     this.ngZone.onStable.pipe(take(1)).subscribe(() => this.autosize.resizeToFitContent(true));
@@ -52,8 +60,13 @@ export class SettingsComponent implements OnDestroy {
     return logData.reverse().join('\n');
   }
 
+  /**
+   * Gets GitHub body
+   *
+   * @param body
+   * @returns git hub body
+   */
   getGitHubBody(body: string): string {
-
     const r = [];
     body
       .replace(/\r/g, '')
