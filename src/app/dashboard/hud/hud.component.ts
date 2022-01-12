@@ -9,6 +9,7 @@ import { YesNoComponent } from '../../dialogs/yes-no/yes-no.component';
 import { Hud } from '../../models/hud';
 import { QuestionAnswer } from '../../models/questionAnswer';
 import { YesNo } from '../../models/yesNo';
+import { FileHelpService } from '../../services/file-help.service';
 import { LogService } from '../../services/log.service';
 import { SnackService } from '../../services/snack.service';
 
@@ -69,7 +70,8 @@ export class HudComponent implements OnInit {
     private app: AppComponent,
     private dialog: MatDialog,
     private snack: SnackService,
-    private log: LogService
+    private log: LogService,
+    private fileHelp: FileHelpService
   ) {
     this.localHuds = `${this.app.settings.libraryPath}\\huds`;
     this.electron.fs.ensureDir(this.localHuds);
@@ -156,8 +158,9 @@ export class HudComponent implements OnInit {
    *
    * @param _hud
    */
-  add(_hud: Hud): void {
+  async add(_hud: Hud): Promise<void> {
     this.log.info('COPY', `Installing "${_hud.path}" => "${this.app.settings.customPath}\\${_hud.folderName}"`);
+    await this.makeSureThereAreNoReadOnlyFoldersInThisFolder(_hud.path);
     this.electron.fs.copy(_hud.path, `${this.app.settings.customPath}\\${_hud.folderName}`)
       .then(() => {
         this.snack.show(`${_hud.folderName} was installed`);
@@ -252,7 +255,6 @@ export class HudComponent implements OnInit {
       const s = 'We could not find any hud here. Are you sure you selected the right folder and it has the info.vdf file inside.';
       this.snack.show(s, null, 6000);
     }
-
     this.folderUpload.nativeElement.value = null;
   }
 
@@ -294,6 +296,31 @@ export class HudComponent implements OnInit {
       this.uninstall(hud);
     });
     this.add(_hud);
+  }
+
+  /**
+   * Makes sure there are no read only folders in this folder
+   *
+   * https://www.geeksforgeeks.org/node-js-fs-chmod-method/?ref=lbp
+   *
+   * @param path
+   */
+  private makeSureThereAreNoReadOnlyFoldersInThisFolder(path: string): void {
+    const foldersAlreadyLookedAt = [];
+    const files = this.fileHelp.getAllFiles(path);
+    files.forEach(file => {
+      const folder = file.split('\\');
+      folder.pop();
+      const folderPath = folder.join('\\');
+      if (!foldersAlreadyLookedAt.includes(folderPath)) {
+        const mode = this.electron.fs.statSync(folderPath).mode;
+        if (mode !== 16822) {
+          this.log.warn('CHANGE', `Have to change "${folderPath}" from "${mode}" => "16822"`);
+          this.electron.fs.chmodSync(folderPath, 0o600);
+        }
+        foldersAlreadyLookedAt.push(folderPath);
+      }
+    });
   }
 
   /**
