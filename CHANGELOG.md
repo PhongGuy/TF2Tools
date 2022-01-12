@@ -1,4 +1,4 @@
-## <small>4.6.1 (2022-01-11)</small>
+## <small>4.6.1 (2022-01-12)</small>
 
 * [Bumped Version] 4.6.1 ([35a2424](https://github.com/PhongGuy/TF2Tools/commit/35a2424))
 * added GitHub Action/Auto Update ([fa868af](https://github.com/PhongGuy/TF2Tools/commit/fa868af))
@@ -11,11 +11,13 @@
 * Bump @playwright/test from 1.17.1 to 1.17.2 ([d66e658](https://github.com/PhongGuy/TF2Tools/commit/d66e658))
 * Bump @typescript-eslint/eslint-plugin from 5.9.0 to 5.9.1 ([b513671](https://github.com/PhongGuy/TF2Tools/commit/b513671))
 * Bump @typescript-eslint/parser from 5.9.0 to 5.9.1 ([f0fc320](https://github.com/PhongGuy/TF2Tools/commit/f0fc320))
+* Bump electron from 16.0.6 to 16.0.7 ([5222336](https://github.com/PhongGuy/TF2Tools/commit/5222336))
 * Bump eslint-plugin-jsdoc from 37.5.1 to 37.5.2 ([6c9bd48](https://github.com/PhongGuy/TF2Tools/commit/6c9bd48))
 * Bump eslint-plugin-jsdoc from 37.5.2 to 37.6.1 ([f8e6319](https://github.com/PhongGuy/TF2Tools/commit/f8e6319))
 * Bump karma from 6.3.9 to 6.3.10 ([aabb0bf](https://github.com/PhongGuy/TF2Tools/commit/aabb0bf))
 * Bump playwright from 1.17.1 to 1.17.2 ([5b5a784](https://github.com/PhongGuy/TF2Tools/commit/5b5a784))
 * Bump rxjs from 7.5.1 to 7.5.2 ([6e9f57b](https://github.com/PhongGuy/TF2Tools/commit/6e9f57b))
+* Can't uninstall when there is a protected folder in a hud. ([49edffa](https://github.com/PhongGuy/TF2Tools/commit/49edffa)), closes [#146](https://github.com/PhongGuy/TF2Tools/issues/146)
 * changed how logs are displayed in settings ([d0c748f](https://github.com/PhongGuy/TF2Tools/commit/d0c748f))
 * Remove @ngx-translate ([403e4ec](https://github.com/PhongGuy/TF2Tools/commit/403e4ec)), closes [#133](https://github.com/PhongGuy/TF2Tools/issues/133)
 * Set default width of dialogs instead of writing it multible times ([57a2769](https://github.com/PhongGuy/TF2Tools/commit/57a2769)), closes [#134](https://github.com/PhongGuy/TF2Tools/issues/134)
@@ -26,6 +28,8 @@
 * updated autoupdate ([6593bfd](https://github.com/PhongGuy/TF2Tools/commit/6593bfd))
 * updated autoupdate ([0f55a2c](https://github.com/PhongGuy/TF2Tools/commit/0f55a2c))
 * updated autoupdate ([fef84d6](https://github.com/PhongGuy/TF2Tools/commit/fef84d6))
+* updated changelog ([e8678e2](https://github.com/PhongGuy/TF2Tools/commit/e8678e2))
+* updated docs ([030c481](https://github.com/PhongGuy/TF2Tools/commit/030c481))
 * updated docs ([16682c2](https://github.com/PhongGuy/TF2Tools/commit/16682c2))
 
 
