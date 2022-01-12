@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import * as moment from 'moment';
 import { ElectronService } from '../core/services';
 import { LogActions } from '../mock/logActions';
+import { SnackService } from './snack.service';
 
 /**
  * Log Service
@@ -26,7 +27,8 @@ export class LogService {
    * @param electron
    */
   constructor(
-    private electron: ElectronService
+    private electron: ElectronService,
+    private snack: SnackService
   ) {
     this.logPath = this.electron.appData('TF2Tools\\log.log');
     this.electron.fs.ensureFile(this.logPath);
@@ -42,7 +44,7 @@ export class LogService {
   }
 
   /**
-   * Infos log service
+   * Log info
    *
    * @param process
    * @param message
@@ -52,13 +54,24 @@ export class LogService {
   }
 
   /**
-   * Errors log service
+   * Log warning
+   *
+   * @param process
+   * @param message
+   */
+  warn(process: LogActions['process'], message: string): void {
+    this.write('WARN', process, message);
+  }
+
+  /**
+   * Log error
    *
    * @param process
    * @param message
    */
   error(process: LogActions['process'], message: string): void {
     this.write('ERROR', process, message);
+    this.snack.show(`We encountered an error. See logs in settings for more information`);
   }
 
   /**
