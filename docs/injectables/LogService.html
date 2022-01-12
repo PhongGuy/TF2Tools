@@ -122,6 +122,9 @@
                                 <a href="#scope" >scope</a>
                             </li>
                             <li>
+                                <a href="#warn" >warn</a>
+                            </li>
+                            <li>
                                     <span class="modifier">Private</span>
                                 <a href="#write" >write</a>
                             </li>
@@ -143,12 +146,12 @@
             <tbody>
                 <tr>
                     <td class="col-md-4">
-<code>constructor(electron: <a href="../injectables/ElectronService.html" target="_self">ElectronService</a>)</code>
+<code>constructor(electron: <a href="../injectables/ElectronService.html" target="_self">ElectronService</a>, snack: <a href="../injectables/SnackService.html" target="_self">SnackService</a>)</code>
                     </td>
                 </tr>
                         <tr>
                             <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="21" class="link-to-prism">src/app/services/log.service.ts:21</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="22" class="link-to-prism">src/app/services/log.service.ts:22</a></div>
                             </td>
                         </tr>
 
@@ -172,6 +175,18 @@
                                                   
                                                         <td>
                                                                         <code><a href="../injectables/ElectronService.html" target="_self" >ElectronService</a></code>
+                                                        </td>
+                                                  
+                                                    <td>
+                                                            No
+                                                    </td>
+                                                    
+                                                </tr>
+                                                <tr>
+                                                        <td>snack</td>
+                                                  
+                                                        <td>
+                                                                        <code><a href="../injectables/SnackService.html" target="_self" >SnackService</a></code>
                                                         </td>
                                                   
                                                     <td>
@@ -213,8 +228,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="70"
-                            class="link-to-prism">src/app/services/log.service.ts:70</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="83"
+                            class="link-to-prism">src/app/services/log.service.ts:83</a></div>
                 </td>
             </tr>
 
@@ -254,15 +269,15 @@ This way we should only use about 50kb in log file size.</p>
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="60"
-                            class="link-to-prism">src/app/services/log.service.ts:60</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="72"
+                            class="link-to-prism">src/app/services/log.service.ts:72</a></div>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-description"><p>Errors log service</p>
+                    <div class="io-description"><p>Log error</p>
 </div>
 
                     <div class="io-description">
@@ -338,8 +353,8 @@ This way we should only use about 50kb in log file size.</p>
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="95"
-                            class="link-to-prism">src/app/services/log.service.ts:95</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="108"
+                            class="link-to-prism">src/app/services/log.service.ts:108</a></div>
                 </td>
             </tr>
 
@@ -383,15 +398,15 @@ This way we should only use about 50kb in log file size.</p>
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="50"
-                            class="link-to-prism">src/app/services/log.service.ts:50</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="52"
+                            class="link-to-prism">src/app/services/log.service.ts:52</a></div>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-description"><p>Infos log service</p>
+                    <div class="io-description"><p>Log info</p>
 </div>
 
                     <div class="io-description">
@@ -465,8 +480,8 @@ This way we should only use about 50kb in log file size.</p>
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="40"
-                            class="link-to-prism">src/app/services/log.service.ts:40</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="42"
+                            class="link-to-prism">src/app/services/log.service.ts:42</a></div>
                 </td>
             </tr>
 
@@ -516,6 +531,88 @@ This way we should only use about 50kb in log file size.</p>
         <tbody>
             <tr>
                 <td class="col-md-4">
+                    <a name="warn"></a>
+                    <span class="name">
+                        <span ><b>warn</b></span>
+                        <a href="#warn"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>warn(process, message: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="62"
+                            class="link-to-prism">src/app/services/log.service.ts:62</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Log warning</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>process</td>
+                                    <td>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                                <tr>
+                                    <td>message</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
                     <a name="write"></a>
                     <span class="name">
                         <span class="modifier">Private</span>
@@ -534,8 +631,8 @@ This way we should only use about 50kb in log file size.</p>
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="83"
-                            class="link-to-prism">src/app/services/log.service.ts:83</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="96"
+                            class="link-to-prism">src/app/services/log.service.ts:96</a></div>
                 </td>
             </tr>
 
@@ -633,7 +730,7 @@ This way we should only use about 50kb in log file size.</p>
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="17" class="link-to-prism">src/app/services/log.service.ts:17</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="18" class="link-to-prism">src/app/services/log.service.ts:18</a></div>
                         </td>
                     </tr>
 
@@ -671,7 +768,7 @@ This way we should only use about 50kb in log file size.</p>
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="21" class="link-to-prism">src/app/services/log.service.ts:21</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="22" class="link-to-prism">src/app/services/log.service.ts:22</a></div>
                         </td>
                     </tr>
 
@@ -694,6 +791,7 @@ This way we should only use about 50kb in log file size.</p>
 import * as moment from &#x27;moment&#x27;;
 import { ElectronService } from &#x27;../core/services&#x27;;
 import { LogActions } from &#x27;../mock/logActions&#x27;;
+import { SnackService } from &#x27;./snack.service&#x27;;
 
 /**
  * Log Service
@@ -718,7 +816,8 @@ export class LogService {
    * @param electron
    */
   constructor(
-    private electron: ElectronService
+    private electron: ElectronService,
+    private snack: SnackService
   ) {
     this.logPath &#x3D; this.electron.appData(&#x27;TF2Tools\\log.log&#x27;);
     this.electron.fs.ensureFile(this.logPath);
@@ -734,7 +833,7 @@ export class LogService {
   }
 
   /**
-   * Infos log service
+   * Log info
    *
    * @param process
    * @param message
@@ -744,13 +843,24 @@ export class LogService {
   }
 
   /**
-   * Errors log service
+   * Log warning
+   *
+   * @param process
+   * @param message
+   */
+  warn(process: LogActions[&#x27;process&#x27;], message: string): void {
+    this.write(&#x27;WARN&#x27;, process, message);
+  }
+
+  /**
+   * Log error
    *
    * @param process
    * @param message
    */
   error(process: LogActions[&#x27;process&#x27;], message: string): void {
     this.write(&#x27;ERROR&#x27;, process, message);
+    this.snack.show(&#x60;We encountered an error. See logs in settings for more information&#x60;);
   }
 
   /**

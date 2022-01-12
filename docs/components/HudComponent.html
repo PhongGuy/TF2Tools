@@ -171,6 +171,7 @@
                     <td class="col-md-4">
                         <ul class="index-list">
                             <li>
+                                    <span class="modifier">Async</span>
                                 <a href="#add" >add</a>
                             </li>
                             <li>
@@ -180,6 +181,10 @@
                             <li>
                                     <span class="modifier">Private</span>
                                 <a href="#hudFilter" >hudFilter</a>
+                            </li>
+                            <li>
+                                    <span class="modifier">Private</span>
+                                <a href="#makeSureThereAreNoReadOnlyFoldersInThisFolder" >makeSureThereAreNoReadOnlyFoldersInThisFolder</a>
                             </li>
                             <li>
                                 <a href="#ngOnInit" >ngOnInit</a>
@@ -220,12 +225,12 @@
             <tbody>
                 <tr>
                     <td class="col-md-4">
-<code>constructor(electron: <a href="../injectables/ElectronService.html" target="_self">ElectronService</a>, app: <a href="../components/AppComponent.html" target="_self">AppComponent</a>, dialog: MatDialog, snack: <a href="../injectables/SnackService.html" target="_self">SnackService</a>, log: <a href="../injectables/LogService.html" target="_self">LogService</a>)</code>
+<code>constructor(electron: <a href="../injectables/ElectronService.html" target="_self">ElectronService</a>, app: <a href="../components/AppComponent.html" target="_self">AppComponent</a>, dialog: MatDialog, snack: <a href="../injectables/SnackService.html" target="_self">SnackService</a>, log: <a href="../injectables/LogService.html" target="_self">LogService</a>, fileHelp: <a href="../injectables/FileHelpService.html" target="_self">FileHelpService</a>)</code>
                     </td>
                 </tr>
                         <tr>
                             <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="57" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:57</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="58" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:58</a></div>
                             </td>
                         </tr>
 
@@ -304,6 +309,18 @@
                                                     </td>
                                                     
                                                 </tr>
+                                                <tr>
+                                                        <td>fileHelp</td>
+                                                  
+                                                        <td>
+                                                                        <code><a href="../injectables/FileHelpService.html" target="_self" >FileHelpService</a></code>
+                                                        </td>
+                                                  
+                                                    <td>
+                                                            No
+                                                    </td>
+                                                    
+                                                </tr>
                                         </tbody>
                                     </table>
                             </div>
@@ -328,6 +345,7 @@
                 <td class="col-md-4">
                     <a name="add"></a>
                     <span class="name">
+                        <span class="modifier">Async</span>
                         <span ><b>add</b></span>
                         <a href="#add"><span class="icon ion-ios-link"></span></a>
                     </span>
@@ -335,15 +353,16 @@
             </tr>
             <tr>
                 <td class="col-md-4">
-<code>add(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>add(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="159"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:159</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="161"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:161</a></div>
                 </td>
             </tr>
 
@@ -383,7 +402,7 @@
                     <div>
                     </div>
                     <div class="io-description">
-                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+                        <b>Returns : </b>    <code>Promise&lt;void&gt;</code>
 
                     </div>
                     <div class="io-description">
@@ -415,8 +434,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="323"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:323</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="350"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:350</a></div>
                 </td>
             </tr>
 
@@ -489,8 +508,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="305"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:305</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="332"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:332</a></div>
                 </td>
             </tr>
 
@@ -545,6 +564,80 @@
         <tbody>
             <tr>
                 <td class="col-md-4">
+                    <a name="makeSureThereAreNoReadOnlyFoldersInThisFolder"></a>
+                    <span class="name">
+                        <span class="modifier">Private</span>
+                        <span ><b>makeSureThereAreNoReadOnlyFoldersInThisFolder</b></span>
+                        <a href="#makeSureThereAreNoReadOnlyFoldersInThisFolder"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>makeSureThereAreNoReadOnlyFoldersInThisFolder(path: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="308"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:308</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Makes sure there are no read only folders in this folder</p>
+<p><a href="https://www.geeksforgeeks.org/node-js-fs-chmod-method/?ref=lbp">https://www.geeksforgeeks.org/node-js-fs-chmod-method/?ref=lbp</a></p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>path</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
                     <a name="ngOnInit"></a>
                     <span class="name">
                         <span ><b>ngOnInit</b></span>
@@ -561,8 +654,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="84"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:84</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="86"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:86</a></div>
                 </td>
             </tr>
 
@@ -600,8 +693,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="198"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:198</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="201"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:201</a></div>
                 </td>
             </tr>
 
@@ -671,8 +764,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="264"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:264</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="266"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:266</a></div>
                 </td>
             </tr>
 
@@ -742,8 +835,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="292"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:292</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="294"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:294</a></div>
                 </td>
             </tr>
 
@@ -813,8 +906,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="173"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:173</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="176"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:176</a></div>
                 </td>
             </tr>
 
@@ -884,8 +977,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="118"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:118</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="120"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:120</a></div>
                 </td>
             </tr>
 
@@ -923,8 +1016,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="226"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:226</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="229"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:229</a></div>
                 </td>
             </tr>
 
@@ -999,7 +1092,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="32" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:32</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="33" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:33</a></div>
                         </td>
                     </tr>
 
@@ -1031,7 +1124,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="57" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:57</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="58" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:58</a></div>
                         </td>
                     </tr>
 
@@ -1072,7 +1165,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="27" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:27</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="28" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:28</a></div>
                         </td>
                     </tr>
 
@@ -1104,7 +1197,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="36" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:36</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="37" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:37</a></div>
                         </td>
                     </tr>
 
@@ -1136,7 +1229,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="40" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:40</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="41" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:41</a></div>
                         </td>
                     </tr>
 
@@ -1168,7 +1261,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="44" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:44</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="45" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:45</a></div>
                         </td>
                     </tr>
 
@@ -1199,7 +1292,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="53" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:53</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="54" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:54</a></div>
                         </td>
                     </tr>
 
@@ -1231,7 +1324,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="48" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:48</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="49" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:49</a></div>
                         </td>
                     </tr>
 
@@ -1261,6 +1354,7 @@ import { YesNoComponent } from &#x27;../../dialogs/yes-no/yes-no.component&#x27;
 import { Hud } from &#x27;../../models/hud&#x27;;
 import { QuestionAnswer } from &#x27;../../models/questionAnswer&#x27;;
 import { YesNo } from &#x27;../../models/yesNo&#x27;;
+import { FileHelpService } from &#x27;../../services/file-help.service&#x27;;
 import { LogService } from &#x27;../../services/log.service&#x27;;
 import { SnackService } from &#x27;../../services/snack.service&#x27;;
 
@@ -1321,7 +1415,8 @@ export class HudComponent implements OnInit {
     private app: AppComponent,
     private dialog: MatDialog,
     private snack: SnackService,
-    private log: LogService
+    private log: LogService,
+    private fileHelp: FileHelpService
   ) {
     this.localHuds &#x3D; &#x60;${this.app.settings.libraryPath}\\huds&#x60;;
     this.electron.fs.ensureDir(this.localHuds);
@@ -1408,8 +1503,9 @@ export class HudComponent implements OnInit {
    *
    * @param _hud
    */
-  add(_hud: Hud): void {
+  async add(_hud: Hud): Promise&lt;void&gt; {
     this.log.info(&#x27;COPY&#x27;, &#x60;Installing &quot;${_hud.path}&quot; &#x3D;&gt; &quot;${this.app.settings.customPath}\\${_hud.folderName}&quot;&#x60;);
+    await this.makeSureThereAreNoReadOnlyFoldersInThisFolder(_hud.path);
     this.electron.fs.copy(_hud.path, &#x60;${this.app.settings.customPath}\\${_hud.folderName}&#x60;)
       .then(() &#x3D;&gt; {
         this.snack.show(&#x60;${_hud.folderName} was installed&#x60;);
@@ -1504,7 +1600,6 @@ export class HudComponent implements OnInit {
       const s &#x3D; &#x27;We could not find any hud here. Are you sure you selected the right folder and it has the info.vdf file inside.&#x27;;
       this.snack.show(s, null, 6000);
     }
-
     this.folderUpload.nativeElement.value &#x3D; null;
   }
 
@@ -1546,6 +1641,31 @@ export class HudComponent implements OnInit {
       this.uninstall(hud);
     });
     this.add(_hud);
+  }
+
+  /**
+   * Makes sure there are no read only folders in this folder
+   *
+   * https://www.geeksforgeeks.org/node-js-fs-chmod-method/?ref&#x3D;lbp
+   *
+   * @param path
+   */
+  private makeSureThereAreNoReadOnlyFoldersInThisFolder(path: string): void {
+    const foldersAlreadyLookedAt &#x3D; [];
+    const files &#x3D; this.fileHelp.getAllFiles(path);
+    files.forEach(file &#x3D;&gt; {
+      const folder &#x3D; file.split(&#x27;\\&#x27;);
+      folder.pop();
+      const folderPath &#x3D; folder.join(&#x27;\\&#x27;);
+      if (!foldersAlreadyLookedAt.includes(folderPath)) {
+        const mode &#x3D; this.electron.fs.statSync(folderPath).mode;
+        if (mode !&#x3D;&#x3D; 16822) {
+          this.log.warn(&#x27;CHANGE&#x27;, &#x60;Have to change &quot;${folderPath}&quot; from &quot;${mode}&quot; &#x3D;&gt; &quot;16822&quot;&#x60;);
+          this.electron.fs.chmodSync(folderPath, 0o600);
+        }
+        foldersAlreadyLookedAt.push(folderPath);
+      }
+    });
   }
 
   /**
