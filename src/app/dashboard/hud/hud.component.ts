@@ -32,10 +32,6 @@ export class HudComponent implements OnInit {
    */
   currentHuds: Hud[];
   /**
-   * Huds installed of hud component
-   */
-  hudsInstalled: number;
-  /**
    * Library  of hud component
    */
   library: Hud[];
@@ -130,13 +126,11 @@ export class HudComponent implements OnInit {
       }
     });
 
-    this.hudsInstalled = 0;
     this.currentHuds = [];
     this.notInLibrary = [];
     this.electron.fs.readdirSync(this.app.settings.customPath).forEach(customFiles => {
       const info = this.app.settings.customPath + '/' + customFiles + '/info.vdf';
       if (this.electron.fs.existsSync(info)) {
-        this.hudsInstalled++;
 
         const data = this.electron.fs.readFileSync(info, { encoding: 'utf8', flag: 'r' }).split('"');
         const h = { name: data[1], folderName: customFiles, version: data[5], path: this.app.settings.customPath + '\\' + customFiles };
