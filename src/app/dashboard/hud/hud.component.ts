@@ -26,11 +26,10 @@ export class HudComponent implements OnInit {
    * Folder upload `ElementRef`
    */
   @ViewChild('folderUpload') folderUpload: ElementRef;
-
   /**
-   * Current huds of hud component
+   * Installed huds of hud component
    */
-  currentHuds: Hud[];
+  installedHuds: Hud[];
   /**
    * Library  of hud component
    */
@@ -63,7 +62,7 @@ export class HudComponent implements OnInit {
    */
   constructor(
     private electron: ElectronService,
-    private app: AppComponent,
+    public app: AppComponent,
     private dialog: MatDialog,
     private snack: SnackService,
     private log: LogService,
@@ -80,7 +79,7 @@ export class HudComponent implements OnInit {
    * @description first we need to look for a folder with info file in, we will assume that is the current hud.
    */
   ngOnInit(): void {
-    this.update();
+    this.getHudsAndAddThemToLibraryAndInstalledHuds();
 
     // temp, to move old files
     if (this.library.length === 0) {
@@ -96,7 +95,7 @@ export class HudComponent implements OnInit {
               this.electron.fs.move(oldPath, `${this.app.settings.libraryPath}\\hitsounds`, { overwrite: true })
                 .then(() => {
                   this.snack.show('Files was moved to new library');
-                  this.update();
+                  this.getHudsAndAddThemToLibraryAndInstalledHuds();
                 }).catch((err) => this.log.error('MOVE', err));
             }
           }).catch((err) => this.log.error('MOVE', err));
@@ -111,9 +110,9 @@ export class HudComponent implements OnInit {
   }
 
   /**
-   * Updates hud component
+   * Gets huds and add them to library and installed huds
    */
-  update(): void {
+  getHudsAndAddThemToLibraryAndInstalledHuds(): void {
     this.library = [];
     this.electron.fs.ensureDir(this.localHuds);
     this.log.info('READ', `Looking for huds in ${this.localHuds}`);
@@ -121,26 +120,18 @@ export class HudComponent implements OnInit {
       const info = this.localHuds + '/' + customFiles + '/info.vdf';
       if (this.electron.fs.existsSync(info)) {
         const data = this.electron.fs.readFileSync(info, { encoding: 'utf8', flag: 'r' }).split('"');
-        const h = { name: data[1], folderName: customFiles, version: data[5], path: this.localHuds + '\\' + customFiles };
-        this.library.push(h);
+        this.addHudToLibraryIfMissing(data[1], customFiles, data[5]);
       }
     });
 
-    this.currentHuds = [];
-    this.notInLibrary = [];
+    this.installedHuds = [];
     this.electron.fs.readdirSync(this.app.settings.customPath).forEach(customFiles => {
       const info = this.app.settings.customPath + '/' + customFiles + '/info.vdf';
       if (this.electron.fs.existsSync(info)) {
 
         const data = this.electron.fs.readFileSync(info, { encoding: 'utf8', flag: 'r' }).split('"');
         const h = { name: data[1], folderName: customFiles, version: data[5], path: this.app.settings.customPath + '\\' + customFiles };
-        const l = { name: data[1], folderName: customFiles, version: data[5], path: this.localHuds + '\\' + customFiles };
-
-        this.currentHuds.push(h);
-
-        if (!this.electron.fs.existsSync(l.path)) {
-          this.notInLibrary.push(h);
-        }
+        this.addHudToInstalledHuds(data[1], customFiles, data[5]);
       }
     });
 
@@ -148,17 +139,20 @@ export class HudComponent implements OnInit {
   }
 
   /**
-   * Adds hud
+   * Installs hud
    *
    * @param _hud
    */
-  async add(_hud: Hud): Promise<void> {
+  async installHud(_hud: Hud): Promise<void> {
+    this.app.loading = true;
     this.log.info('COPY', `Installing "${_hud.path}" => "${this.app.settings.customPath}\\${_hud.folderName}"`);
     await this.makeSureThereAreNoReadOnlyFoldersInThisFolder(_hud.path);
-    this.electron.fs.copy(_hud.path, `${this.app.settings.customPath}\\${_hud.folderName}`)
+    const dest = `${this.app.settings.customPath}\\${_hud.folderName}`;
+    this.electron.fs.copy(_hud.path, dest)
       .then(() => {
         this.snack.show(`${_hud.folderName} was installed`);
-        this.update();
+        this.addHudToInstalledHuds(_hud.name, _hud.folderName, _hud.version);
+        this.app.loading = false;
       }).catch(err => this.log.error('COPY', err));
   }
 
@@ -167,36 +161,42 @@ export class HudComponent implements OnInit {
    *
    * @param _hud
    */
-  uninstall(_hud: Hud): void {
+  uninstallHud(_hud: Hud): void {
     if (this.electron.fs.existsSync(_hud.path)) {
+      this.app.loading = true;
       if (this.app.settings.moveOrCopy) {
         this.log.info('MOVE', `Uninstalling "${_hud.path}" => "${this.localHuds}\\${_hud.folderName}"`);
-        this.electron.fs.move(_hud.path, `${this.localHuds}\\${_hud.folderName}`, { overwrite: true })
+        const dest = `${this.localHuds}\\${_hud.folderName}`;
+        this.electron.fs.move(_hud.path, dest, { overwrite: true })
           .then(() => {
             this.snack.show(`${_hud.folderName} was uninstalled`);
-            this.update();
+            this.removeHudFromInstalledHuds(_hud);
+            this.addHudToLibraryIfMissing(_hud.name, _hud.folderName, _hud.version);
+            this.app.loading = false;
           }).catch(err => this.log.error('MOVE', err));
       } else {
         this.log.info('REMOVE', `Uninstalling "${_hud.path}"`);
         this.electron.fs.remove(_hud.path)
           .then(() => {
             this.snack.show(`${_hud.folderName} was uninstalled`);
-            this.update();
+            this.removeHudFromInstalledHuds(_hud);
+            this.app.loading = false;
           }).catch(err => this.log.error('REMOVE', err));
       }
     }
   }
 
   /**
-   * Removes hud
+   * Deletes hud
    *
    * @param _hud
    */
-  remove(_hud: Hud): void {
+  deleteHud(_hud: Hud): void {
     if (this.electron.fs.existsSync(_hud.path)) {
+      this.app.loading = true;
       const d: YesNo = new YesNo();
-      d.question = `Remove ${_hud.folderName}?`;
-      d.subQuestion = `Are you sure you want to remove ${_hud.folderName}? This cannot be undone!`;
+      d.question = `Delete ${_hud.folderName}?`;
+      d.subQuestion = `Are you sure you want to delete ${_hud.folderName}? This cannot be undone!`;
 
       const dialogRef = this.dialog.open(YesNoComponent, {
         data: d
@@ -204,15 +204,22 @@ export class HudComponent implements OnInit {
 
       dialogRef.afterClosed().subscribe(result => {
         if (result) {
-          this.log.info('DELETE', `Remove "${_hud.path}"`);
+          this.log.info('DELETE', `Deleted "${_hud.path}"`);
           this.electron.fs.remove(_hud.path)
             .then(() => {
-              this.snack.show(`${_hud.folderName} was removed`);
-              this.update();
+              this.snack.show(`${_hud.folderName} was deleted`);
+              this.removeHudFromLibrary(_hud);
+              this.app.loading = false;
             }).catch(err => this.log.error('REMOVE', err));
+        } else {
+          this.app.loading = false;
         }
       });
     }
+  }
+
+  test() {
+    this.app.loading = false;
   }
 
   /**
@@ -220,7 +227,8 @@ export class HudComponent implements OnInit {
    *
    * @param event
    */
-  upload(event: Event): void {
+  uploadHuds(event: Event): void {
+    this.app.loading = true;
     const target = event.target as HTMLInputElement;
     const files: File[] = Array.from(target.files);
     const hudsFound = files.filter(i => i.name === 'info.vdf');
@@ -235,19 +243,19 @@ export class HudComponent implements OnInit {
           this.electron.fs.copy(path, dest)
             .then(() => {
               this.log.info('COPY', `Successfully uploaded ${name}`);
-              this.snack.show(`Added "${name}" to library`, null, hudsFound.length > 2 ? 1000 : 3000);
+              this.snack.show(`Added "${name}" to library`, null, hudsFound.length > 2 ? 1000 : 2600);
               const data = this.electron.fs.readFileSync(hud.path, { encoding: 'utf8', flag: 'r' }).split('"');
-              const l = { name: data[1], folderName: name, version: data[5], path: this.localHuds + '\\' + name };
-              this.library.push(l);
-              this.myControl.setValue('');
+              this.addHudToLibraryIfMissing(data[1], name, data[5]);
             }).catch(err => this.log.error('COPY', err));
         } else {
           this.snack.show(`${name} is already in library`);
         }
       });
+      this.app.loading = false;
     } else {
       const s = 'We could not find any hud here. Are you sure you selected the right folder and it has the info.vdf file inside.';
       this.snack.show(s, null, 6000);
+      this.app.loading = false;
     }
     this.folderUpload.nativeElement.value = null;
   }
@@ -257,7 +265,7 @@ export class HudComponent implements OnInit {
    *
    * @param _hud
    */
-  rename(_hud: Hud): void {
+  renameHud(_hud: Hud): void {
     const dialogRef = this.dialog.open(QuestionAnswerComponent, {
       data: {
         question: `Rename ${_hud.folderName}`,
@@ -266,30 +274,108 @@ export class HudComponent implements OnInit {
       } as QuestionAnswer
     });
 
-    dialogRef.afterClosed().subscribe(result => {
-      if (typeof result === 'string') {
-        const path = _hud.path.split('\\');
-        const name = path.pop();
-        this.log.info('RENAME', `Renaming "${_hud.folderName}" => "${name}"`);
-        this.electron.fs.rename(_hud.path, `${path.join('\\')}\\${result}`)
+    dialogRef.afterClosed().subscribe(newName => {
+      if (typeof newName === 'string') {
+        this.log.info('RENAME', `Renaming "${_hud.folderName}" => "${newName}"`);
+        const dest = `${this.localHuds}\\${newName}`;
+
+        this.electron.fs.rename(_hud.path, dest)
           .then(() => {
-            this.snack.show(`Updated "${name}" to "${result}"`);
-            this.update();
+            this.snack.show(`Updated "${_hud.folderName}" to "${newName}"`);
+            this.renameLibraryHud(_hud, newName);
           }).catch(err => this.log.error('RENAME', err));
       }
     });
   }
 
   /**
-   * Replaces hud component
+   * Replaces hud with installed
    *
    * @param _hud
    */
-  replace(_hud: Hud): void {
-    this.currentHuds.forEach(hud => {
-      this.uninstall(hud);
+  replaceHudWithInstalled(_hud: Hud): void {
+    this.installedHuds.forEach(hud => {
+      this.uninstallHud(hud);
     });
-    this.add(_hud);
+    this.installHud(_hud);
+  }
+
+  /**
+   * Adds hud to installed huds
+   *
+   * @param name
+   * @param folderName
+   * @param version
+   */
+  private addHudToInstalledHuds(name: string, folderName: string, version: string): void {
+    const hud = new Hud();
+    hud.name = name;
+    hud.folderName = folderName;
+    hud.version = version;
+    hud.path = `${this.app.settings.customPath}\\${folderName}`;
+    this.installedHuds.push(hud);
+  }
+
+  /**
+   * Removes hud from installed huds
+   *
+   * @param _hud
+   */
+  private removeHudFromInstalledHuds(_hud: Hud): void {
+    const index = this.installedHuds.indexOf(_hud);
+    if (index >= 0) {
+      this.installedHuds.splice(index, 1);
+    }
+  }
+
+  /**
+   * Adds hud to library if missing
+   *
+   * @param name
+   * @param folderName
+   * @param version
+   */
+  private async addHudToLibraryIfMissing(name: string, folderName: string, version: string): Promise<void> {
+
+    const hud = new Hud();
+
+    hud.name = name;
+    hud.folderName = folderName;
+    hud.version = version;
+    hud.path = `${this.localHuds}\\${folderName}`;
+
+    const index = this.library.findIndex(a => a.folderName === folderName);
+    if (index === -1) {
+      this.library.push(hud);
+      this.myControl.setValue('');
+    }
+  }
+
+  /**
+   * Renames library hud
+   *
+   * @param _hud
+   * @param newName
+   */
+  private renameLibraryHud(_hud: Hud, newName: string): void {
+    const index = this.library.indexOf(_hud);
+    if (index >= 0) {
+      this.library[index].folderName = newName;
+      this.library[index].path = `${this.localHuds}\\${newName}`;
+    }
+  }
+
+  /**
+   * Removes hud from library
+   *
+   * @param _hud
+   */
+  private removeHudFromLibrary(_hud: Hud): void {
+    const index = this.library.indexOf(_hud);
+    if (index >= 0) {
+      this.library.splice(index, 1);
+      this.myControl.setValue('');
+    }
   }
 
   /**
@@ -332,7 +418,7 @@ export class HudComponent implements OnInit {
       } else if (option.name.toLowerCase().includes(filterValue)) {
         return true;
       }
-    });
+    }).sort((a: Hud, b: Hud) => a.folderName.localeCompare(b.folderName));
   }
 
   /**

@@ -112,12 +112,9 @@ button.active {
   }
 }
 
-mat-spinner {
-  top: 50%;
-  margin-top: -50px;
-  margin-left: -50px;
-  left: 50%;
+mat-progress-bar {
   position: absolute!important;
+  top: 59px;
   z-index: 1;
 }
 
