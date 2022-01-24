@@ -7,6 +7,7 @@ import { ElectronService } from './core/services';
 import { LatestRelease } from './models/latestRelease';
 import { Settings } from './models/settings';
 import { Update } from './models/update';
+import { VtfCrosshair } from './models/vtfCrosshair';
 import { FileHelpService } from './services/file-help.service';
 import { LogService } from './services/log.service';
 import { SnackService } from './services/snack.service';
@@ -61,7 +62,7 @@ export class AppComponent implements OnInit {
   /**
    * Vtf found
    */
-  vtf: string[] = [];
+  vtf: VtfCrosshair[] = [];
   /**
    * Vtf scripts found
    */
@@ -277,7 +278,6 @@ export class AppComponent implements OnInit {
       // try to find vtf crosshairs
       if (what === 'vtf' || what === null) {
         this.findAllVtfCrosshairsInCustomFolder(file);
-
         this.findAllWeaponScriptsInCustomFolder(file);
       }
 
@@ -349,7 +349,14 @@ export class AppComponent implements OnInit {
         }
       }
       if (err === 0) {
-        this.vtf.push(file);
+        const name = file.split('\\').pop().split('.')[0];
+        if (file.endsWith('.vtf')) {
+          this.vtf.push({
+            name,
+            path: file,
+            disabled: !this.electron.fs.existsSync(file.replace('.vtf', '.vmt'))
+          });
+        }
       }
     }
   }
