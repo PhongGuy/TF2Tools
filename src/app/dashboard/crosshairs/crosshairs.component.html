@@ -3,10 +3,11 @@
         <div class="col-md-4">
             <mat-form-field appearance="fill" class="w-100">
                 <mat-label>Choose a crosshair</mat-label>
-                <mat-select #crosshairSelected value="{{app.vtf[0].replace('.vtf', '').split('\\').pop()}}">
-                    <mat-option #crosshairSelected *ngFor="let food of app.vtf"
-                        [value]="food.replace('.vtf', '').split('\\').pop()">
-                        {{food.replace('.vtf', '').split('\\').pop()}}
+                <mat-select #crosshairSelected value="{{app.vtf[0].name}}">
+                    <mat-option #crosshairSelected *ngFor="let crosshair of app.vtf" [value]="crosshair.name"
+                        [disabled]="crosshair.disabled" matTooltip="Crosshair is missing .vmt(Valve Material Type)"
+                        [matTooltipDisabled]="!crosshair.disabled" matTooltipPosition="before">
+                        {{crosshair.name}}
                     </mat-option>
                 </mat-select>
             </mat-form-field>
@@ -27,7 +28,7 @@
         <div class="col-md-5 crosshairsChanges">
             <!-- <p>Class{{selected.classes.length > 1 ? 'es' : ''}}: {{selected.classes.join(', ')}}</p> -->
             <!-- <p>Weapon Class{{selected.weaponClasses.length > 1 ? 'es' : ''}}: {{selected.weaponClasses.join(', ')}}</p> -->
-            <p>Catego{{selected.names.length > 1 ? 'ries' : 'ry'}}:<br> {{selected.names.join(', ')}}</p>
+            <!-- <p>Catego{{selected.names.length > 1 ? 'ries' : 'ry'}}:<br> {{selected.names.join(', ')}}</p> -->
             <!-- <p>Slot{{selected.slots.length > 1 ? 's' : ''}}: {{selected.slots.join(', ')}}</p> -->
             <!-- <p>Affected Weapon{{selected.weaponsAffected.length > 1 ? 's' : ''}}: {{selected.weaponsAffected.join('\<br>')}}</p> -->
             <p>Affected Weapon{{selected.weaponsAffected.length > 1 ? 's' : ''}}:<br><span
