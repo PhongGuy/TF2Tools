@@ -135,7 +135,8 @@
                     <td class="col-md-4">
                         <ul class="index-list">
                             <li>
-                                <a href="#currentHuds" >currentHuds</a>
+                                    <span class="modifier">Public</span>
+                                <a href="#app" >app</a>
                             </li>
                             <li>
                                 <a href="#filteredOptions" >filteredOptions</a>
@@ -144,7 +145,7 @@
                                 <a href="#folderUpload" >folderUpload</a>
                             </li>
                             <li>
-                                <a href="#hudsInstalled" >hudsInstalled</a>
+                                <a href="#installedHuds" >installedHuds</a>
                             </li>
                             <li>
                                 <a href="#library" >library</a>
@@ -171,8 +172,19 @@
                     <td class="col-md-4">
                         <ul class="index-list">
                             <li>
+                                    <span class="modifier">Private</span>
+                                <a href="#addHudToInstalledHuds" >addHudToInstalledHuds</a>
+                            </li>
+                            <li>
+                                    <span class="modifier">Private</span>
                                     <span class="modifier">Async</span>
-                                <a href="#add" >add</a>
+                                <a href="#addHudToLibraryIfMissing" >addHudToLibraryIfMissing</a>
+                            </li>
+                            <li>
+                                <a href="#deleteHud" >deleteHud</a>
+                            </li>
+                            <li>
+                                <a href="#getHudsAndAddThemToLibraryAndInstalledHuds" >getHudsAndAddThemToLibraryAndInstalledHuds</a>
                             </li>
                             <li>
                                     <span class="modifier">Private</span>
@@ -183,6 +195,10 @@
                                 <a href="#hudFilter" >hudFilter</a>
                             </li>
                             <li>
+                                    <span class="modifier">Async</span>
+                                <a href="#installHud" >installHud</a>
+                            </li>
+                            <li>
                                     <span class="modifier">Private</span>
                                 <a href="#makeSureThereAreNoReadOnlyFoldersInThisFolder" >makeSureThereAreNoReadOnlyFoldersInThisFolder</a>
                             </li>
@@ -190,22 +206,32 @@
                                 <a href="#ngOnInit" >ngOnInit</a>
                             </li>
                             <li>
-                                <a href="#remove" >remove</a>
+                                    <span class="modifier">Private</span>
+                                <a href="#removeHudFromInstalledHuds" >removeHudFromInstalledHuds</a>
                             </li>
                             <li>
-                                <a href="#rename" >rename</a>
+                                    <span class="modifier">Private</span>
+                                <a href="#removeHudFromLibrary" >removeHudFromLibrary</a>
                             </li>
                             <li>
-                                <a href="#replace" >replace</a>
+                                <a href="#renameHud" >renameHud</a>
                             </li>
                             <li>
-                                <a href="#uninstall" >uninstall</a>
+                                    <span class="modifier">Private</span>
+                                <a href="#renameLibraryHud" >renameLibraryHud</a>
                             </li>
                             <li>
-                                <a href="#update" >update</a>
+                                    <span class="modifier">Async</span>
+                                <a href="#replaceHudWithInstalled" >replaceHudWithInstalled</a>
                             </li>
                             <li>
-                                <a href="#upload" >upload</a>
+                                <a href="#test" >test</a>
+                            </li>
+                            <li>
+                                <a href="#uninstallHud" >uninstallHud</a>
+                            </li>
+                            <li>
+                                <a href="#uploadHuds" >uploadHuds</a>
                             </li>
                         </ul>
                     </td>
@@ -230,7 +256,7 @@
                 </tr>
                         <tr>
                             <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="58" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:58</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="53" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:53</a></div>
                             </td>
                         </tr>
 
@@ -343,33 +369,226 @@
         <tbody>
             <tr>
                 <td class="col-md-4">
-                    <a name="add"></a>
+                    <a name="addHudToInstalledHuds"></a>
                     <span class="name">
-                        <span class="modifier">Async</span>
-                        <span ><b>add</b></span>
-                        <a href="#add"><span class="icon ion-ios-link"></span></a>
+                        <span class="modifier">Private</span>
+                        <span ><b>addHudToInstalledHuds</b></span>
+                        <a href="#addHudToInstalledHuds"><span class="icon ion-ios-link"></span></a>
                     </span>
                 </td>
             </tr>
             <tr>
                 <td class="col-md-4">
                     <span class="modifier-icon icon ion-ios-reset"></span>
-                    <code>add(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
+                    <code>addHudToInstalledHuds(name: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>, folderName: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>, version: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>)</code>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="161"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:161</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="315"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:315</a></div>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-description"><p>Adds hud</p>
+                    <div class="io-description"><p>Adds hud to installed huds</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>name</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                                <tr>
+                                    <td>folderName</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                                <tr>
+                                    <td>version</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="addHudToLibraryIfMissing"></a>
+                    <span class="name">
+                        <span class="modifier">Private</span>
+                        <span class="modifier">Async</span>
+                        <span ><b>addHudToLibraryIfMissing</b></span>
+                        <a href="#addHudToLibraryIfMissing"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>addHudToLibraryIfMissing(name: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>, folderName: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>, version: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="343"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:343</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Adds hud to library if missing</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>name</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                                <tr>
+                                    <td>folderName</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                                <tr>
+                                    <td>version</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>    <code>Promise&lt;void&gt;</code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="deleteHud"></a>
+                    <span class="name">
+                        <span ><b>deleteHud</b></span>
+                        <a href="#deleteHud"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>deleteHud(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="199"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:199</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Deletes hud</p>
 </div>
 
                     <div class="io-description">
@@ -402,11 +621,50 @@
                     <div>
                     </div>
                     <div class="io-description">
-                        <b>Returns : </b>    <code>Promise&lt;void&gt;</code>
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
 
                     </div>
                     <div class="io-description">
                         
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="getHudsAndAddThemToLibraryAndInstalledHuds"></a>
+                    <span class="name">
+                        <span ><b>getHudsAndAddThemToLibraryAndInstalledHuds</b></span>
+                        <a href="#getHudsAndAddThemToLibraryAndInstalledHuds"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>getHudsAndAddThemToLibraryAndInstalledHuds()</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="115"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:115</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Gets huds and add them to library and installed huds</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
                     </div>
                 </td>
             </tr>
@@ -434,8 +692,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="350"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:350</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="435"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:435</a></div>
                 </td>
             </tr>
 
@@ -508,8 +766,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="332"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:332</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="417"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:417</a></div>
                 </td>
             </tr>
 
@@ -564,6 +822,79 @@
         <tbody>
             <tr>
                 <td class="col-md-4">
+                    <a name="installHud"></a>
+                    <span class="name">
+                        <span class="modifier">Async</span>
+                        <span ><b>installHud</b></span>
+                        <a href="#installHud"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>installHud(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="146"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:146</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Installs hud</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>_hud</td>
+                                    <td>
+                                                <code><a href="../classes/Hud.html" target="_self" >Hud</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>    <code>Promise&lt;void&gt;</code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
                     <a name="makeSureThereAreNoReadOnlyFoldersInThisFolder"></a>
                     <span class="name">
                         <span class="modifier">Private</span>
@@ -582,8 +913,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="308"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:308</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="393"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:393</a></div>
                 </td>
             </tr>
 
@@ -654,8 +985,8 @@
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="86"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:86</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="81"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:81</a></div>
                 </td>
             </tr>
 
@@ -677,31 +1008,33 @@
         <tbody>
             <tr>
                 <td class="col-md-4">
-                    <a name="remove"></a>
+                    <a name="removeHudFromInstalledHuds"></a>
                     <span class="name">
-                        <span ><b>remove</b></span>
-                        <a href="#remove"><span class="icon ion-ios-link"></span></a>
+                        <span class="modifier">Private</span>
+                        <span ><b>removeHudFromInstalledHuds</b></span>
+                        <a href="#removeHudFromInstalledHuds"><span class="icon ion-ios-link"></span></a>
                     </span>
                 </td>
             </tr>
             <tr>
                 <td class="col-md-4">
-<code>remove(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>removeHudFromInstalledHuds(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="201"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:201</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="329"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:329</a></div>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-description"><p>Removes hud</p>
+                    <div class="io-description"><p>Removes hud from installed huds</p>
 </div>
 
                     <div class="io-description">
@@ -748,24 +1081,97 @@
         <tbody>
             <tr>
                 <td class="col-md-4">
-                    <a name="rename"></a>
+                    <a name="removeHudFromLibrary"></a>
                     <span class="name">
-                        <span ><b>rename</b></span>
-                        <a href="#rename"><span class="icon ion-ios-link"></span></a>
+                        <span class="modifier">Private</span>
+                        <span ><b>removeHudFromLibrary</b></span>
+                        <a href="#removeHudFromLibrary"><span class="icon ion-ios-link"></span></a>
                     </span>
                 </td>
             </tr>
             <tr>
                 <td class="col-md-4">
-<code>rename(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>removeHudFromLibrary(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="266"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:266</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="378"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:378</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Removes hud from library</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>_hud</td>
+                                    <td>
+                                                <code><a href="../classes/Hud.html" target="_self" >Hud</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="renameHud"></a>
+                    <span class="name">
+                        <span ><b>renameHud</b></span>
+                        <a href="#renameHud"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>renameHud(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="273"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:273</a></div>
                 </td>
             </tr>
 
@@ -819,31 +1225,118 @@
         <tbody>
             <tr>
                 <td class="col-md-4">
-                    <a name="replace"></a>
+                    <a name="renameLibraryHud"></a>
                     <span class="name">
-                        <span ><b>replace</b></span>
-                        <a href="#replace"><span class="icon ion-ios-link"></span></a>
+                        <span class="modifier">Private</span>
+                        <span ><b>renameLibraryHud</b></span>
+                        <a href="#renameLibraryHud"><span class="icon ion-ios-link"></span></a>
                     </span>
                 </td>
             </tr>
             <tr>
                 <td class="col-md-4">
-<code>replace(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>renameLibraryHud(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>, newName: <a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank">string</a>)</code>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="294"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:294</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="365"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:365</a></div>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-description"><p>Replaces hud component</p>
+                    <div class="io-description"><p>Renames library hud</p>
+</div>
+
+                    <div class="io-description">
+                        <b>Parameters :</b>
+                        
+                        <table class="params">
+                            <thead>
+                                <tr>
+                                    <td>Name</td>
+                                    <td>Type</td>
+                                    <td>Optional</td>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>_hud</td>
+                                    <td>
+                                                <code><a href="../classes/Hud.html" target="_self" >Hud</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                                <tr>
+                                    <td>newName</td>
+                                    <td>
+                                                <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/string" target="_blank" >string</a></code>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div>
+                    </div>
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                    <div class="io-description">
+                        
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="replaceHudWithInstalled"></a>
+                    <span class="name">
+                        <span class="modifier">Async</span>
+                        <span ><b>replaceHudWithInstalled</b></span>
+                        <a href="#replaceHudWithInstalled"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <span class="modifier-icon icon ion-ios-reset"></span>
+                    <code>replaceHudWithInstalled(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="301"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:301</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Replaces hud with installed</p>
 </div>
 
                     <div class="io-description">
@@ -876,7 +1369,7 @@
                     <div>
                     </div>
                     <div class="io-description">
-                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >any</a></code>
 
                     </div>
                     <div class="io-description">
@@ -890,24 +1383,61 @@
         <tbody>
             <tr>
                 <td class="col-md-4">
-                    <a name="uninstall"></a>
+                    <a name="test"></a>
                     <span class="name">
-                        <span ><b>uninstall</b></span>
-                        <a href="#uninstall"><span class="icon ion-ios-link"></span></a>
+                        <span ><b>test</b></span>
+                        <a href="#test"><span class="icon ion-ios-link"></span></a>
                     </span>
                 </td>
             </tr>
             <tr>
                 <td class="col-md-4">
-<code>uninstall(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>)</code>
+<code>test()</code>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="176"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:176</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="226"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:226</a></div>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+
+                    <div class="io-description">
+                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
+
+                    </div>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="uninstallHud"></a>
+                    <span class="name">
+                        <span ><b>uninstallHud</b></span>
+                        <a href="#uninstallHud"><span class="icon ion-ios-link"></span></a>
+                    </span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+<code>uninstallHud(_hud: <a href="../classes/Hud.html" target="_self">Hud</a>, loadingStop)</code>
+                </td>
+            </tr>
+
+
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-line">Defined in <a href="" data-line="165"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:165</a></div>
                 </td>
             </tr>
 
@@ -926,6 +1456,8 @@
                                     <td>Name</td>
                                     <td>Type</td>
                                     <td>Optional</td>
+                                    <td>Default value</td>
+                                    <td>Description</td>
                                 </tr>
                             </thead>
                             <tbody>
@@ -939,7 +1471,29 @@
                                         No
                                     </td>
 
+                                    <td>
+                                    </td>
 
+                                    <td>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>loadingStop</td>
+                                    <td>
+                                    </td>
+
+                                    <td>
+                                        No
+                                    </td>
+
+                                    <td>
+                                        <code>true</code>
+                                    </td>
+
+                                    <td>
+                                        <p>this is meant to be used with <code>replaceHudWithInstalled</code></p>
+
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -961,63 +1515,24 @@
         <tbody>
             <tr>
                 <td class="col-md-4">
-                    <a name="update"></a>
+                    <a name="uploadHuds"></a>
                     <span class="name">
-                        <span ><b>update</b></span>
-                        <a href="#update"><span class="icon ion-ios-link"></span></a>
+                        <span ><b>uploadHuds</b></span>
+                        <a href="#uploadHuds"><span class="icon ion-ios-link"></span></a>
                     </span>
                 </td>
             </tr>
             <tr>
                 <td class="col-md-4">
-<code>update()</code>
+<code>uploadHuds(event: <a href="https://angular.io/api/router/Event" target="_blank">Event</a>)</code>
                 </td>
             </tr>
 
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="120"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:120</a></div>
-                </td>
-            </tr>
-
-
-            <tr>
-                <td class="col-md-4">
-                    <div class="io-description"><p>Updates hud component</p>
-</div>
-
-                    <div class="io-description">
-                        <b>Returns : </b>        <code><a href="https://www.typescriptlang.org/docs/handbook/basic-types.html" target="_blank" >void</a></code>
-
-                    </div>
-                </td>
-            </tr>
-        </tbody>
-    </table>
-    <table class="table table-sm table-bordered">
-        <tbody>
-            <tr>
-                <td class="col-md-4">
-                    <a name="upload"></a>
-                    <span class="name">
-                        <span ><b>upload</b></span>
-                        <a href="#upload"><span class="icon ion-ios-link"></span></a>
-                    </span>
-                </td>
-            </tr>
-            <tr>
-                <td class="col-md-4">
-<code>upload(event: <a href="https://angular.io/api/router/Event" target="_blank">Event</a>)</code>
-                </td>
-            </tr>
-
-
-            <tr>
-                <td class="col-md-4">
-                    <div class="io-line">Defined in <a href="" data-line="229"
-                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:229</a></div>
+                    <div class="io-line">Defined in <a href="" data-line="235"
+                            class="link-to-prism">src/app/dashboard/hud/hud.component.ts:235</a></div>
                 </td>
             </tr>
 
@@ -1077,31 +1592,26 @@
         <tbody>
             <tr>
                 <td class="col-md-4">
-                    <a name="currentHuds"></a>
+                    <a name="app"></a>
                     <span class="name">
-                        <span ><b>currentHuds</b></span>
-                        <a href="#currentHuds"><span class="icon ion-ios-link"></span></a>
+                            <span class="modifier">Public</span>
+                        <span ><b>app</b></span>
+                        <a href="#app"><span class="icon ion-ios-link"></span></a>
                     </span>
                 </td>
             </tr>
                 <tr>
                     <td class="col-md-4">
-                        <i>Type : </i>        <code><a href="../classes/Hud.html" target="_self" >Hud[]</a></code>
+                        <i>Type : </i>        <code><a href="../components/AppComponent.html" target="_self" >AppComponent</a></code>
 
                     </td>
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="33" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:33</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="65" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:65</a></div>
                         </td>
                     </tr>
 
-            <tr>
-                <td class="col-md-4">
-                    <div class="io-description"><p>Current huds of hud component</p>
-</div>
-                </td>
-            </tr>
 
         </tbody>
     </table>
@@ -1124,7 +1634,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="58" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:58</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="53" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:53</a></div>
                         </td>
                     </tr>
 
@@ -1182,28 +1692,28 @@
         <tbody>
             <tr>
                 <td class="col-md-4">
-                    <a name="hudsInstalled"></a>
+                    <a name="installedHuds"></a>
                     <span class="name">
-                        <span ><b>hudsInstalled</b></span>
-                        <a href="#hudsInstalled"><span class="icon ion-ios-link"></span></a>
+                        <span ><b>installedHuds</b></span>
+                        <a href="#installedHuds"><span class="icon ion-ios-link"></span></a>
                     </span>
                 </td>
             </tr>
                 <tr>
                     <td class="col-md-4">
-                        <i>Type : </i>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/number" target="_blank" >number</a></code>
+                        <i>Type : </i>        <code><a href="../classes/Hud.html" target="_self" >Hud[]</a></code>
 
                     </td>
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="37" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:37</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="32" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:32</a></div>
                         </td>
                     </tr>
 
             <tr>
                 <td class="col-md-4">
-                    <div class="io-description"><p>Huds installed of hud component</p>
+                    <div class="io-description"><p>Installed huds of hud component</p>
 </div>
                 </td>
             </tr>
@@ -1229,7 +1739,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="41" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:41</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="36" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:36</a></div>
                         </td>
                     </tr>
 
@@ -1261,7 +1771,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="45" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:45</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="40" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:40</a></div>
                         </td>
                     </tr>
 
@@ -1292,7 +1802,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="54" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:54</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="49" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:49</a></div>
                         </td>
                     </tr>
 
@@ -1324,7 +1834,7 @@
                 </tr>
                     <tr>
                         <td class="col-md-4">
-                                <div class="io-line">Defined in <a href="" data-line="49" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:49</a></div>
+                                <div class="io-line">Defined in <a href="" data-line="44" class="link-to-prism">src/app/dashboard/hud/hud.component.ts:44</a></div>
                         </td>
                     </tr>
 
@@ -1371,15 +1881,10 @@ export class HudComponent implements OnInit {
    * Folder upload &#x60;ElementRef&#x60;
    */
   @ViewChild(&#x27;folderUpload&#x27;) folderUpload: ElementRef;
-
   /**
-   * Current huds of hud component
+   * Installed huds of hud component
    */
-  currentHuds: Hud[];
-  /**
-   * Huds installed of hud component
-   */
-  hudsInstalled: number;
+  installedHuds: Hud[];
   /**
    * Library  of hud component
    */
@@ -1412,7 +1917,7 @@ export class HudComponent implements OnInit {
    */
   constructor(
     private electron: ElectronService,
-    private app: AppComponent,
+    public app: AppComponent,
     private dialog: MatDialog,
     private snack: SnackService,
     private log: LogService,
@@ -1429,7 +1934,7 @@ export class HudComponent implements OnInit {
    * @description first we need to look for a folder with info file in, we will assume that is the current hud.
    */
   ngOnInit(): void {
-    this.update();
+    this.getHudsAndAddThemToLibraryAndInstalledHuds();
 
     // temp, to move old files
     if (this.library.length &#x3D;&#x3D;&#x3D; 0) {
@@ -1445,7 +1950,7 @@ export class HudComponent implements OnInit {
               this.electron.fs.move(oldPath, &#x60;${this.app.settings.libraryPath}\\hitsounds&#x60;, { overwrite: true })
                 .then(() &#x3D;&gt; {
                   this.snack.show(&#x27;Files was moved to new library&#x27;);
-                  this.update();
+                  this.getHudsAndAddThemToLibraryAndInstalledHuds();
                 }).catch((err) &#x3D;&gt; this.log.error(&#x27;MOVE&#x27;, err));
             }
           }).catch((err) &#x3D;&gt; this.log.error(&#x27;MOVE&#x27;, err));
@@ -1460,9 +1965,9 @@ export class HudComponent implements OnInit {
   }
 
   /**
-   * Updates hud component
+   * Gets huds and add them to library and installed huds
    */
-  update(): void {
+  getHudsAndAddThemToLibraryAndInstalledHuds(): void {
     this.library &#x3D; [];
     this.electron.fs.ensureDir(this.localHuds);
     this.log.info(&#x27;READ&#x27;, &#x60;Looking for huds in ${this.localHuds}&#x60;);
@@ -1470,28 +1975,18 @@ export class HudComponent implements OnInit {
       const info &#x3D; this.localHuds + &#x27;/&#x27; + customFiles + &#x27;/info.vdf&#x27;;
       if (this.electron.fs.existsSync(info)) {
         const data &#x3D; this.electron.fs.readFileSync(info, { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; }).split(&#x27;&quot;&#x27;);
-        const h &#x3D; { name: data[1], folderName: customFiles, version: data[5], path: this.localHuds + &#x27;\\&#x27; + customFiles };
-        this.library.push(h);
+        this.addHudToLibraryIfMissing(data[1], customFiles, data[5]);
       }
     });
 
-    this.hudsInstalled &#x3D; 0;
-    this.currentHuds &#x3D; [];
-    this.notInLibrary &#x3D; [];
+    this.installedHuds &#x3D; [];
     this.electron.fs.readdirSync(this.app.settings.customPath).forEach(customFiles &#x3D;&gt; {
       const info &#x3D; this.app.settings.customPath + &#x27;/&#x27; + customFiles + &#x27;/info.vdf&#x27;;
       if (this.electron.fs.existsSync(info)) {
-        this.hudsInstalled++;
 
         const data &#x3D; this.electron.fs.readFileSync(info, { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; }).split(&#x27;&quot;&#x27;);
         const h &#x3D; { name: data[1], folderName: customFiles, version: data[5], path: this.app.settings.customPath + &#x27;\\&#x27; + customFiles };
-        const l &#x3D; { name: data[1], folderName: customFiles, version: data[5], path: this.localHuds + &#x27;\\&#x27; + customFiles };
-
-        this.currentHuds.push(h);
-
-        if (!this.electron.fs.existsSync(l.path)) {
-          this.notInLibrary.push(h);
-        }
+        this.addHudToInstalledHuds(data[1], customFiles, data[5]);
       }
     });
 
@@ -1499,17 +1994,20 @@ export class HudComponent implements OnInit {
   }
 
   /**
-   * Adds hud
+   * Installs hud
    *
    * @param _hud
    */
-  async add(_hud: Hud): Promise&lt;void&gt; {
+  async installHud(_hud: Hud): Promise&lt;void&gt; {
+    this.app.loading &#x3D; true;
     this.log.info(&#x27;COPY&#x27;, &#x60;Installing &quot;${_hud.path}&quot; &#x3D;&gt; &quot;${this.app.settings.customPath}\\${_hud.folderName}&quot;&#x60;);
     await this.makeSureThereAreNoReadOnlyFoldersInThisFolder(_hud.path);
-    this.electron.fs.copy(_hud.path, &#x60;${this.app.settings.customPath}\\${_hud.folderName}&#x60;)
+    const dest &#x3D; &#x60;${this.app.settings.customPath}\\${_hud.folderName}&#x60;;
+    this.electron.fs.copy(_hud.path, dest)
       .then(() &#x3D;&gt; {
         this.snack.show(&#x60;${_hud.folderName} was installed&#x60;);
-        this.update();
+        this.addHudToInstalledHuds(_hud.name, _hud.folderName, _hud.version);
+        this.app.loading &#x3D; false;
       }).catch(err &#x3D;&gt; this.log.error(&#x27;COPY&#x27;, err));
   }
 
@@ -1517,37 +2015,48 @@ export class HudComponent implements OnInit {
    * Uninstalls hud
    *
    * @param _hud
+   * @param [loadingStop] this is meant to be used with &#x60;replaceHudWithInstalled&#x60;
    */
-  uninstall(_hud: Hud): void {
+  uninstallHud(_hud: Hud, loadingStop &#x3D; true): void {
     if (this.electron.fs.existsSync(_hud.path)) {
+      this.app.loading &#x3D; true;
       if (this.app.settings.moveOrCopy) {
         this.log.info(&#x27;MOVE&#x27;, &#x60;Uninstalling &quot;${_hud.path}&quot; &#x3D;&gt; &quot;${this.localHuds}\\${_hud.folderName}&quot;&#x60;);
-        this.electron.fs.move(_hud.path, &#x60;${this.localHuds}\\${_hud.folderName}&#x60;, { overwrite: true })
+        const dest &#x3D; &#x60;${this.localHuds}\\${_hud.folderName}&#x60;;
+        this.electron.fs.move(_hud.path, dest, { overwrite: true })
           .then(() &#x3D;&gt; {
             this.snack.show(&#x60;${_hud.folderName} was uninstalled&#x60;);
-            this.update();
+            this.removeHudFromInstalledHuds(_hud);
+            this.addHudToLibraryIfMissing(_hud.name, _hud.folderName, _hud.version);
+            if (loadingStop) {
+              this.app.loading &#x3D; false;
+            }
           }).catch(err &#x3D;&gt; this.log.error(&#x27;MOVE&#x27;, err));
       } else {
         this.log.info(&#x27;REMOVE&#x27;, &#x60;Uninstalling &quot;${_hud.path}&quot;&#x60;);
         this.electron.fs.remove(_hud.path)
           .then(() &#x3D;&gt; {
             this.snack.show(&#x60;${_hud.folderName} was uninstalled&#x60;);
-            this.update();
+            this.removeHudFromInstalledHuds(_hud);
+            if (loadingStop) {
+              this.app.loading &#x3D; false;
+            }
           }).catch(err &#x3D;&gt; this.log.error(&#x27;REMOVE&#x27;, err));
       }
     }
   }
 
   /**
-   * Removes hud
+   * Deletes hud
    *
    * @param _hud
    */
-  remove(_hud: Hud): void {
+  deleteHud(_hud: Hud): void {
     if (this.electron.fs.existsSync(_hud.path)) {
+      this.app.loading &#x3D; true;
       const d: YesNo &#x3D; new YesNo();
-      d.question &#x3D; &#x60;Remove ${_hud.folderName}?&#x60;;
-      d.subQuestion &#x3D; &#x60;Are you sure you want to remove ${_hud.folderName}? This cannot be undone!&#x60;;
+      d.question &#x3D; &#x60;Delete ${_hud.folderName}?&#x60;;
+      d.subQuestion &#x3D; &#x60;Are you sure you want to delete ${_hud.folderName}? This cannot be undone!&#x60;;
 
       const dialogRef &#x3D; this.dialog.open(YesNoComponent, {
         data: d
@@ -1555,15 +2064,22 @@ export class HudComponent implements OnInit {
 
       dialogRef.afterClosed().subscribe(result &#x3D;&gt; {
         if (result) {
-          this.log.info(&#x27;DELETE&#x27;, &#x60;Remove &quot;${_hud.path}&quot;&#x60;);
+          this.log.info(&#x27;DELETE&#x27;, &#x60;Deleted &quot;${_hud.path}&quot;&#x60;);
           this.electron.fs.remove(_hud.path)
             .then(() &#x3D;&gt; {
-              this.snack.show(&#x60;${_hud.folderName} was removed&#x60;);
-              this.update();
+              this.snack.show(&#x60;${_hud.folderName} was deleted&#x60;);
+              this.removeHudFromLibrary(_hud);
+              this.app.loading &#x3D; false;
             }).catch(err &#x3D;&gt; this.log.error(&#x27;REMOVE&#x27;, err));
+        } else {
+          this.app.loading &#x3D; false;
         }
       });
     }
+  }
+
+  test() {
+    this.app.loading &#x3D; false;
   }
 
   /**
@@ -1571,7 +2087,8 @@ export class HudComponent implements OnInit {
    *
    * @param event
    */
-  upload(event: Event): void {
+  uploadHuds(event: Event): void {
+    this.app.loading &#x3D; true;
     const target &#x3D; event.target as HTMLInputElement;
     const files: File[] &#x3D; Array.from(target.files);
     const hudsFound &#x3D; files.filter(i &#x3D;&gt; i.name &#x3D;&#x3D;&#x3D; &#x27;info.vdf&#x27;);
@@ -1586,19 +2103,19 @@ export class HudComponent implements OnInit {
           this.electron.fs.copy(path, dest)
             .then(() &#x3D;&gt; {
               this.log.info(&#x27;COPY&#x27;, &#x60;Successfully uploaded ${name}&#x60;);
-              this.snack.show(&#x60;Added &quot;${name}&quot; to library&#x60;, null, hudsFound.length &gt; 2 ? 1000 : 3000);
+              this.snack.show(&#x60;Added &quot;${name}&quot; to library&#x60;, null, hudsFound.length &gt; 2 ? 1000 : 2600);
               const data &#x3D; this.electron.fs.readFileSync(hud.path, { encoding: &#x27;utf8&#x27;, flag: &#x27;r&#x27; }).split(&#x27;&quot;&#x27;);
-              const l &#x3D; { name: data[1], folderName: name, version: data[5], path: this.localHuds + &#x27;\\&#x27; + name };
-              this.library.push(l);
-              this.myControl.setValue(&#x27;&#x27;);
+              this.addHudToLibraryIfMissing(data[1], name, data[5]);
             }).catch(err &#x3D;&gt; this.log.error(&#x27;COPY&#x27;, err));
         } else {
           this.snack.show(&#x60;${name} is already in library&#x60;);
         }
       });
+      this.app.loading &#x3D; false;
     } else {
       const s &#x3D; &#x27;We could not find any hud here. Are you sure you selected the right folder and it has the info.vdf file inside.&#x27;;
       this.snack.show(s, null, 6000);
+      this.app.loading &#x3D; false;
     }
     this.folderUpload.nativeElement.value &#x3D; null;
   }
@@ -1608,7 +2125,7 @@ export class HudComponent implements OnInit {
    *
    * @param _hud
    */
-  rename(_hud: Hud): void {
+  renameHud(_hud: Hud): void {
     const dialogRef &#x3D; this.dialog.open(QuestionAnswerComponent, {
       data: {
         question: &#x60;Rename ${_hud.folderName}&#x60;,
@@ -1617,30 +2134,108 @@ export class HudComponent implements OnInit {
       } as QuestionAnswer
     });
 
-    dialogRef.afterClosed().subscribe(result &#x3D;&gt; {
-      if (typeof result &#x3D;&#x3D;&#x3D; &#x27;string&#x27;) {
-        const path &#x3D; _hud.path.split(&#x27;\\&#x27;);
-        const name &#x3D; path.pop();
-        this.log.info(&#x27;RENAME&#x27;, &#x60;Renaming &quot;${_hud.folderName}&quot; &#x3D;&gt; &quot;${name}&quot;&#x60;);
-        this.electron.fs.rename(_hud.path, &#x60;${path.join(&#x27;\\&#x27;)}\\${result}&#x60;)
+    dialogRef.afterClosed().subscribe(newName &#x3D;&gt; {
+      if (typeof newName &#x3D;&#x3D;&#x3D; &#x27;string&#x27;) {
+        this.log.info(&#x27;RENAME&#x27;, &#x60;Renaming &quot;${_hud.folderName}&quot; &#x3D;&gt; &quot;${newName}&quot;&#x60;);
+        const dest &#x3D; &#x60;${this.localHuds}\\${newName}&#x60;;
+
+        this.electron.fs.rename(_hud.path, dest)
           .then(() &#x3D;&gt; {
-            this.snack.show(&#x60;Updated &quot;${name}&quot; to &quot;${result}&quot;&#x60;);
-            this.update();
+            this.snack.show(&#x60;Updated &quot;${_hud.folderName}&quot; to &quot;${newName}&quot;&#x60;);
+            this.renameLibraryHud(_hud, newName);
           }).catch(err &#x3D;&gt; this.log.error(&#x27;RENAME&#x27;, err));
       }
     });
   }
 
   /**
-   * Replaces hud component
+   * Replaces hud with installed
    *
    * @param _hud
    */
-  replace(_hud: Hud): void {
-    this.currentHuds.forEach(hud &#x3D;&gt; {
-      this.uninstall(hud);
+  async replaceHudWithInstalled(_hud: Hud) {
+    await this.installedHuds.forEach(async hud &#x3D;&gt; {
+      await this.uninstallHud(hud, false);
     });
-    this.add(_hud);
+    await this.installHud(_hud);
+  }
+
+  /**
+   * Adds hud to installed huds
+   *
+   * @param name
+   * @param folderName
+   * @param version
+   */
+  private addHudToInstalledHuds(name: string, folderName: string, version: string): void {
+    const hud &#x3D; new Hud();
+    hud.name &#x3D; name;
+    hud.folderName &#x3D; folderName;
+    hud.version &#x3D; version;
+    hud.path &#x3D; &#x60;${this.app.settings.customPath}\\${folderName}&#x60;;
+    this.installedHuds.push(hud);
+  }
+
+  /**
+   * Removes hud from installed huds
+   *
+   * @param _hud
+   */
+  private removeHudFromInstalledHuds(_hud: Hud): void {
+    const index &#x3D; this.installedHuds.indexOf(_hud);
+    if (index &gt;&#x3D; 0) {
+      this.installedHuds.splice(index, 1);
+    }
+  }
+
+  /**
+   * Adds hud to library if missing
+   *
+   * @param name
+   * @param folderName
+   * @param version
+   */
+  private async addHudToLibraryIfMissing(name: string, folderName: string, version: string): Promise&lt;void&gt; {
+
+    const hud &#x3D; new Hud();
+
+    hud.name &#x3D; name;
+    hud.folderName &#x3D; folderName;
+    hud.version &#x3D; version;
+    hud.path &#x3D; &#x60;${this.localHuds}\\${folderName}&#x60;;
+
+    const index &#x3D; this.library.findIndex(a &#x3D;&gt; a.folderName &#x3D;&#x3D;&#x3D; folderName);
+    if (index &#x3D;&#x3D;&#x3D; -1) {
+      this.library.push(hud);
+      this.myControl.setValue(&#x27;&#x27;);
+    }
+  }
+
+  /**
+   * Renames library hud
+   *
+   * @param _hud
+   * @param newName
+   */
+  private renameLibraryHud(_hud: Hud, newName: string): void {
+    const index &#x3D; this.library.indexOf(_hud);
+    if (index &gt;&#x3D; 0) {
+      this.library[index].folderName &#x3D; newName;
+      this.library[index].path &#x3D; &#x60;${this.localHuds}\\${newName}&#x60;;
+    }
+  }
+
+  /**
+   * Removes hud from library
+   *
+   * @param _hud
+   */
+  private removeHudFromLibrary(_hud: Hud): void {
+    const index &#x3D; this.library.indexOf(_hud);
+    if (index &gt;&#x3D; 0) {
+      this.library.splice(index, 1);
+      this.myControl.setValue(&#x27;&#x27;);
+    }
   }
 
   /**
@@ -1683,7 +2278,7 @@ export class HudComponent implements OnInit {
       } else if (option.name.toLowerCase().includes(filterValue)) {
         return true;
       }
-    });
+    }).sort((a: Hud, b: Hud) &#x3D;&gt; a.folderName.localeCompare(b.folderName));
   }
 
   /**
@@ -1710,16 +2305,16 @@ export class HudComponent implements OnInit {
     &lt;mat-card-title&gt;Huds&lt;/mat-card-title&gt;
     &lt;mat-card-actions align&#x3D;&quot;end&quot;&gt;
         &lt;button mat-raised-button (click)&#x3D;&quot;folderUpload.click()&quot; color&#x3D;&quot;primary&quot;&gt;Add huds to your library&lt;/button&gt;
-        &lt;input class&#x3D;&quot;d-none&quot; type&#x3D;&quot;file&quot; #folderUpload (change)&#x3D;&quot;upload($event)&quot; webkitdirectory mozdirectory /&gt;
+        &lt;input class&#x3D;&quot;d-none&quot; type&#x3D;&quot;file&quot; #folderUpload (change)&#x3D;&quot;uploadHuds($event)&quot; webkitdirectory mozdirectory /&gt;
     &lt;/mat-card-actions&gt;
 &lt;/mat-card&gt;
 
-&lt;h1 class&#x3D;&quot;mt-5&quot;&gt;Installed hud{{hudsInstalled &gt; 1 ? &#x27;s&#x27; : &#x27;&#x27;}}&lt;/h1&gt;
+&lt;h1 class&#x3D;&quot;mt-5&quot;&gt;Installed hud{{installedHuds.length &gt; 1 ? &#x27;s&#x27; : &#x27;&#x27;}}&lt;/h1&gt;
 &lt;mat-card class&#x3D;&quot;card-list&quot;&gt;
     &lt;mat-list&gt;
-        &lt;mat-list-item *ngFor&#x3D;&quot;let hud of currentHuds&quot; disableRipple&#x3D;&quot;true&quot;&gt;
+        &lt;mat-list-item *ngFor&#x3D;&quot;let hud of installedHuds&quot; disableRipple&#x3D;&quot;true&quot;&gt;
             &lt;span matLine&gt;{{hud.folderName}}&lt;/span&gt;
-            &lt;button mat-icon-button color&#x3D;&quot;warn&quot; matTooltip&#x3D;&quot;Uninstall&quot; (click)&#x3D;&quot;uninstall(hud)&quot;&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;warn&quot; matTooltip&#x3D;&quot;Uninstall&quot; (click)&#x3D;&quot;uninstallHud(hud)&quot;&gt;
                 &lt;mat-icon&gt;delete&lt;/mat-icon&gt;
             &lt;/button&gt;
         &lt;/mat-list-item&gt;
@@ -1743,16 +2338,17 @@ export class HudComponent implements OnInit {
     &lt;mat-list&gt;
         &lt;mat-list-item *ngFor&#x3D;&quot;let hud of filteredOptions | async&quot;&gt;
             &lt;span matLine&gt;{{ hud.folderName }}&lt;/span&gt;
-            &lt;button mat-icon-button color&#x3D;&quot;warn&quot; matTooltip&#x3D;&quot;Remove&quot; (click)&#x3D;&quot;remove(hud)&quot;&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;warn&quot; matTooltip&#x3D;&quot;Delete&quot; (click)&#x3D;&quot;deleteHud(hud)&quot;&gt;
                 &lt;mat-icon&gt;delete&lt;/mat-icon&gt;
             &lt;/button&gt;
-            &lt;button mat-icon-button color&#x3D;&quot;accent&quot; matTooltip&#x3D;&quot;Rename&quot; (click)&#x3D;&quot;rename(hud)&quot;&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;accent&quot; matTooltip&#x3D;&quot;Rename&quot; (click)&#x3D;&quot;renameHud(hud)&quot;&gt;
                 &lt;mat-icon&gt;drive_file_rename_outline&lt;/mat-icon&gt;
             &lt;/button&gt;
-            &lt;button mat-icon-button color&#x3D;&quot;primary&quot; matTooltip&#x3D;&quot;Install&quot; (click)&#x3D;&quot;add(hud)&quot;&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;primary&quot; matTooltip&#x3D;&quot;Install&quot; (click)&#x3D;&quot;installHud(hud)&quot;&gt;
                 &lt;mat-icon&gt;get_app&lt;/mat-icon&gt;
             &lt;/button&gt;
-            &lt;button mat-icon-button color&#x3D;&quot;primary&quot; matTooltip&#x3D;&quot;Replace with installed&quot; (click)&#x3D;&quot;replace(hud)&quot;&gt;
+            &lt;button mat-icon-button color&#x3D;&quot;primary&quot; matTooltip&#x3D;&quot;Replace with installed&quot;
+                (click)&#x3D;&quot;replaceHudWithInstalled(hud)&quot;&gt;
                 &lt;mat-icon&gt;autorenew&lt;/mat-icon&gt;
             &lt;/button&gt;
         &lt;/mat-list-item&gt;
@@ -1787,7 +2383,7 @@ export class HudComponent implements OnInit {
 <script src="../js/libs/htmlparser.js"></script>
 <script src="../js/libs/deep-iterator.js"></script>
 <script>
-        var COMPONENT_TEMPLATE = '<div><mat-card class="mb-2">    <mat-card-title>Huds</mat-card-title>    <mat-card-actions align="end">        <button mat-raised-button (click)="folderUpload.click()" color="primary">Add huds to your library</button>        <input class="d-none" type="file" #folderUpload (change)="upload($event)" webkitdirectory mozdirectory />    </mat-card-actions></mat-card><h1 class="mt-5">Installed hud{{hudsInstalled > 1 ? \'s\' : \'\'}}</h1><mat-card class="card-list">    <mat-list>        <mat-list-item *ngFor="let hud of currentHuds" disableRipple="true">            <span matLine>{{hud.folderName}}</span>            <button mat-icon-button color="warn" matTooltip="Uninstall" (click)="uninstall(hud)">                <mat-icon>delete</mat-icon>            </button>        </mat-list-item>    </mat-list></mat-card><h1 class="mt-5">Library</h1><mat-form-field class="w-100" appearance="fill">    <mat-label>Search</mat-label>    <input type="text" #searchLibrary placeholder="Pick one" aria-label="Number" matInput [formControl]="myControl"        [matAutocomplete]="auto">    <mat-autocomplete autoActiveFirstOption #auto="matAutocomplete">        <mat-option *ngFor="let option of filteredOptions | async" [value]="option.folderName">            {{option.folderName}}        </mat-option>    </mat-autocomplete></mat-form-field><mat-card class="card-list">    <mat-list>        <mat-list-item *ngFor="let hud of filteredOptions | async">            <span matLine>{{ hud.folderName }}</span>            <button mat-icon-button color="warn" matTooltip="Remove" (click)="remove(hud)">                <mat-icon>delete</mat-icon>            </button>            <button mat-icon-button color="accent" matTooltip="Rename" (click)="rename(hud)">                <mat-icon>drive_file_rename_outline</mat-icon>            </button>            <button mat-icon-button color="primary" matTooltip="Install" (click)="add(hud)">                <mat-icon>get_app</mat-icon>            </button>            <button mat-icon-button color="primary" matTooltip="Replace with installed" (click)="replace(hud)">                <mat-icon>autorenew</mat-icon>            </button>        </mat-list-item>    </mat-list></mat-card></div>'
+        var COMPONENT_TEMPLATE = '<div><mat-card class="mb-2">    <mat-card-title>Huds</mat-card-title>    <mat-card-actions align="end">        <button mat-raised-button (click)="folderUpload.click()" color="primary">Add huds to your library</button>        <input class="d-none" type="file" #folderUpload (change)="uploadHuds($event)" webkitdirectory mozdirectory />    </mat-card-actions></mat-card><h1 class="mt-5">Installed hud{{installedHuds.length > 1 ? \'s\' : \'\'}}</h1><mat-card class="card-list">    <mat-list>        <mat-list-item *ngFor="let hud of installedHuds" disableRipple="true">            <span matLine>{{hud.folderName}}</span>            <button mat-icon-button color="warn" matTooltip="Uninstall" (click)="uninstallHud(hud)">                <mat-icon>delete</mat-icon>            </button>        </mat-list-item>    </mat-list></mat-card><h1 class="mt-5">Library</h1><mat-form-field class="w-100" appearance="fill">    <mat-label>Search</mat-label>    <input type="text" #searchLibrary placeholder="Pick one" aria-label="Number" matInput [formControl]="myControl"        [matAutocomplete]="auto">    <mat-autocomplete autoActiveFirstOption #auto="matAutocomplete">        <mat-option *ngFor="let option of filteredOptions | async" [value]="option.folderName">            {{option.folderName}}        </mat-option>    </mat-autocomplete></mat-form-field><mat-card class="card-list">    <mat-list>        <mat-list-item *ngFor="let hud of filteredOptions | async">            <span matLine>{{ hud.folderName }}</span>            <button mat-icon-button color="warn" matTooltip="Delete" (click)="deleteHud(hud)">                <mat-icon>delete</mat-icon>            </button>            <button mat-icon-button color="accent" matTooltip="Rename" (click)="renameHud(hud)">                <mat-icon>drive_file_rename_outline</mat-icon>            </button>            <button mat-icon-button color="primary" matTooltip="Install" (click)="installHud(hud)">                <mat-icon>get_app</mat-icon>            </button>            <button mat-icon-button color="primary" matTooltip="Replace with installed"                (click)="replaceHudWithInstalled(hud)">                <mat-icon>autorenew</mat-icon>            </button>        </mat-list-item>    </mat-list></mat-card></div>'
     var COMPONENTS = [{'name': 'AppComponent', 'selector': 'app-root'},{'name': 'CrosshairsComponent', 'selector': 'app-crosshairs'},{'name': 'DashboardComponent', 'selector': 'app-dashboard'},{'name': 'HitsoundComponent', 'selector': 'app-hitsound'},{'name': 'HudComponent', 'selector': 'app-hud'},{'name': 'MultipleWarningComponent', 'selector': 'app-multiple-warning'},{'name': 'QuestionAnswerComponent', 'selector': 'app-question-answer'},{'name': 'SettingsComponent', 'selector': 'app-settings'},{'name': 'SetupComponent', 'selector': 'app-setup'},{'name': 'UploadChangeNameComponent', 'selector': 'app-upload-change-name'},{'name': 'WeaponsSoundsComponent', 'selector': 'app-weapons-sounds'},{'name': 'YesNoComponent', 'selector': 'app-yes-no'}];
     var DIRECTIVES = [];
     var ACTUAL_COMPONENT = {'name': 'HudComponent'};

@@ -1577,12 +1577,12 @@ export class HitsoundComponent implements OnInit {
           });
 
           await firstValueFrom(dialogRef.afterClosed())
-            .then((newName) &#x3D;&gt; {
+            .then(async (newName) &#x3D;&gt; {
               if (typeof newName &#x3D;&#x3D;&#x3D; &#x27;string&#x27;) {
-                this.electron.fs.copy(sound.path, &#x60;${this.localHitsounds}\\${newName}.wav&#x60;)
-                  .then(() &#x3D;&gt; {
-                    this.snack.show(&#x60;${name} was added&#x60;);
-                    this.update();
+                await this.electron.fs.copy(sound.path, &#x60;${this.localHitsounds}\\${newName}.wav&#x60;)
+                  .then(async () &#x3D;&gt; {
+                    this.snack.show(&#x60;${newName} was added&#x60;);
+                    await this.update();
                   })
                   .catch(err &#x3D;&gt; this.log.error(&#x27;COPY&#x27;, err));
               }

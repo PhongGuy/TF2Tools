@@ -163,6 +163,9 @@ customElements.define('compodoc-menu', class extends HTMLElement {
                                 <a href="classes/UploadChangeName.html" data-type="entity-link" >UploadChangeName</a>
                             </li>
                             <li class="link">
+                                <a href="classes/VtfCrosshair.html" data-type="entity-link" >VtfCrosshair</a>
+                            </li>
+                            <li class="link">
                                 <a href="classes/WeaponData.html" data-type="entity-link" >WeaponData</a>
                             </li>
                             <li class="link">
