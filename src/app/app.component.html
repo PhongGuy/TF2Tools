@@ -1,5 +1,6 @@
 <mat-toolbar class="toolbar">
-    <span clasS="">TF2 Tools</span>
+    <span>TF2 Tools</span>
+    <small [textContent]="version"></small>
     <div class="spacer"></div>
     <button mat-icon-button (click)="minimize()" matTooltip="Minimize">
         <mat-icon>remove</mat-icon>
