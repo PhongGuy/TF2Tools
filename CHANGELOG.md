@@ -1,6 +1,7 @@
-## <small>4.6.1 (2022-01-12)</small>
+## <small>4.6.2 (2022-01-12)</small>
 
 * [Bumped Version] 4.6.1 ([35a2424](https://github.com/PhongGuy/TF2Tools/commit/35a2424))
+* [Bumped Version] 4.6.2 ([a14d768](https://github.com/PhongGuy/TF2Tools/commit/a14d768))
 * added GitHub Action/Auto Update ([fa868af](https://github.com/PhongGuy/TF2Tools/commit/fa868af))
 * added LogService ([2d826dc](https://github.com/PhongGuy/TF2Tools/commit/2d826dc))
 * added new logs ([1288ac1](https://github.com/PhongGuy/TF2Tools/commit/1288ac1))
@@ -28,7 +29,9 @@
 * updated autoupdate ([6593bfd](https://github.com/PhongGuy/TF2Tools/commit/6593bfd))
 * updated autoupdate ([0f55a2c](https://github.com/PhongGuy/TF2Tools/commit/0f55a2c))
 * updated autoupdate ([fef84d6](https://github.com/PhongGuy/TF2Tools/commit/fef84d6))
+* updated changelog ([071bafb](https://github.com/PhongGuy/TF2Tools/commit/071bafb))
 * updated changelog ([e8678e2](https://github.com/PhongGuy/TF2Tools/commit/e8678e2))
+* updated docs ([acc9a7c](https://github.com/PhongGuy/TF2Tools/commit/acc9a7c))
 * updated docs ([030c481](https://github.com/PhongGuy/TF2Tools/commit/030c481))
 * updated docs ([16682c2](https://github.com/PhongGuy/TF2Tools/commit/16682c2))
 
