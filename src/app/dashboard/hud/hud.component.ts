@@ -160,8 +160,9 @@ export class HudComponent implements OnInit {
    * Uninstalls hud
    *
    * @param _hud
+   * @param [loadingStop] this is meant to be used with `replaceHudWithInstalled`
    */
-  uninstallHud(_hud: Hud): void {
+  uninstallHud(_hud: Hud, loadingStop = true): void {
     if (this.electron.fs.existsSync(_hud.path)) {
       this.app.loading = true;
       if (this.app.settings.moveOrCopy) {
@@ -172,7 +173,9 @@ export class HudComponent implements OnInit {
             this.snack.show(`${_hud.folderName} was uninstalled`);
             this.removeHudFromInstalledHuds(_hud);
             this.addHudToLibraryIfMissing(_hud.name, _hud.folderName, _hud.version);
-            this.app.loading = false;
+            if (loadingStop) {
+              this.app.loading = false;
+            }
           }).catch(err => this.log.error('MOVE', err));
       } else {
         this.log.info('REMOVE', `Uninstalling "${_hud.path}"`);
@@ -180,7 +183,9 @@ export class HudComponent implements OnInit {
           .then(() => {
             this.snack.show(`${_hud.folderName} was uninstalled`);
             this.removeHudFromInstalledHuds(_hud);
-            this.app.loading = false;
+            if (loadingStop) {
+              this.app.loading = false;
+            }
           }).catch(err => this.log.error('REMOVE', err));
       }
     }
@@ -293,11 +298,11 @@ export class HudComponent implements OnInit {
    *
    * @param _hud
    */
-  replaceHudWithInstalled(_hud: Hud): void {
-    this.installedHuds.forEach(hud => {
-      this.uninstallHud(hud);
+  async replaceHudWithInstalled(_hud: Hud) {
+    await this.installedHuds.forEach(async hud => {
+      await this.uninstallHud(hud, false);
     });
-    this.installHud(_hud);
+    await this.installHud(_hud);
   }
 
   /**
