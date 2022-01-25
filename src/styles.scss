@@ -68,6 +68,12 @@ html {
 
 mat-toolbar {
   padding-bottom: 100px;
+
+  small {
+    font-size: xx-small;
+    margin-top: 7px;
+    margin-left: 5px;
+  }
 }
 
 .blue-snackbar {

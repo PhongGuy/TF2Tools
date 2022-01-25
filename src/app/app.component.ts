@@ -167,6 +167,13 @@ export class AppComponent implements OnInit {
   }
 
   /**
+   * Gets version
+   */
+  get version(): string {
+    return APP_CONFIG.version;
+  }
+
+  /**
    * on init
    */
   ngOnInit(): void {
