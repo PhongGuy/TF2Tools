@@ -16,8 +16,6 @@ updates:
     # Add assignees
     assignees:
       - "PhongGuy"
-    # Allow up to 10 open pull requests for npm dependencies
-    open-pull-requests-limit: 10
 
   - package-ecosystem: "npm"
     directory: "/app"
@@ -30,5 +28,3 @@ updates:
     # Add assignees
     assignees:
       - "PhongGuy"
-    # Allow up to 10 open pull requests for npm dependencies
-    open-pull-requests-limit: 10
