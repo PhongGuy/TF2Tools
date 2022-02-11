@@ -47,7 +47,7 @@
     "@angular/cdk": "~13.2.1",
     "@angular/common": "~13.2.2",
     "@angular/compiler": "~13.1.0",
-    "@angular/core": "~13.2.0",
+    "@angular/core": "~13.2.2",
     "@angular/forms": "~13.2.2",
     "@angular/language-service": "~13.2.2",
     "@angular/material": "~13.2.1",
