@@ -42,14 +42,14 @@
     "changelog": "conventional-changelog -i CHANGELOG.md -s -r 0"
   },
   "dependencies": {
-    "@angular/animations": "~13.2.4",
+    "@angular/animations": "~13.2.5",
     "@angular/cdk": "~13.2.1",
     "@angular/common": "~13.2.5",
     "@angular/compiler": "~13.1.0",
     "@angular/core": "~13.2.4",
     "@angular/forms": "~13.2.4",
     "@angular/language-service": "~13.2.4",
-    "@angular/material": "~13.2.4",
+    "@angular/material": "~13.2.5",
     "@angular/platform-browser": "~13.2.4",
     "@angular/platform-browser-dynamic": "~13.2.1",
     "@angular/router": "~13.2.4",
