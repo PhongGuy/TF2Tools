@@ -5,6 +5,6 @@
   "private": true,
   "dependencies": {
     "appdata-path": "^1.0.0",
-    "fs-extra": "^10.0.1"
+    "fs-extra": "^10.1.0"
   }
 }
