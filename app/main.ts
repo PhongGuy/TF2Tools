@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, screen, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as url from 'url';
@@ -27,12 +27,11 @@ function createWindow(): BrowserWindow {
     show: false
   });
 
-
   if (serve) {
+    const debug = require('electron-debug');
+    debug();
     win.webContents.openDevTools();
-    require('electron-reload')(__dirname, {
-      electron: require(path.join(__dirname, '/../node_modules/electron'))
-    });
+    require('electron-reloader')(module);
     win.loadURL('http://localhost:4200');
     win.once('ready-to-show', () => {
       win.show()
@@ -63,6 +62,11 @@ function createWindow(): BrowserWindow {
     // in an array if your app supports multi windows, this is the time
     // when you should delete the corresponding element.
     win = null;
+  });
+
+  win.webContents.on('will-navigate', function (e, url) {
+    e.preventDefault();
+    shell.openExternal(url);
   });
 
   ipcMain.on('minimize', () => {
