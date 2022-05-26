@@ -10,7 +10,6 @@ const args = process.argv.slice(1),
 function createWindow(): BrowserWindow {
 
   const electronScreen = screen;
-  const size = electronScreen.getPrimaryDisplay().workAreaSize;
 
   // Create the browser window.
   win = new BrowserWindow({
@@ -30,7 +29,9 @@ function createWindow(): BrowserWindow {
   if (serve) {
     const debug = require('electron-debug');
     debug();
+
     win.webContents.openDevTools();
+
     require('electron-reloader')(module);
     win.loadURL('http://localhost:4200');
     win.once('ready-to-show', () => {
@@ -64,7 +65,7 @@ function createWindow(): BrowserWindow {
     win = null;
   });
 
-  win.webContents.on('will-navigate', function (e, url) {
+  win.webContents.on('will-navigate', (e, url) => {
     e.preventDefault();
     shell.openExternal(url);
   });
