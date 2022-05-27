@@ -1,24 +1,21 @@
 {
   "name": "TF2Tools",
-  "version": "4.7.0",
+  "version": "4.7.5",
   "description": "Change hud, crosshair and hitsound easily.",
   "homepage": "https://github.com/PhongGuy/TF2Tools",
   "author": {
     "name": "PhongGuy"
   },
   "keywords": [
-    "angular",
-    "angular 13",
-    "electron",
-    "electron 16",
-    "nodejs",
-    "typescript",
-    "playwright",
-    "eslint",
-    "sass",
-    "windows",
-    "mac",
-    "linux"
+    "tf2",
+    "tf2 hud",
+    "tf2 hudmod",
+    "tf2 crosshairs",
+    "tf2 hitsound",
+    "tf2 hitsound tool",
+    "tf2 crosshair tool",
+    "tf2 hud tool",
+    "tf2 tools"
   ],
   "main": "app/main.js",
   "private": true,
@@ -26,7 +23,7 @@
     "postinstall": "electron-builder install-app-deps",
     "ng": "ng",
     "start": "npm-run-all -p electron:serve ng:serve",
-    "ng:serve": "ng serve -c web -o",
+    "ng:serve": "ng serve -c web",
     "build": "npm run electron:serve-tsc && ng build --base-href ./",
     "build:dev": "npm run build -- -c dev",
     "build:prod": "npm run build -- -c production",
@@ -110,6 +107,6 @@
     "node": ">=14.0.0"
   },
   "browserslist": [
-    "chrome 91"
+    "chrome 100"
   ]
 }
