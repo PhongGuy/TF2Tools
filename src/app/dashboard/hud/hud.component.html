@@ -10,7 +10,7 @@
 <mat-card class="card-list">
     <mat-list>
         <mat-list-item *ngFor="let hud of installedHuds" disableRipple="true">
-            <span matLine>{{hud.folderName}}</span>
+            <span matLine>{{hud.name}}</span>
             <button mat-icon-button color="warn" matTooltip="Uninstall" (click)="uninstallHud(hud)">
                 <mat-icon>delete</mat-icon>
             </button>
@@ -25,8 +25,8 @@
     <input type="text" #searchLibrary placeholder="Pick one" aria-label="Number" matInput [formControl]="myControl"
         [matAutocomplete]="auto">
     <mat-autocomplete autoActiveFirstOption #auto="matAutocomplete">
-        <mat-option *ngFor="let option of filteredOptions | async" [value]="option.folderName">
-            {{option.folderName}}
+        <mat-option *ngFor="let option of filteredOptions | async" [value]="option.name">
+            {{option.name}}
         </mat-option>
     </mat-autocomplete>
 </mat-form-field>
@@ -34,7 +34,7 @@
 <mat-card class="card-list">
     <mat-list>
         <mat-list-item *ngFor="let hud of filteredOptions | async">
-            <span matLine>{{ hud.folderName }}</span>
+            <span matLine>{{ hud.name }}</span>
             <button mat-icon-button color="warn" matTooltip="Delete" (click)="deleteHud(hud)">
                 <mat-icon>delete</mat-icon>
             </button>
