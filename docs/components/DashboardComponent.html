@@ -297,6 +297,17 @@ export class DashboardComponent {
                 &lt;div class&#x3D;&quot;gab&quot;&gt;&lt;/div&gt;
                 &lt;button mat-raised-button routerLink&#x3D;&quot;settings&quot; routerLinkActive&#x3D;&quot;active&quot;
                     [matBadgeHidden]&#x3D;&quot;!app.gitHub.update&quot; matBadge&#x3D;&quot;1&quot; [disabled]&#x3D;&quot;app.loading&quot;&gt;Settings&lt;/button&gt;
+                &lt;div class&#x3D;&quot;gab&quot;&gt;&lt;/div&gt;
+                &lt;div class&#x3D;&quot;d-flex justify-content-center&quot;&gt;
+                    &lt;a href&#x3D;&quot;https://github.com/PhongGuy/TF2Tools/issues/new?assignees&#x3D;PhongGuy&amp;labels&#x3D;bug&amp;template&#x3D;bug_report.md&amp;title&#x3D;&quot;
+                        mat-icon-button matTooltip&#x3D;&quot;Report a bug&quot;&gt;
+                        &lt;mat-icon&gt;bug_report&lt;/mat-icon&gt;
+                    &lt;/a&gt;
+                    &lt;a href&#x3D;&quot;https://github.com/PhongGuy/TF2Tools/issues/new?assignees&#x3D;PhongGuy&amp;labels&#x3D;feature&amp;template&#x3D;feature_request.md&amp;title&#x3D;&quot;
+                        mat-icon-button matTooltip&#x3D;&quot;Suggest a feature&quot;&gt;
+                        &lt;mat-icon&gt;bookmark_add&lt;/mat-icon&gt;
+                    &lt;/a&gt;
+                &lt;/div&gt;
             &lt;/div&gt;
         &lt;/div&gt;
         &lt;div class&#x3D;&quot;col-lg-10 col-md-9&quot;&gt;
@@ -312,7 +323,7 @@ export class DashboardComponent {
                 <p class="comment">
                     <code>./dashboard.component.scss</code>
                 </p>
-                <pre class="line-numbers"><code class="language-scss">button {
+                <pre class="line-numbers"><code class="language-scss">.fixed-nav &gt; button {
   width: 100%;
   margin-bottom: .5rem;
 }
@@ -344,12 +355,13 @@ export class DashboardComponent {
 <script src="../js/libs/htmlparser.js"></script>
 <script src="../js/libs/deep-iterator.js"></script>
 <script>
-        var COMPONENT_TEMPLATE = '<div><div class="container">    <div class="row">        <div class="col-lg-2 col-md-3">            <div class="fixed-nav">                <button mat-raised-button routerLink="hud" routerLinkActive="active"                    [disabled]="app.loading">Huds</button>                <button mat-raised-button routerLink="hitsound" routerLinkActive="active"                    [disabled]="app.loading">Kill/hitsounds</button>                <button mat-raised-button routerLink="crosshairs" routerLinkActive="active"                    [disabled]="app.loading">Crosshairs</button>                <button mat-raised-button routerLink="weapon-sounds" routerLinkActive="active" disabled>Weapon                    sounds</button>                <div class="gab"></div>                <button mat-raised-button routerLink="settings" routerLinkActive="active"                    [matBadgeHidden]="!app.gitHub.update" matBadge="1" [disabled]="app.loading">Settings</button>            </div>        </div>        <div class="col-lg-10 col-md-9">            <router-outlet></router-outlet>            <div class="mb-3"></div>        </div>    </div></div></div>'
+        var COMPONENT_TEMPLATE = '<div><div class="container">    <div class="row">        <div class="col-lg-2 col-md-3">            <div class="fixed-nav">                <button mat-raised-button routerLink="hud" routerLinkActive="active"                    [disabled]="app.loading">Huds</button>                <button mat-raised-button routerLink="hitsound" routerLinkActive="active"                    [disabled]="app.loading">Kill/hitsounds</button>                <button mat-raised-button routerLink="crosshairs" routerLinkActive="active"                    [disabled]="app.loading">Crosshairs</button>                <button mat-raised-button routerLink="weapon-sounds" routerLinkActive="active" disabled>Weapon                    sounds</button>                <div class="gab"></div>                <button mat-raised-button routerLink="settings" routerLinkActive="active"                    [matBadgeHidden]="!app.gitHub.update" matBadge="1" [disabled]="app.loading">Settings</button>                <div class="gab"></div>                <div class="d-flex justify-content-center">                    <a href="https://github.com/PhongGuy/TF2Tools/issues/new?assignees=PhongGuy&labels=bug&template=bug_report.md&title="                        mat-icon-button matTooltip="Report a bug">                        <mat-icon>bug_report</mat-icon>                    </a>                    <a href="https://github.com/PhongGuy/TF2Tools/issues/new?assignees=PhongGuy&labels=feature&template=feature_request.md&title="                        mat-icon-button matTooltip="Suggest a feature">                        <mat-icon>bookmark_add</mat-icon>                    </a>                </div>            </div>        </div>        <div class="col-lg-10 col-md-9">            <router-outlet></router-outlet>            <div class="mb-3"></div>        </div>    </div></div></div>'
     var COMPONENTS = [{'name': 'AppComponent', 'selector': 'app-root'},{'name': 'CrosshairsComponent', 'selector': 'app-crosshairs'},{'name': 'DashboardComponent', 'selector': 'app-dashboard'},{'name': 'HitsoundComponent', 'selector': 'app-hitsound'},{'name': 'HudComponent', 'selector': 'app-hud'},{'name': 'MultipleWarningComponent', 'selector': 'app-multiple-warning'},{'name': 'QuestionAnswerComponent', 'selector': 'app-question-answer'},{'name': 'SettingsComponent', 'selector': 'app-settings'},{'name': 'SetupComponent', 'selector': 'app-setup'},{'name': 'UploadChangeNameComponent', 'selector': 'app-upload-change-name'},{'name': 'WeaponsSoundsComponent', 'selector': 'app-weapons-sounds'},{'name': 'YesNoComponent', 'selector': 'app-yes-no'}];
     var DIRECTIVES = [];
     var ACTUAL_COMPONENT = {'name': 'DashboardComponent'};
 </script>
 <script src="../js/tree.js"></script>
+
 
 
 
