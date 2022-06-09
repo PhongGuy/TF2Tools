@@ -52,7 +52,7 @@
     "@angular/language-service": "~13.3.11",
     "@angular/material": "~13.2.6",
     "@angular/platform-browser": "~13.2.6",
-    "@angular/platform-browser-dynamic": "~13.3.10",
+    "@angular/platform-browser-dynamic": "~14.0.1",
     "@angular/router": "~13.2.6",
     "appdata-path": "1.0.0",
     "bootstrap": "5.1.3",
