@@ -1,6 +1,6 @@
 {
   "name": "TF2Tools",
-  "version": "4.7.5",
+  "version": "4.8.0",
   "main": "main.js",
   "private": true,
   "dependencies": {
