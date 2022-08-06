@@ -1,8 +1,8 @@
 <h1 mat-dialog-title>{{data.question}}</h1>
 <div mat-dialog-content *ngIf="data.subQuestion">
-    {{data.subQuestion}}
+  {{data.subQuestion}}
 </div>
-<div mat-dialog-actions align="end">
-    <button mat-button [mat-dialog-close]="false" cdkFocusInitial>No</button>
-    <button mat-button [mat-dialog-close]="true" color="warn">Yes</button>
+<div mat-dialog-actions cdkTrapFocus [cdkTrapFocusAutoCapture]="true">
+  <button mat-raised-button [mat-dialog-close]="true" color="warn">Yes</button>
+  <button mat-button [mat-dialog-close]="false" cdkFocusInitial>No</button>
 </div>
