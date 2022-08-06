@@ -1,19 +1,19 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { FormControl } from '@angular/forms';
-import { MatDialog } from '@angular/material/dialog';
-import { firstValueFrom, map, Observable, startWith } from 'rxjs';
-import { AppComponent } from '../../app.component';
-import { ElectronService } from '../../core/services';
-import { QuestionAnswerComponent } from '../../dialogs/question-answer/question-answer.component';
-import { YesNoComponent } from '../../dialogs/yes-no/yes-no.component';
-import { Hitsound } from '../../models/hitsound';
-import { QuestionAnswer } from '../../models/questionAnswer';
-import { UploadChangeName } from '../../models/uploadChangeName';
-import { YesNo } from '../../models/yesNo';
-import { LogService } from '../../services/log.service';
-import { SnackService } from '../../services/snack.service';
-import { MultipleWarningComponent } from './multiple-warning/multiple-warning.component';
-import { UploadChangeNameComponent } from './upload-change-name/upload-change-name.component';
+import {Component, ElementRef, OnInit, ViewChild} from '@angular/core';
+import {FormControl} from '@angular/forms';
+import {MatDialog} from '@angular/material/dialog';
+import {firstValueFrom, map, Observable, startWith} from 'rxjs';
+import {AppComponent} from '../../app.component';
+import {ElectronService} from '../../core/services';
+import {QuestionAnswerComponent} from '../../dialogs/question-answer/question-answer.component';
+import {YesNoComponent} from '../../dialogs/yes-no/yes-no.component';
+import {Hitsound} from '../../models/hitsound';
+import {QuestionAnswer} from '../../models/questionAnswer';
+import {UploadChangeName} from '../../models/uploadChangeName';
+import {YesNo} from '../../models/yesNo';
+import {LogService} from '../../services/log.service';
+import {SnackService} from '../../services/snack.service';
+import {MultipleWarningComponent} from './multiple-warning/multiple-warning.component';
+import {UploadChangeNameComponent} from './upload-change-name/upload-change-name.component';
 
 /**
  * Hitsound component
@@ -67,7 +67,7 @@ export class HitsoundComponent implements OnInit {
     private log: LogService
   ) {
     this.localHitsounds = `${this.app.settings.libraryPath}\\hitsounds`;
-    this.electron.fs.ensureDir(this.localHitsounds);
+    this.electron.fs.ensureDirSync(this.localHitsounds);
     this.log.scope('HITSOUND');
   }
 
@@ -101,7 +101,7 @@ export class HitsoundComponent implements OnInit {
     this.electron.fs.readdirSync(this.localHitsounds).forEach(file => {
       const name = file.split('.');
       name.pop();
-      const h = { name: name.toString(), path: `${this.localHitsounds}\\${name}.wav` };
+      const h = {name: name.toString(), path: `${this.localHitsounds}\\${name}.wav`};
       this.library.push(h);
     });
     this.myControl.setValue('');
@@ -134,19 +134,19 @@ export class HitsoundComponent implements OnInit {
           });
 
           await firstValueFrom(dialogRef.afterClosed())
-            .then(async (newName) => {
+            .then(newName => {
               if (typeof newName === 'string') {
-                await this.electron.fs.copy(sound.path, `${this.localHitsounds}\\${newName}.wav`)
-                  .then(async () => {
+                this.electron.fs.copy(sound.path, `${this.localHitsounds}\\${newName}.wav`)
+                  .then(_ => {
                     this.snack.show(`${newName} was added`);
-                    await this.update();
+                    this.update();
                   })
                   .catch(err => this.log.error('COPY', err));
               }
             });
         } else {
           this.electron.fs.copy(sound.path, dest)
-            .then(() => {
+            .then(_ => {
               this.snack.show(`${name} was added`);
               this.update();
             })
@@ -177,6 +177,7 @@ export class HitsoundComponent implements OnInit {
 
       dialogRef.afterClosed().subscribe(r => {
         if (typeof r === 'string') {
+          this.app.loading = true;
           const path = _hitsound.path.split('\\');
           path.pop();
           this.log.info('RENAME', `Renaming "${_hitsound.path}" => "${path.join('\\')}\\${r}.wav"`);
@@ -186,6 +187,7 @@ export class HitsoundComponent implements OnInit {
               this.update();
             })
             .catch(err => this.log.error('RENAME', err));
+          this.app.loading = false;
         }
       });
 
@@ -200,7 +202,6 @@ export class HitsoundComponent implements OnInit {
    * @param _hitsound
    */
   remove(_hitsound: Hitsound): void {
-
     const info = new YesNo();
     info.question = `Remove ${_hitsound.name}?`;
     info.subQuestion = `Are you sure you want to remove ${_hitsound.name}? This cannot be undone!`;
@@ -211,6 +212,7 @@ export class HitsoundComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe(result => {
       if (result) {
+        this.app.loading = true;
         this.log.info('REMOVE', `Removing "${_hitsound.path}"`);
         this.electron.fs.remove(_hitsound.path)
           .then(() => {
@@ -222,6 +224,7 @@ export class HitsoundComponent implements OnInit {
             }
           })
           .catch(err => this.log.error('REMOVE', err));
+        this.app.loading = false;
       }
     });
   }
@@ -233,7 +236,7 @@ export class HitsoundComponent implements OnInit {
    * @param _name
    */
   removeFile(file: string, _name: string): void {
-    this.remove({ name: _name, path: file });
+    this.remove({name: _name, path: file});
   }
 
   /**
@@ -242,7 +245,7 @@ export class HitsoundComponent implements OnInit {
    * @param file
    */
   playFile(file: string): void {
-    this.play({ name: 'hitsound', path: file });
+    this.play({name: 'hitsound', path: file});
   }
 
   /**
@@ -264,7 +267,7 @@ export class HitsoundComponent implements OnInit {
     audio.play();
 
     if (_hitsound.name === 'hitsound') {
-      audio.addEventListener('ended', end => {
+      audio.addEventListener('ended', _ => {
         this.electron.fs.removeSync(_hitsound.path);
       });
     }
@@ -286,7 +289,7 @@ export class HitsoundComponent implements OnInit {
     const path = this.app.hitsounds[0];
     if (path !== undefined) {
       this.log.info('COPY', `Installing "${_hitsound.path}" => "${path}"`);
-      this.electron.fs.copy(_hitsound.path, path, { overwrite: true })
+      this.electron.fs.copy(_hitsound.path, path, {overwrite: true})
         .then(() => {
           this.snack.show(`Hitsound ${_hitsound.name} was installed`);
           this.app.update('hitsounds');
@@ -317,7 +320,7 @@ export class HitsoundComponent implements OnInit {
     const path = this.app.killsounds[0];
     if (path !== undefined) {
       this.log.info('COPY', `Installing "${_killsound.path}" => "${path}"`);
-      this.electron.fs.copy(_killsound.path, path, { overwrite: true })
+      this.electron.fs.copy(_killsound.path, path, {overwrite: true})
         .then(() => {
           this.snack.show(`Killsound ${_killsound.name} was installed`);
           this.app.update('hitsounds');

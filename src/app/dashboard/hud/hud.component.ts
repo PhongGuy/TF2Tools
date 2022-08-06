@@ -1,17 +1,17 @@
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { FormControl } from '@angular/forms';
-import { MatDialog } from '@angular/material/dialog';
-import { map, Observable, startWith } from 'rxjs';
-import { AppComponent } from '../../app.component';
-import { ElectronService } from '../../core/services';
-import { QuestionAnswerComponent } from '../../dialogs/question-answer/question-answer.component';
-import { YesNoComponent } from '../../dialogs/yes-no/yes-no.component';
-import { Hud } from '../../models/hud';
-import { QuestionAnswer } from '../../models/questionAnswer';
-import { YesNo } from '../../models/yesNo';
-import { FileHelpService } from '../../services/file-help.service';
-import { LogService } from '../../services/log.service';
-import { SnackService } from '../../services/snack.service';
+import {Component, ElementRef, OnInit, ViewChild} from '@angular/core';
+import {FormControl} from '@angular/forms';
+import {MatDialog} from '@angular/material/dialog';
+import {map, Observable, startWith} from 'rxjs';
+import {AppComponent} from '../../app.component';
+import {ElectronService} from '../../core/services';
+import {QuestionAnswerComponent} from '../../dialogs/question-answer/question-answer.component';
+import {YesNoComponent} from '../../dialogs/yes-no/yes-no.component';
+import {Hud} from '../../models/hud';
+import {QuestionAnswer} from '../../models/questionAnswer';
+import {YesNo} from '../../models/yesNo';
+import {FileHelpService} from '../../services/file-help.service';
+import {LogService} from '../../services/log.service';
+import {SnackService} from '../../services/snack.service';
 
 /**
  * Hud
@@ -39,11 +39,6 @@ export class HudComponent implements OnInit {
    */
   localHuds: string;
   /**
-   * Not in library of hud component
-   */
-  notInLibrary: Hud[];
-
-  /**
    * My control of hud component
    */
   myControl = new FormControl();
@@ -59,6 +54,8 @@ export class HudComponent implements OnInit {
    * @param app
    * @param dialog
    * @param snack
+   * @param log
+   * @param fileHelp
    */
   constructor(
     private electron: ElectronService,
@@ -69,7 +66,7 @@ export class HudComponent implements OnInit {
     private fileHelp: FileHelpService
   ) {
     this.localHuds = `${this.app.settings.libraryPath}\\huds`;
-    this.electron.fs.ensureDir(this.localHuds);
+    this.electron.fs.ensureDirSync(this.localHuds);
     this.log.scope('HUDS');
   }
 
@@ -87,12 +84,12 @@ export class HudComponent implements OnInit {
       if (this.electron.fs.existsSync(oldPath)) {
         this.snack.show('Moving your files to new library...', null, 5000);
         this.log.info('MOVE', `Trying to move files from "${oldPath}" => "${this.localHuds}"`);
-        this.electron.fs.move(oldPath, this.localHuds, { overwrite: true })
+        this.electron.fs.move(oldPath, this.localHuds, {overwrite: true})
           .then(() => {
             oldPath = this.electron.appData('TF2Tools\\hitsounds');
             if (this.electron.fs.existsSync(oldPath)) {
               this.log.info('MOVE', `Trying to move your hitsounds from "${oldPath}" => "${this.app.settings.libraryPath}\\hitsounds"`);
-              this.electron.fs.move(oldPath, `${this.app.settings.libraryPath}\\hitsounds`, { overwrite: true })
+              this.electron.fs.move(oldPath, `${this.app.settings.libraryPath}\\hitsounds`, {overwrite: true})
                 .then(() => {
                   this.snack.show('Files was moved to new library');
                   this.getHudsAndAddThemToLibraryAndInstalledHuds();
@@ -114,12 +111,12 @@ export class HudComponent implements OnInit {
    */
   getHudsAndAddThemToLibraryAndInstalledHuds(): void {
     this.library = [];
-    this.electron.fs.ensureDir(this.localHuds);
+    this.electron.fs.ensureDirSync(this.localHuds);
     this.log.info('READ', `Looking for huds in ${this.localHuds}`);
-    this.electron.fs.readdirSync(this.localHuds).forEach(customFiles => {
+    this.electron.fs.readdirSync(this.localHuds).forEach(async customFiles => {
       const info = this.localHuds + '/' + customFiles + '/info.vdf';
       if (this.electron.fs.existsSync(info)) {
-        this.addHudToLibraryIfMissing(customFiles);
+        await this.addHudToLibraryIfMissing(customFiles);
       }
     });
 
@@ -164,11 +161,11 @@ export class HudComponent implements OnInit {
       if (this.app.settings.moveOrCopy) {
         this.log.info('MOVE', `Uninstalling "${_hud.path}" => "${this.localHuds}\\${_hud.name}"`);
         const dest = `${this.localHuds}\\${_hud.name}`;
-        this.electron.fs.move(_hud.path, dest, { overwrite: true })
-          .then(() => {
+        this.electron.fs.move(_hud.path, dest, {overwrite: true})
+          .then(async _ => {
             this.snack.show(`${_hud.name} was uninstalled`);
             this.removeHudFromInstalledHuds(_hud);
-            this.addHudToLibraryIfMissing(_hud.name);
+            await this.addHudToLibraryIfMissing(_hud.name);
             if (loadingStop) {
               this.app.loading = false;
             }
@@ -240,11 +237,10 @@ export class HudComponent implements OnInit {
         if (!this.electron.fs.existsSync(dest)) {
           this.log.info('COPY', `Uploading "${hud.path}" => "${dest}"`);
           this.electron.fs.copy(hud.path, dest)
-            .then(() => {
+            .then(async _ => {
               this.log.info('COPY', `Successfully uploaded ${hud.name}`);
               this.snack.show(`Added "${hud.name}" to library`, null, hudsFound.length > 2 ? 1000 : 2600);
-              const data = this.electron.fs.readFileSync(hud.path, { encoding: 'utf8', flag: 'r' }).split('"');
-              this.addHudToLibraryIfMissing(hud.name);
+              await this.addHudToLibraryIfMissing(hud.name);
             }).catch(err => this.log.error('COPY', err));
         } else {
           this.snack.show(`${hud.name} is already in library`);
@@ -293,7 +289,7 @@ export class HudComponent implements OnInit {
    * @param _hud
    */
   async replaceHudWithInstalled(_hud: Hud) {
-    this.installedHuds.forEach(async (hud) => {
+    this.installedHuds.forEach(hud => {
       this.uninstallHud(hud, false);
     });
     await this.installHud(_hud);
@@ -313,7 +309,7 @@ export class HudComponent implements OnInit {
     huds.forEach(hud => {
       const path = hud.path.replace('\\info.vdf', '');
       const name = path.split('\\').pop();
-      hudsFound.push({ name, path });
+      hudsFound.push({name, path});
     });
 
     return hudsFound;
@@ -348,7 +344,6 @@ export class HudComponent implements OnInit {
    *
    * @param name
    * @param name
-   * @param version
    */
   private async addHudToLibraryIfMissing(name: string): Promise<void> {
 

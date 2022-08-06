@@ -1,16 +1,16 @@
-import { HttpClient } from '@angular/common/http';
-import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { NavigationEnd, Router } from '@angular/router';
-import { BehaviorSubject } from 'rxjs';
-import { APP_CONFIG } from '../environments/environment';
-import { ElectronService } from './core/services';
-import { LatestRelease } from './models/latestRelease';
-import { Settings } from './models/settings';
-import { Update } from './models/update';
-import { VtfCrosshair } from './models/vtfCrosshair';
-import { FileHelpService } from './services/file-help.service';
-import { LogService } from './services/log.service';
-import { SnackService } from './services/snack.service';
+import {HttpClient} from '@angular/common/http';
+import {Component, ElementRef, OnInit, ViewChild} from '@angular/core';
+import {NavigationEnd, Router} from '@angular/router';
+import {BehaviorSubject} from 'rxjs';
+import {APP_CONFIG} from '../environments/environment';
+import {ElectronService} from './core/services';
+import {LatestRelease} from './models/latestRelease';
+import {Settings} from './models/settings';
+import {Update} from './models/update';
+import {VtfCrosshair} from './models/vtfCrosshair';
+import {FileHelpService} from './services/file-help.service';
+import {LogService} from './services/log.service';
+import {SnackService} from './services/snack.service';
 
 /**
  * This is the main app component
@@ -122,12 +122,12 @@ export class AppComponent implements OnInit {
     this.appdata = this.electron.appData('TF2Tools');
     this.appTemp = `${this.appdata}\\temp`;
 
-    this.electron.fs.ensureDir(this.appdata);
-    this.electron.fs.ensureDir(`${this.appdata}\\temp`);
+    this.electron.fs.ensureDirSync(this.appdata);
+    this.electron.fs.ensureDirSync(`${this.appdata}\\temp`);
 
 
     if (this.electron.fs.existsSync(`${this.appdata}\\settings.json`)) {
-      const data = this.electron.fs.readFileSync(`${this.appdata}\\settings.json`, { encoding: 'utf8', flag: 'r' });
+      const data = this.electron.fs.readFileSync(`${this.appdata}\\settings.json`, {encoding: 'utf8', flag: 'r'});
       const jsonSettings = JSON.parse(data) as Settings;
       for (const k in this.settings) {
         if (Object.prototype.hasOwnProperty.call(this.settings, k) && Object.prototype.hasOwnProperty.call(jsonSettings, k)) {
@@ -238,7 +238,8 @@ export class AppComponent implements OnInit {
    * @returns `string`
    */
   generateRandomString(length): string {
-    let result = ''; let seeds;
+    let result = '';
+    let seeds;
 
     for (let i = 0; i < length - 1; i++) {
       //Generate seeds array, that will be the bag from where randomly select generated char

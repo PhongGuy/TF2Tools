@@ -1,48 +1,61 @@
 <h1 class="mt-0 mb-3">Settings</h1>
 
 <mat-card *ngIf="app.gitHub.update">
-    <mat-card-title>Update available</mat-card-title>
-    <mat-card-subtitle>{{app.gitHub.release.name}} is now available!</mat-card-subtitle>
-    <mat-card-content [innerText]="getGitHubBody(app.gitHub.release.body)"></mat-card-content>
-    <mat-card-actions align="end">
-        <a href="https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.zip" mat-button color="primary"
-            download>Download</a>
-    </mat-card-actions>
+  <mat-card-title>Update available</mat-card-title>
+  <mat-card-subtitle>{{app.gitHub.release.name}} is now available!</mat-card-subtitle>
+  <mat-card-content [innerText]="getGitHubBody(app.gitHub.release.body)"></mat-card-content>
+  <mat-card-actions align="end">
+    <a href="https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.zip" mat-button color="primary"
+       download>Download</a>
+  </mat-card-actions>
+</mat-card>
+
+
+<mat-card class="settings">
+  <div class="item">
+    <div class="info">
+      <h3>Show installed path</h3>
+      <span>Show installed paths of huds, hit and killsounds.</span>
+    </div>
+    <div class="col"></div>
+    <mat-slide-toggle [(ngModel)]="app.settings.showPath" (change)="updateSettings()"></mat-slide-toggle>
+  </div>
 </mat-card>
 
 <h3>Custom folder</h3>
 <mat-form-field class="w-100" appearance="fill">
-    <mat-label>Location</mat-label>
-    <input matInput type="text" disabled [value]="app.settings.customPath">
+  <mat-label>Location</mat-label>
+  <input matInput type="text" disabled [value]="app.settings.customPath">
 </mat-form-field>
 
 <h3>Library location</h3>
 <mat-form-field class="w-100" appearance="fill">
-    <mat-label>Location</mat-label>
-    <input matInput type="text" disabled [value]="app.settings.libraryPath">
+  <mat-label>Location</mat-label>
+  <input matInput type="text" disabled [value]="app.settings.libraryPath">
 </mat-form-field>
 <div align="end">
-    <button mat-raised-button color="primary" (click)="changeLibrary()" [disabled]="app.loading">Change
-        location</button>
+  <button mat-raised-button color="primary" (click)="changeLibrary()" [disabled]="app.loading">Change
+    location
+  </button>
 </div>
 
 <h1>Huds</h1>
 <mat-card class="settings">
 
-    <div class="item">
-        <div class="info">
-            <h3>Save hud edits on uninstall</h3>
-            <span>Save recent customizations edits on hud when uninstalling</span>
-        </div>
-        <div class="col"></div>
-        <mat-slide-toggle [(ngModel)]="app.settings.moveOrCopy" (change)="updateSettings()"></mat-slide-toggle>
+  <div class="item">
+    <div class="info">
+      <h3>Save hud edits on uninstall</h3>
+      <span>Save recent customizations edits on hud when uninstalling</span>
     </div>
+    <div class="col"></div>
+    <mat-slide-toggle [(ngModel)]="app.settings.moveOrCopy" (change)="updateSettings()"></mat-slide-toggle>
+  </div>
 
 </mat-card>
 
 <h1>Log</h1>
 <p>Use logs to report a problem. This will help us understand what is wrong.</p>
 <mat-form-field class="w-100 h-30" appearance="fill">
-    <mat-label>TF2Tools/log</mat-label>
-    <textarea matInput [value]="getLog()" cdkTextareaAutosize #autosize="cdkTextareaAutosize" disabled></textarea>
+  <mat-label>TF2Tools/log</mat-label>
+  <textarea matInput [value]="getLog()" cdkTextareaAutosize #autosize="cdkTextareaAutosize" disabled></textarea>
 </mat-form-field>
