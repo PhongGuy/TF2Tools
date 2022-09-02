@@ -1,8 +1,8 @@
-import { Injectable } from '@angular/core';
+import {Injectable} from '@angular/core';
 import * as moment from 'moment';
-import { ElectronService } from '../core/services';
-import { LogActions } from '../mock/logActions';
-import { SnackService } from './snack.service';
+import {ElectronService} from '../core/services';
+import {LogActions} from '../mock/logActions';
+import {SnackService} from './snack.service';
 
 /**
  * Log Service
@@ -81,7 +81,7 @@ export class LogService {
    * This way we should only use about 50kb in log file size.
    */
   cleanup(): void {
-    const logs = this.electron.fs.readFileSync(this.logPath, { encoding: 'utf8', flag: 'r' }).split('\n').reverse();
+    const logs = this.electron.fs.readFileSync(this.logPath, {encoding: 'utf8', flag: 'r'}).split('\n').reverse();
     const sliced = logs.slice(0, 501);
     this.electron.fs.writeFileSync(this.logPath, sliced.reverse().join('\n'));
   }
@@ -94,7 +94,13 @@ export class LogService {
    * @param message
    */
   private write(level: LogActions['level'], process: LogActions['process'], message: string): void {
-    const log = `${this.getDateTime()} (${this.scopeWhat}) [${level}] *${process}* > ${message}`;
+    const dateTime = this.getDateTime();
+    const levelText = `[${level}]` + '       '.slice(level.length + 2);
+    const processText = `*${process}*` + '        '.slice(process.length + 2);
+    const scopeText = `(${this.scopeWhat})` + '               '.slice(this.scopeWhat.length + 2);
+
+    const log = `${dateTime} ${levelText} ${scopeText} ${processText} ${message}`;
+
     this.electron.fs.appendFile(this.logPath, `${log}\n`).then(() => {
       console.log(log);
     });

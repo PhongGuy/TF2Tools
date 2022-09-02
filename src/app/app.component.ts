@@ -110,6 +110,7 @@ export class AppComponent implements OnInit {
    * @param snack
    * @param fileHelp
    * @param http
+   * @param log
    */
   constructor(
     private electron: ElectronService,
@@ -127,8 +128,8 @@ export class AppComponent implements OnInit {
 
 
     if (this.electron.fs.existsSync(`${this.appdata}\\settings.json`)) {
-      const data = this.electron.fs.readFileSync(`${this.appdata}\\settings.json`, {encoding: 'utf8', flag: 'r'});
-      const jsonSettings = JSON.parse(data) as Settings;
+      const data = this.electron.fs.readJSONSync(`${this.appdata}\\settings.json`, {encoding: 'utf8', flag: 'r'});
+      const jsonSettings = data as Settings;
       for (const k in this.settings) {
         if (Object.prototype.hasOwnProperty.call(this.settings, k) && Object.prototype.hasOwnProperty.call(jsonSettings, k)) {
           this.settings[k] = jsonSettings[k];
@@ -219,7 +220,7 @@ export class AppComponent implements OnInit {
   /** toggle between full screen and minimize */
   fullscreenToggle(): void {
     this.electron.ipcRenderer.send('fullscreen');
-    this.fullscreen = this.fullscreen ? false : true;
+    this.fullscreen = !this.fullscreen;
     this.fullscreenTip = this.fullscreen ? 'Restore Down' : 'Maximize';
     this.fullscreenIcon = this.fullscreen ? 'fullscreen_exit' : 'fullscreen';
   }

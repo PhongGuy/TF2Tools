@@ -116,7 +116,7 @@ export class HudComponent implements OnInit {
     this.electron.fs.readdirSync(this.localHuds).forEach(async customFiles => {
       const info = this.localHuds + '/' + customFiles + '/info.vdf';
       if (this.electron.fs.existsSync(info)) {
-        await this.addHudToLibraryIfMissing(customFiles);
+        this.addHudToLibraryIfMissing(customFiles);
       }
     });
 
@@ -162,10 +162,10 @@ export class HudComponent implements OnInit {
         this.log.info('MOVE', `Uninstalling "${_hud.path}" => "${this.localHuds}\\${_hud.name}"`);
         const dest = `${this.localHuds}\\${_hud.name}`;
         this.electron.fs.move(_hud.path, dest, {overwrite: true})
-          .then(async _ => {
+          .then(_ => {
             this.snack.show(`${_hud.name} was uninstalled`);
             this.removeHudFromInstalledHuds(_hud);
-            await this.addHudToLibraryIfMissing(_hud.name);
+            this.addHudToLibraryIfMissing(_hud.name);
             if (loadingStop) {
               this.app.loading = false;
             }
@@ -173,7 +173,7 @@ export class HudComponent implements OnInit {
       } else {
         this.log.info('REMOVE', `Uninstalling "${_hud.path}"`);
         this.electron.fs.remove(_hud.path)
-          .then(() => {
+          .then(_ => {
             this.snack.show(`${_hud.name} was uninstalled`);
             this.removeHudFromInstalledHuds(_hud);
             if (loadingStop) {
@@ -236,12 +236,14 @@ export class HudComponent implements OnInit {
 
         if (!this.electron.fs.existsSync(dest)) {
           this.log.info('COPY', `Uploading "${hud.path}" => "${dest}"`);
-          this.electron.fs.copy(hud.path, dest)
-            .then(async _ => {
-              this.log.info('COPY', `Successfully uploaded ${hud.name}`);
-              this.snack.show(`Added "${hud.name}" to library`, null, hudsFound.length > 2 ? 1000 : 2600);
-              await this.addHudToLibraryIfMissing(hud.name);
-            }).catch(err => this.log.error('COPY', err));
+          try {
+            this.electron.fs.copySync(hud.path, dest);
+            this.log.info('COPY', `Successfully uploaded ${hud.name}`);
+            this.snack.show(`Added "${hud.name}" to library`, null, hudsFound.length > 2 ? 1000 : 2600);
+            this.addHudToLibraryIfMissing(hud.name);
+          } catch (err) {
+            this.log.error('COPY', err);
+          }
         } else {
           this.snack.show(`${hud.name} is already in library`);
         }
@@ -345,7 +347,7 @@ export class HudComponent implements OnInit {
    * @param name
    * @param name
    */
-  private async addHudToLibraryIfMissing(name: string): Promise<void> {
+  private addHudToLibraryIfMissing(name: string) {
 
     const hud = new Hud();
 

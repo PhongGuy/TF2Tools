@@ -15,12 +15,12 @@ import {MultipleWarningComponent} from './dashboard/hitsound/multiple-warning/mu
 import {UploadChangeNameComponent} from './dashboard/hitsound/upload-change-name/upload-change-name.component';
 import {HudComponent} from './dashboard/hud/hud.component';
 import {SettingsComponent} from './dashboard/settings/settings.component';
-import {WeaponsSoundsComponent} from './dashboard/weapons-sounds/weapons-sounds.component';
 import {QuestionAnswerComponent} from './dialogs/question-answer/question-answer.component';
 import {YesNoComponent} from './dialogs/yes-no/yes-no.component';
 import {MaterialModule} from './material';
 import {SetupComponent} from './setup/setup.component';
-import {A11yModule} from "@angular/cdk/a11y";
+import {A11yModule} from '@angular/cdk/a11y';
+import {WeaponSoundsComponent} from './dashboard/game-sounds/weapon-sounds/weapon-sounds.component';
 
 /**
  * App Module
@@ -34,11 +34,11 @@ import {A11yModule} from "@angular/cdk/a11y";
     QuestionAnswerComponent,
     YesNoComponent,
     CrosshairsComponent,
-    WeaponsSoundsComponent,
     MultipleWarningComponent,
     SetupComponent,
     UploadChangeNameComponent,
-    SettingsComponent
+    SettingsComponent,
+    WeaponSoundsComponent
   ],
   imports: [
     BrowserModule,

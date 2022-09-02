@@ -56,7 +56,6 @@ export class SettingsComponent implements OnDestroy {
   getLog(): string {
     const logs = this.electron.fs.readFileSync(this.electron.appData('TF2Tools\\log.log'), { encoding: 'utf8', flag: 'r' });
     const logData = logs.split('\n');
-    console.log(logData.length);
     return logData.reverse().join('\n');
   }
 

@@ -22,4 +22,4 @@ You can change your vtf crosshairs, choose a background and see how it looks.
 
 # Download
 
-You can download the latest stable version [here](https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.zip).
+You can download the latest stable version [here](https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.exe).

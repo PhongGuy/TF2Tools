@@ -1,15 +1,15 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
-import { MatListOption, MatSelectionList } from '@angular/material/list';
-import { MatSelect } from '@angular/material/select';
-import { MatTabGroup } from '@angular/material/tabs';
-import { APP_CONFIG } from '../../../environments/environment';
-import { AppComponent } from '../../app.component';
-import { ElectronService } from '../../core/services';
-import { tfWeapons } from '../../mock/tfWeapons';
-import { CrosshairSelected } from '../../models/crosshairSelected';
-import { WeaponData } from '../../models/weaponData';
-import { LogService } from '../../services/log.service';
-import { SnackService } from '../../services/snack.service';
+import {Component, OnInit, ViewChild} from '@angular/core';
+import {MatListOption, MatSelectionList} from '@angular/material/list';
+import {MatSelect} from '@angular/material/select';
+import {MatTabGroup} from '@angular/material/tabs';
+import {APP_CONFIG} from '../../../environments/environment';
+import {AppComponent} from '../../app.component';
+import {ElectronService} from '../../core/services';
+import {tfWeapons} from '../../mock/tfWeapons';
+import {CrosshairSelected} from '../../models/crosshairSelected';
+import {WeaponData} from '../../models/weaponData';
+import {LogService} from '../../services/log.service';
+import {SnackService} from '../../services/snack.service';
 
 /**
  * Crosshairs component
@@ -133,6 +133,7 @@ export class CrosshairsComponent implements OnInit {
    * @param app AppComponent
    * @param electron
    * @param snack
+   * @param log
    */
   constructor(
     public app: AppComponent,
@@ -170,11 +171,6 @@ export class CrosshairsComponent implements OnInit {
         this.selected.weaponsAffected.push(effected);
       });
 
-      // this.selected.weaponClasses.push(weapon.info.weaponClass);
-      // if (!this.selected.slots.includes(weapon.info.slot)) {
-      //   this.selected.slots.push(weapon.info.slot);
-      // }
-
       this.crosshairSelected.value = weapon.crosshair;
     });
   }
@@ -206,11 +202,11 @@ export class CrosshairsComponent implements OnInit {
     this.electron.fs.ensureDir(vtfPath)
       .then(() => {
         this.snack.show('Adding vtf crosshairs', null, 2500);
-        this.electron.fs.copy(`${APP_CONFIG.src}assets/vtf/materials/vgui/replay/thumbnails`, vtfPath, { overwrite: true })
+        this.electron.fs.copy(`${APP_CONFIG.src}assets/vtf/materials/vgui/replay/thumbnails`, vtfPath, {overwrite: true})
           .then(() => {
             this.electron.fs.ensureDir(scriptPath)
               .then(() => {
-                this.electron.fs.copy(`${APP_CONFIG.src}assets/vtf/scripts`, scriptPath, { overwrite: false })
+                this.electron.fs.copy(`${APP_CONFIG.src}assets/vtf/scripts`, scriptPath, {overwrite: false})
                   .then(() => {
                     this.snack.show('vtf crosshairs was generated');
                     this.app.update();
@@ -230,7 +226,7 @@ export class CrosshairsComponent implements OnInit {
   apply(): void {
     const crosshair = this.crosshairSelected.value;
     this.selectedWeapons.forEach(weapon => {
-      const file = this.electron.fs.readFileSync(weapon.path, { encoding: 'utf8', flag: 'r' });
+      const file = this.electron.fs.readFileSync(weapon.path, {encoding: 'utf8', flag: 'r'});
       this.log.info('CHANGE', `Installing "${weapon.crosshair}" => "${crosshair}" in "${weapon.path}"`);
       this.electron.fs.writeFile(weapon.path, file.replace(`/thumbnails/${weapon.crosshair}`, `/thumbnails/${crosshair}`))
         .then(() => {
@@ -274,7 +270,7 @@ export class CrosshairsComponent implements OnInit {
     weaponsTab.forEach(weapon => {
       if (weapon !== crosshair) {
         if (weapon.info.slot === slot || slot === 'All') {
-          const file = this.electron.fs.readFileSync(weapon.path, { encoding: 'utf8', flag: 'r' });
+          const file = this.electron.fs.readFileSync(weapon.path, {encoding: 'utf8', flag: 'r'});
           this.log.info('CHANGE', `Installing "${weapon.crosshair}" => "${crosshair}" in "${weapon.path}"`);
           this.electron.fs.writeFileSync(weapon.path, file.replace(`/thumbnails/${weapon.crosshair}`, `/thumbnails/${crosshair}`));
         }
@@ -295,7 +291,7 @@ export class CrosshairsComponent implements OnInit {
     this.allWeapons.forEach(weapon => {
       if (weapon !== crosshair) {
         if (weapon.info.slot === slot || weapon.info.slot === 'All') {
-          const file = this.electron.fs.readFileSync(weapon.path, { encoding: 'utf8', flag: 'r' });
+          const file = this.electron.fs.readFileSync(weapon.path, {encoding: 'utf8', flag: 'r'});
           this.log.info('WRITE', `Installing "${weapon.crosshair}" => "${crosshair}" in "${weapon.path}"`);
           this.electron.fs.writeFileSync(weapon.path, file.replace(`/thumbnails/${weapon.crosshair}`, `/thumbnails/${crosshair}`));
         }
@@ -324,9 +320,15 @@ export class CrosshairsComponent implements OnInit {
    * @returns to plural
    */
   private slotToPlural(slot: 'Primary' | 'Secondary' | 'Melee' | 'All'): string {
-    if (slot === 'Primary') { return 'Primaries'; }
-    if (slot === 'Secondary') { return 'Secondaries'; }
-    if (slot === 'Melee') { return 'Melees'; }
+    if (slot === 'Primary') {
+      return 'Primaries';
+    }
+    if (slot === 'Secondary') {
+      return 'Secondaries';
+    }
+    if (slot === 'Melee') {
+      return 'Melees';
+    }
   }
 
   /**
@@ -374,7 +376,7 @@ export class CrosshairsComponent implements OnInit {
 
     this.app.vtfScripts.forEach(path => {
       // read script file
-      const read = this.electron.fs.readFileSync(path, { encoding: 'utf8', flag: 'r' });
+      const read = this.electron.fs.readFileSync(path, {encoding: 'utf8', flag: 'r'});
       const name = path.replace('.txt', '').split('\\').pop();
 
       const crosshair = read
@@ -390,7 +392,7 @@ export class CrosshairsComponent implements OnInit {
       newWeapon.crosshair = crosshair;
       newWeapon.path = path;
 
-      tfWeapons.forEach((v, k) => {
+      tfWeapons.forEach(v => {
         if (name === v.weaponClass) {
           newWeapon.info = v;
 
