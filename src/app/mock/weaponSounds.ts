@@ -1,10 +1,10 @@
-class weaponInfo {
+class WeaponInfo {
   name: string;
   alias: string;
   sounds: string[];
 }
 
-export const weaponSounds: weaponInfo[] = [
+export const weaponSounds: WeaponInfo[] = [
   {
     name: 'Rocket Lanucher',
     alias: 'Weapon_RPG',

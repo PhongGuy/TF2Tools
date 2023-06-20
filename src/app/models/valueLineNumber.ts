@@ -1,4 +1,4 @@
-export class valueLineNumber {
+export class ValueLineNumber {
   value: string;
   lineNumber: number;
 }

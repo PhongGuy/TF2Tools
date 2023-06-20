@@ -1,11 +1,11 @@
-import {valueLineNumber} from './valueLineNumber';
+import {ValueLineNumber} from './valueLineNumber';
 
-export class gameSound {
+export class GameSound {
   name: string = null;
-  channel: valueLineNumber = null;
-  soundlevel: valueLineNumber = null;
-  volume: valueLineNumber = null;
-  wave: valueLineNumber = null;
-  pitch: valueLineNumber = null;
-  rndwave: valueLineNumber[] = [];
+  channel: ValueLineNumber = null;
+  soundlevel: ValueLineNumber = null;
+  volume: ValueLineNumber = null;
+  wave: ValueLineNumber = null;
+  pitch: ValueLineNumber = null;
+  rndwave: ValueLineNumber[] = [];
 }

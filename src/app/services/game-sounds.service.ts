@@ -1,5 +1,5 @@
 import {Injectable} from '@angular/core';
-import {gameSound} from '../models/gameSound';
+import {GameSound} from '../models/gameSound';
 import {LogService} from './log.service';
 import {ElectronService} from '../core/services';
 
@@ -14,7 +14,7 @@ export class GameSoundsService {
   ) {
   }
 
-  getSounds(file: string): gameSound[] | null {
+  getSounds(file: string): GameSound[] | null {
     if (this.checkIfFileExists(file)) {
       const data = this.electron.fs.readFileSync(file, {encoding: 'utf8', flag: 'r'});
       return this.getSoundsFromFile(data);
@@ -22,7 +22,7 @@ export class GameSoundsService {
     return null;
   }
 
-  async getDefaultSounds(what: 'weaponSounds'): Promise<gameSound[] | null> {
+  async getDefaultSounds(what: 'weaponSounds'): Promise<GameSound[] | null> {
     switch (what) {
       case 'weaponSounds':
         return fetch('https://raw.githubusercontent.com/powerlord/tf2-data/master/game_sounds/game_sounds_weapons.txt')
@@ -43,13 +43,13 @@ export class GameSoundsService {
     return false;
   }
 
-  private getSoundsFromFile(file: string): gameSound[] {
-    const sounds: gameSound[] = [];
+  private getSoundsFromFile(file: string): GameSound[] {
+    const sounds: GameSound[] = [];
     const lines = file.split('\n');
     const fileSounds = this.getFileSounds(lines);
 
     fileSounds.forEach(soundName => {
-      const sound: gameSound = new gameSound();
+      const sound: GameSound = new GameSound();
       sound.name = soundName;
       let lineNumber = this.getLineNumber(lines, soundName);
       lineNumber++;

@@ -2,7 +2,7 @@ import {Component, OnInit} from '@angular/core';
 import {weaponSounds} from '../../../mock/weaponSounds';
 import {AppComponent} from '../../../app.component';
 import {LogService} from '../../../services/log.service';
-import {gameSound} from '../../../models/gameSound';
+import {GameSound} from '../../../models/gameSound';
 import {GameSoundsService} from '../../../services/game-sounds.service';
 
 @Component({
@@ -13,8 +13,8 @@ import {GameSoundsService} from '../../../services/game-sounds.service';
 export class WeaponSoundsComponent implements OnInit {
 
   weaponSounds = weaponSounds;
-  allWeaponSounds: gameSound[];
-  defaultSounds: gameSound[];
+  allWeaponSounds: GameSound[];
+  defaultSounds: GameSound[];
 
   constructor(
     private app: AppComponent,
