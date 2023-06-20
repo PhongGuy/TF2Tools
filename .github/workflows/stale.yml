@@ -22,7 +22,7 @@ jobs:
 
       # Close issues and pull requests with no recent activity
       - name: Close Stale Issues
-        uses: actions/stale@v4.1.0
+        uses: actions/stale@v4.1.1
         with:
           days-before-stale: 30
           days-before-close: 5
