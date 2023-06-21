@@ -92,7 +92,7 @@
     "jasmine-spec-reporter": "7.0.0",
     "karma": "6.4.2",
     "karma-coverage-istanbul-reporter": "3.0.3",
-    "karma-electron": "7.2.0",
+    "karma-electron": "7.3.0",
     "karma-jasmine": "5.1.0",
     "karma-jasmine-html-reporter": "2.0.0",
     "node-polyfill-webpack-plugin": "2.0.0",
