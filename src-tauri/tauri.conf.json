@@ -1,45 +1,66 @@
 {
+  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "build": {
-    "beforeDevCommand": "bun run start --port 1420",
-    "beforeBuildCommand": "bun run build",
+    "beforeBuildCommand": "bun run ng:build",
+    "beforeDevCommand": "bun run ng:start --port 1420",
     "devPath": "http://localhost:1420",
-    "distDir": "../dist/TF2Tools",
+    "distDir": "../dist/tf2-tools",
     "withGlobalTauri": false
   },
   "package": {
-    "productName": "TF2Tools",
-    "version": "0.0.0"
+    "productName": "tf2-tools",
+    "version": "../package.json"
   },
   "tauri": {
     "allowlist": {
-      "all": false,
-      "shell": {
-        "all": false,
-        "open": true
-      }
+      "all": false
     },
     "bundle": {
       "active": true,
-      "targets": "all",
-      "identifier": "com.TF2Tools.dev",
+      "category": "DeveloperTool",
+      "copyright": "",
+      "deb": {
+        "depends": []
+      },
+      "externalBin": [],
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
         "icons/128x128@2x.png",
         "icons/icon.icns",
         "icons/icon.ico"
-      ]
+      ],
+      "identifier": "com.tf2-tools.dev",
+      "longDescription": "",
+      "macOS": {
+        "entitlements": null,
+        "exceptionDomain": "",
+        "frameworks": [],
+        "providerShortName": null,
+        "signingIdentity": null
+      },
+      "resources": [],
+      "shortDescription": "",
+      "targets": "all",
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": ""
+      }
     },
     "security": {
       "csp": null
     },
+    "updater": {
+      "active": false
+    },
     "windows": [
       {
         "fullscreen": false,
+        "height": 600,
         "resizable": true,
         "title": "TF2Tools",
-        "width": 800,
-        "height": 600
+        "width": 800
       }
     ]
   }
