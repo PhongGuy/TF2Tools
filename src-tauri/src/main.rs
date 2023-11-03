@@ -8,7 +8,7 @@ use surrealdb::{
     Surreal,
 };
 
-mod commands;
+mod settings;
 
 pub static DB: Lazy<Surreal<Db>> = Lazy::new(Surreal::init);
 pub static PROJECT_LOCAL_DIR: Lazy<std::path::PathBuf> = Lazy::new(|| {
@@ -34,7 +34,7 @@ async fn main() {
 
     // Run the tauri application
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![commands::greet])
+        .invoke_handler(tauri::generate_handler![settings::get_settings])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

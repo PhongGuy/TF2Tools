@@ -14,8 +14,8 @@ export class AppComponent {
     event.preventDefault();
 
     // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    invoke<string>("greet", { name }).then((text) => {
-      this.greetingMessage = text;
+    invoke<string>("get_settings").then((text) => {
+      console.log(text);
     });
   }
 }
