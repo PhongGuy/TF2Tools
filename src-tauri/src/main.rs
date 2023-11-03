@@ -8,6 +8,8 @@ use surrealdb::{
     Surreal,
 };
 
+mod commands;
+
 pub static DB: Lazy<Surreal<Db>> = Lazy::new(Surreal::init);
 pub static PROJECT_LOCAL_DIR: Lazy<std::path::PathBuf> = Lazy::new(|| {
     ProjectDirs::from("Project", "PhongGuy", "tf2-tools")
@@ -30,7 +32,9 @@ async fn main() {
     // Initialize the database
     init_db().await.expect("failed to initialize database");
 
+    // Run the tauri application
     tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![commands::greet])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
