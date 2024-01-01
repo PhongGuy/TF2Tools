@@ -85,7 +85,7 @@
     "electron-debug": "3.2.0",
     "electron-reloader": "1.2.3",
     "eslint": "8.53.0",
-    "eslint-plugin-import": "2.29.0",
+    "eslint-plugin-import": "2.29.1",
     "eslint-plugin-jsdoc": "39.9.1",
     "eslint-plugin-prefer-arrow": "1.2.3",
     "jasmine-core": "5.1.1",
