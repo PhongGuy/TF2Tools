@@ -72,7 +72,7 @@
     "@angular-eslint/template-parser": "14.4.0",
     "@angular/cli": "14.2.13",
     "@angular/compiler-cli": "14.1.1",
-    "@compodoc/compodoc": "1.1.21",
+    "@compodoc/compodoc": "1.1.23",
     "@playwright/test": "1.41.2",
     "@types/jasmine": "5.1.4",
     "@types/jasminewd2": "2.0.13",
