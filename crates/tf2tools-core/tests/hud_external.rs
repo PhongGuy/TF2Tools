@@ -943,3 +943,30 @@ fn one_folder_whose_name_is_not_utf8_can_be_removed() {
     assert!(!odd.exists());
     assert!(custom.join("manual/info.vdf").is_file());
 }
+
+#[cfg(unix)]
+#[test]
+fn removing_a_linked_hud_takes_the_link_and_leaves_its_target() {
+    let env = library_env();
+    let custom = env.tf2.custom_dir();
+    let target = env.tmp.path().join("elsewhere/linked");
+    write_file(&target.join("info.vdf"), b"x");
+    write_file(&target.join("resource/mine.res"), b"hand made");
+    std::os::unix::fs::symlink(&target, custom.join("linked")).unwrap();
+    place(&env, "manual");
+    let before = snapshot(&target);
+
+    let refused = env.lib.uninstall_one_hud(&env.tf2, "linked", &[]);
+    let Err(InstallError::ExternalHuds(found)) = refused else {
+        panic!("removed without being named: {refused:?}");
+    };
+    assert_eq!(names(&found), ["linked"]);
+
+    env.lib
+        .uninstall_one_hud(&env.tf2, "linked", &found)
+        .unwrap();
+
+    assert!(custom.join("linked").symlink_metadata().is_err());
+    assert_eq!(snapshot(&target), before);
+    assert!(custom.join("manual/info.vdf").is_file());
+}

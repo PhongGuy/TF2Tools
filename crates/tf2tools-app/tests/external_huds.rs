@@ -501,6 +501,58 @@ fn removing_the_stray_hud_leaves_the_managed_card(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn the_other_rows_wait_while_one_hud_is_asked_about(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    place(&env, "manual");
+    place(&env, "another");
+    let _page = open_huds(cx, &s);
+
+    support::click_id(cx, s.win, ids::hud_uninstall("manual"));
+    wait_dialog(cx, &s);
+    assert!(support::disabled_of(
+        cx,
+        s.win,
+        ids::hud_uninstall("another")
+    ));
+    // Its own button spins rather than greys out, like every other HUD action's.
+    assert!(!support::disabled_of(
+        cx,
+        s.win,
+        ids::hud_uninstall("manual")
+    ));
+
+    support::click_id(cx, s.win, ids::EXTERNAL_HUDS_CANCEL);
+    support::wait_real(cx, "the rows to come back", |cx| {
+        !support::disabled_of(cx, s.win, ids::hud_uninstall("another"))
+    });
+}
+
+// The second click lands before the first's question opens, the one moment the row is reachable.
+#[gpui_kit::test]
+fn a_double_click_on_a_row_asks_once(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    place(&env, "manual");
+    place(&env, "another");
+    let _page = open_huds(cx, &s);
+
+    for _ in 0..2 {
+        support::click_without_settling(cx, s.win, ids::hud_uninstall("manual"));
+    }
+    wait_dialog(cx, &s);
+    support::settle(cx, s.win);
+    support::click_id(cx, s.win, ids::EXTERNAL_HUDS_CANCEL);
+    support::wait_real(cx, "the rows to come back", |cx| {
+        !support::disabled_of(cx, s.win, ids::hud_uninstall("another"))
+    });
+    support::settle(cx, s.win);
+
+    assert!(!support::present(cx, s.win, ids::EXTERNAL_HUDS_DIALOG));
+    assert!(intact(&env, "manual"));
+}
+
+#[gpui_kit::test]
 fn library_huds_are_never_asked_about(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
