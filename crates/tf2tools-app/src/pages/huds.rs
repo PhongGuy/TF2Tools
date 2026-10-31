@@ -73,6 +73,8 @@ enum Busy {
     /// Keyed by the HUD's folder name.
     Install(String),
     Uninstall,
+    /// Uninstalling one HUD of a conflict, keyed by its folder under `tf/custom`.
+    UninstallOne(String),
     /// Keyed by the HUD's folder name.
     Delete(String),
     /// Keyed by the copied HUD's folder name.
@@ -423,7 +425,7 @@ impl HudsPage {
     fn run_guarded(
         &mut self,
         busy: Busy,
-        (action, title, tf2): (HudAction, &'static str, Tf2Install),
+        (action, only, title, tf2): (HudAction, Option<String>, &'static str, Tf2Install),
         op: impl FnOnce(&Services, ExternalPlan) -> Result<Done, OpError> + Send + 'static,
         cx: &mut Context<Self>,
         after: Option<AfterRun>,
@@ -432,7 +434,7 @@ impl HudsPage {
         cx.notify();
         let win = self.win;
         cx.spawn(async move |page, cx| {
-            let Some(plan) = check_external(action, tf2, win, title, cx).await else {
+            let Some(plan) = check_external(action, only, tf2, win, title, cx).await else {
                 let _ = page.update(cx, |page, cx| {
                     page.busy = None;
                     cx.notify();
@@ -504,7 +506,7 @@ impl HudsPage {
         });
         self.run_guarded(
             busy,
-            (HudAction::Install, INSTALL_FAILED, tf2.clone()),
+            (HudAction::Install, None, INSTALL_FAILED, tf2.clone()),
             move |s, plan| {
                 let done = install_job(s, &id, &tf2, &plan)?;
                 if let Ok(mut slot) = installed.lock() {
@@ -517,21 +519,29 @@ impl HudsPage {
         );
     }
 
-    // Clears every HUD from tf/custom; the toast names the HUD the installed card showed.
-    fn uninstall(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    // Clears every HUD from tf/custom, or just folder `only` in a conflict; the toast names the
+    // HUD the page showed.
+    fn uninstall(&mut self, only: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
         let tf2 = match require_tf2(cx) {
             Ok(tf2) => tf2,
             Err(err) => return toast_error(window, cx, &err),
         };
-        let name = self.installed().map(|hud| hud.name).unwrap_or_default();
+        let name = match &only {
+            Some(folder) => self.hud_name(folder).to_owned(),
+            None => self.installed().map(|hud| hud.name).unwrap_or_default(),
+        };
+        let busy = only.clone().map_or(Busy::Uninstall, Busy::UninstallOne);
+        let scope = only.clone();
         self.run_guarded(
-            Busy::Uninstall,
-            (HudAction::Uninstall, UNINSTALL_FAILED, tf2.clone()),
+            busy,
+            (HudAction::Uninstall, scope, UNINSTALL_FAILED, tf2.clone()),
             move |s, plan| {
                 let discard = plan.prepare(s, &tf2, UNINSTALL_FAILED)?;
-                s.library
-                    .uninstall_hud_discarding(&tf2, discard)
-                    .map_err(|e| describe_tf2_install(&e).into_op(UNINSTALL_FAILED))?;
+                let removed = match &only {
+                    Some(folder) => s.library.uninstall_one_hud(&tf2, folder, discard),
+                    None => s.library.uninstall_hud_discarding(&tf2, discard),
+                };
+                removed.map_err(|e| describe_tf2_install(&e).into_op(UNINSTALL_FAILED))?;
                 plan.log_discarded(s);
                 let message = format!("Uninstalled HUD(s): {name}");
                 activity::write(
@@ -686,7 +696,7 @@ struct Installed {
 
 impl HudsPage {
     // Managed HUDs show their library name; a hand-placed folder shows its folder name.
-    // Several HUDs at once is a conflict, so the card then shows as empty.
+    // Several HUDs at once is a conflict, which `conflict_card` lists instead.
     fn installed(&self) -> Option<Installed> {
         let (custom, status) = self.status.as_ref()?;
         let (folder, managed_id) = match status {
@@ -704,11 +714,20 @@ impl HudsPage {
         })
     }
 
-    fn conflicts(&self) -> Option<&[String]> {
-        match &self.status {
-            Some((_, HudStatus::Multiple { folder_names })) => Some(folder_names),
-            _ => None,
-        }
+    // The HUDs a conflict lists, as folder and name; `None` outside a conflict.
+    fn conflicts(&self) -> Option<Vec<(String, String)>> {
+        let Some((_, HudStatus::Multiple { folder_names })) = &self.status else {
+            return None;
+        };
+        let named = |folder: &String| (folder.clone(), self.hud_name(folder).to_owned());
+        Some(folder_names.iter().map(named).collect())
+    }
+
+    // The library's name for the HUD in `folder`, else the folder's own name.
+    fn hud_name<'a>(&'a self, folder: &'a str) -> &'a str {
+        (self.huds.iter())
+            .find(|hud| hud.folder_name() == folder)
+            .map_or(folder, HudEntry::name)
     }
 }
 
@@ -791,9 +810,9 @@ fn installed_card(hud: Installed, busy: Option<&Busy>, cx: &mut Context<HudsPage
                                 .label("Uninstall")
                                 .loading(busy == Some(&Busy::Uninstall))
                                 .disabled(busy.is_some_and(|b| *b != Busy::Uninstall))
-                                .on_click(
-                                    cx.listener(|page, _, window, cx| page.uninstall(window, cx)),
-                                ),
+                                .on_click(cx.listener(|page, _, window, cx| {
+                                    page.uninstall(None, window, cx)
+                                })),
                         ),
                 )
                 .child(labelled(
@@ -805,13 +824,52 @@ fn installed_card(hud: Installed, busy: Option<&Busy>, cx: &mut Context<HudsPage
         .into_any_element()
 }
 
-// v5's orange-500 warning box, listing every HUD folder found in tf/custom.
-fn conflict_box(folders: &[String], cx: &App) -> AnyElement {
+// The installed card during a conflict: every HUD found, each with its own Uninstall, so the
+// player can get down to one. `huds` holds each one's folder and name.
+fn conflict_card(
+    huds: Vec<(String, String)>,
+    busy: Option<&Busy>,
+    cx: &mut Context<HudsPage>,
+) -> AnyElement {
+    let mut rows = v_flex().px_6().gap_4();
+    for (folder, name) in huds {
+        let removing = Busy::UninstallOne(folder.clone());
+        let button = Button::new(ids::hud_uninstall(&folder))
+            .outline()
+            .px(SM_ICON_PX)
+            .icon(IconName::Unplug)
+            .label("Uninstall")
+            .accessibility_label(format!("Uninstall {name}"))
+            .loading(busy == Some(&removing))
+            .disabled(busy.is_some_and(|b| *b != removing));
+        let name = labelled(
+            div().min_w_0().truncate().font_weight(FontWeight::SEMIBOLD),
+            ids::hud_installed_name(&folder),
+            name,
+        );
+        rows = rows.child(
+            h_flex()
+                .gap_4()
+                .justify_between()
+                .child(name)
+                .child(button.on_click(cx.listener(move |page, _, window, cx| {
+                    page.uninstall(Some(folder.clone()), window, cx)
+                }))),
+        );
+    }
+    card_frame(cx)
+        .id(ids::HUDS_INSTALLED)
+        .test_support()
+        .py_6()
+        .child(rows)
+        .into_any_element()
+}
+
+// v5's orange-500 warning box; the card above it names the HUDs.
+fn conflict_box(cx: &App) -> AnyElement {
     let orange: Hsla = rgb(ORANGE_500).into();
-    let message = format!(
-        "Multiple HUDs are installed: {}. Uninstall to keep only one.",
-        folders.join(", ")
-    );
+    let message =
+        "TF2 can only use one HUD at a time. Uninstall the ones you don't want until one is left.";
     h_flex()
         .id(ids::HUDS_CONFLICTS)
         .role(Role::Alert)
@@ -1283,9 +1341,12 @@ impl HudsPage {
 
 impl Render for HudsPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let installed = match self.installed() {
-            Some(hud) => installed_card(hud, self.busy.as_ref(), cx),
-            None => empty_card(cx),
+        let conflicts = self.conflicts();
+        let conflicted = conflicts.is_some();
+        let installed = match (conflicts, self.installed()) {
+            (Some(huds), _) => conflict_card(huds, self.busy.as_ref(), cx),
+            (None, Some(hud)) => installed_card(hud, self.busy.as_ref(), cx),
+            (None, None) => empty_card(cx),
         };
         let content = v_flex()
             .id(ids::page(Page::Huds))
@@ -1303,11 +1364,15 @@ impl Render for HudsPage {
                         div()
                             .text_lg()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child("Installed HUD"),
+                            .child(if conflicted {
+                                "Installed HUDs"
+                            } else {
+                                "Installed HUD"
+                            }),
                     )
                     .child(installed),
             )
-            .children(self.conflicts().map(|folders| conflict_box(folders, cx)))
+            .children(conflicted.then(|| conflict_box(cx)))
             .child(self.library(cx));
         scroll_area(ids::page_scrollbar(Page::Huds), &self.scroll, content).size_full()
     }

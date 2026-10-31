@@ -14,7 +14,7 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::external_huds::{HudAction, dialog_text, names_text};
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    DraftSlot, ExternalHud, HudEntry, LibraryKind, Profile, ProfileDraft, Provenance,
+    DraftSlot, ExternalHud, GbId, HudEntry, LibraryKind, Profile, ProfileDraft, Provenance,
     ReinstallError, Tf2Install,
 };
 
@@ -335,6 +335,169 @@ fn uninstall_asks_with_its_own_words(cx: &mut TestAppContext) {
     let toast = wait_toast(cx, &s);
     assert!(toast.starts_with("HUD uninstalled."), "{toast}");
     assert!(!custom(&env).join("manual").exists());
+}
+
+/// A conflict's page: `rayshud` installed from the library beside the hand-placed `manual`.
+fn conflict(cx: &mut TestAppContext, env: &support::Env) -> support::ShellWindow {
+    let s = support::shell_window(cx, env, found(env));
+    let installed = seed(&s, env, "rayshud");
+    s.services
+        .library
+        .install_hud(installed.id(), &tf2(env))
+        .unwrap();
+    place(env, "manual");
+    s
+}
+
+fn wait_single_card(cx: &mut TestAppContext, s: &support::ShellWindow) {
+    support::wait_real(cx, "the single HUD card", |cx| {
+        support::present(cx, s.win, ids::HUDS_UNINSTALL)
+    });
+    support::settle(cx, s.win);
+}
+
+#[gpui_kit::test]
+fn a_conflict_lists_every_hud_with_its_own_button(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = conflict(cx, &env);
+    let _page = open_huds(cx, &s);
+    assert!(!support::present(cx, s.win, ids::HUDS_INSTALLED_EMPTY));
+    assert!(!support::present(cx, s.win, ids::HUDS_UNINSTALL));
+    for folder in ["manual", "rayshud"] {
+        assert_eq!(
+            support::label_of(cx, s.win, ids::hud_installed_name(folder)).as_deref(),
+            Some(folder)
+        );
+        assert!(support::present(cx, s.win, ids::hud_uninstall(folder)));
+    }
+}
+
+#[gpui_kit::test]
+fn a_conflict_shows_a_library_huds_own_name(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_gb_huds(&env, &[(7, "Rays HUD")]);
+    let path = env.tmp.path().join("rayshud.zip");
+    std::fs::write(&path, support::hud_zip_bytes("rayshud")).unwrap();
+    let gb = Provenance::GameBanana {
+        gb_id: GbId::new(7),
+        author: "vex".into(),
+    };
+    let library = &s.services.library;
+    let entry = library.import_hud(&path, gb).unwrap();
+    library.install_hud(entry.id(), &tf2(&env)).unwrap();
+    place(&env, "manual");
+    let _page = open_huds(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::hud_installed_name("rayshud")).as_deref(),
+        Some("Rays HUD")
+    );
+}
+
+#[gpui_kit::test]
+fn removing_a_library_hud_from_a_conflict_needs_no_question(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = conflict(cx, &env);
+    let _page = open_huds(cx, &s);
+    support::click_id(cx, s.win, ids::hud_uninstall("rayshud"));
+    let toast = wait_toast(cx, &s);
+    assert!(toast.contains("rayshud has been removed"), "{toast}");
+    assert!(!custom(&env).join("rayshud").exists());
+    assert!(intact(&env, "manual"));
+    assert!(in_library(&s, "rayshud"));
+
+    wait_single_card(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUDS_INSTALLED_NAME).as_deref(),
+        Some("manual")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUDS_INSTALLED_BADGE).as_deref(),
+        Some("External")
+    );
+    assert!(!support::present(cx, s.win, ids::HUDS_CONFLICTS));
+}
+
+#[gpui_kit::test]
+fn removing_an_external_hud_asks_about_that_hud_alone(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    place(&env, "manual");
+    place(&env, "another");
+    let _page = open_huds(cx, &s);
+
+    support::click_id(cx, s.win, ids::hud_uninstall("manual"));
+    wait_dialog(cx, &s);
+    let title = support::label_of(cx, s.win, ids::EXTERNAL_HUDS_TITLE).unwrap();
+    assert_eq!(title, "Keep manual?");
+    let description = support::label_of(cx, s.win, ids::EXTERNAL_HUDS_DESCRIPTION).unwrap();
+    assert!(description.contains("manual"), "{description}");
+    assert!(!description.contains("another"), "{description}");
+
+    support::click_id(cx, s.win, ids::EXTERNAL_HUDS_CANCEL);
+    support::wait_real(cx, "the dialog to go", |cx| {
+        !support::present(cx, s.win, ids::EXTERNAL_HUDS_DIALOG)
+    });
+    support::settle(cx, s.win);
+    assert!(intact(&env, "manual"));
+    assert!(intact(&env, "another"));
+
+    support::click_id(cx, s.win, ids::hud_uninstall("manual"));
+    wait_dialog(cx, &s);
+    support::click_id(cx, s.win, ids::EXTERNAL_HUDS_DISCARD);
+    let toast = wait_toast(cx, &s);
+    assert!(toast.contains("Removed without a copy: manual."), "{toast}");
+    assert!(!custom(&env).join("manual").exists());
+    assert!(intact(&env, "another"));
+
+    wait_single_card(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUDS_INSTALLED_NAME).as_deref(),
+        Some("another")
+    );
+}
+
+#[gpui_kit::test]
+fn keeping_a_copy_of_one_hud_leaves_the_other_out_of_the_library(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    place(&env, "manual");
+    place(&env, "another");
+    let _page = open_huds(cx, &s);
+
+    support::click_id(cx, s.win, ids::hud_uninstall("manual"));
+    wait_dialog(cx, &s);
+    support::click_id(cx, s.win, ids::EXTERNAL_HUDS_KEEP);
+    let toast = wait_toast(cx, &s);
+    assert!(
+        toast.contains("A copy of manual is in your library."),
+        "{toast}"
+    );
+    assert!(in_library(&s, "manual"));
+    assert!(!in_library(&s, "another"));
+    assert!(!custom(&env).join("manual").exists());
+    assert!(intact(&env, "another"));
+}
+
+#[gpui_kit::test]
+fn removing_the_stray_hud_leaves_the_managed_card(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = conflict(cx, &env);
+    let _page = open_huds(cx, &s);
+    support::click_id(cx, s.win, ids::hud_uninstall("manual"));
+    wait_dialog(cx, &s);
+    support::click_id(cx, s.win, ids::EXTERNAL_HUDS_DISCARD);
+    wait_toast(cx, &s);
+
+    wait_single_card(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUDS_INSTALLED_NAME).as_deref(),
+        Some("rayshud")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUDS_INSTALLED_BADGE).as_deref(),
+        Some("Managed")
+    );
 }
 
 #[gpui_kit::test]

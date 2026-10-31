@@ -151,11 +151,13 @@ pub fn dialog_text(action: HudAction, huds: &[ExternalHud]) -> (String, String, 
     (title, description, label)
 }
 
-/// Finds the HUDs `action` would lose and asks about them. `Some` carries on with what the
-/// player chose, and with an empty plan when there is nothing to ask; `None` means stop,
-/// after a toast when the scan failed.
+/// Finds the HUDs `action` would lose and asks about them; with `only`, it touches that one
+/// folder and the question is about it alone. `Some` carries on with what the player chose,
+/// and with an empty plan when there is nothing to ask; `None` means stop, after a toast
+/// when the scan failed.
 pub async fn check_external(
     action: HudAction,
+    only: Option<String>,
     tf2: Tf2Install,
     win: AnyWindowHandle,
     title: &'static str,
@@ -164,7 +166,9 @@ pub async fn check_external(
     let scanning = cx.update(|cx| {
         run_blocking(cx, move |s| {
             let found = s.library.external_huds(&tf2);
-            found.map_err(|e| describe_library(&e).into_op(title))
+            let mut huds = found.map_err(|e| describe_library(&e).into_op(title))?;
+            huds.retain(|hud| only.as_deref().is_none_or(|one| hud.folder_name() == one));
+            Ok(huds)
         })
     });
     match scanning.await {

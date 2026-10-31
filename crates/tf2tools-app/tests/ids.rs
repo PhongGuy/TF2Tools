@@ -38,6 +38,11 @@ fn page_ids_use_kebab_slugs() {
 #[test]
 fn keyed_ids_carry_the_stable_key() {
     assert_eq!(name(ids::hud_card("budhud")), "hud-card:budhud");
+    assert_eq!(name(ids::hud_uninstall("budhud")), "hud-uninstall:budhud");
+    assert_eq!(
+        name(ids::hud_installed_name("budhud")),
+        "hud-installed-name:budhud"
+    );
     assert_eq!(
         name(ids::sound_card("ding-1a2b3c4d")),
         "sound-card:ding-1a2b3c4d"
