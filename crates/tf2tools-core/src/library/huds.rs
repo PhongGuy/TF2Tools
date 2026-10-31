@@ -2,7 +2,7 @@
 //! installing one HUD at a time into `tf/custom`.
 
 use std::collections::{HashMap, HashSet};
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 use rusqlite::{OptionalExtension, params};
@@ -417,7 +417,7 @@ impl Library {
         };
 
         let custom = tf2.custom_dir();
-        self.refuse_unnamed_huds(&custom, discard)?;
+        self.refuse_unnamed_huds(&custom, discard, None)?;
         // Scan before touching tf/custom, so a failed scan leaves the old install in place.
         let mut target = self.install_name(&src, store_hud_id, store_gb_id, &folder)?;
         // Blanked before anything moves, so a failed removal or copy never leaves the
@@ -527,9 +527,54 @@ impl Library {
     ) -> Result<(), InstallError> {
         let _swap = live_link::hud_swap_lock();
         let custom = tf2.custom_dir();
-        self.refuse_unnamed_huds(&custom, discard)?;
+        self.refuse_unnamed_huds(&custom, discard, None)?;
         live_link::clear_staging(&custom)?;
         remove_installed_huds(&custom)?;
+        self.forget_install()
+    }
+
+    /// Removes the one HUD called `folder` from `tf/custom`, as `hud_status` names it, and
+    /// leaves every other HUD alone. Install settings are cleared only when it is the
+    /// recorded install. A name that is no HUD folder there changes nothing. Fails with
+    /// `ExternalHuds` and changes nothing when the library cannot put this HUD back and
+    /// `discard` does not name it.
+    pub fn uninstall_one_hud(
+        &self,
+        tf2: &Tf2Install,
+        folder: &str,
+        discard: &[ExternalHud],
+    ) -> Result<(), InstallError> {
+        let _swap = live_link::hud_swap_lock();
+        let custom = tf2.custom_dir();
+        // Only what the scan found can go, so no name reaches outside tf/custom.
+        let found = scan_hud_folders(&custom)?;
+        let target = found.iter().find_map(|path| {
+            let name = path.file_name()?;
+            (name.to_string_lossy() == folder).then_some((path, name))
+        });
+        let Some((path, name)) = target else {
+            return Ok(());
+        };
+        self.refuse_unnamed_huds(&custom, discard, Some(name))?;
+        let recorded = self
+            .db
+            .read(|conn| read_setting(conn, "installed_hud_folder"))
+            .map_err(install_db)?
+            .is_some_and(|installed| installed == folder);
+        // Staging only ever holds the recorded install, and another HUD's removal must not
+        // cost that install its way back after a crash.
+        if recorded {
+            live_link::clear_staging(&custom)?;
+        }
+        remove_dir_if_present(path)?;
+        if recorded {
+            self.forget_install()?;
+        }
+        Ok(())
+    }
+
+    /// Clears the record of what is installed, along with the profile that put it there.
+    fn forget_install(&self) -> Result<(), InstallError> {
         self.db
             .write(|conn| {
                 let tx = conn.transaction()?;
@@ -686,17 +731,20 @@ impl Library {
     }
 
     // The one gate in front of every removal, so no caller can lose a HUD by forgetting to ask.
+    // `only` narrows it to the one folder a removal touches.
     fn refuse_unnamed_huds(
         &self,
         custom: &Path,
         discard: &[ExternalHud],
+        only: Option<&OsStr>,
     ) -> Result<(), InstallError> {
-        let unnamed = self.unnamed_huds(custom, discard).map_err(|e| match e {
+        let mut unnamed = self.unnamed_huds(custom, discard).map_err(|e| match e {
             LibraryError::Io { path, source } => InstallError::Io { path, source },
             other => InstallError::Database {
                 message: other.to_string(),
             },
         })?;
+        unnamed.retain(|hud| only.is_none_or(|folder| hud.folder == folder));
         if unnamed.is_empty() {
             Ok(())
         } else {

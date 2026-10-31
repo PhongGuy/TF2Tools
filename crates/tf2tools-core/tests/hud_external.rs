@@ -742,3 +742,204 @@ fn reinstall_leaves_a_hand_placed_folder_of_the_same_name_alone() {
     assert!(matches!(err, ReinstallError::Changed { .. }), "{err:?}");
     assert_eq!(snapshot(&custom), before);
 }
+
+fn record(env: &LibraryEnv) -> [Option<String>; 4] {
+    [
+        "installed_hud_folder",
+        "installed_hud_id",
+        "installed_hud_fingerprint",
+        "active_profile_id",
+    ]
+    .map(|key| setting(&env.dir, key))
+}
+
+fn named(env: &LibraryEnv, folder: &str) -> Vec<ExternalHud> {
+    let mut found = env.lib.external_huds(&env.tf2).unwrap();
+    found.retain(|hud| hud.folder_name() == folder);
+    found
+}
+
+/// A crash's leftovers: a marked swap that set `folder` aside.
+fn set_aside(env: &LibraryEnv, folder: &str) {
+    let staging = env.tf2.custom_dir().join(".tf2tools-reinstall");
+    write_file(&staging.join("swapping"), folder.as_bytes());
+    write_file(&staging.join("old").join(folder).join("info.vdf"), b"x");
+}
+
+#[test]
+fn removing_one_hud_leaves_the_others_as_they_were() {
+    let env = library_env();
+    let installed = hud(&env, "rayshud");
+    env.lib.install_hud(installed.id(), &env.tf2).unwrap();
+    place(&env, "manual");
+    place(&env, "another");
+    let custom = env.tf2.custom_dir();
+    let (ours, theirs) = (
+        snapshot(&custom.join("rayshud")),
+        snapshot(&custom.join("manual")),
+    );
+
+    let discard = named(&env, "another");
+    env.lib
+        .uninstall_one_hud(&env.tf2, "another", &discard)
+        .unwrap();
+
+    assert!(!custom.join("another").exists());
+    assert_eq!(snapshot(&custom.join("rayshud")), ours);
+    assert_eq!(snapshot(&custom.join("manual")), theirs);
+}
+
+#[test]
+fn removing_one_external_hud_is_refused_until_it_is_named() {
+    let env = library_env();
+    place(&env, "manual");
+    place(&env, "another");
+    let custom = env.tf2.custom_dir();
+    let before = snapshot(&custom);
+
+    let refused = env.lib.uninstall_one_hud(&env.tf2, "manual", &[]);
+    let Err(InstallError::ExternalHuds(found)) = refused else {
+        panic!("removed without being named: {refused:?}");
+    };
+
+    assert_eq!(names(&found), ["manual"]);
+    assert_eq!(snapshot(&custom), before);
+}
+
+#[test]
+fn naming_another_hud_does_not_cover_the_one_being_removed() {
+    let env = library_env();
+    place(&env, "manual");
+    place(&env, "another");
+    let discard = named(&env, "another");
+    let refused = env.lib.uninstall_one_hud(&env.tf2, "manual", &discard);
+    assert!(matches!(refused, Err(InstallError::ExternalHuds(_))));
+    assert!(env.tf2.custom_dir().join("manual/info.vdf").is_file());
+}
+
+#[test]
+fn an_edited_install_is_refused_when_it_alone_is_removed() {
+    let env = library_env();
+    let installed = hud(&env, "rayshud");
+    env.lib.install_hud(installed.id(), &env.tf2).unwrap();
+    place(&env, "manual");
+    let edited = env.tf2.custom_dir().join("rayshud/resource/mine.res");
+    write_file(&edited, b"edited");
+
+    let refused = env.lib.uninstall_one_hud(&env.tf2, "rayshud", &[]);
+    assert!(matches!(refused, Err(InstallError::ExternalHuds(_))));
+    assert!(edited.is_file());
+}
+
+#[test]
+fn removing_the_recorded_hud_clears_the_record() {
+    let env = library_env();
+    let installed = hud(&env, "rayshud");
+    env.lib.install_hud(installed.id(), &env.tf2).unwrap();
+    set_setting(&env.dir, "active_profile_id", "p1");
+    place(&env, "manual");
+
+    env.lib.uninstall_one_hud(&env.tf2, "rayshud", &[]).unwrap();
+
+    assert_eq!(record(&env), [const { Some(String::new()) }; 4]);
+    assert_eq!(
+        env.lib.hud_status(&env.tf2).unwrap(),
+        HudStatus::Unmanaged {
+            folder_name: "manual".to_owned()
+        }
+    );
+}
+
+#[test]
+fn removing_another_hud_keeps_the_record_of_the_install() {
+    let env = library_env();
+    let installed = hud(&env, "rayshud");
+    env.lib.install_hud(installed.id(), &env.tf2).unwrap();
+    set_setting(&env.dir, "active_profile_id", "p1");
+    let before = record(&env);
+    place(&env, "manual");
+
+    let discard = named(&env, "manual");
+    env.lib
+        .uninstall_one_hud(&env.tf2, "manual", &discard)
+        .unwrap();
+
+    assert_eq!(record(&env), before);
+    assert_eq!(
+        env.lib.hud_status(&env.tf2).unwrap(),
+        HudStatus::Managed {
+            folder_name: "rayshud".to_owned(),
+            id: installed.id().clone()
+        }
+    );
+    assert!(env.lib.external_huds(&env.tf2).unwrap().is_empty());
+}
+
+#[test]
+fn a_removed_hud_does_not_come_back_from_a_crash_leftover() {
+    let env = library_env();
+    let installed = hud(&env, "rayshud");
+    env.lib.install_hud(installed.id(), &env.tf2).unwrap();
+    place(&env, "manual");
+    set_aside(&env, "rayshud");
+
+    env.lib.uninstall_one_hud(&env.tf2, "rayshud", &[]).unwrap();
+    env.lib.recover_reinstall(&env.tf2).unwrap();
+
+    assert!(!env.tf2.custom_dir().join("rayshud").exists());
+}
+
+#[test]
+fn removing_another_hud_leaves_a_crash_leftover_to_recover() {
+    let env = library_env();
+    let installed = hud(&env, "rayshud");
+    env.lib.install_hud(installed.id(), &env.tf2).unwrap();
+    place(&env, "manual");
+    set_aside(&env, "rayshud");
+
+    let discard = named(&env, "manual");
+    env.lib
+        .uninstall_one_hud(&env.tf2, "manual", &discard)
+        .unwrap();
+
+    assert!(env.tf2.custom_dir().join(".tf2tools-reinstall").exists());
+}
+
+#[test]
+fn only_a_hud_folder_can_be_removed_by_name() {
+    let env = library_env();
+    let custom = env.tf2.custom_dir();
+    place(&env, "manual");
+    write_file(&custom.join("notahud/readme.txt"), b"x");
+    write_file(&custom.parent().unwrap().join("outside/info.vdf"), b"x");
+    let before = snapshot(&custom);
+
+    for folder in ["notahud", "gone", "../outside", "..", ""] {
+        env.lib.uninstall_one_hud(&env.tf2, folder, &[]).unwrap();
+    }
+
+    assert_eq!(snapshot(&custom), before);
+    assert!(custom.parent().unwrap().join("outside/info.vdf").is_file());
+}
+
+#[cfg(unix)]
+#[test]
+fn one_folder_whose_name_is_not_utf8_can_be_removed() {
+    use std::os::unix::ffi::OsStrExt;
+    let env = library_env();
+    let custom = env.tf2.custom_dir();
+    let odd = custom.join(std::ffi::OsStr::from_bytes(b"hud\xff"));
+    write_file(&odd.join("info.vdf"), b"x");
+    place(&env, "manual");
+
+    let found = env.lib.external_huds(&env.tf2).unwrap();
+    let name = "hud\u{fffd}";
+    let discard: Vec<ExternalHud> = found
+        .into_iter()
+        .filter(|hud| hud.folder_name() == name)
+        .collect();
+    env.lib.uninstall_one_hud(&env.tf2, name, &discard).unwrap();
+
+    assert!(!odd.exists());
+    assert!(custom.join("manual/info.vdf").is_file());
+}
