@@ -6,14 +6,13 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::color_picker::ColorPicker;
 use gpui_kit::component::input::Input;
 use gpui_kit::component::popover::Popover;
-use gpui_kit::component::scroll::{Scrollbar, ScrollbarMode};
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _, h_flex, v_flex,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    Anchor, AnyElement, Context, CursorStyle, DispatchPhase, ElementId, FontWeight, Hsla,
+    Anchor, AnyElement, Context, CursorStyle, DispatchPhase, Div, ElementId, FontWeight, Hsla,
     InteractiveElement as _, IntoElement, MouseButton, MouseDownEvent, MouseMoveEvent,
     MouseUpEvent, ParentElement as _, Pixels, Point, SharedString, StatefulInteractiveElement as _,
     Styled, TestSupportExt as _, Window, canvas, div, point, px,
@@ -33,6 +32,7 @@ use super::{Field, FontList, HudMakerPage};
 use crate::ids;
 use crate::pages::crosshair_maker::model::hsla_of_rgba;
 use crate::widgets::labelled;
+use crate::widgets::scroll::scroll_area;
 
 // The prompt with nothing selected, naming the scene whose tab is open.
 fn empty_hint(scene: Option<Scene>) -> &'static str {
@@ -128,18 +128,12 @@ fn fill<E: Styled>(el: E, docked: bool) -> E {
     }
 }
 
-// A body with a scrollbar laid over its right edge, always shown while the body overflows so the
-// player sees there is more below. The part list keeps a small inset around it.
-fn scrolled((body, bar): (AnyElement, Scrollbar), docked: bool, inset: bool) -> AnyElement {
-    let holder = fill(v_flex().relative(), docked).child(body).child(
-        div()
-            .absolute()
-            .inset_0()
-            .child(bar.mode(ScrollbarMode::Always).viewport_from_layout()),
-    );
+// A body already wrapped in its scroll area, sized to the panel. The part list keeps a small
+// inset around it.
+fn scrolled(area: Div, docked: bool, inset: bool) -> AnyElement {
     fill(v_flex(), docked)
         .when(inset, |el| el.p_1())
-        .child(holder)
+        .child(fill(area, docked))
         .into_any_element()
 }
 
@@ -309,7 +303,7 @@ impl HudMakerPage {
             PanelMode::DockLeft | PanelMode::DockRight => frame.flex_1(),
         };
         let body = (!place.collapsed).then(|| {
-            let content = match panel {
+            let area = match panel {
                 Panel::Options => {
                     let rows = v_flex()
                         .id(ids::HUD_MAKER_PANEL_BODY)
@@ -319,15 +313,15 @@ impl HudMakerPage {
                         .p_3()
                         .gap_3()
                         .children(self.panel_rows(cx));
-                    let bar = Scrollbar::vertical(&self.panel_scroll);
-                    (fill(rows, docked).into_any_element(), bar)
+                    let bar = ids::HUD_MAKER_PANEL_BODY_SCROLLBAR;
+                    scroll_area(bar, &self.panel_scroll, fill(rows, docked))
                 }
                 Panel::Parts => {
                     let list = self.part_list(docked, cx);
-                    (list, Scrollbar::vertical(&self.parts_scroll))
+                    scroll_area(ids::HUD_MAKER_PARTS_SCROLLBAR, &self.parts_scroll, list)
                 }
             };
-            scrolled(content, docked, panel == Panel::Parts)
+            scrolled(area, docked, panel == Panel::Parts)
         });
         frame
             .child(self.panel_title(panel, place, cx))

@@ -85,6 +85,8 @@ pub const SETTINGS_RESYNC: &str = "settings-resync";
 pub const SETTINGS_NOTICES: &str = "settings-notices";
 /// The scrollable box of third-party notices, present while shown.
 pub const SETTINGS_NOTICES_VIEW: &str = "settings-notices-view";
+/// The notices box's scrollbar, over its right edge.
+pub const SETTINGS_NOTICES_SCROLLBAR: &str = "settings-notices-scrollbar";
 /// The conflicts box, labelled "Conflicts Detected. " and one line per conflict.
 pub const SOUNDS_CONFLICTS: &str = "sounds-conflicts";
 /// Wraps the library search input.
@@ -178,6 +180,8 @@ pub const HUD_MAKER_TOOLBAR_COLLAPSE: &str = "hud-maker-toolbar-collapse";
 pub const HUD_MAKER_TOOLBAR_EXPAND: &str = "hud-maker-toolbar-expand";
 /// The scrolling part list.
 pub const HUD_MAKER_PARTS: &str = "hud-maker-parts";
+/// The part list's scrollbar, over its right edge.
+pub const HUD_MAKER_PARTS_SCROLLBAR: &str = "hud-maker-parts-scrollbar";
 /// The tooltip on a part list row's name, shown while the pointer rests on it.
 pub const HUD_MAKER_ROW_TIP: &str = "hud-maker-row-tip";
 /// The tooltip naming an alignment button's place, shown while the pointer rests on it.
@@ -202,6 +206,8 @@ pub const HUD_MAKER_PANEL: &str = "hud-maker-panel";
 pub const HUD_MAKER_PANEL_TITLE: &str = "hud-maker-panel-title";
 /// The side panel's rows under the title bar; absent while collapsed.
 pub const HUD_MAKER_PANEL_BODY: &str = "hud-maker-panel-body";
+/// The side panel body's scrollbar, over its right edge.
+pub const HUD_MAKER_PANEL_BODY_SCROLLBAR: &str = "hud-maker-panel-body-scrollbar";
 /// The side panel's "Dock left" button.
 pub const HUD_MAKER_PANEL_DOCK_LEFT: &str = "hud-maker-panel-dock-left";
 /// The side panel's "Dock right" button.
@@ -442,6 +448,8 @@ pub const CROSSHAIR_MAKER_OUTLINE_COLOR: &str = "crosshair-maker-outline-color";
 pub const CROSSHAIR_MAKER_VIEW: &str = "crosshair-maker-view";
 /// The maker's side panel, which scrolls when the window is too short for it.
 pub const CROSSHAIR_MAKER_PANEL: &str = "crosshair-maker-panel";
+/// The side panel's scrollbar, over its right edge.
+pub const CROSSHAIR_MAKER_PANEL_SCROLLBAR: &str = "crosshair-maker-panel-scrollbar";
 /// The zoom label button, labelled "100%" and so on; a click fits the grid.
 pub const CROSSHAIR_MAKER_ZOOM: &str = "crosshair-maker-zoom";
 /// The Zoom in button.
@@ -742,6 +750,12 @@ pub fn page(page: Page) -> ElementId {
     ElementId::Name(format!("page-{}", page.slug()).into())
 }
 
+/// The scrollbar over `page`'s right edge, drawn while the page overflows:
+/// "page-scrollbar-<slug>".
+pub fn page_scrollbar(page: Page) -> ElementId {
+    ElementId::Name(format!("page-scrollbar-{}", page.slug()).into())
+}
+
 /// An id for one of many like elements, carrying its stable key: "<kind>:<key>".
 pub fn keyed(kind: &str, key: &str) -> ElementId {
     ElementId::Name(format!("{kind}:{key}").into())
@@ -790,6 +804,11 @@ pub fn log_details_toggle(id: i64) -> ElementId {
 /// A row's expanded details text: "log-details:<id>".
 pub fn log_details(id: i64) -> ElementId {
     keyed("log-details", &id.to_string())
+}
+
+/// The scrollbar over a row's expanded details: "log-details-scrollbar:<id>".
+pub fn log_details_scrollbar(id: i64) -> ElementId {
+    keyed("log-details-scrollbar", &id.to_string())
 }
 
 // The kinds of the Addons page's per-card ids, each keyed by the addon's asset name.
@@ -1321,6 +1340,8 @@ pub fn hud_fonts_issue(ix: usize) -> ElementId {
 
 /// The HUD fonts dialog's scrolling list of font and issue rows.
 pub const HUD_FONTS_LIST: &str = "hud-fonts-list";
+/// The HUD fonts list's scrollbar, over its right edge.
+pub const HUD_FONTS_LIST_SCROLLBAR: &str = "hud-fonts-list-scrollbar";
 
 /// One of the maker's colour swatches, keyed by its index: "crosshair-maker-swatch:<ix>".
 pub fn crosshair_maker_swatch(ix: usize) -> ElementId {
