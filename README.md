@@ -2,7 +2,7 @@
 
 Set up your Team Fortress 2 HUD, hitsounds, killsounds and crosshairs in a few clicks, and find new ones from the community without leaving the app.
 
-**[Download for Windows](https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.exe)** · **[Download for Linux](https://github.com/PhongGuy/TF2Tools/releases/latest)**
+**[Download for Windows](https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.exe)** · **[Download for Linux](https://github.com/PhongGuy/TF2Tools/releases/latest/download/tf2tools-linux-x86_64.AppImage)**
 
 ![The HUD Store: community HUDs as cards, each ready to download](.github/readme/hud-store.webp)
 
@@ -81,10 +81,10 @@ The download links on this page always fetch the newest TF2Tools for Windows or 
 
 ### Linux
 
-Open the [latest release](https://github.com/PhongGuy/TF2Tools/releases/latest) and download one of these:
+Download one of these:
 
-- **Ubuntu, Debian, Mint and similar:** the file ending in `_amd64.deb`. Double-click it to open it in your software center, then click Install. TF2Tools appears in your app menu.
-- **Any other distribution:** the file ending in `_x86_64.AppImage`. Right-click it, open Properties, allow it to run as a program, then double-click it. If it doesn't start, your system may be missing FUSE, which AppImages use; your distribution's help pages explain how to add it.
+- **Ubuntu, Debian, Mint and similar:** **[tf2tools-linux-amd64.deb](https://github.com/PhongGuy/TF2Tools/releases/latest/download/tf2tools-linux-amd64.deb)**. Double-click it to open it in your software center, then click Install. TF2Tools appears in your app menu.
+- **Any other distribution:** **[tf2tools-linux-x86_64.AppImage](https://github.com/PhongGuy/TF2Tools/releases/latest/download/tf2tools-linux-x86_64.AppImage)**. Right-click it, open Properties, allow it to run as a program, then double-click it. If it doesn't start, your system may be missing FUSE, which AppImages use; your distribution's help pages explain how to add it.
 
 TF2Tools is built on Ubuntu 22.04, so it runs on that and newer systems.
 
