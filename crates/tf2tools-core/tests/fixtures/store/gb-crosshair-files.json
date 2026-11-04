@@ -1,0 +1,23 @@
+{
+    "_idRow": 456577,
+    "_sName": "Dyselxic Crosshair - Kunai",
+    "_aFiles": [
+        {
+            "_idRow": 1213224,
+            "_sFile": "-dyselxic-crosshair-main_aefd4.zip",
+            "_nFilesize": 700007,
+            "_tsDateAdded": 1718115617,
+            "_nDownloadCount": 3464,
+            "_sDownloadUrl": "https:\/\/gamebanana.com\/dl\/1213224",
+            "_sMd5Checksum": "624ae757067d6af1d845b42bda01f73b",
+            "_sAnalysisState": "done",
+            "_sAnalysisResult": "ok",
+            "_sAnalysisResultVerbose": "File passed preliminary analysis",
+            "_sAvState": "done",
+            "_sAvResult": "clean",
+            "_bIsArchived": false,
+            "_bHasContents": true,
+            "_sDescription": "Dyslexic Crosshair"
+        }
+    ]
+}

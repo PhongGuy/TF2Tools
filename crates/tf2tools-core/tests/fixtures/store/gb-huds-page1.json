@@ -1,0 +1,264 @@
+{
+  "_aMetadata": {
+    "_nRecordCount": 800,
+    "_bIsComplete": false,
+    "_nPerpage": 15
+  },
+  "_aRecords": [
+    {
+      "_idRow": 463048,
+      "_sModelName": "Mod",
+      "_sSingularTitle": "Mod",
+      "_sIconClasses": "SubmissionType Mod",
+      "_sName": "DarHUD",
+      "_sProfileUrl": "https://gamebanana.com/mods/463048",
+      "_tsDateAdded": 1692303997,
+      "_tsDateModified": 1787142965,
+      "_bHasFiles": true,
+      "_aTags": [
+        "Software Used: VTFEdit"
+      ],
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "64de884308830.jpg",
+            "_sFile220": "220-90_64de884308830.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_64de884308830.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_64de884308830.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "64e13863b300d.jpg",
+            "_sFile100": "100-90_64e13863b300d.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "64de80e640145.jpg",
+            "_sFile100": "100-90_64de80e640145.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_idRow": 2136470,
+        "_sName": "DarSitam",
+        "_bIsOnline": false,
+        "_bHasRipe": false,
+        "_sProfileUrl": "https://gamebanana.com/members/2136470",
+        "_sAvatarUrl": "https://images.gamebanana.com/img/av/628cbe20615c9.png",
+        "_sHdAvatarUrl": "https://images.gamebanana.com/img/av/64e0d94fa121e.png"
+      },
+      "_aGame": {
+        "_idRow": 297,
+        "_sName": "Team Fortress 2",
+        "_sProfileUrl": "https://gamebanana.com/games/297",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/games/4f5a605d0eb52.png"
+      },
+      "_aRootCategory": {
+        "_sName": "GUIs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1644",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b49a79d865.png"
+      },
+      "_aSubCategory": {
+        "_sName": "HUDs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1649",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b4f6d86293.png"
+      },
+      "_sVersion": "v2026.18",
+      "_tsDateUpdated": 1787143383,
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 445,
+      "_nPostCount": 285,
+      "_bWasFeatured": true,
+      "_nViewCount": 270784,
+      "_bIsOwnedByAccessor": false
+    },
+    {
+      "_idRow": 609267,
+      "_sModelName": "Mod",
+      "_sSingularTitle": "Mod",
+      "_sIconClasses": "SubmissionType Mod",
+      "_sName": "Cooler HUD",
+      "_sProfileUrl": "https://gamebanana.com/mods/609267",
+      "_tsDateAdded": 1753452053,
+      "_tsDateModified": 1790225869,
+      "_bHasFiles": true,
+      "_aTags": [],
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "Cooler HUD",
+            "_sFile": "688383e551ccc.jpg",
+            "_sFile220": "220-90_688383e551ccc.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_688383e551ccc.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_688383e551ccc.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "Voice Chat - Captions - Damage",
+            "_sFile": "68bcbfb0a74f7.jpg",
+            "_sFile100": "100-90_68bcbfb0a74f7.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "Minmode",
+            "_sFile": "68bcbfb080692.jpg",
+            "_sFile100": "100-90_68bcbfb080692.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_idRow": 1420667,
+        "_sName": "Pyromaniax",
+        "_bIsOnline": false,
+        "_bHasRipe": false,
+        "_sProfileUrl": "https://gamebanana.com/members/1420667",
+        "_sAvatarUrl": "https://images.gamebanana.com/img/av/5c6c8730338b4.png"
+      },
+      "_aGame": {
+        "_idRow": 297,
+        "_sName": "Team Fortress 2",
+        "_sProfileUrl": "https://gamebanana.com/games/297",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/games/4f5a605d0eb52.png"
+      },
+      "_aRootCategory": {
+        "_sName": "GUIs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1644",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b49a79d865.png"
+      },
+      "_aSubCategory": {
+        "_sName": "HUDs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1649",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b4f6d86293.png"
+      },
+      "_sVersion": "v2.7",
+      "_tsDateUpdated": 1790225872,
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 325,
+      "_nPostCount": 219,
+      "_bWasFeatured": true,
+      "_nViewCount": 93790,
+      "_bIsOwnedByAccessor": false
+    },
+    {
+      "_idRow": 409955,
+      "_sModelName": "Mod",
+      "_sSingularTitle": "Mod",
+      "_sIconClasses": "SubmissionType Mod",
+      "_sName": "My Version of Helltaker HUD Portraits",
+      "_sProfileUrl": "https://gamebanana.com/mods/409955",
+      "_tsDateAdded": 1667304882,
+      "_tsDateModified": 1704741291,
+      "_bHasFiles": true,
+      "_aTags": [
+        "Software Used: VTFEdit",
+        "Software Used: GIMP",
+        "Software Used: Paint.NET"
+      ],
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "Helltaker Mercs",
+            "_sFile": "63610d4928713.jpg",
+            "_sFile220": "220-90_63610d4928713.jpg",
+            "_hFile220": 125,
+            "_wFile220": 220,
+            "_sFile530": "530-90_63610d4928713.jpg",
+            "_hFile530": 301,
+            "_wFile530": 530,
+            "_sFile100": "100-90_63610d4928713.jpg",
+            "_hFile100": 57,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "Scout (Modeus)",
+            "_sFile": "63610b65b48c6.jpg",
+            "_sFile100": "100-90_63610b65b48c6.jpg",
+            "_hFile100": 57,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "Scout (Modeus)",
+            "_sFile": "63610b69670b5.jpg",
+            "_sFile100": "100-90_63610b69670b5.jpg",
+            "_hFile100": 57,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_idRow": 1431722,
+        "_sName": "Nickle",
+        "_bIsOnline": false,
+        "_bHasRipe": false,
+        "_sProfileUrl": "https://gamebanana.com/members/1431722",
+        "_sAvatarUrl": "https://images.gamebanana.com/img/av/6078104595d47.png",
+        "_sHdAvatarUrl": "https://images.gamebanana.com/img/av/6078104f04eae.png",
+        "_sUpicUrl": "https://images.gamebanana.com/img/upic/5d9d9129b0bf0.png"
+      },
+      "_aGame": {
+        "_idRow": 297,
+        "_sName": "Team Fortress 2",
+        "_sProfileUrl": "https://gamebanana.com/games/297",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/games/4f5a605d0eb52.png"
+      },
+      "_aRootCategory": {
+        "_sName": "GUIs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1644",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b49a79d865.png"
+      },
+      "_aSubCategory": {
+        "_sName": "HUDs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1649",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b4f6d86293.png"
+      },
+      "_sVersion": "1.2",
+      "_tsDateUpdated": 1667441789,
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 319,
+      "_nPostCount": 80,
+      "_bWasFeatured": true,
+      "_nViewCount": 158061,
+      "_bIsOwnedByAccessor": false
+    }
+  ]
+}

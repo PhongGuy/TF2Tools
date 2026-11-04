@@ -1,0 +1,258 @@
+{
+  "_aMetadata": {
+    "_nRecordCount": 97,
+    "_bIsComplete": false,
+    "_nPerpage": 15
+  },
+  "_aRecords": [
+    {
+      "_idRow": 456577,
+      "_sModelName": "Mod",
+      "_sSingularTitle": "Mod",
+      "_sIconClasses": "SubmissionType Mod",
+      "_sName": "Dyselxic Crosshair - Kunai",
+      "_sProfileUrl": "https://gamebanana.com/mods/456577",
+      "_tsDateAdded": 1689567250,
+      "_tsDateModified": 1749174118,
+      "_bHasFiles": true,
+      "_aTags": [],
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "66c071a63156d.jpg",
+            "_sFile220": "220-90_66c071a63156d.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "66c071a63156d.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_66c071a63156d.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "64b53c8423359.jpg",
+            "_sFile100": "100-90_64b53c8423359.jpg",
+            "_hFile100": 71,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "64b4bf4cabfe3.jpg",
+            "_sFile100": "100-90_64b4bf4cabfe3.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_idRow": 2134385,
+        "_sName": "Vexcenot",
+        "_bIsOnline": false,
+        "_bHasRipe": false,
+        "_sProfileUrl": "https://gamebanana.com/members/2134385",
+        "_sAvatarUrl": "https://images.gamebanana.com/img/av/69b946a75f4d2.png",
+        "_sHdAvatarUrl": "https://images.gamebanana.com/img/av/69a7d71a43c1d.png"
+      },
+      "_aGame": {
+        "_idRow": 297,
+        "_sName": "Team Fortress 2",
+        "_sProfileUrl": "https://gamebanana.com/games/297",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/games/4f5a605d0eb52.png"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b4a3beeef7.png"
+      },
+      "_aSubCategory": {
+        "_sName": "Crosshairs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1105",
+        "_sIconUrl": ""
+      },
+      "_sVersion": "15",
+      "_tsDateUpdated": 1719030915,
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 77,
+      "_nPostCount": 95,
+      "_bWasFeatured": true,
+      "_nViewCount": 99452,
+      "_bIsOwnedByAccessor": false
+    },
+    {
+      "_idRow": 511274,
+      "_sModelName": "Mod",
+      "_sSingularTitle": "Mod",
+      "_sIconClasses": "SubmissionType Mod",
+      "_sName": "MaxiCross+ - Per-Weapon Crosshairs",
+      "_sProfileUrl": "https://gamebanana.com/mods/511274",
+      "_tsDateAdded": 1714740783,
+      "_tsDateModified": 1789656867,
+      "_bHasFiles": true,
+      "_aTags": [
+        "Casual Compatibility: Casual Compatible"
+      ],
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6aabfe316cd13.jpg",
+            "_sFile220": "220-90_6aabfe316cd13.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6aabfe316cd13.jpg",
+            "_hFile530": 299,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6aabfe316cd13.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6aabfe3b78eb9.jpg",
+            "_sFile100": "100-90_6aabfe3b78eb9.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6aabfe3e76dcd.jpg",
+            "_sFile100": "100-90_6aabfe3e76dcd.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_idRow": 2780694,
+        "_sName": "Max_Andrew",
+        "_bIsOnline": false,
+        "_bHasRipe": false,
+        "_sProfileUrl": "https://gamebanana.com/members/2780694",
+        "_sAvatarUrl": "https://images.gamebanana.com/img/av/67c2f7d78ef02.png",
+        "_sHdAvatarUrl": "https://images.gamebanana.com/img/av/67c2f78761048.png",
+        "_sUpicUrl": "https://images.gamebanana.com/img/upic/66ae9f6c3d9ce.png"
+      },
+      "_aGame": {
+        "_idRow": 297,
+        "_sName": "Team Fortress 2",
+        "_sProfileUrl": "https://gamebanana.com/games/297",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/games/4f5a605d0eb52.png"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b4a3beeef7.png"
+      },
+      "_aSubCategory": {
+        "_sName": "Crosshairs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1105",
+        "_sIconUrl": ""
+      },
+      "_sVersion": "4",
+      "_tsDateUpdated": 1789657080,
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 71,
+      "_nPostCount": 49,
+      "_bWasFeatured": true,
+      "_nViewCount": 44179,
+      "_bIsOwnedByAccessor": false
+    },
+    {
+      "_idRow": 398404,
+      "_sModelName": "Mod",
+      "_sSingularTitle": "Mod",
+      "_sIconClasses": "SubmissionType Mod",
+      "_sName": "512x Crosshair Pack",
+      "_sProfileUrl": "https://gamebanana.com/mods/398404",
+      "_tsDateAdded": 1661578673,
+      "_tsDateModified": 1684560796,
+      "_bHasFiles": true,
+      "_aTags": [],
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "Shotgun/Scattergun crosshair",
+            "_sFile": "64605635b2c9c.jpg",
+            "_sFile220": "220-90_64605635b2c9c.jpg",
+            "_hFile220": 110,
+            "_wFile220": 220,
+            "_sFile530": "64605635b2c9c.jpg",
+            "_hFile530": 200,
+            "_wFile530": 530,
+            "_sFile100": "100-90_64605635b2c9c.jpg",
+            "_hFile100": 50,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "General crosshair",
+            "_sFile": "6460564422811.jpg",
+            "_sFile100": "100-90_6460564422811.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          },
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "Rocket Launcher crosshair (shows Beggar's spread)",
+            "_sFile": "64605640cadce.jpg",
+            "_sFile100": "100-90_64605640cadce.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_idRow": 2041551,
+        "_sName": "The Birdy from Nowhere!",
+        "_bIsOnline": false,
+        "_bHasRipe": false,
+        "_sProfileUrl": "https://gamebanana.com/members/2041551",
+        "_sAvatarUrl": "https://images.gamebanana.com/img/av/61ab337b0a945.png",
+        "_sHdAvatarUrl": "https://images.gamebanana.com/img/av/68404de86d6c1.png"
+      },
+      "_aGame": {
+        "_idRow": 297,
+        "_sName": "Team Fortress 2",
+        "_sProfileUrl": "https://gamebanana.com/games/297",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/games/4f5a605d0eb52.png"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b4a3beeef7.png"
+      },
+      "_aSubCategory": {
+        "_sName": "Crosshairs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1105",
+        "_sIconUrl": ""
+      },
+      "_sVersion": "v3",
+      "_tsDateUpdated": 1684034928,
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 69,
+      "_nPostCount": 51,
+      "_bWasFeatured": false,
+      "_nViewCount": 65094,
+      "_bIsOwnedByAccessor": false
+    }
+  ]
+}

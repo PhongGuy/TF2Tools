@@ -1,0 +1,4 @@
+Unmodified copies from MIT-licensed HUDs, used as KeyValues round-trip fixtures.
+jofrehud-basechat.res              JofreHUD ee162a5fbcde15edfb49800cd2a0ef1f8a496fbe resource/ui/basechat.res (LICENSE-jofrehud)
+jofrehud-huddamageaccount.res      JofreHUD ee162a5fbcde15edfb49800cd2a0ef1f8a496fbe resource/ui/huddamageaccount.res (LICENSE-jofrehud)
+budhud-hudteamgoaltournament.res   budhud 16f7be2bb4f0dcbe46ec5f444486ab6a6ea4c7e6 _tf2hud/resource/ui/hudteamgoaltournament.res, CRLF (LICENSE-budhud.md)

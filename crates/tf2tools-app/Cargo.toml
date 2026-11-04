@@ -1,0 +1,95 @@
+[package]
+name = "tf2tools-app"
+version.workspace = true
+description = "The TF2Tools desktop app: a GPUI shell over tf2tools-core"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "tf2tools_app"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tf2tools"
+path = "src/main.rs"
+
+[dependencies]
+tf2tools-core = { path = "../tf2tools-core" }
+gpui-kit.workspace = true
+# Unused directly: holds the resolve at =0.7.1 (a caret resolve picks 0.7.2).
+gpui-component.workspace = true
+# Unused directly: holds the resolve at =0.7.1 (a caret resolve picks 0.7.2).
+gpui-base.workspace = true
+# Unused directly: turns on `debug-embed`, so debug builds carry their icons.
+rust-embed.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+async-channel.workspace = true
+rodio.workspace = true
+image = { workspace = true, features = ["jpeg"] }
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+chrono.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[build-dependencies]
+embed-resource.workspace = true
+
+[features]
+# Reads a throwaway signing key and a loopback feed from the environment, for end-to-end
+# update tests; a release build refuses to compile with it.
+update-test-key = []
+
+[dev-dependencies]
+gpui-kit = { workspace = true, features = ["test-support"] }
+tempfile.workspace = true
+rusqlite.workspace = true
+zip.workspace = true
+wiremock.workspace = true
+sha2.workspace = true
+minisign.workspace = true
+# The real cosmic-text system, so a test can resolve the bundled font weights.
+gpui-pre-wgpu = "=0.3.8"
+
+[[example]]
+name = "app_timing"
+test = true
+
+# cargo-packager 0.11.8 input for `make package`; paths are relative to this crate.
+[package.metadata.packager]
+product-name = "TF2Tools"
+identifier = "com.tf2tools.app"
+description = "Manage Team Fortress 2 HUDs, hitsounds, crosshairs and addons"
+long-description = "Installs and manages HUDs, hitsounds, killsounds, crosshairs and mastercomfig addons in Team Fortress 2's tf/custom folder."
+authors = ["TF2Tools contributors"]
+formats = ["deb", "appimage"]
+binaries = [{ path = "tf2tools", main = true }]
+resources = [{ src = "../../assets", target = "assets" }]
+icons = [
+    "../../packaging/icons/32x32.png",
+    "../../packaging/icons/128x128.png",
+    "../../packaging/icons/icon.png",
+]
+
+# One static desktop entry replaces the generated one, named for the window's app id in the deb.
+[package.metadata.packager.linux]
+generate-desktop-entry = false
+
+[package.metadata.packager.deb]
+package-name = "tf2tools"
+# ALSA's 24.04 name first: there bare libasound2 is virtual and apt picks the OSS shim for it.
+depends = ["libasound2t64 | libasound2", "libxcb1", "libxcb-xkb1", "libxkbcommon0", "libxkbcommon-x11-0", "libvulkan1"]
+files = { "../../packaging/com.tf2tools.app.desktop" = "usr/share/applications/com.tf2tools.app.desktop" }
+
+# `make package` builds only the Linux formats; the release passes `--formats nsis` on Windows.
+[package.metadata.packager.nsis]
+installer-icon = "../../packaging/icons/icon.ico"
+installer-mode = "currentUser"
+
+# The AppImage script links `<binary>.desktop` into the AppDir root, so it keeps that name.
+[package.metadata.packager.appimage]
+files = { "../../packaging/com.tf2tools.app.desktop" = "usr/share/applications/tf2tools.desktop" }
+excluded-libraries = ["libvulkan*", "libGL*", "libEGL*"]

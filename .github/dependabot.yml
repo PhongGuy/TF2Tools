@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directories:
+      - "/"
+      - "/tools/tf2tools-pilot"
+    schedule:
+      interval: "monthly"
+    groups:
+      cargo:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "gpui*"

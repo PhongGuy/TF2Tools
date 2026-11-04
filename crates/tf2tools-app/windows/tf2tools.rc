@@ -1,0 +1,2 @@
+// The exe icon Explorer and the taskbar show; icon.ico is found through build.rs's include dir.
+1 ICON "icon.ico"

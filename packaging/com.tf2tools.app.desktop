@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=TF2Tools
+Comment=Manage Team Fortress 2 HUDs, hitsounds, crosshairs and addons
+Exec=tf2tools
+Icon=tf2tools
+Terminal=false
+Categories=Game;
+StartupWMClass=com.tf2tools.app

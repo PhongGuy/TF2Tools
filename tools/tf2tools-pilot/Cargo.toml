@@ -1,0 +1,41 @@
+[package]
+name = "tf2tools-pilot"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT"
+publish = false
+
+# Its own workspace root, so cargo never walks up into the app workspace and the git
+# host dependency stays out of the merge gate.
+[workspace]
+
+[dependencies]
+tf2tools-app = { path = "../../crates/tf2tools-app" }
+tf2tools-core = { path = "../../crates/tf2tools-core" }
+# This crate keeps its own lock, so the kit trio's exact pins are repeated here.
+gpui-kit = "=0.7.1"
+gpui-component = "=0.7.1"
+gpui-base = "=0.7.1"
+gpui-pilot-host = { git = "https://github.com/PhongGuy/gpui-pilot", tag = "v0.1.0" }
+anyhow = "1"
+zip = "9"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+# The image cache is keyed by the URL's SHA-256, as core names it.
+sha2 = "0.11"
+# Seeded log rows need past timestamps, which the core log never writes; same pins as the app.
+rusqlite = { version = "0.40", features = ["bundled"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+
+[features]
+# The app's update test seam, for an end-to-end update run against a loopback feed.
+update-test-key = ["tf2tools-app/update-test-key"]
+
+[dev-dependencies]
+tempfile = "3"
+# The test platform records file dialogs, so a test can see a pick reach one.
+gpui-kit = { version = "=0.7.1", features = ["test-support"] }
+
+# Headless frame numbers need an optimised host and app.
+[profile.dev.package."*"]
+opt-level = 3

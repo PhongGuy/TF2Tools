@@ -1,0 +1,23 @@
+{
+  "tag_name": "9.100.1",
+  "assets": [
+    {
+      "name": "mastercomfig-addon-flat-mouse.vpk",
+      "browser_download_url": "https://github.com/mastercomfig/mastercomfig/releases/download/9.100.1/mastercomfig-addon-flat-mouse.vpk",
+      "size": 299,
+      "download_count": 40731
+    },
+    {
+      "name": "mastercomfig-addon-lowmem.vpk",
+      "browser_download_url": "https://github.com/mastercomfig/mastercomfig/releases/download/9.100.1/mastercomfig-addon-lowmem.vpk",
+      "size": 318,
+      "download_count": 4940
+    },
+    {
+      "name": "autoexec.cfg",
+      "browser_download_url": "https://github.com/mastercomfig/mastercomfig/releases/download/9.100.1/autoexec.cfg",
+      "size": 63017,
+      "download_count": 363
+    }
+  ]
+}

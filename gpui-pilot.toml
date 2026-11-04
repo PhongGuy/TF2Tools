@@ -1,0 +1,11 @@
+# How gpui-pilot builds and launches TF2Tools for an agent; see tools/tf2tools-pilot.
+# The host clears its environment: pass TF2TOOLS_PILOT_DATA in the launch's "env", not the shell
+# (XDG_*_HOME and HOME are refused there). See CONTRIBUTING.md, Pilot QA.
+[headless]
+build = ["cargo", "build", "--manifest-path", "tools/tf2tools-pilot/Cargo.toml"]
+binary = "tools/tf2tools-pilot/target/debug/tf2tools-pilot"
+
+[session]
+build = ["cargo", "build", "-p", "tf2tools-app", "--bin", "tf2tools", "--profile", "timing"]
+binary = "target/timing/tf2tools"
+binds = ["assets"]

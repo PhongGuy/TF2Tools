@@ -1,0 +1,81 @@
+[workspace]
+members = ["crates/tf2tools-core", "crates/tf2tools-app"]
+# The pilot crate pins its own gpui-pilot host and keeps its own lock.
+exclude = ["tools/tf2tools-pilot"]
+resolver = "3"
+
+[workspace.package]
+version = "6.0.0-alpha.0"
+edition = "2024"
+rust-version = "1.99"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+rusqlite = { version = "0.40", features = ["bundled"] }
+thiserror = "2"
+dirs = "7"
+steamlocate = "2.1"
+tempfile = "3"
+zip = "9"
+sevenz-rust2 = "0.24"
+vpk = "0.3"
+vtf = "0.4.1"
+image = { version = "0.25", default-features = false, features = ["png", "webp"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22.1"
+semver = "1.0.28"
+minisign-verify = "=0.3.0"
+minisign = "=0.10.0"
+uuid = { version = "1.28", features = ["v4"] }
+chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
+walkdir = "2.5"
+# Free disk space before copying a HUD; the version already locked, disks only.
+sysinfo = { version = "=0.31.4", default-features = false, features = ["disk"] }
+reqwest = "=0.13.5"
+tokio = { version = "1.53", features = ["sync", "fs", "time", "io-util", "rt"] }
+md-5 = "0.11"
+sha2 = "0.11"
+tracing = "0.1"
+# Unix process-group kill for the bounded font commands; the version already locked.
+libc = "0.2.190"
+ttf-parser = { version = "=0.25.1", default-features = false, features = ["std"] }
+winreg = "=0.56.0"
+windows-sys = { version = "=0.61.2", features = ["Win32_Graphics_Gdi", "Win32_UI_WindowsAndMessaging"] }
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "ansi", "env-filter", "std"] }
+wiremock = "0.6.5"
+# Windows resources for the exe icon; the version gpui-pre already resolves.
+embed-resource = "=3.0.12"
+# UI: the kit trio is pinned exactly at the proven 0.7.1; a caret resolve picks 0.7.2.
+gpui-kit = "=0.7.1"
+gpui-component = "=0.7.1"
+gpui-base = "=0.7.1"
+rust-embed = { version = "=8.13.0", features = ["debug-embed"] }
+anyhow = "1"
+async-channel = "2.5"
+rodio = { version = "0.23", default-features = false, features = ["playback", "wav", "mp3"] }
+
+# Dev builds optimised for measuring frame and startup timings.
+[profile.timing]
+inherits = "dev"
+opt-level = 3
+debug = 0
+
+# The texture decoders are per-pixel loops that crawl unoptimised; the HUD Maker's pictures
+# decode with them, so dev builds keep them fast.
+[profile.dev.package.vtf]
+opt-level = 3
+[profile.dev.package.texpresso]
+opt-level = 3
+
+# Release builds trade build time for size; never set `panic` here (see tests/release_profile.rs).
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+# One-line fixes, see the README in each vendor/ directory.
+[patch.crates-io]
+gpui-pre-linux = { path = "vendor/gpui-pre-linux" }
+gpui-pre-scheduler = { path = "vendor/gpui-pre-scheduler" }

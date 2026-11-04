@@ -1,0 +1,172 @@
+{
+  "_aMetadata": {
+    "_nRecordCount": 19718,
+    "_bIsComplete": false,
+    "_nPerpage": 15
+  },
+  "_aRecords": [
+    {
+      "_idRow": 53978,
+      "_sModelName": "Sound",
+      "_sSingularTitle": "Sound",
+      "_sIconClasses": "SubmissionType Sound",
+      "_sName": "Musical Events",
+      "_sProfileUrl": "https://gamebanana.com/sounds/53978",
+      "_tsDateAdded": 1623684181,
+      "_tsDateModified": 1766795847,
+      "_bHasFiles": true,
+      "_aTags": [
+        "Purity: Fun",
+        "Bitrate: 320 kbit/s"
+      ],
+      "_aPreviewMedia": {
+        "_aMetadata": {
+          "_sAudioUrl": "https://files.gamebanana.com/preview/sounds/something_59646.mp3"
+        }
+      },
+      "_aSubmitter": {
+        "_idRow": 1764818,
+        "_sName": "ball_hurt",
+        "_bIsOnline": false,
+        "_bHasRipe": false,
+        "_sProfileUrl": "https://gamebanana.com/members/1764818",
+        "_sAvatarUrl": "https://images.gamebanana.com/img/av/64b51efd2cd1a.png",
+        "_sHdAvatarUrl": "https://images.gamebanana.com/img/av/63e8d92149bd6.png"
+      },
+      "_aGame": {
+        "_idRow": 297,
+        "_sName": "Team Fortress 2",
+        "_sProfileUrl": "https://gamebanana.com/games/297",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/games/4f5a605d0eb52.png"
+      },
+      "_aRootCategory": {
+        "_sName": "Sound Packs",
+        "_sProfileUrl": "https://gamebanana.com/sounds/cats/1947",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/SoundCategory/5e47a3dde9a53.png"
+      },
+      "_tsDateUpdated": 1701189436,
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 130,
+      "_nPostCount": 134,
+      "_bWasFeatured": false,
+      "_nViewCount": 62465,
+      "_bIsOwnedByAccessor": false
+    },
+    {
+      "_idRow": 66434,
+      "_sModelName": "Sound",
+      "_sSingularTitle": "Sound",
+      "_sIconClasses": "SubmissionType Sound",
+      "_sName": "Russian MGE pro pack",
+      "_sProfileUrl": "https://gamebanana.com/sounds/66434",
+      "_tsDateAdded": 1677147259,
+      "_tsDateModified": 1785835127,
+      "_bHasFiles": true,
+      "_aTags": [],
+      "_aPreviewMedia": {
+        "_aMetadata": {
+          "_sAudioUrl": "https://files.gamebanana.com/preview/sounds/untitled_6ad67.mp3"
+        }
+      },
+      "_aSubmitter": {
+        "_idRow": 1861884,
+        "_sName": "Dakasin",
+        "_bIsOnline": false,
+        "_bHasRipe": false,
+        "_sProfileUrl": "https://gamebanana.com/members/1861884",
+        "_sAvatarUrl": "https://images.gamebanana.com/img/av/608e931ed9f26.jpg",
+        "_sHdAvatarUrl": "https://images.gamebanana.com/img/av/66f55b180ea1a.gif"
+      },
+      "_aGame": {
+        "_idRow": 297,
+        "_sName": "Team Fortress 2",
+        "_sProfileUrl": "https://gamebanana.com/games/297",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/games/4f5a605d0eb52.png"
+      },
+      "_aRootCategory": {
+        "_sName": "Character Voice",
+        "_sProfileUrl": "https://gamebanana.com/sounds/cats/425",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/SoundCategory/5e478fb4c6317.png"
+      },
+      "_aSubCategory": {
+        "_sName": "Multi-class Voice Packs",
+        "_sProfileUrl": "https://gamebanana.com/sounds/cats/4403",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/SoundCategory/60abe7c7a6c17.png"
+      },
+      "_tsDateUpdated": 1785835007,
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 102,
+      "_nPostCount": 101,
+      "_bWasFeatured": false,
+      "_nViewCount": 178688,
+      "_bIsOwnedByAccessor": false
+    },
+    {
+      "_idRow": 59101,
+      "_sModelName": "Sound",
+      "_sSingularTitle": "Sound",
+      "_sIconClasses": "SubmissionType Sound",
+      "_sName": "Understandable Pyro 2.0",
+      "_sProfileUrl": "https://gamebanana.com/sounds/59101",
+      "_tsDateAdded": 1644105920,
+      "_tsDateModified": 1686771105,
+      "_bHasFiles": true,
+      "_aTags": [
+        "Purity: Pure"
+      ],
+      "_aPreviewMedia": {
+        "_aMetadata": {
+          "_sAudioUrl": "https://files.gamebanana.com/preview/sounds/actuallygoodpyro.mp3"
+        }
+      },
+      "_aSubmitter": {
+        "_idRow": 1744970,
+        "_sName": "FlowerX",
+        "_bIsOnline": false,
+        "_bHasRipe": false,
+        "_sProfileUrl": "https://gamebanana.com/members/1744970",
+        "_sAvatarUrl": "https://images.gamebanana.com/img/av/6206fb1cf3cc4.png",
+        "_sHdAvatarUrl": "https://images.gamebanana.com/img/av/62270787e5e03.png",
+        "_sUpicUrl": "https://images.gamebanana.com/img/upic/6206f861ee91d.png",
+        "_aSubjectShaper": {
+          "_sBorderStyle": "Drop Shadow",
+          "_sFont": "Impact",
+          "_sTextColor": "#d43535",
+          "_sTextHoverColor": "#ffffff",
+          "_sBorderColor": "#000000",
+          "_sBorderHoverColor": "#af1212"
+        },
+        "_sSubjectShaperCssCode": "font-family:'Impact';color:#d43535;"
+      },
+      "_aGame": {
+        "_idRow": 297,
+        "_sName": "Team Fortress 2",
+        "_sProfileUrl": "https://gamebanana.com/games/297",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/games/4f5a605d0eb52.png"
+      },
+      "_aRootCategory": {
+        "_sName": "Character Voice",
+        "_sProfileUrl": "https://gamebanana.com/sounds/cats/425",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/SoundCategory/5e478fb4c6317.png"
+      },
+      "_aSubCategory": {
+        "_sName": "Pyro Voice",
+        "_sProfileUrl": "https://gamebanana.com/sounds/cats/4396",
+        "_sIconUrl": "https://images.gamebanana.com/img/ico/SoundCategory/60abe44e8795e.png"
+      },
+      "_tsDateUpdated": 1686771229,
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 99,
+      "_nPostCount": 64,
+      "_bWasFeatured": true,
+      "_nViewCount": 48520,
+      "_bIsOwnedByAccessor": false
+    }
+  ]
+}

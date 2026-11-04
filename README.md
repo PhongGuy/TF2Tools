@@ -1,25 +1,138 @@
-# Introduction
+# TF2Tools
 
-TF2Tools will help you change hud, hitsound and kill sound by the click of a button.
+Set up your Team Fortress 2 HUD, hitsounds, killsounds and crosshairs in a few clicks, and find new ones from the community without leaving the app.
 
-## Huds
+**[Download for Windows](https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.exe)** · **[Download for Linux](https://github.com/PhongGuy/TF2Tools/releases/latest)**
 
-You upload all of your local huds, now you can switch huds easily.
+![The HUD Store: community HUDs as cards, each ready to download](.github/readme/hud-store.webp)
 
-![image](https://user-images.githubusercontent.com/36205789/148740670-62bc2bb8-20a9-4300-8d65-54fad03a0778.png)
+TF2Tools is free and open source. It finds your game through Steam, puts what you pick into TF2's custom folder for you, and keeps everything you collect in one library, so switching back is one click.
 
-## Hit/kill sound
+This is TF2Tools 6, a native desktop app rebuilt from the ground up. It replaces the older TF2Tools, which ran inside a web browser engine; the new one is a regular app, lighter and quicker to use. The older app still lives on the [v4 branch](https://github.com/PhongGuy/TF2Tools/tree/v4), and its downloads are in the releases up to v4.8.0.
 
-You upload your collection of hitsounds and kill sounds. (has to be wav files) Now you can switch hitsounds and killsounds to your liking. You can also listen to how it sounds by clicking the play button.
+## What it does
 
-![image](https://user-images.githubusercontent.com/36205789/146427237-631cbdb0-c5ba-48ca-989c-c91005bbce00.png)
+### HUDs
 
-## Crosshairs
+Keep all your HUDs in one place and switch between them with one click. TF2 can only use one HUD at a time, so TF2Tools takes the old one out when you install another. If a HUD needs fonts you don't have, TF2Tools offers to install them. Get new HUDs from the HUD Store: the hand-picked list from hud-db, or everything on GameBanana.
 
-You can change your vtf crosshairs, choose a background and see how it looks.
+![The HUDs page: the HUD in your game at the top, your library below](.github/readme/huds.webp)
 
-![image](https://user-images.githubusercontent.com/36205789/148741114-e1622439-0793-4f0a-bd6d-994d480de1b6.png)
+### Hitsounds and killsounds
 
-# Download
+Add your own sounds or download them from the Sound Store, play them right in the app, and pick one as your hitsound and one as your killsound.
 
-You can download the latest stable version [here](https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.exe).
+![The Sounds page: your hitsound and killsound at the top, your library below](.github/readme/sounds.webp)
+
+### A crosshair for every weapon
+
+Go class by class and give each weapon its own crosshair: one of TF2's own, an image of your own, or one from the Crosshair Store.
+
+![The Crosshairs page: a crosshair picked in the list and previewed over a map, above Scout's weapons](.github/readme/crosshairs.webp)
+
+### mastercomfig addons
+
+Install mastercomfig's addons from the Addon Store. The Addons page shows what you have and offers updates when mastercomfig releases new ones.
+
+![The Addon Store](.github/readme/addon-store.webp)
+
+### The stores
+
+Browse sounds and crosshairs from GameBanana, preview sounds before you download them, search and sort the GameBanana stores, and filter the hand-picked HUDs.
+
+![The Sound Store](.github/readme/sound-store.webp)
+
+![The Crosshair Store](.github/readme/crosshair-store.webp)
+
+### Make your own crosshair
+
+The Crosshair Maker lets you draw a crosshair pixel by pixel. Start from a shape such as a dot, a cross or a circle, or bring in a picture, then shape it with the pencil, lines, boxes and circles. The preview shows it over a map as you work. Save it, and it joins your crosshairs, ready to give to any weapon.
+
+![The Crosshair Maker: a circle with a dot being drawn, with its preview over a map](.github/readme/crosshair-maker.webp)
+
+### Make your own HUD
+
+The HUD Maker shows your HUD the way the game draws it: in a fight, on the scoreboard, at the main menu and more. Click any part to move it, resize it, recolour it or hide it, or start from one of your HUDs with **Edit a copy**. Save it to your library and install it like any other HUD.
+
+![The HUD Maker: the main menu with the Items button picked and its settings open beside it](.github/readme/hud-maker.webp)
+
+### Profiles
+
+Save your HUD, sounds and crosshairs together as a profile, for example one for competitive and one for casual, and switch your whole setup at once.
+
+![The Profiles page](.github/readme/profiles.webp)
+
+### Settings
+
+Point TF2Tools at your game if it didn't find it, set the preview volume and refresh the stores. The Logs page lists what TF2Tools did, and TF2Tools checks for new versions of itself (see [Updates](#updates)).
+
+![The Settings page: the preview volume, how often the stores refresh, and each store's last sync](.github/readme/settings.webp)
+
+## Download and install
+
+Until TF2Tools 6 is finished, the download links on this page lead to the older TF2Tools 4. To get TF2Tools 6 for Windows or Linux, open the [Releases page](https://github.com/PhongGuy/TF2Tools/releases), pick the newest one marked **Pre-release** and download your file from there.
+
+### Windows
+
+1. Download **[TF2Tools.exe](https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.exe)** and open it.
+2. Windows may say **"Windows protected your PC"**, because TF2Tools isn't signed with a paid certificate. Click **More info**, then **Run anyway**.
+3. The installer sets TF2Tools up for your Windows account. It doesn't ask for an administrator password.
+4. Start TF2Tools from the Start menu or the desktop shortcut.
+
+### Linux
+
+Open the [latest release](https://github.com/PhongGuy/TF2Tools/releases/latest) and download one of these:
+
+- **Ubuntu, Debian, Mint and similar:** the file ending in `_amd64.deb`. Double-click it to open it in your software center, then click Install. TF2Tools appears in your app menu.
+- **Any other distribution:** the file ending in `_x86_64.AppImage`. Right-click it, open Properties, allow it to run as a program, then double-click it. If it doesn't start, your system may be missing FUSE, which AppImages use; your distribution's help pages explain how to add it.
+
+TF2Tools is built on Ubuntu 22.04, so it runs on that and newer systems.
+
+### First start
+
+TF2Tools looks for Team Fortress 2 in your Steam libraries. The badge at the top says **TF2 Connected** when it found the game. If it says **TF2 Not Found**, open **Settings**, click **Auto-detect** or **Browse** to your Team Fortress 2 folder, then **Save Settings**.
+
+### Updates
+
+TF2Tools tells you when a new version is out. On Windows and with the AppImage it updates itself in one click. With the `.deb`, it opens the release page so you can download the new one the same way.
+
+## Quick start
+
+1. Install TF2Tools and open it. Check that the badge at the top says **TF2 Connected**.
+2. Open the **HUD Store**, pick a HUD and download it. It lands in **HUDs**, your library.
+3. On the **HUDs** page, click **Install** on the HUD you want. Start TF2 and it's there.
+4. Do the same for sounds in the **Sound Store** and **Sounds**, and give your weapons crosshairs on the **Crosshairs** page.
+5. Happy with your setup? Save it as a profile on the **Profiles** page so you can switch back in one click.
+
+TF2 reads its HUD, sounds and crosshairs when it starts, so restart the game to see a change.
+
+## Coming from an older version
+
+- **TF2Tools 5:** your library, profiles and settings carry over. TF2Tools 6 uses the same library and upgrades it the first time it opens.
+- **TF2Tools 4:** TF2Tools 6 starts with an empty library, since it can't read TF2Tools 4's list. What TF2Tools 4 put in your game stays there until you replace it, and installing a HUD from TF2Tools 6 takes out the HUD you have now. On Windows, TF2Tools 6 installs next to TF2Tools 4 and takes over the desktop shortcut. Once you're happy, remove the old one in Windows **Settings > Apps > Installed apps**: it's the TF2Tools entry with version 4.8.0.
+- **Still want TF2Tools 4?** Its downloads stay on the [Releases page](https://github.com/PhongGuy/TF2Tools/releases) up to v4.8.0, and its code is on the [v4 branch](https://github.com/PhongGuy/TF2Tools/tree/v4).
+
+## Privacy
+
+No accounts, no ads, no tracking. TF2Tools goes online for the stores (GameBanana, GitHub and mastercomfig.com) and to check GitHub for a new version of TF2Tools. Your library stays on your computer.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The bundled Inter font is under the SIL Open Font License, in `licenses/Inter-OFL.txt`. The icons come from Lucide and are under the ISC License, in `licenses/Lucide-ISC.txt`. The app carries these notices inside itself and shows them under Settings, Licences.
+
+Team Fortress 2, its weapon icons, crosshairs and other game artwork are the property of Valve Corporation and are used here with credit, in a free fan tool, for players of the game. TF2Tools is not made, endorsed or supported by Valve. Steam and Team Fortress are trademarks of Valve Corporation.
+
+## For developers
+
+TF2Tools 6 is written in Rust with [GPUI](https://www.gpui.rs/), the UI framework behind the Zed editor. There is no web view: `crates/tf2tools-core` holds the library, installs, file formats and store clients without any UI, and `crates/tf2tools-app` is the app.
+
+To build and try it from source you need Rust 1.99 or newer, and on Linux the system libraries listed in [CONTRIBUTING.md](CONTRIBUTING.md#requirements). Then:
+
+```bash
+git clone https://github.com/PhongGuy/TF2Tools.git
+cd TF2Tools
+make demo     # runs against a throwaway library and a fake TF2 install
+make check    # formatting, lints and the tests
+```
+
+`cargo run -p tf2tools-app` runs it against your real library and game instead. Building, testing, packaging and the screenshot script are all in [CONTRIBUTING.md](CONTRIBUTING.md).
