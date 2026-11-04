@@ -250,28 +250,30 @@ fn the_crosshairs_caption_claims_only_what_the_shot_shows() {
 }
 
 #[test]
-fn the_pre_release_hint_covers_both_platforms() {
-    // Until 6.x is GitHub's Latest, both the .exe and the Linux files live on a Pre-release.
+fn the_install_note_points_at_the_newest_release_and_the_older_ones() {
+    // Since 6.0.0 is GitHub's Latest, the links fetch it, and older versions stay on Releases.
     let readme = repo_file("README.md");
     let install = readme
         .split_once("\n## Download and install\n")
         .expect("an install section")
         .1;
-    let hint = install
+    let note = install
         .split_once("\n### Windows\n")
         .expect("a Windows section")
         .0;
     for needle in [
-        "Pre-release",
+        "newest",
         "Windows",
         "Linux",
+        "TF2Tools 4",
         "](https://github.com/PhongGuy/TF2Tools/releases)",
     ] {
-        assert!(
-            hint.contains(needle),
-            "the Pre-release hint lacks {needle:?}"
-        );
+        assert!(note.contains(needle), "the install note lacks {needle:?}");
     }
+    assert!(
+        !note.contains("Pre-release"),
+        "the note still sends players to a Pre-release"
+    );
 }
 
 #[test]

@@ -4,8 +4,9 @@
 use crate::error::UpdateCheckError;
 
 /// The production minisign public keys (base64), any of which may sign a manifest.
-/// Two slots for rotation; empty until the release key exists.
-pub const UPDATE_PUBLIC_KEYS: &[&str] = &[];
+/// Two slots for rotation; the first holds the release key (minisign key id 53867C793ACEB351).
+pub const UPDATE_PUBLIC_KEYS: &[&str] =
+    &["RWRRs846eXyGU3h3tVjuB++1Blcrbl9Js5eIwzQnKM7MDgTvPhPGCQul"];
 
 /// Decoded public keys, tried in slot order when checking a signature.
 #[derive(Debug, Clone)]
@@ -153,7 +154,7 @@ mod tests {
 
     #[test]
     fn the_production_slots_hold_at_most_two_decodable_keys() {
-        // black_box keeps clippy's constant lints off a slot list that is empty today.
+        // black_box keeps clippy's constant lints off a slot list whose length is a constant.
         let slots = std::hint::black_box(UPDATE_PUBLIC_KEYS);
         assert!(slots.len() <= 2, "{slots:?}");
         if !slots.is_empty() {

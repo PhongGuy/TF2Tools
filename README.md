@@ -70,7 +70,7 @@ Point TF2Tools at your game if it didn't find it, set the preview volume and ref
 
 ## Download and install
 
-Until TF2Tools 6 is finished, the download links on this page lead to the older TF2Tools 4. To get TF2Tools 6 for Windows or Linux, open the [Releases page](https://github.com/PhongGuy/TF2Tools/releases), pick the newest one marked **Pre-release** and download your file from there.
+The download links on this page always fetch the newest TF2Tools for Windows or Linux. Older versions, TF2Tools 4 among them, stay on the [Releases page](https://github.com/PhongGuy/TF2Tools/releases).
 
 ### Windows
 
