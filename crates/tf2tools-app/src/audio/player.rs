@@ -4,13 +4,14 @@
 use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
+use gpui_kit::base::POPUP_PRIORITY;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::{Slider, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, h_flex, v_flex};
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _,
     IntoElement, ParentElement as _, Render, SharedString, Styled as _, Subscription, Task,
-    TestSupportExt as _, Window, div, px,
+    TestSupportExt as _, Window, deferred, div, px,
 };
 
 use super::AudioOut;
@@ -198,6 +199,10 @@ impl Player {
     }
 }
 
+// An open dialog keeps anything under the pop-up layer from taking clicks (see
+// tests/sound_store_play.rs), so the player sits just above it and under the tooltips.
+const PLAYER_PRIORITY: usize = POPUP_PRIORITY + 1;
+
 impl Render for Player {
     // v5's SoundPreviewPlayer: a card pinned bottom right, the playing sound over the volume row.
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
@@ -246,9 +251,12 @@ impl Render for Player {
                         )),
                 )
         });
-        v_flex()
+        // The player floats over the page and any open dialog, and swallows its own clicks so
+        // a press on it never reaches the card or backdrop beneath.
+        let card = v_flex()
             .id(ids::SOUND_PLAYER)
             .test_support()
+            .occlude()
             .absolute()
             .bottom(px(16.))
             .right(px(16.))
@@ -290,6 +298,7 @@ impl Render for Player {
                         ids::SOUND_PLAYER_VOLUME_VALUE,
                         volume.to_string(),
                     )),
-            )
+            );
+        deferred(card).with_priority(PLAYER_PRIORITY)
     }
 }
