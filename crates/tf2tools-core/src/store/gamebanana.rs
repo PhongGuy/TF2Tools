@@ -215,8 +215,8 @@ fn parse_mod(record: &Value) -> Option<ModRecord> {
     if gb_id == 0 {
         return None;
     }
-    // The gallery prefers the 530 px rendition, falling back to 220 px; the card
-    // thumbnail is the first 100 px rendition found.
+    // The gallery prefers the 530 px rendition, then the original (most screenshots
+    // carry only that and a 100 px one), then 220 px; the card thumbnail is the first 100 px.
     let mut images = Vec::new();
     let mut thumbnail_url = None;
     for image in record["_aPreviewMedia"]["_aImages"]
@@ -227,6 +227,7 @@ fn parse_mod(record: &Value) -> Option<ModRecord> {
         let base = image["_sBaseUrl"].as_str().unwrap_or("");
         if let Some(file) = image["_sFile530"]
             .as_str()
+            .or_else(|| image["_sFile"].as_str())
             .or_else(|| image["_sFile220"].as_str())
         {
             images.push(format!("{base}/{file}"));
@@ -277,4 +278,33 @@ fn tags_json(value: &Value) -> String {
 
 fn json_list(items: &[String]) -> String {
     serde_json::to_string(items).unwrap_or_else(|_| "[]".to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mod_images_fall_back_to_the_original_file_when_no_530_rendition_exists() {
+        // GameBanana gives most screenshots only `_sFile` and `_sFile100`; mixed with a full entry.
+        let record = serde_json::json!({
+            "_idRow": 456577,
+            "_aPreviewMedia": { "_aImages": [
+                {"_sBaseUrl": "https://img/mods", "_sFile": "a.jpg", "_sFile530": "530-a.jpg",
+                 "_sFile220": "220-a.jpg", "_sFile100": "100-a.jpg"},
+                {"_sBaseUrl": "https://img/mods", "_sFile": "b.jpg", "_sFile100": "100-b.jpg"},
+                {"_sBaseUrl": "https://img/mods", "_sFile220": "220-c.jpg", "_sFile100": "100-c.jpg"},
+                {"_sBaseUrl": "https://img/mods", "_sFile": "d.jpg", "_sFile100": "100-d.jpg"}
+            ]}
+        });
+        let parsed = parse_mod(&record).expect("a record with an id parses");
+        assert_eq!(
+            parsed.images_json,
+            r#"["https://img/mods/530-a.jpg","https://img/mods/b.jpg","https://img/mods/220-c.jpg","https://img/mods/d.jpg"]"#
+        );
+        assert_eq!(
+            parsed.thumbnail_url.as_deref(),
+            Some("https://img/mods/100-a.jpg")
+        );
+    }
 }
