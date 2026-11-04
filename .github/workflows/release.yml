@@ -167,6 +167,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # What's Changed lists the commits since the previous tag.
+          fetch-depth: 0
       # A tag that disagrees with Cargo.toml would otherwise surface later as a missing AppImage.
       - name: The tag matches the workspace version
         run: |
@@ -221,15 +223,25 @@ jobs:
             echo "the signed manifest has no Windows installer" >&2
             exit 1
           fi
+      # Copies with no version in their names give links that always fetch the latest release; the
+      # manifest keeps pointing at the versioned files.
+      - name: Add the unversioned copies and checksums
+        working-directory: dist
+        run: |
+          cp TF2Tools.exe tf2tools-windows-setup.exe
+          cp tf2tools_*_x86_64.AppImage tf2tools-linux-x86_64.AppImage
+          cp tf2tools_*_amd64.deb tf2tools-linux-amd64.deb
+          sha256sum tf2tools_* TF2Tools.exe tf2tools-update.json tf2tools-update.json.minisig tf2tools-windows-setup.exe tf2tools-linux-x86_64.AppImage tf2tools-linux-amd64.deb > SHA256SUMS
+          cat SHA256SUMS
       - name: Create the draft release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           version=${GITHUB_REF_NAME#v}
-          sed "s/{version}/$version/g" packaging/release-notes.md > "$RUNNER_TEMP/notes.md"
+          scripts/release-notes.sh "$GITHUB_REF_NAME" packaging/release-notes.md > "$RUNNER_TEMP/notes.md"
           prerelease=()
           case $version in *-*) prerelease=(--prerelease) ;; esac
           gh release create "$GITHUB_REF_NAME" --draft --verify-tag "${prerelease[@]}" \
             --title "TF2Tools $version" --notes-file "$RUNNER_TEMP/notes.md" \
-            dist/tf2tools_* dist/TF2Tools.exe dist/tf2tools-update.json dist/tf2tools-update.json.minisig
+            dist/tf2tools_* dist/TF2Tools.exe dist/tf2tools-update.json dist/tf2tools-update.json.minisig dist/tf2tools-windows-setup.exe dist/tf2tools-linux-x86_64.AppImage dist/tf2tools-linux-amd64.deb dist/SHA256SUMS

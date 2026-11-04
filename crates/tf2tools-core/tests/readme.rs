@@ -55,7 +55,7 @@ const IMAGES: [&str; 11] = [
 ];
 const IMAGE_BUDGET: u64 = 2_000_000;
 const EXE: &str = "https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.exe";
-const LATEST: &str = "https://github.com/PhongGuy/TF2Tools/releases/latest";
+const LATEST: &str = "https://github.com/PhongGuy/TF2Tools/releases/latest/download";
 
 // Everything above the developer section is for players.
 fn player_part(readme: &str) -> &str {
@@ -127,17 +127,34 @@ fn the_download_links_come_first_and_match_the_release_assets() {
     let readme = repo_file("README.md");
     let first_image = readme.find("![").expect("a hero image");
     assert!(readme.find(EXE).expect("the Windows download") < first_image);
+    // The unversioned AppImage, so the top link downloads the file instead of opening a page.
     assert!(
         readme
-            .find(&format!("]({LATEST})"))
+            .find(&format!(
+                "**[Download for Linux]({LATEST}/tf2tools-linux-x86_64.AppImage)**"
+            ))
             .expect("the Linux download")
             < first_image
     );
+    let linux = readme
+        .split_once("\n### Linux\n")
+        .and_then(|(_, rest)| rest.split_once("\n### "))
+        .expect("a Linux section")
+        .0;
+    for direct in ["tf2tools-linux-amd64.deb", "tf2tools-linux-x86_64.AppImage"] {
+        assert!(
+            linux.contains(&format!("]({LATEST}/{direct})")),
+            "the Linux section lacks a direct {direct} link"
+        );
+    }
     let release = repo_file(".github/workflows/release.yml");
     for (asset, in_readme) in [
         ("TF2Tools.exe", "TF2Tools.exe"),
-        ("tf2tools_*_x86_64.AppImage", "_x86_64.AppImage"),
-        ("tf2tools_*_amd64.deb", "_amd64.deb"),
+        (
+            "tf2tools-linux-x86_64.AppImage",
+            "tf2tools-linux-x86_64.AppImage",
+        ),
+        ("tf2tools-linux-amd64.deb", "tf2tools-linux-amd64.deb"),
     ] {
         assert!(
             release.contains(asset),

@@ -1,21 +1,24 @@
-# TF2Tools {version}
+<!-- One or two sentences on what is new in this release, written for players. -->
 
-TF2Tools installs and manages HUDs, hitsounds, killsounds, crosshairs and mastercomfig addons for Team Fortress 2.
+## What's Changed
 
-<!-- what's new goes here before publishing -->
+{changes}
 
-## Download
+## Downloads
 
-- [TF2Tools AppImage](https://github.com/PhongGuy/TF2Tools/releases/download/v{version}/tf2tools_{version}_x86_64.AppImage): for most Linux systems; it updates itself.
-- [TF2Tools for Ubuntu and Debian](https://github.com/PhongGuy/TF2Tools/releases/download/v{version}/tf2tools_{version}_amd64.deb): does not update itself; get new versions from this page.
-- [TF2Tools for Windows](https://github.com/PhongGuy/TF2Tools/releases/download/v{version}/TF2Tools.exe): download and run it to install; after that TF2Tools updates itself.
+| Platform | File |
+| --- | --- |
+| Windows x64 | [TF2Tools.exe](https://github.com/PhongGuy/TF2Tools/releases/download/v{version}/TF2Tools.exe) |
+| Linux x86_64 | [tf2tools_{version}_x86_64.AppImage](https://github.com/PhongGuy/TF2Tools/releases/download/v{version}/tf2tools_{version}_x86_64.AppImage) for most Linux systems, or [tf2tools_{version}_amd64.deb](https://github.com/PhongGuy/TF2Tools/releases/download/v{version}/tf2tools_{version}_amd64.deb) for Ubuntu and Debian |
 
-## Opening the AppImage
+Each file also has a copy with no version in its name, for links that always point at the latest release. Check a download with `sha256sum -c SHA256SUMS`.
 
-After downloading, right-click the file, open Properties, allow it to run as a program, then double-click it.
+## Before you install
 
-## Installing on Windows
+- **Windows:** Windows may show a blue box saying "Windows protected your PC". TF2Tools is free and not signed with a paid certificate, so Windows does not recognise it yet. Click "More info", then "Run anyway". Only do this for the file from this page. TF2Tools 6 installs next to TF2Tools 4. Once it works, you can remove TF2Tools 4 in Windows Settings > Apps.
+- **Linux AppImage:** after downloading, right-click the file, open Properties, allow it to run as a program, then double-click it.
+- **Linux .deb:** open it with your software installer and click Install.
 
-Windows may show a blue box saying "Windows protected your PC". TF2Tools is free and not signed with a paid certificate, so Windows does not recognise it yet. Click "More info", then "Run anyway". Only do this for the file from this page.
+## Updates
 
-TF2Tools 6 installs next to the old version. Once it works, you can remove the old one in Windows Settings > Apps.
+On Windows and with the AppImage, TF2Tools checks for new versions and installs them itself after checking their signature. The .deb does not update itself; get new versions from the [Releases page](https://github.com/PhongGuy/TF2Tools/releases).
