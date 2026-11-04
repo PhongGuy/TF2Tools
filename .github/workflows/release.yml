@@ -26,8 +26,8 @@ env:
 jobs:
   gate:
     runs-on: ubuntu-24.04
-    # A cold build plus the full suite runs about an hour on a hosted runner.
-    timeout-minutes: 120
+    # A release starts from a cold cache, which takes about 20 minutes.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
