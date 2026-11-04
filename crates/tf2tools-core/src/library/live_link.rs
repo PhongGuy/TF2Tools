@@ -381,6 +381,8 @@ mod tests {
         assert!(!custom.join(STAGING_DIR).exists());
     }
 
+    // Windows trims trailing spaces from folder names, so such a folder cannot exist there.
+    #[cfg(not(windows))]
     #[test]
     fn a_folder_named_with_outer_spaces_comes_back_as_named() {
         let tmp = tempfile::tempdir().unwrap();
@@ -417,13 +419,19 @@ mod tests {
             let tmp = tempfile::tempdir().unwrap();
             let custom = tmp.path().join("custom");
             let staging = custom.join(STAGING_DIR);
+            // Windows cannot create these names, but the marker alone must still be refused.
+            #[cfg(not(windows))]
             std::fs::create_dir_all(staging.join("old").join(name)).unwrap();
+            #[cfg(windows)]
+            std::fs::create_dir_all(staging.join("old")).unwrap();
             std::fs::write(staging.join(MARKER), name).unwrap();
             assert_eq!(
                 recover_in(&custom, &mut std_rename).unwrap(),
                 Recovery::Cleared,
                 "{name}"
             );
+            // On Windows these names resolve to a drive or a device, never a folder here.
+            #[cfg(not(windows))]
             assert!(!custom.join(name).exists(), "{name}");
             assert!(!staging.exists(), "{name}");
         }

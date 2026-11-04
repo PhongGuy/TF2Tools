@@ -163,7 +163,8 @@ mod tests {
         for (i, (lib, apps)) in libraries.iter().enumerate() {
             vdf.push_str(&format!(
                 "\t\"{i}\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t}}\n",
-                lib.display()
+                // Steam escapes the backslashes of a Windows path in this file.
+                lib.display().to_string().replace('\\', "\\\\")
             ));
             fs::create_dir_all(lib.join("steamapps/common")).unwrap();
             for (id, dir) in *apps {

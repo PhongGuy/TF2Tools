@@ -48,6 +48,8 @@ fn everything_installed_on_windows_needs_no_attention() {
     assert!(check.fingerprint().is_empty());
 }
 
+// A case mismatch needs a case-sensitive file system, which Windows lacks.
+#[cfg(not(windows))]
 #[test]
 fn the_fingerprint_is_sorted_keys() {
     let tmp = tempfile::tempdir().unwrap();
