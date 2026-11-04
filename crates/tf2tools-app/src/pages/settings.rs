@@ -13,8 +13,9 @@ use gpui_kit::component::slider::{Slider, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _,
-    IntoElement, ParentElement as _, Render, SharedString, StatefulInteractiveElement as _,
-    Styled as _, Subscription, TestSupportExt as _, Window, div, px, relative,
+    IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
+    px, relative,
 };
 
 use tf2tools_core::{LogLevel, NewLogEntry, SettingsError, StoreKind, StoreSyncStatus, Tf2Install};
@@ -33,6 +34,7 @@ use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, error_label, toast, toast_error};
 use crate::sync::{SyncEvent, SyncHub, sync_hub};
 use crate::updater::{self, updater};
+use crate::widgets::scroll::scroll_area;
 
 /// What the page is waiting on; while set, the form's buttons are disabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,6 +96,8 @@ pub struct SettingsPage {
     /// The embedded licence notices, and whether the Licences card shows them.
     notices: Vec<Notice>,
     show_notices: bool,
+    scroll: ScrollHandle,
+    notices_scroll: ScrollHandle,
 }
 
 /// One store's running flag and failure text, the only hub state Settings draws.
@@ -200,6 +204,8 @@ impl SettingsPage {
             _volume: volume_bound,
             notices: notices::all(),
             show_notices: false,
+            scroll: ScrollHandle::new(),
+            notices_scroll: ScrollHandle::new(),
         };
         page.load(window, cx);
         page.load_sync(window, cx);
@@ -537,10 +543,11 @@ fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyEl
     let theme = cx.theme();
     let shown = page.show_notices;
     let view = shown.then(|| {
-        v_flex()
+        let view = v_flex()
             .id(ids::SETTINGS_NOTICES_VIEW)
             .test_support()
             .max_h(px(320.))
+            .track_scroll(&page.notices_scroll)
             .overflow_y_scroll()
             .gap_4()
             .p_3()
@@ -565,7 +572,8 @@ fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyEl
                             .text_color(theme.muted_foreground)
                             .child(notice.text().to_owned()),
                     )
-            }))
+            }));
+        scroll_area(ids::SETTINGS_NOTICES_SCROLLBAR, &page.notices_scroll, view)
     });
     v_flex()
         .gap_3()
@@ -725,10 +733,11 @@ impl Render for SettingsPage {
                     .child("Stores will re-sync automatically when cache expires. Default: 7 days (168 hours)."),
             );
 
-        v_flex()
+        let content = v_flex()
             .id(ids::page(Page::Settings))
             .test_support()
             .size_full()
+            .track_scroll(&self.scroll)
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .child(
@@ -789,6 +798,7 @@ impl Render for SettingsPage {
                         Some(notices_content(self, cx)),
                         cx,
                     )),
-            )
+            );
+        scroll_area(ids::page_scrollbar(Page::Settings), &self.scroll, content).size_full()
     }
 }

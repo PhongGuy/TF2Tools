@@ -23,9 +23,9 @@ use gpui_kit::{
     AnyElement, AnyWindowHandle, AppContext as _, Context, CursorStyle, DispatchPhase, Entity,
     FocusHandle, FontWeight, Hsla, InteractiveElement as _, IntoElement, MouseButton,
     MouseDownEvent, MouseExitEvent, MouseMoveEvent, MouseUpEvent, ObjectFit, ParentElement as _,
-    Pixels, Point, Render, ScrollWheelEvent, SharedString, Size, StatefulInteractiveElement as _,
-    Styled as _, StyledImage as _, Subscription, TestSupportExt as _, WeakEntity, Window, canvas,
-    div, fill, img, point, px, size,
+    Pixels, Point, Render, ScrollHandle, ScrollWheelEvent, SharedString, Size,
+    StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription,
+    TestSupportExt as _, WeakEntity, Window, canvas, div, fill, img, point, px, size,
 };
 
 use tf2tools_core::{
@@ -50,6 +50,7 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
+use crate::widgets::scroll::scroll_area;
 use model::{
     Editor, FIT_TIP, OPACITY_TIP, REDO_TIP, SWATCH_NAMES, SWATCHES, Tool, UNDO_TIP, Viewport,
     ZOOM_IN_TIP, ZOOM_OUT_TIP, alpha_of_percent, colour_hint, fit_note, hsla_of, hsla_of_rgba,
@@ -135,6 +136,7 @@ pub struct CrosshairMakerPage {
     grid_lines_touched: bool,
     /// The starter shapes dialog; the kit's dialog owns it, so it lapses once closed.
     starter: Option<WeakEntity<StarterDialog>>,
+    panel_scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -247,6 +249,7 @@ impl CrosshairMakerPage {
             grid_lines: false,
             grid_lines_touched: false,
             starter: None,
+            panel_scroll: ScrollHandle::new(),
             _subscriptions: subscriptions,
         }
     }
@@ -772,14 +775,15 @@ impl CrosshairMakerPage {
                     )
             });
         // The panel spans the row and scrolls, so a short window still reaches its last control.
-        v_flex()
+        let content = v_flex()
             .id(ids::CROSSHAIR_MAKER_PANEL)
             .test_support()
-            .flex_none()
-            .w(width)
-            .h_full()
+            .size_full()
             .min_h_0()
+            .track_scroll(&self.panel_scroll)
             .overflow_y_scroll()
+            // The panel has no padding of its own, so this keeps its controls clear of the bar.
+            .pr_4()
             .gap_4()
             .child(save)
             .child(
@@ -878,7 +882,16 @@ impl CrosshairMakerPage {
                             )
                             .child(div().text_sm().child("Crosshair colour in game")),
                     ),
-            )
+            );
+        scroll_area(
+            ids::CROSSHAIR_MAKER_PANEL_SCROLLBAR,
+            &self.panel_scroll,
+            content,
+        )
+        .flex_none()
+        .w(width)
+        .h_full()
+        .min_h_0()
     }
 
     // The drawing at in-game size, tinted as the game tints it, centred over the map.

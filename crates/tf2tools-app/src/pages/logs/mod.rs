@@ -3,7 +3,7 @@
 
 pub mod model;
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use gpui_kit::assets::IconName;
@@ -17,8 +17,8 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
     InteractiveElement as _, IntoElement, ListAlignment, ListState, ParentElement as _, Render,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
-    Window, div, list, px, rgb, transparent_black,
+    ScrollHandle, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
+    WeakEntity, Window, div, list, px, rgb, transparent_black,
 };
 use tf2tools_core::{LogEntry, LogLevel, LogQuery};
 
@@ -31,6 +31,7 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::labelled;
+use crate::widgets::scroll::scroll_area;
 use crate::widgets::store_error::error_line;
 use model::{CATEGORIES, LEVELS, PAGE_SIZE, level_name, relative_time};
 
@@ -52,8 +53,9 @@ pub struct LogsPage {
     /// The last page came back full, so the list ends in a "Load more" item.
     has_more: bool,
     loading_more: bool,
-    /// Rows whose details are open, by row id so the set survives Load more.
-    expanded: HashSet<i64>,
+    /// Rows whose details are open, by row id so the set survives Load more, each with its
+    /// details box's scroll position.
+    expanded: HashMap<i64, ScrollHandle>,
     win: AnyWindowHandle,
     /// Bumped by every load; a load that lands under an older generation is dropped.
     load_generation: u64,
@@ -104,7 +106,7 @@ impl LogsPage {
             error: None,
             has_more: false,
             loading_more: false,
-            expanded: HashSet::new(),
+            expanded: HashMap::new(),
             win: window.window_handle(),
             load_generation: 0,
             list: ListState::new(0, ListAlignment::Top, px(200.)),
@@ -166,7 +168,7 @@ impl LogsPage {
 
     /// Whether row `id`'s details are expanded.
     pub fn is_expanded(&self, id: i64) -> bool {
-        self.expanded.contains(&id)
+        self.expanded.contains_key(&id)
     }
 
     /// Queries the next page with `before = last shown id` and appends it; a failure toasts
@@ -220,8 +222,8 @@ impl LogsPage {
 
     // Flips one row's details and re-measures it so the rows below move with it.
     fn toggle_details(&mut self, id: i64, ix: usize, cx: &mut Context<Self>) {
-        if !self.expanded.remove(&id) {
-            self.expanded.insert(id);
+        if self.expanded.remove(&id).is_none() {
+            self.expanded.insert(id, ScrollHandle::new());
         }
         self.list.remeasure_items(ix..ix + 1);
         cx.notify();
@@ -391,7 +393,7 @@ impl LogsPage {
                     let page = page.read(cx);
                     match page.entries.get(ix).cloned() {
                         Some(entry) => {
-                            let expanded = page.expanded.contains(&entry.id());
+                            let expanded = page.expanded.get(&entry.id()).cloned();
                             card(&entry, ix, expanded, now, this.clone(), cx)
                         }
                         None if page.has_more && ix == page.entries.len() => {
@@ -428,7 +430,7 @@ fn details(
     id: i64,
     ix: usize,
     text: &str,
-    expanded: bool,
+    expanded: Option<ScrollHandle>,
     page: WeakEntity<LogsPage>,
     cx: &App,
 ) -> impl IntoElement {
@@ -444,7 +446,7 @@ fn details(
                 .ghost()
                 .xsmall()
                 .text_xs()
-                .icon(if expanded {
+                .icon(if expanded.is_some() {
                     IconName::ChevronDown
                 } else {
                     IconName::ChevronRight
@@ -454,23 +456,23 @@ fn details(
                     let _ = page.update(cx, |page, cx| page.toggle_details(id, ix, cx));
                 }),
         )
-        .when(expanded, |el| {
-            el.child(
-                div()
-                    .id(ids::log_details(id))
-                    .aria_label(text.clone())
-                    .test_support()
-                    .w_full()
-                    .max_h(px(192.))
-                    .overflow_y_scroll()
-                    .p_2()
-                    .rounded(px(4.))
-                    .bg(theme.muted)
-                    .font_family(theme.mono_font_family.clone())
-                    .text_xs()
-                    .line_height(px(16.))
-                    .child(text),
-            )
+        .when_some(expanded, |el, scroll| {
+            let block = div()
+                .id(ids::log_details(id))
+                .aria_label(text.clone())
+                .test_support()
+                .w_full()
+                .max_h(px(192.))
+                .track_scroll(&scroll)
+                .overflow_y_scroll()
+                .p_2()
+                .rounded(px(4.))
+                .bg(theme.muted)
+                .font_family(theme.mono_font_family.clone())
+                .text_xs()
+                .line_height(px(16.))
+                .child(text);
+            el.child(scroll_area(ids::log_details_scrollbar(id), &scroll, block).w_full())
         })
 }
 
@@ -480,7 +482,7 @@ fn details(
 fn card(
     entry: &LogEntry,
     ix: usize,
-    expanded: bool,
+    expanded: Option<ScrollHandle>,
     now: DateTime<Utc>,
     page: WeakEntity<LogsPage>,
     cx: &App,

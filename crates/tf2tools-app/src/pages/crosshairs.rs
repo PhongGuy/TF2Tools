@@ -42,6 +42,7 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::crosshair_picker::{CrosshairPicker, preview_image};
+use crate::widgets::scroll::scroll_area;
 use crate::widgets::weapon_assigner::{
     AssignRequested, AssignTarget, AssignedCell, AssignerState, ClassChanged, WeaponAssigner,
 };
@@ -919,7 +920,7 @@ impl Render for CrosshairsPage {
             .installed
             .as_ref()
             .and_then(|installed| conflict_box(installed.conflicts(), cx));
-        v_flex()
+        let content = v_flex()
             .id(ids::page(Page::Crosshairs))
             .test_support()
             .size_full()
@@ -950,6 +951,7 @@ impl Render for CrosshairsPage {
                     .child(self.actions(cx)),
             )
             .children(conflicts)
-            .child(self.assigner.clone())
+            .child(self.assigner.clone());
+        scroll_area(ids::page_scrollbar(Page::Crosshairs), &self.scroll, content).size_full()
     }
 }

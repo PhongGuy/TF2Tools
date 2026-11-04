@@ -5,7 +5,6 @@ use std::rc::Rc;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::scroll::{Scrollbar, ScrollbarMode};
 use gpui_kit::component::{
     ActiveTheme as _, Icon, Sizable as _, Size, WindowExt as _, h_flex, v_flex,
 };
@@ -26,6 +25,7 @@ use crate::pages::common::ORANGE_500;
 use crate::services::run_blocking;
 use crate::shell::toast::{toast, toast_error};
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
+use crate::widgets::scroll::scroll_area;
 
 /// The user's answer to the HUD fonts dialog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -203,30 +203,19 @@ pub fn font_check_dialog(
                                             .child(description.clone()),
                                     ),
                             )
-                            .child(
-                                div()
-                                    .relative()
-                                    .child(
-                                        v_flex()
-                                            .id(ids::HUD_FONTS_LIST)
-                                            .track_scroll(&list_scroll)
-                                            .test_support()
-                                            .gap_2()
-                                            .max_h(px(256.))
-                                            .overflow_y_scroll()
-                                            .children(font_rows)
-                                            .children(issue_rows),
-                                    )
-                                    // Always shown while the rows overflow, so a long list
-                                    // reads as one that continues.
-                                    .child(
-                                        div().absolute().inset_0().child(
-                                            Scrollbar::vertical(&list_scroll)
-                                                .mode(ScrollbarMode::Always)
-                                                .viewport_from_layout(),
-                                        ),
-                                    ),
-                            )
+                            .child(scroll_area(
+                                ids::HUD_FONTS_LIST_SCROLLBAR,
+                                &list_scroll,
+                                v_flex()
+                                    .id(ids::HUD_FONTS_LIST)
+                                    .track_scroll(&list_scroll)
+                                    .test_support()
+                                    .gap_2()
+                                    .max_h(px(256.))
+                                    .overflow_y_scroll()
+                                    .children(font_rows)
+                                    .children(issue_rows),
+                            ))
                             .child(
                                 h_flex()
                                     .justify_end()

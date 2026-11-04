@@ -12,7 +12,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, Context, Entity, EventEmitter, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement, Render, SharedString,
+    InteractiveElement as _, IntoElement, ParentElement, Render, ScrollHandle, SharedString,
     StatefulInteractiveElement as _, Styled, Subscription, TestSupportExt as _, Window, div, px,
 };
 use tf2tools_core::{AddonEntry, AddonName, LogLevel, NewLogEntry, StoreItemId, StoreKind};
@@ -31,6 +31,7 @@ use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_download::StoreDownloads;
 use crate::widgets::card_grid::{SHELL_CHROME_WIDTH, columns_for, stretch_rows};
 use crate::widgets::labelled;
+use crate::widgets::scroll::scroll_area;
 use model::{AddonAction, actions, count_line, needs_tf2};
 
 /// The Addons page. Built fresh on each visit; it reloads when TF2's state or the library changes.
@@ -45,6 +46,7 @@ pub struct AddonsPage {
     updates: Entity<AddonUpdates>,
     /// The addon this page works on now and what it does to it.
     busy: Option<(AddonName, AddonAction)>,
+    scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -70,6 +72,7 @@ impl AddonsPage {
             load_generation: 0,
             updates,
             busy: None,
+            scroll: ScrollHandle::new(),
             _subscriptions: vec![tf2, library, updating, downloading],
         };
         page.reload(cx);
@@ -392,16 +395,18 @@ impl Render for AddonsPage {
                 self.sections(columns, cx)
             }
         });
-        v_flex()
+        let content = v_flex()
             .id(ids::page(Page::Addons))
             .test_support()
             .size_full()
+            .track_scroll(&self.scroll)
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
             .children(warning)
             .child(self.header(cx))
-            .children(body)
+            .children(body);
+        scroll_area(ids::page_scrollbar(Page::Addons), &self.scroll, content).size_full()
     }
 }
 
