@@ -165,9 +165,11 @@ fn only_the_packages_are_uploaded_and_released() {
 #[test]
 fn the_signing_secrets_reach_only_the_signing_step() {
     let text = workflow();
+    // Named as in the maintainer's other cargo-packager projects; the closing braces keep
+    // the key's name from matching inside the password's.
     for secret in [
-        "secrets.TF2TOOLS_MINISIGN_KEY",
-        "secrets.TF2TOOLS_MINISIGN_PASSWORD",
+        "secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}",
+        "secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD }}",
     ] {
         assert_eq!(text.matches(secret).count(), 1, "{secret}");
         assert!(job(&text, "draft").contains(secret), "{secret}");
@@ -175,7 +177,8 @@ fn the_signing_secrets_reach_only_the_signing_step() {
     assert!(!text.contains("set -x"));
     for line in text.lines().map(str::trim) {
         assert!(
-            !(line.contains("echo") && line.contains("MINISIGN")),
+            !(line.contains("echo")
+                && (line.contains("MINISIGN") || line.contains("SIGN_PRIVATE"))),
             "echoes a secret: {line}"
         );
     }
@@ -262,7 +265,10 @@ fn the_signer_is_built_without_the_secrets_and_signing_only_runs_it() {
     );
     assert!(!build.contains("secrets."), "{build}");
     let sign = step(&draft, "Sign the update manifest");
-    assert!(sign.contains("secrets.TF2TOOLS_MINISIGN_KEY"), "{sign}");
+    assert!(
+        sign.contains("TF2TOOLS_MINISIGN_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}"),
+        "{sign}"
+    );
     assert!(
         sign.contains("run: target/debug/examples/make_manifest sign --dir dist"),
         "{sign}"

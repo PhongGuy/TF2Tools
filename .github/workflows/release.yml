@@ -198,8 +198,8 @@ jobs:
         run: cargo build --locked -p tf2tools-core --example make_manifest
       - name: Sign the update manifest
         env:
-          TF2TOOLS_MINISIGN_KEY: ${{ secrets.TF2TOOLS_MINISIGN_KEY }}
-          TF2TOOLS_MINISIGN_PASSWORD: ${{ secrets.TF2TOOLS_MINISIGN_PASSWORD }}
+          TF2TOOLS_MINISIGN_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}
+          TF2TOOLS_MINISIGN_PASSWORD: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD }}
         run: target/debug/examples/make_manifest sign --dir dist --version "${GITHUB_REF_NAME#v}"
       - name: Verify it against the compiled-in keys
         run: |

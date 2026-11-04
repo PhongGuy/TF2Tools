@@ -20,7 +20,7 @@ Keep `tf2tools-update.key` and its password offline (a password manager plus an 
 
 ### 2. Put the public key in the app (maintainer)
 
-The second line of `tf2tools-update.pub` is the base64 public key. Put it in the first slot of `UPDATE_PUBLIC_KEYS` in `crates/tf2tools-core/src/update/keys.rs`:
+The second line of `tf2tools-update.pub` is the base64 public key (a `.pub` from `cargo packager signer generate` is base64-wrapped as a whole; decode it first). Put it in the first slot of `UPDATE_PUBLIC_KEYS` in `crates/tf2tools-core/src/update/keys.rs`:
 
 ```rust
 pub const UPDATE_PUBLIC_KEYS: &[&str] = &["RW...the second line of tf2tools-update.pub..."];
@@ -30,16 +30,16 @@ Commit it (`feat(update): add the release signing key`). Every build from then o
 
 ### 3. Store the two secrets (maintainer)
 
-The `draft` job's signing step reads two repository secrets:
+The `draft` job's signing step reads two repository secrets, named as in the maintainer's other cargo-packager projects, and hands them to `make_manifest` as `TF2TOOLS_MINISIGN_KEY` and `TF2TOOLS_MINISIGN_PASSWORD`:
 
-- `TF2TOOLS_MINISIGN_KEY`: the full text of `tf2tools-update.key`, both lines.
-- `TF2TOOLS_MINISIGN_PASSWORD`: the key's password.
+- `CARGO_PACKAGER_SIGN_PRIVATE_KEY`: the key file exactly as written, either the two-line minisign text or the single base64 line that `cargo packager signer generate` writes.
+- `CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD`: the key's password.
 
 Set them with the GitHub CLI or on the repository's Settings page under Secrets and variables, Actions:
 
 ```sh
-gh secret set TF2TOOLS_MINISIGN_KEY < tf2tools-update.key
-gh secret set TF2TOOLS_MINISIGN_PASSWORD   # prompts for the value
+gh secret set CARGO_PACKAGER_SIGN_PRIVATE_KEY < tf2tools-update.key
+gh secret set CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD   # prompts for the value
 ```
 
 ### 4. Dry-run the real key locally (maintainer)

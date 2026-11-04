@@ -198,9 +198,10 @@ fn sign_manifest(
     let password = password
         .filter(|p| !p.is_empty())
         .ok_or_else(|| format!("{PASSWORD_VAR} is not set"))?;
+    let key = unwrap_key_file(key);
     // A SecretKeyBox is only parsed when converted, so each probe gets a fresh one. A key
     // that opens without a password is refused before any decryption is tried.
-    let boxed = || minisign::SecretKeyBox::from(key.to_owned());
+    let boxed = || minisign::SecretKeyBox::from(key.clone());
     if minisign::SecretKey::from_unencrypted_box(boxed()).is_ok() {
         return Err(format!(
             "{KEY_VAR} is not encrypted; the release key must have a password"
@@ -219,6 +220,19 @@ fn sign_manifest(
     minisign::sign(None, &secret, Cursor::new(manifest), None, None)
         .map(|signature| signature.into_string())
         .map_err(|_| "signing the manifest failed".to_owned())
+}
+
+/// The key file's text: as given, or decoded when the whole file was stored base64-encoded,
+/// as cargo-packager writes it. Anything that does not decode stays as given.
+fn unwrap_key_file(key: &str) -> String {
+    use base64::Engine as _;
+    let trimmed = key.trim();
+    base64::engine::general_purpose::STANDARD
+        .decode(trimmed)
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .filter(|text| text.starts_with("untrusted comment:"))
+        .unwrap_or_else(|| key.to_owned())
 }
 
 /// Ok when `signature` verifies over the exact `manifest` bytes with any of `keys` (base64
@@ -458,6 +472,19 @@ mod tests {
                 "{bad:?}"
             );
         }
+    }
+
+    #[test]
+    fn a_key_wrapped_in_base64_signs_like_the_plain_file() {
+        // cargo-packager writes the whole key file base64-encoded; the secret may hold either.
+        use base64::Engine as _;
+        let (public, secret) = key();
+        let wrapped = base64::engine::general_purpose::STANDARD.encode(secret);
+        let json = br#"{"version":"6.0.1","platforms":{}}"#;
+        let signature = sign_manifest(json, Some(&format!("{wrapped}\n")), Some(PASSWORD)).unwrap();
+        verify_manifest(json, signature.as_bytes(), &[public.as_str()]).unwrap();
+        let err = sign_manifest(json, Some("bm90IGEga2V5"), Some(PASSWORD)).unwrap_err();
+        assert!(err.contains("is not a minisign secret key"), "{err}");
     }
 
     #[test]
