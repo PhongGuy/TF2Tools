@@ -10,7 +10,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     AnyElement, Context, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
-    Styled as _, TestSupportExt as _, Window, div, px, uniform_list,
+    Styled as _, TestSupportExt as _, UniformListScrollHandle, Window, div, px, uniform_list,
 };
 use tf2tools_core::{
     BoardMode, BorrowRefused, BorrowSource, Borrowed, Brings, HudEntry, HudFiles, HudId, HudModel,
@@ -23,6 +23,7 @@ use crate::ids;
 use crate::services::{OpError, Services, require_tf2, run_blocking};
 use crate::shell::toast::{ToastKind, toast};
 use crate::widgets::labelled;
+use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 
 const HUD_UNREADABLE: &str = "Couldn't read that HUD.";
 const LIST_FAILED: &str = "Couldn't read your HUDs library.";
@@ -43,6 +44,7 @@ pub(super) struct BorrowSection {
     huds: Option<Vec<(HudId, String)>>,
     chosen: Option<HudId>,
     parts: Option<Vec<SourcePart>>,
+    parts_scroll: UniformListScrollHandle,
     reads: u64,
 }
 
@@ -473,9 +475,13 @@ impl HudMakerPage {
             rows.len(),
             cx.processor(|page, range, _, cx| page.borrow_part_rows(range, cx)),
         )
+        .track_scroll(&self.borrow.parts_scroll)
         .test_support()
         .w_full()
-        .h(px(tall));
+        .h(px(tall))
+        .pr(BAR_WIDTH);
+        let bar = ids::HUD_MAKER_BORROW_PARTS_SCROLLBAR;
+        let list = scroll_area(bar, &self.borrow.parts_scroll, list);
         section = section.child(heading("Choose a part")).child(list);
         vec![section.into_any_element()]
     }

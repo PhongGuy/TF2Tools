@@ -4,6 +4,7 @@ mod support;
 
 use gpui_kit::TestAppContext;
 use support::maker_page::{IMAGE, VALUE, click_in_panel, editor, on_page, open_maker};
+use support::scroll::{assert_bar_on_right_edge, assert_clear_of_bar, assert_track_scrolls};
 use tf2tools_app::ids;
 use tf2tools_core::{NewPart, PartKey, PinCorner, PinRefused};
 
@@ -92,4 +93,28 @@ fn deleting_an_anchor_something_is_attached_to_says_so(cx: &mut TestAppContext) 
             .part(anchor.as_ref().unwrap())
             .is_some()
     }));
+}
+
+#[gpui_kit::test]
+fn the_attach_menu_shows_a_bar_clear_of_its_parts(cx: &mut TestAppContext) {
+    let (_env, s, page) = open_maker(cx);
+    // Anchors beside the health value, so the menu lists more parts than it shows.
+    on_page(cx, &s, &page, |p, _, cx| {
+        let e = p.editor_mut().unwrap();
+        for _ in 0..12 {
+            e.select(Some(PartKey::new(VALUE)));
+            e.add_part_selected(NewPart::Anchor).unwrap();
+        }
+        e.select(Some(PartKey::new(VALUE)));
+        cx.notify();
+    });
+    click_in_panel(cx, &s, ids::HUD_MAKER_ATTACH.into());
+    let (list, bar) = (
+        ids::HUD_MAKER_ATTACH_LIST,
+        ids::HUD_MAKER_ATTACH_LIST_SCROLLBAR,
+    );
+    assert_bar_on_right_edge(cx, s.win, list, bar);
+    let image = ids::hud_maker_attach_to(&PartKey::new(IMAGE));
+    assert_clear_of_bar(cx, s.win, image.clone(), bar);
+    assert_track_scrolls(cx, s.win, list, image);
 }

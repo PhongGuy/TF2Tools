@@ -278,6 +278,8 @@ pub const HUD_MAKER_COLOUR: &str = "hud-maker-colour";
 pub const HUD_MAKER_COLOUR_NAME: &str = "hud-maker-colour-name";
 /// The scrolling list of the HUD's colour names under the active Colour row.
 pub const HUD_MAKER_COLOUR_NAMES: &str = "hud-maker-colour-names";
+/// The scrollbar beside the named colours list.
+pub const HUD_MAKER_COLOUR_NAMES_SCROLLBAR: &str = "hud-maker-colour-names-scrollbar";
 /// The HUD Maker toolbar's Undo button.
 pub const HUD_MAKER_UNDO: &str = "hud-maker-undo";
 /// The HUD Maker toolbar's Redo button.
@@ -326,6 +328,8 @@ pub const HUD_MAKER_BORROW_CLOSE: &str = "hud-maker-borrow-close";
 pub const HUD_MAKER_BORROW_EMPTY: &str = "hud-maker-borrow-empty";
 /// The chosen HUD's parts list in the Borrow a part section.
 pub const HUD_MAKER_BORROW_PARTS: &str = "hud-maker-borrow-parts";
+/// The scrollbar over the Borrow a part parts list.
+pub const HUD_MAKER_BORROW_PARTS_SCROLLBAR: &str = "hud-maker-borrow-parts-scrollbar";
 /// The credit line under a previewed borrow.
 pub const HUD_MAKER_BORROW_CREDIT: &str = "hud-maker-borrow-credit";
 /// The list of what comes with a previewed borrow and what stays behind.
@@ -559,14 +563,14 @@ pub const CAROUSEL_EMPTY: &str = "carousel-empty";
 pub const LIGHTBOX: &str = "lightbox";
 /// A store item's detail dialog content.
 pub const STORE_DETAIL: &str = "store-detail";
-/// The detail dialog's "Downloaded" (curated) or "In Library" badge; present only when owned.
-pub const STORE_DETAIL_BADGE: &str = "store-detail-badge";
-/// The detail dialog's progress, labelled with the progress text; present only while the item downloads.
-pub const STORE_DETAIL_PROGRESS: &str = "store-detail-progress";
 /// The detail dialog's scrolling part under its header: files, carousel and body.
 pub const STORE_DETAIL_BODY: &str = "store-detail-body";
 /// The scrollbar beside `STORE_DETAIL_BODY`.
 pub const STORE_DETAIL_SCROLLBAR: &str = "store-detail-scrollbar";
+/// The detail dialog's "Downloaded" (curated) or "In Library" badge; present only when owned.
+pub const STORE_DETAIL_BADGE: &str = "store-detail-badge";
+/// The detail dialog's progress, labelled with the progress text; present only while the item downloads.
+pub const STORE_DETAIL_PROGRESS: &str = "store-detail-progress";
 /// The detail dialog's download progress bar, inside `STORE_DETAIL_PROGRESS`.
 pub const STORE_DETAIL_BAR: &str = "store-detail-bar";
 /// The detail dialog's file listing error, labelled with the message.
@@ -676,12 +680,12 @@ pub const PROFILES_GRID: &str = "profiles-grid";
 pub const PROFILES_LIBRARY: &str = "profiles-library";
 /// The scrolling list of missing items in the profile apply dialog.
 pub const PROFILES_MISSING_LIST: &str = "profiles-missing-list";
+/// The scrollbar beside the Missing Items list.
+pub const PROFILES_MISSING_LIST_SCROLLBAR: &str = "profiles-missing-list-scrollbar";
 /// The profile search input.
 pub const PROFILES_SEARCH: &str = "profiles-search";
 /// The header's Create New button.
 pub const PROFILES_CREATE: &str = "profiles-create";
-/// The scrollbar beside the Missing Items list.
-pub const PROFILES_MISSING_LIST_SCROLLBAR: &str = "profiles-missing-list-scrollbar";
 /// The header's Save Current button.
 pub const PROFILES_SAVE_CURRENT: &str = "profiles-save-current";
 /// The empty state shown when there are no profiles.
@@ -1733,6 +1737,11 @@ pub fn hud_maker_font_choices(key: &str) -> ElementId {
     keyed("hud-maker-font-choices", key)
 }
 
+/// The scrollbar beside font row `key`'s open choices list.
+pub fn hud_maker_font_choices_scrollbar(key: &str) -> ElementId {
+    keyed("hud-maker-font-choices-scrollbar", key)
+}
+
 /// A row of "All settings", keyed by the setting as spelled: "hud-maker-setting:xpos".
 pub fn hud_maker_setting(key: &str) -> ElementId {
     keyed("hud-maker-setting", key)
@@ -1870,6 +1879,12 @@ pub const HUD_MAKER_SITUATION_RESET: &str = "hud-maker-situation-reset";
 pub const HUD_MAKER_SITUATION_METER: &str = "hud-maker-situation-meter";
 /// The situation menu's scrolling list of meters, while open.
 pub const HUD_MAKER_SITUATION_METERS: &str = "hud-maker-situation-meters";
+/// The scrollbar over the situation menu's meter list.
+pub const HUD_MAKER_SITUATION_METERS_SCROLLBAR: &str = "hud-maker-situation-meters-scrollbar";
+/// The side panel's Attach to menu list.
+pub const HUD_MAKER_ATTACH_LIST: &str = "hud-maker-attach-list";
+/// The scrollbar over the Attach to menu list.
+pub const HUD_MAKER_ATTACH_LIST_SCROLLBAR: &str = "hud-maker-attach-list-scrollbar";
 /// The side panel's Show it, which picks the situation a part needs to show.
 pub const HUD_MAKER_PANEL_SHOW_IT: &str = "hud-maker-panel-show-it";
 /// The timeline strip under the canvas, while any event plays.

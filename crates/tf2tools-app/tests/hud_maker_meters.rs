@@ -5,6 +5,7 @@ mod support;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use support::maker_page::open_maker;
+use support::scroll::{assert_bar_on_right_edge, assert_clear_of_bar, assert_track_scrolls};
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::editor::HudEditor;
 use tf2tools_app::pages::hud_maker::{Field, HudMakerPage};
@@ -245,4 +246,21 @@ fn the_meter_list_fits_a_small_window(cx: &mut TestAppContext) {
         ids::hud_maker_situation_meter(MeterKind::Canteen),
     );
     assert_eq!(meter(cx, &page), MeterKind::Canteen);
+}
+
+#[gpui_kit::test]
+fn the_meter_list_shows_a_bar_clear_of_its_meters(cx: &mut TestAppContext) {
+    let (_env, s, _page) = open_maker(cx);
+    support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
+    support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION_METER);
+    let (list, bar) = (
+        ids::HUD_MAKER_SITUATION_METERS,
+        ids::HUD_MAKER_SITUATION_METERS_SCROLLBAR,
+    );
+    assert_bar_on_right_edge(cx, s.win, list, bar);
+    for kind in MeterKind::ALL {
+        assert_clear_of_bar(cx, s.win, ids::hud_maker_situation_meter(kind), bar);
+    }
+    let first = ids::hud_maker_situation_meter(MeterKind::ALL[0]);
+    assert_track_scrolls(cx, s.win, list, first);
 }
