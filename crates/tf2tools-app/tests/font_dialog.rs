@@ -224,6 +224,10 @@ fn a_long_font_list_shows_a_scrollbar_that_takes_clicks(cx: &mut TestAppContext)
         last.bottom() > list.bottom(),
         "the list overflows: {last:?} in {list:?}"
     );
+    assert!(
+        last.right() <= list.right() - px(12.),
+        "the rows stay clear of the bar: {last:?} in {list:?}"
+    );
     // The bar's track runs down the list's right edge; a click at its foot jumps to the end.
     cx.update_window(win, |_, w, cx| {
         w.click_at(
