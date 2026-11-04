@@ -210,3 +210,69 @@ fn a_volume_change_does_not_redraw_the_cards(cx: &mut TestAppContext) {
     }
     assert_eq!(redraws.get(), 0);
 }
+
+/// Twenty playable sounds, so the grid's last cards sit under the floating player.
+fn seed_many(env: &support::Env, url: &str) {
+    let names: Vec<String> = (1..=20).map(|n| format!("Sound {n}")).collect();
+    let rows: Vec<(i64, &str, &str, Option<&str>)> = names
+        .iter()
+        .zip(1..)
+        .map(|(name, id)| (id, name.as_str(), "hitsound", Some(url)))
+        .collect();
+    support::seed_sounds(env, &rows);
+}
+
+/// The first of the twenty sounds whose card the grid draws.
+fn shown(cx: &mut TestAppContext, w: &support::SoundStoreWindow) -> u64 {
+    (1..=20)
+        .find(|&n| support::present(cx, w.win, ids::store_play(S, &gb(n))))
+        .expect("a drawn card")
+}
+
+#[gpui_kit::test]
+fn the_player_s_stop_over_a_card_only_stops(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let url = server.mount_preview(1, vec![4, 5, 6]);
+    let w = support::sound_store_window(cx, &env, &server, |env| seed_many(env, &url));
+    let n = shown(cx, &w);
+    support::click_id(cx, w.win, ids::store_play(S, &gb(n)));
+    support::wait_real(cx, "the preview", |_| w.audio.plays().len() == 1);
+    let stop = support::bounds_of(cx, w.win, ids::SOUND_PLAYER_STOP).expect("the stop button");
+    assert!(
+        (1..=20).any(
+            |n| support::bounds_of(cx, w.win, ids::store_card(S, &gb(n)))
+                .is_some_and(|card| card.contains(&stop.center()))
+        ),
+        "a card must sit under the player for this test to mean anything"
+    );
+    support::click_id(cx, w.win, ids::SOUND_PLAYER_STOP);
+    assert_eq!(cx.update(|cx| w.page.read(cx).playing(cx)), None);
+    assert!(
+        !support::present(cx, w.win, ids::STORE_DETAIL),
+        "the click stops at the player and never opens the card under it"
+    );
+}
+
+#[gpui_kit::test]
+fn the_player_stays_usable_over_an_open_detail(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let url = server.mount_preview(1, vec![4, 5, 6]);
+    let w = support::sound_store_window(cx, &env, &server, |env| seed_many(env, &url));
+    let n = shown(cx, &w);
+    support::click_id(cx, w.win, ids::store_card(S, &gb(n)));
+    assert!(support::present(cx, w.win, ids::STORE_DETAIL));
+    support::click_id(cx, w.win, ids::STORE_PREVIEW);
+    support::wait_real(cx, "the preview", |_| w.audio.plays().len() == 1);
+    support::click_id(cx, w.win, ids::SOUND_PLAYER_STOP);
+    assert_eq!(
+        cx.update(|cx| w.page.read(cx).playing(cx)),
+        None,
+        "the player draws above the dialog's backdrop, so its stop is reachable"
+    );
+    assert!(
+        support::present(cx, w.win, ids::STORE_DETAIL),
+        "using the player leaves the dialog open"
+    );
+}
