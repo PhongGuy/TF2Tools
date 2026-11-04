@@ -64,6 +64,22 @@ fn one_image_has_no_controls_and_none_says_so(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn position_label_follows_the_steps_and_hides_for_one_image(cx: &mut TestAppContext) {
+    let (win, _) = open(cx, 3);
+    let position = |cx: &mut TestAppContext| support::label_of(cx, win, ids::CAROUSEL_POSITION);
+    assert_eq!(position(cx).as_deref(), Some("1 / 3"));
+    support::click_id(cx, win, ids::CAROUSEL_NEXT);
+    assert_eq!(position(cx).as_deref(), Some("2 / 3"));
+    support::click_id(cx, win, ids::CAROUSEL_PREV);
+    support::click_id(cx, win, ids::CAROUSEL_PREV);
+    assert_eq!(position(cx).as_deref(), Some("3 / 3"));
+    let (win, _) = open(cx, 1);
+    assert!(!support::present(cx, win, ids::CAROUSEL_POSITION));
+    let (win, _) = open(cx, 0);
+    assert!(!support::present(cx, win, ids::CAROUSEL_POSITION));
+}
+
+#[gpui_kit::test]
 fn wants_the_shown_and_the_next_screenshot_at_carousel_size(cx: &mut TestAppContext) {
     support::init(cx);
     let asked = Arc::new(Mutex::new(Vec::<String>::new()));

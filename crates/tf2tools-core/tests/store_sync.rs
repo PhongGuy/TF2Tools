@@ -367,7 +367,7 @@ async fn crosshair_and_hud_syncs_read_mod_pages_concurrently() {
             "Dyselxic Crosshair - Kunai".to_owned(),
             "Vexcenot".to_owned(),
             Some("https://images.gamebanana.com/img/ss/mods/100-90_66c071a63156d.jpg".to_owned()),
-            r#"["https://images.gamebanana.com/img/ss/mods/66c071a63156d.jpg"]"#.to_owned(),
+            r#"["https://images.gamebanana.com/img/ss/mods/66c071a63156d.jpg","https://images.gamebanana.com/img/ss/mods/64b53c8423359.jpg","https://images.gamebanana.com/img/ss/mods/64b4bf4cabfe3.jpg"]"#.to_owned(),
             77,
             "[]".to_owned(),
             1689567250,
