@@ -8,6 +8,7 @@ use std::time::Duration;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, ElementId, Entity, TestAppContext, px};
+use support::scroll::{assert_bar_beside, assert_clear_of_bar, assert_track_scrolls};
 use tf2tools_app::ids;
 use tf2tools_app::library_events::{LibraryChanged, LibraryEvents};
 use tf2tools_app::pages::profiles::ProfilesPage;
@@ -1231,4 +1232,32 @@ fn at_800x600_the_profiles_header_fits_and_the_cards_have_room(cx: &mut TestAppC
         library.bottom() <= page.bottom() + px(1.),
         "{library:?} still runs past {page:?}"
     );
+}
+
+#[gpui_kit::test]
+fn a_long_missing_items_list_shows_a_bar_beside_its_rows(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    // Builtin crosshairs the catalog does not know, each its own missing row.
+    let crosshairs = (0..10)
+        .map(|ix| DraftCrosshair::Set {
+            weapon_script: format!("tf_weapon_probe_{ix}"),
+            crosshair: CrosshairRef::Builtin(format!("gone{ix}")),
+        })
+        .collect();
+    let comp = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Comp").with_crosshairs(crosshairs))
+        .unwrap();
+    let _page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::wait_real(cx, "the Missing Items dialog", |cx| {
+        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
+    });
+    support::dialog_box(cx, s.win);
+    let bar = ids::PROFILES_MISSING_LIST_SCROLLBAR;
+    assert_bar_beside(cx, s.win, ids::PROFILES_MISSING_LIST, bar);
+    assert_clear_of_bar(cx, s.win, ids::missing_item(0), bar);
+    assert_track_scrolls(cx, s.win, bar, ids::missing_item(0));
 }

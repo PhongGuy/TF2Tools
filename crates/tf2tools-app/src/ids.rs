@@ -680,6 +680,8 @@ pub const PROFILES_MISSING_LIST: &str = "profiles-missing-list";
 pub const PROFILES_SEARCH: &str = "profiles-search";
 /// The header's Create New button.
 pub const PROFILES_CREATE: &str = "profiles-create";
+/// The scrollbar beside the Missing Items list.
+pub const PROFILES_MISSING_LIST_SCROLLBAR: &str = "profiles-missing-list-scrollbar";
 /// The header's Save Current button.
 pub const PROFILES_SAVE_CURRENT: &str = "profiles-save-current";
 /// The empty state shown when there are no profiles.
