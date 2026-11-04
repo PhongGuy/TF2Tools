@@ -47,7 +47,8 @@ jobs:
 
   windows:
     runs-on: windows-2025
-    timeout-minutes: 60
+    # Lint plus every test binary runs past an hour on a hosted runner.
+    timeout-minutes: 120
     defaults:
       run:
         # Git for Windows' bash, so the commands read the same as on Linux.
