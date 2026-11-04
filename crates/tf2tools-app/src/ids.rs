@@ -559,6 +559,8 @@ pub const CAROUSEL_NEXT: &str = "carousel-next";
 pub const CAROUSEL_IMAGE: &str = "carousel-image";
 /// Labelled "No screenshots" when a carousel has no images.
 pub const CAROUSEL_EMPTY: &str = "carousel-empty";
+/// A carousel's "3 / 26" position, labelled with that text; present only with two or more images.
+pub const CAROUSEL_POSITION: &str = "carousel-position";
 /// The screenshot lightbox dialog's content.
 pub const LIGHTBOX: &str = "lightbox";
 /// A store item's detail dialog content.

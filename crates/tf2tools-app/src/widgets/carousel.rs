@@ -168,6 +168,23 @@ impl Render for Carousel {
                             .on_click(cx.listener(|this, _, _, cx| this.next(cx))),
                     ),
             );
+            // A small "3 / 26" under the image says where in the gallery the user is.
+            let position = format!("{} / {}", self.index + 1, self.len());
+            return v_flex()
+                .w_full()
+                .gap_2()
+                .child(area)
+                .child(labelled(
+                    div()
+                        .w_full()
+                        .flex()
+                        .justify_center()
+                        .text_xs()
+                        .text_color(muted_foreground),
+                    ids::CAROUSEL_POSITION,
+                    position,
+                ))
+                .into_any_element();
         }
         area.into_any_element()
     }
