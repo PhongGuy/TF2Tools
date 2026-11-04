@@ -7722,7 +7722,7 @@ dependencies = [
 
 [[package]]
 name = "tf2tools-app"
-version = "6.0.0"
+version = "6.0.1"
 dependencies = [
  "anyhow",
  "async-channel",
@@ -7751,7 +7751,7 @@ dependencies = [
 
 [[package]]
 name = "tf2tools-core"
-version = "6.0.0"
+version = "6.0.1"
 dependencies = [
  "base64 0.22.1",
  "chrono",
