@@ -494,6 +494,8 @@ fn a_saved_view_for_older_choices_never_replaces_newer_shown_files(cx: &mut Test
     assert!(!std::sync::Arc::ptr_eq(&shown, &newer));
 }
 
+// It locks a folder with Unix permissions, which Windows does not have.
+#[cfg(unix)]
 #[gpui_kit::test]
 fn a_reload_that_cannot_read_the_files_says_so_in_plain_words(cx: &mut TestAppContext) {
     use std::os::unix::fs::PermissionsExt as _;

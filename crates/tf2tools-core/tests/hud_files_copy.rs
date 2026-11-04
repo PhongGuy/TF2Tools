@@ -3,7 +3,10 @@
 mod common;
 
 use common::hud_copy::{empty_game, folder_with};
-use tf2tools_core::{CopyView, HudFiles, HudFilesError};
+use tf2tools_core::{CopyView, HudFiles};
+// Only the Unix link test checks why a folder was refused.
+#[cfg(unix)]
+use tf2tools_core::HudFilesError;
 
 fn text(file: Option<tf2tools_core::HudFile>) -> Option<String> {
     file.map(|f| String::from_utf8(f.into_bytes()).unwrap())

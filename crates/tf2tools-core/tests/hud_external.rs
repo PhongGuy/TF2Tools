@@ -11,8 +11,11 @@ use common::{
 };
 use tf2tools_core::{
     ApplyProfileError, ApplyStep, DraftSlot, ExternalHud, HudEntry, HudId, HudStatus, InstallError,
-    KeepHudError, LibraryKind, Profile, ProfileDraft, Provenance, Reinstall, ReinstallError,
+    LibraryKind, Profile, ProfileDraft, Provenance, Reinstall, ReinstallError,
 };
+// Only the Unix permission and link tests check why keeping a HUD failed.
+#[cfg(unix)]
+use tf2tools_core::KeepHudError;
 
 fn place(env: &LibraryEnv, folder: &str) {
     let root = env.tf2.custom_dir().join(folder);

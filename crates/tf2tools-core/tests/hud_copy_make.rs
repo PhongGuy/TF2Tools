@@ -4,7 +4,10 @@ mod common;
 
 use common::hud_copy::{game_for, import_stock_hud, snapshot};
 use common::hud_stock::{HEALTH, stock_files};
-use common::{library_env, tmp_is_empty, tree, write_file};
+use common::{library_env, tree};
+// Only the Unix permission and link tests use these.
+#[cfg(unix)]
+use common::{tmp_is_empty, write_file};
 use tf2tools_core::{
     CopyHudError, HudId, HudModel, LibraryKind, MakeTarget, PartKey, Platform, Provenance,
 };

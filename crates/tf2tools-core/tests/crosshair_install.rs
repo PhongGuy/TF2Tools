@@ -412,6 +412,8 @@ fn uninstalling_an_unknown_crosshair_is_not_in_library() {
     assert!(matches!(err, InstallError::NotInLibrary { .. }), "{err:?}");
 }
 
+// It locks a folder with Unix permissions, which Windows does not have.
+#[cfg(unix)]
 #[test]
 fn a_failed_uninstall_keeps_the_crosshair_and_its_assignments() {
     use std::os::unix::fs::PermissionsExt as _;

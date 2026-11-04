@@ -9,7 +9,7 @@ TARGET=x86_64-pc-windows-gnu
 IMAGE=localhost/tf2tools-wincheck:1
 mode=${1:-lint}
 case $mode in
-  lint) cmd=(cargo clippy --locked --target "$TARGET" --workspace --all-targets --all-features -- -Dwarnings) ;;
+  lint) cmd=(cargo clippy --locked --keep-going --target "$TARGET" --workspace --all-targets --all-features -- -Dwarnings) ;;
   build) cmd=(cargo build --locked --target "$TARGET" -p tf2tools-app --bin tf2tools) ;;
   *) echo "usage: scripts/check-windows.sh [lint|build]" >&2; exit 2 ;;
 esac

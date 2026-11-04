@@ -1052,6 +1052,8 @@ fn delete_works_without_tf2(cx: &mut TestAppContext) {
     assert!(s.services.library.list_crosshairs().unwrap().is_empty());
 }
 
+// It locks a folder with Unix permissions, which Windows does not have.
+#[cfg(unix)]
 #[gpui_kit::test]
 fn a_failed_delete_toasts_and_keeps_the_crosshair(cx: &mut TestAppContext) {
     use std::os::unix::fs::PermissionsExt as _;
