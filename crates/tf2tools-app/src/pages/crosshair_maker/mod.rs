@@ -782,6 +782,8 @@ impl CrosshairMakerPage {
             .min_h_0()
             .track_scroll(&self.panel_scroll)
             .overflow_y_scroll()
+            // The panel has no padding of its own, so this keeps its controls clear of the bar.
+            .pr_4()
             .gap_4()
             .child(save)
             .child(

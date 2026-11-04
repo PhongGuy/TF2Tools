@@ -247,6 +247,22 @@ fn the_crosshair_maker_panel_shows_a_bar(cx: &mut TestAppContext) {
     assert_track_scrolls(cx, s.win, panel, ids::CROSSHAIR_MAKER_COLOR_HINT);
 }
 
+#[gpui_kit::test]
+fn the_crosshair_maker_panel_keeps_its_controls_clear_of_the_bar(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    open(cx, &s, Page::CrosshairMaker);
+    resize(cx, &s, 800., 400.);
+    let panel = support::bounds_of(cx, s.win, ids::CROSSHAIR_MAKER_PANEL).expect("the panel");
+    let name = support::bounds_of(cx, s.win, ids::CROSSHAIR_MAKER_NAME).expect("the name field");
+    assert!(
+        name.right() <= panel.right() - px(12.),
+        "the name field ends at {:?}, under the bar at the panel's edge {:?}",
+        name.right(),
+        panel.right()
+    );
+}
+
 /// Opens Logs over one entry with `lines` lines of details and expands them.
 fn expanded_details(cx: &mut TestAppContext, s: &support::ShellWindow, lines: usize) -> i64 {
     let details: Vec<String> = (0..lines).map(|ix| format!("line {ix}")).collect();
