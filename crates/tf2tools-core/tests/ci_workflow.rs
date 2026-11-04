@@ -43,7 +43,7 @@ fn a_windows_job_lints_and_tests_the_workspace() {
         "persist-credentials: false",
         "components: clippy",
         "run: cargo clippy --locked --workspace --all-targets --all-features -- -Dwarnings",
-        "run: cargo test --locked --workspace",
+        "run: cargo test --locked --workspace --no-fail-fast",
     ] {
         assert!(
             windows.lines().any(|l| l.trim() == want),
