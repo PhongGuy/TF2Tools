@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 10;
+pub(crate) const SCHEMA_VERSION: u32 = 11;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -76,6 +76,11 @@ const STEPS: &[Step] = &[
     Step {
         version: 10,
         sql: STEP_10_SQL,
+        add_columns: &[],
+    },
+    Step {
+        version: 11,
+        sql: STEP_11_SQL,
         add_columns: &[],
     },
 ];
@@ -355,4 +360,13 @@ const STEP_10_SQL: &str = "
     CREATE INDEX IF NOT EXISTS idx_library_crosshairs_gb ON library_crosshairs(store_gb_id) WHERE store_gb_id IS NOT NULL;
     CREATE INDEX IF NOT EXISTS idx_library_huds_gb ON library_huds(store_gb_id) WHERE store_gb_id IS NOT NULL;
     ANALYZE;
+";
+
+/// v6 step 11: earlier syncs dropped most GameBanana screenshots, so the crosshair and HUD
+/// stores forget their sync stamp and checkpoint; the next visit refetches every row in place.
+const STEP_11_SQL: &str = "
+    DELETE FROM store_cache_meta WHERE key IN (
+        'crosshairs_last_synced', 'crosshairs_sync_page', 'crosshairs_sync_start', 'crosshairs_sync_fetched',
+        'huds_gb_last_synced', 'huds_gb_sync_page', 'huds_gb_sync_start', 'huds_gb_sync_fetched'
+    );
 ";

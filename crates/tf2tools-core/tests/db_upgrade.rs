@@ -25,7 +25,7 @@ const V1_SCHEMA: &str = "
     PRAGMA user_version = 1;";
 
 #[test]
-fn v5_database_upgrades_to_v10_without_loss() {
+fn v5_database_upgrades_to_v11_without_loss() {
     let (_tmp, dir) = common::temp_data_dir();
     common::write_v5_database(&dir);
     let before = common::dump_tables(&Connection::open(dir.db_path()).unwrap());
@@ -34,7 +34,7 @@ fn v5_database_upgrades_to_v10_without_loss() {
         "seed fills every table"
     );
     let db = Database::open(&dir).expect("open v5 database");
-    assert_eq!(db.schema_version(), 10);
+    assert_eq!(db.schema_version(), 11);
     drop(db);
     let after = Connection::open(dir.db_path()).unwrap();
     assert_eq!(common::dump_tables(&after), before);
@@ -42,7 +42,7 @@ fn v5_database_upgrades_to_v10_without_loss() {
     let version: u32 = after
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 10);
+    assert_eq!(version, 11);
     let analyzed: i64 = after
         .query_row(
             "SELECT count(*) FROM sqlite_master WHERE name = 'sqlite_stat1'",
@@ -66,12 +66,12 @@ fn v5_database_upgrades_to_v10_without_loss() {
         assert!(sql.ends_with("WHERE store_gb_id IS NOT NULL"), "{sql}");
     }
     drop(after);
-    let db = Database::open(&dir).expect("reopen at v10");
-    assert_eq!(db.schema_version(), 10);
+    let db = Database::open(&dir).expect("reopen at v11");
+    assert_eq!(db.schema_version(), 11);
 }
 
 #[test]
-fn v1_database_upgrades_to_v10() {
+fn v1_database_upgrades_to_v11() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -87,7 +87,7 @@ fn v1_database_upgrades_to_v10() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v1 database");
-    assert_eq!(db.schema_version(), 10);
+    assert_eq!(db.schema_version(), 11);
     drop(db);
 
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -115,7 +115,7 @@ fn newer_schema_is_refused_and_left_untouched() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
-    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 11;")
+    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 12;")
         .unwrap();
     drop(conn);
     let before = std::fs::read(dir.db_path()).unwrap();
@@ -125,7 +125,7 @@ fn newer_schema_is_refused_and_left_untouched() {
 
     let err = Database::open(&dir).expect_err("a newer schema must be refused");
     assert!(
-        matches!(&err, OpenError::NewerSchema { path, found: 11, supported: 10 } if *path == dir.db_path()),
+        matches!(&err, OpenError::NewerSchema { path, found: 12, supported: 11 } if *path == dir.db_path()),
         "{err:?}"
     );
     assert_eq!(std::fs::read(dir.db_path()).unwrap(), before);
@@ -203,5 +203,55 @@ fn unwritable_data_dir_reports_io_with_the_path() {
     match &err {
         OpenError::Io { path, .. } => assert!(path.starts_with(dir.root()), "{path:?}"),
         other => panic!("expected Io, got {other:?}"),
+    }
+}
+
+#[test]
+fn v10_database_marks_the_gamebanana_mod_stores_stale_and_keeps_their_rows() {
+    // v10 synced crosshair and HUD galleries missing most screenshots; step 11 forces a full resync.
+    let (_tmp, dir) = common::temp_data_dir();
+    drop(Database::open(&dir).expect("create"));
+    let conn = Connection::open(dir.db_path()).unwrap();
+    let fresh = common::hours_ago(0);
+    for key in ["curated", "huds_gb", "sounds", "crosshairs", "addons"] {
+        conn.execute(
+            "INSERT OR REPLACE INTO store_cache_meta (key, value) VALUES (?1, ?2)",
+            [format!("{key}_last_synced"), fresh.clone()],
+        )
+        .unwrap();
+    }
+    conn.execute_batch(
+        "INSERT INTO store_cache_meta (key, value) VALUES
+            ('crosshairs_sync_page', '3'), ('crosshairs_sync_start', 'x'), ('crosshairs_sync_fetched', '45'),
+            ('sounds_sync_page', '2');
+        INSERT INTO store_crosshairs (gb_id, name, fetched_at) VALUES (1, 'kept', 'x');
+        INSERT INTO store_huds_gb (gb_id, name, fetched_at) VALUES (2, 'kept', 'x');
+        PRAGMA user_version = 10;",
+    )
+    .unwrap();
+    drop(conn);
+
+    let db = Database::open(&dir).expect("open v10 database");
+    assert_eq!(db.schema_version(), 11);
+    drop(db);
+    let conn = Connection::open(dir.db_path()).unwrap();
+    let keys: Vec<String> = conn
+        .prepare("SELECT key FROM store_cache_meta ORDER BY key")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    assert_eq!(
+        keys,
+        [
+            "addons_last_synced",
+            "curated_last_synced",
+            "sounds_last_synced",
+            "sounds_sync_page"
+        ]
+    );
+    for table in ["store_crosshairs", "store_huds_gb"] {
+        assert_eq!(common::count(&dir, table), 1, "{table} rows are kept");
     }
 }
