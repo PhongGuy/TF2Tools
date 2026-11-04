@@ -408,7 +408,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(body, b"ok");
-        assert!(USER_AGENT.starts_with("TF2Tools/6.0.0"), "{USER_AGENT}");
+        assert!(
+            USER_AGENT.starts_with(concat!("TF2Tools/", env!("CARGO_PKG_VERSION"))),
+            "{USER_AGENT}"
+        );
         assert!(USER_AGENT.ends_with(" (+https://github.com/PhongGuy/TF2Tools)"));
     }
 
