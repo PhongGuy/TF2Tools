@@ -62,6 +62,11 @@ inherits = "dev"
 opt-level = 3
 debug = 0
 
+# GPUI and the other dependencies crawl unoptimised, which made the UI tests take an hour
+# in CI; the workspace crates stay unoptimised so they rebuild quickly.
+[profile.dev.package."*"]
+opt-level = 2
+
 # The texture decoders are per-pixel loops that crawl unoptimised; the HUD Maker's pictures
 # decode with them, so dev builds keep them fast.
 [profile.dev.package.vtf]

@@ -26,8 +26,8 @@ env:
 jobs:
   gate:
     runs-on: ubuntu-24.04
-    # A cold build plus the full suite runs about an hour on a hosted runner.
-    timeout-minutes: 120
+    # About 16 minutes with a warm cache and 20 from cold.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -37,6 +37,9 @@ jobs:
           toolchain: stable
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          # The key ignores build profiles; bump it when Cargo.toml changes how deps compile.
+          prefix-key: v1-rust
       # GPUI's windowing, font and GPU libraries, plus ALSA for the sound player.
       - name: Install system libraries
         run: |
@@ -47,8 +50,8 @@ jobs:
 
   windows:
     runs-on: windows-2025
-    # Lint plus every test binary runs past an hour on a hosted runner.
-    timeout-minutes: 120
+    # About 25 minutes with a warm cache and 51 from cold.
+    timeout-minutes: 75
     defaults:
       run:
         # Git for Windows' bash, so the commands read the same as on Linux.
@@ -65,6 +68,9 @@ jobs:
           toolchain: stable
           components: clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          # The key ignores build profiles; bump it when Cargo.toml changes how deps compile.
+          prefix-key: v1-rust
       - name: Lint
         run: cargo clippy --locked --workspace --all-targets --all-features -- -Dwarnings
       - name: Test

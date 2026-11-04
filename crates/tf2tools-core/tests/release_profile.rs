@@ -199,3 +199,21 @@ fn the_release_profile_is_thin_lto_one_codegen_unit_and_stripped() {
         "{release:?}"
     );
 }
+
+/// The GPUI tests crawl on unoptimised dependencies, so dev and test builds optimise every
+/// crate outside the workspace while the workspace itself stays quick to rebuild.
+#[test]
+fn dev_builds_optimise_every_dependency() {
+    let manifest = std::fs::read_to_string(repo().join("Cargo.toml")).unwrap();
+    let section: Vec<String> = manifest
+        .lines()
+        .skip_while(|l| l.trim() != r#"[profile.dev.package."*"]"#)
+        .skip(1)
+        .take_while(|l| !l.trim_start().starts_with('['))
+        .map(squeeze)
+        .collect();
+    assert!(
+        section.iter().any(|l| l == "opt-level=2"),
+        "Cargo.toml needs [profile.dev.package.\"*\"] with opt-level = 2: {section:?}"
+    );
+}
