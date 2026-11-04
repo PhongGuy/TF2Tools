@@ -113,3 +113,21 @@ pub fn click_in_panel(cx: &mut TestAppContext, s: &super::ShellWindow, id: Eleme
     }
     super::click_id(cx, s.win, id);
 }
+
+/// Wheels the side panel until all of `id` lies inside its body, up when it sits above.
+pub fn scroll_panel_to(cx: &mut TestAppContext, s: &super::ShellWindow, id: ElementId) {
+    for _ in 0..80 {
+        let body = super::bounds_of(cx, s.win, ids::HUD_MAKER_PANEL_BODY).unwrap();
+        let b = super::bounds_of(cx, s.win, id.clone()).unwrap();
+        if b.top() >= body.top() && b.bottom() <= body.bottom() {
+            return;
+        }
+        let step = if b.top() < body.top() { 1. } else { -1. };
+        let turn = ScrollDelta::Lines(point(0., step));
+        cx.update_window(s.win, |_, w, cx| {
+            w.scroll(ids::HUD_MAKER_PANEL_BODY, turn, cx)
+        })
+        .unwrap();
+    }
+    panic!("{id:?} never scrolled into the side panel");
+}

@@ -10,9 +10,9 @@ use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _, Window,
-    div, px, transparent_black,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, Task,
+    TestSupportExt as _, Window, div, px, transparent_black,
 };
 use tf2tools_core::{StoreFile, StoreItem, StoreItemId, StoreKind};
 
@@ -30,6 +30,7 @@ use crate::tokio_bridge;
 use crate::widgets::carousel::Carousel;
 use crate::widgets::dialog_frame::{BOX_CHROME, DETAIL_WIDTH, DIALOG_WIDTH, DialogFrame};
 use crate::widgets::labelled;
+use crate::widgets::scroll::scroll_beside;
 
 /// The item a detail dialog is about, as the card that opened it knows it.
 #[derive(Clone, Debug, PartialEq)]
@@ -101,6 +102,8 @@ pub struct StoreDetail {
     store_item: Option<StoreItem>,
     files: FilesState,
     carousel: Entity<Carousel>,
+    // The scroll of everything under the header.
+    scroll: ScrollHandle,
     win: AnyWindowHandle,
     _item_task: Task<()>,
     files_task: Option<Task<()>>,
@@ -183,6 +186,7 @@ impl StoreDetail {
             store_item: None,
             files: FilesState::Loading,
             carousel,
+            scroll: ScrollHandle::new(),
             win,
             _item_task: item_task,
             files_task: None,
@@ -434,13 +438,28 @@ impl Render for StoreDetail {
             None => (None, None),
         };
         // The files sit right under the title so they stay on screen above a tall carousel.
-        // v5 caps the dialog at 90% of the window (`max-h-[90vh]`) and scrolls its body.
+        // v5 caps the dialog at 90% of the window (`max-h-[90vh]`) and scrolls its body; here
+        // the header stays, so the bar in the box padding starts below the close X.
+        let scrolled = v_flex()
+            .id(ids::STORE_DETAIL_BODY)
+            .test_support()
+            .min_h_0()
+            .track_scroll(&self.scroll)
+            .overflow_y_scroll()
+            .gap_4()
+            .children(progress_el)
+            .child(self.files_section(busy, cx))
+            // A 16:9 box has no content height to defend, so a short window would squash it.
+            .children(
+                has_screenshots(self.item.kind)
+                    .then(|| div().flex_shrink_0().child(self.carousel.clone())),
+            )
+            .children(body);
         v_flex()
             .id(ids::STORE_DETAIL)
             .test_support()
             .w_full()
             .max_h(window.viewport_size().height * 0.9 - BOX_CHROME)
-            .overflow_y_scroll()
             .gap_4()
             // v5's header: the badge rides 8 px after the name, the author on the line below,
             // and the kind's action at the top right beside that block. v5 draws the header
@@ -473,14 +492,7 @@ impl Render for StoreDetail {
                     )
                     .children(action),
             )
-            .children(progress_el)
-            .child(self.files_section(busy, cx))
-            // A 16:9 box has no content height to defend, so a short window would squash it.
-            .children(
-                has_screenshots(self.item.kind)
-                    .then(|| div().flex_shrink_0().child(self.carousel.clone())),
-            )
-            .children(body)
+            .child(scroll_beside(ids::STORE_DETAIL_SCROLLBAR, &self.scroll, scrolled).min_h_0())
     }
 }
 

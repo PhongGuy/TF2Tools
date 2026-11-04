@@ -32,7 +32,7 @@ use super::{Field, FontList, HudMakerPage};
 use crate::ids;
 use crate::pages::crosshair_maker::model::hsla_of_rgba;
 use crate::widgets::labelled;
-use crate::widgets::scroll::scroll_area;
+use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 
 // The prompt with nothing selected, naming the scene whose tab is open.
 fn empty_hint(scene: Option<Scene>) -> &'static str {
@@ -311,6 +311,7 @@ impl HudMakerPage {
                         .track_scroll(&self.panel_scroll)
                         .test_support()
                         .p_3()
+                        .pr(BAR_WIDTH)
                         .gap_3()
                         .children(self.panel_rows(cx));
                     let bar = ids::HUD_MAKER_PANEL_BODY_SCROLLBAR;
@@ -1061,15 +1062,20 @@ impl HudMakerPage {
                     .label(label)
                     .tooltip("Keep this part beside another as that one moves"),
             )
-            .child(
+            .child(scroll_area(
+                ids::HUD_MAKER_ATTACH_LIST_SCROLLBAR,
+                &self.attach_scroll,
                 v_flex()
-                    .id("hud-maker-attach-list")
+                    .id(ids::HUD_MAKER_ATTACH_LIST)
+                    .test_support()
                     .max_h(px(NAMES_HEIGHT))
+                    .track_scroll(&self.attach_scroll)
                     .overflow_y_scroll()
                     .gap_1()
                     .items_start()
+                    .pr(BAR_WIDTH)
                     .children(items),
-            );
+            ));
         let mut out = v_flex().gap_1().child(menu);
         if let Some(to) = pinned_to {
             let to = to.key().clone();
@@ -1435,12 +1441,19 @@ impl HudMakerPage {
                         cx.listener(move |page, _, window, cx| page.name_colour(&name, window, cx)),
                     )
             });
-            v_flex()
+            let list = v_flex()
                 .id(ids::HUD_MAKER_COLOUR_NAMES)
                 .max_h(px(NAMES_HEIGHT))
+                .track_scroll(&self.names_scroll)
                 .overflow_y_scroll()
                 .test_support()
-                .children(rows)
+                .pr(BAR_WIDTH)
+                .children(rows);
+            scroll_area(
+                ids::HUD_MAKER_COLOUR_NAMES_SCROLLBAR,
+                &self.names_scroll,
+                list,
+            )
         });
         v_flex()
             .gap_1()
@@ -1463,6 +1476,7 @@ impl HudMakerPage {
                             .on_click(cx.listener(|page, _, _, cx| {
                                 page.names_open = !page.names_open;
                                 page.reveal_names = page.names_open;
+                                page.names_scroll.set_offset(point(px(0.), px(0.)));
                                 page.font_open = None;
                                 cx.notify();
                             })),
@@ -1539,6 +1553,8 @@ impl HudMakerPage {
         let part = self.editor().and_then(|e| e.selected().cloned());
         self.font_open = part.filter(|_| !open).map(|p| (p, key.to_owned(), list));
         self.reveal_font_list = self.font_open.is_some();
+        // Each list opens at its top, whichever list was scrolled before.
+        self.font_scroll.set_offset(point(px(0.), px(0.)));
         self.names_open = false;
         cx.notify();
     }
@@ -1632,12 +1648,16 @@ impl HudMakerPage {
             None => Vec::new(),
         };
         let list = open.map(|_| {
-            v_flex()
+            let list = v_flex()
                 .id(ids::hud_maker_font_choices(key))
                 .max_h(px(NAMES_HEIGHT))
+                .track_scroll(&self.font_scroll)
                 .overflow_y_scroll()
                 .test_support()
-                .children(choices)
+                .pr(BAR_WIDTH)
+                .children(choices);
+            let bar = ids::hud_maker_font_choices_scrollbar(key);
+            scroll_area(bar, &self.font_scroll, list)
         });
         let size_here = self.font_size_row.as_ref().is_some_and(|(part, row)| {
             row == key && self.editor().and_then(|e| e.selected()) == Some(part)

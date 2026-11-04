@@ -5,6 +5,10 @@ mod support;
 use std::collections::BTreeSet;
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
+use support::maker_page::scroll_panel_to;
+use support::scroll::{
+    assert_bar_on_right_edge, assert_clear_of_bar, assert_track_scrolls_virtual,
+};
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::services::Tf2State;
@@ -503,4 +507,34 @@ fn a_borrow_that_lands_after_the_players_changes_moved_on_is_dropped(cx: &mut Te
         cx.update(|cx| page.read(cx).editor().unwrap().changes().to_vec()),
         after
     );
+}
+
+#[gpui_kit::test]
+fn a_long_parts_list_shows_a_bar_clear_of_its_rows(cx: &mut TestAppContext) {
+    // Thirty labels under the health panel, so the list runs past its tallest.
+    let mut res = String::from("\"Resource/UI/HudPlayerHealth.res\"\n{\n");
+    res.push_str("  HudPlayerHealth { ControlName EditablePanel xpos 0 ypos r120 wide 250 tall 120 visible 1 }\n");
+    for ix in 0..30 {
+        res.push_str(&format!(
+            "  Probe{ix} {{ ControlName CExLabel xpos {ix} ypos 0 wide 10 tall 10 labelText x }}\n"
+        ));
+    }
+    res.push_str("}\n");
+    let files = [("resource/ui/hudplayerhealth.res", res.as_str())];
+    let (_env, s, page, id) = opened_with_source_hud(cx, mia(), &files);
+    open_borrow(cx, &s, &page);
+    support::click_id(cx, s.win, ids::hud_maker_borrow_hud(&id));
+    let root = ids::hud_maker_borrow_part(&PartKey::new(ROOT));
+    support::wait_real(cx, "the parts list", |cx| {
+        support::present(cx, s.win, root.clone())
+    });
+    let (list, bar) = (
+        ids::HUD_MAKER_BORROW_PARTS,
+        ids::HUD_MAKER_BORROW_PARTS_SCROLLBAR,
+    );
+    scroll_panel_to(cx, &s, list.into());
+    assert_bar_on_right_edge(cx, s.win, list, bar);
+    assert_clear_of_bar(cx, s.win, list, ids::HUD_MAKER_PANEL_BODY_SCROLLBAR);
+    assert_clear_of_bar(cx, s.win, root.clone(), bar);
+    assert_track_scrolls_virtual(cx, s.win, list, root);
 }

@@ -47,7 +47,7 @@ use crate::store_detail::{DetailItem, open_detail};
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 use crate::widgets::labelled;
-use crate::widgets::scroll::scroll_area;
+use crate::widgets::scroll::{scroll_area, scroll_beside};
 
 /// A card's height: the name row, two wrapped rows of badges and the button footer.
 const CARD_HEIGHT: Pixels = px(196.);
@@ -633,6 +633,8 @@ fn missing_items_dialog(
     let description: SharedString =
         format!("Some items in \"{profile_name}\" are no longer in your library.").into();
     let items: Rc<[MissingItem]> = items.into();
+    // The list's scroll position outlives the builder, which runs every frame.
+    let list_scroll = ScrollHandle::new();
     window.defer(cx, move |window, cx| {
         let frame = DialogFrame::new(DIALOG_WIDTH);
         window.open_dialog(cx, move |dialog, window, cx| {
@@ -691,14 +693,19 @@ fn missing_items_dialog(
                                             .child(description.clone()),
                                     ),
                             )
-                            .child(
+                            // The bar sits in the box padding, so the rows keep their width.
+                            .child(scroll_beside(
+                                ids::PROFILES_MISSING_LIST_SCROLLBAR,
+                                &list_scroll,
                                 v_flex()
                                     .id(ids::PROFILES_MISSING_LIST)
+                                    .track_scroll(&list_scroll)
+                                    .test_support()
                                     .gap_3()
                                     .max_h(px(256.))
                                     .overflow_y_scroll()
                                     .children(rows),
-                            )
+                            ))
                             .child(
                                 h_flex()
                                     .justify_end()

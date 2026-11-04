@@ -25,7 +25,7 @@ use crate::pages::common::ORANGE_500;
 use crate::services::run_blocking;
 use crate::shell::toast::{toast, toast_error};
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
-use crate::widgets::scroll::scroll_area;
+use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 
 /// The user's answer to the HUD fonts dialog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -213,6 +213,8 @@ pub fn font_check_dialog(
                                     .gap_2()
                                     .max_h(px(256.))
                                     .overflow_y_scroll()
+                                    // The rows fill the width, so they leave room for the bar.
+                                    .pr(BAR_WIDTH)
                                     .children(font_rows)
                                     .children(issue_rows),
                             ))

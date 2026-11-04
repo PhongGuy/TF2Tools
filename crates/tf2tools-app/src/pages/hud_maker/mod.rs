@@ -590,6 +590,10 @@ pub struct HudMakerPage {
     // Whether the side panel's Add and Attach menus are open.
     add_part_open: bool,
     attach_open: bool,
+    // The scrolls of the Attach menu, the named colours and the open font list.
+    attach_scroll: ScrollHandle,
+    names_scroll: ScrollHandle,
+    font_scroll: ScrollHandle,
     // The timeline's playback and its slider.
     timeline: timeline::Timeline,
     // The Animations section's open row and its row editor's fields.
@@ -846,6 +850,9 @@ impl HudMakerPage {
             anims,
             add_part_open: false,
             attach_open: false,
+            attach_scroll: ScrollHandle::new(),
+            names_scroll: ScrollHandle::new(),
+            font_scroll: ScrollHandle::new(),
             every_screen: false,
             checks: checks::Checks::default(),
             backdrop: backdrop::BackdropState::default(),

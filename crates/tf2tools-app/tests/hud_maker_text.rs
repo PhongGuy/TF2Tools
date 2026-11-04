@@ -7,6 +7,7 @@ use gpui_kit::component::input::InputEvent;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, ScrollDelta, TestAppContext, point};
 use std::sync::Arc;
+use support::scroll::{assert_bar_on_right_edge, assert_clear_of_bar, assert_track_scrolls};
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::view::Panel;
 use tf2tools_app::pages::hud_maker::{Field, HudMakerPage};
@@ -1399,4 +1400,89 @@ fn a_y_inset_moves_the_text_down_whatever_its_alignment(cx: &mut TestAppContext)
         assert!(d3 > 1.0, "{alignment} moves down: {tops:?}");
         assert!((d6 - 2. * d3).abs() <= 1.0, "{alignment} scales: {tops:?}");
     }
+}
+
+/// A scheme with twenty more colours and fonts than `FONTS`, so the panel's lists run long.
+fn long_scheme() -> String {
+    let colours: String = (0..20)
+        .map(|ix| format!(" \"Probe{ix:02}\" \"{ix} 0 0 255\""))
+        .collect();
+    let fonts: String = (0..20)
+        .map(|ix| {
+            format!(" \"ProbeFont{ix:02}\" {{ \"1\" {{ \"name\" \"Verdana\" \"tall\" \"12\" }} }}")
+        })
+        .collect();
+    FONTS
+        .replace("\"Colors\" {", &format!("\"Colors\" {{{colours}"))
+        .replace("\"Fonts\" {", &format!("\"Fonts\" {{{fonts}"))
+}
+
+/// The Maker over `long_scheme`.
+fn opened_long(cx: &mut TestAppContext) -> (support::Env, support::ShellWindow) {
+    let env = support::env();
+    let picker = Arc::new(ScriptedPicker::empty());
+    let s = shell_with_scheme(cx, &env, picker, &long_scheme());
+    open_maker(cx, &s);
+    (env, s)
+}
+
+/// Wheels the side panel until the foot of `id`, where its track ends, lies inside the
+/// panel's body. The wheel turns in the panel's left padding, so an open list never takes them.
+fn wheel_panel_to_foot(cx: &mut TestAppContext, s: &support::ShellWindow, id: gpui_kit::ElementId) {
+    for _ in 0..80 {
+        let body = support::bounds_of(cx, s.win, ids::HUD_MAKER_PANEL_BODY).unwrap();
+        let b = support::bounds_of(cx, s.win, id.clone()).unwrap();
+        let foot = b.bottom() - gpui_kit::px(12.);
+        if foot >= body.top() && b.bottom() <= body.bottom() {
+            return;
+        }
+        let step = if foot < body.top() { 1. } else { -1. };
+        send(
+            cx,
+            s,
+            gpui_kit::ScrollWheelEvent {
+                position: point(body.left() + gpui_kit::px(4.), body.center().y),
+                delta: ScrollDelta::Lines(point(0., step)),
+                modifiers: Default::default(),
+                touch_phase: gpui_kit::TouchPhase::Moved,
+            },
+        );
+    }
+    panic!("the foot of {id:?} never scrolled into the side panel");
+}
+
+// An open list inside the side panel shows its own bar, both clear of the panel's bar.
+#[gpui_kit::test]
+fn the_named_colours_show_a_bar_inside_the_panel(cx: &mut TestAppContext) {
+    let (_env, s) = opened_long(cx);
+    click_row(cx, &s, KF);
+    click_in_panel(cx, &s, ids::hud_maker_colour_row("TeamRed"));
+    click_in_panel(cx, &s, ids::HUD_MAKER_COLOUR_NAME.into());
+    let (list, bar) = (
+        ids::HUD_MAKER_COLOUR_NAMES,
+        ids::HUD_MAKER_COLOUR_NAMES_SCROLLBAR,
+    );
+    wheel_panel_to_foot(cx, &s, list.into());
+    assert_bar_on_right_edge(cx, s.win, list, bar);
+    assert_clear_of_bar(cx, s.win, list, ids::HUD_MAKER_PANEL_BODY_SCROLLBAR);
+    let tan = ids::hud_maker_colour_name("TanLight");
+    assert_clear_of_bar(cx, s.win, tan.clone(), bar);
+    assert_track_scrolls(cx, s.win, list, tan);
+}
+
+#[gpui_kit::test]
+fn a_font_list_shows_a_bar_inside_the_panel(cx: &mut TestAppContext) {
+    let (_env, s) = opened_long(cx);
+    click_row(cx, &s, HV);
+    click_in_panel(cx, &s, ids::hud_maker_font_list("font"));
+    let (list, bar) = (
+        ids::hud_maker_font_choices("font"),
+        ids::hud_maker_font_choices_scrollbar("font"),
+    );
+    wheel_panel_to_foot(cx, &s, list.clone());
+    assert_bar_on_right_edge(cx, s.win, list.clone(), bar.clone());
+    assert_clear_of_bar(cx, s.win, list.clone(), ids::HUD_MAKER_PANEL_BODY_SCROLLBAR);
+    let small = ids::hud_maker_font_name("HudFontSmall");
+    assert_clear_of_bar(cx, s.win, small.clone(), bar);
+    assert_track_scrolls(cx, s.win, list, small);
 }

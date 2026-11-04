@@ -8,8 +8,8 @@ use gpui_kit::component::slider::{Slider, SliderEvent, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     Anchor, AnyElement, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
-    ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, Window, div, px,
+    ParentElement as _, ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _,
+    Subscription, TestSupportExt as _, Window, div, px,
 };
 use tf2tools_core::{GameSituation, MeterKind, SituationSwitch, TfClass, WeaponKind};
 
@@ -17,6 +17,7 @@ use super::HudMakerPage;
 use super::tip::tipped;
 use crate::ids;
 use crate::widgets::labelled;
+use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 
 /// A number the situation menu sets with a slider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +63,7 @@ const METERS_HEIGHT: f32 = 300.;
 pub(super) struct SituationMenu {
     open: bool,
     meters_open: bool,
+    meters_scroll: ScrollHandle,
     sliders: [Entity<SliderState>; 3],
     _subscriptions: Vec<Subscription>,
 }
@@ -92,6 +94,7 @@ impl SituationMenu {
         SituationMenu {
             open: false,
             meters_open: false,
+            meters_scroll: ScrollHandle::new(),
             sliders: sliders.map(|(_, state)| state),
             _subscriptions: subscriptions,
         }
@@ -294,18 +297,23 @@ impl HudMakerPage {
                         page.set_meter(kind, true, window, cx);
                     }))
             });
-            v_flex()
+            let scroll = &self.situation_menu.meters_scroll;
+            let list = v_flex()
                 .id(ids::HUD_MAKER_SITUATION_METERS)
                 .test_support()
                 .max_h(px(METERS_HEIGHT))
+                .track_scroll(scroll)
                 .overflow_y_scroll()
                 .gap_1()
                 .items_start()
-                .children(items)
+                .pr(BAR_WIDTH)
+                .children(items);
+            scroll_area(ids::HUD_MAKER_SITUATION_METERS_SCROLLBAR, scroll, list)
         });
         // The open meter list takes the menu's whole body, so its 21 rows have room.
         if let Some(meters) = meters {
-            let body = v_flex().w_72().gap_2().child(meter_row).child(meters);
+            // Wider than the menu, so the longest meter name clears the list's bar.
+            let body = v_flex().w_80().gap_2().child(meter_row).child(meters);
             return Some(self.situation_popover(trigger, body, cx));
         }
         let body = v_flex()

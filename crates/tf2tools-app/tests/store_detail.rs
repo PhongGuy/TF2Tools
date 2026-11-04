@@ -6,6 +6,7 @@ use gpui_kit::component::WindowExt as _;
 use gpui_kit::px;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, TestAppContext};
+use support::scroll::{assert_bar_beside, assert_clear_of_bar, assert_track_scrolls, bounds};
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_store::bodies::{curated_body, gamebanana_body, social_icon};
 use tf2tools_app::store_detail::detail_width;
@@ -748,5 +749,55 @@ fn a_short_window_scrolls_the_detail_instead_of_squashing_the_carousel(cx: &mut 
     assert!(
         (image.size.height - want).abs() <= px(1.),
         "carousel {image:?}"
+    );
+}
+
+// The header stays while the files, carousel and body scroll beside a bar in the box padding,
+// below the close X and clear of the Download buttons.
+#[gpui_kit::test]
+fn a_short_window_shows_a_bar_beside_the_detail_body(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let repo = server.mount_curated("rayshud", support::hud_zip_bytes("rayshud"), Duration::ZERO);
+    let json = r#"{"flags":["minmode"],"traits":{"os":["linux"]},"resources":["banner","menu"]}"#;
+    let (win, _) = support::store_window(
+        cx,
+        &env,
+        &server,
+        move |env| support::seed_curated(env, "rayshud", "rayshud", "raysfire", Some(&repo), json),
+        |_, _| support::Blank,
+    );
+    cx.simulate_window_resize(win, gpui_kit::size(px(1280.), px(420.)));
+    let rayshud = StoreItemId::Curated("rayshud".into());
+    detail(
+        cx,
+        win,
+        item(StoreKind::CuratedHuds, rayshud, "rayshud", true),
+        true,
+    );
+    support::wait_real(cx, "the archive", |cx| {
+        support::present(cx, win, ids::store_file(0))
+    });
+    support::dialog_box(cx, win);
+    let bar = ids::STORE_DETAIL_SCROLLBAR;
+    assert_bar_beside(cx, win, ids::STORE_DETAIL_BODY, bar);
+    assert_clear_of_bar(cx, win, ids::store_file(0), bar);
+    let close = cx
+        .update_window(win, |_, w, _| {
+            w.within("dialog").try_find("close").map(|e| e.bounds())
+        })
+        .unwrap()
+        .expect("the close X");
+    let track = bounds(cx, win, bar);
+    assert!(
+        close.bottom() <= track.top(),
+        "the X {close:?} sits over the bar {track:?}"
+    );
+    let name = bounds(cx, win, ids::STORE_DETAIL_NAME);
+    assert_track_scrolls(cx, win, bar, ids::store_file(0));
+    assert_eq!(
+        bounds(cx, win, ids::STORE_DETAIL_NAME),
+        name,
+        "the header stays"
     );
 }
