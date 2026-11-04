@@ -120,3 +120,17 @@ fn compact_is_v5s_dialog_size(cx: &mut TestAppContext) {
     let swatch = support::bounds_of(cx, win, ids::CROSSHAIRS_SWATCH).unwrap();
     assert_eq!(swatch.size.height, gpui_kit::px(28.));
 }
+
+#[gpui_kit::test]
+fn the_list_shows_a_bar_clear_of_its_options(cx: &mut TestAppContext) {
+    use support::scroll::{
+        assert_bar_on_right_edge, assert_clear_of_bar, assert_track_scrolls_virtual,
+    };
+    let env = support::env();
+    let (win, _picker, services) = open(cx, &env, false);
+    let first = ids::crosshair_builtin(services.builtins.all()[0].name());
+    let bar = ids::CROSSHAIRS_LIST_SCROLLBAR;
+    assert_bar_on_right_edge(cx, win, ids::CROSSHAIRS_LIST, bar);
+    assert_clear_of_bar(cx, win, first.clone(), bar);
+    assert_track_scrolls_virtual(cx, win, bar, first);
+}

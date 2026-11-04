@@ -31,7 +31,7 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::labelled;
-use crate::widgets::scroll::scroll_area;
+use crate::widgets::scroll::{scroll_area, scroll_beside};
 use crate::widgets::store_error::error_line;
 use model::{CATEGORIES, LEVELS, PAGE_SIZE, level_name, relative_time};
 
@@ -380,30 +380,28 @@ impl LogsPage {
     fn rows(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let this = cx.entity().downgrade();
         let now = Utc::now();
-        div()
-            .id(ids::LOGS_LIST)
-            .test_support()
+        let rows = div().id(ids::LOGS_LIST).test_support().size_full().child(
+            list(self.list.clone(), move |ix, _, cx| {
+                let Some(page) = this.upgrade() else {
+                    return div().into_any_element();
+                };
+                let page = page.read(cx);
+                match page.entries.get(ix).cloned() {
+                    Some(entry) => {
+                        let expanded = page.expanded.get(&entry.id()).cloned();
+                        card(&entry, ix, expanded, now, this.clone(), cx)
+                    }
+                    None if page.has_more && ix == page.entries.len() => {
+                        more_row(page.loading_more, this.clone())
+                    }
+                    None => div().into_any_element(),
+                }
+            })
+            .size_full(),
+        );
+        scroll_beside(ids::LOGS_LIST_SCROLLBAR, &self.list, rows)
             .flex_1()
             .min_h_0()
-            .child(
-                list(self.list.clone(), move |ix, _, cx| {
-                    let Some(page) = this.upgrade() else {
-                        return div().into_any_element();
-                    };
-                    let page = page.read(cx);
-                    match page.entries.get(ix).cloned() {
-                        Some(entry) => {
-                            let expanded = page.expanded.get(&entry.id()).cloned();
-                            card(&entry, ix, expanded, now, this.clone(), cx)
-                        }
-                        None if page.has_more && ix == page.entries.len() => {
-                            more_row(page.loading_more, this.clone())
-                        }
-                        None => div().into_any_element(),
-                    }
-                })
-                .size_full(),
-            )
     }
 }
 

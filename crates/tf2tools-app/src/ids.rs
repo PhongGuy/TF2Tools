@@ -103,6 +103,12 @@ pub const SOUNDS_GRID: &str = "sounds-grid";
 pub const CROSSHAIRS_SEARCH: &str = "crosshairs-search";
 /// The picker's virtualized list.
 pub const CROSSHAIRS_LIST: &str = "crosshairs-list";
+/// The crosshair list's scrollbar, over its right edge.
+pub const CROSSHAIRS_LIST_SCROLLBAR: &str = "crosshairs-list-scrollbar";
+/// The weapon assigner's list of the class's weapon rows.
+pub const WEAPON_LIST: &str = "weapon-list";
+/// The compact weapon list's scrollbar, over its right edge.
+pub const WEAPON_LIST_SCROLLBAR: &str = "weapon-list-scrollbar";
 /// Labelled "Built-in (n)", the count after filtering.
 pub const CROSSHAIRS_GROUP_BUILTIN: &str = "crosshairs-group-builtin";
 /// Labelled "My Crosshairs (n)", the count after filtering.
@@ -613,6 +619,8 @@ pub const LOGS_LEVEL: &str = "logs-level";
 pub const LOGS_CLEAR: &str = "logs-clear";
 /// The Activity Log's row list.
 pub const LOGS_LIST: &str = "logs-list";
+/// The log list's scrollbar, in a gutter just right of the rows.
+pub const LOGS_LIST_SCROLLBAR: &str = "logs-list-scrollbar";
 /// Labelled "No log entries found" when the filtered log is empty.
 pub const LOGS_EMPTY: &str = "logs-empty";
 /// The text of a failed log load.
@@ -754,6 +762,12 @@ pub fn page(page: Page) -> ElementId {
 /// "page-scrollbar-<slug>".
 pub fn page_scrollbar(page: Page) -> ElementId {
     ElementId::Name(format!("page-scrollbar-{}", page.slug()).into())
+}
+
+/// The scrollbar of the card grid `grid`, in a gutter just right of its cards:
+/// "grid-scrollbar:<grid>".
+pub fn grid_scrollbar(grid: &str) -> ElementId {
+    keyed("grid-scrollbar", grid)
 }
 
 /// An id for one of many like elements, carrying its stable key: "<kind>:<key>".

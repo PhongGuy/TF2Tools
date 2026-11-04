@@ -49,6 +49,7 @@ use crate::timing;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::carousel::open_lightbox;
 use crate::widgets::labelled;
+use crate::widgets::scroll::scroll_area;
 
 /// The card's text and buttons below a store HUD's 16:9 screenshot, and a local card's height.
 const CARD_TEXT_HEIGHT: Pixels = px(136.);
@@ -114,6 +115,8 @@ pub struct HudsPage {
     gallery_pending: bool,
     search: Entity<InputState>,
     grid: CardGrid,
+    /// The page's own scroll, which moves only in a window too short for the page.
+    scroll: ScrollHandle,
     /// This page's own `RemoteImages` viewer, so a page released late cannot clear a newer one's wants.
     image_viewer: String,
     _subscriptions: Vec<Subscription>,
@@ -198,6 +201,7 @@ impl HudsPage {
             gallery_pending: false,
             search,
             grid,
+            scroll: ScrollHandle::new(),
             image_viewer,
             _subscriptions: subscriptions,
         }
@@ -1283,10 +1287,11 @@ impl Render for HudsPage {
             Some(hud) => installed_card(hud, self.busy.as_ref(), cx),
             None => empty_card(cx),
         };
-        v_flex()
+        let content = v_flex()
             .id(ids::page(Page::Huds))
             .test_support()
             .size_full()
+            .track_scroll(&self.scroll)
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
@@ -1303,7 +1308,8 @@ impl Render for HudsPage {
                     .child(installed),
             )
             .children(self.conflicts().map(|folders| conflict_box(folders, cx)))
-            .child(self.library(cx))
+            .child(self.library(cx));
+        scroll_area(ids::page_scrollbar(Page::Huds), &self.scroll, content).size_full()
     }
 }
 

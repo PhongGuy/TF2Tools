@@ -42,6 +42,7 @@ pub mod fonts;
 pub mod hud_copies;
 pub mod hud_switches;
 pub mod maker_page;
+pub mod scroll;
 pub mod update_fake;
 pub mod update_feed;
 

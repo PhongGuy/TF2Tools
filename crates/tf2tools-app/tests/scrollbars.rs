@@ -4,15 +4,21 @@ use gpui_kit::component::v_flex;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
     AnyWindowHandle, AppContext as _, Bounds, Context, ElementId, InteractiveElement as _,
-    IntoElement, ParentElement as _, Pixels, Render, ScrollHandle, StatefulInteractiveElement as _,
+    IntoElement, ParentElement as _, Render, ScrollHandle, StatefulInteractiveElement as _,
     Styled as _, TestAppContext, TestSupportExt as _, Window, WindowBounds, WindowOptions, div,
     point, px, size,
 };
+use support::scroll::{
+    assert_bar_beside, assert_bar_on_right_edge, assert_clear_of_bar, assert_track_scrolls,
+    assert_track_scrolls_virtual, assert_track_stays, bounds, press_track_foot,
+};
 use tf2tools_app::ids;
+use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
+use tf2tools_app::widgets::card_grid::CardGrid;
 use tf2tools_app::widgets::scroll::scroll_area;
-use tf2tools_core::{LogLevel, NewLogEntry, Tf2Install};
+use tf2tools_core::{LogLevel, NewLogEntry, ProfileDraft, Provenance, Tf2Install};
 
 const LIST: &str = "probe-list";
 const BAR: &str = "probe-bar";
@@ -62,64 +68,6 @@ fn rows_window(cx: &mut TestAppContext, rows: usize) -> AnyWindowHandle {
     })
     .unwrap()
     .0
-}
-
-fn bounds(
-    cx: &mut TestAppContext,
-    win: AnyWindowHandle,
-    id: impl Into<ElementId>,
-) -> Bounds<Pixels> {
-    let id = id.into();
-    support::bounds_of(cx, win, id.clone()).unwrap_or_else(|| panic!("no {id:?}"))
-}
-
-/// Asserts the scrollbar `bar` spans the right edge of `area`, top to bottom.
-fn assert_bar_on_right_edge(
-    cx: &mut TestAppContext,
-    win: AnyWindowHandle,
-    area: impl Into<ElementId>,
-    bar: impl Into<ElementId>,
-) {
-    let (area, bar) = (bounds(cx, win, area), bounds(cx, win, bar));
-    let near = |a: Pixels, b: Pixels| (a - b).abs() <= px(1.);
-    assert!(
-        near(bar.right(), area.right())
-            && near(bar.top(), area.top())
-            && near(bar.bottom(), area.bottom()),
-        "the bar {bar:?} is not on the right edge of {area:?}"
-    );
-}
-
-/// Presses the foot of `area`'s scrollbar track; a drawn bar scrolls toward the end.
-fn press_track_foot(cx: &mut TestAppContext, win: AnyWindowHandle, area: impl Into<ElementId>) {
-    let area = area.into();
-    let b = bounds(cx, win, area.clone());
-    cx.update_window(win, |_, w, cx| {
-        w.click_at(
-            area,
-            point(b.size.width - px(6.), b.size.height - px(6.)),
-            cx,
-        )
-    })
-    .unwrap();
-    support::settle(cx, win);
-}
-
-/// Asserts a press on `area`'s track foot moves `probe` up by more than a few pixels.
-fn assert_track_scrolls(
-    cx: &mut TestAppContext,
-    win: AnyWindowHandle,
-    area: impl Into<ElementId>,
-    probe: impl Into<ElementId>,
-) {
-    let (area, probe) = (area.into(), probe.into());
-    let before = bounds(cx, win, probe.clone());
-    press_track_foot(cx, win, area.clone());
-    let after = bounds(cx, win, probe);
-    assert!(
-        after.top() < before.top() - px(20.),
-        "no scrollbar took the press in {area:?}: {before:?} -> {after:?}"
-    );
 }
 
 #[gpui_kit::test]
@@ -311,4 +259,174 @@ fn short_log_details_keep_their_height(cx: &mut TestAppContext) {
         ids::log_details(id),
         ids::log_details_scrollbar(id),
     );
+}
+
+const GRID: &str = "probe-grid";
+
+/// A four-column store grid of `cards` 120 px cards inside the shell's page padding.
+struct Grid {
+    grid: CardGrid,
+    cards: usize,
+}
+
+impl Render for Grid {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .size_full()
+            .p(tf2tools_app::shell::CONTENT_PADDING)
+            .child(self.grid.render(self.cards, px(120.), |ix, _, _| {
+                div()
+                    .id(("probe-card", ix))
+                    .test_support()
+                    .size_full()
+                    .into_any_element()
+            }))
+    }
+}
+
+fn grid_window(cx: &mut TestAppContext, cards: usize) -> AnyWindowHandle {
+    support::init(cx);
+    cx.update(|cx| {
+        gpui_kit::open_window(support::window_options(), cx, |_, cx| {
+            cx.new(|_| Grid {
+                grid: CardGrid::store(GRID, 4),
+                cards,
+            })
+        })
+    })
+    .unwrap()
+    .0
+}
+
+#[gpui_kit::test]
+fn a_card_grid_shows_a_bar_beside_its_cards(cx: &mut TestAppContext) {
+    let win = grid_window(cx, 200);
+    let bar = ids::grid_scrollbar(GRID);
+    assert_bar_beside(cx, win, GRID, bar.clone());
+    assert_clear_of_bar(cx, win, ("probe-card", 3usize), bar.clone());
+    assert_track_scrolls_virtual(cx, win, bar, ("probe-card", 0usize));
+}
+
+#[gpui_kit::test]
+fn a_card_grid_that_fits_stays_put(cx: &mut TestAppContext) {
+    let win = grid_window(cx, 2);
+    let bar = ids::grid_scrollbar(GRID);
+    assert_bar_beside(cx, win, GRID, bar.clone());
+    assert_track_stays(cx, win, bar, ("probe-card", 0usize));
+}
+
+/// Imports `n` HUDs named hud00, hud01 and so on.
+fn seed_huds(s: &support::ShellWindow, env: &support::Env, n: usize) {
+    for ix in 0..n {
+        let name = format!("hud{ix:02}");
+        let path = env.tmp.path().join(format!("{name}.zip"));
+        std::fs::write(&path, support::hud_zip_bytes(&name)).unwrap();
+        s.services
+            .library
+            .import_hud(&path, Provenance::Local)
+            .unwrap();
+    }
+}
+
+/// Opens a fresh HUDs page, by way of Settings, so it lists the HUDs seeded since the shell opened.
+fn open_huds(cx: &mut TestAppContext, s: &support::ShellWindow) {
+    open(cx, s, Page::Settings);
+    open(cx, s, Page::Huds);
+    let page = cx.update(|cx| s.shell.read(cx).huds_page()).unwrap();
+    support::wait_real(cx, "HUDs to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+}
+
+// The library keeps a 320 px floor, so the page itself still scrolls a little at 1280x800.
+#[gpui_kit::test]
+fn at_1280x1024_only_the_huds_grid_scrolls(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    seed_huds(&s, &env, 24);
+    resize(cx, &s, 1280., 1024.);
+    open_huds(cx, &s);
+    let bar = ids::grid_scrollbar(ids::HUDS_GRID);
+    assert_bar_beside(cx, s.win, ids::HUDS_GRID, bar.clone());
+    assert_track_stays(cx, s.win, ids::page(Page::Huds), ids::HUDS_LIBRARY);
+    assert_track_scrolls_virtual(cx, s.win, bar, ids::hud_card("hud00"));
+}
+
+#[gpui_kit::test]
+fn at_800x600_the_huds_page_and_its_grid_each_show_a_bar(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    seed_huds(&s, &env, 24);
+    resize(cx, &s, 800., 600.);
+    open_huds(cx, &s);
+    let page = ids::page(Page::Huds);
+    assert_bar_on_right_edge(cx, s.win, page.clone(), ids::page_scrollbar(Page::Huds));
+    assert_track_scrolls(cx, s.win, page, ids::HUDS_LIBRARY);
+    let bar = ids::grid_scrollbar(ids::HUDS_GRID);
+    assert_bar_beside(cx, s.win, ids::HUDS_GRID, bar.clone());
+    assert_track_scrolls_virtual(cx, s.win, bar, ids::hud_card("hud00"));
+}
+
+/// Creates `n` empty profiles and opens Profiles; returns the first profile's card id.
+fn profiles_page(cx: &mut TestAppContext, s: &support::ShellWindow, n: usize) -> ElementId {
+    let profiles: Vec<_> = (0..n)
+        .map(|ix| {
+            s.services
+                .library
+                .create_profile(&ProfileDraft::new(format!("Profile {ix:02}")))
+                .unwrap()
+        })
+        .collect();
+    let first = &profiles[0];
+    cx.update(|cx| Tf2Probe::install(cx, || false));
+    open(cx, s, Page::Profiles);
+    let page = cx.update(|cx| s.shell.read(cx).profiles_page()).unwrap();
+    support::wait_real(cx, "Profiles to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+    ids::profile_card(first.id())
+}
+
+#[gpui_kit::test]
+fn at_1280x800_only_the_profiles_grid_scrolls(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    resize(cx, &s, 1280., 800.);
+    let first = profiles_page(cx, &s, 24);
+    let bar = ids::grid_scrollbar(ids::PROFILES_GRID);
+    assert_bar_beside(cx, s.win, ids::PROFILES_GRID, bar.clone());
+    assert_track_stays(cx, s.win, ids::page(Page::Profiles), ids::PROFILES_LIBRARY);
+    assert_track_scrolls_virtual(cx, s.win, bar, first);
+}
+
+#[gpui_kit::test]
+fn at_800x600_the_profiles_page_and_its_grid_each_show_a_bar(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    resize(cx, &s, 800., 600.);
+    let first = profiles_page(cx, &s, 24);
+    let page = ids::page(Page::Profiles);
+    assert_bar_on_right_edge(cx, s.win, page.clone(), ids::page_scrollbar(Page::Profiles));
+    assert_track_scrolls(cx, s.win, page, ids::PROFILES_LIBRARY);
+    let bar = ids::grid_scrollbar(ids::PROFILES_GRID);
+    assert_bar_beside(cx, s.win, ids::PROFILES_GRID, bar.clone());
+    assert_track_scrolls_virtual(cx, s.win, bar, first);
+}
+
+#[gpui_kit::test]
+fn a_long_log_shows_a_bar_beside_its_rows(cx: &mut TestAppContext) {
+    let env = support::env();
+    support::seed_log_rows(&env, 60);
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let first = support::log_rows(&s.services)[0].id();
+    open(cx, &s, Page::Logs);
+    let page = cx.update(|cx| s.shell.read(cx).logs_page()).unwrap();
+    support::wait_real(cx, "logs to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    assert_bar_beside(cx, s.win, ids::LOGS_LIST, ids::LOGS_LIST_SCROLLBAR);
+    assert_clear_of_bar(cx, s.win, ids::log_row(first), ids::LOGS_LIST_SCROLLBAR);
+    assert_track_scrolls_virtual(cx, s.win, ids::LOGS_LIST_SCROLLBAR, ids::log_row(first));
 }
