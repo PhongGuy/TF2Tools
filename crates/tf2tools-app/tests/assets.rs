@@ -62,7 +62,7 @@ fn a_miss_names_every_place_searched() {
     let dev = tmp.path().join("dev");
     let err = AssetRoot::resolve_from(Some(env.clone()), Some(exe.clone()), Some(dev.clone()))
         .unwrap_err();
-    let lib = tmp.path().join("lib/tf2tools/assets");
+    let lib = tmp.path().join("lib").join("tf2tools").join("assets");
     assert_eq!(
         err.searched,
         vec![env.clone(), exe.join("assets"), lib.clone(), dev.clone()]

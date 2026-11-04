@@ -26,8 +26,8 @@ env:
 jobs:
   gate:
     runs-on: ubuntu-24.04
-    # The full suite runs about 30 minutes on a hosted runner, so 30 cut it short.
-    timeout-minutes: 60
+    # A cold build plus the full suite runs about an hour on a hosted runner.
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -47,7 +47,8 @@ jobs:
 
   windows:
     runs-on: windows-2025
-    timeout-minutes: 60
+    # Lint plus every test binary runs past an hour on a hosted runner.
+    timeout-minutes: 120
     defaults:
       run:
         # Git for Windows' bash, so the commands read the same as on Linux.
@@ -67,4 +68,5 @@ jobs:
       - name: Lint
         run: cargo clippy --locked --workspace --all-targets --all-features -- -Dwarnings
       - name: Test
-        run: cargo test --locked --workspace
+        # Run every test binary, so one run lists every Windows failure.
+        run: cargo test --locked --workspace --no-fail-fast

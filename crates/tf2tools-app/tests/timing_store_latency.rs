@@ -73,6 +73,8 @@ fn walk_passes_2000_cards_and_reports_memory(cx: &mut TestAppContext) {
         note(&report, "passed_cards").parse::<usize>().unwrap() >= 2_000,
         "{report:?}"
     );
+    // Memory comes from /proc, which only Linux has.
+    #[cfg(target_os = "linux")]
     assert!(note(&report, "rss_kb").parse::<u64>().unwrap() > 0);
     assert_eq!(note(&report, "foreground_decodes"), "0");
 }

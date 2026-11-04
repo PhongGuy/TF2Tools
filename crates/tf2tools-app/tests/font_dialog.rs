@@ -55,11 +55,29 @@ fn the_dialog_lists_missing_and_protected_fonts(cx: &mut TestAppContext) {
     );
     assert_eq!(
         support::label_of(cx, win, ids::hud_fonts_font(0)).as_deref(),
-        Some("Surface: resource/fonts/surface.ttf")
+        Some(
+            format!(
+                "Surface: {}",
+                std::path::Path::new("resource")
+                    .join("fonts")
+                    .join("surface.ttf")
+                    .display()
+            )
+            .as_str()
+        )
     );
     assert_eq!(
         support::label_of(cx, win, ids::hud_fonts_font(1)).as_deref(),
-        Some("Code Pro: resource/fonts/codepro.ttf")
+        Some(
+            format!(
+                "Code Pro: {}",
+                std::path::Path::new("resource")
+                    .join("fonts")
+                    .join("codepro.ttf")
+                    .display()
+            )
+            .as_str()
+        )
     );
     assert_eq!(
         support::label_of(cx, win, ids::hud_fonts_font(2)).as_deref(),

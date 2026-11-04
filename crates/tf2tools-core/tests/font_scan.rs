@@ -5,7 +5,9 @@ mod common;
 use std::path::PathBuf;
 
 use common::hud_fonts::fixture_hud;
-use tf2tools_core::{FontCheckError, FontIssue, HudFonts, Platform, scan_hud_fonts};
+#[cfg(not(windows))]
+use tf2tools_core::FontIssue;
+use tf2tools_core::{FontCheckError, HudFonts, Platform, scan_hud_fonts};
 
 fn summary(fonts: &HudFonts) -> Vec<(String, Vec<PathBuf>)> {
     let mut out: Vec<_> = fonts
@@ -21,6 +23,8 @@ fn entry(name: &str, file: &str) -> (String, Vec<PathBuf>) {
     (name.to_owned(), vec![PathBuf::from(file)])
 }
 
+// A case mismatch needs a case-sensitive file system, which Windows lacks.
+#[cfg(not(windows))]
 #[test]
 fn linux_scan_matches_shipped_names_and_reports_file_problems() {
     let tmp = tempfile::tempdir().unwrap();

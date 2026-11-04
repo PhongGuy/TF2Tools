@@ -80,7 +80,7 @@ fn the_hook_records_uncaught_panics_and_chains_to_the_previous_one() {
     assert!(text.starts_with(&head), "{text}");
     assert!(text.contains("\nThread: worker\n"), "{text}");
     assert!(text.contains("\nMessage: uncaught boom\n"), "{text}");
-    assert!(text.contains("tests/crash_hook.rs:"), "{text}");
+    assert!(text.contains(&format!("{}:", file!())), "{text}");
     assert!(text.contains("\n\nBacktrace:\n"), "{text}");
     assert_eq!(calls.load(Ordering::SeqCst), 6);
 }

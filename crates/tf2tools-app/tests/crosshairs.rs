@@ -350,7 +350,10 @@ fn tf2(env: &support::Env) -> Tf2Install {
 }
 
 fn managed(env: &support::Env) -> std::path::PathBuf {
-    env.game.join("tf/custom/tf2tools-crosshairs")
+    env.game
+        .join("tf")
+        .join("custom")
+        .join("tf2tools-crosshairs")
 }
 
 fn toast_text(cx: &mut TestAppContext, s: &support::ShellWindow) -> String {
