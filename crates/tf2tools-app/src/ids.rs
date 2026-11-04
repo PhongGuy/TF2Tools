@@ -563,6 +563,10 @@ pub const STORE_DETAIL: &str = "store-detail";
 pub const STORE_DETAIL_BADGE: &str = "store-detail-badge";
 /// The detail dialog's progress, labelled with the progress text; present only while the item downloads.
 pub const STORE_DETAIL_PROGRESS: &str = "store-detail-progress";
+/// The detail dialog's scrolling part under its header: files, carousel and body.
+pub const STORE_DETAIL_BODY: &str = "store-detail-body";
+/// The scrollbar beside `STORE_DETAIL_BODY`.
+pub const STORE_DETAIL_SCROLLBAR: &str = "store-detail-scrollbar";
 /// The detail dialog's download progress bar, inside `STORE_DETAIL_PROGRESS`.
 pub const STORE_DETAIL_BAR: &str = "store-detail-bar";
 /// The detail dialog's file listing error, labelled with the message.
