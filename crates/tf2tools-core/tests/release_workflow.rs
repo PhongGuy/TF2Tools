@@ -154,12 +154,96 @@ fn only_the_packages_are_uploaded_and_released() {
     );
     assert!(linux.contains("if-no-files-found: error"), "{linux}");
     let draft = job(&text, "draft");
+    let create = step(&draft, "Create the draft release");
+    let uploads = RELEASED.map(|f| format!("dist/{f}")).join(" ");
     assert!(
-        draft.contains(
-            "dist/tf2tools_* dist/TF2Tools.exe dist/tf2tools-update.json dist/tf2tools-update.json.minisig"
-        ),
-        "{draft}"
+        create.contains(&format!("{uploads} dist/SHA256SUMS")),
+        "{create}"
     );
+}
+
+/// Every release file but SHA256SUMS, in upload order. The first four are what the updater and the
+/// README depend on; the rest are the unversioned copies.
+const RELEASED: [&str; 7] = [
+    "tf2tools_*",
+    "TF2Tools.exe",
+    "tf2tools-update.json",
+    "tf2tools-update.json.minisig",
+    "tf2tools-windows-setup.exe",
+    "tf2tools-linux-x86_64.AppImage",
+    "tf2tools-linux-amd64.deb",
+];
+
+#[test]
+fn the_draft_adds_unversioned_copies_and_checksums_after_verifying() {
+    let draft = job(&workflow(), "draft");
+    let extras = step(&draft, "Add the unversioned copies and checksums");
+    for copy in [
+        "cp TF2Tools.exe tf2tools-windows-setup.exe",
+        "cp tf2tools_*_x86_64.AppImage tf2tools-linux-x86_64.AppImage",
+        "cp tf2tools_*_amd64.deb tf2tools-linux-amd64.deb",
+    ] {
+        assert!(extras.contains(copy), "missing `{copy}`:\n{extras}");
+    }
+    // Bare names, so `sha256sum -c SHA256SUMS` works in a folder of downloads.
+    let names = RELEASED.join(" ");
+    assert!(
+        extras.contains(&format!("sha256sum {names} > SHA256SUMS")),
+        "{extras}"
+    );
+    let at = |s: &str| draft.find(s).unwrap_or_else(|| panic!("missing {s}"));
+    assert!(at("Verify it against the compiled-in keys") < at("Add the unversioned copies"));
+    assert!(at("Add the unversioned copies") < at("Create the draft release"));
+}
+
+#[test]
+fn the_draft_writes_whats_changed_from_full_history() {
+    let draft = job(&workflow(), "draft");
+    assert!(draft.contains("fetch-depth: 0"), "{draft}");
+    let create = step(&draft, "Create the draft release");
+    assert!(
+        create.contains(
+            "scripts/release-notes.sh \"$GITHUB_REF_NAME\" packaging/release-notes.md > \"$RUNNER_TEMP/notes.md\""
+        ),
+        "{create}"
+    );
+}
+
+#[test]
+fn the_release_notes_template_has_the_sections_in_order() {
+    let notes = read("packaging/release-notes.md");
+    // The title comes from `gh release create --title`, and the intro is written by hand.
+    assert!(!notes.lines().any(|l| l.starts_with("# ")), "{notes}");
+    assert!(notes.starts_with("<!-- "), "{notes}");
+    let mut last = 0;
+    for part in [
+        "## What's Changed",
+        "\n{changes}\n",
+        "## Downloads",
+        "| Platform | File |",
+        "| Windows x64 |",
+        "| Linux x86_64 |",
+        "no version in its name",
+        "Check a download with `sha256sum -c SHA256SUMS`.",
+        "## Before you install",
+        "## Updates",
+    ] {
+        let at = notes
+            .find(part)
+            .unwrap_or_else(|| panic!("missing {part:?}"));
+        assert!(at >= last, "{part:?} is out of order");
+        last = at;
+    }
+    for words in [
+        "tf2tools_{version}_x86_64.AppImage",
+        "tf2tools_{version}_amd64.deb",
+        "allow it to run as a program",
+        "software installer",
+        "checking their signature",
+        "does not update itself",
+    ] {
+        assert!(notes.contains(words), "missing {words:?}");
+    }
 }
 
 #[test]
@@ -316,6 +400,12 @@ fn the_runbook_names_every_secret_and_gated_step() {
         "TF2Tools.exe",
         "--draft",
         "Valve",
+        "What's Changed",
+        "scripts/release-notes.sh",
+        "SHA256SUMS",
+        "tf2tools-windows-setup.exe",
+        "tf2tools-linux-x86_64.AppImage",
+        "tf2tools-linux-amd64.deb",
     ] {
         assert!(runbook.contains(needle), "runbook lacks {needle:?}");
     }
@@ -397,7 +487,7 @@ fn the_release_page_offers_windows_and_explains_its_warning() {
     }
     assert!(!notes.contains("4.8 until"), "{notes}");
     assert!(
-        notes.contains("TF2Tools 6 installs next to the old version. Once it works, you can remove the old one in Windows Settings > Apps."),
+        notes.contains("TF2Tools 6 installs next to TF2Tools 4. Once it works, you can remove TF2Tools 4 in Windows Settings > Apps."),
         "{notes}"
     );
 }

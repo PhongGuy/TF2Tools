@@ -113,20 +113,21 @@ Any rerun of this loopback test sets `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`
    ```
 
    The tag must match the workspace version; the `draft` job fails early when it does not.
-5. **(maintainer)** Watch the Release run (`gh run watch` or the Actions tab). It runs `gate`, then `linux` and `windows`, then `draft`, which calls `gh release create --draft`.
+5. **(maintainer)** Watch the Release run (`gh run watch` or the Actions tab). It runs `gate`, then `linux` and `windows`, then `draft`, which signs the manifest, adds the unversioned copies and `SHA256SUMS`, writes the notes with `scripts/release-notes.sh` and calls `gh release create --draft`.
 6. **(maintainer)** Review the draft:
-   - The assets are the AppImage, the deb, `TF2Tools.exe`, `tf2tools-update.json` and `tf2tools-update.json.minisig`.
+   - The assets are the AppImage, the deb, `TF2Tools.exe`, `tf2tools-update.json` and `tf2tools-update.json.minisig`, plus the unversioned copies `tf2tools-windows-setup.exe`, `tf2tools-linux-x86_64.AppImage` and `tf2tools-linux-amd64.deb`, and `SHA256SUMS`, which covers every other file. In a folder holding the downloads, `sha256sum -c --ignore-missing SHA256SUMS` must print `OK` for each.
    - Download `TF2Tools.exe` on a Windows PC, install it and check it opens and finds TF2 before publishing.
    - Download the manifest and its signature and check them: `minisign -Vm tf2tools-update.json -p tf2tools-update.pub`.
    - A prerelease deb's Version uses `~`, such as `6.0.0~alpha.1`, so it sorts before `6.0.0`: `dpkg-deb -f tf2tools_<version>_amd64.deb Version`.
    - A tag with `-` in it is marked as a prerelease.
-7. **(maintainer)** Write "what's new" in the draft body where the placeholder comment is.
+7. **(maintainer)** Replace the placeholder comment at the top of the draft body with one or two sentences on what is new in this release, and read through What's Changed: reword or drop any bullet a player would not understand.
 8. **(maintainer)** Publish.
 
 ## Facts to keep in mind
 
 - **Prereleases never reach the in-app updater.** The updater reads `releases/latest`, which skips prereleases, so the update feed starts with the first stable release.
 - **`TF2Tools.exe` is a fixed name.** Every v4 client downloads `TF2Tools.exe` from the latest release, and the manifest's `windows-x86_64-nsis` entry points at it. The `windows` job renames cargo-packager's `tf2tools_<version>_x64-setup.exe` to it, and the `draft` job fails when it is missing from `dist` or from the verified manifest.
+- **The unversioned copies are fixed names too.** The README's Linux download points at `releases/latest/download/tf2tools-linux-x86_64.AppImage`. The manifest never names the copies; it points at the versioned files.
 - **A bad published release is fixed by a higher version, never by deleting it.** Clients may already hold its manifest.
 - **A run started by hand from a branch is a dry run.** The `draft` job runs only for `refs/tags/v*`, so a `workflow_dispatch` from a branch stops after uploading the `linux-packages` and `windows-installer` workflow artifacts.
 - **The release build has no update test seam.** The `linux` and `windows` jobs set `TF2TOOLS_RELEASE_BUILD`, and the `update-test-key` feature refuses to compile with it set.
@@ -167,7 +168,9 @@ If the old key is compromised, that wait is not possible: switch to the new key 
 
 ## Writing release notes
 
-The release page is for players, not developers. The fixed text lives in `packaging/release-notes.md`; the "what's new" part is written in the draft.
+The release page is for players, not developers. The fixed text lives in `packaging/release-notes.md`. `scripts/release-notes.sh <tag> packaging/release-notes.md` fills in the version and replaces the `{changes}` line with What's Changed: one bullet per `feat` or `fix` commit since the previous `v*` tag, oldest first, without merges or the `ci`, `release`, `test` and `deps` scopes, then a Full Changelog link to the comparison with that tag (the first release has none). With no such commit it writes "Small fixes and improvements." The intro at the top is written by hand in the draft.
+
+Since the bullets are commit subjects, a `feat` or `fix` subject should already read well to a player.
 
 - Use player words and say what changed in play terms ("Crosshairs now show a preview for every weapon").
 - No commands, no file paths, no crate or library names.
