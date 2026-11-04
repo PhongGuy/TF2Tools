@@ -553,3 +553,19 @@ fn each_slot_frames_its_icon_in_the_slot_colour() {
         gpui_kit::rgb(0xf97316).into()
     );
 }
+
+#[gpui_kit::test]
+fn the_compact_list_shows_a_bar_clear_of_its_rows(cx: &mut TestAppContext) {
+    use support::scroll::{assert_bar_on_right_edge, assert_clear_of_bar, assert_track_scrolls};
+    let env = support::env();
+    let (win, _assigner, _) = open(cx, &env, true);
+    let rows = scripts(TfClass::Scout, None);
+    assert_bar_on_right_edge(cx, win, ids::WEAPON_LIST, ids::WEAPON_LIST_SCROLLBAR);
+    assert_clear_of_bar(
+        cx,
+        win,
+        ids::weapon_row(rows[0]),
+        ids::WEAPON_LIST_SCROLLBAR,
+    );
+    assert_track_scrolls(cx, win, ids::WEAPON_LIST, ids::weapon_row(rows[0]));
+}

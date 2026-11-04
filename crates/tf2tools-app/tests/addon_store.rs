@@ -445,3 +445,29 @@ fn the_store_stays_syncing_until_the_post_sync_reload_lands(cx: &mut TestAppCont
     assert!(!idle_before_reload.get(), "idle before the reload landed");
     assert!(!cx.update(|cx| w.page.read(cx).is_syncing()));
 }
+
+// The bar sits in a gutter beside the cards, so the last column keeps its full width.
+#[gpui_kit::test]
+fn a_long_addon_store_shows_a_bar_beside_its_cards(cx: &mut TestAppContext) {
+    use support::scroll::{assert_bar_beside, assert_clear_of_bar, assert_track_scrolls};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let assets: Vec<String> = (0..30)
+        .map(|i| format!("mastercomfig-addon-a{i:02}.vpk"))
+        .collect();
+    let uri = server.uri();
+    let rows = assets.clone();
+    let w = support::addon_store_window(cx, &env, &server, found(&env), move |env, _| {
+        let rows: Vec<(&str, &str, &str)> = rows
+            .iter()
+            .map(|a| (a.as_str(), "Addon", "9.100.1"))
+            .collect();
+        support::seed_addons(env, &uri, &rows);
+    });
+    let bar = ids::grid_scrollbar(ids::STORE_GRID);
+    assert_bar_beside(cx, w.win, ids::STORE_GRID, bar.clone());
+    // Three columns at 1200 px: the third card ends the first row at the grid's right edge.
+    let third = ids::store_card(A, &addon(&assets[2]));
+    assert_clear_of_bar(cx, w.win, third, bar.clone());
+    assert_track_scrolls(cx, w.win, bar, ids::store_card(A, &addon(&assets[0])));
+}

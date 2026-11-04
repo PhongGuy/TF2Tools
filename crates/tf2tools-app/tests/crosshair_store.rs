@@ -321,3 +321,23 @@ fn another_stores_sync_leaves_the_banner_hidden(cx: &mut TestAppContext) {
     assert!(!support::present(cx, win, ids::SYNC_BANNER));
     run.finish(Ok(SyncSummary::default()));
 }
+
+#[gpui_kit::test]
+fn a_long_store_grid_shows_a_bar_beside_its_cards(cx: &mut TestAppContext) {
+    use support::scroll::{assert_bar_beside, assert_clear_of_bar, assert_track_scrolls_virtual};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let seed = |env: &support::Env| support::seed_crosshairs(env, 1..=200, 0, false);
+    let (win, page) = support::store_window(cx, &env, &server, seed, CrosshairStorePage::new);
+    support::wait_real(cx, "the grid", |cx| {
+        cx.update(|cx| page.read(cx).grid().read(cx).is_loaded())
+    });
+    support::settle(cx, win);
+    let bar = ids::grid_scrollbar(ids::STORE_GRID);
+    assert_bar_beside(cx, win, ids::STORE_GRID, bar.clone());
+    // Most liked first: 200 heads the first row and 197 ends it at the grid's right edge.
+    let columns = 4;
+    let last = ids::store_card(C, &gb(201 - columns));
+    assert_clear_of_bar(cx, win, last, bar.clone());
+    assert_track_scrolls_virtual(cx, win, bar, ids::store_card(C, &gb(200)));
+}

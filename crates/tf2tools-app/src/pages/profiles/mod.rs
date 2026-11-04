@@ -16,9 +16,9 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
-    Window, div, px, transparent_black,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
+    WeakEntity, Window, div, px, transparent_black,
 };
 
 use tf2tools_core::{
@@ -47,6 +47,7 @@ use crate::store_detail::{DetailItem, open_detail};
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 use crate::widgets::labelled;
+use crate::widgets::scroll::scroll_area;
 
 /// A card's height: the name row, two wrapped rows of badges and the button footer.
 const CARD_HEIGHT: Pixels = px(196.);
@@ -72,6 +73,8 @@ pub struct ProfilesPage {
     activating: Option<ProfileId>,
     wizard: Option<WeakEntity<ProfileWizard>>,
     grid: CardGrid,
+    /// The page's own scroll, which moves only in a window too short for the page.
+    scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -102,6 +105,7 @@ impl ProfilesPage {
             activating: None,
             wizard: None,
             grid: CardGrid::new(ids::PROFILES_GRID),
+            scroll: ScrollHandle::new(),
             _subscriptions: vec![tf2, library, search_changed],
         };
         page.reload(cx);
@@ -1257,10 +1261,11 @@ impl Render for ProfilesPage {
                 cx,
             )
         });
-        v_flex()
+        let content = v_flex()
             .id(ids::page(Page::Profiles))
             .test_support()
             .size_full()
+            .track_scroll(&self.scroll)
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
@@ -1277,6 +1282,7 @@ impl Render for ProfilesPage {
                     )
                     .child(active),
             )
-            .child(self.library(has_tf2, busy, cx))
+            .child(self.library(has_tf2, busy, cx));
+        scroll_area(ids::page_scrollbar(Page::Profiles), &self.scroll, content).size_full()
     }
 }

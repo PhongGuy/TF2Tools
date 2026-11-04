@@ -22,6 +22,7 @@ use crate::ids;
 use crate::previews::{CrosshairPreviews, Preview};
 use crate::services::Services;
 use crate::widgets::labelled;
+use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 
 /// Every picker row, header or option, is this tall; `uniform_list` sizes all rows by the first.
 const ROW_HEIGHT: Pixels = px(28.);
@@ -190,7 +191,8 @@ impl CrosshairPicker {
         let library = self.library.clone();
         let selected = self.selected.clone();
         let previews = self.previews.clone();
-        uniform_list(ids::CROSSHAIRS_LIST, rows.len(), move |range, _, cx| {
+        // The right padding keeps the options clear of the scrollbar's track.
+        let list = uniform_list(ids::CROSSHAIRS_LIST, rows.len(), move |range, _, cx| {
             range
                 .map(|ix| match rows[ix] {
                     Row::BuiltinHeader(n) => {
@@ -222,7 +224,8 @@ impl CrosshairPicker {
         .test_support()
         .h(self.list_height())
         .p_1()
-        .into_any_element()
+        .pr(BAR_WIDTH);
+        scroll_area(ids::CROSSHAIRS_LIST_SCROLLBAR, &self.list, list).into_any_element()
     }
 }
 

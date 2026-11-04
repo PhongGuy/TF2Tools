@@ -12,9 +12,9 @@ use gpui_kit::component::{
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    Context, Entity, EventEmitter, Hsla, InteractiveElement as _, IntoElement, ObjectFit,
-    ParentElement as _, Render, StatefulInteractiveElement as _, Styled as _, StyledImage as _,
-    Subscription, TestSupportExt as _, Window, div, img, px, rgb,
+    AnyElement, Context, Entity, EventEmitter, Hsla, InteractiveElement as _, IntoElement,
+    ObjectFit, ParentElement as _, Render, ScrollHandle, StatefulInteractiveElement as _,
+    Styled as _, StyledImage as _, Subscription, TestSupportExt as _, Window, div, img, px, rgb,
 };
 
 use tf2tools_core::{CrosshairRef, TfClass, Weapon, WeaponSlot, weapons};
@@ -26,6 +26,7 @@ use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
 use crate::services::Services;
 use crate::widgets::crosshair_picker::preview_image;
 use crate::widgets::labelled;
+use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 
 /// Tailwind blue-500, v5's secondary slot dot.
 const BLUE_500: u32 = 0x3b82f6;
@@ -101,6 +102,8 @@ pub struct WeaponAssigner {
     /// Weapon script to its wiki icon URL.
     icon_urls: HashMap<&'static str, String>,
     _images: Vec<Subscription>,
+    /// The compact list's scroll.
+    list_scroll: ScrollHandle,
 }
 
 impl EventEmitter<AssignRequested> for WeaponAssigner {}
@@ -136,6 +139,7 @@ impl WeaponAssigner {
             cells: Vec::new(),
             state: AssignerState::default(),
             compact,
+            list_scroll: ScrollHandle::new(),
             previews,
             _previews: observe_previews,
             images,
@@ -291,7 +295,7 @@ impl WeaponAssigner {
     }
 
     // The class's weapon rows, separated by dividers; compact mode scrolls them in 144 px.
-    fn weapon_list(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn weapon_list(&self, cx: &mut Context<Self>) -> AnyElement {
         let border = cx.theme().border;
         let rows = weapons()
             .iter()
@@ -303,10 +307,21 @@ impl WeaponAssigner {
                     .child(self.weapon_row(weapon, cx))
             })
             .collect::<Vec<_>>();
-        v_flex()
-            .id("weapon-list")
-            .when(self.compact, |list| list.overflow_y_scroll().h(px(144.)))
-            .children(rows)
+        let list = v_flex()
+            .id(ids::WEAPON_LIST)
+            .test_support()
+            .when(self.compact, |list| {
+                list.track_scroll(&self.list_scroll)
+                    .overflow_y_scroll()
+                    .h(px(144.))
+                    .pr(BAR_WIDTH)
+            })
+            .children(rows);
+        if self.compact {
+            scroll_area(ids::WEAPON_LIST_SCROLLBAR, &self.list_scroll, list).into_any_element()
+        } else {
+            list.into_any_element()
+        }
     }
 
     // One weapon: its wiki icon in a slot-coloured frame, or the slot square, and dot,

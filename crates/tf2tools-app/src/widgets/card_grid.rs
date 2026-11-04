@@ -5,12 +5,16 @@ use std::cell::{Cell, RefCell};
 use std::ops::Range;
 use std::rc::Rc;
 
+use gpui_kit::TestSupportExt as _;
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::*;
 use gpui_kit::{
     AnyElement, App, Pixels, SharedString, UniformListScrollHandle, Window, canvas, div, px,
     uniform_list,
 };
+
+use crate::ids;
+use crate::widgets::scroll::scroll_beside;
 
 /// v5's `gap-4` between cards and between rows.
 pub const GRID_GAP: Pixels = px(16.);
@@ -227,14 +231,17 @@ impl CardGrid {
                 .collect()
         })
         .track_scroll(&self.scroll)
+        .test_support()
         .size_full();
 
-        div()
+        let grid = div()
             .relative()
             .size_full()
             .child(watch)
             .child(list)
-            .child(self.hook_canvas(count, columns, rows))
+            .child(self.hook_canvas(count, columns, rows));
+        scroll_beside(ids::grid_scrollbar(&self.id), &self.scroll, grid)
+            .size_full()
             .into_any_element()
     }
 

@@ -13,7 +13,7 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     AnyElement, App, Context, EventEmitter, FontWeight, HighlightStyle, InteractiveElement as _,
-    InteractiveText, IntoElement, ParentElement as _, Pixels, Render,
+    InteractiveText, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
     StatefulInteractiveElement as _, Styled as _, StyledText, Subscription, Task,
     TestSupportExt as _, UnderlineStyle, WeakEntity, Window, div, px, transparent_black,
 };
@@ -31,6 +31,7 @@ use crate::store_download::{StoreDownloads, download_button, format_bytes};
 use crate::store_messages::read_failed;
 use crate::sync::sync_hub;
 use crate::widgets::card_grid::{SHELL_CHROME_WIDTH, columns_for, stretch_rows};
+use crate::widgets::scroll::scroll_beside;
 use crate::widgets::store_error::store_error_line;
 use model::{AddonState, addon_state, downloads_label, ordered, store_release};
 
@@ -86,6 +87,8 @@ pub struct AddonStorePage {
     /// An addon run ended and its reload has not landed; the page still reads as syncing.
     sync_reload_pending: bool,
     load: Option<Task<()>>,
+    /// The card grid's scroll.
+    scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -134,6 +137,7 @@ impl AddonStorePage {
             hub_running,
             sync_reload_pending: false,
             load: None,
+            scroll: ScrollHandle::new(),
             _subscriptions: subscriptions,
         };
         page.reload(cx);
@@ -388,13 +392,19 @@ impl AddonStorePage {
             })
             .collect();
         Some(
-            div()
-                .id(ids::STORE_GRID)
-                .test_support()
-                .size_full()
-                .overflow_y_scroll()
-                .child(stretch_rows(cards, columns))
-                .into_any_element(),
+            scroll_beside(
+                ids::grid_scrollbar(ids::STORE_GRID),
+                &self.scroll,
+                div()
+                    .id(ids::STORE_GRID)
+                    .test_support()
+                    .size_full()
+                    .track_scroll(&self.scroll)
+                    .overflow_y_scroll()
+                    .child(stretch_rows(cards, columns)),
+            )
+            .size_full()
+            .into_any_element(),
         )
     }
 }
