@@ -9,12 +9,14 @@ use gpui_kit::component::button::{Button, ButtonGroup};
 use gpui_kit::component::{Selectable as _, v_flex};
 use gpui_kit::{
     AppContext as _, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
-    Render, Styled as _, TestSupportExt as _, Window, div, px,
+    Render, ScrollHandle, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _,
+    Window, px,
 };
 
 use crate::ids;
 use crate::shell::CONTENT_PADDING;
 use crate::shell::route::Page;
+use crate::widgets::scroll::scroll_area;
 use curated_tab::CuratedTab;
 use gamebanana_tab::GameBananaTab;
 
@@ -31,6 +33,7 @@ pub struct HudStorePage {
     tab: HudStoreTab,
     curated: Option<Entity<CuratedTab>>,
     gamebanana: Option<Entity<GameBananaTab>>,
+    scroll: ScrollHandle,
 }
 
 impl HudStorePage {
@@ -40,9 +43,15 @@ impl HudStorePage {
             tab: HudStoreTab::GameBanana,
             curated: None,
             gamebanana: None,
+            scroll: ScrollHandle::new(),
         };
         page.select(HudStoreTab::Curated, window, cx);
         page
+    }
+
+    /// The page's scroll; it moves only when the window cannot fit the toolbar and a card row.
+    pub fn page_scroll(&self) -> ScrollHandle {
+        self.scroll.clone()
     }
 
     pub fn tab(&self) -> HudStoreTab {
@@ -119,10 +128,14 @@ impl Render for HudStorePage {
             HudStoreTab::Curated => self.curated.clone().map(|tab| tab.into_any_element()),
             HudStoreTab::GameBanana => self.gamebanana.clone().map(|tab| tab.into_any_element()),
         };
-        v_flex()
+        // The tab keeps its grid at least a card row tall; a short window, or open filters,
+        // scrolls the whole page to reach it, as on HUDs, so the toolbar never squeezes it.
+        let content = v_flex()
             .id(ids::page(Page::HudStore))
             .test_support()
             .size_full()
+            .track_scroll(&self.scroll)
+            .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
             .child(
@@ -131,6 +144,7 @@ impl Render for HudStorePage {
                     .child(self.tab_button(HudStoreTab::Curated, cx))
                     .child(self.tab_button(HudStoreTab::GameBanana, cx)),
             )
-            .child(div().flex_1().min_h_0().children(body))
+            .child(v_flex().flex_1().children(body));
+        scroll_area(ids::page_scrollbar(Page::HudStore), &self.scroll, content).size_full()
     }
 }
