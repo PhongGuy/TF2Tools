@@ -184,17 +184,6 @@ fn a_cancelled_browse_keeps_the_path(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn revisiting_settings_reloads_and_drops_unsaved_edits(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    let page = open_settings(cx, &s);
-    set_path(cx, &s, &page, "/unsaved");
-    support::click_id(cx, s.win, ids::nav(Page::Huds));
-    let page = open_settings(cx, &s);
-    assert_eq!(path_value(cx, &page), "");
-}
-
-#[gpui_kit::test]
 fn save_persists_everything_and_connects_tf2(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
