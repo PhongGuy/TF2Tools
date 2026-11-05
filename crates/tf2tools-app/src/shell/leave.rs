@@ -66,6 +66,9 @@ pub fn leave_then(
         return;
     }
     cx.set_global(Asking(true));
+    // The press that asked (a sidebar item) has taken focus off the maker, and the dialog hands
+    // focus back to whatever held it at open, so the maker takes it first to get it after Keep editing.
+    reclaim_maker_focus(window, cx);
     let answer = confirm(Confirm::discard_changes(), window, cx);
     let handle = window.window_handle();
     cx.spawn(async move |cx| {
@@ -78,6 +81,22 @@ pub fn leave_then(
         }
     })
     .detach();
+}
+
+fn reclaim_maker_focus(window: &mut Window, cx: &mut App) {
+    match cx.try_global::<OpenMaker>() {
+        Some(OpenMaker::Crosshair(page)) => {
+            let _ = page
+                .clone()
+                .update(cx, |page, cx| page.reclaim_focus(window, cx));
+        }
+        Some(OpenMaker::Hud(page)) => {
+            let _ = page
+                .clone()
+                .update(cx, |page, cx| page.reclaim_focus(window, cx));
+        }
+        Some(OpenMaker::None) | None => {}
+    }
 }
 
 /// The window's should-close answer: true when `can_leave`; otherwise false, with the dialog
