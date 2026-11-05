@@ -742,8 +742,8 @@ fn an_install_blocked_by_a_players_folder_says_so(cx: &mut TestAppContext) {
     assert_eq!(std::fs::read(mine.join("notes.txt")).unwrap(), b"mine");
 }
 
-// At the 800x600 minimum with the sidebar open, the grid keeps room for a row of cards (the
-// page scrolls to show it whole) and Add HUD keeps the page's margin.
+// At the 800x600 minimum with the sidebar open, the grid keeps room for a row of 136 px local
+// cards (the page scrolls to show it whole) and Add HUD keeps the page's margin.
 #[gpui_kit::test]
 fn at_800x600_the_grid_has_room_and_add_hud_keeps_the_margin(cx: &mut TestAppContext) {
     use gpui_kit::{px, size};
@@ -758,7 +758,7 @@ fn at_800x600_the_grid_has_room_and_add_hud_keeps_the_margin(cx: &mut TestAppCon
     let page = bounds(cx, ids::page(Page::Huds));
     let library = bounds(cx, ids::HUDS_LIBRARY.into());
     assert!(
-        library.size.height >= px(300.),
+        library.size.height >= px(136.),
         "the grid is a {library:?} strip"
     );
     let (add, search) = (
