@@ -186,6 +186,8 @@ fn import_cases() -> Vec<(ImportError, &'static str)> {
     ]
 }
 
+const GAME_MOVED: &str = "TF2 wasn't found where it used to be. Check the TF2 folder in Settings.";
+
 fn install_cases() -> Vec<(InstallError, &'static str)> {
     vec![
         (
@@ -208,6 +210,12 @@ fn install_cases() -> Vec<(InstallError, &'static str)> {
                 message: "database is locked".into(),
             },
             LIBRARY_UPDATE,
+        ),
+        (
+            InstallError::GameMissing {
+                path: PathBuf::from("/home/p/Games/Team Fortress 2/tf"),
+            },
+            GAME_MOVED,
         ),
     ]
 }
@@ -309,6 +317,12 @@ fn apply_cases() -> Vec<(ApplyProfileError, &'static str)> {
                 message: "database is locked".into(),
             },
             PROFILES_OPEN,
+        ),
+        (
+            ApplyProfileError::GameMissing {
+                path: PathBuf::from("/home/p/Games/Team Fortress 2/tf"),
+            },
+            GAME_MOVED,
         ),
     ]
 }

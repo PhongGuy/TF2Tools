@@ -199,6 +199,7 @@ pub fn describe_install(err: &InstallError) -> StoreFailure {
             "This addon is no longer in your library. Download it again."
         }
         InstallError::Database { .. } => LIBRARY_UPDATE,
+        InstallError::GameMissing { .. } => crate::local_messages::GAME_MOVED,
         _ => "Something went wrong while installing. Try again later.",
     };
     StoreFailure::new(message, err.to_string())

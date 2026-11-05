@@ -23,6 +23,8 @@ pub const LIVE_NOTE: &str = "Your installed HUD is updated. Type hud_reloadschem
      console to see it. Font, image and animation changes show after you restart TF2.";
 const NOT_UPDATED_TITLE: &str = "Installed copy not updated";
 const IN_USE: &str = "TF2 is using this HUD's files. Close TF2, then Save again to update it.";
+const GAME_MOVED: &str = "Saved, but TF2 wasn't found where it used to be. Check the \
+     TF2 folder in Settings.";
 const NOT_UPDATED: &str =
     "Saved, but couldn't update the installed copy. Close TF2 and install it again from HUDs.";
 
@@ -47,6 +49,7 @@ pub fn live_failure(err: &ReinstallError) -> &'static str {
     match err {
         ReinstallError::InUse { .. } | ReinstallError::SetAside { .. } => IN_USE,
         ReinstallError::Changed { .. } => CHANGED,
+        ReinstallError::GameMissing { .. } => GAME_MOVED,
         _ => NOT_UPDATED,
     }
 }

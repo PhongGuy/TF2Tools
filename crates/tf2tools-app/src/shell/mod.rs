@@ -35,7 +35,7 @@ use crate::pages::profiles::ProfilesPage;
 use crate::pages::settings::SettingsPage;
 use crate::pages::sound_store::SoundStorePage;
 use crate::pages::sounds::SoundsPage;
-use crate::services::{run_blocking, tf2_state};
+use crate::services::{recheck_tf2, run_blocking, tf2_state};
 use crate::sync::{SyncEvent, store_name, sync_hub};
 use crate::updater::{UpdateEvent, updater, view as update_view};
 use route::{NavigateTo, Page};
@@ -98,6 +98,13 @@ impl Shell {
         focus.focus(window, cx);
         // The header badge reads the TF2 state, so the shell redraws whenever it changes.
         cx.observe(&tf2_state(cx), |_, _, cx| cx.notify()).detach();
+        // A player back from moving the game folder sees the badge catch up.
+        cx.observe_window_activation(window, |_, window, cx| {
+            if window.is_window_active() {
+                recheck_tf2(cx);
+            }
+        })
+        .detach();
         // The header rings read the sync hub, and a failed sync toasts; no hub, no syncs.
         let hub_subscriptions = sync_hub(cx).map(|hub| {
             [
@@ -176,6 +183,7 @@ impl Shell {
             return;
         }
         self.page = page;
+        recheck_tf2(cx);
         leave::forget_maker(cx);
         self.huds = None;
         self.sounds = None;
