@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 
 use super::{
-    CrosshairId, IoFailure, Library, Provenance, create_dir_all, folder_name, gb_id_column,
-    import_db, install_db, io_at, is_plain_name, library_db, new_id, now, paint_db,
+    CrosshairId, IoFailure, Library, Provenance, create_dir_all, folder_name, game_custom_dir,
+    gb_id_column, import_db, install_db, io_at, is_plain_name, library_db, new_id, now, paint_db,
     remove_dir_if_present, remove_file_if_present, save_setting,
 };
 use crate::crosshair_catalog::BuiltinCrosshairs;
@@ -866,7 +866,7 @@ impl Library {
             }
         }
 
-        let base = tf2.custom_dir().join(MANAGED_DIR);
+        let base = game_custom_dir(tf2)?.join(MANAGED_DIR);
         remove_dir_if_present(&base)?;
         if !applied.is_empty() {
             let materials = base.join(MATERIALS_DIR);
@@ -900,7 +900,9 @@ impl Library {
 
     /// Removes `tf/custom/tf2tools-crosshairs/`; the assignments stay. Already gone is fine.
     pub fn remove_crosshairs(&self, tf2: &Tf2Install) -> Result<(), InstallError> {
-        Ok(remove_dir_if_present(&tf2.custom_dir().join(MANAGED_DIR))?)
+        Ok(remove_dir_if_present(
+            &game_custom_dir(tf2)?.join(MANAGED_DIR),
+        )?)
     }
 
     /// Takes crosshair `id` out of the game: the weapon scripts naming its texture, then its
@@ -927,7 +929,7 @@ impl Library {
             .ok_or_else(|| InstallError::NotInLibrary {
                 what: format!("crosshair {id}"),
             })?;
-        let custom = tf2.custom_dir();
+        let custom = game_custom_dir(tf2)?;
         if !texture_in_game(&custom, &folder) {
             return Ok(());
         }

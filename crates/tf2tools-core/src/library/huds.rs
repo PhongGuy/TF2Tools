@@ -10,8 +10,8 @@ use walkdir::WalkDir;
 
 use super::{
     HudId, IoFailure, Library, METADATA_DIR, Provenance, copy_dir_excluding_metadata,
-    create_dir_all, gb_id_column, hud_folder, hud_print, import_db, install_db, io_at,
-    is_plain_name, library_db, live_link, made_huds, new_id, now, read_setting,
+    create_dir_all, game_custom_dir, gb_id_column, hud_folder, hud_print, import_db, install_db,
+    io_at, is_plain_name, library_db, live_link, made_huds, new_id, now, read_setting,
     remove_dir_if_present, save_setting, walk_failure,
 };
 use crate::archive::extract_archive;
@@ -528,7 +528,7 @@ impl Library {
             made_huds::stranded_save(&live).ok_or_else(not_in_library)?
         };
 
-        let custom = tf2.custom_dir();
+        let custom = game_custom_dir(tf2)?;
         self.refuse_unnamed_huds(&custom, discard, None)?;
         // Scan before touching tf/custom, so a failed scan leaves the old install in place.
         let mut target = self.install_name(&src, store_hud_id, store_gb_id, &folder)?;
@@ -638,7 +638,7 @@ impl Library {
         discard: &[ExternalHud],
     ) -> Result<(), InstallError> {
         let _swap = live_link::hud_swap_lock();
-        let custom = tf2.custom_dir();
+        let custom = game_custom_dir(tf2)?;
         self.refuse_unnamed_huds(&custom, discard, None)?;
         live_link::clear_staging(&custom)?;
         remove_installed_huds(&custom)?;
@@ -657,7 +657,7 @@ impl Library {
         discard: &[ExternalHud],
     ) -> Result<(), InstallError> {
         let _swap = live_link::hud_swap_lock();
-        let custom = tf2.custom_dir();
+        let custom = game_custom_dir(tf2)?;
         // Only what the scan found can go, so no name reaches outside tf/custom.
         let found = scan_hud_folders(&custom)?;
         let target = found.iter().find_map(|path| {

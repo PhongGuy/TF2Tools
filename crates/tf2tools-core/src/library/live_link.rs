@@ -10,7 +10,7 @@ use rusqlite::OptionalExtension;
 
 use super::{
     HudId, HudStatus, IoFailure, Library, copy_dir_excluding_metadata, create_dir_all,
-    is_plain_name, made_huds, remove_dir_if_present,
+    game_custom_dir, is_plain_name, made_huds, remove_dir_if_present,
 };
 use crate::error::{LibraryError, ReinstallError};
 use crate::hud_maker::is_device_name;
@@ -74,7 +74,7 @@ impl Library {
     /// copy's fingerprint.
     pub fn reinstall_hud(&self, id: &HudId, tf2: &Tf2Install) -> Result<Reinstall, ReinstallError> {
         let _swap = hud_swap_lock();
-        let custom = tf2.custom_dir();
+        let custom = game_custom_dir(tf2)?;
         // A crash's leftover goes first, so the status below sees the HUD where it belongs.
         recover_in(&custom, &mut std_rename)?;
         let folder = match self.hud_status(tf2).map_err(status_error)? {
@@ -150,7 +150,7 @@ impl Library {
     /// Holds the swap lock.
     pub fn recover_reinstall(&self, tf2: &Tf2Install) -> Result<Recovery, ReinstallError> {
         let _swap = hud_swap_lock();
-        recover_in(&tf2.custom_dir(), &mut std_rename)
+        recover_in(&game_custom_dir(tf2)?, &mut std_rename)
     }
 }
 
