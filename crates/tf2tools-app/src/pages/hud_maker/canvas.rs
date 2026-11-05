@@ -1791,19 +1791,20 @@ fn border_pieces(part: &Part, b: &PartBox, look: &Look) -> Vec<AnyElement> {
 
 // The class model as the shipped portrait: a square as wide or tall as the box allows, standing
 // on the box's bottom edge, centred. It never reaches up under a shown sibling with a higher
-// zpos that overlaps it, as the game's camera frames the model below the player lists.
-// Nothing when the portrait did not decode.
+// zpos that overlaps it, as the game's camera frames the model below the player lists. The
+// class menu's model stands where its own camera puts it. Nothing when the portrait did not decode.
 fn portrait(part: &Part, b: &PartBox, look: &Look) -> Option<AnyElement> {
     let image = look.images.get(&PartKey::new(MODEL_STAND_IN))?;
+    if look.model.scene() == Scene::ClassSelect {
+        return Some(framed_portrait(part, b, image, look));
+    }
     let foot = b.y().saturating_add(b.tall());
     let right = b.x().saturating_add(b.wide());
-    // The class menu's camera is fixed, so no sibling squeezes its model.
-    let squeezed = look.model.scene() != Scene::ClassSelect;
     let ceiling = look
         .model
         .parts()
         .iter()
-        .filter(|p| squeezed && p.parent() == part.parent() && p.key() != part.key())
+        .filter(|p| p.parent() == part.parent() && p.key() != part.key())
         .filter_map(|p| look.layout.get(p.key()))
         .filter(|s| s.hidden().is_none() && s.z() > b.z())
         .filter(|s| s.x() < right && b.x() < s.x().saturating_add(s.wide()))
@@ -1828,6 +1829,57 @@ fn portrait(part: &Part, b: &PartBox, look: &Look) -> Option<AnyElement> {
             )
             .into_any_element(),
     )
+}
+
+// The class menu's model, framed as its camera frames it: the panel's `fov` spans its width at
+// the model's distance, and the model stands at the `model` block's offset from the eye line.
+// Paint order stays the file's zpos (lower behind; equal zpos, the later block behind), so with
+// the stock zpos 6 for both, the buttons paint over the model, which stands below them anyway.
+fn framed_portrait(part: &Part, b: &PartBox, image: &Arc<RenderImage>, look: &Look) -> AnyElement {
+    let camera = |key: &str, stock: f32| {
+        model_block_value(part, look.model, key)
+            .or_else(|| part.value(key).and_then(|l| l.text().trim().parse().ok()))
+            .unwrap_or(stock)
+    };
+    let fov = camera("fov", 25.).clamp(1., 179.);
+    let ahead = camera("origin_x", 320.).max(1.);
+    let units = 2. * ahead * (fov / 2.).to_radians().tan();
+    let per_unit = b.wide() as f32 / units;
+    let feet = b.tall() as f32 / 2. - camera("origin_z", -49.) * per_unit;
+    let side = CLASS_HEIGHT * per_unit;
+    // Positive y is the camera's left.
+    let centre = b.wide() as f32 / 2. - camera("origin_y", 10.) * per_unit;
+    let at = |v: f32| px(v * look.scale);
+    div()
+        .id(ids::hud_maker_portrait(part.key()))
+        .test_support()
+        .absolute()
+        .left(at(centre - side / 2.))
+        .top(at(feet - side))
+        .size(at(side))
+        .child(
+            img(image.clone())
+                .object_fit(ObjectFit::Fill)
+                .size(at(side)),
+        )
+        .into_any_element()
+}
+
+/// A standing class's height in world units: the player hull.
+const CLASS_HEIGHT: f32 = 82.;
+
+// A number from the model panel's `model` block, the last block in load order that sets it.
+fn model_block_value(part: &Part, model: &HudModel, key: &str) -> Option<f32> {
+    (part.blocks().iter().rev()).find_map(|(file, path)| {
+        let mut path: Vec<&str> = path.iter().map(String::as_str).collect();
+        path.push("model");
+        let doc = model.document(file)?;
+        (doc.find(&path).into_iter())
+            .flat_map(|block| block.children())
+            .filter(|e| e.key().eq_ignore_ascii_case(key))
+            .filter_map(|e| e.text()?.trim().parse().ok())
+            .next_back()
+    })
 }
 
 // The sample rank where the game draws the player's: the medal, a 3D model whose flat picture

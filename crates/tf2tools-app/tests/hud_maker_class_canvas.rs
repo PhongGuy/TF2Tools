@@ -177,8 +177,16 @@ fn the_backdrop_room_is_a_dark_fill_unless_the_hud_hides_it(cx: &mut TestAppCont
     assert!(!support::present(cx, s.win, ids::hud_maker_fill(&bg)));
 }
 
+// The model's top and bottom as fractions of its box under the stock camera: fov 25 at 320
+// units, the feet 49 below the eye line, an 82-unit class.
+fn framed(part: gpui_kit::Bounds<gpui_kit::Pixels>, feet: f32) -> (f32, f32) {
+    let span = 2. * 320. * (12.5f32).to_radians().tan();
+    let at = |z: f32| f32::from(part.top()) + (0.5 - z / span) * f32::from(part.size.height);
+    (at(feet + 82.), at(feet))
+}
+
 #[gpui_kit::test]
-fn the_class_model_stands_at_its_full_box_not_squeezed_under_the_tips(cx: &mut TestAppContext) {
+fn the_class_model_stands_where_the_camera_frames_it_below_the_buttons(cx: &mut TestAppContext) {
     let env = support::env();
     let s = shell_with_textures(cx, &env, &[]);
     let _page = open_maker(cx, &s);
@@ -186,10 +194,59 @@ fn the_class_model_stands_at_its_full_box_not_squeezed_under_the_tips(cx: &mut T
     let key = PartKey::new("class/TFPlayerModel");
     let part = support::bounds_of(cx, s.win, ids::hud_maker_part(&key)).unwrap();
     let portrait = support::bounds_of(cx, s.win, ids::hud_maker_portrait(&key)).unwrap();
-    // The tips box overlaps the model's columns and sits higher in z; the scoreboard would stop
-    // the portrait short of it, but the class menu's camera is fixed.
-    assert!((f32::from(portrait.size.width) - f32::from(part.size.width)).abs() <= 0.5);
-    assert!((f32::from(portrait.bottom()) - f32::from(part.bottom())).abs() <= 0.5);
+    let (top, foot) = framed(part, -49.);
+    assert!(
+        (f32::from(portrait.top()) - top).abs() <= 1.,
+        "{portrait:?} top {top}"
+    );
+    assert!(
+        (f32::from(portrait.bottom()) - foot).abs() <= 1.,
+        "{portrait:?} foot {foot}"
+    );
+    // The figure clears the class buttons, so none of them is drawn over, and the tips box,
+    // higher in z, does not squeeze it.
+    for button in ["scout", "soldier", "random"] {
+        let b = support::bounds_of(
+            cx,
+            s.win,
+            ids::hud_maker_part(&PartKey::new(format!("class/{button}"))),
+        )
+        .unwrap();
+        assert!(portrait.top() >= b.bottom(), "{button} {b:?} {portrait:?}");
+    }
+}
+
+#[gpui_kit::test]
+fn the_class_model_follows_the_camera_the_file_sets(cx: &mut TestAppContext) {
+    let moved = support::hud_stock::class_select().replace(
+        "TFPlayerModel { ControlName CTFPlayerModelPanel xpos 0 ypos 0 zpos 6 wide 480 tall 480 visible 1",
+        "TFPlayerModel { ControlName CTFPlayerModelPanel xpos 0 ypos 0 zpos 6 wide 480 tall 480 visible 1 fov 25\n    model { force_pos 1 origin_x 320 origin_y 0 origin_z -20 }",
+    );
+    assert_ne!(moved, support::hud_stock::class_select());
+    let env = support::env();
+    let s = shell_with_textures(
+        cx,
+        &env,
+        &[("resource/ui/classselection.res", Some(&moved))],
+    );
+    let _page = open_maker(cx, &s);
+    support::click_scene(cx, s.win, Scene::ClassSelect);
+    let key = PartKey::new("class/TFPlayerModel");
+    let part = support::bounds_of(cx, s.win, ids::hud_maker_part(&key)).unwrap();
+    let portrait = support::bounds_of(cx, s.win, ids::hud_maker_portrait(&key)).unwrap();
+    let (top, foot) = framed(part, -20.);
+    assert!(
+        (f32::from(portrait.top()) - top).abs() <= 1.,
+        "{portrait:?} top {top}"
+    );
+    assert!(
+        (f32::from(portrait.bottom()) - foot).abs() <= 1.,
+        "{portrait:?} foot {foot}"
+    );
+    // origin_y 0 puts the model on the camera's axis: centred across the box.
+    let mid =
+        |b: gpui_kit::Bounds<gpui_kit::Pixels>| f32::from(b.left()) + f32::from(b.size.width) / 2.;
+    assert!((mid(portrait) - mid(part)).abs() <= 1.);
 }
 
 #[gpui_kit::test]

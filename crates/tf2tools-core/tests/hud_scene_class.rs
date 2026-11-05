@@ -98,3 +98,27 @@ fn a_missing_or_unparsable_file_is_a_class_select_problem_only() {
         }
     }
 }
+
+#[test]
+fn the_class_buttons_paint_over_the_model_that_shares_their_zpos() {
+    // The model and the buttons all set zpos 6, the model listed last; the game puts a later
+    // sibling of equal zpos beneath, so every button and its picture paint over the model.
+    let l = menu(&stock_files()).layout(SD);
+    let model = l.paint_rank(&k("class/TFPlayerModel")).unwrap();
+    for button in ["scout", "soldier", "heavyweapons", "random"] {
+        for key in [
+            format!("class/{button}"),
+            format!("class/{button}/SubImage"),
+        ] {
+            assert!(l.paint_rank(&k(&key)).unwrap() > model, "{key}");
+        }
+    }
+    // A HUD that raises the model's zpos above the buttons' puts it on top, as the game does.
+    let raised = common::hud_stock::class_select().replace(
+        "TFPlayerModel { ControlName CTFPlayerModelPanel xpos 0 ypos 0 zpos 6",
+        "TFPlayerModel { ControlName CTFPlayerModelPanel xpos 0 ypos 0 zpos 8",
+    );
+    let l = menu(&stock_files_with(&[(FILE, Some(&raised))])).layout(SD);
+    let model = l.paint_rank(&k("class/TFPlayerModel")).unwrap();
+    assert!(l.paint_rank(&k("class/soldier/SubImage")).unwrap() < model);
+}
