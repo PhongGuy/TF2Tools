@@ -78,6 +78,8 @@ pub struct CuratedTab {
     visible: Range<usize>,
     viewer: String,
     load: Option<Task<()>>,
+    /// Set while the HUD Store is away; the tab then holds its reloads and image wants.
+    hidden: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -144,6 +146,7 @@ impl CuratedTab {
             visible: 0..0,
             viewer,
             load: None,
+            hidden: false,
             _subscriptions: subscriptions,
         };
         tab.reload(cx);
@@ -183,14 +186,32 @@ impl CuratedTab {
         self.refilter(cx);
     }
 
+    /// Hides or shows the tab with its page. Hidden, it drops its image wants and skips
+    /// reloads; shown again, it rereads the store and the library, keeping filters and scroll.
+    pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        if hidden == std::mem::replace(&mut self.hidden, hidden) {
+            return;
+        }
+        if hidden {
+            if let Some(images) = RemoteImages::global(cx) {
+                images.update(cx, |images, cx| images.want(&self.viewer, Vec::new(), cx));
+            }
+            return;
+        }
+        self.reload(cx);
+    }
+
     /// Whether the library holds the curated HUD `hud_id`.
     pub fn is_downloaded(&self, hud_id: &str) -> bool {
         self.downloaded.contains(hud_id)
     }
 
     // Reads the curated HUDs and the library's curated ids off the UI thread; a newer
-    // reload drops an older one in flight.
+    // reload drops an older one in flight. A hidden tab rereads on return instead.
     fn reload(&mut self, cx: &mut Context<Self>) {
+        if self.hidden {
+            return;
+        }
         let read = run_blocking(cx, |s| {
             let items = s
                 .store

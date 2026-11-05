@@ -41,7 +41,8 @@ const RED_500: u32 = 0xef4444;
 
 type Labels = Entity<SelectState<Vec<&'static str>>>;
 
-/// The Activity Log page. Built fresh on each visit, it queries the first page on creation.
+/// The Activity Log page. It queries the first page on creation and again on each return,
+/// keeping its filters and open rows.
 pub struct LogsPage {
     entries: Vec<LogEntry>,
     category: Option<&'static str>,
@@ -134,6 +135,13 @@ impl LogsPage {
 
     pub fn level(&self) -> Option<LogLevel> {
         self.level
+    }
+
+    /// Re-queries on return, so rows logged while away show under the kept filters.
+    pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        if !hidden {
+            self.reload(cx);
+        }
     }
 
     /// Sets a filter and re-queries from the top; a load still running is dropped.

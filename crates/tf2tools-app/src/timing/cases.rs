@@ -296,8 +296,8 @@ impl Runner {
             return Some(Err(format!("{} has no frame runner", self.case.name())));
         };
         match self.phase {
-            // Rebuild the case's page, so it loads the library as it is now rather than as
-            // the shell's start page first found it.
+            // Rebuild the case's page (a kept store or log page rereads on return), so it
+            // loads the library as it is now rather than as the shell's start page found it.
             Phase::Opening => {
                 let away = Page::ALL.into_iter().find(|&p| p != home).unwrap_or(home);
                 self.shell.update(cx, |shell, cx| {

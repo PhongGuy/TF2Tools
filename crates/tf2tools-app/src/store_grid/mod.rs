@@ -22,11 +22,13 @@ use gpui_kit::{
 use tf2tools_core::{StoreCard, StoreKind, StoreQuery, StoreSort};
 
 use crate::ids;
+use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::pages::common::{
     SkeletonTop, empty_state_card, empty_state_with_action, skeleton_cards,
 };
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
 use crate::services::{OpError, run_blocking};
+use crate::store_download::SessionDownloads;
 use crate::store_messages::read_failed;
 use crate::sync::{SyncEvent, SyncHub, sync_hub};
 use crate::widgets::card_grid::{CardGrid, SHELL_CHROME_WIDTH, columns_for_store};
@@ -166,6 +168,12 @@ pub struct StoreGrid {
     debounce: Option<Task<()>>,
     /// Wall-clock start of the current query, so timing measures the query and not the debounce.
     query_started: Instant,
+    /// Set while the grid's page is away; it then holds its re-queries and image wants.
+    hidden: bool,
+    /// A sync or a library change landed while hidden, so the rows need a re-read on return.
+    stale: bool,
+    /// The page's downloads this session, which each re-read retires.
+    session: Option<SessionDownloads>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -222,6 +230,12 @@ impl StoreGrid {
                 }
             }));
         }
+        // The cards' In Library marks read the library, so a change made elsewhere while the
+        // page is away calls for a re-read on return.
+        let events = LibraryEvents::global(cx);
+        subscriptions.push(cx.subscribe(&events, |grid, _, _: &LibraryChanged, _| {
+            grid.stale |= grid.hidden;
+        }));
 
         let mut grid = CardGrid::store(ids::STORE_GRID, config.max_columns);
         let this = cx.entity().downgrade();
@@ -260,6 +274,9 @@ impl StoreGrid {
             syncing: sync_hub(cx).is_some_and(|hub| hub.read(cx).is_running(config.kind)),
             debounce: None,
             query_started: Instant::now(),
+            hidden: false,
+            stale: false,
+            session: None,
             _subscriptions: subscriptions,
         };
         store.restart(cx);
@@ -336,6 +353,43 @@ impl StoreGrid {
                 grid.restart(cx);
             });
         }));
+    }
+
+    /// The search the grid queries, once typing has paused.
+    pub fn search(&self) -> &str {
+        &self.search
+    }
+
+    pub fn sort(&self) -> StoreSort {
+        self.sort
+    }
+
+    /// Lets each re-read retire the downloads `session` recorded before it began.
+    pub fn track_session(&mut self, session: SessionDownloads) {
+        self.session = Some(session);
+    }
+
+    /// Hides or shows the grid with its page. Hidden, it drops its image wants and holds sync
+    /// re-queries; shown again, it asks for the drawn cards' images and re-reads once if
+    /// anything landed meanwhile, keeping search, sort, category and scroll.
+    pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        if hidden == std::mem::replace(&mut self.hidden, hidden) {
+            return;
+        }
+        if hidden {
+            self.stale |= self.trailing.take().is_some();
+            if let (CardSize::Image { .. }, Some(images)) =
+                (self.config.card, RemoteImages::global(cx))
+            {
+                images.update(cx, |images, cx| images.want(&self.viewer, Vec::new(), cx));
+            }
+            return;
+        }
+        self.grid.rearm();
+        if std::mem::take(&mut self.stale) {
+            self.requery(cx);
+        }
+        cx.notify();
     }
 
     /// Reorders the store from its first card.
@@ -505,6 +559,10 @@ impl StoreGrid {
         if fetched == std::mem::replace(&mut self.sync_fetched, fetched) || fetched == 0 {
             return;
         }
+        if self.hidden {
+            self.stale = true;
+            return;
+        }
         match self.throttle.request(cx.background_executor().now()) {
             Gate::Now => self.requery(cx),
             Gate::After(delay) => {
@@ -519,7 +577,12 @@ impl StoreGrid {
     }
 
     // A re-query now: it marks the throttle run, which also covers a trailing run it replaces.
+    // A hidden grid only notes that one is owed.
     fn requery(&mut self, cx: &mut Context<Self>) {
+        if self.hidden {
+            self.stale = true;
+            return;
+        }
         self.trailing = None;
         self.throttle.ran(cx.background_executor().now());
         self.start_reload(cx);
@@ -539,6 +602,8 @@ impl StoreGrid {
         let (kind, sort, search) = (self.config.kind, self.sort, self.search.clone());
         let category = self.category.clone();
         let loaded = self.feed.items().len();
+        // Downloads recorded before the read began are in the library rows it reads.
+        let recorded = self.session.as_ref().map(SessionDownloads::snapshot);
         let reading = run_blocking(cx, move |s| {
             reload(loaded, anchor.as_ref(), |after, limit| {
                 let query = query_for(sort, &search, category.as_deref(), limit);
@@ -556,7 +621,14 @@ impl StoreGrid {
             let _ = grid.update(cx, |grid, cx| {
                 grid.requeries += 1;
                 match reloaded {
-                    Ok((items, end)) => grid.apply_reload(generation, items, end, cx),
+                    Ok((items, end)) => {
+                        if generation == grid.feed.generation()
+                            && let (Some(session), Some(recorded)) = (&grid.session, &recorded)
+                        {
+                            session.forget(recorded);
+                        }
+                        grid.apply_reload(generation, items, end, cx)
+                    }
                     Err(_) => grid.feed.reload_failed(generation),
                 }
                 if generation == grid.feed.generation() {
@@ -622,6 +694,9 @@ impl StoreGrid {
         let CardSize::Image { .. } = self.config.card else {
             return;
         };
+        if self.hidden {
+            return;
+        }
         let Some(images) = RemoteImages::global(cx) else {
             return;
         };
