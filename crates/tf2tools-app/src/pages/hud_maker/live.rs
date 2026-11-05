@@ -15,6 +15,7 @@ use crate::activity;
 use crate::ids;
 use crate::services::Services;
 use crate::shell::toast::{ToastKind, toast};
+use crate::widgets::Named as _;
 
 /// The console command that reloads a HUD's layouts and colours in a running TF2.
 pub const RELOAD_COMMAND: &str = "hud_reloadscheme";
@@ -123,7 +124,7 @@ impl HudMakerPage {
             .ghost()
             .small()
             .icon(IconName::Close)
-            .accessibility_label("Close")
+            .named("Close")
             .flex_none()
             .on_click(cx.listener(|page, _, _, cx| {
                 page.live_note = false;

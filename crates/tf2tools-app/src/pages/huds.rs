@@ -46,6 +46,7 @@ use crate::shell::font_check::ask_about_fonts;
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, error_label, toast, toast_error};
 use crate::timing;
+use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::carousel::open_lightbox;
 use crate::widgets::labelled;
@@ -1176,6 +1177,7 @@ fn hud_card(
                     Button::new(ids::hud_delete(folder))
                         .ghost()
                         .icon(IconName::Trash)
+                        .named("Delete from library")
                         .loading(deleting)
                         .disabled(busy.is_some() && !deleting)
                         .on_click(on_page(HudsPage::delete)),

@@ -35,6 +35,7 @@ use crate::store_detail::{DetailItem, open_detail};
 use crate::store_download::{DownloadEvent, StoreDownloads, download_button};
 use crate::store_messages::read_failed;
 use crate::sync::{SyncEvent, sync_hub};
+use crate::widgets::Named as _;
 use crate::widgets::card_grid::{CardGrid, SHELL_CHROME_WIDTH, columns_for_store};
 use crate::widgets::labelled;
 use crate::widgets::store_error::store_error_line;
@@ -304,6 +305,8 @@ impl CuratedTab {
             .children(Os::ALL.map(|os| {
                 Toggle::new(ids::store_filter_os(os.key()))
                     .label(os.label())
+                    // The kit's toggle reads its name from the tooltip, not the label.
+                    .tooltip(format!("HUDs that work on {}", os.label()))
                     .checked(self.filter.os.contains(&os))
                     .px_3()
                     .font_weight(FontWeight::MEDIUM)
@@ -583,6 +586,7 @@ fn curated_card(hud: &CuratedHud, downloaded: bool, cx: &App) -> AnyElement {
             .ghost()
             .flex_none()
             .icon(IconName::ExternalLink)
+            .named("Visit the HUD's page")
             .size(px(36.))
             .on_click(move |_, _, cx| {
                 // The card itself opens the detail, so the click stops here.

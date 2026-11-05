@@ -29,6 +29,7 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_download::StoreDownloads;
+use crate::widgets::Named as _;
 use crate::widgets::card_grid::{SHELL_CHROME_WIDTH, columns_for, stretch_rows};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
@@ -577,7 +578,7 @@ fn addon_card(addon: &AddonEntry, state: &CardState, cx: &mut Context<AddonsPage
                         .disabled(disabled(action))
                         .on_click(on(action));
                     if beside_update {
-                        button.into_any_element()
+                        button.named("Uninstall").into_any_element()
                     } else {
                         button.flex_1().label("Uninstall").into_any_element()
                     }
@@ -585,7 +586,7 @@ fn addon_card(addon: &AddonEntry, state: &CardState, cx: &mut Context<AddonsPage
                 AddonAction::Delete => Button::new(ids::addon_delete(name))
                     .ghost()
                     .icon(Icon::new(IconName::Trash).text_color(danger))
-                    .tooltip("Remove from library")
+                    .named("Remove from library")
                     .disabled(disabled(action))
                     .on_click(on(action))
                     .into_any_element(),

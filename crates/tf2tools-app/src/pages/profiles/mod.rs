@@ -44,6 +44,7 @@ use crate::shell::font_check::ask_about_fonts;
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_detail::{DetailItem, open_detail};
+use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 use crate::widgets::labelled;
@@ -1089,6 +1090,7 @@ fn profile_card(
                     Button::new(ids::profile_edit(id))
                         .outline()
                         .icon(IconName::Pencil)
+                        .named("Edit profile")
                         .disabled(busy)
                         .on_click(on_edit),
                 )
@@ -1096,6 +1098,7 @@ fn profile_card(
                     Button::new(ids::profile_delete(id))
                         .outline()
                         .icon(IconName::Trash)
+                        .named("Delete profile")
                         .disabled(busy)
                         .on_click(on_delete),
                 ),

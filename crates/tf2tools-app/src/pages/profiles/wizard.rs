@@ -30,6 +30,7 @@ use crate::ids;
 use crate::local_messages::{describe_library, describe_profile};
 use crate::services::{Services, run_blocking};
 use crate::shell::toast::{ToastKind, toast, toast_error};
+use crate::widgets::Named as _;
 use crate::widgets::crosshair_picker::CrosshairPicker;
 use crate::widgets::dialog_frame::{DETAIL_WIDTH, DialogFrame};
 use crate::widgets::labelled;
@@ -688,14 +689,21 @@ impl ProfileWizard {
                     .iter()
                     .find(|s| s.id() == &sound)
                     .map(|s| SharedString::from(s.folder_name().to_owned()));
-                let icon = if folder.is_some() && folder == playing {
-                    IconName::Square
+                let (icon, words) = if folder.is_some() && folder == playing {
+                    (IconName::Square, "Stop")
                 } else {
-                    IconName::Play
+                    (IconName::Play, "Play")
                 };
-                Some(Button::new(play_id).outline().small().icon(icon).on_click(
-                    cx.listener(move |wizard, _, _, cx| wizard.preview(sound.clone(), cx)),
-                ))
+                Some(
+                    Button::new(play_id)
+                        .outline()
+                        .small()
+                        .icon(icon)
+                        .named(words)
+                        .on_click(
+                            cx.listener(move |wizard, _, _, cx| wizard.preview(sound.clone(), cx)),
+                        ),
+                )
             }
             _ => None,
         };

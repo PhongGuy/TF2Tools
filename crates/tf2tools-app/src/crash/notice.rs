@@ -12,6 +12,7 @@ use gpui_kit::{
 use crate::ids;
 use crate::shell::toast::{ToastKind, toast};
 use crate::updater::view::BANNER_HEIGHT;
+use crate::widgets::Named as _;
 use crate::widgets::labelled;
 
 pub const NOTICE: &str = "TF2Tools closed unexpectedly last time.";
@@ -70,6 +71,7 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
     let dismiss = Button::new(ids::CRASH_BANNER_DISMISS)
         .ghost()
         .icon(IconName::X)
+        .named("Close")
         .small()
         .flex_none()
         .on_click(move |_, _, cx| notice.update(cx, |n, cx| n.dismiss(cx)));

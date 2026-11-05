@@ -34,6 +34,7 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
+use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::labelled;
 
@@ -503,7 +504,7 @@ impl SoundsPage {
                                         IconName::Play
                                     })
                                     .size(px(32.))
-                                    .tooltip(if playing { "Stop" } else { "Play" })
+                                    .named(if playing { "Stop" } else { "Play" })
                                     .on_click(cx.listener(move |page, _, window, cx| {
                                         page.play_slot(kind, name.clone(), window, cx)
                                     })),
@@ -721,7 +722,7 @@ fn sound_card(
                                 } else {
                                     IconName::Play
                                 })
-                                .tooltip(if playing { "Stop" } else { "Play" })
+                                .named(if playing { "Stop" } else { "Play" })
                                 .on_click(on_card(page, sound, SoundsPage::play_sound)),
                         )
                         .child(
@@ -729,6 +730,7 @@ fn sound_card(
                                 .ghost()
                                 .px(SM_ICON_PX)
                                 .icon(IconName::Trash)
+                                .named("Delete from library")
                                 .loading(deleting)
                                 .disabled(busy.is_some() && !deleting)
                                 .on_click(on_card(page, sound, SoundsPage::delete)),

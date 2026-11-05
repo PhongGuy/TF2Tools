@@ -225,6 +225,7 @@ impl HudMakerPage {
             .ghost()
             .xsmall()
             .icon(IconName::RotateCcw)
+            .accessibility_label(RESET_TIP)
             .disabled(!editor.picture_changed())
             .on_click(cx.listener(|page, _, window, cx| {
                 page.edit_selected(window, cx, |e| {

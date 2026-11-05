@@ -18,6 +18,7 @@ use super::{HEADER_HEIGHT, Shell};
 use crate::ids;
 use crate::services::{Tf2State, tf2_state};
 use crate::sync::{store_name, store_slug, sync_hub};
+use crate::widgets::Named as _;
 use crate::widgets::sync_ring::{RingColors, SyncRing};
 
 /// Element `header`, `HEADER_HEIGHT` tall, titled for `page`.
@@ -42,7 +43,7 @@ pub(super) fn render(page: Page, cx: &mut Context<Shell>) -> impl IntoElement + 
                 .icon(IconName::PanelLeft)
                 // v5's `size-7` trigger around a 16 px icon: medium icon, 28 px box.
                 .size(px(28.))
-                .tooltip("Toggle Sidebar")
+                .named("Toggle Sidebar")
                 .on_click(cx.listener(|shell, _, window, cx| shell.toggle_sidebar(window, cx))),
         )
         .child(
