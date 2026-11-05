@@ -415,3 +415,59 @@ fn a_starter_the_editor_refuses_leaves_the_page_alone(cx: &mut TestAppContext) {
     );
     assert_eq!(undo_depth(cx, &page), 0);
 }
+
+// The 64x64 Cross with gap from the bug report: arms on the canvas's edge columns and rows.
+#[gpui_kit::test]
+fn the_starter_preview_shows_the_whole_canvas(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = shell(cx, &env);
+    let page = open_maker(cx, &s);
+    let _dialog = open_starters(cx, &s, &page);
+    support::click_id(
+        cx,
+        s.win,
+        ids::crosshair_maker_starter(Starter::CrossWithGap.slug()),
+    );
+    let frame = support::bounds_of(cx, s.win, ids::CROSSHAIR_MAKER_STARTER_PREVIEW).unwrap();
+    let picture = support::bounds_of(cx, s.win, ids::CROSSHAIR_MAKER_STARTER_PICTURE).unwrap();
+    // Two pixels a cell, inside the frame's 1 px border on every side.
+    assert_eq!(picture.size.width, gpui_kit::px(128.), "{picture:?}");
+    assert_eq!(picture.size.height, gpui_kit::px(128.), "{picture:?}");
+    let border = gpui_kit::px(1.);
+    assert!(
+        picture.left() >= frame.left() + border
+            && picture.right() <= frame.right() - border
+            && picture.top() >= frame.top() + border
+            && picture.bottom() <= frame.bottom() - border,
+        "the picture {picture:?} spills out of the frame {frame:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn a_wider_gap_shortens_the_longest_arm_on_offer(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = shell(cx, &env);
+    let page = open_maker(cx, &s);
+    let dialog = open_starters(cx, &s, &page);
+    support::click_id(
+        cx,
+        s.win,
+        ids::crosshair_maker_starter(Starter::CrossWithGap.slug()),
+    );
+    let length_max = |cx: &mut TestAppContext| {
+        cx.update(|cx| dialog.read(cx).slider(Param::Length).read(cx).max_value())
+    };
+    assert_eq!(length_max(cx), 28.);
+    set_slider(cx, &s, &dialog, Param::Length, 32.);
+    set_slider(cx, &s, &dialog, Param::Thickness, 16.);
+    set_slider(cx, &s, &dialog, Param::Gap, 31.);
+    assert_eq!(length_max(cx), 1.);
+    assert_eq!(
+        value_label(cx, &s, Param::Length).as_deref(),
+        Some("Length: 1 px")
+    );
+    assert_eq!(cx.update(|cx| dialog.read(cx).params(cx)).length, 1);
+    // Narrowing the gap again offers the room back.
+    set_slider(cx, &s, &dialog, Param::Gap, 4.);
+    assert_eq!(length_max(cx), 28.);
+}

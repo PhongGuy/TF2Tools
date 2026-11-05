@@ -57,6 +57,23 @@ impl Starter {
         }
     }
 
+    /// `(min, max, step)` of `param` for this shape at `size`, given the other sliders: a Cross
+    /// with gap's arms must end on the canvas, so its Length tops out at what the Gap leaves.
+    pub fn limits(self, param: Param, params: StarterParams, size: CanvasSize) -> (u32, u32, u32) {
+        let (min, max, step) = param.limits(size);
+        if self == Starter::CrossWithGap && param == Param::Length {
+            let gap = Param::Gap.snap(size, params.gap as f32);
+            return (min, max.min(size.side() / 2 - gap).max(min), step);
+        }
+        (min, max, step)
+    }
+
+    /// `param`'s value in `params` as the nearest step inside `limits`.
+    pub fn snap(self, param: Param, params: StarterParams, size: CanvasSize) -> u32 {
+        let (min, max, _) = self.limits(param, params, size);
+        param.snap(size, params.get(param) as f32).clamp(min, max)
+    }
+
     /// The sliders' starting values at `size`; a Dot starts small, everything else at half.
     pub fn defaults(self, size: CanvasSize) -> StarterParams {
         let n = size.side();
@@ -158,7 +175,7 @@ impl StarterParams {
 /// snapped to its slider's limits first.
 pub fn starter_cells(shape: Starter, params: StarterParams, size: CanvasSize) -> Vec<(u32, u32)> {
     let n = size.side();
-    let snap = |param: Param| param.snap(size, params.get(param) as f32);
+    let snap = |param: Param| shape.snap(param, params, size);
     let (length, thickness, span) = (
         snap(Param::Length),
         snap(Param::Thickness),

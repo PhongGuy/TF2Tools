@@ -490,6 +490,8 @@ pub const CROSSHAIR_MAKER_IMPORT_PNG: &str = "crosshair-maker-import-png";
 pub const CROSSHAIR_MAKER_STARTER_DIALOG: &str = "crosshair-maker-starter-dialog";
 /// The dialog's live preview, labelled "<shape> preview".
 pub const CROSSHAIR_MAKER_STARTER_PREVIEW: &str = "crosshair-maker-starter-preview";
+/// The drawing inside the starter preview's frame.
+pub const CROSSHAIR_MAKER_STARTER_PICTURE: &str = "crosshair-maker-starter-picture";
 /// The dialog's Cancel button.
 pub const CROSSHAIR_MAKER_STARTER_CANCEL: &str = "crosshair-maker-starter-cancel";
 /// The starter dialog's Use button.
