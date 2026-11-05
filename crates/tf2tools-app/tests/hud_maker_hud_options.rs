@@ -11,7 +11,7 @@ use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    HudEntry, LibraryKind, OptionKind, OptionValue, PartKey, Platform, Provenance, Tf2Install,
+    HudEntry, LibraryKind, OptionKind, OptionValue, PartKey, Platform, Tf2Install,
 };
 
 type Opened = (
@@ -374,7 +374,7 @@ fn a_page_opened_before_an_update_refuses_to_save(cx: &mut TestAppContext) {
         env.tmp.path(),
         "somehud",
         &refs,
-        Provenance::Local,
+        support::hud_copies::store_item(),
     );
     let tf = Tf2Install::from_path(&env.game).unwrap().tf_dir();
     s.services
