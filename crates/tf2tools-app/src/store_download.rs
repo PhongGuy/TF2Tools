@@ -335,11 +335,15 @@ impl StoreDownloads {
         let Some(target) = self.active.take() else {
             return;
         };
-        // A HUD that had to take a numbered name says so; anything else names the store item.
+        // A HUD or crosshair that had to take a numbered name says so; anything else names
+        // the store item.
         let added = match &result {
             Ok(Ok(entries)) => entries.iter().find_map(|entry| match entry {
                 LibraryEntry::Hud(hud) if hud.wanted_name().is_some() => {
                     Some(crate::pages::huds::added_message(hud))
+                }
+                LibraryEntry::Crosshair(c) if c.wanted_name().is_some() => {
+                    Some(crate::pages::crosshairs::added_message(c))
                 }
                 _ => None,
             }),

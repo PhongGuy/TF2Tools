@@ -129,6 +129,46 @@ fn a_downloaded_crosshair_lands_on_the_crosshairs_page(cx: &mut TestAppContext) 
 }
 
 #[gpui_kit::test]
+fn a_download_whose_name_is_taken_names_the_numbered_one(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_gb_files(
+        7,
+        &[("cross.zip", support::crosshair_zip_bytes())],
+        Duration::ZERO,
+    );
+    let s = support::shell_window(
+        cx,
+        &env,
+        Tf2State::Found(Tf2Install::from_path(&env.game).unwrap()),
+    );
+    support::store_ready(cx, &server);
+    support::seed_crosshairs(&env, [7], 0, false);
+    // The player's own crosshair already holds the store item's name.
+    support::seed_crosshair(&s.services, &env, "Cross 7");
+    support::click_id(cx, s.win, ids::nav(Page::CrosshairStore));
+    let page = cx
+        .update(|cx| s.shell.read(cx).crosshair_store_page())
+        .expect("the page");
+    support::wait_real(cx, "the grid", |cx| {
+        cx.update(|cx| page.read(cx).grid().read(cx).is_loaded())
+    });
+    support::click_id(cx, s.win, ids::store_download(C, &gb(7)));
+    support::wait_real(cx, "the file row", |cx| {
+        support::present(cx, s.win, ids::store_file(0))
+    });
+    support::click_id(cx, s.win, ids::store_file(0));
+    support::wait_real(cx, "the toast", |cx| {
+        support::present(cx, s.win, ids::TOAST)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::TOAST).as_deref(),
+        Some("Crosshair downloaded. Added to your library as Cross 7 (2)")
+    );
+    assert_eq!(s.services.library.list_crosshairs().unwrap().len(), 2);
+}
+
+#[gpui_kit::test]
 fn the_store_detail_is_padded_like_v5(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();

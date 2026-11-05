@@ -295,6 +295,38 @@ fn import_adds_the_picked_png(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn an_import_whose_name_is_taken_keeps_both_and_names_the_new_one(cx: &mut TestAppContext) {
+    let env = support::env();
+    let path = env.tmp.path().join("picked/Ring.png");
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(&path, support::crosshair_png([255, 0, 0, 255])).unwrap();
+    let picker = Arc::new(ScriptedPicker::new([path]));
+    let s = support::shell_window_with(cx, &env, found(&env), picker, support::no_steam());
+    let first = support::seed_crosshair(&s.services, &env, "Ring");
+    open_crosshairs(cx, &s);
+    support::click_id(cx, s.win, ids::CROSSHAIRS_IMPORT);
+    support::wait_real(cx, "the toast", |cx| {
+        support::present(cx, s.win, ids::TOAST)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::TOAST).as_deref(),
+        Some("Crosshair imported. Added to your library as Ring (2)")
+    );
+    let mut names: Vec<_> = s
+        .services
+        .library
+        .list_crosshairs()
+        .unwrap()
+        .iter()
+        .map(|c| (c.id().clone(), c.name().to_owned()))
+        .collect();
+    names.sort_by(|a, b| a.1.cmp(&b.1));
+    assert_eq!(names.len(), 2);
+    assert_eq!(names[0], (first.id().clone(), "Ring".to_owned()));
+    assert_eq!(names[1].1, "Ring (2)");
+}
+
+#[gpui_kit::test]
 fn a_failed_load_records_no_timings(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
