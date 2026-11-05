@@ -132,6 +132,16 @@ impl ProfilesPage {
         &self.search
     }
 
+    /// The page's own scroll handle, which moves the active card, search and grid together.
+    pub fn page_scroll(&self) -> ScrollHandle {
+        self.scroll.clone()
+    }
+
+    /// The profile grid's scroll handle; its offset is what the grid drew.
+    pub fn grid_scroll(&self) -> ScrollHandle {
+        self.grid.scroll_handle().0.borrow().base_handle.clone()
+    }
+
     /// The Save Current dialog's name field.
     pub fn save_name_input(&self) -> &Entity<InputState> {
         &self.save_name
