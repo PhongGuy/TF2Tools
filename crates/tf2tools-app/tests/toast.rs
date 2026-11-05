@@ -40,14 +40,14 @@ fn an_op_error_toast_shows_the_action_and_the_core_message(cx: &mut TestAppConte
 }
 
 #[gpui_kit::test]
-fn the_no_tf2_toast_is_v5s_text(cx: &mut TestAppContext) {
+fn the_no_tf2_toast_says_what_to_do(cx: &mut TestAppContext) {
     support::init(cx);
     let win = support::blank_window(cx);
     cx.update_window(win, |_, w, cx| toast_error(w, cx, &OpError::NoTf2))
         .unwrap();
     assert_eq!(
         support::label_of(cx, win, "toast").as_deref(),
-        Some("TF2 path not set")
+        Some("TF2 not found. Set the TF2 folder in Settings, then try again.")
     );
 }
 

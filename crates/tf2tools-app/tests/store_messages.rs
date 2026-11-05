@@ -471,7 +471,7 @@ fn addon_update_errors_read_as_player_advice() {
         no_tf2(),
         StoreFailure::new(
             "Set your TF2 folder in Settings, then try again.",
-            "TF2 path not set"
+            "TF2 not found: Set the TF2 folder in Settings, then try again."
         )
     );
     assert_eq!(

@@ -364,7 +364,7 @@ impl Render for Shell {
         // Every page has its arm here; the page entity is built on first draw, since its
         // inputs need the window.
         let body = match self.page {
-            // Edit in HUD Maker asks for the maker by event; the subscription dies with the page.
+            // Edit in HUD Maker and the TF2 notice ask by event; subscriptions die with the page.
             Page::Huds => {
                 let preloaded = &mut self.preloaded_huds;
                 self.huds
@@ -377,17 +377,29 @@ impl Render for Shell {
                             shell.edit_hud(edit.0.clone(), cx)
                         })
                         .detach();
+                        cx.subscribe(&page, |shell, _, nav: &NavigateTo, cx| {
+                            shell.navigate(nav.0, cx)
+                        })
+                        .detach();
                         page
                     })
                     .clone()
                     .into_any_element()
             }
+            // Its TF2 notice asks for Settings by event, as the other pages here do.
             Page::Sounds => self
                 .sounds
-                .get_or_insert_with(|| cx.new(|cx| SoundsPage::new(window, cx)))
+                .get_or_insert_with(|| {
+                    let page = cx.new(|cx| SoundsPage::new(window, cx));
+                    cx.subscribe(&page, |shell, _, nav: &NavigateTo, cx| {
+                        shell.navigate(nav.0, cx)
+                    })
+                    .detach();
+                    page
+                })
                 .clone()
                 .into_any_element(),
-            // Edit and Copy ask for the maker by event; the subscriptions die with the page.
+            // Edit, Copy and the TF2 notice ask by event; the subscriptions die with the page.
             Page::Crosshairs => self
                 .crosshairs
                 .get_or_insert_with(|| {
@@ -398,6 +410,10 @@ impl Render for Shell {
                     .detach();
                     cx.subscribe(&page, |shell, _, copy: &CopyToMaker, cx| {
                         shell.copy_to_maker(copy.0.clone(), cx)
+                    })
+                    .detach();
+                    cx.subscribe(&page, |shell, _, nav: &NavigateTo, cx| {
+                        shell.navigate(nav.0, cx)
                     })
                     .detach();
                     page

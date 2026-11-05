@@ -1,17 +1,22 @@
 //! Building blocks the pages share: v5's card frame, badges, empty state and skeletons.
 
 use gpui_kit::assets::IconName;
+use gpui_kit::component::button::Button;
 use gpui_kit::component::skeleton::Skeleton;
 use gpui_kit::component::tag::Tag;
-use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, h_flex, v_flex};
+use gpui_kit::component::{
+    ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
+};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, App, Div, ElementId, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    MouseButton, ParentElement, Pixels, Role, SharedString, StatefulInteractiveElement, Styled,
-    TestSupportExt as _, Window, div, px, rgb, transparent_black,
+    AnyElement, App, Context, Div, ElementId, EventEmitter, FontWeight, Hsla,
+    InteractiveElement as _, IntoElement, MouseButton, ParentElement, Pixels, Role, SharedString,
+    StatefulInteractiveElement, Styled, TestSupportExt as _, Window, div, px, rgb,
+    transparent_black,
 };
 
 use crate::ids;
+use crate::shell::route::{NavigateTo, Page};
 use crate::widgets::labelled;
 
 /// v5's size-sm button with an icon (h-8 px-2.5): kit Medium height with this padding.
@@ -159,8 +164,46 @@ fn pill(tag: Tag, border: Hsla, text: SharedString, truncate: bool) -> Div {
     })
 }
 
+/// The hover reason on an action that writes into the game while no TF2 folder is known.
+pub(crate) const NEEDS_TF2: &str = "Set the TF2 folder in Settings first";
+
+/// Shuts `button`, an action that writes into the game, while `has_tf2` is false and says why
+/// on hover. Call it after the button's own `disabled`, which it would otherwise lose to.
+pub(crate) fn needs_tf2(button: Button, has_tf2: bool) -> Button {
+    if has_tf2 {
+        button
+    } else {
+        button.disabled(true).tooltip(NEEDS_TF2)
+    }
+}
+
 /// v5's orange "TF2 path not set" alert with `body` below the title; the caller decides when.
 pub(crate) fn no_tf2_warning(id: &'static str, body: &'static str, cx: &App) -> AnyElement {
+    tf2_alert(id, body, None, cx)
+}
+
+/// `no_tf2_warning` with an "Open Settings" button (`settings_id`) that asks the shell for
+/// the Settings page, for pages whose actions wait on the TF2 folder.
+pub(crate) fn no_tf2_notice<T: EventEmitter<NavigateTo>>(
+    id: &'static str,
+    settings_id: &'static str,
+    body: &'static str,
+    cx: &mut Context<T>,
+) -> AnyElement {
+    let settings = Button::new(settings_id)
+        .outline()
+        .small()
+        .label("Open Settings")
+        .on_click(cx.listener(|_, _, _, cx| cx.emit(NavigateTo(Page::Settings))));
+    tf2_alert(id, body, Some(settings.into_any_element()), cx)
+}
+
+fn tf2_alert(
+    id: &'static str,
+    body: &'static str,
+    action: Option<AnyElement>,
+    cx: &App,
+) -> AnyElement {
     let orange: Hsla = rgb(ORANGE_500).into();
     let muted = cx.theme().muted_foreground;
     h_flex()
@@ -190,7 +233,8 @@ pub(crate) fn no_tf2_warning(id: &'static str, body: &'static str, cx: &App) -> 
                         .text_color(orange)
                         .child("TF2 path not set"),
                 )
-                .child(div().text_sm().text_color(muted).child(body)),
+                .child(div().text_sm().text_color(muted).child(body))
+                .children(action.map(|action| div().mt_3().child(action))),
         )
         .into_any_element()
 }

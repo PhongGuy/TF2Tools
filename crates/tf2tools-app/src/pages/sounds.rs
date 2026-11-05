@@ -12,9 +12,9 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, ClickEvent, Context, ElementId, Entity,
-    FontWeight, Hsla, InteractiveElement as _, IntoElement, ParentElement as _, Render, Role,
-    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
-    WeakEntity, Window, div, px, rgb, transparent_black,
+    EventEmitter, FontWeight, Hsla, InteractiveElement as _, IntoElement, ParentElement as _,
+    Render, Role, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
+    TestSupportExt as _, WeakEntity, Window, div, px, rgb, transparent_black,
 };
 
 use tf2tools_core::{
@@ -22,17 +22,17 @@ use tf2tools_core::{
     SoundKind,
 };
 
-use super::common::{SM_ICON_PX, YELLOW_500, badge_of, card_frame};
+use super::common::{SM_ICON_PX, YELLOW_500, badge_of, card_frame, needs_tf2, no_tf2_notice};
 use crate::activity;
 use crate::audio::player::{NowPlaying, Player, sound_player};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_import, describe_library, describe_tf2_install};
 use crate::picker::PickKind;
-use crate::services::{OpError, Services, require_tf2, run_blocking, tf2_state};
+use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
-use crate::shell::route::Page;
+use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
@@ -48,6 +48,9 @@ enum Busy {
     Delete(String),
     Uninstall(SoundKind),
 }
+
+// Its TF2 notice asks the shell for the Settings page.
+impl EventEmitter<NavigateTo> for SoundsPage {}
 
 /// The Sounds page. Built fresh on each visit and plays through the app's one player; it
 /// reloads whenever the TF2 state changes.
@@ -515,7 +518,7 @@ impl SoundsPage {
                                 slot.name,
                             )),
                     )
-                    .child(
+                    .child(needs_tf2(
                         Button::new(ids::sound_slot_uninstall(kind))
                             .outline()
                             .px(SM_ICON_PX)
@@ -530,7 +533,8 @@ impl SoundsPage {
                             .on_click(cx.listener(move |page, _, window, cx| {
                                 page.uninstall(kind, window, cx)
                             })),
-                    )
+                        tf2_state(cx).read(cx).install().is_some(),
+                    ))
                     .into_any_element()
             }
             None => labelled(
@@ -660,9 +664,10 @@ fn sound_card(
 ) -> AnyElement {
     let folder = sound.folder_name();
     let deleting = busy == Some(&Busy::Delete(folder.to_owned()));
+    let has_tf2 = tf2_state(cx).read(cx).install().is_some();
     let install = |id: ElementId, kind: SoundKind, icon: IconName, label: &'static str| {
         let installing = busy == Some(&Busy::Install(folder.to_owned(), kind));
-        Button::new(id)
+        let button = Button::new(id)
             .outline()
             .px(SM_ICON_PX)
             .icon(icon)
@@ -671,7 +676,8 @@ fn sound_card(
             .disabled(busy.is_some() && !installing)
             .on_click(on_card(page, sound, move |page, entry, window, cx| {
                 page.install(entry, kind, window, cx)
-            }))
+            }));
+        needs_tf2(button, has_tf2)
     };
     let vpk = (sound.format() == SoundFormat::Vpk).then(|| {
         badge_of(
@@ -867,6 +873,15 @@ impl Render for SoundsPage {
             .installed
             .as_ref()
             .and_then(|installed| conflict_box(installed, cx));
+        let missing = matches!(tf2_state(cx).read(cx), Tf2State::Missing { .. });
+        let warning = missing.then(|| {
+            no_tf2_notice(
+                ids::SOUNDS_NO_TF2,
+                ids::SOUNDS_NO_TF2_SETTINGS,
+                "Set the TF2 folder in Settings to install sounds.",
+                cx,
+            )
+        });
         v_flex()
             .id(ids::page(Page::Sounds))
             .test_support()
@@ -874,6 +889,7 @@ impl Render for SoundsPage {
             .size_full()
             .p(CONTENT_PADDING)
             .gap_6()
+            .children(warning)
             .child(slots)
             .children(conflicts)
             .child(self.library(cx))
