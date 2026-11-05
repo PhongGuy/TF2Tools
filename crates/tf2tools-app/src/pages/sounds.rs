@@ -424,22 +424,16 @@ struct Slot {
 }
 
 impl SoundsPage {
-    // A managed install shows its library sound's name; anything else shows v5's file text.
+    // A managed install shows its library sound's name; a file no library sound matches
+    // says so in the words the HUDs page uses, never its file name.
     fn slot(&self, kind: SoundKind) -> Option<Slot> {
         let slot = self.installed.as_ref()?.slot(kind);
-        let active = slot.active()?;
-        let vpk = active == SoundFormat::Vpk;
+        let vpk = slot.active()? == SoundFormat::Vpk;
         let name = slot
             .managed()
             .and_then(|id| self.sounds.iter().find(|s| s.id() == id))
             .map_or_else(
-                || {
-                    if vpk {
-                        format!("VPK {}", kind.name())
-                    } else {
-                        format!("{}.wav", kind.name())
-                    }
-                },
+                || "A sound added outside TF2Tools".to_owned(),
                 |s| s.name().to_owned(),
             );
         Some(Slot { name, vpk })

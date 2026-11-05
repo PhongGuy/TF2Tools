@@ -296,7 +296,7 @@ fn an_installed_vpk_shows_the_vpk_badge(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn a_hand_placed_hitsound_shows_v5s_file_name(cx: &mut TestAppContext) {
+fn a_hand_placed_hitsound_says_it_came_from_outside_tf2tools(cx: &mut TestAppContext) {
     let env = support::env();
     place(&env, "tf2tools-sounds", "hitsound.wav");
     let s = support::shell_window(cx, &env, found(&env));
@@ -308,7 +308,52 @@ fn a_hand_placed_hitsound_shows_v5s_file_name(cx: &mut TestAppContext) {
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::sound_slot_name(hit)).as_deref(),
-        Some("hitsound.wav")
+        Some("A sound added outside TF2Tools")
+    );
+}
+
+#[gpui_kit::test]
+fn a_hand_placed_vpk_killsound_says_it_came_from_outside_tf2tools(cx: &mut TestAppContext) {
+    let env = support::env();
+    let pak = support::vpk_bytes(&[("sound/ui/killsound.wav", &wav(441))]);
+    std::fs::write(env.game.join("tf/custom/tf2tools-killsound.vpk"), pak).unwrap();
+    let s = support::shell_window(cx, &env, found(&env));
+    let _page = open_sounds(cx, &s);
+    let kill = SoundKind::Killsound;
+    assert_eq!(
+        support::label_of(cx, s.win, ids::sound_slot_vpk(kill)).as_deref(),
+        Some("VPK")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::sound_slot_name(kill)).as_deref(),
+        Some("A sound added outside TF2Tools")
+    );
+}
+
+#[gpui_kit::test]
+fn deleting_the_installed_wav_empties_its_slot(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let ding = seed(&s, &env, "Ding", "wav", &wav(441));
+    s.services
+        .library
+        .install_sound(ding.id(), SoundKind::Hitsound, &tf2(&env))
+        .unwrap();
+    let _page = open_sounds(cx, &s);
+    support::click_id(cx, s.win, ids::sound_delete(ding.folder_name()));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::wait_real(cx, "the delete toast", |cx| {
+        support::present(cx, s.win, ids::TOAST)
+    });
+    let hit = SoundKind::Hitsound;
+    assert_eq!(
+        support::label_of(cx, s.win, ids::sound_slot_status(hit)).as_deref(),
+        Some("None")
+    );
+    assert!(
+        !env.game
+            .join("tf/custom/tf2tools-sounds/sound/ui/hitsound.wav")
+            .exists()
     );
 }
 

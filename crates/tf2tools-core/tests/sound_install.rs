@@ -206,14 +206,20 @@ fn deleting_an_installed_vpk_sound_uninstalls_it() {
 }
 
 #[test]
-fn deleting_an_installed_wav_sound_keeps_the_installed_copy() {
+fn deleting_an_installed_wav_sound_uninstalls_it() {
     let env = library_env();
     let sound = import_wav(&env, "Ding");
     env.lib
         .install_sound(sound.id(), SoundKind::Hitsound, &env.tf2)
         .unwrap();
     env.lib.delete_sound(sound.id(), Some(&env.tf2)).unwrap();
-    assert!(env.tf2.custom_dir().join(UI).join("hitsound.wav").is_file());
+    assert!(!env.tf2.custom_dir().join(UI).join("hitsound.wav").exists());
+    assert_eq!(
+        setting(&env.dir, "installed_hitsound_folder").as_deref(),
+        Some("")
+    );
+    let scan = env.lib.installed_sounds(&env.tf2).unwrap();
+    assert_eq!(scan.slot(SoundKind::Hitsound).active(), None);
     assert!(env.lib.list_sounds().unwrap().is_empty());
 }
 

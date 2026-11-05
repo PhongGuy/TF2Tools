@@ -83,6 +83,20 @@ fn a_foreign_sound_file_is_not_saved() {
 }
 
 #[test]
+fn a_deleted_installed_sound_is_gone_from_the_game_and_the_saved_profile() {
+    let env = library_env();
+    let hit = import_wav_as(&env, "Ding", Provenance::Local);
+    env.lib
+        .install_sound(hit.id(), SoundKind::Hitsound, &env.tf2)
+        .unwrap();
+    env.lib.delete_sound(hit.id(), Some(&env.tf2)).unwrap();
+    let p = env.lib.save_current_profile("After", &env.tf2).unwrap();
+    assert!(p.hitsound().is_none());
+    let scan = env.lib.installed_sounds(&env.tf2).unwrap();
+    assert_eq!(scan.slot(SoundKind::Hitsound).active(), None);
+}
+
+#[test]
 fn save_current_refuses_a_blank_name() {
     let env = library_env();
     assert!(matches!(
