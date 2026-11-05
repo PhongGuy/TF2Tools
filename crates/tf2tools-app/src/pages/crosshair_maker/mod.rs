@@ -62,9 +62,11 @@ use starter_dialog::StarterDialog;
 
 /// The side panel's width; the grid takes the rest.
 const PANEL_WIDTH: Pixels = px(280.);
-/// The side panel's width in a window narrower than NARROW_WINDOW.
-const NARROW_PANEL_WIDTH: Pixels = px(232.);
+/// The side panel's width in a window narrower than NARROW_WINDOW; its Save row wraps.
+const NARROW_PANEL_WIDTH: Pixels = px(200.);
 const NARROW_WINDOW: Pixels = px(1024.);
+/// The page's padding in a narrow window, as the HUD Maker's, so the grid keeps 6 px cells.
+const NARROW_PADDING: Pixels = px(16.);
 /// A toolbar group's lead: the divider's width with the space around it, 4 + 1 + 4 + 4.
 const DIVIDER_LEAD: Pixels = px(13.);
 /// The preview box, as on the Crosshairs page; the texture inside is drawn at its 64 px.
@@ -741,6 +743,7 @@ impl CrosshairMakerPage {
             .children(error)
             .child(
                 h_flex()
+                    .flex_wrap()
                     .gap_2()
                     .child(
                         Button::new(ids::CROSSHAIR_MAKER_SAVE)
@@ -1699,11 +1702,36 @@ fn size_label(side: u32) -> String {
 
 impl Render for CrosshairMakerPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let panel_width = if window.viewport_size().width < NARROW_WINDOW {
-            NARROW_PANEL_WIDTH
+        let narrow = window.viewport_size().width < NARROW_WINDOW;
+        let (panel_width, padding) = if narrow {
+            (NARROW_PANEL_WIDTH, NARROW_PADDING)
         } else {
-            PANEL_WIDTH
+            (PANEL_WIDTH, CONTENT_PADDING)
         };
+        // A wide window wraps the toolbar inside the canvas column. A narrow one runs it across
+        // the grid and the panel both, so it keeps to two rows and the grid keeps its height.
+        let toolbar = Some(self.toolbar(cx).into_any_element());
+        let (above, inside) = if narrow {
+            (toolbar, None)
+        } else {
+            (None, toolbar)
+        };
+        let grid = self.grid(cx);
+        let column = v_flex()
+            .flex_1()
+            .min_w_0()
+            .min_h_0()
+            .h_full()
+            .gap_4()
+            .children(inside)
+            .child(grid);
+        let row = h_flex()
+            .flex_1()
+            .min_h_0()
+            .w_full()
+            .gap_4()
+            .child(column)
+            .child(self.panel(panel_width, cx));
         v_flex()
             .id(ids::page(Page::CrosshairMaker))
             .test_support()
@@ -1748,27 +1776,9 @@ impl Render for CrosshairMakerPage {
             )
             .on_action(cx.listener(|page, _: &FitGrid, _, cx| page.zoom(cx, Viewport::fit)))
             .size_full()
-            .p(CONTENT_PADDING)
+            .p(padding)
             .gap_4()
-            .child(
-                h_flex()
-                    .flex_1()
-                    .min_h_0()
-                    .w_full()
-                    .gap_4()
-                    // The toolbar wraps inside the canvas column, so a narrow window costs the
-                    // grid a row of height instead of drawing buttons over the side panel.
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .min_w_0()
-                            .min_h_0()
-                            .h_full()
-                            .gap_4()
-                            .child(self.toolbar(cx))
-                            .child(self.grid(cx)),
-                    )
-                    .child(self.panel(panel_width, cx)),
-            )
+            .children(above)
+            .child(row)
     }
 }

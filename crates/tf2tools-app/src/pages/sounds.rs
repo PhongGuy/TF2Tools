@@ -13,8 +13,8 @@ use gpui_kit::component::{
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, ClickEvent, Context, ElementId, Entity,
     EventEmitter, FontWeight, Hsla, InteractiveElement as _, IntoElement, ParentElement as _,
-    Render, Role, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
-    TestSupportExt as _, WeakEntity, Window, div, px, rgb, transparent_black,
+    Pixels, Render, Role, ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _,
+    Subscription, TestSupportExt as _, WeakEntity, Window, div, px, rgb, transparent_black,
 };
 
 use tf2tools_core::{
@@ -37,6 +37,13 @@ use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::labelled;
+use crate::widgets::scroll::scroll_area;
+
+/// A library card's height; a short window scrolls the page rather than cut the grid below a row.
+const CARD_HEIGHT: Pixels = px(136.);
+// Room after the grid's last row, so it scrolls clear of the floating player and one toast lifted
+// over it; the grid's floor keeps that room under one row on a short page.
+const PLAYER_CLEARANCE: Pixels = px(152.);
 
 /// The action in flight: its button spins and the other mutating buttons disable.
 #[derive(Clone, PartialEq, Eq)]
@@ -68,6 +75,7 @@ pub struct SoundsPage {
     player: Entity<Player>,
     search: Entity<InputState>,
     grid: CardGrid,
+    scroll: ScrollHandle,
     _tf2: Subscription,
     _library: Subscription,
     _player: Subscription,
@@ -101,7 +109,8 @@ impl SoundsPage {
             load_generation: 0,
             player,
             search,
-            grid: CardGrid::new(ids::SOUNDS_GRID),
+            grid: CardGrid::new(ids::SOUNDS_GRID).with_foot(PLAYER_CLEARANCE),
+            scroll: ScrollHandle::new(),
             _tf2: tf2,
             _library: library,
             _player: observe_player,
@@ -119,6 +128,16 @@ impl SoundsPage {
     /// The app's floating player; its sound outlives the page.
     pub fn player(&self) -> &Entity<Player> {
         &self.player
+    }
+
+    /// The page's own scroll handle, which moves the slots, search and grid together.
+    pub fn page_scroll(&self) -> ScrollHandle {
+        self.scroll.clone()
+    }
+
+    /// The sound grid's scroll handle; its offset is what the grid drew.
+    pub fn grid_scroll(&self) -> ScrollHandle {
+        self.grid.scroll_handle().0.borrow().base_handle.clone()
     }
 
     /// The library search box.
@@ -484,10 +503,14 @@ impl SoundsPage {
                     .is_some_and(|now| now.key == key);
                 let uninstalling = self.busy == Some(Busy::Uninstall(kind));
                 let name = slot.name.clone();
+                // The name truncates before Uninstall gives up any width.
                 h_flex()
                     .justify_between()
+                    .gap_2()
                     .child(
                         h_flex()
+                            .flex_1()
+                            .min_w_0()
                             .gap_2()
                             .child(
                                 Button::new(ids::sound_slot_play(kind))
@@ -504,13 +527,14 @@ impl SoundsPage {
                                     })),
                             )
                             .child(labelled(
-                                div().text_sm().text_color(muted),
+                                div().min_w_0().truncate().text_sm().text_color(muted),
                                 ids::sound_slot_name(kind),
                                 slot.name,
                             )),
                     )
                     .child(needs_tf2(
                         Button::new(ids::sound_slot_uninstall(kind))
+                            .flex_none()
                             .outline()
                             .px(SM_ICON_PX)
                             .icon(IconName::Unplug)
@@ -804,17 +828,19 @@ impl SoundsPage {
             let page = cx.entity().downgrade();
             let busy = self.busy.clone();
             let sounds = self.sounds.clone();
-            Some(self.grid.render(shown.len(), px(136.), move |ix, _, cx| {
-                let sound = &sounds[shown[ix]];
-                let on = playing.as_ref() == Some(&sound_key(sound.folder_name()));
-                sound_card(sound, on, busy.as_ref(), &page, cx)
-            }))
+            Some(
+                self.grid
+                    .render(shown.len(), CARD_HEIGHT, move |ix, _, cx| {
+                        let sound = &sounds[shown[ix]];
+                        let on = playing.as_ref() == Some(&sound_key(sound.folder_name()));
+                        sound_card(sound, on, busy.as_ref(), &page, cx)
+                    }),
+            )
         };
         let muted = cx.theme().muted_foreground;
         let importing = self.busy == Some(Busy::Import);
         v_flex()
             .flex_1()
-            .min_h_0()
             .gap_4()
             .child(
                 h_flex()
@@ -849,15 +875,24 @@ impl SoundsPage {
                         .prefix(Icon::new(IconName::Search).text_color(muted)),
                 ),
             )
-            .child(div().flex_1().min_h_0().children(body))
+            .child(
+                div()
+                    .id(ids::SOUNDS_LIBRARY)
+                    .test_support()
+                    .flex_1()
+                    .min_h(CARD_HEIGHT + PLAYER_CLEARANCE)
+                    .children(body),
+            )
     }
 }
 
 impl Render for SoundsPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Both slots stretch to the taller one, as v5's two-column grid draws them.
         let slots = h_flex()
+            .flex_none()
             .gap_4()
-            .items_start()
+            .items_stretch()
             .child(self.slot_card(SoundKind::Hitsound, cx))
             .child(self.slot_card(SoundKind::Killsound, cx));
         let conflicts = self
@@ -873,17 +908,20 @@ impl Render for SoundsPage {
                 cx,
             )
         });
-        v_flex()
+        // As on HUDs, the page scrolls as a whole only when the window is too short for it.
+        let content = v_flex()
             .id(ids::page(Page::Sounds))
             .test_support()
-            .relative()
             .size_full()
+            .track_scroll(&self.scroll)
+            .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
             .children(warning)
             .child(slots)
             .children(conflicts)
-            .child(self.library(cx))
+            .child(self.library(cx));
+        scroll_area(ids::page_scrollbar(Page::Sounds), &self.scroll, content).size_full()
     }
 }
 
