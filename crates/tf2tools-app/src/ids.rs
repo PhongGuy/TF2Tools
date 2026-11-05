@@ -103,6 +103,8 @@ pub const SOUNDS_NO_TF2: &str = "sounds-no-tf2";
 pub const SOUNDS_NO_TF2_SETTINGS: &str = "sounds-no-tf2-settings";
 /// The Sounds page's card grid.
 pub const SOUNDS_GRID: &str = "sounds-grid";
+/// The box the Sounds page's grid fills, under the library search.
+pub const SOUNDS_LIBRARY: &str = "sounds-library";
 /// Wraps the picker's search input.
 pub const CROSSHAIRS_SEARCH: &str = "crosshairs-search";
 /// The picker's virtualized list.
