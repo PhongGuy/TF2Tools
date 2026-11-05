@@ -1514,3 +1514,56 @@ fn a_font_list_shows_a_bar_inside_the_panel(cx: &mut TestAppContext) {
     assert_clear_of_bar(cx, s.win, small.clone(), bar);
     assert_track_scrolls(cx, s.win, list, small);
 }
+
+/// Asserts each of `controls` is in the side panel and ends left of its scrollbar.
+fn assert_controls_clear_of_the_panel_bar(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    controls: &[gpui_kit::ElementId],
+) {
+    for id in controls {
+        assert!(support::present(cx, s.win, id.clone()), "no {id:?}");
+        scroll_panel_to(cx, s, id.clone());
+        assert_clear_of_bar(cx, s.win, id.clone(), ids::HUD_MAKER_PANEL_BODY_SCROLLBAR);
+    }
+}
+
+// The controls a pilot pass found cut by the panel's bar, floating and then docked.
+#[gpui_kit::test]
+fn the_panel_controls_stay_clear_of_its_scrollbar(cx: &mut TestAppContext) {
+    let (_env, s, page) = opened(cx);
+    for dock in [None, Some(ids::HUD_MAKER_PANEL_DOCK_RIGHT)] {
+        if let Some(dock) = dock {
+            support::click_id(cx, s.win, dock);
+        }
+        // With nothing picked the panel shows the HUD's options and presets.
+        cx.update(|cx| {
+            page.update(cx, |p, cx| {
+                p.editor_mut().unwrap().select(None);
+                cx.notify();
+            })
+        });
+        support::settle(cx, s.win);
+        assert_controls_clear_of_the_panel_bar(
+            cx,
+            &s,
+            &[
+                ids::hud_maker_option("item_commando"),
+                ids::HUD_MAKER_PRESET_SAVE.into(),
+            ],
+        );
+        click_row(cx, &s, HV);
+        assert_controls_clear_of_the_panel_bar(
+            cx,
+            &s,
+            &[
+                ids::HUD_MAKER_Y.into(),
+                ids::HUD_MAKER_TALL.into(),
+                ids::HUD_MAKER_LAYER.into(),
+                ids::HUD_MAKER_ATTACH.into(),
+                ids::hud_maker_font_family_list("font"),
+                ids::hud_maker_font_shadow("font"),
+            ],
+        );
+    }
+}
