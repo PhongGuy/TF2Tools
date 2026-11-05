@@ -213,6 +213,31 @@ fn the_crosshair_maker_panel_keeps_its_controls_clear_of_the_bar(cx: &mut TestAp
     );
 }
 
+// The opacity handle is centred on the track's end, so it spills half its 16 px plus a 3 px
+// hover ring past the track; that spill must stay inside the panel and clear of the bar.
+#[gpui_kit::test]
+fn the_opacity_handle_stays_whole_at_both_ends(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    open(cx, &s, Page::CrosshairMaker);
+    resize(cx, &s, 1280., 800.);
+    let panel = support::bounds_of(cx, s.win, ids::CROSSHAIR_MAKER_PANEL).expect("the panel");
+    let track = support::bounds_of(cx, s.win, ids::CROSSHAIR_MAKER_OPACITY).expect("the slider");
+    let spill = px(11.);
+    assert!(
+        track.left() - spill >= panel.left(),
+        "at 1% the handle starts at {:?}, left of the panel at {:?}",
+        track.left() - spill,
+        panel.left()
+    );
+    assert!(
+        track.right() + spill <= panel.right() - px(12.),
+        "at 100% the handle ends at {:?}, under the bar at the panel's edge {:?}",
+        track.right() + spill,
+        panel.right()
+    );
+}
+
 /// Opens Logs over one entry with `lines` lines of details and expands them.
 fn expanded_details(cx: &mut TestAppContext, s: &support::ShellWindow, lines: usize) -> i64 {
     let details: Vec<String> = (0..lines).map(|ix| format!("line {ix}")).collect();

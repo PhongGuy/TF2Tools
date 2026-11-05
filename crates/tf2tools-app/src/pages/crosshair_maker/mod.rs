@@ -832,6 +832,9 @@ impl CrosshairMakerPage {
                             .id(ids::CROSSHAIR_MAKER_OPACITY)
                             .aria_label("Opacity")
                             .test_support()
+                            // The handle overhangs the track's ends by 11 px; the margin keeps
+                            // it whole at 1% and 100% instead of clipped by the panel.
+                            .mx_3()
                             .tooltip(|window, cx| Tooltip::new(OPACITY_TIP).build(window, cx))
                             .child(Slider::new(&self.opacity)),
                     ),
