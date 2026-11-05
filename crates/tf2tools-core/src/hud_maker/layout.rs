@@ -497,6 +497,13 @@ impl HudModel {
             let (px, py) = parents[i].map_or((0, 0), |p| (boxes[p].x, boxes[p].y));
             let (wide, tall) = placed[i].size;
             let (x, y) = (px.saturating_add(rx), py.saturating_add(ry));
+            // The health element grows its pulse image about its centre as health moves.
+            let grow = match GameSituation::is_pulse_image(part) {
+                true => s.health_pulse_grow(self),
+                false => 0,
+            };
+            let (x, y) = (x.saturating_sub(grow), y.saturating_sub(grow));
+            let (wide, tall) = (wide.saturating_add(2 * grow), tall.saturating_add(2 * grow));
             let parent_hidden = parents[i].is_some_and(|p| boxes[p].hidden.is_some());
             let hidden = hidden_by(
                 part,

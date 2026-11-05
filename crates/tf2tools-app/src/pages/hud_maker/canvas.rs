@@ -959,6 +959,7 @@ impl HudMakerPage {
             frame: None,
             anchors,
             images: self.seen_images().unwrap_or(&loaded.images),
+            tints: &self.tints,
             text: &loaded.text,
             fonts: &loaded.font_names,
             text_system: &self.text_system,
@@ -1187,6 +1188,8 @@ struct Look<'a> {
     /// The anchors the player added, which draw as a small cross.
     anchors: HashSet<PartKey>,
     images: &'a Images,
+    /// Image textures tinted by their draw colour.
+    tints: &'a RefCell<super::tint::Tints>,
     /// The game's English text, which a `#token` label draws in place of its token.
     text: &'a GameText,
     /// The text system's family names, lowercased, so a label draws its font only when known.
@@ -1705,6 +1708,9 @@ fn image_pieces(
     image: &Arc<RenderImage>,
     look: &Look,
 ) -> Vec<AnyElement> {
+    // The texture modulated by the colour the game draws it in, such as the dying pulse's red.
+    let colour = look.model.draw_colour(part, look.situation);
+    let image = &super::tint::drawn(look.tints, image, colour, look.vision);
     let cells = image_cells(part, b.wide(), b.tall(), texture_size(image), look.screen);
     pieces(&cells, image, look, |i| {
         ids::hud_maker_image_cell(part.key(), i)

@@ -21,6 +21,7 @@ mod recipes;
 mod screens;
 pub mod situation;
 pub mod timeline;
+mod tint;
 mod tip;
 pub mod view;
 
@@ -427,6 +428,8 @@ pub struct HudMakerPage {
     // What a wrapped label's lines are measured with on the canvas.
     text_system: Arc<TextSystem>,
     ui_family: SharedString,
+    // Image textures tinted by their draw colour, made as the canvas first draws them.
+    tints: RefCell<tint::Tints>,
     parts_scroll: UniformListScrollHandle,
     // The side panel body's scroll, and whether a font list or the named colours just opened
     // and should be shown.
@@ -767,6 +770,7 @@ impl HudMakerPage {
             area: Rc::new(Cell::new(Bounds::default())),
             text_system: cx.text_system().clone(),
             ui_family: cx.theme().font_family.clone(),
+            tints: RefCell::default(),
             parts_scroll: UniformListScrollHandle::new(),
             panel_scroll: ScrollHandle::new(),
             reveal_font_list: false,
@@ -1764,6 +1768,18 @@ impl HudMakerPage {
                 .cloned(),
             _ => None,
         }
+    }
+
+    /// The texture the canvas draws for image part `part`: [`Self::image`] tinted by the colour
+    /// the game draws it in at the situation shown.
+    pub fn drawn_image(&self, part: &PartKey) -> Option<Arc<RenderImage>> {
+        let image = self.image(part)?;
+        let Load::Ready(loaded) = &self.load else {
+            return None;
+        };
+        let model = loaded.editor.model();
+        let colour = model.draw_colour(model.part(part)?, loaded.editor.situation());
+        Some(tint::drawn(&self.tints, &image, colour, self.vision()))
     }
 
     /// The game's picture behind the main menu at the editor's screen shape, through the
@@ -4229,6 +4245,9 @@ fn crop(sheet: &RgbaImage, icon: &KillIcon) -> Option<RgbaImage> {
 
 impl Render for HudMakerPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        for image in self.tints.get_mut().take_stale() {
+            cx.drop_image(image, Some(window));
+        }
         self.preview_part_drag();
         self.tick_timeline(window, cx);
         self.read_menu_art(cx);
