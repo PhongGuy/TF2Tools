@@ -349,7 +349,7 @@ fn split_bg(words: Vec<String>) -> Vec<String> {
 }
 
 // Common HUD name words, for names the game's authors wrote in one lower-case run.
-const KNOWN: [&str; 26] = [
+const KNOWN: [&str; 27] = [
     "ammo",
     "background",
     "bar",
@@ -359,6 +359,7 @@ const KNOWN: [&str; 26] = [
     "class",
     "count",
     "health",
+    "holder",
     "icon",
     "image",
     "label",
@@ -446,6 +447,7 @@ mod tests {
             ("Classmodelpanel", "Class model panel"),
             ("Classmodelpanel background", "Class model panel background"),
             ("healthbar", "Health bar"),
+            ("Classmodelholder", "Class model holder"),
             ("Panelty", "Panelty"),
             ("Hud", "Hud"),
             ("PlayerStatus", "Player status"),
