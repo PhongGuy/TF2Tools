@@ -175,13 +175,16 @@ impl Shell {
         self.page
     }
 
-    // Leaving a page drops it, so the next visit builds it fresh from the saved state: Settings
-    // rereads its form, HUDs its library, and Sounds' player stops. Re-selecting the current
-    // page keeps it as it is. Toasts rise above the sound player while it shows.
+    // Leaving a library page, a maker or Settings drops it, so the next visit builds it fresh
+    // from the saved state: Settings rereads its form, HUDs its library, and Sounds' player
+    // stops. The stores and the Activity Log are kept, hidden, so a return finds their tab,
+    // search, filters, sort and scroll as left. Re-selecting the current page keeps it as it
+    // is. Toasts rise above the sound player while it shows.
     pub fn navigate(&mut self, page: Page, cx: &mut Context<Self>) {
         if page == self.page {
             return;
         }
+        self.set_kept_hidden(self.page, true, cx);
         self.page = page;
         recheck_tf2(cx);
         leave::forget_maker(cx);
@@ -191,15 +194,38 @@ impl Shell {
         self.crosshair_maker = None;
         self.hud_maker = None;
         self.settings = None;
-        self.hud_store = None;
-        self.sound_store = None;
-        self.addon_store = None;
-        self.crosshair_store = None;
-        self.logs = None;
         self.addons = None;
         self.profiles = None;
+        self.set_kept_hidden(page, false, cx);
         toast::lift_above_player(page.shows_player(), cx);
         cx.notify();
+    }
+
+    // Tells a kept page, if built, that it leaves or comes back on screen.
+    fn set_kept_hidden(&self, page: Page, hidden: bool, cx: &mut Context<Self>) {
+        match page {
+            Page::HudStore => self.hud_store.as_ref().map(|p| {
+                p.update(cx, |p, cx| p.set_hidden(hidden, cx));
+            }),
+            Page::SoundStore => self.sound_store.as_ref().map(|p| {
+                p.update(cx, |p, cx| p.set_hidden(hidden, cx));
+            }),
+            Page::CrosshairStore => self.crosshair_store.as_ref().map(|p| {
+                p.update(cx, |p, cx| p.set_hidden(hidden, cx));
+            }),
+            Page::AddonStore => self.addon_store.as_ref().map(|p| {
+                p.update(cx, |p, cx| p.set_hidden(hidden, cx));
+            }),
+            Page::Logs => self.logs.as_ref().map(|p| {
+                p.update(cx, |p, cx| p.set_hidden(hidden, cx));
+            }),
+            _ => None,
+        };
+    }
+
+    // A kept page, but only while it shows, as every other page's accessor reads.
+    fn shown<T>(&self, page: Page, entity: &Option<Entity<T>>) -> Option<Entity<T>> {
+        entity.clone().filter(|_| self.page == page)
     }
 
     // The sidebar's way to another page: at once when no drawing would be lost, else after the
@@ -271,27 +297,27 @@ impl Shell {
 
     /// The HUD Store page while it shows.
     pub fn hud_store_page(&self) -> Option<Entity<HudStorePage>> {
-        self.hud_store.clone()
+        self.shown(Page::HudStore, &self.hud_store)
     }
 
     /// The Sound Store page while it shows.
     pub fn sound_store_page(&self) -> Option<Entity<SoundStorePage>> {
-        self.sound_store.clone()
+        self.shown(Page::SoundStore, &self.sound_store)
     }
 
     /// The Addon Store page while it shows.
     pub fn addon_store_page(&self) -> Option<Entity<AddonStorePage>> {
-        self.addon_store.clone()
+        self.shown(Page::AddonStore, &self.addon_store)
     }
 
     /// The Crosshair Store page while it shows.
     pub fn crosshair_store_page(&self) -> Option<Entity<CrosshairStorePage>> {
-        self.crosshair_store.clone()
+        self.shown(Page::CrosshairStore, &self.crosshair_store)
     }
 
     /// The Logs page while it shows.
     pub fn logs_page(&self) -> Option<Entity<LogsPage>> {
-        self.logs.clone()
+        self.shown(Page::Logs, &self.logs)
     }
 
     /// The Addons page while it shows.

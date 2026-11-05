@@ -107,9 +107,18 @@ impl SoundStorePage {
         &self.grid
     }
 
-    /// The floating player; it goes with the page, which stops its sound.
+    /// The floating player; leaving the page stops its sound.
     pub fn player(&self) -> &Entity<Player> {
         &self.player
+    }
+
+    /// Hides or shows the page's grid (see `StoreGrid::set_hidden`); hiding also stops the
+    /// preview, as leaving the page always has.
+    pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        if hidden {
+            self.player.update(cx, |player, cx| player.stop(cx));
+        }
+        self.grid.update(cx, |grid, cx| grid.set_hidden(hidden, cx));
     }
 
     /// The GameBanana id whose preview plays, if any.

@@ -72,6 +72,11 @@ impl CrosshairStorePage {
         &self.grid
     }
 
+    /// Hides or shows the page's grid; see `StoreGrid::set_hidden`.
+    pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        self.grid.update(cx, |grid, cx| grid.set_hidden(hidden, cx));
+    }
+
     /// Opens the shared `StoreDetail` for the grid's card `id`, with `in_library` read now; a card
     /// no longer in the grid opens nothing.
     pub fn open(&self, id: &StoreItemId, window: &mut Window, cx: &mut App) {

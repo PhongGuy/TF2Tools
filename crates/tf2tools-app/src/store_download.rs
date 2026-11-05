@@ -180,19 +180,33 @@ impl SessionDownloads {
         self.ids.borrow().contains(&id)
     }
 
+    /// The downloads recorded so far.
+    pub fn snapshot(&self) -> HashSet<GbId> {
+        self.ids.borrow().clone()
+    }
+
+    /// Drops `ids`, once a store read taken after they were recorded speaks for them.
+    pub fn forget(&self, ids: &HashSet<GbId>) {
+        self.ids.borrow_mut().retain(|id| !ids.contains(id));
+    }
+
     /// `card.in_library`, or downloaded this session.
     pub fn in_library(&self, card: &StoreCard) -> bool {
         card.in_library || matches!(&card.id, StoreItemId::GameBanana(id) if self.contains(*id))
     }
 
     /// Redraws `grid` on every `StoreDownloads` notify, and records then redraws on a finished
-    /// download of this kind. Empty without the `StoreDownloads` global.
+    /// download of this kind; `grid`'s re-reads then retire the downloads they cover. Empty
+    /// without the `StoreDownloads` global.
     #[must_use = "dropping the subscriptions stops the grid redraws and the In Library flip"]
     pub fn track<T: 'static>(
         &self,
         grid: &Entity<StoreGrid>,
         cx: &mut Context<T>,
     ) -> Vec<Subscription> {
+        // The grid's re-reads carry the library's word, so each one retires what it covers.
+        let session = self.clone();
+        grid.update(cx, |grid, _| grid.track_session(session));
         let Some(downloads) = StoreDownloads::global(cx) else {
             return Vec::new();
         };

@@ -26,7 +26,7 @@ pub enum HudStoreTab {
 }
 
 /// The HUD Store page. Each tab is built on first show and kept while the page lives, so
-/// switching back finds its filters as they were.
+/// switching back finds its filters as they were; the shell keeps the page across visits.
 pub struct HudStorePage {
     tab: HudStoreTab,
     curated: Option<Entity<CuratedTab>>,
@@ -58,7 +58,34 @@ impl HudStorePage {
         if tab == HudStoreTab::GameBanana && self.gamebanana.is_none() {
             self.gamebanana = Some(cx.new(|cx| GameBananaTab::new(window, cx)));
         }
+        // A tab the page hid when it went away wakes when the player picks it.
+        self.set_tab_hidden(tab, false, cx);
         cx.notify();
+    }
+
+    /// Hides both tabs while the page is away; showing it wakes only the selected tab.
+    pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        if hidden {
+            self.set_tab_hidden(HudStoreTab::Curated, true, cx);
+            self.set_tab_hidden(HudStoreTab::GameBanana, true, cx);
+        } else {
+            self.set_tab_hidden(self.tab, false, cx);
+        }
+    }
+
+    fn set_tab_hidden(&self, tab: HudStoreTab, hidden: bool, cx: &mut Context<Self>) {
+        match tab {
+            HudStoreTab::Curated => {
+                if let Some(curated) = &self.curated {
+                    curated.update(cx, |tab, cx| tab.set_hidden(hidden, cx));
+                }
+            }
+            HudStoreTab::GameBanana => {
+                if let Some(gamebanana) = &self.gamebanana {
+                    gamebanana.update(cx, |tab, cx| tab.set_hidden(hidden, cx));
+                }
+            }
+        }
     }
 
     /// The Curated tab, once built.

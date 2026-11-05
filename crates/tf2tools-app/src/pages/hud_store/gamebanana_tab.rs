@@ -78,6 +78,11 @@ impl GameBananaTab {
         &self.grid
     }
 
+    /// Hides or shows the tab's grid; see `StoreGrid::set_hidden`.
+    pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        self.grid.update(cx, |grid, cx| grid.set_hidden(hidden, cx));
+    }
+
     /// Whether the library holds `card`, as the store read it or as downloaded this session.
     pub fn is_in_library(&self, card: &StoreCard) -> bool {
         self.downloaded.in_library(card)

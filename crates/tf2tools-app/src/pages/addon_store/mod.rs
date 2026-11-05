@@ -89,6 +89,8 @@ pub struct AddonStorePage {
     load: Option<Task<()>>,
     /// The card grid's scroll.
     scroll: ScrollHandle,
+    /// Set while the page is away; it then skips reloads and rereads on return.
+    hidden: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -138,6 +140,7 @@ impl AddonStorePage {
             sync_reload_pending: false,
             load: None,
             scroll: ScrollHandle::new(),
+            hidden: false,
             _subscriptions: subscriptions,
         };
         page.reload(cx);
@@ -182,9 +185,21 @@ impl AddonStorePage {
         });
     }
 
+    /// Hides or shows the page. Shown again, it rereads, since the Addons page may have changed
+    /// the library meanwhile; the scroll stays where it was.
+    pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        if hidden != std::mem::replace(&mut self.hidden, hidden) && !hidden {
+            self.reload(cx);
+        }
+    }
+
     /// Rereads the store's addons and the library's off the UI thread; a newer reload drops an
-    /// older one in flight. Without a TF2 install nothing reads Installed.
+    /// older one in flight. Without a TF2 install nothing reads Installed. A hidden page
+    /// rereads on return instead.
     pub fn reload(&mut self, cx: &mut Context<Self>) {
+        if self.hidden {
+            return;
+        }
         let tf2 = tf2_state(cx).read(cx).install().cloned();
         let read = run_blocking(cx, move |s| {
             let items = s
