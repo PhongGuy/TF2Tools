@@ -991,6 +991,94 @@ fn out_of_range_numbers_are_refused_and_the_field_restored(cx: &mut TestAppConte
     );
 }
 
+fn note_under(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    of: &'static str,
+) -> Option<String> {
+    support::label_of(cx, s.win, ids::hud_maker_note_for(&of.into()))
+}
+
+#[gpui_kit::test]
+fn a_rounded_number_says_where_it_landed_until_the_next_good_one(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    select_hv(cx, &s);
+    commit(cx, &s, &page, Field::X, "301");
+    let x = hv_box(cx, &page).0;
+    assert_ne!(x, 301, "the file holds coarser steps than one pixel");
+    assert_eq!(
+        note_under(cx, &s, ids::HUD_MAKER_X),
+        Some(format!(
+            "Rounded to {x}, the nearest step the HUD file can hold"
+        ))
+    );
+    // A run of typed values hits steps and misses them; only a miss leaves a note.
+    let (mut hits, mut misses) = (0, 0);
+    for typed in 200..=210 {
+        commit(cx, &s, &page, Field::X, &typed.to_string());
+        let x = hv_box(cx, &page).0;
+        let note = note_under(cx, &s, ids::HUD_MAKER_X);
+        if x == typed {
+            hits += 1;
+            assert_eq!(note, None, "{typed}");
+        } else {
+            misses += 1;
+            assert!(note.is_some_and(|n| n.starts_with(&format!("Rounded to {x},"))));
+        }
+    }
+    assert!(hits > 0 && misses > 0, "{hits} hits, {misses} misses");
+}
+
+#[gpui_kit::test]
+fn a_refused_number_says_why_until_the_next_good_one(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    select_hv(cx, &s);
+    for (field, id, text, said) in [
+        (
+            Field::Y,
+            ids::HUD_MAKER_Y,
+            "5000",
+            "Must be between -4320 and 4320",
+        ),
+        (Field::X, ids::HUD_MAKER_X, "abc", "Whole numbers only"),
+        (Field::X, ids::HUD_MAKER_X, "1.5", "Whole numbers only"),
+        (
+            Field::X,
+            ids::HUD_MAKER_X,
+            "99999999999999999999999",
+            "Must be between -7680 and 7680",
+        ),
+        (
+            Field::Wide,
+            ids::HUD_MAKER_WIDE,
+            "0",
+            "Must be between 1 and 7680",
+        ),
+        (
+            Field::Layer,
+            ids::HUD_MAKER_LAYER,
+            "99999999999",
+            "Must be between -2147483648 and 2147483647",
+        ),
+    ] {
+        commit(cx, &s, &page, field, text);
+        assert_eq!(note_under(cx, &s, id).as_deref(), Some(said), "{text}");
+    }
+    commit(cx, &s, &page, Field::Y, "900");
+    assert_eq!(note_under(cx, &s, ids::HUD_MAKER_Y), None);
+    assert!(
+        note_under(cx, &s, ids::HUD_MAKER_X).is_some(),
+        "each box keeps its own note"
+    );
+    // Another part starts with clean boxes.
+    click_row(cx, &s, &PartKey::new("HudWeaponAmmo/AmmoInClip"));
+    assert_eq!(note_under(cx, &s, ids::HUD_MAKER_X), None);
+}
+
 /// Drags from `from` by `by` window pixels in eight moves with Ctrl held, so snapping stays
 /// off and the part lands where the pointer says.
 fn drag_window(

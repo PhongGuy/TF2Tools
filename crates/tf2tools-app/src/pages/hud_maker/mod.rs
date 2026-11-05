@@ -407,6 +407,17 @@ pub(super) enum FontList {
 
 type Shown = [Option<ShownText>; Field::ALL.len()];
 
+/// Why a number box's last typed value did not land as typed, for the part it was typed for.
+#[derive(Debug, Clone)]
+pub(super) struct FieldNote {
+    part: PartKey,
+    pub(super) text: SharedString,
+    // A refusal reads in the warning colour; a rounding is only information.
+    pub(super) refused: bool,
+}
+
+type Notes = [Option<FieldNote>; Field::ALL.len()];
+
 /// The HUD Maker page; it reads the game's default HUD once, when it is built.
 pub struct HudMakerPage {
     load: Load,
@@ -474,6 +485,7 @@ pub struct HudMakerPage {
     checked: Checked,
     fields: [Entity<InputState>; Field::ALL.len()],
     shown: Shown,
+    notes: Notes,
     colour: Entity<ColorPickerState>,
     // Whether the active Colour row lists the HUD's colour names.
     names_open: bool,
@@ -785,6 +797,7 @@ impl HudMakerPage {
             checked: Default::default(),
             fields,
             shown: Default::default(),
+            notes: Default::default(),
             colour,
             names_open: false,
             active_colour: None,
@@ -1768,6 +1781,13 @@ impl HudMakerPage {
     /// The side panel's number field `field`.
     pub fn field(&self, field: Field) -> &Entity<InputState> {
         &self.fields[field as usize]
+    }
+
+    // The note under `field` while the selection is the part it was typed for.
+    pub(super) fn field_note(&self, field: Field) -> Option<&FieldNote> {
+        let note = self.notes[field as usize].as_ref()?;
+        let selected = self.editor()?.selected()?;
+        (*selected == note.part).then_some(note)
     }
 
     /// The Colour row's picker.
@@ -3190,6 +3210,7 @@ impl HudMakerPage {
                     .scroll_to_item(row, ScrollStrategy::Nearest);
             }
             self.shown_part = selected.clone();
+            self.notes = Default::default();
         }
         let selected = selected.as_ref();
         if self
@@ -3315,7 +3336,7 @@ impl HudMakerPage {
     // refresh showed, once: the field is then cleared until the next refresh. A whole-number
     // field's text out of range commits nothing; Text, "Time on screen" and a setting go to core
     // as typed, which refuses what the row cannot take. Either way the refresh puts the real
-    // value back.
+    // value back, and the box's note says why when that value is not what was typed.
     fn flush(&mut self, cx: &mut Context<Self>) {
         for field in Field::ALL {
             let Some(shown) = self.shown[field as usize].clone() else {
@@ -3337,9 +3358,29 @@ impl HudMakerPage {
             editor.select(Some(shown.part.clone()));
             let result = commit_typed(editor, field, &shown, &text);
             editor.select(before);
-            if let Some(Err(err)) = result {
-                tracing::debug!("the HUD Maker refused a typed {field:?}: {err:?}");
-            }
+            // A box value the file holds in coarser steps lands on the nearest one.
+            let note = match result {
+                Ok(()) => typed_value(field, &text, editor.screen())
+                    .ok()
+                    .zip(landed(editor, field, &shown.part))
+                    .filter(|(typed, landed)| typed != landed)
+                    .map(|(_, landed)| {
+                        let said =
+                            format!("Rounded to {landed}, the nearest step the HUD file can hold");
+                        (said, false)
+                    }),
+                Err(Refusal::Note(said)) => Some((said, true)),
+                Err(Refusal::Refused(err)) => {
+                    tracing::debug!("the HUD Maker refused a typed {field:?}: {err:?}");
+                    None
+                }
+                Err(Refusal::Skipped) => None,
+            };
+            self.notes[field as usize] = note.map(|(said, refused)| FieldNote {
+                part: shown.part,
+                text: said.into(),
+                refused,
+            });
         }
     }
 
@@ -3814,59 +3855,110 @@ fn save_job(
     })
 }
 
-// Commits `text` typed into `field` to `part`, which the caller has selected; None when the
-// text is not a whole number the field takes.
+// Why a typed value did not commit: a note for the player, core's refusal, or no row to take it.
+enum Refusal {
+    Note(String),
+    Refused(EditRefused),
+    Skipped,
+}
+
+// Commits `text` typed into `field` to `part`, which the caller has selected.
 fn commit_typed(
     editor: &mut HudEditor,
     field: Field,
     shown: &ShownText,
     text: &str,
-) -> Option<Result<(), EditRefused>> {
-    let value = typed_value(field, text, editor.screen());
-    let b = editor.layout().get(&shown.part).cloned();
-    Some(match field {
+) -> Result<(), Refusal> {
+    let screen = editor.screen();
+    let value = || typed_value(field, text, screen).map_err(Refusal::Note);
+    let key = || shown.key.as_deref().ok_or(Refusal::Skipped);
+    let row = || field.row_key().ok_or(Refusal::Skipped);
+    let done = match field {
         Field::Text => editor.set_property_selected(TEXT_KEY, text),
-        Field::Lifetime => editor.set_property_selected("delta_lifetime", text),
-        Field::Setting => editor.set_key_text_selected(shown.key.as_deref()?, text),
-        Field::FontSize => editor.edit_font_selected(shown.key.as_deref()?, FontEdit::Size(value?)),
+        // Core judges a time, so its bad value is the one refusal the note explains.
+        Field::Lifetime => {
+            return editor
+                .set_property_selected("delta_lifetime", text)
+                .map_err(|err| match err {
+                    EditRefused::BadValue => Refusal::Note(time_note(text)),
+                    err => Refusal::Refused(err),
+                });
+        }
+        Field::Setting => editor.set_key_text_selected(key()?, text),
+        Field::FontSize => editor.edit_font_selected(key()?, FontEdit::Size(value()?)),
         // Every other field is a whole number for a part the layout places.
-        _ if b.is_none() => return None,
-        Field::X => editor.move_selected(value? - b?.x(), 0),
-        Field::Y => editor.move_selected(0, value? - b?.y()),
-        Field::Wide => editor.resize_selected(Some(value?), None),
-        Field::Tall => editor.resize_selected(None, Some(value?)),
-        Field::Layer => editor.set_layer_selected(value?),
-        Field::RowHeight | Field::RowGap | Field::SectionGap => {
-            editor.set_number_selected(field.number_key()?, value?)
+        _ => {
+            let b = (editor.layout().get(&shown.part).cloned()).ok_or(Refusal::Skipped)?;
+            match field {
+                Field::X => editor.move_selected(value()? - b.x(), 0),
+                Field::Y => editor.move_selected(0, value()? - b.y()),
+                Field::Wide => editor.resize_selected(Some(value()?), None),
+                Field::Tall => editor.resize_selected(None, Some(value()?)),
+                Field::Layer => editor.set_layer_selected(value()?),
+                Field::RowHeight | Field::RowGap | Field::SectionGap => {
+                    editor.set_number_selected(row()?, value()?)
+                }
+                // The killfeed's line numbers are Stage 2 rows, which core writes through
+                // set_property.
+                _ => editor.set_property_selected(row()?, &value()?.to_string()),
+            }
         }
-        // The killfeed's line numbers are Stage 2 rows, which core writes through set_property.
-        Field::LineHeight | Field::LineSpacing => {
-            editor.set_property_selected(field.row_key()?, &value?.to_string())
-        }
-    })
+    };
+    done.map_err(Refusal::Refused)
 }
 
-// A typed whole number the field accepts at `screen`: a size from 1 to four screens on its axis,
-// a position within four screens either side of the origin, any layer or Number that fits (core
-// refuses a Number out of its range), or a font size core takes.
-fn typed_value(field: Field, text: &str, screen: Screen) -> Option<i32> {
-    let value = text.parse::<i64>().ok()?;
+// Where a box field's value landed on `part`; None for the other fields.
+fn landed(editor: &HudEditor, field: Field, part: &PartKey) -> Option<i32> {
+    let b = editor.layout().get(part)?;
+    match field {
+        Field::X => Some(b.x()),
+        Field::Y => Some(b.y()),
+        Field::Wide => Some(b.wide()),
+        Field::Tall => Some(b.tall()),
+        _ => None,
+    }
+}
+
+// A typed whole number the field accepts at `screen`, or the note saying why not.
+fn typed_value(field: Field, text: &str, screen: Screen) -> Result<i32, String> {
+    let digits = text.strip_prefix('-').unwrap_or(text);
+    let range = number_range(field, screen)
+        .filter(|_| !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()))
+        .ok_or_else(|| "Whole numbers only".to_owned())?;
+    (text.parse::<i64>().ok())
+        .filter(|v| range.contains(v))
+        .and_then(|v| i32::try_from(v).ok())
+        .ok_or_else(|| format!("Must be between {} and {}", range.start(), range.end()))
+}
+
+// What a whole-number field takes: a size from 1 to four screens on its axis, a position within
+// four screens either side of the origin, any layer that fits, a Number up to core's four
+// 480-unit screens, or a font size core takes.
+fn number_range(field: Field, screen: Screen) -> Option<std::ops::RangeInclusive<i64>> {
     let reach = |span: u32| 4 * i64::from(span);
-    let ok = match field {
-        Field::X => (-reach(screen.wide())..=reach(screen.wide())).contains(&value),
-        Field::Y => (-reach(screen.tall())..=reach(screen.tall())).contains(&value),
-        Field::Wide => (1..=reach(screen.wide())).contains(&value),
-        Field::Tall => (1..=reach(screen.tall())).contains(&value),
-        Field::Layer
-        | Field::RowHeight
+    Some(match field {
+        Field::X => -reach(screen.wide())..=reach(screen.wide()),
+        Field::Y => -reach(screen.tall())..=reach(screen.tall()),
+        Field::Wide => 1..=reach(screen.wide()),
+        Field::Tall => 1..=reach(screen.tall()),
+        Field::Layer => i64::from(i32::MIN)..=i64::from(i32::MAX),
+        Field::RowHeight
         | Field::RowGap
         | Field::SectionGap
         | Field::LineHeight
-        | Field::LineSpacing => true,
-        Field::FontSize => (1..=256).contains(&value),
-        Field::Text | Field::Lifetime | Field::Setting => false,
-    };
-    ok.then(|| i32::try_from(value).ok()).flatten()
+        | Field::LineSpacing => 0..=reach(480),
+        Field::FontSize => 1..=256,
+        Field::Text | Field::Lifetime | Field::Setting => return None,
+    })
+}
+
+// Why core refused a typed time on screen.
+fn time_note(text: &str) -> String {
+    if text.parse::<f64>().is_ok() {
+        "Must be between 0 and 1920, with at most two decimals".to_owned()
+    } else {
+        "Numbers only".to_owned()
+    }
 }
 
 // Each `CustomFontFiles` file the HUD lists; a missing or unreadable one is skipped.
