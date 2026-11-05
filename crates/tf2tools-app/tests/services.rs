@@ -138,9 +138,15 @@ fn a_detection_hit_survives_a_failed_save() {
 
 #[test]
 fn op_errors_read_as_a_toast_title_and_description() {
-    assert_eq!(OpError::NoTf2.title(), "TF2 path not set");
-    assert_eq!(OpError::NoTf2.description(), "");
-    assert_eq!(OpError::NoTf2.to_string(), "TF2 path not set");
+    assert_eq!(OpError::NoTf2.title(), "TF2 not found");
+    assert_eq!(
+        OpError::NoTf2.description(),
+        "Set the TF2 folder in Settings, then try again."
+    );
+    assert_eq!(
+        OpError::NoTf2.to_string(),
+        "TF2 not found: Set the TF2 folder in Settings, then try again."
+    );
     let e = OpError::core("Install HUD", "disk full");
     assert_eq!((e.title(), e.description()), ("Install HUD", "disk full"));
     assert_eq!(e.to_string(), "Install HUD: disk full");
