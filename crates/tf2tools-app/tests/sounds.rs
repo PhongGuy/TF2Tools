@@ -1,9 +1,6 @@
 mod support;
 
-use std::cell::Cell;
-use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext, px};
@@ -141,22 +138,10 @@ fn toasts_drop_back_down_off_the_sounds_page(cx: &mut TestAppContext) {
     assert!(toast.bottom() > player_top, "{toast:?} still lifted");
 }
 
+// The app's one player outlives the page, so a load still in flight when the player leaves
+// plays once it lands, and the player floats over the next page to show it.
 #[gpui_kit::test]
-fn leaving_the_page_stops_the_sound(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let page = open_sounds(cx, &s);
-    play(cx, &page, "Ding", vec![1]);
-    support::wait_real(cx, "the play", |_| s.audio.plays().len() == 1);
-    drop(page);
-    support::click_id(cx, s.win, ids::nav(Page::Huds));
-    support::wait_real(cx, "the stop", |_| {
-        s.audio.calls().last() == Some(&AudioCall::Stop)
-    });
-}
-
-#[gpui_kit::test]
-fn a_load_that_lands_after_leaving_plays_nothing(cx: &mut TestAppContext) {
+fn a_load_that_lands_after_leaving_still_plays(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let page = open_sounds(cx, &s);
@@ -167,50 +152,20 @@ fn a_load_that_lands_after_leaving_plays_nothing(cx: &mut TestAppContext) {
         name: "Ding".into(),
         subtitle: "test".into(),
     };
-    let loaded = Arc::new(AtomicBool::new(false));
-    let flag = loaded.clone();
     // Start the play and leave in one update, so the page is gone before the load lands.
-    let task = cx
-        .update_window(s.win, |_, _, cx| {
-            let task = player.update(cx, |p, cx| {
-                p.toggle(
-                    now,
-                    move |_| {
-                        flag.store(true, Ordering::SeqCst);
-                        Ok(vec![1])
-                    },
-                    cx,
-                )
-            });
-            s.shell
-                .update(cx, |shell, cx| shell.navigate(Page::Huds, cx));
-            task
-        })
-        .unwrap();
+    cx.update_window(s.win, |_, _, cx| {
+        player.update(cx, |p, cx| p.toggle(now, |_| Ok(vec![1]), cx).detach());
+        s.shell
+            .update(cx, |shell, cx| shell.navigate(Page::Huds, cx));
+    })
+    .unwrap();
     drop(player);
-    // The toggle's task ends once the landed load has found the player gone.
-    let done = Rc::new(Cell::new(false));
-    let finished = done.clone();
-    cx.update(|cx| {
-        cx.spawn(async move |_| {
-            task.await;
-            finished.set(true);
-        })
-        .detach()
-    });
-    // A late play never ends on the recording audio, so stop waiting at the first play too
-    // and let the assertion name it rather than the wait time out.
-    support::wait_real(cx, "the toggle's task or a play", |_| {
-        done.get() || !s.audio.plays().is_empty()
-    });
-    assert!(
-        s.audio.plays().is_empty(),
-        "a load that landed after leaving still played"
-    );
-    assert!(done.get());
-    assert!(loaded.load(Ordering::SeqCst));
+    support::wait_real(cx, "the late play", |_| s.audio.plays().len() == 1);
     support::settle(cx, s.win);
-    assert!(s.audio.plays().is_empty());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::SOUND_PLAYER_NAME).as_deref(),
+        Some("Ding")
+    );
 }
 
 /// A TF2-playable WAV: 16-bit stereo PCM at `rate` Hz, `frames` frames of silence.

@@ -24,7 +24,7 @@ use tf2tools_core::{
 
 use super::common::{SM_ICON_PX, YELLOW_500, badge_of, card_frame};
 use crate::activity;
-use crate::audio::player::{NowPlaying, Player};
+use crate::audio::player::{NowPlaying, Player, sound_player};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_import, describe_library, describe_tf2_install};
@@ -48,8 +48,8 @@ enum Busy {
     Uninstall(SoundKind),
 }
 
-/// The Sounds page. Built fresh on each visit with its own `Player`; it reloads whenever the
-/// TF2 state changes.
+/// The Sounds page. Built fresh on each visit and plays through the app's one player; it
+/// reloads whenever the TF2 state changes.
 pub struct SoundsPage {
     win: AnyWindowHandle,
     sounds: Rc<[SoundEntry]>,
@@ -77,7 +77,7 @@ impl SoundsPage {
         let tf2 = cx.observe(&tf2_state(cx), |page, _, cx| page.reload(cx));
         let events = LibraryEvents::global(cx);
         let library = cx.subscribe(&events, |page, _, _: &LibraryChanged, cx| page.reload(cx));
-        let player = cx.new(|cx| Player::new(window, cx));
+        let player = sound_player(window, cx);
         // The slot play icons read the player's sound, so redraw when it starts or ends.
         let observe_player = cx.observe(&player, |_, _, cx| cx.notify());
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search sounds..."));
@@ -112,7 +112,7 @@ impl SoundsPage {
         self.loaded
     }
 
-    /// The floating player; it goes with the page, which stops its sound.
+    /// The app's floating player; its sound outlives the page.
     pub fn player(&self) -> &Entity<Player> {
         &self.player
     }
@@ -855,7 +855,6 @@ impl SoundsPage {
 }
 
 impl Render for SoundsPage {
-    // The player floats over the page's bottom right corner, so it is the root's last child.
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let slots = h_flex()
             .gap_4()
@@ -876,7 +875,6 @@ impl Render for SoundsPage {
             .child(slots)
             .children(conflicts)
             .child(self.library(cx))
-            .child(self.player.clone())
     }
 }
 

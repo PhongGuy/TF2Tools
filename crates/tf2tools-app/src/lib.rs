@@ -39,6 +39,7 @@ pub mod widgets;
 pub fn init(cx: &mut gpui_kit::App) {
     gpui_kit::init(cx);
     shell::toast::ToastLayer::register(cx);
+    audio::player::PlayerLayer::register(cx);
     theme::install(cx);
     keymap::bind(cx);
 }

@@ -7,10 +7,7 @@ use gpui_kit::AppContext as _;
 
 use gpui_kit::TestAppContext;
 use tf2tools_app::audio::AudioCall;
-use tf2tools_app::audio::player::NowPlaying;
 use tf2tools_app::ids;
-use tf2tools_app::services::Tf2State;
-use tf2tools_app::shell::route::Page;
 use tf2tools_core::{GbId, StoreItemId, StoreKind};
 
 const S: StoreKind = StoreKind::Sounds;
@@ -120,33 +117,6 @@ fn the_card_play_button_reads_stop_while_playing_and_play_after(cx: &mut TestApp
         Some("Play"),
         "after a failed preview"
     );
-}
-
-#[gpui_kit::test]
-fn leaving_the_sound_store_stops_the_preview(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    support::click_id(cx, s.win, ids::nav(Page::SoundStore));
-    let page = cx
-        .update(|cx| s.shell.read(cx).sound_store_page())
-        .expect("the page");
-    support::wait_real(cx, "the player", |cx| {
-        cx.update(|cx| page.read(cx).player().read(cx).is_ready())
-    });
-    let player = cx.update(|cx| page.read(cx).player().clone());
-    let now = NowPlaying {
-        key: "store-sound:1".into(),
-        name: "Ding".into(),
-        subtitle: "by vex".into(),
-    };
-    cx.update(|cx| player.update(cx, |p, cx| p.toggle(now, |_| Ok(vec![1]), cx).detach()));
-    support::wait_real(cx, "the play", |_| s.audio.plays().len() == 1);
-    drop(player);
-    drop(page);
-    support::click_id(cx, s.win, ids::nav(Page::Huds));
-    support::wait_real(cx, "the stop", |_| {
-        s.audio.calls().last() == Some(&AudioCall::Stop)
-    });
 }
 
 #[gpui_kit::test]
