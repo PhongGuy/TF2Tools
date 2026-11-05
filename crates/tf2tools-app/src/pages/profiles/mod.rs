@@ -343,6 +343,7 @@ impl ProfilesPage {
         let page = cx.entity().downgrade();
         window.defer(cx, move |window, cx| {
             let frame = DialogFrame::new(DIALOG_WIDTH);
+            let field = input.clone();
             window.open_dialog(cx, move |dialog, window, cx| {
                 let typed = input.read(cx).value();
                 let blank = typed.trim().is_empty();
@@ -426,6 +427,8 @@ impl ProfilesPage {
                     ),
                 )
             });
+            // Opening focuses the dialog; the name field takes the keyboard from it.
+            field.update(cx, |st, cx| st.focus(window, cx));
         });
     }
 

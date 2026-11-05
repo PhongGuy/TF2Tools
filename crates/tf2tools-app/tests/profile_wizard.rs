@@ -187,6 +187,32 @@ fn create_new_opens_the_wizard_on_the_name_step(cx: &mut TestAppContext) {
     }
 }
 
+// The name field takes the keyboard as the wizard opens, for Create and Edit alike.
+#[gpui_kit::test]
+fn the_wizard_focuses_its_name_field(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Comp"))
+        .unwrap();
+    let page = open_profiles(cx, &s);
+    let name_focused = |cx: &mut TestAppContext, w: &Entity<ProfileWizard>| {
+        let input = cx.update(|cx| w.read(cx).name_input().clone());
+        cx.update_window(s.win, |_, win, cx| {
+            use gpui_kit::Focusable as _;
+            input.read(cx).focus_handle(cx).is_focused(win)
+        })
+        .unwrap()
+    };
+    let w = open_wizard(cx, &s, &page, ids::PROFILES_CREATE);
+    assert!(name_focused(cx, &w), "Create");
+    support::click_id(cx, s.win, ids::WIZARD_CANCEL);
+    let w = open_wizard(cx, &s, &page, ids::profile_edit(comp.id()));
+    assert!(name_focused(cx, &w), "Edit");
+}
+
 #[gpui_kit::test]
 fn the_empty_state_create_opens_it_too(cx: &mut TestAppContext) {
     let env = support::env();

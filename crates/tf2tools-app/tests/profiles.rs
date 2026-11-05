@@ -394,6 +394,24 @@ fn the_save_dialog_carries_v5_s_description(cx: &mut TestAppContext) {
     );
 }
 
+// The name field takes the keyboard as the dialog opens, so the player can type at once.
+#[gpui_kit::test]
+fn the_save_dialog_focuses_its_name_field(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::PROFILES_SAVE_CURRENT);
+    support::settle(cx, s.win);
+    let input = cx.update(|cx| page.read(cx).save_name_input().clone());
+    let focused = cx
+        .update_window(s.win, |_, w, cx| {
+            use gpui_kit::Focusable as _;
+            input.read(cx).focus_handle(cx).is_focused(w)
+        })
+        .unwrap();
+    assert!(focused, "the name field has the keyboard");
+}
+
 #[gpui_kit::test]
 fn a_blank_name_cannot_be_saved(cx: &mut TestAppContext) {
     let env = support::env();
