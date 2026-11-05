@@ -145,3 +145,32 @@ fn the_class_menu_keeps_the_colour_its_file_gives_the_room(cx: &mut TestAppConte
     );
     assert!(support::present(cx, s.win, ids::hud_maker_fill(&bg)));
 }
+
+#[gpui_kit::test]
+fn the_text_box_of_a_line_the_game_writes_says_the_preview_shows_a_sample(cx: &mut TestAppContext) {
+    let s = spectator(cx, support::hud_stock::SPECTATOR);
+    let page = cx.update(|cx| s.shell.read(cx).hud_maker_page()).unwrap();
+    let select = |cx: &mut TestAppContext, name: &str| {
+        let key = PartKey::new(format!("Spectator/{name}"));
+        cx.update(|cx| {
+            page.update(cx, |p, cx| {
+                p.editor_mut().unwrap().select(Some(key));
+                cx.notify();
+            })
+        });
+        support::settle(cx, s.win);
+    };
+    // The game replaces MapLabel's text with the map being played, so its Text box disagrees
+    // with the canvas unless the panel says why.
+    select(cx, "MapLabel");
+    assert!(support::present(cx, s.win, ids::HUD_MAKER_TEXT));
+    let note = support::label_of(cx, s.win, ids::HUD_MAKER_PANEL_CODE_TEXT);
+    assert_eq!(
+        note.as_deref(),
+        Some("The game fills in this text, so the preview shows an example.")
+    );
+    // A line that shows its own text has no such note.
+    select(cx, "SwitchCamModeLabel");
+    assert!(support::present(cx, s.win, ids::HUD_MAKER_TEXT));
+    assert!(!support::present(cx, s.win, ids::HUD_MAKER_PANEL_CODE_TEXT));
+}

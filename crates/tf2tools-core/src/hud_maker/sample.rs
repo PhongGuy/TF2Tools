@@ -853,6 +853,12 @@ impl SampleSet {
             .map(|&(_, text)| text)
     }
 
+    /// Whether the game's code sizes `part` to its text, so its file's width never cuts it:
+    /// the class menu's team count line (`CTFClassMenu::ApplySchemeSettings`).
+    pub fn sizes_to_text(self, part: &str) -> bool {
+        self == SampleSet::ClassPick && part.eq_ignore_ascii_case("CountLabel")
+    }
+
     /// The note for a part the game fills with content the preview cannot draw; only the
     /// class menu and MvM samples have any.
     pub fn game_filled(self, part: &str) -> Option<&'static str> {

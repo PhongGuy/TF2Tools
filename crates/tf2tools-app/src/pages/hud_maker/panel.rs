@@ -51,6 +51,7 @@ const FROM_BASE: &str =
     "This part comes from another file the HUD includes, so it can't be changed here yet";
 const BASE_MISSING: &str =
     "Some files this part builds on weren't found, so it may look different in the game.";
+const CODE_TEXT: &str = "The game fills in this text, so the preview shows an example.";
 pub(super) const RESET_TIP: &str = "Reset to the HUD's default";
 const MIRROR_TIP: &str = "Move it to the other side of the screen, left and right swapped";
 const MIRROR_WIDTH_TIP: &str = "This part's width follows the screen, so it can't be mirrored.";
@@ -117,6 +118,8 @@ struct Rows {
     // The player hid the part by giving it size zero, so its size reads as hidden.
     size_hidden: bool,
     names: Vec<(String, Hsla)>,
+    // The game's code writes the part's text, so the canvas shows a sample, not the Text box.
+    code_text: bool,
 }
 
 /// Sizes a panel body: docked, it fills what its frame has; floating, it keeps its own height
@@ -558,6 +561,9 @@ impl HudMakerPage {
                 (name.to_owned(), swatch)
             })
             .collect();
+        let sample = model.scene_rule().sample();
+        let code_text =
+            sample.code_text(part.name()).is_some() || sample.code_label(part.name()).is_some();
         Body::Rows(Rows {
             base_missing: part.base_incomplete(),
             shows: (part.code_toggled().map(|toggled| toggled.shows_when()))
@@ -568,6 +574,7 @@ impl HudMakerPage {
             hidden,
             size_hidden,
             names,
+            code_text,
         })
     }
 
@@ -697,6 +704,9 @@ impl HudMakerPage {
                 _ => None,
             };
             out.push(self.row(spec, changed, extra, content, cx));
+            if spec.kind() == PropertyKind::Text && rows.code_text {
+                out.push(note(ids::HUD_MAKER_PANEL_CODE_TEXT, CODE_TEXT.into()));
+            }
         }
         out.extend(self.picture_row(cx));
         out.extend(self.flash_row(cx));

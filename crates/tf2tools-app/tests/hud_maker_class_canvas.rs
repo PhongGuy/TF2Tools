@@ -204,3 +204,22 @@ fn the_tips_box_is_outlined_as_drawn_in_game(cx: &mut TestAppContext) {
         Some("Class tips draw in game")
     );
 }
+
+#[gpui_kit::test]
+fn the_team_count_line_shows_whole_as_the_game_sizes_it_to_its_text(cx: &mut TestAppContext) {
+    let lang = r#""lang" { "Language" "English" "Tokens" { "TF_TeamCount" "Other players on your team" } }"#;
+    let env = support::env();
+    let s = shell_with_textures(cx, &env, &[("resource/tf_english.txt", Some(lang))]);
+    let _page = open_maker(cx, &s);
+    support::click_scene(cx, s.win, Scene::ClassSelect);
+    let key = PartKey::new("class/CountLabel");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::hud_maker_text(&key)).as_deref(),
+        Some("Other players on your team")
+    );
+    // The file's 150-unit box is narrower than the line; the game's code widens the label to
+    // its text, so nothing past the box is cut.
+    let part = support::bounds_of(cx, s.win, ids::hud_maker_part(&key)).unwrap();
+    let shown = support::bounds_of(cx, s.win, ids::hud_maker_text_clip(&key)).unwrap();
+    assert!(shown.right() > part.right(), "{shown:?} cut at {part:?}");
+}
