@@ -365,7 +365,9 @@ const TOOLBAR: [&str; 21] = [
 ];
 
 #[gpui_kit::test]
-fn the_toolbar_stays_inside_the_canvas_column_at_small_window_sizes(cx: &mut TestAppContext) {
+fn the_toolbar_stays_above_the_grid_and_clear_of_the_panel_at_small_window_sizes(
+    cx: &mut TestAppContext,
+) {
     let env = support::env();
     let s = shell(cx, &env);
     let _page = open_maker(cx, &s);
@@ -386,9 +388,16 @@ fn the_toolbar_stays_inside_the_canvas_column_at_small_window_sizes(cx: &mut Tes
             column.right() <= panel.left(),
             "{w}x{h}: the column {column:?} runs under the panel {panel:?}"
         );
+        // A wide window keeps the toolbar in the canvas column; a narrow one runs it over the
+        // panel too.
+        let right = if w < 1024. {
+            panel.right()
+        } else {
+            column.right()
+        };
         for (id, b) in TOOLBAR.iter().zip(&got) {
             assert!(
-                b.left() >= column.left() && b.right() <= column.right(),
+                b.left() >= column.left() && b.right() <= right,
                 "{w}x{h}: {id} {b:?} leaves the column {column:?}"
             );
             assert!(
@@ -436,8 +445,16 @@ fn no_toolbar_row_starts_or_ends_with_a_divider(cx: &mut TestAppContext) {
         let mut wanted: Vec<ElementId> = TOOLBAR.into_iter().map(ElementId::from).collect();
         wanted.extend(dividers.iter().cloned());
         wanted.push(ids::CROSSHAIR_MAKER_VIEW.into());
+        wanted.push(ids::CROSSHAIR_MAKER_PANEL.into());
         let mut got = boxes(cx, &s, &wanted);
+        let panel = got.pop().unwrap();
         let column = got.pop().unwrap();
+        // A narrow window runs the toolbar over the panel as well as the column.
+        let right = if w < 1024. {
+            panel.right()
+        } else {
+            column.right()
+        };
         // A divider left of the column is clipped away at a row's start, so only boxes inside
         // the column are drawn; none may straddle its edge.
         let mut rows: Vec<Vec<(bool, Bounds<Pixels>)>> = Vec::new();
@@ -447,7 +464,7 @@ fn no_toolbar_row_starts_or_ends_with_a_divider(cx: &mut TestAppContext) {
                 continue;
             }
             assert!(
-                b.left() >= column.left() && b.right() <= column.right(),
+                b.left() >= column.left() && b.right() <= right,
                 "{w}x{h}: {:?} {b:?} is cut by the column {column:?}",
                 wanted[ix]
             );
@@ -2535,4 +2552,75 @@ fn shrinking_a_drawing_that_fits_does_not_ask(cx: &mut TestAppContext) {
         CanvasSize::Small
     );
     assert_eq!(painted(cx, &page), [(4, 4)]);
+}
+
+// At 900x600 with the sidebar open the toolbar keeps to two rows clear of the grid and the
+// panel, the grid keeps 6 px cells at 64x64, and every panel control fits and scrolls into view.
+#[gpui_kit::test]
+fn at_900x600_the_toolbar_keeps_two_rows_and_the_grid_six_pixel_cells(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = shell(cx, &env);
+    let page = open_maker(cx, &s);
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(900.), px(600.)));
+    let mut wanted: Vec<ElementId> = TOOLBAR.into_iter().map(ElementId::from).collect();
+    wanted.push(ids::CROSSHAIR_MAKER_VIEW.into());
+    wanted.push(ids::CROSSHAIR_MAKER_PANEL.into());
+    let mut got = boxes(cx, &s, &wanted);
+    let panel = got.pop().unwrap();
+    let view = got.pop().unwrap();
+    assert!(
+        view.right() <= panel.left(),
+        "{view:?} runs under {panel:?}"
+    );
+    let mut rows: Vec<Pixels> = Vec::new();
+    for (id, b) in TOOLBAR.iter().zip(&got) {
+        assert!(
+            b.left() >= view.left() && b.right() <= panel.right(),
+            "{id} {b:?} leaves the page"
+        );
+        assert!(
+            b.bottom() <= view.top() && b.bottom() <= panel.top(),
+            "{id} {b:?} overlaps the grid {view:?} or the panel {panel:?}"
+        );
+        if !rows
+            .iter()
+            .any(|y| (*y - support::mid_y(*b)).abs() < px(2.))
+        {
+            rows.push(support::mid_y(*b));
+        }
+    }
+    assert!(rows.len() <= 2, "the toolbar wraps to {} rows", rows.len());
+    let (side, cell) = cx.update(|cx| {
+        let page = page.read(cx);
+        (page.editor().size().side(), page.cell_size())
+    });
+    assert_eq!(side, 64);
+    assert!(cell >= px(6.), "cells are {cell:?}");
+    // Each panel control fits the panel's width, and the last one scrolls into view.
+    let controls: Vec<ElementId> = [
+        ids::CROSSHAIR_MAKER_NAME,
+        ids::CROSSHAIR_MAKER_SAVE,
+        ids::CROSSHAIR_MAKER_SAVE_AS_NEW,
+        ids::CROSSHAIR_MAKER_COLOR,
+        ids::CROSSHAIR_MAKER_OPACITY,
+        ids::CROSSHAIR_MAKER_OUTLINE,
+        ids::CROSSHAIR_MAKER_BACKGROUND,
+        ids::CROSSHAIR_MAKER_PREVIEW_COLOR,
+    ]
+    .into_iter()
+    .map(ElementId::from)
+    .chain((0..4).map(ids::crosshair_maker_swatch))
+    .collect();
+    for (id, b) in controls.iter().zip(boxes(cx, &s, &controls)) {
+        assert!(
+            b.left() >= panel.left() && b.right() <= panel.right(),
+            "{id:?} {b:?} leaves the panel {panel:?}"
+        );
+    }
+    send(cx, &s, wheel(panel.center(), -50., Modifiers::default()));
+    let last = boxes(cx, &s, &[ids::CROSSHAIR_MAKER_PREVIEW_COLOR.into()])[0];
+    assert!(
+        last.top() >= panel.top() && last.bottom() <= panel.bottom(),
+        "{last:?} stays out of the panel {panel:?}"
+    );
 }
