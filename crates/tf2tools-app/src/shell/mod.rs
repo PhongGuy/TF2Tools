@@ -176,11 +176,11 @@ impl Shell {
         self.page
     }
 
-    // Leaving a library page, a maker or Settings drops it, so the next visit builds it fresh
-    // from the saved state: Settings rereads its form, HUDs its library. The stores and the
-    // Activity Log are kept, hidden, so a return finds their tab, search, filters, sort and
-    // scroll as left. Re-selecting the current page keeps it as it is. A playing sound plays
-    // on; the idle player shows only on the sound pages, and toasts rise above it while it shows.
+    // Leaving a library page or a maker drops it, so the next visit builds it fresh from the
+    // saved state. The stores, the Activity Log and Settings are kept, hidden, so a return finds
+    // their tab, search, filters, sort, scroll and unsaved edits as left. Re-selecting the
+    // current page keeps it as it is. A playing sound plays on; the idle player shows only on
+    // the sound pages, and toasts rise above it while it shows.
     pub fn navigate(&mut self, page: Page, cx: &mut Context<Self>) {
         if page == self.page {
             return;
@@ -194,7 +194,6 @@ impl Shell {
         self.crosshairs = None;
         self.crosshair_maker = None;
         self.hud_maker = None;
-        self.settings = None;
         self.addons = None;
         self.profiles = None;
         self.set_kept_hidden(page, false, cx);
@@ -218,6 +217,9 @@ impl Shell {
                 p.update(cx, |p, cx| p.set_hidden(hidden, cx));
             }),
             Page::Logs => self.logs.as_ref().map(|p| {
+                p.update(cx, |p, cx| p.set_hidden(hidden, cx));
+            }),
+            Page::Settings => self.settings.as_ref().map(|p| {
                 p.update(cx, |p, cx| p.set_hidden(hidden, cx));
             }),
             _ => None,
@@ -293,7 +295,7 @@ impl Shell {
 
     /// The Settings page while it shows.
     pub fn settings_page(&self) -> Option<Entity<SettingsPage>> {
-        self.settings.clone()
+        self.shown(Page::Settings, &self.settings)
     }
 
     /// The HUD Store page while it shows.

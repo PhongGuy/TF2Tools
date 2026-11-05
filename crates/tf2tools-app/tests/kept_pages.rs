@@ -1,6 +1,7 @@
 //! The stores and the Activity Log outlive a visit to another page: leaving and coming back
 //! finds their tab, search, filters, sort, category and scroll as the player left them, while
-//! what changed meanwhile (the library, a sync, new log rows) still shows on return.
+//! what changed meanwhile (the library, a sync, new log rows) still shows on return. Settings
+//! keeps its unsaved edits the same way.
 
 mod support;
 
@@ -13,6 +14,7 @@ use tf2tools_app::library_events::LibraryEvents;
 use tf2tools_app::pages::hud_store::curated::{Facet, Os};
 use tf2tools_app::pages::hud_store::gamebanana_tab::GameBananaTab;
 use tf2tools_app::pages::hud_store::{HudStorePage, HudStoreTab};
+use tf2tools_app::pages::settings::SettingsPage;
 use tf2tools_app::pages::sound_store::model::Category;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
@@ -450,4 +452,100 @@ fn the_huds_page_is_rebuilt_on_return(cx: &mut TestAppContext) {
         .update(|cx| s.shell.read(cx).huds_page())
         .expect("the HUDs page again");
     assert_ne!(first.entity_id(), second.entity_id());
+}
+
+// Settings opened through the sidebar, once its first load has landed.
+fn settings(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<SettingsPage> {
+    let page = cx
+        .update(|cx| s.shell.read(cx).settings_page())
+        .expect("Settings");
+    support::wait_real(cx, "settings to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+    page
+}
+
+fn settings_path(cx: &mut TestAppContext, page: &Entity<SettingsPage>) -> String {
+    cx.update(|cx| page.read(cx).path_input().read(cx).value().to_string())
+}
+
+fn settings_hours(cx: &mut TestAppContext, page: &Entity<SettingsPage>) -> f32 {
+    cx.update(|cx| page.read(cx).cache_hours().read(cx).value().start())
+}
+
+fn type_path(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    page: &Entity<SettingsPage>,
+    path: &str,
+) {
+    let input = cx.update(|cx| page.read(cx).path_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        input.update(cx, |state, cx| state.set_value(path, window, cx))
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+}
+
+fn set_hours(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    page: &Entity<SettingsPage>,
+    hours: f32,
+) {
+    let slider = cx.update(|cx| page.read(cx).cache_hours().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        slider.update(cx, |state, cx| state.set_value(hours, window, cx))
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+}
+
+// Unsaved Settings edits outlive a trip to another page, and Save then writes them.
+#[gpui_kit::test]
+fn settings_keeps_unsaved_edits_until_save(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, missing());
+    support::click_id(cx, s.win, ids::nav(Page::Settings));
+    let page = settings(cx, &s);
+    let game = env.game.display().to_string();
+    type_path(cx, &s, &page, &game);
+    set_hours(cx, &s, &page, 48.);
+
+    away_and_back(cx, &s, Page::Settings);
+    let again = settings(cx, &s);
+    assert_eq!(again.entity_id(), page.entity_id(), "the same page");
+    assert_eq!(settings_path(cx, &again), game);
+    assert_eq!(settings_hours(cx, &again), 48.);
+
+    cx.update_window(s.win, |_, window, cx| {
+        again.update(cx, |page, cx| page.save(window, cx))
+    })
+    .unwrap();
+    support::wait_real(cx, "the saved path", |_| {
+        s.services.db.settings().unwrap().tf2_path() == Some(env.game.as_path())
+    });
+    assert_eq!(s.services.db.settings().unwrap().sync_cache_hours(), 48);
+}
+
+// A field left untouched shows what was saved elsewhere while Settings was hidden, while an
+// edited one keeps the edit.
+#[gpui_kit::test]
+fn settings_refreshes_untouched_fields_on_return(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, missing());
+    support::click_id(cx, s.win, ids::nav(Page::Settings));
+    let page = settings(cx, &s);
+    set_hours(cx, &s, &page, 48.);
+
+    support::click_id(cx, s.win, ids::nav(Page::Huds));
+    s.services.db.set_tf2_path(Some(&env.game)).unwrap();
+    s.services.db.set_sync_cache_hours(12).unwrap();
+    support::click_id(cx, s.win, ids::nav(Page::Settings));
+    let game = env.game.display().to_string();
+    support::wait_real(cx, "the path saved while away", |cx| {
+        settings_path(cx, &page) == game
+    });
+    assert_eq!(settings_hours(cx, &page), 48.);
 }

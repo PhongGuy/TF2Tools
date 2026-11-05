@@ -12,13 +12,15 @@ use gpui_kit::component::select::{Select, SelectEvent, SelectState};
 use gpui_kit::component::slider::{Slider, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::{
-    AnyElement, App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _,
-    IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
+    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
     StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
     px, relative,
 };
 
-use tf2tools_core::{LogLevel, NewLogEntry, SettingsError, StoreKind, StoreSyncStatus, Tf2Install};
+use tf2tools_core::{
+    LogLevel, NewLogEntry, Settings, SettingsError, StoreKind, StoreSyncStatus, Tf2Install,
+};
 
 use crate::activity;
 use crate::audio::volume::{bind_slider, shared_volume};
@@ -73,11 +75,16 @@ impl SearchableListItem for Tf2Candidate {
 
 type Candidates = Entity<SelectState<Vec<Tf2Candidate>>>;
 
-/// The Settings form. Built fresh on each visit, it loads the saved settings on creation.
+/// The Settings form. The shell keeps it across visits, so unsaved edits stay until Save; it
+/// loads the saved settings on creation and rereads them each time it shows again.
 pub struct SettingsPage {
+    window: AnyWindowHandle,
     path: Entity<InputState>,
     volume: Entity<SliderState>,
     cache_hours: Entity<SliderState>,
+    /// The path and hours last read or saved; a field still holding them is untouched.
+    saved_path: SharedString,
+    saved_hours: u32,
     /// The install select, present only after Auto-detect found several installs.
     candidates: Option<Candidates>,
     loaded: bool,
@@ -188,9 +195,12 @@ impl SettingsPage {
         // The App Updates card draws the updater's state, so every change redraws the page.
         let updates = updater(cx).map(|u| cx.observe(&u, |_, _, cx| cx.notify()));
         let mut page = Self {
+            window: window.window_handle(),
             path,
             volume,
             cache_hours,
+            saved_path: SharedString::default(),
+            saved_hours: 0,
             candidates: None,
             loaded: false,
             busy: None,
@@ -207,7 +217,7 @@ impl SettingsPage {
             scroll: ScrollHandle::new(),
             notices_scroll: ScrollHandle::new(),
         };
-        page.load(window, cx);
+        page.load(true, cx);
         page.load_sync(window, cx);
         page
     }
@@ -233,37 +243,63 @@ impl SettingsPage {
         &self.cache_hours
     }
 
-    // Reads the settings in the background, then fills the form; a failed read toasts and
-    // leaves the defaults so the form stays usable.
-    fn load(&self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Rereads the saved settings on return, so a field left untouched shows what changed
+    /// while the page was hidden; an edited field keeps its edit.
+    pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        if !hidden {
+            self.load(false, cx);
+        }
+    }
+
+    // Reads the settings in the background, then fills the form: every field on the first
+    // load, afterwards only the untouched ones. A failed read toasts and leaves the form as is.
+    fn load(&self, first: bool, cx: &mut Context<Self>) {
         let reading = run_blocking(cx, |s| {
             s.db.settings()
                 .map_err(|e| describe_settings(&e).into_op("Load settings"))
         });
-        cx.spawn_in(window, async move |page, cx| {
+        let win = self.window;
+        cx.spawn(async move |page, cx| {
             let read = reading.await;
-            let _ = page.update_in(cx, |page, window, cx| {
-                match read {
-                    Ok(settings) => {
-                        let path = settings
-                            .tf2_path()
-                            .map(|p| p.display().to_string())
-                            .unwrap_or_default();
-                        page.path
-                            .update(cx, |input, cx| input.set_value(path, window, cx));
-                        shared_volume(cx)
-                            .update(cx, |shared, cx| shared.loaded(settings.volume(), cx));
-                        let hours = settings.sync_cache_hours() as f32;
-                        page.cache_hours
-                            .update(cx, |s, cx| s.set_value(hours, window, cx));
+            let _ = cx.update_window(win, |_, window, cx| {
+                page.update(cx, |page, cx| {
+                    match read {
+                        Ok(settings) => page.fill(&settings, first, window, cx),
+                        Err(err) => toast_error(window, cx, &err),
                     }
-                    Err(err) => toast_error(window, cx, &err),
-                }
-                page.loaded = true;
-                cx.notify();
+                    page.loaded = true;
+                    cx.notify();
+                })
             });
         })
         .detach();
+    }
+
+    // Puts the saved values in the fields still holding the last ones read, or in all of them.
+    fn fill(
+        &mut self,
+        settings: &Settings,
+        all: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let path: SharedString = settings
+            .tf2_path()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default()
+            .into();
+        if all || self.path.read(cx).value() == self.saved_path {
+            self.path
+                .update(cx, |input, cx| input.set_value(path.clone(), window, cx));
+        }
+        self.saved_path = path;
+        shared_volume(cx).update(cx, |shared, cx| shared.loaded(settings.volume(), cx));
+        let hours = settings.sync_cache_hours();
+        if all || whole(&self.cache_hours, cx) == self.saved_hours {
+            self.cache_hours
+                .update(cx, |s, cx| s.set_value(hours as f32, window, cx));
+        }
+        self.saved_hours = hours;
     }
 
     // Reads every store's status off the UI thread; only the newest read may land, so a slow
@@ -453,7 +489,8 @@ impl SettingsPage {
     /// Validates a non-empty path before any write, so a bad path leaves the database as it
     /// was; an empty one keeps the saved path, as v5 does. A found install then drives `Tf2State`.
     pub fn save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let path = self.path.read(cx).value().trim().to_owned();
+        let typed = self.path.read(cx).value();
+        let path = typed.trim().to_owned();
         let hours = whole(&self.cache_hours, cx).clamp(1, 720);
         let saving = run_blocking(cx, move |s| {
             let failed = |e: SettingsError| describe_settings(&e).into_op("Failed to save");
@@ -473,8 +510,8 @@ impl SettingsPage {
         });
         self.busy = Some(Busy::Save);
         cx.notify();
-        // Leaving Settings drops the page mid-save, so the state and the toast go through the
-        // app and the window; only the busy flag needs the page.
+        // The state and the toast go through the app and the window, so they land even if the
+        // page is gone; the page only takes its busy flag and its new untouched values.
         let win = window.window_handle();
         cx.spawn(async move |page, cx| {
             let saved = saving.await;
@@ -486,6 +523,7 @@ impl SettingsPage {
                     .map(|()| install),
                 failed => failed,
             };
+            let ok = saved.is_ok();
             cx.update(|cx| {
                 if let Ok(Some(install)) = &saved {
                     tf2_state(cx).update(cx, |tf2, cx| {
@@ -499,6 +537,10 @@ impl SettingsPage {
                 });
             });
             let _ = page.update(cx, |page, cx| {
+                if ok {
+                    page.saved_path = typed;
+                    page.saved_hours = hours;
+                }
                 page.busy = None;
                 cx.notify();
             });
