@@ -3669,8 +3669,9 @@ impl HudMakerPage {
         self.columns_area().size.width - TOOLBAR_GAP * 2. < TOOLBAR_TWO_ROWS
     }
 
-    // The screen shape menu, then Undo and Redo, the name and save row, the overflow menu and
-    // the button that collapses the toolbar.
+    // The screen shape menu, then Undo and Redo, the name and save row and the overflow menu,
+    // which wrap among themselves; the button that collapses the toolbar sits outside the wrap,
+    // so it always closes the first row.
     fn toolbar(&self, screen: Screen, cx: &mut Context<Self>) -> AnyElement {
         let (can_undo, can_redo) = self
             .editor()
@@ -3712,7 +3713,9 @@ impl HudMakerPage {
             .tooltip("Hide toolbar")
             .accessibility_label("Hide toolbar")
             .on_click(cx.listener(|page, _, _, cx| page.set_toolbar_collapsed(true, cx)));
-        h_flex()
+        let body = h_flex()
+            .flex_1()
+            .min_w_0()
             .flex_wrap()
             .items_start()
             .gap_2()
@@ -3725,8 +3728,12 @@ impl HudMakerPage {
                     .flatten(),
             )
             .child(self.more_menu(cx))
-            .child(collapse)
-            .children(self.live_note_row(cx))
+            .children(self.live_note_row(cx));
+        h_flex()
+            .items_start()
+            .gap_2()
+            .child(body)
+            .child(collapse.flex_none())
             .into_any_element()
     }
 

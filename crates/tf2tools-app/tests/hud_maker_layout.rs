@@ -107,3 +107,20 @@ fn the_scene_bar_picks_tabs_or_menu_by_width_alone(cx: &mut TestAppContext) {
         "the chooser changed with the scene: {mixed:?}"
     );
 }
+
+// At 900x600 the hide button shares the toolbar's first row with the screen menu.
+#[gpui_kit::test]
+fn at_900x600_the_hide_button_stays_on_the_toolbars_first_row(cx: &mut TestAppContext) {
+    let (s, page) = open_at(cx, 900., 600.);
+    let mut wrapped = Vec::new();
+    for scene in Scene::ALL {
+        set_scene(cx, &s, &page, scene);
+        let menu = bounds(cx, &s, ids::HUD_MAKER_SCREEN_MENU);
+        let hide = bounds(cx, &s, ids::HUD_MAKER_TOOLBAR_COLLAPSE);
+        let middle = hide.top() + hide.size.height / 2.;
+        if middle < menu.top() || middle > menu.bottom() {
+            wrapped.push((scene, menu, hide));
+        }
+    }
+    assert!(wrapped.is_empty(), "the hide button wrapped: {wrapped:?}");
+}
