@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tempfile::TempDir;
-use tf2tools_core::{HudEntry, Provenance};
+use tf2tools_core::{GbId, HudEntry, Provenance};
 
 use super::{LibraryEnv, vpk_bytes, write_file, zip_bytes};
 
@@ -25,6 +25,15 @@ pub fn folder_with(root: &Path, files: &[(&str, &str)]) -> PathBuf {
         write_file(&root.join(rel), text.as_bytes());
     }
     root.to_path_buf()
+}
+
+/// A store item's provenance: only the same store item arriving again replaces its library
+/// HUD, so a base that is updated by a re-import needs one.
+pub fn store_item() -> Provenance {
+    Provenance::GameBanana {
+        gb_id: GbId::new(7),
+        author: "someone".into(),
+    }
 }
 
 static ARCHIVES: AtomicUsize = AtomicUsize::new(0);

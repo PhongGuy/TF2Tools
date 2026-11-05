@@ -54,7 +54,7 @@ fn a_copy_with_a_newer_base_offers_update_and_reports_it(cx: &mut TestAppContext
         env.tmp.path(),
         "somehud",
         "TanLight",
-        Provenance::Local,
+        support::hud_copies::store_item(),
     );
     let copy = s.services.library.copy_hud(base.id()).unwrap();
     seed_base(
@@ -62,7 +62,7 @@ fn a_copy_with_a_newer_base_offers_update_and_reports_it(cx: &mut TestAppContext
         env.tmp.path(),
         "somehud",
         "TanDark",
-        Provenance::Local,
+        support::hud_copies::store_item(),
     );
     revisit_huds(cx, &s);
     support::wait_real(cx, "the update check", |cx| {
@@ -96,7 +96,7 @@ fn updating_an_installed_copy_reinstalls_it(cx: &mut TestAppContext) {
         env.tmp.path(),
         "somehud",
         "TanLight",
-        Provenance::Local,
+        support::hud_copies::store_item(),
     );
     let copy = s.services.library.copy_hud(base.id()).unwrap();
     let tf2 = Tf2Install::from_path(&env.game).unwrap();
@@ -112,7 +112,7 @@ fn updating_an_installed_copy_reinstalls_it(cx: &mut TestAppContext) {
         env.tmp.path(),
         "somehud",
         "TanDark",
-        Provenance::Local,
+        support::hud_copies::store_item(),
     );
     revisit_huds(cx, &s);
     support::wait_real(cx, "the update check", |cx| {
@@ -171,7 +171,7 @@ fn edit_waits_while_an_update_runs(cx: &mut TestAppContext) {
         env.tmp.path(),
         "somehud",
         "TanLight",
-        Provenance::Local,
+        support::hud_copies::store_item(),
     );
     let copy = s.services.library.copy_hud(base.id()).unwrap();
     seed_base(
@@ -179,7 +179,7 @@ fn edit_waits_while_an_update_runs(cx: &mut TestAppContext) {
         env.tmp.path(),
         "somehud",
         "TanDark",
-        Provenance::Local,
+        support::hud_copies::store_item(),
     );
     revisit_huds(cx, &s);
     support::wait_real(cx, "the update check", |cx| {

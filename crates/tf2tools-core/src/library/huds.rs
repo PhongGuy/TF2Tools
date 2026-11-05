@@ -114,6 +114,7 @@ pub struct HudEntry {
     has_gallery: bool,
     created_at: String,
     updated_at: String,
+    wanted_name: Option<String>,
 }
 
 impl HudEntry {
@@ -162,6 +163,12 @@ impl HudEntry {
     pub fn updated_at(&self) -> &str {
         &self.updated_at
     }
+
+    /// The name an import wanted when another library HUD already had it, so this one
+    /// took a numbered name instead. Only the entry `import_hud` returns carries it.
+    pub fn wanted_name(&self) -> Option<&str> {
+        self.wanted_name.as_deref()
+    }
 }
 
 pub(super) const HUD_COLUMNS: &str = "id, folder_name, name, author, store_hud_id, store_gb_id, \
@@ -183,6 +190,46 @@ pub(super) fn hud_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<HudEntry> 
         has_gallery: r.get::<_, i64>("has_gallery")? != 0,
         created_at: r.get("created_at")?,
         updated_at: r.get("updated_at")?,
+        wanted_name: None,
+    })
+}
+
+/// The numbered name a HUD takes when the one it wanted is in use.
+struct Rename {
+    name: String,
+    wanted: String,
+}
+
+/// The display name and author a HUD in `folder_name` takes from the store row its
+/// provenance points at; without a store row the folder name stands in for the name.
+fn hud_display(
+    conn: &rusqlite::Connection,
+    folder_name: &str,
+    provenance: &Provenance,
+    store_gb_id: Option<i64>,
+) -> rusqlite::Result<(String, String)> {
+    let fallback = || (folder_name.to_owned(), String::new());
+    Ok(match provenance {
+        Provenance::Local => fallback(),
+        Provenance::Curated { hud_id } => conn
+            .query_row(
+                "SELECT name, author FROM store_huds WHERE hud_id = ?1",
+                [hud_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?
+            .unwrap_or_else(fallback),
+        Provenance::GameBanana { author, .. } => {
+            let name = conn
+                .query_row(
+                    "SELECT name FROM store_huds_gb WHERE gb_id = ?1",
+                    [store_gb_id],
+                    |r| r.get(0),
+                )
+                .optional()?
+                .unwrap_or_else(|| folder_name.to_owned());
+            (name, author.clone())
+        }
     })
 }
 
@@ -200,8 +247,10 @@ impl Library {
     }
 
     /// Imports the HUD inside `archive` (any format `extract_archive` reads) into
-    /// `library/huds/<folder>`, replacing a previous import of the same folder, and records
-    /// it with `provenance`. Fails with `NotAHud` when no `info.vdf` is inside.
+    /// `library/huds/<folder>` and records it with `provenance`. The same store item in that
+    /// folder is replaced; any other HUD holding the folder or the name stays, and this one
+    /// takes a numbered name (see `HudEntry::wanted_name`). Fails with `NotAHud` when no
+    /// `info.vdf` is inside.
     pub fn import_hud(
         &self,
         archive: &Path,
@@ -236,16 +285,96 @@ impl Library {
                 path: archive.to_path_buf(),
             })?;
 
-        self.add_hud_folder(&root, &folder_name, provenance)
+        let (folder_name, rename) = self.place_hud(&folder_name, &provenance)?;
+        self.add_hud_folder(&root, &folder_name, provenance, rename)
+    }
+
+    /// Where a HUD arriving as `folder` with `provenance` goes. The same store item already
+    /// in that folder is an update and goes back in place. Any other HUD holding the folder
+    /// or the display name, or a folder already on disk, keeps it, and the newcomer takes
+    /// the first free number: `<folder>-<n>` named `<name> (<n>)`.
+    fn place_hud(
+        &self,
+        folder: &str,
+        provenance: &Provenance,
+    ) -> Result<(String, Option<Rename>), ImportError> {
+        let gb_column = match provenance {
+            Provenance::GameBanana { gb_id, .. } => Some(gb_id_column(*gb_id)?),
+            _ => None,
+        };
+        let (name, rows) = self
+            .db
+            .read(|conn| {
+                let (name, _) = hud_display(conn, folder, provenance, gb_column)?;
+                let mut stmt = conn.prepare(
+                    "SELECT folder_name, name, store_hud_id, store_gb_id FROM library_huds",
+                )?;
+                let rows = stmt
+                    .query_map([], |r| {
+                        Ok((
+                            r.get::<_, String>(0)?,
+                            r.get::<_, String>(1)?,
+                            r.get::<_, Option<String>>(2)?,
+                            r.get::<_, Option<i64>>(3)?,
+                        ))
+                    })?
+                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                Ok((name, rows))
+            })
+            .map_err(import_db)?;
+
+        // Rows of this very store item never stand in the way; a manual import has no
+        // identity, so it is never the same HUD.
+        let same_item = |hud_id: Option<&str>, gb_id: Option<i64>| match provenance {
+            Provenance::Local => false,
+            Provenance::Curated { hud_id: wanted } => hud_id == Some(wanted.as_str()),
+            Provenance::GameBanana { .. } => gb_id.is_some() && gb_id == gb_column,
+        };
+        let mut folders = HashSet::new();
+        let mut names = HashSet::new();
+        for (row_folder, row_name, hud_id, gb_id) in &rows {
+            if same_item(hud_id.as_deref(), *gb_id) {
+                if row_folder == folder {
+                    return Ok((folder.to_owned(), None));
+                }
+                continue;
+            }
+            folders.insert(row_folder.as_str());
+            names.insert(row_name.as_str());
+        }
+
+        let library = self.dir.library_dir(LibraryKind::Huds);
+        let free = |f: &str, n: &str| {
+            !folders.contains(f)
+                && !names.contains(n)
+                && library.join(f).symlink_metadata().is_err()
+        };
+        if free(folder, &name) {
+            return Ok((folder.to_owned(), None));
+        }
+        let mut number = 2u32;
+        loop {
+            let numbered_folder = format!("{folder}-{number}");
+            let numbered_name = format!("{name} ({number})");
+            if free(&numbered_folder, &numbered_name) {
+                let rename = Rename {
+                    name: numbered_name,
+                    wanted: name,
+                };
+                return Ok((numbered_folder, Some(rename)));
+            }
+            number = number.saturating_add(1);
+        }
     }
 
     /// Copies the HUD at `root` to `library/huds/<folder_name>`, replacing what is there, and
-    /// records it. A failure leaves no folder behind.
+    /// records it, under `rename`'s name when given. A failure leaves no folder behind.
     fn add_hud_folder(
         &self,
         root: &Path,
         folder_name: &str,
         provenance: Provenance,
+        rename: Option<Rename>,
     ) -> Result<HudEntry, ImportError> {
         let dest = self.dir.library_dir(LibraryKind::Huds).join(folder_name);
         let copied = remove_dir_if_present(&dest)
@@ -256,7 +385,7 @@ impl Library {
             return Err(failure.into());
         }
 
-        let recorded = self.record_hud(folder_name, provenance);
+        let recorded = self.record_hud(folder_name, provenance, rename);
         if recorded.is_err() {
             let _ = remove_dir_if_present(&dest);
         }
@@ -264,11 +393,12 @@ impl Library {
     }
 
     /// Writes the `library_huds` row for a freshly copied folder, taking the display name
-    /// and author from the store row its provenance points at.
+    /// (unless `rename` gives one) and author from the store row its provenance points at.
     fn record_hud(
         &self,
         folder_name: &str,
         provenance: Provenance,
+        rename: Option<Rename>,
     ) -> Result<HudEntry, ImportError> {
         let (source, store_hud_id, store_gb_id) = match &provenance {
             Provenance::Local => ("local", None, None),
@@ -280,30 +410,11 @@ impl Library {
         self.db
             .write(|conn| {
                 let tx = conn.transaction()?;
-                // Without a store row the folder name stands in for the display name.
-                let fallback = || (folder_name.to_owned(), String::new());
-                let (name, author) = match &provenance {
-                    Provenance::Local => fallback(),
-                    Provenance::Curated { hud_id } => tx
-                        .query_row(
-                            "SELECT name, author FROM store_huds WHERE hud_id = ?1",
-                            [hud_id],
-                            |r| Ok((r.get(0)?, r.get(1)?)),
-                        )
-                        .optional()?
-                        .unwrap_or_else(fallback),
-                    Provenance::GameBanana { author, .. } => {
-                        let name = tx
-                            .query_row(
-                                "SELECT name FROM store_huds_gb WHERE gb_id = ?1",
-                                [store_gb_id],
-                                |r| r.get(0),
-                            )
-                            .optional()?
-                            .unwrap_or_else(|| folder_name.to_owned());
-                        (name, author.clone())
-                    }
-                };
+                let (mut name, author) = hud_display(&tx, folder_name, &provenance, store_gb_id)?;
+                let wanted_name = rename.map(|rename| {
+                    name = rename.name;
+                    rename.wanted
+                });
                 tx.execute(
                     "INSERT OR REPLACE INTO library_huds (id, folder_name, name, author, source,
                          store_hud_id, store_gb_id, created_at, updated_at)
@@ -330,6 +441,7 @@ impl Library {
                     has_gallery: false,
                     created_at: timestamp.clone(),
                     updated_at: timestamp,
+                    wanted_name,
                 })
             })
             .map_err(import_db)
@@ -610,7 +722,7 @@ impl Library {
             let src = custom.join(&hud.folder);
             refuse_uncopyable(&src)?;
             let folder = self.free_hud_folder(hud.folder_name())?;
-            let entry = self.add_hud_folder(&src, &folder, Provenance::Local);
+            let entry = self.add_hud_folder(&src, &folder, Provenance::Local, None);
             kept.push(entry.map_err(keep_import)?);
         }
         Ok(kept)

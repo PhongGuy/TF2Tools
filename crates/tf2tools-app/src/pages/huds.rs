@@ -471,7 +471,7 @@ impl HudsPage {
                         let entry = NewLogEntry::new(LogLevel::Info, "hud", "import", message)
                             .with_details(format!("Source: {}", path.display()));
                         activity::write(s, &entry);
-                        let added = format!("{} added to your library", hud.name());
+                        let added = added_message(&hud);
                         Ok((ToastKind::Success, "HUD imported".into(), added.into()))
                     },
                     cx,
@@ -906,6 +906,15 @@ fn conflict_box(cx: &App) -> AnyElement {
                 ),
         )
         .into_any_element()
+}
+
+/// The toast line for a HUD just added to the library, naming the numbered name it took
+/// when another library HUD already had the one it wanted.
+pub(crate) fn added_message(hud: &HudEntry) -> String {
+    match hud.wanted_name() {
+        Some(_) => format!("Added to your library as {}", hud.name()),
+        None => format!("{} added to your library", hud.name()),
+    }
 }
 
 fn is_store(hud: &HudEntry) -> bool {

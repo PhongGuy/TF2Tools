@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use tf2tools_app::services::Services;
-use tf2tools_core::{EditorSchema, EditorSchemas, HudEntry, HudFiles, LibraryKind, Provenance};
+use tf2tools_core::{EditorSchema, EditorSchemas, HudEntry, HudFiles, LibraryKind};
 
 use super::hud_stock::{HEALTH, stock};
 
@@ -52,8 +52,13 @@ pub fn seed_switch_copy(services: &Services, dir: &Path) -> HudEntry {
         .iter()
         .map(|(p, t)| (p.as_str(), t.as_str()))
         .collect();
-    let base =
-        super::hud_copies::import_stock_hud(services, dir, "somehud", &refs, Provenance::Local);
+    let base = super::hud_copies::import_stock_hud(
+        services,
+        dir,
+        "somehud",
+        &refs,
+        super::hud_copies::store_item(),
+    );
     services.library.copy_hud(base.id()).unwrap()
 }
 

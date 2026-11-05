@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::hud_copy::import_stock_hud;
+use common::hud_copy::{import_stock_hud, store_item};
 use common::hud_stock::HEALTH;
 use common::{LibraryEnv, library_env, sql};
 use tf2tools_core::{CopyUpdate, LibraryKind, Provenance};
@@ -27,13 +27,13 @@ fn store(env: &LibraryEnv, hash: &str) {
 #[test]
 fn a_reinstall_with_new_bytes_is_offered_and_same_bytes_are_not() {
     let env = library_env();
-    let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    let base = import_stock_hud(&env, "somehud", &[], store_item());
     let copy = env.lib.copy_hud(base.id()).unwrap();
     assert_eq!(
         env.lib.copy_update(copy.id()).unwrap(),
         CopyUpdate::UpToDate
     );
-    import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    import_stock_hud(&env, "somehud", &[], store_item());
     assert_eq!(
         env.lib.copy_update(copy.id()).unwrap(),
         CopyUpdate::UpToDate
@@ -43,7 +43,7 @@ fn a_reinstall_with_new_bytes_is_offered_and_same_bytes_are_not() {
         &env,
         "somehud",
         &[("resource/ui/hudplayerhealth.res", &health)],
-        Provenance::Local,
+        store_item(),
     );
     assert_eq!(
         env.lib.copy_update(copy.id()).unwrap(),

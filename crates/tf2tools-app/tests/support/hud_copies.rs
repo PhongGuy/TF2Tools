@@ -5,7 +5,16 @@ use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tf2tools_app::services::Services;
-use tf2tools_core::{HudEntry, Provenance};
+use tf2tools_core::{GbId, HudEntry, Provenance};
+
+/// A store item's provenance: only the same store item arriving again replaces its library
+/// HUD, so a base updated by a re-import needs one.
+pub fn store_item() -> Provenance {
+    Provenance::GameBanana {
+        gb_id: GbId::new(7),
+        author: "someone".into(),
+    }
+}
 
 static ARCHIVES: AtomicUsize = AtomicUsize::new(0);
 

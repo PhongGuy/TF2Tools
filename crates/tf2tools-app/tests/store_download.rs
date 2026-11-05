@@ -272,6 +272,44 @@ fn a_gamebanana_hud_downloads_into_the_library_and_toasts(cx: &mut TestAppContex
 }
 
 #[gpui_kit::test]
+fn a_download_whose_name_is_taken_keeps_both_and_names_the_new_one(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_gb_files(
+        7,
+        &[("flawhud.zip", support::hud_zip_bytes("flawhud"))],
+        Duration::ZERO,
+    );
+    let (win, _) = support::store_window(
+        cx,
+        &env,
+        &server,
+        |env| support::seed_gb_huds(env, &[(7, "FlawHUD")]),
+        |_, _| support::Blank,
+    );
+    // The player's own FlawHUD, imported by hand under the same folder name.
+    let own = env.tmp.path().join("flawhud.zip");
+    std::fs::write(&own, support::hud_zip_bytes("flawhud")).unwrap();
+    cx.update(|cx| {
+        let services = cx.global::<Services>();
+        services
+            .library
+            .import_hud(&own, Provenance::Local)
+            .unwrap();
+    });
+    let d = downloads(cx);
+    let file = files(cx, GB, &gb(7)).remove(0);
+    assert!(start(cx, &d, win, target(GB, gb(7), "FlawHUD"), file));
+    wait_idle(cx, &d);
+    support::wait_real(cx, "the toast", |cx| support::present(cx, win, ids::TOAST));
+    assert_eq!(
+        support::label_of(cx, win, ids::TOAST).as_deref(),
+        Some("HUD downloaded. Added to your library as FlawHUD (2)")
+    );
+    assert_eq!(library(cx).len(), 2);
+}
+
+#[gpui_kit::test]
 fn a_failed_download_toasts_and_leaves_the_library_alone(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();

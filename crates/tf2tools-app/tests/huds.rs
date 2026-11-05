@@ -282,6 +282,25 @@ fn add_hud_imports_the_picked_archive(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn an_import_whose_name_is_taken_keeps_both_and_names_the_new_one(cx: &mut TestAppContext) {
+    let env = support::env();
+    let archive = hud_zip(env.tmp.path(), "budhud");
+    let picker = Arc::new(ScriptedPicker::new([archive]));
+    let s = support::shell_window_with(cx, &env, found(&env), picker, support::no_steam());
+    seed(&s.services, &env, "budhud", Provenance::Local);
+    let _page = revisit(cx, &s);
+    support::click_id(cx, s.win, ids::HUDS_ADD);
+    support::wait_real(cx, "the import toast", |cx| {
+        support::present(cx, s.win, ids::TOAST)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::TOAST).as_deref(),
+        Some("HUD imported. Added to your library as budhud (2)")
+    );
+    assert_eq!(s.services.library.list_huds().unwrap().len(), 2);
+}
+
+#[gpui_kit::test]
 fn a_cancelled_pick_changes_nothing(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window_with(

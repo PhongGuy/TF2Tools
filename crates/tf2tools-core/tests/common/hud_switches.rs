@@ -99,7 +99,7 @@ pub fn copy_with(env: &super::LibraryEnv, layer: &[(String, String)]) -> tf2tool
         .map(|(p, t)| (p.as_str(), t.as_str()))
         .collect();
     let base =
-        super::hud_copy::import_stock_hud(env, "somehud", &extra, tf2tools_core::Provenance::Local);
+        super::hud_copy::import_stock_hud(env, "somehud", &extra, super::hud_copy::store_item());
     env.lib.copy_hud(base.id()).unwrap()
 }
 pub fn dir(env: &super::LibraryEnv, hud: &tf2tools_core::HudEntry) -> PathBuf {
