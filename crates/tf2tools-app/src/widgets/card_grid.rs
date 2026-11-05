@@ -94,6 +94,8 @@ pub struct CardGrid {
     /// The row range of uniform_list's last range call this frame, as `(start, end)`.
     rendered: Rc<Cell<(usize, usize)>>,
     hooks: Rc<Hooks>,
+    /// Empty room after the last row, so it can scroll clear of something floating over the grid.
+    foot: Pixels,
 }
 
 type VisibleHook = Rc<dyn Fn(Range<usize>, &mut App)>;
@@ -120,7 +122,13 @@ impl CardGrid {
             card_height: Rc::new(Cell::new(px(0.))),
             rendered: Rc::new(Cell::new((0, 0))),
             hooks: Rc::new(Hooks::default()),
+            foot: px(0.),
         }
+    }
+
+    /// This grid with `foot` of empty room scrolled in after its last row.
+    pub fn with_foot(self, foot: Pixels) -> Self {
+        Self { foot, ..self }
     }
 
     /// A grid on the store breakpoints (up to 4 columns), capped at `max_columns`.
@@ -243,7 +251,8 @@ impl CardGrid {
         })
         .track_scroll(&self.scroll)
         .test_support()
-        .size_full();
+        .size_full()
+        .pb(self.foot);
 
         let grid = div()
             .relative()

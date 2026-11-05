@@ -1,5 +1,5 @@
 //! The Sounds page at small windows: the page scrolls as a whole over a grid of at least one card
-//! row, slot text keeps clear of Uninstall, and nothing the page draws hides under the player.
+//! row, slot text keeps clear of Uninstall, and the last card row scrolls clear of the player.
 
 mod support;
 
@@ -161,8 +161,39 @@ fn the_slot_cards_share_one_height(cx: &mut TestAppContext) {
     }
 }
 
-// At 900x600 the page scrolls as a whole to a grid at least one card tall, which scrolls to its
-// own last card; the page's end leaves the grid clear of the floating player and its toasts.
+// Scrolls the grid to its end under a fresh toast: the last row ends inside the grid and above
+// both the floating player and the toast.
+fn assert_last_row_clears_the_player(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    page: &Entity<SoundsPage>,
+    cards: &[ElementId],
+) {
+    let grid_scroll = grid_scroll(cx, page);
+    to_end(cx, s, &grid_scroll);
+    cx.update_window(s.win, |_, window, cx| {
+        toast(window, cx, ToastKind::Success, "Hitsound installed", "")
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    let (grid, player, note) = (
+        bounds(cx, s.win, ids::SOUNDS_GRID),
+        bounds(cx, s.win, ids::SOUND_PLAYER),
+        bounds(cx, s.win, ids::TOAST),
+    );
+    let last = drawn(cx, s, cards)
+        .into_iter()
+        .map(|b| b.bottom())
+        .fold(px(0.), Pixels::max);
+    assert!(
+        last <= grid.bottom() + px(1.) && last <= player.top().min(note.top()),
+        "the last row ends at {last:?}: past the grid {grid:?}, the player {player:?} or the \
+         toast {note:?}"
+    );
+}
+
+// At 900x600 the page scrolls as a whole to a grid at least one card tall, and at the page's end
+// the grid's last row scrolls clear of the floating player and its toast.
 #[gpui_kit::test]
 fn at_900x600_the_page_scrolls_to_a_card_row_clear_of_the_player(cx: &mut TestAppContext) {
     let env = support::env();
@@ -178,25 +209,11 @@ fn at_900x600_the_page_scrolls_to_a_card_row_clear_of_the_player(cx: &mut TestAp
     assert_bar_beside(cx, s.win, ids::SOUNDS_GRID, bar.clone());
     let scroll = page_scroll(cx, &page);
     to_end(cx, &s, &scroll);
-    cx.update_window(s.win, |_, window, cx| {
-        toast(window, cx, ToastKind::Success, "Hitsound installed", "")
-    })
-    .unwrap();
-    support::settle(cx, s.win);
     let card = drawn(cx, &s, &cards)[0];
-    let (grid, player, note, area) = (
-        bounds(cx, s.win, ids::SOUNDS_GRID),
-        bounds(cx, s.win, ids::SOUND_PLAYER),
-        bounds(cx, s.win, ids::TOAST),
-        bounds(cx, s.win, area),
-    );
+    let (grid, area) = (bounds(cx, s.win, ids::SOUNDS_GRID), bounds(cx, s.win, area));
     assert!(
         grid.size.height >= card.size.height && grid.bottom() <= area.bottom() + px(1.),
         "the grid {grid:?} shows no full {card:?} row in the page {area:?}"
-    );
-    assert!(
-        grid.bottom() <= player.top().min(note.top()),
-        "the grid {grid:?} runs under the player {player:?} or the toast {note:?}"
     );
     let first = cards
         .iter()
@@ -204,28 +221,26 @@ fn at_900x600_the_page_scrolls_to_a_card_row_clear_of_the_player(cx: &mut TestAp
         .unwrap()
         .clone();
     assert_track_scrolls_virtual(cx, s.win, bar, first);
-    let grid_scroll = grid_scroll(cx, &page);
-    to_end(cx, &s, &grid_scroll);
-    let last = drawn(cx, &s, &cards)
-        .into_iter()
-        .map(|b| b.bottom())
-        .fold(px(0.), Pixels::max);
-    assert!(
-        last <= grid.bottom() + px(1.),
-        "the last row ends at {last:?}, below the grid {grid:?}"
-    );
+    assert_last_row_clears_the_player(cx, &s, &page, &cards);
 }
 
-// At a common size the page fits, so only the grid's bar shows.
+// At a common size the page fits and the grid runs to the page's 48 px margin, as on HUDs; only
+// the grid's bar shows, and its last row still scrolls clear of the player.
 #[gpui_kit::test]
 fn at_1280x800_only_the_sounds_grid_scrolls(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Found(tf2(&env)));
     let cards = seed_many(&s, &env, 24);
     resize(cx, &s, 1280., 800.);
-    let _page = open_sounds(cx, &s);
+    let page = open_sounds(cx, &s);
     let bar = ids::grid_scrollbar(ids::SOUNDS_GRID);
     assert_bar_beside(cx, s.win, ids::SOUNDS_GRID, bar.clone());
     assert_track_stays(cx, s.win, ids::page(Page::Sounds), ids::SOUNDS_LIBRARY);
+    let grid = bounds(cx, s.win, ids::SOUNDS_GRID);
+    assert!(
+        grid.bottom() >= px(800. - 48. - 1.),
+        "the grid {grid:?} stops short of the window's 48 px margin"
+    );
     assert_track_scrolls_virtual(cx, s.win, bar, cards[0].clone());
+    assert_last_row_clears_the_player(cx, &s, &page, &cards);
 }

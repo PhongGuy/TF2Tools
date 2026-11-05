@@ -39,11 +39,11 @@ use crate::widgets::card_grid::CardGrid;
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
 
-/// A library card's height, and the grid's floor: a short window scrolls the page instead.
+/// A library card's height; a short window scrolls the page rather than cut the grid below a row.
 const CARD_HEIGHT: Pixels = px(136.);
-// The page ends above the floating player and one toast lifted over it, so scrolled to its end
-// no card's buttons sit under either.
-const PAGE_FOOT: Pixels = px(200.);
+// Room after the grid's last row, so it scrolls clear of the floating player and one toast lifted
+// over it; the grid's floor keeps that room under one row on a short page.
+const PLAYER_CLEARANCE: Pixels = px(152.);
 
 /// The action in flight: its button spins and the other mutating buttons disable.
 #[derive(Clone, PartialEq, Eq)]
@@ -109,7 +109,7 @@ impl SoundsPage {
             load_generation: 0,
             player,
             search,
-            grid: CardGrid::new(ids::SOUNDS_GRID),
+            grid: CardGrid::new(ids::SOUNDS_GRID).with_foot(PLAYER_CLEARANCE),
             scroll: ScrollHandle::new(),
             _tf2: tf2,
             _library: library,
@@ -880,7 +880,7 @@ impl SoundsPage {
                     .id(ids::SOUNDS_LIBRARY)
                     .test_support()
                     .flex_1()
-                    .min_h(CARD_HEIGHT)
+                    .min_h(CARD_HEIGHT + PLAYER_CLEARANCE)
                     .children(body),
             )
     }
@@ -916,7 +916,6 @@ impl Render for SoundsPage {
             .track_scroll(&self.scroll)
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
-            .pb(PAGE_FOOT)
             .gap_6()
             .children(warning)
             .child(slots)
