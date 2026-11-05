@@ -1,12 +1,12 @@
 //! Startup: open the window on the loading view, open the services off the UI thread, then show
 //! the shell or the startup error view, and detect TF2 once the shell has drawn.
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
-use gpui_kit::component::Theme;
+use gpui_kit::component::{Theme, TitleBar};
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, Bounds, Font, FontWeight, TitlebarOptions, Window,
-    WindowBounds, WindowOptions, font, px, size,
+    WindowBounds, WindowDecorations, WindowOptions, font, px, size,
 };
 use tf2tools_core::{DataDir, Endpoints, FontHost, Recovery, Tf2Install};
 
@@ -274,21 +274,36 @@ fn recover_live_link(services: &Services, tf2: &Tf2Install) {
     }
 }
 
-// The main window: centred at 1200x900, never smaller than 800x600. The compositor draws the
-// title bar, as v5's Tauri window used native decorations.
-fn window_options(cx: &App) -> WindowOptions {
+/// The packaged 256 px app icon for the taskbar and window switcher, decoded once; `None`
+/// only if the committed PNG were corrupt.
+pub fn window_icon() -> Option<Arc<image::RgbaImage>> {
+    static ICON: OnceLock<Option<Arc<image::RgbaImage>>> = OnceLock::new();
+    let png = include_bytes!("../../../packaging/icons/128x128@2x.png");
+    ICON.get_or_init(|| {
+        image::load_from_memory_with_format(png, image::ImageFormat::Png)
+            .ok()
+            .map(|img| Arc::new(img.to_rgba8()))
+    })
+    .clone()
+}
+
+/// The main window's options: centred at 1200x900, never smaller than 800x600, built on the kit
+/// title bar's. On Linux the header draws the title bar, so the compositor adds none.
+pub fn window_options(cx: &App) -> WindowOptions {
     WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
             None,
             size(px(1200.), px(900.)),
             cx,
         ))),
+        window_decorations: cfg!(target_os = "linux").then_some(WindowDecorations::Client),
         titlebar: Some(TitlebarOptions {
             title: Some("TF2Tools".into()),
-            ..Default::default()
+            ..TitleBar::title_bar_options()
         }),
         app_id: Some(APP_ID.into()),
         window_min_size: Some(size(px(800.), px(600.))),
-        ..Default::default()
+        icon: window_icon(),
+        ..TitleBar::window_options()
     }
 }
