@@ -18,7 +18,9 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::widgets::card_grid::CardGrid;
 use tf2tools_app::widgets::scroll::scroll_area;
-use tf2tools_core::{LogLevel, NewLogEntry, ProfileDraft, Provenance, Tf2Install};
+use tf2tools_core::{
+    GbId, LogLevel, NewLogEntry, ProfileDraft, Provenance, StoreItemId, StoreKind, Tf2Install,
+};
 
 const LIST: &str = "probe-list";
 const BAR: &str = "probe-bar";
@@ -453,4 +455,178 @@ fn a_long_log_shows_a_bar_beside_its_rows(cx: &mut TestAppContext) {
     assert_bar_beside(cx, s.win, ids::LOGS_LIST, ids::LOGS_LIST_SCROLLBAR);
     assert_clear_of_bar(cx, s.win, ids::log_row(first), ids::LOGS_LIST_SCROLLBAR);
     assert_track_scrolls_virtual(cx, s.win, ids::LOGS_LIST_SCROLLBAR, ids::log_row(first));
+}
+
+/// Seeds 12 curated HUDs whose facets fill the "More filters" rows as a real hud-db sync does.
+fn seed_curated_huds(env: &support::Env) -> Vec<ElementId> {
+    let mut chips = Vec::new();
+    for ix in 0..12 {
+        let (flag, tag, mode, res) = (
+            format!("flag{ix}"),
+            format!("tag{ix}"),
+            format!("mode{}", ix % 5),
+            format!("{}x1080", 1440 + ix % 4),
+        );
+        let data = format!(
+            r#"{{"flags":["menus","minmode","crosshairs","{flag}"],"tags":["clean","{tag}"],"traits":{{"gamemode":["{mode}"],"res":["{res}"],"os":["windows","mac","linux"]}}}}"#
+        );
+        let id = format!("hud{ix:02}");
+        support::seed_curated(env, &id, &id, "a", None, &data);
+        for (facet, value) in [
+            ("flag", flag),
+            ("tag", tag),
+            ("gamemode", mode),
+            ("resolution", res),
+        ] {
+            chips.push(ids::store_filter(facet, &value));
+        }
+    }
+    chips
+}
+
+/// Opens the HUD Store's curated tab and waits for its HUDs.
+fn open_curated(cx: &mut TestAppContext, s: &support::ShellWindow) -> ScrollHandle {
+    open(cx, s, Page::HudStore);
+    let page = cx.update(|cx| s.shell.read(cx).hud_store_page()).unwrap();
+    let tab = cx.update(|cx| page.read(cx).curated()).unwrap();
+    support::wait_real(cx, "the curated HUDs", |cx| {
+        cx.update(|cx| tab.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+    cx.update(|cx| page.read(cx).page_scroll())
+}
+
+// Every control in `controls` lies across the page's width, and the page scrolls far enough to
+// show it; then, scrolled to its end, the page shows the whole grid at least one `card` tall.
+fn assert_reachable_with_a_card_row(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    page: Page,
+    scroll: &ScrollHandle,
+    controls: &[ElementId],
+    card: ElementId,
+) {
+    let area = bounds(cx, s.win, ids::page(page));
+    let reach = area.bottom() + scroll.max_offset().y;
+    for id in controls {
+        let b = bounds(cx, s.win, id.clone());
+        assert!(
+            b.left() >= area.left() && b.right() <= area.right() && b.bottom() <= reach,
+            "{id:?} at {b:?} is out of reach of the page {area:?}"
+        );
+    }
+    let card = bounds(cx, s.win, card);
+    scroll.set_offset(point(px(0.), -scroll.max_offset().y));
+    support::settle(cx, s.win);
+    let grid = bounds(cx, s.win, ids::STORE_GRID);
+    assert!(
+        grid.size.height >= card.size.height && grid.bottom() <= area.bottom() + px(1.),
+        "the grid {grid:?} shows no full {card:?} row in the page {area:?}"
+    );
+}
+
+// At 900x600 with More filters open, the page scrolls so every chip and a full card row show.
+#[gpui_kit::test]
+fn at_900x600_the_open_curated_filters_leave_a_card_row(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let mut controls = seed_curated_huds(&env);
+    resize(cx, &s, 900., 600.);
+    let scroll = open_curated(cx, &s);
+    support::click_id(cx, s.win, ids::STORE_FILTER_MORE);
+    controls.extend([
+        ids::STORE_FILTER_MORE.into(),
+        ids::STORE_FILTER_PRERELEASE.into(),
+        ids::STORE_FILTER_OS_GROUP.into(),
+    ]);
+    let page = ids::page(Page::HudStore);
+    assert_bar_on_right_edge(cx, s.win, page.clone(), ids::page_scrollbar(Page::HudStore));
+    let card = ids::store_card(
+        StoreKind::CuratedHuds,
+        &StoreItemId::Curated("hud00".into()),
+    );
+    assert_reachable_with_a_card_row(cx, &s, Page::HudStore, &scroll, &controls, card);
+    assert_bar_beside(
+        cx,
+        s.win,
+        ids::STORE_GRID,
+        ids::grid_scrollbar(ids::STORE_GRID),
+    );
+}
+
+// At a common size with the filters closed the curated page fits, so only its grid scrolls.
+#[gpui_kit::test]
+fn at_1280x800_only_the_curated_grid_scrolls(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    seed_curated_huds(&env);
+    resize(cx, &s, 1280., 800.);
+    open_curated(cx, &s);
+    let card = ids::store_card(
+        StoreKind::CuratedHuds,
+        &StoreItemId::Curated("hud00".into()),
+    );
+    assert_track_stays(cx, s.win, ids::page(Page::HudStore), card.clone());
+    let bar = ids::grid_scrollbar(ids::STORE_GRID);
+    assert_bar_beside(cx, s.win, ids::STORE_GRID, bar.clone());
+    assert_track_scrolls_virtual(cx, s.win, bar, card);
+}
+
+/// Seeds 12 hitsounds and opens the Sound Store on them; the most liked, 12, leads.
+fn open_sound_store(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    env: &support::Env,
+) -> ScrollHandle {
+    let names: Vec<String> = (1..=12).map(|i| format!("Sound {i}")).collect();
+    let rows: Vec<_> = names
+        .iter()
+        .zip(1..)
+        .map(|(name, id)| (id, name.as_str(), "hitsound", None))
+        .collect();
+    support::seed_sounds(env, &rows);
+    open(cx, s, Page::SoundStore);
+    let page = cx.update(|cx| s.shell.read(cx).sound_store_page()).unwrap();
+    let grid = cx.update(|cx| page.read(cx).grid().clone());
+    support::wait_real(cx, "the sounds", |cx| {
+        cx.update(|cx| grid.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+    cx.update(|cx| page.read(cx).page_scroll())
+}
+
+// At 900x600 the Sound Store's category pills and sort stay in reach over a full card row.
+#[gpui_kit::test]
+fn at_900x600_the_sound_store_filters_leave_a_card_row(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    resize(cx, &s, 900., 600.);
+    let scroll = open_sound_store(cx, &s, &env);
+    let mut controls: Vec<ElementId> = ["all", "hitsound", "killsound"]
+        .into_iter()
+        .map(ids::store_category)
+        .collect();
+    controls.extend([ids::STORE_SORT.into(), ids::STORE_SEARCH.into()]);
+    let page = ids::page(Page::SoundStore);
+    assert_bar_on_right_edge(
+        cx,
+        s.win,
+        page.clone(),
+        ids::page_scrollbar(Page::SoundStore),
+    );
+    let card = ids::store_card(StoreKind::Sounds, &StoreItemId::GameBanana(GbId::new(12)));
+    assert_reachable_with_a_card_row(cx, &s, Page::SoundStore, &scroll, &controls, card);
+}
+
+#[gpui_kit::test]
+fn at_1280x800_only_the_sound_store_grid_scrolls(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    resize(cx, &s, 1280., 800.);
+    open_sound_store(cx, &s, &env);
+    let card = ids::store_card(StoreKind::Sounds, &StoreItemId::GameBanana(GbId::new(12)));
+    assert_track_stays(cx, s.win, ids::page(Page::SoundStore), card.clone());
+    let bar = ids::grid_scrollbar(ids::STORE_GRID);
+    assert_bar_beside(cx, s.win, ids::STORE_GRID, bar.clone());
+    assert_track_scrolls_virtual(cx, s.win, bar, card);
 }

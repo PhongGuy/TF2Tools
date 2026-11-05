@@ -52,6 +52,11 @@ pub fn columns_for_store(width: Pixels, max: usize) -> usize {
     columns.min(max.max(1))
 }
 
+// One whole-pixel cell of `columns` across `width`, gaps between them.
+fn cell_width(width: Pixels, columns: usize) -> Pixels {
+    ((width - GRID_GAP * (columns - 1) as f32) / columns as f32).floor()
+}
+
 /// v5's CSS grid for short lists, not virtualized: `columns` equal cells per row, each row as
 /// tall as its tallest card, a short last row padded with empty cells.
 pub fn stretch_rows(cards: Vec<AnyElement>, columns: usize) -> AnyElement {
@@ -138,6 +143,12 @@ impl CardGrid {
         &self.scroll
     }
 
+    /// One row's height, a card of `height(cell width)` plus the gap, at the last measured
+    /// width; known before any card is drawn, so a page can floor the grid at one row.
+    pub fn row_height_for(&self, height: impl Fn(Pixels) -> Pixels) -> Pixels {
+        height(cell_width(self.width.get(), self.columns())) + GRID_GAP
+    }
+
     /// The height of one row (last rendered card height plus the gap), or None before a frame
     /// has laid out a card.
     pub fn row_height(&self) -> Option<Pixels> {
@@ -209,7 +220,7 @@ impl CardGrid {
         let list = uniform_list(self.id.clone(), rows, move |range, window, cx| {
             rendered.set((range.start, range.end));
             let width = width.get();
-            let cell_width = ((width - GRID_GAP * (columns - 1) as f32) / columns as f32).floor();
+            let cell_width = cell_width(width, columns);
             let cell_height = height(cell_width);
             card_height.set(cell_height);
             range
