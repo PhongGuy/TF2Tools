@@ -503,15 +503,19 @@ impl CuratedTab {
             self.shown.clone(),
             self.downloaded.clone(),
         );
-        Some(self.grid.render_sized(
-            shown.len(),
-            |width| width * (9. / 16.) + CARD_TEXT_HEIGHT,
-            move |ix, _, cx| {
-                let hud = &huds[shown[ix]];
-                curated_card(hud, downloaded.contains(&hud.hud_id), cx)
-            },
-        ))
+        Some(
+            self.grid
+                .render_sized(shown.len(), card_height, move |ix, _, cx| {
+                    let hud = &huds[shown[ix]];
+                    curated_card(hud, downloaded.contains(&hud.hud_id), cx)
+                }),
+        )
     }
+}
+
+// A card's 16:9 screenshot over its text, in a cell `width` wide.
+fn card_height(width: Pixels) -> Pixels {
+    width * (9. / 16.) + CARD_TEXT_HEIGHT
 }
 
 // A filter toggle: primary while selected, outline otherwise.
@@ -691,15 +695,16 @@ impl Render for CuratedTab {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // v5's `flex flex-col gap-6`: the first card row sits 24 px under the toolbar.
         let viewport_width = window.viewport_size().width;
+        // The grid never gets shorter than one card row; open filters scroll the page instead.
         v_flex()
-            .size_full()
+            .flex_1()
             .gap_6()
             .child(self.toolbar(cx))
             .children(self.error_line(cx))
             .child(
                 div()
                     .flex_1()
-                    .min_h_0()
+                    .min_h(self.grid.row_height_for(card_height))
                     .children(self.body(viewport_width, cx)),
             )
     }

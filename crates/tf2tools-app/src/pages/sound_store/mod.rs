@@ -9,8 +9,8 @@ use std::rc::Rc;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
     App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
-    Subscription, TestSupportExt as _, WeakEntity, Window, div, px,
+    ParentElement as _, Render, ScrollHandle, SharedString, StatefulInteractiveElement as _,
+    Styled as _, Subscription, TestSupportExt as _, WeakEntity, Window, div, px,
 };
 use tf2tools_core::{GbId, StoreCard, StoreItemId, StoreKind};
 
@@ -23,6 +23,8 @@ use crate::store_download::SessionDownloads;
 use crate::store_grid::{CardRenderer, CardSize, StoreGrid, StoreGridConfig};
 use crate::store_preview::{parse_preview_key, preview_key};
 use crate::sync::sync_hub;
+use crate::widgets::card_grid::GRID_GAP;
+use crate::widgets::scroll::scroll_area;
 use crate::widgets::sync_banner::sync_banner;
 use card::{CardState, sound_card};
 use model::Category;
@@ -41,6 +43,7 @@ pub struct SoundStorePage {
     downloaded: SessionDownloads,
     /// The key of the preview the cards last drew as playing.
     playing_key: Option<SharedString>,
+    scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -99,6 +102,7 @@ impl SoundStorePage {
             category: Category::All,
             downloaded,
             playing_key: None,
+            scroll: ScrollHandle::new(),
             _subscriptions: subscriptions,
         }
     }
@@ -106,6 +110,11 @@ impl SoundStorePage {
     /// The store card grid this page draws and queries.
     pub fn grid(&self) -> &Entity<StoreGrid> {
         &self.grid
+    }
+
+    /// The page's scroll; it moves only when the window cannot fit the filters and a card row.
+    pub fn page_scroll(&self) -> ScrollHandle {
+        self.scroll.clone()
     }
 
     /// The app's floating player; a preview keeps playing after the page hides.
@@ -191,16 +200,26 @@ fn card_playing(player: &WeakEntity<Player>, card: &StoreCard, cx: &App) -> bool
 
 impl Render for SoundStorePage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        v_flex()
+        // The grid never gets shorter than one card row; a short window scrolls the whole page
+        // to reach it, as on HUDs, so the filter rows never squeeze it.
+        let content = v_flex()
             .id(ids::page(Page::SoundStore))
             .test_support()
             .relative()
             .size_full()
+            .track_scroll(&self.scroll)
+            .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
             .children(sync_banner(KIND, self.grid.read(cx).total() > Some(0), cx))
             .child(self.grid.read(cx).search_row(cx))
             .child(self.filter_row(window, cx))
-            .child(div().flex_1().min_h_0().child(self.grid.clone()))
+            .child(
+                div()
+                    .flex_1()
+                    .min_h(px(CARD_HEIGHT) + GRID_GAP)
+                    .child(self.grid.clone()),
+            );
+        scroll_area(ids::page_scrollbar(Page::SoundStore), &self.scroll, content).size_full()
     }
 }
