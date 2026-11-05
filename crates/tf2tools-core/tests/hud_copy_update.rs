@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::hud_copy::{game_for, import_stock_hud, snapshot};
+use common::hud_copy::{game_for, import_stock_hud, snapshot, store_item};
 use common::hud_stock::{HEALTH, stock_files};
 use common::{library_env, sql, tmp_is_empty, tree, write_file};
 use tf2tools_core::{
@@ -28,7 +28,7 @@ fn set(group: u32, block: &str, key: &str, old: &str, new: &str) -> Change {
 fn an_update_replays_reports_and_keeps_the_copy_s_metadata() {
     let env = library_env();
     let tf = game_for(&env, &[]);
-    let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    let base = import_stock_hud(&env, "somehud", &[], store_item());
     let copy = env.lib.copy_hud(base.id()).unwrap();
     let changes = [
         set(
@@ -62,7 +62,7 @@ fn an_update_replays_reports_and_keeps_the_copy_s_metadata() {
         &env,
         "somehud",
         &[("resource/ui/hudplayerhealth.res", &v2), ("NEW.txt", "new")],
-        Provenance::Local,
+        store_item(),
     );
     let newer_before = snapshot(&huds.join(newer.folder_name()));
     let done = env
@@ -109,7 +109,7 @@ fn an_update_replays_reports_and_keeps_the_copy_s_metadata() {
 fn an_update_from_another_source_or_a_made_hud_is_refused() {
     let env = library_env();
     let tf = game_for(&env, &[]);
-    let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    let base = import_stock_hud(&env, "somehud", &[], store_item());
     let copy = env.lib.copy_hud(base.id()).unwrap();
     let other = import_stock_hud(&env, "otherhud", &[("NEW.txt", "new")], Provenance::Local);
     let made = env
@@ -154,9 +154,9 @@ fn an_update_from_another_source_or_a_made_hud_is_refused() {
 fn an_update_without_room_changes_nothing() {
     let mut env = library_env();
     let tf = game_for(&env, &[]);
-    let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    let base = import_stock_hud(&env, "somehud", &[], store_item());
     let copy = env.lib.copy_hud(base.id()).unwrap();
-    let newer = import_stock_hud(&env, "somehud", &[("NEW.txt", "new")], Provenance::Local);
+    let newer = import_stock_hud(&env, "somehud", &[("NEW.txt", "new")], store_item());
     env.lib.set_free_space_probe(|_| Ok(0));
     let d = env
         .dir
@@ -175,9 +175,9 @@ fn an_update_without_room_changes_nothing() {
 fn a_failed_swap_rolls_back_to_the_copy_as_it_was() {
     let env = library_env();
     let tf = game_for(&env, &[]);
-    let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    let base = import_stock_hud(&env, "somehud", &[], store_item());
     let copy = env.lib.copy_hud(base.id()).unwrap();
-    let newer = import_stock_hud(&env, "somehud", &[("NEW.txt", "new")], Provenance::Local);
+    let newer = import_stock_hud(&env, "somehud", &[("NEW.txt", "new")], store_item());
     let huds = env.dir.library_dir(LibraryKind::Huds);
     let d = huds.join(copy.folder_name());
     let before = snapshot(&d);
@@ -202,9 +202,9 @@ fn a_failed_swap_rolls_back_to_the_copy_as_it_was() {
 fn an_update_finishes_a_swap_a_crash_interrupted() {
     let env = library_env();
     let tf = game_for(&env, &[]);
-    let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    let base = import_stock_hud(&env, "somehud", &[], store_item());
     let copy = env.lib.copy_hud(base.id()).unwrap();
-    let newer = import_stock_hud(&env, "somehud", &[("NEW.txt", "new")], Provenance::Local);
+    let newer = import_stock_hud(&env, "somehud", &[("NEW.txt", "new")], store_item());
     let d = env
         .dir
         .library_dir(LibraryKind::Huds)

@@ -147,20 +147,23 @@ fn gamebanana_import_records_store_gb_and_the_provenance_author() {
 }
 
 #[test]
-fn reimporting_the_same_folder_replaces_files_and_row() {
+fn reimporting_the_same_store_item_replaces_files_and_row() {
     let env = library_env();
+    let curated = Provenance::Curated {
+        hud_id: "myhud".into(),
+    };
     let first = hud_zip(
         &env,
         "v1.zip",
         &[("myhud/info.vdf", b"1"), ("myhud/old.res", b"old")],
     );
-    env.lib.import_hud(&first, Provenance::Local).unwrap();
+    env.lib.import_hud(&first, curated.clone()).unwrap();
     let second = hud_zip(
         &env,
         "v2.zip",
         &[("myhud/info.vdf", b"2"), ("myhud/new.res", b"new")],
     );
-    let entry = env.lib.import_hud(&second, Provenance::Local).unwrap();
+    let entry = env.lib.import_hud(&second, curated).unwrap();
 
     let listed = env.lib.list_huds().unwrap();
     assert_eq!(listed.len(), 1);

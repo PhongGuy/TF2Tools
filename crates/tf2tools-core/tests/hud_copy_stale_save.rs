@@ -2,10 +2,10 @@
 
 mod common;
 
-use common::hud_copy::{game_for, import_stock_hud, snapshot};
+use common::hud_copy::{game_for, import_stock_hud, snapshot, store_item};
 use common::hud_switches::{choices, copy_with, dir, switch_layer};
 use common::library_env;
-use tf2tools_core::{HudAssets, MakeHudError, MakeTarget, Platform, Provenance};
+use tf2tools_core::{HudAssets, MakeHudError, MakeTarget, Platform};
 
 #[test]
 fn a_save_opened_before_an_update_is_refused() {
@@ -24,7 +24,7 @@ fn a_save_opened_before_an_update_is_refused() {
         .iter()
         .map(|(p, t)| (p.as_str(), t.as_str()))
         .collect();
-    let newer = import_stock_hud(&env, "somehud", &extra, Provenance::Local);
+    let newer = import_stock_hud(&env, "somehud", &extra, store_item());
     env.lib
         .update_copy(copy.id(), newer.id(), &tf, Platform::Linux)
         .unwrap();

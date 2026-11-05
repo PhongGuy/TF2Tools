@@ -2,11 +2,11 @@
 
 mod common;
 
-use common::hud_copy::{game_for, import_stock_hud};
+use common::hud_copy::{game_for, import_stock_hud, store_item};
 use common::hud_stock::HEALTH;
 use common::hud_switches::{choices, copy_with, save, switch_layer};
 use common::{LibraryEnv, library_env};
-use tf2tools_core::{Change, CopyUpdated, HudEntry, Platform, Provenance, SetKey};
+use tf2tools_core::{Change, CopyUpdated, HudEntry, Platform, SetKey};
 
 const SLOT_FILE: &str = "#customization/bh_player_largehealth.res";
 const HEALTH_FILE: &str = "resource/ui/hudplayerhealth.res";
@@ -21,7 +21,7 @@ fn update(
         .iter()
         .map(|(p, t)| (p.as_str(), t.as_str()))
         .collect();
-    let newer = import_stock_hud(env, "somehud", &extra, Provenance::Local);
+    let newer = import_stock_hud(env, "somehud", &extra, store_item());
     env.lib
         .update_copy(copy.id(), newer.id(), tf, Platform::Linux)
         .unwrap()
