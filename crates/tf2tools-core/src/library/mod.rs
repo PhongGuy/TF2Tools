@@ -270,6 +270,16 @@ pub(crate) fn now() -> String {
     crate::timestamp::now()
 }
 
+/// The number a clashing import takes in "<name> (<n>)": the first from 2 that `free`
+/// accepts. Shared by HUDs and crosshairs so both number the same way.
+pub(super) fn first_free_number(free: impl Fn(u32) -> bool) -> u32 {
+    let mut number = 2u32;
+    while !free(number) {
+        number = number.saturating_add(1);
+    }
+    number
+}
+
 /// An I/O failure and the path it happened on, mapped into each operation's error enum.
 /// Crate-private, so the `From` impls below cannot be reached from outside the crate.
 #[derive(Debug)]
