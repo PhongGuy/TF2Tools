@@ -415,6 +415,25 @@ impl CrosshairMakerPage {
         .detach();
     }
 
+    // Switches 64x64 and 32x32, asking first when a shrink would cut paint off the edges;
+    // either way the switch is one undo step.
+    fn switch_size(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let size = self.editor.size().other();
+        // The cell under a still pointer differs at the new size, or under the dialog.
+        self.unhover(cx);
+        if !self.editor.would_crop(size) {
+            self.edit(cx, |e| e.set_size(size));
+            return;
+        }
+        let answer = confirm(Confirm::shrink_canvas(), window, cx);
+        cx.spawn_in(window, async move |page, cx| {
+            if answer.recv().await.unwrap_or(false) {
+                let _ = page.update(cx, |page, cx| page.edit(cx, |e| e.set_size(size)));
+            }
+        })
+        .detach();
+    }
+
     /// Puts `drawing` on the canvas through `Editor::use_starter`, asking first through
     /// `Confirm::discard_changes()` when the drawing has unsaved changes; also clears the name
     /// field, the taken-name line and the hover readout. While `busy()` it only toasts `BUSY`.
@@ -1279,11 +1298,9 @@ impl CrosshairMakerPage {
                             .label(size_label(e.size().side()))
                             .tooltip("Switch canvas size")
                             .disabled(busy)
-                            .on_click(cx.listener(|page, _, _, cx| {
-                                // The cell under a still pointer differs at the new size.
-                                page.hover = None;
-                                page.edit(cx, |e| e.set_size(e.size().other()))
-                            })),
+                            .on_click(
+                                cx.listener(|page, _, window, cx| page.switch_size(window, cx)),
+                            ),
                     ),
                 )
                 .child(

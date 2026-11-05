@@ -381,6 +381,25 @@ impl Editor {
         self.commit(before);
     }
 
+    /// Whether switching to `size` would drop paint: only a shrink can, and only when a pixel
+    /// outside the middle square it keeps is not clear.
+    pub fn would_crop(&self, size: CanvasSize) -> bool {
+        let (old, new) = (self.size.side(), size.side());
+        if new >= old {
+            return false;
+        }
+        let kept = (old - new) / 2..(old + new) / 2;
+        self.pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .enumerate()
+            .any(|(i, px)| {
+                let (x, y) = (i as u32 % old, i as u32 / old);
+                px[3] != 0 && !(kept.contains(&x) && kept.contains(&y))
+            })
+    }
+
     /// Switches the canvas size around the centre: 64 to 32 keeps the middle `16..48`, 32 to
     /// 64 places the drawing at offset 16. One undo step; the current size is a no-op.
     pub fn set_size(&mut self, size: CanvasSize) {
