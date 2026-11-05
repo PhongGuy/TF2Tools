@@ -448,6 +448,12 @@ fn install_cases() -> Vec<(InstallError, &'static str)> {
             },
             "TF2Tools couldn't update your library. Restart TF2Tools and try again.",
         ),
+        (
+            InstallError::GameMissing {
+                path: PathBuf::from("/home/p/Games/Team Fortress 2/tf"),
+            },
+            "TF2 wasn't found where it used to be. Check the TF2 folder in Settings.",
+        ),
     ]
 }
 

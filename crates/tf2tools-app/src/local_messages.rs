@@ -27,6 +27,9 @@ const PROFILES_OPEN: &str = "TF2Tools couldn't open your profiles. Restart TF2To
 /// The game's HUD files are missing or unreadable.
 pub const HUD_FILES: &str =
     "TF2Tools can't find TF2's HUD files. Check the TF2 folder in Settings.";
+/// The game folder moved away since TF2Tools found it, so nothing was written.
+pub(crate) const GAME_MOVED: &str =
+    "TF2 wasn't found where it used to be. Check the TF2 folder in Settings.";
 const UNKNOWN: &str =
     "Something went wrong. Try again, and restart TF2Tools if it keeps happening.";
 
@@ -384,6 +387,7 @@ pub fn describe_tf2_install(err: &InstallError) -> LocalFailure {
         InstallError::NotInLibrary { .. } => GONE,
         InstallError::Database { .. } => LIBRARY_UPDATE,
         InstallError::ExternalHuds(_) => NEW_EXTERNAL_HUD,
+        InstallError::GameMissing { .. } => GAME_MOVED,
         _ => UNKNOWN,
     };
     LocalFailure::new(message, err.to_string())
@@ -434,6 +438,7 @@ pub fn describe_apply_profile(err: &ApplyProfileError) -> LocalFailure {
         ApplyProfileError::ExternalHuds(_) => NEW_EXTERNAL_HUD,
         ApplyProfileError::Io { .. } => TF2_WRITE,
         ApplyProfileError::Database { .. } => PROFILES_OPEN,
+        ApplyProfileError::GameMissing { .. } => GAME_MOVED,
         _ => UNKNOWN,
     };
     LocalFailure::new(message, err.to_string())

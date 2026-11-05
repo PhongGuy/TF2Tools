@@ -7,8 +7,8 @@ use rusqlite::{OptionalExtension, params};
 
 use super::{
     IoFailure, Library, Provenance, SoundId, check_vpk_magic, create_dir_all, folder_name,
-    gb_id_column, import_db, install_db, io_at, is_plain_name, library_db, new_id, now,
-    read_setting, remove_dir_if_present, remove_file_if_present, save_setting,
+    game_custom_dir, gb_id_column, import_db, install_db, io_at, is_plain_name, library_db, new_id,
+    now, read_setting, remove_dir_if_present, remove_file_if_present, save_setting,
 };
 use crate::error::{ImportError, InstallError, LibraryError};
 use crate::pak::first_wav_in_vpk;
@@ -417,7 +417,7 @@ impl Library {
             .sound_file(&folder, format)?
             .ok_or_else(not_in_library)?;
 
-        let custom = tf2.custom_dir();
+        let custom = game_custom_dir(tf2)?;
         let (target, other) = match format {
             SoundFormat::Wav => (kind.wav_target(&custom), kind.vpk_target(&custom)),
             SoundFormat::Vpk => (kind.vpk_target(&custom), kind.wav_target(&custom)),
@@ -441,7 +441,7 @@ impl Library {
 
     /// Removes both installed forms of one kind and clears its install settings.
     pub fn uninstall_sound(&self, kind: SoundKind, tf2: &Tf2Install) -> Result<(), InstallError> {
-        let custom = tf2.custom_dir();
+        let custom = game_custom_dir(tf2)?;
         remove_file_if_present(&kind.wav_target(&custom))?;
         remove_file_if_present(&kind.vpk_target(&custom))?;
         self.db

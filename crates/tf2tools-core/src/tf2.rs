@@ -66,6 +66,11 @@ impl Tf2Install {
         self.game_dir.join("tf")
     }
 
+    /// Whether the game folder (`tf/`) is still where the install was found.
+    pub fn is_present(&self) -> bool {
+        self.tf_dir().is_dir()
+    }
+
     /// `<game_dir>/tf/custom`, where HUDs, sounds and addons are installed.
     pub fn custom_dir(&self) -> PathBuf {
         self.tf_dir().join("custom")

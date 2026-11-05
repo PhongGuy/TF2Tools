@@ -9,7 +9,7 @@ use rusqlite::{Connection, OptionalExtension, Row};
 use super::crosshairs::{SOURCE_BUILTIN, SOURCE_LIBRARY, is_weapon_script};
 use super::{
     CrosshairRef, ExternalHud, GbId, HudId, HudStatus, Library, Provenance, SoundId, SoundKind,
-    new_id, now, profile_db, read_setting, save_setting,
+    game_custom_dir, new_id, now, profile_db, read_setting, save_setting,
 };
 use crate::crosshair_catalog::BuiltinCrosshairs;
 use crate::error::{ApplyProfileError, LibraryError, ProfileError};
@@ -1168,7 +1168,7 @@ impl Library {
         }
         // Asked before any step, so a refused apply leaves sounds and crosshairs alone too.
         let unnamed = self
-            .unnamed_huds(&tf2.custom_dir(), discard)
+            .unnamed_huds(&game_custom_dir(tf2)?, discard)
             .map_err(|e| match e {
                 LibraryError::Io { path, source } => ApplyProfileError::Io { path, source },
                 other => ApplyProfileError::Database {

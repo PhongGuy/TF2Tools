@@ -448,6 +448,13 @@ pub enum ReinstallError {
         /// SQLite's description of the failure.
         message: String,
     },
+    /// The game folder (`tf/`) is no longer where the install was found, so nothing was
+    /// written or created.
+    #[error("Team Fortress 2 is no longer at {path}")]
+    GameMissing {
+        /// The `tf` folder that is gone.
+        path: PathBuf,
+    },
 }
 
 /// Why an item could not be installed into or removed from `tf/custom`.
@@ -478,6 +485,13 @@ pub enum InstallError {
     /// Nothing was changed.
     #[error("{} HUDs in tf/custom are not in the library", .0.len())]
     ExternalHuds(Vec<ExternalHud>),
+    /// The game folder (`tf/`) is no longer where the install was found, so nothing was
+    /// written or created.
+    #[error("Team Fortress 2 is no longer at {path}")]
+    GameMissing {
+        /// The `tf` folder that is gone.
+        path: PathBuf,
+    },
 }
 
 /// Why a HUD in `tf/custom` could not be added to the library. Nothing in `tf/custom` changes.
@@ -623,6 +637,13 @@ pub enum ApplyProfileError {
     Database {
         /// SQLite's description of the failure.
         message: String,
+    },
+    /// The game folder (`tf/`) is no longer where the install was found, so nothing was
+    /// written or created.
+    #[error("Team Fortress 2 is no longer at {path}")]
+    GameMissing {
+        /// The `tf` folder that is gone.
+        path: PathBuf,
     },
 }
 

@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use rusqlite::{OptionalExtension, params};
 
 use super::{
-    IoFailure, Library, check_vpk_magic, create_dir_all, import_db, install_db, io_at,
-    is_plain_name, library_db, now, remove_file_if_present,
+    IoFailure, Library, check_vpk_magic, create_dir_all, game_custom_dir, import_db, install_db,
+    io_at, is_plain_name, library_db, now, remove_file_if_present,
 };
 use crate::error::{ImportError, InstallError, LibraryError};
 use crate::paths::LibraryKind;
@@ -303,7 +303,7 @@ impl Library {
             });
         }
 
-        let custom = tf2.custom_dir();
+        let custom = game_custom_dir(tf2)?;
         create_dir_all(&custom)?;
         let dest = custom.join(name.as_str());
         std::fs::copy(&source, &dest).map_err(io_at(&dest))?;
@@ -324,7 +324,7 @@ impl Library {
     /// Removes an addon's VPK and `.sound.cache` from `tf/custom` and rewrites
     /// `addons.cfg`; the library entry stays.
     pub fn uninstall_addon(&self, name: &AddonName, tf2: &Tf2Install) -> Result<(), InstallError> {
-        Ok(remove_installed(name, &tf2.custom_dir())?)
+        Ok(remove_installed(name, &game_custom_dir(tf2)?)?)
     }
 
     /// Forgets an addon: with a TF2 install it is uninstalled first, then its library

@@ -27,12 +27,13 @@ use walkdir::WalkDir;
 use crate::archive::VPK_MAGIC;
 use crate::db::Database;
 use crate::error::{
-    HistoryError, HudLoadError, ImportError, InstallError, KeepHudError, LibraryError,
-    MakeHudError, PaintError, PresetError, ProfileError,
+    ApplyProfileError, HistoryError, HudLoadError, ImportError, InstallError, KeepHudError,
+    LibraryError, MakeHudError, PaintError, PresetError, ProfileError, ReinstallError,
 };
 use crate::fonts::Platform;
 use crate::hud_maker::{EditorSchemas, HudFiles, HudOptions, MakerBase};
 use crate::paths::DataDir;
+use crate::tf2::Tf2Install;
 
 pub(crate) use addons::display_info;
 pub use addons::{AddonEntry, AddonName};
@@ -334,6 +335,39 @@ impl From<IoFailure> for HudLoadError {
 impl From<IoFailure> for LibraryError {
     fn from(IoFailure { path, source }: IoFailure) -> Self {
         Self::Io { path, source }
+    }
+}
+
+/// The game's `tf` folder has moved away; mapped into each writer's `GameMissing`.
+pub(crate) struct GameMissing {
+    path: PathBuf,
+}
+
+/// `tf/custom` of `tf2` for a writer into the game. Refuses when `tf` itself is gone, so
+/// no writer recreates a moved game's tree; a missing `custom` is still the writer's to make.
+pub(crate) fn game_custom_dir(tf2: &Tf2Install) -> Result<PathBuf, GameMissing> {
+    if tf2.is_present() {
+        Ok(tf2.custom_dir())
+    } else {
+        Err(GameMissing { path: tf2.tf_dir() })
+    }
+}
+
+impl From<GameMissing> for InstallError {
+    fn from(GameMissing { path }: GameMissing) -> Self {
+        Self::GameMissing { path }
+    }
+}
+
+impl From<GameMissing> for ReinstallError {
+    fn from(GameMissing { path }: GameMissing) -> Self {
+        Self::GameMissing { path }
+    }
+}
+
+impl From<GameMissing> for ApplyProfileError {
+    fn from(GameMissing { path }: GameMissing) -> Self {
+        Self::GameMissing { path }
     }
 }
 
