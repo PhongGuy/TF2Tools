@@ -471,8 +471,9 @@ impl HudsPage {
                             .import_hud(&path, Provenance::Local)
                             .map_err(|e| describe_import(&e).into_op("Failed to import HUD"))?;
                         let message = format!("Imported HUD: {}", hud.name());
-                        let entry = NewLogEntry::new(LogLevel::Info, "hud", "import", message)
-                            .with_details(format!("Source: {}", path.display()));
+                        // The source path is developer detail, so it goes to tracing only.
+                        tracing::info!(source = %path.display(), "imported a HUD");
+                        let entry = NewLogEntry::new(LogLevel::Info, "hud", "import", message);
                         activity::write(s, &entry);
                         let added = added_message(&hud);
                         Ok((ToastKind::Success, "HUD imported".into(), added.into()))
@@ -570,8 +571,7 @@ impl HudsPage {
     fn delete(&mut self, hud: &HudEntry, window: &mut Window, cx: &mut Context<Self>) {
         let answer = confirm(Confirm::delete_hud(hud.name()), window, cx);
         let (id, name) = (hud.id().clone(), hud.name().to_owned());
-        let folder = hud.folder_name().to_owned();
-        let busy = Busy::Delete(folder.clone());
+        let busy = Busy::Delete(hud.folder_name().to_owned());
         cx.spawn(async move |page, cx| {
             if !answer.recv().await.unwrap_or(false) {
                 return;
@@ -583,7 +583,7 @@ impl HudsPage {
                         s.library
                             .delete_hud(&id)
                             .map_err(|e| describe_library(&e).into_op("Failed to delete HUD"))?;
-                        let message = format!("Deleted HUD from library: {folder}");
+                        let message = format!("Deleted HUD from library: {name}");
                         let entry = NewLogEntry::new(LogLevel::Info, "hud", "delete", message);
                         activity::write(s, &entry);
                         let deleted = format!("{name} has been deleted from your library");
@@ -694,14 +694,13 @@ type AfterRun = Box<dyn FnOnce(&mut Window, &mut App)>;
 struct Installed {
     name: String,
     managed: bool,
-    path: String,
 }
 
 impl HudsPage {
     // Managed HUDs show their library name; a hand-placed folder shows its folder name.
     // Several HUDs at once is a conflict, which `conflict_card` lists instead.
     fn installed(&self) -> Option<Installed> {
-        let (custom, status) = self.status.as_ref()?;
+        let (_, status) = self.status.as_ref()?;
         let (folder, managed_id) = match status {
             HudStatus::Managed { folder_name, id } => (folder_name, Some(id)),
             HudStatus::Unmanaged { folder_name } => (folder_name, None),
@@ -713,7 +712,6 @@ impl HudsPage {
         Some(Installed {
             name: name.to_owned(),
             managed: managed_id.is_some(),
-            path: custom.join(folder).display().to_string(),
         })
     }
 
@@ -772,7 +770,8 @@ fn empty_card(cx: &App) -> AnyElement {
         .into_any_element()
 }
 
-// v5's InstalledHud: the name and its badge beside Uninstall, then the folder path.
+// v5's InstalledHud: the name and its badge beside Uninstall, then where it came from in
+// plain words (v5 showed the folder path).
 fn installed_card(
     hud: Installed,
     busy: Option<&Busy>,
@@ -781,11 +780,13 @@ fn installed_card(
 ) -> AnyElement {
     let theme = cx.theme();
     // Managed is shadcn's borderless secondary badge; External is its outline badge.
-    let (badge, border, text) = if hud.managed {
-        (Tag::secondary(), transparent_black(), "Managed")
+    let (badge, border, text, place) = if hud.managed {
+        let place = "Active in TF2.";
+        (Tag::secondary(), transparent_black(), "Managed", place)
     } else {
         let outline = Tag::secondary().outline().text_color(theme.foreground);
-        (outline, theme.border, "External")
+        let place = "Added to TF2 outside TF2Tools.";
+        (outline, theme.border, "External", place)
     };
     card_frame(cx)
         .id(ids::HUDS_INSTALLED)
@@ -827,7 +828,7 @@ fn installed_card(
                 .child(labelled(
                     div().px_6().text_sm().text_color(theme.muted_foreground),
                     ids::HUDS_INSTALLED_PATH,
-                    hud.path,
+                    place,
                 )),
         )
         .into_any_element()
@@ -1488,8 +1489,7 @@ pub(crate) fn blocked_description(blocked: &str) -> String {
 }
 
 /// Carries out `plan`, installs library HUD `id` into `tf2`, writes the activity row naming the
-/// `tf/custom` folder it landed in and returns where it went; the HUDs page and the HUD Maker
-/// share it.
+/// HUD and returns where it went; the HUDs page and the HUD Maker share it.
 pub(crate) fn install_job(
     s: &Services,
     id: &HudId,
@@ -1502,15 +1502,20 @@ pub(crate) fn install_job(
         .install_hud_discarding(id, tf2, discard)
         .map_err(|e| describe_tf2_install(&e).into_op(INSTALL_FAILED))?;
     plan.log_discarded(s);
-    let folder = installed.folder();
-    let target = tf2.custom_dir().join(folder);
+    // The player's log names the HUD; the folder it landed in is developer detail.
+    let target = tf2.custom_dir().join(installed.folder());
+    tracing::info!(target = %target.display(), "installed a HUD");
+    let listed = s.library.list_huds().ok().into_iter().flatten();
+    let name = (listed.into_iter().find(|hud| hud.id() == id)).map_or_else(
+        || installed.folder().to_owned(),
+        |hud| hud.name().to_owned(),
+    );
     let entry = NewLogEntry::new(
         LogLevel::Info,
         "hud",
         "install",
-        format!("Installed HUD: {folder}"),
-    )
-    .with_details(format!("Installed to: {}", target.display()));
+        format!("Installed HUD: {name}"),
+    );
     activity::write(s, &entry);
     Ok(installed)
 }

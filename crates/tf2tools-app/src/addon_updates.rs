@@ -209,13 +209,14 @@ impl AddonUpdates {
             .and_then(|g| g.0.read(cx).install().cloned());
         let job = {
             let name = name.clone();
+            let display = display.clone();
             run_blocking(cx, move |services| {
                 let tf2 = tf2.ok_or_else(|| install_failed(no_tf2()))?;
                 services
                     .library
                     .install_addon(&name, &tf2)
                     .map_err(|e| install_failed(describe_install(&e)))?;
-                let message = format!("Installed addon: {}", name.as_str());
+                let message = format!("Installed addon: {display}");
                 let entry = NewLogEntry::new(LogLevel::Info, "addon_store", "install", message);
                 activity::write(services, &entry);
                 Ok(())

@@ -137,6 +137,13 @@ fn saving_the_installed_hud_updates_it_and_says_how_to_see_it(cx: &mut TestAppCo
         Some(LIVE_NOTE)
     );
     assert!(cx.update(|cx| page.read(cx).live_note_shown()));
+    // The player's log names the HUD; where it landed is developer detail.
+    let rows = support::log_rows(&s.services);
+    let updated = rows
+        .iter()
+        .find(|r| r.message() == "Updated installed HUD: My HUD")
+        .unwrap();
+    assert_eq!(updated.details(), None);
 }
 
 #[gpui_kit::test]

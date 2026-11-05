@@ -105,7 +105,7 @@ impl Confirm {
     pub fn delete_addon() -> Self {
         Self {
             title: "Delete Addon".into(),
-            description: "Are you sure you want to remove this addon from your library? If installed, it will also be removed from tf/custom/."
+            description: "Are you sure you want to remove this addon from your library? If installed, it will also be removed from TF2."
                 .into(),
             confirm_label: "Delete".into(),
             cancel_label: "Cancel".into(),

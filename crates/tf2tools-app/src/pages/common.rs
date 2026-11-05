@@ -177,7 +177,10 @@ pub(crate) fn needs_tf2(button: Button, has_tf2: bool) -> Button {
     }
 }
 
-/// v5's orange "TF2 path not set" alert with `body` below the title; the caller decides when.
+/// The orange alert's title; it fits a folder never set and a saved folder that moved away.
+const NO_TF2_TITLE: &str = "TF2 not found";
+
+/// v5's orange "TF2 not found" alert with `body` below the title; the caller decides when.
 pub(crate) fn no_tf2_warning(id: &'static str, body: &'static str, cx: &App) -> AnyElement {
     tf2_alert(id, body, None, cx)
 }
@@ -209,7 +212,7 @@ fn tf2_alert(
     h_flex()
         .id(id)
         .role(Role::Alert)
-        .aria_label("TF2 path not set")
+        .aria_label(NO_TF2_TITLE)
         .test_support()
         .items_start()
         .gap_3()
@@ -231,7 +234,7 @@ fn tf2_alert(
                     div()
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(orange)
-                        .child("TF2 path not set"),
+                        .child(NO_TF2_TITLE),
                 )
                 .child(div().text_sm().text_color(muted).child(body))
                 .children(action.map(|action| div().mt_3().child(action))),

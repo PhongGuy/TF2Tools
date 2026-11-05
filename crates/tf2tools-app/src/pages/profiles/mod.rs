@@ -438,6 +438,7 @@ impl ProfilesPage {
             return;
         }
         let answer = confirm(Confirm::delete_profile(name), window, cx);
+        let message = format!("Deleted profile: {name}");
         cx.spawn(async move |page, cx| {
             if !answer.recv().await.unwrap_or(false) {
                 return;
@@ -448,14 +449,8 @@ impl ProfilesPage {
                         s.library
                             .delete_profile(&id)
                             .map_err(|e| describe_profile(&e).into_op("Failed to delete"))?;
-                        let details = format!("Profile ID: {}", id.as_str());
-                        let entry = NewLogEntry::new(
-                            LogLevel::Info,
-                            "profile",
-                            "delete",
-                            "Deleted profile",
-                        )
-                        .with_details(details);
+                        // The id is internal; the player's row names the profile instead.
+                        let entry = NewLogEntry::new(LogLevel::Info, "profile", "delete", message);
                         activity::write(s, &entry);
                         Ok(("Profile deleted".into(), SharedString::default()))
                     },
@@ -1267,7 +1262,7 @@ impl Render for ProfilesPage {
         let warning = missing.then(|| {
             no_tf2_warning(
                 ids::PROFILES_NO_TF2,
-                "Configure your TF2 installation path in Settings to activate profiles.",
+                "Set the TF2 folder in Settings to activate profiles.",
                 cx,
             )
         });

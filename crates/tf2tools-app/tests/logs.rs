@@ -151,11 +151,11 @@ fn each_row_is_a_card_newest_first(cx: &mut TestAppContext) {
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::log_category(id)).as_deref(),
-        Some("hud_store")
+        Some("HUD Store")
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::log_action(id)).as_deref(),
-        Some("download")
+        Some("Download")
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::log_message(id)).as_deref(),

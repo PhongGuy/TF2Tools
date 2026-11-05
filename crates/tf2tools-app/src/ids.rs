@@ -97,7 +97,7 @@ pub const SOUNDS_EMPTY: &str = "sounds-empty";
 pub const SOUNDS_NO_MATCH: &str = "sounds-no-match";
 /// The "Add Sound" button, "Importing..." while busy; opens the sound file picker.
 pub const SOUNDS_ADD: &str = "sounds-add";
-/// The Sounds page's "TF2 path not set" notice, present only while TF2 is not found.
+/// The Sounds page's "TF2 not found" notice, present only while TF2 is not found.
 pub const SOUNDS_NO_TF2: &str = "sounds-no-tf2";
 /// The notice's "Open Settings" button.
 pub const SOUNDS_NO_TF2_SETTINGS: &str = "sounds-no-tf2-settings";
@@ -127,7 +127,7 @@ pub const CROSSHAIRS_BACKGROUND: &str = "crosshairs-background";
 pub const CROSSHAIRS_PREVIEW: &str = "crosshairs-preview";
 /// The "Import" button, "Importing..." while busy; opens the crosshair image picker.
 pub const CROSSHAIRS_IMPORT: &str = "crosshairs-import";
-/// The Crosshairs page's "TF2 path not set" notice, present only while TF2 is not found.
+/// The Crosshairs page's "TF2 not found" notice, present only while TF2 is not found.
 pub const CROSSHAIRS_NO_TF2: &str = "crosshairs-no-tf2";
 /// The notice's "Open Settings" button.
 pub const CROSSHAIRS_NO_TF2_SETTINGS: &str = "crosshairs-no-tf2-settings";
@@ -506,7 +506,7 @@ pub const HUDS_INSTALLED_EMPTY: &str = "huds-installed-empty";
 pub const HUDS_INSTALLED_NAME: &str = "huds-installed-name";
 /// Labelled "Managed" or "External".
 pub const HUDS_INSTALLED_BADGE: &str = "huds-installed-badge";
-/// Labelled "<game>/tf/custom/<folder>".
+/// Labelled "Active in TF2." or "Added to TF2 outside TF2Tools.".
 pub const HUDS_INSTALLED_PATH: &str = "huds-installed-path";
 /// The installed card's "Uninstall" button; removes the HUD from tf/custom.
 pub const HUDS_UNINSTALL: &str = "huds-uninstall";
@@ -516,7 +516,7 @@ pub const HUDS_CONFLICTS: &str = "huds-conflicts";
 pub const HUDS_SEARCH: &str = "huds-search";
 /// The "Add HUD" button; opens the archive picker.
 pub const HUDS_ADD: &str = "huds-add";
-/// The HUDs page's "TF2 path not set" notice, present only while TF2 is not found.
+/// The HUDs page's "TF2 not found" notice, present only while TF2 is not found.
 pub const HUDS_NO_TF2: &str = "huds-no-tf2";
 /// The notice's "Open Settings" button.
 pub const HUDS_NO_TF2_SETTINGS: &str = "huds-no-tf2-settings";
@@ -631,7 +631,7 @@ pub const ADDON_STORE_TAG: &str = "addon-store-tag";
 pub const ADDON_STORE_INFO: &str = "addon-store-info";
 /// The Addon Store info line's clickable text, whose underlined ranges open their links.
 pub const ADDON_STORE_INFO_TEXT: &str = "addon-store-info-text";
-/// The Addon Store's "TF2 path not set" warning, present only without a TF2 install.
+/// The Addon Store's "TF2 not found" warning, present only without a TF2 install.
 pub const ADDON_STORE_NO_TF2: &str = "addon-store-no-tf2";
 /// Wraps the Activity Log's category select.
 pub const LOGS_CATEGORY: &str = "logs-category";
@@ -651,7 +651,7 @@ pub const LOGS_ERROR: &str = "logs-error";
 pub const LOGS_RETRY: &str = "logs-retry";
 /// The list's last item, labelled "Load more", or "Loading..." while a page loads.
 pub const LOGS_MORE: &str = "logs-more";
-/// The Addons page's "TF2 path not set" warning, present only without a TF2 install.
+/// The Addons page's "TF2 not found" warning, present only without a TF2 install.
 pub const ADDONS_NO_TF2: &str = "addons-no-tf2";
 /// The Addons page's count line under the title.
 pub const ADDONS_COUNT: &str = "addons-count";

@@ -34,9 +34,9 @@ pub fn startup(cx: &App) {
         return;
     };
     cx.background_spawn(async move {
-        let details = format!("Database: {}", services.data.db_path().display());
-        let entry = NewLogEntry::new(LogLevel::Info, "system", "startup", "TF2Tools started")
-            .with_details(details);
+        // The database path is developer detail, so it goes to tracing, not the player's log.
+        tracing::info!(database = %services.data.db_path().display(), "TF2Tools started");
+        let entry = NewLogEntry::new(LogLevel::Info, "system", "startup", "TF2Tools started");
         write(&services, &entry);
         // Trimming after the append keeps the table at exactly the cap, newest row included.
         if let Err(err) = services.activity.trim(LOG_KEEP) {
@@ -69,10 +69,7 @@ pub fn sync_entry(kind: StoreKind, summary: SyncSummary) -> Option<NewLogEntry> 
             "addon_store",
             format!("Synced {} addons from mastercomfig", summary.rows),
         ),
-        _ => (
-            "store",
-            format!("Synced {} curated HUDs from hud-db", summary.rows),
-        ),
+        _ => ("store", format!("Synced {} curated HUDs", summary.rows)),
     };
     Some(NewLogEntry::new(LogLevel::Info, category, "sync", message))
 }
@@ -111,14 +108,14 @@ pub fn download_entry(event: &DownloadEvent) -> NewLogEntry {
         ),
         StoreKind::Addons => (
             "addon_store",
-            format!("Downloaded addon to library: {id}"),
-            format!("Addon download failed: {id}"),
+            format!("Downloaded addon to library: {name}"),
+            format!("Addon download failed: {name}"),
             false,
         ),
         _ => (
             "store",
             format!("Downloaded HUD: {name}"),
-            format!("HUD download failed (ID: {id})"),
+            format!("HUD download failed: {name}"),
             false,
         ),
     };

@@ -251,14 +251,12 @@ impl SoundsPage {
                             .library
                             .import_sound(&path, &name, Provenance::Local)
                             .map_err(|e| describe_import(&e).into_op("Failed to import sound"))?;
-                        let file = path
-                            .file_name()
-                            .map(|f| f.to_string_lossy())
-                            .unwrap_or_default();
+                        // The picked file is developer detail; the player's row keeps the format.
+                        tracing::info!(source = %path.display(), "imported a sound");
                         let (_, format) = format_texts(sound.format());
                         let message = format!("Imported sound: {}", sound.name());
                         let entry = NewLogEntry::new(LogLevel::Info, "sound", "import", message)
-                            .with_details(format!("File: {file}, Format: {format}"));
+                            .with_details(format!("Format: {format}"));
                         activity::write(s, &entry);
                         let added = format!("{} added to your library", sound.name());
                         Ok(("Sound imported".into(), added.into()))
@@ -290,15 +288,14 @@ impl SoundsPage {
             _ => ("Killsound installed", "Failed to install killsound"),
         };
         let id = sound.id().clone();
-        let folder = sound.folder_name().to_owned();
-        let (format, _) = format_texts(sound.format());
+        let name = sound.name().to_owned();
         self.run(
-            Busy::Install(folder.clone(), kind),
+            Busy::Install(sound.folder_name().to_owned(), kind),
             move |s| {
                 s.library
                     .install_sound(&id, kind, &tf2)
                     .map_err(|e| describe_tf2_install(&e).into_op(failed))?;
-                let message = format!("Installed {} ({format}): {folder}", kind.name());
+                let message = format!("Installed {}: {name}", kind.name());
                 activity::write(
                     s,
                     &NewLogEntry::new(LogLevel::Info, "sound", "install", message),
@@ -315,8 +312,8 @@ impl SoundsPage {
         let answer = confirm(Confirm::delete_sound(), window, cx);
         let id = sound.id().clone();
         let key = sound_key(sound.folder_name());
-        let folder = sound.folder_name().to_owned();
-        let busy = Busy::Delete(folder.clone());
+        let name = sound.name().to_owned();
+        let busy = Busy::Delete(sound.folder_name().to_owned());
         cx.spawn(async move |page, cx| {
             if !answer.recv().await.unwrap_or(false) {
                 return;
@@ -335,7 +332,7 @@ impl SoundsPage {
                         s.library
                             .delete_sound(&id, tf2.as_ref())
                             .map_err(|e| describe_library(&e).into_op("Failed to delete sound"))?;
-                        let message = format!("Deleted sound: {folder}");
+                        let message = format!("Deleted sound: {name}");
                         let entry = NewLogEntry::new(LogLevel::Info, "sound", "delete", message);
                         activity::write(s, &entry);
                         Ok(("Sound deleted".into(), SharedString::default()))

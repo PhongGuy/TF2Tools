@@ -127,7 +127,7 @@ pub fn assigned_count(n: usize) -> String {
     format!("{n} {noun} assigned")
 }
 
-/// The activity row for a saved profile; an update also names the profile id, as v5 did.
+/// The activity row for a saved profile, naming it (v5 also showed the internal id on an update).
 pub fn log_entry(editing: bool, profile: &Profile) -> NewLogEntry {
     let name = profile.name();
     if editing {
@@ -137,7 +137,6 @@ pub fn log_entry(editing: bool, profile: &Profile) -> NewLogEntry {
             "update",
             format!("Updated profile: {name}"),
         )
-        .with_details(format!("Profile ID: {}", profile.id().as_str()))
     } else {
         NewLogEntry::new(
             LogLevel::Info,

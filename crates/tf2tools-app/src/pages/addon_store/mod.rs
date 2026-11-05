@@ -254,7 +254,7 @@ impl AddonStorePage {
         missing.then(|| {
             no_tf2_warning(
                 ids::ADDON_STORE_NO_TF2,
-                "Configure your TF2 installation path in Settings to install addons.",
+                "Set the TF2 folder in Settings to install addons.",
                 cx,
             )
         })

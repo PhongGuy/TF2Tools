@@ -413,13 +413,14 @@ impl CrosshairsPage {
                             .map_err(|e| {
                                 describe_import(&e).into_op("Failed to import crosshair")
                             })?;
+                        // The source path is developer detail, so it goes to tracing only.
+                        tracing::info!(source = %path.display(), "imported a crosshair");
                         let entry = NewLogEntry::new(
                             LogLevel::Info,
                             "crosshair",
                             "import",
                             format!("Imported crosshair: {}", crosshair.name()),
-                        )
-                        .with_details(format!("Source: {}", path.display()));
+                        );
                         activity::write(s, &entry);
                         let added = added_message(&crosshair);
                         Ok((
@@ -505,13 +506,13 @@ impl CrosshairsPage {
                 // v5 logs an install only when it wrote at least one weapon script.
                 if !report.applied().is_empty() {
                     let dest = tf2.custom_dir().join("tf2tools-crosshairs");
+                    tracing::info!(destination = %dest.display(), "installed crosshairs");
                     let entry = NewLogEntry::new(
                         LogLevel::Info,
                         "crosshair",
                         "install",
                         format!("Installed {} crosshair assignments", report.applied().len()),
-                    )
-                    .with_details(format!("Destination: {}", dest.display()));
+                    );
                     activity::write(s, &entry);
                 }
                 Ok(install_outcome(&report))
