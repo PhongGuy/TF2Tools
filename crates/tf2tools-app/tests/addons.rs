@@ -266,11 +266,7 @@ fn install_copies_the_addon_writes_a_row_and_emits(cx: &mut TestAppContext) {
     assert_eq!(rows.len(), 1);
     assert_eq!(
         row(&rows[0]),
-        (
-            "addon_store",
-            "install",
-            &*format!("Installed addon: {PYRO}")
-        )
+        ("addon_store", "install", "Installed addon: No Pyroland")
     );
 }
 
@@ -292,7 +288,7 @@ fn uninstall_removes_it_and_writes_a_row(cx: &mut TestAppContext) {
         (
             "addon_store",
             "uninstall",
-            &*format!("Uninstalled addon: {FOOT}")
+            "Uninstalled addon: No Footsteps"
         )
     );
 }
@@ -304,12 +300,12 @@ fn delete_asks_then_removes_and_writes_a_row(cx: &mut TestAppContext) {
     support::seed_library_addon(&s.services, &env, FOOT, "9.100.1", &vpk(), true);
     let _page = open_addons(cx, &s);
     support::click_id(cx, s.win, ids::addon_delete(&name(FOOT)));
+    let asked = support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).unwrap();
     assert_eq!(
-        support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
-        Some(
-            "Are you sure you want to remove this addon from your library? If installed, it will also be removed from tf/custom/."
-        )
+        asked,
+        "Are you sure you want to remove this addon from your library? If installed, it will also be removed from TF2."
     );
+    support::assert_plain(&asked);
     support::click_id(cx, s.win, ids::CONFIRM_OK);
     toast_is(cx, &s, "Addon removed. No Footsteps removed from library");
     assert!(s.services.library.list_addons(None).unwrap().is_empty());
@@ -323,7 +319,7 @@ fn delete_asks_then_removes_and_writes_a_row(cx: &mut TestAppContext) {
         (
             "addon",
             "delete",
-            &*format!("Deleted addon from library: {FOOT}")
+            "Deleted addon from library: No Footsteps"
         )
     );
 }

@@ -522,10 +522,7 @@ fn edit_saves_in_place(cx: &mut TestAppContext) {
         (row.action(), row.message()),
         ("update", "Updated profile: Pubs")
     );
-    assert_eq!(
-        row.details(),
-        Some(format!("Profile ID: {}", comp.id().as_str()).as_str())
-    );
+    assert_eq!(row.details(), None);
 }
 
 /// Applies `profile` to the fake game, so the page opens with it active.

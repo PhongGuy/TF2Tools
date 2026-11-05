@@ -60,14 +60,15 @@ pub fn live_failure(err: &ReinstallError) -> &'static str {
 pub(crate) fn live_job(s: &Services, id: &HudId, name: &str, tf2: &Tf2Install) -> Live {
     match s.library.reinstall_hud(id, tf2) {
         Ok(Reinstall::Updated { folder }) => {
+            // Where it landed is developer detail; the player's log names the HUD.
             let target = tf2.custom_dir().join(&folder);
+            tracing::info!(target = %target.display(), "updated the installed HUD");
             let entry = NewLogEntry::new(
                 LogLevel::Info,
                 "hud",
                 "install",
                 format!("Updated installed HUD: {name}"),
-            )
-            .with_details(format!("Installed to: {}", target.display()));
+            );
             activity::write(s, &entry);
             Live::Updated
         }

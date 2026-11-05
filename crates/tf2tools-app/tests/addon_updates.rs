@@ -133,7 +133,7 @@ fn a_reinstall_writes_the_install_row(cx: &mut TestAppContext) {
             .any(|e| e.category() == "addon_store" && e.action() == "install")
     });
     let rows = support::log_rows(&s.services);
-    assert_eq!(rows[0].message(), format!("Installed addon: {FOOT}"));
+    assert_eq!(rows[0].message(), "Installed addon: No Footsteps");
 }
 
 #[gpui_kit::test]

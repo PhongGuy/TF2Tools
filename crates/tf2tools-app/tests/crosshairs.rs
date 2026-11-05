@@ -837,14 +837,9 @@ fn crosshair_operations_write_v5s_rows(cx: &mut TestAppContext) {
             ),
         ]
     );
-    assert_eq!(
-        rows[2].details().map(str::to_owned),
-        Some(format!("Source: {}", path.display()))
-    );
-    assert_eq!(
-        rows[1].details().map(str::to_owned),
-        Some(format!("Destination: {}", managed(&env).display()))
-    );
+    // File paths are developer detail, kept out of the player's log.
+    assert_eq!(rows[2].details(), None);
+    assert_eq!(rows[1].details(), None);
 }
 
 #[gpui_kit::test]

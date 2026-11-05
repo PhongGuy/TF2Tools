@@ -168,10 +168,10 @@ fn the_log_rows_are_v5s() {
     );
     s.activity.append(&log_entry(true, &profile)).unwrap();
     let row = &support::log_rows(&s)[0];
-    let id = format!("Profile ID: {}", profile.id().as_str());
+    // The profile's id is internal, so the row names it and carries no details.
     assert_eq!(
         (row.action(), row.message(), row.details()),
-        ("update", "Updated profile: Comp", Some(id.as_str()))
+        ("update", "Updated profile: Comp", None)
     );
 }
 

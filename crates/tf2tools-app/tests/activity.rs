@@ -81,10 +81,8 @@ fn startup_writes_its_row_then_trims_to_the_cap(cx: &mut TestAppContext) {
         (rows[0].category(), rows[0].action(), rows[0].message()),
         ("system", "startup", "TF2Tools started")
     );
-    assert_eq!(
-        rows[0].details().map(str::to_owned),
-        Some(format!("Database: {}", env.data.db_path().display()))
-    );
+    // The database's path is developer detail, kept out of the player's log.
+    assert_eq!(rows[0].details(), None);
     // LOG_KEEP + 4 rows trimmed to LOG_KEEP drops seed rows 1 to 4.
     assert_eq!(rows.last().unwrap().message(), "row 5");
 }
@@ -107,7 +105,7 @@ fn sync_rows_read_like_v5() {
     assert_eq!(sync_entry(StoreKind::Sounds, summary(true, 0, 500)), None);
     assert_eq!(
         sync_entry(StoreKind::CuratedHuds, summary(false, 3, 41)),
-        Some(info("store", "sync", "Synced 41 curated HUDs from hud-db"))
+        Some(info("store", "sync", "Synced 41 curated HUDs"))
     );
     assert_eq!(
         sync_entry(StoreKind::GameBananaHuds, summary(false, 12, 900)),
@@ -206,7 +204,7 @@ fn download_rows_read_like_v5() {
             LogLevel::Error,
             "store",
             "download",
-            "HUD download failed (ID: budhud)"
+            "HUD download failed: budhud"
         )
         .with_details("boom")
     );
@@ -220,7 +218,7 @@ fn download_rows_read_like_v5() {
         info(
             "addon_store",
             "download",
-            "Downloaded addon to library: mastercomfig-addon-no-footsteps.vpk"
+            "Downloaded addon to library: No Footsteps"
         )
     );
     assert_eq!(
@@ -233,7 +231,7 @@ fn download_rows_read_like_v5() {
             LogLevel::Error,
             "addon_store",
             "download",
-            "Addon download failed: mastercomfig-addon-no-footsteps.vpk"
+            "Addon download failed: No Footsteps"
         )
         .with_details("boom")
     );

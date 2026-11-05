@@ -506,7 +506,7 @@ pub const HUDS_INSTALLED_EMPTY: &str = "huds-installed-empty";
 pub const HUDS_INSTALLED_NAME: &str = "huds-installed-name";
 /// Labelled "Managed" or "External".
 pub const HUDS_INSTALLED_BADGE: &str = "huds-installed-badge";
-/// Labelled "<game>/tf/custom/<folder>".
+/// Labelled "Active in TF2." or "Added to TF2 outside TF2Tools.".
 pub const HUDS_INSTALLED_PATH: &str = "huds-installed-path";
 /// The installed card's "Uninstall" button; removes the HUD from tf/custom.
 pub const HUDS_UNINSTALL: &str = "huds-uninstall";

@@ -441,11 +441,11 @@ fn delete_asks_then_removes_and_writes_a_row(cx: &mut TestAppContext) {
         support::present(cx, s.win, ids::PROFILES_EMPTY)
     });
     let rows = support::log_rows(&s.services);
-    assert_eq!(row(&rows[0]), ("profile", "delete", "Deleted profile"));
     assert_eq!(
-        rows[0].details(),
-        Some(format!("Profile ID: {}", comp.id().as_str()).as_str())
+        row(&rows[0]),
+        ("profile", "delete", "Deleted profile: Competitive")
     );
+    assert_eq!(rows[0].details(), None);
 }
 
 #[gpui_kit::test]

@@ -154,7 +154,7 @@ impl AddonsPage {
                 s.library
                     .install_addon(&name, &tf2)
                     .map_err(|e| describe_tf2_install(&e).into_op("Failed to install addon"))?;
-                let message = format!("Installed addon: {}", name.as_str());
+                let message = format!("Installed addon: {display}");
                 activity::write(
                     s,
                     &NewLogEntry::new(LogLevel::Info, "addon_store", "install", message),
@@ -185,7 +185,7 @@ impl AddonsPage {
                 s.library
                     .uninstall_addon(&name, &tf2)
                     .map_err(|e| describe_tf2_install(&e).into_op("Failed to uninstall addon"))?;
-                let message = format!("Uninstalled addon: {}", name.as_str());
+                let message = format!("Uninstalled addon: {display}");
                 activity::write(
                     s,
                     &NewLogEntry::new(LogLevel::Info, "addon_store", "uninstall", message),
@@ -220,7 +220,7 @@ impl AddonsPage {
                         s.library
                             .delete_addon(&name, tf2.as_ref())
                             .map_err(|e| describe_library(&e).into_op("Failed to delete addon"))?;
-                        let message = format!("Deleted addon from library: {}", name.as_str());
+                        let message = format!("Deleted addon from library: {display}");
                         let entry = NewLogEntry::new(LogLevel::Info, "addon", "delete", message);
                         activity::write(s, &entry);
                         let removed = format!("{display} removed from library");

@@ -110,7 +110,7 @@ fn delete_addon_reads_like_v5() {
     assert_eq!(spec.title.as_ref(), "Delete Addon");
     assert_eq!(
         spec.description.as_ref(),
-        "Are you sure you want to remove this addon from your library? If installed, it will also be removed from tf/custom/."
+        "Are you sure you want to remove this addon from your library? If installed, it will also be removed from TF2."
     );
     assert_eq!(spec.confirm_label.as_ref(), "Delete");
 }

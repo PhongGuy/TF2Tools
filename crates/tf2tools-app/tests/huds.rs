@@ -103,17 +103,10 @@ fn a_library_install_is_managed(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::HUDS_INSTALLED_BADGE).as_deref(),
         Some("Managed")
     );
-    let path = env
-        .game
-        .join("tf")
-        .join("custom")
-        .join("rayshud")
-        .display()
-        .to_string();
-    assert_eq!(
-        support::label_of(cx, s.win, ids::HUDS_INSTALLED_PATH),
-        Some(path)
-    );
+    // The card says where the HUD is in player words, not as a folder path.
+    let place = support::label_of(cx, s.win, ids::HUDS_INSTALLED_PATH).unwrap();
+    assert_eq!(place, "Active in TF2.");
+    support::assert_plain(&place);
     assert!(support::present(cx, s.win, ids::HUDS_UNINSTALL));
 }
 
@@ -131,6 +124,9 @@ fn a_hand_placed_hud_is_external(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::HUDS_INSTALLED_BADGE).as_deref(),
         Some("External")
     );
+    let place = support::label_of(cx, s.win, ids::HUDS_INSTALLED_PATH).unwrap();
+    assert_eq!(place, "Added to TF2 outside TF2Tools.");
+    support::assert_plain(&place);
 }
 
 #[gpui_kit::test]
@@ -541,17 +537,9 @@ fn hud_operations_write_v5s_rows(cx: &mut TestAppContext) {
             ("hud", "delete", "Deleted HUD from library: budhud"),
         ]
     );
-    assert_eq!(
-        rows[3].details().map(str::to_owned),
-        Some(format!("Source: {}", archive.display()))
-    );
-    assert_eq!(
-        rows[2].details().map(str::to_owned),
-        Some(format!(
-            "Installed to: {}",
-            env.game.join("tf").join("custom").join("budhud").display()
-        ))
-    );
+    // File paths are developer detail, kept out of the player's log.
+    assert_eq!(rows[3].details(), None);
+    assert_eq!(rows[2].details(), None);
 }
 
 #[gpui_kit::test]
@@ -708,7 +696,7 @@ fn an_install_that_ends_after_leaving_still_announces_the_change(cx: &mut TestAp
 }
 
 #[gpui_kit::test]
-fn an_install_logs_the_folder_it_lands_in(cx: &mut TestAppContext) {
+fn an_install_logs_the_huds_name_not_its_folder(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     seed(&s.services, &env, "m0rehud-abc1234", Provenance::Local);
@@ -728,14 +716,8 @@ fn an_install_logs_the_folder_it_lands_in(cx: &mut TestAppContext) {
     });
     let rows = support::log_rows(&s.services);
     let install = rows.iter().find(|r| r.action() == "install").unwrap();
-    assert_eq!(install.message(), "Installed HUD: m0rehud");
-    assert_eq!(
-        install.details().map(str::to_owned),
-        Some(format!(
-            "Installed to: {}",
-            env.game.join("tf").join("custom").join("m0rehud").display()
-        ))
-    );
+    assert_eq!(install.message(), "Installed HUD: m0rehud-abc1234");
+    assert_eq!(install.details(), None);
     assert!(env.game.join("tf/custom/m0rehud/info.vdf").is_file());
     revisit(cx, &s);
     assert_eq!(

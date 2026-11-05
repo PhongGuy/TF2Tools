@@ -805,22 +805,15 @@ fn sound_operations_write_v5s_rows(cx: &mut TestAppContext) {
         got,
         [
             ("sound", "import", "Imported sound: Ding"),
-            (
-                "sound",
-                "install",
-                format!("Installed hitsound (wav): {folder}").as_str()
-            ),
+            // The sound's name, never its library folder.
+            ("sound", "install", "Installed hitsound: Ding"),
             ("sound", "uninstall", "Uninstalled hitsound"),
-            (
-                "sound",
-                "delete",
-                format!("Deleted sound: {folder}").as_str()
-            ),
+            ("sound", "delete", "Deleted sound: Ding"),
         ]
     );
     assert_eq!(
         rows[3].details(),
-        Some("File: Ding.wav, Format: 16-bit PCM, 44100Hz, Stereo")
+        Some("Format: 16-bit PCM, 44100Hz, Stereo")
     );
 }
 

@@ -125,7 +125,7 @@ fn hub_drawn(hub: &SyncHub) -> Vec<HubDrawn> {
 }
 
 /// The sync cards in v5's order, with v5's titles and descriptions.
-const SYNC_CARDS: [(StoreKind, &str, &str); 5] = [
+pub const SYNC_CARDS: [(StoreKind, &str, &str); 5] = [
     (
         StoreKind::Sounds,
         "Sound Store",
@@ -144,7 +144,7 @@ const SYNC_CARDS: [(StoreKind, &str, &str); 5] = [
     (
         StoreKind::CuratedHuds,
         "Curated HUD Store",
-        "Curated HUDs from mastercomfig/hud-db",
+        "Curated HUDs from mastercomfig",
     ),
     (
         StoreKind::Addons,

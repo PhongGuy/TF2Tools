@@ -4,7 +4,7 @@ use std::rc::Rc;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, ScrollDelta, TestAppContext, point, px};
 use tf2tools_app::ids;
-use tf2tools_app::pages::settings::{SettingsPage, format_synced};
+use tf2tools_app::pages::settings::{SYNC_CARDS, SettingsPage, format_synced};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::sync::{SyncHub, SyncSummary};
@@ -94,6 +94,14 @@ fn settings_sync_ids_carry_the_store_slug() {
         ids::settings_resync(StoreKind::GameBananaHuds),
         gpui_kit::ElementId::Name("settings-resync:gamebanana-huds".into())
     );
+}
+
+#[test]
+fn the_sync_cards_name_their_sources_in_player_words() {
+    // A repository path like owner/name means nothing to a player.
+    for (_, title, description) in SYNC_CARDS {
+        assert!(!description.contains('/'), "{title}: {description:?}");
+    }
 }
 
 #[gpui_kit::test]
