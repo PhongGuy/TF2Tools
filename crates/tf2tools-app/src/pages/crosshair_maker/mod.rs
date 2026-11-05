@@ -50,6 +50,7 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
+use crate::widgets::crosshair_picker::IN_GAME_SIZE;
 use crate::widgets::scroll::scroll_area;
 use model::{
     Editor, FIT_TIP, OPACITY_TIP, REDO_TIP, SWATCH_NAMES, SWATCHES, Tool, UNDO_TIP, Viewport,
@@ -925,7 +926,7 @@ impl CrosshairMakerPage {
                 }
             },
         )
-        .size(px(64.));
+        .size(IN_GAME_SIZE);
         let path = cx.global::<Services>().assets.background(background);
         div()
             .id(ids::CROSSHAIR_MAKER_PREVIEW)
@@ -953,7 +954,12 @@ impl CrosshairMakerPage {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .child(texture),
+                    .child(
+                        div()
+                            .id(ids::CROSSHAIR_MAKER_PREVIEW_CROSSHAIR)
+                            .test_support()
+                            .child(texture),
+                    ),
             )
     }
 

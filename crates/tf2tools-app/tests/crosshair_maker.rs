@@ -2470,3 +2470,20 @@ fn see_through_pixels_survive_save_and_reopen(cx: &mut TestAppContext) {
     assert_eq!(pixel(cx, &page, 5, 5), [255, 255, 255, 191]);
     assert_eq!(alpha(cx, &page), 191);
 }
+
+#[gpui_kit::test]
+fn the_preview_draws_the_drawing_at_its_in_game_size(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = shell(cx, &env);
+    let page = open_maker(cx, &s);
+    // A 32x32 drawing is doubled to the same 64 px the game draws.
+    for _ in 0..2 {
+        let shown = boxes(cx, &s, &[ids::CROSSHAIR_MAKER_PREVIEW_CROSSHAIR.into()])[0];
+        assert_eq!(shown.size, gpui_kit::size(px(64.), px(64.)));
+        support::click_id(cx, s.win, ids::CROSSHAIR_MAKER_SIZE);
+    }
+    assert_eq!(
+        cx.update(|cx| page.read(cx).editor().size()),
+        CanvasSize::Large
+    );
+}

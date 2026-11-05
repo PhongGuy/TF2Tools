@@ -41,7 +41,7 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
-use crate::widgets::crosshair_picker::{CrosshairPicker, preview_image};
+use crate::widgets::crosshair_picker::{CrosshairPicker, IN_GAME_SIZE, preview_image};
 use crate::widgets::scroll::scroll_area;
 use crate::widgets::weapon_assigner::{
     AssignRequested, AssignTarget, AssignedCell, AssignerState, ClassChanged, WeaponAssigner,
@@ -675,7 +675,14 @@ impl CrosshairsPage {
         let (label, centre) = match selection {
             Some((selected, name)) => {
                 let preview = self.previews.read(cx).preview(selected, cx);
-                let centre = preview_image(preview, px(48.)).map(IntoElement::into_any_element);
+                // Drawn as big as the game draws it, the same as the maker's preview.
+                let centre = preview_image(preview, IN_GAME_SIZE).map(|image| {
+                    div()
+                        .id(ids::CROSSHAIRS_PREVIEW_CROSSHAIR)
+                        .test_support()
+                        .child(image)
+                        .into_any_element()
+                });
                 (format!("{name} on {background}"), centre)
             }
             None => {

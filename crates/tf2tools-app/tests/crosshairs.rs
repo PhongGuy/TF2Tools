@@ -1188,3 +1188,22 @@ fn a_delete_writes_an_activity_row(cx: &mut TestAppContext) {
     let row = rows.iter().find(|r| r.action() == "delete").unwrap();
     assert_eq!(row.message(), "Deleted crosshair from library: Zebra");
 }
+
+// The game draws every crosshair 64 px square at the default crosshair scale, whatever the
+// resolution, and the maker's preview uses the same size.
+#[gpui_kit::test]
+fn the_preview_draws_the_crosshair_at_its_in_game_size(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let _page = open_crosshairs(cx, &s);
+    let first = s.services.builtins.all()[0].clone();
+    support::click_id(cx, s.win, ids::crosshair_builtin(first.name()));
+    support::wait_real(cx, "the preview", |cx| {
+        support::present(cx, s.win, ids::CROSSHAIRS_PREVIEW_CROSSHAIR)
+    });
+    let shown = support::bounds_of(cx, s.win, ids::CROSSHAIRS_PREVIEW_CROSSHAIR).unwrap();
+    assert_eq!(
+        shown.size,
+        gpui_kit::size(gpui_kit::px(64.), gpui_kit::px(64.))
+    );
+}
