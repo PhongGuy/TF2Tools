@@ -173,8 +173,9 @@ fn nav_item(
         .on_click(cx.listener(move |shell, _, window, cx| shell.request_navigate(page, window, cx)))
 }
 
-// One lucide icon per kind of thing, shared by its library, store and maker pages.
-fn icon(page: Page) -> IconName {
+/// The page's sidebar icon: one lucide icon per kind of thing, shared by its library, store
+/// and maker pages.
+pub fn icon(page: Page) -> IconName {
     match page {
         Page::Huds | Page::HudStore | Page::HudMaker => IconName::Paintbrush,
         Page::Sounds | Page::SoundStore => IconName::Volume2,

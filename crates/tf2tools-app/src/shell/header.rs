@@ -5,7 +5,7 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, TitleBar, h_flex};
+use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, TitleBar, h_flex};
 use gpui_kit::{
     App, Context, FontWeight, InteractiveElement as _, IntoElement, MouseButton,
     ParentElement as _, Pixels, Role, StatefulInteractiveElement as _, Styled as _,
@@ -16,6 +16,7 @@ use tf2tools_core::StoreKind;
 
 use super::leave::should_close;
 use super::route::Page;
+use super::sidebar::icon as nav_icon;
 use super::{HEADER_HEIGHT, Shell};
 use crate::ids;
 use crate::services::{Tf2State, tf2_state};
@@ -123,14 +124,28 @@ fn tf2_badge(cx: &App) -> Option<impl IntoElement + use<>> {
     )
 }
 
-// v5's SyncIndicator, in its S, C, H, M order: a 24 px arc with the store's letter centred,
-// spinning for Curated HUDs, which has no total. Addons sync without a ring.
+/// The icon a store's sync ring shows: the sidebar icon of its store page, so Curated HUDs
+/// shares the HUD Store's.
+pub fn ring_icon(kind: StoreKind) -> IconName {
+    nav_icon(match kind {
+        StoreKind::Sounds => Page::SoundStore,
+        StoreKind::Crosshairs => Page::CrosshairStore,
+        StoreKind::Addons => Page::AddonStore,
+        _ => Page::HudStore,
+    })
+}
+
+// Fits inside the ring's 3 px stroke with a little air around it.
+const RING_ICON: Pixels = px(12.);
+
+// v5's SyncIndicator, in its S, C, H, M order: a 24 px arc with the store's icon centred where
+// v5 had its letter, spinning for Curated HUDs, which has no total. Addons sync without a ring.
 fn sync_rings(cx: &App) -> Vec<impl IntoElement + use<>> {
-    const RINGS: [(StoreKind, &str); 4] = [
-        (StoreKind::Sounds, "S"),
-        (StoreKind::Crosshairs, "C"),
-        (StoreKind::GameBananaHuds, "H"),
-        (StoreKind::CuratedHuds, "M"),
+    const RINGS: [StoreKind; 4] = [
+        StoreKind::Sounds,
+        StoreKind::Crosshairs,
+        StoreKind::GameBananaHuds,
+        StoreKind::CuratedHuds,
     ];
     let Some(hub) = sync_hub(cx) else {
         return Vec::new();
@@ -139,7 +154,7 @@ fn sync_rings(cx: &App) -> Vec<impl IntoElement + use<>> {
     let (colors, muted) = (RingColors::of(cx.theme()), cx.theme().muted_foreground);
     RINGS
         .into_iter()
-        .filter_map(|(kind, letter)| {
+        .filter_map(|kind| {
             let tick = hub.progress(kind)?;
             let curated = kind == StoreKind::CuratedHuds;
             let label = if curated {
@@ -172,10 +187,14 @@ fn sync_rings(cx: &App) -> Vec<impl IntoElement + use<>> {
                             .spinning(curated)
                             .child(
                                 div()
-                                    .text_size(px(7.))
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(muted)
-                                    .child(letter),
+                                    .id(ids::keyed("sync-ring-icon", store_slug(kind)))
+                                    .test_support()
+                                    .flex_none()
+                                    .child(
+                                        Icon::new(ring_icon(kind))
+                                            .with_size(Size::Size(RING_ICON))
+                                            .text_color(muted),
+                                    ),
                             ),
                     ),
             )

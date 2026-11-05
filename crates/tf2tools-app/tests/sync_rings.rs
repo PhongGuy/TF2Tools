@@ -2,6 +2,8 @@ use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::{Bounds, Entity, TestAppContext, point, px, size};
 use tf2tools_app::ids;
 use tf2tools_app::services::Tf2State;
+use tf2tools_app::shell::route::Page;
+use tf2tools_app::shell::{nav_icon, ring_icon};
 use tf2tools_app::sync::{SyncHub, SyncSummary};
 use tf2tools_app::widgets::sync_ring::{
     RING_RADIUS, RING_SIZE, RING_STROKE, RingColors, SPIN_PERIOD, cap_centres, spin_arc,
@@ -249,4 +251,32 @@ fn the_curated_spinner_turns_a_fixed_quarter_once_a_second() {
         assert!((0. ..100.).contains(&start), "{step}: {start}");
         assert!(close(end - start, 25.), "{step}: {start} {end}");
     }
+}
+
+// Each ring shows its store's sidebar icon where v5 had a letter; Curated HUDs shares the
+// HUD Store's.
+#[test]
+fn each_ring_icon_is_its_stores_sidebar_icon() {
+    for (kind, page) in [
+        (StoreKind::Sounds, Page::SoundStore),
+        (StoreKind::Crosshairs, Page::CrosshairStore),
+        (StoreKind::GameBananaHuds, Page::HudStore),
+        (StoreKind::CuratedHuds, Page::HudStore),
+    ] {
+        assert_eq!(ring_icon(kind), nav_icon(page), "{kind:?}");
+    }
+}
+
+#[gpui_kit::test]
+fn the_ring_icon_is_12_px_and_centred_in_the_ring(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (hub, _runs) = support::fake_hub(cx);
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    start(cx, &hub, StoreKind::CuratedHuds);
+    support::next_repaint(cx);
+    let ring = support::bounds_of(cx, s.win, ids::sync_ring(StoreKind::CuratedHuds)).unwrap();
+    let icon = support::bounds_of(cx, s.win, ids::keyed("sync-ring-icon", "curated-huds"))
+        .expect("an icon in the ring");
+    assert_eq!(icon.size, size(px(12.), px(12.)));
+    assert_eq!(icon.center(), ring.center());
 }
