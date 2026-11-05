@@ -18,8 +18,10 @@ use super::starter::{Param, Starter, StarterParams, starter_drawing};
 use crate::ids;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 
-/// The preview box's side; the drawing is scaled to whole pixels per cell inside it.
+/// The room inside the preview's frame; the drawing is scaled to whole pixels per cell in it.
 const PREVIEW_SIZE: Pixels = px(128.);
+/// The frame's 1 px border, drawn outside `PREVIEW_SIZE` so it never covers the drawing's edge.
+const PREVIEW_BORDER: Pixels = px(1.);
 
 /// The dialog's shape, sliders and the canvas size and paint the starter is drawn in.
 pub struct StarterDialog {
@@ -68,16 +70,15 @@ impl StarterDialog {
         let shape = Starter::Cross;
         let defaults = shape.defaults(size);
         let sliders = Param::ALL.map(|param| {
-            let (min, max, step) = param.limits(size);
-            let slider = cx.new(|_| {
-                SliderState::new()
-                    .min(min as f32)
-                    .max(max as f32)
-                    .step(step as f32)
-                    .default_value(defaults.get(param) as f32)
-            });
-            // The labels and preview are drawn from the slider values, so any change redraws.
-            cx.observe(&slider, |_, _, cx| cx.notify()).detach();
+            let slider =
+                cx.new(|_| slider_state(shape.limits(param, defaults, size), defaults.get(param)));
+            // The labels and preview are drawn from the slider values, so any change redraws,
+            // and a moved Gap can change how long a Length still fits.
+            cx.observe(&slider, |this, _, cx| {
+                this.fit_limits(cx);
+                cx.notify();
+            })
+            .detach();
             slider
         });
         Self {
@@ -86,6 +87,26 @@ impl StarterDialog {
             paint,
             shape,
             sliders,
+        }
+    }
+
+    // Rebuilds any slider whose range no longer matches the shape and the other sliders,
+    // keeping its value snapped inside the new range. A slider already in range is left alone,
+    // so the observer this triggers settles at once.
+    fn fit_limits(&mut self, cx: &mut Context<Self>) {
+        let params = self.params(cx);
+        for param in Param::ALL {
+            let (min, max, step) = self.shape.limits(param, params, self.size);
+            let slider = self.slider(param).clone();
+            let range = slider.read(cx).min_value()..=slider.read(cx).max_value();
+            if range == (min as f32..=max as f32) {
+                continue;
+            }
+            let value = params.get(param).clamp(min, max);
+            slider.update(cx, |state, cx| {
+                *state = slider_state((min, max, step), value);
+                cx.notify();
+            });
         }
     }
 
@@ -108,6 +129,8 @@ impl StarterDialog {
             let value = self.slider(param).read(cx).value().start();
             params.set(param, param.snap(self.size, value));
         }
+        // The Gap is snapped first, so the Length can be held to what it leaves.
+        params.length = self.shape.snap(Param::Length, params, self.size);
         params
     }
 
@@ -126,6 +149,7 @@ impl StarterDialog {
                 .clone()
                 .update(cx, |state, cx| state.set_value(value, window, cx));
         }
+        self.fit_limits(cx);
         cx.notify();
     }
 
@@ -177,7 +201,7 @@ impl StarterDialog {
             .aria_label(format!("{} preview", self.shape.label()))
             .test_support()
             .flex_none()
-            .size(PREVIEW_SIZE)
+            .size(PREVIEW_SIZE + PREVIEW_BORDER * 2.)
             .rounded_lg()
             .border_1()
             .border_color(border)
@@ -185,8 +209,23 @@ impl StarterDialog {
             .flex()
             .items_center()
             .justify_center()
-            .child(picture)
+            .child(
+                div()
+                    .id(ids::CROSSHAIR_MAKER_STARTER_PICTURE)
+                    .test_support()
+                    .flex_none()
+                    .child(picture),
+            )
     }
+}
+
+/// A slider over `(min, max, step)` at `value`.
+fn slider_state((min, max, step): (u32, u32, u32), value: u32) -> SliderState {
+    SliderState::new()
+        .min(min as f32)
+        .max(max as f32)
+        .step(step as f32)
+        .default_value(value as f32)
 }
 
 impl Render for StarterDialog {

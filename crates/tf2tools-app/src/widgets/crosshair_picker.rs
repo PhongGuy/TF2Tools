@@ -302,6 +302,10 @@ impl Render for CrosshairPicker {
     }
 }
 
+/// How big the game draws a crosshair at the default crosshair scale: the weapon script's 64
+/// texels, in screen pixels at any resolution. Both previews show crosshairs at this size.
+pub const IN_GAME_SIZE: Pixels = px(64.);
+
 /// The drawn preview at `size`, or nothing while it is pending or missing.
 pub(crate) fn preview_image(preview: Preview, size: Pixels) -> Option<impl IntoElement> {
     match preview {

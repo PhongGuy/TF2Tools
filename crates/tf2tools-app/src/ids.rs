@@ -125,6 +125,8 @@ pub const CROSSHAIRS_SWATCH: &str = "crosshairs-swatch";
 pub const CROSSHAIRS_BACKGROUND: &str = "crosshairs-background";
 /// The composite preview, labelled "No crosshair" or "{name} on {background}".
 pub const CROSSHAIRS_PREVIEW: &str = "crosshairs-preview";
+/// The selected crosshair inside the preview, drawn at its in-game size.
+pub const CROSSHAIRS_PREVIEW_CROSSHAIR: &str = "crosshairs-preview-crosshair";
 /// The "Import" button, "Importing..." while busy; opens the crosshair image picker.
 pub const CROSSHAIRS_IMPORT: &str = "crosshairs-import";
 /// The Crosshairs page's "TF2 not found" notice, present only while TF2 is not found.
@@ -440,6 +442,8 @@ pub const CROSSHAIR_MAKER_COLOR_HINT: &str = "crosshair-maker-color-hint";
 pub const CROSSHAIR_MAKER_PREVIEW_COLOR: &str = "crosshair-maker-preview-color";
 /// The tinted preview over the chosen background.
 pub const CROSSHAIR_MAKER_PREVIEW: &str = "crosshair-maker-preview";
+/// The drawing inside the maker's preview, drawn at its in-game size.
+pub const CROSSHAIR_MAKER_PREVIEW_CROSSHAIR: &str = "crosshair-maker-preview-crosshair";
 /// Wraps the preview background Select.
 pub const CROSSHAIR_MAKER_BACKGROUND: &str = "crosshair-maker-background";
 /// Wraps the crosshair name input.
@@ -488,6 +492,8 @@ pub const CROSSHAIR_MAKER_IMPORT_PNG: &str = "crosshair-maker-import-png";
 pub const CROSSHAIR_MAKER_STARTER_DIALOG: &str = "crosshair-maker-starter-dialog";
 /// The dialog's live preview, labelled "<shape> preview".
 pub const CROSSHAIR_MAKER_STARTER_PREVIEW: &str = "crosshair-maker-starter-preview";
+/// The drawing inside the starter preview's frame.
+pub const CROSSHAIR_MAKER_STARTER_PICTURE: &str = "crosshair-maker-starter-picture";
 /// The dialog's Cancel button.
 pub const CROSSHAIR_MAKER_STARTER_CANCEL: &str = "crosshair-maker-starter-cancel";
 /// The starter dialog's Use button.

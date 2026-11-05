@@ -1117,3 +1117,28 @@ fn white_and_grey_swatches_say_they_follow_your_crosshair_colour() {
     // A swatch that is not white or grey keeps its own name as its tooltip.
     assert_eq!(swatch_tooltip(RED, "Red"), "Red");
 }
+
+#[test]
+fn shrinking_knows_when_it_would_cut_off_paint() {
+    let mut e = Editor::new();
+    assert!(
+        !e.would_crop(CanvasSize::Small),
+        "an empty canvas loses nothing"
+    );
+    // The middle 16..48 survives a shrink, so paint on its edges is safe.
+    for (x, y) in [(16, 16), (47, 47), (16, 47)] {
+        dab(&mut e, x, y);
+    }
+    assert!(!e.would_crop(CanvasSize::Small));
+    dab(&mut e, 15, 30);
+    assert!(e.would_crop(CanvasSize::Small));
+    assert!(
+        !e.would_crop(CanvasSize::Large),
+        "the current size is no change"
+    );
+    e.set_size(CanvasSize::Small);
+    assert!(
+        !e.would_crop(CanvasSize::Large),
+        "growing keeps every pixel"
+    );
+}

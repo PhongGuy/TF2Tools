@@ -50,6 +50,7 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
+use crate::widgets::crosshair_picker::IN_GAME_SIZE;
 use crate::widgets::scroll::scroll_area;
 use model::{
     Editor, FIT_TIP, OPACITY_TIP, REDO_TIP, SWATCH_NAMES, SWATCHES, Tool, UNDO_TIP, Viewport,
@@ -409,6 +410,25 @@ impl CrosshairMakerPage {
         cx.spawn_in(window, async move |page, cx| {
             if answer.recv().await.unwrap_or(false) {
                 let _ = page.update_in(cx, |page, window, cx| page.reset(window, cx));
+            }
+        })
+        .detach();
+    }
+
+    // Switches 64x64 and 32x32, asking first when a shrink would cut paint off the edges;
+    // either way the switch is one undo step.
+    fn switch_size(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let size = self.editor.size().other();
+        // The cell under a still pointer differs at the new size, or under the dialog.
+        self.unhover(cx);
+        if !self.editor.would_crop(size) {
+            self.edit(cx, |e| e.set_size(size));
+            return;
+        }
+        let answer = confirm(Confirm::shrink_canvas(), window, cx);
+        cx.spawn_in(window, async move |page, cx| {
+            if answer.recv().await.unwrap_or(false) {
+                let _ = page.update(cx, |page, cx| page.edit(cx, |e| e.set_size(size)));
             }
         })
         .detach();
@@ -832,6 +852,9 @@ impl CrosshairMakerPage {
                             .id(ids::CROSSHAIR_MAKER_OPACITY)
                             .aria_label("Opacity")
                             .test_support()
+                            // The handle overhangs the track's ends by 11 px; the margin keeps
+                            // it whole at 1% and 100% instead of clipped by the panel.
+                            .mx_3()
                             .tooltip(|window, cx| Tooltip::new(OPACITY_TIP).build(window, cx))
                             .child(Slider::new(&self.opacity)),
                     ),
@@ -922,7 +945,7 @@ impl CrosshairMakerPage {
                 }
             },
         )
-        .size(px(64.));
+        .size(IN_GAME_SIZE);
         let path = cx.global::<Services>().assets.background(background);
         div()
             .id(ids::CROSSHAIR_MAKER_PREVIEW)
@@ -950,7 +973,12 @@ impl CrosshairMakerPage {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .child(texture),
+                    .child(
+                        div()
+                            .id(ids::CROSSHAIR_MAKER_PREVIEW_CROSSHAIR)
+                            .test_support()
+                            .child(texture),
+                    ),
             )
     }
 
@@ -1270,11 +1298,9 @@ impl CrosshairMakerPage {
                             .label(size_label(e.size().side()))
                             .tooltip("Switch canvas size")
                             .disabled(busy)
-                            .on_click(cx.listener(|page, _, _, cx| {
-                                // The cell under a still pointer differs at the new size.
-                                page.hover = None;
-                                page.edit(cx, |e| e.set_size(e.size().other()))
-                            })),
+                            .on_click(
+                                cx.listener(|page, _, window, cx| page.switch_size(window, cx)),
+                            ),
                     ),
                 )
                 .child(

@@ -31,6 +31,16 @@ impl Confirm {
         }
     }
 
+    /// The prompt before shrinking a crosshair drawing to 32x32 would cut paint off its edges.
+    pub fn shrink_canvas() -> Self {
+        Self {
+            title: "Shrink canvas".into(),
+            description: "Shrinking to 32x32 cuts off the edges of your drawing.".into(),
+            confirm_label: "Shrink".into(),
+            cancel_label: "Cancel".into(),
+        }
+    }
+
     /// v5's HudCard delete prompt for the HUD called `name`.
     pub fn delete_hud(name: &str) -> Self {
         Self {

@@ -379,3 +379,31 @@ fn a_starter_drawing_paints_its_cells_and_leaves_the_rest_clear() {
         }
     }
 }
+
+#[test]
+fn a_cross_with_gap_only_offers_lengths_that_fit_the_canvas() {
+    for size in SIZES {
+        let h = size.side() / 2;
+        // A plain cross has no gap, so its Length keeps the full range.
+        let base = Starter::Cross.defaults(size);
+        assert_eq!(
+            Starter::Cross.limits(Param::Length, base, size),
+            Param::Length.limits(size)
+        );
+        for gap in values(Param::Gap, size) {
+            let mut p = Starter::CrossWithGap.defaults(size);
+            p.gap = gap;
+            let (min, max, step) = Starter::CrossWithGap.limits(Param::Length, p, size);
+            assert_eq!((min, max, step), (1, h - gap, 1), "gap {gap}");
+            // Every offered length draws arms of exactly that length, none of it off the edge.
+            for length in (min..=max).step_by(step as usize) {
+                p.length = length;
+                let (_, reach) = check(Starter::CrossWithGap, p, size);
+                assert_eq!(reach.0, (gap + length).max(p.thickness / 2), "{p:?}");
+            }
+            // A length past the gap's room snaps to the longest that fits.
+            p.length = h;
+            assert_eq!(Starter::CrossWithGap.snap(Param::Length, p, size), h - gap);
+        }
+    }
+}
