@@ -574,7 +574,8 @@ fn addon_card(addon: &AddonEntry, state: &CardState, cx: &mut Context<AddonsPage
                 AddonAction::Uninstall => {
                     let button = Button::new(ids::addon_uninstall(name))
                         .outline()
-                        .icon(IconName::Trash)
+                        // Unplug, as on the other pages, so it never reads as Delete's trash can.
+                        .icon(IconName::Unplug)
                         .disabled(disabled(action))
                         .on_click(on(action));
                     if beside_update {
