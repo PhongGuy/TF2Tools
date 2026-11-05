@@ -20,6 +20,7 @@ use gpui_kit::{
 
 use tf2tools_core::{CrosshairId, CrosshairRef, HudEntry, HudId};
 
+use crate::audio::player::show_idle;
 use crate::keymap::ToggleSidebar;
 use crate::local_messages::describe_settings;
 use crate::pages::addon_store::AddonStorePage;
@@ -176,10 +177,10 @@ impl Shell {
     }
 
     // Leaving a library page, a maker or Settings drops it, so the next visit builds it fresh
-    // from the saved state: Settings rereads its form, HUDs its library, and Sounds' player
-    // stops. The stores and the Activity Log are kept, hidden, so a return finds their tab,
-    // search, filters, sort and scroll as left. Re-selecting the current page keeps it as it
-    // is. Toasts rise above the sound player while it shows.
+    // from the saved state: Settings rereads its form, HUDs its library. The stores and the
+    // Activity Log are kept, hidden, so a return finds their tab, search, filters, sort and
+    // scroll as left. Re-selecting the current page keeps it as it is. A playing sound plays
+    // on; the idle player shows only on the sound pages, and toasts rise above it while it shows.
     pub fn navigate(&mut self, page: Page, cx: &mut Context<Self>) {
         if page == self.page {
             return;
@@ -197,7 +198,7 @@ impl Shell {
         self.addons = None;
         self.profiles = None;
         self.set_kept_hidden(page, false, cx);
-        toast::lift_above_player(page.shows_player(), cx);
+        show_idle(page.shows_player(), cx);
         cx.notify();
     }
 

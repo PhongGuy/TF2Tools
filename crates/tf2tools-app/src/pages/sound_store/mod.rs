@@ -14,7 +14,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{GbId, StoreCard, StoreItemId, StoreKind};
 
-use crate::audio::player::Player;
+use crate::audio::player::{Player, sound_player};
 use crate::ids;
 use crate::pages::common::filter_badge;
 use crate::shell::CONTENT_PADDING;
@@ -32,7 +32,8 @@ const KIND: StoreKind = StoreKind::Sounds;
 const CARD_HEIGHT: f32 = 382.;
 
 /// The Sound Store. Search, sort, count and paging belong to the grid, which this page lays out
-/// in v5's rows around the sync banner and category pills, plus the floating player.
+/// in v5's rows around the sync banner and category pills; its previews play through the app's
+/// one player.
 pub struct SoundStorePage {
     grid: Entity<StoreGrid>,
     player: Entity<Player>,
@@ -47,7 +48,7 @@ impl SoundStorePage {
     /// Needs the `Services` global; the grid is `StoreGridConfig::new(Sounds, "sounds")` with 382 px cards.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // The player comes first so each card can read what plays and start its preview.
-        let player = cx.new(|cx| Player::new(window, cx));
+        let player = sound_player(window, cx);
         let weak = player.downgrade();
         let downloaded = SessionDownloads::new(KIND);
         let render: CardRenderer = {
@@ -107,17 +108,13 @@ impl SoundStorePage {
         &self.grid
     }
 
-    /// The floating player; leaving the page stops its sound.
+    /// The app's floating player; a preview keeps playing after the page hides.
     pub fn player(&self) -> &Entity<Player> {
         &self.player
     }
 
-    /// Hides or shows the page's grid (see `StoreGrid::set_hidden`); hiding also stops the
-    /// preview, as leaving the page always has.
+    /// Hides or shows the page's grid (see `StoreGrid::set_hidden`).
     pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
-        if hidden {
-            self.player.update(cx, |player, cx| player.stop(cx));
-        }
         self.grid.update(cx, |grid, cx| grid.set_hidden(hidden, cx));
     }
 
@@ -193,7 +190,6 @@ fn card_playing(player: &WeakEntity<Player>, card: &StoreCard, cx: &App) -> bool
 }
 
 impl Render for SoundStorePage {
-    // The player floats over the page's bottom right corner, so it is the root's last child.
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         v_flex()
             .id(ids::page(Page::SoundStore))
@@ -206,6 +202,5 @@ impl Render for SoundStorePage {
             .child(self.grid.read(cx).search_row(cx))
             .child(self.filter_row(window, cx))
             .child(div().flex_1().min_h_0().child(self.grid.clone()))
-            .child(self.player.clone())
     }
 }

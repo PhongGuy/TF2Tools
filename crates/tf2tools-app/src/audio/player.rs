@@ -4,14 +4,14 @@
 use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::base::POPUP_PRIORITY;
+use gpui_kit::base::{POPUP_PRIORITY, Root, RootPlugin};
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::{Slider, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, h_flex, v_flex};
 use gpui_kit::{
-    AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _,
-    IntoElement, ParentElement as _, Render, SharedString, Styled as _, Subscription, Task,
-    TestSupportExt as _, Window, deferred, div, px,
+    AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight, Global,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
+    Subscription, Task, TestSupportExt as _, Window, deferred, div, px,
 };
 
 use super::AudioOut;
@@ -19,7 +19,7 @@ use super::volume::{SharedVolume, bind_slider, shared_volume};
 use crate::ids;
 use crate::local_messages::{describe_audio, describe_settings};
 use crate::services::{OpError, Services, run_blocking};
-use crate::shell::toast::toast_error;
+use crate::shell::toast::{lift_above_player, toast_error};
 use crate::widgets::labelled;
 
 /// What the floating player shows while a sound plays; `key` tells two sounds apart.
@@ -46,7 +46,7 @@ pub struct Player {
 impl Player {
     /// Needs the `Services` global. Reads the saved volume off the UI thread unless the app
     /// already knows it (`is_ready` after).
-    /// Releasing the entity stops the sound.
+    /// Releasing the entity stops its sound, if it holds one.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let audio = cx.global::<Services>().audio.clone();
         let shared = shared_volume(cx);
@@ -59,7 +59,13 @@ impl Player {
                 .default_value(percent)
         });
         let bound = bind_slider(&volume, window, cx);
-        cx.on_release(|player, _| player.audio.stop()).detach();
+        // A player holding nothing leaves the shared audio alone; another may be playing.
+        cx.on_release(|player, _| {
+            if player.now.is_some() {
+                player.audio.stop();
+            }
+        })
+        .detach();
         let mut player = Self {
             audio,
             win: window.window_handle(),
@@ -196,6 +202,75 @@ impl Player {
             });
         })
         .detach();
+    }
+}
+
+// The app's one player, built on first use, and whether it shows: always while it plays, else
+// only where `show_idle` asks. Pages send sounds to it and the window root's `PlayerLayer` draws
+// it, so a sound outlives the page that started it.
+#[derive(Default)]
+struct SoundPlayer {
+    player: Option<Entity<Player>>,
+    idle_shown: bool,
+    shown: bool,
+}
+
+impl Global for SoundPlayer {}
+
+/// The app's one floating player, built in `window` on first use.
+pub fn sound_player(window: &mut Window, cx: &mut App) -> Entity<Player> {
+    if let Some(player) = cx
+        .try_global::<SoundPlayer>()
+        .and_then(|g| g.player.clone())
+    {
+        return player;
+    }
+    let player = cx.new(|cx| Player::new(window, cx));
+    cx.observe(&player, |_, cx| sync_shown(cx)).detach();
+    cx.default_global::<SoundPlayer>().player = Some(player.clone());
+    player
+}
+
+/// Shows or hides the app's player while it plays nothing; a playing player always shows.
+pub fn show_idle(shown: bool, cx: &mut App) {
+    cx.default_global::<SoundPlayer>().idle_shown = shown;
+    sync_shown(cx);
+}
+
+// Recomputes whether the player shows; a change moves the toasts clear of it and redraws, since
+// a hidden player's own notify reaches no window.
+fn sync_shown(cx: &mut App) {
+    let global = cx.default_global::<SoundPlayer>();
+    let (idle, player) = (global.idle_shown, global.player.clone());
+    let shown = idle || player.is_some_and(|p| p.read(cx).now_playing().is_some());
+    let global = cx.global_mut::<SoundPlayer>();
+    if global.shown == shown {
+        return;
+    }
+    global.shown = shown;
+    lift_above_player(shown, cx);
+    cx.refresh_windows();
+}
+
+/// Draws the app's player in every window over the page, whichever page shows.
+pub struct PlayerLayer;
+
+impl PlayerLayer {
+    /// Registers the layer for every window opened after this call.
+    pub fn register(cx: &mut App) {
+        Root::register_plugin(cx, |_, _| Self);
+    }
+}
+
+impl RootPlugin for PlayerLayer {}
+
+impl Render for PlayerLayer {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let player = cx
+            .try_global::<SoundPlayer>()
+            .filter(|global| global.shown)
+            .and_then(|global| global.player.clone());
+        div().size_full().children(player)
     }
 }
 

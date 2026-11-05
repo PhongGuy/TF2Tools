@@ -102,7 +102,8 @@ impl Page {
         )
     }
 
-    /// Whether the page shows the floating sound player: Sounds and the Sound Store.
+    /// Whether the page shows the floating sound player while it is idle: Sounds and the Sound
+    /// Store. A playing player shows on every page.
     pub fn shows_player(self) -> bool {
         matches!(self, Page::Sounds | Page::SoundStore)
     }
