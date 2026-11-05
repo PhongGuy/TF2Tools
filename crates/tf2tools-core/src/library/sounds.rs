@@ -339,13 +339,13 @@ impl Library {
         Ok(())
     }
 
-    /// Removes a sound's library folder and row. With a TF2 install, a VPK sound that is
-    /// the installed hitsound or killsound also loses `tf/custom/tf2tools-<kind>.vpk` and
-    /// that install setting and clears the active profile; an installed WAV copy stays.
+    /// Removes a sound's library folder and row. With a TF2 install, a sound that is the
+    /// installed hitsound or killsound also leaves the game: its installed file and that
+    /// install setting go, and the active profile is cleared.
     pub fn delete_sound(&self, id: &SoundId, tf2: Option<&Tf2Install>) -> Result<(), LibraryError> {
         let (folder, format) = self.sound_folder(id)?;
-        let installed_kinds: Vec<SoundKind> = match (tf2, format) {
-            (Some(_), SoundFormat::Vpk) => self
+        let installed_kinds: Vec<SoundKind> = match tf2 {
+            Some(_) => self
                 .db
                 .read(|conn| {
                     let mut kinds = Vec::new();
@@ -357,11 +357,15 @@ impl Library {
                     Ok(kinds)
                 })
                 .map_err(library_db)?,
-            _ => Vec::new(),
+            None => Vec::new(),
         };
         if let Some(tf2) = tf2 {
+            let custom = tf2.custom_dir();
             for kind in &installed_kinds {
-                remove_file_if_present(&kind.vpk_target(&tf2.custom_dir()))?;
+                remove_file_if_present(&match format {
+                    SoundFormat::Wav => kind.wav_target(&custom),
+                    SoundFormat::Vpk => kind.vpk_target(&custom),
+                })?;
             }
         }
         // The row goes before the library folder, so a failed removal never leaves a row
