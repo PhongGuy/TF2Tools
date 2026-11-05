@@ -30,6 +30,9 @@ use crate::widgets::dialog_frame::{BOX_CHROME, DETAIL_WIDTH, DIALOG_WIDTH, Dialo
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_beside;
 
+// A failed listing's height: one 22.5 px line of message, the 8 px gap and the 32 px Retry.
+const FILES_STATUS_HEIGHT: Pixels = px(62.5);
+
 /// The item a detail dialog is about, as the card that opened it knows it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DetailItem {
@@ -332,7 +335,9 @@ impl StoreDetail {
     fn files_section(&self, busy: bool, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
         match &self.files {
+            // Held at the failure's height, one line and the Retry button, so the dialog keeps still.
             FilesState::Loading => div()
+                .min_h(FILES_STATUS_HEIGHT)
                 .text_sm()
                 .text_color(muted)
                 .child("Loading files...")

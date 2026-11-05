@@ -204,6 +204,32 @@ fn a_listing_that_fails_after_the_dialog_closes_stays_quiet(cx: &mut TestAppCont
 }
 
 #[gpui_kit::test]
+fn the_detail_keeps_its_height_when_the_listing_fails(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_gb_missing(9, Duration::from_millis(300));
+    let (win, _) = support::store_window(
+        cx,
+        &env,
+        &server,
+        |env| support::seed_gb_huds(env, &[(9, "Gone")]),
+        |_, _| support::Blank,
+    );
+    let d = detail(cx, win, item(GB, gb(9), "Gone", false), false);
+    let loading = bounds(cx, win, ids::STORE_DETAIL);
+    assert!(cx.update(|cx| matches!(d.read(cx).files(), FilesState::Loading)));
+    support::wait_real(cx, "the inline error", |cx| {
+        support::present(cx, win, ids::STORE_FILES_ERROR)
+    });
+    let failed = bounds(cx, win, ids::STORE_DETAIL);
+    assert_eq!(
+        loading.size.height, failed.size.height,
+        "{loading:?} -> {failed:?}"
+    );
+    assert_eq!(loading.origin.y, failed.origin.y);
+}
+
+#[gpui_kit::test]
 fn a_running_download_disables_other_file_buttons(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
