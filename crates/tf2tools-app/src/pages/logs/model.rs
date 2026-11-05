@@ -7,9 +7,10 @@ use tf2tools_core::LogLevel;
 /// Rows fetched per query; the next page's `before` is the last row's id.
 pub const PAGE_SIZE: u32 = 100;
 
-/// The category select: label, then the filter (`None` is All). v5's order, then Profiles and Addons.
+/// The category select: label, then the filter (`None` is every category). v5's order, then
+/// Profiles and Addons.
 pub const CATEGORIES: [(&str, Option<&str>); 9] = [
-    ("All", None),
+    ("All categories", None),
     ("HUDs", Some("hud")),
     ("Sounds", Some("sound")),
     ("Crosshairs", Some("crosshair")),
@@ -22,11 +23,45 @@ pub const CATEGORIES: [(&str, Option<&str>); 9] = [
 
 /// The level select: label, then the filter.
 pub const LEVELS: [(&str, Option<LogLevel>); 4] = [
-    ("All", None),
+    ("All levels", None),
     ("Info", Some(LogLevel::Info)),
     ("Warning", Some(LogLevel::Warning)),
     ("Error", Some(LogLevel::Error)),
 ];
+
+/// A row's stored category in player words; an unknown one has its underscores spaced out.
+pub fn category_label(category: &str) -> String {
+    let known = match category {
+        "hud" => "HUD",
+        "sound" => "Sound",
+        "crosshair" => "Crosshair",
+        "addon" => "Addon",
+        "profile" => "Profile",
+        "hud_store" => "HUD Store",
+        "sound_store" => "Sound Store",
+        "crosshair_store" => "Crosshair Store",
+        "addon_store" => "Addon Store",
+        _ => return spaced(category),
+    };
+    known.to_owned()
+}
+
+/// A row's stored action in player words, read the same way as `category_label`.
+pub fn action_label(action: &str) -> String {
+    match action {
+        "save_current" => "Save current setup".to_owned(),
+        _ => spaced(action),
+    }
+}
+
+// "install_fonts" reads "Install fonts": underscores become spaces, the first letter a capital.
+fn spaced(name: &str) -> String {
+    let words = name.replace('_', " ");
+    let mut chars = words.chars();
+    chars.next().map_or_else(String::new, |first| {
+        first.to_uppercase().chain(chars).collect()
+    })
+}
 
 /// v5's `formatRelativeTime` between an RFC 3339 `timestamp` and `now`: "Just now" under a
 /// minute (and for a future time), else "N minute(s)/hour(s)/day(s) ago", singular at 1.

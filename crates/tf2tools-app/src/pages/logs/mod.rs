@@ -33,7 +33,9 @@ use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::labelled;
 use crate::widgets::scroll::{scroll_area, scroll_beside};
 use crate::widgets::store_error::error_line;
-use model::{CATEGORIES, LEVELS, PAGE_SIZE, level_name, relative_time};
+use model::{
+    CATEGORIES, LEVELS, PAGE_SIZE, action_label, category_label, level_name, relative_time,
+};
 
 /// Tailwind green-500 and red-500, v5's info and error level icons.
 const GREEN_500: u32 = 0x22c55e;
@@ -67,7 +69,7 @@ pub struct LogsPage {
 }
 
 impl LogsPage {
-    /// Builds the selects and the list, then loads the first page for All / All.
+    /// Builds the selects and the list, then loads the first page of every category and level.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let categories: Vec<&'static str> = CATEGORIES.iter().map(|(l, _)| *l).collect();
         let levels: Vec<&'static str> = LEVELS.iter().map(|(l, _)| *l).collect();
@@ -500,8 +502,9 @@ fn card(
         LogLevel::Error => (IconName::CircleX, RED_500),
         _ => (IconName::Info, GREEN_500),
     };
-    let category = entry.category().to_owned();
-    let badge = match category.as_str() {
+    // The badge's colour follows the stored category; its text is the player's word for it.
+    let category = category_label(entry.category());
+    let badge = match entry.category() {
         "system" => badge_of(
             ids::log_category(id),
             Tag::secondary().outline().text_color(theme.foreground),
@@ -559,7 +562,7 @@ fn card(
                                 .child(labelled(
                                     div().text_sm().font_weight(FontWeight::MEDIUM),
                                     ids::log_action(id),
-                                    entry.action().to_owned(),
+                                    action_label(entry.action()),
                                 )),
                         )
                         .child(labelled(

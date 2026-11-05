@@ -1,5 +1,7 @@
 use chrono::{DateTime, Duration, Utc};
-use tf2tools_app::pages::logs::model::{CATEGORIES, LEVELS, PAGE_SIZE, level_name, relative_time};
+use tf2tools_app::pages::logs::model::{
+    CATEGORIES, LEVELS, PAGE_SIZE, action_label, category_label, level_name, relative_time,
+};
 use tf2tools_app::shell::confirm::Confirm;
 use tf2tools_core::LogLevel;
 
@@ -59,7 +61,7 @@ fn the_selects_list_v5s_options_plus_profiles_and_addons() {
     assert_eq!(
         cats,
         [
-            ("All", None),
+            ("All categories", None),
             ("HUDs", Some("hud")),
             ("Sounds", Some("sound")),
             ("Crosshairs", Some("crosshair")),
@@ -74,7 +76,7 @@ fn the_selects_list_v5s_options_plus_profiles_and_addons() {
     assert_eq!(
         levels,
         [
-            ("All", None),
+            ("All levels", None),
             ("Info", Some(LogLevel::Info)),
             ("Warning", Some(LogLevel::Warning)),
             ("Error", Some(LogLevel::Error)),
@@ -84,6 +86,22 @@ fn the_selects_list_v5s_options_plus_profiles_and_addons() {
     assert_eq!(level_name(LogLevel::Info), "info");
     assert_eq!(level_name(LogLevel::Warning), "warning");
     assert_eq!(level_name(LogLevel::Error), "error");
+}
+
+#[test]
+fn rows_name_categories_and_actions_in_player_words() {
+    // Rows keep the stored names; only what the page shows is reworded.
+    assert_eq!(category_label("hud"), "HUD");
+    assert_eq!(category_label("addon_store"), "Addon Store");
+    assert_eq!(category_label("hud_store"), "HUD Store");
+    assert_eq!(category_label("store"), "Store");
+    assert_eq!(category_label("profile"), "Profile");
+    assert_eq!(action_label("save_current"), "Save current setup");
+    assert_eq!(action_label("install_fonts"), "Install fonts");
+    assert_eq!(action_label("download"), "Download");
+    // A name this build never wrote still reads as words.
+    assert_eq!(category_label("some_thing"), "Some thing");
+    assert_eq!(action_label("re_sync"), "Re sync");
 }
 
 #[test]
