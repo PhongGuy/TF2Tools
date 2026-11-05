@@ -143,8 +143,9 @@ fn two_installed_huds_show_the_conflict_box(cx: &mut TestAppContext) {
     let label = support::label_of(cx, s.win, ids::HUDS_CONFLICTS).unwrap();
     assert_eq!(
         label,
-        "HUD Conflicts Detected. Multiple HUDs are installed: budhud, rayshud. Uninstall to keep only one."
+        "HUD Conflicts Detected. TF2 can only use one HUD at a time. Uninstall the ones you don't want until one is left."
     );
+    assert!(!support::present(cx, s.win, ids::HUDS_INSTALLED_EMPTY));
 }
 
 #[gpui_kit::test]

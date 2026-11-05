@@ -2966,7 +2966,14 @@ impl HudMakerPage {
         cx.notify();
         let win = self.win;
         cx.spawn(async move |page, cx| {
-            let checking = check_external(HudAction::Install, tf2.clone(), win, INSTALL_FAILED, cx);
+            let checking = check_external(
+                HudAction::Install,
+                None,
+                tf2.clone(),
+                win,
+                INSTALL_FAILED,
+                cx,
+            );
             let Some(plan) = checking.await else {
                 let _ = page.update(cx, |page, cx| {
                     page.installing = false;

@@ -263,6 +263,16 @@ pub fn click_id(cx: &mut TestAppContext, win: AnyWindowHandle, id: impl Into<Ele
     settle(cx, win);
 }
 
+/// Clicks `id` and leaves spawned work unrun, so a second click lands before it.
+pub fn click_without_settling(
+    cx: &mut TestAppContext,
+    win: AnyWindowHandle,
+    id: impl Into<ElementId>,
+) {
+    let id = id.into();
+    cx.update_window(win, |_, w, cx| w.click(id, cx)).unwrap();
+}
+
 /// Clicks `page`'s sidebar item, first wheeling the sidebar groups to their end when the item
 /// sits below their visible area, as a player in a short window would. It only scrolls down,
 /// so an item scrolled out above the visible area is not reached.

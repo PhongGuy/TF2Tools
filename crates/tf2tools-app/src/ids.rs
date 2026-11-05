@@ -1020,6 +1020,16 @@ pub fn hud_shot(folder: &str) -> ElementId {
     keyed("hud-shot", folder)
 }
 
+/// A HUD's name in the list of installed HUDs a conflict shows, keyed by its folder.
+pub fn hud_installed_name(folder: &str) -> ElementId {
+    keyed("hud-installed-name", folder)
+}
+
+/// A HUD's Uninstall button in the list of installed HUDs a conflict shows.
+pub fn hud_uninstall(folder: &str) -> ElementId {
+    keyed("hud-uninstall", folder)
+}
+
 /// A library HUD card's Install button.
 pub fn hud_install(folder: &str) -> ElementId {
     keyed("hud-install", folder)
