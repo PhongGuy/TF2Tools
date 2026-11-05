@@ -1,19 +1,22 @@
-//! v5's Header: the sidebar toggle, the page title and a right-aligned status slot.
+//! v5's Header: the sidebar toggle, the page title and a right-aligned status slot, drawn as
+//! the window's title bar with the window controls at its right.
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, TitleBar, h_flex};
 use gpui_kit::{
-    App, Context, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
-    Role, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
-    transparent_black,
+    App, Context, FontWeight, InteractiveElement as _, IntoElement, MouseButton,
+    ParentElement as _, Pixels, Role, StatefulInteractiveElement as _, Styled as _,
+    TestSupportExt as _, div, px, transparent_black,
 };
 
 use tf2tools_core::StoreKind;
 
+use super::leave::should_close;
 use super::route::Page;
+use super::sidebar::icon as nav_icon;
 use super::{HEADER_HEIGHT, Shell};
 use crate::ids;
 use crate::services::{Tf2State, tf2_state};
@@ -21,30 +24,55 @@ use crate::sync::{store_name, store_slug, sync_hub};
 use crate::widgets::Named as _;
 use crate::widgets::sync_ring::{RingColors, SyncRing};
 
-/// Element `header`, `HEADER_HEIGHT` tall, titled for `page`.
+/// Element `header`, `HEADER_HEIGHT` tall, titled for `page`, inside the kit's title bar.
 pub(super) fn render(page: Page, cx: &mut Context<Shell>) -> impl IntoElement + use<> {
-    let border = cx.theme().border;
+    let (border, bg) = (cx.theme().border, cx.theme().background);
+    // The kit bar moves the window from empty space, maximises on double-click and puts the
+    // window controls at the right, restyled flat to keep v5's look. The `header` id wraps the
+    // whole bar so it still measures v5's 56 px, border included.
+    div().id(ids::HEADER).test_support().flex_none().child(
+        TitleBar::new()
+            .h(HEADER_HEIGHT)
+            .pl_0()
+            .bg(bg)
+            .border_b_1()
+            .border_color(border)
+            // Linux's close button otherwise removes the window past the unsaved-work guard.
+            .on_close_window(|_, window, cx| {
+                if should_close(window, cx) {
+                    window.remove_window();
+                }
+            })
+            .child(content(page, cx)),
+    )
+}
+
+// v5's header row: the sidebar toggle, the page title and the status slot.
+fn content(page: Page, cx: &mut Context<Shell>) -> impl IntoElement + use<> {
     let title = page.title();
     // No wrapper while nothing syncs, so an empty row adds no gap before the badge.
     let rings = sync_rings(cx);
     let rings = (!rings.is_empty()).then(|| h_flex().gap_1p5().children(rings));
     h_flex()
-        .id(ids::HEADER)
-        .test_support()
-        .flex_none()
-        .h(HEADER_HEIGHT)
+        .flex_1()
+        .h_full()
         .px(px(24.))
         .gap_4()
-        .border_b_1()
-        .border_color(border)
+        // The kit button leaves its press unhandled, so the bar would start a window move from it.
         .child(
-            Button::new(ids::SIDEBAR_TOGGLE)
-                .ghost()
-                .icon(IconName::PanelLeft)
-                // v5's `size-7` trigger around a 16 px icon: medium icon, 28 px box.
-                .size(px(28.))
-                .named("Toggle Sidebar")
-                .on_click(cx.listener(|shell, _, window, cx| shell.toggle_sidebar(window, cx))),
+            div()
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .child(
+                    Button::new(ids::SIDEBAR_TOGGLE)
+                        .ghost()
+                        .icon(IconName::PanelLeft)
+                        // v5's `size-7` trigger around a 16 px icon: medium icon, 28 px box.
+                        .size(px(28.))
+                        .named("Toggle Sidebar")
+                        .on_click(
+                            cx.listener(|shell, _, window, cx| shell.toggle_sidebar(window, cx)),
+                        ),
+                ),
         )
         .child(
             div()
@@ -96,14 +124,28 @@ fn tf2_badge(cx: &App) -> Option<impl IntoElement + use<>> {
     )
 }
 
-// v5's SyncIndicator, in its S, C, H, M order: a 24 px arc with the store's letter centred,
-// spinning for Curated HUDs, which has no total. Addons sync without a ring.
+/// The icon a store's sync ring shows: the sidebar icon of its store page, so Curated HUDs
+/// shares the HUD Store's.
+pub fn ring_icon(kind: StoreKind) -> IconName {
+    nav_icon(match kind {
+        StoreKind::Sounds => Page::SoundStore,
+        StoreKind::Crosshairs => Page::CrosshairStore,
+        StoreKind::Addons => Page::AddonStore,
+        _ => Page::HudStore,
+    })
+}
+
+// Fits inside the ring's 3 px stroke with a little air around it.
+const RING_ICON: Pixels = px(12.);
+
+// v5's SyncIndicator, in its S, C, H, M order: a 24 px arc with the store's icon centred where
+// v5 had its letter, spinning for Curated HUDs, which has no total. Addons sync without a ring.
 fn sync_rings(cx: &App) -> Vec<impl IntoElement + use<>> {
-    const RINGS: [(StoreKind, &str); 4] = [
-        (StoreKind::Sounds, "S"),
-        (StoreKind::Crosshairs, "C"),
-        (StoreKind::GameBananaHuds, "H"),
-        (StoreKind::CuratedHuds, "M"),
+    const RINGS: [StoreKind; 4] = [
+        StoreKind::Sounds,
+        StoreKind::Crosshairs,
+        StoreKind::GameBananaHuds,
+        StoreKind::CuratedHuds,
     ];
     let Some(hub) = sync_hub(cx) else {
         return Vec::new();
@@ -112,7 +154,7 @@ fn sync_rings(cx: &App) -> Vec<impl IntoElement + use<>> {
     let (colors, muted) = (RingColors::of(cx.theme()), cx.theme().muted_foreground);
     RINGS
         .into_iter()
-        .filter_map(|(kind, letter)| {
+        .filter_map(|kind| {
             let tick = hub.progress(kind)?;
             let curated = kind == StoreKind::CuratedHuds;
             let label = if curated {
@@ -145,10 +187,14 @@ fn sync_rings(cx: &App) -> Vec<impl IntoElement + use<>> {
                             .spinning(curated)
                             .child(
                                 div()
-                                    .text_size(px(7.))
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .text_color(muted)
-                                    .child(letter),
+                                    .id(ids::keyed("sync-ring-icon", store_slug(kind)))
+                                    .test_support()
+                                    .flex_none()
+                                    .child(
+                                        Icon::new(ring_icon(kind))
+                                            .with_size(Size::Size(RING_ICON))
+                                            .text_color(muted),
+                                    ),
                             ),
                     ),
             )
