@@ -1348,32 +1348,30 @@ impl Render for HudsPage {
             (None, Some(hud)) => installed_card(hud, self.busy.as_ref(), cx),
             (None, None) => empty_card(cx),
         };
-        let content = v_flex()
-            .id(ids::page(Page::Huds))
-            .test_support()
-            .size_full()
-            .track_scroll(&self.scroll)
-            .overflow_y_scroll()
-            .p(CONTENT_PADDING)
-            .gap_6()
-            .child(
-                v_flex()
-                    .flex_none()
-                    .gap_3()
-                    .child(
-                        div()
-                            .text_lg()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(if conflicted {
+        let content =
+            v_flex()
+                .id(ids::page(Page::Huds))
+                .test_support()
+                .size_full()
+                .track_scroll(&self.scroll)
+                .overflow_y_scroll()
+                .p(CONTENT_PADDING)
+                .gap_6()
+                .child(
+                    v_flex()
+                        .flex_none()
+                        .gap_3()
+                        .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child(
+                            if conflicted {
                                 "Installed HUDs"
                             } else {
                                 "Installed HUD"
-                            }),
-                    )
-                    .child(installed),
-            )
-            .children(conflicted.then(|| conflict_box(cx)))
-            .child(self.library(cx));
+                            },
+                        ))
+                        .child(installed),
+                )
+                .children(conflicted.then(|| conflict_box(cx)))
+                .child(self.library(cx));
         scroll_area(ids::page_scrollbar(Page::Huds), &self.scroll, content).size_full()
     }
 }
