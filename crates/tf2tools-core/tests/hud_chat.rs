@@ -5,8 +5,8 @@ mod common;
 
 use common::hud_stock::{HUDLAYOUT, stock_files_with, with_blocks};
 use tf2tools_core::{
-    HiddenBy, HideTechnique, HudModel, OptionValue, PanelRule, PartId, PartKey, Platform, Rgba,
-    Scene, SceneRule, Screen, ShowsFor,
+    GameSituation, HiddenBy, HideTechnique, HudModel, OptionValue, PanelRule, PartId, PartKey,
+    Platform, Rgba, SampleSet, Scene, SceneRule, Screen, ShowsFor, SituationSwitch,
 };
 
 const CHAT_FILE: &str = "resource/ui/basechat.res";
@@ -286,4 +286,29 @@ fn no_sample_lines_where_the_chat_is_not_drawn() {
     let files = stock_files_with(&[(CHAT_FILE, None)]);
     let missing = HudModel::load(&files, Platform::Linux).unwrap();
     assert!(missing.chat_sample(SD).is_none());
+}
+
+#[test]
+fn while_typing_the_input_line_sits_where_the_game_puts_it_and_says_say() {
+    // CBaseHudChat::OnTick ignores the file's ypos and tall: the line is one chat-scheme
+    // Default font plus 2 px tall, its top 1.75 such heights above the chat's bottom.
+    let typing = GameSituation::default().with_switch(SituationSwitch::Typing, true);
+    let line = PartKey::new("HudChat/ChatInputLine");
+    let plain = chat_with(CHAT, &[]).layout_in(SD, &typing);
+    let b = plain.get(&line).unwrap();
+    assert_eq!(b.hidden(), None);
+    // No Default font: a 12-unit one, so 14 px tall and 120 - 24.5 down, truncated.
+    assert_eq!(
+        (b.x() - 10, b.y() - 275, b.wide(), b.tall()),
+        (10, 95, 260, 14)
+    );
+    let scheme = chat_scheme("", STOCK_BASE).replace(
+        "Fonts {",
+        r#"Fonts { "Default" { "1" { "name" "Verdana" "tall" "14" } }"#,
+    );
+    let m = chat_with(CHAT, &[(CHAT_SCHEME_FILE, Some(scheme.as_str()))]);
+    let b = m.layout_in(SD, &typing).get(&line).unwrap().clone();
+    assert_eq!((b.y() - 275, b.tall()), (92, 16));
+    // The line shows the code's prompt over the file's empty panel.
+    assert_eq!(SampleSet::Empty.code_text("ChatInputLine"), Some("Say :"));
 }

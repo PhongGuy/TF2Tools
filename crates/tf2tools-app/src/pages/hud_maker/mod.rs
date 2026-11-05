@@ -3586,7 +3586,7 @@ impl HudMakerPage {
                 }))
         });
         Popover::new("hud-maker-board-modes")
-            .anchor(Anchor::BottomLeft)
+            .anchor(Anchor::TopLeft)
             .open(self.board_mode_open)
             .on_open_change(move |&open, _, cx| {
                 let _ = page.update(cx, |page, cx| {
@@ -3615,7 +3615,7 @@ impl HudMakerPage {
             .label(name);
         let items = Scene::ALL.map(|scene| pick(scene, cx).ghost());
         Popover::new("hud-maker-scene-choices")
-            .anchor(Anchor::BottomLeft)
+            .anchor(Anchor::TopLeft)
             .open(self.scene_open)
             .on_open_change(move |&open, _, cx| {
                 let _ = page.update(cx, |page, cx| {

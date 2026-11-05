@@ -189,6 +189,8 @@ pub(super) enum Fit {
     /// At the x the game's code gives it: `gap` 640-wide units, scaled by screen width, plus the
     /// width of the sibling panel.
     AfterSibling { sibling: &'static str, gap: i32 },
+    /// The chat's input line: its file's ypos and tall give way to the chat font's height.
+    ChatInput,
 }
 
 impl CodeToggled {
@@ -449,7 +451,13 @@ static HUD_TOGGLED: [CodeToggled; 55] = [
     when("PlayerStatus_RuneKing", POWERUP, POWERUP_WHEN),
     when("PlayerStatus_RunePlague", POWERUP, POWERUP_WHEN),
     when("PlayerStatus_RuneSupernova", POWERUP, POWERUP_WHEN),
-    when("ChatInputLine", TYPING, TYPING_WHEN),
+    // CBaseHudChat::OnTick sets the input line's ypos and tall itself, so the file's
+    // off-screen ypos never hides it.
+    CodeToggled {
+        owned: &["ypos", "tall"],
+        fit: Fit::ChatInput,
+        ..when("ChatInputLine", TYPING, TYPING_WHEN)
+    },
     when("ChatFiltersButton", TYPING, TYPING_WHEN),
     // On a King of the Hill map the KOTH timers take the round timer's place; both keep the
     // round timer's off-screen hide.

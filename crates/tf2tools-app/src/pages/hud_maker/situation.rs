@@ -55,6 +55,9 @@ const WEAPONS: [(WeaponKind, &str); 2] = [
     (WeaponKind::NoClip, "Weapon without a clip"),
 ];
 
+// How far a slider's handle and its hover ring reach past the track's end.
+const THUMB_REACH: gpui_kit::Pixels = px(11.);
+
 // The meter list's height cap, so 21 weapons never run the menu off a small window.
 const METERS_HEIGHT: f32 = 300.;
 
@@ -190,18 +193,24 @@ impl HudMakerPage {
             .icon(IconName::ChevronsUpDown)
             .label(format!("{}, {} health", s.class().name(), s.health()))
             .tooltip("The moment in game the preview shows");
-        let pick =
-            |id, label: &'static str, on: bool, next: GameSituation, cx: &mut Context<Self>| {
-                Button::new(id)
-                    .ghost()
-                    .xsmall()
-                    .label(label)
-                    .selected(on)
-                    .on_click(cx.listener(move |page, _, window, cx| {
-                        page.situation_menu.open = false;
-                        page.set_situation(next.clone(), window, cx);
-                    }))
-            };
+        // A class or weapon pick closes the menu; a yes/no switch keeps it open, so several
+        // combine in one trip.
+        let pick = |id,
+                    label: &'static str,
+                    on: bool,
+                    next: GameSituation,
+                    closes: bool,
+                    cx: &mut Context<Self>| {
+            Button::new(id)
+                .ghost()
+                .xsmall()
+                .label(label)
+                .selected(on)
+                .on_click(cx.listener(move |page, _, window, cx| {
+                    page.situation_menu.open &= !closes;
+                    page.set_situation(next.clone(), window, cx);
+                }))
+        };
         let classes = TfClass::ALL.map(|c| {
             let next = s.clone().with_class(c);
             pick(
@@ -209,6 +218,7 @@ impl HudMakerPage {
                 c.name(),
                 s.class() == c,
                 next,
+                true,
                 cx,
             )
         });
@@ -219,13 +229,21 @@ impl HudMakerPage {
                 label,
                 s.weapon() == w,
                 next,
+                true,
                 cx,
             )
         });
         let switches = SWITCHES.map(|(sw, label)| {
             let on = s.is_on(sw);
             let next = s.clone().with_switch(sw, !on);
-            pick(ids::hud_maker_situation_switch(sw), label, on, next, cx)
+            pick(
+                ids::hud_maker_situation_switch(sw),
+                label,
+                on,
+                next,
+                false,
+                cx,
+            )
         });
         // The minimal HUD is a model setting, not a moment, so it flips the editor's flag.
         let minmode = self.minmode();
@@ -235,7 +253,6 @@ impl HudMakerPage {
             .label("Minimal HUD")
             .selected(minmode)
             .on_click(cx.listener(move |page, _, window, cx| {
-                page.situation_menu.open = false;
                 page.set_minmode(!minmode, window, cx);
             }));
         let minmode = tipped(&ids::HUD_MAKER_MINMODE.into(), MINMODE_TIP, minmode);
@@ -248,12 +265,15 @@ impl HudMakerPage {
                     h_flex()
                         .gap_2()
                         .items_center()
+                        // The handle at either end reaches past the track, so the track is
+                        // inset by that much and the value sits clear of it.
                         .child(
-                            div()
-                                .id(ids::hud_maker_situation_slider(which.slug()))
-                                .test_support()
-                                .flex_1()
-                                .child(Slider::new(self.situation_menu.slider(which))),
+                            div().flex_1().px(THUMB_REACH).child(
+                                div()
+                                    .id(ids::hud_maker_situation_slider(which.slug()))
+                                    .test_support()
+                                    .child(Slider::new(self.situation_menu.slider(which))),
+                            ),
                         )
                         .child(labelled(
                             div().w_10().text_xs().text_color(muted),
@@ -348,7 +368,7 @@ impl HudMakerPage {
         Some(self.situation_popover(trigger, body, cx))
     }
 
-    // The menu's popover under its trigger, holding `body`.
+    // The menu's popover below its trigger, holding `body`.
     fn situation_popover(
         &self,
         trigger: Button,
@@ -357,7 +377,7 @@ impl HudMakerPage {
     ) -> AnyElement {
         let page = cx.entity().downgrade();
         Popover::new("hud-maker-situation")
-            .anchor(Anchor::BottomLeft)
+            .anchor(Anchor::TopLeft)
             .open(self.situation_menu.open)
             .on_open_change(move |&open, _, cx| {
                 let _ = page.update(cx, |page, cx| {

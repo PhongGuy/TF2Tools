@@ -466,6 +466,23 @@ impl HudModel {
             }
         }
 
+        // CBaseHudChat::OnTick: the input line is the chat scheme's Default font plus 2 px tall,
+        // its top 1.75 such heights above the chat's bottom.
+        for (i, part) in parts.iter().enumerate() {
+            if part.code_toggled().map(|t| t.fit()) != Some(Fit::ChatInput) {
+                continue;
+            }
+            let Some(chat) = parents[i] else { continue };
+            let font = (self.chat_scheme().font("Default", screen.tall)).map_or_else(
+                || super::font_tall_px(12, screen.tall),
+                |f| f.pixel_tall(screen.tall),
+            );
+            let tall = font.saturating_add(2);
+            let y = f64::from(placed[chat].size.1) - f64::from(tall) * 1.75;
+            placed[i].rel.1 = y as i32;
+            placed[i].size.1 = tall;
+        }
+
         let pins: Vec<Option<Pin>> = (0..parts.len())
             .map(|i| pin_of(parts, &parents, i))
             .collect();
@@ -688,6 +705,8 @@ fn place(part: &Part, parent: (i32, i32), screen: (i32, i32), scale: ScreenScale
         Fit::BottomBar => (x, y, screen.0, screen.1.saturating_sub(y).max(0)),
         // Placed once every sibling's width is known, in `layout`.
         Fit::AfterSibling { .. } => (x, y, wide, tall),
+        // Placed once the chat's height is known, in `layout`.
+        Fit::ChatInput => (x, y, wide, tall),
     };
     Placed {
         rel: (x, y),

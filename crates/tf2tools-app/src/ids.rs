@@ -258,6 +258,8 @@ pub const HUD_MAKER_VIEWMODELS: &str = "hud-maker-viewmodels";
 pub const HUD_MAKER_PANEL_PART: &str = "hud-maker-panel-part";
 /// When the selected part shows in game, from its panel's rule.
 pub const HUD_MAKER_PANEL_SHOWS: &str = "hud-maker-panel-shows";
+/// The side panel's note for a part whose text the game writes itself, under its Text box.
+pub const HUD_MAKER_PANEL_CODE_TEXT: &str = "hud-maker-panel-code-text";
 /// The side panel's note for a part drawn from a file the HUD includes, which cannot be edited.
 pub const HUD_MAKER_PANEL_FROM_BASE: &str = "hud-maker-panel-from-base";
 /// The second note when some file behind a from-base part was not found.

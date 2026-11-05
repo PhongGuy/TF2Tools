@@ -838,8 +838,12 @@ impl SampleSet {
     }
 
     /// The text the game's code writes over `part`'s `labelText`; a `#` name is a game token the
-    /// canvas resolves. Only the spectator sample has any.
+    /// canvas resolves. Only the spectator sample and the HUD's chat input line have any.
     pub fn code_text(self, part: &str) -> Option<&'static str> {
+        // CBaseHudChat::StartMessageMode's English prompt for a chat to everyone.
+        if self == SampleSet::Empty && part.eq_ignore_ascii_case("ChatInputLine") {
+            return Some("Say :");
+        }
         if self != SampleSet::Spectating {
             return None;
         }
@@ -847,6 +851,12 @@ impl SampleSet {
             .iter()
             .find(|(name, _)| name.eq_ignore_ascii_case(part))
             .map(|&(_, text)| text)
+    }
+
+    /// Whether the game's code sizes `part` to its text, so its file's width never cuts it:
+    /// the class menu's team count line (`CTFClassMenu::ApplySchemeSettings`).
+    pub fn sizes_to_text(self, part: &str) -> bool {
+        self == SampleSet::ClassPick && part.eq_ignore_ascii_case("CountLabel")
     }
 
     /// The note for a part the game fills with content the preview cannot draw; only the

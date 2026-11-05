@@ -1357,10 +1357,15 @@ fn label_element(
     // negative) and the y inset moves it down. The box clips what the insets push out.
     let (inset_x, iy) = look.model.text_inset(part.key(), look.screen);
     let (ix, iy) = (inset_x as f32 * look.scale, iy as f32 * look.scale);
-    let room = px((f32::from(wide) - ix).max(0.));
+    // A label the game widens to its text has no width to cut it at.
+    let grows = look.sample.sizes_to_text(part.name());
+    let room = match grows {
+        true => px(look.screen.wide() as f32 * look.scale),
+        false => px((f32::from(wide) - ix).max(0.)),
+    };
     let wrapped = wrapped_lines(part, b, &shown, font, look);
     let el = el
-        .overflow_hidden()
+        .when(!grows, |el| el.overflow_hidden())
         .whitespace_nowrap()
         .text_size(px(size))
         .line_height(px(size))

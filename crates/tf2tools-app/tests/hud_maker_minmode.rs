@@ -34,10 +34,13 @@ fn won(
     })
 }
 
-/// Flips the Minimal HUD switch from the HUD tab's situation menu.
+/// Flips the Minimal HUD switch from the HUD tab's situation menu, which stays open after a
+/// switch, then closes the menu.
 fn flip(cx: &mut TestAppContext, s: &support::ShellWindow) {
     support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
     support::click_id(cx, s.win, ids::HUD_MAKER_MINMODE);
+    support::press(cx, s.win, "escape");
+    support::settle(cx, s.win);
 }
 
 fn commit(

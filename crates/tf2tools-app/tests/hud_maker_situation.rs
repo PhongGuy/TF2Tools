@@ -114,3 +114,81 @@ fn show_it_is_offered_only_while_the_part_is_hidden(cx: &mut TestAppContext) {
     in_menu(cx, &s, ids::hud_maker_situation_class(TfClass::Scout));
     assert!(support::present(cx, s.win, ids::HUD_MAKER_PANEL_SHOW_IT));
 }
+
+/// Opens the menu behind `trigger` and checks that its item `first` lies below the button.
+fn opens_below(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    trigger: &'static str,
+    first: gpui_kit::ElementId,
+) {
+    support::click_id(cx, s.win, trigger);
+    let button = support::bounds_of(cx, s.win, trigger).unwrap();
+    let item = support::bounds_of(cx, s.win, first).unwrap();
+    assert!(
+        item.top() >= button.bottom(),
+        "{trigger}: {item:?} not below {button:?}"
+    );
+    support::press(cx, s.win, "escape");
+    support::settle(cx, s.win);
+}
+
+#[gpui_kit::test]
+fn the_strip_menus_open_below_their_buttons(cx: &mut TestAppContext) {
+    let (_env, s, _page) = open_maker(cx);
+    let first = ids::hud_maker_situation_class(TfClass::Scout);
+    opens_below(cx, &s, ids::HUD_MAKER_SITUATION, first);
+    // The scene tabs fold into a menu in a narrow window.
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(900.), gpui_kit::px(800.)),
+    );
+    support::settle(cx, s.win);
+    let hud = ids::hud_maker_scene(Scene::Hud);
+    opens_below(cx, &s, ids::HUD_MAKER_SCENE_MENU, hud);
+}
+
+#[gpui_kit::test]
+fn switches_stay_open_so_several_combine_in_one_trip(cx: &mut TestAppContext) {
+    let (_env, s, page) = open_maker(cx);
+    support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
+    for sw in [SituationSwitch::Typing, SituationSwitch::Aiming] {
+        support::click_id(cx, s.win, ids::hud_maker_situation_switch(sw));
+        assert!(situation(cx, &page).is_on(sw), "{sw:?}");
+    }
+    support::click_id(cx, s.win, ids::HUD_MAKER_MINMODE);
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::hud_maker_situation_switch(SituationSwitch::Koth)
+    ));
+}
+
+#[gpui_kit::test]
+fn a_slider_value_sits_clear_of_the_handle_at_the_top(cx: &mut TestAppContext) {
+    let (_env, s, page) = open_maker(cx);
+    support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
+    for (which, slug, top) in [
+        (SituationSlider::Health, "health", 300.),
+        (SituationSlider::Ammo, "ammo", 100.),
+    ] {
+        let slider = cx.update(|cx| page.read(cx).situation_slider(which));
+        cx.update_window(s.win, |_, window, cx| {
+            slider.update(cx, |st, cx| {
+                st.set_value(top, window, cx);
+                cx.emit(SliderEvent::Release(SliderValue::Single(top)));
+            })
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+        // At its top the handle is centred on the track's end: 8 px past it, plus a 3 px ring
+        // while hovered or dragged.
+        let track = support::bounds_of(cx, s.win, ids::hud_maker_situation_slider(slug)).unwrap();
+        let value = support::bounds_of(cx, s.win, ids::hud_maker_situation_value(slug)).unwrap();
+        let reach = track.right() + gpui_kit::px(11.);
+        assert!(
+            value.left() >= reach,
+            "{slug}: {value:?} under the handle ending {reach:?}"
+        );
+    }
+}

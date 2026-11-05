@@ -131,3 +131,10 @@ fn the_backdrop_room_is_a_dark_fill_and_the_tips_box_is_drawn_in_game() {
         assert!(m.part(&PartKey::new(key)).is_some(), "{key}");
     }
 }
+
+#[test]
+fn only_the_class_menu_s_team_count_line_grows_to_its_text() {
+    assert!(SampleSet::ClassPick.sizes_to_text("CountLabel"));
+    assert!(!SampleSet::ClassPick.sizes_to_text("numScout"));
+    assert!(!SampleSet::Empty.sizes_to_text("CountLabel"));
+}
