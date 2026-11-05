@@ -250,3 +250,27 @@ fn the_chat_lines_count_only_what_the_history_shows(cx: &mut TestAppContext) {
         "band {band:?} past the history {history:?}"
     );
 }
+
+#[gpui_kit::test]
+fn typing_in_chat_shows_the_say_line_at_the_bottom_of_the_chat(cx: &mut TestAppContext) {
+    let (_env, s, _page) = opened(cx, CHAT);
+    let line = PartKey::new("HudChat/ChatInputLine");
+    assert!(!support::present(cx, s.win, ids::hud_maker_text(&line)));
+    support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
+    support::click_id(
+        cx,
+        s.win,
+        ids::hud_maker_situation_switch(tf2tools_core::SituationSwitch::Typing),
+    );
+    support::press(cx, s.win, "escape");
+    support::settle(cx, s.win);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::hud_maker_text(&line)).as_deref(),
+        Some("Say :")
+    );
+    // The game moves the line from the file's off-screen spot into the chat's lower edge.
+    let chat = bounds(cx, &s, ids::hud_maker_part(&PartKey::new("HudChat")));
+    let drawn = bounds(cx, &s, ids::hud_maker_part(&line));
+    assert!(chat.contains(&drawn.origin), "{drawn:?} outside {chat:?}");
+    assert!(drawn.bottom() <= chat.bottom(), "{drawn:?} below {chat:?}");
+}

@@ -838,8 +838,12 @@ impl SampleSet {
     }
 
     /// The text the game's code writes over `part`'s `labelText`; a `#` name is a game token the
-    /// canvas resolves. Only the spectator sample has any.
+    /// canvas resolves. Only the spectator sample and the HUD's chat input line have any.
     pub fn code_text(self, part: &str) -> Option<&'static str> {
+        // CBaseHudChat::StartMessageMode's English prompt for a chat to everyone.
+        if self == SampleSet::Empty && part.eq_ignore_ascii_case("ChatInputLine") {
+            return Some("Say :");
+        }
         if self != SampleSet::Spectating {
             return None;
         }
