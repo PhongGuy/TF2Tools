@@ -24,9 +24,6 @@ const FILES_UNKNOWN: &str = "Couldn't load the files. Try again later.";
 const PV_FETCH: &str = "Couldn't get this preview from GameBanana. Try again later.";
 const PV_UNAVAILABLE: &str = "Couldn't play this preview. Try again later.";
 
-/// The toast title when a detail's file listing fails; v5's words.
-pub const FILES_FAILED_TITLE: &str = "Failed to load files";
-
 /// The toast title when a detail cannot read its cached store row.
 pub const DETAILS_FAILED_TITLE: &str = "Failed to load details";
 
