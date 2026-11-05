@@ -10,9 +10,9 @@ use walkdir::WalkDir;
 
 use super::{
     HudId, IoFailure, Library, METADATA_DIR, Provenance, copy_dir_excluding_metadata,
-    create_dir_all, game_custom_dir, gb_id_column, hud_folder, hud_print, import_db, install_db,
-    io_at, is_plain_name, library_db, live_link, made_huds, new_id, now, read_setting,
-    remove_dir_if_present, save_setting, walk_failure,
+    create_dir_all, first_free_number, game_custom_dir, gb_id_column, hud_folder, hud_print,
+    import_db, install_db, io_at, is_plain_name, library_db, live_link, made_huds, new_id, now,
+    read_setting, remove_dir_if_present, save_setting, walk_failure,
 };
 use crate::archive::extract_archive;
 use crate::error::{ImportError, InstallError, KeepHudError, LibraryError};
@@ -352,19 +352,13 @@ impl Library {
         if free(folder, &name) {
             return Ok((folder.to_owned(), None));
         }
-        let mut number = 2u32;
-        loop {
-            let numbered_folder = format!("{folder}-{number}");
-            let numbered_name = format!("{name} ({number})");
-            if free(&numbered_folder, &numbered_name) {
-                let rename = Rename {
-                    name: numbered_name,
-                    wanted: name,
-                };
-                return Ok((numbered_folder, Some(rename)));
-            }
-            number = number.saturating_add(1);
-        }
+        let number =
+            first_free_number(|n| free(&format!("{folder}-{n}"), &format!("{name} ({n})")));
+        let rename = Rename {
+            name: format!("{name} ({number})"),
+            wanted: name,
+        };
+        Ok((format!("{folder}-{number}"), Some(rename)))
     }
 
     /// Copies the HUD at `root` to `library/huds/<folder_name>`, replacing what is there, and

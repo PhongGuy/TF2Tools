@@ -420,7 +420,7 @@ impl CrosshairsPage {
                         )
                         .with_details(format!("Source: {}", path.display()));
                         activity::write(s, &entry);
-                        let added = format!("{} added to your library", crosshair.name());
+                        let added = added_message(&crosshair);
                         Ok((
                             ToastKind::Success,
                             "Crosshair imported".into(),
@@ -823,6 +823,15 @@ impl CrosshairsPage {
             .children(export)
             .children(edit)
             .children(delete)
+    }
+}
+
+/// The toast line for a crosshair just added to the library, naming the numbered name it
+/// took when another library crosshair already had the one it wanted.
+pub(crate) fn added_message(crosshair: &CrosshairEntry) -> String {
+    match crosshair.wanted_name() {
+        Some(_) => format!("Added to your library as {}", crosshair.name()),
+        None => format!("{} added to your library", crosshair.name()),
     }
 }
 

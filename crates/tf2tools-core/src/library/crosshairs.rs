@@ -1,16 +1,16 @@
 //! Crosshair library: importing a PNG or VTF crosshair, previews of library and builtin
 //! crosshairs, and the per-weapon assignment table, ported from v5's `commands/crosshairs.rs`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 
 use super::{
-    CrosshairId, IoFailure, Library, Provenance, create_dir_all, folder_name, game_custom_dir,
-    gb_id_column, import_db, install_db, io_at, is_plain_name, library_db, new_id, now, paint_db,
-    remove_dir_if_present, remove_file_if_present, save_setting,
+    CrosshairId, IoFailure, Library, Provenance, create_dir_all, first_free_number, folder_name,
+    game_custom_dir, gb_id_column, import_db, install_db, io_at, is_plain_name, library_db, new_id,
+    now, paint_db, remove_dir_if_present, remove_file_if_present, save_setting,
 };
 use crate::crosshair_catalog::BuiltinCrosshairs;
 use crate::error::{ImportError, InstallError, LibraryError, PaintError, VtfError};
@@ -100,6 +100,7 @@ pub struct CrosshairEntry {
     format: CrosshairFormat,
     provenance: Provenance,
     created_at: String,
+    wanted_name: Option<String>,
 }
 
 impl CrosshairEntry {
@@ -131,6 +132,12 @@ impl CrosshairEntry {
     /// When the crosshair was imported, as v5's RFC 3339 text.
     pub fn created_at(&self) -> &str {
         &self.created_at
+    }
+
+    /// The name an import wanted when another library crosshair already had it, so this
+    /// one took a numbered name instead. Only the entry `import_crosshair` returns carries it.
+    pub fn wanted_name(&self) -> Option<&str> {
+        self.wanted_name.as_deref()
     }
 }
 
@@ -280,6 +287,7 @@ fn crosshair_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<CrosshairEntry>
         format: CrosshairFormat::from_column(&r.get::<_, String>("source_type")?),
         provenance: Provenance::from_columns(None, r.get("store_gb_id")?, ""),
         created_at: r.get("created_at")?,
+        wanted_name: None,
     })
 }
 
@@ -299,7 +307,8 @@ impl Library {
 
     /// Imports a `.png` (converted to a 64x64 VTF, the PNG kept as `preview.png`) or a
     /// `.vtf` (copied, with a best-effort decoded `preview.png`) into
-    /// `library/crosshairs/<slug>-<id8>/` beside its VMT, and records it. Curated
+    /// `library/crosshairs/<slug>-<id8>/` beside its VMT, and records it. A name another
+    /// crosshair holds keeps that one and takes "<name> (<n>)" (see `wanted_name`). Curated
     /// provenance is refused, since only HUDs come from the curated store.
     pub fn import_crosshair(
         &self,
@@ -338,7 +347,7 @@ impl Library {
             return Err(failure.into());
         }
 
-        let entry = CrosshairEntry {
+        let mut entry = CrosshairEntry {
             id: CrosshairId::new(id),
             folder_name: folder,
             name: name.to_owned(),
@@ -346,14 +355,30 @@ impl Library {
             // Crosshairs keep no author column, so the entry matches what a list reads back.
             provenance: Provenance::from_columns(None, store_gb_id, ""),
             created_at: now(),
+            wanted_name: None,
         };
         let source = if store_gb_id.is_some() {
             "store"
         } else {
             "local"
         };
+        // The name is picked inside one immediate transaction, so two imports racing for it
+        // cannot both take it. A taken name, in any case, gives way to "<name> (<n>)".
         let recorded = self.db.write(|conn| {
-            conn.execute(
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            if name_taken(&tx, name, None)? {
+                let mut taken = HashSet::new();
+                let mut stmt = tx.prepare("SELECT name FROM library_crosshairs")?;
+                for other in stmt.query_map([], |r| r.get::<_, String>(0))? {
+                    taken.insert(other?.to_lowercase());
+                }
+                drop(stmt);
+                let numbered = |n| format!("{name} ({n})");
+                let number = first_free_number(|n| !taken.contains(&numbered(n).to_lowercase()));
+                entry.name = numbered(number);
+                entry.wanted_name = Some(name.to_owned());
+            }
+            tx.execute(
                 "INSERT INTO library_crosshairs (id, folder_name, name, source_type, source,
                      store_gb_id, created_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
@@ -366,7 +391,8 @@ impl Library {
                     store_gb_id,
                     entry.created_at
                 ],
-            )
+            )?;
+            tx.commit()
         });
         if let Err(e) = recorded {
             let _ = remove_dir_if_present(&dest);
@@ -431,6 +457,7 @@ impl Library {
             format: CrosshairFormat::Painted,
             provenance: Provenance::Local,
             created_at: now(),
+            wanted_name: None,
         };
         if let Err(e) = self.record_new_painted(&entry) {
             let _ = remove_dir_if_present(&dest);
@@ -1268,6 +1295,7 @@ mod tests {
             format: CrosshairFormat::Painted,
             provenance: Provenance::Local,
             created_at: now(),
+            wanted_name: None,
         };
         let err = lib.record_new_painted(&entry).unwrap_err();
         assert!(
@@ -1343,6 +1371,7 @@ mod tests {
             format: CrosshairFormat::Painted,
             provenance: Provenance::Local,
             created_at: now(),
+            wanted_name: None,
         };
         let err = while_another_process_adds(&dir, "ÉCLAIR", || lib.record_new_painted(&entry))
             .unwrap_err();
