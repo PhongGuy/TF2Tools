@@ -260,6 +260,18 @@ fn damage_numbers_take_a_decimal_time_on_screen(cx: &mut TestAppContext) {
         Some("1.5"),
         "a bad value commits nothing"
     );
+    let note = |cx: &mut TestAppContext| {
+        let of = ids::hud_maker_number("delta_lifetime");
+        support::label_of(cx, s.win, ids::hud_maker_note_for(&of))
+    };
+    assert_eq!(
+        note(cx).as_deref(),
+        Some("Must be between 0 and 1920, with at most two decimals")
+    );
+    commit(cx, &s, &page, Field::Lifetime, "soon");
+    assert_eq!(note(cx).as_deref(), Some("Numbers only"));
+    commit(cx, &s, &page, Field::Lifetime, "2");
+    assert_eq!(note(cx), None);
 }
 
 #[gpui_kit::test]
@@ -268,6 +280,16 @@ fn the_killfeed_offers_its_line_numbers(cx: &mut TestAppContext) {
     click_row(cx, &s, KF);
     commit(cx, &s, &page, Field::LineHeight, "20");
     assert_eq!(value(cx, &page, KF, "LineHeight").as_deref(), Some("20"));
+    commit(cx, &s, &page, Field::LineHeight, "5000");
+    assert_eq!(
+        support::label_of(
+            cx,
+            s.win,
+            ids::hud_maker_note_for(&ids::hud_maker_number("LineHeight"))
+        )
+        .as_deref(),
+        Some("Must be between 0 and 1920")
+    );
     commit(cx, &s, &page, Field::LineSpacing, "6");
     assert_eq!(value(cx, &page, KF, "LineSpacing").as_deref(), Some("6"));
 }
