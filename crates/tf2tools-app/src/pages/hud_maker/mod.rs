@@ -197,8 +197,8 @@ impl PanelState {
 // area's size, the list's size and the screen's box.
 struct PartsSpot {
     at: Point<Pixels>,
-    // The scene whose drawn parts the spot was last judged against.
-    scene: Scene,
+    // Whether the spot was judged against the parts its scene painted, not a stale frame's.
+    painted: bool,
     weighed: Weighed,
 }
 
@@ -2362,10 +2362,11 @@ impl HudMakerPage {
             .chain(std::iter::once(toolbar))
             .collect();
         // The part list keeps its spot while it stays off the killfeed, the chat and the other
-        // panels; covering the selection is settling's to handle, and covering other parts is not
-        // reason enough to move. Otherwise it moves to the nearest spot covering the least of
-        // what the canvas draws, selection included so the selection never draws it in. A new
-        // area, screen or list size weighs it afresh from the player's place.
+        // panels, across tab switches too; covering the selection is settling's to handle, and
+        // covering other parts is not reason enough to move. Otherwise it moves to the nearest
+        // spot covering the least of what the canvas draws, selection included so the selection
+        // never draws it in. A new area, screen or list size weighs it afresh from the player's
+        // place.
         let homes: Vec<Point<Pixels>> = things.iter().map(|t| t.home.origin).collect();
         let to_area = |b: &Bounds<Pixels>| Bounds::new(b.origin - area.origin, b.size);
         let killfeed = self.killfeed_band().map(|b| to_area(&b));
@@ -2415,7 +2416,7 @@ impl HudMakerPage {
             let dragging = self.panels[Panel::Parts as usize].drag.is_some();
             let kept = (self.parts_spot.as_ref())
                 .filter(|kept| !dragging && kept.weighed == weighed && fits(kept.at))
-                .map(|kept| (kept.at, kept.scene));
+                .map(|kept| (kept.at, kept.painted));
             let from = kept.map_or(thing.home.origin, |(at, _)| at);
             let least = || {
                 view::least_covering(
@@ -2428,53 +2429,21 @@ impl HudMakerPage {
                     area.size,
                 )
             };
-            let covered = |at: Point<Pixels>| -> f32 {
-                let b = boxed(at);
-                drawn
-                    .iter()
-                    .map(|d| {
-                        let o = b.intersect(d);
-                        f32::from(o.size.width).max(0.) * f32::from(o.size.height).max(0.)
-                    })
-                    .sum()
-            };
             // The parts drawn belong to this scene once the canvas has painted it.
             let painted = self.drawn_scene.get() == Some(scene);
+            // A tab switch alone never moves the list. An answer given before the scene painted
+            // is weighed again once it has.
             let (at, judged) = match kept {
-                // Answers given before the scene paints are weighed again after it does.
-                Some((at, was)) if in_way(at) => (least(), if painted { scene } else { was }),
-                // A switch to another scene: the spot stays only where it covers no more of the
-                // new scene's parts than the least-covering spot does. Until that scene paints,
-                // the spot stays unjudged.
-                Some((at, was)) if was != scene => {
-                    if !painted {
-                        (at, was)
-                    } else {
-                        let best = least();
-                        let spot = if covered(at) <= covered(best) {
-                            at
-                        } else {
-                            best
-                        };
-                        (spot, scene)
-                    }
-                }
+                Some((at, was)) if in_way(at) || (!was && painted) => (least(), painted),
                 Some((at, was)) => (at, was),
-                None => (
-                    least(),
-                    if painted {
-                        scene
-                    } else {
-                        self.drawn_scene.get().unwrap_or(scene)
-                    },
-                ),
+                None => (least(), painted),
             };
             things[i].home.origin = at;
             things[i].avoid = [killfeed, chat];
             // A list the player drags settles afresh from where it is dropped.
             self.parts_spot = (!dragging).then(|| PartsSpot {
                 at: things[i].home.origin,
-                scene: judged,
+                painted: judged,
                 weighed,
             });
             search = (!dragging).then_some((i, drawn, screen, keep_off));

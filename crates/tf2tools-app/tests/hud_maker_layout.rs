@@ -3,11 +3,11 @@
 
 mod support;
 
-use gpui_kit::{AppContext as _, Bounds, Entity, Pixels, TestAppContext};
+use gpui_kit::{AppContext as _, Bounds, Entity, Pixels, TestAppContext, point};
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::services::Tf2State;
-use tf2tools_core::{BoardMode, Scene, Tf2Install};
+use tf2tools_core::{BoardMode, PartKey, Scene, Tf2Install};
 
 fn found(env: &support::Env) -> Tf2State {
     Tf2State::Found(Tf2Install::from_path(&env.game).unwrap())
@@ -123,4 +123,113 @@ fn at_900x600_the_hide_button_stays_on_the_toolbars_first_row(cx: &mut TestAppCo
         }
     }
     assert!(wrapped.is_empty(), "the hide button wrapped: {wrapped:?}");
+}
+
+fn show_parts(cx: &mut TestAppContext, s: &support::ShellWindow) {
+    if !support::present(cx, s.win, ids::HUD_MAKER_PARTS) {
+        support::click_id(cx, s.win, ids::HUD_MAKER_PARTS_PANEL_COLLAPSE);
+    }
+    support::settle(cx, s.win);
+}
+
+// The side panel's and the open part list's bounds as drawn.
+fn panels(cx: &mut TestAppContext, s: &support::ShellWindow) -> [Bounds<Pixels>; 2] {
+    [
+        bounds(cx, s, ids::HUD_MAKER_PANEL),
+        bounds(cx, s, ids::HUD_MAKER_PARTS_PANEL),
+    ]
+}
+
+// Every part the canvas draws in the current scene, with its window bounds.
+fn drawn_parts(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    page: &Entity<HudMakerPage>,
+) -> Vec<(PartKey, Bounds<Pixels>)> {
+    let canvas = bounds(cx, s, ids::HUD_MAKER_CANVAS);
+    cx.update(|cx| {
+        let editor = page.read(cx).editor().unwrap();
+        let scale = f32::from(canvas.size.width) / editor.screen().wide() as f32;
+        let layout = editor.layout();
+        (layout.paint_order())
+            .filter(|b| b.hidden().is_none())
+            .filter_map(|b| {
+                let (x, y, w, h) = layout.shown(b.key())?;
+                let at = point(
+                    canvas.left() + gpui_kit::px(x as f32 * scale),
+                    canvas.top() + gpui_kit::px(y as f32 * scale),
+                );
+                let size = gpui_kit::size(
+                    gpui_kit::px(w as f32 * scale),
+                    gpui_kit::px(h as f32 * scale),
+                );
+                (w > 0 && h > 0).then(|| (b.key().clone(), Bounds::new(at, size)))
+            })
+            .collect()
+    })
+}
+
+fn select(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    page: &Entity<HudMakerPage>,
+    key: Option<&PartKey>,
+) {
+    cx.update(|cx| {
+        page.update(cx, |p, cx| {
+            p.editor_mut().unwrap().select(key.cloned());
+            cx.notify();
+        })
+    });
+    support::settle(cx, s.win);
+}
+
+// With nothing selected, a tour of the tabs leaves both floating panels where they stand.
+#[gpui_kit::test]
+fn a_tab_switch_leaves_the_floating_panels_where_they_stand(cx: &mut TestAppContext) {
+    let mut moved = Vec::new();
+    for (w, h) in [(900., 600.), (1280., 800.), (1920., 1080.)] {
+        let (s, page) = open_at(cx, w, h);
+        show_parts(cx, &s);
+        let start = panels(cx, &s);
+        for scene in [
+            Scene::Scoreboard,
+            Scene::MainMenu,
+            Scene::Hud,
+            Scene::FreezeCam,
+            Scene::WinPanel,
+            Scene::Hud,
+        ] {
+            set_scene(cx, &s, &page, scene);
+            let now = panels(cx, &s);
+            if now.map(|b| b.origin) != start.map(|b| b.origin) {
+                moved.push(((w, h), scene, start, now));
+            }
+        }
+    }
+    assert!(moved.is_empty(), "the panels moved: {moved:?}");
+}
+
+// On the HUD tab, selecting a part neither panel covers leaves both where the player left them.
+#[gpui_kit::test]
+fn a_selection_the_panels_do_not_cover_leaves_them_where_they_stand(cx: &mut TestAppContext) {
+    let mut moved = Vec::new();
+    for (w, h) in [(900., 600.), (1280., 800.), (1920., 1080.)] {
+        let (s, page) = open_at(cx, w, h);
+        show_parts(cx, &s);
+        let home = panels(cx, &s);
+        let parts = drawn_parts(cx, &s, &page);
+        for (key, part) in parts {
+            if home.iter().any(|b| b.intersects(&part)) {
+                continue;
+            }
+            select(cx, &s, &page, Some(&key));
+            let now = panels(cx, &s);
+            if now.map(|b| b.origin) != home.map(|b| b.origin) {
+                moved.push(((w, h), key, home, now));
+            }
+            select(cx, &s, &page, None);
+        }
+    }
+    assert!(moved.is_empty(), "the panels moved: {moved:?}");
 }
