@@ -250,6 +250,34 @@ fn saved_state(saved: Option<&Path>) -> Tf2State {
     }
 }
 
+/// The state after looking at the disk again, or `None` when nothing changed: a found install
+/// whose game folder moved away turns missing with its path kept, and a kept path that holds
+/// TF2 again turns found, as Save Settings would.
+fn rechecked(state: &Tf2State) -> Option<Tf2State> {
+    match state {
+        Tf2State::Found(install) if !install.is_present() => Some(Tf2State::Missing {
+            saved: Some(install.game_dir().to_path_buf()),
+        }),
+        Tf2State::Missing { saved: Some(saved) } => match saved_state(Some(saved)) {
+            found @ Tf2State::Found(_) => Some(found),
+            Tf2State::Detecting | Tf2State::Missing { .. } => None,
+        },
+        _ => None,
+    }
+}
+
+/// Looks at the game folder again and updates the shared state when it changed. The shell
+/// calls it on a page change and when its window becomes active; there is no timer.
+pub fn recheck_tf2(cx: &mut App) {
+    let state = tf2_state(cx);
+    if let Some(next) = rechecked(state.read(cx)) {
+        state.update(cx, |tf2, cx| {
+            *tf2 = next;
+            cx.notify();
+        });
+    }
+}
+
 /// Holds the shared `Tf2State` entity, so `Services` itself stays `Send + Sync`.
 pub struct Tf2Global(pub Entity<Tf2State>);
 

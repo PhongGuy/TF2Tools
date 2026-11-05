@@ -280,6 +280,18 @@ fn a_folder_that_would_not_move_says_tf2_is_using_it() {
     );
 }
 
+#[test]
+fn a_moved_game_folder_points_to_settings() {
+    let gone = ReinstallError::GameMissing {
+        path: PathBuf::from("/home/p/Games/Team Fortress 2/tf"),
+    };
+    assert_eq!(
+        live_failure(&gone),
+        "Saved, but TF2 wasn't found where it used to be. Check the TF2 folder in \
+         Settings."
+    );
+}
+
 #[gpui_kit::test]
 fn a_later_save_as_new_takes_the_note_away(cx: &mut TestAppContext) {
     let env = support::env();
