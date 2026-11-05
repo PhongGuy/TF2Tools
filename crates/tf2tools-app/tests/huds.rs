@@ -358,21 +358,42 @@ fn install_makes_a_hud_active(cx: &mut TestAppContext) {
     );
 }
 
+// Sets the shared TF2 state, as Settings or a recheck would.
+fn set_tf2(cx: &mut TestAppContext, s: &support::ShellWindow, state: Tf2State) {
+    cx.update(|cx| {
+        s.tf2.update(cx, |tf2, cx| {
+            *tf2 = state;
+            cx.notify();
+        })
+    });
+    support::settle(cx, s.win);
+}
+
 #[gpui_kit::test]
-fn install_without_tf2_says_so(cx: &mut TestAppContext) {
+fn without_tf2_the_page_warns_and_shuts_installs(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     seed(&s.services, &env, "budhud", Provenance::Local);
     let _page = revisit(cx, &s);
-    support::click_id(cx, s.win, ids::hud_install("budhud"));
-    support::wait_real(cx, "the toast", |cx| {
-        support::present(cx, s.win, ids::TOAST)
-    });
-    assert_eq!(
-        support::label_of(cx, s.win, ids::TOAST).as_deref(),
-        Some("TF2 path not set")
-    );
+    assert!(support::present(cx, s.win, ids::HUDS_NO_TF2));
+    assert!(support::disabled_of(cx, s.win, ids::hud_install("budhud")));
+    assert!(!support::disabled_of(cx, s.win, ids::HUDS_ADD));
+    assert!(!support::disabled_of(cx, s.win, ids::hud_delete("budhud")));
+    support::click_id(cx, s.win, ids::HUDS_NO_TF2_SETTINGS);
+    assert!(support::present(cx, s.win, ids::page(Page::Settings)));
     assert!(!env.game.join("tf/custom/budhud").exists());
+}
+
+#[gpui_kit::test]
+fn finding_tf2_clears_the_warning_and_opens_installs(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    seed(&s.services, &env, "budhud", Provenance::Local);
+    let _page = revisit(cx, &s);
+    assert!(support::present(cx, s.win, ids::HUDS_NO_TF2));
+    set_tf2(cx, &s, found(&env));
+    assert!(!support::present(cx, s.win, ids::HUDS_NO_TF2));
+    assert!(!support::disabled_of(cx, s.win, ids::hud_install("budhud")));
 }
 
 #[gpui_kit::test]

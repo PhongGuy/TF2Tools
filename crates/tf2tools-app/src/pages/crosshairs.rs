@@ -26,7 +26,7 @@ use tf2tools_core::{
     TfClass, WeaponSlot, write_png,
 };
 
-use super::common::{SM_ICON_PX, YELLOW_500};
+use super::common::{SM_ICON_PX, YELLOW_500, needs_tf2, no_tf2_notice};
 use crate::activity;
 use crate::assets::BACKGROUNDS;
 use crate::ids;
@@ -36,10 +36,10 @@ use crate::local_messages::{
 };
 use crate::picker::{PickKind, file_name_for, with_extension};
 use crate::previews::CrosshairPreviews;
-use crate::services::{OpError, Services, require_tf2, run_blocking, tf2_state};
+use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
-use crate::shell::route::Page;
+use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::crosshair_picker::{CrosshairPicker, preview_image};
 use crate::widgets::scroll::scroll_area;
@@ -118,6 +118,7 @@ pub struct CrosshairsPage {
 
 impl EventEmitter<EditPainted> for CrosshairsPage {}
 impl EventEmitter<CopyToMaker> for CrosshairsPage {}
+impl EventEmitter<NavigateTo> for CrosshairsPage {}
 
 impl CrosshairsPage {
     /// The picker list's scroll handle; its offset is what the list drew.
@@ -783,6 +784,7 @@ impl CrosshairsPage {
         let importing = self.busy == Some(Busy::Import);
         let installing = self.busy == Some(Busy::Install);
         let removing = self.busy == Some(Busy::Uninstall);
+        let has_tf2 = tf2_state(cx).read(cx).install().is_some();
         v_flex()
             .gap(px(6.))
             .child(
@@ -795,7 +797,7 @@ impl CrosshairsPage {
                     .disabled(self.busy.is_some() && !importing)
                     .on_click(cx.listener(|page, _, _, cx| page.import(cx))),
             )
-            .child(
+            .child(needs_tf2(
                 Button::new(ids::CROSSHAIRS_INSTALL)
                     .primary()
                     .px(SM_ICON_PX)
@@ -808,8 +810,9 @@ impl CrosshairsPage {
                     .loading(installing)
                     .disabled(self.busy.is_some() && !installing)
                     .on_click(cx.listener(|page, _, window, cx| page.install(window, cx))),
-            )
-            .child(
+                has_tf2,
+            ))
+            .child(needs_tf2(
                 Button::new(ids::CROSSHAIRS_UNINSTALL)
                     .outline()
                     .px(SM_ICON_PX)
@@ -818,7 +821,8 @@ impl CrosshairsPage {
                     .loading(removing)
                     .disabled(self.busy.is_some() && !removing)
                     .on_click(cx.listener(|page, _, window, cx| page.uninstall(window, cx))),
-            )
+                has_tf2,
+            ))
             .children(copy)
             .children(export)
             .children(edit)
@@ -929,6 +933,15 @@ impl Render for CrosshairsPage {
             .installed
             .as_ref()
             .and_then(|installed| conflict_box(installed.conflicts(), cx));
+        let missing = matches!(tf2_state(cx).read(cx), Tf2State::Missing { .. });
+        let warning = missing.then(|| {
+            no_tf2_notice(
+                ids::CROSSHAIRS_NO_TF2,
+                ids::CROSSHAIRS_NO_TF2_SETTINGS,
+                "Set the TF2 folder in Settings to install crosshairs.",
+                cx,
+            )
+        });
         let content = v_flex()
             .id(ids::page(Page::Crosshairs))
             .test_support()
@@ -937,6 +950,7 @@ impl Render for CrosshairsPage {
             .track_scroll(&self.scroll)
             .p(CONTENT_PADDING)
             .gap_4()
+            .children(warning)
             .child(
                 h_flex()
                     .gap_4()

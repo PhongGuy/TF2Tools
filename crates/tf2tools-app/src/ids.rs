@@ -97,6 +97,10 @@ pub const SOUNDS_EMPTY: &str = "sounds-empty";
 pub const SOUNDS_NO_MATCH: &str = "sounds-no-match";
 /// The "Add Sound" button, "Importing..." while busy; opens the sound file picker.
 pub const SOUNDS_ADD: &str = "sounds-add";
+/// The Sounds page's "TF2 path not set" notice, present only while TF2 is not found.
+pub const SOUNDS_NO_TF2: &str = "sounds-no-tf2";
+/// The notice's "Open Settings" button.
+pub const SOUNDS_NO_TF2_SETTINGS: &str = "sounds-no-tf2-settings";
 /// The Sounds page's card grid.
 pub const SOUNDS_GRID: &str = "sounds-grid";
 /// Wraps the picker's search input.
@@ -123,6 +127,10 @@ pub const CROSSHAIRS_BACKGROUND: &str = "crosshairs-background";
 pub const CROSSHAIRS_PREVIEW: &str = "crosshairs-preview";
 /// The "Import" button, "Importing..." while busy; opens the crosshair image picker.
 pub const CROSSHAIRS_IMPORT: &str = "crosshairs-import";
+/// The Crosshairs page's "TF2 path not set" notice, present only while TF2 is not found.
+pub const CROSSHAIRS_NO_TF2: &str = "crosshairs-no-tf2";
+/// The notice's "Open Settings" button.
+pub const CROSSHAIRS_NO_TF2_SETTINGS: &str = "crosshairs-no-tf2-settings";
 /// The "Install to TF2" button, "Installing..." while busy.
 pub const CROSSHAIRS_INSTALL: &str = "crosshairs-install";
 /// The "Uninstall" button, "Removing..." while busy.
@@ -508,6 +516,10 @@ pub const HUDS_CONFLICTS: &str = "huds-conflicts";
 pub const HUDS_SEARCH: &str = "huds-search";
 /// The "Add HUD" button; opens the archive picker.
 pub const HUDS_ADD: &str = "huds-add";
+/// The HUDs page's "TF2 path not set" notice, present only while TF2 is not found.
+pub const HUDS_NO_TF2: &str = "huds-no-tf2";
+/// The notice's "Open Settings" button.
+pub const HUDS_NO_TF2_SETTINGS: &str = "huds-no-tf2-settings";
 /// Labelled "Your library is empty".
 pub const HUDS_EMPTY: &str = "huds-empty";
 /// Labelled "No HUDs found", shown when a search matches nothing.

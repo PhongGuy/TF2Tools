@@ -140,7 +140,7 @@ impl OpError {
 
     pub fn title(&self) -> &str {
         match self {
-            Self::NoTf2 => "TF2 path not set",
+            Self::NoTf2 => "TF2 not found",
             Self::Core { action, .. } => action,
             Self::Internal(_) => "Something went wrong",
         }
@@ -148,7 +148,7 @@ impl OpError {
 
     pub fn description(&self) -> &str {
         match self {
-            Self::NoTf2 => "",
+            Self::NoTf2 => "Set the TF2 folder in Settings, then try again.",
             Self::Core { message, .. } => message,
             Self::Internal(_) => local_messages::INTERNAL,
         }

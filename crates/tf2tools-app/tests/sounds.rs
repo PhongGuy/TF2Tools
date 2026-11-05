@@ -665,21 +665,49 @@ fn kill_installs_a_vpk_as_the_killsound(cx: &mut TestAppContext) {
     );
 }
 
+// Sets the shared TF2 state, as Settings or a recheck would.
+fn set_tf2(cx: &mut TestAppContext, s: &support::ShellWindow, state: Tf2State) {
+    cx.update(|cx| {
+        s.tf2.update(cx, |tf2, cx| {
+            *tf2 = state;
+            cx.notify();
+        })
+    });
+    support::settle(cx, s.win);
+}
+
 #[gpui_kit::test]
-fn install_without_tf2_says_so(cx: &mut TestAppContext) {
+fn without_tf2_the_page_warns_and_shuts_installs(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     let ding = seed(&s, &env, "Ding", "wav", &wav(441));
     let _page = open_sounds(cx, &s);
-    support::click_id(cx, s.win, ids::sound_hit(ding.folder_name()));
-    support::wait_real(cx, "the toast", |cx| {
-        support::present(cx, s.win, ids::TOAST)
-    });
-    assert_eq!(
-        support::label_of(cx, s.win, ids::TOAST).as_deref(),
-        Some("TF2 path not set")
-    );
+    let folder = ding.folder_name();
+    assert!(support::present(cx, s.win, ids::SOUNDS_NO_TF2));
+    assert!(support::disabled_of(cx, s.win, ids::sound_hit(folder)));
+    assert!(support::disabled_of(cx, s.win, ids::sound_kill(folder)));
+    assert!(!support::disabled_of(cx, s.win, ids::SOUNDS_ADD));
+    assert!(!support::disabled_of(cx, s.win, ids::sound_play(folder)));
+    assert!(!support::disabled_of(cx, s.win, ids::sound_delete(folder)));
+    support::click_id(cx, s.win, ids::SOUNDS_NO_TF2_SETTINGS);
+    assert!(support::present(cx, s.win, ids::page(Page::Settings)));
     assert!(!env.game.join("tf/custom/tf2tools-sounds").exists());
+}
+
+#[gpui_kit::test]
+fn finding_tf2_clears_the_warning_and_opens_installs(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let ding = seed(&s, &env, "Ding", "wav", &wav(441));
+    let _page = open_sounds(cx, &s);
+    assert!(support::present(cx, s.win, ids::SOUNDS_NO_TF2));
+    set_tf2(cx, &s, found(&env));
+    assert!(!support::present(cx, s.win, ids::SOUNDS_NO_TF2));
+    assert!(!support::disabled_of(
+        cx,
+        s.win,
+        ids::sound_hit(ding.folder_name())
+    ));
 }
 
 #[gpui_kit::test]
