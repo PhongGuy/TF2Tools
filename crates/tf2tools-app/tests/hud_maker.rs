@@ -191,6 +191,32 @@ fn leaving_with_unsaved_changes_asks_first(cx: &mut TestAppContext) {
     assert_eq!(page_now(cx, &s), Page::Huds);
 }
 
+// Keep editing, by button or Esc, hands the keys back to the maker without a click on it.
+#[gpui_kit::test]
+fn keep_editing_gives_the_keys_back_to_the_maker(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    let from = hv_box(cx, &page).0;
+    for dismiss in ["button", "escape"] {
+        let at = bounds(cx, &s, ids::hud_maker_part(&PartKey::new(HV))).center();
+        let k = scale(cx, &s);
+        drag_window(cx, &s, at, (45. * k, 0.));
+        assert_eq!(hv_box(cx, &page).0, from + 45);
+        support::click_id(cx, s.win, ids::nav(Page::Huds));
+        assert!(support::present(cx, s.win, ids::CONFIRM_DIALOG));
+        match dismiss {
+            "button" => support::click_id(cx, s.win, ids::CONFIRM_CANCEL),
+            _ => support::press(cx, s.win, "escape"),
+        }
+        support::settle(cx, s.win);
+        assert!(!support::present(cx, s.win, ids::CONFIRM_DIALOG));
+        assert_eq!(page_now(cx, &s), Page::HudMaker);
+        support::press(cx, s.win, "ctrl-z");
+        assert_eq!(hv_box(cx, &page).0, from, "{dismiss}: Ctrl+Z was lost");
+    }
+}
+
 fn bounds(
     cx: &mut TestAppContext,
     s: &support::ShellWindow,

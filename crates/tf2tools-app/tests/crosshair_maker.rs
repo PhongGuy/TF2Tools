@@ -1305,6 +1305,27 @@ fn the_sidebar_asks_before_dropping_a_drawing(cx: &mut TestAppContext) {
     assert!(cx.update(|cx| leave::can_leave(cx)));
 }
 
+// Keep editing, by button or Esc, hands the keys back to the maker without a click on it.
+#[gpui_kit::test]
+fn keep_editing_gives_the_keys_back_to_the_maker(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = shell(cx, &env);
+    let page = open_maker(cx, &s);
+    for dismiss in ["button", "escape"] {
+        paint_cell(cx, &s, &page, 1, 1);
+        support::click_id(cx, s.win, ids::nav(Page::Huds));
+        assert!(support::present(cx, s.win, ids::CONFIRM_DIALOG));
+        match dismiss {
+            "button" => support::click_id(cx, s.win, ids::CONFIRM_CANCEL),
+            _ => support::press(cx, s.win, "escape"),
+        }
+        support::settle(cx, s.win);
+        assert!(!support::present(cx, s.win, ids::CONFIRM_DIALOG));
+        support::press(cx, s.win, "ctrl-z");
+        assert!(painted(cx, &page).is_empty(), "{dismiss}: Ctrl+Z was lost");
+    }
+}
+
 #[gpui_kit::test]
 fn a_clean_maker_leaves_without_asking(cx: &mut TestAppContext) {
     let env = support::env();
