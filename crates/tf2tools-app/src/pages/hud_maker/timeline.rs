@@ -13,6 +13,7 @@ use gpui_kit::{
 };
 
 use super::HudMakerPage;
+use super::parts::plain_name;
 use crate::ids;
 use crate::widgets::labelled;
 
@@ -126,7 +127,17 @@ impl HudMakerPage {
         if fired.is_empty() {
             return None;
         }
-        let names: Vec<&str> = fired.iter().map(|f| f.event()).collect();
+        // Events this HUD leaves empty, or lacks, change nothing, so there is nothing to play.
+        let animations = editor.model().animations();
+        let empty = |name: &str| {
+            animations
+                .event(name)
+                .is_none_or(|e| e.commands().is_empty())
+        };
+        if fired.iter().all(|f| empty(f.event())) {
+            return None;
+        }
+        let names: Vec<String> = fired.iter().map(|f| event_name(f.event())).collect();
         let names = SharedString::from(names.join(", "));
         let in_game = (editor.moment() > 0.)
             .then(|| editor.frame().in_game_only().join(", "))
@@ -199,5 +210,37 @@ impl HudMakerPage {
                 .child(clear)
                 .into_any_element(),
         )
+    }
+}
+
+// The events the game fires on its own, in player words; any other reads as its plain name.
+const GAME_EVENTS: [(&str, &str); 9] = [
+    ("DamagedPlayer", "Taking damage"),
+    ("HudHealthBonusPulse", "Overheal pulse"),
+    ("HudHealthBonusPulseStop", "Overheal pulse ends"),
+    ("HudHealthDyingPulse", "Low health pulse"),
+    ("HudHealthDyingPulseStop", "Low health pulse ends"),
+    ("HudLowAmmoPulse", "Low ammo pulse"),
+    ("HudLowAmmoPulseStop", "Low ammo pulse ends"),
+    ("HudMedicCharged", "ÜberCharge ready"),
+    ("HudMedicChargedStop", "ÜberCharge used"),
+];
+
+/// Event `raw` as the timeline names it to a player.
+pub(super) fn event_name(raw: &str) -> String {
+    (GAME_EVENTS.iter())
+        .find(|(event, _)| event.eq_ignore_ascii_case(raw))
+        .map_or_else(|| plain_name(raw), |(_, name)| (*name).to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::event_name;
+
+    #[test]
+    fn events_read_as_player_words() {
+        assert_eq!(event_name("HudHealthDyingPulse"), "Low health pulse");
+        assert_eq!(event_name("hudmediccharged"), "ÜberCharge ready");
+        assert_eq!(event_name("TestNudge"), "Test nudge");
     }
 }

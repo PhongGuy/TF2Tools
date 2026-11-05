@@ -12,7 +12,6 @@ use gpui_kit::component::popover::Popover;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _, h_flex, v_flex,
 };
-use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     Anchor, AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
     StatefulInteractiveElement as _, Styled as _, Task, TestSupportExt as _, Window, div, point,
@@ -42,7 +41,8 @@ const LIST_FAILED: &str = "Couldn't read your presets.";
 const PRESET_UNREADABLE: &str = "That file isn't a preset TF2Tools can read.";
 const RECIPE_UNREADABLE: &str = "That file isn't a recipe TF2Tools can read.";
 const RECIPE_SAVE_FAILED: &str = "Couldn't save the recipe.";
-const START_OFF: &str = "Only for a new HUD with no changes";
+const START_SAVED: &str = "Only for a new HUD. This one is already saved.";
+const START_CHANGED: &str = "Only before you change anything. Undo your changes to use it.";
 const TF2_ONLY: &str = "Some of these changes only show in TF2.";
 
 /// What the preview bar says about the latest preview: its name and what it left out.
@@ -272,17 +272,34 @@ impl HudMakerPage {
     // The menu's entries: Start from, and once it is pressed, a button per starting point.
     fn more_items(&self, cx: &mut Context<Self>) -> AnyElement {
         let live = self.can_start_from();
+        let muted = cx.theme().muted_foreground;
         let start = Button::new(ids::HUD_MAKER_START)
             .ghost()
             .small()
             .label("Start from a ready-made HUD")
             .disabled(!live)
-            .when(!live, |b| b.tooltip(START_OFF))
             .on_click(cx.listener(|page, _, _, cx| {
                 page.start_open = true;
                 cx.notify();
             }));
-        let muted = cx.theme().muted_foreground;
+        // An off entry says why, both on hover (the holder still hovers while the button is
+        // off) and in a line under it, since a greyed-out entry alone tells a player nothing.
+        let why = (!live).then(|| match self.saved_hud() {
+            Some(_) => START_SAVED,
+            None => START_CHANGED,
+        });
+        let start = match why {
+            Some(why) => v_flex()
+                .items_start()
+                .child(tipped(&ids::HUD_MAKER_START.into(), why, start))
+                .child(labelled(
+                    div().px_2().text_xs().text_color(muted),
+                    ids::HUD_MAKER_START_WHY,
+                    why,
+                ))
+                .into_any_element(),
+            None => start.into_any_element(),
+        };
         let points = (self.start_open && live).then(|| {
             StartingPoint::ALL.map(|which| {
                 let pick = Button::new(ids::hud_maker_start(which.label()))

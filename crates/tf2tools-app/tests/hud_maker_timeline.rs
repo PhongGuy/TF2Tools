@@ -3,7 +3,7 @@
 mod support;
 
 use gpui_kit::TestAppContext;
-use support::maker_page::{VALUE, on_page, open_maker};
+use support::maker_page::{ANIMS, VALUE, on_page, open_maker, open_maker_with};
 use tf2tools_app::ids;
 use tf2tools_core::{GameSituation, PartKey};
 
@@ -16,7 +16,7 @@ fn low_health_shows_the_timeline_with_its_pulse(cx: &mut TestAppContext) {
     });
     assert_eq!(
         support::label_of(cx, s.win, ids::HUD_MAKER_TIMELINE_EVENTS).as_deref(),
-        Some("HudHealthDyingPulse")
+        Some("Low health pulse")
     );
     support::click_id(cx, s.win, ids::HUD_MAKER_TIMELINE_PLAY);
     assert!(cx.update(|cx| page.read(cx).is_playing()));
@@ -87,4 +87,38 @@ fn an_edit_from_the_panel_stops_playback(cx: &mut TestAppContext) {
         !cx.update(|cx| page.read(cx).is_playing()),
         "an edit stops playback"
     );
+}
+
+#[gpui_kit::test]
+fn the_timeline_names_events_in_player_words(cx: &mut TestAppContext) {
+    let (_env, s, page) = open_maker(cx);
+    on_page(cx, &s, &page, |p, w, cx| {
+        assert!(p.play_event("HudMedicCharged", w, cx));
+        assert!(p.play_event("TestNudge", w, cx));
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_TIMELINE_EVENTS).as_deref(),
+        Some("ÜberCharge ready, Test nudge")
+    );
+}
+
+#[gpui_kit::test]
+fn an_event_that_moves_nothing_shows_no_timeline(cx: &mut TestAppContext) {
+    let (_env, s, page) = open_maker(cx);
+    on_page(cx, &s, &page, |p, w, cx| {
+        assert!(p.play_event("DamagedPlayer", w, cx));
+    });
+    assert!(!support::present(cx, s.win, ids::HUD_MAKER_TIMELINE));
+}
+
+#[gpui_kit::test]
+fn low_health_on_a_hud_without_its_pulse_shows_no_timeline(cx: &mut TestAppContext) {
+    let anims = ANIMS.replace("event HudHealthDyingPulse\n", "event SomethingElse\n");
+    assert_ne!(anims, ANIMS);
+    let (_env, s, page) = open_maker_with(cx, &anims);
+    on_page(cx, &s, &page, |p, w, cx| {
+        p.set_situation(GameSituation::default().with_health(60), w, cx)
+    });
+    assert!(!support::present(cx, s.win, ids::HUD_MAKER_TIMELINE));
+    assert!(!support::present(cx, s.win, ids::HUD_MAKER_TIMELINE_TIME));
 }
