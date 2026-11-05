@@ -1599,6 +1599,12 @@ pub fn hud_maker_tip_for(of: &ElementId) -> ElementId {
     keyed("hud-maker-tip-for", &of.to_string())
 }
 
+/// The note under the HUD Maker number box `of`, labelled with why a typed value was rounded
+/// or refused; absent once a typed value lands as typed.
+pub fn hud_maker_note_for(of: &ElementId) -> ElementId {
+    keyed("hud-maker-note-for", &of.to_string())
+}
+
 pub fn hud_maker_align(value: &str) -> ElementId {
     keyed("hud-maker-align", value)
 }

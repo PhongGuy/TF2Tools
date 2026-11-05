@@ -1371,19 +1371,27 @@ impl HudMakerPage {
         field: Field,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let muted = cx.theme().muted_foreground;
+        let (muted, warning) = (cx.theme().muted_foreground, cx.theme().warning);
         let input = Input::new(self.field(field)).small();
         let input = if prefix.is_empty() {
             input
         } else {
             input.prefix(div().text_xs().text_color(muted).child(prefix))
         };
+        let id = id.into();
+        // A typed value that was rounded or refused says why under its box.
+        let note = self.field_note(field).map(|note| {
+            let colour = if note.refused { warning } else { muted };
+            let style = div().text_xs().text_color(colour);
+            labelled(style, ids::hud_maker_note_for(&id), note.text.clone())
+        });
         div()
             .id(id)
             .test_support()
             .flex_1()
             .min_w_0()
             .child(input)
+            .when_some(note, |el, note| el.flex().flex_col().gap_0p5().child(note))
             .into_any_element()
     }
 
