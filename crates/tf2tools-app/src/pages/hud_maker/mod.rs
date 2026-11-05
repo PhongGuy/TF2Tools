@@ -2718,6 +2718,13 @@ impl HudMakerPage {
         cx.notify();
     }
 
+    /// Gives the keys back to the page unless something inside it already holds them.
+    pub fn reclaim_focus(&self, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App) {
+        if !self.focus.contains_focused(window, cx) {
+            self.focus.focus(window, cx);
+        }
+    }
+
     /// True unless the editor holds unsaved changes or the name differs from the saved one.
     pub fn can_leave(&self) -> bool {
         self.editor().is_none_or(|e| !e.is_dirty()) && self.typed_name == self.saved_name

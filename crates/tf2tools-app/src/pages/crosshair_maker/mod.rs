@@ -292,6 +292,13 @@ impl CrosshairMakerPage {
         &self.name
     }
 
+    /// Gives the keys back to the page unless something inside it already holds them.
+    pub fn reclaim_focus(&self, window: &mut gpui_kit::Window, cx: &mut gpui_kit::App) {
+        if !self.focus.contains_focused(window, cx) {
+            self.focus.focus(window, cx);
+        }
+    }
+
     /// True while the drawing holds no unsaved changes.
     pub fn can_leave(&self) -> bool {
         !self.editor.is_dirty()
