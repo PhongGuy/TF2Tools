@@ -53,8 +53,9 @@ use crate::widgets::scroll::scroll_area;
 
 /// The card's text and buttons below a store HUD's 16:9 screenshot, and a local card's height.
 const CARD_TEXT_HEIGHT: Pixels = px(136.);
-// The grid never gets shorter than about one row of cards; a short window scrolls the page.
-const LIBRARY_MIN_HEIGHT: Pixels = px(320.);
+// The grid never gets shorter than one row of local cards, as on Profiles, so a common window
+// fits the page and only the grid scrolls; a short window still scrolls the page.
+const LIBRARY_MIN_HEIGHT: Pixels = CARD_TEXT_HEIGHT;
 // Room for up to three lines of the note that a copy's newer version is in the HUD Store.
 const STORE_NOTE_HEIGHT: Pixels = px(48.);
 /// Edit's tooltip while another HUD action runs.

@@ -339,7 +339,31 @@ fn open_huds(cx: &mut TestAppContext, s: &support::ShellWindow) {
     support::settle(cx, s.win);
 }
 
-// The library keeps a 320 px floor, so the page itself still scrolls a little at 1280x800.
+// At a common window size the page fits, so only the grid's bar shows; it reaches the last card.
+#[gpui_kit::test]
+fn at_1280x800_only_the_huds_grid_scrolls(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    seed_huds(&s, &env, 24);
+    resize(cx, &s, 1280., 800.);
+    open_huds(cx, &s);
+    let bar = ids::grid_scrollbar(ids::HUDS_GRID);
+    assert_bar_beside(cx, s.win, ids::HUDS_GRID, bar.clone());
+    assert_track_stays(cx, s.win, ids::page(Page::Huds), ids::HUDS_LIBRARY);
+    let page = cx.update(|cx| s.shell.read(cx).huds_page()).unwrap();
+    let grid = cx.update(|cx| page.read(cx).grid_scroll());
+    grid.set_offset(point(px(0.), -grid.max_offset().y));
+    support::settle(cx, s.win);
+    let (last, area) = (
+        bounds(cx, s.win, ids::hud_card("hud23")),
+        bounds(cx, s.win, ids::HUDS_GRID),
+    );
+    assert!(
+        last.bottom() <= area.bottom() + px(1.),
+        "the last card {last:?} ends below the grid {area:?}"
+    );
+}
+
 #[gpui_kit::test]
 fn at_1280x1024_only_the_huds_grid_scrolls(cx: &mut TestAppContext) {
     let env = support::env();
