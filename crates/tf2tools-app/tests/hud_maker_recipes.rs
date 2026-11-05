@@ -726,3 +726,57 @@ fn the_bar_says_when_some_changes_only_show_in_tf2(cx: &mut TestAppContext) {
     let bar = support::label_of(cx, s.win, ids::HUD_MAKER_PREVIEW).unwrap();
     assert!(!bar.contains(TF2_ONLY), "{bar}");
 }
+
+/// Hovers the off Start from entry and returns the tooltip it shows and the note under it.
+fn why_start_is_off(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+) -> (Option<String>, Option<String>) {
+    assert!(!open_more(cx, s), "Start from is on");
+    let holder = ids::hud_maker_tip_for(&ids::HUD_MAKER_START.into());
+    cx.update_window(s.win, |_, w, cx| w.hover(holder, cx))
+        .unwrap();
+    support::settle(cx, s.win);
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(800));
+    support::settle(cx, s.win);
+    (
+        support::label_of(cx, s.win, ids::HUD_MAKER_TIP),
+        support::label_of(cx, s.win, ids::HUD_MAKER_START_WHY),
+    )
+}
+
+#[gpui_kit::test]
+fn an_off_start_from_says_it_waits_for_no_changes(cx: &mut TestAppContext) {
+    let (_env, s, _page) = opened(cx);
+    click_in_panel(cx, &s, ids::hud_maker_option("chat_top"));
+    let (tip, note) = why_start_is_off(cx, &s);
+    let why = "Only before you change anything. Undo your changes to use it.";
+    assert_eq!(tip.as_deref(), Some(why));
+    assert_eq!(note.as_deref(), Some(why));
+}
+
+#[gpui_kit::test]
+fn an_off_start_from_says_a_saved_hud_cannot_use_it(cx: &mut TestAppContext) {
+    let (_env, s, page) = opened(cx);
+    let made = s
+        .services
+        .library
+        .save_made_hud(
+            &MakeTarget::New,
+            "Made",
+            &support::hud_stock::stock_files(),
+            Platform::Linux,
+            &[],
+        )
+        .unwrap();
+    cx.update(|cx| page.update(cx, |p, cx| p.open(made.entry().id().clone(), cx)));
+    support::wait_real(cx, "the made HUD to load", |cx| {
+        cx.update(|cx| page.read(cx).saved_hud().is_some())
+    });
+    support::settle(cx, s.win);
+    let (tip, note) = why_start_is_off(cx, &s);
+    let why = "Only for a new HUD. This one is already saved.";
+    assert_eq!(tip.as_deref(), Some(why));
+    assert_eq!(note.as_deref(), Some(why));
+}

@@ -24,7 +24,6 @@ use tf2tools_core::{
 };
 
 use super::canvas::{colour, scene_note};
-use super::editor::shows_for;
 use super::parts::row_label;
 use super::tip::{Spot, record, tip, tip_beside_row, tipped};
 use super::view::{Panel, PanelMode, PanelPlace};
@@ -869,12 +868,14 @@ impl HudMakerPage {
         tipped(&ids::HUD_MAKER_MIRROR.into(), tip, button)
     }
 
-    // Show it, for a part the game shows only in some situations: it sets the situation in
-    // which the part, or the panel holding it, shows.
+    // Show it, for a part the current situation hides: it sets the situation in which the
+    // part, or the panel holding it, shows.
     fn show_it_button(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let editor = self.editor()?;
         let part = editor.selected()?.clone();
-        shows_for(editor.model(), &part)?;
+        if !editor.offers_show_it(&part) {
+            return None;
+        }
         let button = Button::new(ids::HUD_MAKER_PANEL_SHOW_IT)
             .outline()
             .xsmall()
@@ -1591,6 +1592,12 @@ impl HudMakerPage {
         let (size, outline, shadow) = variant.map_or((None, false, false), |f| {
             (Some(f.tall()), f.outline(), f.dropshadow())
         });
+        // A font the maker made for this part has a made-up name, so the line names it by what
+        // the player chose: its family and size.
+        let current = match (starts_with_ignoring_case(&current, CLONE_PREFIX), size) {
+            (true, Some(size)) => format!("{family}, size {size} (this part only)"),
+            _ => current,
+        };
         let open = self
             .open_font_list()
             .filter(|(at, _)| *at == key)
@@ -1716,7 +1723,7 @@ impl HudMakerPage {
                         }),
                 )
         };
-        // The font's name has a line of its own, since a clone's name is long; its family sits
+        // The font's name has a line of its own, since an edited font's line is long; its family sits
         // beside the list buttons below it.
         v_flex()
             .gap_1()

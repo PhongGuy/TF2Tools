@@ -571,6 +571,13 @@ impl HudEditor {
         (model.animations()).frame(model, self.layout(), &self.fired(), self.moment)
     }
 
+    /// Whether Show it has work to do for `part`: the game shows it only in some situations
+    /// and the current one hides it, or a panel holding it.
+    pub fn offers_show_it(&self, part: &PartKey) -> bool {
+        shows_for(self.model(), part).is_some()
+            && (self.layout().get(part)).is_some_and(|b| b.hidden().is_some())
+    }
+
     /// Sets the situation in which `part`, or its nearest code-toggled ancestor, shows; false
     /// when nothing the game toggles decides whether it shows.
     pub fn show_part_situation(&mut self, part: &PartKey) -> bool {

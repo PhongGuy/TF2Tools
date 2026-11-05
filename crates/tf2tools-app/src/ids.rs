@@ -378,6 +378,8 @@ pub const HUD_MAKER_PREVIEW_APPLY: &str = "hud-maker-preview-apply";
 pub const HUD_MAKER_PREVIEW_CANCEL: &str = "hud-maker-preview-cancel";
 /// The overflow menu's "Start from a ready-made HUD" entry, live only on a new unedited HUD.
 pub const HUD_MAKER_START: &str = "hud-maker-start";
+/// The note under an off "Start from a ready-made HUD" saying why it is off.
+pub const HUD_MAKER_START_WHY: &str = "hud-maker-start-why";
 /// The toolbar's overflow menu button.
 pub const HUD_MAKER_MORE: &str = "hud-maker-more";
 /// The toolbar's screen shape button, which opens the shapes.

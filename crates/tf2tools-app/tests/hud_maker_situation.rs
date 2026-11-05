@@ -89,3 +89,28 @@ fn show_it_shows_a_part_the_situation_hides(cx: &mut TestAppContext) {
     click_in_panel(cx, &s, ids::HUD_MAKER_PANEL_SHOW_IT.into());
     assert_eq!(situation(cx, &page).class(), TfClass::Medic);
 }
+
+#[gpui_kit::test]
+fn show_it_is_offered_only_while_the_part_is_hidden(cx: &mut TestAppContext) {
+    let (_env, s, page) = open_maker(cx);
+    cx.update(|cx| {
+        page.update(cx, |p, cx| {
+            p.editor_mut()
+                .unwrap()
+                .select(Some(PartKey::new("HudMedicCharge")));
+            cx.notify();
+        })
+    });
+    support::settle(cx, s.win);
+    // A Soldier never sees the charge meter, so Show it is there to bring it up.
+    assert!(support::present(cx, s.win, ids::HUD_MAKER_PANEL_SHOW_IT));
+    click_in_panel(cx, &s, ids::HUD_MAKER_PANEL_SHOW_IT.into());
+    assert_eq!(situation(cx, &page).class(), TfClass::Medic);
+    assert!(
+        !support::present(cx, s.win, ids::HUD_MAKER_PANEL_SHOW_IT),
+        "Show it stays offered while the meter already shows"
+    );
+    // Back to a class that hides it, Show it returns.
+    in_menu(cx, &s, ids::hud_maker_situation_class(TfClass::Scout));
+    assert!(support::present(cx, s.win, ids::HUD_MAKER_PANEL_SHOW_IT));
+}
