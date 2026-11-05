@@ -537,6 +537,19 @@ fn save_draft(
     create: bool,
 ) -> Result<ProfileUpdate, ProfileError> {
     let tx = conn.transaction().map_err(profile_db)?;
+    // Two cards with one name cannot be told apart, so another profile's name is refused.
+    let taken: bool = tx
+        .query_row(
+            "SELECT EXISTS (SELECT 1 FROM profiles WHERE name = ?1 COLLATE NOCASE AND id != ?2)",
+            [name, id],
+            |r| r.get(0),
+        )
+        .map_err(profile_db)?;
+    if taken {
+        return Err(ProfileError::NameTaken {
+            name: name.to_owned(),
+        });
+    }
     let slots = [
         (
             &HUD_SLOT,
@@ -1036,7 +1049,8 @@ impl Library {
     }
 
     /// Creates a profile from a draft, with a new id; `Keep` slots are left empty.
-    /// Fails with `EmptyName`, `InvalidWeaponScript` or `ItemNotFound` before writing.
+    /// Fails with `EmptyName`, `NameTaken` (another profile's name, any case),
+    /// `InvalidWeaponScript` or `ItemNotFound` before writing.
     pub fn create_profile(&self, draft: &ProfileDraft) -> Result<Profile, ProfileError> {
         let name = validated_name(draft)?;
         let id = new_id();

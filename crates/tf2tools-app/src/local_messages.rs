@@ -413,6 +413,10 @@ pub fn describe_profile(err: &ProfileError) -> LocalFailure {
     let message = match err {
         ProfileError::NotFound { .. } => PROFILE_GONE,
         ProfileError::EmptyName => "Give the profile a name, then try again.",
+        ProfileError::NameTaken { name } => {
+            let message = crate::pages::profiles::model::taken_message(name);
+            return LocalFailure::new(message, err.to_string());
+        }
         ProfileError::ItemNotFound { .. } => {
             "An item you picked is no longer in your library. Pick another one, then try again."
         }

@@ -728,6 +728,8 @@ pub const PROFILES_SAVE_DIALOG: &str = "profiles-save-dialog";
 pub const PROFILES_SAVE_DESCRIPTION: &str = "profiles-save-description";
 /// The Save Current dialog's name input.
 pub const PROFILES_SAVE_NAME: &str = "profiles-save-name";
+/// The Save Current dialog's line saying another profile has the typed name.
+pub const PROFILES_SAVE_TAKEN: &str = "profiles-save-taken";
 /// The Save Current dialog's Cancel button.
 pub const PROFILES_SAVE_CANCEL: &str = "profiles-save-cancel";
 /// The Save Current dialog's Save button.
@@ -781,6 +783,8 @@ pub const WIZARD_CANCEL: &str = "wizard-cancel";
 pub const WIZARD_BACK: &str = "wizard-back";
 /// The footer's Next button, replaced by Save on the last step.
 pub const WIZARD_NEXT: &str = "wizard-next";
+/// The name step's line saying another profile has the typed name.
+pub const WIZARD_NAME_TAKEN: &str = "wizard-name-taken";
 /// "Create Profile" or "Save Changes".
 pub const WIZARD_SAVE: &str = "wizard-save";
 

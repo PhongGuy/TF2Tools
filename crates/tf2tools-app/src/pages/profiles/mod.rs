@@ -142,6 +142,11 @@ impl ProfilesPage {
         self.grid.scroll_handle().0.borrow().base_handle.clone()
     }
 
+    /// The name of the loaded profile, other than `except`, that already has `name` (any case).
+    pub fn taken_name(&self, name: &str, except: Option<&ProfileId>) -> Option<String> {
+        model::taken_by(&self.profiles, name, except).map(|p| p.name().to_owned())
+    }
+
     /// The Save Current dialog's name field.
     pub fn save_name_input(&self) -> &Entity<InputState> {
         &self.save_name
@@ -339,7 +344,11 @@ impl ProfilesPage {
         window.defer(cx, move |window, cx| {
             let frame = DialogFrame::new(DIALOG_WIDTH);
             window.open_dialog(cx, move |dialog, window, cx| {
-                let blank = input.read(cx).value().trim().is_empty();
+                let typed = input.read(cx).value();
+                let blank = typed.trim().is_empty();
+                let taken = page
+                    .upgrade()
+                    .and_then(|p| p.read(cx).taken_name(&typed, None));
                 let on_ok = {
                     let (page, input) = (page.clone(), input.clone());
                     move |_: &_, _: &mut Window, cx: &mut App| submit_save(&page, &input, cx)
@@ -387,7 +396,14 @@ impl ProfilesPage {
                                             .id(ids::PROFILES_SAVE_NAME)
                                             .test_support()
                                             .child(Input::new(&input)),
-                                    ),
+                                    )
+                                    .children(taken.as_deref().map(|name| {
+                                        labelled(
+                                            div().text_sm().text_color(cx.theme().danger),
+                                            ids::PROFILES_SAVE_TAKEN,
+                                            model::taken_message(name),
+                                        )
+                                    })),
                             )
                             .child(
                                 h_flex()
@@ -403,7 +419,7 @@ impl ProfilesPage {
                                         Button::new(ids::PROFILES_SAVE_OK)
                                             .primary()
                                             .label("Save Profile")
-                                            .disabled(blank)
+                                            .disabled(blank || taken.is_some())
                                             .on_click(ok),
                                     ),
                             ),
@@ -810,10 +826,14 @@ fn missing_row(ix: usize, item: &MissingItem, cx: &App) -> AnyElement {
         .into_any_element()
 }
 
-// The Save Current dialog's OK: false (dialog stays open) for a blank name, else starts the save.
+// The Save Current dialog's OK: false (dialog stays open) for a blank or taken name, else
+// starts the save.
 fn submit_save(page: &WeakEntity<ProfilesPage>, input: &Entity<InputState>, cx: &mut App) -> bool {
     let name = input.read(cx).value().trim().to_owned();
-    if name.is_empty() {
+    let taken = page
+        .upgrade()
+        .is_some_and(|p| p.read(cx).taken_name(&name, None).is_some());
+    if name.is_empty() || taken {
         return false;
     }
     let _ = page.update(cx, |page, cx| page.save_current(name, cx));

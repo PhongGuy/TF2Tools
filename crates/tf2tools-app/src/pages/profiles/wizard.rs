@@ -23,6 +23,7 @@ use tf2tools_core::{
 };
 
 use super::ProfilesPage;
+use super::model as profiles_model;
 use super::wizard_model::{self as model, CrosshairMode, CustomCrosshair, SlotOption, WizardStep};
 use crate::activity;
 use crate::audio::player::{NowPlaying, Player};
@@ -265,7 +266,18 @@ impl ProfileWizard {
     }
 
     fn can_proceed(&self, cx: &App) -> bool {
-        model::can_proceed(&self.name.read(cx).value())
+        model::can_proceed(&self.name.read(cx).value()) && self.taken_name(cx).is_none()
+    }
+
+    // The other profile already holding the typed name, read from the page's loaded list.
+    fn taken_name(&self, cx: &App) -> Option<String> {
+        let except = match &self.kind {
+            WizardMode::Edit(id) => Some(id),
+            WizardMode::Create => None,
+        };
+        let page = self.page.upgrade()?;
+        page.read(cx)
+            .taken_name(&self.name.read(cx).value(), except)
     }
 
     // Reads the libraries (and the edited profile) off the UI thread, then fills the selects
@@ -639,15 +651,25 @@ impl ProfileWizard {
         row
     }
 
-    fn name_step(&self) -> AnyElement {
-        field(
-            "Profile Name",
-            div()
-                .id(ids::WIZARD_NAME)
-                .test_support()
-                .child(Input::new(&self.name).disabled(self.saving)),
-        )
-        .into_any_element()
+    fn name_step(&self, cx: &App) -> AnyElement {
+        let taken = self.taken_name(cx).map(|name| {
+            labelled(
+                div().text_sm().text_color(cx.theme().danger),
+                ids::WIZARD_NAME_TAKEN,
+                profiles_model::taken_message(&name),
+            )
+        });
+        v_flex()
+            .gap_2()
+            .child(field(
+                "Profile Name",
+                div()
+                    .id(ids::WIZARD_NAME)
+                    .test_support()
+                    .child(Input::new(&self.name).disabled(self.saving)),
+            ))
+            .children(taken)
+            .into_any_element()
     }
 
     fn hud_step(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -879,7 +901,7 @@ impl Render for ProfileWizard {
         let muted = cx.theme().muted_foreground;
         let editing = self.editing();
         let body = match self.step {
-            WizardStep::Name => self.name_step(),
+            WizardStep::Name => self.name_step(cx),
             WizardStep::Hud => self.hud_step(cx),
             WizardStep::Sounds => self.sounds_step(cx),
             WizardStep::Crosshairs => self.crosshairs_step(cx),

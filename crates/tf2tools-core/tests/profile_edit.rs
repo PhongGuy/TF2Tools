@@ -249,6 +249,31 @@ fn updating_an_unknown_profile_is_not_found() {
     ));
 }
 
+// Another profile's name, in any case, is refused on create and rename; a profile keeps its
+// own name, or changes only its case, freely.
+#[test]
+fn a_name_another_profile_has_is_refused() {
+    let env = library_env();
+    let comp = env
+        .lib
+        .create_profile(&ProfileDraft::new("Competitive"))
+        .unwrap();
+    let pub_ = env.lib.create_profile(&ProfileDraft::new("Pubs")).unwrap();
+    let taken = |r: Result<_, ProfileError>| matches!(r, Err(ProfileError::NameTaken { name }) if name == "competitive");
+    assert!(taken(
+        env.lib.create_profile(&ProfileDraft::new(" competitive "))
+    ));
+    assert!(taken(
+        env.lib
+            .update_profile(pub_.id(), &ProfileDraft::new("competitive"))
+            .map(|u| u.profile().clone())
+    ));
+    env.lib
+        .update_profile(comp.id(), &ProfileDraft::new("COMPETITIVE"))
+        .unwrap();
+    assert_eq!(env.lib.profiles().unwrap().len(), 2);
+}
+
 #[test]
 fn profiles_are_listed_by_name() {
     let env = library_env();

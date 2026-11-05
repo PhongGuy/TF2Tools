@@ -412,6 +412,27 @@ fn a_blank_name_cannot_be_saved(cx: &mut TestAppContext) {
     assert!(support::log_rows(&s.services).is_empty());
 }
 
+// A name another profile has, in any case, keeps the dialog open and says why.
+#[gpui_kit::test]
+fn a_taken_name_cannot_be_saved(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    empty_profile(&s, "Competitive");
+    let page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::PROFILES_SAVE_CURRENT);
+    type_name(cx, &s, &page, " competitive ");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILES_SAVE_TAKEN).as_deref(),
+        Some("You already have a profile called Competitive. Pick another name.")
+    );
+    support::click_id(cx, s.win, ids::PROFILES_SAVE_OK);
+    support::settle(cx, s.win);
+    assert!(support::present(cx, s.win, ids::PROFILES_SAVE_DIALOG));
+    assert_eq!(s.services.library.profiles().unwrap().len(), 1);
+    type_name(cx, &s, &page, "Competitive 2");
+    assert!(!support::present(cx, s.win, ids::PROFILES_SAVE_TAKEN));
+}
+
 #[gpui_kit::test]
 fn save_current_rests_without_tf2(cx: &mut TestAppContext) {
     let env = support::env();
