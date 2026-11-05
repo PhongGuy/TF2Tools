@@ -57,6 +57,8 @@ pub struct Shell {
     collapsed: bool,
     focus: FocusHandle,
     huds: Option<Entity<HudsPage>>,
+    /// The HUDs search the player left, which the rebuilt page starts from.
+    huds_search: String,
     /// The HUD list startup read beside the services, kept for the first HUDs page only.
     preloaded_huds: Option<Vec<HudEntry>>,
     /// The hub observation and failure-toast subscription, while a hub is installed.
@@ -153,6 +155,7 @@ impl Shell {
             collapsed,
             focus,
             huds: None,
+            huds_search: String::new(),
             preloaded_huds: huds,
             _hub_subscriptions: hub_subscriptions,
             _update_subscriptions: update_subscriptions,
@@ -180,7 +183,7 @@ impl Shell {
     }
 
     // Leaving a library page or a maker drops it, so the next visit builds it fresh from the
-    // saved state. The stores, the Activity Log and Settings are kept, hidden, so a return finds
+    // saved state; only the HUDs search text is carried over. The stores, the Activity Log and Settings are kept, hidden, so a return finds
     // their tab, search, filters, sort, scroll and unsaved edits as left. Re-selecting the
     // current page keeps it as it is. A playing sound plays on; the idle player shows only on
     // the sound pages, and toasts rise above it while it shows.
@@ -192,7 +195,9 @@ impl Shell {
         self.page = page;
         recheck_tf2(cx);
         leave::forget_maker(cx);
-        self.huds = None;
+        if let Some(huds) = self.huds.take() {
+            self.huds_search = huds.read(cx).search_input().read(cx).value().to_string();
+        }
         self.sounds = None;
         self.crosshairs = None;
         self.crosshair_maker = None;
@@ -369,12 +374,16 @@ impl Render for Shell {
         let body = match self.page {
             // Edit in HUD Maker and the TF2 notice ask by event; subscriptions die with the page.
             Page::Huds => {
-                let preloaded = &mut self.preloaded_huds;
+                let (preloaded, search) = (&mut self.preloaded_huds, &self.huds_search);
                 self.huds
                     .get_or_insert_with(|| {
-                        let page = cx.new(|cx| match preloaded.take() {
-                            Some(huds) => HudsPage::with_library(huds, window, cx),
-                            None => HudsPage::new(window, cx),
+                        let page = cx.new(|cx| {
+                            let mut page = match preloaded.take() {
+                                Some(huds) => HudsPage::with_library(huds, window, cx),
+                                None => HudsPage::new(window, cx),
+                            };
+                            page.set_search(search, window, cx);
+                            page
                         });
                         cx.subscribe(&page, |shell, _, edit: &EditInHudMaker, cx| {
                             shell.edit_hud(edit.0.clone(), cx)

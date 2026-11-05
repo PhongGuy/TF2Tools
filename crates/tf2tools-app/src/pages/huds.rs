@@ -237,6 +237,14 @@ impl HudsPage {
         &self.search
     }
 
+    /// Puts `text` in the search box, as the shell does for a rebuilt page; empty leaves it blank.
+    pub fn set_search(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if !text.is_empty() {
+            self.search
+                .update(cx, |st, cx| st.set_value(text.to_owned(), window, cx));
+        }
+    }
+
     // Reads the library and the tf/custom scan in the background. Any error toast goes through
     // the stored window handle, so a page dropped mid-load is harmless.
     fn reload(&mut self, cx: &mut Context<Self>) {
