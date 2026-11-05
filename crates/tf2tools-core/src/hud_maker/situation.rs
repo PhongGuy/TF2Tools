@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use super::{Fired, HudModel, PartKey};
+use super::{Fired, HudModel, Part, PartKey, Rgba};
 use crate::weapons::TfClass;
 
 /// The health element, where the game starts the health pulses.
@@ -14,6 +14,11 @@ const AMMO_PANEL: &str = "HudWeaponAmmo";
 const CHARGE_PANEL: &str = "HudMedicCharge";
 /// The share of max health under which the dying pulse runs when the HUD sets none.
 pub(super) const DEATH_WARNING: f32 = 0.49;
+/// The health pulse image, which the health element sizes and colours itself.
+pub(super) const PULSE_IMAGE: &str = "PlayerStatusHealthBonusImage";
+/// How far the pulse image grows on each side at its fullest when the HUD sets no
+/// `HealthBonusPosAdj`.
+const PULSE_POS_ADJ: f32 = 25.;
 /// Below this ammo percent the low ammo pulse runs.
 const LOW_AMMO: u8 = 40;
 
@@ -183,6 +188,48 @@ impl GameSituation {
 
     fn dying_under(&self, warning: f32) -> bool {
         f32::from(self.health) < f32::from(self.max_health()) * warning
+    }
+
+    /// Whether `part` is the health element's pulse image, which the game sizes and colours.
+    pub(super) fn is_pulse_image(part: &Part) -> bool {
+        part.name().eq_ignore_ascii_case(PULSE_IMAGE)
+            && part.parent() == Some(&PartKey::new(HEALTH_PANEL))
+    }
+
+    /// How many pixels the game grows the pulse image by on each side in `model`.
+    /// `CTFHudPlayerHealth::SetHealth`: adj = round(share * HealthBonusPosAdj), where share is
+    /// the overheal over the cap's room (at most 1) or how far under the dying line health is.
+    pub(super) fn health_pulse_grow(&self, model: &HudModel) -> i32 {
+        let panel = model.part(&PartKey::new(HEALTH_PANEL));
+        let pos_adj = (panel.and_then(|p| p.value("HealthBonusPosAdj")))
+            .map_or(PULSE_POS_ADJ, |l| {
+                super::expr::atoi(l.text().as_bytes()) as f32
+            });
+        let (health, max) = (f32::from(self.health), f32::from(self.max_health()));
+        let warning = death_warning(model, &PartKey::new(HEALTH_PANEL));
+        let share = if self.health > self.max_health() {
+            let room = f32::from(self.overheal_cap()) - max;
+            ((health - max) / room).min(1.)
+        } else if self.dying_under(warning) {
+            (max * warning - health) / (max * warning)
+        } else {
+            return 0;
+        };
+        // RoundFloatToInt converts in the default rounding mode, which breaks ties to even.
+        (share * pos_adj).round_ties_even() as i32
+    }
+
+    /// The colour the game draws the pulse image in: `HealthDeathWarningColor` (default the
+    /// scheme's `HUDDeathWarning`) while dying, else plain white.
+    pub(super) fn pulse_colour(&self, model: &HudModel) -> Rgba {
+        let health = PartKey::new(HEALTH_PANEL);
+        if self.health > self.max_health() || !self.dying_under(death_warning(model, &health)) {
+            return Rgba::WHITE;
+        }
+        let colour = (model.part(&health))
+            .and_then(|p| p.value("HealthDeathWarningColor"))
+            .map_or("HUDDeathWarning", |l| l.text().trim());
+        model.scheme().colour(colour)
     }
 
     /// The events the game fires at this moment, in order: health, ammo, Medic charge, hit.

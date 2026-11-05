@@ -46,6 +46,7 @@ mod snap;
 mod snapshot;
 mod starting;
 mod text_wrap;
+mod tint;
 mod vision;
 
 pub use animations::{
@@ -112,4 +113,5 @@ pub use snap::{Guide, GuideAxis, Snap};
 pub(crate) use snapshot::SnapshotFile;
 pub use starting::StartingPoint;
 pub use text_wrap::{wrap_lines, wrapped_text_left};
+pub use tint::tint_pixels;
 pub use vision::{Backdrop, MIN_CONTRAST, Vision, contrast_ratio, relative_luminance};

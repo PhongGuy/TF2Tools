@@ -69,7 +69,7 @@ pub use hud_maker::{
     SizeExpr, SizeForm, Snap, StartingPoint, SwitchAction, Switched, Team, TermOp, ValueMap,
     Vision, check_hud_path, contrast_ratio, drawn_image, font_families, font_family, font_tall_px,
     image_cells, nine_slice, normalise_game_path, rank_medal, rank_pieces, relative_luminance,
-    scene_image, stand_in_families,
+    scene_image, stand_in_families, tint_pixels,
 };
 pub use hud_maker::{
     AnimCommand, AnimEvent, AnimFrame, AnimScript, Animated, Fired, GAME_TRIGGERS, GameSituation,
