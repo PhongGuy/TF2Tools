@@ -1591,6 +1591,12 @@ impl HudMakerPage {
         let (size, outline, shadow) = variant.map_or((None, false, false), |f| {
             (Some(f.tall()), f.outline(), f.dropshadow())
         });
+        // A font the maker made for this part has a made-up name, so the line names it by what
+        // the player chose: its family and size.
+        let current = match (starts_with_ignoring_case(&current, CLONE_PREFIX), size) {
+            (true, Some(size)) => format!("{family}, size {size} (this part only)"),
+            _ => current,
+        };
         let open = self
             .open_font_list()
             .filter(|(at, _)| *at == key)
@@ -1716,7 +1722,7 @@ impl HudMakerPage {
                         }),
                 )
         };
-        // The font's name has a line of its own, since a clone's name is long; its family sits
+        // The font's name has a line of its own, since an edited font's line is long; its family sits
         // beside the list buttons below it.
         v_flex()
             .gap_1()

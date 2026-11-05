@@ -453,6 +453,33 @@ fn a_family_comes_from_the_huds_fonts(cx: &mut TestAppContext) {
     assert_eq!(family.as_deref(), Some("TF2 Build"));
 }
 
+/// What the Font line shows for a font the part owns: its family and size, never the made-up
+/// scheme name.
+fn plain_font_line(cx: &mut TestAppContext, page: &Entity<HudMakerPage>, font: &str) -> String {
+    cx.update(|cx| {
+        let e = page.read(cx).editor().unwrap();
+        let f = e.model().scheme().font(font, e.screen().tall()).unwrap();
+        format!("{}, size {} (this part only)", f.family(), f.tall())
+    })
+}
+
+#[gpui_kit::test]
+fn an_edited_font_shows_its_family_and_size_not_a_made_up_name(cx: &mut TestAppContext) {
+    let (_env, s, page) = opened(cx);
+    click_row(cx, &s, HV);
+    click_in_panel(cx, &s, ids::hud_maker_font_size("font"));
+    commit(cx, &s, &page, Field::FontSize, "24");
+    let font = value(cx, &page, HV, "font").unwrap();
+    assert!(font.starts_with("TF2Tools_"), "the part got its own font");
+    let line = support::label_of(cx, s.win, ids::hud_maker_font("font")).unwrap();
+    assert!(
+        !line.contains("TF2Tools"),
+        "{line:?} shows the made-up name"
+    );
+    assert_eq!(line, plain_font_line(cx, &page, &font));
+    assert!(line.contains("size 24"), "{line:?}");
+}
+
 #[gpui_kit::test]
 fn the_font_name_gets_the_whole_row(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx);
@@ -460,9 +487,10 @@ fn the_font_name_gets_the_whole_row(cx: &mut TestAppContext) {
     click_in_panel(cx, &s, ids::hud_maker_font_family_list("font"));
     support::click_id(cx, s.win, ids::hud_maker_font_family("TF2 Build"));
     let font = value(cx, &page, HV, "font").unwrap();
+    assert!(font.starts_with("TF2Tools_"), "the part got its own font");
     assert_eq!(
         support::label_of(cx, s.win, ids::hud_maker_font("font")).as_deref(),
-        Some(font.as_str())
+        Some(plain_font_line(cx, &page, &font).as_str())
     );
     scroll_panel_to(cx, &s, ids::hud_maker_font_add("font"));
     let name = support::bounds_of(cx, s.win, ids::hud_maker_font("font")).unwrap();
