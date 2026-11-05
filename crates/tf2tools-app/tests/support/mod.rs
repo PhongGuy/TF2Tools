@@ -835,6 +835,16 @@ impl StoreServer {
         });
     }
 
+    /// GameBanana Mod `gb_id` answers its listing with a 404 after `delay`.
+    pub fn mount_gb_missing(&self, gb_id: u64, delay: Duration) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(format!("/apiv11/Mod/{gb_id}")))
+                .respond_with(ResponseTemplate::new(404).set_delay(delay))
+                .mount(&self.server),
+        );
+    }
+
     /// GameBanana Sound `gb_id` listing `files` (name, body); file i is served at `/dl/{gb_id}/{i}` after `delay`.
     pub fn mount_sound_files(&self, gb_id: u64, files: &[(&str, Vec<u8>)], delay: Duration) {
         let uri = self.uri();

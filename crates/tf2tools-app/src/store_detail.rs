@@ -23,14 +23,15 @@ use crate::shell::toast::{ToastKind, toast};
 use crate::store_download::{
     DownloadEvent, DownloadTarget, StoreDownloads, format_bytes, progress_label, progress_percent,
 };
-use crate::store_messages::{
-    DETAILS_FAILED_TITLE, FILES_FAILED_TITLE, describe_files, listing_stopped, read_failed,
-};
+use crate::store_messages::{DETAILS_FAILED_TITLE, describe_files, listing_stopped, read_failed};
 use crate::tokio_bridge;
 use crate::widgets::carousel::Carousel;
 use crate::widgets::dialog_frame::{BOX_CHROME, DETAIL_WIDTH, DIALOG_WIDTH, DialogFrame};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_beside;
+
+// A failed listing's height: one 22.5 px line of message, the 8 px gap and the 32 px Retry.
+const FILES_STATUS_HEIGHT: Pixels = px(62.5);
 
 /// The item a detail dialog is about, as the card that opened it knows it.
 #[derive(Clone, Debug, PartialEq)]
@@ -270,21 +271,10 @@ impl StoreDetail {
 
     fn files_loaded(&mut self, result: Result<Vec<StoreFile>, String>, cx: &mut Context<Self>) {
         self.files_task = None;
+        // A failure shows only inline with Retry: a toast would repeat it, or speak for a closed dialog.
         self.files = match result {
             Ok(files) => FilesState::Ready(files),
-            Err(message) => {
-                let description = message.clone();
-                let _ = self.win.update(cx, |_, window, cx| {
-                    toast(
-                        window,
-                        cx,
-                        ToastKind::Error,
-                        FILES_FAILED_TITLE,
-                        description,
-                    )
-                });
-                FilesState::Failed(message)
-            }
+            Err(message) => FilesState::Failed(message),
         };
         cx.notify();
     }
@@ -345,7 +335,9 @@ impl StoreDetail {
     fn files_section(&self, busy: bool, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
         match &self.files {
+            // Held at the failure's height, one line and the Retry button, so the dialog keeps still.
             FilesState::Loading => div()
+                .min_h(FILES_STATUS_HEIGHT)
                 .text_sm()
                 .text_color(muted)
                 .child("Loading files...")

@@ -121,7 +121,10 @@ fn a_click_on_a_failure_toast_leaves_the_detail_open(cx: &mut TestAppContext) {
         cx,
         &env,
         &server,
-        |env| support::seed_gb_huds(env, &[(9, "Gone")]),
+        |env| {
+            support::seed_gb_huds(env, &[(9, "Gone")]);
+            support::rename_table(env, "store_huds_gb", "store_huds_gb_hidden");
+        },
         |_, _| support::Blank,
     );
     let _d = detail(cx, win, item(GB, gb(9), "Gone", false), false);
@@ -130,8 +133,9 @@ fn a_click_on_a_failure_toast_leaves_the_detail_open(cx: &mut TestAppContext) {
     assert!(support::present(cx, win, ids::STORE_DETAIL));
 }
 
+// The dialog already shows a failed listing inline with Retry, so a toast would say it twice.
 #[gpui_kit::test]
-fn a_failed_listing_shows_inline_toasts_and_retries(cx: &mut TestAppContext) {
+fn a_failed_listing_shows_inline_only_and_retries(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     let (win, _) = support::store_window(
@@ -141,21 +145,29 @@ fn a_failed_listing_shows_inline_toasts_and_retries(cx: &mut TestAppContext) {
         |env| support::seed_gb_huds(env, &[(9, "Gone")]),
         |_, _| support::Blank,
     );
-    let _d = detail(cx, win, item(GB, gb(9), "Gone", false), false);
+    let d = detail(cx, win, item(GB, gb(9), "Gone", false), false);
     support::wait_real(cx, "the inline error", |cx| {
         support::present(cx, win, ids::STORE_FILES_ERROR)
     });
-    support::wait_real(cx, "the toast", |cx| support::present(cx, win, ids::TOAST));
-    let toast = support::label_of(cx, win, ids::TOAST).unwrap();
-    assert!(toast.starts_with("Failed to load files. "), "{toast}");
-    assert!(
-        !toast.to_lowercase().contains("download"),
-        "opening a detail downloads nothing: {toast}"
-    );
     let inline = support::label_of(cx, win, ids::STORE_FILES_ERROR).unwrap();
     support::assert_plain(&inline);
     assert!(inline.contains("GameBanana"), "{inline}");
-    assert_eq!(toast, format!("Failed to load files. {inline}"));
+    assert!(
+        !inline.to_lowercase().contains("download"),
+        "opening a detail downloads nothing: {inline}"
+    );
+    assert!(support::present(cx, win, ids::STORE_FILES_RETRY));
+    assert_eq!(support::toast_labels(cx, win), Vec::<String>::new());
+    // A retry that fails again still shows the one message and no toast.
+    support::click_id(cx, win, ids::STORE_FILES_RETRY);
+    support::wait_real(cx, "the second failure", |cx| {
+        cx.update(|cx| matches!(d.read(cx).files(), FilesState::Failed(_)))
+    });
+    assert_eq!(
+        support::label_of(cx, win, ids::STORE_FILES_ERROR).as_deref(),
+        Some(inline.as_str())
+    );
+    assert_eq!(support::toast_labels(cx, win), Vec::<String>::new());
     server.mount_gb_files(
         9,
         &[("gone.zip", support::hud_zip_bytes("gone"))],
@@ -166,6 +178,55 @@ fn a_failed_listing_shows_inline_toasts_and_retries(cx: &mut TestAppContext) {
         support::present(cx, win, ids::store_file(0))
     });
     assert!(!support::present(cx, win, ids::STORE_FILES_ERROR));
+}
+
+// The test keeps the view alive past Esc, so the late failure really lands on a closed dialog.
+#[gpui_kit::test]
+fn a_listing_that_fails_after_the_dialog_closes_stays_quiet(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_gb_missing(9, Duration::from_millis(300));
+    let (win, _) = support::store_window(
+        cx,
+        &env,
+        &server,
+        |env| support::seed_gb_huds(env, &[(9, "Gone")]),
+        |_, _| support::Blank,
+    );
+    let d = detail(cx, win, item(GB, gb(9), "Gone", false), false);
+    assert!(cx.update(|cx| matches!(d.read(cx).files(), FilesState::Loading)));
+    support::press(cx, win, "escape");
+    assert!(!support::present(cx, win, ids::STORE_DETAIL));
+    support::wait_real(cx, "the late failure", |cx| {
+        cx.update(|cx| matches!(d.read(cx).files(), FilesState::Failed(_)))
+    });
+    assert_eq!(support::toast_labels(cx, win), Vec::<String>::new());
+}
+
+#[gpui_kit::test]
+fn the_detail_keeps_its_height_when_the_listing_fails(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_gb_missing(9, Duration::from_millis(300));
+    let (win, _) = support::store_window(
+        cx,
+        &env,
+        &server,
+        |env| support::seed_gb_huds(env, &[(9, "Gone")]),
+        |_, _| support::Blank,
+    );
+    let d = detail(cx, win, item(GB, gb(9), "Gone", false), false);
+    let loading = bounds(cx, win, ids::STORE_DETAIL);
+    assert!(cx.update(|cx| matches!(d.read(cx).files(), FilesState::Loading)));
+    support::wait_real(cx, "the inline error", |cx| {
+        support::present(cx, win, ids::STORE_FILES_ERROR)
+    });
+    let failed = bounds(cx, win, ids::STORE_DETAIL);
+    assert_eq!(
+        loading.size.height, failed.size.height,
+        "{loading:?} -> {failed:?}"
+    );
+    assert_eq!(loading.origin.y, failed.origin.y);
 }
 
 #[gpui_kit::test]
