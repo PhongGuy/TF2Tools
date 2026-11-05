@@ -12,6 +12,9 @@ pub mod route;
 mod sidebar;
 pub mod toast;
 
+pub use header::ring_icon;
+pub use sidebar::icon as nav_icon;
+
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
     AppContext as _, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement,
