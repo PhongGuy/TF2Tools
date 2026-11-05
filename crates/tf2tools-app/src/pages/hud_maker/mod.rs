@@ -138,10 +138,11 @@ const PARTS_MIN_ROWS: f32 = 3.;
 // The narrowest toolbar that holds the screen menu, Undo, Redo and the name on one row, so the
 // whole bar fits two rows; narrower, the save row moves into More.
 const TOOLBAR_TWO_ROWS: Pixels = px(380.);
-// Estimates for the scene tab row: pixels per label letter, per tab, and kept for the note.
+// Estimates for the scene tab row: pixels per label letter and per tab, and the least kept for
+// the note, which cuts itself short rather than push the tabs into a menu.
 const SCENE_TAB_LETTER: f32 = 7.5;
 const SCENE_TAB_PAD: f32 = 28.;
-const SCENE_NOTE_ROOM: f32 = 160.;
+const SCENE_NOTE_ROOM: f32 = 40.;
 // The match mode dropdown beside the Scoreboard tab: its longest label, icon and padding.
 const BOARD_MODE_WIDTH: f32 = 150.;
 // The Minimal HUD chip off the HUD tab: its label, padding and gap.
@@ -196,8 +197,8 @@ impl PanelState {
 // area's size, the list's size and the screen's box.
 struct PartsSpot {
     at: Point<Pixels>,
-    // The scene whose drawn parts the spot was last judged against.
-    scene: Scene,
+    // Whether the spot was judged against the parts its scene painted, not a stale frame's.
+    painted: bool,
     weighed: Weighed,
 }
 
@@ -2381,10 +2382,11 @@ impl HudMakerPage {
             .chain(std::iter::once(toolbar))
             .collect();
         // The part list keeps its spot while it stays off the killfeed, the chat and the other
-        // panels; covering the selection is settling's to handle, and covering other parts is not
-        // reason enough to move. Otherwise it moves to the nearest spot covering the least of
-        // what the canvas draws, selection included so the selection never draws it in. A new
-        // area, screen or list size weighs it afresh from the player's place.
+        // panels, across tab switches too; covering the selection is settling's to handle, and
+        // covering other parts is not reason enough to move. Otherwise it moves to the nearest
+        // spot covering the least of what the canvas draws, selection included so the selection
+        // never draws it in. A new area, screen or list size weighs it afresh from the player's
+        // place.
         let homes: Vec<Point<Pixels>> = things.iter().map(|t| t.home.origin).collect();
         let to_area = |b: &Bounds<Pixels>| Bounds::new(b.origin - area.origin, b.size);
         let killfeed = self.killfeed_band().map(|b| to_area(&b));
@@ -2434,7 +2436,7 @@ impl HudMakerPage {
             let dragging = self.panels[Panel::Parts as usize].drag.is_some();
             let kept = (self.parts_spot.as_ref())
                 .filter(|kept| !dragging && kept.weighed == weighed && fits(kept.at))
-                .map(|kept| (kept.at, kept.scene));
+                .map(|kept| (kept.at, kept.painted));
             let from = kept.map_or(thing.home.origin, |(at, _)| at);
             let least = || {
                 view::least_covering(
@@ -2447,53 +2449,21 @@ impl HudMakerPage {
                     area.size,
                 )
             };
-            let covered = |at: Point<Pixels>| -> f32 {
-                let b = boxed(at);
-                drawn
-                    .iter()
-                    .map(|d| {
-                        let o = b.intersect(d);
-                        f32::from(o.size.width).max(0.) * f32::from(o.size.height).max(0.)
-                    })
-                    .sum()
-            };
             // The parts drawn belong to this scene once the canvas has painted it.
             let painted = self.drawn_scene.get() == Some(scene);
+            // A tab switch alone never moves the list. An answer given before the scene painted
+            // is weighed again once it has.
             let (at, judged) = match kept {
-                // Answers given before the scene paints are weighed again after it does.
-                Some((at, was)) if in_way(at) => (least(), if painted { scene } else { was }),
-                // A switch to another scene: the spot stays only where it covers no more of the
-                // new scene's parts than the least-covering spot does. Until that scene paints,
-                // the spot stays unjudged.
-                Some((at, was)) if was != scene => {
-                    if !painted {
-                        (at, was)
-                    } else {
-                        let best = least();
-                        let spot = if covered(at) <= covered(best) {
-                            at
-                        } else {
-                            best
-                        };
-                        (spot, scene)
-                    }
-                }
+                Some((at, was)) if in_way(at) || (!was && painted) => (least(), painted),
                 Some((at, was)) => (at, was),
-                None => (
-                    least(),
-                    if painted {
-                        scene
-                    } else {
-                        self.drawn_scene.get().unwrap_or(scene)
-                    },
-                ),
+                None => (least(), painted),
             };
             things[i].home.origin = at;
             things[i].avoid = [killfeed, chat];
             // A list the player drags settles afresh from where it is dropped.
             self.parts_spot = (!dragging).then(|| PartsSpot {
                 at: things[i].home.origin,
-                scene: judged,
+                painted: judged,
                 weighed,
             });
             search = (!dragging).then_some((i, drawn, screen, keep_off));
@@ -3582,8 +3552,8 @@ impl HudMakerPage {
     }
 
     // Whether every scene tab fits the strip with room left for the note. It estimates the row
-    // from the labels and reads only the area, so it cannot oscillate; before the first layout
-    // it says yes.
+    // from the labels and reads only the area and the Minimal HUD switch, never the scene, so
+    // the strip keeps one layout per width; before the first layout it says yes.
     fn scene_tabs_fit(&self) -> bool {
         let width = f32::from(self.area.get().size.width);
         let letters: usize = Scene::ALL
@@ -3591,19 +3561,13 @@ impl HudMakerPage {
             .map(|&s| SceneRule::get(s).label().chars().count())
             .sum();
         let row = letters as f32 * SCENE_TAB_LETTER + Scene::ALL.len() as f32 * SCENE_TAB_PAD;
-        // The mode dropdown stays on the Scoreboard tab, so the tabs give up room for it first.
-        // The situation menu on the HUD tab takes room from the note, which cuts itself short.
-        let modes = if self.scene() == Some(Scene::Scoreboard) {
-            BOARD_MODE_WIDTH
-        } else {
-            0.
-        };
-        // The Minimal HUD chip shows off the HUD tab while the switch is on.
-        let chip = match self.minmode && self.scene() != Some(Scene::Hud) {
+        // Room for the widest extras any scene adds, the Scoreboard's mode dropdown and the
+        // Minimal HUD chip; the HUD tab's situation menu takes room from the note instead.
+        let chip = match self.minmode {
             true => MINMODE_CHIP_WIDTH,
             false => 0.,
         };
-        width <= 0. || row + modes + chip + SCENE_NOTE_ROOM <= width
+        width <= 0. || row + BOARD_MODE_WIDTH + chip + SCENE_NOTE_ROOM <= width
     }
 
     // One button named for the open mode; its menu lists the three modes and a pick switches.
@@ -3715,8 +3679,9 @@ impl HudMakerPage {
         self.columns_area().size.width - TOOLBAR_GAP * 2. < TOOLBAR_TWO_ROWS
     }
 
-    // The screen shape menu, then Undo and Redo, the name and save row, the overflow menu and
-    // the button that collapses the toolbar.
+    // The screen shape menu, then Undo and Redo, the name and save row and the overflow menu,
+    // which wrap among themselves; the button that collapses the toolbar sits outside the wrap,
+    // so it always closes the first row.
     fn toolbar(&self, screen: Screen, cx: &mut Context<Self>) -> AnyElement {
         let (can_undo, can_redo) = self
             .editor()
@@ -3758,7 +3723,9 @@ impl HudMakerPage {
             .tooltip("Hide toolbar")
             .accessibility_label("Hide toolbar")
             .on_click(cx.listener(|page, _, _, cx| page.set_toolbar_collapsed(true, cx)));
-        h_flex()
+        let body = h_flex()
+            .flex_1()
+            .min_w_0()
             .flex_wrap()
             .items_start()
             .gap_2()
@@ -3771,8 +3738,12 @@ impl HudMakerPage {
                     .flatten(),
             )
             .child(self.more_menu(cx))
-            .child(collapse)
-            .children(self.live_note_row(cx))
+            .children(self.live_note_row(cx));
+        h_flex()
+            .items_start()
+            .gap_2()
+            .child(body)
+            .child(collapse.flex_none())
             .into_any_element()
     }
 
