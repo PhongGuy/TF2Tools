@@ -384,7 +384,7 @@ impl Render for AddonsPage {
         let warning = missing.then(|| {
             no_tf2_warning(
                 ids::ADDONS_NO_TF2,
-                "Configure your TF2 installation path in Settings to manage addons.",
+                "Set the TF2 folder in Settings to manage addons.",
                 cx,
             )
         });

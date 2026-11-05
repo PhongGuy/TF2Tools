@@ -385,6 +385,19 @@ fn without_tf2_the_page_warns_and_shuts_installs(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn a_moved_tf2_folder_is_titled_not_found(cx: &mut TestAppContext) {
+    // A saved folder that moved away is "set", so the title must not claim it isn't.
+    let env = support::env();
+    let saved = Some(env.game.join("gone"));
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved });
+    let _page = revisit(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUDS_NO_TF2).as_deref(),
+        Some("TF2 not found")
+    );
+}
+
+#[gpui_kit::test]
 fn finding_tf2_clears_the_warning_and_opens_installs(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });

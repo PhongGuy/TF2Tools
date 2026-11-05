@@ -1267,7 +1267,7 @@ impl Render for ProfilesPage {
         let warning = missing.then(|| {
             no_tf2_warning(
                 ids::PROFILES_NO_TF2,
-                "Configure your TF2 installation path in Settings to activate profiles.",
+                "Set the TF2 folder in Settings to activate profiles.",
                 cx,
             )
         });
