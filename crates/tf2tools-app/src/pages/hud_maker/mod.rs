@@ -138,10 +138,11 @@ const PARTS_MIN_ROWS: f32 = 3.;
 // The narrowest toolbar that holds the screen menu, Undo, Redo and the name on one row, so the
 // whole bar fits two rows; narrower, the save row moves into More.
 const TOOLBAR_TWO_ROWS: Pixels = px(380.);
-// Estimates for the scene tab row: pixels per label letter, per tab, and kept for the note.
+// Estimates for the scene tab row: pixels per label letter and per tab, and the least kept for
+// the note, which cuts itself short rather than push the tabs into a menu.
 const SCENE_TAB_LETTER: f32 = 7.5;
 const SCENE_TAB_PAD: f32 = 28.;
-const SCENE_NOTE_ROOM: f32 = 160.;
+const SCENE_NOTE_ROOM: f32 = 40.;
 // The match mode dropdown beside the Scoreboard tab: its longest label, icon and padding.
 const BOARD_MODE_WIDTH: f32 = 150.;
 // The Minimal HUD chip off the HUD tab: its label, padding and gap.
@@ -3541,8 +3542,8 @@ impl HudMakerPage {
     }
 
     // Whether every scene tab fits the strip with room left for the note. It estimates the row
-    // from the labels and reads only the area, so it cannot oscillate; before the first layout
-    // it says yes.
+    // from the labels and reads only the area and the Minimal HUD switch, never the scene, so
+    // the strip keeps one layout per width; before the first layout it says yes.
     fn scene_tabs_fit(&self) -> bool {
         let width = f32::from(self.area.get().size.width);
         let letters: usize = Scene::ALL
@@ -3550,19 +3551,13 @@ impl HudMakerPage {
             .map(|&s| SceneRule::get(s).label().chars().count())
             .sum();
         let row = letters as f32 * SCENE_TAB_LETTER + Scene::ALL.len() as f32 * SCENE_TAB_PAD;
-        // The mode dropdown stays on the Scoreboard tab, so the tabs give up room for it first.
-        // The situation menu on the HUD tab takes room from the note, which cuts itself short.
-        let modes = if self.scene() == Some(Scene::Scoreboard) {
-            BOARD_MODE_WIDTH
-        } else {
-            0.
-        };
-        // The Minimal HUD chip shows off the HUD tab while the switch is on.
-        let chip = match self.minmode && self.scene() != Some(Scene::Hud) {
+        // Room for the widest extras any scene adds, the Scoreboard's mode dropdown and the
+        // Minimal HUD chip; the HUD tab's situation menu takes room from the note instead.
+        let chip = match self.minmode {
             true => MINMODE_CHIP_WIDTH,
             false => 0.,
         };
-        width <= 0. || row + modes + chip + SCENE_NOTE_ROOM <= width
+        width <= 0. || row + BOARD_MODE_WIDTH + chip + SCENE_NOTE_ROOM <= width
     }
 
     // One button named for the open mode; its menu lists the three modes and a pick switches.
