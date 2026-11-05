@@ -430,14 +430,41 @@ fn install_lists_skipped_assignments_in_a_warning(cx: &mut TestAppContext) {
     );
 }
 
+// Sets the shared TF2 state, as Settings or a recheck would.
+fn set_tf2(cx: &mut TestAppContext, s: &support::ShellWindow, state: Tf2State) {
+    cx.update(|cx| {
+        s.tf2.update(cx, |tf2, cx| {
+            *tf2 = state;
+            cx.notify();
+        })
+    });
+    support::settle(cx, s.win);
+}
+
 #[gpui_kit::test]
-fn install_without_tf2_says_so(cx: &mut TestAppContext) {
+fn without_tf2_the_page_warns_and_shuts_installs(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     let _page = open_crosshairs(cx, &s);
-    support::click_id(cx, s.win, ids::CROSSHAIRS_INSTALL);
-    assert_eq!(toast_text(cx, &s), "TF2 path not set");
+    assert!(support::present(cx, s.win, ids::CROSSHAIRS_NO_TF2));
+    assert!(support::disabled_of(cx, s.win, ids::CROSSHAIRS_INSTALL));
+    assert!(support::disabled_of(cx, s.win, ids::CROSSHAIRS_UNINSTALL));
+    assert!(!support::disabled_of(cx, s.win, ids::CROSSHAIRS_IMPORT));
+    support::click_id(cx, s.win, ids::CROSSHAIRS_NO_TF2_SETTINGS);
+    assert!(support::present(cx, s.win, ids::page(Page::Settings)));
     assert!(!managed(&env).exists());
+}
+
+#[gpui_kit::test]
+fn finding_tf2_clears_the_warning_and_opens_installs(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let _page = open_crosshairs(cx, &s);
+    assert!(support::present(cx, s.win, ids::CROSSHAIRS_NO_TF2));
+    set_tf2(cx, &s, found(&env));
+    assert!(!support::present(cx, s.win, ids::CROSSHAIRS_NO_TF2));
+    assert!(!support::disabled_of(cx, s.win, ids::CROSSHAIRS_INSTALL));
+    assert!(!support::disabled_of(cx, s.win, ids::CROSSHAIRS_UNINSTALL));
 }
 
 #[gpui_kit::test]
@@ -459,15 +486,6 @@ fn uninstall_removes_the_folder_and_keeps_the_assignments(cx: &mut TestAppContex
     assert_eq!(toast_text(cx, &s), "Crosshairs uninstalled from TF2");
     assert!(!managed(&env).exists());
     assert_eq!(s.services.library.assignments().unwrap().len(), 1);
-}
-
-#[gpui_kit::test]
-fn uninstall_without_tf2_says_so(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
-    let _page = open_crosshairs(cx, &s);
-    support::click_id(cx, s.win, ids::CROSSHAIRS_UNINSTALL);
-    assert_eq!(toast_text(cx, &s), "TF2 path not set");
 }
 
 #[gpui_kit::test]

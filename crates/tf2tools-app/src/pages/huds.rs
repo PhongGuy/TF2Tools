@@ -26,7 +26,7 @@ use tf2tools_core::{
     Platform, Provenance, StoreItem, StoreItemId, StoreKind, Tf2Install,
 };
 
-use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame};
+use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, needs_tf2, no_tf2_notice};
 use crate::activity;
 use crate::font_check::FontCheckSession;
 use crate::ids;
@@ -38,12 +38,12 @@ use crate::local_messages::{
 use crate::pages::hud_maker::live::{Live, live_job};
 use crate::picker::PickKind;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
-use crate::services::{OpError, Services, require_tf2, run_blocking, tf2_state};
+use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::external_huds::{ExternalPlan, HudAction, check_external};
 use crate::shell::font_check::ask_about_fonts;
-use crate::shell::route::Page;
+use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, error_label, toast, toast_error};
 use crate::timing;
 use crate::widgets::Named as _;
@@ -127,6 +127,7 @@ pub struct HudsPage {
 }
 
 impl EventEmitter<EditInHudMaker> for HudsPage {}
+impl EventEmitter<NavigateTo> for HudsPage {}
 
 impl HudsPage {
     /// Needs the `Services` and `Tf2Global` globals. Starts the first load off the UI thread.
@@ -772,7 +773,12 @@ fn empty_card(cx: &App) -> AnyElement {
 }
 
 // v5's InstalledHud: the name and its badge beside Uninstall, then the folder path.
-fn installed_card(hud: Installed, busy: Option<&Busy>, cx: &mut Context<HudsPage>) -> AnyElement {
+fn installed_card(
+    hud: Installed,
+    busy: Option<&Busy>,
+    has_tf2: bool,
+    cx: &mut Context<HudsPage>,
+) -> AnyElement {
     let theme = cx.theme();
     // Managed is shadcn's borderless secondary badge; External is its outline badge.
     let (badge, border, text) = if hud.managed {
@@ -804,7 +810,7 @@ fn installed_card(hud: Installed, busy: Option<&Busy>, cx: &mut Context<HudsPage
                                 ))
                                 .child(badge_of(ids::HUDS_INSTALLED_BADGE, badge, border, text)),
                         )
-                        .child(
+                        .child(needs_tf2(
                             Button::new(ids::HUDS_UNINSTALL)
                                 .outline()
                                 .px(SM_ICON_PX)
@@ -815,7 +821,8 @@ fn installed_card(hud: Installed, busy: Option<&Busy>, cx: &mut Context<HudsPage
                                 .on_click(cx.listener(|page, _, window, cx| {
                                     page.uninstall(None, window, cx)
                                 })),
-                        ),
+                            has_tf2,
+                        )),
                 )
                 .child(labelled(
                     div().px_6().text_sm().text_color(theme.muted_foreground),
@@ -831,6 +838,7 @@ fn installed_card(hud: Installed, busy: Option<&Busy>, cx: &mut Context<HudsPage
 fn conflict_card(
     huds: Vec<(String, String)>,
     busy: Option<&Busy>,
+    has_tf2: bool,
     cx: &mut Context<HudsPage>,
 ) -> AnyElement {
     let mut rows = v_flex().px_6().gap_4();
@@ -844,6 +852,7 @@ fn conflict_card(
             .accessibility_label(format!("Uninstall {name}"))
             .loading(busy == Some(&removing))
             .disabled(busy.is_some_and(|b| *b != removing));
+        let button = needs_tf2(button, has_tf2);
         let name = labelled(
             div().min_w_0().truncate().font_weight(FontWeight::SEMIBOLD),
             ids::hud_installed_name(&folder),
@@ -1036,6 +1045,7 @@ fn hud_card(
     cx: &App,
 ) -> AnyElement {
     let theme = cx.theme();
+    let has_tf2 = tf2_state(cx).read(cx).install().is_some();
     let folder = hud.folder_name();
     let installing = busy == Some(&Busy::Install(folder.to_owned()));
     let deleting = busy == Some(&Busy::Delete(folder.to_owned()));
@@ -1182,7 +1192,7 @@ fn hud_card(
                         .disabled(busy.is_some() && !deleting)
                         .on_click(on_page(HudsPage::delete)),
                 )
-                .child(
+                .child(needs_tf2(
                     Button::new(ids::hud_install(folder))
                         .primary()
                         .px(SM_ICON_PX)
@@ -1191,7 +1201,8 @@ fn hud_card(
                         .loading(installing)
                         .disabled(busy.is_some() && !installing)
                         .on_click(on_page(HudsPage::install)),
-                ),
+                    has_tf2,
+                )),
         )
         .into_any_element()
 }
@@ -1353,13 +1364,24 @@ impl HudsPage {
 
 impl Render for HudsPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let state = tf2_state(cx).read(cx);
+        let has_tf2 = state.install().is_some();
+        let missing = matches!(state, Tf2State::Missing { .. });
         let conflicts = self.conflicts();
         let conflicted = conflicts.is_some();
         let installed = match (conflicts, self.installed()) {
-            (Some(huds), _) => conflict_card(huds, self.busy.as_ref(), cx),
-            (None, Some(hud)) => installed_card(hud, self.busy.as_ref(), cx),
+            (Some(huds), _) => conflict_card(huds, self.busy.as_ref(), has_tf2, cx),
+            (None, Some(hud)) => installed_card(hud, self.busy.as_ref(), has_tf2, cx),
             (None, None) => empty_card(cx),
         };
+        let warning = missing.then(|| {
+            no_tf2_notice(
+                ids::HUDS_NO_TF2,
+                ids::HUDS_NO_TF2_SETTINGS,
+                "Set the TF2 folder in Settings to install HUDs.",
+                cx,
+            )
+        });
         let content =
             v_flex()
                 .id(ids::page(Page::Huds))
@@ -1369,6 +1391,7 @@ impl Render for HudsPage {
                 .overflow_y_scroll()
                 .p(CONTENT_PADDING)
                 .gap_6()
+                .children(warning)
                 .child(
                     v_flex()
                         .flex_none()
