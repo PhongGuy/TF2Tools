@@ -10,7 +10,7 @@ use tf2tools_app::ids;
 use tf2tools_app::local_messages::copy_in_store_text;
 use tf2tools_app::services::{Services, Tf2State};
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::{CopyUpdate, HudEntry, Provenance, Tf2Install};
+use tf2tools_core::{CopyUpdate, GbId, HudEntry, Provenance, Tf2Install};
 
 const RAYS: &str = "rayshud-a22ede014e4f3b1260aa8fd657ff0757d9d006b8";
 
@@ -21,6 +21,15 @@ fn stock_shell(cx: &mut TestAppContext, env: &support::Env) -> support::ShellWin
         env,
         Tf2State::Found(Tf2Install::from_path(&env.game).unwrap()),
     )
+}
+
+/// A store item's provenance: only the same store item arriving again replaces its library
+/// HUD, so a base updated by a re-import needs one.
+fn store_item() -> Provenance {
+    Provenance::GameBanana {
+        gb_id: GbId::new(7),
+        author: "someone".into(),
+    }
 }
 
 fn seed_base(
@@ -54,7 +63,7 @@ fn a_copy_with_a_newer_base_offers_update_and_reports_it(cx: &mut TestAppContext
         env.tmp.path(),
         "somehud",
         "TanLight",
-        Provenance::Local,
+        store_item(),
     );
     let copy = s.services.library.copy_hud(base.id()).unwrap();
     seed_base(
@@ -62,7 +71,7 @@ fn a_copy_with_a_newer_base_offers_update_and_reports_it(cx: &mut TestAppContext
         env.tmp.path(),
         "somehud",
         "TanDark",
-        Provenance::Local,
+        store_item(),
     );
     revisit_huds(cx, &s);
     support::wait_real(cx, "the update check", |cx| {
@@ -96,7 +105,7 @@ fn updating_an_installed_copy_reinstalls_it(cx: &mut TestAppContext) {
         env.tmp.path(),
         "somehud",
         "TanLight",
-        Provenance::Local,
+        store_item(),
     );
     let copy = s.services.library.copy_hud(base.id()).unwrap();
     let tf2 = Tf2Install::from_path(&env.game).unwrap();
@@ -112,7 +121,7 @@ fn updating_an_installed_copy_reinstalls_it(cx: &mut TestAppContext) {
         env.tmp.path(),
         "somehud",
         "TanDark",
-        Provenance::Local,
+        store_item(),
     );
     revisit_huds(cx, &s);
     support::wait_real(cx, "the update check", |cx| {
@@ -171,7 +180,7 @@ fn edit_waits_while_an_update_runs(cx: &mut TestAppContext) {
         env.tmp.path(),
         "somehud",
         "TanLight",
-        Provenance::Local,
+        store_item(),
     );
     let copy = s.services.library.copy_hud(base.id()).unwrap();
     seed_base(
@@ -179,7 +188,7 @@ fn edit_waits_while_an_update_runs(cx: &mut TestAppContext) {
         env.tmp.path(),
         "somehud",
         "TanDark",
-        Provenance::Local,
+        store_item(),
     );
     revisit_huds(cx, &s);
     support::wait_real(cx, "the update check", |cx| {

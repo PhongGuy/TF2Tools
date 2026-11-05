@@ -321,6 +321,16 @@ impl StoreDownloads {
         let Some(target) = self.active.take() else {
             return;
         };
+        // A HUD that had to take a numbered name says so; anything else names the store item.
+        let added = match &result {
+            Ok(Ok(entries)) => entries.iter().find_map(|entry| match entry {
+                LibraryEntry::Hud(hud) if hud.wanted_name().is_some() => {
+                    Some(crate::pages::huds::added_message(hud))
+                }
+                _ => None,
+            }),
+            _ => None,
+        };
         let failure = match result {
             Ok(Ok(_)) => None,
             Ok(Err(err)) => Some(failure_description(target.kind, &err)),
@@ -334,7 +344,7 @@ impl StoreDownloads {
             None => (
                 ToastKind::Success,
                 format!("{} downloaded", kind_title(target.kind)),
-                format!("{} added to your library", target.name),
+                added.unwrap_or_else(|| format!("{} added to your library", target.name)),
             ),
             Some(message) => (
                 ToastKind::Error,
