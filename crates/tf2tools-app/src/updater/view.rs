@@ -15,6 +15,7 @@ use super::backend::UNAVAILABLE;
 use super::{REOPEN, UpdateState, Updater, updater};
 use crate::ids;
 use crate::shell::leave;
+use crate::widgets::Named as _;
 use crate::widgets::labelled;
 
 /// v5's banner for the installed updater, or None when it should not show.
@@ -91,6 +92,7 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
         Button::new(ids::UPDATE_BANNER_DISMISS)
             .ghost()
             .icon(IconName::X)
+            .named("Close")
             // Small draws v5's 14 px X in a 24 px button.
             .small()
             .flex_none()

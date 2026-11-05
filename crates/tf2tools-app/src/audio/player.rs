@@ -20,6 +20,7 @@ use crate::ids;
 use crate::local_messages::{describe_audio, describe_settings};
 use crate::services::{OpError, Services, run_blocking};
 use crate::shell::toast::{lift_above_player, toast_error};
+use crate::widgets::Named as _;
 use crate::widgets::labelled;
 
 /// What the floating player shows while a sound plays; `key` tells two sounds apart.
@@ -298,6 +299,7 @@ impl Render for Player {
                         .ghost()
                         .icon(IconName::Square)
                         .size(px(32.))
+                        .named("Stop")
                         .on_click(cx.listener(|player, _, _, cx| player.stop(cx))),
                 )
                 .child(

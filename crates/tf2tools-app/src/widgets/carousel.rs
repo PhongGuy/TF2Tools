@@ -12,6 +12,7 @@ use gpui_kit::{
 
 use crate::ids;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
+use crate::widgets::Named as _;
 use crate::widgets::dialog_frame::DialogFrame;
 use crate::widgets::labelled;
 
@@ -158,12 +159,14 @@ impl Render for Carousel {
                     .child(
                         Button::new(ids::CAROUSEL_PREV)
                             .icon(IconName::ChevronLeft)
+                            .named("Previous image")
                             .outline()
                             .on_click(cx.listener(|this, _, _, cx| this.prev(cx))),
                     )
                     .child(
                         Button::new(ids::CAROUSEL_NEXT)
                             .icon(IconName::ChevronRight)
+                            .named("Next image")
                             .outline()
                             .on_click(cx.listener(|this, _, _, cx| this.next(cx))),
                     ),

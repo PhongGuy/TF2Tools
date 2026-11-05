@@ -17,6 +17,7 @@ use super::HudMakerPage;
 use super::editor::{AnimEdit, AnimRefused};
 use crate::ids;
 use crate::shell::toast::{ToastKind, toast};
+use crate::widgets::Named as _;
 use crate::widgets::labelled;
 use gpui_kit::assets::IconName;
 
@@ -305,7 +306,7 @@ impl HudMakerPage {
                             .xsmall()
                             .icon(IconName::Pencil)
                             .selected(is_open)
-                            .tooltip("Change this row")
+                            .named("Change this row")
                             .on_click(cx.listener(move |page, _, window, cx| {
                                 page.toggle_anim_row(edit_event.clone(), i, window, cx)
                             })),
@@ -315,7 +316,7 @@ impl HudMakerPage {
                             .ghost()
                             .xsmall()
                             .icon(IconName::Trash)
-                            .tooltip("Delete this row")
+                            .named("Delete this row")
                             .on_click(cx.listener(move |page, _, window, cx| {
                                 page.anims.open = None;
                                 let event = delete_event.clone();

@@ -31,6 +31,7 @@ use super::view::{Panel, PanelMode, PanelPlace};
 use super::{Field, FontList, HudMakerPage};
 use crate::ids;
 use crate::pages::crosshair_maker::model::hsla_of_rgba;
+use crate::widgets::Named as _;
 use crate::widgets::labelled;
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 
@@ -368,7 +369,7 @@ impl HudMakerPage {
                 .ghost()
                 .small()
                 .icon(icon)
-                .tooltip(tip)
+                .named(tip)
                 .selected(chosen == mode)
                 .on_click(cx.listener(move |page, _, _, cx| {
                     let place = PanelPlace {
@@ -428,7 +429,7 @@ impl HudMakerPage {
                     .ghost()
                     .small()
                     .icon(collapse_icon)
-                    .tooltip(collapse_tip)
+                    .named(collapse_tip)
                     .on_click(cx.listener(move |page, _, _, cx| page.toggle_collapsed(panel, cx))),
             )
             .into_any_element()
@@ -1206,6 +1207,7 @@ impl HudMakerPage {
             .ghost()
             .xsmall()
             .icon(IconName::RotateCcw)
+            .accessibility_label(RESET_TIP)
             .disabled(!changed)
             .on_click(cx.listener(move |page, _, window, cx| {
                 page.discard(match spec.kind() {
