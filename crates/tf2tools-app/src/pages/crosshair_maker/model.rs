@@ -139,7 +139,8 @@ pub struct Editor {
     redo: VecDeque<Snapshot>,
     open_id: Option<CrosshairId>,
     name: String,
-    dirty: bool,
+    /// The drawing as last opened, created or saved; dirty means the canvas differs from it.
+    saved: Snapshot,
 }
 
 impl Default for Editor {
@@ -166,7 +167,7 @@ impl Editor {
             redo: VecDeque::new(),
             open_id: None,
             name: String::new(),
-            dirty: false,
+            saved: (size, blank(size)),
         }
     }
 
@@ -179,6 +180,7 @@ impl Editor {
         Some(Self {
             size,
             pixels: drawing.pixels().to_vec(),
+            saved: (size, drawing.pixels().to_vec()),
             open_id: Some(id),
             name: name.into(),
             ..Self::new()
@@ -444,9 +446,10 @@ impl Editor {
         self.redo.len()
     }
 
-    /// True once anything changed the drawing since it was opened, created or saved.
+    /// Whether the drawing differs from the one last opened, created or saved, so undoing
+    /// back to it is clean.
     pub fn is_dirty(&self) -> bool {
-        self.dirty
+        self.saved.0 != self.size || self.saved.1 != self.pixels
     }
 
     /// The library crosshair this drawing was opened from or last saved as.
@@ -459,13 +462,15 @@ impl Editor {
         &self.name
     }
 
-    /// Records a save of `saved` as `id` and `name`, keeping the history; the drawing becomes
-    /// clean only if it still equals `saved`, so edits made while the save ran stay unsaved.
+    /// Records a save of `saved` as `id` and `name`, keeping the history. `saved` becomes the
+    /// clean drawing, so edits made while the save ran stay unsaved until undone.
     pub fn mark_saved(&mut self, id: CrosshairId, name: impl Into<String>, saved: &RgbaImage) {
         self.open_id = Some(id);
         self.name = name.into();
-        if self.size.side() == saved.width() && self.pixels == saved.pixels() {
-            self.dirty = false;
+        if let Some(size) =
+            CanvasSize::of_side(saved.width()).filter(|_| saved.width() == saved.height())
+        {
+            self.saved = (size, saved.pixels().to_vec());
         }
     }
 
@@ -581,18 +586,16 @@ impl Editor {
     fn restore(&mut self, (size, pixels): Snapshot) {
         self.size = size;
         self.pixels = pixels;
-        self.dirty = true;
     }
 
     /// Records `before` as one undo step if the canvas has changed since; an edit that
-    /// changed nothing leaves the history and the dirty flag alone.
+    /// changed nothing leaves the history alone.
     fn commit(&mut self, before: Snapshot) {
         if before.0 == self.size && before.1 == self.pixels {
             return;
         }
         push_capped(&mut self.undo, before);
         self.redo.clear();
-        self.dirty = true;
     }
 }
 

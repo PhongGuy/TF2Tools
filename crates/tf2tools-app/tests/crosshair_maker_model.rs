@@ -338,6 +338,44 @@ fn an_edit_made_while_a_save_ran_stays_unsaved() {
         (Some("abc"), "Dot"),
         "the next save updates the same crosshair"
     );
+    e.undo();
+    assert!(!e.is_dirty(), "undoing the second dab returns to the save");
+}
+
+#[test]
+fn undoing_back_to_the_opened_drawing_is_clean() {
+    let drawing = RgbaImage::from_pixels(32, 32, vec![0; 32 * 32 * 4]).unwrap();
+    let mut e = Editor::open(CrosshairId::new("abc"), "Dot", &drawing).unwrap();
+    dab(&mut e, 5, 5);
+    assert!(e.is_dirty());
+    e.undo();
+    assert!(!e.is_dirty(), "the drawing is the one opened");
+    e.redo();
+    assert!(
+        e.is_dirty(),
+        "redo past the opened drawing is unsaved again"
+    );
+
+    let mut fresh = Editor::new();
+    dab(&mut fresh, 1, 1);
+    fresh.undo();
+    assert!(!fresh.is_dirty(), "a new canvas undone to blank is clean");
+}
+
+#[test]
+fn undoing_back_to_the_saved_drawing_is_clean() {
+    let mut e = Editor::new();
+    dab(&mut e, 1, 1);
+    let sent = e.drawing();
+    e.mark_saved(CrosshairId::new("abc"), "Dot", &sent);
+    dab(&mut e, 2, 2);
+    assert!(e.is_dirty());
+    e.undo();
+    assert!(!e.is_dirty(), "the drawing is the one saved");
+    e.undo();
+    assert!(e.is_dirty(), "undoing past the save is unsaved");
+    e.redo();
+    assert!(!e.is_dirty());
 }
 
 #[test]
