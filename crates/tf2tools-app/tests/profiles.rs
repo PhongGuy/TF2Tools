@@ -394,6 +394,24 @@ fn the_save_dialog_carries_v5_s_description(cx: &mut TestAppContext) {
     );
 }
 
+// The name field takes the keyboard as the dialog opens, so the player can type at once.
+#[gpui_kit::test]
+fn the_save_dialog_focuses_its_name_field(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::PROFILES_SAVE_CURRENT);
+    support::settle(cx, s.win);
+    let input = cx.update(|cx| page.read(cx).save_name_input().clone());
+    let focused = cx
+        .update_window(s.win, |_, w, cx| {
+            use gpui_kit::Focusable as _;
+            input.read(cx).focus_handle(cx).is_focused(w)
+        })
+        .unwrap();
+    assert!(focused, "the name field has the keyboard");
+}
+
 #[gpui_kit::test]
 fn a_blank_name_cannot_be_saved(cx: &mut TestAppContext) {
     let env = support::env();
@@ -410,6 +428,27 @@ fn a_blank_name_cannot_be_saved(cx: &mut TestAppContext) {
     assert!(!has_dialog(cx, &s));
     assert!(s.services.library.profiles().unwrap().is_empty());
     assert!(support::log_rows(&s.services).is_empty());
+}
+
+// A name another profile has, in any case, keeps the dialog open and says why.
+#[gpui_kit::test]
+fn a_taken_name_cannot_be_saved(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    empty_profile(&s, "Competitive");
+    let page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::PROFILES_SAVE_CURRENT);
+    type_name(cx, &s, &page, " competitive ");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILES_SAVE_TAKEN).as_deref(),
+        Some("You already have a profile called Competitive. Pick another name.")
+    );
+    support::click_id(cx, s.win, ids::PROFILES_SAVE_OK);
+    support::settle(cx, s.win);
+    assert!(support::present(cx, s.win, ids::PROFILES_SAVE_DIALOG));
+    assert_eq!(s.services.library.profiles().unwrap().len(), 1);
+    type_name(cx, &s, &page, "Competitive 2");
+    assert!(!support::present(cx, s.win, ids::PROFILES_SAVE_TAKEN));
 }
 
 #[gpui_kit::test]

@@ -12,10 +12,10 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, WindowExt as _, h_flex, v_flex,
 };
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FocusHandle, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
-    Window, div, px,
+    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FocusHandle,
+    Focusable as _, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Render,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
+    WeakEntity, Window, div, px,
 };
 use tf2tools_core::{
     Assignment, CrosshairEntry, DraftSlot, HudEntry, HudId, LibraryError, Profile, ProfileDraft,
@@ -23,6 +23,7 @@ use tf2tools_core::{
 };
 
 use super::ProfilesPage;
+use super::model as profiles_model;
 use super::wizard_model::{self as model, CrosshairMode, CustomCrosshair, SlotOption, WizardStep};
 use crate::activity;
 use crate::audio::player::{NowPlaying, Player};
@@ -140,9 +141,13 @@ impl ProfileWizard {
                     })
                     .child(frame.measure(content.clone()))
             });
-            // Opening focuses the new dialog, which tells this one apart from any stacked later.
+            // Opening focuses the new dialog, which tells this one apart from any stacked later;
+            // the name field then takes the keyboard from it, so the player can type at once.
             let focus = window.focused(cx);
-            child.update(cx, |wizard, _| wizard.dialog_focus = focus);
+            child.update(cx, |wizard, cx| {
+                wizard.dialog_focus = focus;
+                wizard.name.update(cx, |st, cx| st.focus(window, cx));
+            });
         });
         wizard
     }
@@ -163,10 +168,14 @@ impl ProfileWizard {
         // Next, Save and the play buttons read the name and the selects at render, so any change
         // to them just redraws; Enter in the name field acts as Next.
         let mut subscriptions = vec![
-            cx.subscribe(&name, |wizard, _, event: &InputEvent, cx| match event {
-                InputEvent::PressEnter { .. } => wizard.next(cx),
-                _ => cx.notify(),
-            }),
+            cx.subscribe_in(
+                &name,
+                window,
+                |wizard, _, event: &InputEvent, window, cx| match event {
+                    InputEvent::PressEnter { .. } => wizard.next(window, cx),
+                    _ => cx.notify(),
+                },
+            ),
             cx.observe(&player, |_, _, cx| cx.notify()),
         ];
         subscriptions.push(cx.observe(&hud, |_, _, cx| cx.notify()));
@@ -180,7 +189,6 @@ impl ProfileWizard {
                 wizard.assign(&event.scripts, cx)
             }),
         );
-        name.update(cx, |st, cx| st.focus(window, cx));
         let wizard = Self {
             kind,
             page,
@@ -265,7 +273,18 @@ impl ProfileWizard {
     }
 
     fn can_proceed(&self, cx: &App) -> bool {
-        model::can_proceed(&self.name.read(cx).value())
+        model::can_proceed(&self.name.read(cx).value()) && self.taken_name(cx).is_none()
+    }
+
+    // The other profile already holding the typed name, read from the page's loaded list.
+    fn taken_name(&self, cx: &App) -> Option<String> {
+        let except = match &self.kind {
+            WizardMode::Edit(id) => Some(id),
+            WizardMode::Create => None,
+        };
+        let page = self.page.upgrade()?;
+        page.read(cx)
+            .taken_name(&self.name.read(cx).value(), except)
     }
 
     // Reads the libraries (and the edited profile) off the UI thread, then fills the selects
@@ -422,28 +441,35 @@ impl ProfileWizard {
         self.player.update(cx, |player, cx| player.stop(cx));
     }
 
-    // Moves to `step`; leaving the Sounds step stops a preview.
-    fn go_to(&mut self, step: WizardStep, cx: &mut Context<Self>) {
+    // Moves to `step`; leaving the Sounds step stops a preview. The name field stops rendering
+    // off its step, so the dialog takes the keyboard back from it and Escape still cancels.
+    fn go_to(&mut self, step: WizardStep, window: &mut Window, cx: &mut Context<Self>) {
         if self.step == WizardStep::Sounds && step != WizardStep::Sounds {
             self.stop_preview(cx);
+        }
+        if step != WizardStep::Name
+            && self.name.read(cx).focus_handle(cx).is_focused(window)
+            && let Some(focus) = &self.dialog_focus
+        {
+            window.focus(focus, cx);
         }
         self.step = step;
         cx.notify();
     }
 
-    fn next(&mut self, cx: &mut Context<Self>) {
+    fn next(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(next) = self.step.next()
             && self.can_proceed(cx)
         {
-            self.go_to(next, cx);
+            self.go_to(next, window, cx);
         }
     }
 
     // v5's stepper: a later circle jumps there with a valid name; an earlier one, or any while
     // saving, does nothing.
-    fn jump(&mut self, step: WizardStep, cx: &mut Context<Self>) {
+    fn jump(&mut self, step: WizardStep, window: &mut Window, cx: &mut Context<Self>) {
         if !self.saving && step > self.step && self.can_proceed(cx) {
-            self.go_to(step, cx);
+            self.go_to(step, window, cx);
         }
     }
 
@@ -622,7 +648,7 @@ impl ProfileWizard {
                 .font_weight(FontWeight::MEDIUM)
                 .cursor_pointer()
                 .child(mark)
-                .on_click(cx.listener(move |wizard, _, _, cx| wizard.jump(step, cx)));
+                .on_click(cx.listener(move |wizard, _, window, cx| wizard.jump(step, window, cx)));
             let circle = if reached {
                 circle.bg(primary).text_color(on_primary)
             } else {
@@ -639,15 +665,25 @@ impl ProfileWizard {
         row
     }
 
-    fn name_step(&self) -> AnyElement {
-        field(
-            "Profile Name",
-            div()
-                .id(ids::WIZARD_NAME)
-                .test_support()
-                .child(Input::new(&self.name).disabled(self.saving)),
-        )
-        .into_any_element()
+    fn name_step(&self, cx: &App) -> AnyElement {
+        let taken = self.taken_name(cx).map(|name| {
+            labelled(
+                div().text_sm().text_color(cx.theme().danger),
+                ids::WIZARD_NAME_TAKEN,
+                profiles_model::taken_message(&name),
+            )
+        });
+        v_flex()
+            .gap_2()
+            .child(field(
+                "Profile Name",
+                div()
+                    .id(ids::WIZARD_NAME)
+                    .test_support()
+                    .child(Input::new(&self.name).disabled(self.saving)),
+            ))
+            .children(taken)
+            .into_any_element()
     }
 
     fn hud_step(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -840,7 +876,7 @@ impl ProfileWizard {
                 .outline()
                 .label("Back")
                 .disabled(self.saving)
-                .on_click(cx.listener(move |wizard, _, _, cx| wizard.go_to(back, cx)))
+                .on_click(cx.listener(move |wizard, _, window, cx| wizard.go_to(back, window, cx)))
         });
         let forward = if last {
             Button::new(ids::WIZARD_SAVE)
@@ -854,7 +890,7 @@ impl ProfileWizard {
                 .primary()
                 .label("Next")
                 .disabled(!ready)
-                .on_click(cx.listener(|wizard, _, _, cx| wizard.next(cx)))
+                .on_click(cx.listener(|wizard, _, window, cx| wizard.next(window, cx)))
         };
         let cancel = Button::new(ids::WIZARD_CANCEL)
             .outline()
@@ -879,7 +915,7 @@ impl Render for ProfileWizard {
         let muted = cx.theme().muted_foreground;
         let editing = self.editing();
         let body = match self.step {
-            WizardStep::Name => self.name_step(),
+            WizardStep::Name => self.name_step(cx),
             WizardStep::Hud => self.hud_step(cx),
             WizardStep::Sounds => self.sounds_step(cx),
             WizardStep::Crosshairs => self.crosshairs_step(cx),

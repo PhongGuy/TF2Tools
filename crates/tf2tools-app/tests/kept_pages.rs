@@ -454,6 +454,38 @@ fn the_huds_page_is_rebuilt_on_return(cx: &mut TestAppContext) {
     assert_ne!(first.entity_id(), second.entity_id());
 }
 
+// The rebuilt HUDs page starts from the search the player left, and filters by it.
+#[gpui_kit::test]
+fn the_huds_search_outlives_a_trip_away(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, missing());
+    import(&env, &s, "budhud", Provenance::Local);
+    import(&env, &s, "rayshud", Provenance::Local);
+    support::click_id(cx, s.win, ids::nav(Page::Settings));
+    support::click_id(cx, s.win, ids::nav(Page::Huds));
+    let page = cx.update(|cx| s.shell.read(cx).huds_page()).unwrap();
+    support::wait_real(cx, "the library", |cx| {
+        cx.update(|cx| page.read(cx).hud_count() == 2)
+    });
+    let input = cx.update(|cx| page.read(cx).search_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        input.update(cx, |st, cx| st.set_value("rays", window, cx))
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+
+    support::click_id(cx, s.win, ids::nav(Page::Settings));
+    support::click_id(cx, s.win, ids::nav(Page::Huds));
+    let again = cx.update(|cx| s.shell.read(cx).huds_page()).unwrap();
+    assert_ne!(again.entity_id(), page.entity_id(), "a fresh page");
+    let text = cx.update(|cx| again.read(cx).search_input().read(cx).value().to_string());
+    assert_eq!(text, "rays");
+    support::wait_real(cx, "the filtered library", |cx| {
+        support::present(cx, s.win, ids::hud_card("rayshud"))
+    });
+    assert!(!support::present(cx, s.win, ids::hud_card("budhud")));
+}
+
 // Settings opened through the sidebar, once its first load has landed.
 fn settings(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<SettingsPage> {
     let page = cx

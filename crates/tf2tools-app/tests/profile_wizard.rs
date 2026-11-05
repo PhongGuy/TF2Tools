@@ -187,6 +187,32 @@ fn create_new_opens_the_wizard_on_the_name_step(cx: &mut TestAppContext) {
     }
 }
 
+// The name field takes the keyboard as the wizard opens, for Create and Edit alike.
+#[gpui_kit::test]
+fn the_wizard_focuses_its_name_field(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Comp"))
+        .unwrap();
+    let page = open_profiles(cx, &s);
+    let name_focused = |cx: &mut TestAppContext, w: &Entity<ProfileWizard>| {
+        let input = cx.update(|cx| w.read(cx).name_input().clone());
+        cx.update_window(s.win, |_, win, cx| {
+            use gpui_kit::Focusable as _;
+            input.read(cx).focus_handle(cx).is_focused(win)
+        })
+        .unwrap()
+    };
+    let w = open_wizard(cx, &s, &page, ids::PROFILES_CREATE);
+    assert!(name_focused(cx, &w), "Create");
+    support::click_id(cx, s.win, ids::WIZARD_CANCEL);
+    let w = open_wizard(cx, &s, &page, ids::profile_edit(comp.id()));
+    assert!(name_focused(cx, &w), "Edit");
+}
+
 #[gpui_kit::test]
 fn the_empty_state_create_opens_it_too(cx: &mut TestAppContext) {
     let env = support::env();
@@ -209,6 +235,36 @@ fn a_blank_name_keeps_next_disabled(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::wizard_step(4));
     assert_eq!(step(cx, &w), WizardStep::Name);
     set_name(cx, &s, &w, "Comp");
+    support::click_id(cx, s.win, ids::WIZARD_NEXT);
+    assert_eq!(step(cx, &w), WizardStep::Hud);
+}
+
+// Another profile's name, in any case, holds the wizard on the name step and says why; an
+// edited profile keeps its own name.
+#[gpui_kit::test]
+fn a_taken_name_keeps_next_disabled(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Comp"))
+        .unwrap();
+    let page = open_profiles(cx, &s);
+    let w = open_wizard(cx, &s, &page, ids::PROFILES_CREATE);
+    set_name(cx, &s, &w, "comp");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::WIZARD_NAME_TAKEN).as_deref(),
+        Some("You already have a profile called Comp. Pick another name.")
+    );
+    support::click_id(cx, s.win, ids::WIZARD_NEXT);
+    support::click_id(cx, s.win, ids::wizard_step(4));
+    assert_eq!(step(cx, &w), WizardStep::Name);
+    support::click_id(cx, s.win, ids::WIZARD_CANCEL);
+    assert!(!has_dialog(cx, &s));
+
+    let w = open_wizard(cx, &s, &page, ids::profile_edit(comp.id()));
+    assert!(!support::present(cx, s.win, ids::WIZARD_NAME_TAKEN));
     support::click_id(cx, s.win, ids::WIZARD_NEXT);
     assert_eq!(step(cx, &w), WizardStep::Hud);
 }

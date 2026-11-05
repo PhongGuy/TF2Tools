@@ -274,6 +274,12 @@ fn profile_cases() -> Vec<(ProfileError, &'static str)> {
             "Give the profile a name, then try again.",
         ),
         (
+            ProfileError::NameTaken {
+                name: "Competitive".into(),
+            },
+            "You already have a profile called Competitive. Pick another name.",
+        ),
+        (
             ProfileError::ItemNotFound {
                 what: "HUD rayshud".into(),
             },

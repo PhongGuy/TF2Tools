@@ -571,6 +571,12 @@ pub enum ProfileError {
     /// The profile name is blank after trimming.
     #[error("a profile name cannot be empty")]
     EmptyName,
+    /// Another profile already has this name, ignoring case.
+    #[error("a profile called {name} already exists")]
+    NameTaken {
+        /// The trimmed name that was asked for.
+        name: String,
+    },
     /// A slot or crosshair names an item the library does not have.
     #[error("{what} is not in the library")]
     ItemNotFound {

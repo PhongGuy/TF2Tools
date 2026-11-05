@@ -2,7 +2,8 @@
 //! toast and log texts, and where a missing item can be downloaded again.
 
 use tf2tools_core::{
-    ApplyProfileReport, ApplyStep, MissingKind, Profile, Provenance, StoreItemId, StoreKind,
+    ApplyProfileReport, ApplyStep, MissingKind, Profile, ProfileId, Provenance, StoreItemId,
+    StoreKind,
 };
 
 /// The crosshair badge: "1 crosshair", "N crosshairs".
@@ -26,6 +27,26 @@ pub fn is_empty(profile: &Profile) -> bool {
 pub fn matches(name: &str, query: &str) -> bool {
     let query = query.trim().to_lowercase();
     query.is_empty() || name.to_lowercase().contains(&query)
+}
+
+/// The profile among `profiles`, other than `except`, that already has `name` (trimmed, any case).
+pub fn taken_by<'a>(
+    profiles: &'a [Profile],
+    name: &str,
+    except: Option<&ProfileId>,
+) -> Option<&'a Profile> {
+    let name = name.trim().to_lowercase();
+    if name.is_empty() {
+        return None;
+    }
+    profiles
+        .iter()
+        .find(|p| Some(p.id()) != except && p.name().to_lowercase() == name)
+}
+
+/// The line under a name field holding another profile's name.
+pub fn taken_message(name: &str) -> String {
+    format!("You already have a profile called {name}. Pick another name.")
 }
 
 /// "HUD", "Hitsound", "Killsound", "Crosshairs".
