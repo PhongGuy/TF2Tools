@@ -24,7 +24,6 @@ use tf2tools_core::{
 };
 
 use super::canvas::{colour, scene_note};
-use super::editor::shows_for;
 use super::parts::row_label;
 use super::tip::{Spot, record, tip, tip_beside_row, tipped};
 use super::view::{Panel, PanelMode, PanelPlace};
@@ -869,12 +868,14 @@ impl HudMakerPage {
         tipped(&ids::HUD_MAKER_MIRROR.into(), tip, button)
     }
 
-    // Show it, for a part the game shows only in some situations: it sets the situation in
-    // which the part, or the panel holding it, shows.
+    // Show it, for a part the current situation hides: it sets the situation in which the
+    // part, or the panel holding it, shows.
     fn show_it_button(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let editor = self.editor()?;
         let part = editor.selected()?.clone();
-        shows_for(editor.model(), &part)?;
+        if !editor.offers_show_it(&part) {
+            return None;
+        }
         let button = Button::new(ids::HUD_MAKER_PANEL_SHOW_IT)
             .outline()
             .xsmall()
