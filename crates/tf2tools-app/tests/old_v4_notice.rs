@@ -4,7 +4,8 @@
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use gpui_kit::TestAppContext;
+use gpui_kit::test::TestWindowExt as _;
+use gpui_kit::{AppContext as _, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::old_v4::{NOTICE, OldV4Notice, UninstallRunner, pending};
 use tf2tools_app::services::Tf2State;
@@ -76,17 +77,61 @@ fn the_banner_asks_in_plain_words(cx: &mut TestAppContext) {
     );
 }
 
+fn open(cx: &mut TestAppContext, s: &support::ShellWindow) -> bool {
+    cx.update(|cx| cx.windows().contains(&s.win))
+}
+
 #[gpui_kit::test]
-fn remove_runs_v4s_own_uninstaller_once(cx: &mut TestAppContext) {
+fn remove_first_says_tf2tools_will_close(cx: &mut TestAppContext) {
     let (_env, s, calls) = shell_with(cx, Some(v4()));
     support::click_id(cx, s.win, ids::OLD_V4_BANNER_REMOVE);
+    assert!(support::present(cx, s.win, ids::CONFIRM_DIALOG));
+    let text = support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).unwrap();
+    assert_eq!(
+        text,
+        "TF2Tools closes while the old version is removed. Open it again when it's done."
+    );
+    support::assert_plain(&text);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_OK).as_deref(),
+        Some("Remove and close")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_CANCEL).as_deref(),
+        Some("Cancel")
+    );
+    assert!(calls.lock().unwrap().is_empty(), "nothing runs before OK");
+}
+
+#[gpui_kit::test]
+fn cancel_leaves_everything_as_it_was(cx: &mut TestAppContext) {
+    let (_env, s, calls) = shell_with(cx, Some(v4()));
+    support::click_id(cx, s.win, ids::OLD_V4_BANNER_REMOVE);
+    support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
+    cx.run_until_parked();
+    assert!(calls.lock().unwrap().is_empty());
+    assert!(open(cx, &s));
+    assert!(support::present(cx, s.win, ids::OLD_V4_BANNER));
+    assert!(!asked(&s), "Cancel is not an answer");
+}
+
+#[gpui_kit::test]
+fn remove_and_close_starts_v4s_uninstaller_then_closes(cx: &mut TestAppContext) {
+    let (_env, s, calls) = shell_with(cx, Some(v4()));
+    // A second window keeps the test app alive when the shell's window goes.
+    let _other = support::blank_window(cx);
+    support::click_id(cx, s.win, ids::OLD_V4_BANNER_REMOVE);
+    // A plain click, since the helper's settle afterwards would look for the closed window.
+    support::settle(cx, s.win);
+    cx.update_window(s.win, |_, w, cx| w.click(ids::CONFIRM_OK, cx))
+        .unwrap();
     cx.run_until_parked();
     assert_eq!(
         *calls.lock().unwrap(),
         [(PathBuf::from(V4_EXE), vec!["/currentuser".to_owned()])]
     );
-    assert!(!support::present(cx, s.win, ids::OLD_V4_BANNER));
     assert!(asked(&s), "Remove is remembered");
+    assert!(!open(cx, &s), "TF2Tools closes so the uninstaller can run");
 }
 
 #[gpui_kit::test]
@@ -113,7 +158,7 @@ fn a_remembered_answer_skips_detection(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn a_runner_that_fails_says_where_to_remove_it_by_hand(cx: &mut TestAppContext) {
+fn a_failed_start_keeps_the_app_open_and_says_where_to_remove_it(cx: &mut TestAppContext) {
     let env = support::env();
     let runner: UninstallRunner =
         Arc::new(|_: &Path, _: &[String]| Err(std::io::Error::other("blocked")));
@@ -122,7 +167,9 @@ fn a_runner_that_fails_says_where_to_remove_it_by_hand(cx: &mut TestAppContext) 
     });
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     support::click_id(cx, s.win, ids::OLD_V4_BANNER_REMOVE);
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
     cx.run_until_parked();
+    assert!(open(cx, &s), "a failed start keeps TF2Tools open");
     let toasts = support::toast_labels(cx, s.win);
     assert!(
         toasts.contains(
