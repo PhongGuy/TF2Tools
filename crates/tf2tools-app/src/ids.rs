@@ -502,6 +502,8 @@ pub const CROSSHAIR_MAKER_OPACITY_LABEL: &str = "crosshair-maker-opacity-label";
 pub const CROSSHAIR_MAKER_STARTERS: &str = "crosshair-maker-starters";
 /// The toolbar's Import PNG button, which opens a PNG as a new drawing.
 pub const CROSSHAIR_MAKER_IMPORT_PNG: &str = "crosshair-maker-import-png";
+/// The overlay that shows while a file is dragged over the maker, labelled with what to drop.
+pub const CROSSHAIR_MAKER_DROP_TARGET: &str = "crosshair-maker-drop-target";
 /// The starter shapes dialog's content.
 pub const CROSSHAIR_MAKER_STARTER_DIALOG: &str = "crosshair-maker-starter-dialog";
 /// The dialog's live preview, labelled "<shape> preview".
@@ -532,6 +534,8 @@ pub const HUDS_INSTALLED_BADGE: &str = "huds-installed-badge";
 pub const HUDS_INSTALLED_PATH: &str = "huds-installed-path";
 /// The installed card's "Uninstall" button; removes the HUD from tf/custom.
 pub const HUDS_UNINSTALL: &str = "huds-uninstall";
+/// The installed card's "Edit" button; opens the HUD, or a copy of it, in the HUD Maker.
+pub const HUDS_INSTALLED_EDIT: &str = "huds-installed-edit";
 /// The warning shown when more than one HUD sits in tf/custom.
 pub const HUDS_CONFLICTS: &str = "huds-conflicts";
 /// Wraps the library search input.

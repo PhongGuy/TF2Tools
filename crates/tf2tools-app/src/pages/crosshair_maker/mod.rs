@@ -6,6 +6,7 @@ pub mod starter;
 pub mod starter_dialog;
 
 use std::cell::Cell;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 use gpui_kit::assets::IconName;
@@ -20,12 +21,12 @@ use gpui_kit::component::{
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, AppContext as _, Context, CursorStyle, DispatchPhase, Entity,
-    FocusHandle, FontWeight, Hsla, InteractiveElement as _, IntoElement, MouseButton,
-    MouseDownEvent, MouseExitEvent, MouseMoveEvent, MouseUpEvent, ObjectFit, ParentElement as _,
-    Pixels, Point, Render, ScrollHandle, ScrollWheelEvent, SharedString, Size,
-    StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription,
-    TestSupportExt as _, WeakEntity, Window, canvas, div, fill, img, point, px, size,
+    AnyElement, AnyWindowHandle, AppContext as _, Context, CursorStyle, DispatchPhase,
+    DragMoveEvent, Entity, ExternalPaths, FocusHandle, FontWeight, Hsla, InteractiveElement as _,
+    IntoElement, MouseButton, MouseDownEvent, MouseExitEvent, MouseMoveEvent, MouseUpEvent,
+    ObjectFit, ParentElement as _, Pixels, Point, Render, ScrollHandle, ScrollWheelEvent,
+    SharedString, Size, StatefulInteractiveElement as _, Styled as _, StyledImage as _,
+    Subscription, TestSupportExt as _, WeakEntity, Window, canvas, div, fill, img, point, px, size,
 };
 
 use tf2tools_core::{
@@ -77,6 +78,9 @@ const COPY_FAILED: &str = "Failed to copy crosshair";
 const PNG_IMPORT_FAILED: &str = "Failed to import PNG";
 /// The toast for a picture (starter, copy or PNG) that arrives while a save or open runs.
 pub const BUSY: &str = "Wait for the Crosshair Maker to finish, then try again.";
+/// Shown when the files dropped on the maker hold no PNG.
+pub const DROP_A_PNG: &str = "Drop a PNG image.";
+const DROP_HINT: &str = "Drop a PNG to open it";
 const RECOVERED: &str = "The saved drawing was damaged, so it was rebuilt from the crosshair file.";
 
 /// How a save ended, when it did not fail with a toast.
@@ -129,6 +133,8 @@ pub struct CrosshairMakerPage {
     opening: bool,
     /// True while Import PNG's file dialog is open, so a second click opens no second one.
     picking: bool,
+    /// True while files from the desktop are dragged over the page, to show the drop target.
+    file_over: bool,
     /// Whether the centre guides show over the grid.
     guides: bool,
     /// The cell under the pointer, for the position readout.
@@ -247,6 +253,7 @@ impl CrosshairMakerPage {
             saving_as_new: false,
             opening: false,
             picking: false,
+            file_over: false,
             guides: true,
             hover: None,
             grid_lines: false,
@@ -477,9 +484,8 @@ impl CrosshairMakerPage {
         .detach();
     }
 
-    // Picks a PNG, then reads and fits it off the UI thread before `take_new`, so the confirm
-    // for unsaved changes comes after the decode. `opening` is set as soon as a path arrives;
-    // one that arrives while a save or open runs is turned away with a toast.
+    // Picks a PNG and hands it to `load_png`; a path that arrives while a save or open runs is
+    // turned away with a toast.
     fn import_png(&mut self, cx: &mut Context<Self>) {
         if self.busy() || self.picking {
             return;
@@ -490,34 +496,50 @@ impl CrosshairMakerPage {
         let win = self.win;
         cx.spawn(async move |page, cx| {
             let picked = picking.await;
-            let Ok(loading) = page.update(cx, |page, cx| {
+            let refused = page.update(cx, |page, cx| {
                 page.picking = false;
                 cx.notify();
-                let path = picked?;
-                if page.busy() {
-                    return Some(Err(()));
-                }
-                page.opening = true;
-                Some(Ok(run_blocking(cx, move |_| {
-                    read_png(&path)
-                        .map(fit_to_maker)
-                        .map_err(|e| describe_png_read(&e).into_op(PNG_IMPORT_FAILED))
-                })))
-            }) else {
-                return;
-            };
-            let loading = match loading {
-                None => return,
-                Some(Ok(loading)) => loading,
-                Some(Err(())) => {
-                    cx.update(|cx| {
-                        let _ = win.update(cx, |_, window, cx| {
-                            toast(window, cx, ToastKind::Info, BUSY, "")
-                        });
+                picked.is_some_and(|path| !page.load_png(path, cx))
+            });
+            if refused.unwrap_or(false) {
+                cx.update(|cx| {
+                    let _ = win.update(cx, |_, window, cx| {
+                        toast(window, cx, ToastKind::Info, BUSY, "")
                     });
-                    return;
-                }
-            };
+                });
+            }
+        })
+        .detach();
+    }
+
+    // Files dropped from the desktop open the first PNG among them as Import PNG would.
+    fn drop_files(&mut self, paths: &ExternalPaths, window: &mut Window, cx: &mut Context<Self>) {
+        self.file_over = false;
+        cx.notify();
+        let Some(path) = paths.paths().iter().find(|p| is_png_name(p)) else {
+            toast(window, cx, ToastKind::Info, DROP_A_PNG, "");
+            return;
+        };
+        if self.picking || !self.load_png(path.clone(), cx) {
+            toast(window, cx, ToastKind::Info, BUSY, "");
+        }
+    }
+
+    // Reads and fits the PNG off the UI thread before `take_new`, so the confirm for unsaved
+    // changes comes after the decode. False, with nothing started, while a save or open runs.
+    fn load_png(&mut self, path: PathBuf, cx: &mut Context<Self>) -> bool {
+        if self.busy() {
+            return false;
+        }
+        self.opening = true;
+        cx.notify();
+        let loading = run_blocking(cx, move |_| {
+            read_png(&path)
+                .map(fit_to_maker)
+                .map_err(|e| describe_png_read(&e).into_op(PNG_IMPORT_FAILED))
+        });
+        let win = self.win;
+        cx.spawn(async move |page, cx| {
             let loaded = loading.await;
             // Like `copy_from`: a page dropped meanwhile just drops the picture.
             let landed = page
@@ -541,6 +563,16 @@ impl CrosshairMakerPage {
             });
         })
         .detach();
+        true
+    }
+
+    // Tracks whether a desktop file drag is over the page; it lapses once the drag ends.
+    fn file_drag(&mut self, ev: &DragMoveEvent<ExternalPaths>, cx: &mut Context<Self>) {
+        let over = ev.bounds.contains(&ev.event.position);
+        if over != self.file_over {
+            self.file_over = over;
+            cx.notify();
+        }
     }
 
     // Every new drawing (starter, copy, PNG) lands here: asks before dropping unsaved changes,
@@ -1696,6 +1728,35 @@ fn divider(ix: usize, cx: &Context<CrosshairMakerPage>) -> impl IntoElement {
         .bg(cx.theme().border)
 }
 
+/// Whether `path` names a PNG by its extension, in any case.
+fn is_png_name(path: &Path) -> bool {
+    path.extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("png"))
+}
+
+// A dashed frame over the whole page while a file is dragged over it, saying what to drop.
+fn drop_target(cx: &Context<CrosshairMakerPage>) -> impl IntoElement {
+    let theme = cx.theme();
+    div()
+        .id(ids::CROSSHAIR_MAKER_DROP_TARGET)
+        .aria_label(DROP_HINT)
+        .test_support()
+        .absolute()
+        .inset_0()
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded_lg()
+        .border_2()
+        .border_dashed()
+        .border_color(theme.ring)
+        .bg(theme.background.opacity(0.85))
+        .text_lg()
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(theme.foreground)
+        .child(DROP_HINT)
+}
+
 fn size_label(side: u32) -> String {
     format!("{side}x{side}")
 }
@@ -1732,6 +1793,11 @@ impl Render for CrosshairMakerPage {
             .gap_4()
             .child(column)
             .child(self.panel(panel_width, cx));
+        // A drag that left the window or was let go elsewhere ends with no move to say so.
+        if !cx.has_active_drag() {
+            self.file_over = false;
+        }
+        let target = self.file_over.then(|| drop_target(cx));
         v_flex()
             .id(ids::page(Page::CrosshairMaker))
             .test_support()
@@ -1775,10 +1841,14 @@ impl Render for CrosshairMakerPage {
                 cx.listener(|page, _: &ZoomOutGrid, _, cx| page.zoom(cx, |v| v.zoom_centre(-1))),
             )
             .on_action(cx.listener(|page, _: &FitGrid, _, cx| page.zoom(cx, Viewport::fit)))
+            .on_drag_move(cx.listener(|page, ev, _, cx| page.file_drag(ev, cx)))
+            .on_drop(cx.listener(|page, paths, window, cx| page.drop_files(paths, window, cx)))
+            .relative()
             .size_full()
             .p(padding)
             .gap_4()
             .children(above)
             .child(row)
+            .children(target)
     }
 }

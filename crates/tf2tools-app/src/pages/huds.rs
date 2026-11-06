@@ -33,7 +33,7 @@ use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
     copy_in_store_text, copy_made_text, copy_updated_notice, describe_copy_hud, describe_import,
-    describe_library, describe_tf2_install, describe_update_copy,
+    describe_library, describe_tf2_install, describe_update_copy, editing_copy_text,
 };
 use crate::pages::hud_maker::live::{Live, live_job};
 use crate::picker::PickKind;
@@ -607,11 +607,26 @@ impl HudsPage {
 }
 
 impl HudsPage {
+    // The library card's "Edit a copy".
+    fn copy(&mut self, hud: &HudEntry, _: &mut Window, cx: &mut Context<Self>) {
+        self.copy_and_edit(hud, false, cx);
+    }
+
+    // The installed card's Edit: a made HUD or copy opens as it is; any other HUD is copied
+    // first, so a store HUD's original keeps taking its updates.
+    fn edit_installed(&mut self, hud: &HudEntry, made: bool, cx: &mut Context<Self>) {
+        match made {
+            true => cx.emit(EditInHudMaker(hud.id().clone())),
+            false => self.copy_and_edit(hud, true, cx),
+        }
+    }
+
     // Makes an editable copy of `hud` off the UI thread, since a HUD can be hundreds of MB,
     // then opens the copy in the HUD Maker. The job fills `made` with the copy's id for the
-    // after-run hook, which runs only on success.
-    fn copy(&mut self, hud: &HudEntry, _: &mut Window, cx: &mut Context<Self>) {
+    // after-run hook, which runs only on success. `installed` picks the installed card's toast.
+    fn copy_and_edit(&mut self, hud: &HudEntry, installed: bool, cx: &mut Context<Self>) {
         let (id, author) = (hud.id().clone(), hud.author().to_owned());
+        let base = hud.name().to_owned();
         let busy = Busy::Copy(hud.folder_name().to_owned());
         let made = Arc::new(Mutex::new(None::<HudId>));
         let (page, made_for_open) = (cx.entity().downgrade(), made.clone());
@@ -633,7 +648,10 @@ impl HudsPage {
                 if let Ok(mut slot) = made.lock() {
                     *slot = Some(copy.id().clone());
                 }
-                let text = copy_made_text(copy.name(), &author);
+                let text = match installed {
+                    true => editing_copy_text(&base, &author),
+                    false => copy_made_text(copy.name(), &author),
+                };
                 Ok((ToastKind::Success, "Copy made".into(), text.into()))
             },
             cx,
@@ -702,6 +720,8 @@ type AfterRun = Box<dyn FnOnce(&mut Window, &mut App)>;
 struct Installed {
     name: String,
     managed: bool,
+    /// The library's entry and whether it opens as it is; None for a hand-placed folder.
+    entry: Option<(HudEntry, bool)>,
 }
 
 impl HudsPage {
@@ -714,12 +734,12 @@ impl HudsPage {
             HudStatus::Unmanaged { folder_name } => (folder_name, None),
             _ => return None,
         };
-        let name = managed_id
-            .and_then(|id| self.huds.iter().find(|h| h.id() == id))
-            .map_or(folder.as_str(), HudEntry::name);
+        let entry = managed_id.and_then(|id| self.huds.iter().find(|h| h.id() == id));
+        let name = entry.map_or(folder.as_str(), HudEntry::name);
         Some(Installed {
             name: name.to_owned(),
             managed: managed_id.is_some(),
+            entry: entry.map(|h| (h.clone(), self.made.contains(h.folder_name()))),
         })
     }
 
@@ -796,6 +816,22 @@ fn installed_card(
         let place = "Added to TF2 outside TF2Tools.";
         (outline, theme.border, "External", place)
     };
+    // Edit is a library action, so it stays enabled without TF2; it waits out any other action.
+    let edit = hud.entry.map(|(entry, made)| {
+        let copying = busy == Some(&Busy::Copy(entry.folder_name().to_owned()));
+        Button::new(ids::HUDS_INSTALLED_EDIT)
+            .outline()
+            .px(SM_ICON_PX)
+            .icon(IconName::Pencil)
+            .label("Edit")
+            .tooltip(match busy {
+                Some(_) if !copying => EDIT_WAIT,
+                _ => "Edit in HUD Maker",
+            })
+            .loading(copying)
+            .disabled(busy.is_some() && !copying)
+            .on_click(cx.listener(move |page, _, _, cx| page.edit_installed(&entry, made, cx)))
+    });
     card_frame(cx)
         .id(ids::HUDS_INSTALLED)
         .test_support()
@@ -819,19 +855,21 @@ fn installed_card(
                                 ))
                                 .child(badge_of(ids::HUDS_INSTALLED_BADGE, badge, border, text)),
                         )
-                        .child(needs_tf2(
-                            Button::new(ids::HUDS_UNINSTALL)
-                                .outline()
-                                .px(SM_ICON_PX)
-                                .icon(IconName::Unplug)
-                                .label("Uninstall")
-                                .loading(busy == Some(&Busy::Uninstall))
-                                .disabled(busy.is_some_and(|b| *b != Busy::Uninstall))
-                                .on_click(cx.listener(|page, _, window, cx| {
-                                    page.uninstall(None, window, cx)
-                                })),
-                            has_tf2,
-                        )),
+                        .child(
+                            h_flex().gap_2().children(edit).child(needs_tf2(
+                                Button::new(ids::HUDS_UNINSTALL)
+                                    .outline()
+                                    .px(SM_ICON_PX)
+                                    .icon(IconName::Unplug)
+                                    .label("Uninstall")
+                                    .loading(busy == Some(&Busy::Uninstall))
+                                    .disabled(busy.is_some_and(|b| *b != Busy::Uninstall))
+                                    .on_click(cx.listener(|page, _, window, cx| {
+                                        page.uninstall(None, window, cx)
+                                    })),
+                                has_tf2,
+                            )),
+                        ),
                 )
                 .child(labelled(
                     div().px_6().text_sm().text_color(theme.muted_foreground),

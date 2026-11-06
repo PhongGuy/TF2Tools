@@ -633,18 +633,20 @@ fn a_profile_without_a_hud_refuses_too() {
 }
 
 #[test]
-fn install_anyway_with_the_hud_missing_refuses_too() {
+fn install_anyway_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking() {
     let env = library_env();
     let gone = hud(&env, "budhud");
     let profile = hud_profile(&env, DraftSlot::Item(gone.id().clone()));
     env.lib.delete_hud(gone.id()).unwrap();
     place(&env, "manual");
-    let err = env
+    // The skipped HUD step removes nothing, so there is no HUD to ask about.
+    let report = env
         .lib
         .apply_profile(profile.id(), &env.tf2, &builtin_catalog(), true)
-        .unwrap_err();
-    assert!(matches!(err, ApplyProfileError::ExternalHuds(_)), "{err:?}");
+        .unwrap();
+    assert!(!report.applied().contains(&ApplyStep::Hud));
     assert!(env.tf2.custom_dir().join("manual/info.vdf").is_file());
+    assert_eq!(env.lib.active_profile().unwrap(), None);
 }
 
 #[test]

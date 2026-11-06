@@ -23,7 +23,7 @@ use gpui_kit::{
 
 use tf2tools_core::{
     ApplyProfileError, ApplyProfileReport, ApplyStep, ExternalHud, LogLevel, MissingItem,
-    NewLogEntry, Profile, ProfileError, ProfileId, StoreKind, Tf2Install,
+    MissingKind, NewLogEntry, Profile, ProfileError, ProfileId, StoreKind, Tf2Install,
 };
 
 use self::probe::Tf2Probe;
@@ -550,13 +550,16 @@ fn apply_job(
     let skipped: Vec<&str> = report.skipped().iter().map(MissingItem::name).collect();
     let details = model::report_details(report.applied(), &skipped, report.failed());
     let name = profile.name();
-    let (level, message) = if report.failed().is_empty() {
-        (LogLevel::Info, format!("Activated profile: {name}"))
-    } else {
+    let (level, message) = if !report.failed().is_empty() {
         (
             LogLevel::Error,
             format!("Failed to activate profile: {name}"),
         )
+    } else if skipped.is_empty() {
+        (LogLevel::Info, format!("Activated profile: {name}"))
+    } else {
+        // Missing items were left as they were, so the profile is applied, not active.
+        (LogLevel::Info, format!("Applied profile: {name}"))
     };
     let entry = NewLogEntry::new(level, "profile", "activate", message).with_details(details);
     activity::write(s, &entry);
@@ -591,7 +594,7 @@ fn announce(done: Result<Activation, OpError>, tf2: Tf2Install, window: &mut Win
             note,
             ..
         }) if report.failed().is_empty() => {
-            let title = format!("Profile \"{}\" activated", profile.name());
+            let title = model::success_title(profile.name(), !report.skipped().is_empty());
             // A HUD kept out of its expected folder warns as a plain HUD install does.
             match report.hud_blocked_name() {
                 Some(blocked) => toast(
@@ -603,8 +606,10 @@ fn announce(done: Result<Activation, OpError>, tf2: Tf2Install, window: &mut Win
                 ),
                 None => {
                     let installed = model::installed_parts(&profile, &report);
-                    let skipped = report.skipped().len();
-                    let mut description = model::activated_description(&installed, skipped);
+                    let kinds: Vec<MissingKind> =
+                        report.skipped().iter().map(|m| m.kind().clone()).collect();
+                    let kept = model::kept_parts(&kinds);
+                    let mut description = model::activated_description(&installed, &kept);
                     if let Some(note) = note {
                         description = format!("{description}. {note}");
                     }
