@@ -29,8 +29,9 @@ const STORES: [Page; 4] = [
     Page::CrosshairStore,
     Page::AddonStore,
 ];
-// Maps sits under the makers: it is the least-used item.
-const MAKERS: [Page; 3] = [Page::CrosshairMaker, Page::HudMaker, Page::Maps];
+const MAKERS: [Page; 2] = [Page::CrosshairMaker, Page::HudMaker];
+// Maps gets its own group under the makers: it is the least-used item.
+const MAPS: [Page; 1] = [Page::Maps];
 const FOOTER: [Page; 2] = [Page::Settings, Page::Logs];
 // v5's nav item height, and the shorter one a short window uses so every item fits.
 const NAV_HEIGHT: f32 = 32.;
@@ -74,10 +75,11 @@ pub(super) fn render(
             .when(!tight, |d| d.py_2())
             .child(group)
     };
-    let (tools, stores, makers, footer) = (
+    let (tools, stores, makers, maps, footer) = (
         group(&TOOLS, cx),
         group(&STORES, cx),
         group(&MAKERS, cx),
+        group(&MAPS, cx),
         group(&FOOTER, cx),
     );
     v_flex()
@@ -131,6 +133,8 @@ pub(super) fn render(
                         .child(padded(stores))
                         .child(separator())
                         .child(padded(makers))
+                        .child(separator())
+                        .child(padded(maps))
                         .overflow_y_scrollbar(),
                 ),
         )
