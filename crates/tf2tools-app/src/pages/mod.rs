@@ -10,6 +10,7 @@ pub mod hud_maker;
 pub mod hud_store;
 pub mod huds;
 pub mod logs;
+pub mod maps;
 pub mod placeholder;
 pub mod profiles;
 pub mod settings;

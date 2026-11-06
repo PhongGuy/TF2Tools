@@ -35,6 +35,7 @@ use crate::pages::hud_maker::HudMakerPage;
 use crate::pages::hud_store::HudStorePage;
 use crate::pages::huds::{EditInHudMaker, HudsPage};
 use crate::pages::logs::LogsPage;
+use crate::pages::maps::MapsPage;
 use crate::pages::profiles::ProfilesPage;
 use crate::pages::settings::SettingsPage;
 use crate::pages::sound_store::SoundStorePage;
@@ -85,6 +86,7 @@ pub struct Shell {
     addon_store: Option<Entity<AddonStorePage>>,
     crosshair_store: Option<Entity<CrosshairStorePage>>,
     logs: Option<Entity<LogsPage>>,
+    maps: Option<Entity<MapsPage>>,
     addons: Option<Entity<AddonsPage>>,
     profiles: Option<Entity<ProfilesPage>>,
 }
@@ -178,6 +180,7 @@ impl Shell {
             addon_store: None,
             crosshair_store: None,
             logs: None,
+            maps: None,
             addons: None,
             profiles: None,
         }
@@ -188,7 +191,7 @@ impl Shell {
     }
 
     // Leaving a library page or a maker drops it, so the next visit builds it fresh from the
-    // saved state; only the HUDs search text is carried over. The stores, the Activity Log and Settings are kept, hidden, so a return finds
+    // saved state; only the HUDs search text is carried over. The stores, Maps, the Activity Log and Settings are kept, hidden, so a return finds
     // their tab, search, filters, sort, scroll and unsaved edits as left. Re-selecting the
     // current page keeps it as it is. A playing sound plays on; the idle player shows only on
     // the sound pages, and toasts rise above it while it shows.
@@ -230,6 +233,9 @@ impl Shell {
                 p.update(cx, |p, cx| p.set_hidden(hidden, cx));
             }),
             Page::Logs => self.logs.as_ref().map(|p| {
+                p.update(cx, |p, cx| p.set_hidden(hidden, cx));
+            }),
+            Page::Maps => self.maps.as_ref().map(|p| {
                 p.update(cx, |p, cx| p.set_hidden(hidden, cx));
             }),
             Page::Settings => self.settings.as_ref().map(|p| {
@@ -334,6 +340,11 @@ impl Shell {
     /// The Logs page while it shows.
     pub fn logs_page(&self) -> Option<Entity<LogsPage>> {
         self.shown(Page::Logs, &self.logs)
+    }
+
+    /// The Maps page while it shows.
+    pub fn maps_page(&self) -> Option<Entity<MapsPage>> {
+        self.shown(Page::Maps, &self.maps)
     }
 
     /// The Addons page while it shows.
@@ -516,6 +527,11 @@ impl Render for Shell {
             Page::Logs => self
                 .logs
                 .get_or_insert_with(|| cx.new(|cx| LogsPage::new(window, cx)))
+                .clone()
+                .into_any_element(),
+            Page::Maps => self
+                .maps
+                .get_or_insert_with(|| cx.new(|cx| MapsPage::new(window, cx)))
                 .clone()
                 .into_any_element(),
             // The page asks to show another page by event; the subscription dies with the page.

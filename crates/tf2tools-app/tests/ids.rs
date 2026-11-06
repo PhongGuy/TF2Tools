@@ -27,6 +27,7 @@ fn page_ids_use_kebab_slugs() {
             "addon-store",
             "crosshair-maker",
             "hud-maker",
+            "maps",
             "settings",
             "logs"
         ]
@@ -79,6 +80,7 @@ fn labels_and_titles_match_v5() {
             ("Addon Store", "Addon Store"),
             ("Crosshair Maker", "Crosshair Maker"),
             ("HUD Maker", "HUD Maker"),
+            ("Maps", "Maps"),
             ("Settings", "Settings"),
             ("Logs", "Activity Log"),
         ]

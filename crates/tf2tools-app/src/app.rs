@@ -169,11 +169,13 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                 Ok((services, collapsed, huds, update_source, crash, old_v4)) => {
                     timing::mark(cx, "services");
                     let store = services.store.clone();
+                    let store_for_maps = store.clone();
                     cx.set_global(services);
                     // The shell subscribes to the hub, so the hub must exist before it.
                     SyncHub::install(cx, store_runner(store.clone()));
                     RemoteImages::install(cx, store_fetch(store));
                     StoreDownloads::install(cx);
+                    crate::pages::maps::MapListSource::install(cx, store_for_maps);
                     let updates = Updater::install(cx, update_source, updater::system_restart());
                     activity::watch_stores(cx);
                     install_tf2_state(cx, Tf2State::Detecting);

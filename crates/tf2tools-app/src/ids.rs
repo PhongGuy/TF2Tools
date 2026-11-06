@@ -2100,3 +2100,44 @@ pub const HUD_MAKER_TIMELINE_TIME: &str = "hud-maker-timeline-time";
 pub fn hud_maker_anim_colour(event: &str, row: usize) -> ElementId {
     keyed("hud-maker-anim-colour", &format!("{event}#{row}"))
 }
+
+/// The Maps page's search box.
+pub const MAPS_SEARCH: &str = "maps-search";
+/// Wraps the Maps page's sort select.
+pub const MAPS_SORT: &str = "maps-sort";
+/// Labelled with the map count, such as "4368 maps" or "2 of 4368 maps".
+pub const MAPS_COUNT: &str = "maps-count";
+/// Fetches serveme.tf's map list again.
+pub const MAPS_REFRESH: &str = "maps-refresh";
+/// The Maps page's row list.
+pub const MAPS_LIST: &str = "maps-list";
+/// The map list's scrollbar, in a gutter just right of the rows.
+pub const MAPS_LIST_SCROLLBAR: &str = "maps-list-scrollbar";
+/// Labelled "Getting the map list..." or "No maps match your search" when no row shows.
+pub const MAPS_EMPTY: &str = "maps-empty";
+/// The text of a failed map list fetch.
+pub const MAPS_ERROR: &str = "maps-error";
+/// Retries a failed map list fetch.
+pub const MAPS_RETRY: &str = "maps-retry";
+/// The Maps page's "TF2 not found" warning, present only without a TF2 install.
+pub const MAPS_NO_TF2: &str = "maps-no-tf2";
+
+/// One map's row: "map-row:<name>".
+pub fn map_row(name: &str) -> ElementId {
+    keyed("map-row", name)
+}
+
+/// A row's Download button, labelled with its percent while it runs: "map-download:<name>".
+pub fn map_download(name: &str) -> ElementId {
+    keyed("map-download", name)
+}
+
+/// A downloaded map's Remove button: "map-remove:<name>".
+pub fn map_remove(name: &str) -> ElementId {
+    keyed("map-remove", name)
+}
+
+/// A row's state, labelled "Downloaded" or "In game": "map-state:<name>".
+pub fn map_state(name: &str) -> ElementId {
+    keyed("map-state", name)
+}
