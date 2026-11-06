@@ -106,20 +106,50 @@ pub fn installed_parts(profile: &Profile, report: &ApplyProfileReport) -> Vec<&'
         .collect()
 }
 
-/// The success toast's description: v5's "Installed: ..." or "All customizations cleared",
-/// plus ". Skipped N missing item(s)" when the apply left items out.
-pub fn activated_description(installed: &[&str], skipped: usize) -> String {
-    let mut text = if installed.is_empty() {
-        "All customizations cleared".to_owned()
+/// The success toast's title: "activated" when the game now matches the profile, "applied"
+/// when missing items were skipped and so the profile is not marked Active.
+pub fn success_title(name: &str, skipped: bool) -> String {
+    let verb = if skipped { "applied" } else { "activated" };
+    format!("Profile \"{name}\" {verb}")
+}
+
+/// The slots whose missing items were skipped, once each in step order, as `step_label`s.
+pub fn kept_parts(kinds: &[MissingKind]) -> Vec<&'static str> {
+    let crosshair = |k: &MissingKind| matches!(k, MissingKind::Crosshair { .. });
+    [
+        (ApplyStep::Hud, kinds.contains(&MissingKind::Hud)),
+        (ApplyStep::Hitsound, kinds.contains(&MissingKind::Hitsound)),
+        (
+            ApplyStep::Killsound,
+            kinds.contains(&MissingKind::Killsound),
+        ),
+        (ApplyStep::Crosshairs, kinds.iter().any(crosshair)),
+    ]
+    .into_iter()
+    .filter(|(_, kept)| *kept)
+    .map(|(step, _)| step_label(step))
+    .collect()
+}
+
+/// The success toast's description: v5's "Installed: ..." or "All customizations cleared";
+/// with skipped slots, which ones kept what the player had.
+pub fn activated_description(installed: &[&str], kept: &[&str]) -> String {
+    if kept.is_empty() {
+        return if installed.is_empty() {
+            "All customizations cleared".to_owned()
+        } else {
+            format!("Installed: {}", installed.join(", "))
+        };
+    }
+    let lead = if installed.is_empty() {
+        "Nothing new installed".to_owned()
     } else {
         format!("Installed: {}", installed.join(", "))
     };
-    match skipped {
-        0 => {}
-        1 => text.push_str(". Skipped 1 missing item"),
-        n => text.push_str(&format!(". Skipped {n} missing items")),
-    }
-    text
+    format!(
+        "{lead}. Kept what you had for: {} (missing from your library)",
+        kept.join(", ")
+    )
 }
 
 /// The failure toast's description, naming the failed steps only; their raw errors stay in the

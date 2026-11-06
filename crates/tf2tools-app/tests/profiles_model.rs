@@ -2,8 +2,8 @@ mod support;
 
 use gpui_kit::TestAppContext;
 use tf2tools_app::pages::profiles::model::{
-    activated_description, crosshair_count, failed_description, kind_label, matches,
-    redownload_target, report_details, step_label,
+    activated_description, crosshair_count, failed_description, kept_parts, kind_label, matches,
+    redownload_target, report_details, step_label, success_title,
 };
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_core::{ApplyStep, GbId, MissingKind, Provenance, StoreItemId, StoreKind};
@@ -46,20 +46,51 @@ fn steps_and_kinds_have_v5_s_labels() {
 }
 
 #[test]
-fn the_activated_toast_reads_like_v5_plus_skips() {
+fn the_activated_toast_reads_like_v5() {
     assert_eq!(
-        activated_description(&["HUD", "Hitsound", "Killsound", "Crosshairs"], 0),
+        activated_description(&["HUD", "Hitsound", "Killsound", "Crosshairs"], &[]),
         "Installed: HUD, Hitsound, Killsound, Crosshairs"
     );
-    assert_eq!(activated_description(&[], 0), "All customizations cleared");
     assert_eq!(
-        activated_description(&["Hitsound"], 1),
-        "Installed: Hitsound. Skipped 1 missing item"
+        activated_description(&[], &[]),
+        "All customizations cleared"
+    );
+}
+
+#[test]
+fn an_apply_with_skips_names_what_it_kept() {
+    assert_eq!(
+        activated_description(&["Hitsound"], &["HUD"]),
+        "Installed: Hitsound. Kept what you had for: HUD (missing from your library)"
     );
     assert_eq!(
-        activated_description(&[], 2),
-        "All customizations cleared. Skipped 2 missing items"
+        activated_description(&[], &["HUD", "Crosshairs"]),
+        "Nothing new installed. Kept what you had for: HUD, Crosshairs (missing from your library)"
     );
+}
+
+#[test]
+fn a_skip_makes_the_title_say_applied_not_activated() {
+    assert_eq!(success_title("Comp", false), "Profile \"Comp\" activated");
+    assert_eq!(success_title("Comp", true), "Profile \"Comp\" applied");
+}
+
+#[test]
+fn kept_parts_name_each_skipped_slot_once_in_step_order() {
+    let scattergun = MissingKind::Crosshair {
+        weapon_script: "tf_weapon_scattergun".into(),
+    };
+    let minigun = MissingKind::Crosshair {
+        weapon_script: "tf_weapon_minigun".into(),
+    };
+    let kinds = [
+        MissingKind::Killsound,
+        MissingKind::Hud,
+        scattergun,
+        minigun,
+    ];
+    assert_eq!(kept_parts(&kinds), ["HUD", "Killsound", "Crosshairs"]);
+    assert!(kept_parts(&[]).is_empty());
 }
 
 #[test]
