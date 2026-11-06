@@ -524,6 +524,8 @@ pub const HUDS_INSTALLED_BADGE: &str = "huds-installed-badge";
 pub const HUDS_INSTALLED_PATH: &str = "huds-installed-path";
 /// The installed card's "Uninstall" button; removes the HUD from tf/custom.
 pub const HUDS_UNINSTALL: &str = "huds-uninstall";
+/// The installed card's "Edit" button; opens the HUD, or a copy of it, in the HUD Maker.
+pub const HUDS_INSTALLED_EDIT: &str = "huds-installed-edit";
 /// The warning shown when more than one HUD sits in tf/custom.
 pub const HUDS_CONFLICTS: &str = "huds-conflicts";
 /// Wraps the library search input.
