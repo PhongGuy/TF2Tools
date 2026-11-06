@@ -8,6 +8,7 @@ mod github;
 pub(crate) mod http;
 mod images;
 mod items;
+mod maps;
 mod sync;
 mod unpack;
 
@@ -26,6 +27,7 @@ pub use cards::{StoreCard, StoreCursor, StoreQuery, StoreSort};
 pub use download::{DownloadPhase, DownloadProgress};
 use http::{Http, Redirects, Timeouts};
 pub use items::{StoreFile, StoreItem, StoreItemId};
+pub use maps::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 
 const MB: u64 = 1024 * 1024;
 /// The page limit of a store whose limit is neither fixed nor derived (v5's cap).
@@ -96,6 +98,8 @@ pub struct Endpoints {
     image_prefixes: Vec<String>,
     hud_resources: String,
     wiki_images: String,
+    serveme: String,
+    map_downloads: String,
 }
 
 impl Default for Endpoints {
@@ -117,6 +121,8 @@ impl Default for Endpoints {
                 "https://raw.githubusercontent.com/mastercomfig/hud-db/main/hud-resources"
                     .to_owned(),
             wiki_images: "https://wiki.teamfortress.com/w/images".to_owned(),
+            serveme: "https://serveme.tf".to_owned(),
+            map_downloads: "https://fastdl.serveme.tf/maps".to_owned(),
         }
     }
 }
@@ -124,8 +130,8 @@ impl Default for Endpoints {
 impl Endpoints {
     /// Every base under `base` (no trailing slash): GameBanana `{base}/apiv11`, GitHub API
     /// `{base}/gh-api`, github.com `{base}/gh`, previews `[{base}/preview/]`, images
-    /// `[{base}/img/]`, hud-db screenshots `{base}/img/hud-resources` and wiki images
-    /// `{base}/img/wiki`.
+    /// `[{base}/img/]`, hud-db screenshots `{base}/img/hud-resources`, wiki images
+    /// `{base}/img/wiki`, serveme.tf `{base}/serveme` and map files `{base}/fastdl/maps`.
     pub fn loopback(base: &str) -> Self {
         Self {
             gamebanana: format!("{base}/apiv11"),
@@ -135,6 +141,8 @@ impl Endpoints {
             image_prefixes: vec![format!("{base}/img/")],
             hud_resources: format!("{base}/img/hud-resources"),
             wiki_images: format!("{base}/img/wiki"),
+            serveme: format!("{base}/serveme"),
+            map_downloads: format!("{base}/fastdl/maps"),
         }
     }
 
@@ -204,6 +212,28 @@ impl Endpoints {
         )
     }
 
+    /// The serveme.tf base whose `/maps` page lists the community maps.
+    pub fn serveme(&self) -> &str {
+        &self.serveme
+    }
+
+    /// The base a map downloads from, as `{base}/{name}.bsp`.
+    pub fn map_downloads(&self) -> &str {
+        &self.map_downloads
+    }
+
+    /// These endpoints with another serveme.tf base.
+    pub fn with_serveme(mut self, base: impl Into<String>) -> Self {
+        self.serveme = base.into();
+        self
+    }
+
+    /// These endpoints with another map download base.
+    pub fn with_map_downloads(mut self, base: impl Into<String>) -> Self {
+        self.map_downloads = base.into();
+        self
+    }
+
     /// These endpoints with another GameBanana API base.
     pub fn with_gamebanana(mut self, base: impl Into<String>) -> Self {
         self.gamebanana = base.into();
@@ -259,6 +289,7 @@ pub struct StoreConfig {
     connect_timeout: Duration,
     read_timeout: Duration,
     loopback_only: bool,
+    map_size_cap: u64,
 }
 
 impl Default for StoreConfig {
@@ -272,6 +303,7 @@ impl Default for StoreConfig {
             connect_timeout: Duration::from_secs(10),
             read_timeout: Duration::from_secs(30),
             loopback_only: false,
+            map_size_cap: 512 * MB,
         }
     }
 }
@@ -304,6 +336,17 @@ impl StoreConfig {
     /// The largest download accepted for `kind`, in bytes.
     pub fn size_cap(&self, kind: StoreKind) -> u64 {
         self.size_caps[kind.index()]
+    }
+
+    /// The largest map file accepted, in bytes; serveme's biggest is about 210 MB.
+    pub fn map_size_cap(&self) -> u64 {
+        self.map_size_cap
+    }
+
+    /// This config with another map size cap.
+    pub fn with_map_size_cap(mut self, bytes: u64) -> Self {
+        self.map_size_cap = bytes;
+        self
     }
 
     /// How long a connection may take to open.

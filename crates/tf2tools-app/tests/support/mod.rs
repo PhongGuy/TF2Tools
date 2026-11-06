@@ -892,6 +892,16 @@ impl StoreServer {
         format!("{}{route}", self.uri())
     }
 
+    /// Serves `body` at `route` (a path such as `/serveme/maps`).
+    pub fn mount_bytes(&self, route: &str, body: Vec<u8>) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(route))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+                .mount(&self.server),
+        );
+    }
+
     /// A curated HUD's archive at `{uri}/repo/{hud_id}/archive/{CURATED_HASH}.zip`; returns the repo URL to seed.
     pub fn mount_curated(&self, hud_id: &str, body: Vec<u8>, delay: Duration) -> String {
         self.rt.block_on(

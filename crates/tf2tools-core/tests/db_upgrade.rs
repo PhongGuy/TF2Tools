@@ -25,7 +25,7 @@ const V1_SCHEMA: &str = "
     PRAGMA user_version = 1;";
 
 #[test]
-fn v5_database_upgrades_to_v11_without_loss() {
+fn v5_database_upgrades_to_v12_without_loss() {
     let (_tmp, dir) = common::temp_data_dir();
     common::write_v5_database(&dir);
     let before = common::dump_tables(&Connection::open(dir.db_path()).unwrap());
@@ -34,15 +34,23 @@ fn v5_database_upgrades_to_v11_without_loss() {
         "seed fills every table"
     );
     let db = Database::open(&dir).expect("open v5 database");
-    assert_eq!(db.schema_version(), 11);
+    assert_eq!(db.schema_version(), 12);
     drop(db);
     let after = Connection::open(dir.db_path()).unwrap();
-    assert_eq!(common::dump_tables(&after), before);
-    assert_eq!(common::schema_shape(&after), common::v10_shape());
+    let mut rows = common::dump_tables(&after);
+    for table in ["store_maps", "downloaded_maps"] {
+        assert_eq!(
+            rows.remove(table).map(|r| r.len()),
+            Some(0),
+            "{table} starts empty"
+        );
+    }
+    assert_eq!(rows, before);
+    assert_eq!(common::schema_shape(&after), common::current_shape());
     let version: u32 = after
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 11);
+    assert_eq!(version, 12);
     let analyzed: i64 = after
         .query_row(
             "SELECT count(*) FROM sqlite_master WHERE name = 'sqlite_stat1'",
@@ -66,12 +74,12 @@ fn v5_database_upgrades_to_v11_without_loss() {
         assert!(sql.ends_with("WHERE store_gb_id IS NOT NULL"), "{sql}");
     }
     drop(after);
-    let db = Database::open(&dir).expect("reopen at v11");
-    assert_eq!(db.schema_version(), 11);
+    let db = Database::open(&dir).expect("reopen at v12");
+    assert_eq!(db.schema_version(), 12);
 }
 
 #[test]
-fn v1_database_upgrades_to_v11() {
+fn v1_database_upgrades_to_v12() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -87,11 +95,11 @@ fn v1_database_upgrades_to_v11() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v1 database");
-    assert_eq!(db.schema_version(), 11);
+    assert_eq!(db.schema_version(), 12);
     drop(db);
 
     let conn = Connection::open(dir.db_path()).unwrap();
-    assert_eq!(common::schema_shape(&conn), common::v10_shape());
+    assert_eq!(common::schema_shape(&conn), common::current_shape());
     let keys: Vec<String> = conn
         .prepare("SELECT key FROM store_cache_meta ORDER BY key")
         .unwrap()
@@ -115,7 +123,7 @@ fn newer_schema_is_refused_and_left_untouched() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
-    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 12;")
+    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 13;")
         .unwrap();
     drop(conn);
     let before = std::fs::read(dir.db_path()).unwrap();
@@ -125,7 +133,7 @@ fn newer_schema_is_refused_and_left_untouched() {
 
     let err = Database::open(&dir).expect_err("a newer schema must be refused");
     assert!(
-        matches!(&err, OpenError::NewerSchema { path, found: 12, supported: 11 } if *path == dir.db_path()),
+        matches!(&err, OpenError::NewerSchema { path, found: 13, supported: 12 } if *path == dir.db_path()),
         "{err:?}"
     );
     assert_eq!(std::fs::read(dir.db_path()).unwrap(), before);
@@ -232,7 +240,7 @@ fn v10_database_marks_the_gamebanana_mod_stores_stale_and_keeps_their_rows() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v10 database");
-    assert_eq!(db.schema_version(), 11);
+    assert_eq!(db.schema_version(), 12);
     drop(db);
     let conn = Connection::open(dir.db_path()).unwrap();
     let keys: Vec<String> = conn
@@ -254,4 +262,22 @@ fn v10_database_marks_the_gamebanana_mod_stores_stale_and_keeps_their_rows() {
     for table in ["store_crosshairs", "store_huds_gb"] {
         assert_eq!(common::count(&dir, table), 1, "{table} rows are kept");
     }
+}
+
+#[test]
+fn v11_database_gains_the_map_tables() {
+    let (_tmp, dir) = common::temp_data_dir();
+    drop(Database::open(&dir).expect("create"));
+    let conn = Connection::open(dir.db_path()).unwrap();
+    conn.execute_batch(
+        "DROP TABLE store_maps; DROP TABLE downloaded_maps; PRAGMA user_version = 11;",
+    )
+    .unwrap();
+    drop(conn);
+
+    let db = Database::open(&dir).expect("open v11 database");
+    assert_eq!(db.schema_version(), 12);
+    drop(db);
+    assert_eq!(common::count(&dir, "store_maps"), 0);
+    assert_eq!(common::count(&dir, "downloaded_maps"), 0);
 }

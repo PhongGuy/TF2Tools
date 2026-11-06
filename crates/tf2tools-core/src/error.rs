@@ -794,6 +794,108 @@ pub enum FilesError {
     },
 }
 
+/// Why a community map was not downloaded into `tf/maps`.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum MapDownloadError {
+    /// The name is not a plain map file name.
+    #[error("{name:?} is not a map name")]
+    BadName {
+        /// The name that was asked for.
+        name: String,
+    },
+    /// The game already has this map, and TF2Tools did not put it there.
+    #[error("{name} is already in the game")]
+    InGame {
+        /// The map's name.
+        name: String,
+    },
+    /// TF2Tools already downloaded this map.
+    #[error("{name} is already downloaded")]
+    AlreadyDownloaded {
+        /// The map's name.
+        name: String,
+    },
+    /// The file that arrived is not a map.
+    #[error("the file for {name} is not a map")]
+    NotAMap {
+        /// The map's name.
+        name: String,
+    },
+    /// The server kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// The server answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// The server could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The file grew past the map size cap.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// A file in the game folder could not be written or moved.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The file or folder involved.
+        path: PathBuf,
+        /// The underlying error.
+        #[source]
+        source: std::io::Error,
+    },
+    /// SQLite failed to record the download.
+    #[error("map database error: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+}
+
+/// Why a community map was not removed from `tf/maps`.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum MapRemoveError {
+    /// TF2Tools did not download this map, so it is never removed.
+    #[error("{name} was not downloaded by TF2Tools")]
+    NotDownloaded {
+        /// The map's name.
+        name: String,
+    },
+    /// The map file could not be deleted.
+    #[error("cannot delete {path}: {source}")]
+    Io {
+        /// The file involved.
+        path: PathBuf,
+        /// The underlying error.
+        #[source]
+        source: std::io::Error,
+    },
+    /// SQLite failed to read or forget the download.
+    #[error("map database error: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+}
+
 /// Why a store download did not end up in the library.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

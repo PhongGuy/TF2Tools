@@ -29,11 +29,15 @@ const STORES: [Page; 4] = [
     Page::CrosshairStore,
     Page::AddonStore,
 ];
-const MAKERS: [Page; 2] = [Page::CrosshairMaker, Page::HudMaker];
+// Maps sits under the makers: it is the least-used item.
+const MAKERS: [Page; 3] = [Page::CrosshairMaker, Page::HudMaker, Page::Maps];
 const FOOTER: [Page; 2] = [Page::Settings, Page::Logs];
+// v5's nav item height, and the shorter one a short window uses so every item fits.
+const NAV_HEIGHT: f32 = 32.;
+const NAV_TIGHT_HEIGHT: f32 = 28.;
 // The window height below which v5's spacing pushes the open rail's last group under its
-// footer; shorter windows tighten the spacing between groups so every item shows whole.
-const ROOMY_HEIGHT: Pixels = px(624.);
+// footer; shorter windows tighten the spacing and the items so every item shows whole.
+const ROOMY_HEIGHT: Pixels = px(660.);
 
 /// Element `sidebar`, `SIDEBAR_WIDTH` wide, or `SIDEBAR_COLLAPSED_WIDTH` when `collapsed`, in a
 /// window `window_height` tall.
@@ -50,19 +54,19 @@ pub(super) fn render(
         theme.sidebar_foreground,
         theme.primary,
     );
+    // The shut rail's title row takes no height, so only the open one needs the tighter spacing.
+    let tight = !collapsed && window_height < ROOMY_HEIGHT;
     let group = |pages: &[Page], cx: &mut Context<Shell>| {
         v_flex().gap_1().children(
             pages
                 .iter()
-                .map(|&p| nav_item(p, p == active, collapsed, cx))
+                .map(|&p| nav_item(p, p == active, collapsed, tight, cx))
                 .collect::<Vec<_>>(),
         )
     };
     // v5's SidebarSeparator spans its container: the full rail between groups, inset by the
     // footer's padding at the bottom.
     let separator = || Separator::horizontal().color(border);
-    // The shut rail's title row takes no height, so only the open one needs the tighter spacing.
-    let tight = !collapsed && window_height < ROOMY_HEIGHT;
     let padded = |group| {
         div()
             .px_2()
@@ -139,6 +143,7 @@ fn nav_item(
     page: Page,
     active: bool,
     collapsed: bool,
+    tight: bool,
     cx: &mut Context<Shell>,
 ) -> impl IntoElement + use<> {
     let theme = cx.theme();
@@ -153,7 +158,7 @@ fn nav_item(
         .flex()
         .items_center()
         .gap_2()
-        .h(px(32.))
+        .h(px(if tight { NAV_TIGHT_HEIGHT } else { NAV_HEIGHT }))
         .rounded(px(8.))
         .text_sm()
         .cursor_pointer()
@@ -184,5 +189,6 @@ pub fn icon(page: Page) -> IconName {
         Page::Addons | Page::AddonStore => IconName::Puzzle,
         Page::Settings => IconName::Settings,
         Page::Logs => IconName::ScrollText,
+        Page::Maps => IconName::Map,
     }
 }

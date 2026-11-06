@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 11;
+pub(crate) const SCHEMA_VERSION: u32 = 12;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -81,6 +81,11 @@ const STEPS: &[Step] = &[
     Step {
         version: 11,
         sql: STEP_11_SQL,
+        add_columns: &[],
+    },
+    Step {
+        version: 12,
+        sql: STEP_12_SQL,
         add_columns: &[],
     },
 ];
@@ -368,5 +373,23 @@ const STEP_11_SQL: &str = "
     DELETE FROM store_cache_meta WHERE key IN (
         'crosshairs_last_synced', 'crosshairs_sync_page', 'crosshairs_sync_start', 'crosshairs_sync_fetched',
         'huds_gb_last_synced', 'huds_gb_sync_page', 'huds_gb_sync_start', 'huds_gb_sync_fetched'
+    );
+";
+
+/// v6 step 12: the cached serveme.tf map list, and the maps the app put in `tf/maps`, which
+/// are the only ones it may remove.
+const STEP_12_SQL: &str = "
+    CREATE TABLE IF NOT EXISTS store_maps (
+        name TEXT PRIMARY KEY,
+        times_played INTEGER NOT NULL DEFAULT 0,
+        first_played TEXT,
+        last_played TEXT,
+        size INTEGER NOT NULL DEFAULT 0,
+        fetched_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS downloaded_maps (
+        name TEXT PRIMARY KEY,
+        size INTEGER NOT NULL,
+        downloaded_at TEXT NOT NULL
     );
 ";
