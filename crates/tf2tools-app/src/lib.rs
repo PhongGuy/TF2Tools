@@ -16,6 +16,7 @@ pub mod keymap;
 pub mod library_events;
 pub mod local_messages;
 pub mod notices;
+pub mod old_v4;
 pub mod pages;
 pub mod picker;
 pub mod previews;
