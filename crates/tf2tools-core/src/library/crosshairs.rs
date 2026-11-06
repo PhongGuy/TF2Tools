@@ -18,6 +18,7 @@ use crate::paths::LibraryKind;
 use crate::templates;
 use crate::texture::{RgbaImage, decode_vtf, png_to_vtf, rgba_to_vtf};
 use crate::tf2::Tf2Install;
+use crate::{ice, pak};
 
 /// v5's `crosshair_source` texts.
 pub(super) const SOURCE_BUILTIN: &str = "builtin";
@@ -238,6 +239,9 @@ pub enum SkipReason {
     UnknownBuiltin,
     /// The library folder is unsafe, gone or holds no VTF.
     MissingLibraryCrosshair,
+    /// The game's own script for the weapon is missing, unreadable or has no crosshair block,
+    /// so no full script can be written.
+    NoStockScript,
 }
 
 /// What `tf/custom` holds of the managed crosshair folder and of rival weapon scripts.
@@ -270,6 +274,31 @@ impl InstalledCrosshairs {
     /// assignment alone does not tell: it may not be installed yet, or may have moved on.
     pub fn is_in_game(&self, id: &CrosshairId) -> bool {
         self.in_game.contains(id)
+    }
+}
+
+/// The game's stock weapon scripts, read from `tf/tf2_misc_dir.vpk`; None when the pak is
+/// missing or unreadable, which leaves every weapon without one.
+struct StockScripts {
+    pak: Option<(PathBuf, vpk::VPK)>,
+}
+
+impl StockScripts {
+    fn open(tf2: &Tf2Install) -> Self {
+        let path = tf2.tf_dir().join("tf2_misc_dir.vpk");
+        let pak = pak::open_vpk(&path).ok().map(|pak| (path, pak));
+        Self { pak }
+    }
+
+    /// The full script for `weapon_script` pointing at `reference`'s texture, decrypted from
+    /// `scripts/<weapon_script>.ctx` and patched; None when it is absent, unreadable or has no
+    /// crosshair block.
+    fn patched(&self, weapon_script: &str, reference: &str) -> Option<Vec<u8>> {
+        let (path, pak) = self.pak.as_ref()?;
+        let name = format!("scripts/{weapon_script}.ctx");
+        let entry = pak.tree.get(&name)?;
+        let encrypted = pak::read_entry(path, &name, entry).ok()?;
+        templates::weapon_script(&ice::decrypt(&encrypted, ice::CTX_KEY), reference)
     }
 }
 
@@ -836,9 +865,10 @@ impl Library {
 
     /// Rebuilds `tf/custom/tf2tools-crosshairs/` from the assignment table: the folder is
     /// removed, then written with each applicable crosshair's VTF and VMT and one weapon
-    /// script per assignment, files named by `templates::texture_name`. Unsafe or dangling
-    /// rows are skipped and reported. A failure mid-write can leave the folder partial;
-    /// the next apply rebuilds it.
+    /// script per assignment, files named by `templates::texture_name`. Each script is the
+    /// game's own from `tf2_misc_dir.vpk` with only its crosshair block replaced. Unsafe or
+    /// dangling rows, and weapons whose stock script cannot be read, are skipped and reported.
+    /// A failure mid-write can leave the folder partial; the next apply rebuilds it.
     pub fn apply_crosshairs(
         &self,
         tf2: &Tf2Install,
@@ -857,7 +887,9 @@ impl Library {
             .map_err(install_db)?;
 
         // Every row is judged before the folder is touched, since its weapon script and
-        // reference come from the database and are joined into paths below.
+        // reference come from the database and are joined into paths below. A row also needs
+        // the game's own script to patch, since TF2 takes a loose script as the whole weapon.
+        let stock = StockScripts::open(tf2);
         let mut applied = Vec::new();
         let mut skipped = Vec::new();
         let mut files: BTreeMap<String, CrosshairFiles> = BTreeMap::new();
@@ -880,10 +912,16 @@ impl Library {
                     _ => continue,
                 }
             };
+            let resolved = resolved.and_then(|found| {
+                stock
+                    .patched(&weapon_script, &reference)
+                    .map(|script| (found, script))
+                    .ok_or(SkipReason::NoStockScript)
+            });
             match resolved {
-                Ok(found) => {
+                Ok((found, script)) => {
                     files.entry(reference.clone()).or_insert(found);
-                    applied.push((weapon_script, reference));
+                    applied.push((weapon_script, script));
                 }
                 Err(reason) => skipped.push(SkippedAssignment {
                     weapon_script,
@@ -913,10 +951,9 @@ impl Library {
                 }
                 .map_err(io_at(&vmt))?;
             }
-            for (weapon_script, reference) in &applied {
+            for (weapon_script, text) in &applied {
                 let script = scripts.join(format!("{weapon_script}.txt"));
-                std::fs::write(&script, templates::weapon_script(reference))
-                    .map_err(io_at(&script))?;
+                std::fs::write(&script, text).map_err(io_at(&script))?;
             }
         }
         Ok(ApplyReport {

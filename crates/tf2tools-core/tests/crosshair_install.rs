@@ -6,7 +6,10 @@ use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use common::{LibraryEnv, library_env, set_setting, setting, sql, tree, write_file};
+use common::{
+    LibraryEnv, STOCK_WEAPON_TXT, crosshair_env, patched_stock_script, set_setting, setting, sql,
+    tree, write_file,
+};
 use tf2tools_core::{
     BuiltinCrosshairs, CrosshairEntry, CrosshairRef, InstallError, Provenance, SkipReason,
 };
@@ -41,7 +44,7 @@ fn builtin(name: &str) -> CrosshairRef {
 
 #[test]
 fn apply_writes_textures_and_scripts_for_builtin_and_library_crosshairs() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     let library_ref = CrosshairRef::Library(dot.id().clone());
     env.lib
@@ -87,17 +90,13 @@ fn apply_writes_textures_and_scripts_for_builtin_and_library_crosshairs() {
         fs::read(custom.join(MATERIALS).join("cpma_9.vmt")).unwrap(),
         fs::read(bundled().join("vmt/cpma_9.vmt")).unwrap()
     );
-    let script = fs::read_to_string(custom.join(SCRIPTS).join("tf_weapon_scattergun.txt")).unwrap();
-    assert!(script.starts_with("\"WeaponData\""), "{script}");
-    assert!(
-        script.contains("\"file\"\t\t\"vgui/replay/thumbnails/cpma_9\""),
-        "{script}"
+    assert_eq!(
+        fs::read_to_string(custom.join(SCRIPTS).join("tf_weapon_scattergun.txt")).unwrap(),
+        patched_stock_script("cpma_9")
     );
-    let script =
-        fs::read_to_string(custom.join(SCRIPTS).join("tf_weapon_rocketlauncher.txt")).unwrap();
-    assert!(
-        script.contains(&format!("\"vgui/replay/thumbnails/{f}\"")),
-        "{script}"
+    assert_eq!(
+        fs::read_to_string(custom.join(SCRIPTS).join("tf_weapon_rocketlauncher.txt")).unwrap(),
+        patched_stock_script(f)
     );
     assert_eq!(
         setting(&env.dir, "active_profile_id").as_deref(),
@@ -107,7 +106,7 @@ fn apply_writes_textures_and_scripts_for_builtin_and_library_crosshairs() {
 
 #[test]
 fn a_builtin_without_a_vmt_gets_the_template() {
-    let env = library_env();
+    let env = crosshair_env();
     env.lib
         .assign("tf_weapon_scattergun", &builtin("Crossdot"))
         .unwrap();
@@ -127,7 +126,7 @@ fn a_builtin_without_a_vmt_gets_the_template() {
 fn a_quote_in_a_library_folder_name_installs_under_a_safe_name() {
     const QUOTED: &str = "q\"t-1a2b3c4d";
     const SAFE: &str = "q-t-1a2b3c4d";
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     let library = env.dir.library_dir(tf2tools_core::LibraryKind::Crosshairs);
     let old = library.join(dot.folder_name());
@@ -183,7 +182,7 @@ fn a_quote_in_a_library_folder_name_installs_under_a_safe_name() {
 
 #[test]
 fn missing_and_unsafe_assignments_are_skipped_and_reported() {
-    let env = library_env();
+    let env = crosshair_env();
     env.lib
         .assign("tf_weapon_scattergun", &builtin("Dot_Tob"))
         .unwrap();
@@ -238,6 +237,88 @@ fn missing_and_unsafe_assignments_are_skipped_and_reported() {
     assert!(!env.tf2.tf_dir().join("evil.txt").exists());
 }
 
+#[test]
+fn a_weapon_without_a_readable_stock_script_is_skipped_and_never_written() {
+    let env = crosshair_env();
+    for weapon in [
+        "tf_weapon_scattergun",
+        "tf_weapon_bat",
+        "tf_weapon_pistol_scout",
+    ] {
+        env.lib.assign(weapon, &builtin("cpma_9")).unwrap();
+    }
+    // The bat's stock script has no crosshair block to replace; the pistol's is not in the pak.
+    let paths = [
+        "scripts/tf_weapon_scattergun.ctx",
+        "scripts/tf_weapon_bat.ctx",
+    ];
+    let flat: &[u8] = b"WeaponData { TextureData { \"ammo\" { } } }";
+    write_file(
+        &env.tf2.tf_dir().join("tf2_misc_dir.vpk"),
+        &common::vpk_bytes(&[(paths[0], common::STOCK_WEAPON_CTX), (paths[1], flat)]),
+    );
+
+    let report = env.lib.apply_crosshairs(&env.tf2, &catalog()).unwrap();
+    assert_eq!(report.applied(), ["tf_weapon_scattergun"]);
+    let skipped: Vec<(&str, SkipReason)> = report
+        .skipped()
+        .iter()
+        .map(|s| (s.weapon_script(), s.reason()))
+        .collect();
+    assert_eq!(
+        skipped,
+        [
+            ("tf_weapon_bat", SkipReason::NoStockScript),
+            ("tf_weapon_pistol_scout", SkipReason::NoStockScript),
+        ]
+    );
+    assert_eq!(
+        tree(&env.tf2.custom_dir()),
+        [
+            format!("{MATERIALS}/cpma_9.vmt"),
+            format!("{MATERIALS}/cpma_9.vtf"),
+            format!("{SCRIPTS}/tf_weapon_scattergun.txt"),
+        ]
+    );
+}
+
+#[test]
+fn without_the_game_pak_every_weapon_is_skipped() {
+    let env = crosshair_env();
+    fs::remove_file(env.tf2.tf_dir().join("tf2_misc_dir.vpk")).unwrap();
+    env.lib
+        .assign("tf_weapon_scattergun", &builtin("cpma_9"))
+        .unwrap();
+
+    let report = env.lib.apply_crosshairs(&env.tf2, &catalog()).unwrap();
+    assert!(report.applied().is_empty());
+    assert_eq!(report.skipped()[0].reason(), SkipReason::NoStockScript);
+    assert!(!env.tf2.custom_dir().join("tf2tools-crosshairs").exists());
+}
+
+#[test]
+fn apply_replaces_an_old_crosshair_only_script_with_the_full_one() {
+    let env = crosshair_env();
+    let script = env
+        .tf2
+        .custom_dir()
+        .join(SCRIPTS)
+        .join("tf_weapon_scattergun.txt");
+    write_file(
+        &script,
+        b"\"WeaponData\"\n{\n\t\"TextureData\"\n\t{\n\t\t\"crosshair\"\n\t\t{\n\t\t\t\"file\"\t\t\"vgui/replay/thumbnails/cpma_9\"\n\t\t}\n\t}\n}",
+    );
+    env.lib
+        .assign("tf_weapon_scattergun", &builtin("cpma_9"))
+        .unwrap();
+
+    env.lib.apply_crosshairs(&env.tf2, &catalog()).unwrap();
+    let written = fs::read_to_string(&script).unwrap();
+    assert_eq!(written, patched_stock_script("cpma_9"));
+    assert!(written.contains("\"TimeFireDelay\""));
+    assert_ne!(written.as_bytes(), STOCK_WEAPON_TXT);
+}
+
 /// Removes a weapon's assignment row directly, as a profile apply that omits it would.
 fn drop_assignment(env: &LibraryEnv, weapon_script: &str) {
     sql(&env.dir)
@@ -250,7 +331,7 @@ fn drop_assignment(env: &LibraryEnv, weapon_script: &str) {
 
 #[test]
 fn apply_rebuilds_the_folder_so_cleared_assignments_disappear() {
-    let env = library_env();
+    let env = crosshair_env();
     let custom = env.tf2.custom_dir();
     env.lib
         .assign("tf_weapon_scattergun", &builtin("cpma_9"))
@@ -280,7 +361,7 @@ fn apply_rebuilds_the_folder_so_cleared_assignments_disappear() {
 
 #[test]
 fn remove_crosshairs_deletes_only_the_managed_folder() {
-    let env = library_env();
+    let env = crosshair_env();
     let custom = env.tf2.custom_dir();
     env.lib
         .assign("tf_weapon_scattergun", &builtin("cpma_9"))
@@ -300,7 +381,7 @@ fn remove_crosshairs_deletes_only_the_managed_folder() {
 
 #[test]
 fn installed_crosshairs_counts_scripts_and_reports_conflicts() {
-    let env = library_env();
+    let env = crosshair_env();
     let custom = env.tf2.custom_dir();
     let empty = env.lib.installed_crosshairs(&env.tf2).unwrap();
     assert!(!empty.folder_exists());
@@ -339,7 +420,7 @@ fn assign_both(env: &LibraryEnv, dot: &CrosshairEntry) {
 
 #[test]
 fn uninstalling_one_crosshair_keeps_the_others_in_the_game() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     assign_both(&env, &dot);
     env.lib.apply_crosshairs(&env.tf2, &catalog()).unwrap();
@@ -358,7 +439,7 @@ fn uninstalling_one_crosshair_keeps_the_others_in_the_game() {
 
 #[test]
 fn uninstalling_the_only_crosshair_leaves_no_managed_folder() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     env.lib
         .assign(
@@ -374,7 +455,7 @@ fn uninstalling_the_only_crosshair_leaves_no_managed_folder() {
 
 #[test]
 fn uninstalling_a_crosshair_not_in_the_game_installs_nothing() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     assign_both(&env, &dot);
 
@@ -384,7 +465,7 @@ fn uninstalling_a_crosshair_not_in_the_game_installs_nothing() {
 
 #[test]
 fn uninstalling_a_crosshair_reassigned_since_its_install_removes_its_files() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     assign_both(&env, &dot);
     env.lib.apply_crosshairs(&env.tf2, &catalog()).unwrap();
@@ -405,7 +486,7 @@ fn uninstalling_a_crosshair_reassigned_since_its_install_removes_its_files() {
 
 #[test]
 fn uninstalling_an_unknown_crosshair_is_not_in_library() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     env.lib.delete_crosshair(dot.id()).unwrap();
     let err = env.lib.uninstall_crosshair(dot.id(), &env.tf2).unwrap_err();
@@ -418,7 +499,7 @@ fn uninstalling_an_unknown_crosshair_is_not_in_library() {
 fn a_failed_uninstall_keeps_the_crosshair_and_its_assignments() {
     use std::os::unix::fs::PermissionsExt as _;
 
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     assign_both(&env, &dot);
     env.lib.apply_crosshairs(&env.tf2, &catalog()).unwrap();
@@ -441,7 +522,7 @@ fn a_failed_uninstall_keeps_the_crosshair_and_its_assignments() {
 
 #[test]
 fn deleting_an_assigned_crosshair_clears_the_active_profile() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     assign_both(&env, &dot);
     set_setting(&env.dir, "active_profile_id", "p1");
@@ -451,7 +532,7 @@ fn deleting_an_assigned_crosshair_clears_the_active_profile() {
 
 #[test]
 fn deleting_an_unused_crosshair_keeps_the_active_profile() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     set_setting(&env.dir, "active_profile_id", "p1");
     env.lib.delete_crosshair(dot.id()).unwrap();
@@ -463,7 +544,7 @@ fn deleting_an_unused_crosshair_keeps_the_active_profile() {
 
 #[test]
 fn uninstalling_a_crosshair_leaves_pending_changes_uninstalled() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     assign_both(&env, &dot);
     env.lib.apply_crosshairs(&env.tf2, &catalog()).unwrap();
@@ -491,7 +572,7 @@ fn uninstalling_a_crosshair_leaves_pending_changes_uninstalled() {
 
 #[test]
 fn deleting_a_library_crosshair_keeps_a_builtin_assignment_of_the_same_name() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     env.lib
         .assign("tf_weapon_scattergun", &builtin(dot.folder_name()))
@@ -502,7 +583,7 @@ fn deleting_a_library_crosshair_keeps_a_builtin_assignment_of_the_same_name() {
 
 #[test]
 fn uninstalling_a_crosshair_keeps_a_script_for_a_longer_texture_name() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     env.lib
         .assign(
@@ -526,7 +607,7 @@ fn uninstalling_a_crosshair_keeps_a_script_for_a_longer_texture_name() {
 
 #[test]
 fn the_scan_tells_which_library_crosshairs_are_in_the_game() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     let ring = import_png(&env, "Ring");
     assert!(
@@ -555,7 +636,7 @@ fn the_scan_tells_which_library_crosshairs_are_in_the_game() {
 
 #[test]
 fn uninstalling_a_crosshair_keeps_a_script_for_a_texture_ending_the_same() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     env.lib
         .assign(
@@ -580,7 +661,7 @@ fn uninstalling_a_crosshair_keeps_a_script_for_a_texture_ending_the_same() {
 
 #[test]
 fn a_failed_vmt_removal_keeps_the_vtf_so_a_retry_can_finish() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     env.lib
         .assign(
@@ -613,7 +694,7 @@ fn a_failed_vmt_removal_keeps_the_vtf_so_a_retry_can_finish() {
 
 #[test]
 fn a_folder_name_climbing_out_of_the_managed_folder_deletes_nothing() {
-    let env = library_env();
+    let env = crosshair_env();
     let dot = import_png(&env, "Dot");
     env.lib
         .assign("tf_weapon_rocketlauncher", &builtin("cpma_9"))
