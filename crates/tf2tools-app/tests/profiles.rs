@@ -857,20 +857,18 @@ fn install_anyway_skips_the_missing_item(cx: &mut TestAppContext) {
     toast_is(
         cx,
         &s,
-        "Profile \"Comp\" activated. Installed: Hitsound. Skipped 1 missing item",
+        "Profile \"Comp\" applied. Installed: Hitsound. Kept what you had for: HUD (missing from your library)",
     );
     assert!(!has_dialog(cx, &s));
-    assert_eq!(
-        s.services.library.active_profile().unwrap(),
-        Some(comp.id().clone())
-    );
+    // The game does not match the profile, so it is not marked Active.
+    assert_eq!(s.services.library.active_profile().unwrap(), None);
     support::wait_real(cx, "LibraryChanged", |_| changes.get() >= 1);
     assert_eq!(changes.get(), 1);
     let rows = support::log_rows(&s.services);
     assert_eq!(rows.len(), 1);
     assert_eq!(
         row(&rows[0]),
-        ("profile", "activate", "Activated profile: Comp")
+        ("profile", "activate", "Applied profile: Comp")
     );
     assert!(
         rows[0]
