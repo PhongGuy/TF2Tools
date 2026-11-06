@@ -107,9 +107,29 @@ pub const M10_INDEXES: [(&str, &str); 13] = [
     ("idx_library_huds_gb", "library_huds"),
 ];
 
-/// The v5 fixture's shape plus migration 10's indexes: the schema v6 opens to.
-pub fn v10_shape() -> SchemaShape {
-    let mut shape = schema_shape(&v5_fixture_connection());
+/// The tables migration 12 adds, as the schema should hold them.
+const M12_TABLES: &str = "
+    CREATE TABLE store_maps (
+        name TEXT PRIMARY KEY,
+        times_played INTEGER NOT NULL DEFAULT 0,
+        first_played TEXT,
+        last_played TEXT,
+        size INTEGER NOT NULL DEFAULT 0,
+        fetched_at TEXT NOT NULL
+    );
+    CREATE TABLE downloaded_maps (
+        name TEXT PRIMARY KEY,
+        size INTEGER NOT NULL,
+        downloaded_at TEXT NOT NULL
+    );
+";
+
+/// The v5 fixture's shape plus migration 10's indexes and migration 12's map tables: the
+/// schema v6 opens to.
+pub fn current_shape() -> SchemaShape {
+    let conn = v5_fixture_connection();
+    conn.execute_batch(M12_TABLES).unwrap();
+    let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape
             .objects
@@ -420,7 +440,9 @@ pub async fn store_env() -> StoreEnv {
         .with_github_api(format!("{uri}/gh-api"))
         .with_github(format!("{uri}/gh"))
         .with_preview_prefixes([format!("{uri}/preview/")])
-        .with_image_prefixes([format!("{uri}/img/")]);
+        .with_image_prefixes([format!("{uri}/img/")])
+        .with_serveme(format!("{uri}/serveme"))
+        .with_map_downloads(format!("{uri}/fastdl/maps"));
     let client = StoreClient::new(db.clone(), dir.clone(), endpoints).with_config(fast_config());
     let lib = Library::new(db, dir.clone());
     StoreEnv {

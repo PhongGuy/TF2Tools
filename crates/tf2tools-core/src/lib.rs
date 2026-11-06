@@ -42,10 +42,10 @@ pub use error::{
     ApplyProfileError, ArchiveError, BorrowSourceError, CatalogError, CopyHudError, DataDirError,
     DetectError, DownloadError, FilesError, FontCheckError, FontInstallError, HistoryError,
     HudFilesError, HudLoadError, ImageError, ImportError, InstallError, KeepHudError, KvParseError,
-    LibraryError, LogError, MakeHudError, OpenError, PaintError, PngReadError, PngWriteError,
-    PresetError, PreviewError, ProfileError, QueryError, RecipeError, ReinstallError, SchemaError,
-    SettingsError, SyncError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
-    UpdateDownloadError, VpkError, VtfError, WavError,
+    LibraryError, LogError, MakeHudError, MapDownloadError, MapRemoveError, OpenError, PaintError,
+    PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
+    ReinstallError, SchemaError, SettingsError, SyncError, UpdateApplyError, UpdateCheckError,
+    UpdateCopyError, UpdateDownloadError, VpkError, VtfError, WavError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
@@ -99,6 +99,7 @@ pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
 pub use settings::{Settings, Volume};
+pub use store::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 pub use store::{
     DownloadPhase, DownloadProgress, Endpoints, StoreCard, StoreClient, StoreConfig, StoreCursor,
     StoreFile, StoreItem, StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus,

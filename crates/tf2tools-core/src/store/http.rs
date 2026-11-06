@@ -5,7 +5,9 @@ use std::cell::Cell;
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::error::{DownloadError, FilesError, ImageError, PreviewError, SyncError};
+use crate::error::{
+    DownloadError, FilesError, ImageError, MapDownloadError, PreviewError, SyncError,
+};
 
 /// Identifies the app to GameBanana and GitHub; never carries user data.
 pub(crate) const USER_AGENT: &str = concat!(
@@ -72,6 +74,7 @@ from_net_failure!(
     SyncError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     FilesError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     DownloadError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
+    MapDownloadError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     PreviewError: url => Self::UntrustedUrl { url },
     ImageError: url => Self::UntrustedUrl { url },
 );

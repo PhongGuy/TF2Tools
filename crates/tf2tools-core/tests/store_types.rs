@@ -6,6 +6,7 @@ mod common;
 use std::time::Duration;
 
 use common::{sql, temp_data_dir};
+use tf2tools_core::{CommunityMap, MapDownloadError, MapEntry, MapRemoveError, MapState};
 use tf2tools_core::{
     Database, DownloadError, DownloadPhase, DownloadProgress, Endpoints, FilesError, ImageError,
     PreviewError, QueryError, StoreClient, StoreConfig, StoreFile, StoreItem, StoreItemId,
@@ -36,6 +37,11 @@ fn store_types_are_send_sync_debug() {
     assert_send_sync::<SyncOutcome>();
     assert_send_sync::<DownloadProgress>();
     assert_send_sync::<DownloadPhase>();
+    assert_send_sync::<CommunityMap>();
+    assert_send_sync::<MapEntry>();
+    assert_send_sync::<MapState>();
+    assert_send_sync::<MapDownloadError>();
+    assert_send_sync::<MapRemoveError>();
 }
 
 #[test]

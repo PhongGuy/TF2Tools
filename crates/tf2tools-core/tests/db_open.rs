@@ -4,10 +4,10 @@ use rusqlite::Connection;
 use tf2tools_core::{Database, LibraryKind};
 
 #[test]
-fn fresh_open_creates_layout_and_reaches_v11() {
+fn fresh_open_creates_layout_and_reaches_v12() {
     let (_tmp, dir) = common::temp_data_dir();
     let db = Database::open(&dir).expect("open");
-    assert_eq!(db.schema_version(), 11);
+    assert_eq!(db.schema_version(), 12);
     assert!(dir.db_path().is_file());
     assert!(dir.tmp_dir().is_dir());
     for kind in LibraryKind::ALL {
@@ -16,7 +16,7 @@ fn fresh_open_creates_layout_and_reaches_v11() {
 }
 
 #[test]
-fn fresh_database_is_wal_at_schema_v11() {
+fn fresh_database_is_wal_at_schema_v12() {
     let (_tmp, dir) = common::temp_data_dir();
     drop(Database::open(&dir).expect("open"));
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -27,15 +27,15 @@ fn fresh_database_is_wal_at_schema_v11() {
     let version: u32 = conn
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 11);
+    assert_eq!(version, 12);
 }
 
 #[test]
-fn fresh_schema_matches_the_v10_shape() {
+fn fresh_schema_matches_the_current_shape() {
     let (_tmp, dir) = common::temp_data_dir();
     drop(Database::open(&dir).expect("open"));
     let fresh = Connection::open(dir.db_path()).unwrap();
-    assert_eq!(common::schema_shape(&fresh), common::v10_shape());
+    assert_eq!(common::schema_shape(&fresh), common::current_shape());
 }
 
 #[test]
@@ -50,7 +50,7 @@ fn reopen_keeps_rows_and_version() {
     .unwrap();
     drop(conn);
     let db = Database::open(&dir).expect("second open");
-    assert_eq!(db.schema_version(), 11);
+    assert_eq!(db.schema_version(), 12);
     drop(db);
     let conn = Connection::open(dir.db_path()).unwrap();
     let page: String = conn

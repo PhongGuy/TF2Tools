@@ -214,7 +214,7 @@ pub(super) fn stale(client: &StoreClient, kind: StoreKind) -> Result<bool, SyncE
 }
 
 /// True when `{key}_last_synced` is missing, unparseable or at least `hours` old.
-fn is_stale(conn: &Connection, key: &str, hours: u32) -> rusqlite::Result<bool> {
+pub(super) fn is_stale(conn: &Connection, key: &str, hours: u32) -> rusqlite::Result<bool> {
     let Some(last) = get_meta(conn, &format!("{key}_last_synced"))? else {
         return Ok(true);
     };
@@ -275,7 +275,7 @@ fn get_meta(conn: &Connection, key: &str) -> rusqlite::Result<Option<String>> {
     .optional()
 }
 
-fn set_meta(conn: &Connection, key: &str, value: &str) -> rusqlite::Result<()> {
+pub(super) fn set_meta(conn: &Connection, key: &str, value: &str) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT INTO store_cache_meta (key, value) VALUES (?1, ?2)
          ON CONFLICT(key) DO UPDATE SET value = excluded.value",
