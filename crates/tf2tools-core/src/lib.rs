@@ -19,6 +19,7 @@ mod error;
 mod fonts;
 mod hud_maker;
 mod library;
+mod old_v4;
 mod pak;
 pub mod panic_mark;
 mod paths;
@@ -94,6 +95,7 @@ pub use library::{
 };
 pub use library::{CopyUpdate, CopyUpdated, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
+pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
 pub use settings::{Settings, Volume};
