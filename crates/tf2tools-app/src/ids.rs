@@ -492,6 +492,8 @@ pub const CROSSHAIR_MAKER_OPACITY_LABEL: &str = "crosshair-maker-opacity-label";
 pub const CROSSHAIR_MAKER_STARTERS: &str = "crosshair-maker-starters";
 /// The toolbar's Import PNG button, which opens a PNG as a new drawing.
 pub const CROSSHAIR_MAKER_IMPORT_PNG: &str = "crosshair-maker-import-png";
+/// The overlay that shows while a file is dragged over the maker, labelled with what to drop.
+pub const CROSSHAIR_MAKER_DROP_TARGET: &str = "crosshair-maker-drop-target";
 /// The starter shapes dialog's content.
 pub const CROSSHAIR_MAKER_STARTER_DIALOG: &str = "crosshair-maker-starter-dialog";
 /// The dialog's live preview, labelled "<shape> preview".
