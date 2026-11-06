@@ -285,3 +285,44 @@ fn a_new_screen_shape_goes_back_to_the_fit(cx: &mut TestAppContext) {
     let area = support::bounds_of(cx, s.win, ids::HUD_MAKER_CANVAS_AREA).unwrap();
     assert!(c.size.width <= area.size.width && c.size.height <= area.size.height);
 }
+
+// The chip that stops a comparison belongs to the view, not the zoomed screen, so it stays
+// whole wherever the screen is zoomed and panned to.
+#[gpui_kit::test]
+fn the_stop_comparing_chip_stays_in_the_view_at_any_zoom(cx: &mut TestAppContext) {
+    let (s, page) = open(cx);
+    cx.update(|cx| {
+        page.update(cx, |p, cx| {
+            p.editor_mut().unwrap().compare_with(Vec::new());
+            cx.notify();
+        })
+    });
+    support::settle(cx, s.win);
+    for _ in 0..6 {
+        menu(cx, &s, ids::HUD_MAKER_ZOOM_IN);
+    }
+    assert_eq!(zoom_label(cx, &s).as_deref(), Some("400%"));
+    let view = support::bounds_of(cx, s.win, ids::HUD_MAKER_CANVAS_VIEW).unwrap();
+    // A far pan to the screen's bottom-right corner, then one to its top-left.
+    for by in [point(px(-5000.), px(-5000.)), point(px(5000.), px(5000.))] {
+        let mid = view.center();
+        let steps = 20.;
+        send(cx, &s, down(MouseButton::Middle, mid, Modifiers::default()));
+        for i in 1..=steps as i32 {
+            let at = mid + point(by.x * (i as f32 / steps), by.y * (i as f32 / steps));
+            send(cx, &s, moved(MouseButton::Middle, at, Modifiers::default()));
+        }
+        send(cx, &s, up(MouseButton::Middle, mid + by));
+        let chip = support::bounds_of(cx, s.win, ids::HUD_MAKER_COMPARE_STOP).unwrap();
+        let inside = chip.left() >= view.left()
+            && chip.top() >= view.top()
+            && chip.right() <= view.right()
+            && chip.bottom() <= view.bottom();
+        assert!(
+            inside,
+            "after a pan by {by:?} the chip {chip:?} left the view {view:?}"
+        );
+    }
+    support::click_id(cx, s.win, ids::HUD_MAKER_COMPARE_STOP);
+    assert!(cx.update(|cx| page.read(cx).editor().unwrap().compared().is_none()));
+}
