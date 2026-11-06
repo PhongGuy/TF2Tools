@@ -24,6 +24,7 @@ pub mod timeline;
 mod tint;
 mod tip;
 pub mod view;
+mod zoom;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariants as _};
@@ -62,7 +63,8 @@ use crate::activity;
 use crate::ids;
 use crate::keymap::{
     CancelHudDrag, HUD_MAKER_CONTEXT, NUDGE_FAR, NudgeDown, NudgeDownFar, NudgeLeft, NudgeLeftFar,
-    NudgeRight, NudgeRightFar, NudgeUp, NudgeUpFar, RedoHudChange, UndoHudChange,
+    NudgeRight, NudgeRightFar, NudgeUp, NudgeUpFar, RedoHudChange, UndoHudChange, ZoomFitHud,
+    ZoomInHud, ZoomOutHud,
 };
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
@@ -84,7 +86,7 @@ use editor::{FontAddRefused, HudEditor};
 use panel::PanelDrag;
 pub use situation::SituationSlider;
 use tip::tipped;
-use view::{CanvasFit, Panel, PanelMode, PanelPlace, Places};
+use view::{CanvasFit, Panel, PanelMode, PanelPlace, Places, Zoom};
 
 const LOADING: &str = "Loading the default HUD...";
 const ADD_REFUSED: &str = "That part can't be added here.";
@@ -479,6 +481,13 @@ pub struct HudMakerPage {
     // The latest canvas press, so a second press on its spot steps on to the next part.
     last_press: Option<LastPress>,
     part_drag: Option<PartDrag>,
+    // The canvas's zoom and pan, for the screen shape they were made at; another shape fits.
+    zoom: Option<(Screen, Zoom)>,
+    // Touchpad travel gathered toward the next Ctrl+wheel zoom step.
+    zoom_carry: Pixels,
+    // Space is down, so a left press on the canvas pans; and the running pan's last pointer.
+    space_held: bool,
+    canvas_pan: Option<Point<Pixels>>,
     // Match size is waiting for the press that names the part whose size to copy.
     matching_size: bool,
     // The refused nudge already toasted for the key held now; a key coming up, a new selection
@@ -596,6 +605,8 @@ pub struct HudMakerPage {
     more_open: bool,
     // Whether the toolbar's screen shape menu is open.
     screen_open: bool,
+    // The toolbar's zoom menu is open.
+    zoom_open: bool,
     scene_open: bool,
     board_mode_open: bool,
     // The minimal HUD lasts the session, like the colour-blind view: a newly opened HUD gets it.
@@ -796,6 +807,10 @@ impl HudMakerPage {
             hovered: None,
             last_press: None,
             part_drag: None,
+            zoom: None,
+            zoom_carry: px(0.),
+            space_held: false,
+            canvas_pan: None,
             matching_size: false,
             nudge_refused: None,
             focus,
@@ -860,6 +875,7 @@ impl HudMakerPage {
             shown_part: None,
             more_open: false,
             screen_open: false,
+            zoom_open: false,
             scene_open: false,
             board_mode_open: false,
             minmode: false,
@@ -2340,7 +2356,7 @@ impl HudMakerPage {
             })
             .and_then(|key| editor.layout().get(key))
             .map(|b| {
-                let fit = CanvasFit::new(self.screen_area(), editor.screen());
+                let fit = self.canvas_fit(editor.screen());
                 let part = fit.rect(b.x(), b.y(), b.wide(), b.tall());
                 Bounds::new(part.origin - area.origin, part.size)
             });
@@ -2425,7 +2441,9 @@ impl HudMakerPage {
                 .map(|b| to_area(&b))
                 .chain(lines.iter().copied())
                 .collect();
-            let screen_box = to_area(&CanvasFit::new(self.screen_area(), shape).screen_bounds());
+            // Zoomed in, only the part of the screen the canvas shows can be covered.
+            let shown = self.canvas_fit(shape).screen_bounds();
+            let screen_box = to_area(&shown.intersect(&self.screen_area()));
             let screen = (self.place_of(Panel::Parts).collapsed).then_some(screen_box);
             let keep_off: Vec<Bounds<Pixels>> = (fixed.iter().copied())
                 .chain(
@@ -3695,9 +3713,9 @@ impl HudMakerPage {
         self.columns_area().size.width - TOOLBAR_GAP * 2. < TOOLBAR_TWO_ROWS
     }
 
-    // The screen shape menu, then Undo and Redo, the name and save row and the overflow menu,
-    // which wrap among themselves; the button that collapses the toolbar sits outside the wrap,
-    // so it always closes the first row.
+    // The screen shape menu, then Undo and Redo, the name and save row, the zoom menu and the
+    // overflow menu, which wrap among themselves; the button that collapses the toolbar sits
+    // outside the wrap, so it always closes the first row.
     fn toolbar(&self, screen: Screen, cx: &mut Context<Self>) -> AnyElement {
         let (can_undo, can_redo) = self
             .editor()
@@ -3753,6 +3771,8 @@ impl HudMakerPage {
                     .into_iter()
                     .flatten(),
             )
+            // The zoom menu sits after the save row, so the name keeps its place on the first row.
+            .child(self.zoom_controls(screen, cx))
             .child(self.more_menu(cx))
             .children(self.live_note_row(cx));
         h_flex()
@@ -4312,7 +4332,14 @@ impl Render for HudMakerPage {
             // A key in the page makes the next edit the keyboard's, which holds no panel. A bound
             // key never reaches key listeners, so its edit actions let go themselves.
             .capture_key_down(cx.listener(|page, _, _, cx| page.let_go(cx)))
-            .on_key_up(cx.listener(|page, _, _, _| page.nudge_refused = None))
+            .on_key_down(cx.listener(|page, ev, _, cx| page.space_down(ev, cx)))
+            .on_key_up(cx.listener(|page, ev, _, cx| {
+                page.nudge_refused = None;
+                page.space_up(ev, cx);
+            }))
+            .on_action(cx.listener(|page, _: &ZoomInHud, _, cx| page.zoom_canvas(1, cx)))
+            .on_action(cx.listener(|page, _: &ZoomOutHud, _, cx| page.zoom_canvas(-1, cx)))
+            .on_action(cx.listener(|page, _: &ZoomFitHud, _, cx| page.fit_canvas(cx)))
             .on_action(cx.listener(|page, _: &UndoHudChange, window, cx| {
                 page.let_go(cx);
                 page.undo(window, cx)
