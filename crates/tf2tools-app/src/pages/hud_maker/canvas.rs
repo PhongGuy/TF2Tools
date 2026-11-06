@@ -122,6 +122,7 @@ impl HudMakerPage {
         let dragging = self.part_drag.is_some();
         let dividing = self.compare_drag;
         let waiting = self.held.is_some();
+        let panning = self.is_panning();
         let watch = canvas(
             move |bounds, window, _| {
                 if area.get() != bounds {
@@ -135,6 +136,7 @@ impl HudMakerPage {
                     if phase == DispatchPhase::Capture {
                         let _ = released.update(cx, |page, cx| {
                             page.compare_drag = false;
+                            page.end_canvas_pan(cx);
                             page.end_part_drag(window, cx)
                         });
                     }
@@ -170,6 +172,14 @@ impl HudMakerPage {
                         }
                     });
                 }
+                if panning {
+                    let panned = page.clone();
+                    window.on_mouse_event(move |ev: &MouseMoveEvent, phase, _, cx| {
+                        if phase == DispatchPhase::Capture {
+                            let _ = panned.update(cx, |page, cx| page.pan_canvas(ev, cx));
+                        }
+                    });
+                }
                 if !dragging {
                     return;
                 }
@@ -201,8 +211,9 @@ impl HudMakerPage {
             return frame.into_any_element();
         };
         let editor = &loaded.editor;
-        let fit = CanvasFit::new(self.screen_area(), editor.screen());
+        let fit = self.canvas_fit(editor.screen());
         let screen = fit.screen_bounds();
+        let room = self.screen_area();
         let theme = cx.theme();
         let (primary, border) = (theme.primary, theme.border);
         let (warning, background) = (theme.warning, theme.background);
@@ -252,7 +263,8 @@ impl HudMakerPage {
             .filter(|part| layout.get(part.key()).is_some_and(|b| b.hidden().is_none()))
             .filter_map(|part| {
                 let (x, y, wide, tall) = layout.shown(part.key())?;
-                Some((fit.rect(x, y, wide, tall), Some(part.key()) == selected_key))
+                let r = fit.rect(x, y, wide, tall).intersect(&room);
+                Some((r, Some(part.key()) == selected_key))
             })
             .collect();
         // Each part paints only what the game shows of it, cut at its parents' edges. A part cut
@@ -547,8 +559,8 @@ impl HudMakerPage {
             .id(ids::HUD_MAKER_CANVAS)
             .test_support()
             .absolute()
-            .left(screen.origin.x - area.origin.x)
-            .top(screen.origin.y - area.origin.y)
+            .left(screen.origin.x - room.origin.x)
+            .top(screen.origin.y - room.origin.y)
             .w(screen.size.width)
             .h(screen.size.height)
             .overflow_hidden()
@@ -591,9 +603,42 @@ impl HudMakerPage {
                 .border_color(border)
                 .child(text)
         });
+        // The screen sits in a view the size of the room it is fitted into, which clips it when
+        // zoomed. The view takes the wheel and the presses that pan, over its letterbox too.
+        let grab = match (self.is_panning(), self.space_held) {
+            (true, _) => Some(CursorStyle::ClosedHand),
+            (false, true) => Some(CursorStyle::OpenHand),
+            _ => None,
+        };
+        let view = div()
+            .id(ids::HUD_MAKER_CANVAS_VIEW)
+            .test_support()
+            .absolute()
+            .left(room.origin.x - area.origin.x)
+            .top(room.origin.y - area.origin.y)
+            .w(room.size.width)
+            .h(room.size.height)
+            .overflow_hidden()
+            .when_some(grab, |el, cursor| el.cursor(cursor))
+            .on_scroll_wheel(cx.listener(|page, ev, window, cx| page.wheel_canvas(ev, window, cx)))
+            .on_mouse_down(
+                MouseButton::Middle,
+                cx.listener(|page, ev: &MouseDownEvent, window, cx| {
+                    page.start_canvas_pan(ev.position, window, cx)
+                }),
+            )
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|page, ev: &MouseDownEvent, window, cx| {
+                    if page.space_held {
+                        page.start_canvas_pan(ev.position, window, cx);
+                    }
+                }),
+            )
+            .child(screen_div);
         let screen_shape = editor.screen();
         frame
-            .child(screen_div)
+            .child(view)
             .children(badge)
             .child(self.floating_toolbar(screen_shape, cx))
             .children(self.panels(cx))
@@ -695,7 +740,7 @@ impl HudMakerPage {
         let Some(editor) = self.editor() else {
             return;
         };
-        let shown = CanvasFit::new(self.screen_area(), editor.screen()).screen_bounds();
+        let shown = self.canvas_fit(editor.screen()).screen_bounds();
         let wide = f32::from(shown.size.width);
         if wide > 0. {
             self.set_compare_split(f32::from(at.x - shown.origin.x) / wide, cx);
@@ -761,14 +806,17 @@ impl HudMakerPage {
     // press on the same spot, steps on to the next part under the pointer instead. Otherwise a
     // press the selection holds (see `holds_press`) keeps it, so the player can drag it.
     fn press_canvas(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        // With Space held the press pans instead; the canvas view's own handler starts it.
+        if self.space_held {
+            return;
+        }
         if self.matching_size {
             return self.pick_size_source(ev, window, cx);
         }
-        let area = self.screen_area();
         let Some(editor) = self.editor() else {
             return;
         };
-        let at = CanvasFit::new(area, editor.screen()).to_screen(ev.position);
+        let at = self.canvas_fit(editor.screen()).to_screen(ev.position);
         let selected = editor.selected().cloned();
         let picks = at.map_or_else(Vec::new, |(x, y)| self.picks_at(x, y));
         let held = at.is_some_and(|(x, y)| self.holds_press(x, y, &picks));
@@ -986,9 +1034,8 @@ impl HudMakerPage {
     ) {
         self.matching_size = false;
         self.focus.focus(window, cx);
-        let area = self.screen_area();
         let source = self.editor().and_then(|editor| {
-            let (x, y) = CanvasFit::new(area, editor.screen()).to_screen(ev.position)?;
+            let (x, y) = self.canvas_fit(editor.screen()).to_screen(ev.position)?;
             let hit = self.picks_at(x, y).into_iter().next()?.key().clone();
             (Some(&hit) != editor.selected()).then_some(hit)
         });
@@ -1015,7 +1062,7 @@ impl HudMakerPage {
     // A press on a sample killfeed line selects the killfeed, whose own box takes no clicks,
     // and starts moving it as a press on any other part does.
     fn press_killfeed(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if self.stop_matching_size(cx) {
+        if self.space_held || self.stop_matching_size(cx) {
             return;
         }
         let Some(editor) = self.editor_mut() else {
@@ -1036,7 +1083,7 @@ impl HudMakerPage {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let area = self.screen_area();
+        let scale = (self.editor()).map_or(0., |e| self.canvas_fit(e.screen()).scale());
         // A drag measures the real layout, so playback stops and the moment returns to 0.
         self.stop_playing();
         let Some(editor) = self.editor_mut() else {
@@ -1044,7 +1091,6 @@ impl HudMakerPage {
         };
         editor.end_drag();
         editor.set_moment(0.);
-        let scale = CanvasFit::new(area, editor.screen()).scale();
         self.flush(cx);
         self.focus.focus(window, cx);
         self.part_drag = Some(PartDrag {

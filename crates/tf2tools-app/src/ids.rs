@@ -196,6 +196,16 @@ pub const HUD_MAKER_TOOLBAR: &str = "hud-maker-toolbar";
 pub const HUD_MAKER_TOOLBAR_COLLAPSE: &str = "hud-maker-toolbar-collapse";
 /// The collapsed toolbar's one button, which opens it again.
 pub const HUD_MAKER_TOOLBAR_EXPAND: &str = "hud-maker-toolbar-expand";
+/// The view the screen sits in on the canvas, which clips it when zoomed and takes the pans.
+pub const HUD_MAKER_CANVAS_VIEW: &str = "hud-maker-canvas-view";
+/// The toolbar's Zoom out button for the canvas.
+pub const HUD_MAKER_ZOOM_OUT: &str = "hud-maker-zoom-out";
+/// The canvas's zoom level beside the zoom buttons, labelled "100%" and so on.
+pub const HUD_MAKER_ZOOM: &str = "hud-maker-zoom";
+/// The toolbar's Zoom in button for the canvas.
+pub const HUD_MAKER_ZOOM_IN: &str = "hud-maker-zoom-in";
+/// The toolbar's Fit button, which fits the screen to the canvas again.
+pub const HUD_MAKER_ZOOM_FIT: &str = "hud-maker-zoom-fit";
 /// The scrolling part list.
 pub const HUD_MAKER_PARTS: &str = "hud-maker-parts";
 /// The part list's scrollbar, over its right edge.
