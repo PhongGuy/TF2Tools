@@ -3,7 +3,7 @@
 use gpui_kit::{Bounds, Pixels, Size, point, px, size};
 use tf2tools_app::pages::hud_maker::view::list_font_px;
 use tf2tools_app::pages::hud_maker::view::{
-    CanvasFit, Floating, HeightCap, Panel, PanelMode, PanelPlace, Places, Settled, avoid,
+    CanvasFit, Floating, HeightCap, Panel, PanelMode, PanelPlace, Places, Settled, Zoom, avoid,
     least_covering, settle, settle_folding,
 };
 use tf2tools_core::Screen;
@@ -822,4 +822,79 @@ fn a_folding_list_keeps_off_both_boxes_it_avoids() {
     assert!(!shown.intersects(&one), "{at:?} on the first box");
     assert!(!shown.intersects(&two), "{at:?} on the second box");
     assert!(!shown.intersects(&part), "{at:?} on the part");
+}
+
+// The screen pixel under window point `at`, unrounded, so a zoom can be checked to keep it.
+fn under(fit: &CanvasFit, at: gpui_kit::Point<Pixels>) -> (f32, f32) {
+    let origin = fit.screen_bounds().origin;
+    (
+        f32::from(at.x - origin.x) / fit.scale(),
+        f32::from(at.y - origin.y) / fit.scale(),
+    )
+}
+
+#[test]
+fn the_fit_zoom_is_the_plain_fit() {
+    let room = area(100., 50., 1200., 540.);
+    assert_eq!(
+        CanvasFit::zoomed(room, HD, Zoom::FIT),
+        CanvasFit::new(room, HD)
+    );
+    assert!(Zoom::FIT.is_fit() && !Zoom::FIT.can_zoom_out() && Zoom::FIT.can_zoom_in());
+    assert_eq!(Zoom::FIT.label(), "100%");
+}
+
+#[test]
+fn zooming_keeps_the_screen_pixel_under_the_anchor() {
+    let room = area(100., 50., 960., 540.);
+    let anchor = point(px(400.), px(300.));
+    let before = under(&CanvasFit::new(room, HD), anchor);
+    let zoom = Zoom::FIT.step(1, anchor, room, HD);
+    let fit = CanvasFit::zoomed(room, HD, zoom);
+    assert!(fit.scale() > 0.5, "{zoom:?}");
+    let after = under(&fit, anchor);
+    assert!(
+        (before.0 - after.0).abs() < 0.01 && (before.1 - after.1).abs() < 0.01,
+        "{before:?} became {after:?}"
+    );
+    assert_eq!(zoom.step(-1, anchor, room, HD), Zoom::FIT);
+}
+
+#[test]
+fn zoom_stops_at_both_ends_and_labels_its_level() {
+    let room = area(0., 0., 960., 540.);
+    let mid = point(px(480.), px(270.));
+    let mut zoom = Zoom::FIT;
+    for _ in 0..20 {
+        zoom = zoom.step(1, mid, room, HD);
+    }
+    assert!(!zoom.can_zoom_in() && zoom.can_zoom_out());
+    assert_eq!(zoom.label(), "400%");
+    assert_eq!(CanvasFit::zoomed(room, HD, zoom).scale(), 0.5 * 4.);
+    assert_eq!(zoom.step(-20, mid, room, HD), Zoom::FIT);
+}
+
+#[test]
+fn a_pan_moves_the_view_and_stops_at_the_screens_edges() {
+    let room = area(0., 0., 960., 540.);
+    let mid = point(px(480.), px(270.));
+    let zoom = Zoom::FIT.step(3, mid, room, HD);
+    let start = CanvasFit::zoomed(room, HD, zoom).screen_bounds();
+    let panned = zoom.pan_by(point(px(-30.), px(20.)), room, HD);
+    let moved = CanvasFit::zoomed(room, HD, panned).screen_bounds();
+    assert_eq!(moved.origin - start.origin, point(px(-30.), px(20.)));
+    // A pan far past the edge shows the screen's corner in the area's corner, never beyond.
+    let far = zoom.pan_by(point(px(5000.), px(5000.)), room, HD);
+    assert_eq!(
+        CanvasFit::zoomed(room, HD, far).screen_bounds().origin,
+        room.origin
+    );
+    let far = zoom.pan_by(point(px(-5000.), px(-5000.)), room, HD);
+    let shown = CanvasFit::zoomed(room, HD, far).screen_bounds();
+    assert_eq!(shown.bottom_right(), room.bottom_right());
+    // At the fit nothing pans.
+    assert_eq!(
+        Zoom::FIT.pan_by(point(px(40.), px(40.)), room, HD),
+        Zoom::FIT
+    );
 }

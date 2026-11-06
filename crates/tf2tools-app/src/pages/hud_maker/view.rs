@@ -39,6 +39,40 @@ impl CanvasFit {
         }
     }
 
+    /// The fit scaled by `zoom` and moved by its pan. A screen longer than `area` on an axis is
+    /// kept covering it there, so a pan never shows past the screen's edge; a shorter one centres.
+    pub fn zoomed(area: Bounds<Pixels>, screen: Screen, zoom: Zoom) -> CanvasFit {
+        let fit = CanvasFit::new(area, screen);
+        if zoom.is_fit() || fit.scale <= 0. {
+            return fit;
+        }
+        let scale = fit.scale * zoom.level();
+        let centred = centred_origin(area, screen, scale);
+        let place = |start: Pixels, room: Pixels, len: f32, at: Pixels| {
+            let len = px(len);
+            if len > room {
+                at.min(start).max(start + room - len)
+            } else {
+                start + (room - len) / 2.
+            }
+        };
+        let (wide, tall) = (screen.wide() as f32 * scale, screen.tall() as f32 * scale);
+        let origin = point(
+            place(area.origin.x, area.size.width, wide, centred.x + zoom.pan.x),
+            place(
+                area.origin.y,
+                area.size.height,
+                tall,
+                centred.y + zoom.pan.y,
+            ),
+        );
+        CanvasFit {
+            origin,
+            scale,
+            screen,
+        }
+    }
+
     /// Window pixels per screen pixel.
     pub fn scale(&self) -> f32 {
         self.scale
@@ -68,6 +102,97 @@ impl CanvasFit {
         let inside = |v: f32, end: u32| v >= 0. && v < end as f32;
         (inside(x, self.screen.wide()) && inside(y, self.screen.tall()))
             .then_some((x as i32, y as i32))
+    }
+}
+
+// Where `screen` at `scale` sits centred in `area`.
+fn centred_origin(area: Bounds<Pixels>, screen: Screen, scale: f32) -> Point<Pixels> {
+    let (wide, tall) = (screen.wide() as f32 * scale, screen.tall() as f32 * scale);
+    area.origin
+        + point(
+            (area.size.width - px(wide)) / 2.,
+            (area.size.height - px(tall)) / 2.,
+        )
+}
+
+/// The canvas's zoom levels, as times the fit: the fit, then up to four times it.
+pub const ZOOM_LEVELS: [f32; 7] = [1., 1.25, 1.5, 2., 2.5, 3., 4.];
+
+/// How far the player zoomed into the canvas past the fit, and how far they panned it from
+/// centred. Every step and pan comes back clamped, so the zoom always draws what it says.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Zoom {
+    step: usize,
+    pan: Point<Pixels>,
+}
+
+impl Zoom {
+    /// The screen fitted to the area, which is where every canvas starts.
+    pub const FIT: Zoom = Zoom {
+        step: 0,
+        pan: Point {
+            x: px(0.),
+            y: px(0.),
+        },
+    };
+
+    /// Times the fit this zoom draws at.
+    pub fn level(&self) -> f32 {
+        ZOOM_LEVELS[self.step]
+    }
+
+    pub fn is_fit(&self) -> bool {
+        self.step == 0
+    }
+
+    pub fn can_zoom_in(&self) -> bool {
+        self.step + 1 < ZOOM_LEVELS.len()
+    }
+
+    pub fn can_zoom_out(&self) -> bool {
+        self.step > 0
+    }
+
+    /// The level as a player reads it, the fit being 100%.
+    pub fn label(&self) -> String {
+        format!("{}%", (self.level() * 100.).round())
+    }
+
+    /// `steps` levels in (or out, when negative), keeping the screen pixel under window point
+    /// `anchor` where it is as far as the screen's edges allow. Back at the fit, it centres.
+    pub fn step(
+        self,
+        steps: i32,
+        anchor: Point<Pixels>,
+        area: Bounds<Pixels>,
+        screen: Screen,
+    ) -> Zoom {
+        let last = ZOOM_LEVELS.len() as i64 - 1;
+        let to = (self.step as i64 + i64::from(steps)).clamp(0, last) as usize;
+        let now = CanvasFit::zoomed(area, screen, self);
+        if to == 0 || now.scale <= 0. {
+            return Zoom::FIT;
+        }
+        let scale = now.scale / self.level() * ZOOM_LEVELS[to];
+        let origin = anchor - (anchor - now.origin) * (scale / now.scale);
+        let pan = origin - centred_origin(area, screen, scale);
+        Zoom { step: to, pan }.clamped(area, screen)
+    }
+
+    /// The view moved by `by` window pixels, as far as the screen's edges allow.
+    pub fn pan_by(self, by: Point<Pixels>, area: Bounds<Pixels>, screen: Screen) -> Zoom {
+        Zoom {
+            pan: self.pan + by,
+            ..self
+        }
+        .clamped(area, screen)
+    }
+
+    // The pan the drawn origin really has, so a pan past an edge does not wind up.
+    fn clamped(self, area: Bounds<Pixels>, screen: Screen) -> Zoom {
+        let fit = CanvasFit::zoomed(area, screen, self);
+        let pan = fit.origin - centred_origin(area, screen, fit.scale);
+        Zoom { pan, ..self }
     }
 }
 

@@ -64,7 +64,13 @@ gpui_kit::actions!(
         /// Moves the selected part `NUDGE_FAR` units up.
         NudgeUpFar,
         /// Moves the selected part `NUDGE_FAR` units down.
-        NudgeDownFar
+        NudgeDownFar,
+        /// Zooms the canvas in around its middle.
+        ZoomInHud,
+        /// Zooms the canvas out around its middle.
+        ZoomOutHud,
+        /// Fits the screen to the canvas again.
+        ZoomFitHud
     ]
 );
 
@@ -117,5 +123,10 @@ pub fn bind(cx: &mut App) {
         KeyBinding::new("shift-right", NudgeRightFar, hud),
         KeyBinding::new("shift-up", NudgeUpFar, hud),
         KeyBinding::new("shift-down", NudgeDownFar, hud),
+        KeyBinding::new("secondary-=", ZoomInHud, hud),
+        KeyBinding::new("secondary-+", ZoomInHud, hud),
+        KeyBinding::new("secondary-shift-=", ZoomInHud, hud),
+        KeyBinding::new("secondary--", ZoomOutHud, hud),
+        KeyBinding::new("secondary-0", ZoomFitHud, hud),
     ]);
 }
