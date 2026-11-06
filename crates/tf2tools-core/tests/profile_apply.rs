@@ -11,7 +11,7 @@ use common::{
 };
 use tf2tools_core::{
     ApplyProfileError, ApplyStep, CrosshairRef, DraftCrosshair, DraftSlot, HudId, MissingKind,
-    Profile, ProfileDraft, ProfileError, ProfileId, Provenance,
+    Profile, ProfileDraft, ProfileError, ProfileId, Provenance, SoundKind,
 };
 
 const UI: &str = "tf2tools-sounds/sound/ui";
@@ -125,36 +125,89 @@ fn missing_items_stop_the_apply_and_touch_nothing() {
 }
 
 #[test]
-fn skip_missing_empties_a_missing_slot_and_reports_it() {
+fn skip_missing_leaves_the_installed_hud_and_does_not_activate() {
     let (env, p) = full_profile();
     let hud_id = env.lib.list_huds().unwrap()[0].id().clone();
     env.lib.delete_hud(&hud_id).unwrap();
+    let other = import_hud_as(&env, "otherhud", Provenance::Local);
+    env.lib.install_hud(other.id(), &env.tf2).unwrap();
+    set_setting(&env.dir, "active_profile_id", "other");
     let custom = env.tf2.custom_dir();
-    write_file(&custom.join("oldhud/info.vdf"), b"x");
-    let named = env.lib.external_huds(&env.tf2).unwrap();
     let report = env
         .lib
-        .apply_profile_discarding(p.id(), &env.tf2, &builtin_catalog(), true, &named)
+        .apply_profile(p.id(), &env.tf2, &builtin_catalog(), true)
         .unwrap();
     assert_eq!(report.skipped().len(), 1);
     assert_eq!(report.skipped()[0].kind(), &MissingKind::Hud);
-    assert_eq!(report.applied(), ALL);
-    assert!(!custom.join("oldhud").exists());
-    assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
+    assert_eq!(
+        report.applied(),
+        [
+            ApplyStep::Hitsound,
+            ApplyStep::Killsound,
+            ApplyStep::Crosshairs
+        ]
+    );
+    assert!(report.failed().is_empty());
+    assert!(custom.join("otherhud/info.vdf").is_file());
+    assert!(custom.join(UI).join("hitsound.wav").is_file());
+    assert_eq!(setting(&env.dir, "active_profile_id").as_deref(), Some(""));
+    assert_eq!(env.lib.active_profile().unwrap(), None);
 }
 
 #[test]
-fn an_unknown_builtin_is_missing_and_stays_assigned_when_skipped() {
+fn skip_missing_keeps_a_missing_sound_and_still_clears_a_none_slot() {
     let env = library_env();
-    let draft = ProfileDraft::new("X")
-        .with_crosshairs(vec![builtin("tf_weapon_scattergun", "no_such_builtin")]);
+    let hit = import_wav_as(&env, "Ding", Provenance::Local);
+    let old_hit = import_wav_as(&env, "OldDing", Provenance::Local);
+    let old_kill = import_wav_as(&env, "OldBell", Provenance::Local);
+    let hud = import_hud_as(&env, "rayshud", Provenance::Local);
+    env.lib.install_hud(hud.id(), &env.tf2).unwrap();
+    // The profile wants "Ding" as hitsound and no killsound and no HUD.
+    let draft = ProfileDraft::new("P").with_hitsound(DraftSlot::Item(hit.id().clone()));
     let p = env.lib.create_profile(&draft).unwrap();
+    env.lib.delete_sound(hit.id(), None).unwrap();
+    env.lib
+        .install_sound(old_hit.id(), SoundKind::Hitsound, &env.tf2)
+        .unwrap();
+    env.lib
+        .install_sound(old_kill.id(), SoundKind::Killsound, &env.tf2)
+        .unwrap();
+    let custom = env.tf2.custom_dir();
+    let hitsound = custom.join(UI).join("hitsound.wav");
+    let kept = std::fs::read(&hitsound).unwrap();
+    let report = env
+        .lib
+        .apply_profile(p.id(), &env.tf2, &builtin_catalog(), true)
+        .unwrap();
+    assert_eq!(report.skipped()[0].kind(), &MissingKind::Hitsound);
+    assert_eq!(
+        report.applied(),
+        [ApplyStep::Hud, ApplyStep::Killsound, ApplyStep::Crosshairs]
+    );
+    assert_eq!(std::fs::read(&hitsound).unwrap(), kept);
+    assert!(!custom.join(UI).join("killsound.wav").exists());
+    assert!(!custom.join("rayshud").exists());
+    assert_eq!(env.lib.active_profile().unwrap(), None);
+}
+
+#[test]
+fn a_skipped_crosshair_keeps_that_weapons_assignment_and_others_follow_the_profile() {
+    let env = library_env();
+    let draft = ProfileDraft::new("X").with_crosshairs(vec![
+        builtin("tf_weapon_scattergun", "no_such_builtin"),
+        builtin("tf_weapon_rocketlauncher", "cpma_9"),
+        builtin("tf_weapon_minigun", "no_such_builtin"),
+    ]);
+    let p = env.lib.create_profile(&draft).unwrap();
+    let kept = CrosshairRef::Builtin("cpma_9".into());
+    env.lib.assign("tf_weapon_scattergun", &kept).unwrap();
+    env.lib.assign("tf_weapon_sniperrifle", &kept).unwrap();
     let catalog = builtin_catalog();
     match env.lib.apply_profile(p.id(), &env.tf2, &catalog, false) {
         Err(ApplyProfileError::Missing(items)) => assert_eq!(
             items[0].kind(),
             &MissingKind::Crosshair {
-                weapon_script: "tf_weapon_scattergun".into()
+                weapon_script: "tf_weapon_minigun".into()
             }
         ),
         other => panic!("expected Missing, got {other:?}"),
@@ -163,10 +216,21 @@ fn an_unknown_builtin_is_missing_and_stays_assigned_when_skipped() {
         .lib
         .apply_profile(p.id(), &env.tf2, &catalog, true)
         .unwrap();
-    assert_eq!(report.skipped().len(), 1);
+    assert_eq!(report.skipped().len(), 2);
     assert!(report.applied().contains(&ApplyStep::Crosshairs));
-    assert_eq!(assigned(&env), ["tf_weapon_scattergun"]);
-    assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
+    // The skipped scattergun keeps its crosshair, the sniper rifle (not in the profile)
+    // is cleared and the skipped minigun, never assigned, stays unassigned.
+    let assignments = env.lib.assignments().unwrap();
+    let scattergun = assignments
+        .iter()
+        .find(|a| a.weapon_script() == "tf_weapon_scattergun")
+        .unwrap();
+    assert_eq!(scattergun.crosshair(), &kept);
+    assert_eq!(
+        assigned(&env),
+        ["tf_weapon_rocketlauncher", "tf_weapon_scattergun"]
+    );
+    assert_eq!(env.lib.active_profile().unwrap(), None);
 }
 
 // Needs a read-only directory, which `chmod` only makes on unix.
