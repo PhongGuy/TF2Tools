@@ -155,6 +155,29 @@ fn skip_missing_leaves_the_installed_hud_and_does_not_activate() {
 }
 
 #[test]
+fn a_none_hud_still_asks_about_a_hand_placed_hud_when_another_item_is_skipped() {
+    let env = library_env();
+    let hit = import_wav_as(&env, "Ding", Provenance::Local);
+    let draft = ProfileDraft::new("P").with_hitsound(DraftSlot::Item(hit.id().clone()));
+    let p = env.lib.create_profile(&draft).unwrap();
+    env.lib.delete_sound(hit.id(), None).unwrap();
+    let custom = env.tf2.custom_dir();
+    write_file(&custom.join("manual/info.vdf"), b"x");
+    match env
+        .lib
+        .apply_profile(p.id(), &env.tf2, &builtin_catalog(), true)
+    {
+        Err(ApplyProfileError::ExternalHuds(huds)) => assert_eq!(huds.len(), 1),
+        other => panic!("expected ExternalHuds, got {other:?}"),
+    }
+    let named = env.lib.external_huds(&env.tf2).unwrap();
+    env.lib
+        .apply_profile_discarding(p.id(), &env.tf2, &builtin_catalog(), true, &named)
+        .unwrap();
+    assert!(!custom.join("manual").exists());
+}
+
+#[test]
 fn skip_missing_keeps_a_missing_sound_and_still_clears_a_none_slot() {
     let env = library_env();
     let hit = import_wav_as(&env, "Ding", Provenance::Local);

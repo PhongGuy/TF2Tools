@@ -1149,8 +1149,8 @@ impl Library {
     /// Applies a profile to `tf2`: resolves it (a builtin the catalog lacks is missing),
     /// then installs or uninstalls the HUD, each sound and the crosshairs, best effort.
     /// Missing items fail with `Missing` before any file is touched unless `skip_missing`,
-    /// which leaves what is installed for those slots alone; a HUD the library cannot put
-    /// back then fails with `ExternalHuds` the same way. The profile becomes active only
+    /// which leaves what is installed for those slots alone; unless the HUD is skipped, a HUD
+    /// the library cannot put back then fails with `ExternalHuds` the same way. The profile becomes active only
     /// when nothing was skipped and no step failed, so Active means the game matches it.
     pub fn apply_profile(
         &self,
@@ -1182,16 +1182,20 @@ impl Library {
             return Err(ApplyProfileError::Missing(resolved.missing));
         }
         // Asked before any step, so a refused apply leaves sounds and crosshairs alone too.
-        let unnamed = self
-            .unnamed_huds(&game_custom_dir(tf2)?, discard)
-            .map_err(|e| match e {
-                LibraryError::Io { path, source } => ApplyProfileError::Io { path, source },
-                other => ApplyProfileError::Database {
-                    message: other.to_string(),
-                },
-            })?;
-        if !unnamed.is_empty() {
-            return Err(ApplyProfileError::ExternalHuds(unnamed));
+        // A skipped HUD removes nothing, so there is nothing to ask about.
+        let skipped = |kind: MissingKind| resolved.missing.iter().any(|m| m.kind == kind);
+        if !skipped(MissingKind::Hud) {
+            let unnamed =
+                self.unnamed_huds(&game_custom_dir(tf2)?, discard)
+                    .map_err(|e| match e {
+                        LibraryError::Io { path, source } => ApplyProfileError::Io { path, source },
+                        other => ApplyProfileError::Database {
+                            message: other.to_string(),
+                        },
+                    })?;
+            if !unnamed.is_empty() {
+                return Err(ApplyProfileError::ExternalHuds(unnamed));
+            }
         }
 
         // Cleared up front so a partial apply never leaves this profile marked active;
@@ -1208,7 +1212,6 @@ impl Library {
         };
         // A skipped slot runs no step, so whatever is installed there stays; an empty
         // slot still uninstalls, since the profile asks for nothing there.
-        let skipped = |kind: MissingKind| resolved.missing.iter().any(|m| m.kind == kind);
         let mut hud_blocked_name = None;
         if !skipped(MissingKind::Hud) {
             let hud = match &resolved.hud {

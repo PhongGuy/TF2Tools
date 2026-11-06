@@ -622,7 +622,9 @@ fn a_profile_keeps_a_copy_then_applies(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn install_anyway_still_asks_before_removing(cx: &mut TestAppContext) {
+fn install_anyway_with_the_hud_missing_keeps_a_hand_placed_hud_without_asking(
+    cx: &mut TestAppContext,
+) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let gone = seed(&s, &env, "budhud");
@@ -635,11 +637,11 @@ fn install_anyway_still_asks_before_removing(cx: &mut TestAppContext) {
         support::present(cx, s.win, ids::PROFILES_MISSING_INSTALL)
     });
     support::click_id(cx, s.win, ids::PROFILES_MISSING_INSTALL);
-    wait_dialog(cx, &s);
-    assert!(intact(&env, "manual"));
-    support::click_id(cx, s.win, ids::EXTERNAL_HUDS_DISCARD);
+    // The skipped HUD step removes nothing, so the player is not asked about their HUD.
     wait_toast(cx, &s);
-    assert!(!custom(&env).join("manual").exists());
+    assert!(!support::present(cx, s.win, ids::EXTERNAL_HUDS_DIALOG));
+    assert!(intact(&env, "manual"));
+    assert_eq!(s.services.library.active_profile().unwrap(), None);
 }
 
 /// Real `ExternalHud`s can only come from a scan, so the words are checked on a scratch tree.
