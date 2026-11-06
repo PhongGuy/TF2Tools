@@ -38,6 +38,14 @@ pub const CRASH_BANNER_TEXT: &str = "crash-banner-text";
 /// "Copy details".
 pub const CRASH_BANNER_COPY: &str = "crash-banner-copy";
 pub const CRASH_BANNER_DISMISS: &str = "crash-banner-dismiss";
+/// The banner offering to remove TF2Tools 4, on Windows when it is still installed.
+pub const OLD_V4_BANNER: &str = "old-v4-banner";
+/// Labelled "The old version of TF2Tools is still installed."
+pub const OLD_V4_BANNER_TEXT: &str = "old-v4-banner-text";
+/// "Remove it": runs TF2Tools 4's own uninstaller.
+pub const OLD_V4_BANNER_REMOVE: &str = "old-v4-banner-remove";
+/// "Not now".
+pub const OLD_V4_BANNER_LATER: &str = "old-v4-banner-later";
 pub const CONFIRM_DIALOG: &str = "confirm-dialog";
 pub const CONFIRM_TITLE: &str = "confirm-title";
 pub const CONFIRM_DESCRIPTION: &str = "confirm-description";

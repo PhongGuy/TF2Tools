@@ -23,6 +23,7 @@ pub struct Settings {
     maker_grid_lines: bool,
     hud_maker_panel: Option<String>,
     hud_maker_backdrop: Option<PathBuf>,
+    old_v4_asked: bool,
 }
 
 impl Settings {
@@ -65,6 +66,11 @@ impl Settings {
     pub fn hud_maker_backdrop(&self) -> Option<&Path> {
         self.hud_maker_backdrop.as_deref()
     }
+
+    /// Whether the player already answered the offer to remove TF2Tools 4, `false` by default.
+    pub fn old_v4_asked(&self) -> bool {
+        self.old_v4_asked
+    }
 }
 
 impl Default for Settings {
@@ -78,6 +84,7 @@ impl Default for Settings {
             maker_grid_lines: false,
             hud_maker_panel: None,
             hud_maker_backdrop: None,
+            old_v4_asked: false,
         }
     }
 }
@@ -143,6 +150,7 @@ impl Database {
                 "hud_maker_backdrop" => {
                     settings.hud_maker_backdrop = (!value.is_empty()).then(|| value.into())
                 }
+                "old_v4_asked" => settings.old_v4_asked = matches!(value.as_str(), "true" | "1"),
                 _ => {}
             }
         }
@@ -233,6 +241,11 @@ impl Database {
                 .map(drop)
                 .map_err(db_error),
         }
+    }
+
+    /// Records that the player answered the offer to remove TF2Tools 4, so it never shows again.
+    pub fn set_old_v4_asked(&self) -> Result<(), SettingsError> {
+        self.save_setting("old_v4_asked", "true")
     }
 
     /// The fingerprint keys stored for `hud_folder`; empty when none, or when the

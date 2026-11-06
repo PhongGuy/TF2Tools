@@ -67,6 +67,8 @@ pub struct Shell {
     _update_subscriptions: Option<[Subscription; 2]>,
     /// The crash notice observation, while a notice is installed.
     _crash_subscription: Option<Subscription>,
+    /// The TF2Tools 4 banner observation, while the notice is installed.
+    _old_v4_subscription: Option<Subscription>,
     sounds: Option<Entity<SoundsPage>>,
     crosshairs: Option<Entity<CrosshairsPage>>,
     crosshair_maker: Option<Entity<CrosshairMakerPage>>,
@@ -148,6 +150,8 @@ impl Shell {
         // The crash banner reads the notice, so dismissing it redraws the shell.
         let crash_subscription =
             crate::crash::notice::crash_notice(cx).map(|n| cx.observe(&n, |_, _, cx| cx.notify()));
+        let old_v4_subscription =
+            crate::old_v4::old_v4_notice(cx).map(|n| cx.observe(&n, |_, _, cx| cx.notify()));
         crate::timing::register_shell(cx.entity().downgrade(), cx);
         window.on_window_should_close(cx, leave::should_close);
         Self {
@@ -160,6 +164,7 @@ impl Shell {
             _hub_subscriptions: hub_subscriptions,
             _update_subscriptions: update_subscriptions,
             _crash_subscription: crash_subscription,
+            _old_v4_subscription: old_v4_subscription,
             sounds: None,
             crosshairs: None,
             crosshair_maker: None,
@@ -557,6 +562,7 @@ impl Render for Shell {
                     .child(header::render(self.page, cx))
                     .children(update_view::banner(cx))
                     .children(crate::crash::notice::banner(cx))
+                    .children(crate::old_v4::banner(cx))
                     .child(div().flex_1().min_h_0().child(body)),
             )
     }

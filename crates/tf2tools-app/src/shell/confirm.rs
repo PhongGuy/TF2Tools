@@ -31,6 +31,18 @@ impl Confirm {
         }
     }
 
+    /// The prompt before removing TF2Tools 4, whose uninstaller closes this app too.
+    pub fn remove_old_v4() -> Self {
+        Self {
+            title: "Remove the old TF2Tools".into(),
+            description:
+                "TF2Tools closes while the old version is removed. Open it again when it's done."
+                    .into(),
+            confirm_label: "Remove and close".into(),
+            cancel_label: "Cancel".into(),
+        }
+    }
+
     /// The prompt before shrinking a crosshair drawing to 32x32 would cut paint off its edges.
     pub fn shrink_canvas() -> Self {
         Self {

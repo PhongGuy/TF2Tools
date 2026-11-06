@@ -15,6 +15,7 @@ use crate::assets::{AssetRoot, AssetRootError};
 use crate::audio::{AudioOut, RecordingAudio, RodioOut};
 use crate::crash::{self, notice::CrashNotice};
 use crate::local_messages::describe_startup;
+use crate::old_v4::{self, OldV4Notice};
 use crate::picker::{NativePicker, PathPicker};
 use crate::remote_images::{RemoteImages, store_fetch};
 use crate::services::{
@@ -138,12 +139,15 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
         // Read only once the app is sure to open, and moved aside after the first frame draws
         // the banner, so a failed start or a window closed earlier keeps it for the next.
         let crash = crash::read_crash(&crash_dir);
+        // A registry read on Windows only, and skipped once the player has answered.
+        let old_v4 = old_v4::pending(&settings, tf2tools_core::detect_old_v4);
         Ok::<_, StartupError>((
             services,
             settings.sidebar_collapsed(),
             huds,
             update_source,
             crash,
+            old_v4,
         ))
     });
     // Font matching costs several ms per weight on the first frame; resolving the theme's
@@ -162,7 +166,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
         let opened = opening.await;
         let _ = win.update(cx, |_, window, cx| {
             let next = match opened {
-                Ok((services, collapsed, huds, update_source, crash)) => {
+                Ok((services, collapsed, huds, update_source, crash, old_v4)) => {
                     timing::mark(cx, "services");
                     let store = services.store.clone();
                     cx.set_global(services);
@@ -174,6 +178,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                     activity::watch_stores(cx);
                     install_tf2_state(cx, Tf2State::Detecting);
                     CrashNotice::install(cx, crash);
+                    OldV4Notice::install(cx, old_v4, old_v4::system_runner());
                     let shell = cx.new(|cx| Shell::with_huds(collapsed, huds, window, cx));
                     // The runtime and the syncs wait for the first frame, so they never delay it.
                     window.on_next_frame(move |_, cx| {
