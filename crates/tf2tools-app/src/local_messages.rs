@@ -168,13 +168,24 @@ pub fn reopen_notice(dropped: usize, tf2_updated: bool) -> Option<ReopenNotice> 
 
 /// What the player reads once a copy is made: it is theirs to edit, and whose work it is.
 pub fn copy_made_text(copy_name: &str, author: &str) -> String {
+    format!("{copy_name} is yours to edit. {}", terms_note(author))
+}
+
+/// The installed HUD's Edit made a copy of `base`: the player edits that, not the original.
+pub fn editing_copy_text(base: &str, author: &str) -> String {
+    format!(
+        "Editing a copy of {base}. The original stays as it is. {}",
+        terms_note(author)
+    )
+}
+
+// Whose work a copied HUD is, and where its sharing terms live.
+fn terms_note(author: &str) -> String {
     let whose = match author {
         "" => "another author's work".to_owned(),
         author => format!("{author}'s work"),
     };
-    format!(
-        "{copy_name} is yours to edit. It's {whose}: check the HUD's page for its terms before you share yours."
-    )
+    format!("It's {whose}: check the HUD's page for its terms before you share yours.")
 }
 
 /// A refused copy, save or update for want of disk room; `verb` names the action and the
