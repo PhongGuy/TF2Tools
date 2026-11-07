@@ -777,6 +777,7 @@ impl HudMakerPage {
             .then(|| note(ids::HUD_MAKER_PANEL_BASE_MISSING, BASE_MISSING.into()));
         let mut out: Vec<AnyElement> = missing.into_iter().chain(shows).collect();
         out.extend(self.show_it_button(cx));
+        out.extend(self.cut_off_row(cx));
         out.extend(self.part_actions(cx));
         out.extend(self.attach_row(cx));
         let families = match self.open_font_list() {
@@ -1140,6 +1141,39 @@ impl HudMakerPage {
                 }
             }));
         Some(h_flex().child(button).into_any_element())
+    }
+
+    // For a part poking out of its parent, which the game cuts off there: says so, with a
+    // button that grows the parent to hold it.
+    fn cut_off_row(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let editor = self.editor()?;
+        let parent = editor.model().part(editor.selection_outside_parent()?)?;
+        let name = row_label(parent);
+        let said = format!("Part of this is outside {name}, so TF2 cuts it off.");
+        let button = Button::new(ids::HUD_MAKER_GROW_PARENT)
+            .outline()
+            .xsmall()
+            .label(format!("Make {name} bigger"))
+            .on_click(cx.listener(|page, _, window, cx| {
+                page.edit_selected(window, cx, |e| {
+                    if let Err(err) = e.grow_parent_to_fit() {
+                        tracing::debug!("the HUD Maker refused to grow a parent: {err:?}");
+                    }
+                })
+            }));
+        let note = labelled(
+            div().text_sm().text_color(cx.theme().warning),
+            ids::HUD_MAKER_PANEL_CUT_OFF,
+            said,
+        );
+        Some(
+            v_flex()
+                .gap_1()
+                .items_start()
+                .child(note)
+                .child(button)
+                .into_any_element(),
+        )
     }
 
     // Add, a menu of the parts the player can add near the selection, and Delete for a part

@@ -1565,6 +1565,12 @@ pub fn hud_maker_selected(key: &PartKey) -> ElementId {
     keyed("hud-maker-selected", key.as_str())
 }
 
+/// The dashed outline of a selected part's whole box where it pokes out of its parent and the
+/// game cuts it off: "hud-maker-cut-off:<key>".
+pub fn hud_maker_cut_off(key: &PartKey) -> ElementId {
+    keyed("hud-maker-cut-off", key.as_str())
+}
+
 /// One of the side panel's Align and Distribute buttons for several parts, by what it does
 /// ("left", "centre", "right", "top", "middle", "bottom", "across", "down"):
 /// "hud-maker-line-up:<name>".
@@ -2100,6 +2106,10 @@ pub const HUD_MAKER_ATTACH_LIST: &str = "hud-maker-attach-list";
 pub const HUD_MAKER_ATTACH_LIST_SCROLLBAR: &str = "hud-maker-attach-list-scrollbar";
 /// The side panel's Show it, which picks the situation a part needs to show.
 pub const HUD_MAKER_PANEL_SHOW_IT: &str = "hud-maker-panel-show-it";
+/// The side panel's note that the selection pokes out of its parent, which the game cuts off.
+pub const HUD_MAKER_PANEL_CUT_OFF: &str = "hud-maker-panel-cut-off";
+/// The button under that note that grows the parent to hold the selection.
+pub const HUD_MAKER_GROW_PARENT: &str = "hud-maker-grow-parent";
 /// The timeline strip under the canvas, while any event plays.
 pub const HUD_MAKER_TIMELINE: &str = "hud-maker-timeline";
 /// The timeline's list of the events playing, joined by ", ".
