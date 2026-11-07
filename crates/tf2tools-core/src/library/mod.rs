@@ -39,7 +39,7 @@ pub(crate) use addons::display_info;
 pub use addons::{AddonEntry, AddonName};
 pub use crosshairs::{
     ApplyReport, Assignment, CrosshairEntry, CrosshairFormat, CrosshairRef, InstalledCrosshairs,
-    PaintTarget, PaintedSource, SkipReason, SkippedAssignment,
+    PaintTarget, PaintedSource, SkipReason, SkippedAssignment, crosshair_scripts_need_repair,
 };
 pub use hud_copy::{CopyUpdate, CopyUpdated, TreeHash};
 pub(crate) use hud_folder::is_safe_folder;

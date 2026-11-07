@@ -12,6 +12,7 @@ use common::{
 };
 use tf2tools_core::{
     BuiltinCrosshairs, CrosshairEntry, CrosshairRef, InstallError, Provenance, SkipReason,
+    crosshair_scripts_need_repair,
 };
 
 const MATERIALS: &str = "tf2tools-crosshairs/materials/vgui/replay/thumbnails";
@@ -717,4 +718,48 @@ fn a_folder_name_climbing_out_of_the_managed_folder_deletes_nothing() {
     assert!(vmt.exists());
     let scan = env.lib.installed_crosshairs(&env.tf2).unwrap();
     assert!(!scan.is_in_game(dot.id()));
+}
+
+// The crosshair-only script apply wrote before 6.0.2, which stops the weapon from firing.
+const OLD_SCRIPT: &str = "\"WeaponData\"\n{\n\t\"TextureData\"\n\t{\n\t\t\"crosshair\"\n\t\t{\n\t\t\t\"file\"\t\t\"vgui/replay/thumbnails/cpma_9\"\n\t\t\t\"x\"\t\t\"0\"\n\t\t\t\"y\"\t\t\"0\"\n\t\t\t\"width\"\t\t\"64\"\n\t\t\t\"height\"\t\"64\"\n\t\t}\n\t}\n}";
+
+#[test]
+fn an_old_crosshair_only_script_needs_repair_and_apply_repairs_it() {
+    let env = crosshair_env();
+    env.lib
+        .assign("tf_weapon_scattergun", &builtin("cpma_9"))
+        .unwrap();
+    env.lib.apply_crosshairs(&env.tf2, &catalog()).unwrap();
+    assert!(!crosshair_scripts_need_repair(&env.tf2));
+
+    let custom = env.tf2.custom_dir();
+    write_file(
+        &custom.join(SCRIPTS).join("tf_weapon_pistol_scout.txt"),
+        OLD_SCRIPT.as_bytes(),
+    );
+    assert!(crosshair_scripts_need_repair(&env.tf2));
+
+    env.lib.apply_crosshairs(&env.tf2, &catalog()).unwrap();
+    assert!(!crosshair_scripts_need_repair(&env.tf2));
+}
+
+#[test]
+fn no_repair_without_old_weapon_scripts() {
+    let env = crosshair_env();
+    assert!(!crosshair_scripts_need_repair(&env.tf2));
+
+    let custom = env.tf2.custom_dir();
+    fs::create_dir_all(custom.join(SCRIPTS)).unwrap();
+    assert!(!crosshair_scripts_need_repair(&env.tf2));
+
+    // Only weapon scripts count, and only those in the managed folder.
+    write_file(
+        &custom.join(SCRIPTS).join("readme.txt"),
+        OLD_SCRIPT.as_bytes(),
+    );
+    write_file(
+        &custom.join("other-mod/scripts/tf_weapon_scattergun.txt"),
+        OLD_SCRIPT.as_bytes(),
+    );
+    assert!(!crosshair_scripts_need_repair(&env.tf2));
 }
