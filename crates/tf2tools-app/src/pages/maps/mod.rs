@@ -12,7 +12,7 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, FontWeight, Global, InteractiveElement as _,
-    IntoElement, ListAlignment, ListState, ParentElement as _, Render,
+    IntoElement, ListAlignment, ListState, ParentElement as _, Pixels, Render,
     StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
     Window, div, list, px,
 };
@@ -31,9 +31,9 @@ use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_download::format_bytes;
 use crate::store_messages::{BUSY_TEXT, BUSY_TITLE};
 use crate::tokio_bridge;
-use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_beside;
 use crate::widgets::store_error::error_line;
+use crate::widgets::{Named as _, labelled};
 use model::{MapRow, MapSort, SORTS, count_label, last_played_label, visible};
 
 const MAP_READ: &str = "TF2Tools couldn't read its map list. Restart TF2Tools and try again.";
@@ -41,7 +41,9 @@ const ROW_HEIGHT: f32 = 44.;
 const PLAYED_WIDTH: f32 = 96.;
 const LAST_WIDTH: f32 = 112.;
 const SIZE_WIDTH: f32 = 88.;
-const ACTION_WIDTH: f32 = 184.;
+const ACTION_WIDTH: f32 = 160.;
+// Below this window width the play columns give their room to the map name.
+const WIDE_WINDOW: Pixels = px(1100.);
 
 /// The client the page fetches serveme.tf's list with. The app installs it at startup;
 /// without it (as in tests that do not ask for one) the page shows the cached list only.
@@ -78,6 +80,8 @@ pub struct MapsPage {
     syncing: bool,
     /// The page has asked for a fresh list, so a return does not fetch again.
     refreshed: bool,
+    // Whether the window is too narrow for the play columns; set each render.
+    compact: bool,
     error: Option<String>,
     downloading: Option<Running>,
     /// Bumped by every load; a load that lands under an older generation is dropped.
@@ -121,6 +125,7 @@ impl MapsPage {
             loaded: false,
             syncing: false,
             refreshed: false,
+            compact: false,
             error: None,
             downloading: None,
             load_generation: 0,
@@ -478,7 +483,7 @@ impl MapsPage {
         ))
     }
 
-    fn column_titles(cx: &App) -> impl IntoElement {
+    fn column_titles(compact: bool, cx: &App) -> impl IntoElement {
         let cell = |width: f32, text: &'static str| {
             div().w(px(width)).flex_none().text_right().child(text)
         };
@@ -492,8 +497,10 @@ impl MapsPage {
             .font_weight(FontWeight::MEDIUM)
             .text_color(cx.theme().muted_foreground)
             .child(div().flex_1().min_w_0().child("Map"))
-            .child(cell(PLAYED_WIDTH, "Times played"))
-            .child(cell(LAST_WIDTH, "Last played"))
+            .when(!compact, |row| {
+                row.child(cell(PLAYED_WIDTH, "Times played"))
+                    .child(cell(LAST_WIDTH, "Last played"))
+            })
             .child(cell(SIZE_WIDTH, "Size"))
             .child(div().w(px(ACTION_WIDTH)).flex_none())
     }
@@ -525,7 +532,7 @@ impl MapsPage {
                 };
                 let page = page.read(cx);
                 match page.shown.get(ix).and_then(|&i| page.rows.get(i)) {
-                    Some(map) => map_row(map, page.downloading.as_ref(), has_tf2, this.clone(), cx),
+                    Some(map) => map_row(map, page, has_tf2, this.clone(), cx),
                     None => div().into_any_element(),
                 }
             })
@@ -540,7 +547,7 @@ impl MapsPage {
 // One map: its name, play count, last day played and size, then what the player can do.
 fn map_row(
     map: &MapRow,
-    running: Option<&Running>,
+    shown_in: &MapsPage,
     has_tf2: bool,
     page: WeakEntity<MapsPage>,
     cx: &App,
@@ -548,6 +555,7 @@ fn map_row(
     let theme = cx.theme();
     let muted = theme.muted_foreground;
     let name = map.name.clone();
+    let running = shown_in.downloading.as_ref();
     let cell = |width: f32, text: String| {
         div()
             .w(px(width))
@@ -581,7 +589,7 @@ fn map_row(
                         .ghost()
                         .small()
                         .icon(IconName::Trash)
-                        .label("Remove")
+                        .named("Remove")
                         .on_click(move |_, window, cx| {
                             let _ =
                                 page.update(cx, |page, cx| page.remove(&remove_name, window, cx));
@@ -619,6 +627,8 @@ fn map_row(
         .id(ids::map_row(&map.name))
         .aria_label(map.name.clone())
         .test_support()
+        // A list item shrinks to its content unless told otherwise, which skews the columns.
+        .w_full()
         .h(px(ROW_HEIGHT))
         .px_3()
         .gap_3()
@@ -634,11 +644,13 @@ fn map_row(
                 .font_weight(FontWeight::MEDIUM)
                 .child(map.name.clone()),
         )
-        .child(cell(PLAYED_WIDTH, map.times_played.to_string()))
-        .child(cell(
-            LAST_WIDTH,
-            last_played_label(map.last_played.as_deref()),
-        ))
+        .when(!shown_in.compact, |row| {
+            row.child(cell(PLAYED_WIDTH, map.times_played.to_string()))
+                .child(cell(
+                    LAST_WIDTH,
+                    last_played_label(map.last_played.as_deref()),
+                ))
+        })
         .child(cell(SIZE_WIDTH, format_bytes(map.size)))
         .child(
             h_flex()
@@ -651,7 +663,8 @@ fn map_row(
 }
 
 impl Render for MapsPage {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.compact = window.viewport_size().width < WIDE_WINDOW;
         // The box can change without an event (a value set by code), so it is compared here.
         if self.search.read(cx).value().as_ref() != self.query {
             self.refilter(cx);
@@ -689,7 +702,7 @@ impl Render for MapsPage {
                 v_flex()
                     .flex_1()
                     .min_h_0()
-                    .child(Self::column_titles(cx))
+                    .child(Self::column_titles(self.compact, cx))
                     .child(body),
             )
     }
