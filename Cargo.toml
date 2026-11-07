@@ -12,7 +12,7 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
 thiserror = "2"
 dirs = "7"
 steamlocate = "2.1"
@@ -24,7 +24,7 @@ vtf = "0.4.1"
 image = { version = "0.25", default-features = false, features = ["png", "webp"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-base64 = "0.22.1"
+base64 = "0.23.1"
 semver = "1.0.28"
 minisign-verify = "=0.3.0"
 minisign = "=0.10.0"
@@ -32,7 +32,7 @@ uuid = { version = "1.28", features = ["v4"] }
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 walkdir = "2.5"
 # Free disk space before copying a HUD; the version already locked, disks only.
-sysinfo = { version = "=0.31.4", default-features = false, features = ["disk", "system"] }
+sysinfo = { version = "=0.40.1", default-features = false, features = ["disk", "system"] }
 reqwest = "=0.13.5"
 tokio = { version = "1.53", features = ["sync", "fs", "time", "io-util", "rt"] }
 md-5 = "0.11"
