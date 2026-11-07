@@ -45,6 +45,43 @@ fn click_screen(cx: &mut TestAppContext, s: &support::ShellWindow, x: f32, y: f3
     support::settle(cx, s.win);
 }
 
+/// Alt-clicks the canvas at screen pixel (x, y), which selects the part there itself rather
+/// than its group.
+fn pick_screen(cx: &mut TestAppContext, s: &support::ShellWindow, x: f32, y: f32) {
+    let canvas = support::bounds_of(cx, s.win, ids::HUD_MAKER_CANVAS).unwrap();
+    let k = scale(cx, s);
+    let position = canvas.origin + point(px(x * k), px(y * k));
+    let (button, modifiers) = (MouseButton::Left, alt());
+    send(
+        cx,
+        s,
+        MouseDownEvent {
+            button,
+            position,
+            modifiers,
+            click_count: 1,
+            first_mouse: false,
+        },
+    );
+    send(
+        cx,
+        s,
+        gpui_kit::MouseUpEvent {
+            button,
+            position,
+            modifiers,
+            click_count: 1,
+        },
+    );
+}
+
+fn alt() -> Modifiers {
+    Modifiers {
+        alt: true,
+        ..Default::default()
+    }
+}
+
 fn hv_box(cx: &mut TestAppContext, page: &Entity<HudMakerPage>) -> (i32, i32, i32, i32) {
     cx.update(|cx| {
         let e = page.read(cx).editor().unwrap();
@@ -60,7 +97,7 @@ fn can_undo(cx: &mut TestAppContext, page: &Entity<HudMakerPage>) -> bool {
 #[gpui_kit::test]
 fn arrow_keys_nudge_the_selection_one_unit_and_shift_ten(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx);
-    click_screen(cx, &s, 220., 947.);
+    pick_screen(cx, &s, 220., 947.);
     support::press(cx, s.win, "right");
     assert_eq!(hv_box(cx, &page).0, 173);
     support::press(cx, s.win, "shift-right");
@@ -159,7 +196,8 @@ fn a_dragged_part_snaps_to_a_nearby_centre_and_shows_a_guide(cx: &mut TestAppCon
     let k = scale(cx, &s);
     let canvas = support::bounds_of(cx, s.win, ids::HUD_MAKER_CANVAS).unwrap();
     let from = hv_centre(cx, &s);
-    press_and_move(cx, &s, from, (45. * k, 0.), Modifiers::default());
+    // Alt takes the health value itself, not its group.
+    press_and_move(cx, &s, from, (45. * k, 0.), alt());
     let guide =
         support::bounds_of(cx, s.win, ids::HUD_MAKER_GUIDE_X).expect("a guide while snapped");
     let at = f32::from(guide.origin.x - canvas.origin.x) / k;
@@ -271,7 +309,7 @@ fn mirror_moves_the_part_to_the_other_side_as_one_step(cx: &mut TestAppContext) 
 #[gpui_kit::test]
 fn match_size_copies_the_next_clicked_parts_size(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx);
-    click_screen(cx, &s, 220., 947.);
+    pick_screen(cx, &s, 220., 947.);
     support::click_id(cx, s.win, ids::HUD_MAKER_MATCH_SIZE);
     assert!(picking(cx, &page));
     // Inside the health image, outside HV over its middle and right of the class portrait.
@@ -286,7 +324,7 @@ fn match_size_copies_the_next_clicked_parts_size(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn escape_stops_picking_and_keeps_the_selection(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx);
-    click_screen(cx, &s, 220., 947.);
+    pick_screen(cx, &s, 220., 947.);
     support::click_id(cx, s.win, ids::HUD_MAKER_MATCH_SIZE);
     support::press(cx, s.win, "escape");
     assert!(!picking(cx, &page));
@@ -363,7 +401,7 @@ fn mirror_is_disabled_where_it_cannot_hold_on_every_screen(cx: &mut TestAppConte
 #[gpui_kit::test]
 fn a_handle_or_killfeed_press_while_picking_only_stops_picking(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx);
-    click_screen(cx, &s, 220., 947.);
+    pick_screen(cx, &s, 220., 947.);
     for target in [
         ids::hud_maker_handle(Handle::BottomRight),
         ids::hud_maker_killfeed_line(0),
@@ -384,7 +422,7 @@ use tf2tools_app::pages::hud_maker::Field;
 #[gpui_kit::test]
 fn arrow_keys_leave_a_focused_text_field_alone(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx);
-    click_screen(cx, &s, 220., 947.);
+    pick_screen(cx, &s, 220., 947.);
     let input = cx.update(|cx| page.read(cx).field(Field::X).clone());
     cx.update_window(s.win, |_, window, cx| {
         input.update(cx, |st, cx| st.focus(window, cx))
@@ -405,7 +443,7 @@ fn nudge_part(
     key: &str,
     keys: &str,
 ) {
-    click_screen(cx, s, 220., 947.);
+    pick_screen(cx, s, 220., 947.);
     select_part(cx, s, page, key);
     support::press(cx, s.win, keys);
 }
@@ -493,7 +531,7 @@ fn an_alignment_tooltip_goes_when_a_press_opens_the_font_list(cx: &mut TestAppCo
     // Tall enough that the whole panel shows, alignment grid and Font row alike.
     cx.simulate_window_resize(s.win, gpui_kit::size(px(1600.), px(1400.)));
     support::settle(cx, s.win);
-    click_screen(cx, &s, 220., 947.);
+    pick_screen(cx, &s, 220., 947.);
     cx.update_window(s.win, |_, w, cx| {
         w.hover(ids::hud_maker_align("north-east"), cx)
     })
@@ -517,7 +555,7 @@ fn a_panel_button_tooltip_goes_on_a_press_elsewhere(cx: &mut TestAppContext) {
     let (_env, s, _page) = opened(cx);
     cx.simulate_window_resize(s.win, gpui_kit::size(px(1600.), px(1400.)));
     support::settle(cx, s.win);
-    click_screen(cx, &s, 220., 947.);
+    pick_screen(cx, &s, 220., 947.);
     cx.update_window(s.win, |_, w, cx| {
         w.hover(
             ids::hud_maker_tip_for(&ids::HUD_MAKER_MATCH_SIZE.into()),
@@ -545,7 +583,7 @@ fn an_alignment_tooltip_stands_level_with_its_own_button_right_of_the_grid(
     let (_env, s, _page) = opened(cx);
     cx.simulate_window_resize(s.win, gpui_kit::size(px(1600.), px(1400.)));
     support::settle(cx, s.win);
-    click_screen(cx, &s, 220., 947.);
+    pick_screen(cx, &s, 220., 947.);
     for value in ["north-west", "north-east"] {
         cx.update_window(s.win, |_, w, cx| w.hover(ids::hud_maker_align(value), cx))
             .unwrap();

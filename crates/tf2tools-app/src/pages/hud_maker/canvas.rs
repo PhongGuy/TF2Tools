@@ -445,11 +445,11 @@ impl HudMakerPage {
             )
         });
         let selected = selected.map(outline);
-        // A part that paints nothing here is outlined dashed and says so, since the outline is
-        // all the player sees of it.
+        // A part that paints nothing here, itself or through a part inside it, is outlined dashed
+        // and says so, since the outline is all the player sees of it.
         let named = |key: &PartKey| {
             let part = model.part(key)?;
-            let blank = !draws(part, &look);
+            let blank = !draws(part, &look) && !paints_inside(model, layout, key, &look);
             let name = super::parts::row_label(part);
             let label = match blank {
                 true => format!("{name}, {NOTHING_SHOWN}"),
@@ -855,10 +855,11 @@ impl HudMakerPage {
             .into_any_element()
     }
 
-    // Selects the best part under the press, fitted from the same bounds the frame was drawn
-    // with, and starts moving it; the press also hands the keys to the page. Alt, or a second
-    // press on the same spot, steps on to the next part under the pointer instead. Otherwise a
-    // press the selection holds (see `holds_press`) keeps it, so the player can drag it.
+    // Selects the group of the best part under the press (see `grouped`), fitted from the same
+    // bounds the frame was drawn with, and starts moving it; the press also hands the keys to
+    // the page. Alt, a second press on the same spot or a double-click goes inside a selection
+    // around that part, and otherwise Alt or the second press steps on to the next part under
+    // the pointer. A press the selection holds (see `holds_press`) keeps it, so it drags.
     fn press_canvas(&mut self, ev: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         // With Space held the press pans instead; the canvas view's own handler starts it.
         if self.space_held {
@@ -876,23 +877,22 @@ impl HudMakerPage {
         let held = at.is_some_and(|(x, y)| self.holds_press(x, y, &picks));
         let picks: Vec<PartKey> = picks.into_iter().map(|p| p.key().clone()).collect();
         // The same spot steps on only while nothing was laid out again since that press; the
-        // second half of a double-click keeps what its first half picked.
+        // second half of a double-click goes inside what its first half picked, or keeps it.
         let generation = editor.layout().generation();
         let same_spot = matches!(&self.last_press, Some(last)
             if Some(last.at) == at && selected.as_ref() == Some(&last.picked)
                 && last.generation == generation);
-        let next = match (
-            ev.modifiers.alt || (same_spot && ev.click_count < 2),
-            &selected,
-        ) {
-            (false, Some(current)) if same_spot => Some(current.clone()),
-            (true, Some(current)) => picks
-                .iter()
-                .position(|k| k == current)
+        let steps = ev.modifiers.alt || (same_spot && ev.click_count < 2);
+        let top = picks.first();
+        let inside = (selected.as_ref().zip(top)).and_then(|(s, t)| self.drilled(s, t));
+        let next = match inside.filter(|_| steps || ev.click_count >= 2) {
+            Some(inner) => Some(inner),
+            None if steps => (selected.as_ref())
+                .and_then(|current| picks.iter().position(|k| k == current))
                 .map(|i| picks[(i + 1) % picks.len()].clone())
-                .or_else(|| picks.first().cloned()),
-            _ if held => selected.clone(),
-            _ => picks.first().cloned(),
+                .or_else(|| top.cloned()),
+            None if same_spot || held => selected.clone(),
+            None => top.map(|t| self.grouped(t)),
         };
         let hit = next.is_some();
         let Some(editor) = self.editor_mut() else {
@@ -933,7 +933,7 @@ impl HudMakerPage {
             let picks = self.picks_at(x, y);
             match self.holds_press(x, y, &picks) {
                 true => editor.selected().cloned(),
-                false => picks.first().map(|p| p.key().clone()),
+                false => picks.first().map(|p| self.grouped(p.key())),
             }
         });
         self.hover_on_canvas = true;
@@ -961,13 +961,52 @@ impl HudMakerPage {
         let layout: &HudLayout = &shown_layout;
         // Chrome colours do not change what a part draws.
         let look = self.look(loaded, layout, 1., Hsla::default(), Hsla::default());
-        let ghost = (loaded.editor.selected()).and_then(|key| game_hidden_root(model, layout, key));
-        let shown = |b: &PartBox| {
-            b.hidden().is_none()
-                || ghost.is_some_and(|root| game_hidden_root(model, layout, b.key()) == Some(root))
-        };
+        let shown = takes_clicks(model, layout, loaded.editor.selected());
         let draws = |key: &PartKey| model.part(key).is_some_and(|p| draws(p, &look));
         layout.pick_ranked(x, y, shown, draws)
+    }
+
+    // What a plain click on `top` selects: its group (see `group_of`), so a player takes their
+    // health whole; once the selection is inside that group, `top` itself.
+    fn grouped(&self, top: &PartKey) -> PartKey {
+        let super::Load::Ready(loaded) = &self.load else {
+            return top.clone();
+        };
+        let model = loaded.editor.model();
+        let layout = loaded.editor.shown_layout();
+        let selected = loaded.editor.selected();
+        let shown = takes_clicks(model, &layout, selected);
+        match group_of(model, &layout, top, &shown) {
+            Some(group)
+                if !selected.is_some_and(|s| *s != group && is_within(model, s, &group)) =>
+            {
+                group
+            }
+            _ => top.clone(),
+        }
+    }
+
+    // Going inside `selected` towards `top`: the outermost group between them, or `top` when
+    // none is; `None` unless `selected` encloses `top`.
+    fn drilled(&self, selected: &PartKey, top: &PartKey) -> Option<PartKey> {
+        let super::Load::Ready(loaded) = &self.load else {
+            return None;
+        };
+        let model = loaded.editor.model();
+        if selected == top || !is_within(model, top, selected) {
+            return None;
+        }
+        let layout = loaded.editor.shown_layout();
+        let shown = takes_clicks(model, &layout, Some(selected));
+        let mut inner = top.clone();
+        let mut at = model.part(top).and_then(|p| p.parent());
+        while let Some(key) = at.filter(|k| *k != selected) {
+            if is_group(model, &layout, key, &shown) {
+                inner = key.clone();
+            }
+            at = model.part(key).and_then(|p| p.parent());
+        }
+        Some(inner)
     }
 
     // Whether a press at screen pixel (x, y) stays on the selection: inside its outline, unless
@@ -1814,6 +1853,62 @@ pub(super) fn game_hidden_root<'a>(
 // Whether `key` has a box of which nothing would show, cut off whole by its parents or the screen.
 fn cut_off_whole(layout: &HudLayout, key: &PartKey) -> bool {
     layout.get(key).is_some() && layout.shown(key).is_none()
+}
+
+// Which boxes a click may land on: those the game shows, plus the faint panel of a selected
+// part the game hides.
+fn takes_clicks<'a>(
+    model: &'a HudModel,
+    layout: &'a HudLayout,
+    selected: Option<&'a PartKey>,
+) -> impl Fn(&PartBox) -> bool + 'a {
+    let ghost = selected.and_then(|key| game_hidden_root(model, layout, key));
+    move |b: &PartBox| {
+        b.hidden().is_none()
+            || ghost.is_some_and(|root| game_hidden_root(model, layout, b.key()) == Some(root))
+    }
+}
+
+/// `key`'s group: its nearest enclosing panel that a click may select and that holds two or
+/// more parts, as the health panel holds the health number and cross; `None` when none does.
+pub(super) fn group_of(
+    model: &HudModel,
+    layout: &HudLayout,
+    key: &PartKey,
+    shown: &dyn Fn(&PartBox) -> bool,
+) -> Option<PartKey> {
+    let mut at = model.part(key)?.parent();
+    while let Some(parent) = at {
+        if is_group(model, layout, parent, shown) {
+            return Some(parent.clone());
+        }
+        at = model.part(parent)?.parent();
+    }
+    None
+}
+
+fn is_group(
+    model: &HudModel,
+    layout: &HudLayout,
+    key: &PartKey,
+    shown: &dyn Fn(&PartBox) -> bool,
+) -> bool {
+    let takes = layout.get(key).is_some_and(|b| b.clickable() && shown(b));
+    let parts = (model.parts().iter())
+        .filter(|p| p.parent() == Some(key) && layout.get(p.key()).is_some())
+        .take(2)
+        .count();
+    takes && parts >= 2
+}
+
+// Whether a part the game shows inside `key`, at any depth, draws something.
+fn paints_inside(model: &HudModel, layout: &HudLayout, key: &PartKey, look: &Look) -> bool {
+    (model.parts().iter()).any(|p| {
+        p.key() != key
+            && layout.get(p.key()).is_some_and(|b| b.hidden().is_none())
+            && draws(p, look)
+            && is_within(model, p.key(), key)
+    })
 }
 
 // Whether `key` is `root` or lies anywhere under it.

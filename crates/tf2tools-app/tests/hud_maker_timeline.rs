@@ -35,7 +35,31 @@ fn a_move_animation_moves_the_part_at_the_moment_and_clicks_still_pick(cx: &mut 
     });
     let after = support::bounds_of(cx, s.win, ids::hud_maker_part(&value)).unwrap();
     assert!(after.left() < before.left(), "{before:?} -> {after:?}");
-    support::click_id(cx, s.win, ids::hud_maker_part(&value));
+    // Alt takes the value itself rather than its health group.
+    let alt = gpui_kit::Modifiers {
+        alt: true,
+        ..Default::default()
+    };
+    let (button, position) = (gpui_kit::MouseButton::Left, after.center());
+    gpui_kit::AppContext::update_window(cx, s.win, |_, w, cx| {
+        let down = gpui_kit::MouseDownEvent {
+            button,
+            position,
+            modifiers: alt,
+            click_count: 1,
+            first_mouse: false,
+        };
+        let up = gpui_kit::MouseUpEvent {
+            button,
+            position,
+            modifiers: alt,
+            click_count: 1,
+        };
+        let _ = w.dispatch_event(gpui_kit::InputEvent::to_platform_input(down), cx);
+        let _ = w.dispatch_event(gpui_kit::InputEvent::to_platform_input(up), cx);
+    })
+    .unwrap();
+    support::settle(cx, s.win);
     assert_eq!(
         cx.update(|cx| page.read(cx).editor().unwrap().selected().cloned()),
         Some(value.clone())

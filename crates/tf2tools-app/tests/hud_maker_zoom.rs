@@ -252,9 +252,16 @@ fn a_zoomed_press_selects_and_drags_by_hud_units(cx: &mut TestAppContext) {
         MouseButton::Left,
         part.center(),
         point(px(45. * scale), px(-27. * scale)),
-        Modifiers::secondary_key(),
+        Modifiers {
+            alt: true,
+            ..Modifiers::secondary_key()
+        },
     );
-    assert_eq!(selection(cx, &page).as_deref(), Some(HV));
+    assert_eq!(
+        selection(cx, &page).as_deref(),
+        Some(HV),
+        "Alt takes the part itself"
+    );
     let end = hv_box(cx, &page);
     assert_eq!(
         (end.0 - start.0, end.1 - start.1),
