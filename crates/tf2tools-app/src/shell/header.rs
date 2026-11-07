@@ -64,6 +64,8 @@ fn content(page: Page, tf2_running: bool, cx: &mut Context<Shell>) -> impl IntoE
     let rings = sync_rings(cx);
     let rings = (!rings.is_empty()).then(|| h_flex().gap_1p5().children(rings));
     h_flex()
+        .id(ids::HEADER_ROW)
+        .test_support()
         .flex_1()
         .h_full()
         .px(px(24.))

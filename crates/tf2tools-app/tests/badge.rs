@@ -38,12 +38,14 @@ fn the_badge_sits_right_of_the_title_in_the_header(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     let header = support::bounds_of(cx, s.win, ids::HEADER).unwrap();
+    let row = support::bounds_of(cx, s.win, ids::HEADER_ROW).unwrap();
     let badge = support::bounds_of(cx, s.win, ids::TF2_BADGE).unwrap();
     let title = support::bounds_of(cx, s.win, ids::HEADER_TITLE).unwrap();
     assert!(badge.origin.x > title.origin.x + title.size.width);
+    // Measured against our own row, since Windows draws its window buttons right of it.
+    assert!(row.origin.x + row.size.width <= header.origin.x + header.size.width);
     assert!(
-        header.origin.x + header.size.width - (badge.origin.x + badge.size.width)
-            <= gpui_kit::px(32.)
+        row.origin.x + row.size.width - (badge.origin.x + badge.size.width) <= gpui_kit::px(32.)
     );
     assert!(
         badge.origin.y >= header.origin.y
