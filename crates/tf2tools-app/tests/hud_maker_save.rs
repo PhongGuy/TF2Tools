@@ -62,8 +62,8 @@ fn save(
     page: &Entity<HudMakerPage>,
     button: &'static str,
 ) {
-    // Save as new sits in the toolbar's overflow menu.
-    if button == ids::HUD_MAKER_SAVE_AS_NEW {
+    // Save as new sits in the toolbar's overflow menu, and so does Save in a narrow toolbar.
+    if button == ids::HUD_MAKER_SAVE_AS_NEW || !support::present(cx, s.win, button) {
         support::click_id(cx, s.win, ids::HUD_MAKER_MORE);
     }
     support::click_id(cx, s.win, button);
@@ -548,6 +548,7 @@ fn the_save_row_wraps_inside_the_toolbar(cx: &mut TestAppContext) {
         cx.simulate_window_resize(s.win, gpui_kit::size(gpui_kit::px(w), gpui_kit::px(h)));
         support::settle(cx, s.win);
         let page = open_maker(cx, &s);
+        support::maker_page::float_panels(cx, &s, &page);
         if docked {
             support::click_id(cx, s.win, ids::HUD_MAKER_PARTS_PANEL_DOCK_RIGHT);
             support::click_id(cx, s.win, ids::HUD_MAKER_PARTS_PANEL_COLLAPSE);

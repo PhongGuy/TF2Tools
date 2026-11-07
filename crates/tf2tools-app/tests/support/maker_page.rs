@@ -7,6 +7,7 @@ use gpui_kit::{
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::pages::hud_maker::editor::HudEditor;
+use tf2tools_app::pages::hud_maker::view::{Panel, PanelPlace};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{HudModel, Platform, Tf2Install};
@@ -87,6 +88,15 @@ pub fn on_page(
     })
     .unwrap();
     super::settle(cx, s.win);
+}
+
+/// Floats both panels at their own default places, the layout before docking became the
+/// default; for tests of floating panels, or of a canvas no dock narrows.
+pub fn float_panels(cx: &mut TestAppContext, s: &super::ShellWindow, page: &Entity<HudMakerPage>) {
+    on_page(cx, s, page, |p, _, cx| {
+        p.set_place_of(Panel::Options, PanelPlace::DEFAULT, cx);
+        p.set_place_of(Panel::Parts, PanelPlace::PARTS_DEFAULT, cx);
+    });
 }
 
 /// Wheels the side panel until `id` shows, then clicks it.

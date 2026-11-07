@@ -736,6 +736,7 @@ fn escape_closes_an_open_option_picker(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn an_open_option_picker_leaves_the_swatches_where_they_were_at_800x600(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx);
+    support::maker_page::float_panels(cx, &s, &page);
     cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
     support::settle(cx, s.win);
     // Brings the grid into view, then measures every swatch before the picker opens.

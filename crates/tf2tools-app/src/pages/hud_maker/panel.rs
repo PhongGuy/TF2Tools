@@ -144,6 +144,8 @@ fn scrolled(area: Div, docked: bool, inset: bool) -> AnyElement {
 pub(super) const STACK_GAP: f32 = 8.;
 // The space left under a docked column.
 const COLUMN_MARGIN: f32 = 16.;
+// A docked panel folded to a rail at the area's edge is this wide.
+pub(super) const RAIL_WIDTH: Pixels = px(36.);
 // The side panel's bottom stays within this share of the area's height, so the lower HUD stays
 // clickable, but the panel is never shorter than SIDE_PANEL_MIN; its body scrolls inside.
 pub(super) const SIDE_PANEL_SHARE: f32 = 0.6;
@@ -191,32 +193,44 @@ pub(super) struct PanelDrag {
 
 impl HudMakerPage {
     // Floating panels sit where placed; docked ones share one column per side, side panel on
-    // top, so two docked on one side stack instead of overlapping.
+    // top, so two docked on one side stack instead of overlapping. A side holding only rails
+    // shows them as slim tabs, and a panel opened from its rail lies over the canvas beside them.
     pub(super) fn panels(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let mut out = Vec::new();
-        for side in [PanelMode::DockLeft, PanelMode::DockRight] {
-            let on_side: Vec<Panel> = (Panel::ALL.into_iter())
-                .filter(|&p| self.mode_shown(p) == side)
-                .collect();
-            let docked: Vec<AnyElement> = on_side.into_iter().map(|p| self.panel(p, cx)).collect();
-            if docked.is_empty() {
-                continue;
-            }
-            // The column runs to just short of the area's bottom, so a full panel shows its border.
-            let room = (self.area.get().size.height - px(COLUMN_MARGIN)).max(px(0.));
+        // The column runs to just short of the area's bottom, so a full panel shows its border.
+        let room = (self.area.get().size.height - px(COLUMN_MARGIN)).max(px(0.));
+        let column = |side: PanelMode, inset: Pixels, children: Vec<AnyElement>| {
             let column = v_flex()
                 .absolute()
                 .top_0()
                 .h(room)
                 .gap(px(STACK_GAP))
-                .children(docked);
-            out.push(
-                match side {
-                    PanelMode::DockLeft => column.left_0().items_start(),
-                    _ => column.right_0().items_end(),
-                }
-                .into_any_element(),
-            );
+                .children(children);
+            match side {
+                PanelMode::DockLeft => column.left(inset).items_start(),
+                _ => column.right(inset).items_end(),
+            }
+            .into_any_element()
+        };
+        for side in [PanelMode::DockLeft, PanelMode::DockRight] {
+            let on_side: Vec<Panel> = (Panel::ALL.into_iter())
+                .filter(|&p| self.mode_shown(p) == side)
+                .collect();
+            let (rails, docked): (Vec<Panel>, Vec<Panel>) =
+                on_side.into_iter().partition(|&p| self.is_railed(p));
+            // A panel opened from its rail stands beside the rails, so each rail stays in reach.
+            let inset = match rails.is_empty() {
+                true => px(0.),
+                false => RAIL_WIDTH + px(STACK_GAP),
+            };
+            if !rails.is_empty() {
+                let rails = rails.into_iter().map(|p| self.rail(p, cx)).collect();
+                out.push(column(side, px(0.), rails));
+            }
+            if !docked.is_empty() {
+                let docked = docked.into_iter().map(|p| self.panel(p, cx)).collect();
+                out.push(column(side, inset, docked));
+            }
         }
         for p in Panel::ALL {
             if self.mode_shown(p) == PanelMode::Floating {
@@ -224,6 +238,39 @@ impl HudMakerPage {
             }
         }
         out
+    }
+
+    // A docked panel folded to a slim tab at its edge; its one button opens the panel, under
+    // the collapse button's id since it stands in for the collapsed panel.
+    fn rail(&self, panel: Panel, cx: &mut Context<Self>) -> AnyElement {
+        let own = ids_of(panel);
+        let (icon, tip) = match panel {
+            Panel::Options => (IconName::Paintbrush, "Show the part settings"),
+            Panel::Parts => (IconName::Layers, "Show the list of parts"),
+        };
+        let theme = cx.theme();
+        v_flex()
+            .id(own.frame)
+            .test_support()
+            .occlude()
+            .flex_none()
+            .w(RAIL_WIDTH)
+            .py_1()
+            .items_center()
+            .rounded_md()
+            .border_1()
+            .border_color(theme.border)
+            .bg(theme.background)
+            .shadow_md()
+            .child(
+                Button::new(own.collapse)
+                    .ghost()
+                    .small()
+                    .icon(icon)
+                    .named(tip)
+                    .on_click(cx.listener(move |page, _, _, cx| page.toggle_collapsed(panel, cx))),
+            )
+            .into_any_element()
     }
 
     // The panel measures itself with a `canvas` watcher, so avoidance can use last frame's size;
@@ -364,7 +411,7 @@ impl HudMakerPage {
                 }),
             )
             .child(title);
-        // The dock buttons show the player's choice, kept while a floored dock floats.
+        // The dock buttons show the player's choice.
         let chosen = self.place_of(panel).mode;
         let mode_button = |id: &'static str, icon: IconName, tip: &'static str, mode: PanelMode| {
             Button::new(id)

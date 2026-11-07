@@ -199,8 +199,12 @@ fn a_damaged_segment_falls_back_on_its_own() {
 
 #[test]
 fn the_parts_panel_starts_collapsed_and_narrower() {
-    assert_eq!(Places::DEFAULT.options, PanelPlace::DEFAULT);
-    assert_eq!(Places::DEFAULT.get(Panel::Parts), PanelPlace::PARTS_DEFAULT);
+    // Both start docked beside the canvas, floating from their own default places if floated.
+    let docked = |mode, place: PanelPlace| PanelPlace { mode, ..place };
+    let left = docked(PanelMode::DockLeft, PanelPlace::DEFAULT);
+    assert_eq!(Places::DEFAULT.options, left);
+    let right = docked(PanelMode::DockRight, PanelPlace::PARTS_DEFAULT);
+    assert_eq!(Places::DEFAULT.get(Panel::Parts), right);
     const { assert!(PanelPlace::PARTS_DEFAULT.collapsed) };
     assert_eq!(PanelPlace::PARTS_DEFAULT.mode, PanelMode::Floating);
     const { assert!(!Places::DEFAULT.toolbar_collapsed) };

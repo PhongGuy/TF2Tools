@@ -765,7 +765,8 @@ fn the_note_keeps_clear_at(cx: &mut TestAppContext, w: f32, h: f32) -> Bounds<Pi
     let s = shell_with(cx, &env, &[("resource/ui/scoreboard.res", Some(&board))]);
     cx.simulate_window_resize(s.win, gpui_kit::size(gpui_kit::px(w), gpui_kit::px(h)));
     support::settle(cx, s.win);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     to_scene(cx, &s, Scene::Scoreboard);
     click_row(cx, &s, BLUE);
     let note = bounds(cx, &s, ids::HUD_MAKER_SCENE_NOTE);
@@ -2514,6 +2515,7 @@ fn shrinking_a_selection_elsewhere_leaves_the_list_where_it_is(cx: &mut TestAppC
     );
     resize(cx, &s, 1920., 1080.);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     set_scene(cx, &s, &page, Scene::MainMenu);
     show_parts(cx, &s);
     support::settle(cx, s.win);

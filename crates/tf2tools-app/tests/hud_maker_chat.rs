@@ -130,6 +130,7 @@ fn the_open_parts_list_keeps_off_the_chat_lines(cx: &mut TestAppContext) {
     // so drag the chat until its first line ends in the list's middle, then let go of the
     // selection, which the list would fold over instead.
     let (_env, s, page) = opened(cx, CHAT);
+    support::maker_page::float_panels(cx, &s, &page);
     for (w, h) in [(1280., 800.), (1920., 1080.)] {
         cx.simulate_window_resize(s.win, gpui_kit::size(gpui_kit::px(w), gpui_kit::px(h)));
         support::settle(cx, s.win);
