@@ -10,11 +10,13 @@ use serde::de::{Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use super::changes::{check_cfg_path, check_switch_path};
 use super::document::KvDocument;
 use super::files::HudFiles;
-use super::hud_options::{active_bases, base_target, base_targets, scan};
+use super::hud_options::{
+    SHIPPED_ART, active_bases, base_target, base_targets, menu_art, scan, toggle_lines,
+};
 use super::model::{live_blocks, root_block};
 use super::options::{
     CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue,
-    SwitchAction, ValueMap, is_item_colour,
+    SwitchAction, ValueMap, is_item_colour, template_refs, text_suits,
 };
 use crate::error::SchemaError;
 use crate::fonts::Platform;
@@ -416,14 +418,16 @@ impl HudSchemas {
     }
 }
 
-/// Any of these on a control asks for something this build does not do.
-const UNSUPPORTED: [&str; 5] = [
-    "Special",
-    "SpecialParameters",
-    "ComboDirectories",
-    "ComboFiles",
-    "Command",
-];
+/// What a `Special` names that this build does: switch to the game's stock backgrounds, or
+/// make one of the HUD's shipped backgrounds the menu art. A `Command` names a preview hook
+/// and changes no file, so it is ignored.
+const STOCK_BACKGROUNDS: &str = "StockBackgrounds";
+const HUD_BACKGROUND: &str = "HUDBackground";
+/// The folder holding a HUD's menu art.
+const MENU_ART_DIR: &str = "materials/console";
+
+/// The kinds of file a `WriteFile` may write whole.
+const TEXT_FILES: [&str; 4] = [".res", ".txt", ".vdf", ".vmt"];
 
 /// The controls of one schema compiled against one copy.
 #[derive(Debug, Clone, Default)]
@@ -469,6 +473,8 @@ enum Leaves {
     Value,
     /// A ComboBox option: a literal only.
     Literal,
+    /// A text box: `$value`, alone or within other words.
+    Text,
 }
 
 /// Where a key edit lands: file, block path, key and conditional.
@@ -489,7 +495,12 @@ impl HudSchema {
             enabled: self.enabled.as_deref(),
             docs: BTreeMap::new(),
             bases: None,
+            copy_dirs: false,
+            referenced: BTreeSet::new(),
         };
+        for control in &self.controls {
+            references(&control.fields, &mut fit.referenced);
+        }
         let mut out = SchemaOptions::default();
         let mut seen = BTreeSet::new();
         for control in &self.controls {
@@ -572,6 +583,10 @@ struct Fit<'a> {
     docs: BTreeMap<String, Option<KvDocument>>,
     /// Every active `#base` line of the copy as (file, target), read once when first needed.
     bases: Option<Vec<(String, String)>>,
+    /// Whether the pick being read copies option folders rather than moving them.
+    copy_dirs: bool,
+    /// Control names another control's text names through `{$name ? a : b}`.
+    referenced: BTreeSet<String>,
 }
 
 impl Fit<'_> {
@@ -601,9 +616,6 @@ impl Fit<'_> {
         control: &Control,
     ) -> Result<OptionSpec, Refused> {
         let fields = &control.fields;
-        if UNSUPPORTED.iter().any(|k| fields.get(k).is_some()) {
-            return Err(Refused::LeftOut);
-        }
         let kind = fields
             .get("Type")
             .and_then(SchemaValue::as_str)
@@ -660,7 +672,11 @@ impl Fit<'_> {
                     return Err(Refused::LeftOut);
                 }
                 let mut actions = self.actions(fields, Leaves::Value, &mut Vec::new())?;
-                let (choices, literals) = self.choices(fields)?;
+                // A pick listing option folders copies the picked folder's files in.
+                self.copy_dirs = fields.get("ComboDirectories").is_some();
+                let picked = self.choices(fields);
+                self.copy_dirs = false;
+                let (choices, literals) = picked?;
                 actions.extend(per_choice(literals));
                 if actions.is_empty() && choices.iter().all(|c| c.actions().is_empty()) {
                     return Err(Refused::LeftOut);
@@ -673,10 +689,31 @@ impl Fit<'_> {
                     actions,
                 )
             }
+            // The HUD's own on-screen crosshair: a symbol of its crosshair font.
+            "crosshair" => {
+                let actions = self.actions(fields, Leaves::Value, &mut Vec::new())?;
+                let choices: Vec<Choice> = (CROSSHAIR_SYMBOLS.chars())
+                    .map(|c| Choice::new(&c.to_string(), &c.to_string(), Vec::new()))
+                    .collect();
+                let start = value.filter(|v| choices.iter().any(|c| c.key() == v));
+                let start = start.unwrap_or_else(|| choices[0].key().to_owned());
+                (
+                    OptionKind::Choice(choices),
+                    OptionValue::Pick(start),
+                    actions,
+                )
+            }
+            "textbox" | "text" => {
+                let actions = self.actions(fields, Leaves::Text, &mut Vec::new())?;
+                let start = value.filter(|v| text_suits(v)).unwrap_or_default();
+                (OptionKind::Text, OptionValue::Text(start), actions)
+            }
             _ => return Err(Refused::LeftOut),
         };
-        // An option that writes nothing is no option; a ComboBox was checked with its choices.
-        if actions.is_empty() && !matches!(kind, OptionKind::Choice(_)) {
+        // An option that writes nothing is no option, unless another option's text names it;
+        // a ComboBox was checked with its choices.
+        let named = kind == OptionKind::Toggle && self.referenced.contains(name);
+        if actions.is_empty() && !named && !matches!(kind, OptionKind::Choice(_)) {
             return Err(Refused::LeftOut);
         }
         let label = fields
@@ -758,6 +795,7 @@ impl Fit<'_> {
                 "RenameFile" => self.rename(value),
                 "WriteFile" => self.write_file(value),
                 "WriteCfg" => self.write_cfg(value),
+                "Special" => self.special(value, fields.get("SpecialParameters")),
                 _ => continue,
             };
             match got {
@@ -800,12 +838,28 @@ impl Fit<'_> {
                 }
                 continue;
             }
+            // `comment` and `uncomment` lists toggle lines in any text file; an animation file
+            // takes nothing else, as its events are no key tree.
+            let is_list = |k: &str| k == "comment" || k == "uncomment";
+            if content.iter().any(|(k, _)| is_list(k)) {
+                match self.lines_action(&file, content, leaves) {
+                    Ok(action) => actions.push(action),
+                    Err(Refused::Misfit) => misfit = true,
+                    Err(Refused::LeftOut) => return Err(Refused::LeftOut),
+                }
+            }
             if !file.ends_with(".res") {
+                if content.iter().all(|(k, _)| is_list(k)) && file.ends_with(".txt") {
+                    continue;
+                }
                 return Err(Refused::LeftOut);
             }
             let mut sets = Vec::new();
-            for (k, v) in content {
+            for (k, v) in content.iter().filter(|(k, _)| !is_list(k)) {
                 collect_leaves(k, v, &mut Vec::new(), leaves, &mut sets)?;
+            }
+            if sets.is_empty() && content.iter().any(|(k, _)| is_list(k)) {
+                continue;
             }
             let Some(root) = self
                 .doc(&file)
@@ -853,13 +907,79 @@ impl Fit<'_> {
         }
     }
 
-    /// `FileName`: the file moves from the customizations folder to the enabled one.
+    /// `FileName`: the option moves from the customizations folder to the enabled one, as
+    /// named when the copy has that, else as a folder (the name without `.res`) or a `.res`
+    /// file. In a pick listing option folders, the folder's files are copied into the enabled
+    /// folder instead, which may be the HUD's top.
     fn file_name(&self, value: &SchemaValue) -> Result<Vec<OptionAction>, Refused> {
         let name = value.as_str().ok_or(Refused::LeftOut)?;
         let (Some(from), Some(to)) = (self.customizations, self.enabled) else {
             return Err(Refused::LeftOut);
         };
-        self.moved(&format!("{from}/{name}"), &format!("{to}/{name}"))
+        if self.copy_dirs {
+            let folder = check_switch_path(&format!("{from}/{name}")).ok_or(Refused::LeftOut)?;
+            let to = match to.is_empty() {
+                true => String::new(),
+                false => check_switch_path(to).ok_or(Refused::LeftOut)?,
+            };
+            if !self.has(&folder) || self.copy.contains(&folder) {
+                return Err(Refused::Misfit);
+            }
+            return Ok(vec![OptionAction::Switch(SwitchAction::CopyFolder {
+                from: folder,
+                to,
+            })]);
+        }
+        let stem = name.strip_suffix(".res").unwrap_or(name);
+        let at = |n: &str| (format!("{from}/{n}"), format!("{to}/{n}"));
+        let fits = |(a, b): &(String, String)| {
+            [a, b]
+                .iter()
+                .any(|p| check_switch_path(p).is_some_and(|p| self.has(&p)))
+        };
+        let named = at(name);
+        let picked = [at(stem), at(&format!("{stem}.res"))]
+            .into_iter()
+            .find(|p| fits(p))
+            .filter(|_| !fits(&named))
+            .unwrap_or(named);
+        self.moved(&picked.0, &picked.1)
+    }
+
+    /// `Special`: the stock backgrounds switch, which hides the HUD's menu art, or a shipped
+    /// background (named by the first parameter) made the menu art. Anything else is left out.
+    fn special(
+        &self,
+        value: &SchemaValue,
+        parameters: Option<&SchemaValue>,
+    ) -> Result<Vec<OptionAction>, Refused> {
+        match value.as_str() {
+            Some(s) if s.eq_ignore_ascii_case(STOCK_BACKGROUNDS) => {
+                if menu_art(self.copy.iter().cloned(), MENU_ART_DIR).is_empty() {
+                    return Err(Refused::Misfit);
+                }
+                Ok(vec![OptionAction::Switch(SwitchAction::StockBackgrounds {
+                    folder: MENU_ART_DIR.to_owned(),
+                })])
+            }
+            Some(s) if s.eq_ignore_ascii_case(HUD_BACKGROUND) => {
+                let image = (parameters.and_then(SchemaValue::as_array))
+                    .and_then(|p| p.first())
+                    .and_then(SchemaValue::as_str)
+                    .filter(|i| !i.is_empty() && !i.contains(['/', '\\']))
+                    .ok_or(Refused::LeftOut)?;
+                let path = check_switch_path(&format!("{SHIPPED_ART}/{image}.vtf"))
+                    .ok_or(Refused::LeftOut)?;
+                if !self.copy.contains(&path) {
+                    return Err(Refused::Misfit);
+                }
+                let image = path[SHIPPED_ART.len() + 1..path.len() - 4].to_owned();
+                Ok(vec![OptionAction::Switch(SwitchAction::MenuBackground {
+                    image,
+                })])
+            }
+            _ => Err(Refused::LeftOut),
+        }
     }
 
     /// `RenameFile`: `OldName` moves to `NewName`, a trailing `/` naming a folder.
@@ -909,19 +1029,77 @@ impl Fit<'_> {
         self.base_lines(file, on, off)
     }
 
-    /// `WriteFile` whose texts are nothing but `#base` lines, as a `#base` swap.
+    /// `WriteFile`: texts that are nothing but `#base` lines swap the file's `#base` lines;
+    /// any other text writes the whole file. The file must be a text file the path rule
+    /// allows, beside other files of the copy.
     fn write_file(&mut self, value: &SchemaValue) -> Result<Vec<OptionAction>, Refused> {
         let side = |k: &str| value.get(k).and_then(SchemaValue::as_str);
         let file = side("FileName")
             .and_then(check_switch_path)
             .ok_or(Refused::LeftOut)?;
-        let on = side("TrueText")
-            .and_then(base_targets)
-            .ok_or(Refused::LeftOut)?;
-        let off = side("FalseText")
-            .and_then(base_targets)
-            .ok_or(Refused::LeftOut)?;
-        Ok(vec![self.base_lines(&file, on, off)?])
+        let on = side("TrueText").ok_or(Refused::LeftOut)?;
+        let off = side("FalseText");
+        if let (Some(a), Some(b)) = (base_targets(on), off.and_then(base_targets)) {
+            return Ok(vec![self.base_lines(&file, a, b)?]);
+        }
+        if !TEXT_FILES.iter().any(|ext| file.ends_with(ext)) {
+            return Err(Refused::LeftOut);
+        }
+        let folder = file.rsplit_once('/').map(|(dir, _)| dir);
+        if !self.copy.contains(&file) && !folder.is_some_and(|dir| self.has(dir)) {
+            return Err(Refused::Misfit);
+        }
+        Ok(vec![OptionAction::Switch(SwitchAction::WriteText {
+            file,
+            on: on.to_owned(),
+            off: off.map(str::to_owned),
+        })])
+    }
+
+    /// A `comment`/`uncomment` pair on copy file `file`: each a list of line texts. A switch
+    /// reverses its edits when off; a choice's apply only when picked. Every text must be on a
+    /// line of the copy's file.
+    fn lines_action(
+        &mut self,
+        file: &str,
+        content: &[(String, SchemaValue)],
+        leaves: Leaves,
+    ) -> Result<OptionAction, Refused> {
+        let list = |key: &str| -> Result<Vec<String>, Refused> {
+            let Some((_, value)) = content.iter().find(|(k, _)| k == key) else {
+                return Ok(Vec::new());
+            };
+            let items = value.as_array().ok_or(Refused::LeftOut)?;
+            (items.iter())
+                .map(|item| match item.as_str() {
+                    Some(s) if !s.trim().is_empty() && !s.contains(['\n', '\r']) => {
+                        Ok(s.to_owned())
+                    }
+                    _ => Err(Refused::LeftOut),
+                })
+                .collect()
+        };
+        let (comment, uncomment) = (list("comment")?, list("uncomment")?);
+        let reverses = match leaves {
+            Leaves::Toggle => true,
+            Leaves::Literal => false,
+            Leaves::Value | Leaves::Text => return Err(Refused::LeftOut),
+        };
+        if comment.is_empty() && uncomment.is_empty() {
+            return Err(Refused::LeftOut);
+        }
+        let text = (self.copy.contains(file))
+            .then(|| self.files.read_pristine(file).ok().flatten())
+            .flatten()
+            .and_then(|f| String::from_utf8(f.into_bytes()).ok())
+            .ok_or(Refused::Misfit)?;
+        toggle_lines(&text, &comment, &uncomment).ok_or(Refused::Misfit)?;
+        Ok(OptionAction::Switch(SwitchAction::Lines {
+            file: file.to_owned(),
+            comment,
+            uncomment,
+            reverses,
+        }))
     }
 
     /// `WriteCfg`: a settings file with a text for each side, written where the copy's own
@@ -994,6 +1172,21 @@ impl Fit<'_> {
     }
 }
 
+/// The symbols of the crosshair font HUDs draw their own crosshair with; the backslash is
+/// left out, as a file would read it as an escape.
+const CROSSHAIR_SYMBOLS: &str =
+    "!#$%'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+
+/// Every control name the texts in `value` name through `{$name ? a : b}`.
+fn references(value: &SchemaValue, out: &mut BTreeSet<String>) {
+    match value {
+        SchemaValue::String(s) => out.extend(template_refs(s).unwrap_or_default()),
+        SchemaValue::Array(items) => items.iter().for_each(|v| references(v, out)),
+        SchemaValue::Object(fields) => fields.iter().for_each(|(_, v)| references(v, out)),
+        SchemaValue::Null | SchemaValue::Bool(_) | SchemaValue::Number(_) => {}
+    }
+}
+
 /// A `Files` leaf: a value map, or a ComboBox option's literal.
 enum Leaf {
     Map(ValueMap),
@@ -1031,8 +1224,17 @@ fn collect_leaves(
                 off: side("false"),
             })
         }
-        (SchemaValue::String(s), Leaves::Value) if s == "$value" => Leaf::Map(ValueMap::Value),
+        (SchemaValue::String(s), Leaves::Value | Leaves::Text) if s == "$value" => {
+            Leaf::Map(ValueMap::Value)
+        }
         (SchemaValue::String(s), Leaves::Literal) if !s.contains('$') => Leaf::Literal(s.clone()),
+        // Other words around `$value`, or `{$name ? a : b}` naming a switch, make a template;
+        // any other `$` or brace is left out.
+        (SchemaValue::String(s), Leaves::Value | Leaves::Text)
+            if s.contains('$') && template_refs(s).is_some() =>
+        {
+            Leaf::Map(ValueMap::Template(s.clone()))
+        }
         _ => return Err(Refused::LeftOut),
     };
     let (key, cond) = split_cond(key);

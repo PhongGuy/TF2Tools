@@ -6,6 +6,7 @@ use std::collections::BTreeMap;
 
 use serde_json::{Map, Value, json};
 
+use super::options::text_suits;
 use super::{
     AddBlock, AnimationAppend, AnimationChange, AssetFile, BlockLine, Change, ChangeTarget,
     CreditNote, OptionChange, OptionValue, RemoveKey, SetKey, check_hud_path,
@@ -591,6 +592,7 @@ fn parse_option(f: &Fields) -> Option<Option<OptionChange>> {
             OptionValue::Rgba(<[u8; 4]>::try_from(channels).ok()?)
         }
         "pick" => OptionValue::Pick(value.as_str().filter(|k| k.len() <= MAX_PICK)?.to_owned()),
+        "text" => OptionValue::Text(value.as_str().filter(|t| text_suits(t))?.to_owned()),
         _ => return Some(None),
     };
     Some(Some(OptionChange::new(source, id, value)))
@@ -602,5 +604,6 @@ fn option_value_json(value: &OptionValue) -> Value {
         OptionValue::Int(i) => json!({ "int": i }),
         OptionValue::Rgba(rgba) => json!({ "rgba": rgba }),
         OptionValue::Pick(key) => json!({ "pick": key }),
+        OptionValue::Text(text) => json!({ "text": text }),
     }
 }

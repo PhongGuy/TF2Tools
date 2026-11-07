@@ -6,6 +6,7 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::color_picker::ColorPicker;
+use gpui_kit::component::input::Input;
 use gpui_kit::component::searchable_list::SearchableListItem;
 use gpui_kit::component::select::Select;
 use gpui_kit::component::slider::Slider;
@@ -641,6 +642,7 @@ impl HudMakerPage {
             OptionKind::Choice(choices) => self.hud_choices(spec, choices, value, held, cx),
             OptionKind::Number { .. } => self.hud_slider(spec, value, held, cx)?,
             OptionKind::Colour { .. } => self.hud_colour(spec, value, held, cx),
+            OptionKind::Text => self.hud_text_box(spec, held, cx)?,
             _ => return None,
         };
         let muted = cx.theme().muted_foreground;
@@ -744,6 +746,34 @@ impl HudMakerPage {
             .child(name)
             .child(control)
             .into_any_element()
+    }
+
+    // The option's name over a one-line text box; Enter or leaving the box records the text,
+    // and text the HUD's files cannot hold is refused and put back.
+    fn hud_text_box(
+        &self,
+        spec: &OptionSpec,
+        held: bool,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        let input = self.hud_text(spec.id())?;
+        Some(
+            v_flex()
+                .gap_1()
+                .child(
+                    div()
+                        .text_sm()
+                        .text_color(cx.theme().foreground)
+                        .child(spec.label().to_owned()),
+                )
+                .child(
+                    div()
+                        .id(ids::hud_maker_option(spec.id()))
+                        .test_support()
+                        .child(Input::new(&input).small().disabled(held)),
+                )
+                .into_any_element(),
+        )
     }
 
     // The option's name over its slider, with the value in force beside it. Only the release

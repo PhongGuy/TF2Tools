@@ -14,7 +14,8 @@ use super::hud_schema::HudSchema;
 use super::model::{BaseChains, PartKey, apply_set, live_blocks, root_block};
 use super::options::{
     CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue,
-    SwitchAction, ValueMap, derived_colour, rgba_text, value_suits,
+    SwitchAction, ValueMap, derived_colour, rgba_text, template_refs, template_text, text_suits,
+    value_suits,
 };
 use super::scheme::Scheme;
 use crate::error::HudFilesError;
@@ -30,6 +31,13 @@ const MAX_LAYER_FILES: usize = 2_048;
 const MAX_LAYER_BYTES: usize = 64 * 1024 * 1024;
 
 const MANIFEST: &str = "scripts/hudanimations_manifest.txt";
+/// The menu art a shipped background becomes, the folder it ships in, and the chapter list
+/// that points the menu at it.
+const MENU_ART: &str = "materials/console/background_upward.vtf";
+const MENU_ART_WIDE: &str = "materials/console/background_upward_widescreen.vtf";
+pub(super) const SHIPPED_ART: &str = "materials/console/_disabled";
+const CHAPTERS: &str = "scripts/chapterbackgrounds.txt";
+const CHAPTERS_TEXT: &str = "\"chapters\"\n{\n\t1\t\"background_upward\"\n\t2\t\"background_upward\"\n\t3\t\"background_upward\"\n\t4\t\"background_upward\"\n}\n\n\"BackgroundMaps\"\n{\n\t1\t\"background_upward\"\n\t2\t\"background_upward\"\n\t3\t\"background_upward\"\n\t4\t\"background_upward\"\n}\n";
 /// The group every switch but an F file's shares.
 const SWITCHES: &str = "Switches";
 
@@ -189,7 +197,14 @@ impl HudOptions {
             removed: BTreeSet::new(),
             cfg: BTreeMap::new(),
         };
+        // A text naming another schema switch (`{$name ? a : b}`) reads it as the changes
+        // leave it, whatever order they came in.
+        let is_on = |name: &str| {
+            let id = format!("e:{name}");
+            self.value(&id, changes) == Some(OptionValue::Bool(true))
+        };
         let mut left_out = Vec::new();
+        let mut chosen = BTreeSet::new();
         for (i, change) in changes.iter().enumerate() {
             let ChangeTarget::Option(choice) = change.target() else {
                 continue;
@@ -197,30 +212,20 @@ impl HudOptions {
             if ![OptionChange::HUD, OptionChange::SCHEMA].contains(&choice.source()) {
                 continue;
             }
-            let Some(sides) = self.sides(choice) else {
+            if !self.apply_choice(&mut layer, choice, &is_on)? {
                 left_out.push(i);
-                continue;
-            };
-            // Each choice applies whole or not at all, so a refused action leaves no half switch.
-            let saved = (
-                layer.written.clone(),
-                layer.removed.clone(),
-                layer.cfg.clone(),
-            );
-            let mut ok = true;
-            let derived = match self.offered(choice.id()).map(OptionSpec::kind) {
-                Some(OptionKind::Colour { derived }) => derived.as_slice(),
-                _ => &[],
-            };
-            for (action, on) in sides {
-                if !layer.apply(action, on, choice.value(), derived, self.platform)? {
-                    ok = false;
-                    break;
-                }
+            } else if choice.source() == OptionChange::SCHEMA {
+                chosen.insert(choice.id().to_owned());
             }
-            if !ok || !layer.within_caps() {
-                (layer.written, layer.removed, layer.cfg) = saved;
-                left_out.push(i);
+        }
+        // An option whose text names a switch the player changed is written again at its
+        // start value, since its file holds the switch's old word.
+        for spec in &self.specs {
+            let names = spec_refs(spec);
+            let named_changed = names.iter().any(|n| chosen.contains(&format!("e:{n}")));
+            if named_changed && !chosen.contains(spec.id()) {
+                let start = OptionChange::new(OptionChange::SCHEMA, spec.id(), self.start(spec));
+                self.apply_choice(&mut layer, &start, &is_on)?;
             }
         }
         // A path back at its pristine bytes needs no entry in the layer.
@@ -238,6 +243,45 @@ impl HudOptions {
             files: files.with_switches(written, removed).with_switched_cfg(cfg),
             left_out,
         })
+    }
+
+    /// Applies one stored choice to `layer`, whole or not at all, so a refused action leaves
+    /// no half switch; false when it was refused.
+    fn apply_choice(
+        &self,
+        layer: &mut Layer<'_>,
+        choice: &OptionChange,
+        is_on: &dyn Fn(&str) -> bool,
+    ) -> Result<bool, HudFilesError> {
+        let Some(sides) = self.sides(choice) else {
+            return Ok(false);
+        };
+        let saved = (
+            layer.written.clone(),
+            layer.removed.clone(),
+            layer.cfg.clone(),
+        );
+        let derived = match self.offered(choice.id()).map(OptionSpec::kind) {
+            Some(OptionKind::Colour { derived }) => derived.as_slice(),
+            _ => &[],
+        };
+        for (action, on) in sides {
+            let ctx = Applying {
+                on,
+                value: choice.value(),
+                derived,
+                is_on,
+            };
+            if !layer.apply(action, &ctx, self.platform)? {
+                (layer.written, layer.removed, layer.cfg) = saved;
+                return Ok(false);
+            }
+        }
+        if !layer.within_caps() {
+            (layer.written, layer.removed, layer.cfg) = saved;
+            return Ok(false);
+        }
+        Ok(true)
     }
 
     /// The last stored choice for `id` that applies, else the pristine value; None when not offered.
@@ -384,6 +428,18 @@ fn spec_touched(spec: &OptionSpec) -> Vec<String> {
                 paths.push(file.clone());
                 paths.extend(on.iter().chain(off).filter_map(|t| resolve(file, t)));
             }
+            OptionAction::Switch(
+                SwitchAction::Lines { file, .. } | SwitchAction::WriteText { file, .. },
+            ) => paths.extend(check_switch_path(file)),
+            OptionAction::Switch(SwitchAction::CopyFolder { from, .. }) => {
+                paths.extend(check_switch_path(from));
+            }
+            OptionAction::Switch(SwitchAction::StockBackgrounds { folder }) => {
+                paths.extend(check_switch_path(folder));
+            }
+            OptionAction::Switch(SwitchAction::MenuBackground { .. }) => {
+                paths.extend([MENU_ART.to_owned(), CHAPTERS.to_owned()]);
+            }
             OptionAction::WriteCfg {
                 place: CfgPlace::Hud(file),
                 ..
@@ -407,6 +463,10 @@ fn pristine_values(
     let mut scheme = None;
     let mut out = BTreeMap::new();
     for spec in specs {
+        if let Some(found) = lines_value(files, spec) {
+            out.insert(spec.id().to_owned(), found);
+            continue;
+        }
         let Some(OptionAction::SetKey {
             file,
             block,
@@ -431,6 +491,50 @@ fn pristine_values(
         }
     }
     out
+}
+
+/// The value a switching option has in the copy: a switch whose line edits all stand one
+/// way, or the first choice whose switches (lines, menu art) all stand as it leaves them.
+/// Options that also set keys are read from their keys instead.
+fn lines_value(files: &HudFiles, spec: &OptionSpec) -> Option<OptionValue> {
+    let state = |actions: &[OptionAction]| -> Option<bool> {
+        let mut out = None;
+        for action in actions {
+            let read = |path: &str| files.read_pristine(path).ok().flatten();
+            let now = match action {
+                OptionAction::Switch(SwitchAction::Lines {
+                    file,
+                    comment,
+                    uncomment,
+                    ..
+                }) => {
+                    let text = String::from_utf8(read(file)?.into_bytes()).ok()?;
+                    lines_state(&text, comment, uncomment)?
+                }
+                // A shipped background is in force when the menu art holds its bytes.
+                OptionAction::Switch(SwitchAction::MenuBackground { image }) => {
+                    let art = read(MENU_ART)?;
+                    art.bytes() == read(&format!("{SHIPPED_ART}/{image}.vtf"))?.bytes()
+                }
+                OptionAction::Switch(SwitchAction::StockBackgrounds { folder }) => {
+                    menu_art(files.copy_paths(), folder).is_empty()
+                }
+                _ => return None,
+            };
+            if out.is_some_and(|o| o != now) {
+                return None;
+            }
+            out = Some(now);
+        }
+        out
+    };
+    match spec.kind() {
+        OptionKind::Toggle => state(spec.actions()).map(OptionValue::Bool),
+        OptionKind::Choice(choices) if spec.actions().is_empty() => (choices.iter())
+            .find(|c| state(c.actions()) == Some(true))
+            .map(|c| OptionValue::Pick(c.key().to_owned())),
+        _ => None,
+    }
 }
 
 /// The text of `key` (same conditional, any case) in the last live block on `block` under
@@ -470,11 +574,34 @@ fn read_as(kind: &OptionKind, map: &ValueMap, text: &str) -> Option<OptionValue>
             Some(OptionValue::Int(atoi(text.as_bytes())))
         }
         (ValueMap::OnOff { on, .. }, OptionKind::Toggle) => Some(OptionValue::Bool(text == on)),
+        (ValueMap::Value, OptionKind::Choice(choices)) => (choices.iter())
+            .find(|c| c.key() == text)
+            .map(|c| OptionValue::Pick(c.key().to_owned())),
         (ValueMap::PerChoice(pairs), OptionKind::Choice(_)) => (pairs.iter())
             .find(|(_, literal)| literal == text)
             .map(|(key, _)| OptionValue::Pick(key.clone())),
+        (ValueMap::Value, OptionKind::Text) => {
+            text_suits(text).then(|| OptionValue::Text(text.to_owned()))
+        }
+        (ValueMap::Template(template), OptionKind::Text | OptionKind::Number { .. }) => {
+            let value = unfill(template, text)?;
+            match kind {
+                OptionKind::Text => text_suits(value).then(|| OptionValue::Text(value.to_owned())),
+                _ => value.parse().ok().map(OptionValue::Int),
+            }
+        }
         _ => None,
     }
+}
+
+/// The value `text` holds where `template` has its one `$value`; `None` when the text does
+/// not fit the template's other words.
+fn unfill<'a>(template: &str, text: &'a str) -> Option<&'a str> {
+    let (before, after) = template.split_once("$value")?;
+    if after.contains("$value") {
+        return None;
+    }
+    text.strip_prefix(before)?.strip_suffix(after)
 }
 
 /// A spec's own actions and its choices'.
@@ -1028,8 +1155,37 @@ fn switch_paths(action: &SwitchAction) -> Vec<String> {
     match action {
         SwitchAction::CommentLine { file, target } => vec![file.clone(), target.clone()],
         SwitchAction::Move { from, to } => vec![from.clone(), to.clone()],
-        SwitchAction::BaseLines { file, .. } => vec![file.clone()],
+        SwitchAction::BaseLines { file, .. }
+        | SwitchAction::Lines { file, .. }
+        | SwitchAction::WriteText { file, .. } => vec![file.clone()],
+        SwitchAction::CopyFolder { from, to } => vec![from.clone(), to.clone()],
+        SwitchAction::StockBackgrounds { folder } => vec![folder.clone()],
+        SwitchAction::MenuBackground { .. } => vec![MENU_ART.to_owned(), CHAPTERS.to_owned()],
     }
+}
+
+/// One side of a stored choice being applied: on or off, its value, the derived colours it
+/// writes and how to read a switch its texts name.
+#[derive(Clone, Copy)]
+struct Applying<'a> {
+    on: bool,
+    value: &'a OptionValue,
+    derived: &'a [Derived],
+    is_on: &'a dyn Fn(&str) -> bool,
+}
+
+/// The switch options `spec`'s texts name through `{$name ? a : b}`, by schema name.
+fn spec_refs(spec: &OptionSpec) -> Vec<String> {
+    (all_actions(spec))
+        .filter_map(|a| match a {
+            OptionAction::SetKey {
+                value: ValueMap::Template(t),
+                ..
+            } => template_refs(t),
+            _ => None,
+        })
+        .flatten()
+        .collect()
 }
 
 /// The switch layer being built over a copy's pristine files.
@@ -1095,11 +1251,15 @@ impl Layer<'_> {
     fn apply(
         &mut self,
         action: &OptionAction,
-        on: bool,
-        value: &OptionValue,
-        derived: &[Derived],
+        ctx: &Applying<'_>,
         platform: Platform,
     ) -> Result<bool, HudFilesError> {
+        let Applying {
+            on,
+            value,
+            derived,
+            is_on,
+        } = *ctx;
         match action {
             OptionAction::Switch(SwitchAction::CommentLine { file, target }) => {
                 let Some(text) = self.read_text(file)? else {
@@ -1135,6 +1295,75 @@ impl Layer<'_> {
             OptionAction::Switch(SwitchAction::Move { from, to }) => {
                 let (source, dest) = if on { (from, to) } else { (to, from) };
                 self.move_paths(source, dest)
+            }
+            OptionAction::Switch(SwitchAction::Lines {
+                file,
+                comment,
+                uncomment,
+                reverses,
+            }) => {
+                if !on && !reverses {
+                    return Ok(true);
+                }
+                let Some(text) = self.read_text(file)? else {
+                    return Ok(false);
+                };
+                let (comment, uncomment) = if on {
+                    (comment, uncomment)
+                } else {
+                    (uncomment, comment)
+                };
+                let Some(edited) = toggle_lines(&text, comment, uncomment) else {
+                    return Ok(false);
+                };
+                self.put(file, edited.into_bytes());
+                Ok(true)
+            }
+            OptionAction::Switch(SwitchAction::CopyFolder { from, to }) => {
+                if !on {
+                    return Ok(true);
+                }
+                self.copy_folder(from, to)
+            }
+            OptionAction::Switch(SwitchAction::StockBackgrounds { folder }) => {
+                if on {
+                    for path in menu_art(self.under(folder), folder) {
+                        self.take(&path);
+                    }
+                }
+                Ok(true)
+            }
+            OptionAction::Switch(SwitchAction::MenuBackground { image }) => {
+                if !on {
+                    return Ok(true);
+                }
+                let Some(art) = self.read(&format!("{SHIPPED_ART}/{image}.vtf"))? else {
+                    return Ok(false);
+                };
+                self.put(MENU_ART, art);
+                if let Some(wide) = self.read(&format!("{SHIPPED_ART}/{image}_widescreen.vtf"))? {
+                    self.put(MENU_ART_WIDE, wide);
+                }
+                self.put(CHAPTERS, CHAPTERS_TEXT.as_bytes().to_vec());
+                Ok(true)
+            }
+            // An empty text for a file the copy lacks writes no file, so off leaves no stub.
+            OptionAction::Switch(SwitchAction::WriteText {
+                file,
+                on: a,
+                off: b,
+            }) => {
+                let Some(text) = (if on { Some(a) } else { b.as_ref() }) else {
+                    return Ok(true);
+                };
+                let Some(path) = check_switch_path(file) else {
+                    return Ok(false);
+                };
+                match text.is_empty() && !self.copy.contains(&path) {
+                    true => drop(self.written.remove(&path)),
+                    false => self.put(&path, text.clone().into_bytes()),
+                }
+                Ok(true)
             }
             // An empty side writes no file: one this layer wrote goes, and a copy file is
             // left as the HUD ships it.
@@ -1178,6 +1407,9 @@ impl Layer<'_> {
                     (ValueMap::OnOff { off, .. }, _) => off.clone(),
                     (ValueMap::Value, OptionValue::Int(v)) => Some(v.to_string()),
                     (ValueMap::Value, OptionValue::Rgba(c)) => Some(rgba_text(*c)),
+                    (ValueMap::Value, OptionValue::Text(t)) => Some(t.clone()),
+                    (ValueMap::Value, OptionValue::Pick(k)) => Some(k.clone()),
+                    (ValueMap::Template(t), v) => template_text(t, v, is_on),
                     // A pick with no text of its own leaves the key as it is.
                     (ValueMap::PerChoice(pairs), OptionValue::Pick(k)) => {
                         (pairs.iter()).find(|(c, _)| c == k).map(|(_, t)| t.clone())
@@ -1241,6 +1473,38 @@ impl Layer<'_> {
 
     fn read_text(&self, path: &str) -> Result<Option<String>, HudFilesError> {
         Ok(self.read(path)?.and_then(|b| String::from_utf8(b).ok()))
+    }
+
+    /// Copies every file under folder `from` into folder `to` by its path below `from`,
+    /// leaving out the preview pictures option folders carry; refused when a landing fails the
+    /// path rule or the folder holds nothing.
+    fn copy_folder(&mut self, from: &str, to: &str) -> Result<bool, HudFilesError> {
+        let files = self.under(from);
+        let mut copies = Vec::new();
+        for path in &files {
+            if path.ends_with(".png") || path.ends_with(".jpg") {
+                continue;
+            }
+            let rest = &path[from.len() + 1..];
+            let dest = match to.is_empty() {
+                true => rest.to_owned(),
+                false => format!("{to}/{rest}"),
+            };
+            let Some(dest) = check_switch_path(&dest) else {
+                return Ok(false);
+            };
+            copies.push((path.clone(), dest));
+        }
+        if copies.is_empty() {
+            return Ok(false);
+        }
+        for (path, dest) in copies {
+            let Some(bytes) = self.read(&path)? else {
+                return Ok(false);
+            };
+            self.put(&dest, bytes);
+        }
+        Ok(true)
     }
 
     /// Moves the file or every file under the folder `source` to `dest`. Already in place
@@ -1308,6 +1572,91 @@ fn comment_lines(text: &str, file: &str, target: &str, on: bool) -> Option<Strin
         out.push_str(ending);
     }
     found.then_some(out)
+}
+
+/// The menu art among `paths`: `.vtf` and `.vmt` files right in `folder`.
+pub(super) fn menu_art(paths: impl IntoIterator<Item = String>, folder: &str) -> Vec<String> {
+    let inside = |p: &str| {
+        p.strip_prefix(folder)
+            .and_then(|r| r.strip_prefix('/'))
+            .is_some_and(|name| !name.contains('/'))
+    };
+    (paths.into_iter())
+        .filter(|p| inside(p) && (p.ends_with(".vtf") || p.ends_with(".vmt")))
+        .collect()
+}
+
+/// Whether `line` holds `needle`, any run of spaces and tabs in either read as one space, as
+/// schemas write a tab-separated animation line with spaces.
+fn holds(line: &str, needle: &str) -> bool {
+    let squeeze = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let needle = squeeze(needle);
+    !needle.is_empty() && squeeze(line).contains(&needle)
+}
+
+/// Whether a line is commented out with `//`.
+fn is_commented(line: &str) -> bool {
+    line.trim_start().starts_with("//")
+}
+
+/// `text` with every line holding one of `comment` commented out and every line holding one
+/// of `uncomment` uncommented, indentation and endings kept; `None` when some needle is on
+/// no line, since the copy then differs from what the option was made for.
+pub(super) fn toggle_lines(text: &str, comment: &[String], uncomment: &[String]) -> Option<String> {
+    let mut found = vec![false; comment.len() + uncomment.len()];
+    let mut out = String::with_capacity(text.len() + 16);
+    for line in text.split_inclusive('\n') {
+        let body = line.trim_end_matches(['\n', '\r']);
+        let ending = &line[body.len()..];
+        let mut hit = |list: &[String], offset: usize| {
+            let mut any = false;
+            for (i, needle) in list.iter().enumerate() {
+                if holds(body, needle) {
+                    found[offset + i] = true;
+                    any = true;
+                }
+            }
+            any
+        };
+        let shut = hit(comment, 0);
+        let open = hit(uncomment, comment.len());
+        let indent = &body[..body.len() - body.trim_start().len()];
+        let rest = body.trim_start();
+        match (open, shut, is_commented(body)) {
+            (true, _, true) => {
+                out.push_str(indent);
+                out.push_str(rest.trim_start_matches('/'));
+            }
+            (false, true, false) => {
+                out.push_str(indent);
+                out.push_str("//");
+                out.push_str(rest);
+            }
+            _ => out.push_str(body),
+        }
+        out.push_str(ending);
+    }
+    found.iter().all(|f| *f).then_some(out)
+}
+
+/// Whether `text` stands as [`toggle_lines`] leaves it (`Some(true)`), as its reverse leaves
+/// it (`Some(false)`), or neither.
+pub(super) fn lines_state(text: &str, comment: &[String], uncomment: &[String]) -> Option<bool> {
+    let state = |shut: &[String], open: &[String]| {
+        let lines: Vec<&str> = text.lines().collect();
+        let all = |list: &[String], commented: bool| {
+            list.iter().all(|n| {
+                let mut hits = lines.iter().filter(|l| holds(l, n)).peekable();
+                hits.peek().is_some() && hits.all(|l| is_commented(l) == commented)
+            })
+        };
+        all(shut, true) && all(open, false)
+    };
+    match (state(comment, uncomment), state(uncomment, comment)) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        _ => None,
+    }
 }
 
 /// `text` with its active `#base` lines replaced by one per target, where the first stood (or
