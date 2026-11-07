@@ -173,8 +173,8 @@ pub enum OptionSource {
     BuiltIn,
     /// Read from the HUD's own switches.
     Detected,
-    /// Read from the bundled TF2HUD.Editor schema of that name.
-    EditorSchema {
+    /// Read from the bundled HUD option schema of that name.
+    HudSchema {
         /// The schema's name.
         schema: String,
     },
@@ -462,7 +462,7 @@ impl HudModel {
     /// kind, out of range or off-step. A switch turned off may compile to no edits.
     pub(super) fn compile_option(&self, choice: &OptionChange) -> Option<Vec<CompiledSet>> {
         // The HUD's own choices are applied beneath the model, by the switch layer.
-        if [OptionChange::HUD, OptionChange::EDITOR].contains(&choice.source()) {
+        if [OptionChange::HUD, OptionChange::SCHEMA].contains(&choice.source()) {
             return Some(Vec::new());
         }
         if choice.source() != OptionChange::BUILTIN {
@@ -708,7 +708,7 @@ pub(super) fn is_item_colour(key: &str) -> bool {
 
 /// The scheme name and colour `derived` writes beside `key` picked as `c`.
 pub(super) fn derived_colour(derived: Derived, key: &str, c: [u8; 4]) -> (String, [u8; 4]) {
-    // A share of a byte, rounded half to even as TF2HUD.Editor rounds, always fits a byte.
+    // A share of a byte, rounded half to even as the schemas expect, always fits a byte.
     let share = |v: u8, f: f64| (f64::from(v) * f).round_ties_even() as u8;
     match derived {
         Derived::Dimm => (format!("Dimm{key}"), [c[0], c[1], c[2], 100]),
@@ -729,7 +729,7 @@ pub(super) fn rgba_text([r, g, b, a]: [u8; 4]) -> String {
     format!("{r} {g} {b} {a}")
 }
 
-/// Each channel at a quarter, rounded half to even as TF2HUD.Editor rounds, and opaque.
+/// Each channel at a quarter, rounded half to even as the schemas expect, and opaque.
 fn greyed_out([r, g, b, _]: [u8; 4]) -> [u8; 4] {
     // A quarter of a byte, rounded, always fits a byte.
     let quarter = |c: u8| (f64::from(c) * 0.25).round_ties_even() as u8;

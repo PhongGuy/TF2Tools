@@ -19,7 +19,7 @@ const VERSION: u64 = 1;
 const MAX_PICK: usize = 4096;
 
 /// The option sources written under `hud_option`.
-const HUD_SOURCES: [&str; 2] = [OptionChange::HUD, OptionChange::EDITOR];
+const HUD_SOURCES: [&str; 2] = [OptionChange::HUD, OptionChange::SCHEMA];
 
 /// A made HUD's `maker.json`: source hashes by normalised game path, and the changes.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -8,7 +8,7 @@ use common::hud_switches::switch_files;
 use tf2tools_core::{Change, HudFiles, HudOptions, OptionChange, OptionValue, Platform};
 
 fn editor(id: &str, value: OptionValue) -> Change {
-    Change::option(1, OptionChange::new(OptionChange::EDITOR, id, value))
+    Change::option(1, OptionChange::new(OptionChange::SCHEMA, id, value))
 }
 fn text(files: &HudFiles, path: &str) -> String {
     String::from_utf8(files.read(path).unwrap().unwrap().into_bytes()).unwrap()
@@ -107,7 +107,7 @@ fn a_combo_pick_writes_its_own_literal() {
     let json = r##"{ "Controls": { "A": [ { "Name": "c", "Label": "C", "Type": "ComboBox", "Value": "0", "Options": [
       { "Label": "Low", "Value": "0", "Files": { "resource/ui/basechat.res": { "HudChat": { "ypos": "275" } } } },
       { "Label": "Mid", "Value": "2", "Files": { "resource/ui/basechat.res": { "HudChat": { "ypos": "100" } } } } ] } ] } }"##;
-    let schema = tf2tools_core::EditorSchema::parse("x", json.as_bytes()).unwrap();
+    let schema = tf2tools_core::HudSchema::parse("x", json.as_bytes()).unwrap();
     let files = switch_files(&[]);
     let options = HudOptions::read(&files, Some(&schema), Platform::Linux);
     let mid = options
@@ -124,7 +124,7 @@ fn a_combo_pick_writes_its_own_literal() {
 fn a_shadow_flag_writes_the_colour_darkened_where_the_scheme_names_it() {
     let json = r##"{ "Controls": { "A": [ { "Name": "s", "Label": "S", "Type": "ColorPicker", "Value": "1 2 3 255", "Shadow": true,
       "Files": { "resource/clientscheme.res": { "Scheme": { "Colors": { "TanLight": "$value" } } } } } ] } }"##;
-    let schema = tf2tools_core::EditorSchema::parse("x", json.as_bytes()).unwrap();
+    let schema = tf2tools_core::HudSchema::parse("x", json.as_bytes()).unwrap();
     let shadowed = SCHEME.replace(
         "    TanDark",
         "    TanLightShadow \"0 0 0 255\"\n    TanDark",

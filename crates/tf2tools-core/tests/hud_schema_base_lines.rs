@@ -3,7 +3,7 @@
 mod common;
 
 use common::hud_switches::switch_files;
-use tf2tools_core::{EditorSchema, OptionAction, OptionSpec, Platform, SwitchAction};
+use tf2tools_core::{HudSchema, OptionAction, OptionSpec, Platform, SwitchAction};
 
 const FILE: &str = "customizations/damage.res";
 
@@ -31,7 +31,7 @@ fn every_base_form_becomes_base_lines() {
       { "Name": "w2", "Label": "W2", "Type": "CheckBox", "WriteFile": { "FileName": "customizations/damage.res", "TrueText": "#base ../resource/ui/damage_big.res", "FalseText": "#base ../resource/ui/damage_small.res" } },
       { "Name": "w3", "Label": "W3", "Type": "CheckBox", "WriteFile": { "FileName": "customizations/damage.res", "TrueText": "#base ../../../custom/somehud/resource/ui/damage_big.res", "FalseText": "" } },
       { "Name": "w4", "Label": "W4", "Type": "CheckBox", "WriteFile": { "FileName": "customizations/damage.res", "TrueText": "anything else", "FalseText": "" } } ] } }"##;
-    let got = EditorSchema::parse("x", text.as_bytes())
+    let got = HudSchema::parse("x", text.as_bytes())
         .unwrap()
         .options(&switch_files(&[]), Platform::Linux);
     let swap = base_lines(
@@ -66,7 +66,7 @@ fn a_schema_never_reaches_the_metadata_folder() {
       { "Name": "m5", "Label": "M5", "Type": "CheckBox", "WriteFile": { "FileName": "customizations/damage.res", "TrueText": "#base \"../.tf2tools/maker.json\"", "FalseText": "" } },
       { "Name": "m6", "Label": "M6", "Type": "CheckBox", "Files": { "customizations/../.tf2tools/maker.res": { "R": { "a": { "true": "1", "false": "0" } } } } },
       { "Name": "m7", "Label": "M7", "Type": "CheckBox", "RenameFile": { "OldName": "customizations\\streamermode_\\", "NewName": "customizations\\..\\.TF2Tools\\" } } ] } }"##;
-    let got = EditorSchema::parse("x", text.as_bytes())
+    let got = HudSchema::parse("x", text.as_bytes())
         .unwrap()
         .options(&switch_files(&[]), Platform::Linux);
     assert!(got.specs().is_empty());

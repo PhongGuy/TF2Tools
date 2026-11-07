@@ -1652,7 +1652,7 @@ pub enum HistoryError {
     },
 }
 
-/// Why a TF2HUD.Editor schema could not be read.
+/// Why a HUD option schema could not be read.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum SchemaError {

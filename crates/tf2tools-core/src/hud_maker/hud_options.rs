@@ -7,10 +7,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::HudModel;
 use super::changes::{Change, ChangeTarget, OptionChange, SetKey, check_switch_path};
 use super::document::KvDocument;
-use super::editor_schema::EditorSchema;
 use super::edits::EditRefused;
 use super::expr::atoi;
 use super::files::HudFiles;
+use super::hud_schema::HudSchema;
 use super::model::{BaseChains, PartKey, apply_set, live_blocks, root_block};
 use super::options::{
     Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue, SwitchAction,
@@ -125,7 +125,7 @@ impl HudOptions {
 
     /// Schema options (when `schema` is given) then detected switches, dropping a detected
     /// switch that touches a path a schema option touches.
-    pub fn read(files: &HudFiles, schema: Option<&EditorSchema>, platform: Platform) -> HudOptions {
+    pub fn read(files: &HudFiles, schema: Option<&HudSchema>, platform: Platform) -> HudOptions {
         let detected = HudOptions::detected(files, platform);
         let Some(schema) = schema else {
             return detected;
@@ -193,7 +193,7 @@ impl HudOptions {
             let ChangeTarget::Option(choice) = change.target() else {
                 continue;
             };
-            if ![OptionChange::HUD, OptionChange::EDITOR].contains(&choice.source()) {
+            if ![OptionChange::HUD, OptionChange::SCHEMA].contains(&choice.source()) {
                 continue;
             }
             let Some(sides) = self.sides(choice) else {
@@ -351,7 +351,7 @@ fn source_of(spec: &OptionSpec) -> &'static str {
     match spec.source() {
         OptionSource::Detected => OptionChange::HUD,
         OptionSource::BuiltIn => OptionChange::BUILTIN,
-        OptionSource::EditorSchema { .. } => OptionChange::EDITOR,
+        OptionSource::HudSchema { .. } => OptionChange::SCHEMA,
     }
 }
 

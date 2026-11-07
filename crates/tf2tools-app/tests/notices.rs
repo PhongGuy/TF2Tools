@@ -29,8 +29,8 @@ const BUNDLED: &[(&str, Owner)] = &[
     ),
     ("crates/tf2tools-app/assets/theme", Owner::Own),
     (
-        "crates/tf2tools-core/data/tf2hud-editor",
-        Owner::Notice("TF2HUD.Editor-MIT.txt"),
+        "crates/tf2tools-core/data/hud-schemas",
+        Owner::Notice("HUD-option-schemas-MIT.txt"),
     ),
 ];
 
@@ -115,10 +115,10 @@ fn every_bundled_folder_has_a_notice_or_is_set_aside() {
 fn known_notices_get_plain_titles() {
     assert_eq!(notices::title_for("Inter-OFL.txt"), "Inter font");
     assert_eq!(notices::title_for("Lucide-ISC.txt"), "Lucide icons");
-    // The slot Stage 9 fills when it adds the Editor's schemas and their licence.
+    // The slot Stage 9 fills when it adds the HUD option schemas and their licence.
     assert_eq!(
-        notices::title_for("TF2HUD.Editor-MIT.txt"),
-        "TF2HUD.Editor HUD options"
+        notices::title_for("HUD-option-schemas-MIT.txt"),
+        "HUD option schemas (MIT)"
     );
     // A notice nobody titled still shows, named after its file.
     assert_eq!(notices::title_for("Some-Thing-MIT.txt"), "Some Thing MIT");

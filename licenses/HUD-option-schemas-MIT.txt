@@ -1,8 +1,7 @@
-TF2HUD.Editor HUD options
-https://github.com/CriticalFlaw/TF2HUD.Editor
+HUD option schemas
 
-The HUD option files in crates/tf2tools-core/data/tf2hud-editor come from TF2HUD.Editor
-and are used under the following licence.
+The HUD option files in crates/tf2tools-core/data/hud-schemas are used under the
+following licence.
 
 MIT License
 
