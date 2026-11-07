@@ -924,9 +924,20 @@ impl StoreServer {
 
     /// A curated HUD's archive at `{uri}/repo/{hud_id}/archive/{CURATED_HASH}.zip`; returns the repo URL to seed.
     pub fn mount_curated(&self, hud_id: &str, body: Vec<u8>, delay: Duration) -> String {
+        self.mount_curated_at(hud_id, CURATED_HASH, body, delay)
+    }
+
+    /// `mount_curated` at commit `hash`.
+    pub fn mount_curated_at(
+        &self,
+        hud_id: &str,
+        hash: &str,
+        body: Vec<u8>,
+        delay: Duration,
+    ) -> String {
         self.rt.block_on(
             Mock::given(method("GET"))
-                .and(path(format!("/repo/{hud_id}/archive/{CURATED_HASH}.zip")))
+                .and(path(format!("/repo/{hud_id}/archive/{hash}.zip")))
                 .respond_with(
                     ResponseTemplate::new(200)
                         .set_body_bytes(body)

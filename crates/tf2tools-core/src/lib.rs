@@ -94,7 +94,7 @@ pub use library::{
     SkipReason, SkippedAssignment, SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind,
     crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
 };
-pub use library::{CopyUpdate, CopyUpdated, TreeHash};
+pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
