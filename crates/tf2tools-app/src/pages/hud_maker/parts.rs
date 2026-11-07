@@ -149,8 +149,11 @@ impl HudMakerPage {
                         .opacity(0.7)
                         .child(state)
                 });
+                // A part hovered on the canvas lights its row as the pointer on the row would.
                 let (bg, text) = if selected {
                     (primary, primary_fg)
+                } else if self.hovered.as_ref() == Some(&key) {
+                    (hover, fg)
                 } else {
                     (gpui_kit::transparent_black(), fg)
                 };
@@ -204,6 +207,7 @@ impl HudMakerPage {
         } else {
             return;
         };
+        self.hover_on_canvas = false;
         if self.hovered != next {
             self.hovered = next;
             cx.notify();

@@ -217,6 +217,12 @@ impl HudMakerPage {
         let theme = cx.theme();
         let (primary, border) = (theme.primary, theme.border);
         let (warning, background) = (theme.warning, theme.background);
+        let tag_colours = (
+            theme.popover,
+            theme.popover_foreground,
+            theme.muted_foreground,
+            theme.radius,
+        );
         let local = |r: Bounds<Pixels>| Bounds {
             origin: r.origin - screen.origin,
             size: r.size,
@@ -439,20 +445,38 @@ impl HudMakerPage {
             )
         });
         let selected = selected.map(outline);
+        // A part that paints nothing here is outlined dashed and says so, since the outline is
+        // all the player sees of it.
+        let named = |key: &PartKey| {
+            let part = model.part(key)?;
+            let blank = !draws(part, &look);
+            let name = super::parts::row_label(part);
+            let label = match blank {
+                true => format!("{name}, {NOTHING_SHOWN}"),
+                false => name.clone(),
+            };
+            Some((name, blank, label))
+        };
+        let selected_name = editor.selected().and_then(named);
         // Lighter than the selection and faintly filled, so it reads as "this one" without
-        // looking selected; it has no handlers, so presses still reach the canvas.
-        let hover = self
-            .hovered
-            .as_ref()
-            .and_then(|key| layout.get(key))
-            .filter(|b| drawn(b))
-            .map(|b| {
+        // looking selected, with the part's name on a tag beside it. Neither has handlers, so
+        // presses still reach the canvas.
+        let hovered = (self.hovered.as_ref())
+            .and_then(|key| Some((layout.get(key).filter(|b| drawn(b))?, named(key)?)));
+        let (hover, hover_tag) = match hovered {
+            Some((b, (name, blank, label))) => {
                 let r = outline(b);
-                place(div().id(ids::HUD_MAKER_HOVER).test_support(), r)
+                let el = place(div().id(ids::HUD_MAKER_HOVER).test_support(), r)
+                    .aria_label(label.clone())
                     .border_1()
                     .border_color(primary.opacity(0.7))
                     .bg(primary.opacity(0.12))
-            });
+                    .when(blank, |el| el.border_dashed());
+                let tag = hover_tag(r, screen.size, name, blank, label, tag_colours);
+                (Some(el), Some(tag))
+            }
+            None => (None, None),
+        };
         // Guides span the whole screen, one window pixel wide, at the line the drag snapped to.
         let guides = (self.part_drag.iter())
             .flat_map(|d| d.guides.iter())
@@ -475,14 +499,16 @@ impl HudMakerPage {
                 line.test_support().absolute().bg(primary)
             });
         let selection = selected.map(|r| {
-            let el = place(div().id(ids::HUD_MAKER_SELECTION).test_support(), r)
+            let blank = selected_name.as_ref().is_some_and(|(_, blank, _)| *blank);
+            place(div().id(ids::HUD_MAKER_SELECTION).test_support(), r)
+                .when_some(selected_name.map(|(_, _, label)| label), |el, label| {
+                    el.aria_label(label)
+                })
                 .border_2()
-                .border_color(primary);
-            if ghost.is_some() || cut_off.is_some() {
-                el.border_dashed()
-            } else {
-                el
-            }
+                .border_color(primary)
+                .when(ghost.is_some() || cut_off.is_some() || blank, |el| {
+                    el.border_dashed()
+                })
         });
         // Handles sit just outside the selection, so they never cover a small part's content,
         // and an edge too short for a mid-edge handle shows only its corners. A handle press
@@ -577,12 +603,21 @@ impl HudMakerPage {
                     page.press_canvas(ev, window, cx)
                 }),
             )
+            .on_mouse_move(
+                cx.listener(|page, ev: &MouseMoveEvent, _, cx| page.hover_canvas(ev.position, cx)),
+            )
+            .on_hover(cx.listener(|page, inside: &bool, _, cx| {
+                if !*inside {
+                    page.leave_canvas(cx)
+                }
+            }))
             .children(under)
             .children(markers)
             .children(hover)
             .children(selection)
             .children(handles)
             .children(guides)
+            .children(hover_tag)
             .children(
                 (!rule.hides_hud())
                     .then(|| crosshair(screen.size.width / 2., screen.size.height / 2.)),
@@ -885,6 +920,36 @@ impl HudMakerPage {
             });
     }
 
+    // Hovers what a press at window point `at` would select. Only a change redraws, so a
+    // pointer moving within one part costs a pick and nothing more; a drag or pan keeps it.
+    fn hover_canvas(&mut self, at: Point<Pixels>, cx: &mut Context<Self>) {
+        if self.part_drag.is_some() || self.compare_drag || self.is_panning() {
+            return;
+        }
+        let Some(editor) = self.editor() else {
+            return;
+        };
+        let next = (self.canvas_fit(editor.screen()).to_screen(at)).and_then(|(x, y)| {
+            let picks = self.picks_at(x, y);
+            match self.holds_press(x, y, &picks) {
+                true => editor.selected().cloned(),
+                false => picks.first().map(|p| p.key().clone()),
+            }
+        });
+        self.hover_on_canvas = true;
+        if self.hovered != next {
+            self.hovered = next;
+            cx.notify();
+        }
+    }
+
+    // The pointer left the screen: a hover the canvas set goes, one a list row set stays.
+    fn leave_canvas(&mut self, cx: &mut Context<Self>) {
+        if std::mem::take(&mut self.hover_on_canvas) && self.hovered.take().is_some() {
+            cx.notify();
+        }
+    }
+
     // Every part under screen pixel (x, y) a click may select, best first: the parts on the
     // canvas, plus the faint panel of a selected part the game hides.
     fn picks_at(&self, x: i32, y: i32) -> Vec<Pick> {
@@ -1185,6 +1250,57 @@ impl HudMakerPage {
         }
         self.refresh(window, cx);
     }
+}
+
+// What the hover tag and outline labels add for a part that paints nothing in the preview.
+const NOTHING_SHOWN: &str = "draws nothing in this preview";
+
+// The hovered part's name on a small tag just above its outline (below it at the screen's top),
+// kept on the screen's side the part sits nearer, with a note for a part that paints nothing.
+fn hover_tag(
+    r: Bounds<Pixels>,
+    screen: Size<Pixels>,
+    name: String,
+    blank: bool,
+    label: String,
+    (bg, fg, muted, radius): (Hsla, Hsla, Hsla, Pixels),
+) -> AnyElement {
+    let tall = if blank { HOVER_TAG * 2. } else { HOVER_TAG };
+    let tag = div()
+        .id(ids::HUD_MAKER_HOVER_NAME)
+        .aria_label(label)
+        .test_support()
+        .absolute()
+        .px_1p5()
+        .py_0p5()
+        .rounded(radius)
+        .bg(bg.opacity(0.92))
+        .text_color(fg)
+        .text_xs()
+        .whitespace_nowrap()
+        .child(name)
+        .when(blank, |tag| {
+            tag.child(div().text_color(muted).child(capitalised(NOTHING_SHOWN)))
+        });
+    let tag = match r.origin.y >= tall + px(2.) {
+        true => tag.bottom(screen.height - r.origin.y + px(2.)),
+        false => tag.top(r.bottom() + px(2.)),
+    };
+    match r.center().x > screen.width / 2. {
+        true => tag.right((screen.width - r.right()).max(px(0.))),
+        false => tag.left(r.origin.x.max(px(0.))),
+    }
+    .into_any_element()
+}
+
+// The height of one line of the hover tag, used to tell whether it fits above the outline.
+const HOVER_TAG: Pixels = px(20.);
+
+fn capitalised(text: &str) -> String {
+    let mut chars = text.chars();
+    chars
+        .next()
+        .map_or_else(String::new, |c| c.to_uppercase().chain(chars).collect())
 }
 
 // Every part the game shows (or, for a selected hidden panel, ghosts) as elements local to the

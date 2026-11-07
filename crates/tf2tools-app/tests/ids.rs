@@ -599,6 +599,7 @@ fn hud_maker_ids_are_kebab_case_and_keyed_by_part() {
     assert_eq!(ids::HUD_MAKER_PANEL_FLOAT, "hud-maker-panel-float");
     assert_eq!(ids::HUD_MAKER_PARTS_PANEL, "hud-maker-parts-panel");
     assert_eq!(ids::HUD_MAKER_HOVER, "hud-maker-hover");
+    assert_eq!(ids::HUD_MAKER_HOVER_NAME, "hud-maker-hover-name");
     assert_eq!(ids::HUD_MAKER_TOOLBAR, "hud-maker-toolbar");
     assert_eq!(
         ids::HUD_MAKER_TOOLBAR_COLLAPSE,
