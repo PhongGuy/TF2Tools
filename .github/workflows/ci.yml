@@ -26,13 +26,13 @@ env:
 jobs:
   gate:
     runs-on: ubuntu-24.04
-    # About 16 minutes with a warm cache and 20 from cold.
-    timeout-minutes: 45
+    # About 10 minutes with a warm cache; the margin covers a cold one.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
           components: rustfmt, clippy
@@ -50,8 +50,8 @@ jobs:
 
   windows:
     runs-on: windows-2025
-    # About 25 minutes with a warm cache and 51 from cold.
-    timeout-minutes: 75
+    # About 20 minutes with a warm cache; the margin covers a cold one.
+    timeout-minutes: 40
     defaults:
       run:
         # Git for Windows' bash, so the commands read the same as on Linux.
@@ -63,7 +63,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
           components: clippy
@@ -76,3 +76,18 @@ jobs:
       - name: Test
         # Run every test binary, so one run lists every Windows failure.
         run: cargo test --locked --workspace --no-fail-fast
+
+  # Audits the workflows themselves. Offline, so a moving upstream ref never fails a PR.
+  zizmor:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          # One pinned tool run per job; nothing worth restoring.
+          enable-cache: false
+      - name: zizmor
+        run: uvx zizmor@1.32.0 --offline .github/workflows
