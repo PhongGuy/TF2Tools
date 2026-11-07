@@ -10,9 +10,12 @@ use tf2tools_core::{
     ChangeTarget, EditRefused, Fired, FontEdit, GameSituation, HudAssets, HudLayout, HudModel,
     HudOptions, Interp, MeterKind, NewPart, NewPicture, OptionChange, OptionSpec, OptionValue,
     Part, PartBox, PartKey, PictureTarget, PinCorner, PinRefused, Platform, Recipe, RemoveRefused,
-    Scene, Screen, ShowsFor, SituationSwitch, Snap, TfClass, WeaponKind, font_families,
-    font_family, pictures_fit,
+    Scene, Screen, ShowsFor, SituationSwitch, TfClass, WeaponKind, font_families, font_family,
+    pictures_fit,
 };
+
+use super::snapping::{self, Moving, lines};
+pub use super::snapping::{Guide, Snapped};
 
 /// Why an added font file did not land, by whose fault: the file, its name, the HUD's font
 /// list or the part's font.
@@ -223,6 +226,24 @@ impl Handle {
     }
 }
 
+/// Which line of the box around several parts Align puts them on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Align {
+    Left,
+    Centre,
+    Right,
+    Top,
+    Middle,
+    Bottom,
+}
+
+/// Which way Distribute spaces parts out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Spread {
+    Across,
+    Down,
+}
+
 /// One open HUD: its pristine model, the player's changes replayed onto it, and the history.
 pub struct HudEditor {
     pristine: HudModel,
@@ -232,6 +253,8 @@ pub struct HudEditor {
     screen: Screen,
     layout: HudLayout,
     selected: Option<PartKey>,
+    // Two or more parts picked together; `selected` is then empty, so single-part rows lapse.
+    several: Vec<PartKey>,
     undo: VecDeque<Step>,
     redo: VecDeque<Step>,
     saved: Vec<Change>,
@@ -312,6 +335,7 @@ impl HudEditor {
             screen,
             layout,
             selected: None,
+            several: Vec::new(),
             undo: VecDeque::new(),
             redo: VecDeque::new(),
             drag: None,
@@ -440,7 +464,7 @@ impl HudEditor {
         self.cancel_preview();
         self.cancel_drag();
         self.pristine = self.pristine.with_board_mode(mode);
-        self.selected = None;
+        self.clear_selection();
         self.replay();
         self.sync_compared();
     }
@@ -459,7 +483,7 @@ impl HudEditor {
         self.cancel_preview();
         self.cancel_drag();
         self.pristine = self.pristine.with_minmode(on);
-        self.selected = None;
+        self.clear_selection();
         self.replay();
         self.sync_compared();
     }
@@ -476,7 +500,7 @@ impl HudEditor {
             self.cancel_preview();
             self.cancel_drag();
             self.pristine = self.pristine.with_meter(kind);
-            self.selected = None;
+            self.clear_selection();
             self.replay();
             self.sync_compared();
         }
@@ -934,12 +958,93 @@ impl HudEditor {
         if part.is_some() {
             self.cancel_preview();
         }
+        self.several.clear();
         self.selected = part.filter(|key| self.model.part(key).is_some());
+    }
+
+    /// Every selected part: the one part, the several picked together, or none.
+    pub fn selection(&self) -> &[PartKey] {
+        match self.several.is_empty() {
+            true => self.selected.as_slice(),
+            false => &self.several,
+        }
+    }
+
+    /// Whether two or more parts are selected together.
+    pub fn several(&self) -> bool {
+        !self.several.is_empty()
+    }
+
+    /// Whether `part` is one of the selected parts.
+    pub fn is_selected(&self, part: &PartKey) -> bool {
+        self.selection().contains(part)
+    }
+
+    /// Adds `part` to the selection, or takes it out when it is already in. A part going in
+    /// takes out any selected group around it and any selected part inside it, so nothing
+    /// moves twice. One part left is the plain selection.
+    pub fn toggle_select(&mut self, part: PartKey) {
+        if self.model.part(&part).is_none() {
+            return;
+        }
+        self.cancel_preview();
+        let mut parts = self.selection().to_vec();
+        match parts.iter().position(|k| *k == part) {
+            Some(i) => {
+                parts.remove(i);
+            }
+            None => {
+                let model = &self.model;
+                parts.retain(|k| !within(model, k, &part) && !within(model, &part, k));
+                parts.push(part);
+            }
+        }
+        self.select_all(parts);
+    }
+
+    /// Selects exactly `parts`, as a box drawn around them picks; unknown parts are dropped.
+    pub fn select_all(&mut self, parts: Vec<PartKey>) {
+        let mut parts: Vec<PartKey> = (parts.into_iter())
+            .filter(|k| self.model.part(k).is_some())
+            .collect();
+        parts.dedup();
+        match parts.len() {
+            0 | 1 => self.select(parts.pop()),
+            _ => {
+                self.cancel_preview();
+                self.selected = None;
+                self.several = parts;
+            }
+        }
+    }
+
+    // Drops the one or several selected parts.
+    fn clear_selection(&mut self) {
+        self.selected = None;
+        self.several.clear();
+    }
+
+    // Keeps whichever selected parts the model still has, after a replay.
+    fn keep_selection(&mut self) {
+        let parts = self.selection().to_vec();
+        if !parts.is_empty() {
+            self.select_all(parts);
+        }
+    }
+
+    // The selected parts with none inside another selected part, in selection order.
+    fn roots(&self) -> Vec<PartKey> {
+        let parts = self.selection();
+        (parts.iter())
+            .filter(|k| !parts.iter().any(|o| o != *k && within(&self.model, k, o)))
+            .cloned()
+            .collect()
     }
 
     /// Selects the part a click at screen pixel (`x`, `y`) hits; a miss clears the selection.
     pub fn select_at(&mut self, x: i32, y: i32) -> Option<&PartKey> {
         self.cancel_preview();
+        self.several.clear();
         self.selected = self.shown_layout().hit(x, y).cloned();
         self.selected.as_ref()
     }
@@ -953,6 +1058,11 @@ impl HudEditor {
     /// Moves the selection by screen pixels.
     pub fn move_selected(&mut self, dx: i32, dy: i32) -> Result<(), EditRefused> {
         let screen = self.screen;
+        if self.several() {
+            return self.edit_each("move", |m, part, group| {
+                m.move_part(part, dx, dy, screen, group)
+            });
+        }
         self.edit(|m, part, group| m.move_part(part, dx, dy, screen, group))
     }
 
@@ -974,6 +1084,9 @@ impl HudEditor {
 
     /// Nudges the selection by whole HUD units as one undo step.
     pub fn nudge_selected(&mut self, dx: i32, dy: i32) -> Result<(), EditRefused> {
+        if self.several() {
+            return self.edit_each("move", |m, part, group| m.nudge_part(part, dx, dy, group));
+        }
         self.edit(|m, part, group| m.nudge_part(part, dx, dy, group))
     }
 
@@ -992,14 +1105,245 @@ impl HudEditor {
     }
 
     /// `HudLayout::snap_move` for the selection on the layout a running drag started from, or
-    /// the current one; `None` with nothing selected.
-    pub fn snap_move(&self, dx: i32, dy: i32, threshold: i32) -> Option<Snap> {
-        let start = self.drag.as_ref().map_or(&self.layout, |d| &d.layout);
-        Some(start.snap_move(self.selected.as_ref()?, dx, dy, threshold))
+    /// the current one; several parts snap as the one box around them. `None` with nothing
+    /// selected.
+    pub fn snap_move(&self, dx: i32, dy: i32, threshold: i32) -> Option<Snapped> {
+        let (model, start) = self.drag_start();
+        if !self.several() {
+            return Some(
+                start
+                    .snap_move(self.selected.as_ref()?, dx, dy, threshold)
+                    .into(),
+            );
+        }
+        let roots = self.roots();
+        let (x, y, w, h) = around(start, &roots)?;
+        let moving = Moving {
+            across: lines(x, w).to_vec(),
+            down: lines(y, h).to_vec(),
+        };
+        Some(snapping::snap(
+            model,
+            start,
+            &roots,
+            &moving,
+            (dx, dy),
+            threshold,
+        ))
+    }
+
+    /// Snaps the edges a drag of `handle` by (`dx`, `dy`) moves on the selected part, measured
+    /// on the layout the drag began on; an edge the handle leaves never snaps. `None` with
+    /// nothing or several parts selected.
+    pub fn snap_resize(&self, handle: Handle, dx: i32, dy: i32, threshold: i32) -> Option<Snapped> {
+        let part = self.selected.as_ref()?;
+        let (model, start) = self.drag_start();
+        let b = start.get(part)?;
+        use Handle::*;
+        let edge =
+            |start: i32, len: i32, near: bool| i64::from(if near { start } else { start + len });
+        let across = match handle {
+            Left | TopLeft | BottomLeft => vec![edge(b.x(), b.wide(), true)],
+            Right | TopRight | BottomRight => vec![edge(b.x(), b.wide(), false)],
+            _ => Vec::new(),
+        };
+        let down = match handle {
+            Top | TopLeft | TopRight => vec![edge(b.y(), b.tall(), true)],
+            Bottom | BottomLeft | BottomRight => vec![edge(b.y(), b.tall(), false)],
+            _ => Vec::new(),
+        };
+        let moving = Moving { across, down };
+        let movers = std::slice::from_ref(part);
+        Some(snapping::snap(
+            model,
+            start,
+            movers,
+            &moving,
+            (dx, dy),
+            threshold,
+        ))
+    }
+
+    // The model and layout a running drag began on, or the current ones.
+    fn drag_start(&self) -> (&HudModel, &HudLayout) {
+        match &self.drag {
+            Some(d) => (&d.model, &d.layout),
+            None => (&self.model, &self.layout),
+        }
     }
 
     pub fn set_layer_selected(&mut self, zpos: i32) -> Result<(), EditRefused> {
         self.edit(|m, part, group| m.set_layer(part, zpos, group))
+    }
+
+    /// Whether the selected part can step over (`forward`) or under the sibling drawn next to
+    /// it that way.
+    pub fn can_layer(&self, forward: bool) -> bool {
+        self.layer_target(forward).is_some()
+    }
+
+    /// Bring forward (`forward`) or Send back: gives the selected part a layer one past the
+    /// sibling drawn next above or below it, so it draws over or under that sibling. One undo
+    /// step; `NotOffered` when no sibling is drawn that way.
+    pub fn layer_selected(&mut self, forward: bool) -> Result<(), EditRefused> {
+        let zpos = self.layer_target(forward).ok_or(EditRefused::NotOffered)?;
+        self.set_layer_selected(zpos)
+    }
+
+    // The layer that puts the selection past its next sibling in paint order, that way.
+    fn layer_target(&self, forward: bool) -> Option<i32> {
+        let part = self.selected.as_ref()?;
+        let parent = self.model.part(part)?.parent();
+        let own = self.layout.paint_rank(part)?;
+        let siblings = (self.layout.paint_order())
+            .filter(|b| b.key() != part && b.hidden().is_none())
+            .filter(|b| {
+                self.model
+                    .part(b.key())
+                    .is_some_and(|p| p.parent() == parent)
+            })
+            .filter_map(|b| Some((self.layout.paint_rank(b.key())?, b.z())));
+        let next = match forward {
+            true => siblings.filter(|(r, _)| *r > own).min_by_key(|(r, _)| *r),
+            false => siblings.filter(|(r, _)| *r < own).max_by_key(|(r, _)| *r),
+        };
+        let (_, z) = next?;
+        Some(match forward {
+            true => z.saturating_add(1),
+            false => z.saturating_sub(1),
+        })
+    }
+
+    /// Whether the selection is several parts that Align can line up.
+    pub fn can_align(&self) -> bool {
+        self.roots().len() >= 2
+    }
+
+    /// Whether the selection holds the three or more parts Distribute spaces out.
+    pub fn can_distribute(&self) -> bool {
+        self.roots().len() >= 3
+    }
+
+    /// Lines the selected parts up on one edge or centre line of the box around them, as one
+    /// undo step. `NotOffered` with fewer than two parts.
+    pub fn align_selected(&mut self, align: Align) -> Result<(), EditRefused> {
+        let roots = self.roots();
+        if roots.len() < 2 {
+            return Err(EditRefused::NotOffered);
+        }
+        let (x, y, w, h) = around(&self.layout, &roots).ok_or(EditRefused::UnknownPart)?;
+        let moves: Vec<(PartKey, i32, i32)> = (roots.iter())
+            .filter_map(|k| Some((k, self.layout.get(k)?)))
+            .map(|(k, b)| {
+                let (dx, dy) = match align {
+                    Align::Left => (x - b.x(), 0),
+                    Align::Centre => ((x + w / 2) - (b.x() + b.wide() / 2), 0),
+                    Align::Right => ((x + w) - (b.x() + b.wide()), 0),
+                    Align::Top => (0, y - b.y()),
+                    Align::Middle => (0, (y + h / 2) - (b.y() + b.tall() / 2)),
+                    Align::Bottom => (0, (y + h) - (b.y() + b.tall())),
+                };
+                (k.clone(), dx, dy)
+            })
+            .collect();
+        self.move_each("align", &moves)
+    }
+
+    /// Spaces the selected parts out so the gaps between them are equal along `spread`; the
+    /// first and last part stay. One undo step; `NotOffered` with fewer than three parts.
+    pub fn distribute_selected(&mut self, spread: Spread) -> Result<(), EditRefused> {
+        let roots = self.roots();
+        if roots.len() < 3 {
+            return Err(EditRefused::NotOffered);
+        }
+        // Each part as (key, start, length) along the axis, in order of where it starts.
+        let mut row: Vec<(PartKey, i32, i32)> = (roots.iter())
+            .filter_map(|k| {
+                let b = self.layout.get(k)?;
+                Some(match spread {
+                    Spread::Across => (k.clone(), b.x(), b.wide()),
+                    Spread::Down => (k.clone(), b.y(), b.tall()),
+                })
+            })
+            .collect();
+        row.sort_by_key(|(_, start, _)| *start);
+        let (Some(first), Some(last)) = (row.first(), row.last()) else {
+            return Err(EditRefused::UnknownPart);
+        };
+        let span = i64::from(last.1 + last.2) - i64::from(first.1);
+        let filled: i64 = row.iter().map(|(_, _, len)| i64::from(*len)).sum();
+        let gaps = i64::try_from(row.len() - 1).unwrap_or(1);
+        // Whole-pixel gaps, the remainder spread one pixel at a time from the left.
+        let (gap, extra) = (
+            (span - filled).div_euclid(gaps),
+            (span - filled).rem_euclid(gaps),
+        );
+        let mut at = i64::from(first.1);
+        let mut moves = Vec::new();
+        for (i, (key, start, len)) in row.iter().enumerate() {
+            let by = i32::try_from(at - i64::from(*start)).unwrap_or(0);
+            moves.push(match spread {
+                Spread::Across => (key.clone(), by, 0),
+                Spread::Down => (key.clone(), 0, by),
+            });
+            let i = i64::try_from(i).unwrap_or(0);
+            at += i64::from(*len) + gap + i64::from(i < extra);
+        }
+        self.move_each("space out", &moves)
+    }
+
+    // Moves each part by its own screen-pixel delta, as one undo step named
+    // "`verb` N parts".
+    fn move_each(&mut self, verb: &str, moves: &[(PartKey, i32, i32)]) -> Result<(), EditRefused> {
+        let screen = self.screen;
+        let parts: Vec<PartKey> = moves.iter().map(|(k, _, _)| k.clone()).collect();
+        self.build_each(verb, &parts, |m, part, group| {
+            match moves.iter().find(|(k, _, _)| k == part) {
+                Some(&(_, 0, 0)) | None => Ok(Vec::new()),
+                Some(&(_, dx, dy)) => m.move_part(part, dx, dy, screen, group),
+            }
+        })
+    }
+
+    // Runs `build` on every selected part with none of its groups selected, as one undo step named "`verb` N parts". A part that refuses is left as it is; only when
+    // every part refuses is the edit refused.
+    fn edit_each(
+        &mut self,
+        verb: &str,
+        build: impl Fn(&HudModel, &PartKey, u32) -> Result<Vec<Change>, EditRefused>,
+    ) -> Result<(), EditRefused> {
+        let roots = self.roots();
+        self.build_each(verb, &roots, build)
+    }
+
+    fn build_each(
+        &mut self,
+        verb: &str,
+        parts: &[PartKey],
+        build: impl Fn(&HudModel, &PartKey, u32) -> Result<Vec<Change>, EditRefused>,
+    ) -> Result<(), EditRefused> {
+        self.cancel_preview();
+        self.end_drag();
+        self.moment = 0.0;
+        // Each part takes its own group, as its own edit would, so a later reset or show of one
+        // part drops only that part's writes.
+        let first = next_group(&self.changes);
+        let mut added = Vec::new();
+        let mut refused = None;
+        for (i, part) in parts.iter().enumerate() {
+            let group = first.saturating_add(u32::try_from(i).unwrap_or(u32::MAX));
+            match build(&self.model, part, group) {
+                Ok(changes) => added.extend(changes),
+                Err(err) => refused = refused.or(Some(err)),
+            }
+        }
+        if added.is_empty() {
+            return refused.map_or(Ok(()), Err);
+        }
+        let mut next = self.changes.clone();
+        next.extend(added);
+        self.commit_named(next, Some(format!("{verb} {} parts", parts.len())));
+        Ok(())
     }
 
     /// `colour` is `r g b a` text or a scheme colour name.
@@ -1223,8 +1567,44 @@ impl HudEditor {
         self.edit(|m, part, group| m.set_number(part, key, value, group))
     }
 
+    /// Hides the selection as one undo step; of several parts, those the player has not
+    /// hidden yet.
     pub fn hide_selected(&mut self) -> Result<(), EditRefused> {
+        if self.several() {
+            let changes = self.changes.clone();
+            return self.edit_each("hide", |m, part, group| {
+                match m.hide_groups(part, &changes).is_empty() {
+                    true => m.hide_part(part, group),
+                    false => Ok(Vec::new()),
+                }
+            });
+        }
         self.edit(|m, part, group| m.hide_part(part, group))
+    }
+
+    /// Whether the player hid every selected part.
+    pub fn selection_hidden_by_player(&self) -> bool {
+        let parts = self.selection();
+        !parts.is_empty() && parts.iter().all(|p| self.part_hidden_by_player(p))
+    }
+
+    /// Shows every selected part the player hid, as one undo step; false when none was.
+    pub fn show_selection(&mut self) -> bool {
+        self.cancel_preview();
+        let roots = self.roots();
+        let groups: Vec<u32> = (roots.iter())
+            .flat_map(|p| self.model.hide_groups(p, &self.changes))
+            .collect();
+        if groups.is_empty() {
+            return false;
+        }
+        let kept = (self.changes.iter())
+            .filter(|c| !groups.contains(&c.group()))
+            .cloned()
+            .collect();
+        let name = (roots.len() > 1).then(|| format!("show {} parts", roots.len()));
+        self.commit_named(kept, name);
+        true
     }
 
     /// Drops every hide of the selection as one undo step; false when there was none.
@@ -1545,6 +1925,9 @@ impl HudEditor {
     pub fn drag(&mut self, handle: Handle, dx: i32, dy: i32) -> Result<(), EditRefused> {
         self.cancel_preview();
         self.moment = 0.0;
+        if self.several() {
+            return self.drag_several(handle, dx, dy);
+        }
         let part = self.selected.clone().ok_or(EditRefused::UnknownPart)?;
         let (start, start_layout, base) = match &self.drag {
             Some(drag) => (&drag.model, &drag.layout, &drag.changes),
@@ -1565,6 +1948,46 @@ impl HudEditor {
         })
     }
 
+    // Moves every selected part by one delta in one group, from where the drag began. The delta
+    // is held to what the part nearest a range's end may take, so the parts keep their spacing.
+    // A part that cannot move stays; only when none can is the drag refused.
+    fn drag_several(&mut self, handle: Handle, dx: i32, dy: i32) -> Result<(), EditRefused> {
+        if handle != Handle::Move {
+            return Err(EditRefused::NotOffered);
+        }
+        let roots = self.roots();
+        let (start, start_layout, base) = match &self.drag {
+            Some(drag) => (&drag.model, &drag.layout, &drag.changes),
+            None => (&self.model, &self.layout, &self.changes),
+        };
+        let units = Units::new(self.screen);
+        let boxes: Vec<(&PartKey, &PartBox)> = (roots.iter())
+            .filter_map(|k| Some((k, start_layout.get(k)?)))
+            .collect();
+        let held = |by: i32, clamp: &dyn Fn(&PartBox) -> i32| {
+            (boxes.iter().map(|(_, b)| clamp(b)))
+                .min_by_key(|d| d.unsigned_abs())
+                .unwrap_or(by)
+        };
+        let dx = held(dx, &|b| units.clamp_pos(b.x(), dx, self.screen.wide()));
+        let dy = held(dy, &|b| units.clamp_pos(b.y(), dy, self.screen.tall()));
+        let group = next_group(base);
+        let mut added = Vec::new();
+        let mut refused = None;
+        for (part, b) in &boxes {
+            match drag_changes(start, part, b, self.screen, group, Handle::Move, dx, dy) {
+                Ok(changes) => added.extend(changes),
+                Err(err) => refused = refused.or(Some(err)),
+            }
+        }
+        if let Some(err) = refused.filter(|_| added.is_empty()) {
+            return Err(err);
+        }
+        let mut next = base.clone();
+        next.extend(added);
+        self.preview(next, |_| true)
+    }
+
     pub fn is_dragging(&self) -> bool {
         self.drag.is_some()
     }
@@ -1575,7 +1998,10 @@ impl HudEditor {
             return;
         };
         if drag.changes != self.changes {
-            let step = self.step(drag.changes);
+            let mut step = self.step(drag.changes);
+            if self.several() {
+                step.name = Some(format!("move {} parts", self.roots().len()));
+            }
             push_capped(&mut self.undo, step);
             self.redo.clear();
         }
@@ -1680,9 +2106,7 @@ impl HudEditor {
             self.redo.clear();
             (self.model, self.layout, self.dropped) =
                 (preview.model, preview.layout, preview.dropped);
-            if let Some(part) = self.selected.take() {
-                self.select(Some(part));
-            }
+            self.keep_selection();
         }
         true
     }
@@ -1902,10 +2326,16 @@ impl HudEditor {
 
     /// Makes `next` the change list, keeping the old one as an undo step.
     fn commit(&mut self, next: Vec<Change>) {
+        self.commit_named(next, None);
+    }
+
+    // As `commit`, naming the step `name` in place of what its changes read as.
+    fn commit_named(&mut self, next: Vec<Change>, name: Option<String>) {
         self.end_drag();
         self.moment = 0.0;
         let before = std::mem::replace(&mut self.changes, next);
-        let step = self.step(before);
+        let mut step = self.step(before);
+        step.name = name.or(step.name);
         push_capped(&mut self.undo, step);
         self.redo.clear();
         self.replay();
@@ -1914,7 +2344,7 @@ impl HudEditor {
     /// Re-resolves the pristine model into `scene` and drops the selection; the caller replays.
     fn enter(&mut self, scene: Scene) {
         self.pristine = self.pristine.with_scene(scene);
-        self.selected = None;
+        self.clear_selection();
     }
 
     /// The history step that returns to `before` from the current changes; it remembers where
@@ -1939,7 +2369,7 @@ impl HudEditor {
         if let Some(kind) = meter {
             if kind != self.meter() {
                 self.pristine = self.pristine.with_meter(kind);
-                self.selected = None;
+                self.clear_selection();
             }
             self.situation = (self.situation.clone()).with_switch(SituationSwitch::Meter, true);
         }
@@ -1953,7 +2383,7 @@ impl HudEditor {
         };
         if (scene, mode) != (self.scene(), self.board_mode()) {
             self.pristine = self.pristine.with_scene(scene).with_board_mode(mode);
-            self.selected = None;
+            self.clear_selection();
         }
     }
 
@@ -1964,9 +2394,7 @@ impl HudEditor {
         self.dropped = edited.dropped();
         self.model = edited.into_model();
         self.layout = self.model.layout_in(self.screen, &self.situation);
-        if let Some(part) = self.selected.take() {
-            self.select(Some(part));
-        }
+        self.keep_selection();
     }
 }
 
@@ -2028,6 +2456,31 @@ fn drag_changes(
         )?);
     }
     Ok(changes)
+}
+
+/// Whether `inner` sits inside `outer`, below it in the part tree.
+fn within(model: &HudModel, inner: &PartKey, outer: &PartKey) -> bool {
+    let mut at = model.part(inner).and_then(|p| p.parent());
+    while let Some(k) = at {
+        if k == outer {
+            return true;
+        }
+        at = model.part(k).and_then(|p| p.parent());
+    }
+    false
+}
+
+/// The box around `parts` on `layout`, as (x, y, wide, tall); `None` when it has none of them.
+fn around(layout: &HudLayout, parts: &[PartKey]) -> Option<(i32, i32, i32, i32)> {
+    let boxes = parts.iter().filter_map(|k| layout.get(k));
+    let (x0, y0, x1, y1) = boxes.fold(None, |acc: Option<(i32, i32, i32, i32)>, b| {
+        let (x1, y1) = (b.x() + b.wide(), b.y() + b.tall());
+        Some(match acc {
+            None => (b.x(), b.y(), x1, y1),
+            Some((a, b0, c, d)) => (a.min(b.x()), b0.min(b.y()), c.max(x1), d.max(y1)),
+        })
+    })?;
+    Some((x0, y0, x1 - x0, y1 - y0))
 }
 
 /// File units (a 480-high screen) against pixels at one screen, rounding so that a pixel

@@ -13,13 +13,18 @@ use crate::ids;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 
 /// The sheet's rows: the keys, then what they do.
-pub const SHORTCUTS: [(&str, &str); 15] = [
-    ("Arrow keys", "Move the selected part"),
-    ("Shift + arrow keys", "Move it 10 at a time"),
-    ("Ctrl + drag", "Move without snapping"),
-    ("H or Delete", "Hide the selected part"),
+pub const SHORTCUTS: [(&str, &str); 17] = [
+    ("Arrow keys", "Move the selected parts"),
+    ("Shift + arrow keys", "Move them 10 at a time"),
+    ("Ctrl + drag", "Move or resize without snapping"),
+    ("H or Delete", "Hide the selected parts"),
     ("Escape", "Clear the selection"),
     ("Alt + click", "Pick a part inside a group"),
+    (
+        "Shift + click",
+        "Add a part to the selection or take it out",
+    ),
+    ("Drag on empty space", "Select every part inside the box"),
     ("Ctrl+Z", "Undo"),
     ("Ctrl+Y", "Redo"),
     ("Space + drag", "Move around the canvas"),

@@ -781,8 +781,13 @@ fn layer_and_colour_write_their_keys(cx: &mut TestAppContext) {
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
     select_hv(cx, &s);
-    commit(cx, &s, &page, Field::Layer, "9");
-    assert_eq!(hv_value(cx, &page, "zpos").as_deref(), Some("9"));
+    let before = hv_value(cx, &page, "zpos");
+    support::click_id(cx, s.win, ids::HUD_MAKER_BACKWARD);
+    let after = hv_value(cx, &page, "zpos");
+    assert!(
+        after.is_some() && after != before,
+        "{before:?} then {after:?}"
+    );
     let state = cx.update(|cx| page.read(cx).colour_state().clone());
     cx.update(|cx| {
         state.update(cx, |_, cx| {
@@ -983,7 +988,6 @@ fn out_of_range_numbers_are_refused_and_the_field_restored(cx: &mut TestAppConte
         (Field::Tall, "4321"),
         (Field::Wide, "1"),
         (Field::Tall, "1"),
-        (Field::Layer, "99999999999"),
     ] {
         let shown = field_text(cx, &page, field);
         commit(cx, &s, &page, field, text);
@@ -1067,12 +1071,6 @@ fn a_refused_number_says_why_until_the_next_good_one(cx: &mut TestAppContext) {
             ids::HUD_MAKER_WIDE,
             "0",
             "Must be between 1 and 7680",
-        ),
-        (
-            Field::Layer,
-            ids::HUD_MAKER_LAYER,
-            "99999999999",
-            "Must be between -2147483648 and 2147483647",
         ),
     ] {
         commit(cx, &s, &page, field, text);

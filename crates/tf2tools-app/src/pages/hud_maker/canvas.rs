@@ -19,13 +19,13 @@ use gpui_kit::{
 };
 use tf2tools_core::{
     ALIGNMENTS, AnimFrame, Animated, ChatSample, ColumnKind, FontVariant, GameSituation, GameText,
-    Guide, GuideAxis, HiddenBy, HudLayout, HudModel, ImageBorder, ImageCell, Part, PartBox,
-    PartKey, Pick, PlayerListLayout, Rgba, SamplePlayer, SampleSet, Scene, Screen, ScreenScale,
-    Team, Vision, background_corners, corner_radius, image_cells, nine_slice, paints_background,
-    rank_medal, rank_pieces, scene_image, stand_in_families, wrap_lines, wrapped_text_left,
+    GuideAxis, HiddenBy, HudLayout, HudModel, ImageBorder, ImageCell, Part, PartBox, PartKey, Pick,
+    PlayerListLayout, Rgba, SamplePlayer, SampleSet, Scene, Screen, ScreenScale, Team, Vision,
+    background_corners, corner_radius, image_cells, nine_slice, paints_background, rank_medal,
+    rank_pieces, scene_image, stand_in_families, wrap_lines, wrapped_text_left,
 };
 
-use super::editor::Handle;
+use super::editor::{Guide, Handle};
 use super::rank_paint::rank_paint;
 use super::view::{CanvasFit, list_font_px};
 use super::{HudMakerPage, Images};
@@ -101,6 +101,15 @@ pub(super) struct PartDrag {
     guides: Vec<Guide>,
 }
 
+/// A box drawn by dragging on empty canvas, in window pixels; on release it selects every
+/// part inside it, added to the selection when Shift began it.
+#[derive(Debug, Clone)]
+pub(super) struct Marquee {
+    from: Point<Pixels>,
+    to: Point<Pixels>,
+    adding: bool,
+}
+
 /// A canvas press: the screen pixel, the part it selected and the layout it picked on.
 #[derive(Debug, Clone)]
 pub(super) struct LastPress {
@@ -119,7 +128,7 @@ impl HudMakerPage {
     pub(super) fn canvas_area(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let area = self.area.clone();
         let page = cx.entity().downgrade();
-        let dragging = self.part_drag.is_some();
+        let dragging = self.part_drag.is_some() || self.marquee.is_some();
         let dividing = self.compare_drag;
         let waiting = self.held.is_some();
         let panning = self.is_panning();
@@ -137,6 +146,7 @@ impl HudMakerPage {
                         let _ = released.update(cx, |page, cx| {
                             page.compare_drag = false;
                             page.end_canvas_pan(cx);
+                            page.end_marquee(window, cx);
                             page.end_part_drag(window, cx)
                         });
                     }
@@ -186,7 +196,10 @@ impl HudMakerPage {
                 let moved = page.clone();
                 window.on_mouse_event(move |ev: &MouseMoveEvent, phase, window, cx| {
                     if phase == DispatchPhase::Capture {
-                        let _ = moved.update(cx, |page, cx| page.drag_part(ev, window, cx));
+                        let _ = moved.update(cx, |page, cx| {
+                            page.drag_marquee(ev, cx);
+                            page.drag_part(ev, window, cx)
+                        });
                     }
                 });
             },
@@ -510,6 +523,41 @@ impl HudMakerPage {
                     el.border_dashed()
                 })
         });
+        // Several selected parts each get the selection's outline and no handles, since they
+        // only move together.
+        let several: &[PartKey] = match editor.several() {
+            true => editor.selection(),
+            false => &[],
+        };
+        let several = (several.iter())
+            .filter_map(|key| {
+                let b = layout.get(key).filter(|b| drawn(b))?;
+                let label = named(key).map(|(_, _, label)| label)?;
+                let el = place(
+                    div().id(ids::hud_maker_selected(key)).test_support(),
+                    outline(b),
+                )
+                .aria_label(label)
+                .border_2()
+                .border_color(primary);
+                Some(el)
+            })
+            .collect::<Vec<_>>();
+        // The box being drawn, faintly filled, from where the press began to the pointer.
+        let marquee = self.marquee.as_ref().map(|m| {
+            let (from, to) = (m.from - screen.origin, m.to - screen.origin);
+            div()
+                .id(ids::HUD_MAKER_MARQUEE)
+                .test_support()
+                .absolute()
+                .left(from.x.min(to.x))
+                .top(from.y.min(to.y))
+                .w((to.x - from.x).abs())
+                .h((to.y - from.y).abs())
+                .border_1()
+                .border_color(primary)
+                .bg(primary.opacity(0.08))
+        });
         // Handles sit just outside the selection, so they never cover a small part's content,
         // and an edge too short for a mid-edge handle shows only its corners. A handle press
         // starts its own drag and stops there, so the canvas never re-selects.
@@ -615,6 +663,8 @@ impl HudMakerPage {
             .children(markers)
             .children(hover)
             .children(selection)
+            .children(several)
+            .children(marquee)
             .children(handles)
             .children(guides)
             .children(hover_tag)
@@ -877,6 +927,18 @@ impl HudMakerPage {
         let picks = at.map_or_else(Vec::new, |(x, y)| self.picks_at(x, y));
         let held = at.is_some_and(|(x, y)| self.holds_press(x, y, &picks));
         let picks: Vec<PartKey> = picks.into_iter().map(|p| p.key().clone()).collect();
+        // Shift adds what a press picks to the selection or takes it out, and starts a box on
+        // empty canvas; a press on any of several selected parts drags them all.
+        if ev.modifiers.shift {
+            return self.press_adding(ev, at.is_some(), &picks, window, cx);
+        }
+        let model = editor.model();
+        let on_several = editor.several()
+            && (picks.iter()).any(|p| editor.selection().iter().any(|s| is_within(model, p, s)));
+        if on_several {
+            self.focus.focus(window, cx);
+            return self.start_part_drag(Handle::Move, ev.position, window, cx);
+        }
         // The same spot steps on only while nothing was laid out again since that press; the
         // second half of a double-click goes inside what its first half picked, or keeps it.
         let generation = editor.layout().generation();
@@ -908,6 +970,8 @@ impl HudMakerPage {
         self.focus.focus(window, cx);
         if hit {
             self.start_part_drag(Handle::Move, ev.position, window, cx);
+        } else if at.is_some() {
+            self.start_marquee(ev.position, false, cx);
         }
         // Read after the press's own flush, which may have committed a typed value.
         let generation = self.editor().map(|e| e.layout().generation());
@@ -919,6 +983,123 @@ impl HudMakerPage {
                 picked,
                 generation,
             });
+    }
+
+    // A Shift press: the part a plain press would pick (Alt: the part itself) goes in or out of
+    // the selection, or on empty screen a box starts that adds what it covers.
+    fn press_adding(
+        &mut self,
+        ev: &MouseDownEvent,
+        on_screen: bool,
+        picks: &[PartKey],
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(top) = picks.first() else {
+            if on_screen {
+                self.start_marquee(ev.position, true, cx);
+            }
+            return;
+        };
+        let part = match ev.modifiers.alt {
+            true => top.clone(),
+            false => self.grouped(top),
+        };
+        self.last_press = None;
+        if let Some(editor) = self.editor_mut() {
+            editor.toggle_select(part);
+        }
+        self.refresh(window, cx);
+        self.focus.focus(window, cx);
+    }
+
+    fn start_marquee(&mut self, at: Point<Pixels>, adding: bool, cx: &mut Context<Self>) {
+        self.marquee = Some(Marquee {
+            from: at,
+            to: at,
+            adding,
+        });
+        cx.notify();
+    }
+
+    fn drag_marquee(&mut self, ev: &MouseMoveEvent, cx: &mut Context<Self>) {
+        if let Some(m) = &mut self.marquee {
+            m.to = ev.position;
+            cx.notify();
+        }
+    }
+
+    // The release selects every part the box covers whole, each taken as its group when the
+    // group fits too, and none inside another; a box too small to see selects nothing new.
+    pub(super) fn end_marquee(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(m) = self.marquee.take() else {
+            return;
+        };
+        let covered = self.covered_by(&m);
+        let Some(editor) = self.editor_mut() else {
+            return;
+        };
+        let mut parts = match m.adding {
+            true => editor.selection().to_vec(),
+            false => Vec::new(),
+        };
+        for key in covered {
+            if !parts.contains(&key) {
+                parts.push(key);
+            }
+        }
+        editor.select_all(parts);
+        self.refresh(window, cx);
+    }
+
+    // The parts marquee `m` covers whole, in screen pixels, as the selection it makes.
+    fn covered_by(&self, m: &Marquee) -> Vec<PartKey> {
+        let super::Load::Ready(loaded) = &self.load else {
+            return Vec::new();
+        };
+        let editor = &loaded.editor;
+        let fit = self.canvas_fit(editor.screen());
+        let (origin, k) = (fit.screen_bounds().origin, fit.scale());
+        if k <= 0. {
+            return Vec::new();
+        }
+        let px_of = |v: Pixels, o: Pixels| f32::from(v - o) / k;
+        let (x0, x1) = (px_of(m.from.x, origin.x), px_of(m.to.x, origin.x));
+        let (y0, y1) = (px_of(m.from.y, origin.y), px_of(m.to.y, origin.y));
+        let (left, right) = (x0.min(x1), x0.max(x1));
+        let (top, bottom) = (y0.min(y1), y0.max(y1));
+        if right - left < 2. && bottom - top < 2. {
+            return Vec::new();
+        }
+        let model = editor.model();
+        let shown_layout = editor.shown_layout();
+        let layout: &HudLayout = &shown_layout;
+        let inside = |key: &PartKey| {
+            layout.visible(key).is_some_and(|(x, y, w, h)| {
+                x as f32 >= left
+                    && y as f32 >= top
+                    && (x + w) as f32 <= right
+                    && (y + h) as f32 <= bottom
+            })
+        };
+        let shown = takes_clicks(model, layout, None);
+        let mut found: Vec<PartKey> = (layout.boxes().iter())
+            .filter(|b| b.clickable() && b.hidden().is_none() && inside(b.key()))
+            .map(|b| match group_of(model, layout, b.key(), &shown) {
+                Some(group) if inside(&group) => group,
+                _ => b.key().clone(),
+            })
+            .collect();
+        found.dedup();
+        let all = found.clone();
+        found.retain(|k| !all.iter().any(|o| o != k && is_within(model, k, o)));
+        let mut unique = Vec::new();
+        for k in found {
+            if !unique.contains(&k) {
+                unique.push(k);
+            }
+        }
+        unique
     }
 
     // Hovers what a press at window point `at` would select. Only a change redraws, so a
@@ -1246,7 +1427,7 @@ impl HudMakerPage {
         cx.notify();
     }
 
-    /// Previews the drag's latest delta, if a move left one, snapped when it moves the part.
+    /// Previews the drag's latest delta, if a move left one, snapped unless Ctrl is held.
     pub(super) fn preview_part_drag(&mut self) {
         let Some(drag) = &mut self.part_drag else {
             return;
@@ -1255,10 +1436,15 @@ impl HudMakerPage {
             return;
         };
         // The threshold is a fixed reach in window pixels, so snapping feels the same at any zoom.
-        let snaps = handle == Handle::Move && !drag.free && drag.scale > 0.;
+        let snaps = !drag.free && drag.scale > 0.;
         let threshold = (SNAP_WINDOW_PX / drag.scale).round() as i32;
         let snap = (snaps)
-            .then(|| self.editor().and_then(|e| e.snap_move(dx, dy, threshold)))
+            .then(|| {
+                self.editor().and_then(|e| match handle {
+                    Handle::Move => e.snap_move(dx, dy, threshold),
+                    _ => e.snap_resize(handle, dx, dy, threshold),
+                })
+            })
             .flatten();
         let (dx, dy, guides) = match snap {
             Some(s) => (s.dx(), s.dy(), s.guides().to_vec()),

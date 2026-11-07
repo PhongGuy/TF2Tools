@@ -10,9 +10,9 @@ use gpui_kit::component::input::Input;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, Context, Hsla, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
-    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity,
-    Window, canvas, div, px, uniform_list,
+    AnyElement, ClickEvent, Context, Hsla, InteractiveElement as _, IntoElement,
+    ParentElement as _, Pixels, SharedString, StatefulInteractiveElement as _, Styled as _,
+    TestSupportExt as _, WeakEntity, Window, canvas, div, px, uniform_list,
 };
 use tf2tools_core::{HudModel, PanelRule, Part, PartKey};
 
@@ -180,7 +180,7 @@ impl HudMakerPage {
                     file,
                     state,
                     depth: depth(model, part),
-                    selected: editor.selected() == Some(key),
+                    selected: editor.is_selected(key),
                     group: groups.contains(key).then(|| self.folded.contains(key)),
                     changed: editor.part_changed(key),
                     eye: part
@@ -290,8 +290,13 @@ impl HudMakerPage {
                     })
                     // A row click hands the canvas the keys, as a press on the canvas does, so
                     // the arrows nudge the part rather than type into a field.
-                    .on_click(cx.listener(move |page, _, window, cx| {
-                        page.select(Some(key.clone()), window, cx);
+                    // Shift or Ctrl adds the row's part to the selection or takes it out.
+                    .on_click(cx.listener(move |page, ev: &ClickEvent, window, cx| {
+                        let m = ev.modifiers();
+                        match m.shift || m.secondary() {
+                            true => page.toggle_select(key.clone(), window, cx),
+                            false => page.select(Some(key.clone()), window, cx),
+                        }
                         page.focus.focus(window, cx);
                     }))
                     .child(fold)

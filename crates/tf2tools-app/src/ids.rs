@@ -217,6 +217,14 @@ pub const HUD_MAKER_CANVAS: &str = "hud-maker-canvas";
 pub const HUD_MAKER_CROSSHAIR: &str = "hud-maker-crosshair";
 /// The outline over the selected part; present only with a drawn selection.
 pub const HUD_MAKER_SELECTION: &str = "hud-maker-selection";
+/// The box drawn by dragging on empty HUD Maker canvas, which selects the parts inside it.
+pub const HUD_MAKER_MARQUEE: &str = "hud-maker-marquee";
+/// The side panel's line saying how many parts are selected together.
+pub const HUD_MAKER_SEVERAL: &str = "hud-maker-several";
+/// The side panel's Bring forward button in the Layer row.
+pub const HUD_MAKER_FORWARD: &str = "hud-maker-forward";
+/// The side panel's Send back button in the Layer row.
+pub const HUD_MAKER_BACKWARD: &str = "hud-maker-backward";
 /// The outline over the part under the pointer, on the canvas or its row; absent for a hidden
 /// part.
 pub const HUD_MAKER_HOVER: &str = "hud-maker-hover";
@@ -1547,6 +1555,19 @@ pub fn crosshair_maker_starter_value(slug: &str) -> ElementId {
 /// A HUD part drawn on the HUD Maker canvas, keyed by its part key: "hud-maker-part:<key>".
 pub fn hud_maker_part(key: &PartKey) -> ElementId {
     keyed("hud-maker-part", key.as_str())
+}
+
+/// The outline over one of several selected parts on the HUD Maker canvas:
+/// "hud-maker-selected:<key>".
+pub fn hud_maker_selected(key: &PartKey) -> ElementId {
+    keyed("hud-maker-selected", key.as_str())
+}
+
+/// One of the side panel's Align and Distribute buttons for several parts, by what it does
+/// ("left", "centre", "right", "top", "middle", "bottom", "across", "down"):
+/// "hud-maker-line-up:<name>".
+pub fn hud_maker_line_up(name: &str) -> ElementId {
+    keyed("hud-maker-line-up", name)
 }
 
 /// One step of the HUD Maker panel title's way down to the selected part, a part enclosing it
