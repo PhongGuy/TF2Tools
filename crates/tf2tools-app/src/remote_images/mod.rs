@@ -7,6 +7,7 @@ pub mod queue;
 
 use std::collections::HashMap;
 use std::future::Future;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 
@@ -101,6 +102,41 @@ pub fn store_fetch(store: StoreClient) -> ImageFetch {
     })
 }
 
+/// Marks an image key's URL as a file on disk rather than an address on an image host.
+const LOCAL_SCHEME: &str = "file://";
+/// The most bytes a picture on disk may have before it is refused unread.
+const LOCAL_MAX_BYTES: u64 = 8 * 1024 * 1024;
+
+/// The key URL for the picture at `path`. `version` changes whenever the file is rewritten, so
+/// a decode of the old picture is never shown for the new one.
+pub fn local_image_url(path: &Path, version: &str) -> String {
+    format!("{LOCAL_SCHEME}{}#{version}", path.to_string_lossy())
+}
+
+fn local_path(url: &str) -> Option<PathBuf> {
+    let rest = url.strip_prefix(LOCAL_SCHEME)?;
+    Some(PathBuf::from(
+        rest.rsplit_once('#').map_or(rest, |(path, _)| path),
+    ))
+}
+
+/// `fetch`, except that a `local_image_url` is read from disk; a missing, unreadable or
+/// oversized file fails for good.
+fn with_local_files(fetch: ImageFetch) -> ImageFetch {
+    Arc::new(move |url: String| match local_path(&url) {
+        Some(path) => Box::pin(async move {
+            let meta = tokio::fs::metadata(&path).await;
+            if !meta.is_ok_and(|m| m.is_file() && m.len() <= LOCAL_MAX_BYTES) {
+                return Err(FetchFailure::Permanent);
+            }
+            tokio::fs::read(&path)
+                .await
+                .map_err(|_| FetchFailure::Permanent)
+        }),
+        None => fetch(url),
+    })
+}
+
 /// What a view draws for one image.
 #[derive(Clone)]
 pub enum RemoteImage {
@@ -145,6 +181,7 @@ impl RemoteImages {
     }
 
     /// Installs a cache keeping at most `budget` decoded bytes, and sets it as the global.
+    /// `fetch` serves every key but a `local_image_url`, which is read from disk.
     /// Does not start the tokio runtime; the first fetch does.
     pub fn install_with(
         cx: &mut App,
@@ -154,7 +191,7 @@ impl RemoteImages {
     ) -> Entity<Self> {
         let images = cx.new(|_| Self {
             queue: ImageQueue::new(budget),
-            fetch,
+            fetch: with_local_files(fetch),
             decode,
             tasks: HashMap::new(),
             stats: ImageStats::default(),
