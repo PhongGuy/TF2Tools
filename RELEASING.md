@@ -103,7 +103,7 @@ Any rerun of this loopback test sets `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`
    scripts/check-trailers.sh
    ```
 
-   `scripts/test-deb-prerelease.sh` uses podman or docker when the host has no `dpkg-deb`. `scripts/check-trailers.sh` checks every commit since the previous tag for a `Co-authored-by:` or `Claude-Session:` trailer.
+   `scripts/test-deb-prerelease.sh` uses podman or docker when the host has no `dpkg-deb`. `scripts/check-trailers.sh` checks every commit since the previous tag for AI credit, using the same `.github/scripts/attribution-lib.sh` as the PR attribution check.
 3. **(maintainer)** Push the branch.
 4. **(maintainer)** Tag and push the tag:
 
@@ -131,7 +131,7 @@ Any rerun of this loopback test sets `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`
 - **A bad published release is fixed by a higher version, never by deleting it.** Clients may already hold its manifest.
 - **A run started by hand from a branch is a dry run.** The `draft` job runs only for `refs/tags/v*`, so a `workflow_dispatch` from a branch stops after uploading the `linux-packages` and `windows-installer` workflow artifacts.
 - **The release build has no update test seam.** The `linux` and `windows` jobs set `TF2TOOLS_RELEASE_BUILD`, and the `update-test-key` feature refuses to compile with it set.
-- **The trailer gate covers every commit since the previous tag.** The `gate` job runs `scripts/check-trailers.sh HEAD`, which fails on any `Co-authored-by:` or `Claude-Session:` line (any case) in that range; it must print `trailers OK`.
+- **The trailer gate covers every commit since the previous tag.** The `gate` job runs `scripts/check-trailers.sh HEAD`, which fails on any commit in that range that credits an AI agent (an AI or bot `Co-authored-by:`, a session trailer, a "Generated with" footer, the Anthropic noreply address or the robot emoji); a human `Co-authored-by: Name <email>` passes. It must print `trailers OK`. Every PR also runs `.github/workflows/attribution.yml`, which applies the same library to the PR title, body and commits.
 - **The packages bundle Valve assets.** The bundled crosshair VTFs, VMTs and PNGs and the weapon icons ship in every package, and the weapon scripts are compiled into `crates/tf2tools-core/src/weapons.rs`. Their licensing is the maintainer's call before the repository and its releases go public.
 
 ## The Windows installer
