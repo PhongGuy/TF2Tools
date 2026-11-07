@@ -1462,6 +1462,12 @@ pub fn hud_maker_part(key: &PartKey) -> ElementId {
     keyed("hud-maker-part", key.as_str())
 }
 
+/// One step of the HUD Maker panel title's way down to the selected part, a part enclosing it
+/// that a click selects: "hud-maker-crumb:<key>".
+pub fn hud_maker_crumb(key: &PartKey) -> ElementId {
+    keyed("hud-maker-crumb", key.as_str())
+}
+
 /// The clip a part paints inside on the HUD Maker canvas, its box cut to its parents and the
 /// screen: "hud-maker-part-clip:<key>".
 pub fn hud_maker_part_clip(key: &PartKey) -> ElementId {
