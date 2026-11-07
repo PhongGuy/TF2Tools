@@ -104,7 +104,7 @@ impl HudMakerPage {
             Some(_) => top_layer(editor, |path| path.starts_with("materials/")),
             None => Vec::new(),
         };
-        let (files, platform) = (loaded.files.clone(), loaded.platform);
+        let (files, platform) = (Arc::clone(&loaded.files), loaded.platform);
         let read = move |path: &Path| {
             let like = replaced.and_then(|name| texture_size(top, &files, &name, platform));
             let image = read_picture(path).map_err(|e| picture_line(&e))?;

@@ -177,10 +177,10 @@ fn thumb(id: u64) -> String {
 fn gated_images(cx: &mut TestAppContext) -> (Arc<Mutex<Vec<String>>>, Arc<tokio::sync::Semaphore>) {
     let asked = Arc::new(Mutex::new(Vec::new()));
     let gate = Arc::new(tokio::sync::Semaphore::new(0));
-    let (log, held) = (asked.clone(), gate.clone());
+    let (log, held) = (Arc::clone(&asked), Arc::clone(&gate));
     let fetch: ImageFetch = Arc::new(move |url: String| {
         log.lock().unwrap().push(url);
-        let held = held.clone();
+        let held = Arc::clone(&held);
         Box::pin(async move {
             let _permit = held.acquire().await;
             Err(FetchFailure::Permanent)
@@ -383,7 +383,7 @@ type Seen = Rc<RefCell<Vec<(Option<u64>, Vec<u64>)>>>;
 /// Logs `grid` after every notify, so a stale landing shows even when a newer one follows it.
 fn watch(cx: &mut TestAppContext, grid: &Entity<StoreGrid>) -> (Seen, Subscription) {
     let seen = Seen::default();
-    let log = seen.clone();
+    let log = Rc::clone(&seen);
     let sub = cx.update(|cx| {
         cx.observe(grid, move |grid, cx| {
             let g = grid.read(cx);

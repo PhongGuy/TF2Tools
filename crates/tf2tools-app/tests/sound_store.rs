@@ -484,7 +484,7 @@ fn the_page_redraws_when_its_grid_changes(cx: &mut TestAppContext) {
     let w = support::sound_store_window(cx, &env, &server, seed);
     let grid = cx.update(|cx| w.page.read(cx).grid().clone());
     let redraws = Rc::new(Cell::new(0));
-    let seen = redraws.clone();
+    let seen = Rc::clone(&redraws);
     let _sub = cx.update(|cx| cx.observe(&w.page, move |_, _| seen.set(seen.get() + 1)));
     cx.update(|cx| grid.update(cx, |_, cx| cx.notify()));
     cx.run_until_parked();

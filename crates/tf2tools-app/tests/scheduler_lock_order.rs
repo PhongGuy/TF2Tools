@@ -35,7 +35,7 @@ fn a_timed_block_and_a_cross_thread_wake_do_not_deadlock(cx: &mut TestAppContext
         cx.run_until_parked();
         let go = Arc::new(AtomicBool::new(false));
         let waker = {
-            let go = go.clone();
+            let go = Arc::clone(&go);
             std::thread::spawn(move || {
                 while !go.load(Ordering::SeqCst) {
                     std::hint::spin_loop();

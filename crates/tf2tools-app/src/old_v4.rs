@@ -132,7 +132,7 @@ fn remove_and_close(notice: &Entity<OldV4Notice>, window: &mut Window, cx: &mut 
     let (old, runner) = {
         let n = notice.read(cx);
         let Some(old) = n.found.clone() else { return };
-        (old, n.runner.clone())
+        (old, Arc::clone(&n.runner))
     };
     if runner(old.uninstaller(), old.arguments()).is_err() {
         toast(

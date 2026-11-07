@@ -59,7 +59,7 @@ fn play_is_hidden_while_tf2_is_not_found(cx: &mut TestAppContext) {
 fn play_catches_up_when_the_player_changes_page(cx: &mut TestAppContext) {
     let env = support::env();
     let running = Arc::new(AtomicBool::new(false));
-    let probe = running.clone();
+    let probe = Arc::clone(&running);
     cx.update(|cx| Tf2Probe::install(cx, move || probe.load(Ordering::SeqCst)));
     let s = support::shell_window(cx, &env, found(&env));
     assert!(!support::disabled_of(cx, s.win, ids::PLAY_TF2));

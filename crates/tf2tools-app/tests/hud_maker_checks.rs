@@ -69,7 +69,7 @@ fn open_with(
     support::seed_stock_game_with_bytes(&env.game, overrides, extra);
     let state = Tf2State::Found(Tf2Install::from_path(&env.game).unwrap());
     let picker = Arc::new(ScriptedPicker::new(picks));
-    let s = support::shell_window_with(cx, &env, state, picker.clone(), support::no_steam());
+    let s = support::shell_window_with(cx, &env, state, Arc::clone(&picker), support::no_steam());
     before(&s);
     support::click_nav(cx, s.win, Page::HudMaker);
     let page = cx

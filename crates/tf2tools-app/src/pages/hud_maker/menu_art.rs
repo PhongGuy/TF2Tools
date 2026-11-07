@@ -116,7 +116,7 @@ impl HudMakerPage {
         loaded.menu_art[shape] = MenuArt::Reading;
         tracing::debug!(%name, "menu art: read queued");
         let queued = std::time::Instant::now();
-        let (files, platform) = (loaded.files.clone(), loaded.platform);
+        let (files, platform) = (Arc::clone(&loaded.files), loaded.platform);
         // A picked background's files sit over the HUD's.
         let top = top_layer(&loaded.editor, |path| path.starts_with("materials/"));
         let (load, generation) = (self.loads, loaded.menu_generation);

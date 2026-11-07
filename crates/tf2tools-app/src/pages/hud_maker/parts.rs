@@ -128,7 +128,7 @@ impl HudMakerPage {
             }
         };
         self.filter_names = names;
-        self.list_rows = rows.clone();
+        self.list_rows = Rc::clone(&rows);
         rows
     }
 
@@ -219,7 +219,7 @@ impl HudMakerPage {
                 let measure = measure_cut(
                     key.clone(),
                     SharedString::from(name.clone()),
-                    self.cut_names.clone(),
+                    Rc::clone(&self.cut_names),
                     page.clone(),
                 );
                 let name = div()

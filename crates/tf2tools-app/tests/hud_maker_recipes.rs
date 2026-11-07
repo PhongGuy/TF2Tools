@@ -54,7 +54,7 @@ fn opened_picking(
         ],
     );
     let state = Tf2State::Found(Tf2Install::from_path(&env.game).unwrap());
-    let s = support::shell_window_with(cx, &env, state, picker.clone(), support::no_steam());
+    let s = support::shell_window_with(cx, &env, state, Arc::clone(&picker), support::no_steam());
     support::click_nav(cx, s.win, Page::HudMaker);
     let page = cx
         .update(|cx| s.shell.read(cx).hud_maker_page())

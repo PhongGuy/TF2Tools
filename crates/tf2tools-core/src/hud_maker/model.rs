@@ -579,7 +579,7 @@ impl HudModel {
             copy,
             bases: Arc::new(bases),
             platform,
-            loaded_scheme: scheme.clone(),
+            loaded_scheme: Arc::clone(&scheme),
             scheme,
             scheme_cache: Arc::default(),
             chat_scheme,
@@ -595,7 +595,7 @@ impl HudModel {
             hud_hides: None,
             assets: Vec::new(),
             shipped_fonts,
-            loaded_animations: animations.clone(),
+            loaded_animations: Arc::clone(&animations),
             animations,
             replayed: Arc::new([]),
         };
@@ -608,15 +608,15 @@ impl HudModel {
         let mut model = HudModel {
             pristine: self.pristine.clone(),
             current: self.current.clone(),
-            stubs: self.stubs.clone(),
+            stubs: Arc::clone(&self.stubs),
             copy: self.copy,
-            bases: self.bases.clone(),
+            bases: Arc::clone(&self.bases),
             platform: self.platform,
-            loaded_scheme: self.loaded_scheme.clone(),
-            scheme: self.scheme.clone(),
-            scheme_cache: self.scheme_cache.clone(),
-            chat_scheme: self.chat_scheme.clone(),
-            rank_layout: self.rank_layout.clone(),
+            loaded_scheme: Arc::clone(&self.loaded_scheme),
+            scheme: Arc::clone(&self.scheme),
+            scheme_cache: Arc::clone(&self.scheme_cache),
+            chat_scheme: Arc::clone(&self.chat_scheme),
+            rank_layout: Arc::clone(&self.rank_layout),
             scene,
             board_mode: self.board_mode,
             meter: self.meter,
@@ -627,10 +627,10 @@ impl HudModel {
             problems: Vec::new(),
             hud_hides: None,
             assets: self.assets.clone(),
-            shipped_fonts: self.shipped_fonts.clone(),
-            loaded_animations: self.loaded_animations.clone(),
-            animations: self.animations.clone(),
-            replayed: self.replayed.clone(),
+            shipped_fonts: Arc::clone(&self.shipped_fonts),
+            loaded_animations: Arc::clone(&self.loaded_animations),
+            animations: Arc::clone(&self.animations),
+            replayed: Arc::clone(&self.replayed),
         };
         model.resolve_parts(true);
         model
@@ -794,15 +794,15 @@ impl HudModel {
         let mut model = HudModel {
             pristine: self.pristine.clone(),
             current: self.pristine.clone(),
-            stubs: self.stubs.clone(),
+            stubs: Arc::clone(&self.stubs),
             copy: self.copy,
-            bases: self.bases.clone(),
+            bases: Arc::clone(&self.bases),
             platform: self.platform,
-            loaded_scheme: self.loaded_scheme.clone(),
-            scheme: self.loaded_scheme.clone(),
-            scheme_cache: self.scheme_cache.clone(),
-            chat_scheme: self.chat_scheme.clone(),
-            rank_layout: self.rank_layout.clone(),
+            loaded_scheme: Arc::clone(&self.loaded_scheme),
+            scheme: Arc::clone(&self.loaded_scheme),
+            scheme_cache: Arc::clone(&self.scheme_cache),
+            chat_scheme: Arc::clone(&self.chat_scheme),
+            rank_layout: Arc::clone(&self.rank_layout),
             scene: self.scene,
             board_mode: self.board_mode,
             meter: self.meter,
@@ -813,9 +813,9 @@ impl HudModel {
             problems: Vec::new(),
             hud_hides: self.hud_hides,
             assets: Vec::new(),
-            shipped_fonts: self.shipped_fonts.clone(),
-            loaded_animations: self.loaded_animations.clone(),
-            animations: self.loaded_animations.clone(),
+            shipped_fonts: Arc::clone(&self.shipped_fonts),
+            loaded_animations: Arc::clone(&self.loaded_animations),
+            animations: Arc::clone(&self.loaded_animations),
             replayed: Arc::new([]),
         };
         let (mut applied, mut dropped, mut touched) = (Vec::new(), 0, Vec::new());
@@ -904,7 +904,7 @@ impl HudModel {
         {
             let loaded = model.pristine.get(SCHEME_FILE);
             model.scheme = match loaded.is_some_and(|doc| doc.as_bytes() == own.as_bytes()) {
-                true => model.loaded_scheme.clone(),
+                true => Arc::clone(&model.loaded_scheme),
                 false => model.scheme_cache.get_or_build(own.as_bytes(), || {
                     model.loaded_scheme.with_own(own, model.platform)
                 }),
@@ -1030,10 +1030,10 @@ impl SchemeCache {
         if let Some((seen, scheme)) = slot.as_ref()
             && seen.as_slice() == bytes
         {
-            return scheme.clone();
+            return Arc::clone(scheme);
         }
         let scheme = Arc::new(build());
-        *slot = Some((bytes.to_vec(), scheme.clone()));
+        *slot = Some((bytes.to_vec(), Arc::clone(&scheme)));
         scheme
     }
 }

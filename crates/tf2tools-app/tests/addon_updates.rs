@@ -1,5 +1,6 @@
 use crate::support;
 
+use std::rc::Rc;
 use std::time::Duration;
 
 use gpui_kit::TestAppContext;
@@ -38,7 +39,7 @@ fn an_update_reinstalls_on_its_own_finish(cx: &mut TestAppContext) {
     support::seed_library_addon(&s.services, &env, FOOT, "9.0.0", &old(), true);
     let updates = cx.update(AddonUpdates::global);
     let settled = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let seen = settled.clone();
+    let seen = Rc::clone(&settled);
     let _sub = cx.update(|cx| {
         cx.subscribe(&updates, move |_, event: &AddonEvent, _| {
             seen.borrow_mut().push(event.clone())
@@ -208,7 +209,7 @@ fn a_same_item_refusal_settles_once(cx: &mut TestAppContext) {
     support::seed_library_addon(&s.services, &env, FOOT, "9.0.0", &old(), true);
     let updates = cx.update(AddonUpdates::global);
     let settled = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let seen = settled.clone();
+    let seen = Rc::clone(&settled);
     let _sub = cx.update(|cx| {
         cx.subscribe(&updates, move |_, event: &AddonEvent, _| {
             seen.borrow_mut().push(event.clone())
@@ -256,7 +257,7 @@ fn a_failed_update_keeps_the_old_copy_and_settles(cx: &mut TestAppContext) {
     let updates = cx.update(AddonUpdates::global);
     let dl = cx.update(StoreDownloads::install);
     let failed = std::rc::Rc::new(std::cell::Cell::new(false));
-    let saw = failed.clone();
+    let saw = Rc::clone(&failed);
     let _dl_sub = cx.update(|cx| {
         cx.subscribe(&dl, move |_, event: &DownloadEvent, _| {
             if matches!(event, DownloadEvent::Failed { .. }) {
@@ -265,7 +266,7 @@ fn a_failed_update_keeps_the_old_copy_and_settles(cx: &mut TestAppContext) {
         })
     });
     let settled = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let seen = settled.clone();
+    let seen = Rc::clone(&settled);
     let _sub = cx.update(|cx| {
         cx.subscribe(&updates, move |_, event: &AddonEvent, _| {
             seen.borrow_mut().push(event.clone())
@@ -299,7 +300,7 @@ fn overlapping_lookups_hold_busy_until_the_last_ends(cx: &mut TestAppContext) {
     // No store row for FOOT, so each lookup fails on its own and settles.
     let updates = cx.update(AddonUpdates::global);
     let busy = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
-    let seen = busy.clone();
+    let seen = Rc::clone(&busy);
     let _sub = cx.update(|cx| {
         cx.subscribe(&updates, move |u, _: &AddonEvent, cx| {
             seen.borrow_mut().push(u.read(cx).is_busy())

@@ -30,10 +30,10 @@ async fn raw_details_go_to_the_developer_log(cx: &mut TestAppContext) {
         return;
     }
     let buf = Arc::new(Mutex::new(Vec::new()));
-    let sink = buf.clone();
+    let sink = Arc::clone(&buf);
     tracing_subscriber::fmt()
         .with_ansi(false)
-        .with_writer(move || Capture(sink.clone()))
+        .with_writer(move || Capture(Arc::clone(&sink)))
         .try_init()
         .expect("the only subscriber in this binary");
     let shown = LocalFailure::new(

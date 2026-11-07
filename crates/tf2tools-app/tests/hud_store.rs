@@ -362,7 +362,7 @@ fn the_curated_store_stays_syncing_until_the_post_sync_reload_lands(cx: &mut Tes
     let run = runs.recv_timeout(Duration::from_secs(5)).unwrap();
     assert!(cx.update(|cx| tab.read(cx).is_syncing(cx)));
     let idle_and_empty = Rc::new(Cell::new(false));
-    let seen = idle_and_empty.clone();
+    let seen = Rc::clone(&idle_and_empty);
     let _watch = cx.update(|cx| {
         cx.observe(&tab, move |tab, cx| {
             if !tab.read(cx).is_syncing(cx) && tab.read(cx).shown_ids().is_empty() {

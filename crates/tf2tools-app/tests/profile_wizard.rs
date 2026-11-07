@@ -1,5 +1,7 @@
 use crate::support;
 
+use std::rc::Rc;
+
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
@@ -1033,7 +1035,7 @@ fn the_weapon_list_is_inert_while_a_save_is_in_flight(cx: &mut TestAppContext) {
     select_first_builtin(cx, &s, &w);
     let assigner = cx.update(|cx| w.read(cx).assigner().clone());
     let requests = std::rc::Rc::new(std::cell::Cell::new(0));
-    let seen = requests.clone();
+    let seen = Rc::clone(&requests);
     let _sub = cx.update(|cx| {
         cx.subscribe(
             &assigner,

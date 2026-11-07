@@ -34,7 +34,7 @@ impl Recent {
         S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
     {
         // A per-layer filter: a bare layer rejecting INFO would silence every other layer too.
-        Ring(self.lines.clone()).with_filter(LevelFilter::WARN)
+        Ring(Arc::clone(&self.lines)).with_filter(LevelFilter::WARN)
     }
 
     /// The lines, oldest first; empty when the lock is busy or poisoned, so a panic inside the

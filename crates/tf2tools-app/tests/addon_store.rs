@@ -428,7 +428,7 @@ fn the_store_stays_syncing_until_the_post_sync_reload_lands(cx: &mut TestAppCont
     assert!(cx.update(|cx| w.page.read(cx).is_syncing()));
     let before = cx.update(|cx| w.page.read(cx).reloads());
     let idle_before_reload = Rc::new(Cell::new(false));
-    let seen = idle_before_reload.clone();
+    let seen = Rc::clone(&idle_before_reload);
     let _watch = cx.update(|cx| {
         cx.observe(&w.page, move |page, cx| {
             let page = page.read(cx);

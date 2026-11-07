@@ -63,7 +63,7 @@ fn the_buffer_never_hides_info_from_other_layers() {
     let recent = Recent::new();
     let subscriber = tracing_subscriber::registry()
         .with(recent.layer())
-        .with(Count(seen.clone()));
+        .with(Count(Arc::clone(&seen)));
     tracing::subscriber::with_default(subscriber, || tracing::info!("for the other layer"));
     assert_eq!(seen.load(Ordering::SeqCst), 1);
     assert!(recent.snapshot().is_empty());

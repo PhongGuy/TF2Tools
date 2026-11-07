@@ -520,7 +520,7 @@ fn open_shell(
         repo_asset_root(),
         picker,
         detector,
-        audio.clone(),
+        Arc::<RecordingAudio>::clone(&audio),
         Endpoints::default(),
         false,
     )
@@ -599,7 +599,7 @@ pub fn run_frame_case_with(
     mut each_frame: impl FnMut(&mut TestAppContext),
 ) -> Result<CaseReport, String> {
     let out: Rc<RefCell<Option<Result<CaseReport, String>>>> = Rc::default();
-    let sink = out.clone();
+    let sink = Rc::clone(&out);
     let shell = s.shell.clone();
     cx.update_window(s.win, |_, window, cx| {
         cases::run_case(case, config, shell, window, cx, move |report, _, _| {
@@ -1088,7 +1088,7 @@ pub fn sound_store_window(
 ) -> SoundStoreWindow {
     init(cx);
     let audio = Arc::new(RecordingAudio::new());
-    install_services(cx, services_with_audio(env, audio.clone()));
+    install_services(cx, services_with_audio(env, Arc::clone(&audio)));
     store_ready(cx, server);
     seed(env);
     let (win, page) = cx
@@ -1295,7 +1295,7 @@ pub fn thumbnail_fetch() -> ImageFetch {
     .unwrap();
     let jpeg = Arc::new(out.into_inner());
     Arc::new(move |_url: String| {
-        let jpeg = jpeg.clone();
+        let jpeg = Arc::clone(&jpeg);
         Box::pin(async move { Ok(jpeg.to_vec()) })
     })
 }
@@ -1443,7 +1443,7 @@ pub fn library_changes(
     cx: &mut TestAppContext,
 ) -> (std::rc::Rc<std::cell::Cell<usize>>, gpui_kit::Subscription) {
     let count = std::rc::Rc::new(std::cell::Cell::new(0));
-    let seen = count.clone();
+    let seen = Rc::clone(&count);
     let sub = cx.update(|cx| {
         let events = tf2tools_app::library_events::LibraryEvents::global(cx);
         cx.subscribe(

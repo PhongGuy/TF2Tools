@@ -153,7 +153,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
     });
     // Font matching costs several ms per weight on the first frame; resolving the theme's
     // weights now overlaps that with the GPU setup inside `open_window`.
-    let text_system = cx.text_system().clone();
+    let text_system = Arc::clone(cx.text_system());
     let fonts = startup_fonts(cx);
     cx.background_spawn(async move { text_system.prewarm_fonts(&fonts) })
         .detach();

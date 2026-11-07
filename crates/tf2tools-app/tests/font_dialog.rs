@@ -250,7 +250,7 @@ struct PressProbe(Rc<Cell<usize>>);
 
 impl Render for PressProbe {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let seen = self.0.clone();
+        let seen = Rc::clone(&self.0);
         canvas(
             |_, _, _| (),
             move |_, _, window, _| {
@@ -276,7 +276,7 @@ fn track_press_passes_through(cx: &mut TestAppContext, n: usize) -> bool {
     let prompt = prompt(&env, &fonts, &[]);
     support::init(cx);
     let seen = Rc::new(Cell::new(0));
-    let probe = seen.clone();
+    let probe = Rc::clone(&seen);
     let win = cx
         .update(|cx| {
             gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| {

@@ -158,7 +158,7 @@ fn downloads(cx: &mut TestAppContext) -> Entity<StoreDownloads> {
 
 fn events(cx: &mut TestAppContext, d: &Entity<StoreDownloads>) -> Rc<RefCell<Vec<DownloadEvent>>> {
     let seen = Rc::new(RefCell::new(Vec::new()));
-    let log = seen.clone();
+    let log = Rc::clone(&seen);
     cx.update(|cx| {
         cx.subscribe(d, move |_, e: &DownloadEvent, _| {
             log.borrow_mut().push(e.clone())
@@ -381,9 +381,9 @@ struct Buttons {
 
 impl Render for Buttons {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let clicked = self.clicked.clone();
+        let clicked = Rc::clone(&self.clicked);
         div().size_full().children([7u64, 8].map(|id| {
-            let clicked = clicked.clone();
+            let clicked = Rc::clone(&clicked);
             download_button(
                 GB,
                 &gb(id),
@@ -412,7 +412,7 @@ fn one_download_at_a_time_with_progress_on_its_card(cx: &mut TestAppContext) {
         Duration::ZERO,
     );
     let clicked = Rc::new(Cell::new(0));
-    let c = clicked.clone();
+    let c = Rc::clone(&clicked);
     let (win, host) = support::store_window(
         cx,
         &env,
@@ -481,7 +481,7 @@ fn a_second_start_is_refused_and_progress_lands_mid_download(cx: &mut TestAppCon
     );
     let d = downloads(cx);
     let seen = Rc::new(RefCell::new(Vec::<(bool, Option<Progress>)>::new()));
-    let log = seen.clone();
+    let log = Rc::clone(&seen);
     let _watch = cx.update(|cx| {
         cx.observe(&d, move |d, cx| {
             let d = d.read(cx);
