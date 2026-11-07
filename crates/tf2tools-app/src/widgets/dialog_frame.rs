@@ -70,7 +70,7 @@ impl DialogFrame {
 
     /// Wraps the dialog's whole content so its height is measured on every frame.
     pub fn measure(&self, content: impl IntoElement) -> impl IntoElement {
-        let cell = self.content_height.clone();
+        let cell = Rc::clone(&self.content_height);
         div().relative().w_full().child(content).child(
             canvas(
                 move |bounds: Bounds<Pixels>, window: &mut Window, _: &mut App| {

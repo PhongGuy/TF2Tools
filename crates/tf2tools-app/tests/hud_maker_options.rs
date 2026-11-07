@@ -558,7 +558,11 @@ fn a_library_change_during_a_toggle_keeps_the_switch_held(cx: &mut TestAppContex
     let released_early = Rc::new(Cell::new(false));
     let sent = Rc::new(Cell::new(false));
     let _watch = cx.update(|cx| {
-        let (early, sent, installed) = (released_early.clone(), sent.clone(), installed.clone());
+        let (early, sent, installed) = (
+            Rc::clone(&released_early),
+            Rc::clone(&sent),
+            installed.clone(),
+        );
         cx.observe(&page, move |page, cx| {
             let held = page.read(cx).viewmodels_held();
             if held && !sent.replace(true) {

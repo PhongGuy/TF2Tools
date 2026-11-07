@@ -16,7 +16,7 @@ fn ready(cx: &mut TestAppContext, env: &support::Env, server: &support::StoreSer
 
 fn load(cx: &mut TestAppContext, id: u64) -> Result<Vec<u8>, OpError> {
     let out = Rc::new(RefCell::new(None));
-    let slot = out.clone();
+    let slot = Rc::clone(&out);
     cx.update(|cx| {
         let task = load_preview(GbId::new(id), cx);
         cx.spawn(async move |_| *slot.borrow_mut() = Some(task.await))

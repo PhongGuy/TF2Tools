@@ -880,7 +880,7 @@ impl StoreGrid {
     // only the visible cards, never the loaded prefix.
     fn cards_grid(&self, cx: &mut Context<Self>) -> AnyElement {
         let (kind, card_size) = (self.config.kind, self.config.card);
-        let (render, this) = (self.render.clone(), cx.entity().downgrade());
+        let (render, this) = (Rc::clone(&self.render), cx.entity().downgrade());
         let height = move |width: Pixels| match card_size {
             CardSize::Fixed(height) => height,
             CardSize::Image { text_height } => width * (9. / 16.) + text_height,

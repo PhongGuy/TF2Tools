@@ -3,6 +3,7 @@
 //! along, so Apply keeps it as one undo step.
 
 use std::ops::Range;
+use std::sync::Arc;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{
@@ -548,7 +549,7 @@ impl HudMakerPage {
         let target = editor.model().clone();
         let (scene, mode, group) = (editor.scene(), editor.board_mode(), editor.next_group());
         let changes = editor.changes().to_vec();
-        let (files, platform) = (loaded.files.clone(), loaded.platform);
+        let (files, platform) = (Arc::clone(&loaded.files), loaded.platform);
         let load = self.loads;
         self.preview_seq = self.preview_seq.wrapping_add(1);
         let seq = self.preview_seq;

@@ -722,7 +722,7 @@ fn shell_picking(
         cx,
         env,
         Tf2State::Missing { saved: None },
-        picker.clone(),
+        Arc::clone(&picker),
         support::no_steam(),
     );
     (s, picker)
@@ -760,7 +760,7 @@ fn shell_holding(
         cx,
         env,
         Tf2State::Missing { saved: None },
-        picker.clone(),
+        Arc::clone(&picker),
         support::no_steam(),
     );
     (s, picker, release)

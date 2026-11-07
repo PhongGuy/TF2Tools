@@ -46,7 +46,7 @@ fn open(
         .unwrap();
     let assigner = cx.update(|cx| host.read(cx).assigner.clone());
     let events: Events = Rc::default();
-    let sink = events.clone();
+    let sink = Rc::clone(&events);
     cx.update(|cx| {
         cx.subscribe(&assigner, move |_, e: &AssignRequested, _| {
             sink.borrow_mut().push(e.clone())
@@ -207,7 +207,7 @@ fn only_a_real_class_change_emits_class_changed(cx: &mut TestAppContext) {
     let env = support::env();
     let (win, assigner, _) = open(cx, &env, false);
     let changes: Rc<RefCell<Vec<TfClass>>> = Rc::default();
-    let sink = changes.clone();
+    let sink = Rc::clone(&changes);
     cx.update(|cx| {
         cx.subscribe(&assigner, move |_, e: &ClassChanged, _| {
             sink.borrow_mut().push(e.class)
@@ -285,7 +285,7 @@ fn icon_fetch(serve: bool) -> (ImageFetch, Asked) {
     .unwrap();
     let png = Arc::new(out.into_inner());
     let asked: Asked = Arc::default();
-    let log = asked.clone();
+    let log = Arc::clone(&asked);
     let fetch: ImageFetch = Arc::new(move |url: String| {
         log.lock().unwrap().push(url);
         let result = if serve {

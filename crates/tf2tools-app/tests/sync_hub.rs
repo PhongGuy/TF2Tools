@@ -17,7 +17,7 @@ fn read<R>(cx: &mut TestAppContext, hub: &Entity<SyncHub>, f: impl FnOnce(&SyncH
 
 fn events(cx: &mut TestAppContext, hub: &Entity<SyncHub>) -> Rc<RefCell<Vec<SyncEvent>>> {
     let seen = Rc::new(RefCell::new(Vec::new()));
-    let sink = seen.clone();
+    let sink = Rc::clone(&seen);
     cx.update(|cx| {
         cx.subscribe(hub, move |_, ev: &SyncEvent, _| {
             sink.borrow_mut().push(ev.clone())
@@ -84,7 +84,7 @@ fn progress_reaches_the_hub_at_most_once_per_repaint_interval(cx: &mut TestAppCo
     let run = runs.try_recv().unwrap();
     cx.run_until_parked();
     let notes = Rc::new(Cell::new(0));
-    let n = notes.clone();
+    let n = Rc::clone(&notes);
     cx.update(|cx| cx.observe(&hub, move |_, _| n.set(n.get() + 1)).detach());
 
     for fetched in 1..=500 {

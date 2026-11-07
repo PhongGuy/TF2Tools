@@ -29,14 +29,15 @@ impl Tints {
     ) -> Option<Arc<RenderImage>> {
         let found = (self.made.iter()).find(|(s, c, _)| Arc::ptr_eq(s, source) && *c == colour);
         if let Some((_, _, tinted)) = found {
-            return Some(tinted.clone());
+            return Some(Arc::clone(tinted));
         }
         let tinted = tinted(source, colour)?;
         if self.made.len() >= KEEP {
             let (_, _, old) = self.made.remove(0);
             self.stale.push(old);
         }
-        self.made.push((source.clone(), colour, tinted.clone()));
+        self.made
+            .push((Arc::clone(source), colour, Arc::clone(&tinted)));
         Some(tinted)
     }
 
@@ -55,9 +56,9 @@ pub(super) fn drawn(
     vision: Vision,
 ) -> Arc<RenderImage> {
     let Some(colour) = colour else {
-        return image.clone();
+        return Arc::clone(image);
     };
-    (tints.borrow_mut().get(image, vision.simulate(colour))).unwrap_or_else(|| image.clone())
+    (tints.borrow_mut().get(image, vision.simulate(colour))).unwrap_or_else(|| Arc::clone(image))
 }
 
 // A BGRA texture's first frame multiplied by `colour`, rebuilt as a new texture.

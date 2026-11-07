@@ -521,7 +521,7 @@ fn deleting_the_active_profile_clears_the_active_card(cx: &mut TestAppContext) {
 /// Counts `LibraryChanged` from now on; keep the subscription alive.
 fn count_changes(cx: &mut TestAppContext) -> (Rc<Cell<usize>>, gpui_kit::Subscription) {
     let count = Rc::new(Cell::new(0));
-    let seen = count.clone();
+    let seen = Rc::clone(&count);
     let sub = cx.update(|cx| {
         let events = LibraryEvents::global(cx);
         cx.subscribe(&events, move |_, _: &LibraryChanged, _| {
@@ -638,7 +638,7 @@ fn the_tf2_probe_runs_off_the_ui_thread(cx: &mut TestAppContext) {
     let comp = full_profile(&s, &env, "Comp");
     let _page = open_profiles(cx, &s);
     let calls = Arc::new(Mutex::new(Vec::<bool>::new()));
-    let (log, executor) = (calls.clone(), cx.executor());
+    let (log, executor) = (Arc::clone(&calls), cx.executor());
     cx.update(|cx| {
         Tf2Probe::install(cx, move || {
             log.lock().unwrap().push(executor.is_main_thread());

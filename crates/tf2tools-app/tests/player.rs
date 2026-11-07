@@ -22,7 +22,7 @@ fn host(cx: &mut TestAppContext, volume: u8) -> Host {
     let env = support::env();
     support::init(cx);
     let audio = Arc::new(RecordingAudio::new());
-    let services = support::services_with_audio(&env, audio.clone());
+    let services = support::services_with_audio(&env, Arc::clone(&audio));
     services
         .db
         .set_volume(Volume::new(volume).unwrap())

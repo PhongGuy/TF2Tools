@@ -20,7 +20,7 @@ fn the_first_uncaught_panic_keeps_the_crash_file() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("crash");
     let calls = Arc::new(AtomicUsize::new(0));
-    let seen = calls.clone();
+    let seen = Arc::clone(&calls);
     drop(std::panic::take_hook());
     std::panic::set_hook(Box::new(move |info| {
         seen.fetch_add(1, Ordering::SeqCst);

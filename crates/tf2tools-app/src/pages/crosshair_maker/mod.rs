@@ -1385,7 +1385,7 @@ impl CrosshairMakerPage {
         let theme = cx.theme();
         let (light, dark, muted_fg) = (theme.muted, theme.background, theme.muted_foreground);
 
-        let (free, view_origin) = (self.free.clone(), self.view_origin.clone());
+        let (free, view_origin) = (Rc::clone(&self.free), Rc::clone(&self.view_origin));
         let watch = canvas(
             move |bounds, window, _| {
                 view_origin.set(bounds.origin);

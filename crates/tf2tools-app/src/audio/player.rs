@@ -49,7 +49,7 @@ impl Player {
     /// already knows it (`is_ready` after).
     /// Releasing the entity stops its sound, if it holds one.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let audio = cx.global::<Services>().audio.clone();
+        let audio = Arc::clone(&cx.global::<Services>().audio);
         let shared = shared_volume(cx);
         let percent = f32::from(shared.read(cx).get().get());
         let volume = cx.new(|_| {

@@ -3,6 +3,8 @@
 //! Transparent viewmodels addon, which applies to every HUD and is never stored in one. A copy
 //! also lists its own options under "<HUD>'s options"; a selected part shows the ones it reads.
 
+use std::sync::Arc;
+
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::color_picker::ColorPicker;
@@ -645,7 +647,7 @@ impl HudMakerPage {
     // A copy's own options under "<HUD>'s options": the misfit line, then per group in spec
     // order its name and Reset over its rows. `None` for a HUD with none to show.
     fn hud_option_section(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let options = self.editor()?.hud_options()?.clone();
+        let options = Arc::clone(self.editor()?.hud_options()?);
         let misfits = options.misfits();
         if options.specs().is_empty() && misfits == 0 {
             return None;
@@ -732,7 +734,7 @@ impl HudMakerPage {
     /// change it; `None` when none do.
     pub(super) fn part_hud_options(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let editor = self.editor()?;
-        let options = editor.hud_options()?.clone();
+        let options = Arc::clone(editor.hud_options()?);
         let part = editor.selected()?.clone();
         let specs = options.for_part(editor.model(), &part);
         if specs.is_empty() {

@@ -85,7 +85,7 @@ impl HudMakerPage {
     /// The simulated screenshot for the read `id` under a colour-blind view.
     pub(super) fn seen_backdrop(&self, id: u64) -> Option<Arc<RenderImage>> {
         let (made_for, image) = self.seen()?.backdrop.as_ref()?;
-        (*made_for == id).then(|| image.clone())
+        (*made_for == id).then(|| Arc::clone(image))
     }
 
     // The current view's set, else the latest to land, for the current HUD load.
@@ -185,7 +185,7 @@ impl HudMakerPage {
         let missing: Images = (loaded.menu_backgrounds.iter().flatten())
             .map(PartKey::new)
             .filter(|key| !set.images.contains_key(key))
-            .filter_map(|key| Some((key.clone(), loaded.images.get(&key)?.clone())))
+            .filter_map(|key| Some((key.clone(), Arc::clone(loaded.images.get(&key)?))))
             .collect();
         if missing.is_empty() || view.menu_running.contains(&vision) {
             return;

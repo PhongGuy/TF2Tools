@@ -572,7 +572,7 @@ fn an_added_font_file_saves_with_the_hud(cx: &mut TestAppContext) {
     let bytes = support::fonts::sfnt_bytes(&[(1, "Big Numbers")]);
     let path = font_file(&env, "Big Numbers.ttf", &bytes);
     let picker = Arc::new(ScriptedPicker::new([path]));
-    let s = shell(cx, &env, picker.clone());
+    let s = shell(cx, &env, Arc::clone(&picker));
     let page = open_maker(cx, &s);
     click_row(cx, &s, HV);
     click_in_panel(cx, &s, ids::hud_maker_font_add("font"));

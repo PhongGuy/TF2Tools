@@ -267,7 +267,7 @@ impl Updater {
             return false;
         };
         let offer = offer.clone();
-        let apply = backend.apply.clone();
+        let apply = Arc::clone(&backend.apply);
         let services = cx.try_global::<Services>().cloned();
         let version = offer.version.clone();
         if !tokio_bridge::is_running(cx) {
@@ -397,7 +397,7 @@ impl Updater {
             // The hook normally quits the app. gpui only logs when it cannot spawn its relaunch
             // helper, so an app still running after the grace asks the player to reopen it.
             Ok(after) => {
-                (self.restart.clone())(after, cx);
+                Rc::clone(&self.restart)(after, cx);
                 let grace = self.restart_grace;
                 self.task = Some(cx.spawn(async move |this, cx| {
                     cx.background_executor().timer(grace).await;
@@ -486,7 +486,7 @@ mod tests {
     #[gpui_kit::test]
     fn a_check_is_ignored_while_an_update_is_staged_or_busy(cx: &mut TestAppContext) {
         let checks = Arc::new(AtomicUsize::new(0));
-        let counted = checks.clone();
+        let counted = Arc::clone(&checks);
         let backend = UpdateBackend {
             check: Arc::new(move || -> CheckFuture {
                 counted.fetch_add(1, Ordering::SeqCst);

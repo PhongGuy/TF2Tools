@@ -31,7 +31,7 @@ fn fake(
     let asked = Arc::new(Mutex::new(Vec::new()));
     let map: Arc<HashMap<String, Result<Vec<u8>, FetchFailure>>> =
         Arc::new(served.into_iter().map(|(u, r)| (u.to_owned(), r)).collect());
-    let log = asked.clone();
+    let log = Arc::clone(&asked);
     let fetch: ImageFetch = Arc::new(move |url: String| {
         log.lock().unwrap().push(url.clone());
         let result = map
@@ -244,9 +244,9 @@ impl Drop for DropFlag {
 fn dropping_the_cache_cancels_its_fetches(cx: &mut TestAppContext) {
     let started = Arc::new(AtomicBool::new(false));
     let dropped = Arc::new(AtomicBool::new(false));
-    let (on_start, on_drop) = (started.clone(), dropped.clone());
+    let (on_start, on_drop) = (Arc::clone(&started), Arc::clone(&dropped));
     let fetch: ImageFetch = Arc::new(move |_url: String| {
-        let (on_start, guard) = (on_start.clone(), DropFlag(on_drop.clone()));
+        let (on_start, guard) = (Arc::clone(&on_start), DropFlag(Arc::clone(&on_drop)));
         Box::pin(async move {
             let _guard = guard;
             on_start.store(true, Ordering::SeqCst);

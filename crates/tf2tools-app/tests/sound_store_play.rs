@@ -168,7 +168,7 @@ fn a_volume_change_does_not_redraw_the_cards(cx: &mut TestAppContext) {
     });
     let grid = cx.update(|cx| w.page.read(cx).grid().clone());
     let redraws = Rc::new(Cell::new(0));
-    let seen = redraws.clone();
+    let seen = Rc::clone(&redraws);
     let _sub = cx.update(|cx| cx.observe(&grid, move |_, _| seen.set(seen.get() + 1)));
     let slider = cx.update(|cx| w.page.read(cx).player().read(cx).volume().clone());
     for value in [30., 40., 50.] {

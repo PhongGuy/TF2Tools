@@ -62,7 +62,7 @@ fn fonts_dir(env: &support::Env) -> PathBuf {
 
 fn with_host(env: &support::Env, host: FakeFontHost) -> (Services, Arc<FakeFontHost>) {
     let host = Arc::new(host);
-    let dyn_host: Arc<dyn FontHost> = host.clone();
+    let dyn_host: Arc<dyn FontHost> = Arc::<FakeFontHost>::clone(&host);
     let services = support::services(env, support::no_steam()).with_font_host(Some(dyn_host));
     (services, host)
 }

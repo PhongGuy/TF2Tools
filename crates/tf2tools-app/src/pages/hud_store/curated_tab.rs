@@ -499,9 +499,9 @@ impl CuratedTab {
             ));
         }
         let (huds, shown, downloaded) = (
-            self.huds.clone(),
-            self.shown.clone(),
-            self.downloaded.clone(),
+            Rc::clone(&self.huds),
+            Rc::clone(&self.shown),
+            Rc::clone(&self.downloaded),
         );
         Some(
             self.grid
@@ -569,7 +569,7 @@ fn curated_card(hud: &CuratedHud, downloaded: bool, cx: &App) -> AnyElement {
         open_detail(item.clone(), curated_body(), window, cx);
     });
     let button = {
-        let open = open.clone();
+        let open = Rc::clone(&open);
         download_button(
             KIND,
             &id,

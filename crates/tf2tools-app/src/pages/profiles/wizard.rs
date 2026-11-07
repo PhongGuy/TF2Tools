@@ -371,7 +371,7 @@ impl ProfileWizard {
         self.sounds = loaded.sounds.into();
         self.live = loaded.live.into();
         self.crosshairs = loaded.crosshairs.into();
-        let library = self.crosshairs.clone();
+        let library = Rc::clone(&self.crosshairs);
         self.picker
             .update(cx, |picker, cx| picker.set_library(library, cx));
         self.relabel(cx);

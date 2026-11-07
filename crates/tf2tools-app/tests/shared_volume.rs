@@ -114,7 +114,7 @@ fn player_window(
 ) {
     support::init(cx);
     let audio = Arc::new(RecordingAudio::new());
-    let services = support::services_with_audio(env, audio.clone());
+    let services = support::services_with_audio(env, Arc::clone(&audio));
     services
         .db
         .set_volume(Volume::new(volume).unwrap())

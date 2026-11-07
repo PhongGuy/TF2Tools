@@ -128,10 +128,12 @@ pub fn core_backend(
 
     // The timeout is built inside each future, since the closures run outside any runtime.
     let check = {
-        let (client, target, offer) = (client.clone(), target.clone(), offer.clone());
+        let (client, target, offer) =
+            (Arc::clone(&client), Arc::clone(&target), Arc::clone(&offer));
         Arc::new(move || -> CheckFuture {
-            let (client, target, offer) = (client.clone(), target.clone(), offer.clone());
-            let current = current.clone();
+            let (client, target, offer) =
+                (Arc::clone(&client), Arc::clone(&target), Arc::clone(&offer));
+            let current = Arc::clone(&current);
             Box::pin(async move {
                 let found =
                     match tokio::time::timeout(deadlines.check, client.check(&current, &target))
@@ -160,9 +162,13 @@ pub fn core_backend(
 
     // A timed-out download drops core's future, whose part-file guard deletes the part file.
     let download = {
-        let staged = staged.clone();
+        let staged = Arc::clone(&staged);
         Arc::new(move |sink: DownloadSink| -> DownloadFuture {
-            let (client, target, staged) = (client.clone(), target.clone(), staged.clone());
+            let (client, target, staged) = (
+                Arc::clone(&client),
+                Arc::clone(&target),
+                Arc::clone(&staged),
+            );
             let wanted = lock(&offer).clone();
             Box::pin(async move {
                 let Some(wanted) = wanted else {

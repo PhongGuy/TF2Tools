@@ -1484,7 +1484,7 @@ impl Render for CrosshairsPage {
 
         // The main area's width picks the layout; a change asks for another frame, since a
         // refresh requested while drawing is dropped.
-        let measured = self.width.clone();
+        let measured = Rc::clone(&self.width);
         let watch = canvas(
             move |bounds, window, _| {
                 if measured.get() != bounds.size.width {

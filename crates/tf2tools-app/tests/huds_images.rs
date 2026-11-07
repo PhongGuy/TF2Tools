@@ -62,10 +62,10 @@ fn fetch_log() -> (ImageFetch, Arc<Mutex<Vec<String>>>) {
         .unwrap();
     let png = Arc::new(out.into_inner());
     let asked = Arc::new(Mutex::new(Vec::new()));
-    let log = asked.clone();
+    let log = Arc::clone(&asked);
     let fetch: ImageFetch = Arc::new(move |url: String| {
         log.lock().unwrap().push(url);
-        let png = png.clone();
+        let png = Arc::clone(&png);
         Box::pin(async move { Ok(png.to_vec()) })
     });
     (fetch, asked)

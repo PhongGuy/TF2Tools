@@ -23,7 +23,7 @@ fn pending_with_flag(
     gpui_kit::Task<Result<(), tokio_bridge::JoinError>>,
 ) {
     let dropped = Arc::new(AtomicBool::new(false));
-    let guard = SetOnDrop(dropped.clone());
+    let guard = SetOnDrop(Arc::clone(&dropped));
     let task = cx.update(|cx| {
         tokio_bridge::spawn(cx, async move {
             let _guard = guard;
@@ -47,7 +47,7 @@ fn spawn_runs_on_the_multi_thread_runtime_and_resolves_on_the_foreground(cx: &mu
         })
     });
     let out = Arc::new(Mutex::new(None));
-    let slot = out.clone();
+    let slot = Arc::clone(&out);
     cx.update(|cx| {
         cx.spawn(async move |_| {
             *slot.lock().unwrap() = Some(task.await);

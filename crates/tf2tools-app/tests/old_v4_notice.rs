@@ -27,7 +27,7 @@ type Calls = Arc<Mutex<Vec<(PathBuf, Vec<String>)>>>;
 
 fn recording_runner() -> (UninstallRunner, Calls) {
     let calls: Calls = Arc::default();
-    let seen = calls.clone();
+    let seen = Arc::clone(&calls);
     let runner: UninstallRunner = Arc::new(move |exe: &Path, args: &[String]| {
         seen.lock()
             .unwrap()

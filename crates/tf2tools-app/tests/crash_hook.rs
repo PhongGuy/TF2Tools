@@ -19,7 +19,7 @@ fn the_hook_records_uncaught_panics_and_chains_to_the_previous_one() {
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("crash");
     let calls = Arc::new(AtomicUsize::new(0));
-    let seen = calls.clone();
+    let seen = Arc::clone(&calls);
     // A counting hook stands in for std's default one; the harness shows what it prints only
     // when the test fails, which keeps a failed assert readable.
     drop(std::panic::take_hook());

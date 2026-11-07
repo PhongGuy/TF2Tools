@@ -300,7 +300,7 @@ fn progress_ticks_do_not_redraw_settings(cx: &mut TestAppContext) {
     let run = runs.try_recv().unwrap();
     support::next_repaint(cx);
     let redraws = Rc::new(Cell::new(0));
-    let seen = redraws.clone();
+    let seen = Rc::clone(&redraws);
     let _sub = cx.update(|cx| cx.observe(&page, move |_, _| seen.set(seen.get() + 1)));
     for n in 1..=5 {
         run.report(n * 100, 1000);

@@ -102,7 +102,7 @@ impl CrosshairPreviews {
             return Preview::Ready(png.into());
         }
         match self.decoded.get(crosshair) {
-            Some(Some(image)) => Preview::Ready(image.clone().into()),
+            Some(Some(image)) => Preview::Ready(Arc::clone(image).into()),
             Some(None) => Preview::Missing,
             None => Preview::Pending,
         }
@@ -151,7 +151,7 @@ impl CrosshairPreviews {
         let batch: Vec<CrosshairRef> = self.queue.drain(..n).collect();
         self.decodes += batch.len();
         let sent = batch.clone();
-        let decoder = self.decoder.clone();
+        let decoder = Arc::clone(&self.decoder);
         let decoding = run_blocking(cx, move |s| {
             Ok(batch
                 .into_iter()

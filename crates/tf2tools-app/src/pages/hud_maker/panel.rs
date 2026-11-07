@@ -1,6 +1,8 @@
 //! The HUD Maker's floating panels: the side panel with the selection's rows and the parts
 //! panel with the part list, each a title bar that drags, docks and collapses it over its body.
 
+use std::rc::Rc;
+
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::color_picker::ColorPicker;
@@ -318,8 +320,8 @@ impl HudMakerPage {
     pub(super) fn panel(&mut self, panel: Panel, cx: &mut Context<Self>) -> AnyElement {
         let place = self.panel_shown(panel);
         let state = &self.panels[panel as usize];
-        let measured = state.bounds.clone();
-        let open_size = state.open_size.clone();
+        let measured = Rc::clone(&state.bounds);
+        let open_size = Rc::clone(&state.open_size);
         let open = !place.collapsed;
         let page = cx.entity().downgrade();
         let dragging = state.drag.is_some();
@@ -491,7 +493,7 @@ impl HudMakerPage {
             (IconName::ChevronUp, "Collapse")
         };
         // The bar measures its own height, so a panel can fold to it before it was ever collapsed.
-        let height = self.panels[panel as usize].title_height.clone();
+        let height = Rc::clone(&self.panels[panel as usize].title_height);
         let watch = canvas(
             move |inner, window, _| {
                 if height.get() != inner.size.height {
@@ -1597,8 +1599,8 @@ impl HudMakerPage {
                 .tooltip(tip_beside_row(
                     ids::HUD_MAKER_ALIGN_TIP,
                     ALIGN_WORDS[i],
-                    spot.clone(),
-                    row.clone(),
+                    Rc::clone(&spot),
+                    Rc::clone(row),
                 ))
                 .relative()
                 .child(button)

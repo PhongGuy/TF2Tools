@@ -55,9 +55,9 @@ pub fn fake_source(available: bool) -> (UpdateSource, Restart, FakeUpdates) {
     let apply_result = Arc::new(Mutex::new(Ok(AfterInstall::Relaunch(PathBuf::from(
         APPIMAGE,
     )))));
-    let applied = apply_result.clone();
+    let applied = Arc::clone(&apply_result);
     let apply_hold = Arc::new(Mutex::new(()));
-    let hold = apply_hold.clone();
+    let hold = Arc::clone(&apply_hold);
     let backend = UpdateBackend {
         check: Arc::new(move || -> CheckFuture {
             let (tx, rx) = oneshot::channel();
@@ -81,7 +81,7 @@ pub fn fake_source(available: bool) -> (UpdateSource, Restart, FakeUpdates) {
         }),
     };
     let restarts = Rc::new(RefCell::new(Vec::new()));
-    let seen = restarts.clone();
+    let seen = Rc::clone(&restarts);
     let restart: Restart =
         Rc::new(move |after: AfterInstall, _: &mut App| seen.borrow_mut().push(after));
     let source = UpdateSource {
@@ -201,7 +201,7 @@ pub fn visible(cx: &mut TestAppContext, u: &Entity<Updater>) -> bool {
 /// Every event the updater emits from now on.
 pub fn events(cx: &mut TestAppContext, u: &Entity<Updater>) -> Rc<RefCell<Vec<UpdateEvent>>> {
     let seen = Rc::new(RefCell::new(Vec::new()));
-    let sink = seen.clone();
+    let sink = Rc::clone(&seen);
     cx.update(|cx| {
         cx.subscribe(u, move |_, ev: &UpdateEvent, _| {
             sink.borrow_mut().push(ev.clone())

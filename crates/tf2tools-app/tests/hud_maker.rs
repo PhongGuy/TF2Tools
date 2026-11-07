@@ -1479,7 +1479,7 @@ fn escape_without_a_drag_goes_on_to_whatever_else_wants_it(cx: &mut TestAppConte
     let s = stock_shell(cx, &env);
     let _page = open_maker(cx, &s);
     let count = Rc::new(Cell::new(0));
-    let seen = count.clone();
+    let seen = Rc::clone(&count);
     cx.update(|cx| {
         cx.on_action(move |_: &CancelHudDrag, _| seen.set(seen.get() + 1));
     });

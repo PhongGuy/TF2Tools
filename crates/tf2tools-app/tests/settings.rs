@@ -160,7 +160,7 @@ fn browse_fills_the_path_without_saving(cx: &mut TestAppContext) {
         cx,
         &env,
         Tf2State::Missing { saved: None },
-        picker.clone(),
+        Arc::clone(&picker),
         support::no_steam(),
     );
     let page = open_settings(cx, &s);
