@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
-use tf2tools_app::crosshair_sync::{CrosshairSync, SyncStatus};
+use tf2tools_app::crosshair_sync::CrosshairSync;
 use tf2tools_app::ids;
 use tf2tools_app::loadout::BoardTarget;
 use tf2tools_app::pages::crosshairs::CrosshairsPage;
@@ -284,6 +284,7 @@ fn skipped_weapons_show_in_the_line(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn a_failed_apply_toasts_once(cx: &mut TestAppContext) {
     use std::os::unix::fs::PermissionsExt as _;
+    use tf2tools_app::crosshair_sync::SyncStatus;
     let env = support::env();
     let s = window(cx, &env, found(&env));
     let _page = open(cx, &s);
