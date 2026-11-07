@@ -6,8 +6,8 @@ mod common;
 use std::{fs, os::unix::fs::PermissionsExt};
 
 use common::{
-    LibraryEnv, builtin_catalog, import_hud_as, import_png_as, import_wav_as, library_env,
-    set_setting, setting, sql, tree, write_file,
+    LibraryEnv, builtin_catalog, crosshair_env, import_hud_as, import_png_as, import_wav_as,
+    library_env, set_setting, setting, sql, tree, write_file,
 };
 use tf2tools_core::{
     ApplyProfileError, ApplyStep, CrosshairRef, DraftCrosshair, DraftSlot, HudId, MissingKind,
@@ -31,7 +31,7 @@ fn builtin(weapon_script: &str, name: &str) -> DraftCrosshair {
 
 /// A profile with a HUD, both sounds (WAV), a builtin and a library crosshair.
 fn full_profile() -> (LibraryEnv, Profile) {
-    let env = library_env();
+    let env = crosshair_env();
     let hud = import_hud_as(&env, "rayshud", Provenance::Local);
     let hit = import_wav_as(&env, "Ding", Provenance::Local);
     let kill = import_wav_as(&env, "Bell", Provenance::Local);

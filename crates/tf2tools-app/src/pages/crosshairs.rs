@@ -861,6 +861,7 @@ fn install_outcome(report: &ApplyReport) -> Outcome {
                 SkipReason::UnknownBuiltin => "unknown builtin",
                 SkipReason::MissingLibraryCrosshair => "missing crosshair",
                 SkipReason::InvalidWeaponScript => "invalid weapon script",
+                SkipReason::NoStockScript => "game script unreadable",
                 _ => "skipped",
             };
             format!("{} ({reason} {})", skip.weapon_script(), skip.reference())

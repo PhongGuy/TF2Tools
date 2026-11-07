@@ -250,6 +250,33 @@ pub fn vpk_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
     out
 }
 
+/// A stock weapon script as TF2 ships it in `tf2_misc_dir.vpk`: plain and ICE-encrypted.
+pub const STOCK_WEAPON_TXT: &[u8] = include_bytes!("../fixtures/crosshair/stock_weapon.txt");
+pub const STOCK_WEAPON_CTX: &[u8] = include_bytes!("../fixtures/crosshair/stock_weapon.ctx");
+
+/// Writes `tf/tf2_misc_dir.vpk` holding the encrypted stock script as `scripts/<name>.ctx` for
+/// each of `names`, replacing any earlier one.
+pub fn write_stock_scripts(tf2: &Tf2Install, names: &[&str]) {
+    let paths: Vec<String> = names.iter().map(|n| format!("scripts/{n}.ctx")).collect();
+    let entries: Vec<(&str, &[u8])> = paths
+        .iter()
+        .map(|p| (p.as_str(), STOCK_WEAPON_CTX))
+        .collect();
+    write_file(&tf2.tf_dir().join("tf2_misc_dir.vpk"), &vpk_bytes(&entries));
+}
+
+/// `STOCK_WEAPON_TXT` with its crosshair block pointed at `texture`, as apply writes it.
+pub fn patched_stock_script(texture: &str) -> String {
+    let stock = std::str::from_utf8(STOCK_WEAPON_TXT).unwrap();
+    let start = stock.find("\"crosshair\"\r\n\t\t{").unwrap() + "\"crosshair\"\r\n\t\t".len();
+    let end = stock[start..].find('}').unwrap() + start + 1;
+    format!(
+        "{}{{\n\t\t\t\"file\"\t\t\"vgui/replay/thumbnails/{texture}\"\n\t\t\t\"x\"\t\t\"0\"\n\t\t\t\"y\"\t\t\"0\"\n\t\t\t\"width\"\t\t\"64\"\n\t\t\t\"height\"\t\"64\"\n\t\t}}{}",
+        &stock[..start],
+        &stock[end..]
+    )
+}
+
 const GAMEINFO_ONE_VPK: &str =
     r#""GameInfo" { FileSystem { SearchPaths { game+mod+vgui tf/tf2_misc.vpk } } }"#;
 
@@ -344,6 +371,18 @@ pub fn library_env() -> LibraryEnv {
     let tf2 = Tf2Install::from_path(&game).expect("tf2 install");
     let lib = Library::new(db, dir.clone());
     LibraryEnv { tmp, dir, lib, tf2 }
+}
+
+/// `library_env` whose `tf/tf2_misc_dir.vpk` holds a stock script for every assignable weapon,
+/// so crosshair applies can patch full scripts.
+pub fn crosshair_env() -> LibraryEnv {
+    let env = library_env();
+    let names: Vec<&str> = tf2tools_core::weapons()
+        .iter()
+        .map(|w| w.script_name())
+        .collect();
+    write_stock_scripts(&env.tf2, &names);
+    env
 }
 
 /// A plain connection to the library database, for seeding store rows and reading columns.

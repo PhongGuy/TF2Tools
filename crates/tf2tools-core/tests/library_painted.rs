@@ -6,7 +6,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use common::{LibraryEnv, builtin_catalog, import_png_as, library_env, sql, tree};
+use common::{LibraryEnv, builtin_catalog, crosshair_env, import_png_as, library_env, sql, tree};
 use tf2tools_core::{
     CrosshairEntry, CrosshairFormat, CrosshairId, CrosshairRef, LibraryError, LibraryKind,
     PaintError, PaintTarget, Provenance, RgbaImage, decode_vtf, rgba_to_vtf,
@@ -247,7 +247,7 @@ fn an_unwritable_library_is_an_io_error_with_no_row() {
 
 #[test]
 fn apply_installs_a_painted_crosshair_like_any_other() {
-    let env = library_env();
+    let env = crosshair_env();
     let entry = save_new(&env, "Painted", &drawing(32));
     env.lib
         .assign(

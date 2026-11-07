@@ -337,7 +337,8 @@ pub fn blank_window(cx: &mut TestAppContext) -> AnyWindowHandle {
         .0
 }
 
-/// A temp data dir (not yet created) and a fake TF2 game dir with `tf/custom`.
+/// A temp data dir (not yet created) and a fake TF2 game dir with `tf/custom` and a
+/// `tf/tf2_misc_dir.vpk` holding a stock script for every assignable weapon.
 pub struct Env {
     pub tmp: tempfile::TempDir,
     pub data: DataDir,
@@ -349,7 +350,23 @@ pub fn env() -> Env {
     let data = DataDir::at(tmp.path().join("com.tf2tools.app"));
     let game = tmp.path().join("Team Fortress 2");
     std::fs::create_dir_all(game.join("tf/custom")).unwrap();
+    let entries = weapon_script_entries();
+    let entries: Vec<(&str, &[u8])> = entries.iter().map(|(p, b)| (p.as_str(), *b)).collect();
+    std::fs::write(game.join("tf/tf2_misc_dir.vpk"), vpk_bytes(&entries)).unwrap();
     Env { tmp, data, game }
+}
+
+/// The ICE-encrypted stock weapon script core's crosshair tests use.
+const STOCK_WEAPON_CTX: &[u8] =
+    include_bytes!("../../../tf2tools-core/tests/fixtures/crosshair/stock_weapon.ctx");
+
+/// `scripts/<weapon>.ctx` entries for every assignable weapon, so crosshair applies can patch
+/// a full script.
+fn weapon_script_entries() -> Vec<(String, &'static [u8])> {
+    tf2tools_core::weapons()
+        .iter()
+        .map(|w| (format!("scripts/{}.ctx", w.script_name()), STOCK_WEAPON_CTX))
+        .collect()
 }
 
 pub fn repo_asset_root() -> AssetRoot {
@@ -1114,7 +1131,7 @@ pub fn stock_model() -> tf2tools_core::HudModel {
 }
 
 /// Writes `tf/gameinfo.txt` naming `tf/tf2_misc.vpk` and a `tf/tf2_misc_dir.vpk` holding the
-/// stock files, with each `(path, Some(text))` replaced or added and each `(path, None)` removed.
+/// stock files and weapon scripts, with each `(path, Some(text))` replaced or added and each `(path, None)` removed.
 pub fn seed_stock_game_with(game: &std::path::Path, overrides: &[(&str, Option<&str>)]) {
     seed_stock_game_with_bytes(game, overrides, &[]);
 }
@@ -1137,6 +1154,8 @@ pub fn seed_stock_game_with_bytes(
         .map(|(p, t)| (p.as_str(), t.as_bytes()))
         .collect();
     entries.extend_from_slice(extra);
+    let scripts = weapon_script_entries();
+    entries.extend(scripts.iter().map(|(p, b)| (p.as_str(), *b)));
     let tf = game.join("tf");
     std::fs::create_dir_all(&tf).unwrap();
     std::fs::write(

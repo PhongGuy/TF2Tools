@@ -18,6 +18,7 @@ mod disk;
 mod error;
 mod fonts;
 mod hud_maker;
+mod ice;
 mod library;
 mod old_v4;
 mod pak;

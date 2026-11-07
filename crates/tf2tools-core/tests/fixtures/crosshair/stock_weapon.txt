@@ -1,0 +1,27 @@
+WeaponData
+{
+	// A stock-shaped script: "crosshair" { in a comment }
+	"printname"	"#TF_Weapon_Scattergun"
+	"Damage"		"6"
+	"TimeFireDelay"	"0.625"
+	"clip_size"	"6"
+	TextureData
+	{
+		"ammo"
+		{
+				"file"		"sprites/a_icons1"
+		}
+		"crosshair"
+		{
+				"file"		"sprites/crosshairs"
+				"x"		"0"
+				"y"		"0"
+				"width"		"32"
+				"height"	"32"
+		}
+		"autoaim"
+		{
+				"file"		"sprites/crosshairs"
+		}
+	}
+}
