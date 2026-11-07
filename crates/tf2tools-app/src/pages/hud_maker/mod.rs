@@ -562,6 +562,9 @@ pub struct HudMakerPage {
     // One slider per Number option the loaded HUD offers, rebuilt with their subscriptions
     // when a HUD lands.
     sliders: HashMap<&'static str, Entity<SliderState>>,
+    // One menu per built-in Choice option with too many choices for buttons, such as the HUD
+    // crosshair's symbol.
+    option_selects: HashMap<&'static str, Entity<SelectState<Vec<options::ChoiceRow>>>>,
     // The running switch reload, keyed by the HUD choices it builds for; dropping it cancels
     // it. Also the choices whose reload failed, so it is not retried every frame, and the
     // counts of reloads started and landed, for the tests.
@@ -586,6 +589,9 @@ pub struct HudMakerPage {
     // read or toggle land.
     viewmodels: options::Viewmodels,
     viewmodels_reads: u64,
+    // Whether the Crosshairs page gives any weapon a crosshair, as last read, so the HUD
+    // crosshair can warn about seeing two.
+    weapon_crosshairs: bool,
     // The saved presets as last read, the name field Save as preset reads, and a count that
     // lets only the latest preset job's list land.
     presets: Vec<tf2tools_core::PresetEntry>,
@@ -800,7 +806,8 @@ impl HudMakerPage {
         // An addon fetched or removed elsewhere changes what the viewmodels row offers.
         let events = LibraryEvents::global(cx);
         subscriptions.push(cx.subscribe(&events, |page, _, _: &LibraryChanged, cx| {
-            page.read_viewmodels(cx)
+            page.read_viewmodels(cx);
+            page.read_weapon_crosshairs(cx);
         }));
         let situation_menu = situation::SituationMenu::new(window, cx);
         let timeline = timeline::Timeline::new(window, cx);
@@ -880,6 +887,7 @@ impl HudMakerPage {
             picks: 0,
             menu_reads: 0,
             sliders: HashMap::new(),
+            option_selects: HashMap::new(),
             switch_job: None,
             hud_sliders: HashMap::new(),
             hud_selects: HashMap::new(),
@@ -893,6 +901,7 @@ impl HudMakerPage {
             option_colour_open: false,
             viewmodels: options::Viewmodels::Absent,
             viewmodels_reads: 0,
+            weapon_crosshairs: false,
             presets: Vec::new(),
             preset_name,
             preset_reads: 0,
@@ -1154,6 +1163,7 @@ impl HudMakerPage {
                 // A reopened HUD's own pictures, such as borrowed ones, are only in its edits.
                 self.decode_shown_images(cx);
                 self.read_viewmodels(cx);
+                self.read_weapon_crosshairs(cx);
                 self.read_presets(cx);
                 opened.notice.map(Ok)
             }
@@ -1178,13 +1188,37 @@ impl HudMakerPage {
     // option and the release keeps it as one undo step.
     fn build_sliders(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.sliders.clear();
+        self.option_selects.clear();
         self._slider_subscriptions.clear();
         let specs = self.editor().map(HudEditor::options).unwrap_or_default();
         for spec in specs {
+            let id = spec.id();
+            if let OptionKind::Choice(choices) = spec.kind()
+                && choices.len() > options::MAX_CHOICE_BUTTONS
+            {
+                let rows: Vec<_> = (choices.iter())
+                    .map(|c| options::ChoiceRow::of(id, c))
+                    .collect();
+                let state = cx.new(|cx| SelectState::new(rows, None, window, cx));
+                self._slider_subscriptions.push(cx.subscribe_in(
+                    &state,
+                    window,
+                    move |page, _, ev: &SelectEvent<Vec<options::ChoiceRow>>, window, cx| {
+                        let SelectEvent::Confirm(Some(key)) = ev else {
+                            return;
+                        };
+                        let value = OptionValue::Pick(key.to_string());
+                        page.edit_selected(window, cx, |e| {
+                            let _ = e.set_option(id, value);
+                        });
+                    },
+                ));
+                self.option_selects.insert(id, state);
+                continue;
+            }
             let OptionKind::Number { min, max, step } = *spec.kind() else {
                 continue;
             };
-            let id = spec.id();
             let state = cx.new(|_| {
                 SliderState::new()
                     .min(min as f32)
@@ -1288,6 +1322,11 @@ impl HudMakerPage {
         self.hud_texts.get(id).cloned()
     }
 
+    /// The menu of built-in Choice option `id` when it has too many choices for buttons.
+    fn option_select(&self, id: &str) -> Option<Entity<SelectState<Vec<options::ChoiceRow>>>> {
+        self.option_selects.get(id).cloned()
+    }
+
     /// The menu of the copy's own Choice option `id` when it has too many choices for buttons.
     fn hud_select(&self, id: &str) -> Option<Entity<SelectState<Vec<options::ChoiceRow>>>> {
         self.hud_selects.get(id).cloned()
@@ -1317,6 +1356,14 @@ impl HudMakerPage {
                 let at = v as f32;
                 if slider.read(cx).value() != at.into() {
                     slider.update(cx, |s, cx| s.set_value(at, window, cx));
+                }
+            }
+        }
+        for (id, select) in &self.option_selects {
+            if let Some(OptionValue::Pick(key)) = editor.shown_option_value(id) {
+                let key = gpui_kit::SharedString::from(key);
+                if select.read(cx).selected_value() != Some(&key) {
+                    select.update(cx, |s, cx| s.set_selected_value(&key, window, cx));
                 }
             }
         }

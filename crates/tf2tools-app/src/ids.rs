@@ -215,6 +215,12 @@ pub const HUD_MAKER_CANVAS_AREA: &str = "hud-maker-canvas-area";
 pub const HUD_MAKER_CANVAS: &str = "hud-maker-canvas";
 /// The crosshair marker at the middle of the screen.
 pub const HUD_MAKER_CROSSHAIR: &str = "hud-maker-crosshair";
+/// The HUD's own on-screen crosshair label, drawn on the canvas while the HUD shows it.
+pub const HUD_MAKER_HUD_CROSSHAIR: &str = "hud-maker-hud-crosshair";
+/// The note that the HUD crosshair is apart from the Crosshairs page.
+pub const HUD_MAKER_HUD_CROSSHAIR_NOTE: &str = "hud-maker-hud-crosshair-note";
+/// The warning that the HUD crosshair and weapon crosshairs both show.
+pub const HUD_MAKER_HUD_CROSSHAIR_WARNING: &str = "hud-maker-hud-crosshair-warning";
 /// The outline over the selected part; present only with a drawn selection.
 pub const HUD_MAKER_SELECTION: &str = "hud-maker-selection";
 /// The box drawn by dragging on empty HUD Maker canvas, which selects the parts inside it.

@@ -9,6 +9,7 @@ use super::changes::{
 };
 use super::document::{KvValueId, writable};
 use super::fonts::{FONT_DIR, KEPT_DIR};
+use super::options::OptionEdit;
 use super::{
     AnimEvent, BoardMode, CodeToggled, EditRefused, HiddenBy, HudAnimations, HudFiles, KvDocument,
     KvEntry, MeterKind, PanelRule, PartId, RankLayout, Scene, SceneRule, Scheme,
@@ -831,11 +832,13 @@ impl HudModel {
             };
             let (mut any, mut missed, mut counted) = (false, 0, false);
             for compiled in &sets {
-                match compiled
-                    .set
-                    .as_ref()
-                    .and_then(|s| apply_set(&mut model.current, &self.bases, s, platform))
-                {
+                let file = compiled.set.as_ref().and_then(|edit| match edit {
+                    OptionEdit::Set(s) => apply_set(&mut model.current, &self.bases, s, platform),
+                    OptionEdit::Add(a) => {
+                        apply_add_block(&mut model.current, &self.bases, a, platform)
+                    }
+                });
+                match file {
                     Some(file) => {
                         any |= compiled.counts;
                         touched.push(file);
