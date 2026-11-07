@@ -19,6 +19,7 @@ unsafe_code = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
+ref_option = "warn"
 
 [workspace.dependencies]
 rusqlite = { version = "0.40", features = ["bundled"] }

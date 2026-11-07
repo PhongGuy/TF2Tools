@@ -271,14 +271,30 @@ impl CrosshairPicker {
                         let crosshair = CrosshairRef::Builtin(b.name().to_owned());
                         let id = ids::crosshair_builtin(b.name());
                         let name = b.display_name().to_owned();
-                        option(id, name, crosshair, &selected, &previews, &picker, cx)
+                        option(
+                            id,
+                            name,
+                            crosshair,
+                            selected.as_ref(),
+                            &previews,
+                            &picker,
+                            cx,
+                        )
                     }
                     Row::Library(i) => {
                         let c = &library[i];
                         let crosshair = CrosshairRef::Library(c.id().clone());
                         let id = ids::crosshair_library(c.folder_name());
                         let name = c.name().to_owned();
-                        option(id, name, crosshair, &selected, &previews, &picker, cx)
+                        option(
+                            id,
+                            name,
+                            crosshair,
+                            selected.as_ref(),
+                            &previews,
+                            &picker,
+                            cx,
+                        )
                     }
                 })
                 .collect()
@@ -455,7 +471,15 @@ impl CrosshairPicker {
                             }
                             _ => unreachable!("the gallery holds no headers"),
                         };
-                        tile_element(id, name, crosshair, &selected, &previews, &picker, cx)
+                        tile_element(
+                            id,
+                            name,
+                            crosshair,
+                            selected.as_ref(),
+                            &previews,
+                            &picker,
+                            cx,
+                        )
                     });
                     h_flex()
                         .id(("crosshair-tile-row", row))
@@ -599,13 +623,13 @@ fn option(
     id: gpui_kit::ElementId,
     name: String,
     crosshair: CrosshairRef,
-    selected: &Option<CrosshairRef>,
+    selected: Option<&CrosshairRef>,
     previews: &Entity<CrosshairPreviews>,
     picker: &WeakEntity<CrosshairPicker>,
     cx: &App,
 ) -> AnyElement {
     let theme = cx.theme();
-    let is_selected = selected.as_ref() == Some(&crosshair);
+    let is_selected = selected == Some(&crosshair);
     let preview = previews.read(cx).preview(&crosshair, cx);
     let (bg, fg) = if is_selected {
         (theme.primary, theme.primary_foreground)
@@ -659,13 +683,13 @@ fn tile_element(
     id: gpui_kit::ElementId,
     name: String,
     crosshair: CrosshairRef,
-    selected: &Option<CrosshairRef>,
+    selected: Option<&CrosshairRef>,
     previews: &Entity<CrosshairPreviews>,
     picker: &WeakEntity<CrosshairPicker>,
     cx: &App,
 ) -> AnyElement {
     let theme = cx.theme();
-    let is_selected = selected.as_ref() == Some(&crosshair);
+    let is_selected = selected == Some(&crosshair);
     let preview = previews.read(cx).preview(&crosshair, cx);
     let image = match &preview {
         Preview::Ready(source) => Some(source.clone()),
