@@ -103,7 +103,7 @@ Any rerun of this loopback test sets `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`
    scripts/check-trailers.sh
    ```
 
-   `scripts/test-deb-prerelease.sh` uses podman or docker when the host has no `dpkg-deb`. `scripts/check-trailers.sh` checks every commit since the previous tag for a `Co-authored-by:` or `Claude-Session:` trailer.
+   `scripts/test-deb-prerelease.sh` uses podman or docker when the host has no `dpkg-deb`. `scripts/check-trailers.sh` checks every commit since the previous tag for AI credit, using the same `.github/scripts/attribution-lib.sh` as the PR attribution check.
 3. **(maintainer)** Push the branch.
 4. **(maintainer)** Tag and push the tag:
 
@@ -131,7 +131,7 @@ Any rerun of this loopback test sets `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`
 - **A bad published release is fixed by a higher version, never by deleting it.** Clients may already hold its manifest.
 - **A run started by hand from a branch is a dry run.** The `draft` job runs only for `refs/tags/v*`, so a `workflow_dispatch` from a branch stops after uploading the `linux-packages` and `windows-installer` workflow artifacts.
 - **The release build has no update test seam.** The `linux` and `windows` jobs set `TF2TOOLS_RELEASE_BUILD`, and the `update-test-key` feature refuses to compile with it set.
-- **The trailer gate covers every commit since the previous tag.** The `gate` job runs `scripts/check-trailers.sh HEAD`, which fails on any `Co-authored-by:` or `Claude-Session:` line (any case) in that range; it must print `trailers OK`.
+- **The trailer gate covers every commit since the previous tag.** The `gate` job runs `scripts/check-trailers.sh HEAD`, which fails on any commit in that range that credits an AI agent (an AI or bot `Co-authored-by:`, a session trailer, a "Generated with" footer, the Anthropic noreply address or the robot emoji); a human `Co-authored-by: Name <email>` passes. It must print `trailers OK`. Every PR also runs `.github/workflows/attribution.yml`, which applies the same library to the PR title, body and commits.
 - **The packages bundle Valve assets.** The bundled crosshair VTFs, VMTs and PNGs and the weapon icons ship in every package, and the weapon scripts are compiled into `crates/tf2tools-core/src/weapons.rs`. Their licensing is the maintainer's call before the repository and its releases go public.
 
 ## The Windows installer
@@ -168,9 +168,11 @@ If the old key is compromised, that wait is not possible: switch to the new key 
 
 ## Writing release notes
 
-The release page is for players, not developers. The fixed text lives in `packaging/release-notes.md`. `scripts/release-notes.sh <tag> packaging/release-notes.md` fills in the version and replaces the `{changes}` line with What's Changed: one bullet per `feat` or `fix` commit since the previous `v*` tag, oldest first, without merges or the `ci`, `release`, `test` and `deps` scopes, then a Full Changelog link to the comparison with that tag (the first release has none). With no such commit it writes "Small fixes and improvements." The intro at the top is written by hand in the draft.
+The release page is for players, not developers. The fixed text lives in `packaging/release-notes.md`. The `draft` job asks GitHub to generate the notes for the tag (`gh api repos/PhongGuy/TF2Tools/releases/generate-notes` with the previous `v*` tag as `previous_tag_name`), which lists every merged PR since that tag grouped by its label as `.github/release.yml` says: New features (`feature`), Fixes (`bug`), Usability and accessibility, Performance, then Other changes; PRs labelled `chore`, `ci` or `dependencies`, and Dependabot's, are left out. `scripts/release-notes.sh <tag> packaging/release-notes.md <generated>` then fills in the version and replaces the `{changes}` line with that generated body (a file, or `-` for stdin), minus GitHub's own What's Changed heading, so the list and the Full Changelog link sit inside the template. With no PR listed it writes "Small fixes and improvements." The intro at the top is written by hand in the draft.
 
-Since the bullets are commit subjects, a `feat` or `fix` subject should already read well to a player.
+To preview the notes before tagging, run the same two steps by hand with `-f tag_name=<new tag> -f target_commitish=master`.
+
+Since the bullets are PR titles, and the label decides the section, a PR's title should already read well to a player and its label should match its issue's.
 
 - Use player words and say what changed in play terms ("Crosshairs now show a preview for every weapon").
 - No commands, no file paths, no crate or library names.

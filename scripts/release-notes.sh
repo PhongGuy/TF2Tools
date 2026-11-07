@@ -1,42 +1,35 @@
 #!/usr/bin/env bash
 # Prints the release notes for TAG: TEMPLATE with {version} filled in and the {changes} line
-# replaced by the player-facing feat and fix commits since the previous v* tag, oldest first.
-# Usage: release-notes.sh TAG TEMPLATE
+# replaced by GENERATED, the body of GitHub's generated release notes (a file, or - for stdin).
+# Usage: release-notes.sh TAG TEMPLATE GENERATED
 set -euo pipefail
 
-[ $# -eq 2 ] || { echo "usage: release-notes.sh TAG TEMPLATE" >&2; exit 2; }
+[ $# -eq 3 ] || { echo "usage: release-notes.sh TAG TEMPLATE GENERATED" >&2; exit 2; }
 tag=$1
 template=$2
+generated=$3
 version=${tag#v}
-repo_url=https://github.com/PhongGuy/TF2Tools
 
-git rev-parse -q --verify "$tag^{commit}" > /dev/null || { echo "no such tag: $tag" >&2; exit 1; }
 [ -f "$template" ] || { echo "no template: $template" >&2; exit 1; }
+[ "$generated" = - ] || [ -f "$generated" ] || { echo "no generated notes: $generated" >&2; exit 1; }
 
-# The previous release is the nearest v* tag strictly before TAG; none means the first release.
-if prev=$(git describe --tags --abbrev=0 --match 'v*' "$tag^" 2> /dev/null); then
-  range="$prev..$tag"
-else
-  prev=
-  range=$tag
-fi
-
-# Only feat and fix subjects reach players; build, release, test and dependency work does not.
+# The template already carries the What's Changed heading, so GitHub's own copy is dropped along
+# with the blank lines around the body. With no PR bullet left, players still get one line.
 changes=$(mktemp)
 trap 'rm -f "$changes"' EXIT
-pattern='^(feat|fix)(\(([^)]*)\))?!?: (.+)$'
-while IFS= read -r subject; do
-  [[ $subject =~ $pattern ]] || continue
-  case ${BASH_REMATCH[3]} in ci | release | test | deps) continue ;; esac
-  text=${BASH_REMATCH[4]}
-  printf -- '- %s\n' "${text^}" >> "$changes"
-done < <(git log --no-merges --reverse --format=%s "$range")
-[ -s "$changes" ] || echo "- Small fixes and improvements." > "$changes"
-if [ -n "$prev" ]; then
-  printf '\n**Full Changelog**: %s/compare/%s...%s\n' "$repo_url" "$prev" "$tag" >> "$changes"
-fi
+cat -- "$generated" | tr -d '\r' | awk '
+  !dropped && /^## What.s Changed[[:space:]]*$/ { dropped = 1; next }
+  { lines[++n] = $0 }
+  /^[*-] / { bullets = 1 }
+  END {
+    first = 1; while (first <= n && lines[first] ~ /^[[:space:]]*$/) first++
+    last = n; while (last >= first && lines[last] ~ /^[[:space:]]*$/) last--
+    if (!bullets) { print "- Small fixes and improvements."; if (first <= last) print "" }
+    for (i = first; i <= last; i++) print lines[i]
+  }
+' > "$changes"
 
-# Plain string replacement, so a subject holding & or \ comes through as written.
+# Plain string replacement, so a PR title holding & or \ comes through as written.
 awk -v version="$version" -v changes="$changes" '
   $0 == "{changes}" { while ((getline line < changes) > 0) print line; next }
   {

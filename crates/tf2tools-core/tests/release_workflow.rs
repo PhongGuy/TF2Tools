@@ -197,13 +197,18 @@ fn the_draft_adds_unversioned_copies_and_checksums_after_verifying() {
 }
 
 #[test]
-fn the_draft_writes_whats_changed_from_full_history() {
+fn the_draft_writes_whats_changed_from_the_generated_notes() {
     let draft = job(&workflow(), "draft");
+    // The previous tag comes from git history, so the checkout needs every tag.
     assert!(draft.contains("fetch-depth: 0"), "{draft}");
     let create = step(&draft, "Create the draft release");
     assert!(
+        create.contains("gh api \"repos/$GH_REPO/releases/generate-notes\""),
+        "{create}"
+    );
+    assert!(
         create.contains(
-            "scripts/release-notes.sh \"$GITHUB_REF_NAME\" packaging/release-notes.md > \"$RUNNER_TEMP/notes.md\""
+            "scripts/release-notes.sh \"$GITHUB_REF_NAME\" packaging/release-notes.md \"$RUNNER_TEMP/generated.md\" > \"$RUNNER_TEMP/notes.md\""
         ),
         "{create}"
     );
