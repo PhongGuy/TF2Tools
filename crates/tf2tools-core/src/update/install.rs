@@ -204,7 +204,7 @@ fn same_file(_seen: &std::fs::Metadata, opened: &std::fs::Metadata) -> bool {
 fn swap(staged: &StagedUpdate) -> Result<Applied, UpdateApplyError> {
     let path = match staged.target() {
         InstallTarget::AppImage(appimage) => Some(appimage.clone()),
-        _ => None,
+        InstallTarget::WindowsInstaller | InstallTarget::Unmanaged => None,
     };
     Err(UpdateApplyError::Unsupported { path })
 }
