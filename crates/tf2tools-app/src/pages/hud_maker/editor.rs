@@ -15,7 +15,10 @@ use tf2tools_core::{
 };
 
 use super::snapping::{self, Moving, lines};
+
+mod fit;
 pub use super::snapping::{Guide, Snapped};
+pub use fit::outside_parent;
 
 /// Why an added font file did not land, by whose fault: the file, its name, the HUD's font
 /// list or the part's font.
@@ -2531,6 +2534,12 @@ impl Units {
     /// Pixels to units, truncating toward zero as the game does.
     fn normalise(self, px: i32) -> i32 {
         Units::fit(i64::from(px) * 480 / self.tall)
+    }
+
+    /// Pixels to the nearest whole units, halves away from zero.
+    fn nearest(self, px: i32) -> i32 {
+        let n = i64::from(px) * 480;
+        Units::fit((n + n.signum() * self.tall / 2) / self.tall)
     }
 
     /// The units a laid-out size of `px` came from: the least whose scaled size reaches it.

@@ -543,6 +543,28 @@ impl HudMakerPage {
                 Some(el)
             })
             .collect::<Vec<_>>();
+        // A selected part poking out of its parent shows its whole box dashed in the warning
+        // colour, so the player sees what the game cuts off at the parent's edges.
+        let chosen: &[PartKey] = match editor.several() {
+            true => editor.selection(),
+            false => editor.selection().get(..1).unwrap_or(&[]),
+        };
+        let cut_offs = (chosen.iter())
+            .filter_map(|key| {
+                let parent = super::editor::outside_parent(model, layout, key)?;
+                let b = layout.get(key).filter(|b| drawn(b))?;
+                let (name, parent) = (named(key)?.0, named(parent)?.0);
+                let el = place(
+                    div().id(ids::hud_maker_cut_off(key)).test_support(),
+                    local(fit.rect(b.x(), b.y(), b.wide(), b.tall())),
+                )
+                .aria_label(format!("{name}, cut off by {parent}"))
+                .border_1()
+                .border_dashed()
+                .border_color(warning);
+                Some(el)
+            })
+            .collect::<Vec<_>>();
         // The box being drawn, faintly filled, from where the press began to the pointer.
         let marquee = self.marquee.as_ref().map(|m| {
             let (from, to) = (m.from - screen.origin, m.to - screen.origin);
@@ -662,6 +684,7 @@ impl HudMakerPage {
             .children(under)
             .children(markers)
             .children(hover)
+            .children(cut_offs)
             .children(selection)
             .children(several)
             .children(marquee)
