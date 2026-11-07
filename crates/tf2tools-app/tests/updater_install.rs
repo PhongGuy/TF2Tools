@@ -7,7 +7,7 @@ use gpui_kit::TestAppContext;
 use tf2tools_app::updater::{AfterInstall, UpdateEvent, UpdateState};
 use tf2tools_core::LogLevel;
 
-mod support;
+use crate::support;
 use support::update_fake::{
     APPIMAGE, act, events, failure, fake_updater, offer, reach_available, reach_ready, state,
     update_rows, visible, wait_state, with_services,

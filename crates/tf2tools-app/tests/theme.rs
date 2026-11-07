@@ -1,7 +1,7 @@
 use gpui_kit::component::Theme;
 use gpui_kit::{Anchor, Hsla, TestAppContext, px};
 
-mod support;
+use crate::support;
 
 /// `#rrggbbaa` of a resolved colour, so assertions read like the token map.
 fn hex(c: Hsla) -> String {

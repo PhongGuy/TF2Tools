@@ -1,6 +1,6 @@
 //! Reopening made HUDs from the HUDs page.
 
-mod support;
+use crate::support;
 
 use std::io::Write as _;
 

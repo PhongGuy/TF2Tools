@@ -1,6 +1,6 @@
 //! The HUD Maker's live link: Save also updates the installed copy of the same HUD.
 
-mod support;
+use crate::support;
 
 use std::path::PathBuf;
 

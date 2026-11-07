@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use tf2tools_app::assets::{AssetRoot, BACKGROUNDS};
 use tf2tools_core::WeaponSlot;
 
-mod support;
+use crate::support;
 
 /// Makes `root` a valid asset root and returns it.
 fn valid(root: &Path) -> PathBuf {

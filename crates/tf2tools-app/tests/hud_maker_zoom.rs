@@ -1,7 +1,7 @@
 //! The HUD Maker's canvas zooms and pans: the toolbar's zoom menu, Ctrl+Plus, Minus and 0,
 //! Ctrl+wheel around the pointer, middle-drag and Space+drag, and parts picked and moved at zoom.
 
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{

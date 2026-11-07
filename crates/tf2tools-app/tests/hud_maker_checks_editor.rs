@@ -1,6 +1,6 @@
 //! The HUD Maker's checking tools over the editor, without GPUI.
 
-mod support;
+use crate::support;
 
 use support::hud_stock::{HEALTH, label, stock_files_with, with_blocks};
 use tf2tools_app::pages::hud_maker::checks::Checks;

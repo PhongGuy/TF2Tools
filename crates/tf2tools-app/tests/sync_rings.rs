@@ -10,7 +10,7 @@ use tf2tools_app::widgets::sync_ring::{
 };
 use tf2tools_core::StoreKind;
 
-mod support;
+use crate::support;
 
 fn start(cx: &mut TestAppContext, hub: &Entity<SyncHub>, kind: StoreKind) {
     assert!(cx.update(|cx| hub.update(cx, |h, cx| h.start(kind, false, cx))));

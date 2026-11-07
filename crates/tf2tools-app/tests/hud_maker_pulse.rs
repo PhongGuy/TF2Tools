@@ -1,6 +1,6 @@
 //! The health pulse image drawn as the game draws it while dying, headless.
 
-mod support;
+use crate::support;
 
 use std::sync::Arc;
 

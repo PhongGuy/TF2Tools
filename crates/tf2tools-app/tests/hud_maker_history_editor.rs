@@ -1,7 +1,7 @@
 //! The HUD Maker editor's history: restoring a snapshot and laying one out to compare, without
 //! GPUI.
 
-mod support;
+use crate::support;
 
 use support::hud_stock::stock_files;
 use tf2tools_app::pages::hud_maker::editor::HudEditor;

@@ -1,6 +1,6 @@
 //! Borrowing a part from another library HUD in the HUD Maker, headless.
 
-mod support;
+use crate::support;
 
 use std::collections::BTreeSet;
 

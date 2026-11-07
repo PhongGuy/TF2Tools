@@ -1,7 +1,7 @@
 //! The Profiles page at small windows: the page scrolls as a whole over a grid of at least one
 //! card row, as HUDs does, and its controls stay clear of the page's bar.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{Bounds, ElementId, Entity, Pixels, ScrollHandle, TestAppContext, point, px, size};
 use support::scroll::{

@@ -3,7 +3,7 @@
 //! what changed meanwhile (the library, a sync, new log rows) still shows on return. Settings
 //! keeps its unsaved edits the same way.
 
-mod support;
+use crate::support;
 
 use std::time::Duration;
 

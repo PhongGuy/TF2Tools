@@ -1,6 +1,6 @@
 //! The HUD Maker editor's option edits, without GPUI.
 
-mod support;
+use crate::support;
 
 use support::hud_stock::{HUDLAYOUT, stock_files_with, with_blocks};
 use tf2tools_app::pages::hud_maker::editor::HudEditor;

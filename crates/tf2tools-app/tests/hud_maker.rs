@@ -1,6 +1,6 @@
 //! The HUD Maker page through its pilot ids.
 
-mod support;
+use crate::support;
 
 use gpui_kit::component::color_picker::ColorPickerEvent;
 use gpui_kit::component::input::InputEvent;

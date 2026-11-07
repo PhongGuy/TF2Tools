@@ -1,7 +1,7 @@
 //! The HUD crosshair in the HUD Maker, headless: its note, the two-crosshairs warning and the
 //! preview drawing the HUD's own crosshair label.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use std::sync::Arc;

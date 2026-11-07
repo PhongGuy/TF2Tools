@@ -7,7 +7,7 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::updater::{AfterInstall, REOPEN, UpdateState, Updater};
 
-mod support;
+use crate::support;
 use support::ShellWindow;
 use support::update_fake::{
     APPIMAGE, FakeUpdates, failure, fake_updater, offer, reach_available, reach_ready, wait_state,

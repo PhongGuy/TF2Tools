@@ -1,6 +1,6 @@
 //! A library HUD from the store links to its own page; a HUD with no known page does not.
 
-mod support;
+use crate::support;
 
 use gpui_kit::TestAppContext;
 use tf2tools_app::ids;

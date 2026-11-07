@@ -1,6 +1,6 @@
 //! Attaching a part to a sibling from the side panel.
 
-mod support;
+use crate::support;
 
 use gpui_kit::TestAppContext;
 use support::maker_page::{IMAGE, VALUE, click_in_panel, editor, on_page, open_maker};

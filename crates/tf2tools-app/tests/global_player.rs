@@ -1,7 +1,7 @@
 //! One sound player for the whole app: a sound started on Sounds or in the Sound Store keeps
 //! playing, and the player keeps floating, on every other page until it ends or is stopped.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::audio::AudioCall;

@@ -12,7 +12,7 @@ use tf2tools_app::services::{Tf2Detector, Tf2State, recheck_tf2, tf2_state};
 use tf2tools_app::shell::toast::toast_count;
 use tf2tools_core::{CrosshairRef, Tf2Install};
 
-mod support;
+use crate::support;
 
 const FIXED: &str = "Fixed your crosshairs for the latest TF2 update";
 

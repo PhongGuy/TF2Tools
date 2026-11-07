@@ -1,7 +1,7 @@
 //! The HUD Maker's ways in: the Start from card on a new HUD, the keyboard shortcuts sheet,
 //! the hide and deselect keys, Undo and Redo naming their step, and Save and leave.
 
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};

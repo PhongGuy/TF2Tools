@@ -1,6 +1,6 @@
 //! The HUD Maker's scenes: the tab bar, the scoreboard preview and its panel rows.
 
-mod support;
+use crate::support;
 
 use gpui_kit::component::color_picker::ColorPickerEvent;
 use gpui_kit::component::input::InputEvent;

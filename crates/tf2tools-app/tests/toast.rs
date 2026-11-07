@@ -2,7 +2,7 @@ use gpui_kit::{AppContext as _, TestAppContext};
 use tf2tools_app::services::OpError;
 use tf2tools_app::shell::toast::{ToastKind, toast, toast_count, toast_error};
 
-mod support;
+use crate::support;
 
 fn count(cx: &mut TestAppContext, win: gpui_kit::AnyWindowHandle) -> usize {
     cx.update_window(win, |_, w, cx| toast_count(w, cx))

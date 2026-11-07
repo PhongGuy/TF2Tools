@@ -1,7 +1,7 @@
 use gpui_kit::TestAppContext;
 use tf2tools_app::updater::{UpdateState, updater};
 
-mod support;
+use crate::support;
 use support::update_fake::{
     CURRENT, RELEASES, act, events, failure, fake_updater, offer, reach_available, state, visible,
     wait_state,

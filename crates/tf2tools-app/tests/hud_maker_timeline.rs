@@ -1,6 +1,6 @@
 //! The timeline plays the situation's events on the canvas, headless.
 
-mod support;
+use crate::support;
 
 use gpui_kit::TestAppContext;
 use support::maker_page::{ANIMS, VALUE, on_page, open_maker, open_maker_with};

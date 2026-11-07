@@ -1,6 +1,6 @@
 //! A copy's own options in the HUD Maker: reload, save, the Options section and a part's options.
 
-mod support;
+use crate::support;
 
 use gpui_kit::component::color_picker::ColorPickerEvent;
 use gpui_kit::test::TestWindowExt as _;

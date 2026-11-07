@@ -1,6 +1,6 @@
 //! The HUD Maker's editor state, without GPUI.
 
-mod support;
+use crate::support;
 
 use tf2tools_app::pages::hud_maker::editor::{Handle, HudEditor, UNDO_LIMIT};
 use tf2tools_core::{EditRefused, PartKey, Scene, Screen};

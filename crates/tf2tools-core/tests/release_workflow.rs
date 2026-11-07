@@ -440,7 +440,7 @@ fn the_windows_job_builds_the_installer_without_the_test_seam() {
     assert!(windows.contains("--formats nsis"), "{windows}");
     assert!(windows.contains("TF2Tools.exe"), "{windows}");
     assert!(
-        windows.contains("TF2TOOLS_WINDOWS_EXE=\"$(cygpath -m \"$PWD\")/target/release/tf2tools.exe\" cargo test --locked -p tf2tools-app --test packaging -- --ignored"),
+        windows.contains("TF2TOOLS_WINDOWS_EXE=\"$(cygpath -m \"$PWD\")/target/release/tf2tools.exe\" cargo test --locked -p tf2tools-app --test integration packaging:: -- --ignored"),
         "{windows}"
     );
     // cargo test runs from the package root, so a relative exe path would miss the build.

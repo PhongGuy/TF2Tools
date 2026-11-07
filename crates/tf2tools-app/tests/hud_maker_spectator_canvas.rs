@@ -1,6 +1,6 @@
 //! The spectator canvas: the lines the code writes and the bars it paints.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use tf2tools_app::ids;

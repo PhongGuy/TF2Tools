@@ -1,5 +1,4 @@
 //! The vendored restart helper, run against stub processes: the "app" it starts is `touch`.
-#![cfg(target_os = "linux")]
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};

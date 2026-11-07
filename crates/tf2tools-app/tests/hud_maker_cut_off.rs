@@ -1,7 +1,7 @@
 //! A selected part poking out of its parent on the HUD Maker page: the canvas outlines its
 //! whole box, the Part panel says the game cuts it off, and its button grows the parent.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use tf2tools_app::ids;

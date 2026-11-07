@@ -1,6 +1,6 @@
 //! Showing and editing the events that animate a part.
 
-mod support;
+use crate::support;
 
 use gpui_kit::TestAppContext;
 use support::maker_page::{VALUE, click_in_panel, editor, open_maker};

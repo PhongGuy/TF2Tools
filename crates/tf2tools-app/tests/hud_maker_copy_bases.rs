@@ -1,6 +1,6 @@
 //! In a copy, parts drawn from a #base stub edit like any other; the missing-base note stays.
 
-mod support;
+use crate::support;
 
 use std::path::Path;
 

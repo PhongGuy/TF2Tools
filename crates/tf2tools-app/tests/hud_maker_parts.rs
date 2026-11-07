@@ -1,6 +1,6 @@
 //! The HUD Maker's Parts list: the eye on each row, the changed mark, the filter and folding.
 
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};

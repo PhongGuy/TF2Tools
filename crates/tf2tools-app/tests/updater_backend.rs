@@ -7,7 +7,7 @@ use tf2tools_app::updater::backend::{Deadlines, core_backend};
 use tf2tools_app::updater::{DownloadSink, Failure, Offer, UpdateBackend};
 use tf2tools_core::InstallTarget;
 
-mod support;
+use crate::support;
 use support::update_feed::{SignedFeed, fresh_key};
 
 const AGES: Duration = Duration::from_secs(600);

@@ -1,4 +1,4 @@
-mod support;
+use crate::support;
 
 use tf2tools_app::pages::addon_store::model::{
     AddonState, addon_state, downloads_label, ordered, store_release,

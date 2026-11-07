@@ -1,7 +1,7 @@
 //! The HUD Maker's checking tools, headless: every screen at once, the backdrop, hard-to-read
 //! flags and colour-blind views.
 
-mod support;
+use crate::support;
 
 use std::path::PathBuf;
 use std::sync::Arc;

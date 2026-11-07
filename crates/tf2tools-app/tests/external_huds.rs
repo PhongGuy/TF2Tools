@@ -1,6 +1,6 @@
 //! The question before a HUD action removes HUDs the library cannot put back.
 
-mod support;
+use crate::support;
 
 use std::path::PathBuf;
 

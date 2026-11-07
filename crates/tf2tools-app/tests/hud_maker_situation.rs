@@ -1,6 +1,6 @@
 //! The game situation menu and Show it, headless.
 
-mod support;
+use crate::support;
 
 use gpui_kit::component::slider::{SliderEvent, SliderValue};
 use gpui_kit::{AppContext as _, Entity, TestAppContext};

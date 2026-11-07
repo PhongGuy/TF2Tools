@@ -3,7 +3,7 @@ use tf2tools_app::updater::keys::{
 };
 use tf2tools_core::{Endpoints, UPDATE_PUBLIC_KEYS};
 
-mod support;
+use crate::support;
 use support::update_feed::{SignedFeed, fresh_key};
 
 #[test]

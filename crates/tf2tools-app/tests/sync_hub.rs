@@ -5,7 +5,7 @@ use gpui_kit::{Entity, TestAppContext};
 use tf2tools_app::sync::{self, SyncEvent, SyncHub, SyncSummary, SyncTick};
 use tf2tools_core::StoreKind;
 
-mod support;
+use crate::support;
 
 fn start(cx: &mut TestAppContext, hub: &Entity<SyncHub>, kind: StoreKind, force: bool) -> bool {
     cx.update(|cx| hub.update(cx, |h, cx| h.start(kind, force, cx)))

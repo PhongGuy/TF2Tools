@@ -1,7 +1,7 @@
 //! Edit on the installed HUD: a made HUD or copy opens in the HUD Maker, any other HUD is
 //! copied first so the original stays as it is.
 
-mod support;
+use crate::support;
 
 use std::path::Path;
 

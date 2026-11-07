@@ -1,6 +1,6 @@
 //! The HUD Maker editor's Stage 2 edits, without GPUI.
 
-mod support;
+use crate::support;
 
 use support::hud_stock::{HEALTH, stock_files_with};
 use tf2tools_app::pages::hud_maker::editor::{FontAddRefused, HudEditor};

@@ -1,7 +1,7 @@
 //! A part moved out of its parent's box, which the game cuts off there, and growing the parent
 //! to hold it again, in the HUD Maker's editor state without GPUI.
 
-mod support;
+use crate::support;
 
 use tf2tools_app::pages::hud_maker::editor::{Align, HudEditor, outside_parent};
 use tf2tools_core::PartKey;

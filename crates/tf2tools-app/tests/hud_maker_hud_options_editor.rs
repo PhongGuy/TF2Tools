@@ -1,6 +1,6 @@
 //! The editor's HUD options: values, one-step undo, the reload flag and rebasing.
 
-mod support;
+use crate::support;
 
 use std::sync::Arc;
 

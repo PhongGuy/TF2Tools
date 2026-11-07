@@ -1,6 +1,6 @@
 //! Saving and installing from the HUD Maker.
 
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};

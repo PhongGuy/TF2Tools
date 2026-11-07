@@ -1,7 +1,7 @@
 //! Selecting several parts in the HUD Maker's editor state, moving and lining them up, snapping
 //! a resize and stepping a part's layer, without GPUI.
 
-mod support;
+use crate::support;
 
 use tf2tools_app::pages::hud_maker::editor::{Align, Handle, HudEditor, Spread};
 use tf2tools_core::{GuideAxis, PartKey};
