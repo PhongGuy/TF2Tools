@@ -36,7 +36,10 @@ fn a_tall_area_letterboxes_top_and_bottom() {
 fn rects_and_points_convert_both_ways() {
     let fit = CanvasFit::new(area(100., 50., 960., 540.), HD);
     assert_eq!(fit.rect(171, 927, 99, 40), area(185.5, 513.5, 49.5, 20.));
-    assert_eq!(fit.to_screen(point(px(186.5), px(514.5))), Some((173, 929)));
+    assert_eq!(
+        fit.to_screen(point(px(186.5), px(514.5))),
+        Some(tf2tools_core::Point::new(173, 929))
+    );
     assert_eq!(fit.to_screen(point(px(99.), px(60.))), None);
     assert_eq!(
         fit.to_screen(point(px(1060.), px(60.))),

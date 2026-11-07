@@ -93,7 +93,7 @@ impl CanvasFit {
     }
 
     /// The screen pixel under window point `at`; `None` outside the screen or at scale 0.
-    pub fn to_screen(self, at: Point<Pixels>) -> Option<(i32, i32)> {
+    pub fn to_screen(self, at: Point<Pixels>) -> Option<tf2tools_core::Point> {
         if self.scale <= 0. {
             return None;
         }
@@ -101,7 +101,7 @@ impl CanvasFit {
         let y = (f32::from(at.y - self.origin.y) / self.scale).floor();
         let inside = |v: f32, end: u32| v >= 0. && v < end as f32;
         (inside(x, self.screen.wide()) && inside(y, self.screen.tall()))
-            .then_some((x as i32, y as i32))
+            .then_some(tf2tools_core::Point::new(x as i32, y as i32))
     }
 }
 

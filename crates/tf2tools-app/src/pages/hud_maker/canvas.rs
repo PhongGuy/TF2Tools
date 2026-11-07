@@ -113,7 +113,7 @@ pub(super) struct Marquee {
 /// A canvas press: the screen pixel, the part it selected and the layout it picked on.
 #[derive(Debug, Clone)]
 pub(super) struct LastPress {
-    at: (i32, i32),
+    at: tf2tools_core::Point,
     picked: PartKey,
     generation: u64,
 }
@@ -960,8 +960,8 @@ impl HudMakerPage {
         };
         let at = self.canvas_fit(editor.screen()).to_screen(ev.position);
         let selected = editor.selected().cloned();
-        let picks = at.map_or_else(Vec::new, |(x, y)| self.picks_at(x, y));
-        let held = at.is_some_and(|(x, y)| self.holds_press(x, y, &picks));
+        let picks = at.map_or_else(Vec::new, |p| self.picks_at(p.x, p.y));
+        let held = at.is_some_and(|p| self.holds_press(p.x, p.y, &picks));
         let picks: Vec<PartKey> = picks.into_iter().map(|p| p.key().clone()).collect();
         // Shift adds what a press picks to the selection or takes it out, and starts a box on
         // empty canvas; a press on any of several selected parts drags them all.
@@ -1147,9 +1147,9 @@ impl HudMakerPage {
         let Some(editor) = self.editor() else {
             return;
         };
-        let next = (self.canvas_fit(editor.screen()).to_screen(at)).and_then(|(x, y)| {
-            let picks = self.picks_at(x, y);
-            match self.holds_press(x, y, &picks) {
+        let next = (self.canvas_fit(editor.screen()).to_screen(at)).and_then(|p| {
+            let picks = self.picks_at(p.x, p.y);
+            match self.holds_press(p.x, p.y, &picks) {
                 true => editor.selected().cloned(),
                 false => picks.first().map(|p| self.grouped(p.key())),
             }
@@ -1377,8 +1377,8 @@ impl HudMakerPage {
         self.matching_size = false;
         self.focus.focus(window, cx);
         let source = self.editor().and_then(|editor| {
-            let (x, y) = self.canvas_fit(editor.screen()).to_screen(ev.position)?;
-            let hit = self.picks_at(x, y).into_iter().next()?.key().clone();
+            let at = self.canvas_fit(editor.screen()).to_screen(ev.position)?;
+            let hit = self.picks_at(at.x, at.y).into_iter().next()?.key().clone();
             (Some(&hit) != editor.selected()).then_some(hit)
         });
         match source {
