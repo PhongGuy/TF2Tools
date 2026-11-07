@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests for scripts/release-notes.sh in a throwaway repository. Commits are made with plumbing
-# (commit-tree), so no hook runs, and the user's git config is not read.
+# Tests for scripts/release-notes.sh against canned bodies shaped like GitHub's generated release
+# notes, so no network or repository is needed.
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -8,18 +8,6 @@ WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 FAILS=0
 fail() { echo "FAIL: $*" >&2; FAILS=$((FAILS + 1)); }
-
-export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
-export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@example.invalid GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@example.invalid
-git init -q "$WORK/repo"
-cd "$WORK/repo"
-tree=$(git mktree < /dev/null)
-commit() { # commit MESSAGE PARENT...; prints the new sha
-  local message=$1 args=()
-  shift
-  for parent in "$@"; do args+=(-p "$parent"); done
-  git commit-tree "$tree" "${args[@]}" -m "$message"
-}
 
 # A small template: the fixed text around the generated section, with the version in two places.
 cat > "$WORK/template.md" << 'EOF'
@@ -33,60 +21,65 @@ cat > "$WORK/template.md" << 'EOF'
 
 tf2tools_{version}_x86_64.AppImage and v{version}
 EOF
-render() { "$ROOT/scripts/release-notes.sh" "$1" "$WORK/template.md" > "$WORK/out" 2> "$WORK/err"; }
-# The generated section: from the What's Changed heading up to the next heading.
-changes() { awk '/^## What.s Changed$/ { on = 1; next } /^## / { on = 0 } on' "$WORK/out"; }
+render() { "$ROOT/scripts/release-notes.sh" "$1" "$WORK/template.md" "$2" > "$WORK/out" 2> "$WORK/err"; }
+# The generated section: from the template's What's Changed heading up to Downloads.
+changes() { awk '/^## What.s Changed$/ && !seen { seen = 1; on = 1; next } /^## Downloads$/ { on = 0 } on' "$WORK/out"; }
 
-c1=$(commit "feat: the first release")
-git tag -a v1.0.0 -m v1.0.0 "$c1"
-c2=$(commit "feat(huds): show a preview for every HUD" "$c1")
-c3=$(commit "fix(sounds): stop the player from hiding behind dialogs" "$c2")
-c4=$(commit "$(printf 'chore: bump the version\n\nfeat: a body line is not a subject')" "$c3")
-c5=$(commit "fix(ci): cache the build" "$c4")
-c6=$(commit "feat(release): add checksums" "$c5")
-c7=$(commit "fix(test): stabilise a flaky test" "$c6")
-c8=$(commit "fix(deps): bump reqwest" "$c7")
-c9=$(commit "docs: explain the store" "$c8")
-side=$(commit "fix(crosshairs): keep the picked crosshair after a restart" "$c9")
-c10=$(commit "feat: merge the side branch" "$c9" "$side")
-c11=$(commit "feat!: Crosshairs & sounds share one \\ list" "$c10")
-c12=$(commit "refactor(core): split the sync" "$c11")
-git tag -a v1.1.0-beta.1 -m v1.1.0-beta.1 "$c12"
+# A generate-notes body as GitHub returns it: a config comment, its own heading, PRs grouped by
+# label, a New Contributors section and the comparison link, with CRLF line ends.
+printf '%s\r\n' \
+  '<!-- Release notes generated using configuration in .github/release.yml at v1.1.0 -->' \
+  '' \
+  "## What's Changed" \
+  '### New features' \
+  '* Show a preview for every HUD by @p in https://github.com/PhongGuy/TF2Tools/pull/12' \
+  '### Fixes' \
+  '* Crosshairs & sounds share one \ list by @p in https://github.com/PhongGuy/TF2Tools/pull/13' \
+  '' \
+  '## New Contributors' \
+  '* @q made their first contribution in https://github.com/PhongGuy/TF2Tools/pull/13' \
+  '' \
+  '**Full Changelog**: https://github.com/PhongGuy/TF2Tools/compare/v1.0.0...v1.1.0' > "$WORK/generated.md"
 
-render v1.1.0-beta.1 || fail "a normal release: exit 1 [$(cat "$WORK/err")]"
+render v1.1.0 "$WORK/generated.md" || fail "a normal release: exit 1 [$(cat "$WORK/err")]"
 want=$(cat << 'EOF'
 
-- Show a preview for every HUD
-- Stop the player from hiding behind dialogs
-- Keep the picked crosshair after a restart
-- Crosshairs & sounds share one \ list
+<!-- Release notes generated using configuration in .github/release.yml at v1.1.0 -->
 
-**Full Changelog**: https://github.com/PhongGuy/TF2Tools/compare/v1.0.0...v1.1.0-beta.1
+### New features
+* Show a preview for every HUD by @p in https://github.com/PhongGuy/TF2Tools/pull/12
+### Fixes
+* Crosshairs & sounds share one \ list by @p in https://github.com/PhongGuy/TF2Tools/pull/13
+
+## New Contributors
+* @q made their first contribution in https://github.com/PhongGuy/TF2Tools/pull/13
+
+**Full Changelog**: https://github.com/PhongGuy/TF2Tools/compare/v1.0.0...v1.1.0
 
 EOF
 )
 [ "$(changes)" = "$want" ] || fail "a normal release: What's Changed was [$(changes)]"
-grep -qxF 'tf2tools_1.1.0-beta.1_x86_64.AppImage and v1.1.0-beta.1' "$WORK/out" \
+[ "$(grep -c "^## What.s Changed" "$WORK/out")" -eq 1 ] || fail "the heading is doubled: [$(cat "$WORK/out")]"
+grep -qxF 'tf2tools_1.1.0_x86_64.AppImage and v1.1.0' "$WORK/out" \
   || fail "the version is not filled in: [$(cat "$WORK/out")]"
 grep -qxF '<!-- intro -->' "$WORK/out" || fail "the intro slot is gone"
+grep -q $'\r' "$WORK/out" && fail "a carriage return is left"
 grep -qF '{' "$WORK/out" && fail "a placeholder is left: [$(cat "$WORK/out")]"
 
-# Only commits since the previous v* tag count; a tag of another shape is not a release.
-c13=$(commit "chore: tidy" "$c12")
-git tag not-a-release "$c13"
-c14=$(commit "docs: more words" "$c13")
-git tag v1.1.0 "$c14"
-render v1.1.0 || fail "nothing to list: exit 1"
-want=$(printf '\n- Small fixes and improvements.\n\n**Full Changelog**: https://github.com/PhongGuy/TF2Tools/compare/v1.1.0-beta.1...v1.1.0\n')
+# No PR since the previous release: GitHub returns only the comparison link.
+printf '%s\n' '**Full Changelog**: https://github.com/PhongGuy/TF2Tools/compare/v1.1.0...v1.1.1' > "$WORK/empty.md"
+render v1.1.1 - < "$WORK/empty.md" || fail "nothing to list from stdin: exit 1 [$(cat "$WORK/err")]"
+want=$(printf '\n- Small fixes and improvements.\n\n**Full Changelog**: https://github.com/PhongGuy/TF2Tools/compare/v1.1.0...v1.1.1\n')
 [ "$(changes)" = "$want" ] || fail "nothing to list: What's Changed was [$(changes)]"
 
-# The first release has no earlier tag, so it lists its whole history and links no comparison.
-render v1.0.0 || fail "the first release: exit 1"
-[ "$(changes)" = "$(printf '\n- The first release\n')" ] || fail "the first release: [$(changes)]"
-grep -q 'Full Changelog' "$WORK/out" && fail "the first release links a comparison"
+# An empty body still yields the fallback line.
+: > "$WORK/blank.md"
+render v1.0.0 "$WORK/blank.md" || fail "an empty body: exit 1"
+[ "$(changes)" = "$(printf '\n- Small fixes and improvements.\n')" ] || fail "an empty body: [$(changes)]"
 
-if render v9.9.9; then fail "an unknown tag: exit 0"; fi
-if "$ROOT/scripts/release-notes.sh" v1.1.0 > /dev/null 2>&1; then fail "no template: exit 0"; fi
+if render v1.1.0 "$WORK/missing.md"; then fail "a missing generated file: exit 0"; fi
+if "$ROOT/scripts/release-notes.sh" v1.1.0 "$WORK/template.md" > /dev/null 2>&1; then fail "no generated notes argument: exit 0"; fi
+if "$ROOT/scripts/release-notes.sh" v1.1.0 "$WORK/nope.md" "$WORK/generated.md" > /dev/null 2>&1; then fail "no template: exit 0"; fi
 
 [ "$FAILS" -eq 0 ] || { echo "$FAILS release notes check(s) failed" >&2; exit 1; }
 echo "release notes OK"
