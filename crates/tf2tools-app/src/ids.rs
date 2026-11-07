@@ -302,6 +302,8 @@ pub const HUD_MAKER_PICTURE_SHARED: &str = "hud-maker-picture-shared";
 pub const HUD_MAKER_PANEL_EMPTY: &str = "hud-maker-panel-empty";
 /// The HUD's options, the side panel's body while no part is selected.
 pub const HUD_MAKER_OPTIONS: &str = "hud-maker-options";
+/// The Options panel's "Reset all options" button, which asks before dropping every choice.
+pub const HUD_MAKER_OPTIONS_RESET_ALL: &str = "hud-maker-options-reset-all";
 /// The Options panel's section of a copy's own options, under "<HUD>'s options".
 pub const HUD_MAKER_HUD_OPTIONS: &str = "hud-maker-hud-options";
 /// The line saying how many of a copy's options don't fit its version, labelled with it.

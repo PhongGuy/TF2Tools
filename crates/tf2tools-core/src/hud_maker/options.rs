@@ -605,6 +605,11 @@ impl HudModel {
         without_choices(changes, in_group)
     }
 
+    /// `changes` without any built-in option choice, every group at once.
+    pub fn reset_all_options(&self, changes: &[Change]) -> Vec<Change> {
+        without_choices(changes, |_| true)
+    }
+
     /// The built-in `id` when it fits this HUD.
     fn offered(&self, id: &str) -> Option<&'static OptionSpec> {
         BUILT_INS

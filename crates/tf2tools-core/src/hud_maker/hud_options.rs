@@ -291,6 +291,13 @@ impl HudOptions {
         })
     }
 
+    /// `changes` without the choices of every one of these options, all groups at once.
+    pub fn reset_all(&self, changes: &[Change]) -> Vec<Change> {
+        without(changes, |source, id| {
+            (self.specs.iter()).any(|s| s.id() == id && source_of(s) == source)
+        })
+    }
+
     /// Lowercase paths option `id` touches; empty for an unknown id.
     pub fn touched(&self, id: &str) -> Vec<String> {
         self.offered(id).map(spec_touched).unwrap_or_default()
