@@ -354,6 +354,7 @@ impl Library {
     ) -> Result<SavedHud, MakeHudError> {
         let _writes = self.lock_writes();
         self.save_made_hud_locked(target, name, files, platform, changes, assets)
+            .map(|saved| self.with_fresh_thumbnail(saved))
     }
 
     /// As `save_made_hud_with_assets`, refusing with `BaseChanged` before writing anything when
@@ -389,6 +390,15 @@ impl Library {
             }
         }
         self.save_made_hud_locked(target, name, files, platform, changes, assets)
+            .map(|saved| self.with_fresh_thumbnail(saved))
+    }
+
+    // A saved HUD's card picture follows its menu background, which the save may have changed.
+    fn with_fresh_thumbnail(&self, saved: SavedHud) -> SavedHud {
+        SavedHud {
+            entry: self.refresh_hud_thumbnail(saved.entry),
+            ..saved
+        }
     }
 
     // The save itself; the caller holds the library write lock, which is not reentrant.

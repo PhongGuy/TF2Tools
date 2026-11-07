@@ -169,6 +169,12 @@ impl HudEntry {
     pub fn wanted_name(&self) -> Option<&str> {
         self.wanted_name.as_deref()
     }
+
+    /// The entry with its thumbnail flag set to `made`.
+    pub(super) fn with_thumbnail(mut self, made: bool) -> HudEntry {
+        self.has_thumbnail = made;
+        self
+    }
 }
 
 pub(super) const HUD_COLUMNS: &str = "id, folder_name, name, author, store_hud_id, store_gb_id, \
@@ -383,7 +389,7 @@ impl Library {
         if recorded.is_err() {
             let _ = remove_dir_if_present(&dest);
         }
-        recorded
+        recorded.map(|entry| self.refresh_hud_thumbnail(entry))
     }
 
     /// Writes the `library_huds` row for a freshly copied folder, taking the display name

@@ -11,6 +11,7 @@ mod hud_folder;
 mod hud_history;
 mod hud_presets;
 mod hud_print;
+mod hud_thumbnail;
 mod huds;
 mod live_link;
 mod made_huds;

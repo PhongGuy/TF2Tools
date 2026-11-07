@@ -238,3 +238,82 @@ fn an_old_page_released_late_keeps_the_new_pages_wants(cx: &mut TestAppContext) 
     support::settle(cx, s.win);
     assert_eq!(cx.update(|cx| images.read(cx).viewers()), 1);
 }
+
+/// A HUD archive like `hud_zip`'s that also ships a widescreen menu background.
+fn hud_zip_with_background(dir: &Path, name: &str) -> PathBuf {
+    let pixels = [200u8, 30, 30, 255].repeat(64 * 32);
+    let texture = tf2tools_core::RgbaImage::from_pixels(64, 32, pixels).unwrap();
+    let path = dir.join(format!("{name}.zip"));
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+    let options = zip::write::SimpleFileOptions::default();
+    zip.start_file(format!("{name}/info.vdf"), options).unwrap();
+    write!(zip, "\"{name}\"\n{{\n}}\n").unwrap();
+    zip.start_file(
+        format!("{name}/materials/console/background_upward_widescreen.vtf"),
+        options,
+    )
+    .unwrap();
+    zip.write_all(&tf2tools_core::rgba_to_vtf(&texture).unwrap())
+        .unwrap();
+    zip.finish().unwrap();
+    path
+}
+
+#[gpui_kit::test]
+fn a_local_hud_with_a_menu_background_shows_its_own_picture(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    cx.executor().allow_parking();
+    let (fetch, asked) = fetch_log();
+    let images = cx.update(|cx| RemoteImages::install(cx, fetch));
+    let archive = hud_zip_with_background(env.tmp.path(), "mine");
+    let hud = s
+        .services
+        .library
+        .import_hud(&archive, Provenance::Local)
+        .unwrap();
+    assert!(hud.has_thumbnail());
+    seed(&s.services, &env, "plain", Provenance::Local);
+    let _page = revisit(cx, &s);
+    support::wait_real(cx, "the local picture", |cx| {
+        cx.update(|cx| images.read(cx).stats().decodes == 1)
+    });
+    support::settle(cx, s.win);
+    // The picture is read from disk, never asked of the image hosts.
+    assert!(asked.lock().unwrap().is_empty());
+    assert!(support::present(cx, s.win, ids::hud_image("mine")));
+    assert!(!support::present(cx, s.win, ids::hud_image("plain")));
+    assert!(!support::present(cx, s.win, ids::hud_shot("plain")));
+}
+
+#[gpui_kit::test]
+fn a_library_from_before_pictures_gets_them_made_in_the_background(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    cx.executor().allow_parking();
+    let (fetch, _asked) = fetch_log();
+    let images = cx.update(|cx| RemoteImages::install(cx, fetch));
+    let archive = hud_zip_with_background(env.tmp.path(), "older");
+    let hud = s
+        .services
+        .library
+        .import_hud(&archive, Provenance::Local)
+        .unwrap();
+    // As a library from before pictures: no file and the flag clear.
+    let path = s.services.library.hud_thumbnail(&hud).unwrap();
+    std::fs::remove_file(path).unwrap();
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute("UPDATE library_huds SET has_thumbnail = 0", [])
+        .unwrap();
+    let _page = revisit(cx, &s);
+    assert!(!support::present(cx, s.win, ids::hud_image("older")));
+
+    cx.update(tf2tools_app::pages::huds::make_missing_thumbnails);
+    support::wait_real(cx, "the made picture", |cx| {
+        support::settle(cx, s.win);
+        cx.update(|cx| images.read(cx).stats().decodes == 1)
+    });
+    support::settle(cx, s.win);
+    assert!(support::present(cx, s.win, ids::hud_image("older")));
+}
