@@ -1,6 +1,6 @@
 //! Installing a HUD's missing fonts through a fake host; nothing touches the real system.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::PathBuf;

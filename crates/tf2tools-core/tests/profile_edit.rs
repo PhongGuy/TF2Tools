@@ -1,6 +1,6 @@
 //! Creating and editing profiles from drafts, writing v5's columns.
 
-mod common;
+use crate::common;
 
 use common::{
     LibraryEnv, V5_PROFILE_ID as V5_ID, count, gb, import_hud_as, import_png_as, import_wav_as,

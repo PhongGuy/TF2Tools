@@ -1,6 +1,6 @@
 //! A loopback-only store client: nothing leaves the machine, and a warm disk cache still serves.
 
-mod common;
+use crate::common;
 
 use common::{StoreEnv, fast_config, sql, store_env, write_file};
 use std::path::PathBuf;

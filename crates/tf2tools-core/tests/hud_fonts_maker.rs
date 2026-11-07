@@ -1,7 +1,7 @@
 //! Stage 2 fonts: the scheme over the edited clientscheme.res, per-part font clones and added
 //! font files.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, stock_files_with};
 use tf2tools_core::{

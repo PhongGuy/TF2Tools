@@ -1,6 +1,6 @@
 //! Alignment tools: nudges, Match size, Mirror and snapping.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, label, stock_files, stock_files_with, with_blocks};
 use tf2tools_core::{

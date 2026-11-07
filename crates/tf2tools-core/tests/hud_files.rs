@@ -1,6 +1,6 @@
 //! Game files through ordered layers: VPKs in gameinfo order, loose fonts, memory.
 
-mod common;
+use crate::common;
 
 use tf2tools_core::{GameText, HudFiles, HudFilesError, Platform, normalise_game_path};
 

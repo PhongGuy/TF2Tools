@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use rusqlite::Connection;
 use tf2tools_core::{Database, OpenError};

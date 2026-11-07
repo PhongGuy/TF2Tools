@@ -1,6 +1,6 @@
 //! Sound library: WAV and VPK import with provenance, rename, delete and playback bytes.
 
-mod common;
+use crate::common;
 
 use std::fs;
 

@@ -1,6 +1,6 @@
 //! The health pulse image: the game shows it only while you are overhealed or low on health.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{BONUS, HEALTH_RES, health_with_bonus};
 use common::hud_stock::stock_files_with;

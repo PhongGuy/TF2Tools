@@ -1,6 +1,6 @@
 //! Scoreboard edits: code-owned root position, code-toggled hides, lists and the HUD's hide.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{scoreboard_with, stock_files};
 use tf2tools_core::{

@@ -1,6 +1,6 @@
 //! The made-up spectator view and what the game's code writes on it.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files;
 use tf2tools_core::{HudModel, PartKey, Platform, Rgba, SampleSet, Scene, SceneRule, Team};

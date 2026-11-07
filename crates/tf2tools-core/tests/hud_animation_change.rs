@@ -1,6 +1,6 @@
 //! The two animation change shapes: maker.json, replay order, validity, recipes.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{ANIMS, ANIMS_PATH, anim_model};
 use std::collections::BTreeMap;

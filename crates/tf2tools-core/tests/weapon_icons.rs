@@ -1,6 +1,6 @@
 //! Weapon icons from the TF2 wiki: which item pictures each weapon script, and its URL.
 
-mod common;
+use crate::common;
 
 use common::{fast_config, store_env};
 use tf2tools_core::{Database, Endpoints, StoreClient, Weapon, weapons};

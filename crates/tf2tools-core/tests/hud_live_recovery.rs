@@ -1,6 +1,6 @@
 //! The live link's staging folder: HUD scans skip it, recovery and installs clear it.
 
-mod common;
+use crate::common;
 
 use std::fs;
 

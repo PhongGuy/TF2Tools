@@ -1,6 +1,6 @@
 //! Resolving profile references by folder, then by store id, and reporting the rest missing.
 
-mod common;
+use crate::common;
 
 use std::fs;
 

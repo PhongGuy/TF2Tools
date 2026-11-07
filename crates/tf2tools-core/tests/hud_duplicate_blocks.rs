@@ -1,7 +1,7 @@
 //! Duplicate sibling blocks for one panel: the game applies them all in file order, so reads
 //! merge them key by key (the later wins) and edits land where they take effect.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, hudlayout_with_killfeed, stock_files_with, with_blocks};
 use tf2tools_core::{

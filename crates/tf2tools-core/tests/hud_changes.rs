@@ -1,6 +1,6 @@
 //! Semantic changes replayed as token edits: one value span, insertion, order, and what drops.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, stock_files};
 use tf2tools_core::{

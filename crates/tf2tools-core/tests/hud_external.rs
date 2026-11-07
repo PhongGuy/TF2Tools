@@ -1,7 +1,7 @@
 //! HUD folders in tf/custom that the library cannot put back: they are never removed until
 //! the caller names them, and keeping a copy goes first.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::Path;

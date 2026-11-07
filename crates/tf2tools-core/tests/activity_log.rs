@@ -1,6 +1,6 @@
 //! The activity log over v5's logs table: append, filtered keyset queries, clear and trim.
 
-mod common;
+use crate::common;
 
 use common::{count, sql, temp_data_dir};
 use tempfile::TempDir;

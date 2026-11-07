@@ -1,6 +1,6 @@
 //! Save as new from a copy, the credits file, and a copy installed over its original.
 
-mod common;
+use crate::common;
 
 use std::fs::read_to_string;
 

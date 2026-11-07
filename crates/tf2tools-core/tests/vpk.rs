@@ -1,6 +1,6 @@
 //! Reading the first WAV out of a VPK, and refusing malformed VPKs without panicking.
 
-mod common;
+use crate::common;
 
 use std::path::{Path, PathBuf};
 use tf2tools_core::{VpkError, first_wav_in_vpk};

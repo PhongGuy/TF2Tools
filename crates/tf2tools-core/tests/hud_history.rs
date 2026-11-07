@@ -1,6 +1,6 @@
 //! A made HUD's history snapshots, kept in `.tf2tools/history/` inside its library folder.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files;
 use common::{LibraryEnv, library_env, tree};

@@ -1,6 +1,6 @@
 //! In a copy, the model reads each file's #base chain as the game merges it.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{AMMO, HEALTH, stock_files_with};
 use tf2tools_core::{HudFiles, HudModel, PartKey, Platform};

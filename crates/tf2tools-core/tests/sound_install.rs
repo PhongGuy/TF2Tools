@@ -1,6 +1,6 @@
 //! Hitsound and killsound install into tf/custom and the installed-sound scan.
 
-mod common;
+use crate::common;
 
 use std::fs;
 

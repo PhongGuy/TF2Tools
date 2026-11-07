@@ -1,6 +1,6 @@
 //! Listing an item's downloadable files, and fetching store audio previews.
 
-mod common;
+use crate::common;
 
 use common::{StoreEnv, fast_config, sql, store_env, store_fixture};
 use tf2tools_core::{

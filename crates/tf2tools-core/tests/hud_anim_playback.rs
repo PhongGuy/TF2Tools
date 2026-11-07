@@ -1,6 +1,6 @@
 //! Playing animation events to a frame at a moment.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{BONUS, HEALTH_KEY, HEALTH_RES, VALUE, anim_model, health_with_bonus};
 use std::time::{Duration, Instant};

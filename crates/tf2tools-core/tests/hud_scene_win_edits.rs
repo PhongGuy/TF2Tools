@@ -1,6 +1,6 @@
 //! The win panel scene under a #base stub, an edit, and a hudlayout box that hides it.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HUDLAYOUT, stock_files, stock_files_with, win_stub};
 use tf2tools_core::{

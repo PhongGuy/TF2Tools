@@ -1,7 +1,7 @@
 //! The texture an image part draws for the local player's team: a team-coloured panel's
 //! `teambg_<team>`, else its `image`, else the texture the game's code paints into it.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, block, stock_files_with, with_blocks};
 use tf2tools_core::{HudModel, PartKey, Platform, Team, drawn_image};

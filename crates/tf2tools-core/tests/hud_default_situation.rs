@@ -1,7 +1,7 @@
 //! The HUD scene's default situation: a RED Soldier holding a rocket launcher, so parts the
 //! game shows only for other classes, weapons or effects start hidden by the game.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, block, stock_files_with, with_blocks};
 use tf2tools_core::{

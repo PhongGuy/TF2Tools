@@ -1,19 +1,24 @@
 //! Panics that core catches itself run with the thread marked, so the app's crash hook skips them.
-//! One test per binary: it swaps the process-wide panic hook.
+//! It swaps the process-wide panic hook, so it records only its own thread's panics and hands
+//! the other tests' panics to the previous hook.
 
 use std::sync::{Arc, Mutex};
 
 use tf2tools_core::panic_mark::is_marked;
 use tf2tools_core::{decode_vtf, extract_archive};
 
-mod common;
+use crate::common;
 
 #[test]
 fn panics_inside_core_catch_sites_run_marked() {
     let seen: Arc<Mutex<Vec<(String, bool)>>> = Arc::default();
     let record = Arc::clone(&seen);
-    drop(std::panic::take_hook());
+    let me = std::thread::current().id();
+    let fallback = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
+        if std::thread::current().id() != me {
+            return fallback(info);
+        }
         let message = info.payload_as_str().unwrap_or("panic").to_owned();
         if let Ok(mut seen) = record.lock() {
             seen.push((message, is_marked()));

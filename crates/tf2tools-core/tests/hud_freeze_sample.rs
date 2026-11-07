@@ -1,6 +1,6 @@
 //! The made-up killer the freeze cam previews, and the labels it fills.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{FREEZE_PANEL, stock_files_with};
 use tf2tools_core::{HudModel, PartKey, Platform, SampleSet, Scene, SceneRule, Team, drawn_image};

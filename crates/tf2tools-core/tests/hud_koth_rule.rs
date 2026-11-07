@@ -1,6 +1,6 @@
 //! The KOTH timer: its rule, its parts and their boxes in a casual match.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files_with;
 use tf2tools_core::{HideTechnique, HudModel, PanelRule, PartId, PartKey, Platform, Scene, Screen};

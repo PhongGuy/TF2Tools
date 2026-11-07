@@ -1,6 +1,6 @@
 //! The HUD's animations: the manifest's files in order, first event of a name wins.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{ANIMS, MANIFEST_PATH, anim_model};
 use common::hud_stock::stock;

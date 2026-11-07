@@ -1,6 +1,6 @@
 //! Tinting an image by the colour the game draws it in.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{BONUS, HEALTH_RES, health_with_bonus};
 use common::hud_stock::stock_files_with;

@@ -1,6 +1,6 @@
 //! Saving the installed HUD, sounds and crosshair assignments as a new profile.
 
-mod common;
+use crate::common;
 
 use common::{gb, import_hud_as, import_png_as, import_wav_as, library_env, write_file};
 use tf2tools_core::{CrosshairRef, ProfileCrosshairRef, ProfileError, Provenance, SoundKind};

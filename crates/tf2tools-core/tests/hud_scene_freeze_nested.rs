@@ -1,6 +1,6 @@
 //! The freeze cam's killer health file as children of FreezePanelHealth.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{stock_files, stock_files_with};
 use tf2tools_core::{

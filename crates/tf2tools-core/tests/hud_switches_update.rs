@@ -1,6 +1,6 @@
 //! Updating a copy with switches: dropped choices named from the old HUD, no false both-changed.
 
-mod common;
+use crate::common;
 
 use common::hud_copy::{game_for, import_stock_hud, store_item};
 use common::hud_stock::HEALTH;

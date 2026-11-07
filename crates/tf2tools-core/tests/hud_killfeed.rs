@@ -1,6 +1,6 @@
 //! The killfeed part and the two sample lines drawn from HudDeathNotice's settings.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{hudlayout_with_killfeed, stock_files, stock_files_with};
 use tf2tools_core::{HudModel, PanelRule, PartId, PartKey, Platform, Rgba, Scene, Screen};

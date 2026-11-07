@@ -1,6 +1,6 @@
 //! The merged client scheme: colours, aliases, font variants and font files.
 
-mod common;
+use crate::common;
 
 use tf2tools_core::{HudFiles, Platform, Rgba, Scheme};
 

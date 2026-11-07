@@ -1,7 +1,7 @@
 //! Finding an old TF2Tools 4 install from what Windows lists under Apps, over fake registry
 //! entries and a fake file check.
 
-mod common;
+use crate::common;
 
 use std::path::{Path, PathBuf};
 

@@ -1,6 +1,6 @@
 //! Reopening a made HUD: replay, changes TF2 broke, hand edits and files TF2Tools cannot open.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, stock_files, stock_files_with};
 use common::{LibraryEnv, import_hud_as, library_env, tree, write_file};

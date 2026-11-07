@@ -1,6 +1,6 @@
 //! Writing crosshair assignments into tf/custom, removing them, and the installed scan.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::io::Cursor;

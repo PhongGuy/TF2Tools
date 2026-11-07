@@ -1,6 +1,6 @@
 //! Schema #base swaps in every form, and no schema operation reaching `.tf2tools/`.
 
-mod common;
+use crate::common;
 
 use common::hud_switches::switch_files;
 use tf2tools_core::{HudSchema, OptionAction, OptionSpec, Platform, SwitchAction};

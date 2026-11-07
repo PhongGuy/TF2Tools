@@ -1,6 +1,6 @@
 //! Scanning a HUD's declared fonts per platform, with the survey's absent-file rules.
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 
