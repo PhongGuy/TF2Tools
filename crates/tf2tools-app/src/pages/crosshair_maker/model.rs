@@ -172,7 +172,7 @@ impl Editor {
     }
 
     /// A clean editor over a saved drawing. None unless `drawing` is 32x32 or 64x64.
-    pub fn open(id: CrosshairId, name: impl Into<String>, drawing: &RgbaImage) -> Option<Self> {
+    pub fn open(id: CrosshairId, name: String, drawing: &RgbaImage) -> Option<Self> {
         if drawing.width() != drawing.height() {
             return None;
         }
@@ -182,7 +182,7 @@ impl Editor {
             pixels: drawing.pixels().to_vec(),
             saved: (size, drawing.pixels().to_vec()),
             open_id: Some(id),
-            name: name.into(),
+            name,
             ..Self::new()
         })
     }
@@ -483,9 +483,9 @@ impl Editor {
 
     /// Records a save of `saved` as `id` and `name`, keeping the history. `saved` becomes the
     /// clean drawing, so edits made while the save ran stay unsaved until undone.
-    pub fn mark_saved(&mut self, id: CrosshairId, name: impl Into<String>, saved: &RgbaImage) {
+    pub fn mark_saved(&mut self, id: CrosshairId, name: String, saved: &RgbaImage) {
         self.open_id = Some(id);
-        self.name = name.into();
+        self.name = name;
         if let Some(size) =
             CanvasSize::of_side(saved.width()).filter(|_| saved.width() == saved.height())
         {

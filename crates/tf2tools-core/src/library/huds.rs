@@ -385,11 +385,13 @@ impl Library {
             return Err(failure.into());
         }
 
-        let recorded = self.record_hud(folder_name, provenance, rename);
-        if recorded.is_err() {
-            let _ = remove_dir_if_present(&dest);
+        match self.record_hud(folder_name, provenance, rename) {
+            Ok(entry) => Ok(self.refresh_hud_thumbnail(entry)),
+            Err(failure) => {
+                let _ = remove_dir_if_present(&dest);
+                Err(failure)
+            }
         }
-        recorded.map(|entry| self.refresh_hud_thumbnail(entry))
     }
 
     /// Writes the `library_huds` row for a freshly copied folder, taking the display name

@@ -150,7 +150,7 @@ fn decodes_never_run_on_the_foreground(cx: &mut TestAppContext) {
         cx,
         &images,
         "grid",
-        urls.iter().map(|u| ImageKey::card(*u)).collect(),
+        urls.iter().map(|u| ImageKey::card(u)).collect(),
     );
     support::wait_real(cx, "five decodes", |cx| {
         cx.update(|cx| images.read(cx).stats().decodes == 5)

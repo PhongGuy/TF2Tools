@@ -351,7 +351,7 @@ fn all_ready(cx: &mut TestAppContext, images: &Entity<RemoteImages>, urls: &[Str
     cx.update(|cx| {
         urls.iter().all(|u| {
             matches!(
-                images.read(cx).image(&ImageKey::weapon_icon(u.clone())),
+                images.read(cx).image(&ImageKey::weapon_icon(u)),
                 RemoteImage::Ready(_)
             )
         })
@@ -477,7 +477,7 @@ fn a_failed_icon_falls_back_to_the_slot_square(cx: &mut TestAppContext) {
             && cx.update(|cx| {
                 scout.iter().all(|u| {
                     matches!(
-                        images.read(cx).image(&ImageKey::weapon_icon(u.clone())),
+                        images.read(cx).image(&ImageKey::weapon_icon(u)),
                         RemoteImage::Failed
                     )
                 })

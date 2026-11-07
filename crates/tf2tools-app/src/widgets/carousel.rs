@@ -94,11 +94,11 @@ impl Carousel {
         };
         let mut keys = Vec::new();
         if let Some(url) = self.urls.get(self.index) {
-            keys.push(ImageKey::carousel(url.clone()));
+            keys.push(ImageKey::carousel(url));
         }
         if self.len() > 1 {
             let next = &self.urls[(self.index + 1) % self.len()];
-            keys.push(ImageKey::carousel(next.clone()));
+            keys.push(ImageKey::carousel(next));
         }
         let viewer = self.viewer.clone();
         images.update(cx, |images, cx| images.want(&viewer, keys, cx));
@@ -122,8 +122,8 @@ impl Render for Carousel {
             )
             .into_any_element();
         };
-        let image = RemoteImages::global(cx)
-            .map(|images| images.read(cx).image(&ImageKey::carousel(url.clone())));
+        let image =
+            RemoteImages::global(cx).map(|images| images.read(cx).image(&ImageKey::carousel(url)));
         let mut area = div()
             .id(ids::CAROUSEL_IMAGE)
             .test_support()

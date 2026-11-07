@@ -435,7 +435,7 @@ impl HudsPage {
         let keys: Vec<ImageKey> = shown[self.visible.start.min(end)..end]
             .iter()
             .filter_map(|&ix| self.image_urls.get(self.huds[ix].folder_name()))
-            .map(|url| ImageKey::card(url.clone()))
+            .map(|url| ImageKey::card(url))
             .collect();
         images.update(cx, |images, cx| images.want(&self.image_viewer, keys, cx));
     }
@@ -879,8 +879,8 @@ impl HudsPage {
         let Some((_, HudStatus::Multiple { folder_names })) = &self.status else {
             return None;
         };
-        let named = |folder: &String| (folder.clone(), self.hud_name(folder).to_owned());
-        Some(folder_names.iter().map(named).collect())
+        let named = |folder: &str| (folder.to_owned(), self.hud_name(folder).to_owned());
+        Some(folder_names.iter().map(|f| named(f)).collect())
     }
 
     // The library's name for the HUD in `folder`, else the folder's own name.
@@ -1223,7 +1223,7 @@ impl HudsPage {
 // card a click opens the HUD's gallery in the lightbox; a HUD of the player's has none.
 fn screenshot(
     hud: &HudEntry,
-    url: Option<&String>,
+    url: Option<&str>,
     page: &WeakEntity<HudsPage>,
     cx: &App,
 ) -> AnyElement {
@@ -1248,7 +1248,7 @@ fn screenshot(
         .bg(cx.theme().muted);
     let ready = url
         .zip(RemoteImages::global(cx))
-        .map(|(url, images)| images.read(cx).image(&ImageKey::card(url.clone())));
+        .map(|(url, images)| images.read(cx).image(&ImageKey::card(url)));
     match ready {
         Some(RemoteImage::Ready(image)) => area
             .child(
@@ -1266,15 +1266,15 @@ fn screenshot(
 /// What one library card shows beyond its HUD entry.
 struct CardState<'a> {
     /// The card picture's URL: a store screenshot or the HUD's own picture.
-    url: Option<&'a String>,
+    url: Option<&'a str>,
     /// Made in the HUD Maker, so it offers Edit.
     made: bool,
     /// A copy's base name and its update check.
-    copy: Option<(&'a String, Option<&'a CopyUpdate>)>,
+    copy: Option<(&'a str, Option<&'a CopyUpdate>)>,
     /// An unedited store HUD whose store version is newer.
     behind_store: bool,
     /// The HUD's own web page, where its author posts help and updates.
-    page_url: Option<&'a String>,
+    page_url: Option<&'a str>,
 }
 
 // v5's HudCard: name, author and source badge, then delete and Install bottom right.
@@ -1308,7 +1308,7 @@ fn hud_card(
                 .line_clamp(3)
                 .text_color(theme.muted_foreground),
             ids::hud_update_note(folder),
-            copy_in_store_text(copy.map_or("", |(base, _)| base.as_str())),
+            copy_in_store_text(copy.map_or("", |(base, _)| base)),
         )
     });
     let update_mark = behind_store.then(|| {
@@ -1417,7 +1417,8 @@ fn hud_card(
                         .flex_none()
                         .items_start()
                         .gap_1()
-                        .children(page_url.cloned().map(|url| {
+                        .children(page_url.map(|url| {
+                            let url = url.to_owned();
                             Button::new(ids::hud_visit(folder))
                                 .ghost()
                                 .xsmall()
@@ -1583,11 +1584,12 @@ impl HudsPage {
                         let hud = &huds[shown[ix]];
                         let folder = hud.folder_name();
                         let state = CardState {
-                            url: urls.get(folder),
+                            url: urls.get(folder).map(String::as_str),
                             made: made.contains(folder),
-                            copy: (copies.get(folder)).map(|base| (base, updates.get(folder))),
+                            copy: (copies.get(folder))
+                                .map(|base| (base.as_str(), updates.get(folder))),
                             behind_store: behind.contains(folder),
-                            page_url: pages.get(folder),
+                            page_url: pages.get(folder).map(String::as_str),
                         };
                         hud_card(hud, state, busy.as_ref(), &page, cx)
                     }),

@@ -136,7 +136,7 @@ fn a_dropped_carousel_hands_back_its_wants(cx: &mut TestAppContext) {
     cx.executor().allow_parking();
     let images = cx.update(|cx| RemoteImages::install(cx, fetch));
     let cards: Vec<ImageKey> = (0..MAX_FETCHES)
-        .map(|i| ImageKey::card(format!("u/card{i}")))
+        .map(|i| ImageKey::card(&format!("u/card{i}")))
         .collect();
     cx.update(|cx| images.update(cx, |i, cx| i.want("cards", cards.clone(), cx)));
     let (win, carousel) = cx

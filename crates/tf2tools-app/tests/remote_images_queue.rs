@@ -10,7 +10,7 @@ use tf2tools_app::remote_images::queue::{
 use tf2tools_app::remote_images::{FetchFailure, ImageKey, ImageTarget};
 
 fn k(n: usize) -> ImageKey {
-    ImageKey::card(format!("https://images.gamebanana.com/{n}.jpg"))
+    ImageKey::card(&format!("https://images.gamebanana.com/{n}.jpg"))
 }
 
 fn keys(range: Range<usize>) -> Vec<ImageKey> {
@@ -105,7 +105,7 @@ fn one_image_wanted_twice_is_fetched_once() {
     q.want("c", vec![k(0)], now);
     assert_eq!(q.next_fetch(), None);
     // A card and a carousel of one URL are two images.
-    let carousel = ImageKey::carousel(k(0).url);
+    let carousel = ImageKey::carousel(&k(0).url);
     q.want("d", vec![carousel.clone()], now);
     assert_eq!(q.next_fetch(), Some(carousel));
 }

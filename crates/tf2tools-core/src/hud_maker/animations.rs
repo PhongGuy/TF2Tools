@@ -747,8 +747,8 @@ impl Parser {
     /// Keeps a fully read command unless a token is over the cap, a time is bad, or its
     /// conditional is false.
     fn finish(&self, args: &[String], times: &[f32], holds: bool, command: AnimCommand) -> Read {
-        let bad_token = |t: &String| t.len() > MAX_TOKEN || !clean_token(t);
-        if args.iter().any(bad_token) || !times.iter().all(|&t| good_time(t)) {
+        let bad_token = |t: &str| t.len() > MAX_TOKEN || !clean_token(t);
+        if args.iter().any(|t| bad_token(t)) || !times.iter().all(|&t| good_time(t)) {
             Read::Skipped
         } else if !holds {
             Read::Dropped

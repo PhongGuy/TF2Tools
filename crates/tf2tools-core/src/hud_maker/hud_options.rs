@@ -844,7 +844,7 @@ fn join(dir: &str, name: &str) -> String {
 }
 
 /// Whether an option touching `paths` needs TF2 restarted to show.
-fn needs_restart<'a>(paths: impl IntoIterator<Item = &'a String>) -> bool {
+fn needs_restart<'a>(paths: impl IntoIterator<Item = &'a str>) -> bool {
     paths.into_iter().any(|p| {
         p.rsplit('/')
             .next()
@@ -884,7 +884,7 @@ impl Detector {
     }
 
     fn toggle(&mut self, id: &str, label: &str, group: &str, on: bool, action: SwitchAction) {
-        let restart = needs_restart(&switch_paths(&action));
+        let restart = needs_restart(switch_paths(&action).iter().map(String::as_str));
         self.add(OptionSpec::hud(
             id,
             label,
@@ -1009,7 +1009,7 @@ impl Detector {
             OptionKind::Choice(choices),
             OptionValue::Pick(active.unwrap_or_default()),
             Vec::new(),
-            needs_restart(&paths),
+            needs_restart(paths.iter().map(String::as_str)),
             OptionSource::Detected,
         ));
     }
@@ -1159,7 +1159,7 @@ impl Detector {
             to: to.to_owned(),
         });
         let choice = Choice::new(&from, &stem_label(option), vec![action]);
-        let restart = needs_restart(&[from.clone(), to.to_owned()]);
+        let restart = needs_restart([from.as_str(), to]);
         if let Some(spec) = self.specs.iter_mut().find(|s| s.id() == id) {
             spec.add_choice(choice, restart);
             return;

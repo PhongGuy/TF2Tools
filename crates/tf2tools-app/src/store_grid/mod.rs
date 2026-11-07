@@ -705,7 +705,7 @@ impl StoreGrid {
         let start = self.visible.start.min(end);
         let keys: Vec<ImageKey> = cards[start..end]
             .iter()
-            .filter_map(|card| card.thumbnail_url.clone().map(ImageKey::card))
+            .filter_map(|card| card.thumbnail_url.as_deref().map(ImageKey::card))
             .collect();
         images.update(cx, |images, cx| images.want(&self.viewer, keys, cx));
     }
@@ -895,7 +895,7 @@ impl StoreGrid {
                 };
                 let image = match (card_size, &card.thumbnail_url) {
                     (CardSize::Image { .. }, Some(url)) => RemoteImages::global(cx)
-                        .map(|images| images.read(cx).image(&ImageKey::card(url.clone()))),
+                        .map(|images| images.read(cx).image(&ImageKey::card(url))),
                     _ => None,
                 };
                 div()

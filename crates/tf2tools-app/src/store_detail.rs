@@ -257,7 +257,7 @@ impl StoreDetail {
                 Ok(Ok(files)) => Ok(files),
                 Ok(Err(err)) => Err(describe_files(kind, &err)),
                 Err(_) => Err(listing_stopped(
-                    "the file listing task stopped unexpectedly",
+                    "the file listing task stopped unexpectedly".to_owned(),
                 )),
             }
             .map_err(|failure| {

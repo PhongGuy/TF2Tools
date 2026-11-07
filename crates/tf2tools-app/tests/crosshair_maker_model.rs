@@ -302,7 +302,7 @@ fn an_opened_crosshair_starts_clean_and_saving_renames_it() {
     let at = (2 * 32 + 1) * 4;
     pixels[at..at + 4].copy_from_slice(&opaque(RED));
     let drawing = RgbaImage::from_pixels(32, 32, pixels).unwrap();
-    let mut e = Editor::open(CrosshairId::new("abc"), "Dot", &drawing).unwrap();
+    let mut e = Editor::open(CrosshairId::new("abc"), "Dot".to_owned(), &drawing).unwrap();
     assert_eq!(e.size(), CanvasSize::Small);
     assert_eq!(e.pixel(1, 2), opaque(RED));
     assert_eq!(e.drawing(), drawing);
@@ -312,12 +312,12 @@ fn an_opened_crosshair_starts_clean_and_saving_renames_it() {
         (Some("abc"), "Dot")
     );
     let odd = RgbaImage::from_pixels(16, 16, vec![0; 16 * 16 * 4]).unwrap();
-    assert!(Editor::open(CrosshairId::new("abc"), "Dot", &odd).is_none());
+    assert!(Editor::open(CrosshairId::new("abc"), "Dot".to_owned(), &odd).is_none());
 
     dab(&mut e, 5, 5);
     assert!(e.is_dirty());
     let sent = e.drawing();
-    e.mark_saved(CrosshairId::new("abc"), "Ring", &sent);
+    e.mark_saved(CrosshairId::new("abc"), "Ring".to_owned(), &sent);
     assert!(!e.is_dirty());
     assert_eq!(e.name(), "Ring");
     assert!(e.can_undo(), "saving keeps the history");
@@ -331,7 +331,7 @@ fn an_edit_made_while_a_save_ran_stays_unsaved() {
     dab(&mut e, 1, 1);
     let sent = e.drawing();
     dab(&mut e, 2, 2);
-    e.mark_saved(CrosshairId::new("abc"), "Dot", &sent);
+    e.mark_saved(CrosshairId::new("abc"), "Dot".to_owned(), &sent);
     assert!(e.is_dirty(), "the second dab was not in the save");
     assert_eq!(
         (e.open_id().map(CrosshairId::as_str), e.name()),
@@ -345,7 +345,7 @@ fn an_edit_made_while_a_save_ran_stays_unsaved() {
 #[test]
 fn undoing_back_to_the_opened_drawing_is_clean() {
     let drawing = RgbaImage::from_pixels(32, 32, vec![0; 32 * 32 * 4]).unwrap();
-    let mut e = Editor::open(CrosshairId::new("abc"), "Dot", &drawing).unwrap();
+    let mut e = Editor::open(CrosshairId::new("abc"), "Dot".to_owned(), &drawing).unwrap();
     dab(&mut e, 5, 5);
     assert!(e.is_dirty());
     e.undo();
@@ -367,7 +367,7 @@ fn undoing_back_to_the_saved_drawing_is_clean() {
     let mut e = Editor::new();
     dab(&mut e, 1, 1);
     let sent = e.drawing();
-    e.mark_saved(CrosshairId::new("abc"), "Dot", &sent);
+    e.mark_saved(CrosshairId::new("abc"), "Dot".to_owned(), &sent);
     dab(&mut e, 2, 2);
     assert!(e.is_dirty());
     e.undo();
@@ -1010,7 +1010,7 @@ fn the_opacity_tooltip_says_painting_replaces_a_pixel() {
 fn a_starter_becomes_a_new_unsaved_drawing_with_one_undo_step() {
     use tf2tools_app::pages::crosshair_maker::starter::{Starter, starter_drawing};
     let full = RgbaImage::from_pixels(64, 64, vec![255; 64 * 64 * 4]).unwrap();
-    let mut e = Editor::open(CrosshairId::new("abc"), "Old", &full).unwrap();
+    let mut e = Editor::open(CrosshairId::new("abc"), "Old".to_owned(), &full).unwrap();
     e.set_tool(Tool::Eraser);
     dab(&mut e, 0, 0);
     e.set_colour(RED);

@@ -79,9 +79,8 @@ impl KvEntry {
 
     /// Whether every conditional the engine evaluates holds on `platform`.
     pub fn holds(&self, platform: Platform) -> bool {
-        let holds =
-            |cond: &Option<String>| cond.as_ref().is_none_or(|c| condition_holds(c, platform));
-        holds(&self.before) && (self.directive || holds(&self.after))
+        let holds = |cond: Option<&str>| cond.is_none_or(|c| condition_holds(c, platform));
+        holds(self.before.as_deref()) && (self.directive || holds(self.after.as_deref()))
     }
 
     /// The 1-based line of the key.
