@@ -262,7 +262,7 @@ async fn run(args: Args) -> Result<(), Box<dyn Error>> {
 
     let stop = Arc::new(AtomicBool::new(false));
     let sampler = {
-        let (client, stop) = (client.clone(), stop.clone());
+        let (client, stop) = (client.clone(), Arc::clone(&stop));
         std::thread::spawn(move || sample_reads(client, stop, args.read_every))
     };
     let start = Instant::now();
@@ -359,7 +359,7 @@ mod tests {
         let (_server, client) = sound_client(&tmp).await;
         let stop = Arc::new(AtomicBool::new(false));
         let sampler = {
-            let (client, stop) = (client.clone(), stop.clone());
+            let (client, stop) = (client.clone(), Arc::clone(&stop));
             std::thread::spawn(move || sample_reads(client, stop, Duration::from_millis(5)))
         };
         time_all(&client, &[StoreKind::Sounds]).await;

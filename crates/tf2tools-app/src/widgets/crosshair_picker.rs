@@ -115,7 +115,7 @@ impl CrosshairPicker {
                 cx.notify();
             }
         });
-        let builtins = cx.global::<Services>().builtins.clone();
+        let builtins = Arc::clone(&cx.global::<Services>().builtins);
         let builtins_lowered = builtins
             .all()
             .iter()
@@ -250,8 +250,8 @@ impl CrosshairPicker {
     // picker through a weak handle, so a click after it is gone or while it is disabled does nothing.
     fn list(&self, rows: Rc<[Row]>, cx: &mut Context<Self>) -> AnyElement {
         let picker = cx.entity().downgrade();
-        let builtins = self.builtins.clone();
-        let library = self.library.clone();
+        let builtins = Arc::clone(&self.builtins);
+        let library = Rc::clone(&self.library);
         let selected = self.selected.clone();
         let previews = self.previews.clone();
         // The right padding keeps the options clear of the scrollbar's track.
@@ -426,7 +426,7 @@ impl CrosshairPicker {
     // The tile grid. The canvas records the painted width; a change asks for another frame,
     // since a refresh requested while drawing is dropped.
     fn grid(&self, tiles: Rc<[Row]>, cx: &mut Context<Self>) -> AnyElement {
-        let measured = self.width.clone();
+        let measured = Rc::clone(&self.width);
         let watch = canvas(
             move |bounds, window, _| {
                 if measured.get() != bounds.size.width {
@@ -442,8 +442,8 @@ impl CrosshairPicker {
         let columns = (((usable + TILE_GAP) / (TILE_WIDTH + TILE_GAP)).floor() as usize).max(1);
         let rows = tiles.len().div_ceil(columns);
         let picker = cx.entity().downgrade();
-        let builtins = self.builtins.clone();
-        let library = self.library.clone();
+        let builtins = Arc::clone(&self.builtins);
+        let library = Rc::clone(&self.library);
         let selected = self.selected.clone();
         let previews = self.previews.clone();
         let list = uniform_list(ids::CROSSHAIRS_LIST, rows, move |range, _, cx| {

@@ -204,7 +204,7 @@ impl CardGrid {
     ) -> AnyElement {
         // The canvas records the grid's painted width; a change asks for another frame,
         // since a refresh requested while drawing is dropped.
-        let measured = self.width.clone();
+        let measured = Rc::clone(&self.width);
         let watch = canvas(
             move |bounds, window, _| {
                 if measured.get() != bounds.size.width {
@@ -220,9 +220,9 @@ impl CardGrid {
         // Each list item is one row of `columns` cells of one whole-pixel width, since flex
         // cells snap to unequal pixels; a short last row pads with empty cells. Rows keep the
         // column count `rows` was built from, so a breakpoint frame never reshuffles cards.
-        let width = self.width.clone();
-        let card_height = self.card_height.clone();
-        let rendered = self.rendered.clone();
+        let width = Rc::clone(&self.width);
+        let card_height = Rc::clone(&self.card_height);
+        let rendered = Rc::clone(&self.rendered);
         let columns = self.columns();
         let rows = count.div_ceil(columns);
         let list = uniform_list(self.id.clone(), rows, move |range, window, cx| {
@@ -269,8 +269,8 @@ impl CardGrid {
     /// and then its real one, so the stored range is the rendered rows. Hooks run deferred,
     /// since a notify raised during prepaint is dropped.
     fn hook_canvas(&self, count: usize, columns: usize, rows: usize) -> impl IntoElement {
-        let rendered = self.rendered.clone();
-        let hooks = self.hooks.clone();
+        let rendered = Rc::clone(&self.rendered);
+        let hooks = Rc::clone(&self.hooks);
         canvas(
             move |_, _, cx| {
                 let (row_start, row_end) = rendered.get();

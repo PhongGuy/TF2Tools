@@ -409,7 +409,7 @@ fn a_save_that_lands_after_leaving_still_tells_the_library(cx: &mut TestAppConte
     edit(cx, &page, "255 0 0 255");
     set_name(cx, &s, &page, "My HUD");
     let count = Rc::new(Cell::new(0));
-    let seen = count.clone();
+    let seen = Rc::clone(&count);
     let _sub = cx.update(|cx| {
         let events = LibraryEvents::global(cx);
         cx.subscribe(&events, move |_, _: &LibraryChanged, _| {

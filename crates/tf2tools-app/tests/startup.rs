@@ -208,7 +208,7 @@ fn the_first_huds_page_is_born_with_the_library_loaded(cx: &mut TestAppContext) 
     support::init(cx);
     // Record each HUDs page as it is created, before any of its own loads can land.
     let born = Rc::new(RefCell::new(Vec::new()));
-    let seen = born.clone();
+    let seen = Rc::clone(&born);
     let _watch = cx.update(|cx| {
         cx.observe_new(move |page: &mut HudsPage, _, _| {
             seen.borrow_mut().push((page.is_loaded(), page.hud_count()));
@@ -233,7 +233,7 @@ fn a_failed_preload_falls_back_to_the_pages_own_load(cx: &mut TestAppContext) {
     drop(conn);
     support::init(cx);
     let pages: Rc<RefCell<Vec<Entity<HudsPage>>>> = Rc::default();
-    let seen = pages.clone();
+    let seen = Rc::clone(&pages);
     let _watch = cx.update(|cx| {
         cx.observe_new(move |_: &mut HudsPage, _, cx| seen.borrow_mut().push(cx.entity()))
     });

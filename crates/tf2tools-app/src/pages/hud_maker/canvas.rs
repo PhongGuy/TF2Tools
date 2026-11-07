@@ -126,7 +126,7 @@ impl HudMakerPage {
     // even a drag whose press and release arrive before the next frame; it follows moves only
     // while a drag runs or a held panel waits for the pointer to leave it.
     pub(super) fn canvas_area(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let area = self.area.clone();
+        let area = Rc::clone(&self.area);
         let page = cx.entity().downgrade();
         let dragging = self.part_drag.is_some() || self.marquee.is_some();
         let dividing = self.compare_drag;
@@ -250,12 +250,12 @@ impl HudMakerPage {
         look.frame = played_frame.as_ref();
         // The chat lines record where they draw for the part list, as the killfeed's do.
         match look.chat {
-            Some(_) => look.chat_measure = Some(self.chat_bounds.clone()),
+            Some(_) => look.chat_measure = Some(Rc::clone(&self.chat_bounds)),
             None => self.chat_bounds.borrow_mut().clear(),
         }
-        let measured_text = self.text_bounds.clone();
+        let measured_text = Rc::clone(&self.text_bounds);
         if hard.as_ref().is_some_and(|h| !h.is_empty()) {
-            look.measure = Some(measured_text.clone());
+            look.measure = Some(Rc::clone(&measured_text));
         } else {
             measured_text.borrow_mut().clear();
         }
@@ -295,7 +295,7 @@ impl HudMakerPage {
         let hud_crosshair = (!rule.hides_hud())
             .then(|| hud_crosshair_element(&look, |x, y, w, h| local(fit.rect(x, y, w, h))))
             .flatten();
-        let measured = self.killfeed_bounds.clone();
+        let measured = Rc::clone(&self.killfeed_bounds);
         let killfeed = layout.get(&PartKey::new(KILLFEED)).and_then(|b| {
             let r = local(fit.rect(b.x(), b.y(), b.wide(), b.tall()));
             killfeed_lines(&look, r, &measured, cx)
@@ -884,7 +884,7 @@ impl HudMakerPage {
     // margins, wrapping when narrower. It occludes, so a press on it never reaches the canvas,
     // and a watcher measures it so the next frame can centre and settle it.
     fn floating_toolbar(&mut self, screen: Screen, cx: &mut Context<Self>) -> AnyElement {
-        let measured = self.toolbar_bounds.clone();
+        let measured = Rc::clone(&self.toolbar_bounds);
         let watch = canvas(
             move |inner, window, _| {
                 // Pinned to the padding box's corner, the watcher fills the inside of the 1 px
@@ -1274,7 +1274,7 @@ impl HudMakerPage {
         if !current {
             self.text_bounds.borrow_mut().clear();
             let stamp = (
-                loaded.files.clone(),
+                Arc::clone(&loaded.files),
                 e.scene(),
                 e.screen(),
                 e.shown_changes().to_vec(),
@@ -2230,7 +2230,7 @@ fn pieces(
         .map(|(i, c)| {
             let fx = c.wide() as f32 / c.src_wide() as f32 * look.scale;
             let fy = c.tall() as f32 / c.src_tall() as f32 * look.scale;
-            let whole = img(image.clone())
+            let whole = img(Arc::clone(image))
                 .object_fit(ObjectFit::Fill)
                 .absolute()
                 .left(px(-(c.src_x() as f32) * fx))
@@ -2314,7 +2314,7 @@ fn portrait(part: &Part, b: &PartBox, look: &Look) -> Option<AnyElement> {
             .left(at((b.wide() - side) / 2))
             .size(at(side))
             .child(
-                img(image.clone())
+                img(Arc::clone(image))
                     .object_fit(ObjectFit::Fill)
                     .size(at(side)),
             )
@@ -2349,7 +2349,7 @@ fn framed_portrait(part: &Part, b: &PartBox, image: &Arc<RenderImage>, look: &Lo
         .top(at(feet - side))
         .size(at(side))
         .child(
-            img(image.clone())
+            img(Arc::clone(image))
                 .object_fit(ObjectFit::Fill)
                 .size(at(side)),
         )
@@ -2637,7 +2637,7 @@ fn player_rows(key: &PartKey, list: &PlayerListLayout, list_tall: i32, look: &Lo
                 .ping_image()
                 .and_then(|name| look.images.get(&PartKey::new(name)))
                 .and_then(|image| {
-                    let bar = img(image.clone()).size_full();
+                    let bar = img(Arc::clone(image)).size_full();
                     let id = ids::hud_maker_list_ping(key, i);
                     Some(
                         cell(ColumnKind::Ping)?
@@ -2694,7 +2694,11 @@ fn player_rows(key: &PartKey, list: &PlayerListLayout, list_tall: i32, look: &Lo
                         .test_support()
                         .flex_none()
                         .size(class_side)
-                        .child(img(image.clone()).object_fit(ObjectFit::Fill).size_full());
+                        .child(
+                            img(Arc::clone(image))
+                                .object_fit(ObjectFit::Fill)
+                                .size_full(),
+                        );
                     Some(cell(ColumnKind::Class)?.justify_end().child(icon))
                 });
             div()
@@ -2795,8 +2799,11 @@ fn killfeed_lines(
             Some(image) => {
                 let (w, h) = texture_size(image);
                 let wide = (w as f32 * line.icon() as f32 / h.max(1) as f32) as i32;
-                icon.w(at(wide))
-                    .child(img(image.clone()).object_fit(ObjectFit::Fill).size_full())
+                icon.w(at(wide)).child(
+                    img(Arc::clone(image))
+                        .object_fit(ObjectFit::Fill)
+                        .size_full(),
+                )
             }
             None => icon
                 .w(at(line.icon().saturating_mul(2)))
@@ -2818,7 +2825,7 @@ fn killfeed_lines(
             .bg(look.shade(line.background()))
             .text_size(size)
             .line_height(size)
-            .child(line_watcher(measured.clone(), i))
+            .child(line_watcher(Rc::clone(measured), i))
             .child(name(line.killer(), line.killer_colour()))
             .child(icon)
             .child(name(line.victim(), line.victim_colour()))
@@ -2957,7 +2964,7 @@ fn label_text(
     // The text shrinks to its room while its glyphs spill on; the clip around it cuts them at
     // the room's width only, padded a line up and down (and pulled back by as much) so ink
     // above the ascent, descenders and the shadow and outline copies are never cut.
-    let watcher = measure.map(|m| text_watcher(m.clone(), key.clone()));
+    let watcher = measure.map(|m| text_watcher(Rc::clone(m), key.clone()));
     let text = div()
         .relative()
         .min_w(px(0.))

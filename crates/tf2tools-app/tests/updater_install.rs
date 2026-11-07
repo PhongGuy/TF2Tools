@@ -23,7 +23,7 @@ fn download_progress_reaches_the_ui_at_most_once_per_repaint_interval(cx: &mut T
     let (sink, _reply) = fake.next_download(cx);
     cx.run_until_parked();
     let notes = Rc::new(Cell::new(0));
-    let n = notes.clone();
+    let n = Rc::clone(&notes);
     cx.update(|cx| cx.observe(&u, move |_, _| n.set(n.get() + 1)).detach());
     let percent = |cx: &mut TestAppContext| match state(cx, &u) {
         UpdateState::Downloading { percent, .. } => percent,

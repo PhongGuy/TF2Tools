@@ -609,7 +609,13 @@ fn add_sound_imports_the_picked_wav(cx: &mut TestAppContext) {
     let path = env.tmp.path().join("Classic Ding.wav");
     std::fs::write(&path, wav(441)).unwrap();
     let picker = Arc::new(ScriptedPicker::new([path]));
-    let s = support::shell_window_with(cx, &env, found(&env), picker.clone(), support::no_steam());
+    let s = support::shell_window_with(
+        cx,
+        &env,
+        found(&env),
+        Arc::clone(&picker),
+        support::no_steam(),
+    );
     let _page = open_sounds(cx, &s);
     support::click_id(cx, s.win, ids::SOUNDS_ADD);
     support::wait_real(cx, "the import toast", |cx| {

@@ -827,7 +827,7 @@ impl SoundsPage {
                 .map(|now| now.key.clone());
             let page = cx.entity().downgrade();
             let busy = self.busy.clone();
-            let sounds = self.sounds.clone();
+            let sounds = Rc::clone(&self.sounds);
             Some(
                 self.grid
                     .render(shown.len(), CARD_HEIGHT, move |ix, _, cx| {

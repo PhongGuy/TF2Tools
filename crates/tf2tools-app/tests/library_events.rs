@@ -27,7 +27,7 @@ fn new() -> Vec<u8> {
 /// Counts `LibraryChanged` emissions from now on.
 fn counter(cx: &mut TestAppContext) -> (Rc<Cell<usize>>, Subscription) {
     let count = Rc::new(Cell::new(0));
-    let seen = count.clone();
+    let seen = Rc::clone(&count);
     let sub = cx.update(|cx| {
         let events = LibraryEvents::global(cx);
         cx.subscribe(&events, move |_, _: &LibraryChanged, _| {
@@ -66,7 +66,7 @@ fn downloads_emit_on_finish_and_reinstalls_on_success(cx: &mut TestAppContext) {
     support::seed_library_addon(&s.services, &env, FOOT, "9.0.0", &old(), true);
     let updates = cx.update(AddonUpdates::global);
     let settled = Rc::new(Cell::new(false));
-    let done = settled.clone();
+    let done = Rc::clone(&settled);
     let _settled =
         cx.update(|cx| cx.subscribe(&updates, move |_, _: &AddonEvent, _| done.set(true)));
     let (count, _sub) = counter(cx);
@@ -94,7 +94,7 @@ fn a_failed_download_emits_nothing(cx: &mut TestAppContext) {
     support::seed_library_addon(&s.services, &env, FOOT, "9.0.0", &old(), true);
     let updates = cx.update(AddonUpdates::global);
     let settled = Rc::new(Cell::new(false));
-    let done = settled.clone();
+    let done = Rc::clone(&settled);
     let _settled =
         cx.update(|cx| cx.subscribe(&updates, move |_, _: &AddonEvent, _| done.set(true)));
     let (count, _sub) = counter(cx);

@@ -236,7 +236,7 @@ fn a_path_saved_during_detection_wins() {
     // The detector stands in for a slow Steam scan: the user's Save lands while it runs.
     let db: Arc<OnceLock<Database>> = Arc::new(OnceLock::new());
     let detector: Tf2Detector = {
-        let (db, user, detected) = (db.clone(), user.clone(), detected.clone());
+        let (db, user, detected) = (Arc::clone(&db), user.clone(), detected.clone());
         Arc::new(move || {
             db.get().unwrap().set_tf2_path(Some(&user)).unwrap();
             Tf2Install::from_path(&detected).map(|install| vec![install])
@@ -260,7 +260,7 @@ fn a_path_saved_during_detection_wins() {
 fn services_carry_the_audio_out() {
     let env = support::env();
     let audio = Arc::new(RecordingAudio::new());
-    let s = support::services_with_audio(&env, audio.clone());
+    let s = support::services_with_audio(&env, Arc::clone(&audio));
     let _playback = s.audio.play(vec![1], 0.5);
     assert_eq!(audio.plays(), vec![(vec![1], 0.5)]);
 }

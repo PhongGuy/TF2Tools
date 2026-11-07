@@ -78,7 +78,7 @@ fn the_list_opens_on_the_builtin_group(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let _page = open_crosshairs(cx, &s);
-    let builtins = s.services.builtins.clone();
+    let builtins = Arc::clone(&s.services.builtins);
     assert_eq!(
         support::label_of(cx, s.win, ids::CROSSHAIRS_GROUP_BUILTIN),
         Some(format!("Built-in ({})", builtins.len()))
@@ -258,7 +258,13 @@ fn import_adds_the_picked_png(cx: &mut TestAppContext) {
     let path = env.tmp.path().join("Ring.png");
     std::fs::write(&path, support::crosshair_png([255, 0, 0, 255])).unwrap();
     let picker = Arc::new(ScriptedPicker::new([path]));
-    let s = support::shell_window_with(cx, &env, found(&env), picker.clone(), support::no_steam());
+    let s = support::shell_window_with(
+        cx,
+        &env,
+        found(&env),
+        Arc::clone(&picker),
+        support::no_steam(),
+    );
     let page = open_crosshairs(cx, &s);
     support::click_id(cx, s.win, ids::CROSSHAIRS_IMPORT);
     support::wait_real(cx, "the toast", |cx| {
@@ -368,7 +374,13 @@ fn import_of_a_wrong_file_toasts_the_error(cx: &mut TestAppContext) {
 fn a_cancelled_import_changes_nothing(cx: &mut TestAppContext) {
     let env = support::env();
     let picker = Arc::new(ScriptedPicker::empty());
-    let s = support::shell_window_with(cx, &env, found(&env), picker.clone(), support::no_steam());
+    let s = support::shell_window_with(
+        cx,
+        &env,
+        found(&env),
+        Arc::clone(&picker),
+        support::no_steam(),
+    );
     let _page = open_crosshairs(cx, &s);
     support::click_id(cx, s.win, ids::CROSSHAIRS_IMPORT);
     support::settle(cx, s.win);

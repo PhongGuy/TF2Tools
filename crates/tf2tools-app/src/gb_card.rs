@@ -73,7 +73,7 @@ pub fn gamebanana_card(
     };
     let label = if in_library { "In Library" } else { "Download" };
     let button = {
-        let open = open.clone();
+        let open = Rc::clone(&open);
         download_button(
             kind,
             &card.id,

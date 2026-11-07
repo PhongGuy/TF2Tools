@@ -698,7 +698,7 @@ impl HudMakerPage {
             let fonts = read_font_files(&files, &model);
             let files = Arc::new(files);
             Ok(Ok(Opened {
-                pristine_files: files.clone(),
+                pristine_files: Arc::clone(&files),
                 options: None,
                 opened_base: None,
                 files,
@@ -818,7 +818,7 @@ impl HudMakerPage {
         let mut page = HudMakerPage {
             load: Load::Reading,
             area: Rc::new(Cell::new(Bounds::default())),
-            text_system: cx.text_system().clone(),
+            text_system: Arc::clone(cx.text_system()),
             ui_family: cx.theme().font_family.clone(),
             tints: RefCell::default(),
             parts_scroll: UniformListScrollHandle::new(),
@@ -984,7 +984,7 @@ impl HudMakerPage {
             let menu_backgrounds = menu_backgrounds(shown, platform);
             let images = decode_images(shown, made.pristine(), platform);
             let fonts = read_font_files(shown, made.pristine());
-            let options = copy_tf.is_some().then(|| made.options().clone());
+            let options = copy_tf.is_some().then(|| Arc::clone(made.options()));
             let opened_base = copy_tf.is_some().then(|| made.base().clone());
             let asset_fonts = (made.changes().iter())
                 .filter_map(|c| match c.target() {
@@ -1140,7 +1140,7 @@ impl HudMakerPage {
                     font_names,
                 };
                 self.families = None;
-                self.checks = checks::Checks::new(loaded.text.clone());
+                self.checks = checks::Checks::new(Arc::clone(&loaded.text));
                 self.every_screen = false;
                 self.history_open = false;
                 self.borrow = borrow::BorrowSection::default();
@@ -1571,7 +1571,7 @@ impl HudMakerPage {
                 (key, name)
             })
             .collect();
-        let (files, platform) = (loaded.files.clone(), loaded.platform);
+        let (files, platform) = (Arc::clone(&loaded.files), loaded.platform);
         self.image_reads = self.image_reads.wrapping_add(1);
         let (reads, load) = (self.image_reads, self.loads);
         let job = run_blocking(cx, move |_| {
@@ -2005,7 +2005,7 @@ impl HudMakerPage {
             return;
         }
         drop(saves);
-        let saves = self.place_saves.clone();
+        let saves = Rc::clone(&self.place_saves);
         let win = self.win;
         cx.spawn(async move |_, cx| {
             loop {
@@ -2778,7 +2778,7 @@ impl HudMakerPage {
     /// The files the canvas draws from: a copy's with its choices switched in.
     pub fn shown_files(&self) -> Option<Arc<HudFiles>> {
         match &self.load {
-            Load::Ready(loaded) => Some(loaded.files.clone()),
+            Load::Ready(loaded) => Some(Arc::clone(&loaded.files)),
             _ => None,
         }
     }
@@ -2828,8 +2828,8 @@ impl HudMakerPage {
             return;
         }
         let (options, files, platform) = (
-            options.clone(),
-            loaded.pristine_files.clone(),
+            Arc::clone(options),
+            Arc::clone(&loaded.pristine_files),
             loaded.platform,
         );
         let key = choices.clone();
@@ -2979,7 +2979,7 @@ impl HudMakerPage {
             return;
         };
         // Core switches the files on disk itself, so the switched view is never sent.
-        let (files, platform) = (loaded.pristine_files.clone(), loaded.platform);
+        let (files, platform) = (Arc::clone(&loaded.pristine_files), loaded.platform);
         let changes = loaded.editor.changes().to_vec();
         let assets = loaded.editor.assets().clone();
         let options = loaded.editor.hud_options().cloned();

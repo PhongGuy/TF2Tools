@@ -1187,7 +1187,7 @@ impl ProfilesPage {
                 cx,
             ))
         } else {
-            let (profiles, active) = (self.profiles.clone(), self.active.clone());
+            let (profiles, active) = (Rc::clone(&self.profiles), self.active.clone());
             let activating = self.activating.clone();
             let page = cx.entity().downgrade();
             Some(

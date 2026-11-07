@@ -537,7 +537,7 @@ impl HudsPage {
         // library folder. Only a success asks (and claims that folder ahead of the reload it
         // causes); a failed install leaves it to the page-load check.
         let installed = Arc::new(Mutex::new(None::<String>));
-        let (tf2_for_fonts, installed_for_fonts) = (tf2.clone(), installed.clone());
+        let (tf2_for_fonts, installed_for_fonts) = (tf2.clone(), Arc::clone(&installed));
         let ask: AfterRun = Box::new(move |window, cx| {
             let folder = installed_for_fonts.lock().ok().and_then(|mut f| f.take());
             if let Some(folder) = folder {
@@ -657,7 +657,7 @@ impl HudsPage {
         let base = hud.name().to_owned();
         let busy = Busy::Copy(hud.folder_name().to_owned());
         let made = Arc::new(Mutex::new(None::<HudId>));
-        let (page, made_for_open) = (cx.entity().downgrade(), made.clone());
+        let (page, made_for_open) = (cx.entity().downgrade(), Arc::clone(&made));
         let open: AfterRun = Box::new(move |_, cx| {
             let copy = made_for_open.lock().ok().and_then(|mut m| m.take());
             if let Some(copy) = copy {
@@ -1566,13 +1566,13 @@ impl HudsPage {
             };
             let (busy, page) = (self.busy.clone(), cx.entity().downgrade());
             let (huds, urls, pages, made, copies, updates, behind) = (
-                self.huds.clone(),
-                self.image_urls.clone(),
-                self.page_urls.clone(),
-                self.made.clone(),
-                self.copies.clone(),
-                self.updates.clone(),
-                self.behind_store.clone(),
+                Rc::clone(&self.huds),
+                Rc::clone(&self.image_urls),
+                Rc::clone(&self.page_urls),
+                Rc::clone(&self.made),
+                Rc::clone(&self.copies),
+                Rc::clone(&self.updates),
+                Rc::clone(&self.behind_store),
             );
             Some(
                 self.grid

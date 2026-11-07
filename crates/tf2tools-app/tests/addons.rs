@@ -248,7 +248,7 @@ fn install_copies_the_addon_writes_a_row_and_emits(cx: &mut TestAppContext) {
     support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk(), false);
     let _page = open_addons(cx, &s);
     let count = Rc::new(Cell::new(0));
-    let seen = count.clone();
+    let seen = Rc::clone(&count);
     let _sub = cx.update(|cx| {
         let events = LibraryEvents::global(cx);
         cx.subscribe(&events, move |_, _: &LibraryChanged, _| {

@@ -78,7 +78,7 @@ pub(super) type Spot = Rc<Cell<Bounds<Pixels>>>;
 
 /// An invisible child that records its parent's bounds into `spot` each frame.
 pub(super) fn record(spot: &Spot) -> impl IntoElement + use<> {
-    let spot = spot.clone();
+    let spot = Rc::clone(spot);
     canvas(move |bounds, _, _| spot.set(bounds), |_, _, _, _| {})
         .absolute()
         .top_0()

@@ -72,7 +72,7 @@ impl Checks {
             .collect();
         self.screen_runs += 1;
         let key = (scene, editor.shown_changes().to_vec());
-        self.screens = Some((key, (result.clone(), labels.clone())));
+        self.screens = Some((key, (Arc::clone(&result), Arc::clone(&labels))));
         (result, labels)
     }
 
@@ -89,14 +89,14 @@ impl Checks {
         if let Some((last, result)) = &self.hard
             && *last == key
         {
-            return result.clone();
+            return Arc::clone(result);
         }
         let found = editor
             .model()
             .hard_to_read(editor.layout(), backdrop, vision);
         let result = Arc::new(found.into_iter().collect::<HashSet<_>>());
         self.hard_runs += 1;
-        self.hard = Some((key, result.clone()));
+        self.hard = Some((key, Arc::clone(&result)));
         result
     }
 

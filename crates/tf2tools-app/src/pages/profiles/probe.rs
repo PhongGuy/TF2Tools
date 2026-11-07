@@ -53,7 +53,7 @@ impl Tf2Probe {
     /// reads the system's processes: call it off the UI thread.
     pub fn get(cx: &App) -> Arc<dyn Fn() -> bool + Send + Sync> {
         if let Some(probe) = cx.try_global::<Tf2Probe>() {
-            return probe.0.clone();
+            return Arc::clone(&probe.0);
         }
         let Some(root) = cx.try_global::<ProcRoot>().map(|r| r.0.clone()) else {
             return Arc::new(tf2tools_core::tf2_running);

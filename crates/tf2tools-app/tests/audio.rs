@@ -85,7 +85,7 @@ fn silent(drain: bool) -> Output {
         return Output::new(mixer, source);
     }
     let stop = Arc::new(AtomicBool::new(false));
-    let stopped = stop.clone();
+    let stopped = Arc::clone(&stop);
     std::thread::spawn(move || {
         while !stopped.load(Ordering::SeqCst) {
             for _ in 0..4096 {
@@ -102,7 +102,7 @@ fn silent(drain: bool) -> Output {
 /// A `RodioOut` over silent outputs, and a count of how often it opened one.
 fn out(drain: bool) -> (RodioOut, Arc<AtomicUsize>) {
     let opens = Arc::new(AtomicUsize::new(0));
-    let counter = opens.clone();
+    let counter = Arc::clone(&opens);
     let out = RodioOut::with_output(move || {
         counter.fetch_add(1, Ordering::SeqCst);
         Ok(silent(drain))
@@ -155,7 +155,7 @@ fn garbage_fails_to_decode_before_any_device_opens() {
 #[test]
 fn a_failed_device_is_retried_by_the_next_play() {
     let opens = Arc::new(AtomicUsize::new(0));
-    let counter = opens.clone();
+    let counter = Arc::clone(&opens);
     let out = RodioOut::with_output(move || {
         if counter.fetch_add(1, Ordering::SeqCst) == 0 {
             Err(AudioError::Device("no device".into()))

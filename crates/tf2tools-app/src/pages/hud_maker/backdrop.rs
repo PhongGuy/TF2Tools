@@ -105,14 +105,14 @@ impl HudMakerPage {
         let shown = self.backdrop.shown.as_ref()?;
         Some(
             self.seen_backdrop(shown.id)
-                .unwrap_or_else(|| shown.image.clone()),
+                .unwrap_or_else(|| Arc::clone(&shown.image)),
         )
     }
 
     /// The shown picture's pixels and read id, for simulating it under a view.
     pub(super) fn backdrop_pixels(&self) -> Option<(u64, Arc<Backdrop>)> {
         let shown = self.backdrop.shown.as_ref()?;
-        Some((shown.id, shown.picture.clone()))
+        Some((shown.id, Arc::clone(&shown.picture)))
     }
 
     /// False until the saved picture's read has finished, found or not.

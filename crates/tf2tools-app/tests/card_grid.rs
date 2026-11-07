@@ -23,7 +23,7 @@ struct Host {
 
 impl Render for Host {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let built = self.built.clone();
+        let built = Rc::clone(&self.built);
         div()
             .size_full()
             .child(self.grid.render(200, px(120.), move |ix, _, _| {
@@ -183,9 +183,9 @@ fn open_hooked(cx: &mut TestAppContext) -> (AnyWindowHandle, Entity<Hooked>) {
                     let seen: Rc<RefCell<Vec<Range<usize>>>> = Rc::default();
                     let near: Rc<Cell<usize>> = Rc::default();
                     let mut grid = CardGrid::store("hooked-grid", 4);
-                    let log = seen.clone();
+                    let log = Rc::clone(&seen);
                     grid.on_visible(move |range, _| log.borrow_mut().push(range));
-                    let hits = near.clone();
+                    let hits = Rc::clone(&near);
                     grid.on_near_end(move |_| hits.set(hits.get() + 1));
                     Hooked {
                         grid,
@@ -352,7 +352,7 @@ fn a_visible_hook_set_after_the_first_frame_hears_the_current_range(cx: &mut Tes
         .update(|cx| host.read(cx).seen.borrow().last().cloned())
         .unwrap();
     let late: Rc<RefCell<Vec<Range<usize>>>> = Rc::default();
-    let log = late.clone();
+    let log = Rc::clone(&late);
     cx.update(|cx| {
         host.update(cx, |h, cx| {
             h.grid
@@ -378,7 +378,7 @@ fn a_near_end_hook_set_after_it_fired_hears_the_current_count(cx: &mut TestAppCo
     support::settle(cx, win);
     assert_eq!(cx.update(|cx| host.read(cx).near.get()), 1);
     let late: Rc<Cell<usize>> = Rc::default();
-    let hits = late.clone();
+    let hits = Rc::clone(&late);
     cx.update(|cx| {
         host.update(cx, |h, cx| {
             h.grid.on_near_end(move |_| hits.set(hits.get() + 1));

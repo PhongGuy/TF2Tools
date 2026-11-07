@@ -263,7 +263,13 @@ fn add_hud_imports_the_picked_archive(cx: &mut TestAppContext) {
     let env = support::env();
     let archive = hud_zip(env.tmp.path(), "budhud");
     let picker = Arc::new(ScriptedPicker::new([archive]));
-    let s = support::shell_window_with(cx, &env, found(&env), picker.clone(), support::no_steam());
+    let s = support::shell_window_with(
+        cx,
+        &env,
+        found(&env),
+        Arc::clone(&picker),
+        support::no_steam(),
+    );
     let _page = open_huds(cx, &s);
     support::click_id(cx, s.win, ids::HUDS_ADD);
     support::wait_real(cx, "the import toast", |cx| {
@@ -584,7 +590,7 @@ fn a_successful_install_emits_once_and_a_failed_one_not_at_all(cx: &mut TestAppC
     seed(&s.services, &env, "budhud", Provenance::Local);
     let _page = revisit(cx, &s);
     let count = Rc::new(Cell::new(0));
-    let seen = count.clone();
+    let seen = Rc::clone(&count);
     let _sub = cx.update(|cx| {
         let events = LibraryEvents::global(cx);
         cx.subscribe(&events, move |_, _: &LibraryChanged, _| {

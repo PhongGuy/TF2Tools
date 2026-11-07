@@ -20,6 +20,7 @@ unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
 ref_option = "warn"
+clone_on_ref_ptr = "warn"
 
 [workspace.dependencies]
 rusqlite = { version = "0.40", features = ["bundled"] }

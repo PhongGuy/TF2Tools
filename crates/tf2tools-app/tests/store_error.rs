@@ -14,7 +14,7 @@ struct Host {
 
 impl Render for Host {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let retries = self.retries.clone();
+        let retries = Rc::clone(&self.retries);
         div().size_full().child(store_error_line(
             "Failed to load the store",
             move |_, _| retries.set(retries.get() + 1),
@@ -27,7 +27,7 @@ impl Render for Host {
 fn the_line_shows_the_error_and_retry_calls_back(cx: &mut TestAppContext) {
     support::init(cx);
     let retries = Rc::new(Cell::new(0));
-    let host_retries = retries.clone();
+    let host_retries = Rc::clone(&retries);
     let (win, _host) = cx
         .update(|cx| {
             gpui_kit::open_window(support::window_options(), cx, move |_, cx| {

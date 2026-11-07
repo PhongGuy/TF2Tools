@@ -83,7 +83,7 @@ fn position_label_follows_the_steps_and_hides_for_one_image(cx: &mut TestAppCont
 fn wants_the_shown_and_the_next_screenshot_at_carousel_size(cx: &mut TestAppContext) {
     support::init(cx);
     let asked = Arc::new(Mutex::new(Vec::<String>::new()));
-    let log = asked.clone();
+    let log = Arc::clone(&asked);
     let fetch: ImageFetch = Arc::new(move |url: String| {
         log.lock().unwrap().push(url);
         Box::pin(async { Err(FetchFailure::Permanent) })
@@ -123,10 +123,10 @@ fn a_dropped_carousel_hands_back_its_wants(cx: &mut TestAppContext) {
     support::init(cx);
     let asked = Arc::new(Mutex::new(Vec::<String>::new()));
     let gate = Arc::new(tokio::sync::Semaphore::new(0));
-    let (log, held) = (asked.clone(), gate.clone());
+    let (log, held) = (Arc::clone(&asked), Arc::clone(&gate));
     let fetch: ImageFetch = Arc::new(move |url: String| {
         log.lock().unwrap().push(url);
-        let held = held.clone();
+        let held = Arc::clone(&held);
         Box::pin(async move {
             let _permit = held.acquire().await;
             Err(FetchFailure::Permanent)
