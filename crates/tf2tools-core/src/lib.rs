@@ -92,7 +92,7 @@ pub use library::{
     PaintTarget, PaintedSource, PresetEntry, Profile, ProfileCrosshair, ProfileCrosshairRef,
     ProfileDraft, ProfileId, ProfileItem, ProfileUpdate, Provenance, Recovery, Reinstall, SavedHud,
     SkipReason, SkippedAssignment, SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind,
-    pictures_fit, read_recipe_file,
+    crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
 };
 pub use library::{CopyUpdate, CopyUpdated, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};

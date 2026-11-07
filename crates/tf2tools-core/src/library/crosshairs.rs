@@ -1243,6 +1243,25 @@ fn drawing_png(drawing: &RgbaImage) -> Result<Vec<u8>, PaintError> {
     })
 }
 
+/// Whether the managed folder holds a crosshair-only weapon script from before 6.0.2: a
+/// `tf_weapon_*.txt` with no `printname` key, which every stock script has. Such a script
+/// stops the weapon from firing, and an apply replaces it. Reads only the managed folder; an
+/// unreadable folder or file counts as nothing to repair.
+pub fn crosshair_scripts_need_repair(tf2: &Tf2Install) -> bool {
+    let scripts = tf2.custom_dir().join(MANAGED_DIR).join("scripts");
+    let Ok(entries) = std::fs::read_dir(&scripts) else {
+        return false;
+    };
+    entries.flatten().map(|e| e.path()).any(|path| {
+        is_weapon_script_file(&path)
+            && std::fs::read(&path).is_ok_and(|text| {
+                !String::from_utf8_lossy(&text)
+                    .to_ascii_lowercase()
+                    .contains("printname")
+            })
+    })
+}
+
 /// Counts the `tf_weapon_*.txt` files (extension in any case) directly in `<folder>/scripts/`,
 /// the files TF2 reads as weapon scripts. A missing folder has none.
 fn weapon_scripts_in(folder: &Path) -> Result<usize, IoFailure> {
@@ -1255,16 +1274,19 @@ fn weapon_scripts_in(folder: &Path) -> Result<usize, IoFailure> {
     let mut count = 0;
     for entry in entries {
         let path = entry.map_err(io_at(&scripts))?.path();
-        let is_script = path
-            .file_name()
-            .is_some_and(|n| n.to_string_lossy().starts_with("tf_weapon_"))
-            && path
-                .extension()
-                .is_some_and(|e| e.eq_ignore_ascii_case("txt"))
-            && path.is_file();
-        count += usize::from(is_script);
+        count += usize::from(is_weapon_script_file(&path));
     }
     Ok(count)
+}
+
+/// A `tf_weapon_*.txt` file (extension in any case), the name TF2 reads as a weapon script.
+fn is_weapon_script_file(path: &Path) -> bool {
+    path.file_name()
+        .is_some_and(|n| n.to_string_lossy().starts_with("tf_weapon_"))
+        && path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("txt"))
+        && path.is_file()
 }
 
 /// Whether library folder `folder` has its texture in the managed folder under `custom`. A
