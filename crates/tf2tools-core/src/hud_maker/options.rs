@@ -4,12 +4,24 @@
 use std::sync::LazyLock;
 
 use super::HudModel;
-use super::changes::{Change, ChangeTarget, OptionChange, SetKey, check_hud_path};
+use super::changes::{AddBlock, Change, ChangeTarget, OptionChange, SetKey, check_hud_path};
 use super::edits::EditRefused;
 use super::expr::atoi;
 use super::model::{SCHEME_FILE, live_blocks, root_block};
 
 const HUDLAYOUT: &str = "scripts/hudlayout.res";
+
+/// The label HUDs draw their own on-screen crosshair with, in hudlayout.res.
+const CUSTOM_CROSSHAIR: &str = "CustomCrosshair";
+/// The font the HUD crosshair's size goes into, so parts sharing its font keep theirs.
+const CROSSHAIR_FONT: &str = "TF2Tools_HudCrosshair";
+/// The screen height a font size option reads and writes its height at.
+const SIZE_SCREEN_TALL: u32 = 1080;
+
+/// The symbols of the crosshair font HUDs draw their own crosshair with; the backslash is
+/// left out, as a file would read it as an escape.
+pub(super) const CROSSHAIR_SYMBOLS: &str =
+    "!#$%'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 
 /// An option's chosen value.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -105,6 +117,9 @@ pub enum ValueMap {
     PerChoice(Vec<(String, String)>),
     /// The text with each `$value` replaced by the value, as the file spells it.
     Template(String),
+    /// The value is a height at 1080 lines for a font of the option's own, a copy of the font
+    /// the key names, which the key then names.
+    OwnFontSize,
 }
 
 /// A scheme colour derived from a picked colour.
@@ -472,6 +487,7 @@ static BUILT_INS: LazyLock<Vec<OptionSpec>> = LazyLock::new(|| {
             true,
         ),
     ];
+    table.extend(hud_crosshair());
     table.extend(ITEM_COLOURS.iter().map(|&(label, key, [r, g, b])| {
         let id = format!("item_{}", label.to_lowercase().replace('\'', ""));
         OptionSpec::built_in(
@@ -488,6 +504,70 @@ static BUILT_INS: LazyLock<Vec<OptionSpec>> = LazyLock::new(|| {
     }));
     table
 });
+
+/// The HUD's own on-screen crosshair: shown or not, its symbol, size and colour. The canvas
+/// draws the label, so each shows in the preview.
+fn hud_crosshair() -> Vec<OptionSpec> {
+    let group = "HUD crosshair";
+    let shown = |key: &str| {
+        let value = ValueMap::OnOff {
+            on: "1".to_owned(),
+            off: Some("0".to_owned()),
+        };
+        set_key(HUDLAYOUT, CUSTOM_CROSSHAIR, key, value)
+    };
+    let mut on = OptionSpec::built_in(
+        "hud_crosshair",
+        "HUD crosshair",
+        group,
+        OptionKind::Toggle,
+        OptionValue::Bool(false),
+        shown("visible"),
+        false,
+    );
+    on.actions.push(shown("enabled"));
+    let symbols = (CROSSHAIR_SYMBOLS.chars())
+        .map(|c| Choice::new(&c.to_string(), &c.to_string(), Vec::new()))
+        .collect();
+    let symbol = OptionSpec::built_in(
+        "hud_crosshair_symbol",
+        "Symbol",
+        group,
+        OptionKind::Choice(symbols),
+        OptionValue::Pick("+".to_owned()),
+        set_key(HUDLAYOUT, CUSTOM_CROSSHAIR, "labelText", ValueMap::Value),
+        false,
+    );
+    let size = OptionSpec::built_in(
+        "hud_crosshair_size",
+        "Size",
+        group,
+        OptionKind::Number {
+            min: 8,
+            max: 64,
+            step: 1,
+        },
+        OptionValue::Int(24),
+        set_key(HUDLAYOUT, CUSTOM_CROSSHAIR, "font", ValueMap::OwnFontSize),
+        false,
+    );
+    let colour = OptionSpec::built_in(
+        "hud_crosshair_colour",
+        "Colour",
+        group,
+        OptionKind::Colour {
+            derived: Vec::new(),
+        },
+        OptionValue::Rgba([255, 255, 255, 255]),
+        set_key(HUDLAYOUT, CUSTOM_CROSSHAIR, "fgcolor", ValueMap::Value),
+        false,
+    );
+    let mut specs = vec![on, symbol, size, colour];
+    for spec in &mut specs {
+        spec.drawn = true;
+    }
+    specs
+}
 
 impl HudModel {
     /// The built-ins that fit this HUD, in table order.
@@ -509,7 +589,17 @@ impl HudModel {
                 let path: Vec<&str> = std::iter::once(root.key())
                     .chain(block.iter().map(String::as_str))
                     .collect();
-                !live_blocks(doc, &path, self.platform()).is_empty()
+                if live_blocks(doc, &path, self.platform()).is_empty() {
+                    return false;
+                }
+                // A size needs a font to copy, so it fits only where the key names one.
+                match action {
+                    OptionAction::SetKey {
+                        value: ValueMap::OwnFontSize,
+                        ..
+                    } => self.own_font_edits(action, 24).is_some(),
+                    _ => true,
+                }
             }
             // No built-in flips a HUD's own switches or writes a settings file.
             OptionAction::Switch(_) | OptionAction::WriteCfg { .. } => false,
@@ -520,8 +610,14 @@ impl HudModel {
 /// One key edit an option compiles to, `None` when its value cannot be spelled; a derived
 /// colour's edit never counts as dropped.
 pub(super) struct CompiledSet {
-    pub(super) set: Option<SetKey>,
+    pub(super) set: Option<OptionEdit>,
     pub(super) counts: bool,
+}
+
+/// One file edit a built-in option makes: a key set, or a block added (an own font).
+pub(super) enum OptionEdit {
+    Set(SetKey),
+    Add(AddBlock),
 }
 
 impl HudModel {
@@ -542,6 +638,21 @@ impl HudModel {
         }
         let mut sets = Vec::new();
         for action in &spec.actions {
+            if let (
+                OptionAction::SetKey {
+                    value: ValueMap::OwnFontSize,
+                    ..
+                },
+                OptionValue::Int(size),
+            ) = (action, choice.value())
+            {
+                let edits = self.own_font_edits(action, *size)?;
+                sets.extend(edits.into_iter().map(|edit| CompiledSet {
+                    set: Some(edit),
+                    counts: true,
+                }));
+                continue;
+            }
             let OptionAction::SetKey {
                 file,
                 block,
@@ -564,6 +675,7 @@ impl HudModel {
             let text = match (value, choice.value()) {
                 (ValueMap::Value, OptionValue::Int(v)) => Some(v.to_string()),
                 (ValueMap::Value, OptionValue::Rgba(c)) => Some(rgba_text(*c)),
+                (ValueMap::Value, OptionValue::Pick(k)) => Some(k.clone()),
                 (ValueMap::Template(t), v) => template_text(t, v, &|_| false),
                 (ValueMap::OnOff { on, .. }, OptionValue::Bool(true)) => Some(on.clone()),
                 (ValueMap::OnOff { off, .. }, OptionValue::Bool(false)) => match off {
@@ -581,7 +693,7 @@ impl HudModel {
                 continue;
             };
             sets.push(CompiledSet {
-                set: Some(make(key, &text)),
+                set: Some(OptionEdit::Set(make(key, &text))),
                 counts: true,
             });
             // Derived colours go only where the HUD's scheme already names them.
@@ -592,7 +704,7 @@ impl HudModel {
                     let (name, colour) = derived_colour(*d, key, *c);
                     if self.loaded_scheme().named_colour(&name).is_some() {
                         sets.push(CompiledSet {
-                            set: Some(make(&name, &rgba_text(colour))),
+                            set: Some(OptionEdit::Set(make(&name, &rgba_text(colour)))),
                             counts: false,
                         });
                     }
@@ -688,50 +800,109 @@ impl HudModel {
     }
 
     /// The value the pristine HUD already has at the option's first key, read as the option's
-    /// kind: a colour from the merged scheme (it may live in a `#base` file), any other kind
-    /// from the line the option would replace.
+    /// kind: a scheme colour from the merged scheme (it may live in a `#base` file), any other
+    /// kind from the line the option would replace, a part's colour or font resolved through
+    /// the scheme.
     fn pristine_value(&self, spec: &OptionSpec) -> Option<OptionValue> {
-        let Some(OptionAction::SetKey {
-            file,
-            block,
-            key,
-            cond,
-            value,
-        }) = spec.actions.first()
+        let action @ OptionAction::SetKey {
+            file, key, value, ..
+        } = spec.actions.first()?
         else {
             return None;
         };
-        if let OptionKind::Colour { .. } = spec.kind {
+        if let OptionKind::Colour { .. } = spec.kind
+            && file == SCHEME_FILE
+        {
             return self
                 .loaded_scheme()
                 .named_colour(key)
                 .map(|c| OptionValue::Rgba(c.to_array()));
         }
+        let text = self.pristine_text(action)?;
+        match (value, &spec.kind) {
+            (ValueMap::Value, OptionKind::Number { .. }) => {
+                Some(OptionValue::Int(atoi(text.as_bytes())))
+            }
+            (ValueMap::Value, OptionKind::Colour { .. }) => (self.loaded_scheme())
+                .named_colour(text.trim())
+                .map(|c| OptionValue::Rgba(c.to_array())),
+            (ValueMap::Value, OptionKind::Choice(choices)) => (choices.iter())
+                .find(|c| c.key() == text)
+                .map(|c| OptionValue::Pick(c.key().to_owned())),
+            (ValueMap::OwnFontSize, _) => (self.loaded_scheme())
+                .font(text.trim(), SIZE_SCREEN_TALL)
+                .map(|f| OptionValue::Int(f.tall())),
+            (ValueMap::OnOff { on, .. }, _) => Some(OptionValue::Bool(text.trim() == on)),
+            _ => None,
+        }
+    }
+
+    /// The pristine text of a `SetKey` action's key: the first direct line of the key with the
+    /// same conditional (any case) in the last live block on the path that has one, as
+    /// duplicates apply in order.
+    fn pristine_text(&self, action: &OptionAction) -> Option<&str> {
+        let OptionAction::SetKey {
+            file,
+            block,
+            key,
+            cond,
+            ..
+        } = action
+        else {
+            return None;
+        };
         let doc = check_hud_path(file).and_then(|p| self.pristine_document(&p))?;
         let root = root_block(doc)?;
         let path: Vec<&str> = std::iter::once(root.key())
             .chain(block.iter().map(String::as_str))
             .collect();
-        // The line in force: the first direct line of the key with the same conditional (any
-        // case) in the last live block on the path that has one, as duplicates apply in order.
         let same_cond = |c: Option<&str>| match (c, cond.as_deref()) {
             (Some(a), Some(b)) => a.eq_ignore_ascii_case(b),
             (a, b) => a == b,
         };
-        let text = (live_blocks(doc, &path, self.platform()).into_iter().rev())
+        (live_blocks(doc, &path, self.platform()).into_iter().rev())
             .find_map(|block| {
                 block.children().iter().find(|e| {
                     e.text().is_some() && e.key().eq_ignore_ascii_case(key) && same_cond(e.cond())
                 })
             })
-            .and_then(|e| e.text())?;
-        match (value, &spec.kind) {
-            (ValueMap::Value, OptionKind::Number { .. }) => {
-                Some(OptionValue::Int(atoi(text.as_bytes())))
-            }
-            (ValueMap::OnOff { on, .. }, _) => Some(OptionValue::Bool(text.trim() == on)),
-            _ => None,
-        }
+            .and_then(|e| e.text())
+    }
+
+    /// The edits an `OwnFontSize` action makes at `size`: the crosshair's own font, a copy of
+    /// the font its key names, then the key naming it. `None` when the key names no font a
+    /// scheme file defines.
+    fn own_font_edits(&self, action: &OptionAction, size: i32) -> Option<Vec<OptionEdit>> {
+        let OptionAction::SetKey {
+            file, block, key, ..
+        } = action
+        else {
+            return None;
+        };
+        let name = self.pristine_text(action)?.trim();
+        let changes = self.sized_font(name, CROSSHAIR_FONT, size, SIZE_SCREEN_TALL)?;
+        let mut edits: Vec<OptionEdit> = (changes.into_iter())
+            .filter_map(|change| match change.target() {
+                ChangeTarget::Set(set) => Some(OptionEdit::Set(set.clone())),
+                ChangeTarget::AddBlock(add) => Some(OptionEdit::Add(add.clone())),
+                _ => None,
+            })
+            .collect();
+        let root = check_hud_path(file)
+            .and_then(|p| self.pristine_document(&p))
+            .and_then(root_block)?;
+        let path: Vec<&str> = std::iter::once(root.key())
+            .chain(block.iter().map(String::as_str))
+            .collect();
+        edits.push(OptionEdit::Set(SetKey::new(
+            file,
+            &path,
+            key,
+            None,
+            None,
+            CROSSHAIR_FONT,
+        )));
+        Some(edits)
     }
 }
 
