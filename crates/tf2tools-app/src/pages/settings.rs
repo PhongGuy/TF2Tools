@@ -1,6 +1,7 @@
 //! v5's Settings page: the app version with update status and actions, the TF2 path with Browse and
 //! Auto-detect, the preview volume, the store cache duration, one sync card per store with Resync, and Save.
-//! Below them, a Licences card shows the third-party notices the app carries.
+//! Below them, a Licences card shows the third-party notices the app carries, and a Help and
+//! feedback card links to the help page and the place to report a problem.
 
 use std::path::Path;
 
@@ -25,6 +26,7 @@ use tf2tools_core::{
 use crate::activity;
 use crate::audio::volume::{bind_slider, shared_volume};
 use crate::ids;
+use crate::links;
 use crate::local_messages::{
     describe_detect, describe_settings, describe_store_status, describe_tf2_folder,
 };
@@ -639,6 +641,28 @@ fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyEl
         .into_any_element()
 }
 
+// The Help and feedback card's two links, opened in the player's browser.
+fn help_content() -> AnyElement {
+    let link = |id: &'static str, text: &'static str, url: &'static str| {
+        Button::new(id)
+            .outline()
+            .px_3()
+            .label(text)
+            .accessibility_label(text)
+            .on_click(move |_, _, cx| cx.open_url(url))
+    };
+    h_flex()
+        .gap_2()
+        .flex_wrap()
+        .child(link(
+            ids::SETTINGS_REPORT_PROBLEM,
+            "Report a problem",
+            links::REPORT_PROBLEM_URL,
+        ))
+        .child(link(ids::SETTINGS_HELP, "Help", links::HELP_URL))
+        .into_any_element()
+}
+
 // A slider's single value as the whole number the label and Save use.
 fn whole(slider: &Entity<SliderState>, cx: &App) -> u32 {
     slider.read(cx).value().start().round() as u32
@@ -838,6 +862,12 @@ impl Render for SettingsPage {
                         "Licences",
                         "TF2Tools uses work made by others. These are their licences.",
                         Some(notices_content(self, cx)),
+                        cx,
+                    ))
+                    .child(card(
+                        "Help and feedback",
+                        "Stuck, or found something broken? Read the help or tell us about it.",
+                        Some(help_content()),
                         cx,
                     )),
             );

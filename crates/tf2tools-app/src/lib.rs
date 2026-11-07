@@ -16,6 +16,7 @@ pub mod gb_card;
 pub mod ids;
 pub mod keymap;
 pub mod library_events;
+pub mod links;
 pub mod loadout;
 pub mod local_messages;
 pub mod map_messages;
