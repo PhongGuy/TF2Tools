@@ -115,11 +115,7 @@ impl StarterDialog {
     }
 
     pub fn slider(&self, param: Param) -> &Entity<SliderState> {
-        let ix = Param::ALL
-            .iter()
-            .position(|p| *p == param)
-            .expect("every param has a slider");
-        &self.sliders[ix]
+        &self.sliders[param.index()]
     }
 
     /// Every slider snapped (`Param::snap`).
