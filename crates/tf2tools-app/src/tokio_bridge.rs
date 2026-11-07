@@ -13,7 +13,9 @@ use tokio::task::AbortHandle;
 pub use tokio::task::JoinError;
 
 /// Starts a two-worker tokio runtime as an app global and shuts it down on app quit.
-/// A second call keeps the running runtime.
+/// A second call keeps the running runtime. Panics if the OS cannot start its threads.
+// Every download and sync runs on this runtime, so the app cannot work without it.
+#[allow(clippy::expect_used)]
 pub fn init(cx: &mut App) {
     if is_running(cx) {
         return;

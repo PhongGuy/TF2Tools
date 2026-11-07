@@ -202,7 +202,7 @@ impl Editor {
     /// The drawing as an image the size of the canvas.
     pub fn drawing(&self) -> RgbaImage {
         let n = self.size.side();
-        RgbaImage::from_pixels(n, n, self.pixels.clone()).expect("the canvas is n*n*4 bytes")
+        square_image(n, self.pixels.clone())
     }
 
     pub fn tool(&self) -> Tool {
@@ -966,7 +966,14 @@ pub fn preview_texels(drawing: &RgbaImage, by: [u8; 3]) -> RgbaImage {
             out.extend(tint(texel, by));
         }
     }
-    RgbaImage::from_pixels(SIDE, SIDE, out).expect("the preview is 64*64*4 bytes")
+    square_image(SIDE, out)
+}
+
+/// Wraps `side * side * 4` RGBA bytes as an image. Every caller builds `pixels` from a canvas
+/// side of 32 or 64, so `from_pixels` cannot refuse them.
+#[allow(clippy::expect_used)]
+pub(super) fn square_image(side: u32, pixels: Vec<u8>) -> RgbaImage {
+    RgbaImage::from_pixels(side, side, pixels).expect("a canvas image is side*side*4 bytes")
 }
 
 fn blank(size: CanvasSize) -> Vec<u8> {

@@ -3,7 +3,7 @@
 
 use tf2tools_core::RgbaImage;
 
-use super::model::CanvasSize;
+use super::model::{CanvasSize, square_image};
 
 /// A shape a drawing can start from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,6 +106,16 @@ impl Param {
             Param::Thickness => "Thickness",
             Param::Gap => "Gap",
             Param::Size => "Size",
+        }
+    }
+
+    /// The slider's place in `ALL`.
+    pub fn index(self) -> usize {
+        match self {
+            Param::Length => 0,
+            Param::Thickness => 1,
+            Param::Gap => 2,
+            Param::Size => 3,
         }
     }
 
@@ -230,5 +240,5 @@ pub fn starter_drawing(
         let at = ((y * n + x) * 4) as usize;
         pixels[at..at + 4].copy_from_slice(&paint);
     }
-    RgbaImage::from_pixels(n, n, pixels).expect("the canvas is n*n*4 bytes")
+    square_image(n, pixels)
 }
