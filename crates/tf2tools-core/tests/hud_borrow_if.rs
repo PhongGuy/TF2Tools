@@ -40,7 +40,7 @@ fn borrowed(files: &HudFiles, source_text: &str, part: &str) -> HudModel {
         .borrow_part(&source(&[(HEALTH_RES, source_text)]), files, &k(part), 1)
         .unwrap();
     let e = t.with_changes(b.changes());
-    assert_eq!(e.dropped(), 0);
+    assert_eq!(e.dropped(), 0, "borrowing {part} should drop no change");
     e.into_model()
 }
 

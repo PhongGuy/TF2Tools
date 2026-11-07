@@ -286,7 +286,11 @@ pub fn vpk_claiming(path: &str, claimed: u32) -> Vec<u8> {
     // The length field follows the header, the three NUL-ended names (one byte longer than the
     // path) and crc, preload, archive and offset.
     let at = 12 + path.len() + 1 + 4 + 2 + 2 + 4;
-    assert_eq!(bytes[at..at + 4], 3u32.to_le_bytes());
+    assert_eq!(
+        bytes[at..at + 4],
+        3u32.to_le_bytes(),
+        "the vpk length field should hold the real 3 bytes before it is overwritten"
+    );
     bytes[at..at + 4].copy_from_slice(&claimed.to_le_bytes());
     bytes
 }

@@ -437,7 +437,10 @@ fn a_save_that_lands_after_leaving_still_tells_the_library(cx: &mut TestAppConte
 fn taken_by_save_as_new(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<HudMakerPage> {
     let page = saved_once(cx, s);
     save(cx, s, &page, ids::HUD_MAKER_SAVE_AS_NEW);
-    assert!(support::present(cx, s.win, ids::HUD_MAKER_NAME_ERROR));
+    assert!(
+        support::present(cx, s.win, ids::HUD_MAKER_NAME_ERROR),
+        "saving as new under a taken name should show the name error"
+    );
     page
 }
 

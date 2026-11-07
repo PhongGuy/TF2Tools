@@ -62,7 +62,11 @@ fn assign_weapon_crosshair(_: &support::Env, s: &support::ShellWindow) {
 fn turn_on(cx: &mut TestAppContext, s: &support::ShellWindow, page: &Entity<HudMakerPage>) {
     support::maker_page::click_in_panel(cx, s, ids::hud_maker_option("hud_crosshair"));
     let on = cx.update(|cx| (page.read(cx).editor()).and_then(|e| e.option_value("hud_crosshair")));
-    assert_eq!(on, Some(OptionValue::Bool(true)));
+    assert_eq!(
+        on,
+        Some(OptionValue::Bool(true)),
+        "clicking the option should turn hud_crosshair on"
+    );
 }
 
 #[gpui_kit::test]

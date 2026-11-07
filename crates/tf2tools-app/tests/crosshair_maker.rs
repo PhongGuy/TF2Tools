@@ -1055,7 +1055,10 @@ fn ready_to_save(
     paint_cell(cx, s, page, 2, 2);
     support::click_id(cx, s.win, ids::CROSSHAIR_MAKER_UNDO);
     set_name(cx, s, page, "Dot");
-    assert!(support::disabled_ids(cx, s.win, &LOCKED.map(ElementId::from)).is_empty());
+    assert!(
+        support::disabled_ids(cx, s.win, &LOCKED.map(ElementId::from)).is_empty(),
+        "no locked control should stay disabled once the page is idle"
+    );
 }
 
 /// Runs `start` and, in the frame after it with no background work run yet, checks the page
@@ -1082,8 +1085,14 @@ fn assert_locked_during(
         })
         .unwrap();
     assert!(busy, "the save or open is still running");
-    assert_eq!(disabled, LOCKED);
-    assert_eq!(pixel, CLEAR);
+    assert_eq!(
+        disabled, LOCKED,
+        "the busy page should disable exactly the locked controls"
+    );
+    assert_eq!(
+        pixel, CLEAR,
+        "a grid click while busy should leave the pixel clear"
+    );
 }
 
 #[gpui_kit::test]
@@ -1598,7 +1607,10 @@ fn hover_a_cell(
 ) {
     let at = grid(cx, s, page);
     send(cx, s, mouse_move(centre(at, 34, 29), false));
-    assert!(support::present(cx, s.win, ids::CROSSHAIR_MAKER_POSITION));
+    assert!(
+        support::present(cx, s.win, ids::CROSSHAIR_MAKER_POSITION),
+        "hovering the grid should show the position readout"
+    );
 }
 
 #[gpui_kit::test]

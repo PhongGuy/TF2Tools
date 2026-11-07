@@ -3278,7 +3278,10 @@ fn covered_shell_with(
 ) -> support::ShellWindow {
     use support::hud_stock::{HEALTH, HUDLAYOUT, label, with_blocks};
     let stock = "CHealthAccountPanel { xpos c-60 ypos c-8 wide 120 tall 70 }";
-    assert!(HUDLAYOUT.contains(stock));
+    assert!(
+        HUDLAYOUT.contains(stock),
+        "the stock hudlayout should hold the health panel line to replace"
+    );
     let layout = HUDLAYOUT.replace(
         stock,
         &format!("CHealthAccountPanel {{ xpos 60 ypos r90 zpos 9 wide 100 tall 60 {extra} }}"),

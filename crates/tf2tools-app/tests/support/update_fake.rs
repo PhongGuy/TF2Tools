@@ -163,7 +163,10 @@ pub fn reach_available(
     fake: &FakeUpdates,
     offer: Offer,
 ) {
-    assert!(cx.update(|cx| updater.update(cx, |u, cx| u.check(cx))));
+    assert!(
+        cx.update(|cx| updater.update(cx, |u, cx| u.check(cx))),
+        "the updater should start a check"
+    );
     fake.next_check(cx).send(Ok(Some(offer))).unwrap();
     wait_state(cx, updater, "Available", |s| {
         matches!(s, UpdateState::Available(_))
@@ -178,7 +181,10 @@ pub fn reach_ready(
     offer: Offer,
 ) {
     reach_available(cx, updater, fake, offer);
-    assert!(cx.update(|cx| updater.update(cx, |u, cx| u.download(cx))));
+    assert!(
+        cx.update(|cx| updater.update(cx, |u, cx| u.download(cx))),
+        "the updater should start a download from Available"
+    );
     let (sink, reply) = fake.next_download(cx);
     sink.report(1, 1);
     drop(sink);

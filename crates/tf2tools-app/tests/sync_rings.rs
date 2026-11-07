@@ -13,7 +13,10 @@ use tf2tools_core::StoreKind;
 use crate::support;
 
 fn start(cx: &mut TestAppContext, hub: &Entity<SyncHub>, kind: StoreKind) {
-    assert!(cx.update(|cx| hub.update(cx, |h, cx| h.start(kind, false, cx))));
+    assert!(
+        cx.update(|cx| hub.update(cx, |h, cx| h.start(kind, false, cx))),
+        "the hub should accept the sync start"
+    );
 }
 
 #[test]

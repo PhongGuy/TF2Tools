@@ -100,7 +100,11 @@ fn desktop_entry() -> Vec<(String, String)> {
     let mut lines = text
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.starts_with('#'));
-    assert_eq!(lines.next(), Some("[Desktop Entry]"));
+    assert_eq!(
+        lines.next(),
+        Some("[Desktop Entry]"),
+        "the desktop entry should open with its [Desktop Entry] group"
+    );
     lines
         .map(|l| {
             let (k, v) = l
