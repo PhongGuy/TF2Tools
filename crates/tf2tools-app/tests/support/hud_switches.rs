@@ -73,9 +73,27 @@ pub const COLOUR_SCHEMA: &str = r#"{
   }
 }"#;
 
+/// A HUD option schema for `somehud` with one switch that needs the viewmodels addon.
+pub const VIEWMODELS_SCHEMA: &str = r#"{
+  "Links": { "GitHub": "https://github.com/Someone/SomeHUD" },
+  "Controls": {
+    "Look": [
+      { "Name": "sh_vm", "Label": "Transparent Viewmodels", "Type": "Checkbox", "Value": "false",
+        "Special": "TransparentViewmodels",
+        "Files": { "resource/clientscheme.res": { "Scheme": { "Colors": {
+          "TanLight": { "true": "1 2 3 255", "false": "4 5 6 255" } } } } } }
+    ]
+  }
+}"#;
+
 /// The schema copies of `Someone/SomeHUD` open with, for `shell_window_tweaked`.
 pub fn with_colour_schema(services: &mut Services) {
-    let schema = HudSchema::parse("somehud", COLOUR_SCHEMA.as_bytes()).unwrap();
+    with_schema(services, COLOUR_SCHEMA);
+}
+
+/// `json` as the schema copies of `Someone/SomeHUD` open with.
+pub fn with_schema(services: &mut Services, json: &str) {
+    let schema = HudSchema::parse("somehud", json.as_bytes()).unwrap();
     (services.library).set_hud_schemas(HudSchemas::bundled().with(schema));
 }
 

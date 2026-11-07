@@ -19,7 +19,9 @@ use gpui_kit::{
     SharedString, StatefulInteractiveElement as _, Styled as _, Task, TestSupportExt as _, Window,
     div,
 };
-use tf2tools_core::{AddonName, Choice, OptionKind, OptionSpec, OptionValue, Tf2Install};
+use tf2tools_core::{
+    AddonName, Choice, OptionKind, OptionNeed, OptionSpec, OptionValue, Tf2Install,
+};
 
 use super::HudMakerPage;
 use super::tip::tipped;
@@ -36,6 +38,9 @@ const RESTART: &str = "Takes effect after TF2 restarts.";
 const ALREADY_ON: &str = "This HUD already does this.";
 const VIEWMODELS: &str = "mastercomfig-addon-transparent-viewmodels.vpk";
 const GET_VIEWMODELS: &str = "Get Transparent Viewmodels from the Addon store first.";
+const NEEDS_VIEWMODELS: &str = "Needs Transparent Viewmodels. Get it from the Addon store, then turn it on at the end of the options.";
+const TURN_ON_VIEWMODELS: &str =
+    "Needs Transparent viewmodels turned on at the end of the options.";
 const NO_TF2: &str =
     "TF2 wasn't found. Set the TF2 folder in Settings to use Transparent viewmodels.";
 /// A Choice option with more choices than this shows as a menu instead of buttons.
@@ -657,8 +662,29 @@ impl HudMakerPage {
                         SharedString::from(note.to_owned()),
                     ))
                 })
+                .when_some(self.need_note(spec), |el, need| {
+                    el.child(labelled(
+                        div().text_xs().text_color(muted),
+                        ids::hud_maker_option_need(spec.id()),
+                        need,
+                    ))
+                })
                 .into_any_element(),
         )
+    }
+
+    // What the player still has to do for an option that needs something outside the HUD;
+    // none once it is in place. The switch at the end of the options turns the addon on.
+    fn need_note(&self, spec: &OptionSpec) -> Option<&'static str> {
+        match spec.needs()? {
+            OptionNeed::TransparentViewmodels => match self.viewmodels {
+                Viewmodels::Absent => Some(NEEDS_VIEWMODELS),
+                Viewmodels::NoTf2 => Some(NO_TF2),
+                Viewmodels::Off | Viewmodels::Busy { on: false } => Some(TURN_ON_VIEWMODELS),
+                Viewmodels::On | Viewmodels::Busy { on: true } => None,
+            },
+            _ => None,
+        }
     }
 
     // A switch whose click chooses the next state as one undo step.

@@ -8,7 +8,7 @@ use gpui_kit::{AppContext as _, Entity, ScrollDelta, TestAppContext, point};
 use support::hud_switches::{GROUP, HV, SLOT, SWITCH, seed_switch_copy};
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
-use tf2tools_app::services::Tf2State;
+use tf2tools_app::services::{Services, Tf2State};
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
     HudEntry, LibraryKind, OptionKind, OptionValue, PartKey, Platform, Tf2Install,
@@ -27,18 +27,29 @@ fn opened(cx: &mut TestAppContext) -> Opened {
 
 // Opens the switch copy in the HUD Maker; `colour` gives it the one-colour schema too.
 fn open_copy(cx: &mut TestAppContext, colour: bool) -> Opened {
+    let schema = colour.then_some(support::hud_switches::COLOUR_SCHEMA);
+    open_with(cx, schema, |_, _| {})
+}
+
+// Opens the switch copy with `schema` as its own, after `seed` fills the library.
+fn open_with(
+    cx: &mut TestAppContext,
+    schema: Option<&'static str>,
+    seed: impl FnOnce(&Services, &support::Env),
+) -> Opened {
     let env = support::env();
     support::seed_stock_game(&env.game);
     let state = Tf2State::Found(Tf2Install::from_path(&env.game).unwrap());
     let s = support::shell_window_tweaked(cx, &env, state, |services| {
-        if colour {
-            support::hud_switches::with_colour_schema(services);
+        if let Some(json) = schema {
+            support::hud_switches::with_schema(services, json);
         }
     });
     let copy = seed_switch_copy(&s.services, env.tmp.path());
-    if colour {
+    if schema.is_some() {
         support::hud_switches::give_colour_repo(&s.services, &copy);
     }
+    seed(&s.services, &env);
     support::click_id(cx, s.win, ids::nav(Page::Sounds));
     support::click_id(cx, s.win, ids::nav(Page::Huds));
     support::click_id(cx, s.win, ids::hud_edit(copy.folder_name()));
@@ -552,4 +563,52 @@ fn a_reload_that_cannot_read_the_files_says_so_in_plain_words(cx: &mut TestAppCo
         "{line}"
     );
     support::assert_plain(line);
+}
+
+const VM: &str = "e:sh_vm";
+const VIEWMODELS: &str = "mastercomfig-addon-transparent-viewmodels.vpk";
+
+fn need(cx: &mut TestAppContext, s: &support::ShellWindow) -> Option<String> {
+    support::label_of(cx, s.win, ids::hud_maker_option_need(VM))
+}
+
+#[gpui_kit::test]
+fn a_viewmodels_option_says_where_to_get_the_addon(cx: &mut TestAppContext) {
+    let (_env, s, _page, _copy) = open_with(
+        cx,
+        Some(support::hud_switches::VIEWMODELS_SCHEMA),
+        |_, _| {},
+    );
+    assert!(support::present(cx, s.win, ids::hud_maker_option(VM)));
+    assert_eq!(
+        need(cx, &s).as_deref(),
+        Some(
+            "Needs Transparent Viewmodels. Get it from the Addon store, then turn it on at the end of the options."
+        )
+    );
+}
+
+#[gpui_kit::test]
+fn a_viewmodels_option_asks_for_the_addon_until_it_is_on(cx: &mut TestAppContext) {
+    let (_env, s, _page, _copy) = open_with(
+        cx,
+        Some(support::hud_switches::VIEWMODELS_SCHEMA),
+        |services, env| {
+            let vpk = support::vpk_bytes(&[("cfg/addons/x.cfg", b"v1".as_slice())]);
+            support::seed_library_addon(services, env, VIEWMODELS, "9.0.0", &vpk, false);
+        },
+    );
+    support::wait_real(cx, "the addon state", |cx| {
+        support::checked_of(cx, s.win, ids::HUD_MAKER_VIEWMODELS).is_some()
+    });
+    assert_eq!(
+        need(cx, &s).as_deref(),
+        Some("Needs Transparent viewmodels turned on at the end of the options.")
+    );
+    click_in_panel(cx, &s, ids::HUD_MAKER_VIEWMODELS.into());
+    support::wait_real(cx, "the addon to install", |cx| {
+        support::checked_of(cx, s.win, ids::HUD_MAKER_VIEWMODELS) == Some(true)
+    });
+    support::settle(cx, s.win);
+    assert_eq!(need(cx, &s), None);
 }
