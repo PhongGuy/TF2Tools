@@ -254,7 +254,8 @@ fn retry_starts_a_new_sync(cx: &mut TestAppContext, store: Store) {
             unloaded: None,
             retry: false,
             card_one: true,
-        }
+        },
+        "the synced rows should replace the skeletons with cards"
     );
 }
 
@@ -390,7 +391,11 @@ fn loading_skeletons_before_the_first_page(cx: &mut TestAppContext, store: Store
     // The reads land on an empty store with no sync, so the loading skeletons give way.
     support::settle(cx, win);
     let after = seen_now(cx, win, store);
-    assert_eq!((after.loading, after.unloaded.is_some()), (0, true));
+    assert_eq!(
+        (after.loading, after.unloaded.is_some()),
+        (0, true),
+        "once settled, an empty store should swap its loading skeletons for the unloaded note"
+    );
 }
 
 #[gpui_kit::test]

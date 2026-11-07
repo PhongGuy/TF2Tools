@@ -44,8 +44,14 @@ fn started(cx: &mut TestAppContext, boot: Boot) -> AnyWindowHandle {
     let win = cx.update(|cx| start(boot, cx)).unwrap();
     // The hub is installed with the shell, but no frame has been drawn yet: run tasks only.
     support::wait_real(cx, "the hub", |cx| cx.update(|cx| sync_hub(cx).is_some()));
-    assert!(cx.update(|cx| RemoteImages::global(cx).is_some()));
-    assert!(cx.update(|cx| StoreDownloads::global(cx).is_some()));
+    assert!(
+        cx.update(|cx| RemoteImages::global(cx).is_some()),
+        "startup should install the remote image cache"
+    );
+    assert!(
+        cx.update(|cx| StoreDownloads::global(cx).is_some()),
+        "startup should install the store downloads"
+    );
     assert!(
         !cx.update(|cx| tokio_bridge::is_running(cx)),
         "the runtime waits for the first frame"

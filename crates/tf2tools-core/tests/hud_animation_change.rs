@@ -117,7 +117,10 @@ fn recipe_onto(extra: &str, body: &str) -> (Vec<String>, usize) {
         serde_json::Value::from(body)
     );
     let (recipe, skipped) = Recipe::parse(text.as_bytes()).unwrap();
-    assert_eq!(skipped, 0);
+    assert_eq!(
+        skipped, 0,
+        "the recipe should parse without skipping a change"
+    );
     let applied = model.apply_recipe(&recipe, &[], 7);
     let bodies = applied
         .changes()

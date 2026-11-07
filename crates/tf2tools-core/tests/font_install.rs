@@ -219,7 +219,7 @@ fn mkfifo(path: &std::path::Path) {
         .arg(path)
         .status()
         .unwrap();
-    assert!(status.success());
+    assert!(status.success(), "mkfifo should create {}", path.display());
 }
 
 #[cfg(unix)]

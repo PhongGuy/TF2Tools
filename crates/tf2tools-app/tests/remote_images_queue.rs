@@ -20,9 +20,17 @@ fn keys(range: Range<usize>) -> Vec<ImageKey> {
 /// Wants, fetches and decodes `key` as `image` of `bytes`; returns the evicted.
 fn ready(q: &mut ImageQueue<u32>, key: ImageKey, image: u32, bytes: u64) -> Vec<u32> {
     q.want("v", vec![key.clone()], Instant::now());
-    assert_eq!(q.next_fetch(), Some(key.clone()));
+    assert_eq!(
+        q.next_fetch(),
+        Some(key.clone()),
+        "{key:?} should be next to fetch once wanted"
+    );
     q.fetched(&key, Ok(vec![1]), Instant::now());
-    assert_eq!(q.next_decode().map(|(k, _)| k), Some(key.clone()));
+    assert_eq!(
+        q.next_decode().map(|(k, _)| k),
+        Some(key.clone()),
+        "{key:?} should be next to decode once fetched"
+    );
     q.decoded(&key, Some((image, bytes)))
 }
 
@@ -210,9 +218,17 @@ fn webp_decodes_and_bytes_that_are_no_image_do_not() {
 
 /// Fetches and decodes `key`, already wanted and next in the queue, as `image` of `bytes`.
 fn fetch_decode(q: &mut ImageQueue<u32>, key: &ImageKey, image: u32, bytes: u64) -> Vec<u32> {
-    assert_eq!(q.next_fetch(), Some(key.clone()));
+    assert_eq!(
+        q.next_fetch(),
+        Some(key.clone()),
+        "{key:?} should be next to fetch"
+    );
     q.fetched(key, Ok(vec![1]), Instant::now());
-    assert_eq!(q.next_decode().map(|(k, _)| k), Some(key.clone()));
+    assert_eq!(
+        q.next_decode().map(|(k, _)| k),
+        Some(key.clone()),
+        "{key:?} should be next to decode once fetched"
+    );
     q.decoded(key, Some((image, bytes)))
 }
 

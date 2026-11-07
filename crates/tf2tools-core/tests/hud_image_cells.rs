@@ -20,7 +20,11 @@ fn cells(class: &str, extra: &str, texture: (u32, u32)) -> Vec<Cell> {
     let model = HudModel::load(&files, Platform::Linux).unwrap();
     let key = PartKey::new(BG);
     let b = model.layout(HD).get(&key).cloned().unwrap();
-    assert_eq!((b.wide(), b.tall()), (567, 112));
+    assert_eq!(
+        (b.wide(), b.tall()),
+        (567, 112),
+        "the background should scale to 567x112 at HD"
+    );
     let part = model.part(&key).unwrap();
     image_cells(part, b.wide(), b.tall(), texture, HD)
         .iter()

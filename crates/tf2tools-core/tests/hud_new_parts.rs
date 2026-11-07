@@ -20,8 +20,11 @@ fn rect(m: &HudModel, key: &PartKey) -> (i32, i32, i32, i32) {
 
 fn added(m: &HudModel, kind: NewPart, near: &str) -> (PartKey, HudModel) {
     let (key, changes) = m.add_part(kind, &PartKey::new(near), 1).unwrap();
-    assert_eq!(changes.len(), 1);
-    assert!(matches!(changes[0].target(), ChangeTarget::AddBlock(_)));
+    assert_eq!(changes.len(), 1, "adding a part should make one change");
+    assert!(
+        matches!(changes[0].target(), ChangeTarget::AddBlock(_)),
+        "adding a part should add a block"
+    );
     (key, m.with_changes(&changes).into_model())
 }
 

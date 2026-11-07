@@ -144,7 +144,11 @@ fn shell_with_borders(
         "border TFFatLineBorderBlueBG proportionaltoparent",
         "border HudOwnBG proportionaltoparent",
     );
-    assert_ne!(panel, support::hud_stock::WIN_PANEL);
+    assert_ne!(
+        panel,
+        support::hud_stock::WIN_PANEL,
+        "the stock win panel should hold the border to replace"
+    );
     let (blu_vmt, blu_vtf) = texture("color_panel_blu", [0, 0, 255, 255]);
     let (red_vmt, red_vtf) = texture("color_panel_red", [255, 0, 0, 255]);
     let english = utf16le(ENGLISH);

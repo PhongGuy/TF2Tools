@@ -388,7 +388,11 @@ fn active_profile() -> (LibraryEnv, Profile) {
     env.lib
         .apply_profile(p.id(), &env.tf2, &builtin_catalog(), false)
         .unwrap();
-    assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
+    assert_eq!(
+        env.lib.active_profile().unwrap().as_ref(),
+        Some(p.id()),
+        "applying the profile should make it active"
+    );
     (env, p)
 }
 
@@ -398,9 +402,16 @@ fn assert_edit_deactivates(env: &LibraryEnv, p: &Profile, edit: ProfileDraft) {
     let custom = env.tf2.custom_dir();
     let before = tree(&custom);
     let update = env.lib.update_profile(p.id(), &edit).unwrap();
-    assert!(update.deactivated());
-    assert_eq!(env.lib.active_profile().unwrap(), None);
-    assert_eq!(tree(&custom), before);
+    assert!(
+        update.deactivated(),
+        "the edit should report the profile deactivated"
+    );
+    assert_eq!(
+        env.lib.active_profile().unwrap(),
+        None,
+        "the edit should leave no profile active"
+    );
+    assert_eq!(tree(&custom), before, "the edit should not touch tf/custom");
 }
 
 #[test]
@@ -519,12 +530,23 @@ fn assert_failed_write_rolls_back(table: &str) {
              BEGIN SELECT RAISE(ABORT, 'no'); END;"
         ))
         .unwrap();
-    assert!(matches!(
-        env.lib.update_profile(p.id(), &draft),
-        Err(ProfileError::Database { .. })
-    ));
-    assert_eq!(env.lib.profile(p.id()).unwrap(), p);
-    assert_eq!(env.lib.active_profile().unwrap().as_ref(), Some(p.id()));
+    assert!(
+        matches!(
+            env.lib.update_profile(p.id(), &draft),
+            Err(ProfileError::Database { .. })
+        ),
+        "a failed insert should surface as a database error"
+    );
+    assert_eq!(
+        env.lib.profile(p.id()).unwrap(),
+        p,
+        "a failed update should leave the profile as it was"
+    );
+    assert_eq!(
+        env.lib.active_profile().unwrap().as_ref(),
+        Some(p.id()),
+        "a failed update should keep the profile active"
+    );
 
     sql(&env.dir)
         .execute_batch("DROP TRIGGER no_inserts;")

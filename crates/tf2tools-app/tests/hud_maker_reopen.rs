@@ -55,7 +55,11 @@ fn edit_from_huds(
     support::click_id(cx, s.win, ids::nav(Page::Sounds));
     support::click_id(cx, s.win, ids::nav(Page::Huds));
     support::click_id(cx, s.win, ids::hud_edit(hud.folder_name()));
-    assert_eq!(cx.update(|cx| s.shell.read(cx).page()), Page::HudMaker);
+    assert_eq!(
+        cx.update(|cx| s.shell.read(cx).page()),
+        Page::HudMaker,
+        "Edit on the HUD card should open the HUD maker"
+    );
     let page = cx.update(|cx| s.shell.read(cx).hud_maker_page()).unwrap();
     support::wait_real(cx, "the HUD to load", |cx| {
         cx.update(|cx| page.read(cx).is_loaded())

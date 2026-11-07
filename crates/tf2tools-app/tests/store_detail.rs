@@ -45,7 +45,10 @@ fn detail(
     let d = cx
         .update_window(win, |_, window, cx| open_detail(item, body, window, cx))
         .unwrap();
-    assert!(support::present(cx, win, ids::STORE_DETAIL));
+    assert!(
+        support::present(cx, win, ids::STORE_DETAIL),
+        "opening an item should show the store detail dialog"
+    );
     d
 }
 

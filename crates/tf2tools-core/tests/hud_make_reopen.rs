@@ -171,12 +171,19 @@ fn snapshot(root: &std::path::Path) -> Vec<(String, Vec<u8>)> {
 fn assert_reads_leave_the_tree_alone(env: &LibraryEnv, s: &SavedHud) {
     let huds = env.dir.library_dir(LibraryKind::Huds);
     let before = snapshot(&huds);
-    assert!(env.lib.is_made_hud(s.entry().id()).unwrap());
+    assert!(
+        env.lib.is_made_hud(s.entry().id()).unwrap(),
+        "the saved HUD should read as a made HUD"
+    );
     let made = env
         .lib
         .open_made_hud(s.entry().id(), &stock_files(), Platform::Linux)
         .unwrap();
-    assert_eq!(made.changes(), [red_health(1)]);
+    assert_eq!(
+        made.changes(),
+        [red_health(1)],
+        "reopening should give back the one saved change"
+    );
     assert!(
         snapshot(&huds) == before,
         "a read changed the library folder"

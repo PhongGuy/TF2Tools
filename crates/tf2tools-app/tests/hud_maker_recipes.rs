@@ -632,7 +632,10 @@ fn a_recipe_read_for_a_hud_since_replaced_never_lands(cx: &mut TestAppContext) {
 /// Opens the toolbar's overflow menu; true when its Start from entry is live.
 fn open_more(cx: &mut TestAppContext, s: &support::ShellWindow) -> bool {
     support::click_id(cx, s.win, ids::HUD_MAKER_MORE);
-    assert!(support::present(cx, s.win, ids::HUD_MAKER_START));
+    assert!(
+        support::present(cx, s.win, ids::HUD_MAKER_START),
+        "the overflow menu should show its Start from entry"
+    );
     !support::disabled_of(cx, s.win, ids::HUD_MAKER_START)
 }
 

@@ -86,7 +86,8 @@ fn assert_still_playing(
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::SOUND_PLAYER_NAME).as_deref(),
-        Some("Ding")
+        Some("Ding"),
+        "the player should still name the sound"
     );
 }
 

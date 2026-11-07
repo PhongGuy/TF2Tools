@@ -720,7 +720,10 @@ fn scheme_with_picture_borders() -> String {
     TFFatLineBorderBlueBG { bordertype scalable_image image ../hud/color_panel_blu src_corner_height 2 src_corner_width 2 draw_corner_width 8 draw_corner_height 8 }
   }
   Fonts\n";
-    assert!(SCHEME.contains("  Fonts\n"));
+    assert!(
+        SCHEME.contains("  Fonts\n"),
+        "the stock scheme should hold the Fonts section to insert before"
+    );
     SCHEME.replacen("  Fonts\n", BORDERS, 1)
 }
 

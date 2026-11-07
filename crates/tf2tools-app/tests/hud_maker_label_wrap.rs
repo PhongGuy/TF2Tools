@@ -35,7 +35,10 @@ fn tip_with(
     );
     let stock = support::hud_stock::SPECTATOR;
     let text = stock.replace(STOCK_TIP, &line);
-    assert_ne!(text, stock);
+    assert_ne!(
+        text, stock,
+        "the stock spectator file should hold the tip label to replace"
+    );
     let env = support::env();
     let mut files = vec![("resource/ui/spectator.res", Some(text.as_str()))];
     if scheme.is_some() {

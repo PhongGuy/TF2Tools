@@ -21,7 +21,7 @@ fn sets(changes: &[Change], group: u32) -> Vec<(String, String, Option<String>, 
     changes
         .iter()
         .map(|c| {
-            assert_eq!(c.group(), group);
+            assert_eq!(c.group(), group, "every change should be in group {group}");
             let ChangeTarget::Set(s) = c.target() else {
                 panic!("not a set")
             };

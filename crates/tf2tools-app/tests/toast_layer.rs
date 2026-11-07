@@ -40,7 +40,10 @@ fn dialog_and_toast(cx: &mut TestAppContext, (width, height): (f32, f32)) -> Any
     })
     .unwrap();
     support::settle(cx, win);
-    assert!(support::present(cx, win, ids::TOAST));
+    assert!(
+        support::present(cx, win, ids::TOAST),
+        "the error toast should show over the open dialog"
+    );
     win
 }
 
@@ -149,7 +152,10 @@ fn pointer_reaches_the_toast(cx: &mut TestAppContext, window: (f32, f32)) {
         toast_leaves(cx, win),
         "the dialog took the press at {centre:?}"
     );
-    assert!(dialogs_open(cx, win));
+    assert!(
+        dialogs_open(cx, win),
+        "the dialog should stay open after the press passes through"
+    );
 }
 
 #[gpui_kit::test]

@@ -120,8 +120,15 @@ fn answers(cx: &mut TestAppContext, id: &'static str, answer: FontAnswer) {
     let env = support::env();
     let (win, rx) = open(cx, prompt(&env, FONTS, &[]));
     support::click_id(cx, win, id);
-    assert_eq!(rx.try_recv(), Ok(answer));
-    assert!(!support::present(cx, win, ids::HUD_FONTS_DIALOG));
+    assert_eq!(
+        rx.try_recv(),
+        Ok(answer),
+        "clicking {id} should answer {answer:?}"
+    );
+    assert!(
+        !support::present(cx, win, ids::HUD_FONTS_DIALOG),
+        "clicking {id} should close the fonts dialog"
+    );
 }
 
 #[gpui_kit::test]

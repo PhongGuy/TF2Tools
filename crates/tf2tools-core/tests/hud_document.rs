@@ -14,7 +14,11 @@ fn fixture(name: &str) -> Vec<u8> {
 
 fn round_trips(bytes: &[u8]) {
     let doc = KvDocument::parse(bytes).unwrap();
-    assert_eq!(doc.as_bytes(), bytes);
+    assert_eq!(
+        doc.as_bytes(),
+        bytes,
+        "the parsed document should write back byte for byte"
+    );
 }
 
 #[test]

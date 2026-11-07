@@ -206,7 +206,10 @@ fn not_updated(cx: &mut TestAppContext, s: &support::ShellWindow, line: &str) {
         "{:?}",
         support::toast_labels(cx, s.win)
     );
-    assert!(!support::present(cx, s.win, ids::HUD_MAKER_LIVE_NOTE));
+    assert!(
+        !support::present(cx, s.win, ids::HUD_MAKER_LIVE_NOTE),
+        "the live note should go once the toast says the copy was not updated"
+    );
 }
 
 #[cfg(unix)]

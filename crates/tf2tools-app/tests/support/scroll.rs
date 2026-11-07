@@ -126,5 +126,9 @@ pub fn assert_track_stays(
     let probe = probe.into();
     let before = bounds(cx, win, probe.clone());
     press_track_foot(cx, win, area);
-    assert_eq!(bounds(cx, win, probe), before);
+    assert_eq!(
+        bounds(cx, win, probe),
+        before,
+        "pressing the track foot should not move the probe"
+    );
 }

@@ -795,7 +795,8 @@ fn the_note_keeps_clear_at(cx: &mut TestAppContext, w: f32, h: f32) -> Bounds<Pi
     }
     assert_eq!(
         support::label_of(cx, s.win, ids::HUD_MAKER_SCENE_NOTE).as_deref(),
-        Some("This HUD hides the scoreboard")
+        Some("This HUD hides the scoreboard"),
+        "{w}x{h}: the scene note should say the HUD hides the scoreboard"
     );
     note
 }
@@ -2316,7 +2317,11 @@ fn the_list_stays_while_the_selection_is_elsewhere_on(
     let picks = [&away[0], &away[away.len() / 2], &away[away.len() - 1]];
     for key in picks {
         select(cx, &s, &page, key);
-        assert_eq!(selection(cx, &page).as_deref(), Some(key.as_str()));
+        assert_eq!(
+            selection(cx, &page).as_deref(),
+            Some(key.as_str()),
+            "{scene:?}: clicking {key:?} should select it"
+        );
         let now = bounds(cx, &s, ids::HUD_MAKER_PARTS_PANEL);
         assert_eq!(now.origin, list.origin, "{scene:?}: {key:?} moved the list");
         assert!(
