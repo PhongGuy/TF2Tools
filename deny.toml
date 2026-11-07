@@ -1,0 +1,12 @@
+# cargo-deny settings for the dependency audit in CI (.github/workflows/audit.yml).
+
+[advisories]
+# Unmaintained notices count only for crates the workspace depends on directly; the rest arrive
+# through GPUI and its windowing stack, which we can't swap out.
+unmaintained = "workspace"
+yanked = "deny"
+ignore = [
+    # Unmaintained, no known flaw. Core reads font names with it, and GPUI's text stack needs
+    # it anyway, so a swap would not drop it from the app.
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser: GPUI depends on it too; no known flaw" },
+]
