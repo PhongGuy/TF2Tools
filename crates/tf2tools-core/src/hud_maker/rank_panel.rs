@@ -4,14 +4,11 @@
 use super::expr::{AxisSize, PosExpr, ScreenScale, SizeExpr};
 use super::layout::{HudLayout, Screen};
 use super::model::{HudModel, Part, PartKey};
-use super::{HudFiles, Scene, SceneRule};
+use super::{HudFiles, Rect, Scene, SceneRule};
 use crate::fonts::Platform;
 use crate::fonts::keyvalues::{self, KvPair, KvValue};
 
-/// A rectangle as (x, y, wide, tall) in screen pixels from the panel's top-left corner.
-type Rect = (i32, i32, i32, i32);
-
-/// Where a rank panel's code-drawn pieces sit, each `None` when the panel's keys turn it off,
+/// Where a rank panel's code-drawn pieces sit, in screen pixels from the panel's top-left, each `None` when the panel's keys turn it off,
 /// with the look the HUD's own rank file gives them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -105,8 +102,13 @@ struct Placed<'a> {
     shown: Option<Rect>,
 }
 
-fn edges((x, y, w, h): Rect) -> Edges {
-    (x, y, x.saturating_add(w), y.saturating_add(h))
+fn edges(r: Rect) -> Edges {
+    (
+        r.x,
+        r.y,
+        r.x.saturating_add(r.wide),
+        r.y.saturating_add(r.tall),
+    )
 }
 
 /// `a` and `b` overlapped as edges, `None` when they share no area.
@@ -116,7 +118,7 @@ fn overlap(a: Edges, b: Edges) -> Option<Edges> {
 }
 
 fn rect_of((l, t, r, b): Edges) -> Rect {
-    (l, t, r.saturating_sub(l), b.saturating_sub(t))
+    Rect::new(l, t, r.saturating_sub(l), b.saturating_sub(t))
 }
 
 /// Places the control at `path` down the layout's tree for a panel of `wide` x `tall`: each
@@ -132,7 +134,7 @@ fn place<'a>(
 ) -> Option<Placed<'a>> {
     let mut at = String::new();
     // The panel itself is the first parent; nothing clips it here, the canvas does.
-    let mut parent: Rect = (0, 0, wide, tall);
+    let mut parent = Rect::new(0, 0, wide, tall);
     let mut clip = Some((i32::MIN, i32::MIN, i32::MAX, i32::MAX));
     let mut placed = None;
     for name in path.split('/') {
@@ -143,7 +145,7 @@ fn place<'a>(
         let control = layout.control(&at)?;
         let size = |key: &str| control.value(key).map(SizeExpr::parse);
         let (wide_expr, tall_expr) = (size("wide"), size("tall"));
-        let (wide_axis, tall_axis) = (AxisSize::new(0, parent.2), AxisSize::new(0, parent.3));
+        let (wide_axis, tall_axis) = (AxisSize::new(0, parent.wide), AxisSize::new(0, parent.tall));
         let own_wide = wide_expr.as_ref().map_or(0, |e| {
             e.eval(wide_axis, tall_expr.as_ref(), tall_axis, scale)
         });
@@ -155,9 +157,9 @@ fn place<'a>(
                 .value(key)
                 .map_or(0, |t| PosExpr::parse(t).eval(own, along, scale))
         };
-        let x = parent.0.saturating_add(pos("xpos", own_wide, parent.2));
-        let y = parent.1.saturating_add(pos("ypos", own_tall, parent.3));
-        let own = (x, y, own_wide, own_tall);
+        let x = parent.x.saturating_add(pos("xpos", own_wide, parent.wide));
+        let y = parent.y.saturating_add(pos("ypos", own_tall, parent.tall));
+        let own = Rect::new(x, y, own_wide, own_tall);
         let visible = control
             .value("visible")
             .and_then(|t| t.trim().parse::<i64>().ok())
@@ -196,7 +198,7 @@ pub fn rank_pieces(
     let medal = on("show_model").then(|| {
         let side = (i64::from(tall.max(0)) * 12 / 100 * 7 / 10) as i32;
         let at = |size: i32| ((i64::from(size) - i64::from(side)) / 2) as i32;
-        (at(wide), at(tall), side, side)
+        Rect::new(at(wide), at(tall), side, side)
     });
     let level = on("show_progress");
     let layout = model.rank_layout();
@@ -219,8 +221,10 @@ pub fn rank_pieces(
     let name_box = name.as_ref().and_then(|p| p.shown.map(|_| p.own));
     // Progress is three fifths of the fill's own width, then clipped like any other box.
     let fill_rect = fill.as_ref().and_then(|p| {
-        let (x, y, w, h) = p.own;
-        let progress = edges((x, y, (w as f32 * 0.6) as i32, h));
+        let progress = edges(Rect {
+            wide: (p.own.wide as f32 * 0.6) as i32,
+            ..p.own
+        });
         let shown = p.shown.map(edges)?;
         overlap(progress, shown).map(rect_of)
     });
@@ -253,7 +257,7 @@ pub fn rank_medal(
     screen: Screen,
 ) -> Option<Rect> {
     let b = layout.get(key)?;
-    let (x, y, wide, tall) =
+    let Rect { x, y, wide, tall } =
         rank_pieces(model, model.part(key)?, b.wide(), b.tall(), screen).medal()?;
     let gap = ScreenScale::new(screen.tall()).scale(4);
     let (top, bottom) = (
@@ -274,19 +278,19 @@ pub fn rank_medal(
         let Some(name) = rank_pieces(model, part, pb.wide(), pb.tall(), screen).name_box() else {
             continue;
         };
-        let (name_x, name_y) = (pb.x().saturating_add(name.0), pb.y().saturating_add(name.1));
+        let (name_x, name_y) = (pb.x().saturating_add(name.x), pb.y().saturating_add(name.y));
         // Only a name that starts right of the square's left edge can be covered by it.
-        if name_x > left && name_y < bottom && top < name_y.saturating_add(name.3) {
+        if name_x > left && name_y < bottom && top < name_y.saturating_add(name.tall) {
             right = right.min(name_x.saturating_sub(gap));
         }
     }
     let new_x = right.saturating_sub(b.x()).saturating_sub(wide);
     if new_x >= 0 {
-        return Some((new_x, y, wide, tall));
+        return Some(Rect::new(new_x, y, wide, tall));
     }
     // Too little room left of the name: shrink the square about its centre height.
     let side = right.saturating_sub(b.x()).clamp(0, wide);
-    Some((0, y + (tall - side) / 2, side, side))
+    Some(Rect::new(0, y + (tall - side) / 2, side, side))
 }
 
 /// One control of the rank panel's file: its block name, its text keys in file order and its

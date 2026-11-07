@@ -1,7 +1,7 @@
 //! Snapping a dragged part to the screen centre and to other parts' edges and centres. A pure
 //! search over the boxes of one layout; the caller passes the layout the drag began on.
 
-use super::{HudLayout, PartKey};
+use super::{HudLayout, PartKey, Rect};
 
 /// Which way a guide line runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,14 +75,14 @@ impl HudLayout {
         // Targets are drawn parts other than this one and its own children, which move with it,
         // by the area the game shows of each: a part it cuts off whole offers no edges. The
         // mover keeps its whole box, since its shown area changes shape as it leaves a clip.
-        let targets: Vec<(i32, i32, i32, i32)> = (self.boxes().iter())
+        let targets: Vec<Rect> = (self.boxes().iter())
             .filter(|b| b.hidden().is_none() && b.key() != part && !self.is_under(b.key(), part))
             .filter_map(|b| self.shown(b.key()))
             .collect();
         let screen = self.screen();
         let mut snap = unsnapped;
-        let across = |&(x, _, wide, _): &(i32, i32, i32, i32)| lines(x, wide);
-        let down = |&(_, y, _, tall): &(i32, i32, i32, i32)| lines(y, tall);
+        let across = |r: &Rect| lines(r.x, r.wide);
+        let down = |r: &Rect| lines(r.y, r.tall);
         let x = nearest(
             lines(own.x(), own.wide()).map(|l| l + i64::from(dx)),
             i64::from(screen.wide() / 2),

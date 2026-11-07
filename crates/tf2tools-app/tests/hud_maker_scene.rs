@@ -12,7 +12,7 @@ use tf2tools_app::pages::hud_maker::view::{Panel, list_font_px};
 use tf2tools_app::pages::hud_maker::{Field, HudMakerPage};
 use tf2tools_app::services::Tf2State;
 use tf2tools_core::{ColumnKind, PlayerListLayout};
-use tf2tools_core::{PartKey, Scene, Tf2Install};
+use tf2tools_core::{PartKey, Rect, Scene, Tf2Install};
 
 // The side panel's least height, as the page's `SIDE_PANEL_MIN` keeps it.
 const SIDE_PANEL_MIN: f32 = 240.;
@@ -2251,7 +2251,13 @@ fn drawn_parts(
         (layout.paint_order())
             .filter(|b| b.hidden().is_none())
             .filter_map(|b| {
-                let (x, y, w, h) = layout.shown(b.key())?;
+                let Rect {
+                    x,
+                    y,
+                    wide: w,
+                    tall: h,
+                    ..
+                } = layout.shown(b.key())?;
                 let at = point(
                     canvas.left() + gpui_kit::px(x as f32 * scale),
                     canvas.top() + gpui_kit::px(y as f32 * scale),

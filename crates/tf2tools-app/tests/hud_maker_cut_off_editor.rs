@@ -4,7 +4,7 @@
 use crate::support;
 
 use tf2tools_app::pages::hud_maker::editor::{Align, HudEditor, outside_parent};
-use tf2tools_core::PartKey;
+use tf2tools_core::{PartKey, Rect};
 
 const ROUND: &str = "HudMatchStatus/ObjectiveStatusTimePanel";
 const TIME: &str = "HudMatchStatus/ObjectiveStatusTimePanel/TimePanelValue";
@@ -15,9 +15,8 @@ fn key(k: &str) -> PartKey {
     PartKey::new(k)
 }
 
-fn rect(e: &HudEditor, k: &str) -> (i32, i32, i32, i32) {
-    let b = e.layout().get(&key(k)).unwrap();
-    (b.x(), b.y(), b.wide(), b.tall())
+fn rect(e: &HudEditor, k: &str) -> Rect {
+    e.layout().get(&key(k)).unwrap().rect()
 }
 
 fn outside(e: &HudEditor, k: &str) -> Option<String> {
@@ -72,14 +71,14 @@ fn growing_the_round_timer_shows_the_text_where_it_sits_as_one_named_step() {
     assert_eq!(e.layout().shown(&key(TIME)), Some(time), "all of it shows");
     let grown = rect(&e, ROUND);
     assert_eq!(
-        (grown.0, grown.1),
-        (round.0, round.1),
+        (grown.x, grown.y),
+        (round.x, round.y),
         "only the bottom edge moves"
     );
-    assert!(grown.1 + grown.3 >= time.1 + time.3);
+    assert!(grown.y + grown.tall >= time.y + time.tall);
     // Grown by whole file units (2.25 px at 1080p), so at most one unit past the text.
     assert!(
-        grown.1 + grown.3 - (time.1 + time.3) <= 3,
+        grown.y + grown.tall - (time.y + time.tall) <= 3,
         "{grown:?} {time:?}"
     );
     assert_eq!(e.undo_name(), Some("grow Round timer to fit"));
@@ -105,9 +104,9 @@ fn growing_left_and_up_moves_the_parent_and_keeps_its_parts_in_place() {
     );
     assert_eq!(outside(&e, TIME), None);
     let round = rect(&e, ROUND);
-    assert!(round.0 <= time.0 && round.1 <= time.1, "{round:?} {time:?}");
+    assert!(round.x <= time.x && round.y <= time.y, "{round:?} {time:?}");
     assert!(
-        time.0 - round.0 <= 3 && time.1 - round.1 <= 3,
+        time.x - round.x <= 3 && time.y - round.y <= 3,
         "grown no more than needed"
     );
 }

@@ -8,7 +8,8 @@ use super::expr::atoi;
 use super::probe::{self, HideHow};
 use super::scene::Fit;
 use super::{
-    AxisSize, GameSituation, HudModel, Part, PartKey, PinCorner, PosExpr, ScreenScale, SizeExpr,
+    AxisSize, GameSituation, HudModel, Part, PartKey, PinCorner, PosExpr, Rect, ScreenScale,
+    SizeExpr,
 };
 
 /// A screen shape in pixels.
@@ -125,11 +126,13 @@ impl PartBox {
         self.clickable
     }
 
+    /// The box as one rectangle.
+    pub fn rect(&self) -> Rect {
+        Rect::new(self.x, self.y, self.wide, self.tall)
+    }
+
     fn contains(&self, x: i32, y: i32) -> bool {
-        x >= self.x
-            && y >= self.y
-            && i64::from(x) < i64::from(self.x) + i64::from(self.wide)
-            && i64::from(y) < i64::from(self.y) + i64::from(self.tall)
+        self.rect().contains(x, y)
     }
 }
 
@@ -202,25 +205,24 @@ impl HudLayout {
         self.index.get(key).map(|&i| &self.boxes[i])
     }
 
-    /// The part of `key`'s box the game can draw in, as (x, y, wide, tall): the box cut to
+    /// The part of `key`'s box the game can draw in: the box cut to
     /// every enclosing part's box and the screen, as the game clips a panel to its parent.
     /// The whole box when nothing of it would show; `None` when `key` has no box.
-    pub fn visible(&self, key: &PartKey) -> Option<(i32, i32, i32, i32)> {
+    pub fn visible(&self, key: &PartKey) -> Option<Rect> {
         self.index.get(key).map(|&i| self.visible_at(i))
     }
 
     /// The area of `key`'s box the game draws, cut as `visible` cuts it; `None` when `key` has
     /// no box or nothing of it would show.
-    pub fn shown(&self, key: &PartKey) -> Option<(i32, i32, i32, i32)> {
+    pub fn shown(&self, key: &PartKey) -> Option<Rect> {
         self.index.get(key).and_then(|&i| self.shown_at(i))
     }
 
-    fn visible_at(&self, i: usize) -> (i32, i32, i32, i32) {
-        let b = &self.boxes[i];
-        self.shown_at(i).unwrap_or((b.x, b.y, b.wide, b.tall))
+    fn visible_at(&self, i: usize) -> Rect {
+        self.shown_at(i).unwrap_or(self.boxes[i].rect())
     }
 
-    fn shown_at(&self, i: usize) -> Option<(i32, i32, i32, i32)> {
+    fn shown_at(&self, i: usize) -> Option<Rect> {
         let edges = |b: &PartBox| {
             let (x, y) = (i64::from(b.x), i64::from(b.y));
             (x, y, x + i64::from(b.wide), y + i64::from(b.tall))
@@ -256,7 +258,7 @@ impl HudLayout {
         }
         // Inside the box on every side, so each value fits an i32 as the box's own do.
         let fit = |v: i64| i32::try_from(v).unwrap_or(i32::MAX);
-        Some((
+        Some(Rect::new(
             fit(cut.0),
             fit(cut.1),
             fit(cut.2 - cut.0),
@@ -326,14 +328,7 @@ impl HudLayout {
     ) -> Vec<(usize, bool, usize)> {
         let area = |b: &PartBox| i64::from(b.wide.max(0)) * i64::from(b.tall.max(0));
         // A click lands only where the part paints, not where its parent cuts it off.
-        let holds = |i: usize| {
-            let Some((vx, vy, w, h)) = self.shown_at(i) else {
-                return false;
-            };
-            let (x, y) = (i64::from(x), i64::from(y));
-            let (vx, vy) = (i64::from(vx), i64::from(vy));
-            x >= vx && y >= vy && x < vx + i64::from(w) && y < vy + i64::from(h)
-        };
+        let holds = |i: usize| self.shown_at(i).is_some_and(|shown| shown.contains(x, y));
         // (box index, counts as drawing, paint place, lifted over its piece)
         let mut under: Vec<(usize, bool, usize, bool)> = (self.paint.iter().enumerate())
             .filter(|&(_, &i)| {
@@ -392,7 +387,7 @@ impl HudLayout {
 impl HudLayout {
     /// The same layout with each box in `rects` put at its rect, shifted by any moved
     /// ancestor, and every other box shifted with its nearest moved ancestor.
-    pub(super) fn moved(&self, rects: &HashMap<PartKey, (i32, i32, i32, i32)>) -> HudLayout {
+    pub(super) fn moved(&self, rects: &HashMap<PartKey, Rect>) -> HudLayout {
         let mut out = self.clone();
         let mut offset = vec![(0i32, 0i32); self.boxes.len()];
         // Parents come first, so each parent's offset is final when its children read it.
@@ -401,9 +396,9 @@ impl HudLayout {
             let b = &mut out.boxes[i];
             let (ox, oy) = (b.x, b.y);
             match rects.get(&b.key) {
-                Some(&(x, y, wide, tall)) => {
-                    (b.x, b.y) = (x.saturating_add(dx), y.saturating_add(dy));
-                    (b.wide, b.tall) = (wide, tall);
+                Some(r) => {
+                    (b.x, b.y) = (r.x.saturating_add(dx), r.y.saturating_add(dy));
+                    (b.wide, b.tall) = (r.wide, r.tall);
                 }
                 None => (b.x, b.y) = (ox.saturating_add(dx), oy.saturating_add(dy)),
             }
@@ -508,7 +503,7 @@ impl HudModel {
             let hidden = hidden_by(
                 part,
                 parent_hidden,
-                (x, y, wide, tall),
+                Rect::new(x, y, wide, tall),
                 screen_size,
                 (s, self),
             );
@@ -805,7 +800,9 @@ fn pinned_rel(
 fn hidden_by(
     part: &Part,
     parent_hidden: bool,
-    (x, y, wide, tall): (i32, i32, i32, i32),
+    Rect {
+        x, y, wide, tall, ..
+    }: Rect,
     screen: (i32, i32),
     (situation, model): (&GameSituation, &HudModel),
 ) -> Option<HiddenBy> {

@@ -3,7 +3,7 @@
 use crate::common;
 
 use common::hud_stock::{RANK_PANEL, stock_files_with};
-use tf2tools_core::{HudModel, PartKey, Platform, RankPieces, Scene, Screen, rank_pieces};
+use tf2tools_core::{HudModel, PartKey, Platform, RankPieces, Rect, Scene, Screen, rank_pieces};
 
 const MENU_FILE: &str = "resource/ui/mainmenuoverride.res";
 const RANK_FILE: &str = "resource/ui/pvprankpanel.res";
@@ -39,14 +39,14 @@ fn stock_places_the_name_the_track_and_the_inset_fill() {
     // is 1 unit inside it and three fifths of its own 188 units wide.
     for rank in [None, Some(RANK_PANEL)] {
         let p = pieces(rank, 320, 100, SD);
-        assert_eq!(p.name(), Some((125, 25, 195, 20)));
+        assert_eq!(p.name(), Some(Rect::new(125, 25, 195, 20)));
         assert_eq!(
             p.name_box(),
-            Some((125, 25, 260, 20)),
+            Some(Rect::new(125, 25, 260, 20)),
             "the label reaches past BGPanel"
         );
-        assert_eq!(p.bar(), Some((126, 60, 188, 7)));
-        assert_eq!(p.fill(), Some((127, 61, 111, 5)));
+        assert_eq!(p.bar(), Some(Rect::new(126, 60, 188, 7)));
+        assert_eq!(p.fill(), Some(Rect::new(127, 61, 111, 5)));
         assert_eq!(p.name_font(), Some("HudFontSmallishBold"));
         assert_eq!(p.name_colour(), Some("TanLight"));
         assert_eq!(p.name_alignment(), "north-west");
@@ -59,9 +59,9 @@ fn stock_places_the_name_the_track_and_the_inset_fill() {
 #[test]
 fn the_pieces_scale_with_the_screen() {
     let p = pieces(Some(RANK_PANEL), 640, 200, X2);
-    assert_eq!(p.name(), Some((250, 50, 390, 40)));
-    assert_eq!(p.bar(), Some((251, 120, 376, 14)));
-    assert_eq!(p.fill(), Some((253, 122, 223, 10)));
+    assert_eq!(p.name(), Some(Rect::new(250, 50, 390, 40)));
+    assert_eq!(p.bar(), Some(Rect::new(251, 120, 376, 14)));
+    assert_eq!(p.fill(), Some(Rect::new(253, 122, 223, 10)));
 }
 
 #[test]
@@ -71,7 +71,7 @@ fn a_moved_and_restyled_name_is_reported_as_the_file_sets_it() {
         "ControlName CExLabel xpos 0 ypos 0 wide 125 tall 20 font aRegular14 fgcolor White textAlignment center allcaps 1",
     );
     let p = pieces(Some(&own), 320, 100, SD);
-    assert_eq!(p.name(), Some((60, 20, 125, 20)));
+    assert_eq!(p.name(), Some(Rect::new(60, 20, 125, 20)));
     assert_eq!(p.name_box(), p.name());
     assert_eq!(p.name_font(), Some("aRegular14"));
     assert_eq!(
@@ -81,7 +81,11 @@ fn a_moved_and_restyled_name_is_reported_as_the_file_sets_it() {
     );
     assert_eq!(p.name_alignment(), "center");
     assert!(p.name_all_caps());
-    assert_eq!(p.bar(), Some((126, 60, 188, 7)), "the bar is unmoved");
+    assert_eq!(
+        p.bar(),
+        Some(Rect::new(126, 60, 188, 7)),
+        "the bar is unmoved"
+    );
 }
 
 #[test]
@@ -93,7 +97,7 @@ fn a_hidden_name_leaves_the_bar_alone() {
     ] {
         let p = pieces(Some(&own), 320, 100, SD);
         assert_eq!((p.name(), p.name_box()), (None, None), "{own}");
-        assert_eq!(p.bar(), Some((126, 60, 188, 7)));
+        assert_eq!(p.bar(), Some(Rect::new(126, 60, 188, 7)));
     }
 }
 
@@ -110,7 +114,7 @@ fn a_hidden_track_leaves_the_fill() {
     let own = with("wide f0 tall f-2", "wide 0 tall f-2");
     let p = pieces(Some(&own), 320, 100, SD);
     assert_eq!(p.bar(), None);
-    assert_eq!(p.fill(), Some((127, 61, 111, 5)));
+    assert_eq!(p.fill(), Some(Rect::new(127, 61, 111, 5)));
 }
 
 #[test]
@@ -120,14 +124,14 @@ fn a_fill_that_fills_its_container_has_no_inset() {
         "xpos 0 ypos 0 wide f0 tall f0",
     );
     let p = pieces(Some(&own), 320, 100, SD);
-    assert_eq!(p.fill(), Some((126, 60, 112, 7)));
+    assert_eq!(p.fill(), Some(Rect::new(126, 60, 112, 7)));
 }
 
 #[test]
 fn a_file_missing_the_bar_blocks_draws_no_bar() {
     let partial = r#""Resource/UI/PvPRankPanel.res" { BGPanel { xpos rs1 ypos 20 wide 260 tall f40 NameLabel { xpos 65 ypos 5 wide f0 tall 20 } } }"#;
     let p = pieces(Some(partial), 320, 100, SD);
-    assert_eq!(p.name(), Some((125, 25, 195, 20)));
+    assert_eq!(p.name(), Some(Rect::new(125, 25, 195, 20)));
     assert_eq!((p.bar(), p.fill()), (None, None));
     assert_eq!(p.name_font(), None);
 }
@@ -135,8 +139,8 @@ fn a_file_missing_the_bar_blocks_draws_no_bar() {
 #[test]
 fn a_broken_file_draws_stock() {
     let p = pieces(Some("{{{ not a rank file"), 320, 100, SD);
-    assert_eq!(p.bar(), Some((126, 60, 188, 7)));
-    assert_eq!(p.fill(), Some((127, 61, 111, 5)));
+    assert_eq!(p.bar(), Some(Rect::new(126, 60, 188, 7)));
+    assert_eq!(p.fill(), Some(Rect::new(127, 61, 111, 5)));
 }
 
 #[test]
@@ -181,9 +185,9 @@ fn the_medal_stops_at_the_names_whole_box_not_its_clipped_part() {
     let m = HudModel::load_scene(&files, Platform::Linux, Scene::MainMenu).unwrap();
     let key = PartKey::new("MainMenuOverride/RankPanel");
     let p = rank_pieces(&m, m.part(&key).unwrap(), 320, 100, SD);
-    assert_eq!(p.name_box(), Some((160, 40, 260, 20)));
-    assert_eq!(p.name(), Some((200, 40, 220, 20)));
+    assert_eq!(p.name_box(), Some(Rect::new(160, 40, 260, 20)));
+    assert_eq!(p.name(), Some(Rect::new(200, 40, 220, 20)));
     let layout = m.layout(SD);
-    let (x, _, wide, _) = tf2tools_core::rank_medal(&m, &layout, &key, SD).unwrap();
+    let Rect { x, wide, .. } = tf2tools_core::rank_medal(&m, &layout, &key, SD).unwrap();
     assert_eq!(x + wide, 156, "ends a gap short of the box at 160");
 }

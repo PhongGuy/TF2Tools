@@ -7,7 +7,7 @@ use gpui_kit::{AppContext as _, Bounds, Entity, Pixels, TestAppContext, point};
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::services::Tf2State;
-use tf2tools_core::{BoardMode, PartKey, Scene, Tf2Install};
+use tf2tools_core::{BoardMode, PartKey, Rect, Scene, Tf2Install};
 
 fn found(env: &support::Env) -> Tf2State {
     Tf2State::Found(Tf2Install::from_path(&env.game).unwrap())
@@ -154,7 +154,13 @@ fn drawn_parts(
         (layout.paint_order())
             .filter(|b| b.hidden().is_none())
             .filter_map(|b| {
-                let (x, y, w, h) = layout.shown(b.key())?;
+                let Rect {
+                    x,
+                    y,
+                    wide: w,
+                    tall: h,
+                    ..
+                } = layout.shown(b.key())?;
                 let at = point(
                     canvas.left() + gpui_kit::px(x as f32 * scale),
                     canvas.top() + gpui_kit::px(y as f32 * scale),

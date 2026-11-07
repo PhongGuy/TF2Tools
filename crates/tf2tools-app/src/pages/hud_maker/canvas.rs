@@ -20,9 +20,9 @@ use gpui_kit::{
 use tf2tools_core::{
     ALIGNMENTS, AnimFrame, Animated, ChatSample, ColumnKind, FontVariant, GameSituation, GameText,
     GuideAxis, HiddenBy, HudLayout, HudModel, ImageBorder, ImageCell, Part, PartBox, PartKey, Pick,
-    PlayerListLayout, Rgba, SamplePlayer, SampleSet, Scene, Screen, ScreenScale, Team, Vision,
-    background_corners, corner_radius, image_cells, nine_slice, paints_background, rank_medal,
-    rank_pieces, scene_image, stand_in_families, wrap_lines, wrapped_text_left,
+    PlayerListLayout, Rect, Rgba, SamplePlayer, SampleSet, Scene, Screen, ScreenScale, Team,
+    Vision, background_corners, corner_radius, image_cells, nine_slice, paints_background,
+    rank_medal, rank_pieces, scene_image, stand_in_families, wrap_lines, wrapped_text_left,
 };
 
 use super::editor::{Guide, Handle};
@@ -281,8 +281,8 @@ impl HudMakerPage {
             .filter(|part| draws(part, &look))
             .filter(|part| layout.get(part.key()).is_some_and(|b| b.hidden().is_none()))
             .filter_map(|part| {
-                let (x, y, wide, tall) = layout.shown(part.key())?;
-                let r = fit.rect(x, y, wide, tall).intersect(&room);
+                let s = layout.shown(part.key())?;
+                let r = fit.rect(s.x, s.y, s.wide, s.tall).intersect(&room);
                 Some((r, Some(part.key()) == selected_key))
             })
             .collect();
@@ -397,8 +397,8 @@ impl HudMakerPage {
                 return chat;
             }
             let core = model.text_extent(layout, b.key(), look.text)?;
-            let estimate = local(fit.rect(core.0, core.1, core.2, core.3));
-            if core == (b.x(), b.y(), b.wide(), b.tall()) {
+            let estimate = local(fit.rect(core.x, core.y, core.wide, core.tall));
+            if core == b.rect() {
                 return Some(estimate);
             }
             let boxed = local(fit.rect(b.x(), b.y(), b.wide(), b.tall()));
@@ -438,11 +438,8 @@ impl HudMakerPage {
         );
         // Both outlines cover only what the game can draw of the part, inside its parents.
         let outline = |b: &PartBox| {
-            let (x, y, w, h) =
-                layout
-                    .visible(b.key())
-                    .unwrap_or((b.x(), b.y(), b.wide(), b.tall()));
-            local(fit.rect(x, y, w, h))
+            let v = layout.visible(b.key()).unwrap_or(b.rect());
+            local(fit.rect(v.x, v.y, v.wide, v.tall))
         };
         let selected = editor
             .selected()
@@ -451,8 +448,13 @@ impl HudMakerPage {
         // Sides a parent cuts off, as (left, top, right, bottom): a handle there would sit off
         // the box's real edge, so those sides offer none.
         let cut = selected.map_or((false, false, false, false), |b| {
-            let (x, y, w, h) =
-                (layout.visible(b.key())).unwrap_or((b.x(), b.y(), b.wide(), b.tall()));
+            let Rect {
+                x,
+                y,
+                wide: w,
+                tall: h,
+                ..
+            } = (layout.visible(b.key())).unwrap_or(b.rect());
             let end = |at: i32, len: i32| i64::from(at) + i64::from(len);
             (
                 x != b.x(),
@@ -1109,11 +1111,11 @@ impl HudMakerPage {
         let shown_layout = editor.shown_layout();
         let layout: &HudLayout = &shown_layout;
         let inside = |key: &PartKey| {
-            layout.visible(key).is_some_and(|(x, y, w, h)| {
-                x as f32 >= left
-                    && y as f32 >= top
-                    && (x + w) as f32 <= right
-                    && (y + h) as f32 <= bottom
+            layout.visible(key).is_some_and(|v| {
+                v.x as f32 >= left
+                    && v.y as f32 >= top
+                    && (v.x + v.wide) as f32 <= right
+                    && (v.y + v.tall) as f32 <= bottom
             })
         };
         let shown = takes_clicks(model, layout, None);
@@ -1245,8 +1247,9 @@ impl HudMakerPage {
         let outlined = layout
             .get(key)
             .is_some_and(|b| b.hidden().is_none() && b.clickable());
-        let inside = layout.visible(key).is_some_and(|(bx, by, w, h)| {
-            (bx..bx.saturating_add(w)).contains(&x) && (by..by.saturating_add(h)).contains(&y)
+        let inside = layout.visible(key).is_some_and(|v| {
+            (v.x..v.x.saturating_add(v.wide)).contains(&x)
+                && (v.y..v.y.saturating_add(v.tall)).contains(&y)
         });
         if !(outlined && inside) {
             return false;
@@ -1605,8 +1608,8 @@ fn part_elements(
                 Some(root) if ghosted => shown_within(model, layout, part.key(), root),
                 _ => layout.shown(part.key()),
             };
-            let clip = shown.map(|(x, y, w, h)| {
-                let shown = local(fit.rect(x, y, w, h));
+            let clip = shown.map(|s| {
+                let shown = local(fit.rect(s.x, s.y, s.wide, s.tall));
                 Bounds {
                     origin: shown.origin - r.origin,
                     size: shown.size,
@@ -2167,7 +2170,7 @@ fn shown_within(
     layout: &HudLayout,
     key: &PartKey,
     root: &PartKey,
-) -> Option<(i32, i32, i32, i32)> {
+) -> Option<Rect> {
     let edges = |b: &PartBox| {
         let (x, y) = (i64::from(b.x()), i64::from(b.y()));
         (x, y, x + i64::from(b.wide()), y + i64::from(b.tall()))
@@ -2189,7 +2192,7 @@ fn shown_within(
         return None;
     }
     let fit = |v: i64| i32::try_from(v).ok();
-    Some((
+    Some(Rect::new(
         fit(cut.0)?,
         fit(cut.1)?,
         fit(cut.2 - cut.0)?,
@@ -2403,15 +2406,15 @@ fn rank(part: &Part, b: &PartBox, look: &Look) -> Vec<AnyElement> {
     // The game draws its medal left of the name, so the stand-in keeps off the text.
     let medal_at = rank_medal(look.model, look.layout, part.key(), look.screen);
     let at = |v: i32| px(v as f32 * look.scale);
-    let piece = |id: gpui_kit::ElementId, (x, y, w, h): (i32, i32, i32, i32)| {
+    let piece = |id: gpui_kit::ElementId, r: Rect| {
         div()
             .id(id)
             .test_support()
             .absolute()
-            .left(at(x))
-            .top(at(y))
-            .w(at(w.max(0)))
-            .h(at(h.max(0)))
+            .left(at(r.x))
+            .top(at(r.y))
+            .w(at(r.wide.max(0)))
+            .h(at(r.tall.max(0)))
     };
     let scheme = look.model.scheme();
     let medal = pieces.medal().and(medal_at).map(|r| {
@@ -2426,13 +2429,13 @@ fn rank(part: &Part, b: &PartBox, look: &Look) -> Vec<AnyElement> {
         let font = paint.font();
         let mut inner = div()
             .absolute()
-            .left(at(boxed.0 - shown.0))
-            .top(at(boxed.1 - shown.1))
-            .w(at(boxed.2.max(0)))
-            .h(at(boxed.3.max(0)))
+            .left(at(boxed.x - shown.x))
+            .top(at(boxed.y - shown.y))
+            .w(at(boxed.wide.max(0)))
+            .h(at(boxed.tall.max(0)))
             .flex()
             .whitespace_nowrap()
-            .text_size(px(font_px(font, look, boxed.3)))
+            .text_size(px(font_px(font, look, boxed.tall)))
             .text_color(paint.colour().map_or(gpui_kit::white(), |c| look.shade(c)));
         inner = match col {
             0 => inner.justify_start(),
