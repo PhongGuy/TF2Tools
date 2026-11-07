@@ -5,6 +5,7 @@
 mod addons;
 mod borrow;
 mod crosshairs;
+mod hud_cfg;
 mod hud_copy;
 mod hud_folder;
 mod hud_history;

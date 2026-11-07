@@ -295,6 +295,36 @@ fn clicking_a_choice_and_a_switch_records_them(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn reset_all_asks_first_and_undo_brings_the_options_back(cx: &mut TestAppContext) {
+    let (_env, s, page, _copy) = opened(cx);
+    click_in_panel(cx, &s, ids::hud_maker_option(SLOT));
+    wait_reloaded(cx, &page);
+    let slot = |cx: &mut TestAppContext| {
+        cx.update(|cx| page.read(cx).editor().unwrap().hud_option_value(SLOT))
+    };
+    click_in_panel(cx, &s, ids::HUD_MAKER_OPTIONS_RESET_ALL.into());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref(),
+        Some("Reset all options?")
+    );
+    support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
+    support::settle(cx, s.win);
+    assert_eq!(slot(cx), Some(OptionValue::Bool(true)));
+
+    click_in_panel(cx, &s, ids::HUD_MAKER_OPTIONS_RESET_ALL.into());
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::wait_real(cx, "the reset", |cx| {
+        cx.update(|cx| page.read(cx).editor().unwrap().hud_option_value(SLOT))
+            == Some(OptionValue::Bool(false))
+    });
+    cx.update_window(s.win, |_, window, cx| {
+        page.update(cx, |p, cx| p.undo(window, cx))
+    })
+    .unwrap();
+    assert_eq!(slot(cx), Some(OptionValue::Bool(true)));
+}
+
+#[gpui_kit::test]
 fn the_default_hud_has_no_section(cx: &mut TestAppContext) {
     let env = support::env();
     support::seed_stock_game(&env.game);

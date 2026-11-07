@@ -125,6 +125,18 @@ impl Confirm {
         }
     }
 
+    /// The prompt before the HUD Maker resets every option of the open HUD.
+    pub fn reset_all_options() -> Self {
+        Self {
+            title: "Reset all options?".into(),
+            description:
+                "Every option goes back to how the HUD came. Your other changes stay, and Undo brings the options back."
+                    .into(),
+            confirm_label: "Reset all".into(),
+            cancel_label: "Cancel".into(),
+        }
+    }
+
     /// v5's Activity Log "Clear All" prompt.
     pub fn clear_logs() -> Self {
         Self {

@@ -105,6 +105,11 @@ impl Library {
             result => {
                 discard(&staging);
                 result?;
+                // The HUD is updated by now, so a settings file that cannot be written is
+                // only logged; the next install tries again.
+                if let Err(IoFailure { path, source }) = self.write_hud_cfg(&src, tf2) {
+                    tracing::warn!(path = %path.display(), error = %source, "HUD settings file not written");
+                }
                 self.record_install_print(&custom, &folder).map_err(|e| {
                     ReinstallError::Database {
                         message: e.to_string(),
