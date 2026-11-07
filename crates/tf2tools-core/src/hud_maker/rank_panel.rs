@@ -206,17 +206,14 @@ pub fn rank_pieces(
             .flatten()
     };
     let (name, track, fill) = (find(NAME_PATH), find(TRACK_PATH), find(FILL_PATH));
-    let text = |p: &Option<Placed>, key: &str| {
-        p.as_ref()
-            .and_then(|p| p.control.value(key))
-            .map(str::to_owned)
-    };
+    let text =
+        |p: Option<&Placed>, key: &str| p.and_then(|p| p.control.value(key)).map(str::to_owned);
     // Only a CExLabel reads `fgcolor`; a plain Label has just the override.
-    let name_colour = text(&name, "fgcolor_override").or_else(|| {
+    let name_colour = text(name.as_ref(), "fgcolor_override").or_else(|| {
         let is_ex = name.as_ref().is_some_and(|p| {
             (p.control.value("ControlName")).is_some_and(|c| c.eq_ignore_ascii_case("CExLabel"))
         });
-        is_ex.then(|| text(&name, "fgcolor")).flatten()
+        is_ex.then(|| text(name.as_ref(), "fgcolor")).flatten()
     });
     // The label shows as a whole box or not at all: hidden or clipped away leaves neither.
     let name_box = name.as_ref().and_then(|p| p.shown.map(|_| p.own));
@@ -231,18 +228,18 @@ pub fn rank_pieces(
         medal,
         name: name.as_ref().and_then(|p| p.shown),
         name_box,
-        name_font: text(&name, "font"),
+        name_font: text(name.as_ref(), "font"),
         name_colour,
-        name_alignment: text(&name, "textAlignment").unwrap_or_default(),
+        name_alignment: text(name.as_ref(), "textAlignment").unwrap_or_default(),
         name_all_caps: name
             .as_ref()
             .and_then(|p| p.control.value("allcaps"))
             .and_then(|t| t.trim().parse::<i64>().ok())
             .is_some_and(|v| v > 0),
         bar: track.as_ref().and_then(|p| p.shown),
-        track_colour: text(&track, "fgcolor_override"),
+        track_colour: text(track.as_ref(), "fgcolor_override"),
         fill: fill_rect,
-        fill_colour: text(&fill, "fgcolor_override"),
+        fill_colour: text(fill.as_ref(), "fgcolor_override"),
     }
 }
 

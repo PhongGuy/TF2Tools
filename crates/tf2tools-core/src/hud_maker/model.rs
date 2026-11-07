@@ -1468,7 +1468,7 @@ fn block_lines(block: &Located<'_>, key: Option<&str>, minmode: Option<Platform>
             .and_then(|(k, p)| minmode_lines(layer, k, p))
     };
     // A rewritten layer keeps only the entries it lists; any other lists every entry of the key.
-    let keep = |listed: &Option<Vec<&KvEntry>>, e: &KvEntry| match listed {
+    let keep = |listed: Option<&[&KvEntry]>, e: &KvEntry| match listed {
         Some(listed) => listed.iter().any(|l| std::ptr::eq(*l, e)),
         None => key.is_none_or(|k| e.key().eq_ignore_ascii_case(k)),
     };
@@ -1476,7 +1476,7 @@ fn block_lines(block: &Located<'_>, key: Option<&str>, minmode: Option<Platform>
     let mut lines = Vec::new();
     for entry in block.entry.children() {
         if entry.text().is_some() {
-            if keep(&own, entry) {
+            if keep(own.as_deref(), entry) {
                 lines.push(KeyLine::new(block, &block.path, entry));
             }
         } else if is_if_block(entry) {
@@ -1486,7 +1486,7 @@ fn block_lines(block: &Located<'_>, key: Option<&str>, minmode: Option<Platform>
                 entry
                     .children()
                     .iter()
-                    .filter(|e| e.text().is_some() && keep(&sub, e))
+                    .filter(|e| e.text().is_some() && keep(sub.as_deref(), e))
                     .map(|e| KeyLine::new(block, &path, e)),
             );
         }

@@ -120,7 +120,7 @@ fn parse_row(row: &str) -> Option<CommunityMap> {
         return None;
     }
     let cells = cells(row);
-    let date = |cell: &String| Some(cell.clone()).filter(|d| is_date(d));
+    let date = |cell: &str| Some(cell.to_owned()).filter(|d| is_date(d));
     let (played, first_played, last_played) = match cells.as_slice() {
         [_, played, first, last, _, ..] => (played, date(first), date(last)),
         [_, played, _, ..] => (played, None, None),
