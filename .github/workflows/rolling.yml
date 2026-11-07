@@ -1,0 +1,52 @@
+# Early warning, weekly: the gate on the next Rust release (beta), and on stable with every dependency
+# updated within Cargo.toml's ranges. A failure here is a heads-up, not a broken master.
+name: Rolling
+
+on:
+  schedule:
+    - cron: "37 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Debug info and incremental state would overflow the runner's disk.
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  rolling:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: beta
+            toolchain: beta
+            update: false
+          - name: stable / updated deps
+            toolchain: stable
+            update: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: rustfmt, clippy
+      # GPUI's windowing, font and GPU libraries, plus ALSA for the sound player.
+      - name: Install system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config libfontconfig-dev libfreetype-dev libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev libvulkan1 libegl1 libasound2-dev
+      - name: Update dependencies
+        if: matrix.update
+        run: cargo update
+      # The toolchain action leaves stable as the default, so name the matrix toolchain explicitly.
+      - name: Gate
+        run: make check CARGO="cargo +${{ matrix.toolchain }}"

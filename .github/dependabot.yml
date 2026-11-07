@@ -11,3 +11,11 @@ updates:
         patterns: ["*"]
     ignore:
       - dependency-name: "gpui*"
+  # The workflows pin actions to commit hashes; this keeps those pins current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      actions:
+        patterns: ["*"]
