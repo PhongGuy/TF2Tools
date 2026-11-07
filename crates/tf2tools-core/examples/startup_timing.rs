@@ -4,9 +4,6 @@
 //! Usage: `startup_timing --v5-db <dir> [--runs 10] [--scratch <dir>]`, where `<dir>` holds a v5
 //! `tf2tools.db` and its optional `-wal`/`-shm` files. The v5 files are only ever copied.
 
-// Not yet clean of the workspace's expect_used; a later lint PR removes this.
-#![allow(clippy::expect_used)]
-
 use std::error::Error;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -150,8 +147,8 @@ fn report(scenario: &str, loads: &[Load]) {
          open_median_ms={:.3} load_median_ms={:.3} rows={},{},{},{},{}",
         loads.len(),
         ms(median(&totals)),
-        ms(*totals.iter().min().expect("at least one run")),
-        ms(*totals.iter().max().expect("at least one run")),
+        ms(totals.iter().min().copied().unwrap_or_default()),
+        ms(totals.iter().max().copied().unwrap_or_default()),
         ms(median(&opens)),
         ms(median(&reads)),
         r[2],

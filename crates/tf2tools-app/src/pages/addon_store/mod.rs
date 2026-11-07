@@ -303,16 +303,14 @@ impl AddonStorePage {
     fn info(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         // The link words are underlined ranges of one wrapping text; a click on either follows it.
-        let links = [InfoLink::Mastercomfig, InfoLink::Addons];
-        let ranges: Vec<_> = links
-            .iter()
-            .map(|link| {
-                let start = INFO_TEXT
-                    .find(link.word())
-                    .expect("INFO_TEXT holds every link word");
-                start..start + link.word().len()
+        // A word missing from the text just goes without its link.
+        let (links, ranges): (Vec<_>, Vec<_>) = [InfoLink::Mastercomfig, InfoLink::Addons]
+            .into_iter()
+            .filter_map(|link| {
+                let start = INFO_TEXT.find(link.word())?;
+                Some((link, start..start + link.word().len()))
             })
-            .collect();
+            .unzip();
         let underline = HighlightStyle {
             underline: Some(UnderlineStyle {
                 thickness: px(1.),
