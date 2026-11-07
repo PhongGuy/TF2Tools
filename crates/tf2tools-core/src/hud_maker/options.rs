@@ -23,6 +23,8 @@ pub enum OptionValue {
     Rgba([u8; 4]),
     /// The key of the picked choice; empty picks the group's "None".
     Pick(String),
+    /// A line of text the player typed.
+    Text(String),
 }
 
 /// How a player picks an option's value.
@@ -47,6 +49,8 @@ pub enum OptionKind {
     },
     /// One of a list of choices, picked by key.
     Choice(Vec<Choice>),
+    /// A short line of text.
+    Text,
 }
 
 /// One pick of a [`OptionKind::Choice`]: its stored key, label and the switches it makes.
@@ -99,6 +103,8 @@ pub enum ValueMap {
     },
     /// A pick's own text, by choice key; a choice with no entry writes nothing.
     PerChoice(Vec<(String, String)>),
+    /// The text with each `$value` replaced by the value, as the file spells it.
+    Template(String),
 }
 
 /// A scheme colour derived from a picked colour.
@@ -195,6 +201,26 @@ pub enum SwitchAction {
         uncomment: Vec<String>,
         /// Whether off undoes on, as for a switch.
         reverses: bool,
+    },
+    /// Copies every file under copy folder `from` into folder `to` (empty for the HUD's top),
+    /// pictures left out, when on; off does nothing, as for one choice of a pick.
+    CopyFolder {
+        /// The option folder.
+        from: String,
+        /// The folder its files land in.
+        to: String,
+    },
+    /// Takes the HUD's menu art (`.vtf` and `.vmt` files right in `folder`) out of the view
+    /// when on, so the game's stock and seasonal backgrounds show; off does nothing.
+    StockBackgrounds {
+        /// The copy folder holding the menu art.
+        folder: String,
+    },
+    /// Makes shipped background `image` (a picture under `materials/console/_disabled`) the
+    /// menu art when on, writing the chapter list that names it; off does nothing.
+    MenuBackground {
+        /// The picture's name without `.vtf`.
+        image: String,
     },
     /// Writes copy file `file` whole: `on` while on, `off` while off, where `None` leaves it.
     WriteText {
@@ -538,6 +564,7 @@ impl HudModel {
             let text = match (value, choice.value()) {
                 (ValueMap::Value, OptionValue::Int(v)) => Some(v.to_string()),
                 (ValueMap::Value, OptionValue::Rgba(c)) => Some(rgba_text(*c)),
+                (ValueMap::Template(t), v) => template_text(t, v),
                 (ValueMap::OnOff { on, .. }, OptionValue::Bool(true)) => Some(on.clone()),
                 (ValueMap::OnOff { off, .. }, OptionValue::Bool(false)) => match off {
                     Some(off) => Some(off.clone()),
@@ -735,6 +762,7 @@ pub(super) fn value_suits(kind: &OptionKind, value: &OptionValue) -> bool {
         (OptionKind::Choice(choices), OptionValue::Pick(key)) => {
             choices.iter().any(|c| &c.key == key)
         }
+        (OptionKind::Text, OptionValue::Text(text)) => text_suits(text),
         (OptionKind::Number { min, max, step }, OptionValue::Int(v)) => {
             // Widened so a hostile value or bound cannot overflow; a zero step takes nothing.
             (*min..=*max).contains(v)
@@ -744,6 +772,28 @@ pub(super) fn value_suits(kind: &OptionKind, value: &OptionValue) -> bool {
         }
         _ => false,
     }
+}
+
+/// A typed text is at most this many bytes.
+pub(super) const MAX_TEXT: usize = 128;
+
+/// Whether typed `text` can stand in a quoted file value: short, one line, and free of the
+/// quotes and braces that would end the value or open a block.
+pub(super) fn text_suits(text: &str) -> bool {
+    text.len() <= MAX_TEXT && !text.chars().any(|c| c.is_control() || "\"{}".contains(c))
+}
+
+/// `template` with each `$value` replaced by `value` as a file spells it; `None` for a value
+/// with no spelling.
+pub(super) fn template_text(template: &str, value: &OptionValue) -> Option<String> {
+    let text = match value {
+        OptionValue::Int(v) => v.to_string(),
+        OptionValue::Rgba(c) => rgba_text(*c),
+        OptionValue::Text(t) => t.clone(),
+        OptionValue::Pick(k) => k.clone(),
+        OptionValue::Bool(_) => return None,
+    };
+    Some(template.replace("$value", &text))
 }
 
 /// Whether `key` is one of the item-colour scheme names (any case).

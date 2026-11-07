@@ -14,7 +14,7 @@ use super::hud_schema::HudSchema;
 use super::model::{BaseChains, PartKey, apply_set, live_blocks, root_block};
 use super::options::{
     CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue,
-    SwitchAction, ValueMap, derived_colour, rgba_text, value_suits,
+    SwitchAction, ValueMap, derived_colour, rgba_text, template_text, text_suits, value_suits,
 };
 use super::scheme::Scheme;
 use crate::error::HudFilesError;
@@ -30,6 +30,13 @@ const MAX_LAYER_FILES: usize = 2_048;
 const MAX_LAYER_BYTES: usize = 64 * 1024 * 1024;
 
 const MANIFEST: &str = "scripts/hudanimations_manifest.txt";
+/// The menu art a shipped background becomes, the folder it ships in, and the chapter list
+/// that points the menu at it.
+const MENU_ART: &str = "materials/console/background_upward.vtf";
+const MENU_ART_WIDE: &str = "materials/console/background_upward_widescreen.vtf";
+pub(super) const SHIPPED_ART: &str = "materials/console/_disabled";
+const CHAPTERS: &str = "scripts/chapterbackgrounds.txt";
+const CHAPTERS_TEXT: &str = "\"chapters\"\n{\n\t1\t\"background_upward\"\n\t2\t\"background_upward\"\n\t3\t\"background_upward\"\n\t4\t\"background_upward\"\n}\n\n\"BackgroundMaps\"\n{\n\t1\t\"background_upward\"\n\t2\t\"background_upward\"\n\t3\t\"background_upward\"\n\t4\t\"background_upward\"\n}\n";
 /// The group every switch but an F file's shares.
 const SWITCHES: &str = "Switches";
 
@@ -387,6 +394,15 @@ fn spec_touched(spec: &OptionSpec) -> Vec<String> {
             OptionAction::Switch(
                 SwitchAction::Lines { file, .. } | SwitchAction::WriteText { file, .. },
             ) => paths.extend(check_switch_path(file)),
+            OptionAction::Switch(SwitchAction::CopyFolder { from, .. }) => {
+                paths.extend(check_switch_path(from));
+            }
+            OptionAction::Switch(SwitchAction::StockBackgrounds { folder }) => {
+                paths.extend(check_switch_path(folder));
+            }
+            OptionAction::Switch(SwitchAction::MenuBackground { .. }) => {
+                paths.extend([MENU_ART.to_owned(), CHAPTERS.to_owned()]);
+            }
             OptionAction::WriteCfg {
                 place: CfgPlace::Hud(file),
                 ..
@@ -440,25 +456,34 @@ fn pristine_values(
     out
 }
 
-/// The value a line-toggling option has in the copy: a switch whose line edits all stand one
-/// way, or the first choice whose line edits all stand as it leaves them. Options that also
-/// set keys are read from their keys instead.
+/// The value a switching option has in the copy: a switch whose line edits all stand one
+/// way, or the first choice whose switches (lines, menu art) all stand as it leaves them.
+/// Options that also set keys are read from their keys instead.
 fn lines_value(files: &HudFiles, spec: &OptionSpec) -> Option<OptionValue> {
     let state = |actions: &[OptionAction]| -> Option<bool> {
         let mut out = None;
         for action in actions {
-            let OptionAction::Switch(SwitchAction::Lines {
-                file,
-                comment,
-                uncomment,
-                ..
-            }) = action
-            else {
-                return None;
+            let read = |path: &str| files.read_pristine(path).ok().flatten();
+            let now = match action {
+                OptionAction::Switch(SwitchAction::Lines {
+                    file,
+                    comment,
+                    uncomment,
+                    ..
+                }) => {
+                    let text = String::from_utf8(read(file)?.into_bytes()).ok()?;
+                    lines_state(&text, comment, uncomment)?
+                }
+                // A shipped background is in force when the menu art holds its bytes.
+                OptionAction::Switch(SwitchAction::MenuBackground { image }) => {
+                    let art = read(MENU_ART)?;
+                    art.bytes() == read(&format!("{SHIPPED_ART}/{image}.vtf"))?.bytes()
+                }
+                OptionAction::Switch(SwitchAction::StockBackgrounds { folder }) => {
+                    menu_art(files.copy_paths(), folder).is_empty()
+                }
+                _ => return None,
             };
-            let bytes = files.read_pristine(file).ok()??;
-            let text = String::from_utf8(bytes.into_bytes()).ok()?;
-            let now = lines_state(&text, comment, uncomment)?;
             if out.is_some_and(|o| o != now) {
                 return None;
             }
@@ -515,8 +540,28 @@ fn read_as(kind: &OptionKind, map: &ValueMap, text: &str) -> Option<OptionValue>
         (ValueMap::PerChoice(pairs), OptionKind::Choice(_)) => (pairs.iter())
             .find(|(_, literal)| literal == text)
             .map(|(key, _)| OptionValue::Pick(key.clone())),
+        (ValueMap::Value, OptionKind::Text) => {
+            text_suits(text).then(|| OptionValue::Text(text.to_owned()))
+        }
+        (ValueMap::Template(template), OptionKind::Text | OptionKind::Number { .. }) => {
+            let value = unfill(template, text)?;
+            match kind {
+                OptionKind::Text => text_suits(value).then(|| OptionValue::Text(value.to_owned())),
+                _ => value.parse().ok().map(OptionValue::Int),
+            }
+        }
         _ => None,
     }
+}
+
+/// The value `text` holds where `template` has its one `$value`; `None` when the text does
+/// not fit the template's other words.
+fn unfill<'a>(template: &str, text: &'a str) -> Option<&'a str> {
+    let (before, after) = template.split_once("$value")?;
+    if after.contains("$value") {
+        return None;
+    }
+    text.strip_prefix(before)?.strip_suffix(after)
 }
 
 /// A spec's own actions and its choices'.
@@ -1073,6 +1118,9 @@ fn switch_paths(action: &SwitchAction) -> Vec<String> {
         SwitchAction::BaseLines { file, .. }
         | SwitchAction::Lines { file, .. }
         | SwitchAction::WriteText { file, .. } => vec![file.clone()],
+        SwitchAction::CopyFolder { from, to } => vec![from.clone(), to.clone()],
+        SwitchAction::StockBackgrounds { folder } => vec![folder.clone()],
+        SwitchAction::MenuBackground { .. } => vec![MENU_ART.to_owned(), CHAPTERS.to_owned()],
     }
 }
 
@@ -1203,6 +1251,34 @@ impl Layer<'_> {
                 self.put(file, edited.into_bytes());
                 Ok(true)
             }
+            OptionAction::Switch(SwitchAction::CopyFolder { from, to }) => {
+                if !on {
+                    return Ok(true);
+                }
+                self.copy_folder(from, to)
+            }
+            OptionAction::Switch(SwitchAction::StockBackgrounds { folder }) => {
+                if on {
+                    for path in menu_art(self.under(folder), folder) {
+                        self.take(&path);
+                    }
+                }
+                Ok(true)
+            }
+            OptionAction::Switch(SwitchAction::MenuBackground { image }) => {
+                if !on {
+                    return Ok(true);
+                }
+                let Some(art) = self.read(&format!("{SHIPPED_ART}/{image}.vtf"))? else {
+                    return Ok(false);
+                };
+                self.put(MENU_ART, art);
+                if let Some(wide) = self.read(&format!("{SHIPPED_ART}/{image}_widescreen.vtf"))? {
+                    self.put(MENU_ART_WIDE, wide);
+                }
+                self.put(CHAPTERS, CHAPTERS_TEXT.as_bytes().to_vec());
+                Ok(true)
+            }
             // An empty text for a file the copy lacks writes no file, so off leaves no stub.
             OptionAction::Switch(SwitchAction::WriteText {
                 file,
@@ -1263,6 +1339,8 @@ impl Layer<'_> {
                     (ValueMap::OnOff { off, .. }, _) => off.clone(),
                     (ValueMap::Value, OptionValue::Int(v)) => Some(v.to_string()),
                     (ValueMap::Value, OptionValue::Rgba(c)) => Some(rgba_text(*c)),
+                    (ValueMap::Value, OptionValue::Text(t)) => Some(t.clone()),
+                    (ValueMap::Template(t), v) => template_text(t, v),
                     // A pick with no text of its own leaves the key as it is.
                     (ValueMap::PerChoice(pairs), OptionValue::Pick(k)) => {
                         (pairs.iter()).find(|(c, _)| c == k).map(|(_, t)| t.clone())
@@ -1326,6 +1404,38 @@ impl Layer<'_> {
 
     fn read_text(&self, path: &str) -> Result<Option<String>, HudFilesError> {
         Ok(self.read(path)?.and_then(|b| String::from_utf8(b).ok()))
+    }
+
+    /// Copies every file under folder `from` into folder `to` by its path below `from`,
+    /// leaving out the preview pictures option folders carry; refused when a landing fails the
+    /// path rule or the folder holds nothing.
+    fn copy_folder(&mut self, from: &str, to: &str) -> Result<bool, HudFilesError> {
+        let files = self.under(from);
+        let mut copies = Vec::new();
+        for path in &files {
+            if path.ends_with(".png") || path.ends_with(".jpg") {
+                continue;
+            }
+            let rest = &path[from.len() + 1..];
+            let dest = match to.is_empty() {
+                true => rest.to_owned(),
+                false => format!("{to}/{rest}"),
+            };
+            let Some(dest) = check_switch_path(&dest) else {
+                return Ok(false);
+            };
+            copies.push((path.clone(), dest));
+        }
+        if copies.is_empty() {
+            return Ok(false);
+        }
+        for (path, dest) in copies {
+            let Some(bytes) = self.read(&path)? else {
+                return Ok(false);
+            };
+            self.put(&dest, bytes);
+        }
+        Ok(true)
     }
 
     /// Moves the file or every file under the folder `source` to `dest`. Already in place
@@ -1393,6 +1503,18 @@ fn comment_lines(text: &str, file: &str, target: &str, on: bool) -> Option<Strin
         out.push_str(ending);
     }
     found.then_some(out)
+}
+
+/// The menu art among `paths`: `.vtf` and `.vmt` files right in `folder`.
+pub(super) fn menu_art(paths: impl IntoIterator<Item = String>, folder: &str) -> Vec<String> {
+    let inside = |p: &str| {
+        p.strip_prefix(folder)
+            .and_then(|r| r.strip_prefix('/'))
+            .is_some_and(|name| !name.contains('/'))
+    };
+    (paths.into_iter())
+        .filter(|p| inside(p) && (p.ends_with(".vtf") || p.ends_with(".vmt")))
+        .collect()
 }
 
 /// Whether `line` holds `needle`, any run of spaces and tabs in either read as one space, as

@@ -569,6 +569,7 @@ pub struct HudMakerPage {
     // rebuilt with the built-in sliders.
     hud_sliders: HashMap<String, Entity<SliderState>>,
     hud_selects: HashMap<String, Entity<SelectState<Vec<options::ChoiceRow>>>>,
+    hud_texts: HashMap<String, Entity<InputState>>,
     // The copy's own Colour option the option picker edits, with the colour picked so far.
     active_hud_option: Option<(String, Option<[u8; 4]>)>,
     switch_failed: Option<Vec<Change>>,
@@ -880,6 +881,7 @@ impl HudMakerPage {
             switch_job: None,
             hud_sliders: HashMap::new(),
             hud_selects: HashMap::new(),
+            hud_texts: HashMap::new(),
             active_hud_option: None,
             switch_failed: None,
             switch_stats: (0, 0),
@@ -1206,6 +1208,7 @@ impl HudMakerPage {
     fn build_hud_controls(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.hud_sliders.clear();
         self.hud_selects.clear();
+        self.hud_texts.clear();
         let Some(options) = self.editor().and_then(|e| e.hud_options()).cloned() else {
             return;
         };
@@ -1251,6 +1254,23 @@ impl HudMakerPage {
                     ));
                     self.hud_selects.insert(id, state);
                 }
+                // Typed text is recorded on Enter or when the box loses focus, not per key.
+                OptionKind::Text => {
+                    let state = cx.new(|cx| InputState::new(window, cx));
+                    let option = id.clone();
+                    self._slider_subscriptions.push(cx.subscribe_in(
+                        &state,
+                        window,
+                        move |page, input: &Entity<InputState>, ev: &InputEvent, window, cx| {
+                            if matches!(ev, InputEvent::PressEnter { .. } | InputEvent::Blur) {
+                                let text = input.read(cx).value().to_string();
+                                let value = OptionValue::Text(text.trim().to_owned());
+                                page.set_hud_option(&option, value, window, cx);
+                            }
+                        },
+                    ));
+                    self.hud_texts.insert(id, state);
+                }
                 _ => {}
             }
         }
@@ -1259,6 +1279,11 @@ impl HudMakerPage {
     /// The slider of the copy's own Number option `id`, if it offers one.
     pub fn hud_slider_state(&self, id: &str) -> Option<Entity<SliderState>> {
         self.hud_sliders.get(id).cloned()
+    }
+
+    /// The text box of the copy's own Text option `id`.
+    fn hud_text(&self, id: &str) -> Option<Entity<InputState>> {
+        self.hud_texts.get(id).cloned()
     }
 
     /// The menu of the copy's own Choice option `id` when it has too many choices for buttons.
@@ -1299,6 +1324,13 @@ impl HudMakerPage {
                 if slider.read(cx).value() != at.into() {
                     slider.update(cx, |s, cx| s.set_value(at, window, cx));
                 }
+            }
+        }
+        for (id, input) in &self.hud_texts {
+            if let Some(OptionValue::Text(text)) = editor.hud_option_value(id)
+                && input.read(cx).value().as_ref() != text.as_str()
+            {
+                input.update(cx, |s, cx| s.set_value(&text, window, cx));
             }
         }
         for (id, select) in &self.hud_selects {
