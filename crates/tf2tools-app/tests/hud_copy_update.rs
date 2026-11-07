@@ -1,6 +1,6 @@
 //! A copy's card offers Update when its base has a newer version, and reports the result.
 
-mod support;
+use crate::support;
 
 use std::path::Path;
 

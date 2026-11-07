@@ -14,7 +14,7 @@ use tf2tools_app::widgets::card_grid::{
     CardGrid, GRID_GAP, SHELL_CHROME_WIDTH, columns_for, columns_for_store,
 };
 
-mod support;
+use crate::support;
 
 struct Host {
     grid: CardGrid,

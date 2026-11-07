@@ -1,4 +1,4 @@
-mod support;
+use crate::support;
 
 use gpui_kit::component::select::SelectEvent;
 use gpui_kit::test::TestWindowExt as _;

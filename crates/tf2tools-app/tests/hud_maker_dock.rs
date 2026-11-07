@@ -1,6 +1,6 @@
 //! The HUD Maker's default panel layout: docked beside the screen, slim rails in narrow windows.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{Bounds, ElementId, Entity, Pixels, TestAppContext, px, size};
 use tf2tools_app::ids;

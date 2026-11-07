@@ -1,6 +1,6 @@
 //! The HUD Maker's chat: sample lines over the HUD and "Chat at the top", headless.
 
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Bounds, Entity, Pixels, ScrollDelta, TestAppContext, point, px};

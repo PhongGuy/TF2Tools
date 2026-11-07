@@ -1,6 +1,6 @@
 //! The header's Play TF2 button: it starts the game through Steam, waits while TF2 already
 //! runs and stays out of the way while TF2 is not found.
-mod support;
+use crate::support;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};

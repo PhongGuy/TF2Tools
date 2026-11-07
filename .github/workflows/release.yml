@@ -147,7 +147,7 @@ jobs:
           mv "${found[0]}" target/packages/TF2Tools.exe
       # cargo test runs from the package root, so the exe path must be absolute and Windows-style.
       - name: The exe carries the icon
-        run: TF2TOOLS_WINDOWS_EXE="$(cygpath -m "$PWD")/target/release/tf2tools.exe" cargo test --locked -p tf2tools-app --test packaging -- --ignored
+        run: TF2TOOLS_WINDOWS_EXE="$(cygpath -m "$PWD")/target/release/tf2tools.exe" cargo test --locked -p tf2tools-app --test integration packaging:: -- --ignored
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-installer

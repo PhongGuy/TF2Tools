@@ -17,12 +17,12 @@ fn only_warnings_and_errors_are_kept_oldest_first() {
     let lines = recent.snapshot();
     assert_eq!(lines.len(), 2, "{lines:?}");
     assert!(
-        lines[0].ends_with(" WARN crash_recent: disk is full path=huds/x"),
+        lines[0].ends_with(" WARN integration::crash_recent: disk is full path=huds/x"),
         "{}",
         lines[0]
     );
     assert!(
-        lines[1].ends_with(" ERROR crash_recent: store sync failed"),
+        lines[1].ends_with(" ERROR integration::crash_recent: store sync failed"),
         "{}",
         lines[1]
     );

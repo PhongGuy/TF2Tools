@@ -9,7 +9,7 @@ use tf2tools_app::shell::route::Page;
 use tf2tools_app::updater::{UpdateBoot, UpdateState, updater};
 use tf2tools_core::Endpoints;
 
-mod support;
+use crate::support;
 use support::update_fake::{fake_source, offer, state, visible, wait_state};
 
 fn boot(env: &support::Env, updates: UpdateBoot) -> Boot {

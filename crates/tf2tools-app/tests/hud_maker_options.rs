@@ -1,6 +1,6 @@
 //! The HUD Maker's Options panel, headless.
 
-mod support;
+use crate::support;
 
 use gpui_kit::component::color_picker::ColorPickerEvent;
 use gpui_kit::component::slider::{SliderEvent, SliderValue};

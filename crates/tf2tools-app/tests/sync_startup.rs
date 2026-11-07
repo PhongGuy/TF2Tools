@@ -13,7 +13,7 @@ use tf2tools_app::sync::{SyncHub, store_runner, sync_hub};
 use tf2tools_app::tokio_bridge;
 use tf2tools_core::{Endpoints, ImageError, StoreKind};
 
-mod support;
+use crate::support;
 
 /// Port 1 refuses at once, so every real sync fails fast and never leaves the machine.
 fn closed_endpoints() -> Endpoints {

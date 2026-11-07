@@ -11,7 +11,7 @@ use tf2tools_app::sync::{SyncHub, SyncSummary};
 use tf2tools_app::sync_messages::SyncFailure;
 use tf2tools_core::StoreKind;
 
-mod support;
+use crate::support;
 use support::ShellWindow;
 
 const STAMP: &str = "2026-10-16T12:00:00+00:00";

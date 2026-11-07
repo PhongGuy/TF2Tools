@@ -1,6 +1,6 @@
 //! The scaffold at 19,716 rows with images.
 
-mod support;
+use crate::support;
 
 use std::time::{Duration, Instant};
 

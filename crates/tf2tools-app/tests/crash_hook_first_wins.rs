@@ -1,5 +1,5 @@
-//! Only the first uncaught panic of a process is recorded. One test per binary: it installs the
-//! process-wide panic hook.
+//! Only the first uncaught panic of a process is recorded. It runs in a child process of its own:
+//! it installs the process-wide panic hook.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -7,8 +7,16 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tf2tools_app::crash::recent::Recent;
 use tf2tools_app::crash::{CRASH_FILE, install_hook};
 
+use crate::support;
+
 #[test]
 fn the_first_uncaught_panic_keeps_the_crash_file() {
+    // It sets process-wide state, so it runs alone in a child process.
+    if !support::in_own_process(
+        "crash_hook_first_wins::the_first_uncaught_panic_keeps_the_crash_file",
+    ) {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("crash");
     let calls = Arc::new(AtomicUsize::new(0));

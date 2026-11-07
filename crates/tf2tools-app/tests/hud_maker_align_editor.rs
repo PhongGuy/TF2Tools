@@ -1,6 +1,6 @@
 //! Nudges, Mirror, Match size and snapping in the HUD Maker's editor state, without GPUI.
 
-mod support;
+use crate::support;
 
 use tf2tools_app::pages::hud_maker::editor::{Handle, HudEditor};
 use tf2tools_core::{EditRefused, PartKey};

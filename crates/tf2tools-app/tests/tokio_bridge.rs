@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use gpui_kit::TestAppContext;
 use tf2tools_app::tokio_bridge;
 
-mod support;
+use crate::support;
 
 /// Flips its flag when dropped, so a test sees a tokio future being dropped.
 struct SetOnDrop(Arc<AtomicBool>);

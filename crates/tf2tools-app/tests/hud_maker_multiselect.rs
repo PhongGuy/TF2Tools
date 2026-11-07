@@ -2,7 +2,7 @@
 //! Shift-clicked list rows, then moving, hiding, aligning them, and snapping a resize and the
 //! layer buttons, through the pilot ids.
 
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{

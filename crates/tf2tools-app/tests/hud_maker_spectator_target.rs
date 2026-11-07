@@ -1,6 +1,6 @@
 //! The Spectator tab's target ID: what it draws, where, what is editable and where undo goes.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;

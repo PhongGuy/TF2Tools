@@ -10,7 +10,7 @@ use tf2tools_app::shell::CONTENT_PADDING;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{Tf2Install, Volume};
 
-mod support;
+use crate::support;
 use support::ShellWindow;
 
 /// Opens Settings through the sidebar and waits for its first load.

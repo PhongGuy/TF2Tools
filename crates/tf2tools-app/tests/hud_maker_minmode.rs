@@ -1,7 +1,7 @@
 //! The Minimal HUD switch in the situation menu: it holds on every tab, redraws the HUD and
 //! edits follow it.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use support::maker_page::open_maker;

@@ -1,7 +1,7 @@
 //! The local developer log, alone in its binary: tracing caches a callsite's interest the
 //! first time any thread hits it, so a sibling test without a subscriber would silence this one.
 
-mod support;
+use crate::support;
 
 use std::sync::{Arc, Mutex};
 
@@ -25,6 +25,10 @@ impl std::io::Write for Capture {
 // log, and neither shows it to the player.
 #[gpui_kit::test]
 async fn raw_details_go_to_the_developer_log(cx: &mut TestAppContext) {
+    // It sets process-wide state, so it runs alone in a child process.
+    if !support::in_own_process("local_log::raw_details_go_to_the_developer_log") {
+        return;
+    }
     let buf = Arc::new(Mutex::new(Vec::new()));
     let sink = buf.clone();
     tracing_subscriber::fmt()

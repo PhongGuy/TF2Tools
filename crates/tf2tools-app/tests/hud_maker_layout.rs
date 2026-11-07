@@ -1,7 +1,7 @@
 //! The HUD Maker's bars and floating panels keep one layout: the scene bar picks tabs or a menu
 //! by width alone, the toolbar's hide button stays on its first row, and panels stay put.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{AppContext as _, Bounds, Entity, Pixels, TestAppContext, point};
 use tf2tools_app::ids;

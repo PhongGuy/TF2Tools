@@ -1,6 +1,6 @@
 //! The HUD Maker editor's recipe previews, without GPUI.
 
-mod support;
+use crate::support;
 
 use support::hud_stock::stock_files;
 use tf2tools_app::pages::hud_maker::editor::{Handle, HudEditor};

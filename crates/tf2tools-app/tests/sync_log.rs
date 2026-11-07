@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use gpui_kit::TestAppContext;
 use tf2tools_core::StoreKind;
 
-mod support;
+use crate::support;
 
 struct Capture(Arc<Mutex<Vec<u8>>>);
 
@@ -23,6 +23,10 @@ impl std::io::Write for Capture {
 // The raw error is for developers: it reaches the stderr log, never the player.
 #[gpui_kit::test]
 fn a_failure_logs_its_raw_detail(cx: &mut TestAppContext) {
+    // It sets process-wide state, so it runs alone in a child process.
+    if !support::in_own_process("sync_log::a_failure_logs_its_raw_detail") {
+        return;
+    }
     let buf = Arc::new(Mutex::new(Vec::new()));
     let sink = buf.clone();
     tracing_subscriber::fmt()

@@ -1,6 +1,6 @@
 //! The class select canvas: the code's pictures, the backdrop room, the model area and the tips box.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use tf2tools_app::ids;

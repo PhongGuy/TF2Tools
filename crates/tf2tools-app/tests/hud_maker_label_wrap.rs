@@ -1,6 +1,6 @@
 //! Wrapped labels on the canvas: the spectator tip, broken and placed as the game does it.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{Bounds, Entity, Pixels, TestAppContext, px};
 use support::maker_page::{click_in_panel, on_page};

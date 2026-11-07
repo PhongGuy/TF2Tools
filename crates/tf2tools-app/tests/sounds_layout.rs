@@ -1,7 +1,7 @@
 //! The Sounds page at small windows: the page scrolls as a whole over a grid of at least one card
 //! row, slot text keeps clear of Uninstall, and the last card row scrolls clear of the player.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{
     AppContext as _, Bounds, ElementId, Entity, Pixels, ScrollHandle, TestAppContext, point, px,

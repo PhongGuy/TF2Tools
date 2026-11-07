@@ -1,7 +1,7 @@
 //! The Maps page: serveme.tf's list from a local fake, search and sort, and the download,
 //! in-game and remove rules in the real shell.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;

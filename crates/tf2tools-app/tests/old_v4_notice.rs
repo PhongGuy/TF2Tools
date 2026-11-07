@@ -11,7 +11,7 @@ use tf2tools_app::old_v4::{NOTICE, OldV4Notice, UninstallRunner, pending};
 use tf2tools_app::services::Tf2State;
 use tf2tools_core::{OldV4, UninstallEntry, find_old_v4};
 
-mod support;
+use crate::support;
 
 const V4_EXE: &str = r"C:\Users\pyro\AppData\Local\Programs\tf2tools\Uninstall TF2Tools.exe";
 

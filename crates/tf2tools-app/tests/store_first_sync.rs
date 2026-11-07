@@ -2,7 +2,7 @@
 //! sync fills an empty store, a "Could not load" card with Retry when it fails, and cached cards
 //! kept through a later failure; a search that matches nothing is none of these.
 
-mod support;
+use crate::support;
 
 use std::sync::mpsc::Receiver;
 use std::time::Duration;

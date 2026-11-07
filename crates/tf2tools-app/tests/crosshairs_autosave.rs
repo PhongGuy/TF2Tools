@@ -1,7 +1,7 @@
 //! The Crosshairs page saves into TF2 on its own: every board change applies in the
 //! background, rapid changes coalesce, and without TF2 the change waits for the game.
 
-mod support;
+use crate::support;
 
 use std::path::PathBuf;
 

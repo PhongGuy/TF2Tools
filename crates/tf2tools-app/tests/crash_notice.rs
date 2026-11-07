@@ -3,7 +3,7 @@ use tf2tools_app::crash::notice::{CrashNotice, NOTICE, crash_notice};
 use tf2tools_app::ids;
 use tf2tools_app::services::Tf2State;
 
-mod support;
+use crate::support;
 
 const REPORT: &str = "TF2Tools 6.0.0 closed unexpectedly.\nMessage: boom\n";
 

@@ -1,6 +1,6 @@
 //! A scene file that is a #base stub: shown, pickable, read-only, with one plain note.
 
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};

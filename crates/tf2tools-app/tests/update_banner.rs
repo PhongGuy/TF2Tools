@@ -9,7 +9,7 @@ use tf2tools_app::updater::backend::describe_download;
 use tf2tools_app::updater::{AfterInstall, REOPEN, UpdateState, Updater};
 use tf2tools_core::UpdateDownloadError;
 
-mod support;
+use crate::support;
 use support::ShellWindow;
 use support::update_fake::{
     APPIMAGE, FakeUpdates, failure, fake_updater, offer, reach_available, reach_ready, state,

@@ -18,7 +18,7 @@ use tf2tools_core::{Database, Provenance, Tf2Install};
 
 use tf2tools_app::audio::RecordingAudio;
 
-mod support;
+use crate::support;
 
 fn boot(env: &support::Env, detector: Tf2Detector) -> Boot {
     Boot {

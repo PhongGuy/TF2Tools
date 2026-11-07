@@ -1,7 +1,7 @@
 //! The Crosshairs page's loadout board: cells per class and slot, bulk assigns from the
 //! headers, the per-weapon panel, reset, drag and drop, and the not-in-TF2 bar.
 
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};

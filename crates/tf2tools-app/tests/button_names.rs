@@ -1,6 +1,6 @@
 //! Every button says what it does: an icon-only button carries an accessible name, so a
 //! screen reader and the pilot can read it, and a tooltip a player sees on hover.
-mod support;
+use crate::support;
 
 use std::time::Duration;
 

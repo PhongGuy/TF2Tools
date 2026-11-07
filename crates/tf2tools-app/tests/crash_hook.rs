@@ -6,8 +6,16 @@ use std::task::{Context, Waker};
 use tf2tools_app::crash::recent::Recent;
 use tf2tools_app::crash::{CRASH_FILE, catching, install_hook, marked, marked_future};
 
+use crate::support;
+
 #[test]
 fn the_hook_records_uncaught_panics_and_chains_to_the_previous_one() {
+    // It sets process-wide state, so it runs alone in a child process.
+    if !support::in_own_process(
+        "crash_hook::the_hook_records_uncaught_panics_and_chains_to_the_previous_one",
+    ) {
+        return;
+    }
     let tmp = tempfile::tempdir().unwrap();
     let dir = tmp.path().join("crash");
     let calls = Arc::new(AtomicUsize::new(0));

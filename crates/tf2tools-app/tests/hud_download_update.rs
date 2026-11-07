@@ -1,6 +1,6 @@
 //! An unedited store HUD's card marks a newer store version and updates to it in place.
 
-mod support;
+use crate::support;
 
 use std::time::Duration;
 

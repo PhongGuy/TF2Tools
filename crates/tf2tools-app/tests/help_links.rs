@@ -1,5 +1,5 @@
 //! Where a player finds help or reports a problem: the end of Settings, and the crash banner.
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, ScrollDelta, TestAppContext, point, px};

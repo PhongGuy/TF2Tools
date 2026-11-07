@@ -1,6 +1,6 @@
 //! Adding a shadow, box, anchor or crosshair; deleting it; the hit flash.
 
-mod support;
+use crate::support;
 
 use gpui_kit::TestAppContext;
 use support::maker_page::{VALUE, click_in_panel, editor, on_page, open_maker, open_maker_with};

@@ -1,6 +1,6 @@
 //! The Main menu tab's rank pieces follow the HUD's own pvprankpanel.res.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{Bounds, Entity, Pixels, TestAppContext};
 use tf2tools_app::ids;

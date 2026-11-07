@@ -1509,3 +1509,27 @@ pub fn put_start_card_away(cx: &mut TestAppContext, win: AnyWindowHandle) {
         click_id(cx, win, tf2tools_app::ids::HUD_MAKER_START_BLANK);
     }
 }
+
+/// For a test that sets process-wide state (the panic hook, the global tracing subscriber):
+/// returns true in a child process of this binary that runs only `test` (its full name, such as
+/// `crash_hook::name`), where the caller runs its body. In the parent it runs that child, asserts
+/// it passed and returns false.
+pub fn in_own_process(test: &str) -> bool {
+    const CHILD: &str = "TF2TOOLS_TEST_OWN_PROCESS";
+    if std::env::var_os(CHILD).is_some() {
+        return true;
+    }
+    let out = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", test])
+        .env(CHILD, "1")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stdout}\n{stderr}");
+    assert!(
+        stdout.contains("1 passed"),
+        "the child ran no test: {stdout}"
+    );
+    false
+}

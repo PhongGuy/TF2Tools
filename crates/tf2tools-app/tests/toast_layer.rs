@@ -13,7 +13,7 @@ use tf2tools_app::ids;
 use tf2tools_app::shell::toast::{ToastKind, toast};
 use tf2tools_app::widgets::dialog_frame::{DETAIL_WIDTH, DialogFrame};
 
-mod support;
+use crate::support;
 
 /// The two window sizes the bug was seen at.
 const SIZES: [(f32, f32); 2] = [(1280., 800.), (900., 600.)];

@@ -1,6 +1,6 @@
 //! The scoreboard's mode dropdown: what each mode draws, undo across modes and a narrow window.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;

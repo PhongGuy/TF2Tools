@@ -1,6 +1,6 @@
 //! Copying crosshairs into the maker, Save as new, and PNG export and import.
 
-mod support;
+use crate::support;
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

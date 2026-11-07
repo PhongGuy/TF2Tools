@@ -1,6 +1,6 @@
 //! History snapshots in the HUD Maker, headless.
 
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, ScrollDelta, TestAppContext, point, px};

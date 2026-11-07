@@ -10,7 +10,7 @@ use tf2tools_app::services::{
 };
 use tf2tools_core::{Database, Endpoints, Tf2Install};
 
-mod support;
+use crate::support;
 
 #[test]
 fn services_are_clone_send_sync() {

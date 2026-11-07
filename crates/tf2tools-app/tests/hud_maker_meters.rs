@@ -1,6 +1,6 @@
 //! The meter row of the situation menu, what it draws, and undo across meters.
 
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};

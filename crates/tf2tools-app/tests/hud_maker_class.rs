@@ -1,6 +1,6 @@
 //! The Class select tab: what it draws, its stub note, its hint and its edits in the shared list.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;

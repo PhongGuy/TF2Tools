@@ -4,7 +4,7 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::shell::{CONTENT_PADDING, HEADER_HEIGHT, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH};
 
-mod support;
+use crate::support;
 
 #[gpui_kit::test]
 fn the_shell_shows_every_shell_id_and_opens_on_huds(cx: &mut TestAppContext) {

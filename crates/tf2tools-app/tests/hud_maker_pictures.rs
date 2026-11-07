@@ -1,6 +1,6 @@
 //! Picking pictures and backgrounds in the HUD Maker, headless.
 
-mod support;
+use crate::support;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

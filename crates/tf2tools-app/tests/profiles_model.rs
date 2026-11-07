@@ -1,4 +1,4 @@
-mod support;
+use crate::support;
 
 use gpui_kit::TestAppContext;
 use tf2tools_app::pages::profiles::model::{

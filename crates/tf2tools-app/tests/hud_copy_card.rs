@@ -1,6 +1,6 @@
 //! Edit a copy: a library HUD's card makes an editable copy and opens it in the HUD Maker.
 
-mod support;
+use crate::support;
 
 use std::path::Path;
 

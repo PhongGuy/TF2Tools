@@ -1,6 +1,6 @@
 //! Pins the kit behaviour `support::disabled_of` reads: gpui-base 0.7.1's Button binds its
 //! focus handle only while enabled, and exposes no a11y disabled flag.
-mod support;
+use crate::support;
 
 use gpui_kit::component::Disableable as _;
 use gpui_kit::component::button::Button;

@@ -1,6 +1,6 @@
 //! One saved volume: the sound player and Settings draw it, change it and save it together.
 
-mod support;
+use crate::support;
 
 use std::sync::Arc;
 

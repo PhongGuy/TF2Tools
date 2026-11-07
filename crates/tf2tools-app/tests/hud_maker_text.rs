@@ -1,6 +1,6 @@
 //! The HUD Maker's Stage 2 side panel and canvas, headless.
 
-mod support;
+use crate::support;
 
 use gpui_kit::component::color_picker::ColorPickerEvent;
 use gpui_kit::component::input::InputEvent;

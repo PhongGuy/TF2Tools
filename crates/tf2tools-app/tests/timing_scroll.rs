@@ -1,4 +1,4 @@
-mod support;
+use crate::support;
 
 use std::io::Write as _;
 use std::path::{Path, PathBuf};

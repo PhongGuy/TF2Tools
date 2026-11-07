@@ -1,7 +1,7 @@
 //! Alignment on the HUD Maker page: arrow-key nudges, snapping with guides, Mirror and Match
 //! size, through the pilot ids.
 
-mod support;
+use crate::support;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext, point, px};

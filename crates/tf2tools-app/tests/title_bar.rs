@@ -10,7 +10,7 @@ use tf2tools_app::ids;
 use tf2tools_app::services::Tf2State;
 use tf2tools_core::Tf2Install;
 
-mod support;
+use crate::support;
 
 #[gpui_kit::test]
 fn window_options_suit_a_client_drawn_title_bar(cx: &mut TestAppContext) {

@@ -1,6 +1,6 @@
 //! Dropping image files onto the Crosshair Maker.
 
-mod support;
+use crate::support;
 
 use std::path::{Path, PathBuf};
 

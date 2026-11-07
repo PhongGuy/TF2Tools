@@ -1,6 +1,6 @@
 //! The King of the Hill switch and Show it on the KOTH timer.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use support::maker_page::open_maker;

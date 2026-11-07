@@ -1,6 +1,6 @@
 //! The Win panel tab: what it draws, its backdrop and its edits in the shared list.
 
-mod support;
+use crate::support;
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext, px};
 use tf2tools_app::ids;

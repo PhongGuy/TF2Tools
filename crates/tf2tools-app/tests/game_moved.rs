@@ -1,7 +1,7 @@
 //! A game folder moved away while the app runs: installs say so and create nothing, and the
 //! header badge catches up when the player changes page or comes back to the window.
 
-mod support;
+use crate::support;
 
 use std::io::Write as _;
 use std::path::{Path, PathBuf};

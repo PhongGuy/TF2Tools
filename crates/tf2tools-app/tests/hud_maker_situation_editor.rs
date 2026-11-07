@@ -1,6 +1,6 @@
 //! The editor's game situation, played events and moment, without GPUI.
 
-mod support;
+use crate::support;
 
 use support::hud_stock::{HEALTH, block, stock_files_with, with_blocks};
 use support::maker_page::{VALUE, editor, overrides};

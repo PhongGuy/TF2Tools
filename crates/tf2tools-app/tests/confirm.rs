@@ -1,7 +1,7 @@
 use gpui_kit::{AnyWindowHandle, AppContext as _, TestAppContext, px};
 use tf2tools_app::shell::confirm::{Confirm, confirm};
 
-mod support;
+use crate::support;
 
 fn open(
     cx: &mut TestAppContext,

@@ -59,7 +59,11 @@ fn child_warns_under_rust_log_error() {
 #[test]
 fn rust_log_error_still_feeds_the_crash_buffer() {
     let out = std::process::Command::new(std::env::current_exe().unwrap())
-        .args(["--ignored", "--exact", "child_warns_under_rust_log_error"])
+        .args([
+            "--ignored",
+            "--exact",
+            "diagnostics::child_warns_under_rust_log_error",
+        ])
         .env("RUST_LOG", "error")
         .output()
         .unwrap();

@@ -1,6 +1,6 @@
 //! The HUD Maker edits a copy over its own files and saves it with kept originals.
 
-mod support;
+use crate::support;
 
 use std::path::Path;
 
