@@ -183,6 +183,28 @@ pub enum SwitchAction {
         /// The path it takes when on.
         to: String,
     },
+    /// Comments out every line of `file` holding one of `comment` and uncomments every line
+    /// holding one of `uncomment` when on. Off does the reverse when `reverses`, else nothing,
+    /// as for one choice of a pick.
+    Lines {
+        /// The copy path holding the lines.
+        file: String,
+        /// Text whose lines on comments out.
+        comment: Vec<String>,
+        /// Text whose lines on uncomments.
+        uncomment: Vec<String>,
+        /// Whether off undoes on, as for a switch.
+        reverses: bool,
+    },
+    /// Writes copy file `file` whole: `on` while on, `off` while off, where `None` leaves it.
+    WriteText {
+        /// The copy path written.
+        file: String,
+        /// The text written when on.
+        on: String,
+        /// The text written when off, if any.
+        off: Option<String>,
+    },
 }
 
 /// Where an option comes from.

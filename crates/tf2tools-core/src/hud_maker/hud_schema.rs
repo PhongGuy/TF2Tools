@@ -10,7 +10,7 @@ use serde::de::{Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 use super::changes::{check_cfg_path, check_switch_path};
 use super::document::KvDocument;
 use super::files::HudFiles;
-use super::hud_options::{active_bases, base_target, base_targets, scan};
+use super::hud_options::{active_bases, base_target, base_targets, scan, toggle_lines};
 use super::model::{live_blocks, root_block};
 use super::options::{
     CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue,
@@ -417,13 +417,16 @@ impl HudSchemas {
 }
 
 /// Any of these on a control asks for something this build does not do.
-const UNSUPPORTED: [&str; 5] = [
+/// A `Command` names a preview hook and changes no file, so it is ignored.
+const UNSUPPORTED: [&str; 4] = [
     "Special",
     "SpecialParameters",
     "ComboDirectories",
     "ComboFiles",
-    "Command",
 ];
+
+/// The kinds of file a `WriteFile` may write whole.
+const TEXT_FILES: [&str; 4] = [".res", ".txt", ".vdf", ".vmt"];
 
 /// The controls of one schema compiled against one copy.
 #[derive(Debug, Clone, Default)]
@@ -800,12 +803,28 @@ impl Fit<'_> {
                 }
                 continue;
             }
+            // `comment` and `uncomment` lists toggle lines in any text file; an animation file
+            // takes nothing else, as its events are no key tree.
+            let is_list = |k: &str| k == "comment" || k == "uncomment";
+            if content.iter().any(|(k, _)| is_list(k)) {
+                match self.lines_action(&file, content, leaves) {
+                    Ok(action) => actions.push(action),
+                    Err(Refused::Misfit) => misfit = true,
+                    Err(Refused::LeftOut) => return Err(Refused::LeftOut),
+                }
+            }
             if !file.ends_with(".res") {
+                if content.iter().all(|(k, _)| is_list(k)) && file.ends_with(".txt") {
+                    continue;
+                }
                 return Err(Refused::LeftOut);
             }
             let mut sets = Vec::new();
-            for (k, v) in content {
+            for (k, v) in content.iter().filter(|(k, _)| !is_list(k)) {
                 collect_leaves(k, v, &mut Vec::new(), leaves, &mut sets)?;
+            }
+            if sets.is_empty() && content.iter().any(|(k, _)| is_list(k)) {
+                continue;
             }
             let Some(root) = self
                 .doc(&file)
@@ -909,19 +928,77 @@ impl Fit<'_> {
         self.base_lines(file, on, off)
     }
 
-    /// `WriteFile` whose texts are nothing but `#base` lines, as a `#base` swap.
+    /// `WriteFile`: texts that are nothing but `#base` lines swap the file's `#base` lines;
+    /// any other text writes the whole file. The file must be a text file the path rule
+    /// allows, beside other files of the copy.
     fn write_file(&mut self, value: &SchemaValue) -> Result<Vec<OptionAction>, Refused> {
         let side = |k: &str| value.get(k).and_then(SchemaValue::as_str);
         let file = side("FileName")
             .and_then(check_switch_path)
             .ok_or(Refused::LeftOut)?;
-        let on = side("TrueText")
-            .and_then(base_targets)
-            .ok_or(Refused::LeftOut)?;
-        let off = side("FalseText")
-            .and_then(base_targets)
-            .ok_or(Refused::LeftOut)?;
-        Ok(vec![self.base_lines(&file, on, off)?])
+        let on = side("TrueText").ok_or(Refused::LeftOut)?;
+        let off = side("FalseText");
+        if let (Some(a), Some(b)) = (base_targets(on), off.and_then(base_targets)) {
+            return Ok(vec![self.base_lines(&file, a, b)?]);
+        }
+        if !TEXT_FILES.iter().any(|ext| file.ends_with(ext)) {
+            return Err(Refused::LeftOut);
+        }
+        let folder = file.rsplit_once('/').map(|(dir, _)| dir);
+        if !self.copy.contains(&file) && !folder.is_some_and(|dir| self.has(dir)) {
+            return Err(Refused::Misfit);
+        }
+        Ok(vec![OptionAction::Switch(SwitchAction::WriteText {
+            file,
+            on: on.to_owned(),
+            off: off.map(str::to_owned),
+        })])
+    }
+
+    /// A `comment`/`uncomment` pair on copy file `file`: each a list of line texts. A switch
+    /// reverses its edits when off; a choice's apply only when picked. Every text must be on a
+    /// line of the copy's file.
+    fn lines_action(
+        &mut self,
+        file: &str,
+        content: &[(String, SchemaValue)],
+        leaves: Leaves,
+    ) -> Result<OptionAction, Refused> {
+        let list = |key: &str| -> Result<Vec<String>, Refused> {
+            let Some((_, value)) = content.iter().find(|(k, _)| k == key) else {
+                return Ok(Vec::new());
+            };
+            let items = value.as_array().ok_or(Refused::LeftOut)?;
+            (items.iter())
+                .map(|item| match item.as_str() {
+                    Some(s) if !s.trim().is_empty() && !s.contains(['\n', '\r']) => {
+                        Ok(s.to_owned())
+                    }
+                    _ => Err(Refused::LeftOut),
+                })
+                .collect()
+        };
+        let (comment, uncomment) = (list("comment")?, list("uncomment")?);
+        let reverses = match leaves {
+            Leaves::Toggle => true,
+            Leaves::Literal => false,
+            Leaves::Value => return Err(Refused::LeftOut),
+        };
+        if comment.is_empty() && uncomment.is_empty() {
+            return Err(Refused::LeftOut);
+        }
+        let text = (self.copy.contains(file))
+            .then(|| self.files.read_pristine(file).ok().flatten())
+            .flatten()
+            .and_then(|f| String::from_utf8(f.into_bytes()).ok())
+            .ok_or(Refused::Misfit)?;
+        toggle_lines(&text, &comment, &uncomment).ok_or(Refused::Misfit)?;
+        Ok(OptionAction::Switch(SwitchAction::Lines {
+            file: file.to_owned(),
+            comment,
+            uncomment,
+            reverses,
+        }))
     }
 
     /// `WriteCfg`: a settings file with a text for each side, written where the copy's own

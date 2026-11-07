@@ -384,6 +384,9 @@ fn spec_touched(spec: &OptionSpec) -> Vec<String> {
                 paths.push(file.clone());
                 paths.extend(on.iter().chain(off).filter_map(|t| resolve(file, t)));
             }
+            OptionAction::Switch(
+                SwitchAction::Lines { file, .. } | SwitchAction::WriteText { file, .. },
+            ) => paths.extend(check_switch_path(file)),
             OptionAction::WriteCfg {
                 place: CfgPlace::Hud(file),
                 ..
@@ -407,6 +410,10 @@ fn pristine_values(
     let mut scheme = None;
     let mut out = BTreeMap::new();
     for spec in specs {
+        if let Some(found) = lines_value(files, spec) {
+            out.insert(spec.id().to_owned(), found);
+            continue;
+        }
         let Some(OptionAction::SetKey {
             file,
             block,
@@ -431,6 +438,41 @@ fn pristine_values(
         }
     }
     out
+}
+
+/// The value a line-toggling option has in the copy: a switch whose line edits all stand one
+/// way, or the first choice whose line edits all stand as it leaves them. Options that also
+/// set keys are read from their keys instead.
+fn lines_value(files: &HudFiles, spec: &OptionSpec) -> Option<OptionValue> {
+    let state = |actions: &[OptionAction]| -> Option<bool> {
+        let mut out = None;
+        for action in actions {
+            let OptionAction::Switch(SwitchAction::Lines {
+                file,
+                comment,
+                uncomment,
+                ..
+            }) = action
+            else {
+                return None;
+            };
+            let bytes = files.read_pristine(file).ok()??;
+            let text = String::from_utf8(bytes.into_bytes()).ok()?;
+            let now = lines_state(&text, comment, uncomment)?;
+            if out.is_some_and(|o| o != now) {
+                return None;
+            }
+            out = Some(now);
+        }
+        out
+    };
+    match spec.kind() {
+        OptionKind::Toggle => state(spec.actions()).map(OptionValue::Bool),
+        OptionKind::Choice(choices) if spec.actions().is_empty() => (choices.iter())
+            .find(|c| state(c.actions()) == Some(true))
+            .map(|c| OptionValue::Pick(c.key().to_owned())),
+        _ => None,
+    }
 }
 
 /// The text of `key` (same conditional, any case) in the last live block on `block` under
@@ -1028,7 +1070,9 @@ fn switch_paths(action: &SwitchAction) -> Vec<String> {
     match action {
         SwitchAction::CommentLine { file, target } => vec![file.clone(), target.clone()],
         SwitchAction::Move { from, to } => vec![from.clone(), to.clone()],
-        SwitchAction::BaseLines { file, .. } => vec![file.clone()],
+        SwitchAction::BaseLines { file, .. }
+        | SwitchAction::Lines { file, .. }
+        | SwitchAction::WriteText { file, .. } => vec![file.clone()],
     }
 }
 
@@ -1135,6 +1179,47 @@ impl Layer<'_> {
             OptionAction::Switch(SwitchAction::Move { from, to }) => {
                 let (source, dest) = if on { (from, to) } else { (to, from) };
                 self.move_paths(source, dest)
+            }
+            OptionAction::Switch(SwitchAction::Lines {
+                file,
+                comment,
+                uncomment,
+                reverses,
+            }) => {
+                if !on && !reverses {
+                    return Ok(true);
+                }
+                let Some(text) = self.read_text(file)? else {
+                    return Ok(false);
+                };
+                let (comment, uncomment) = if on {
+                    (comment, uncomment)
+                } else {
+                    (uncomment, comment)
+                };
+                let Some(edited) = toggle_lines(&text, comment, uncomment) else {
+                    return Ok(false);
+                };
+                self.put(file, edited.into_bytes());
+                Ok(true)
+            }
+            // An empty text for a file the copy lacks writes no file, so off leaves no stub.
+            OptionAction::Switch(SwitchAction::WriteText {
+                file,
+                on: a,
+                off: b,
+            }) => {
+                let Some(text) = (if on { Some(a) } else { b.as_ref() }) else {
+                    return Ok(true);
+                };
+                let Some(path) = check_switch_path(file) else {
+                    return Ok(false);
+                };
+                match text.is_empty() && !self.copy.contains(&path) {
+                    true => drop(self.written.remove(&path)),
+                    false => self.put(&path, text.clone().into_bytes()),
+                }
+                Ok(true)
             }
             // An empty side writes no file: one this layer wrote goes, and a copy file is
             // left as the HUD ships it.
@@ -1308,6 +1393,79 @@ fn comment_lines(text: &str, file: &str, target: &str, on: bool) -> Option<Strin
         out.push_str(ending);
     }
     found.then_some(out)
+}
+
+/// Whether `line` holds `needle`, any run of spaces and tabs in either read as one space, as
+/// schemas write a tab-separated animation line with spaces.
+fn holds(line: &str, needle: &str) -> bool {
+    let squeeze = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let needle = squeeze(needle);
+    !needle.is_empty() && squeeze(line).contains(&needle)
+}
+
+/// Whether a line is commented out with `//`.
+fn is_commented(line: &str) -> bool {
+    line.trim_start().starts_with("//")
+}
+
+/// `text` with every line holding one of `comment` commented out and every line holding one
+/// of `uncomment` uncommented, indentation and endings kept; `None` when some needle is on
+/// no line, since the copy then differs from what the option was made for.
+pub(super) fn toggle_lines(text: &str, comment: &[String], uncomment: &[String]) -> Option<String> {
+    let mut found = vec![false; comment.len() + uncomment.len()];
+    let mut out = String::with_capacity(text.len() + 16);
+    for line in text.split_inclusive('\n') {
+        let body = line.trim_end_matches(['\n', '\r']);
+        let ending = &line[body.len()..];
+        let mut hit = |list: &[String], offset: usize| {
+            let mut any = false;
+            for (i, needle) in list.iter().enumerate() {
+                if holds(body, needle) {
+                    found[offset + i] = true;
+                    any = true;
+                }
+            }
+            any
+        };
+        let shut = hit(comment, 0);
+        let open = hit(uncomment, comment.len());
+        let indent = &body[..body.len() - body.trim_start().len()];
+        let rest = body.trim_start();
+        match (open, shut, is_commented(body)) {
+            (true, _, true) => {
+                out.push_str(indent);
+                out.push_str(rest.trim_start_matches('/'));
+            }
+            (false, true, false) => {
+                out.push_str(indent);
+                out.push_str("//");
+                out.push_str(rest);
+            }
+            _ => out.push_str(body),
+        }
+        out.push_str(ending);
+    }
+    found.iter().all(|f| *f).then_some(out)
+}
+
+/// Whether `text` stands as [`toggle_lines`] leaves it (`Some(true)`), as its reverse leaves
+/// it (`Some(false)`), or neither.
+pub(super) fn lines_state(text: &str, comment: &[String], uncomment: &[String]) -> Option<bool> {
+    let state = |shut: &[String], open: &[String]| {
+        let lines: Vec<&str> = text.lines().collect();
+        let all = |list: &[String], commented: bool| {
+            list.iter().all(|n| {
+                let mut hits = lines.iter().filter(|l| holds(l, n)).peekable();
+                hits.peek().is_some() && hits.all(|l| is_commented(l) == commented)
+            })
+        };
+        all(shut, true) && all(open, false)
+    };
+    match (state(comment, uncomment), state(uncomment, comment)) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        _ => None,
+    }
 }
 
 /// `text` with its active `#base` lines replaced by one per target, where the first stood (or
