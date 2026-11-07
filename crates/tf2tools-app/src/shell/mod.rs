@@ -276,8 +276,8 @@ impl Shell {
     }
 
     // A kept page, but only while it shows, as every other page's accessor reads.
-    fn shown<T>(&self, page: Page, entity: &Option<Entity<T>>) -> Option<Entity<T>> {
-        entity.clone().filter(|_| self.page == page)
+    fn shown<T>(&self, page: Page, entity: Option<&Entity<T>>) -> Option<Entity<T>> {
+        entity.cloned().filter(|_| self.page == page)
     }
 
     // The sidebar's way to another page: at once when no drawing would be lost, else after the
@@ -344,37 +344,37 @@ impl Shell {
 
     /// The Settings page while it shows.
     pub fn settings_page(&self) -> Option<Entity<SettingsPage>> {
-        self.shown(Page::Settings, &self.settings)
+        self.shown(Page::Settings, self.settings.as_ref())
     }
 
     /// The HUD Store page while it shows.
     pub fn hud_store_page(&self) -> Option<Entity<HudStorePage>> {
-        self.shown(Page::HudStore, &self.hud_store)
+        self.shown(Page::HudStore, self.hud_store.as_ref())
     }
 
     /// The Sound Store page while it shows.
     pub fn sound_store_page(&self) -> Option<Entity<SoundStorePage>> {
-        self.shown(Page::SoundStore, &self.sound_store)
+        self.shown(Page::SoundStore, self.sound_store.as_ref())
     }
 
     /// The Addon Store page while it shows.
     pub fn addon_store_page(&self) -> Option<Entity<AddonStorePage>> {
-        self.shown(Page::AddonStore, &self.addon_store)
+        self.shown(Page::AddonStore, self.addon_store.as_ref())
     }
 
     /// The Crosshair Store page while it shows.
     pub fn crosshair_store_page(&self) -> Option<Entity<CrosshairStorePage>> {
-        self.shown(Page::CrosshairStore, &self.crosshair_store)
+        self.shown(Page::CrosshairStore, self.crosshair_store.as_ref())
     }
 
     /// The Logs page while it shows.
     pub fn logs_page(&self) -> Option<Entity<LogsPage>> {
-        self.shown(Page::Logs, &self.logs)
+        self.shown(Page::Logs, self.logs.as_ref())
     }
 
     /// The Maps page while it shows.
     pub fn maps_page(&self) -> Option<Entity<MapsPage>> {
-        self.shown(Page::Maps, &self.maps)
+        self.shown(Page::Maps, self.maps.as_ref())
     }
 
     /// The Addons page while it shows.
