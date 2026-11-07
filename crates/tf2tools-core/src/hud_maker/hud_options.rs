@@ -14,7 +14,8 @@ use super::hud_schema::HudSchema;
 use super::model::{BaseChains, PartKey, apply_set, live_blocks, root_block};
 use super::options::{
     CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue,
-    SwitchAction, ValueMap, derived_colour, rgba_text, template_text, text_suits, value_suits,
+    SwitchAction, ValueMap, derived_colour, rgba_text, template_refs, template_text, text_suits,
+    value_suits,
 };
 use super::scheme::Scheme;
 use crate::error::HudFilesError;
@@ -196,7 +197,14 @@ impl HudOptions {
             removed: BTreeSet::new(),
             cfg: BTreeMap::new(),
         };
+        // A text naming another schema switch (`{$name ? a : b}`) reads it as the changes
+        // leave it, whatever order they came in.
+        let is_on = |name: &str| {
+            let id = format!("e:{name}");
+            self.value(&id, changes) == Some(OptionValue::Bool(true))
+        };
         let mut left_out = Vec::new();
+        let mut chosen = BTreeSet::new();
         for (i, change) in changes.iter().enumerate() {
             let ChangeTarget::Option(choice) = change.target() else {
                 continue;
@@ -204,30 +212,20 @@ impl HudOptions {
             if ![OptionChange::HUD, OptionChange::SCHEMA].contains(&choice.source()) {
                 continue;
             }
-            let Some(sides) = self.sides(choice) else {
+            if !self.apply_choice(&mut layer, choice, &is_on)? {
                 left_out.push(i);
-                continue;
-            };
-            // Each choice applies whole or not at all, so a refused action leaves no half switch.
-            let saved = (
-                layer.written.clone(),
-                layer.removed.clone(),
-                layer.cfg.clone(),
-            );
-            let mut ok = true;
-            let derived = match self.offered(choice.id()).map(OptionSpec::kind) {
-                Some(OptionKind::Colour { derived }) => derived.as_slice(),
-                _ => &[],
-            };
-            for (action, on) in sides {
-                if !layer.apply(action, on, choice.value(), derived, self.platform)? {
-                    ok = false;
-                    break;
-                }
+            } else if choice.source() == OptionChange::SCHEMA {
+                chosen.insert(choice.id().to_owned());
             }
-            if !ok || !layer.within_caps() {
-                (layer.written, layer.removed, layer.cfg) = saved;
-                left_out.push(i);
+        }
+        // An option whose text names a switch the player changed is written again at its
+        // start value, since its file holds the switch's old word.
+        for spec in &self.specs {
+            let names = spec_refs(spec);
+            let named_changed = names.iter().any(|n| chosen.contains(&format!("e:{n}")));
+            if named_changed && !chosen.contains(spec.id()) {
+                let start = OptionChange::new(OptionChange::SCHEMA, spec.id(), self.start(spec));
+                self.apply_choice(&mut layer, &start, &is_on)?;
             }
         }
         // A path back at its pristine bytes needs no entry in the layer.
@@ -245,6 +243,45 @@ impl HudOptions {
             files: files.with_switches(written, removed).with_switched_cfg(cfg),
             left_out,
         })
+    }
+
+    /// Applies one stored choice to `layer`, whole or not at all, so a refused action leaves
+    /// no half switch; false when it was refused.
+    fn apply_choice(
+        &self,
+        layer: &mut Layer<'_>,
+        choice: &OptionChange,
+        is_on: &dyn Fn(&str) -> bool,
+    ) -> Result<bool, HudFilesError> {
+        let Some(sides) = self.sides(choice) else {
+            return Ok(false);
+        };
+        let saved = (
+            layer.written.clone(),
+            layer.removed.clone(),
+            layer.cfg.clone(),
+        );
+        let derived = match self.offered(choice.id()).map(OptionSpec::kind) {
+            Some(OptionKind::Colour { derived }) => derived.as_slice(),
+            _ => &[],
+        };
+        for (action, on) in sides {
+            let ctx = Applying {
+                on,
+                value: choice.value(),
+                derived,
+                is_on,
+            };
+            if !layer.apply(action, &ctx, self.platform)? {
+                (layer.written, layer.removed, layer.cfg) = saved;
+                return Ok(false);
+            }
+        }
+        if !layer.within_caps() {
+            (layer.written, layer.removed, layer.cfg) = saved;
+            return Ok(false);
+        }
+        Ok(true)
     }
 
     /// The last stored choice for `id` that applies, else the pristine value; None when not offered.
@@ -537,6 +574,9 @@ fn read_as(kind: &OptionKind, map: &ValueMap, text: &str) -> Option<OptionValue>
             Some(OptionValue::Int(atoi(text.as_bytes())))
         }
         (ValueMap::OnOff { on, .. }, OptionKind::Toggle) => Some(OptionValue::Bool(text == on)),
+        (ValueMap::Value, OptionKind::Choice(choices)) => (choices.iter())
+            .find(|c| c.key() == text)
+            .map(|c| OptionValue::Pick(c.key().to_owned())),
         (ValueMap::PerChoice(pairs), OptionKind::Choice(_)) => (pairs.iter())
             .find(|(_, literal)| literal == text)
             .map(|(key, _)| OptionValue::Pick(key.clone())),
@@ -1124,6 +1164,30 @@ fn switch_paths(action: &SwitchAction) -> Vec<String> {
     }
 }
 
+/// One side of a stored choice being applied: on or off, its value, the derived colours it
+/// writes and how to read a switch its texts name.
+#[derive(Clone, Copy)]
+struct Applying<'a> {
+    on: bool,
+    value: &'a OptionValue,
+    derived: &'a [Derived],
+    is_on: &'a dyn Fn(&str) -> bool,
+}
+
+/// The switch options `spec`'s texts name through `{$name ? a : b}`, by schema name.
+fn spec_refs(spec: &OptionSpec) -> Vec<String> {
+    (all_actions(spec))
+        .filter_map(|a| match a {
+            OptionAction::SetKey {
+                value: ValueMap::Template(t),
+                ..
+            } => template_refs(t),
+            _ => None,
+        })
+        .flatten()
+        .collect()
+}
+
 /// The switch layer being built over a copy's pristine files.
 struct Layer<'a> {
     files: &'a HudFiles,
@@ -1187,11 +1251,15 @@ impl Layer<'_> {
     fn apply(
         &mut self,
         action: &OptionAction,
-        on: bool,
-        value: &OptionValue,
-        derived: &[Derived],
+        ctx: &Applying<'_>,
         platform: Platform,
     ) -> Result<bool, HudFilesError> {
+        let Applying {
+            on,
+            value,
+            derived,
+            is_on,
+        } = *ctx;
         match action {
             OptionAction::Switch(SwitchAction::CommentLine { file, target }) => {
                 let Some(text) = self.read_text(file)? else {
@@ -1340,7 +1408,8 @@ impl Layer<'_> {
                     (ValueMap::Value, OptionValue::Int(v)) => Some(v.to_string()),
                     (ValueMap::Value, OptionValue::Rgba(c)) => Some(rgba_text(*c)),
                     (ValueMap::Value, OptionValue::Text(t)) => Some(t.clone()),
-                    (ValueMap::Template(t), v) => template_text(t, v),
+                    (ValueMap::Value, OptionValue::Pick(k)) => Some(k.clone()),
+                    (ValueMap::Template(t), v) => template_text(t, v, is_on),
                     // A pick with no text of its own leaves the key as it is.
                     (ValueMap::PerChoice(pairs), OptionValue::Pick(k)) => {
                         (pairs.iter()).find(|(c, _)| c == k).map(|(_, t)| t.clone())

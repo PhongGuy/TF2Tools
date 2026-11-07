@@ -564,7 +564,7 @@ impl HudModel {
             let text = match (value, choice.value()) {
                 (ValueMap::Value, OptionValue::Int(v)) => Some(v.to_string()),
                 (ValueMap::Value, OptionValue::Rgba(c)) => Some(rgba_text(*c)),
-                (ValueMap::Template(t), v) => template_text(t, v),
+                (ValueMap::Template(t), v) => template_text(t, v, &|_| false),
                 (ValueMap::OnOff { on, .. }, OptionValue::Bool(true)) => Some(on.clone()),
                 (ValueMap::OnOff { off, .. }, OptionValue::Bool(false)) => match off {
                     Some(off) => Some(off.clone()),
@@ -783,9 +783,31 @@ pub(super) fn text_suits(text: &str) -> bool {
     text.len() <= MAX_TEXT && !text.chars().any(|c| c.is_control() || "\"{}".contains(c))
 }
 
-/// `template` with each `$value` replaced by `value` as a file spells it; `None` for a value
-/// with no spelling.
-pub(super) fn template_text(template: &str, value: &OptionValue) -> Option<String> {
+/// `template` with each `{$name ? a : b}` reference resolved (`a` when switch `name` is on
+/// by `is_on`, `$value` meaning this option) and then each `$value` replaced by `value` as a
+/// file spells it; `None` for a value with no spelling or a malformed reference.
+pub(super) fn template_text(
+    template: &str,
+    value: &OptionValue,
+    is_on: &dyn Fn(&str) -> bool,
+) -> Option<String> {
+    let mut resolved = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(open) = rest.find('{') {
+        resolved.push_str(&rest[..open]);
+        let close = rest[open..].find('}')? + open;
+        let (name, on, off) = reference(&rest[open + 1..close])?;
+        let on_now = match name {
+            "value" => *value == OptionValue::Bool(true),
+            name => is_on(name),
+        };
+        resolved.push_str(if on_now { on } else { off });
+        rest = &rest[close + 1..];
+    }
+    resolved.push_str(rest);
+    if resolved.contains('}') {
+        return None;
+    }
     let text = match value {
         OptionValue::Int(v) => v.to_string(),
         OptionValue::Rgba(c) => rgba_text(*c),
@@ -793,7 +815,40 @@ pub(super) fn template_text(template: &str, value: &OptionValue) -> Option<Strin
         OptionValue::Pick(k) => k.clone(),
         OptionValue::Bool(_) => return None,
     };
-    Some(template.replace("$value", &text))
+    Some(resolved.replace("$value", &text))
+}
+
+/// The option names `template`'s `{$name ? a : b}` references name, `value` left out;
+/// `None` when a brace holds anything else or a `$` names no reference or `$value`.
+pub(super) fn template_refs(template: &str) -> Option<Vec<String>> {
+    let mut names = Vec::new();
+    let mut plain = String::new();
+    let mut rest = template;
+    while let Some(open) = rest.find('{') {
+        plain.push_str(&rest[..open]);
+        let close = rest[open..].find('}')? + open;
+        let (name, ..) = reference(&rest[open + 1..close])?;
+        if name != "value" {
+            names.push(name.to_owned());
+        }
+        rest = &rest[close + 1..];
+    }
+    plain.push_str(rest);
+    let stray = plain.contains('}') || plain.replace("$value", "").contains('$');
+    (!stray).then_some(names)
+}
+
+/// A reference's inner text `$name ? a : b` as its parts, each a plain word.
+fn reference(inner: &str) -> Option<(&str, &str, &str)> {
+    let (name, sides) = inner.trim().strip_prefix('$')?.split_once('?')?;
+    let (on, off) = sides.split_once(':')?;
+    Some((word(name)?, word(on)?, word(off)?))
+}
+
+/// `w` trimmed when it is one plain word of letters, digits and underscores.
+fn word(w: &str) -> Option<&str> {
+    let w = w.trim();
+    (!w.is_empty() && w.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')).then_some(w)
 }
 
 /// Whether `key` is one of the item-colour scheme names (any case).

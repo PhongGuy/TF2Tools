@@ -16,7 +16,7 @@ use super::hud_options::{
 use super::model::{live_blocks, root_block};
 use super::options::{
     CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue,
-    SwitchAction, ValueMap, is_item_colour, text_suits,
+    SwitchAction, ValueMap, is_item_colour, template_refs, text_suits,
 };
 use crate::error::SchemaError;
 use crate::fonts::Platform;
@@ -496,7 +496,11 @@ impl HudSchema {
             docs: BTreeMap::new(),
             bases: None,
             copy_dirs: false,
+            referenced: BTreeSet::new(),
         };
+        for control in &self.controls {
+            references(&control.fields, &mut fit.referenced);
+        }
         let mut out = SchemaOptions::default();
         let mut seen = BTreeSet::new();
         for control in &self.controls {
@@ -581,6 +585,8 @@ struct Fit<'a> {
     bases: Option<Vec<(String, String)>>,
     /// Whether the pick being read copies option folders rather than moving them.
     copy_dirs: bool,
+    /// Control names another control's text names through `{$name ? a : b}`.
+    referenced: BTreeSet<String>,
 }
 
 impl Fit<'_> {
@@ -683,6 +689,20 @@ impl Fit<'_> {
                     actions,
                 )
             }
+            // The HUD's own on-screen crosshair: a symbol of its crosshair font.
+            "crosshair" => {
+                let actions = self.actions(fields, Leaves::Value, &mut Vec::new())?;
+                let choices: Vec<Choice> = (CROSSHAIR_SYMBOLS.chars())
+                    .map(|c| Choice::new(&c.to_string(), &c.to_string(), Vec::new()))
+                    .collect();
+                let start = value.filter(|v| choices.iter().any(|c| c.key() == v));
+                let start = start.unwrap_or_else(|| choices[0].key().to_owned());
+                (
+                    OptionKind::Choice(choices),
+                    OptionValue::Pick(start),
+                    actions,
+                )
+            }
             "textbox" | "text" => {
                 let actions = self.actions(fields, Leaves::Text, &mut Vec::new())?;
                 let start = value.filter(|v| text_suits(v)).unwrap_or_default();
@@ -690,8 +710,10 @@ impl Fit<'_> {
             }
             _ => return Err(Refused::LeftOut),
         };
-        // An option that writes nothing is no option; a ComboBox was checked with its choices.
-        if actions.is_empty() && !matches!(kind, OptionKind::Choice(_)) {
+        // An option that writes nothing is no option, unless another option's text names it;
+        // a ComboBox was checked with its choices.
+        let named = kind == OptionKind::Toggle && self.referenced.contains(name);
+        if actions.is_empty() && !named && !matches!(kind, OptionKind::Choice(_)) {
             return Err(Refused::LeftOut);
         }
         let label = fields
@@ -1150,6 +1172,21 @@ impl Fit<'_> {
     }
 }
 
+/// The symbols of the crosshair font HUDs draw their own crosshair with; the backslash is
+/// left out, as a file would read it as an escape.
+const CROSSHAIR_SYMBOLS: &str =
+    "!#$%'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+
+/// Every control name the texts in `value` name through `{$name ? a : b}`.
+fn references(value: &SchemaValue, out: &mut BTreeSet<String>) {
+    match value {
+        SchemaValue::String(s) => out.extend(template_refs(s).unwrap_or_default()),
+        SchemaValue::Array(items) => items.iter().for_each(|v| references(v, out)),
+        SchemaValue::Object(fields) => fields.iter().for_each(|(_, v)| references(v, out)),
+        SchemaValue::Null | SchemaValue::Bool(_) | SchemaValue::Number(_) => {}
+    }
+}
+
 /// A `Files` leaf: a value map, or a ComboBox option's literal.
 enum Leaf {
     Map(ValueMap),
@@ -1187,13 +1224,14 @@ fn collect_leaves(
                 off: side("false"),
             })
         }
-        (SchemaValue::String(s), Leaves::Value) if s == "$value" => Leaf::Map(ValueMap::Value),
+        (SchemaValue::String(s), Leaves::Value | Leaves::Text) if s == "$value" => {
+            Leaf::Map(ValueMap::Value)
+        }
         (SchemaValue::String(s), Leaves::Literal) if !s.contains('$') => Leaf::Literal(s.clone()),
-        (SchemaValue::String(s), Leaves::Text) if s == "$value" => Leaf::Map(ValueMap::Value),
-        // Other words around one `$value` make a template; any other `$` or a brace is a
-        // reference this build does not resolve.
-        (SchemaValue::String(s), Leaves::Text)
-            if s.matches('$').count() == 1 && s.contains("$value") && !s.contains(['{', '}']) =>
+        // Other words around `$value`, or `{$name ? a : b}` naming a switch, make a template;
+        // any other `$` or brace is left out.
+        (SchemaValue::String(s), Leaves::Value | Leaves::Text)
+            if s.contains('$') && template_refs(s).is_some() =>
         {
             Leaf::Map(ValueMap::Template(s.clone()))
         }
