@@ -119,6 +119,8 @@ pub struct HudsPage {
     last_failure: Option<SharedString>,
     /// Store HUDs' screenshot URLs by folder, resolved off-thread with the HUD list.
     image_urls: Rc<HashMap<String, String>>,
+    /// Store HUDs' own web pages by folder, resolved with the screenshot URLs.
+    page_urls: Rc<HashMap<String, String>>,
     /// The grid's last drawn range, as indices into the filtered HUDs.
     visible: Range<usize>,
     /// A screenshot's gallery read is running; further screenshot clicks are ignored.
@@ -209,6 +211,7 @@ impl HudsPage {
             loads_in_flight: 0,
             last_failure: None,
             image_urls: Rc::default(),
+            page_urls: Rc::default(),
             visible: 0..0,
             gallery_pending: false,
             search,
@@ -267,7 +270,7 @@ impl HudsPage {
                 .map(|t| s.library.hud_status(&t).map(|st| (t.custom_dir(), st)))
                 .transpose()
                 .map_err(failed)?;
-            let urls = image_urls(s, &huds);
+            let urls = store_links(s, &huds);
             // A HUD whose check fails offers no Edit; opening it would fail the same way.
             let made: HashSet<String> = huds
                 .iter()
@@ -303,7 +306,7 @@ impl HudsPage {
                             page.copies = Rc::new(copies.clone());
                             page.check_updates(generation, cx);
                             page.status = status.clone();
-                            page.set_image_urls(urls.clone(), cx);
+                            page.set_store_links(urls.clone(), cx);
                             page.last_failure = None;
                             // The first sight of the one active HUD checks its fonts, once per
                             // folder per session; an install or profile apply has claimed its own.
@@ -390,24 +393,25 @@ impl HudsPage {
         .detach();
     }
 
-    // The preloaded library skips the load, so its screenshot URLs resolve on their own.
+    // The preloaded library skips the load, so its screenshot and page URLs resolve on their own.
     fn resolve_image_urls(&mut self, cx: &mut Context<Self>) {
         let huds = self.huds.to_vec();
         let generation = self.load_generation;
-        let resolving = run_blocking(cx, move |s| Ok(image_urls(s, &huds)));
+        let resolving = run_blocking(cx, move |s| Ok(store_links(s, &huds)));
         cx.spawn(async move |page, cx| {
             let Ok(urls) = resolving.await else { return };
             let _ = page.update(cx, |page, cx| {
                 if page.load_generation == generation {
-                    page.set_image_urls(urls, cx);
+                    page.set_store_links(urls, cx);
                 }
             });
         })
         .detach();
     }
 
-    fn set_image_urls(&mut self, urls: HashMap<String, String>, cx: &mut Context<Self>) {
-        self.image_urls = Rc::new(urls);
+    fn set_store_links(&mut self, links: StoreLinks, cx: &mut Context<Self>) {
+        self.image_urls = Rc::new(links.images);
+        self.page_urls = Rc::new(links.pages);
         self.grid.rearm();
         self.want_images(cx);
     }
@@ -1116,16 +1120,45 @@ fn store_row(s: &Services, provenance: &Provenance) -> Option<StoreItem> {
     s.store.store_item(kind, &id).ok().flatten()
 }
 
-// Each store HUD's card thumbnail from its cached store row, by folder. A HUD without a row
-// or a URL is left out and keeps its placeholder.
-fn image_urls(s: &Services, huds: &[HudEntry]) -> HashMap<String, String> {
-    huds.iter()
-        .filter_map(|hud| {
-            let item = store_row(s, hud.provenance())?;
-            let url = item.thumbnail_url()?.to_owned();
-            Some((hud.folder_name().to_owned(), url))
-        })
-        .collect()
+/// Store HUDs' web addresses by library folder, read from their cached store rows.
+#[derive(Debug, Clone, Default)]
+struct StoreLinks {
+    /// Card thumbnails; a HUD without one keeps its placeholder.
+    images: HashMap<String, String>,
+    /// The HUD's own page: a curated HUD's repository, a GameBanana HUD's GameBanana page.
+    pages: HashMap<String, String>,
+}
+
+// Each store HUD's thumbnail and page. A GameBanana id always names a page, even before the
+// store has synced its row; a curated HUD's repository is known only from its row.
+fn store_links(s: &Services, huds: &[HudEntry]) -> StoreLinks {
+    let mut links = StoreLinks::default();
+    for hud in huds {
+        let item = store_row(s, hud.provenance());
+        let folder = hud.folder_name().to_owned();
+        if let Some(url) = item.as_ref().and_then(StoreItem::thumbnail_url) {
+            links.images.insert(folder.clone(), url.to_owned());
+        }
+        let page = match hud.provenance() {
+            Provenance::Curated { .. } => {
+                item.as_ref().and_then(StoreItem::repo).map(str::to_owned)
+            }
+            Provenance::GameBanana { gb_id, .. } => Some(
+                item.as_ref()
+                    .map(StoreItem::profile_url)
+                    .filter(|url| !url.is_empty())
+                    .map_or_else(
+                        || format!("https://gamebanana.com/mods/{}", gb_id.get()),
+                        str::to_owned,
+                    ),
+            ),
+            _ => None,
+        };
+        if let Some(page) = page.filter(|url| !url.is_empty()) {
+            links.pages.insert(folder, page);
+        }
+    }
+    links
 }
 
 impl HudsPage {
@@ -1213,6 +1246,8 @@ struct CardState<'a> {
     copy: Option<(&'a String, Option<&'a CopyUpdate>)>,
     /// An unedited store HUD whose store version is newer.
     behind_store: bool,
+    /// The HUD's own web page, where its author posts help and updates.
+    page_url: Option<&'a String>,
 }
 
 // v5's HudCard: name, author and source badge, then delete and Install bottom right.
@@ -1229,6 +1264,7 @@ fn hud_card(
         made,
         copy,
         behind_store,
+        page_url,
     } = state;
     let theme = cx.theme();
     let has_tf2 = tf2_state(cx).read(cx).install().is_some();
@@ -1348,12 +1384,27 @@ fn hud_card(
                         .children(store_note)
                         .children(update_mark),
                 )
-                .child(badge_of(
-                    ids::hud_badge(folder),
-                    badge,
-                    transparent_black(),
-                    text,
-                )),
+                // The page link sits by the badge, since the action row is full on a narrow card.
+                .child(
+                    h_flex()
+                        .flex_none()
+                        .items_start()
+                        .gap_1()
+                        .children(page_url.cloned().map(|url| {
+                            Button::new(ids::hud_visit(folder))
+                                .ghost()
+                                .xsmall()
+                                .icon(IconName::ExternalLink)
+                                .named("Visit page")
+                                .on_click(move |_, _, cx| cx.open_url(&url))
+                        }))
+                        .child(badge_of(
+                            ids::hud_badge(folder),
+                            badge,
+                            transparent_black(),
+                            text,
+                        )),
+                ),
         )
         .child(
             h_flex()
@@ -1490,9 +1541,10 @@ impl HudsPage {
                 image + CARD_TEXT_HEIGHT + note
             };
             let (busy, page) = (self.busy.clone(), cx.entity().downgrade());
-            let (huds, urls, made, copies, updates, behind) = (
+            let (huds, urls, pages, made, copies, updates, behind) = (
                 self.huds.clone(),
                 self.image_urls.clone(),
+                self.page_urls.clone(),
                 self.made.clone(),
                 self.copies.clone(),
                 self.updates.clone(),
@@ -1508,6 +1560,7 @@ impl HudsPage {
                             made: made.contains(folder),
                             copy: (copies.get(folder)).map(|base| (base, updates.get(folder))),
                             behind_store: behind.contains(folder),
+                            page_url: pages.get(folder),
                         };
                         hud_card(hud, state, busy.as_ref(), &page, cx)
                     }),

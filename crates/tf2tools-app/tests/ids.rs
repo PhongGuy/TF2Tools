@@ -44,6 +44,7 @@ fn keyed_ids_carry_the_stable_key() {
         name(ids::hud_update_mark("budhud")),
         "hud-update-mark:budhud"
     );
+    assert_eq!(name(ids::hud_visit("budhud")), "hud-visit:budhud");
     assert_eq!(
         name(ids::hud_installed_name("budhud")),
         "hud-installed-name:budhud"

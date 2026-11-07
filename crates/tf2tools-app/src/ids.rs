@@ -1141,6 +1141,11 @@ pub fn hud_update(folder: &str) -> ElementId {
     keyed("hud-update", folder)
 }
 
+/// A store HUD card's "Visit page" button, opening the HUD's own page in the browser.
+pub fn hud_visit(folder: &str) -> ElementId {
+    keyed("hud-visit", folder)
+}
+
 /// An unedited store HUD's "Update available" line, shown when the store has a newer version.
 pub fn hud_update_mark(folder: &str) -> ElementId {
     keyed("hud-update-mark", folder)
