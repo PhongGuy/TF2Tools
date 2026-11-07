@@ -863,6 +863,105 @@ impl Library {
         }
     }
 
+    /// Clears the assignments of every script in `weapon_scripts` in one transaction, so those
+    /// weapons go back to the game's own crosshair on the next `apply_crosshairs`. Clears the
+    /// active profile when a row went. A bad name (`InvalidWeaponScript`) fails before anything
+    /// is cleared; weapons without an assignment are ignored.
+    pub fn unassign_many(&self, weapon_scripts: &[&str]) -> Result<(), LibraryError> {
+        if let Some(bad) = weapon_scripts.iter().find(|s| !is_weapon_script(s)) {
+            return Err(LibraryError::InvalidWeaponScript {
+                name: (*bad).to_owned(),
+            });
+        }
+        if weapon_scripts.is_empty() {
+            return Ok(());
+        }
+        self.db
+            .write(|conn| {
+                let tx = conn.transaction()?;
+                let mut removed = 0;
+                for weapon_script in weapon_scripts {
+                    removed += tx.execute(
+                        "DELETE FROM crosshair_assignments WHERE weapon_script = ?1",
+                        [*weapon_script],
+                    )?;
+                }
+                if removed > 0 {
+                    save_setting(&tx, "active_profile_id", "")?;
+                }
+                tx.commit()
+            })
+            .map_err(library_db)
+    }
+
+    /// The weapon scripts, sorted, that `apply_crosshairs` would change in the game: a row it
+    /// would write whose installed script or texture differs, and an installed script it would
+    /// remove. Rows it would skip never count. Reads only; nothing in `tf/custom` changes.
+    pub fn crosshairs_not_in_game(
+        &self,
+        tf2: &Tf2Install,
+        builtins: &BuiltinCrosshairs,
+    ) -> Result<Vec<String>, LibraryError> {
+        let rows: Vec<(String, String, String)> = self
+            .db
+            .read(|conn| {
+                let mut stmt = conn.prepare(
+                    "SELECT weapon_script, crosshair_source, crosshair_ref
+                     FROM crosshair_assignments ORDER BY weapon_script",
+                )?;
+                stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+                    .collect()
+            })
+            .map_err(library_db)?;
+        // Judge each row as apply does, then compare the script apply would write, byte for
+        // byte, with the one in the managed folder, and check its texture is beside it.
+        let base = tf2.custom_dir().join(MANAGED_DIR);
+        let scripts = base.join("scripts");
+        let materials = base.join(MATERIALS_DIR);
+        let stock = StockScripts::open(tf2);
+        let mut written = HashSet::new();
+        let mut waiting = Vec::new();
+        for (weapon_script, source, reference) in rows {
+            let resolvable = is_weapon_script(&weapon_script)
+                && match source.as_str() {
+                    SOURCE_BUILTIN => builtins.get(&reference).is_some(),
+                    SOURCE_LIBRARY => self.library_crosshair_files(&reference).is_some(),
+                    _ => false,
+                };
+            let Some(script) = resolvable
+                .then(|| stock.patched(&weapon_script, &reference))
+                .flatten()
+            else {
+                continue;
+            };
+            let path = scripts.join(format!("{weapon_script}.txt"));
+            let texture = materials.join(format!("{}.vtf", templates::texture_name(&reference)));
+            let installed = std::fs::read(&path).ok();
+            if installed.as_deref() != Some(script.as_slice()) || !texture.is_file() {
+                waiting.push(weapon_script.clone());
+            }
+            written.insert(weapon_script);
+        }
+        let entries = match std::fs::read_dir(&scripts) {
+            Ok(entries) => entries.collect::<Result<Vec<_>, _>>(),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+            Err(e) => Err(e),
+        }
+        .map_err(|e| LibraryError::from(io_at(&scripts)(e)))?;
+        for entry in entries {
+            let path = entry.path();
+            let stem = path.file_stem().map(|s| s.to_string_lossy().into_owned());
+            if let Some(stem) = stem.filter(|_| is_weapon_script_file(&path))
+                && !written.contains(&stem)
+            {
+                waiting.push(stem);
+            }
+        }
+        waiting.sort();
+        waiting.dedup();
+        Ok(waiting)
+    }
+
     /// Rebuilds `tf/custom/tf2tools-crosshairs/` from the assignment table: the folder is
     /// removed, then written with each applicable crosshair's VTF and VMT and one weapon
     /// script per assignment, files named by `templates::texture_name`. Each script is the
