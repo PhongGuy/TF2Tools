@@ -307,7 +307,7 @@ fn listing_errors_read_as_player_advice() {
         );
     }
     assert_eq!(
-        listing_stopped("join error"),
+        listing_stopped("join error".to_owned()),
         StoreFailure::new(
             "Loading the files stopped before it finished. Try again.",
             "join error"
@@ -320,7 +320,7 @@ fn no_listing_message_carries_a_url_status_or_error_text() {
     for (kind, err, _) in files_cases() {
         support::assert_plain(&describe_files(kind, &err).message);
     }
-    support::assert_plain(&listing_stopped("join error").message);
+    support::assert_plain(&listing_stopped("join error".to_owned()).message);
 }
 
 const PV_URL: &str = "https://sounds.gamebanana.com/preview/7.mp3";
@@ -387,7 +387,7 @@ fn preview_errors_read_as_player_advice() {
         )
     );
     assert_eq!(
-        preview_unavailable("store database error: locked"),
+        preview_unavailable("store database error: locked".to_owned()),
         StoreFailure::new(
             "Couldn't play this preview. Try again later.",
             "store database error: locked"
@@ -401,7 +401,7 @@ fn no_preview_message_carries_a_url_status_or_error_text() {
         support::assert_plain(&describe_preview(&err).message);
     }
     support::assert_plain(&preview_gone(GbId::new(99)).message);
-    support::assert_plain(&preview_unavailable("x").message);
+    support::assert_plain(&preview_unavailable("x".to_owned()).message);
 }
 
 const READ: &str = "TF2Tools couldn't read the store. Restart TF2Tools and try again.";

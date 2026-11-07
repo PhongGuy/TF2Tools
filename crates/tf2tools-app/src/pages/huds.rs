@@ -435,7 +435,7 @@ impl HudsPage {
         let keys: Vec<ImageKey> = shown[self.visible.start.min(end)..end]
             .iter()
             .filter_map(|&ix| self.image_urls.get(self.huds[ix].folder_name()))
-            .map(|url| ImageKey::card(url.clone()))
+            .map(|url| ImageKey::card(url))
             .collect();
         images.update(cx, |images, cx| images.want(&self.image_viewer, keys, cx));
     }

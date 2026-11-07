@@ -60,7 +60,7 @@ pub fn describe_download(kind: StoreKind, err: &DownloadError) -> StoreFailure {
 }
 
 /// A download task that ended without an outcome, keeping `detail` for the log.
-pub fn download_stopped(detail: impl Into<String>) -> StoreFailure {
+pub fn download_stopped(detail: &str) -> StoreFailure {
     StoreFailure::new(DL_STOPPED, detail)
 }
 
@@ -137,7 +137,7 @@ pub fn describe_files(kind: StoreKind, err: &FilesError) -> StoreFailure {
 }
 
 /// A listing task that ended without an outcome, keeping `detail` for the log.
-pub fn listing_stopped(detail: impl Into<String>) -> StoreFailure {
+pub fn listing_stopped(detail: String) -> StoreFailure {
     StoreFailure::new(FILES_STOPPED, detail)
 }
 
@@ -172,7 +172,7 @@ pub fn preview_gone(id: GbId) -> StoreFailure {
 }
 
 /// The row read or the fetch task failed without a `PreviewError`, keeping `detail` for the log.
-pub fn preview_unavailable(detail: impl Into<String>) -> StoreFailure {
+pub fn preview_unavailable(detail: String) -> StoreFailure {
     StoreFailure::new(PV_UNAVAILABLE, detail)
 }
 

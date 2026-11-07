@@ -104,7 +104,7 @@ fn the_image_notes_read_the_image_cache_stats(cx: &mut TestAppContext) {
     let images = cx.update(|cx| {
         RemoteImages::install_with(cx, support::thumbnail_fetch(), IMAGE_BUDGET, decode_image)
     });
-    let keys = (1..=3).map(|i| ImageKey::card(format!("u/{i}"))).collect();
+    let keys = (1..=3).map(|i| ImageKey::card(&format!("u/{i}"))).collect();
     cx.update(|cx| images.update(cx, |i, cx| i.want("grid", keys, cx)));
     support::wait_real(cx, "three decodes", |cx| {
         cx.update(|cx| images.read(cx).stats().decodes == 3)

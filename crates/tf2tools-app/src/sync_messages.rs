@@ -53,7 +53,7 @@ pub fn describe_sync(kind: StoreKind, err: &SyncError) -> SyncFailure {
 }
 
 /// A sync whose task ended without an outcome, keeping `detail` for the log.
-pub fn sync_stopped(detail: impl Into<String>) -> SyncFailure {
+pub fn sync_stopped(detail: String) -> SyncFailure {
     SyncFailure::new(STOPPED, detail)
 }
 

@@ -166,7 +166,7 @@ impl WeaponAssigner {
             .iter()
             .filter(|w| w.class() == self.class)
             .filter_map(|w| self.icon_urls.get(w.script_name()))
-            .map(|url| ImageKey::weapon_icon(url.clone()))
+            .map(|url| ImageKey::weapon_icon(url))
             .collect();
         let viewer = icon_viewer(cx.entity_id());
         images.update(cx, |images, cx| images.want(&viewer, keys, cx));
@@ -384,7 +384,7 @@ impl WeaponAssigner {
                 .images
                 .as_ref()
                 .zip(self.icon_urls.get(script))
-                .map(|(i, u)| i.read(cx).image(&ImageKey::weapon_icon(u.clone())));
+                .map(|(i, u)| i.read(cx).image(&ImageKey::weapon_icon(u)));
             // One fixed box either way, so a row keeps its height as its icon lands.
             let slot = div().flex_none().w(px(36.)).h(px(28.));
             match ready {

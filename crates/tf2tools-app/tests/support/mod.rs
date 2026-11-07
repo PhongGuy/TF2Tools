@@ -675,7 +675,7 @@ pub fn fake_runner() -> (SyncRunner, std::sync::mpsc::Receiver<FakeRun>) {
         });
         Box::pin(async move {
             done.await
-                .unwrap_or_else(|_| Err(sync_stopped("the test dropped the run")))
+                .unwrap_or_else(|_| Err(sync_stopped("the test dropped the run".to_owned())))
         })
     });
     (runner, rx)

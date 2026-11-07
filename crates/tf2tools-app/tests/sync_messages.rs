@@ -130,7 +130,7 @@ fn no_message_carries_a_url_status_or_error_text() {
         .iter()
         .map(|(k, e, _)| describe_sync(*k, e).message)
         .collect();
-    messages.push(sync_stopped("the sync stopped: task 7 panicked").message);
+    messages.push(sync_stopped("the sync stopped: task 7 panicked".to_owned()).message);
     for message in messages {
         let lower = message.to_lowercase();
         for banned in [
@@ -151,7 +151,7 @@ fn no_message_carries_a_url_status_or_error_text() {
 #[test]
 fn a_stopped_sync_keeps_its_detail() {
     assert_eq!(
-        sync_stopped("the sync stopped: task 7 panicked"),
+        sync_stopped("the sync stopped: task 7 panicked".to_owned()),
         SyncFailure::new(STOPPED, "the sync stopped: task 7 panicked")
     );
 }

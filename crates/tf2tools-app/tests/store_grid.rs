@@ -250,8 +250,7 @@ fn a_dropped_grid_hands_back_its_thumbnail_wants(cx: &mut TestAppContext) {
         .lock()
         .unwrap()
         .iter()
-        .cloned()
-        .map(ImageKey::card)
+        .map(|url| ImageKey::card(url))
         .collect();
     gate.add_permits(1_000);
     support::wait_real(cx, "the held fetches to fail", |cx| {

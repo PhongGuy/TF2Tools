@@ -48,25 +48,25 @@ pub struct ImageKey {
 
 impl ImageKey {
     /// The URL decoded for a store card.
-    pub fn card(url: impl Into<String>) -> Self {
+    pub fn card(url: &str) -> Self {
         Self {
-            url: url.into(),
+            url: url.to_owned(),
             target: ImageTarget::Card,
         }
     }
 
     /// The URL decoded for the carousel.
-    pub fn carousel(url: impl Into<String>) -> Self {
+    pub fn carousel(url: &str) -> Self {
         Self {
-            url: url.into(),
+            url: url.to_owned(),
             target: ImageTarget::Carousel,
         }
     }
 
     /// The URL decoded for a weapon row.
-    pub fn weapon_icon(url: impl Into<String>) -> Self {
+    pub fn weapon_icon(url: &str) -> Self {
         Self {
-            url: url.into(),
+            url: url.to_owned(),
             target: ImageTarget::WeaponIcon,
         }
     }

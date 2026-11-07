@@ -285,7 +285,7 @@ impl CuratedTab {
         let start = self.visible.start.min(end);
         let keys: Vec<ImageKey> = self.shown[start..end]
             .iter()
-            .filter_map(|&ix| self.huds[ix].images.first().cloned().map(ImageKey::card))
+            .filter_map(|&ix| self.huds[ix].images.first().map(|url| ImageKey::card(url)))
             .collect();
         images.update(cx, |images, cx| images.want(&self.viewer, keys, cx));
     }
@@ -552,7 +552,7 @@ fn curated_card(hud: &CuratedHud, downloaded: bool, cx: &App) -> AnyElement {
         .images
         .first()
         .zip(RemoteImages::global(cx))
-        .map(|(url, images)| images.read(cx).image(&ImageKey::card(url.clone())));
+        .map(|(url, images)| images.read(cx).image(&ImageKey::card(url)));
     let shot = match image {
         Some(RemoteImage::Ready(image)) => {
             shot.child(img(image).size_full().object_fit(ObjectFit::Cover))

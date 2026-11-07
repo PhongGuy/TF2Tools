@@ -73,6 +73,6 @@ pub fn describe_map_remove(err: &MapRemoveError) -> StoreFailure {
 }
 
 /// A map task that ended without an outcome, keeping `detail` for the log.
-pub fn map_stopped(detail: impl Into<String>) -> StoreFailure {
+pub fn map_stopped(detail: String) -> StoreFailure {
     StoreFailure::new(STOPPED, detail)
 }
