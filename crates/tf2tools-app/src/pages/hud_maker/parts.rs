@@ -1,16 +1,18 @@
 //! The parts panel's list: one fixed-height row per part, in model order, indented by depth.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 use std::rc::Rc;
 
-use gpui_kit::component::ActiveTheme as _;
+use gpui_kit::assets::IconName;
+use gpui_kit::component::input::Input;
+use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, Context, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, Window, canvas,
-    div, px, uniform_list,
+    AnyElement, Context, Hsla, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
+    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity,
+    Window, canvas, div, px, uniform_list,
 };
 use tf2tools_core::{HudModel, PanelRule, Part, PartKey};
 
@@ -25,8 +27,12 @@ const INDENT: f32 = 12.;
 const ROW_END: f32 = 16. + 4.;
 // The list's tallest; a shorter area shrinks it, since `uniform_list` needs a definite height.
 pub(super) const LIST_HEIGHT: f32 = 480.;
-// The open panel's height beyond its title and list.
-pub(super) const LIST_PADDING: f32 = 8.;
+// The filter box over the list, with the gap under it.
+const FILTER_HEIGHT: f32 = 32.;
+// The open panel's height beyond its title and list: the inset and the filter box.
+pub(super) const LIST_PADDING: f32 = 8. + FILTER_HEIGHT;
+// The fold arrow and the eye are squares this wide.
+const CONTROL: f32 = 20.;
 // A row's state beside the name: the game hides the part in the preview's situation, or the
 // HUD or the player does.
 const SHOWS_IN_GAME: &str = "shows in game";
@@ -37,10 +43,24 @@ impl HudMakerPage {
     // the panel's width: a long name is cut short of its state tag, so nothing scrolls sideways.
     // Docked, the list fills its panel; floating, it is LIST_HEIGHT, shrunk by a short area.
     pub(super) fn part_list(&mut self, docked: bool, cx: &mut Context<Self>) -> AnyElement {
-        let count = self.editor().map_or(0, |e| e.model().parts().len());
+        let rows = self.list_order(cx);
+        if rows.is_empty() && self.editor().is_some() {
+            let note = div()
+                .id(ids::HUD_MAKER_PARTS_NO_MATCH)
+                .test_support()
+                .p_2()
+                .text_sm()
+                .opacity(0.7)
+                .child("No parts match");
+            return match docked {
+                true => note.flex_1(),
+                false => note.h(px(LIST_HEIGHT)).flex_shrink(1.),
+            }
+            .into_any_element();
+        }
         let list = uniform_list(
             ids::HUD_MAKER_PARTS,
-            count,
+            rows.len(),
             cx.processor(|page, range, window, cx| page.part_rows(range, window, cx)),
         )
         .track_scroll(&self.parts_scroll)
@@ -52,6 +72,62 @@ impl HudMakerPage {
             false => list.h(px(LIST_HEIGHT)).flex_shrink(1.),
         }
         .into_any_element()
+    }
+
+    // The filter box over the list; its height is part of LIST_PADDING.
+    pub(super) fn parts_filter_box(&self) -> AnyElement {
+        div()
+            .id(ids::HUD_MAKER_PARTS_FILTER)
+            .test_support()
+            .flex_none()
+            .h(px(FILTER_HEIGHT))
+            .pb_1()
+            .child(
+                Input::new(&self.parts_filter)
+                    .small()
+                    .cleanable(true)
+                    .prefix(Icon::new(IconName::Search).small()),
+            )
+            .into_any_element()
+    }
+
+    /// The model rows the list shows, in model order. A filter keeps the parts whose name holds
+    /// it, ignoring case, with every group above them, and ignores folds; without one, the
+    /// parts inside a folded group are left out.
+    pub(super) fn list_order(&mut self, cx: &Context<Self>) -> Rc<[usize]> {
+        let query = self.parts_filter.read(cx).value().trim().to_lowercase();
+        let mut names = std::mem::take(&mut self.filter_names);
+        let rows: Rc<[usize]> = match self.editor() {
+            None => Rc::from([]),
+            Some(editor) => {
+                let model = editor.model();
+                let parts = model.parts();
+                if !query.is_empty() {
+                    let mut keep: HashSet<&PartKey> = HashSet::new();
+                    for part in parts {
+                        let name = names
+                            .entry(part.key().clone())
+                            .or_insert_with(|| row_label(part).to_lowercase());
+                        if name.contains(&query) {
+                            keep.insert(part.key());
+                            keep.extend(ancestors(model, part));
+                        }
+                    }
+                    (0..parts.len())
+                        .filter(|&i| keep.contains(parts[i].key()))
+                        .collect()
+                } else if self.folded.is_empty() {
+                    (0..parts.len()).collect()
+                } else {
+                    (0..parts.len())
+                        .filter(|&i| !ancestors(model, &parts[i]).any(|k| self.folded.contains(k)))
+                        .collect()
+                }
+            }
+        };
+        self.filter_names = names;
+        self.list_rows = rows.clone();
+        rows
     }
 
     fn part_rows(
@@ -73,15 +149,20 @@ impl HudMakerPage {
         let radius = theme.radius;
         let page = cx.entity().downgrade();
         let model = editor.model();
-        let rows: Vec<_> = model.parts()[range]
+        let groups: HashSet<&PartKey> = model.parts().iter().filter_map(Part::parent).collect();
+        let shown = &self.list_rows
+            [range.start.min(self.list_rows.len())..range.end.min(self.list_rows.len())];
+        let rows: Vec<_> = shown
             .iter()
+            .filter_map(|&i| model.parts().get(i))
             .map(|part| {
+                let key = part.key();
                 let hidden = editor
                     .layout()
-                    .get(part.key())
+                    .get(key)
                     .is_some_and(|b| b.hidden().is_some());
                 let by_game =
-                    super::canvas::game_hidden_root(model, editor.layout(), part.key()).is_some();
+                    super::canvas::game_hidden_root(model, editor.layout(), key).is_some();
                 let state = if by_game {
                     Some(SHOWS_IN_GAME)
                 } else if hidden {
@@ -89,20 +170,35 @@ impl HudMakerPage {
                 } else {
                     None
                 };
-                let selected = editor.selected() == Some(part.key());
                 let name = row_label(part);
                 let file = (!same_letters(&name, part.name())).then(|| part.name().to_owned());
-                (
-                    part.key().clone(),
-                    (name, file),
+                Row {
+                    key: key.clone(),
+                    name,
+                    file,
                     state,
-                    depth(model, part),
-                    selected,
-                )
+                    depth: depth(model, part),
+                    selected: editor.selected() == Some(key),
+                    group: groups.contains(key).then(|| self.folded.contains(key)),
+                    changed: editor.part_changed(key),
+                    eye: part
+                        .is_readable()
+                        .then(|| editor.part_hidden_by_player(key)),
+                }
             })
             .collect();
         rows.into_iter()
-            .map(|(key, (name, file), state, depth, selected)| {
+            .map(|row| {
+                let Row {
+                    key,
+                    name,
+                    file,
+                    state,
+                    depth,
+                    selected,
+                    ..
+                } = &row;
+                let (key, depth, selected) = (key.clone(), *depth, *selected);
                 let label = SharedString::from(match state {
                     Some(state) => format!("{name} ({state})"),
                     None => name.clone(),
@@ -113,7 +209,7 @@ impl HudMakerPage {
                 // measured), and the element name as the files spell it when the plain name
                 // hides it.
                 let cut = self.cut_names.borrow().get(&key).copied().unwrap_or(true);
-                let tip = match (cut, file) {
+                let tip = match (cut, file.clone()) {
                     (true, Some(file)) => Some(format!("{name}\n{file}")),
                     (true, None) => Some(name.clone()),
                     (false, file) => file,
@@ -136,7 +232,7 @@ impl HudMakerPage {
                         let tip = SharedString::from(tip);
                         name.tooltip(super::tip::tip(ids::HUD_MAKER_ROW_TIP, tip))
                     })
-                    .child(name)
+                    .child(name.clone())
                     .child(measure);
                 let state = state.map(|state| {
                     div()
@@ -157,6 +253,11 @@ impl HudMakerPage {
                 } else {
                     (gpui_kit::transparent_black(), fg)
                 };
+                let fold = self.fold_arrow(&key, row.group, hover, radius, cx);
+                let changed = row.changed.then(|| changed_dot(&key, text));
+                let eye = row
+                    .eye
+                    .map(|hidden| self.eye(&key, hidden, hover, radius, cx));
                 let row = div()
                     .id(ids::hud_maker_row(&key))
                     .aria_label(label.clone())
@@ -164,7 +265,7 @@ impl HudMakerPage {
                     .test_support()
                     .w_full()
                     .h(px(ROW_HEIGHT))
-                    .pl(px(8. + INDENT * depth as f32))
+                    .pl(px(4. + INDENT * depth as f32))
                     .pr(px(ROW_END))
                     .flex()
                     .items_center()
@@ -184,8 +285,11 @@ impl HudMakerPage {
                         page.select(Some(key.clone()), window, cx);
                         page.focus.focus(window, cx);
                     }))
+                    .child(fold)
                     .child(name)
-                    .children(state);
+                    .children(changed)
+                    .children(state)
+                    .children(eye);
                 if selected {
                     row.into_any_element()
                 } else {
@@ -194,6 +298,131 @@ impl HudMakerPage {
             })
             .collect()
     }
+
+    // The arrow before a group's name, or an empty slot of its width so names stay aligned.
+    // A press folds or unfolds without selecting the row.
+    fn fold_arrow(
+        &self,
+        key: &PartKey,
+        folded: Option<bool>,
+        hover: Hsla,
+        radius: Pixels,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let slot = div().flex_none().size(px(CONTROL)).mr_0p5();
+        let Some(folded) = folded else {
+            return slot.into_any_element();
+        };
+        let key = key.clone();
+        slot.id(ids::hud_maker_row_fold(&key))
+            .aria_label(if folded { "Unfold" } else { "Fold" })
+            .test_support()
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(radius)
+            .hover(|el| el.bg(hover))
+            .child(
+                Icon::new(match folded {
+                    true => IconName::ChevronRight,
+                    false => IconName::ChevronDown,
+                })
+                .small(),
+            )
+            .on_click(cx.listener(move |page, _, _, cx| {
+                cx.stop_propagation();
+                page.toggle_fold(&key, cx);
+            }))
+            .into_any_element()
+    }
+
+    // The eye at the row's end: open while the part shows, struck through once the player hid
+    // it. A press writes the "Hide this part" switch's change, one undo step, without selecting.
+    fn eye(
+        &self,
+        key: &PartKey,
+        hidden: bool,
+        hover: Hsla,
+        radius: Pixels,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let key = key.clone();
+        let words = if hidden {
+            "Show this part"
+        } else {
+            "Hide this part"
+        };
+        div()
+            .id(ids::hud_maker_row_eye(&key))
+            .aria_label(words)
+            .test_support()
+            .flex_none()
+            .ml_1()
+            .size(px(CONTROL))
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(radius)
+            .when(!hidden, |el| el.opacity(0.6))
+            .hover(|el| el.bg(hover).opacity(1.))
+            .tooltip(super::tip::tip(ids::HUD_MAKER_TIP, words))
+            .child(
+                Icon::new(match hidden {
+                    true => IconName::EyeOff,
+                    false => IconName::Eye,
+                })
+                .small(),
+            )
+            .on_click(cx.listener(move |page, _, window, cx| {
+                cx.stop_propagation();
+                page.edit_selected(window, cx, |e| {
+                    if let Err(err) = e.set_part_hidden(&key, !hidden) {
+                        tracing::debug!("the HUD Maker refused to hide {key:?}: {err:?}");
+                    }
+                });
+            }))
+            .into_any_element()
+    }
+
+    fn toggle_fold(&mut self, key: &PartKey, cx: &mut Context<Self>) {
+        if !self.folded.remove(key) {
+            self.folded.insert(key.clone());
+        }
+        cx.notify();
+    }
+}
+
+// What one list row shows, read from the editor before any element is built.
+struct Row {
+    key: PartKey,
+    name: String,
+    file: Option<String>,
+    state: Option<&'static str>,
+    depth: usize,
+    selected: bool,
+    // `Some(folded)` for a part that holds others.
+    group: Option<bool>,
+    changed: bool,
+    // `Some(hidden by the player)` for a part that can be hidden.
+    eye: Option<bool>,
+}
+
+// The small dot that marks a part differing from the starting HUD, in the row's text colour.
+fn changed_dot(key: &PartKey, colour: Hsla) -> AnyElement {
+    div()
+        .id(ids::hud_maker_row_changed(key))
+        .aria_label("Changed")
+        .test_support()
+        .flex_none()
+        .ml_2()
+        .size(px(6.))
+        .rounded_full()
+        .bg(colour)
+        .tooltip(super::tip::tip(
+            ids::HUD_MAKER_TIP,
+            "Changed from the starting HUD",
+        ))
+        .into_any_element()
 }
 
 impl HudMakerPage {
@@ -415,6 +644,11 @@ fn capitalise(word: &str) -> String {
     chars.next().map_or_else(String::new, |first| {
         first.to_uppercase().chain(chars).collect()
     })
+}
+
+// The groups `part` sits in, nearest first.
+fn ancestors<'a>(model: &'a HudModel, part: &'a Part) -> impl Iterator<Item = &'a PartKey> {
+    std::iter::successors(part.parent(), |key| model.part(key)?.parent())
 }
 
 // How many parents the part has.

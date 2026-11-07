@@ -369,7 +369,11 @@ impl HudMakerPage {
                 }
                 Panel::Parts => {
                     let list = self.part_list(docked, cx);
-                    scroll_area(ids::HUD_MAKER_PARTS_SCROLLBAR, &self.parts_scroll, list)
+                    let bar = ids::HUD_MAKER_PARTS_SCROLLBAR;
+                    let list = scroll_area(bar, &self.parts_scroll, list);
+                    fill(v_flex(), docked)
+                        .child(self.parts_filter_box())
+                        .child(fill(list, docked))
                 }
             };
             scrolled(area, docked, panel == Panel::Parts)

@@ -114,6 +114,43 @@ fn unhide_removes_the_hide_and_keeps_the_rest() {
 }
 
 #[test]
+fn a_part_hides_and_shows_by_key_as_one_step_each_and_keeps_the_selection() {
+    let mut e = editor();
+    let ammo = PartKey::new("HudWeaponAmmo");
+    e.select(Some(ammo.clone()));
+    e.set_part_hidden(&hv(), true).unwrap();
+    assert!(e.layout().get(&hv()).unwrap().hidden().is_some());
+    assert!(e.part_hidden_by_player(&hv()));
+    assert_eq!(e.selected(), Some(&ammo));
+    // The same change the "Hide this part" switch writes, so selecting HV finds it hidden.
+    e.select(Some(hv()));
+    assert!(e.hidden_by_player());
+    e.set_part_hidden(&hv(), false).unwrap();
+    assert!(!e.part_hidden_by_player(&hv()));
+    assert!(e.changes().is_empty());
+    assert!(e.undo());
+    assert!(e.part_hidden_by_player(&hv()));
+    assert!(e.undo());
+    assert!(!e.part_hidden_by_player(&hv()) && !e.can_undo());
+}
+
+#[test]
+fn a_part_counts_as_changed_only_while_it_differs_from_the_starting_hud() {
+    let mut e = selected();
+    let health = PartKey::new("HudPlayerStatus/HudPlayerHealth");
+    assert!(!e.part_changed(&hv()));
+    e.move_selected(45, 0).unwrap();
+    assert!(e.part_changed(&hv()));
+    assert!(!e.part_changed(&health), "the parent did not change");
+    assert!(e.undo());
+    assert!(!e.part_changed(&hv()), "undone is the starting HUD again");
+    e.set_part_hidden(&health, true).unwrap();
+    assert!(e.part_changed(&health));
+    assert!(e.undo());
+    assert!(!e.part_changed(&health));
+}
+
+#[test]
 fn a_new_screen_relays_out_and_keeps_the_selection() {
     let mut e = selected();
     e.set_screen(Screen::new(1280, 1024));
