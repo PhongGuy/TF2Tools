@@ -1227,8 +1227,25 @@ impl HudEditor {
 
     /// Drops every hide of the selection as one undo step; false when there was none.
     pub fn unhide_selected(&mut self) -> bool {
+        match self.selected.clone() {
+            Some(part) => self.unhide_part(&part),
+            None => false,
+        }
+    }
+
+    /// Hides or shows `part` as one undo step with the change the selection's hide writes,
+    /// keeping the selection; showing a part the player never hid records nothing.
+    pub fn set_part_hidden(&mut self, part: &PartKey, hide: bool) -> Result<(), EditRefused> {
+        if !hide {
+            self.unhide_part(part);
+            return Ok(());
+        }
+        self.edit_part(part, |m, part, group| m.hide_part(part, group), |_| true)
+    }
+
+    fn unhide_part(&mut self, part: &PartKey) -> bool {
         self.cancel_preview();
-        let groups = self.hide_groups();
+        let groups = self.model.hide_groups(part, &self.changes);
         if groups.is_empty() {
             return false;
         }
@@ -1245,6 +1262,28 @@ impl HudEditor {
     /// Whether the player hid the selection.
     pub fn hidden_by_player(&self) -> bool {
         !self.hide_groups().is_empty()
+    }
+
+    /// Whether the player hid `part`.
+    pub fn part_hidden_by_player(&self, part: &PartKey) -> bool {
+        !self.model.hide_groups(part, &self.changes).is_empty()
+    }
+
+    /// Whether `part` reads differently from the starting HUD: a setting's value differs, or
+    /// the starting HUD has no such part.
+    pub fn part_changed(&self, part: &PartKey) -> bool {
+        let Some(now) = self.model.part(part) else {
+            return false;
+        };
+        let Some(was) = self.pristine.part(part) else {
+            return true;
+        };
+        let values = |p: &Part| {
+            (p.settings().into_iter())
+                .map(|l| (l.key().to_ascii_lowercase(), l.text().to_owned()))
+                .collect::<Vec<_>>()
+        };
+        values(now) != values(was)
     }
 
     /// Whether resetting `keys` on the selection would remove a change.
@@ -1760,12 +1799,24 @@ impl HudEditor {
         build: impl FnOnce(&HudModel, &PartKey, u32) -> Result<Vec<Change>, EditRefused>,
         keep: impl FnOnce(&PartBox) -> bool,
     ) -> Result<(), EditRefused> {
+        let part = self.selected.clone().ok_or(EditRefused::UnknownPart)?;
+        self.edit_part(&part, build, keep)?;
+        self.select(Some(part));
+        Ok(())
+    }
+
+    /// As `edit_kept`, for `part` whether or not it is selected; the selection is left as is.
+    fn edit_part(
+        &mut self,
+        part: &PartKey,
+        build: impl FnOnce(&HudModel, &PartKey, u32) -> Result<Vec<Change>, EditRefused>,
+        keep: impl FnOnce(&PartBox) -> bool,
+    ) -> Result<(), EditRefused> {
         self.cancel_preview();
         self.end_drag();
         self.moment = 0.0;
-        let part = self.selected.clone().ok_or(EditRefused::UnknownPart)?;
         let group = next_group(&self.changes);
-        let added = build(&self.model, &part, group)?;
+        let added = build(&self.model, part, group)?;
         if added.is_empty() {
             return Ok(());
         }
@@ -1775,7 +1826,7 @@ impl HudEditor {
         let dropped = edited.dropped();
         let model = edited.into_model();
         let layout = model.layout_in(self.screen, &self.situation);
-        if !layout.get(&part).is_none_or(keep) {
+        if !layout.get(part).is_none_or(keep) {
             return Err(EditRefused::BadValue);
         }
         let before = std::mem::replace(&mut self.changes, next);
@@ -1783,7 +1834,6 @@ impl HudEditor {
         push_capped(&mut self.undo, step);
         self.redo.clear();
         (self.dropped, self.model, self.layout) = (dropped, model, layout);
-        self.select(Some(part));
         Ok(())
     }
 

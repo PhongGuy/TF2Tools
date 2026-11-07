@@ -457,6 +457,12 @@ pub struct HudMakerPage {
     drawn_scene: Cell<Option<Scene>>,
     // Whether each part list row's name was cut short in the last frame it drew.
     cut_names: Rc<RefCell<HashMap<PartKey, bool>>>,
+    // The part list's filter box, the groups the player folded, each part's name as the
+    // filter reads it, and the model rows the list drew last frame, in list order.
+    parts_filter: Entity<InputState>,
+    folded: HashSet<PartKey>,
+    filter_names: HashMap<PartKey, String>,
+    list_rows: Rc<[usize]>,
     // Each label's drawn text in window bounds from the last frame, kept only while a
     // hard-to-read marker shows, so the markers keep off the glyphs.
     text_bounds: Rc<RefCell<HashMap<PartKey, Bounds<Pixels>>>>,
@@ -693,6 +699,7 @@ impl HudMakerPage {
         // Enter and leaving a field commit it; a picked colour applies at once.
         let fields = Field::ALL.map(|_| cx.new(|cx| InputState::new(window, cx)));
         let colour = cx.new(|cx| ColorPickerState::new(window, cx));
+        let parts_filter = cx.new(|cx| InputState::new(window, cx).placeholder("Find a part..."));
         let mut subscriptions: Vec<Subscription> = fields
             .iter()
             .map(|input| {
@@ -703,6 +710,12 @@ impl HudMakerPage {
                 })
             })
             .collect();
+        // The list filters from the box's value as it draws, so each edit just redraws.
+        subscriptions.push(cx.subscribe(&parts_filter, |_, _, ev: &InputEvent, cx| {
+            if matches!(ev, InputEvent::Change) {
+                cx.notify();
+            }
+        }));
         subscriptions.push(cx.subscribe_in(
             &colour,
             window,
@@ -801,6 +814,10 @@ impl HudMakerPage {
             drawn_bounds: Rc::default(),
             drawn_scene: Cell::new(None),
             cut_names: Rc::default(),
+            parts_filter: parts_filter.clone(),
+            folded: HashSet::new(),
+            filter_names: HashMap::new(),
+            list_rows: Rc::from([]),
             text_bounds: Rc::default(),
             text_bounds_for: None,
             settled_for: None,
@@ -1107,6 +1124,11 @@ impl HudMakerPage {
                 self.snapshots_for = None;
                 // A new HUD's rows measure afresh, so names from the last one do not pile up.
                 self.cut_names.borrow_mut().clear();
+                // Folds and names belong to the last HUD's parts; the filter starts empty.
+                self.folded.clear();
+                self.filter_names.clear();
+                self.parts_filter
+                    .update(cx, |input, cx| input.set_value("", window, cx));
                 self.nudge_refused = None;
                 self.load = Load::Ready(Box::new(loaded));
                 self.build_sliders(window, cx);
@@ -1819,6 +1841,11 @@ impl HudMakerPage {
     }
 
     /// The side panel's number field `field`.
+    /// The box that narrows the part list by name.
+    pub fn parts_filter(&self) -> &Entity<InputState> {
+        &self.parts_filter
+    }
+
     pub fn field(&self, field: Field) -> &Entity<InputState> {
         &self.fields[field as usize]
     }
@@ -3259,9 +3286,25 @@ impl HudMakerPage {
         // list scrolls the new part's row into view only when it is out of view.
         if selected != self.shown_part {
             self.panel_scroll.set_offset(point(px(0.), px(0.)));
+            // A part chosen on the canvas inside a folded group opens the groups above it.
+            let above: Vec<PartKey> = match (&selected, self.editor().map(HudEditor::model)) {
+                (Some(key), Some(model)) => {
+                    std::iter::successors(model.part(key).and_then(|p| p.parent()), |k| {
+                        model.part(k)?.parent()
+                    })
+                    .cloned()
+                    .collect()
+                }
+                _ => Vec::new(),
+            };
+            for group in &above {
+                self.folded.remove(group);
+            }
+            let order = self.list_order(cx);
             let row = selected.as_ref().and_then(|key| {
                 let parts = self.editor()?.model().parts();
-                parts.iter().position(|p| p.key() == key)
+                let at = parts.iter().position(|p| p.key() == key)?;
+                order.iter().position(|&i| i == at)
             });
             if let Some(row) = row {
                 self.parts_scroll
