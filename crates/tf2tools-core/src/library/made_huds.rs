@@ -545,12 +545,9 @@ impl Library {
                 dropped: removed + edited.dropped(),
             });
         }
-        if id.is_some() {
-            carry_metadata(&live.join(METADATA_DIR), &build.join(METADATA_DIR))?;
-        }
-        prune_pictures(&build, edited.applied())?;
         let entry = match id {
             None => {
+                prune_pictures(&build, edited.applied())?;
                 rename(&build, &live)?;
                 let inserted = self.insert_made_row(&new_id, &folder, name);
                 if !matches!(inserted, Ok(Some(_))) {
@@ -559,6 +556,9 @@ impl Library {
                 inserted?.ok_or_else(|| name_taken_error(name))?
             }
             Some(id) => {
+                // Carry the live metadata over first so pruning keeps its snapshots' pictures.
+                carry_metadata(&live.join(METADATA_DIR), &build.join(METADATA_DIR))?;
+                prune_pictures(&build, edited.applied())?;
                 // Swap through `<folder>.old` so the previous save is never half replaced.
                 let old = old_folder(&live);
                 rename(&live, &old)?;

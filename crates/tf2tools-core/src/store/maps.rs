@@ -120,16 +120,13 @@ fn parse_row(row: &str) -> Option<CommunityMap> {
         return None;
     }
     let cells = cells(row);
-    if cells.len() < 3 {
-        return None;
-    }
-    let times_played = cells[1].replace(',', "").parse().ok()?;
     let date = |cell: &String| Some(cell.clone()).filter(|d| is_date(d));
-    let (first_played, last_played) = if cells.len() >= 5 {
-        (date(&cells[2]), date(&cells[3]))
-    } else {
-        (None, None)
+    let (played, first_played, last_played) = match cells.as_slice() {
+        [_, played, first, last, _, ..] => (played, date(first), date(last)),
+        [_, played, _, ..] => (played, None, None),
+        _ => return None,
     };
+    let times_played = played.replace(',', "").parse().ok()?;
     let link = &row[row.rfind("<a ")?..];
     let size = attribute(link, "title")?
         .strip_suffix(" bytes")?
