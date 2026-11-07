@@ -1,0 +1,74 @@
+name: Bug report
+description: Something in TF2Tools doesn't work the way it should
+title: "[Bug]: "
+labels: ["bug"]
+assignees: ["PhongGuy"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! The more you tell us, the faster we can fix it.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Describe what went wrong. Screenshots help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we make it happen?
+      description: The steps you took, one per line.
+      placeholder: |
+        1. Open the HUDs page
+        2. Click Install on ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: TF2Tools version
+      description: Shown in Settings.
+      placeholder: "6.0.2"
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: Your system
+      options:
+        - Windows
+        - Linux (AppImage)
+        - Linux (.deb)
+        - Linux (built from source)
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where in the app?
+      options:
+        - HUDs
+        - Sounds
+        - Crosshairs
+        - Profiles
+        - Addons
+        - Stores
+        - Crosshair Maker
+        - HUD Maker
+        - Maps
+        - Settings or updates
+        - Something else
+  - type: textarea
+    id: logs
+    attributes:
+      label: Activity Log or error text
+      description: Anything from the Logs page or an error message. Remove anything personal.
+      render: text

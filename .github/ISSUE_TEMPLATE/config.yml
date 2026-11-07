@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Download TF2Tools
+    url: https://github.com/PhongGuy/TF2Tools/releases/latest
+    about: Get the newest version before reporting a bug; it may already be fixed.
