@@ -3,7 +3,9 @@
 use crate::common;
 
 use common::hud_stock::{HEALTH, block, stock_files_with, with_blocks};
-use tf2tools_core::{GameText, HudModel, PartKey, Platform, Screen, wrap_lines, wrapped_text_left};
+use tf2tools_core::{
+    GameText, HudModel, PartKey, Platform, Rect, Screen, wrap_lines, wrapped_text_left,
+};
 
 const UNDER: &str = "HudPlayerStatus/HudPlayerHealth/";
 const HD: Screen = Screen::new(1920, 1080);
@@ -158,7 +160,13 @@ fn a_wrapped_labels_extent_is_its_broken_lines() {
     let widest = (lines.iter().map(|l| l.trim_end().chars().count()).max()).unwrap();
     let layout = m.layout(HD);
     let b = layout.get(&k("Tip")).unwrap();
-    let (x, y, w, h) = m
+    let Rect {
+        x,
+        y,
+        wide: w,
+        tall: h,
+        ..
+    } = m
         .text_extent(&layout, &k("Tip"), &GameText::default())
         .unwrap();
     assert_eq!((x, y), (b.x(), b.y()));
@@ -171,7 +179,9 @@ fn an_unwrapped_labels_extent_stays_one_line_clipped_to_its_box() {
     let m = with_label(LONG, &[("textAlignment", "north-west")]);
     let (wide, tall, _) = metrics(&m);
     let layout = m.layout(HD);
-    let (_, _, w, h) = m
+    let Rect {
+        wide: w, tall: h, ..
+    } = m
         .text_extent(&layout, &k("Tip"), &GameText::default())
         .unwrap();
     assert_eq!((w, h), (wide, tall));
@@ -184,7 +194,7 @@ fn wrap_off_explicitly_counts_as_unwrapped() {
     let layout = m.layout(HD);
     let h = (m.text_extent(&layout, &k("Tip"), &GameText::default()))
         .unwrap()
-        .3;
+        .tall;
     assert_eq!(h, tall);
 }
 
@@ -197,7 +207,12 @@ fn centerwrap_wraps_alone_and_centres_the_lines_in_the_box() {
     let (_, tall, _) = metrics(&m);
     let layout = m.layout(HD);
     let b = layout.get(&k("Tip")).unwrap();
-    let (x, _, w, h) = m
+    let Rect {
+        x,
+        wide: w,
+        tall: h,
+        ..
+    } = m
         .text_extent(&layout, &k("Tip"), &GameText::default())
         .unwrap();
     assert!(h > tall, "{h}");
@@ -211,7 +226,7 @@ fn plain_wrap_starts_at_the_west_edge_whatever_the_alignment() {
     let b = layout.get(&k("Tip")).unwrap();
     let x = (m.text_extent(&layout, &k("Tip"), &GameText::default()))
         .unwrap()
-        .0;
+        .x;
     assert_eq!(x, b.x());
 }
 
@@ -220,7 +235,7 @@ fn a_wrapped_block_keeps_its_vertical_alignment() {
     let m = with_label(LONG, &[("wrap", "1"), ("textAlignment", "south-west")]);
     let layout = m.layout(HD);
     let b = layout.get(&k("Tip")).unwrap();
-    let (_, y, _, h) = m
+    let Rect { y, tall: h, .. } = m
         .text_extent(&layout, &k("Tip"), &GameText::default())
         .unwrap();
     assert_eq!(y + h, b.y() + b.tall());
@@ -236,7 +251,7 @@ fn the_x_inset_narrows_the_width_the_lines_break_in() {
         let layout = m.layout(HD);
         (m.text_extent(&layout, &k("Tip"), &GameText::default()))
             .unwrap()
-            .3
+            .tall
     };
     assert_eq!(height(&plain), 2 * tall);
     let inset = with_label(
@@ -257,7 +272,7 @@ fn an_explicit_newline_counts_as_a_line_when_wrapped() {
     let layout = m.layout(HD);
     let h = (m.text_extent(&layout, &k("Tip"), &GameText::default()))
         .unwrap()
-        .3;
+        .tall;
     assert_eq!(h, 2 * tall);
 }
 

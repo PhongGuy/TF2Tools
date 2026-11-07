@@ -1,6 +1,7 @@
 //! The Stage 1 vocabulary: which HUD parts the maker offers, how a part is hidden, the
 //! engine's pin corners, and each part's panel rule.
 
+use super::Point;
 use super::probe;
 
 /// A HUD part the Stage 1 maker shows and edits.
@@ -155,9 +156,9 @@ impl PinCorner {
     }
 
     /// This corner's point inside a `wide` x `tall` box, halves rounded down.
-    pub fn point(self, wide: i32, tall: i32) -> (i32, i32) {
+    pub fn point(self, wide: i32, tall: i32) -> Point {
         let (mid_x, mid_y) = (wide / 2, tall / 2);
-        match self {
+        let (x, y) = match self {
             PinCorner::TopLeft => (0, 0),
             PinCorner::TopRight => (wide, 0),
             PinCorner::BottomLeft => (0, tall),
@@ -166,7 +167,8 @@ impl PinCorner {
             PinCorner::CenterRight => (wide, mid_y),
             PinCorner::CenterBottom => (mid_x, tall),
             PinCorner::CenterLeft => (0, mid_y),
-        }
+        };
+        Point::new(x, y)
     }
 }
 

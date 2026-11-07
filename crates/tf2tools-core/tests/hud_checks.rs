@@ -4,7 +4,7 @@ use crate::common;
 
 use common::hud_stock::{HEALTH, HUDLAYOUT, label, stock_files, stock_files_with, with_blocks};
 use tf2tools_core::{
-    GameText, HudFiles, HudModel, PartKey, Platform, Screen, ScreenCheck, ScreenProblem,
+    GameText, HudFiles, HudModel, PartKey, Platform, Rect, Screen, ScreenCheck, ScreenProblem,
 };
 
 const UNDER: &str = "HudPlayerStatus/HudPlayerHealth/";
@@ -366,7 +366,13 @@ fn a_text_label_draws_in_its_text_extent_and_a_painted_one_in_its_box() {
         .unwrap()
         .pixel_tall(HD.tall());
     let wide = (5.0 * f64::from(tall) * 0.55).ceil() as i32;
-    let (x, y, w, h) = m.text_extent(&layout, &k("Caps"), &text).unwrap();
+    let Rect {
+        x,
+        y,
+        wide: w,
+        tall: h,
+        ..
+    } = m.text_extent(&layout, &k("Caps"), &text).unwrap();
     assert_eq!((w, h), (wide, tall));
     assert_eq!(
         x + w,
@@ -377,7 +383,7 @@ fn a_text_label_draws_in_its_text_extent_and_a_painted_one_in_its_box() {
     let boxed = layout.get(&k("Boxed")).unwrap();
     assert_eq!(
         m.text_extent(&layout, &k("Boxed"), &text),
-        Some((boxed.x(), boxed.y(), boxed.wide(), boxed.tall()))
+        Some(Rect::new(boxed.x(), boxed.y(), boxed.wide(), boxed.tall()))
     );
     assert_eq!(m.text_extent(&layout, &k("Missing"), &text), None);
 }
@@ -453,7 +459,7 @@ fn a_hotkey_marker_takes_no_room_in_a_labels_text_extent() {
             + &wide_label("Drawn", "40", "Salt xx Pepper")),
     );
     let (layout, text) = (m.layout(HD), GameText::default());
-    let width = |name: &str| m.text_extent(&layout, &k(name), &text).unwrap().2;
+    let width = |name: &str| m.text_extent(&layout, &k(name), &text).unwrap().wide;
     assert_eq!(width("Marked"), width("Drawn"));
 }
 

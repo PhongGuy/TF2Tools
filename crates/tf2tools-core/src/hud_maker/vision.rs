@@ -5,7 +5,7 @@
 use super::background::paints_background;
 use super::drawn_image::scene_image;
 use super::sample::Team;
-use super::{ClassSchema, HudLayout, HudModel, Part, PartKey, PropertyKind, Rgba, Screen};
+use super::{ClassSchema, HudLayout, HudModel, Part, PartKey, PropertyKind, Rect, Rgba, Screen};
 
 /// The WCAG 2 large-text minimum; text under it is "Hard to read here".
 pub const MIN_CONTRAST: f64 = 3.0;
@@ -228,9 +228,10 @@ impl HudModel {
             .zip(layout.boxes())
             .filter(|(part, b)| part.value("labelText").is_some() && b.hidden().is_none())
             .filter(|(part, _)| {
-                let Some(area @ (x, y, wide, tall)) = layout.shown(part.key()) else {
+                let Some(area) = layout.shown(part.key()) else {
                     return false;
                 };
+                let Rect { x, y, wide, tall } = area;
                 let Some(mean) = backdrop.mean_under(screen, x, y, wide, tall) else {
                     return false;
                 };
@@ -283,23 +284,23 @@ impl HudModel {
 struct Background {
     /// The part's place in the paint order.
     rank: usize,
-    /// The screen area it shows in, as (x, y, wide, tall).
-    area: (i32, i32, i32, i32),
+    /// The screen area it shows in.
+    area: Rect,
     /// Its colour; `None` for a picture, whose pixels the core does not have.
     colour: Option<Rgba>,
 }
 
-/// Whether `top` lies over at least half of `area`; both are (x, y, wide, tall).
-fn covers_half(top: (i32, i32, i32, i32), area: (i32, i32, i32, i32)) -> bool {
+/// Whether `top` lies over at least half of `area`.
+fn covers_half(top: Rect, area: Rect) -> bool {
     let overlap = |start: i32, size: i32, other: i32, other_size: i32| {
         let end =
             (i64::from(start) + i64::from(size)).min(i64::from(other) + i64::from(other_size));
         (end - i64::from(start.max(other))).max(0)
     };
-    let wide = overlap(top.0, top.2, area.0, area.2);
-    let tall = overlap(top.1, top.3, area.1, area.3);
+    let wide = overlap(top.x, top.wide, area.x, area.wide);
+    let tall = overlap(top.y, top.tall, area.y, area.tall);
     // Two i32 sides, doubled, can pass an i64.
-    2 * i128::from(wide) * i128::from(tall) >= i128::from(area.2) * i128::from(area.3)
+    2 * i128::from(wide) * i128::from(tall) >= i128::from(area.wide) * i128::from(area.tall)
 }
 
 /// `top` drawn over the opaque `under` by `top`'s alpha, each channel rounded.

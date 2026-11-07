@@ -2,7 +2,7 @@
 //! box, and the one edge a resize handle moves. Targets are the same as core's: the screen
 //! centre and the start, centre and end of every drawn part outside the movers.
 
-use tf2tools_core::{GuideAxis, HudLayout, HudModel, PartKey, Snap};
+use tf2tools_core::{GuideAxis, HudLayout, HudModel, PartKey, Rect, Snap};
 
 /// One guide line in screen pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -96,7 +96,7 @@ pub(super) fn snap(
         }
         false
     };
-    let targets: Vec<(i32, i32, i32, i32)> = (layout.boxes().iter())
+    let targets: Vec<Rect> = (layout.boxes().iter())
         .filter(|b| b.hidden().is_none() && !moves(b.key()))
         .filter_map(|b| layout.shown(b.key()))
         .collect();
@@ -104,13 +104,13 @@ pub(super) fn snap(
     let x = nearest(
         moving.across.iter().map(|l| l + i64::from(dx)),
         i64::from(screen.wide() / 2),
-        targets.iter().flat_map(|&(x, _, w, _)| lines(x, w)),
+        targets.iter().flat_map(|r| lines(r.x, r.wide)),
         threshold,
     );
     let y = nearest(
         moving.down.iter().map(|l| l + i64::from(dy)),
         i64::from(screen.tall() / 2),
-        targets.iter().flat_map(|&(_, y, _, h)| lines(y, h)),
+        targets.iter().flat_map(|r| lines(r.y, r.tall)),
         threshold,
     );
     for (found, delta, axis) in [

@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use super::edits::code_owns;
 use super::{
     AddBlock, BlockLine, Change, ChangeTarget, CreditNote, HudFiles, HudModel, KeyLine, Part,
-    PartKey, RemoveKey, Screen, SetKey,
+    PartKey, Point, RemoveKey, Screen, SetKey,
 };
 use crate::library::HudAssets;
 
@@ -331,7 +331,7 @@ impl Run<'_> {
         }
         let position = self.detached_position(s);
         let mut keys = self.source_keys(s, position.is_some());
-        if let Some((x, y)) = position {
+        if let Some(Point { x, y }) = position {
             for (key, value) in [("xpos", x), ("ypos", y)] {
                 keys.retain(|(k, _)| !k.eq_ignore_ascii_case(key));
                 keys.push((key.to_owned(), vec![Line::Plain(value.to_string())]));
@@ -481,7 +481,7 @@ impl Run<'_> {
         }
         let position = self.detached_position(s);
         let mut keys = self.source_keys(s, position.is_some());
-        if let Some((x, y)) = position {
+        if let Some(Point { x, y }) = position {
             for (key, value) in [("xpos", x), ("ypos", y)] {
                 keys.retain(|(k, _)| !k.eq_ignore_ascii_case(key));
                 keys.push((key.to_owned(), vec![Line::Plain(value.to_string())]));
@@ -567,7 +567,7 @@ impl Run<'_> {
     /// For the borrowed part itself, when it is pinned to a sibling the player's HUD lacks: its
     /// position relative to its parent as the source draws it, in 480-high units. `None` when
     /// the pin can stay (or there is none); an unresolvable pin is counted and just dropped.
-    fn detached_position(&mut self, s: &Part) -> Option<(i32, i32)> {
+    fn detached_position(&mut self, s: &Part) -> Option<Point> {
         if s.key() != self.root {
             return None;
         }
@@ -595,7 +595,7 @@ impl Run<'_> {
             Some(up) => (here.x() - up.x(), here.y() - up.y()),
             None => (here.x(), here.y()),
         };
-        Some((
+        Some(Point::new(
             px_to_units(px, READ_AT.tall()),
             px_to_units(py, READ_AT.tall()),
         ))

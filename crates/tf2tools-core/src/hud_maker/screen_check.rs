@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use super::text_wrap::{wrap_lines, wrapped_text_left};
-use super::{ALIGNMENTS, GameText, HiddenBy, HudLayout, HudModel, PartKey, Screen};
+use super::{ALIGNMENTS, GameText, HiddenBy, HudLayout, HudModel, PartKey, Point, Rect, Screen};
 
 /// The keys whose presence makes a part paint something.
 const PAINTS: [&str; 4] = ["labelText", "image", "bgcolor_override", "fillcolor"];
@@ -210,7 +210,7 @@ impl HudModel {
             .map(|&screen| {
                 let layout = self.layout(screen);
                 let boxes = layout.boxes();
-                let rects: Vec<Rect> = boxes.iter().map(rect).collect();
+                let rects: Vec<Edges> = boxes.iter().map(rect).collect();
                 let (sw, sh) = (i64::from(screen.wide()), i64::from(screen.tall()));
                 let drawn: Vec<usize> = (0..boxes.len())
                     .filter(|&i| painted[i] && boxes[i].hidden().is_none())
@@ -241,15 +241,10 @@ impl HudModel {
 }
 
 impl HudModel {
-    /// The area `key` draws in `layout` as (x, y, wide, tall) screen pixels: a label that paints
+    /// The area `key` draws in `layout` in screen pixels: a label that paints
     /// nothing but text covers its text's estimated extent, any other part its whole box.
     /// `None` when `layout` has no box for `key`.
-    pub fn text_extent(
-        &self,
-        layout: &HudLayout,
-        key: &PartKey,
-        text: &GameText,
-    ) -> Option<(i32, i32, i32, i32)> {
+    pub fn text_extent(&self, layout: &HudLayout, key: &PartKey, text: &GameText) -> Option<Rect> {
         let b = layout.get(key)?;
         let part = self.part(key)?;
         let sample = self.scene_rule().sample();
@@ -259,28 +254,28 @@ impl HudModel {
         };
         // Clipped to the box, so each side fits an i32 as the box's own does.
         let side = |v: i64| i32::try_from(v).unwrap_or(i32::MAX);
-        Some((side(l), side(t), side(r - l), side(bottom - t)))
+        Some(Rect::new(side(l), side(t), side(r - l), side(bottom - t)))
     }
 
     /// The text inset of the part at `key` as (x, y) screen pixels: `textinsetx` and
     /// `textinsety`, scaled from proportional units when `use_proportional_insets` is on (y is
     /// read as a decimal and rounded up). The x inset moves text in from the side it is aligned
     /// to, west or east; the y inset moves text down whatever its alignment.
-    pub fn text_inset(&self, key: &PartKey, screen: Screen) -> (i32, i32) {
+    pub fn text_inset(&self, key: &PartKey, screen: Screen) -> Point {
         let Some(part) = self.part(key) else {
-            return (0, 0);
+            return Point::default();
         };
         let bytes = |k: &str| part.value(k).map(|v| v.text().as_bytes());
         let int = |k: &str| bytes(k).map_or(0, super::expr::atoi);
         let (x, y) = (int("textinsetx"), int("textinsety"));
         if int("use_proportional_insets") <= 0 {
-            return (x, y);
+            return Point::new(x, y);
         }
         let scale = super::ScreenScale::new(screen.tall());
         let y = bytes("textinsety").map_or(0., super::expr::atof);
         // A float to int cast saturates, so a huge inset stays in range.
         let y = (f64::from(y) * f64::from(scale.scale(1000)) / 1000.).ceil() as i32;
-        (scale.scale(x), y)
+        Point::new(scale.scale(x), y)
     }
 
     /// Where a label's `text` lands, estimated from its font's height and placed by its
@@ -292,7 +287,7 @@ impl HudModel {
         b: &super::PartBox,
         text: &str,
         screen: Screen,
-    ) -> Rect {
+    ) -> Edges {
         let (l, t, r, bottom) = rect(b);
         let font = (part.value("font"))
             .and_then(|f| self.scheme().font(f.text(), screen.tall()))
@@ -300,8 +295,8 @@ impl HudModel {
         // An unknown font draws at 60 % of the box, as the preview does.
         let tall = font.unwrap_or((bottom - t) * 3 / 5);
         let glyph = tall as f64 * GLYPH_WIDTH;
-        let (inset_x, iy) = self.text_inset(part.key(), screen);
-        let (ix, iy) = (i64::from(inset_x), i64::from(iy));
+        let inset = self.text_inset(part.key(), screen);
+        let (ix, iy) = (i64::from(inset.x), i64::from(inset.y));
         let centre_lines = switched_on(part, "centerwrap");
         let wrapped = centre_lines || switched_on(part, "wrap");
         let lines: Vec<&str> = if wrapped {
@@ -331,7 +326,7 @@ impl HudModel {
                 } else {
                     0
                 };
-                l.saturating_add(i64::from(wrapped_text_left(column, inset_x)))
+                l.saturating_add(i64::from(wrapped_text_left(column, inset.x)))
                     .saturating_add(indent)
             }
             0 => l.saturating_add(ix),
@@ -383,13 +378,13 @@ fn switched_on(part: &super::Part, key: &str) -> bool {
 }
 
 /// A box as (left, top, right, bottom) in `i64`, so huge boxes never overflow.
-type Rect = (i64, i64, i64, i64);
+type Edges = (i64, i64, i64, i64);
 
 /// The overlapping pairs among `drawn`, neither under the other, sorted; `None` past
 /// `MAX_PAIRS`. A sweep by left edge compares only boxes whose x-ranges meet.
 fn overlapping(
     drawn: &[usize],
-    rects: &[Rect],
+    rects: &[Edges],
     parents: &[Option<usize>],
 ) -> Option<Vec<(usize, usize)>> {
     let mut order = drawn.to_vec();
@@ -444,16 +439,16 @@ fn sorted(parts: &[super::Part], a: usize, b: usize) -> (PartKey, PartKey) {
     (a.clone(), b.clone())
 }
 
-fn rect(b: &super::PartBox) -> Rect {
+fn rect(b: &super::PartBox) -> Edges {
     let (x, y) = (i64::from(b.x()), i64::from(b.y()));
     (x, y, x + i64::from(b.wide()), y + i64::from(b.tall()))
 }
 
-fn inside((l, t, r, b): Rect, sw: i64, sh: i64) -> bool {
+fn inside((l, t, r, b): Edges, sw: i64, sh: i64) -> bool {
     l >= 0 && t >= 0 && r <= sw && b <= sh
 }
 
 /// Strict overlap: touching edges share no area.
-fn meets(a: &Rect, b: &Rect) -> bool {
+fn meets(a: &Edges, b: &Edges) -> bool {
     a.0 < b.2 && b.0 < a.2 && a.1 < b.3 && b.1 < a.3
 }

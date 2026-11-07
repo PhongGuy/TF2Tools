@@ -1,6 +1,6 @@
 //! Stage 1 rules: hide writes, pin corners, font scaling, and each part's panel rule.
 
-use tf2tools_core::{HideTechnique, PanelRule, PartId, PinCorner, font_tall_px};
+use tf2tools_core::{HideTechnique, PanelRule, PartId, PinCorner, Point, font_tall_px};
 
 #[test]
 fn hide_techniques_write_these_keys() {
@@ -32,18 +32,18 @@ fn pin_corners_parse_like_the_engine() {
     for (text, want) in cases {
         assert_eq!(PinCorner::parse(text), want, "{text:?}");
     }
-    let points: Vec<(i32, i32)> = PinCorner::ALL.iter().map(|c| c.point(99, 40)).collect();
+    let points: Vec<Point> = PinCorner::ALL.iter().map(|c| c.point(99, 40)).collect();
     assert_eq!(
         points,
         [
-            (0, 0),
-            (99, 0),
-            (0, 40),
-            (99, 40),
-            (49, 0),
-            (99, 20),
-            (49, 40),
-            (0, 20)
+            Point::new(0, 0),
+            Point::new(99, 0),
+            Point::new(0, 40),
+            Point::new(99, 40),
+            Point::new(49, 0),
+            Point::new(99, 20),
+            Point::new(49, 40),
+            Point::new(0, 20)
         ]
     );
 }

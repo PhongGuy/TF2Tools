@@ -5,7 +5,9 @@ use crate::common;
 use common::hud_stock::{
     HEALTH, HUDLAYOUT, block, label, stock_files, stock_files_with, with_blocks,
 };
-use tf2tools_core::{HiddenBy, HudFiles, HudLayout, HudModel, PartKey, Pick, Platform, Screen};
+use tf2tools_core::{
+    HiddenBy, HudFiles, HudLayout, HudModel, PartKey, Pick, Platform, Rect, Screen,
+};
 
 const HV: &str = "HudPlayerStatus/HudPlayerHealth/PlayerStatusHealthValue";
 
@@ -19,9 +21,10 @@ fn hd(files: &HudFiles) -> HudLayout {
     layout(files, Screen::new(1920, 1080))
 }
 
-fn rect(l: &HudLayout, k: &str) -> (i32, i32, i32, i32) {
-    let b = l.get(&PartKey::new(k)).unwrap_or_else(|| panic!("{k}"));
-    (b.x(), b.y(), b.wide(), b.tall())
+fn rect(l: &HudLayout, k: &str) -> Rect {
+    l.get(&PartKey::new(k))
+        .unwrap_or_else(|| panic!("{k}"))
+        .rect()
 }
 
 fn health_with(blocks: &str) -> HudFiles {
@@ -53,19 +56,25 @@ fn the_six_screen_shapes() {
 #[test]
 fn parts_lay_out_in_whole_pixels_at_1080p() {
     let l = hd(&stock_files());
-    assert_eq!(rect(&l, "HudPlayerStatus"), (0, 0, 1920, 1080));
+    assert_eq!(rect(&l, "HudPlayerStatus"), Rect::new(0, 0, 1920, 1080));
     assert_eq!(
         rect(&l, "HudPlayerStatus/HudPlayerHealth"),
-        (0, 810, 562, 270),
+        Rect::new(0, 810, 562, 270),
         "ypos r120 gives 810"
     );
-    assert_eq!(rect(&l, HV), (171, 927, 99, 40));
-    assert_eq!(rect(&l, "HudWeaponAmmo"), (1707, 957, 211, 101));
-    assert_eq!(rect(&l, "HudWeaponAmmo/AmmoInClip"), (1729, 968, 123, 90));
-    assert_eq!(rect(&l, "HudItemEffectMeter"), (1529, 941, 225, 112));
+    assert_eq!(rect(&l, HV), Rect::new(171, 927, 99, 40));
+    assert_eq!(rect(&l, "HudWeaponAmmo"), Rect::new(1707, 957, 211, 101));
+    assert_eq!(
+        rect(&l, "HudWeaponAmmo/AmmoInClip"),
+        Rect::new(1729, 968, 123, 90)
+    );
+    assert_eq!(
+        rect(&l, "HudItemEffectMeter"),
+        Rect::new(1529, 941, 225, 112)
+    );
     assert_eq!(
         rect(&l, "CMainTargetID"),
-        (676, 798, 567, 78),
+        Rect::new(676, 798, 567, 78),
         "centred by code"
     );
 }
@@ -75,11 +84,11 @@ fn active_if_blocks_and_own_size_terms() {
     let l = hd(&stock_files());
     assert_eq!(
         rect(&l, "HudMatchStatus/ObjectiveStatusTimePanel"),
-        (814, 0, 292, 67)
+        Rect::new(814, 0, 292, 67)
     );
     assert_eq!(
         rect(&l, "HudMatchStatus/ObjectiveStatusTimePanel/TimePanelValue"),
-        (892, 4, 135, 45)
+        Rect::new(892, 4, 135, 45)
     );
 }
 
@@ -88,14 +97,14 @@ fn proportionaltoparent_aligns_to_the_parent() {
     let l = hd(&stock_files());
     assert_eq!(
         rect(&l, "HudPlayerStatus/HudPlayerClass/classmodelholder"),
-        (0, 630, 225, 450)
+        Rect::new(0, 630, 225, 450)
     );
     assert_eq!(
         rect(
             &l,
             "HudPlayerStatus/HudPlayerClass/classmodelholder/classmodelpanel"
         ),
-        (22, 698, 180, 337)
+        Rect::new(22, 698, 180, 337)
     );
 }
 
@@ -107,15 +116,15 @@ fn other_screen_shapes() {
             &layout(&files, Screen::new(1280, 1024)),
             "HudPlayerStatus/HudPlayerHealth"
         )
-        .1,
+        .y,
         768
     );
     assert_eq!(
-        rect(&layout(&files, Screen::new(2560, 1080)), "HudWeaponAmmo").0,
+        rect(&layout(&files, Screen::new(2560, 1080)), "HudWeaponAmmo").x,
         2347
     );
     assert_eq!(
-        rect(&layout(&files, Screen::new(1440, 1080)), "CMainTargetID").0,
+        rect(&layout(&files, Screen::new(1440, 1080)), "CMainTargetID").x,
         436
     );
 }
@@ -412,7 +421,7 @@ fn a_box_past_its_parent_shows_only_inside_it() {
     let files = stock_files_with(&[("resource/ui/hudammoweapons.res", Some(STOCK_RESERVE))]);
     let l = hd(&files);
     let k = |s: &str| PartKey::new(s);
-    let right = |r: (i32, i32, i32, i32)| r.0 + r.2;
+    let right = |r: Rect| r.x + r.wide;
     let parent = rect(&l, "HudWeaponAmmo");
     let bg = rect(&l, "HudWeaponAmmo/HudWeaponAmmoBG");
     let reserve = rect(&l, "HudWeaponAmmo/AmmoInReserve");
@@ -422,8 +431,8 @@ fn a_box_past_its_parent_shows_only_inside_it() {
     assert_eq!(right(shown), right(parent), "the panel cuts it off");
     assert_eq!(right(shown), right(bg), "so it ends with the background");
     assert_eq!(
-        (shown.0, shown.1, shown.3),
-        (reserve.0, reserve.1, reserve.3)
+        (shown.x, shown.y, shown.tall),
+        (reserve.x, reserve.y, reserve.tall)
     );
     assert_eq!(l.visible(&k("HudWeaponAmmo/HudWeaponAmmoBG")), Some(bg));
     assert_eq!(l.visible(&k("Missing")), None);
@@ -437,7 +446,7 @@ fn a_box_wholly_outside_its_parent_shows_whole() {
         Some(off),
     )]));
     let far = rect(&l, "HudWeaponAmmo/Far");
-    assert!(far.0 > rect(&l, "HudWeaponAmmo").0 + rect(&l, "HudWeaponAmmo").2);
+    assert!(far.x > rect(&l, "HudWeaponAmmo").x + rect(&l, "HudWeaponAmmo").wide);
     // Nothing of it would show, so the selection keeps its whole box rather than vanish.
     assert_eq!(l.visible(&PartKey::new("HudWeaponAmmo/Far")), Some(far));
 }
@@ -472,7 +481,7 @@ fn a_part_its_parent_cuts_off_whole_takes_no_click() {
     let off = r#""Resource/UI/HudAmmoWeapons.res" { Far { ControlName CExLabel xpos 120 ypos 0 wide 20 tall 10 labelText 1 } }"#;
     let files = stock_files_with(&[("resource/ui/hudammoweapons.res", Some(off))]);
     let far = rect(&hd(&files), "HudWeaponAmmo/Far");
-    let picked = pick_text(&files, far.0 + 1, far.1 + 1);
+    let picked = pick_text(&files, far.x + 1, far.y + 1);
     assert!(
         !picked.contains(&"HudWeaponAmmo/Far".to_owned()),
         "{picked:?}"
@@ -488,7 +497,7 @@ const FOOTER_BUTTON: &str = r#"  Footer { ControlName EditablePanel xpos 0 ypos 
 
 /// The parts of FOOTER_BUTTON under the point `at` finds in `inside`'s box, best first, a part
 /// drawing when it has a colour or an image.
-fn pick_footer(inside: &str, at: impl Fn((i32, i32, i32, i32)) -> (i32, i32)) -> Vec<Pick> {
+fn pick_footer(inside: &str, at: impl Fn(Rect) -> (i32, i32)) -> Vec<Pick> {
     let model = HudModel::load(&health_with(FOOTER_BUTTON), Platform::Linux).unwrap();
     let l = model.layout(Screen::new(1920, 1080));
     let (x, y) = at(rect(&l, &format!("{HH}/{inside}")));
@@ -522,7 +531,7 @@ fn names(picks: &[Pick]) -> Vec<&str> {
 
 #[test]
 fn a_click_on_a_buttons_drawn_piece_picks_the_button_first() {
-    let picks = pick_footer("Btn/Inner/Icon", |(x, y, w, h)| (x + w / 2, y + h / 2));
+    let picks = pick_footer("Btn/Inner/Icon", |r| (r.x + r.wide / 2, r.y + r.tall / 2));
     assert_eq!(
         names(&picks),
         ["Btn", "Btn/Inner/Icon", "Footer", "Btn/Inner"],
@@ -535,7 +544,7 @@ fn a_click_on_a_buttons_drawn_piece_picks_the_button_first() {
 
 #[test]
 fn away_from_its_pieces_a_button_that_draws_nothing_comes_after_drawn_parts() {
-    let picks = pick_footer("Btn", |(x, y, w, h)| (x + w - 2, y + h - 2));
+    let picks = pick_footer("Btn", |r| (r.x + r.wide - 2, r.y + r.tall - 2));
     assert_eq!(names(&picks), ["Footer", "Btn/Inner", "Btn"]);
     assert!(!picks[2].draws());
     let model = HudModel::load(&health_with(FOOTER_BUTTON), Platform::Linux).unwrap();

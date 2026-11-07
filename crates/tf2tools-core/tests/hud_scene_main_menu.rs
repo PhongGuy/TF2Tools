@@ -5,7 +5,7 @@ use crate::common;
 use common::hud_stock::{stock_files, stock_files_with};
 use tf2tools_core::{
     GameText, HiddenBy, HideTechnique, HudModel, OptionValue, PanelRule, PartId, PartKey, Platform,
-    RankPieces, SampleSet, Scene, SceneRule, Screen, rank_medal, rank_pieces,
+    RankPieces, Rect, SampleSet, Scene, SceneRule, Screen, rank_medal, rank_pieces,
 };
 
 const MENU_FILE: &str = "resource/ui/mainmenuoverride.res";
@@ -316,18 +316,18 @@ fn a_menu_buttons_text_starts_after_its_inset_clear_of_its_icon() {
         .get(&k("MainMenuOverride/CharacterSetupButton/SubImage"))
         .unwrap();
     // 25 units at 1080 high is 56 pixels.
-    let (x, ..) = extent("MainMenuOverride/CharacterSetupButton");
+    let Rect { x, .. } = extent("MainMenuOverride/CharacterSetupButton");
     assert_eq!(x, items.x() + 56);
     assert!(x >= icon.x() + icon.wide(), "text clear of the icon");
     let east = l.get(&k("MainMenuOverride/EastButton")).unwrap();
-    let (x, _, w, _) = extent("MainMenuOverride/EastButton");
+    let Rect { x, wide: w, .. } = extent("MainMenuOverride/EastButton");
     assert_eq!(
         x + w,
         east.x() + east.wide() - 10,
         "a plain inset is pixels"
     );
     let top = l.get(&k("MainMenuOverride/TopButton")).unwrap();
-    let (x, y, ..) = extent("MainMenuOverride/TopButton");
+    let Rect { x, y, .. } = extent("MainMenuOverride/TopButton");
     assert_eq!((x, y), (top.x(), top.y() + 9));
 }
 
@@ -364,16 +364,22 @@ fn a_y_inset_moves_text_down_and_an_extent_stays_in_its_box() {
     let key = |name: &str| k(&format!("MainMenuOverride/{name}"));
     let extent = |name: &str| m.text_extent(&l, &key(name), &text).unwrap();
     for align in ["center", "south"] {
-        let (_, y0, ..) = extent(&format!("{align}0"));
-        let (_, y4, ..) = extent(&format!("{align}4"));
-        let (_, yp, ..) = extent(&format!("{align}p"));
+        let Rect { y: y0, .. } = extent(&format!("{align}0"));
+        let Rect { y: y4, .. } = extent(&format!("{align}4"));
+        let Rect { y: yp, .. } = extent(&format!("{align}p"));
         assert_eq!(y4, y0 + 4, "{align}: a plain inset moves the text down");
         // 2.5 units at 1080 high is 5.625 pixels, rounded up.
         assert_eq!(yp, y0 + 6, "{align}: a proportional decimal rounds up");
     }
     for name in ["Huge", "HugeY", "Negative"] {
         let b = l.get(&key(name)).unwrap();
-        let (x, y, w, h) = extent(name);
+        let Rect {
+            x,
+            y,
+            wide: w,
+            tall: h,
+            ..
+        } = extent(name);
         assert!(w >= 0 && h >= 0, "{name}: ({x}, {y}, {w}, {h})");
         assert!(
             x >= b.x() && x + w <= b.x() + b.wide(),
@@ -385,13 +391,13 @@ fn a_y_inset_moves_text_down_and_an_extent_stays_in_its_box() {
         );
     }
     assert_eq!(
-        extent("Huge").2,
+        extent("Huge").wide,
         0,
         "text pushed past the box draws nothing"
     );
     let neg = l.get(&key("Negative")).unwrap();
     assert_eq!(
-        extent("Negative").0,
+        extent("Negative").x,
         neg.x(),
         "text pulled out starts at the box's edge"
     );
@@ -425,7 +431,7 @@ fn an_x_inset_narrows_the_text_as_the_game_does() {
     let (l, text) = (m.layout(screen), GameText::default());
     let key = |name: &str| k(&format!("MainMenuOverride/{name}"));
     let extent = |name: &str| {
-        let (x, _, w, _) = m.text_extent(&l, &key(name), &text).unwrap();
+        let Rect { x, wide: w, .. } = m.text_extent(&l, &key(name), &text).unwrap();
         (x, w)
     };
     let left = l.get(&key("Centre0")).unwrap().x();
@@ -461,13 +467,13 @@ fn a_rank_panel_lays_out_the_games_level_bar_name_and_medal() {
     // the sample fills the bar three fifths of the way.
     let level = pieces("RankPanel", 320, 100);
     assert_eq!(level.medal(), None);
-    assert_eq!(level.name(), Some((125, 25, 195, 20)));
-    assert_eq!(level.bar(), Some((126, 60, 188, 7)));
-    assert_eq!(level.fill(), Some((127, 61, 111, 5)));
+    assert_eq!(level.name(), Some(Rect::new(125, 25, 195, 20)));
+    assert_eq!(level.bar(), Some(Rect::new(126, 60, 188, 7)));
+    assert_eq!(level.fill(), Some(Rect::new(127, 61, 111, 5)));
     assert_eq!(RankPieces::SAMPLE_NAME, "Level 42");
     // The medal panel: the medal as big as the game's camera shows it, centred, no bar.
     let medal = pieces("RankModelPanel", 1000, 1000);
-    assert_eq!(medal.medal(), Some((458, 458, 84, 84)));
+    assert_eq!(medal.medal(), Some(Rect::new(458, 458, 84, 84)));
     assert_eq!(
         (medal.name(), medal.bar(), medal.fill()),
         (None, None, None)
@@ -475,16 +481,16 @@ fn a_rank_panel_lays_out_the_games_level_bar_name_and_medal() {
     // Unset keys show both; on a 1080-line screen the pieces scale with it.
     let plain = m.part(&k("MainMenuOverride/Plain")).unwrap();
     let both = rank_pieces(&m, plain, 720, 225, HD);
-    assert_eq!(both.medal(), Some((351, 103, 18, 18)));
-    assert_eq!(both.name(), Some((281, 56, 439, 45)));
-    assert_eq!(both.bar(), Some((282, 137, 424, 15)));
-    assert_eq!(both.fill(), Some((284, 139, 252, 11)));
+    assert_eq!(both.medal(), Some(Rect::new(351, 103, 18, 18)));
+    assert_eq!(both.name(), Some(Rect::new(281, 56, 439, 45)));
+    assert_eq!(both.bar(), Some(Rect::new(282, 137, 424, 15)));
+    assert_eq!(both.fill(), Some(Rect::new(284, 139, 252, 11)));
     // The level area keeps its width past a narrow box's left edge and no height below zero;
     // extreme boxes never overflow.
     let tiny = pieces("RankPanel", 10, 10);
     assert_eq!(tiny.bar(), None);
     let huge = pieces("Plain", i32::MAX, i32::MAX);
-    assert!(huge.medal().is_some_and(|(_, _, side, _)| side > 0));
+    assert!(huge.medal().is_some_and(|Rect { wide: side, .. }| side > 0));
 }
 
 #[test]
@@ -498,7 +504,13 @@ fn the_medal_stand_in_ends_left_of_the_rank_name_at_stock_geometry() {
     for screen in [HD, Screen::new(1280, 960)] {
         let l = m.layout(screen);
         let (mb, lb) = (l.get(&medal_key).unwrap(), l.get(&level_key).unwrap());
-        let (mx, my, mw, mh) = rank_medal(&m, &l, &medal_key, screen).unwrap();
+        let Rect {
+            x: mx,
+            y: my,
+            wide: mw,
+            tall: mh,
+            ..
+        } = rank_medal(&m, &l, &medal_key, screen).unwrap();
         let name = rank_pieces(
             &m,
             m.part(&level_key).unwrap(),
@@ -508,7 +520,7 @@ fn the_medal_stand_in_ends_left_of_the_rank_name_at_stock_geometry() {
         )
         .name()
         .unwrap();
-        let (nx, ny) = (lb.x() + name.0, lb.y() + name.1);
+        let (nx, ny) = (lb.x() + name.x, lb.y() + name.y);
         let (mx, my) = (mb.x() + mx, mb.y() + my);
         assert!(mw > 0 && mh > 0);
         // Clear of the name's box, by a gap, and still level with it.
@@ -517,6 +529,6 @@ fn the_medal_stand_in_ends_left_of_the_rank_name_at_stock_geometry() {
             "{screen:?}: medal ends at {} but name starts at {nx}",
             mx + mw
         );
-        assert!(my < ny + name.3 && ny < my + mh);
+        assert!(my < ny + name.tall && ny < my + mh);
     }
 }

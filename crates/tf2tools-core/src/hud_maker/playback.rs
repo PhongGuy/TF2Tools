@@ -7,7 +7,8 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 use super::animations::atof;
 use super::expr::atoi;
 use super::{
-    AnimCommand, HudAnimations, HudLayout, HudModel, Interp, PartKey, PosExpr, Rgba, ScreenScale,
+    AnimCommand, HudAnimations, HudLayout, HudModel, Interp, PartKey, PosExpr, Rect, Rgba,
+    ScreenScale,
 };
 
 /// Most commands one simulation executes, so a zero-delay loop still returns.
@@ -113,7 +114,7 @@ pub struct Animated {
     fg: Option<Rgba>,
     bg: Option<Rgba>,
     alpha: Option<u8>,
-    rect: Option<(i32, i32, i32, i32)>,
+    rect: Option<Rect>,
     visible: Option<bool>,
 }
 
@@ -133,8 +134,8 @@ impl Animated {
         self.alpha
     }
 
-    /// The box in screen pixels (x, y, wide, tall), when moved or sized.
-    pub fn rect(&self) -> Option<(i32, i32, i32, i32)> {
+    /// The box in screen pixels, when moved or sized.
+    pub fn rect(&self) -> Option<Rect> {
         self.rect
     }
 
@@ -600,10 +601,7 @@ impl Sim<'_> {
     /// The part's value before any animation, from the model and the layout.
     fn own_value(&self, key: &PartKey, field: Field) -> Value {
         let part = self.model.part(key);
-        let rect = self
-            .layout
-            .get(key)
-            .map_or((0, 0, 0, 0), |b| (b.x(), b.y(), b.wide(), b.tall()));
+        let rect = self.layout.get(key).map_or(Rect::default(), |b| b.rect());
         match field {
             Field::Fg => rgba(part.map_or(Rgba::WHITE, |p| self.model.text_colour(p))),
             Field::Bg => {
@@ -616,10 +614,10 @@ impl Sim<'_> {
                 part.and_then(|p| p.value("alpha"))
                     .map_or(255.0, |l| atoi(l.text().as_bytes()) as f32),
             ),
-            Field::X => Value::Num(rect.0 as f32),
-            Field::Y => Value::Num(rect.1 as f32),
-            Field::Wide => Value::Num(rect.2 as f32),
-            Field::Tall => Value::Num(rect.3 as f32),
+            Field::X => Value::Num(rect.x as f32),
+            Field::Y => Value::Num(rect.y as f32),
+            Field::Wide => Value::Num(rect.wide as f32),
+            Field::Tall => Value::Num(rect.tall as f32),
         }
     }
 
@@ -697,7 +695,7 @@ impl Sim<'_> {
         }
         for key in moved {
             let pick = |f: Field| self.value_at(&key, f, t).num().round() as i32;
-            let rect = (
+            let rect = Rect::new(
                 pick(Field::X),
                 pick(Field::Y),
                 pick(Field::Wide),

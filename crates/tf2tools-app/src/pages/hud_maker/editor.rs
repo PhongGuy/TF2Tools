@@ -9,9 +9,9 @@ use tf2tools_core::{
     AnimCommand, AnimEvent, AnimFrame, AnimScript, AnimationChange, BoardMode, Change,
     ChangeTarget, EditRefused, Fired, FontEdit, GameSituation, HudAssets, HudLayout, HudModel,
     HudOptions, Interp, MeterKind, NewPart, NewPicture, OptionChange, OptionSpec, OptionValue,
-    Part, PartBox, PartKey, PictureTarget, PinCorner, PinRefused, Platform, Recipe, RemoveRefused,
-    Scene, Screen, ShowsFor, SituationSwitch, TfClass, WeaponKind, font_families, font_family,
-    pictures_fit,
+    Part, PartBox, PartKey, PictureTarget, PinCorner, PinRefused, Platform, Recipe, Rect,
+    RemoveRefused, Scene, Screen, ShowsFor, SituationSwitch, TfClass, WeaponKind, font_families,
+    font_family, pictures_fit,
 };
 
 use super::snapping::{self, Moving, lines};
@@ -1141,10 +1141,10 @@ impl HudEditor {
             );
         }
         let roots = self.roots();
-        let (x, y, w, h) = around(start, &roots)?;
+        let r = around(start, &roots)?;
         let moving = Moving {
-            across: lines(x, w).to_vec(),
-            down: lines(y, h).to_vec(),
+            across: lines(r.x, r.wide).to_vec(),
+            down: lines(r.y, r.tall).to_vec(),
         };
         Some(snapping::snap(
             model,
@@ -1255,7 +1255,13 @@ impl HudEditor {
         if roots.len() < 2 {
             return Err(EditRefused::NotOffered);
         }
-        let (x, y, w, h) = around(&self.layout, &roots).ok_or(EditRefused::UnknownPart)?;
+        let Rect {
+            x,
+            y,
+            wide: w,
+            tall: h,
+            ..
+        } = around(&self.layout, &roots).ok_or(EditRefused::UnknownPart)?;
         let moves: Vec<(PartKey, i32, i32)> = (roots.iter())
             .filter_map(|k| Some((k, self.layout.get(k)?)))
             .map(|(k, b)| {
@@ -2539,8 +2545,8 @@ fn within(model: &HudModel, inner: &PartKey, outer: &PartKey) -> bool {
     false
 }
 
-/// The box around `parts` on `layout`, as (x, y, wide, tall); `None` when it has none of them.
-fn around(layout: &HudLayout, parts: &[PartKey]) -> Option<(i32, i32, i32, i32)> {
+/// The box around `parts` on `layout`; `None` when it has none of them.
+fn around(layout: &HudLayout, parts: &[PartKey]) -> Option<Rect> {
     let boxes = parts.iter().filter_map(|k| layout.get(k));
     let (x0, y0, x1, y1) = boxes.fold(None, |acc: Option<(i32, i32, i32, i32)>, b| {
         let (x1, y1) = (b.x() + b.wide(), b.y() + b.tall());
@@ -2549,7 +2555,7 @@ fn around(layout: &HudLayout, parts: &[PartKey]) -> Option<(i32, i32, i32, i32)>
             Some((a, b0, c, d)) => (a.min(b.x()), b0.min(b.y()), c.max(x1), d.max(y1)),
         })
     })?;
-    Some((x0, y0, x1 - x0, y1 - y0))
+    Some(Rect::new(x0, y0, x1 - x0, y1 - y0))
 }
 
 /// File units (a 480-high screen) against pixels at one screen, rounding so that a pixel
