@@ -20,6 +20,8 @@ pub const SIDEBAR_GROUPS: &str = "sidebar-groups";
 pub const HEADER: &str = "header";
 pub const HEADER_TITLE: &str = "header-title";
 pub const TF2_BADGE: &str = "tf2-badge";
+/// The header's "Play TF2" button, shown while TF2 is found; disabled while TF2 runs.
+pub const PLAY_TF2: &str = "play-tf2";
 /// One per running kind except Addons, labelled "Syncing {store}: {fetched} / {total}" or "Syncing Curated HUDs...".
 pub const SYNC_RING: &str = "sync-ring";
 pub const TOAST: &str = "toast";

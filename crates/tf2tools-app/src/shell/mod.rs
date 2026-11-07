@@ -37,6 +37,7 @@ use crate::pages::huds::{EditInHudMaker, HudsPage};
 use crate::pages::logs::LogsPage;
 use crate::pages::maps::MapsPage;
 use crate::pages::profiles::ProfilesPage;
+use crate::pages::profiles::probe::Tf2Probe;
 use crate::pages::settings::SettingsPage;
 use crate::pages::sound_store::SoundStorePage;
 use crate::pages::sounds::SoundsPage;
@@ -89,6 +90,8 @@ pub struct Shell {
     maps: Option<Entity<MapsPage>>,
     addons: Option<Entity<AddonsPage>>,
     profiles: Option<Entity<ProfilesPage>>,
+    /// Whether TF2 ran at the last check, for the header's Play TF2 button.
+    tf2_running: bool,
 }
 
 impl Shell {
@@ -107,14 +110,20 @@ impl Shell {
         let focus = cx.focus_handle();
         focus.focus(window, cx);
         // The header badge reads the TF2 state, so the shell redraws whenever it changes.
-        cx.observe(&tf2_state(cx), |_, _, cx| cx.notify()).detach();
-        // A player back from moving the game folder sees the badge catch up.
+        cx.observe(&tf2_state(cx), |_, _, cx| {
+            Self::recheck_running(cx);
+            cx.notify();
+        })
+        .detach();
+        // A player back from moving the game folder, or from closing TF2, sees the header catch up.
         cx.observe_window_activation(window, |_, window, cx| {
             if window.is_window_active() {
                 recheck_tf2(cx);
+                Self::recheck_running(cx);
             }
         })
         .detach();
+        Self::recheck_running(cx);
         // The header rings read the sync hub, and a failed sync toasts; no hub, no syncs.
         let hub_subscriptions = sync_hub(cx).map(|hub| {
             [
@@ -183,7 +192,27 @@ impl Shell {
             maps: None,
             addons: None,
             profiles: None,
+            tf2_running: false,
         }
+    }
+
+    // Asks off the UI thread whether TF2 runs and redraws when the answer changed. Only a found
+    // TF2 is asked about, as the Play button shows only then.
+    fn recheck_running(cx: &mut Context<Self>) {
+        if tf2_state(cx).read(cx).install().is_none() {
+            return;
+        }
+        let probe = Tf2Probe::get(cx);
+        cx.spawn(async move |shell, cx| {
+            let running = cx.background_spawn(async move { probe() }).await;
+            shell.update(cx, |shell, cx| {
+                if shell.tf2_running != running {
+                    shell.tf2_running = running;
+                    cx.notify();
+                }
+            })
+        })
+        .detach();
     }
 
     pub fn page(&self) -> Page {
@@ -202,6 +231,7 @@ impl Shell {
         self.set_kept_hidden(self.page, true, cx);
         self.page = page;
         recheck_tf2(cx);
+        Self::recheck_running(cx);
         leave::forget_maker(cx);
         if let Some(huds) = self.huds.take() {
             self.huds_search = huds.read(cx).search_input().read(cx).value().to_string();
@@ -575,7 +605,7 @@ impl Render for Shell {
                     .flex_1()
                     .min_w_0()
                     .h_full()
-                    .child(header::render(self.page, cx))
+                    .child(header::render(self.page, self.tf2_running, cx))
                     .children(update_view::banner(cx))
                     .children(crate::crash::notice::banner(cx))
                     .children(crate::old_v4::banner(cx))

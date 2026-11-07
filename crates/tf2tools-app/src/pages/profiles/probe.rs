@@ -1,4 +1,4 @@
-//! The "is TF2 running" answer the Profiles page asks before activating, as a global so
+//! The "is TF2 running" answer the Profiles page and the header ask, as a global so
 //! tests can pin it or point the default scan at a fake proc tree.
 
 use std::path::PathBuf;
@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use gpui_kit::{App, Global};
 
-/// Answers "is TF2 running" for the Profiles page; core's process check unless replaced.
+/// Answers "is TF2 running" for the Profiles page and the header; core's process check unless replaced.
 pub struct Tf2Probe(Arc<dyn Fn() -> bool + Send + Sync>);
 
 impl Global for Tf2Probe {}

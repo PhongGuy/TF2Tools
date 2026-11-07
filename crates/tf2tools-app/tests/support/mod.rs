@@ -528,6 +528,9 @@ fn open_shell(
     .with_font_host(font_host);
     tweak(&mut services);
     install_services(cx, services.clone());
+    // A test that pins no probe reads an empty proc tree, never the machine's processes.
+    let proc_root = env.tmp.path().join("proc");
+    cx.update(|cx| tf2tools_app::pages::profiles::probe::Tf2Probe::set_proc_root(cx, proc_root));
     let tf2 = cx.update(|cx| install_tf2_state(cx, state));
     let collapsed = services.db.settings().unwrap().sidebar_collapsed();
     let (win, shell) = cx
