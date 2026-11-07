@@ -1059,6 +1059,15 @@ pub(super) fn write_build(
     }
     let maker = MakerFile::new(sources, listed).with_base(base.clone());
     write_file(&build.join(METADATA_DIR).join(MAKER_FILE), &maker.to_json())?;
+    // A copy always lists its settings files, even none, so an older list never outlives
+    // the options that wrote it.
+    if matches!(base, MakerBase::Copy(_)) {
+        let list = super::hud_cfg::list_json(&files.switched_cfg());
+        write_file(
+            &build.join(METADATA_DIR).join(super::hud_cfg::CFG_FILE),
+            &list,
+        )?;
+    }
     Ok(refused)
 }
 

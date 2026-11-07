@@ -199,6 +199,7 @@ fn set_and_reset_follow_the_built_in_rules() {
         Err(EditRefused::BadValue)
     );
     assert!(options.reset_group("Damage", &changes).is_empty());
+    assert!(options.reset_all(&changes).is_empty());
 }
 
 #[test]

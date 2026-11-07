@@ -1468,6 +1468,33 @@ impl HudEditor {
         true
     }
 
+    /// Whether the changes hold a choice for any option, built-in or the HUD's own.
+    pub fn options_changed(&self) -> bool {
+        self.without_options().len() != self.changes.len()
+    }
+
+    /// Drops every option choice, built-in and the HUD's own, as one undo step; false when
+    /// there were none.
+    pub fn reset_all_options(&mut self) -> bool {
+        self.cancel_preview();
+        self.end_drag();
+        let kept = self.without_options();
+        if kept.len() == self.changes.len() {
+            return false;
+        }
+        self.commit(kept);
+        true
+    }
+
+    /// The changes without any option choice.
+    fn without_options(&self) -> Vec<Change> {
+        let kept = self.pristine.reset_all_options(&self.changes);
+        match &self.hud_options {
+            Some(options) => options.reset_all(&kept),
+            None => kept,
+        }
+    }
+
     /// Steps back one edit; false when there is none. During a drag it cancels only the drag.
     /// A recipe preview is dropped first, even with nothing to undo.
     pub fn undo(&mut self) -> bool {

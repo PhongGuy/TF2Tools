@@ -83,6 +83,35 @@ fn a_group_reset_drops_its_choices_as_one_step() {
 }
 
 #[test]
+fn reset_all_drops_every_option_as_one_step_and_undo_brings_them_back() {
+    let (_files, mut e) = editor();
+    assert!(!e.options_changed());
+    e.set_hud_option(SLOT, OptionValue::Bool(true)).unwrap();
+    let built_in = e.options()[0].id().to_owned();
+    let picked = match e.options()[0].kind() {
+        tf2tools_core::OptionKind::Colour { .. } => OptionValue::Rgba([1, 2, 3, 255]),
+        tf2tools_core::OptionKind::Number { min, .. } => OptionValue::Int(*min),
+        _ => OptionValue::Bool(!matches!(
+            e.option_value(&built_in),
+            Some(OptionValue::Bool(true))
+        )),
+    };
+    e.set_option(&built_in, picked.clone()).unwrap();
+    e.select(Some(PartKey::new(HV)));
+    e.move_selected(4, 0).unwrap();
+    let before = e.changes().to_vec();
+    assert!(e.options_changed());
+    assert!(e.reset_all_options());
+    assert_eq!(e.changes().len(), 1, "only the canvas move stays");
+    assert!(!e.options_changed());
+    assert!(!e.reset_all_options());
+    assert!(e.undo());
+    assert_eq!(e.changes(), before.as_slice());
+    assert_eq!(e.hud_option_value(SLOT), Some(OptionValue::Bool(true)));
+    assert_eq!(e.option_value(&built_in), Some(picked));
+}
+
+#[test]
 fn canvas_edits_never_flag_a_reload() {
     let (_files, mut e) = editor();
     e.select(Some(PartKey::new(HV)));

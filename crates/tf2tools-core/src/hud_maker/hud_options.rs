@@ -9,12 +9,12 @@ use super::changes::{Change, ChangeTarget, OptionChange, SetKey, check_switch_pa
 use super::document::KvDocument;
 use super::edits::EditRefused;
 use super::expr::atoi;
-use super::files::HudFiles;
+use super::files::{CfgFile, HudFiles};
 use super::hud_schema::HudSchema;
 use super::model::{BaseChains, PartKey, apply_set, live_blocks, root_block};
 use super::options::{
-    Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue, SwitchAction,
-    ValueMap, derived_colour, rgba_text, value_suits,
+    CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue,
+    SwitchAction, ValueMap, derived_colour, rgba_text, value_suits,
 };
 use super::scheme::Scheme;
 use crate::error::HudFilesError;
@@ -187,6 +187,7 @@ impl HudOptions {
             copy: files.copy_paths().into_iter().collect(),
             written: BTreeMap::new(),
             removed: BTreeSet::new(),
+            cfg: BTreeMap::new(),
         };
         let mut left_out = Vec::new();
         for (i, change) in changes.iter().enumerate() {
@@ -201,7 +202,11 @@ impl HudOptions {
                 continue;
             };
             // Each choice applies whole or not at all, so a refused action leaves no half switch.
-            let saved = (layer.written.clone(), layer.removed.clone());
+            let saved = (
+                layer.written.clone(),
+                layer.removed.clone(),
+                layer.cfg.clone(),
+            );
             let mut ok = true;
             let derived = match self.offered(choice.id()).map(OptionSpec::kind) {
                 Some(OptionKind::Colour { derived }) => derived.as_slice(),
@@ -214,7 +219,7 @@ impl HudOptions {
                 }
             }
             if !ok || !layer.within_caps() {
-                (layer.written, layer.removed) = saved;
+                (layer.written, layer.removed, layer.cfg) = saved;
                 left_out.push(i);
             }
         }
@@ -228,8 +233,9 @@ impl HudOptions {
             written.push((path, bytes));
         }
         let removed = layer.removed.into_iter().collect();
+        let cfg = layer.cfg.into_values().collect();
         Ok(Switched {
-            files: files.with_switches(written, removed),
+            files: files.with_switches(written, removed).with_switched_cfg(cfg),
             left_out,
         })
     }
@@ -288,6 +294,13 @@ impl HudOptions {
         without(changes, |source, id| {
             (self.specs.iter())
                 .any(|s| s.group() == group && s.id() == id && source_of(s) == source)
+        })
+    }
+
+    /// `changes` without the choices of every one of these options, all groups at once.
+    pub fn reset_all(&self, changes: &[Change]) -> Vec<Change> {
+        without(changes, |source, id| {
+            (self.specs.iter()).any(|s| s.id() == id && source_of(s) == source)
         })
     }
 
@@ -371,6 +384,12 @@ fn spec_touched(spec: &OptionSpec) -> Vec<String> {
                 paths.push(file.clone());
                 paths.extend(on.iter().chain(off).filter_map(|t| resolve(file, t)));
             }
+            OptionAction::WriteCfg {
+                place: CfgPlace::Hud(file),
+                ..
+            } => paths.push(file.clone()),
+            // A file under `tf/cfg` is no path of the copy.
+            OptionAction::WriteCfg { .. } => {}
         }
     }
     paths.sort();
@@ -480,7 +499,7 @@ fn without(changes: &[Change], wanted: impl Fn(&str, &str) -> bool) -> Vec<Chang
 
 /// The copy's `.res` and `.txt` files as text, in path order, within the scan caps, and how
 /// many the caps left unread; files that fail the switch path rule or are no UTF-8 are skipped.
-fn scan(files: &HudFiles, copy: &BTreeSet<String>) -> (Vec<(String, String)>, usize) {
+pub(super) fn scan(files: &HudFiles, copy: &BTreeSet<String>) -> (Vec<(String, String)>, usize) {
     let mut out = Vec::new();
     let mut bytes = 0usize;
     let readable: Vec<&String> = (copy.iter())
@@ -1019,6 +1038,8 @@ struct Layer<'a> {
     copy: BTreeSet<String>,
     written: BTreeMap<String, Vec<u8>>,
     removed: BTreeSet<String>,
+    /// Settings files under `tf/cfg`, by lowercase path.
+    cfg: BTreeMap<String, CfgFile>,
 }
 
 impl Layer<'_> {
@@ -1063,8 +1084,10 @@ impl Layer<'_> {
     }
 
     fn within_caps(&self) -> bool {
-        let bytes = (self.written.values()).fold(0usize, |n, b| n.saturating_add(b.len()));
-        self.written.len() <= MAX_LAYER_FILES && bytes <= MAX_LAYER_BYTES
+        let cfg = self.cfg.values().map(|f| f.bytes());
+        let bytes = (self.written.values().map(Vec::as_slice).chain(cfg))
+            .fold(0usize, |n, b| n.saturating_add(b.len()));
+        self.written.len() + self.cfg.len() <= MAX_LAYER_FILES && bytes <= MAX_LAYER_BYTES
     }
 
     /// Applies one side of `action`; false when it is refused (a missing file or source, a
@@ -1112,6 +1135,36 @@ impl Layer<'_> {
             OptionAction::Switch(SwitchAction::Move { from, to }) => {
                 let (source, dest) = if on { (from, to) } else { (to, from) };
                 self.move_paths(source, dest)
+            }
+            // An empty side writes no file: one this layer wrote goes, and a copy file is
+            // left as the HUD ships it.
+            OptionAction::WriteCfg {
+                place,
+                on: a,
+                off: b,
+            } => {
+                let text = if on { a } else { b };
+                match place {
+                    CfgPlace::Game(path) => {
+                        let Some(file) = CfgFile::new(path, text.clone().into_bytes()) else {
+                            return Ok(false);
+                        };
+                        match text.is_empty() {
+                            true => self.cfg.remove(file.path()),
+                            false => self.cfg.insert(file.path().to_owned(), file),
+                        };
+                    }
+                    CfgPlace::Hud(path) => {
+                        let Some(path) = check_switch_path(path) else {
+                            return Ok(false);
+                        };
+                        match text.is_empty() {
+                            true => drop(self.written.remove(&path)),
+                            false => self.put(&path, text.clone().into_bytes()),
+                        }
+                    }
+                }
+                Ok(true)
             }
             OptionAction::SetKey {
                 file,

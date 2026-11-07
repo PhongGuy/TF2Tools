@@ -507,6 +507,28 @@ fn reset_drops_one_group_of_options() {
 }
 
 #[test]
+fn reset_all_drops_every_option_choice_and_keeps_other_edits() {
+    let m = model();
+    let edit = Change::set(
+        3,
+        SetKey::new(
+            "scripts/hudlayout.res",
+            &["HudLayout", "HudDeathNotice"],
+            "xpos",
+            None,
+            None,
+            "5",
+        ),
+    );
+    let changes = vec![
+        option(0, "item_normal", OptionValue::Rgba([1, 2, 3, 255])),
+        option(1, "killfeed_rows", OptionValue::Int(6)),
+        edit.clone(),
+    ];
+    assert_eq!(m.reset_all_options(&changes), [edit]);
+}
+
+#[test]
 fn an_item_colour_from_a_base_scheme_file_reads_as_the_hud_value() {
     let scheme =
         "#base \"clientscheme_colors.res\"\n\"Scheme\" { Colors { TanDark \"117 107 94 255\" } }";

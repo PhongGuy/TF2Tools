@@ -27,6 +27,7 @@ use crate::library_events::LibraryEvents;
 use crate::local_messages::describe_tf2_install;
 use crate::pages::crosshair_maker::model::hsla_of_rgba;
 use crate::services::{OpError, Services, require_tf2, run_blocking};
+use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::toast::toast_error;
 use crate::widgets::labelled;
 
@@ -143,6 +144,7 @@ impl HudMakerPage {
         vec![
             section
                 .children(self.hud_option_section(cx))
+                .child(self.reset_all_row(cx))
                 .child(self.viewmodels_rows(cx))
                 .child(self.recipe_rows(cx))
                 .into_any_element(),
@@ -253,6 +255,43 @@ impl HudMakerPage {
                     page.viewmodels = state;
                     cx.notify();
                 }
+            });
+        })
+        .detach();
+    }
+
+    // "Reset all options" under every option group, live only while some option holds a
+    // choice and no preview runs.
+    fn reset_all_row(&self, cx: &mut Context<Self>) -> AnyElement {
+        let changed = (self.editor()).is_some_and(|e| e.options_changed() && !e.previewing());
+        let reset = Button::new(ids::HUD_MAKER_OPTIONS_RESET_ALL)
+            .ghost()
+            .xsmall()
+            .icon(IconName::RotateCcw)
+            .label("Reset all options")
+            .disabled(!changed)
+            .on_click(cx.listener(|page, _, window, cx| page.reset_all_options(window, cx)));
+        h_flex().justify_end().child(reset).into_any_element()
+    }
+
+    // Asks first, since it drops every option at once; a dialog closed unanswered counts as no.
+    // The answer applies only to the HUD that was open when asked.
+    pub(super) fn reset_all_options(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let answer = confirm(Confirm::reset_all_options(), window, cx);
+        let load = self.loads;
+        let win = self.win;
+        cx.spawn(async move |page, cx| {
+            if !answer.recv().await.unwrap_or(false) {
+                return;
+            }
+            let _ = win.update(cx, |_, window, cx| {
+                let _ = page.update(cx, |page, cx| {
+                    if page.loads == load {
+                        page.edit_selected(window, cx, |e| {
+                            e.reset_all_options();
+                        });
+                    }
+                });
             });
         })
         .detach();
