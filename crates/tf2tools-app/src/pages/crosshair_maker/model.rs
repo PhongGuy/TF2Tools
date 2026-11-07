@@ -542,7 +542,9 @@ impl Editor {
     fn paint(&self, tool: Tool) -> [u8; 4] {
         match tool {
             Tool::Eraser => CLEAR,
-            _ => self.paint_rgba(),
+            Tool::Pencil | Tool::Fill | Tool::Line | Tool::Rectangle | Tool::Circle => {
+                self.paint_rgba()
+            }
         }
     }
 
@@ -931,7 +933,7 @@ pub fn fit_note(change: FitChange) -> Option<&'static str> {
     match change {
         FitChange::ShrunkToFit => Some(FIT_SHRUNK),
         FitChange::Centred => Some(FIT_CENTRED),
-        _ => None,
+        FitChange::AsIs | _ => None,
     }
 }
 

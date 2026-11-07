@@ -30,7 +30,7 @@ impl HudFiles {
             .unwrap_or_default();
         let Some(name) = chapters.iter().find_map(|p| match &p.value {
             KvValue::Text(t) if !t.trim().is_empty() => Some(t.trim()),
-            _ => None,
+            KvValue::Text(_) | KvValue::Block(_) => None,
         }) else {
             return Ok(None);
         };
@@ -82,6 +82,6 @@ fn block(pair: &KvPair) -> Option<&[KvPair]> {
 fn text<'a>(pairs: &'a [KvPair], name: &str) -> Option<&'a str> {
     pairs.iter().find_map(|pair| match &pair.value {
         KvValue::Text(t) if pair.key.eq_ignore_ascii_case(name) => Some(t.as_str()),
-        _ => None,
+        KvValue::Text(_) | KvValue::Block(_) => None,
     })
 }

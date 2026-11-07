@@ -774,7 +774,10 @@ impl HudsPage {
             let new = fetched.map(|entries| {
                 entries.into_iter().find_map(|entry| match entry {
                     LibraryEntry::Hud(hud) => Some(hud.id().clone()),
-                    _ => None,
+                    LibraryEntry::Sound(_)
+                    | LibraryEntry::Crosshair(_)
+                    | LibraryEntry::Addon(_)
+                    | _ => None,
                 })
             });
             let _ = page.update(cx, |page, cx| match new {
@@ -860,7 +863,7 @@ impl HudsPage {
         let (folder, managed_id) = match status {
             HudStatus::Managed { folder_name, id } => (folder_name, Some(id)),
             HudStatus::Unmanaged { folder_name } => (folder_name, None),
-            _ => return None,
+            HudStatus::NotInstalled | HudStatus::Multiple { .. } | _ => return None,
         };
         let entry = managed_id.and_then(|id| self.huds.iter().find(|h| h.id() == id));
         let name = entry.map_or(folder.as_str(), HudEntry::name);
@@ -1130,7 +1133,7 @@ fn store_row(s: &Services, provenance: &Provenance) -> Option<StoreItem> {
         Provenance::GameBanana { gb_id, .. } => {
             (StoreKind::GameBananaHuds, StoreItemId::GameBanana(*gb_id))
         }
-        _ => return None,
+        Provenance::Local | _ => return None,
     };
     s.store.store_item(kind, &id).ok().flatten()
 }
@@ -1175,7 +1178,7 @@ fn store_links(s: &Services, huds: &[HudEntry]) -> StoreLinks {
                         str::to_owned,
                     ),
             ),
-            _ => None,
+            Provenance::Local | _ => None,
         };
         if let Some(page) = page.filter(|url| !url.is_empty()) {
             links.pages.insert(folder, page);

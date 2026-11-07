@@ -169,6 +169,8 @@ pub fn decode_vtf(bytes: &[u8]) -> Result<RgbaImage, VtfError> {
     }
 }
 
+// vtf has dozens of image formats; every one but these four goes to its own decoder.
+#[allow(clippy::wildcard_enum_match_arm)]
 fn decode_unguarded(bytes: &[u8]) -> Result<RgbaImage, vtf::Error> {
     let file = vtf::from_bytes(bytes)?;
     let image = &file.highres_image;

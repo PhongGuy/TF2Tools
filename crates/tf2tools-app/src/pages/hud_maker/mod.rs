@@ -379,7 +379,13 @@ impl Field {
             Field::LineHeight => Some("LineHeight"),
             Field::LineSpacing => Some("LineSpacing"),
             Field::Lifetime => Some("delta_lifetime"),
-            _ => None,
+            Field::X
+            | Field::Y
+            | Field::Wide
+            | Field::Tall
+            | Field::Text
+            | Field::FontSize
+            | Field::Setting => None,
         }
     }
 
@@ -387,7 +393,18 @@ impl Field {
     fn row_key(self) -> Option<&'static str> {
         match self {
             Field::Text => Some(TEXT_KEY),
-            _ => self.number_key(),
+            Field::X
+            | Field::Y
+            | Field::Wide
+            | Field::Tall
+            | Field::RowHeight
+            | Field::RowGap
+            | Field::SectionGap
+            | Field::LineHeight
+            | Field::LineSpacing
+            | Field::Lifetime
+            | Field::FontSize
+            | Field::Setting => self.number_key(),
         }
     }
 
@@ -989,7 +1006,14 @@ impl HudMakerPage {
             let asset_fonts = (made.changes().iter())
                 .filter_map(|c| match c.target() {
                     ChangeTarget::Asset(asset) => Some(asset.source()),
-                    _ => None,
+                    ChangeTarget::Set(_)
+                    | ChangeTarget::Remove(_)
+                    | ChangeTarget::AddBlock(_)
+                    | ChangeTarget::Option(_)
+                    | ChangeTarget::Credit(_)
+                    | ChangeTarget::Animation(_)
+                    | ChangeTarget::AnimationAppend(_)
+                    | _ => None,
                 })
                 .filter_map(|source| {
                     let bytes = made.assets().get(source)?.to_vec();
@@ -1175,7 +1199,7 @@ impl HudMakerPage {
                 self.load = Load::NoGame;
                 match err {
                     OpError::Internal(_) => Some(Err(err)),
-                    other => {
+                    other @ OpError::NoTf2 | other @ OpError::Core { .. } => {
                         tracing::warn!("the HUD Maker found no HUD files: {other}");
                         None
                     }
@@ -1307,7 +1331,7 @@ impl HudMakerPage {
                     ));
                     self.hud_texts.insert(id, state);
                 }
-                _ => {}
+                OptionKind::Toggle | OptionKind::Colour { .. } | OptionKind::Choice(_) | _ => {}
             }
         }
     }
@@ -1524,7 +1548,7 @@ impl HudMakerPage {
     pub fn editor(&self) -> Option<&HudEditor> {
         match &self.load {
             Load::Ready(loaded) => Some(&loaded.editor),
-            _ => None,
+            Load::Reading | Load::NoGame | Load::CantOpen(_) => None,
         }
     }
 
@@ -1622,7 +1646,7 @@ impl HudMakerPage {
     pub fn editor_mut(&mut self) -> Option<&mut HudEditor> {
         match &mut self.load {
             Load::Ready(loaded) => Some(&mut loaded.editor),
-            _ => None,
+            Load::Reading | Load::NoGame | Load::CantOpen(_) => None,
         }
     }
 
@@ -1634,7 +1658,7 @@ impl HudMakerPage {
             Load::Ready(loaded) => {
                 canvas::drawn_family(family, &loaded.font_names).map(|f| f.to_string())
             }
-            _ => None,
+            Load::Reading | Load::NoGame | Load::CantOpen(_) => None,
         }
     }
 
@@ -1642,7 +1666,7 @@ impl HudMakerPage {
     pub fn knows_font(&self, family: &str) -> bool {
         match &self.load {
             Load::Ready(loaded) => loaded.font_names.contains(&family.to_lowercase()),
-            _ => false,
+            Load::Reading | Load::NoGame | Load::CantOpen(_) => false,
         }
     }
 
@@ -1906,7 +1930,7 @@ impl HudMakerPage {
             Load::Ready(loaded) => (self.seen_images().unwrap_or(&loaded.images))
                 .get(part)
                 .cloned(),
-            _ => None,
+            Load::Reading | Load::NoGame | Load::CantOpen(_) => None,
         }
     }
 
@@ -2374,7 +2398,9 @@ impl HudMakerPage {
         match place.mode {
             PanelMode::Floating => false,
             _ if self.dock_floored() => self.peek != Some(panel),
-            side => place.collapsed && !self.side_open(side),
+            side @ PanelMode::DockLeft | side @ PanelMode::DockRight => {
+                place.collapsed && !self.side_open(side)
+            }
         }
     }
 
@@ -2779,7 +2805,7 @@ impl HudMakerPage {
     pub fn shown_files(&self) -> Option<Arc<HudFiles>> {
         match &self.load {
             Load::Ready(loaded) => Some(Arc::clone(&loaded.files)),
-            _ => None,
+            Load::Reading | Load::NoGame | Load::CantOpen(_) => None,
         }
     }
 
@@ -3346,7 +3372,12 @@ impl HudMakerPage {
             };
             return done.map_err(|e| match e {
                 editor::AnimRefused::RunsCommands => EditRefused::RunsGameCommands,
-                _ => EditRefused::BadValue,
+                editor::AnimRefused::NoSelection
+                | editor::AnimRefused::NoSuchEvent
+                | editor::AnimRefused::NotNamed
+                | editor::AnimRefused::NoSuchRow
+                | editor::AnimRefused::Appended
+                | editor::AnimRefused::BadValue => EditRefused::BadValue,
             });
         }
         match (key, again) {
@@ -3548,13 +3579,30 @@ impl HudMakerPage {
                 Field::Y => b.y().to_string(),
                 Field::Wide => b.wide().to_string(),
                 Field::Tall => b.tall().to_string(),
-                _ => {
+                Field::RowHeight
+                | Field::RowGap
+                | Field::SectionGap
+                | Field::Text
+                | Field::LineHeight
+                | Field::LineSpacing
+                | Field::Lifetime => {
                     let row = field.row_key()?;
                     schema.get(row)?;
                     let text = part.value(row).map_or("", |line| line.text());
                     match field {
                         Field::Text => text.to_owned(),
-                        _ => text.trim().to_owned(),
+                        Field::X
+                        | Field::Y
+                        | Field::Wide
+                        | Field::Tall
+                        | Field::RowHeight
+                        | Field::RowGap
+                        | Field::SectionGap
+                        | Field::LineHeight
+                        | Field::LineSpacing
+                        | Field::Lifetime
+                        | Field::FontSize
+                        | Field::Setting => text.trim().to_owned(),
                     }
                 }
             };
@@ -3579,7 +3627,18 @@ impl HudMakerPage {
             let typed = self.fields[field as usize].read(cx).value().to_string();
             let text = match field {
                 Field::Text => typed,
-                _ => typed.trim().to_owned(),
+                Field::X
+                | Field::Y
+                | Field::Wide
+                | Field::Tall
+                | Field::RowHeight
+                | Field::RowGap
+                | Field::SectionGap
+                | Field::LineHeight
+                | Field::LineSpacing
+                | Field::Lifetime
+                | Field::FontSize
+                | Field::Setting => typed.trim().to_owned(),
             };
             if text == shown.text {
                 continue;
@@ -4182,13 +4241,25 @@ fn commit_typed(
                 .set_property_selected("delta_lifetime", text)
                 .map_err(|err| match err {
                     EditRefused::BadValue => Refusal::Note(time_note(text)),
-                    err => Refusal::Refused(err),
+                    err @ (EditRefused::UnknownPart
+                    | EditRefused::ReadOnly
+                    | EditRefused::NotOffered
+                    | EditRefused::RunsGameCommands
+                    | _) => Refusal::Refused(err),
                 });
         }
         Field::Setting => editor.set_key_text_selected(key()?, text),
         Field::FontSize => editor.edit_font_selected(key()?, FontEdit::Size(value()?)),
         // Every other field is a whole number for a part the layout places.
-        _ => {
+        Field::X
+        | Field::Y
+        | Field::Wide
+        | Field::Tall
+        | Field::RowHeight
+        | Field::RowGap
+        | Field::SectionGap
+        | Field::LineHeight
+        | Field::LineSpacing => {
             let b = (editor.layout().get(&shown.part).cloned()).ok_or(Refusal::Skipped)?;
             match field {
                 Field::X => editor.move_selected(value()? - b.x(), 0),
@@ -4200,7 +4271,12 @@ fn commit_typed(
                 }
                 // The killfeed's line numbers are Stage 2 rows, which core writes through
                 // set_property.
-                _ => editor.set_property_selected(row()?, &value()?.to_string()),
+                Field::Text
+                | Field::LineHeight
+                | Field::LineSpacing
+                | Field::Lifetime
+                | Field::FontSize
+                | Field::Setting => editor.set_property_selected(row()?, &value()?.to_string()),
             }
         }
     };
@@ -4215,7 +4291,15 @@ fn landed(editor: &HudEditor, field: Field, part: &PartKey) -> Option<i32> {
         Field::Y => Some(b.y()),
         Field::Wide => Some(b.wide()),
         Field::Tall => Some(b.tall()),
-        _ => None,
+        Field::RowHeight
+        | Field::RowGap
+        | Field::SectionGap
+        | Field::Text
+        | Field::LineHeight
+        | Field::LineSpacing
+        | Field::Lifetime
+        | Field::FontSize
+        | Field::Setting => None,
     }
 }
 

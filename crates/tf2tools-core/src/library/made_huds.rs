@@ -256,7 +256,13 @@ impl Library {
         let named: BTreeSet<String> = (edited.applied().iter())
             .filter_map(|c| match c.target() {
                 ChangeTarget::Asset(asset) => asset_source(asset),
-                _ => None,
+                ChangeTarget::Set(_)
+                | ChangeTarget::Remove(_)
+                | ChangeTarget::AddBlock(_)
+                | ChangeTarget::Option(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_) => None,
             })
             .collect();
         assets.bytes.retain(|source, _| named.contains(source));
@@ -930,7 +936,13 @@ pub(super) fn prune_pictures(build: &Path, applied: &[Change]) -> Result<(), Mak
     };
     needed.extend(applied.iter().filter_map(|c| match c.target() {
         ChangeTarget::Asset(asset) => asset_source(asset),
-        _ => None,
+        ChangeTarget::Set(_)
+        | ChangeTarget::Remove(_)
+        | ChangeTarget::AddBlock(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_) => None,
     }));
     let images = build.join(IMAGES_DIR);
     if !std::fs::symlink_metadata(&images).is_ok_and(|m| m.is_dir()) {
@@ -1234,7 +1246,13 @@ fn maker_added(previous: &MakerFile, originals: &[String]) -> Vec<String> {
         .collect();
     added.extend(previous.changes().iter().filter_map(|c| match c.target() {
         ChangeTarget::Asset(asset) => check_hud_path(asset.path()),
-        _ => None,
+        ChangeTarget::Set(_)
+        | ChangeTarget::Remove(_)
+        | ChangeTarget::AddBlock(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_) => None,
     }));
     added.push(OWN_SCRIPT.to_owned());
     added.push(CREDITS_FILE.to_owned());
@@ -1298,7 +1316,13 @@ fn credits_text(applied: &[Change], base: &MakerBase) -> Option<String> {
     let lines: Vec<String> = (applied.iter())
         .filter_map(|c| match c.target() {
             ChangeTarget::Credit(n) => Some(n),
-            _ => None,
+            ChangeTarget::Set(_)
+            | ChangeTarget::Remove(_)
+            | ChangeTarget::AddBlock(_)
+            | ChangeTarget::Asset(_)
+            | ChangeTarget::Option(_)
+            | ChangeTarget::Animation(_)
+            | ChangeTarget::AnimationAppend(_) => None,
         })
         .map(|n| {
             let by = if n.author().is_empty() {
@@ -1401,7 +1425,11 @@ fn make_load(e: HudLoadError) -> MakeHudError {
     match e {
         HudLoadError::Io { path, source } => MakeHudError::Io { path, source },
         HudLoadError::Files(files) => MakeHudError::Files(files),
-        other => MakeHudError::Database {
+        other @ HudLoadError::Damaged { .. }
+        | other @ HudLoadError::Newer
+        | other @ HudLoadError::NotFound { .. }
+        | other @ HudLoadError::NotMade { .. }
+        | other @ HudLoadError::Database { .. } => MakeHudError::Database {
             message: other.to_string(),
         },
     }

@@ -21,7 +21,16 @@ fn runs(command: &AnimCommand) -> Option<&str> {
         AnimCommand::RunEvent { event, .. }
         | AnimCommand::StopEvent { event, .. }
         | AnimCommand::RunEventChild { event, .. } => Some(event),
-        _ => None,
+        AnimCommand::Animate { .. }
+        | AnimCommand::SetVisible { .. }
+        | AnimCommand::SetInputEnabled { .. }
+        | AnimCommand::FireCommand { .. }
+        | AnimCommand::PlaySound { .. }
+        | AnimCommand::StopAnimation { .. }
+        | AnimCommand::StopPanelAnimations { .. }
+        | AnimCommand::SetFont { .. }
+        | AnimCommand::SetTexture { .. }
+        | AnimCommand::SetString { .. } => None,
     }
 }
 
@@ -129,7 +138,12 @@ impl Run<'_> {
                 ChangeTarget::AnimationAppend(a) => {
                     !a.lines().is_empty() && a.check(platform).is_some()
                 }
-                _ => false,
+                ChangeTarget::Set(_)
+                | ChangeTarget::Remove(_)
+                | ChangeTarget::AddBlock(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Option(_)
+                | ChangeTarget::Credit(_) => false,
             };
             if keep {
                 self.changes.push(change);
@@ -199,7 +213,7 @@ impl Run<'_> {
                     | AnimCommand::StopAnimation { panel, .. }
                     | AnimCommand::StopPanelAnimations { panel, .. }
                     | AnimCommand::SetString { panel, .. } => renamed(panel),
-                    _ => {}
+                    AnimCommand::FireCommand { .. } | AnimCommand::PlaySound { .. } => {}
                 }
                 c.to_line()
             })

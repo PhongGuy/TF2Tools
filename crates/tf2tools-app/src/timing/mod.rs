@@ -299,7 +299,7 @@ pub fn huds_loaded(window: &mut Window, cx: &mut App) {
                     cx.quit();
                 });
             }
-            _ => {}
+            TimingMode::Off | TimingMode::Startup => {}
         }
     });
 }

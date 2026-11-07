@@ -408,7 +408,18 @@ impl Runner {
             | Case::AddonsNav
             | Case::LogsNav => self.probe(cx),
             Case::SoundStoreWalk => self.walk(cx),
-            _ => self.record(cx),
+            Case::Calibrate
+            | Case::PageSwitch
+            | Case::ClassTab
+            | Case::PickerScroll
+            | Case::HudGridScroll
+            | Case::CrosshairsScroll
+            | Case::SoundStoreScroll
+            | Case::CuratedScroll
+            | Case::GameBananaScroll
+            | Case::SoundStoreSyncScroll
+            | Case::LogsScroll
+            | Case::Idle => self.record(cx),
         }
     }
 
@@ -497,7 +508,24 @@ impl Runner {
         let grid = grid.read(cx);
         match self.case {
             Case::SoundStoreNav => grid.is_loaded() && !grid.cards().is_empty(),
-            _ => grid.first_pages() > self.firsts_at,
+            Case::Calibrate
+            | Case::PageSwitch
+            | Case::ClassTab
+            | Case::PickerScroll
+            | Case::HudGridScroll
+            | Case::CrosshairsScroll
+            | Case::SoundStoreScroll
+            | Case::CuratedScroll
+            | Case::GameBananaScroll
+            | Case::SoundStoreSyncScroll
+            | Case::SoundStoreSearch
+            | Case::SoundStoreWalk
+            | Case::ProfilesNav
+            | Case::AddonsNav
+            | Case::LogsNav
+            | Case::LogsScroll
+            | Case::ProfileApply
+            | Case::Idle => grid.first_pages() > self.firsts_at,
         }
     }
 
@@ -728,7 +756,23 @@ impl Runner {
                     page.update(cx, |page, cx| page.set_class(class, cx));
                 }
             }
-            _ => {}
+            Case::Calibrate
+            | Case::PickerScroll
+            | Case::HudGridScroll
+            | Case::CrosshairsScroll
+            | Case::SoundStoreScroll
+            | Case::CuratedScroll
+            | Case::GameBananaScroll
+            | Case::SoundStoreSyncScroll
+            | Case::SoundStoreNav
+            | Case::SoundStoreSearch
+            | Case::SoundStoreWalk
+            | Case::ProfilesNav
+            | Case::AddonsNav
+            | Case::LogsNav
+            | Case::LogsScroll
+            | Case::ProfileApply
+            | Case::Idle => {}
         }
     }
 
@@ -774,7 +818,15 @@ fn page_loaded(shell: &Shell, page: Page, cx: &App) -> bool {
             .is_some_and(|p| p.read(cx).is_loaded()),
         Page::Addons => shell.addons_page().is_some_and(|p| p.read(cx).is_loaded()),
         Page::Logs => shell.logs_page().is_some_and(|p| p.read(cx).is_loaded()),
-        _ => false,
+        Page::Sounds
+        | Page::CrosshairMaker
+        | Page::HudMaker
+        | Page::HudStore
+        | Page::SoundStore
+        | Page::CrosshairStore
+        | Page::AddonStore
+        | Page::Maps
+        | Page::Settings => false,
     }
 }
 
@@ -815,7 +867,21 @@ fn nav_page(case: Case) -> Option<Page> {
         Case::ProfilesNav => Some(Page::Profiles),
         Case::AddonsNav => Some(Page::Addons),
         Case::LogsNav => Some(Page::Logs),
-        _ => None,
+        Case::Calibrate
+        | Case::PageSwitch
+        | Case::ClassTab
+        | Case::PickerScroll
+        | Case::HudGridScroll
+        | Case::CrosshairsScroll
+        | Case::SoundStoreScroll
+        | Case::CuratedScroll
+        | Case::GameBananaScroll
+        | Case::SoundStoreSyncScroll
+        | Case::SoundStoreSearch
+        | Case::SoundStoreWalk
+        | Case::LogsScroll
+        | Case::ProfileApply
+        | Case::Idle => None,
     }
 }
 
@@ -855,7 +921,21 @@ fn scroll_handle(case: Case, shell: &Entity<Shell>, cx: &App) -> Option<ScrollHa
             .hud_store_page()
             .and_then(|p| p.read(cx).curated())
             .map(|tab| tab.read(cx).grid_scroll()),
-        _ => None,
+        Case::Calibrate
+        | Case::PageSwitch
+        | Case::ClassTab
+        | Case::SoundStoreScroll
+        | Case::GameBananaScroll
+        | Case::SoundStoreSyncScroll
+        | Case::SoundStoreNav
+        | Case::SoundStoreSearch
+        | Case::SoundStoreWalk
+        | Case::ProfilesNav
+        | Case::AddonsNav
+        | Case::LogsNav
+        | Case::LogsScroll
+        | Case::ProfileApply
+        | Case::Idle => None,
     }
 }
 
@@ -872,7 +952,19 @@ fn store_grid(case: Case, shell: &Entity<Shell>, cx: &App) -> Option<Entity<Stor
             .hud_store_page()
             .and_then(|p| p.read(cx).gamebanana())
             .map(|tab| tab.read(cx).grid().clone()),
-        _ => None,
+        Case::Calibrate
+        | Case::PageSwitch
+        | Case::ClassTab
+        | Case::PickerScroll
+        | Case::HudGridScroll
+        | Case::CrosshairsScroll
+        | Case::CuratedScroll
+        | Case::ProfilesNav
+        | Case::AddonsNav
+        | Case::LogsNav
+        | Case::LogsScroll
+        | Case::ProfileApply
+        | Case::Idle => None,
     }
 }
 

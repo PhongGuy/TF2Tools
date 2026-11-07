@@ -375,7 +375,7 @@ fn find_block<'a>(pairs: &'a [KvPair], name: &str) -> Option<&'a [KvPair]> {
 fn find_text<'a>(pairs: &'a [KvPair], name: &str) -> Option<&'a str> {
     pairs.iter().find_map(|pair| match &pair.value {
         KvValue::Text(text) if pair.key.eq_ignore_ascii_case(name) => Some(text.as_str()),
-        _ => None,
+        KvValue::Text(_) | KvValue::Block(_) => None,
     })
 }
 

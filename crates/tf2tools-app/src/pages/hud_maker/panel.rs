@@ -249,7 +249,7 @@ impl HudMakerPage {
                 .children(children);
             match side {
                 PanelMode::DockLeft => column.left(inset).items_start(),
-                _ => column.right(inset).items_end(),
+                PanelMode::Floating | PanelMode::DockRight => column.right(inset).items_end(),
             }
             .into_any_element()
         };
@@ -629,7 +629,19 @@ impl HudMakerPage {
                 .get(row)?
             {
                 tf2tools_core::AnimCommand::Animate { value, .. } => Some(value.clone()),
-                _ => None,
+                tf2tools_core::AnimCommand::RunEvent { .. }
+                | tf2tools_core::AnimCommand::StopEvent { .. }
+                | tf2tools_core::AnimCommand::RunEventChild { .. }
+                | tf2tools_core::AnimCommand::SetVisible { .. }
+                | tf2tools_core::AnimCommand::SetInputEnabled { .. }
+                | tf2tools_core::AnimCommand::FireCommand { .. }
+                | tf2tools_core::AnimCommand::PlaySound { .. }
+                | tf2tools_core::AnimCommand::StopAnimation { .. }
+                | tf2tools_core::AnimCommand::StopPanelAnimations { .. }
+                | tf2tools_core::AnimCommand::SetFont { .. }
+                | tf2tools_core::AnimCommand::SetTexture { .. }
+                | tf2tools_core::AnimCommand::SetString { .. }
+                | _ => None,
             }
         });
         if key == HIT_FLASH_KEY || row.is_some() {
@@ -701,7 +713,18 @@ impl HudMakerPage {
                 let changed = match spec.kind() {
                     PropertyKind::Hide => hidden,
                     PropertyKind::Size if size_hidden => false,
-                    _ => editor.changed(spec.keys()),
+                    PropertyKind::Position
+                    | PropertyKind::Size
+                    | PropertyKind::Layer
+                    | PropertyKind::Colour
+                    | PropertyKind::Text
+                    | PropertyKind::Alignment
+                    | PropertyKind::Toggle
+                    | PropertyKind::Font
+                    | PropertyKind::Image
+                    | PropertyKind::Number
+                    | PropertyKind::Choice
+                    | _ => editor.changed(spec.keys()),
                 };
                 (spec, changed)
             })
@@ -854,7 +877,7 @@ impl HudMakerPage {
                     }
                     self.font_row(spec, &families, cx)
                 }
-                _ => continue,
+                PropertyKind::Image | _ => continue,
             };
             // Mirror and Match size sit in their row's title line, so the panel grows no taller.
             let caps = rows.caps;
@@ -863,7 +886,19 @@ impl HudMakerPage {
                 PropertyKind::Size if caps.resize_wide() || caps.resize_tall() => {
                     Some(self.match_size_button(cx))
                 }
-                _ => None,
+                PropertyKind::Position
+                | PropertyKind::Size
+                | PropertyKind::Layer
+                | PropertyKind::Hide
+                | PropertyKind::Colour
+                | PropertyKind::Text
+                | PropertyKind::Alignment
+                | PropertyKind::Toggle
+                | PropertyKind::Font
+                | PropertyKind::Image
+                | PropertyKind::Number
+                | PropertyKind::Choice
+                | _ => None,
             };
             out.push(self.row(spec, changed, extra, content, cx));
             if spec.kind() == PropertyKind::Text && rows.code_text {
@@ -1508,7 +1543,15 @@ impl HudMakerPage {
                     {
                         &[Field::FontSize]
                     }
-                    _ => &[],
+                    PropertyKind::Layer
+                    | PropertyKind::Hide
+                    | PropertyKind::Colour
+                    | PropertyKind::Alignment
+                    | PropertyKind::Toggle
+                    | PropertyKind::Font
+                    | PropertyKind::Image
+                    | PropertyKind::Choice
+                    | _ => &[],
                 });
                 page.edit_selected(window, cx, |e| {
                     if spec.kind() == PropertyKind::Hide {
@@ -2186,7 +2229,7 @@ fn offered(kind: PropertyKind, caps: PartCaps) -> bool {
         | PropertyKind::Choice
         | PropertyKind::Font => true,
         PropertyKind::Hide => caps.hide(),
-        _ => false,
+        PropertyKind::Image | _ => false,
     }
 }
 

@@ -173,7 +173,14 @@ impl HudMakerPage {
         let fonts: Vec<FontBytes> = (snapshot.changes().iter())
             .filter_map(|c| match c.target() {
                 ChangeTarget::Asset(file) => snapshot.assets().get(file.source()),
-                _ => None,
+                ChangeTarget::Set(_)
+                | ChangeTarget::Remove(_)
+                | ChangeTarget::AddBlock(_)
+                | ChangeTarget::Option(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_)
+                | _ => None,
             })
             .map(|bytes| FontBytes::new(bytes.to_vec()))
             .collect();
@@ -410,7 +417,14 @@ impl HudMakerPage {
                                 let picked = page.editor().is_some_and(|e| {
                                     e.changes().iter().any(|c| match c.target() {
                                         ChangeTarget::Asset(file) => is_picked(file.source()),
-                                        _ => false,
+                                        ChangeTarget::Set(_)
+                                        | ChangeTarget::Remove(_)
+                                        | ChangeTarget::AddBlock(_)
+                                        | ChangeTarget::Option(_)
+                                        | ChangeTarget::Credit(_)
+                                        | ChangeTarget::Animation(_)
+                                        | ChangeTarget::AnimationAppend(_)
+                                        | _ => false,
                                     })
                                 });
                                 let words = match (work, &why) {
@@ -565,7 +579,13 @@ fn save_message(why: &HistoryError) -> String {
             format!("You have {limit} snapshots. Delete one to save another.")
         }
         HistoryError::TooLarge => TOO_LARGE.to_owned(),
-        _ => SAVE_FAILED.to_owned(),
+        HistoryError::NotMade { .. }
+        | HistoryError::NotFound
+        | HistoryError::Damaged { .. }
+        | HistoryError::Newer
+        | HistoryError::Io { .. }
+        | HistoryError::Database { .. }
+        | _ => SAVE_FAILED.to_owned(),
     }
 }
 

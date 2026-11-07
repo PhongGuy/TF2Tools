@@ -92,7 +92,7 @@ impl CrosshairPreviews {
                 .get(name)?
                 .preview_png_path()
                 .map(Path::to_path_buf),
-            _ => None,
+            CrosshairRef::Library(_) | _ => None,
         }
     }
 

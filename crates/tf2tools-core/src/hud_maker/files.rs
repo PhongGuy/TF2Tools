@@ -999,7 +999,7 @@ fn block<'a>(pairs: &'a [KvPair], name: &str) -> Option<&'a [KvPair]> {
         KvValue::Block(children) if pair.key.eq_ignore_ascii_case(name) => {
             Some(children.as_slice())
         }
-        _ => None,
+        KvValue::Text(_) | KvValue::Block(_) => None,
     })
 }
 

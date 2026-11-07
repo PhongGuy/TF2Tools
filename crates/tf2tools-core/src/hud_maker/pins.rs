@@ -180,6 +180,8 @@ fn refused(e: EditRefused) -> PinRefused {
     match e {
         EditRefused::UnknownPart => PinRefused::UnknownPart,
         EditRefused::ReadOnly => PinRefused::ReadOnly,
-        _ => PinRefused::NotOffered,
+        EditRefused::NotOffered | EditRefused::BadValue | EditRefused::RunsGameCommands => {
+            PinRefused::NotOffered
+        }
     }
 }

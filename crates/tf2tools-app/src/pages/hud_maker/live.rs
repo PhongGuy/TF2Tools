@@ -51,7 +51,10 @@ pub fn live_failure(err: &ReinstallError) -> &'static str {
         ReinstallError::InUse { .. } | ReinstallError::SetAside { .. } => IN_USE,
         ReinstallError::Changed { .. } => CHANGED,
         ReinstallError::GameMissing { .. } => GAME_MOVED,
-        _ => NOT_UPDATED,
+        ReinstallError::Unchanged { .. }
+        | ReinstallError::NotInLibrary { .. }
+        | ReinstallError::Database { .. }
+        | _ => NOT_UPDATED,
     }
 }
 

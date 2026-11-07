@@ -620,7 +620,9 @@ impl HudModel {
                         value: ValueMap::OwnFontSize,
                         ..
                     } => self.own_font_edits(action, 24).is_some(),
-                    _ => true,
+                    OptionAction::SetKey { .. }
+                    | OptionAction::Switch(_)
+                    | OptionAction::WriteCfg { .. } => true,
                 }
             }
             // No built-in flips a HUD's own switches or writes a settings file.
@@ -750,7 +752,14 @@ impl HudModel {
                 ChangeTarget::Option(o) if o.source() == OptionChange::BUILTIN && o.id() == id => {
                     Some(o)
                 }
-                _ => None,
+                ChangeTarget::Set(_)
+                | ChangeTarget::Remove(_)
+                | ChangeTarget::AddBlock(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Option(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_) => None,
             }
             .filter(|o| value_suits(&spec.kind, o.value()))
             .filter(|o| {
@@ -907,7 +916,12 @@ impl HudModel {
             .filter_map(|change| match change.target() {
                 ChangeTarget::Set(set) => Some(OptionEdit::Set(set.clone())),
                 ChangeTarget::AddBlock(add) => Some(OptionEdit::Add(add.clone())),
-                _ => None,
+                ChangeTarget::Remove(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Option(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_) => None,
             })
             .collect();
         let root = check_hud_path(file)
@@ -934,7 +948,14 @@ fn built_in_choice(change: &Change, wanted: impl Fn(&str) -> bool) -> Option<&Op
         ChangeTarget::Option(o) if o.source() == OptionChange::BUILTIN && wanted(o.id()) => {
             Some(o.value())
         }
-        _ => None,
+        ChangeTarget::Set(_)
+        | ChangeTarget::Remove(_)
+        | ChangeTarget::AddBlock(_)
+        | ChangeTarget::Asset(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_) => None,
     }
 }
 

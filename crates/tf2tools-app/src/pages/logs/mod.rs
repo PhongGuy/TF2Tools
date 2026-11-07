@@ -500,7 +500,7 @@ fn card(
     let (icon, colour) = match entry.level() {
         LogLevel::Warning => (IconName::TriangleAlert, YELLOW_500),
         LogLevel::Error => (IconName::CircleX, RED_500),
-        _ => (IconName::Info, GREEN_500),
+        LogLevel::Info | _ => (IconName::Info, GREEN_500),
     };
     // The badge's colour follows the stored category; its text is the player's word for it.
     let category = category_label(entry.category());

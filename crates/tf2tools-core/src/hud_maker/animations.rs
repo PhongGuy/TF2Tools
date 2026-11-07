@@ -79,7 +79,11 @@ impl Interp {
             Interp::Flicker(_) => Interp::Flicker(p),
             Interp::Gain(_) => Interp::Gain(p),
             Interp::Bias(_) => Interp::Bias(p),
-            other => other,
+            other @ Interp::Linear
+            | other @ Interp::Accel
+            | other @ Interp::Deaccel
+            | other @ Interp::Spline
+            | other @ Interp::Bounce => other,
         }
     }
 
@@ -303,7 +307,10 @@ impl AnimCommand {
             | AnimCommand::SetFont { panel, .. }
             | AnimCommand::SetTexture { panel, .. }
             | AnimCommand::SetString { panel, .. } => Some(panel),
-            _ => None,
+            AnimCommand::RunEvent { .. }
+            | AnimCommand::StopEvent { .. }
+            | AnimCommand::FireCommand { .. }
+            | AnimCommand::PlaySound { .. } => None,
         }
     }
 }
@@ -536,7 +543,7 @@ impl Parser {
                         return;
                     }
                 }
-                _ => {}
+                Tok::Word(_) | Tok::Cond(_) => {}
             }
         }
     }
@@ -990,7 +997,16 @@ impl ConsoleReach {
                     | AnimCommand::RunEventChild { event, .. } => {
                         todo.push(event.to_ascii_lowercase());
                     }
-                    _ => {}
+                    AnimCommand::Animate { .. }
+                    | AnimCommand::StopEvent { .. }
+                    | AnimCommand::SetVisible { .. }
+                    | AnimCommand::SetInputEnabled { .. }
+                    | AnimCommand::PlaySound { .. }
+                    | AnimCommand::StopAnimation { .. }
+                    | AnimCommand::StopPanelAnimations { .. }
+                    | AnimCommand::SetFont { .. }
+                    | AnimCommand::SetTexture { .. }
+                    | AnimCommand::SetString { .. } => {}
                 }
             }
         }
@@ -1003,7 +1019,12 @@ impl ConsoleReach {
         let (event, commands) = match change.target() {
             ChangeTarget::Animation(a) => (a.event(), a.check(platform)),
             ChangeTarget::AnimationAppend(a) => (a.event(), a.check(platform)),
-            _ => return (change.clone(), 0),
+            ChangeTarget::Set(_)
+            | ChangeTarget::Remove(_)
+            | ChangeTarget::AddBlock(_)
+            | ChangeTarget::Asset(_)
+            | ChangeTarget::Option(_)
+            | ChangeTarget::Credit(_) => return (change.clone(), 0),
         };
         let Some(commands) = commands else {
             return (change.clone(), 0);
@@ -1014,7 +1035,17 @@ impl ConsoleReach {
                 AnimCommand::RunEvent { event, .. } | AnimCommand::RunEventChild { event, .. } => {
                     !self.reaches_console(event)
                 }
-                _ => true,
+                AnimCommand::Animate { .. }
+                | AnimCommand::StopEvent { .. }
+                | AnimCommand::SetVisible { .. }
+                | AnimCommand::SetInputEnabled { .. }
+                | AnimCommand::FireCommand { .. }
+                | AnimCommand::PlaySound { .. }
+                | AnimCommand::StopAnimation { .. }
+                | AnimCommand::StopPanelAnimations { .. }
+                | AnimCommand::SetFont { .. }
+                | AnimCommand::SetTexture { .. }
+                | AnimCommand::SetString { .. } => true,
             })
             .map(AnimCommand::to_line)
             .collect();
@@ -1028,7 +1059,15 @@ impl ConsoleReach {
             ChangeTarget::Animation(_) => {
                 Change::animation(group, AnimationChange::new(event, &text))
             }
-            _ => Change::animation_append(group, AnimationAppend::new(event, &text)),
+            ChangeTarget::Set(_)
+            | ChangeTarget::Remove(_)
+            | ChangeTarget::AddBlock(_)
+            | ChangeTarget::Asset(_)
+            | ChangeTarget::Option(_)
+            | ChangeTarget::Credit(_)
+            | ChangeTarget::AnimationAppend(_) => {
+                Change::animation_append(group, AnimationAppend::new(event, &text))
+            }
         };
         (change, cut)
     }
@@ -1059,7 +1098,12 @@ pub(crate) fn animation_files(
         let event = match change.target() {
             ChangeTarget::Animation(a) => a.event(),
             ChangeTarget::AnimationAppend(a) => a.event(),
-            _ => continue,
+            ChangeTarget::Set(_)
+            | ChangeTarget::Remove(_)
+            | ChangeTarget::AddBlock(_)
+            | ChangeTarget::Asset(_)
+            | ChangeTarget::Option(_)
+            | ChangeTarget::Credit(_) => continue,
         };
         if !names.iter().any(|n| n.eq_ignore_ascii_case(event)) {
             names.push(event);

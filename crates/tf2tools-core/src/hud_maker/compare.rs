@@ -43,7 +43,7 @@ impl ChangeNote {
             }
             ChangeTarget::Animation(a) => (a.event().to_owned(), None),
             ChangeTarget::AnimationAppend(a) => (a.event().to_owned(), None),
-            _ => return None,
+            ChangeTarget::Option(_) | ChangeTarget::Credit(_) => return None,
         };
         Some(ChangeNote { part, key })
     }
@@ -106,7 +106,7 @@ pub fn both_changed(
             ChangeTarget::AnimationAppend(a) => {
                 old.animations().event(a.event()) != new.animations().event(a.event())
             }
-            _ => false,
+            ChangeTarget::Option(_) | ChangeTarget::Credit(_) => false,
         })
         .filter_map(ChangeNote::of)
         .collect()

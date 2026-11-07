@@ -60,7 +60,11 @@ impl Services {
             let (path, message) = (data.db_path(), e.to_string());
             match e {
                 OpenError::NewerSchema { .. } => StartupError::NewerDatabase { path, message },
-                _ => StartupError::Database { path, message },
+                OpenError::Io { .. }
+                | OpenError::Corrupt { .. }
+                | OpenError::Migration { .. }
+                | OpenError::Sqlite { .. }
+                | _ => StartupError::Database { path, message },
             }
         })?;
         let crosshairs = assets.crosshairs_dir();
@@ -161,7 +165,7 @@ impl fmt::Display for OpError {
         f.write_str(self.title())?;
         let description = match self {
             Self::Internal(raw) => raw,
-            _ => self.description(),
+            Self::NoTf2 | Self::Core { .. } => self.description(),
         };
         match description {
             "" => Ok(()),
@@ -199,7 +203,7 @@ impl Tf2State {
     pub fn install(&self) -> Option<&Tf2Install> {
         match self {
             Self::Found(install) => Some(install),
-            _ => None,
+            Self::Detecting | Self::Missing { .. } => None,
         }
     }
 }
@@ -262,7 +266,7 @@ fn rechecked(state: &Tf2State) -> Option<Tf2State> {
             found @ Tf2State::Found(_) => Some(found),
             Tf2State::Detecting | Tf2State::Missing { .. } => None,
         },
-        _ => None,
+        Tf2State::Detecting | Tf2State::Found(_) | Tf2State::Missing { .. } => None,
     }
 }
 

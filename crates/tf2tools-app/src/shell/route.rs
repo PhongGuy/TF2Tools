@@ -82,7 +82,19 @@ impl Page {
     pub fn title(self) -> &'static str {
         match self {
             Page::Logs => "Activity Log",
-            other => other.label(),
+            other @ Page::Huds
+            | other @ Page::Sounds
+            | other @ Page::Crosshairs
+            | other @ Page::CrosshairMaker
+            | other @ Page::HudMaker
+            | other @ Page::Profiles
+            | other @ Page::Addons
+            | other @ Page::HudStore
+            | other @ Page::SoundStore
+            | other @ Page::CrosshairStore
+            | other @ Page::AddonStore
+            | other @ Page::Maps
+            | other @ Page::Settings => other.label(),
         }
     }
 

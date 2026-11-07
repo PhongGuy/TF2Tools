@@ -213,6 +213,6 @@ pub fn redownload_target(
             };
             Some((store, StoreItemId::GameBanana(*gb_id)))
         }
-        _ => None,
+        Provenance::Local | Provenance::Curated { .. } | _ => None,
     }
 }

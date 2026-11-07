@@ -132,7 +132,7 @@ impl Library {
             .flatten()
             .and_then(|maker| match maker.base() {
                 MakerBase::Copy(base) => Some(base.clone()),
-                _ => None,
+                MakerBase::Default => None,
             }))
     }
 
@@ -161,7 +161,7 @@ impl Library {
                 let view = CopyView::new(install, hidden_paths(&live, &maker));
                 Ok(HudFiles::open_copy(tf_dir, &live, &view)?)
             }
-            _ => Ok(HudFiles::open_game(tf_dir)?),
+            MakerBase::Default => Ok(HudFiles::open_game(tf_dir)?),
         }
     }
 
@@ -230,7 +230,7 @@ impl Library {
                 String::new(),
                 String::new(),
             ),
-            _ => (
+            Provenance::Local => (
                 String::new(),
                 "a file you imported".to_owned(),
                 String::new(),
@@ -239,7 +239,11 @@ impl Library {
         };
         let tree = self.hud_tree_hash(entry.id()).map_err(|e| match e {
             LibraryError::Io { path, source } => CopyHudError::Io { path, source },
-            other => copy_library(other),
+            other @ LibraryError::NotFound { .. }
+            | other @ LibraryError::InvalidWeaponScript { .. }
+            | other @ LibraryError::Vpk(_)
+            | other @ LibraryError::Vtf(_)
+            | other @ LibraryError::Database { .. } => copy_library(other),
         })?;
         let install = self
             .install_name(
@@ -330,7 +334,13 @@ pub(super) fn hidden_paths(folder: &Path, maker: &MakerFile) -> Vec<String> {
         .collect();
     hidden.extend(maker.changes().iter().filter_map(|c| match c.target() {
         ChangeTarget::Asset(asset) => Some(asset.path().to_owned()),
-        _ => None,
+        ChangeTarget::Set(_)
+        | ChangeTarget::Remove(_)
+        | ChangeTarget::AddBlock(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_) => None,
     }));
     hidden.extend(read_adding(folder));
     hidden.push(OWN_SCRIPT.to_owned());
@@ -375,7 +385,10 @@ fn copy_library(e: LibraryError) -> CopyHudError {
 fn copy_install(e: InstallError) -> CopyHudError {
     match e {
         InstallError::Io { path, source } => CopyHudError::Io { path, source },
-        other => CopyHudError::Database {
+        other @ InstallError::NotInLibrary { .. }
+        | other @ InstallError::Database { .. }
+        | other @ InstallError::ExternalHuds(_)
+        | other @ InstallError::GameMissing { .. } => CopyHudError::Database {
             message: other.to_string(),
         },
     }
@@ -940,7 +953,13 @@ impl Library {
                 ChangeTarget::Option(choice) => {
                     Some(old_options.label(choice.id()).unwrap_or(UNNAMED_OPTION))
                 }
-                _ => None,
+                ChangeTarget::Set(_)
+                | ChangeTarget::Remove(_)
+                | ChangeTarget::AddBlock(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_) => None,
             })
             .map(ChangeNote::option)
             .collect();
@@ -1018,7 +1037,11 @@ fn save_db(e: rusqlite::Error) -> UpdateCopyError {
 fn save_library(e: LibraryError) -> UpdateCopyError {
     match e {
         LibraryError::Io { path, source } => MakeHudError::Io { path, source }.into(),
-        other => MakeHudError::Database {
+        other @ LibraryError::NotFound { .. }
+        | other @ LibraryError::InvalidWeaponScript { .. }
+        | other @ LibraryError::Vpk(_)
+        | other @ LibraryError::Vtf(_)
+        | other @ LibraryError::Database { .. } => MakeHudError::Database {
             message: other.to_string(),
         }
         .into(),
@@ -1028,7 +1051,12 @@ fn save_library(e: LibraryError) -> UpdateCopyError {
 fn save_copy(e: CopyHudError) -> UpdateCopyError {
     match e {
         CopyHudError::Io { path, source } => MakeHudError::Io { path, source }.into(),
-        other => MakeHudError::Database {
+        other @ CopyHudError::NotFound { .. }
+        | other @ CopyHudError::BaseMissing { .. }
+        | other @ CopyHudError::MadeHud { .. }
+        | other @ CopyHudError::NameTaken { .. }
+        | other @ CopyHudError::NoSpace { .. }
+        | other @ CopyHudError::Database { .. } => MakeHudError::Database {
             message: other.to_string(),
         }
         .into(),

@@ -119,7 +119,9 @@ fn extract_7z(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
 fn extract_vpk(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
     let from_vpk = |e: VpkError| match e {
         VpkError::Io { path, source } => ArchiveError::Io { path, source },
-        other => malformed(archive, other),
+        other @ VpkError::Malformed { .. } | other @ VpkError::NoWav { .. } => {
+            malformed(archive, other)
+        }
     };
     let vpk = pak::open_vpk(archive).map_err(from_vpk)?;
     for name in vpk.tree.keys() {

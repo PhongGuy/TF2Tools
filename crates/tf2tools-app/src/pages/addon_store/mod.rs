@@ -399,7 +399,9 @@ impl AddonStorePage {
                         addon_state(self.library.get(name)),
                         updates.read(cx).is_installing(name),
                     ),
-                    _ => (AddonState::Download, false),
+                    StoreItemId::GameBanana(_) | StoreItemId::Curated(_) | _ => {
+                        (AddonState::Download, false)
+                    }
                 };
                 addon_card(item, state, installing, blocked, page.clone(), cx)
             })
@@ -478,7 +480,7 @@ fn addon_card(
     } else {
         let icon = match state {
             AddonState::Installed => IconName::CircleCheck,
-            _ => IconName::Library,
+            AddonState::Download | AddonState::InLibrary | AddonState::Update => IconName::Library,
         };
         div()
             .id(ids::store_state(KIND, &id))

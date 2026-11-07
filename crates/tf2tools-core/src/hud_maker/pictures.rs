@@ -225,7 +225,13 @@ impl HudModel {
                 .filter(|c| match c.target() {
                     ChangeTarget::Asset(asset) => normalise_game_path(asset.path())
                         .is_some_and(|p| materials.contains(&p.to_ascii_lowercase())),
-                    _ => false,
+                    ChangeTarget::Set(_)
+                    | ChangeTarget::Remove(_)
+                    | ChangeTarget::AddBlock(_)
+                    | ChangeTarget::Option(_)
+                    | ChangeTarget::Credit(_)
+                    | ChangeTarget::Animation(_)
+                    | ChangeTarget::AnimationAppend(_) => false,
                 })
                 .map(Change::group)
                 .collect(),
@@ -269,7 +275,13 @@ impl HudModel {
             .filter(|c| match c.target() {
                 ChangeTarget::Asset(asset) => normalise_game_path(asset.path())
                     .is_some_and(|p| p.eq_ignore_ascii_case(CHAPTERS)),
-                _ => false,
+                ChangeTarget::Set(_)
+                | ChangeTarget::Remove(_)
+                | ChangeTarget::AddBlock(_)
+                | ChangeTarget::Option(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_) => false,
             })
             .map(Change::group)
             .collect();

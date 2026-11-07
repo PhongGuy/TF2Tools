@@ -230,7 +230,7 @@ fn next_entry<I: Iterator<Item = Token>>(tokens: &mut Stream<I>) -> Option<Entry
                         .next_if(|token| matches!(token, Token::Cond(_)))
                         .and_then(|token| match token {
                             Token::Cond(cond) => Some(cond),
-                            _ => None,
+                            Token::Open | Token::Close | Token::Text(_) => None,
                         });
                     return Some(Entry::Pair { key, value, cond });
                 }
@@ -270,7 +270,7 @@ fn skip_block<I: Iterator<Item = Token>>(tokens: &mut Stream<I>) {
                     return;
                 }
             }
-            _ => {}
+            Token::Text(_) | Token::Cond(_) => {}
         }
     }
 }

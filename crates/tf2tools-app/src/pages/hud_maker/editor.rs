@@ -162,7 +162,7 @@ fn delay_of(command: &mut AnimCommand) -> Option<&mut f32> {
         | AnimCommand::SetFont { delay, .. }
         | AnimCommand::SetTexture { delay, .. }
         | AnimCommand::SetString { delay, .. } => Some(delay),
-        _ => None,
+        AnimCommand::Animate { .. } | AnimCommand::FireCommand { .. } | _ => None,
     }
 }
 
@@ -639,7 +639,7 @@ impl HudEditor {
                     false => s.with_health(u16::MAX),
                 }
             }
-            _ => return false,
+            ShowsFor::Weapon(_) | ShowsFor::Mode(_) | _ => return false,
         };
         self.set_situation(next);
         true
@@ -814,7 +814,20 @@ impl HudEditor {
             AnimCommand::Animate { panel, value, .. } if panel.eq_ignore_ascii_case(&name) => {
                 Some(value.clone())
             }
-            _ => None,
+            AnimCommand::Animate { .. }
+            | AnimCommand::RunEvent { .. }
+            | AnimCommand::StopEvent { .. }
+            | AnimCommand::RunEventChild { .. }
+            | AnimCommand::SetVisible { .. }
+            | AnimCommand::SetInputEnabled { .. }
+            | AnimCommand::FireCommand { .. }
+            | AnimCommand::PlaySound { .. }
+            | AnimCommand::StopAnimation { .. }
+            | AnimCommand::StopPanelAnimations { .. }
+            | AnimCommand::SetFont { .. }
+            | AnimCommand::SetTexture { .. }
+            | AnimCommand::SetString { .. }
+            | _ => None,
         })
     }
 
@@ -883,7 +896,15 @@ impl HudEditor {
                 ChangeTarget::AnimationAppend(a) if a.event().eq_ignore_ascii_case(HIT_MARKER) => {
                     lines_name(a.lines(), &name)
                 }
-                _ => false,
+                ChangeTarget::Set(_)
+                | ChangeTarget::Remove(_)
+                | ChangeTarget::AddBlock(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Option(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_)
+                | _ => false,
             })
             .map(Change::group)
             .collect()
@@ -1148,12 +1169,12 @@ impl HudEditor {
         let across = match handle {
             Left | TopLeft | BottomLeft => vec![edge(b.x(), b.wide(), true)],
             Right | TopRight | BottomRight => vec![edge(b.x(), b.wide(), false)],
-            _ => Vec::new(),
+            Move | Top | Bottom => Vec::new(),
         };
         let down = match handle {
             Top | TopLeft | TopRight => vec![edge(b.y(), b.tall(), true)],
             Bottom | BottomLeft | BottomRight => vec![edge(b.y(), b.tall(), false)],
-            _ => Vec::new(),
+            Move | Left | Right => Vec::new(),
         };
         let moving = Moving { across, down };
         let movers = std::slice::from_ref(part);
@@ -1426,7 +1447,11 @@ impl HudEditor {
                     .inspect_err(|&e| {
                         blame = match e {
                             EditRefused::BadValue => FontAddRefused::BadName,
-                            _ => FontAddRefused::HudFull,
+                            EditRefused::UnknownPart
+                            | EditRefused::ReadOnly
+                            | EditRefused::NotOffered
+                            | EditRefused::RunsGameCommands
+                            | _ => FontAddRefused::HudFull,
                         };
                     })?;
             let family = FontEdit::Family(file.family().to_owned());
@@ -1786,7 +1811,14 @@ impl HudEditor {
                 ChangeTarget::Option(o) => {
                     [OptionChange::HUD, OptionChange::SCHEMA].contains(&o.source())
                 }
-                _ => false,
+                ChangeTarget::Set(_)
+                | ChangeTarget::Remove(_)
+                | ChangeTarget::AddBlock(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_)
+                | _ => false,
             })
             .cloned()
             .collect()
@@ -2159,7 +2191,14 @@ impl HudEditor {
         let resolved = self.pristine.with_changes(&changes);
         let sources = (resolved.applied().iter()).filter_map(|c| match c.target() {
             ChangeTarget::Asset(file) => Some(file.source()),
-            _ => None,
+            ChangeTarget::Set(_)
+            | ChangeTarget::Remove(_)
+            | ChangeTarget::AddBlock(_)
+            | ChangeTarget::Option(_)
+            | ChangeTarget::Credit(_)
+            | ChangeTarget::Animation(_)
+            | ChangeTarget::AnimationAppend(_)
+            | _ => None,
         });
         for source in sources {
             if self.assets.get(source).is_none()
@@ -2464,13 +2503,13 @@ fn drag_changes(
         Left | TopLeft | BottomLeft => axis(b.wide(), dx.saturating_neg(), screen.wide())
             .map_or((None, 0), |(w, shift)| (Some(w), shift)),
         Right | TopRight | BottomRight => (axis(b.wide(), dx, screen.wide()).map(|a| a.0), 0),
-        _ => (None, 0),
+        Move | Top | Bottom => (None, 0),
     };
     let (tall, y) = match handle {
         Top | TopLeft | TopRight => axis(b.tall(), dy.saturating_neg(), screen.tall())
             .map_or((None, 0), |(t, shift)| (Some(t), shift)),
         Bottom | BottomLeft | BottomRight => (axis(b.tall(), dy, screen.tall()).map(|a| a.0), 0),
-        _ => (None, 0),
+        Move | Left | Right => (None, 0),
     };
     if wide.is_none() && tall.is_none() {
         return Ok(Vec::new());
@@ -2598,7 +2637,14 @@ fn step_file<'a>(before: &'a [Change], after: &'a [Change]) -> Option<&'a str> {
         .target()
     {
         ChangeTarget::Set(set) => Some(set.file()),
-        _ => None,
+        ChangeTarget::Remove(_)
+        | ChangeTarget::AddBlock(_)
+        | ChangeTarget::Asset(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_)
+        | _ => None,
     }
 }
 

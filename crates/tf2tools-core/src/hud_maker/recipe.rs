@@ -283,7 +283,13 @@ fn read_assets(assets: &Map<String, Value>) -> BTreeMap<String, Vec<u8>> {
 fn asset_source(change: &Change) -> Option<&str> {
     match change.target() {
         ChangeTarget::Asset(asset) => Some(asset.source()),
-        _ => None,
+        ChangeTarget::Set(_)
+        | ChangeTarget::Remove(_)
+        | ChangeTarget::AddBlock(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_) => None,
     }
 }
 
@@ -307,7 +313,14 @@ fn drop_dependents(changes: &mut Vec<Change>, lost: &[(u32, &str)]) {
             ChangeTarget::AddBlock(add) if defines_font(add) && is_clone(add.name()) => {
                 Some(add.name().to_owned())
             }
-            _ => None,
+            ChangeTarget::Set(_)
+            | ChangeTarget::Remove(_)
+            | ChangeTarget::AddBlock(_)
+            | ChangeTarget::Asset(_)
+            | ChangeTarget::Option(_)
+            | ChangeTarget::Credit(_)
+            | ChangeTarget::Animation(_)
+            | ChangeTarget::AnimationAppend(_) => None,
         })
         .collect();
     let depends = |c: &Change| {
@@ -393,14 +406,26 @@ impl HudModel {
             .iter()
             .filter_map(|c| match c.target() {
                 ChangeTarget::Option(o) => Some((o.source(), o.id())),
-                _ => None,
+                ChangeTarget::Set(_)
+                | ChangeTarget::Remove(_)
+                | ChangeTarget::AddBlock(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_) => None,
             })
             .collect();
         let mut next: Vec<Change> = changes
             .iter()
             .filter(|c| match c.target() {
                 ChangeTarget::Option(o) => !chosen.contains(&(o.source(), o.id())),
-                _ => true,
+                ChangeTarget::Set(_)
+                | ChangeTarget::Remove(_)
+                | ChangeTarget::AddBlock(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_) => true,
             })
             .cloned()
             .collect();
@@ -555,7 +580,11 @@ fn writes_font_slots(change: &Change) -> bool {
                 && (slots(add.parent())
                     || (add.parent().len() == 1 && add.name().eq_ignore_ascii_case(SLOTS)))
         }
-        _ => false,
+        ChangeTarget::Asset(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_) => false,
     }
 }
 
@@ -591,7 +620,11 @@ fn named_texts(change: &Change) -> Vec<&str> {
             texts.push(add.name());
             texts.extend(add.lines().iter().flat_map(|l| [l.key(), l.value()]));
         }
-        _ => {}
+        ChangeTarget::Asset(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_) => {}
     }
     texts
 }
@@ -655,6 +688,10 @@ fn renamed_change(change: &Change, renames: &[(String, Option<String>)]) -> Opti
             let block = AddBlock::new(add.file(), &parent, name, add.cond(), lines);
             Change::add_block(group, block)
         }
-        _ => change.clone(),
+        ChangeTarget::Asset(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_) => change.clone(),
     })
 }

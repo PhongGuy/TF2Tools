@@ -98,7 +98,7 @@ impl HudMakerPage {
         };
         let replaced = match target {
             PictureTarget::Code { materials } => materials.first().and_then(|m| image_name(m)),
-            _ => None,
+            PictureTarget::Keys(_) | _ => None,
         };
         let top = match replaced {
             Some(_) => top_layer(editor, |path| path.starts_with("materials/")),
@@ -269,7 +269,7 @@ fn picture_line(err: &PngReadError) -> &'static str {
     match err {
         PngReadError::TooLarge { .. } => TOO_WIDE,
         PngReadError::FileTooLarge { .. } => FILE_TOO_BIG,
-        _ => NOT_A_PICTURE,
+        PngReadError::Io { .. } | PngReadError::Invalid { .. } | _ => NOT_A_PICTURE,
     }
 }
 
