@@ -37,6 +37,8 @@ const CONTROL: f32 = 20.;
 // HUD or the player does.
 const SHOWS_IN_GAME: &str = "shows in game";
 const HIDDEN: &str = "hidden";
+// "Shows in game" draws as a small icon, so the names beside it keep the row; its tooltip says it.
+const SHOWS_IN_GAME_TIP: &str = "Shows in game only when TF2 needs it";
 
 impl HudMakerPage {
     // A `uniform_list`, so only the visible rows are built however large the HUD is. Rows fit
@@ -235,15 +237,22 @@ impl HudMakerPage {
                     .child(name.clone())
                     .child(measure);
                 let state = state.map(|state| {
-                    div()
+                    let tag = div()
                         .id(ids::hud_maker_row_state(&key))
+                        .aria_label(state)
                         .test_support()
                         .flex_none()
                         .ml_2()
-                        .whitespace_nowrap()
-                        .text_xs()
-                        .opacity(0.7)
-                        .child(state)
+                        .opacity(0.7);
+                    if state != SHOWS_IN_GAME {
+                        return tag.whitespace_nowrap().text_xs().child(state);
+                    }
+                    tag.size(px(CONTROL))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .tooltip(super::tip::tip(ids::HUD_MAKER_TIP, SHOWS_IN_GAME_TIP))
+                        .child(Icon::new(IconName::Gamepad2).small())
                 });
                 // A part hovered on the canvas lights its row as the pointer on the row would.
                 let (bg, text) = if selected {

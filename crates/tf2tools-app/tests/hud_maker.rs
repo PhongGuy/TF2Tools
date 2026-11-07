@@ -2137,6 +2137,7 @@ fn hovering_a_part_on_the_canvas_outlines_and_names_it(cx: &mut TestAppContext) 
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::put_start_card_away(cx, s.win);
     show_parts(cx, &s);
     let hv = PartKey::new(HV);
     let part = bounds(cx, &s, ids::hud_maker_part(&hv));
@@ -2171,6 +2172,7 @@ fn a_canvas_hover_marks_the_row_a_click_there_would_select(cx: &mut TestAppConte
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::put_start_card_away(cx, s.win);
     show_parts(cx, &s);
     let part = bounds(cx, &s, ids::hud_maker_part(&PartKey::new(HV)));
     move_to(cx, &s, part.center());

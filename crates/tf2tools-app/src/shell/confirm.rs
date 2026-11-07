@@ -31,6 +31,19 @@ impl Confirm {
         }
     }
 
+    /// The prompt before leaving a HUD with unsaved changes; `can_save` adds that "Save and
+    /// leave" is offered, and without it the player is told a name lets them save.
+    pub fn leave_unsaved(can_save: bool) -> Self {
+        let description = match can_save {
+            true => "You have unsaved changes. Save them before you go?",
+            false => "You have unsaved changes. Give your HUD a name to save it, or discard them.",
+        };
+        Self {
+            description: description.into(),
+            ..Self::discard_changes()
+        }
+    }
+
     /// The prompt before removing TF2Tools 4, whose uninstaller closes this app too.
     pub fn remove_old_v4() -> Self {
         Self {
@@ -173,6 +186,42 @@ impl Confirm {
 /// confirm-cancel (`cancel_label`) and confirm-ok (danger, `confirm_label`). Cancel, Escape, Enter
 /// and OK close it; only OK answers true. The receiver yields the answer once; it errs if the dialog goes away unanswered.
 pub fn confirm(spec: Confirm, window: &mut Window, cx: &mut App) -> async_channel::Receiver<bool> {
+    ask(spec, None, false, true, window, cx)
+}
+
+/// What the player chose in a dialog that offers a third way out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Choice {
+    /// Cancel, Escape, Enter or the dialog going away.
+    Stay,
+    /// The danger button (`confirm_label`).
+    Confirm,
+    /// The primary button added beside it, under `ids::CONFIRM_SAVE`.
+    Other,
+}
+
+/// As `confirm`, answered as a `Choice`, with a primary `other` button after the danger one
+/// when it is given.
+pub fn confirm_or(
+    spec: Confirm,
+    other: Option<SharedString>,
+    window: &mut Window,
+    cx: &mut App,
+) -> async_channel::Receiver<Choice> {
+    let other = other.map(|label| (label, Choice::Other));
+    ask(spec, other, Choice::Stay, Choice::Confirm, window, cx)
+}
+
+// The one dialog behind both: `no` for every way of backing out, `yes` for the danger button
+// and `other`'s answer for its own button.
+fn ask<T: Copy + Send + 'static>(
+    spec: Confirm,
+    other: Option<(SharedString, T)>,
+    no: T,
+    yes: T,
+    window: &mut Window,
+    cx: &mut App,
+) -> async_channel::Receiver<T> {
     // A one-slot channel and try_send: the first answer wins, any later one drops.
     let (tx, rx) = async_channel::bounded(1);
     // Deferred so a menu restoring focus after its click handler cannot pull focus out.
@@ -180,28 +229,31 @@ pub fn confirm(spec: Confirm, window: &mut Window, cx: &mut App) -> async_channe
         let frame = DialogFrame::new(DIALOG_WIDTH);
         window.open_dialog(cx, move |dialog, window, cx| {
             // The builder runs every frame, so each handler clones what it captures.
-            let answer = |yes: bool| {
+            let answer = |said: T| {
                 let tx = tx.clone();
                 move |_: &_, _: &mut Window, _: &mut App| {
-                    let _ = tx.try_send(yes);
+                    let _ = tx.try_send(said);
                     true
                 }
             };
-            let button = |id: &'static str, yes: bool| {
+            let button = |id: &'static str, said: T| {
                 let tx = tx.clone();
                 Button::new(id).on_click(move |_, window, cx| {
-                    let _ = tx.try_send(yes);
+                    let _ = tx.try_send(said);
                     window.close_dialog(cx);
                 })
             };
+            let other = other
+                .clone()
+                .map(|(label, said)| button(ids::CONFIRM_SAVE, said).primary().label(label));
             let muted = cx.theme().muted_foreground;
             frame
                 .apply(dialog, &*window, &*cx)
                 .close_button(false)
                 // The kit binds Enter to Confirm; v5 focuses Cancel on open, so Enter cancels
                 // here too and only a click on confirm-ok answers yes.
-                .on_ok(answer(false))
-                .on_cancel(answer(false))
+                .on_ok(answer(no))
+                .on_cancel(answer(no))
                 .child(
                     frame.measure(
                         v_flex()
@@ -236,15 +288,16 @@ pub fn confirm(spec: Confirm, window: &mut Window, cx: &mut App) -> async_channe
                                     .justify_end()
                                     .gap_2()
                                     .child(
-                                        button(ids::CONFIRM_CANCEL, false)
+                                        button(ids::CONFIRM_CANCEL, no)
                                             .outline()
                                             .label(spec.cancel_label.clone()),
                                     )
                                     .child(
-                                        button(ids::CONFIRM_OK, true)
+                                        button(ids::CONFIRM_OK, yes)
                                             .danger()
                                             .label(spec.confirm_label.clone()),
-                                    ),
+                                    )
+                                    .children(other),
                             ),
                     ),
                 )

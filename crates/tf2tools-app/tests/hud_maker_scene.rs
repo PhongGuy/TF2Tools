@@ -2064,6 +2064,7 @@ fn a_press_in_the_selected_parts_empty_area_drags_it_not_the_part_behind(cx: &mu
 #[gpui_kit::test]
 fn a_click_on_a_buttons_icon_selects_the_button_and_alt_the_icon(cx: &mut TestAppContext) {
     let (s, page) = footer_menu(cx);
+    support::put_start_card_away(cx, s.win);
     let (x, y, _, _) = screen_box(cx, &page, ICON);
     let (at, _) = window_at(cx, &s, &page, (x + 4, y + 4));
     click_at(cx, &s, at, gpui_kit::Modifiers::default(), 1);

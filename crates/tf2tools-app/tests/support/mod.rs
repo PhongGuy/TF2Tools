@@ -924,9 +924,20 @@ impl StoreServer {
 
     /// A curated HUD's archive at `{uri}/repo/{hud_id}/archive/{CURATED_HASH}.zip`; returns the repo URL to seed.
     pub fn mount_curated(&self, hud_id: &str, body: Vec<u8>, delay: Duration) -> String {
+        self.mount_curated_at(hud_id, CURATED_HASH, body, delay)
+    }
+
+    /// `mount_curated` at commit `hash`.
+    pub fn mount_curated_at(
+        &self,
+        hud_id: &str,
+        hash: &str,
+        body: Vec<u8>,
+        delay: Duration,
+    ) -> String {
         self.rt.block_on(
             Mock::given(method("GET"))
-                .and(path(format!("/repo/{hud_id}/archive/{CURATED_HASH}.zip")))
+                .and(path(format!("/repo/{hud_id}/archive/{hash}.zip")))
                 .respond_with(
                     ResponseTemplate::new(200)
                         .set_body_bytes(body)
@@ -1489,4 +1500,12 @@ pub fn click_scene(cx: &mut TestAppContext, win: AnyWindowHandle, scene: tf2tool
         click_id(cx, win, tf2tools_app::ids::HUD_MAKER_SCENE_MENU);
     }
     click_id(cx, win, tf2tools_app::ids::hud_maker_scene(scene));
+}
+
+/// Puts the HUD Maker's Start from card away with Blank, for a test that presses the middle
+/// of the canvas, where the card sits over a new HUD.
+pub fn put_start_card_away(cx: &mut TestAppContext, win: AnyWindowHandle) {
+    if present(cx, win, tf2tools_app::ids::HUD_MAKER_START_BLANK) {
+        click_id(cx, win, tf2tools_app::ids::HUD_MAKER_START_BLANK);
+    }
 }

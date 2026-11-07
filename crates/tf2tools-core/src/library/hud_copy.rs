@@ -404,6 +404,19 @@ pub enum CopyUpdate {
     InStore,
 }
 
+/// Whether the store has a newer version of an unedited store HUD than the library holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DownloadUpdate {
+    /// The store lists a different commit than the downloaded one.
+    Newer,
+    /// The download is the store's current commit.
+    Current,
+    /// No versions to compare: not a curated download, no commit in its folder name, no
+    /// store row, or an edited HUD, which `copy_update` covers.
+    Unknown,
+}
+
 /// A library HUD's tree hash and how many files were read to work it out.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -572,6 +585,34 @@ impl Library {
         })
     }
 
+    /// Whether the store has a newer version of library HUD `id`, a curated download whose
+    /// folder name ends in the commit it was downloaded at.
+    ///
+    /// # Errors
+    /// `NotFound` for no such row; `Io` or `Database` when reading fails.
+    pub fn download_update(&self, id: &HudId) -> Result<DownloadUpdate, LibraryError> {
+        let hud = (self.list_huds()?.into_iter())
+            .find(|h| h.id() == id)
+            .ok_or_else(|| LibraryError::NotFound {
+                what: format!("HUD {id}"),
+            })?;
+        let Provenance::Curated { hud_id } = hud.provenance() else {
+            return Ok(DownloadUpdate::Unknown);
+        };
+        if self.is_made_hud(id)? {
+            return Ok(DownloadUpdate::Unknown);
+        }
+        let (Some(downloaded), Some(current)) =
+            (commit_suffix(hud.folder_name()), self.store_hash(hud_id)?)
+        else {
+            return Ok(DownloadUpdate::Unknown);
+        };
+        Ok(match commits_match(&current, downloaded) {
+            true => DownloadUpdate::Current,
+            false => DownloadUpdate::Newer,
+        })
+    }
+
     /// The tree hash of library HUD `id`'s folder: regular files outside `.tf2tools/`, links
     /// skipped. Files whose size and modified time match the cache are not read again.
     ///
@@ -713,9 +754,14 @@ impl Library {
 
     /// The store's current commit for a curated copy's base, when the store lists it.
     fn store_commit(&self, copy: &CopyBase) -> Result<Option<String>, LibraryError> {
-        let Some(store_hud) = copy.store_id().strip_prefix("hud-db:") else {
-            return Ok(None);
-        };
+        match copy.store_id().strip_prefix("hud-db:") {
+            Some(store_hud) => self.store_hash(store_hud),
+            None => Ok(None),
+        }
+    }
+
+    /// The commit the curated store lists for `store_hud`, when it lists one.
+    fn store_hash(&self, store_hud: &str) -> Result<Option<String>, LibraryError> {
         let hash: Option<String> = self
             .db
             .read(|conn| {

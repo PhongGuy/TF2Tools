@@ -19,12 +19,17 @@ mod pictures;
 pub mod rank_paint;
 mod recipes;
 mod screens;
+mod shortcuts;
 pub mod situation;
+mod start_card;
+mod step_name;
 pub mod timeline;
 mod tint;
 mod tip;
 pub mod view;
 mod zoom;
+
+pub use shortcuts::SHORTCUTS;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariants as _};
@@ -62,9 +67,9 @@ use tf2tools_core::{
 use crate::activity;
 use crate::ids;
 use crate::keymap::{
-    CancelHudDrag, HUD_MAKER_CONTEXT, NUDGE_FAR, NudgeDown, NudgeDownFar, NudgeLeft, NudgeLeftFar,
-    NudgeRight, NudgeRightFar, NudgeUp, NudgeUpFar, RedoHudChange, UndoHudChange, ZoomFitHud,
-    ZoomInHud, ZoomOutHud,
+    CancelHudDrag, HUD_MAKER_CONTEXT, HideHudPart, NUDGE_FAR, NudgeDown, NudgeDownFar, NudgeLeft,
+    NudgeLeftFar, NudgeRight, NudgeRightFar, NudgeUp, NudgeUpFar, RedoHudChange, ShowHudShortcuts,
+    ToggleHudPartHidden, UndoHudChange, ZoomFitHud, ZoomInHud, ZoomOutHud,
 };
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
@@ -218,6 +223,9 @@ struct PlaceSaves {
     latest: Option<String>,
     writing: bool,
 }
+
+// A Save and leave's way out, run once its save lands.
+type AfterSave = Box<dyn FnOnce(&mut Window, &mut App)>;
 
 // The page's one load: still reading, read into an editor, or no usable game files.
 enum Load {
@@ -623,6 +631,10 @@ pub struct HudMakerPage {
     // The minimal HUD lasts the session, like the colour-blind view: a newly opened HUD gets it.
     minmode: bool,
     start_open: bool,
+    // The Start from card: closed by a pick or Blank for this page, and showing its points.
+    start_card: start_card::StartCard,
+    // What Save and leave runs once the save it started lands; any other end drops it.
+    after_save: Option<AfterSave>,
     // The game situation menu on the HUD scene's strip, with its sliders.
     situation_menu: situation::SituationMenu,
     // Whether the side panel's Add and Attach menus are open.
@@ -916,6 +928,8 @@ impl HudMakerPage {
             backdrop: backdrop::BackdropState::default(),
             colour_view: colour_view::ColourView::default(),
             start_open: false,
+            start_card: start_card::StartCard::default(),
+            after_save: None,
             _slider_subscriptions: Vec::new(),
             _subscriptions: subscriptions,
             stored_panel: Some(stored_panel),
@@ -2835,6 +2849,29 @@ impl HudMakerPage {
         self.editor().is_none_or(|e| !e.is_dirty()) && self.typed_name == self.saved_name
     }
 
+    /// True when Save would run now: a HUD is open, it has a name, and no save, install or
+    /// history job holds it.
+    pub fn can_save(&self, cx: &gpui_kit::App) -> bool {
+        matches!(self.load, Load::Ready(_))
+            && !self.trimmed_name(cx).is_empty()
+            && !(self.saving || self.installing || self.history_busy)
+    }
+
+    /// Saves as Save does, then runs `proceed` once the save lands; a save that fails or finds
+    /// the name taken keeps the player here, where the toast or the name field says why.
+    pub fn save_then(
+        &mut self,
+        proceed: impl FnOnce(&mut Window, &mut gpui_kit::App) + 'static,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.can_save(cx) {
+            return;
+        }
+        self.after_save = Some(Box::new(proceed));
+        self.save(false, window, cx);
+    }
+
     fn trimmed_name(&self, cx: &gpui_kit::App) -> String {
         self.name.read(cx).value().trim().to_owned()
     }
@@ -2915,10 +2952,12 @@ impl HudMakerPage {
             if matches!(done, Ok(Saved::Done { .. })) {
                 cx.update(LibraryEvents::changed);
             }
+            let mut then = None;
             let toast_of = page
                 .update(cx, |page, cx| {
                     page.saving = false;
                     cx.notify();
+                    let after = page.after_save.take();
                     match done {
                         Ok(Saved::Done {
                             id,
@@ -2944,6 +2983,7 @@ impl HudMakerPage {
                                 text = format!("{text} {line}");
                             }
                             page.saved_name = name;
+                            then = after;
                             Some(Ok((text, live)))
                         }
                         Ok(Saved::NameTaken(taken)) => {
@@ -2971,6 +3011,9 @@ impl HudMakerPage {
                     Some(Err(err)) => toast_error(window, cx, &err),
                     None => {}
                 });
+                if let Some(proceed) = then {
+                    let _ = win.update(cx, |_, window, cx| proceed(window, cx));
+                }
             });
         })
         .detach();
@@ -3148,6 +3191,8 @@ impl HudMakerPage {
 
     /// Selects `part`, from a part-list row or the canvas; a new selection ends Match size.
     fn select(&mut self, part: Option<PartKey>, window: &mut Window, cx: &mut Context<Self>) {
+        // Picking a part is starting from the HUD as it is, so the Start from card goes.
+        self.close_start_card_on(part.is_some());
         self.matching_size = false;
         self.nudge_refused = None;
         if let Some(editor) = self.editor_mut() {
@@ -3523,6 +3568,29 @@ impl HudMakerPage {
         cx.propagate();
     }
 
+    // H (`toggle`) and Delete hide the selection through the Parts list eye's switch, one undo
+    // step; H on a part the player hid shows it again. With nothing selected the key goes on.
+    fn hide_selected(&mut self, toggle: bool, window: &mut Window, cx: &mut Context<Self>) {
+        self.let_go(cx);
+        if self.part_drag.is_some() {
+            return;
+        }
+        let Some(part) = self.editor().and_then(|e| e.selected()).cloned() else {
+            return cx.propagate();
+        };
+        let hidden = self
+            .editor()
+            .is_some_and(|e| e.part_hidden_by_player(&part));
+        if hidden && !toggle {
+            return;
+        }
+        self.edit_selected(window, cx, |e| {
+            if let Err(err) = e.set_part_hidden(&part, !hidden) {
+                tracing::debug!("the HUD Maker refused to hide {part:?}: {err:?}");
+            }
+        });
+    }
+
     // An arrow key moves the selection by whole HUD units; with nothing selected the key goes
     // on, and during a drag the pointer owns the part.
     fn nudge(&mut self, dx: i32, dy: i32, window: &mut Window, cx: &mut Context<Self>) {
@@ -3554,6 +3622,22 @@ impl HudMakerPage {
         if self.nudge_refused != refused {
             self.nudge_refused = refused;
             toast(window, cx, ToastKind::Info, why, "");
+        }
+    }
+
+    /// The Undo button's tooltip, naming the step it takes back when it has a name.
+    pub fn undo_tip(&self) -> String {
+        match self.editor().and_then(HudEditor::undo_name) {
+            Some(name) => format!("Undo {name} (Ctrl+Z)"),
+            None => UNDO_TIP.to_owned(),
+        }
+    }
+
+    /// The Redo button's tooltip, naming the step it puts back when it has a name.
+    pub fn redo_tip(&self) -> String {
+        match self.editor().and_then(HudEditor::redo_name) {
+            Some(name) => format!("Redo {name} (Ctrl+Y)"),
+            None => REDO_TIP.to_owned(),
         }
     }
 
@@ -3822,22 +3906,21 @@ impl HudMakerPage {
                 ids::HUD_MAKER_UNDO,
                 IconName::Undo2,
                 "Undo",
-                UNDO_TIP,
+                self.undo_tip(),
                 can_undo,
             ),
             (
                 ids::HUD_MAKER_REDO,
                 IconName::Redo2,
                 "Redo",
-                REDO_TIP,
+                self.redo_tip(),
                 can_redo,
             ),
         ]
-        .map(|(id, icon, label, tip, enabled)| {
-            Button::new(id)
+        .map(|(id, icon, label, words, enabled)| {
+            let button = Button::new(id)
                 .ghost()
                 .icon(icon)
-                .tooltip(tip)
                 .accessibility_label(label)
                 .disabled(!enabled)
                 .on_click(cx.listener(move |page, _, window, cx| {
@@ -3846,7 +3929,9 @@ impl HudMakerPage {
                     } else {
                         page.redo(window, cx);
                     }
-                }))
+                }));
+            // The holder keeps the tooltip on a greyed-out button too.
+            tip::tipped(&id.into(), words, button)
         });
         let collapse = Button::new(ids::HUD_MAKER_TOOLBAR_COLLAPSE)
             .ghost()
@@ -4458,6 +4543,11 @@ impl Render for HudMakerPage {
                     page.cancel_part_drag(window, cx)
                 }),
             )
+            .on_action(
+                cx.listener(|p, _: &ToggleHudPartHidden, w, cx| p.hide_selected(true, w, cx)),
+            )
+            .on_action(cx.listener(|p, _: &HideHudPart, w, cx| p.hide_selected(false, w, cx)))
+            .on_action(cx.listener(|p, _: &ShowHudShortcuts, w, cx| p.show_shortcuts(w, cx)))
             .size_full()
             .when(!ready, |el| el.p(CONTENT_PADDING).gap_4())
             .child(body)

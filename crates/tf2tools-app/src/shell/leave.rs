@@ -5,7 +5,7 @@ use gpui_kit::{App, Global, WeakEntity, Window};
 
 use crate::pages::crosshair_maker::CrosshairMakerPage;
 use crate::pages::hud_maker::HudMakerPage;
-use crate::shell::confirm::{Confirm, confirm};
+use crate::shell::confirm::{Choice, Confirm, confirm, confirm_or};
 
 // Cleared on navigation rather than trusted to die with the page, since anything holding the
 // entity (a test, a pending task) keeps the weak handle alive after the shell drops it.
@@ -52,7 +52,8 @@ pub fn can_leave(cx: &App) -> bool {
 
 /// Runs `proceed` (deferred to after the current update) when `can_leave`; otherwise opens
 /// `Confirm::discard_changes` and runs it on Discard. Keep editing drops it, and so does a
-/// request made while that dialog is already open.
+/// request made while that dialog is already open. Leaving the HUD Maker asks with
+/// `Confirm::leave_unsaved` instead, whose Save and leave runs `proceed` once the save lands.
 pub fn leave_then(
     window: &mut Window,
     cx: &mut App,
@@ -69,16 +70,41 @@ pub fn leave_then(
     // The press that asked (a sidebar item) has taken focus off the maker, and the dialog hands
     // focus back to whatever held it at open, so the maker takes it first to get it after Keep editing.
     reclaim_maker_focus(window, cx);
-    let answer = confirm(Confirm::discard_changes(), window, cx);
+    let hud = match cx.try_global::<OpenMaker>() {
+        Some(OpenMaker::Hud(page)) => page.upgrade(),
+        _ => None,
+    };
     let handle = window.window_handle();
+    let Some(hud) = hud else {
+        let answer = confirm(Confirm::discard_changes(), window, cx);
+        cx.spawn(async move |cx| {
+            let discard = answer.recv().await.unwrap_or(false);
+            cx.update(|cx| cx.set_global(Asking(false)));
+            if discard {
+                cx.update(|cx| {
+                    let _ = handle.update(cx, |_, window, cx| proceed(window, cx));
+                });
+            }
+        })
+        .detach();
+        return;
+    };
+    let can_save = hud.read(cx).can_save(cx);
+    let save = can_save.then(|| "Save and leave".into());
+    let answer = confirm_or(Confirm::leave_unsaved(can_save), save, window, cx);
+    let hud = hud.downgrade();
     cx.spawn(async move |cx| {
-        let discard = answer.recv().await.unwrap_or(false);
+        let said = answer.recv().await.unwrap_or(Choice::Stay);
         cx.update(|cx| cx.set_global(Asking(false)));
-        if discard {
-            cx.update(|cx| {
-                let _ = handle.update(cx, |_, window, cx| proceed(window, cx));
+        cx.update(|cx| {
+            let _ = handle.update(cx, |_, window, cx| match said {
+                Choice::Stay => {}
+                Choice::Confirm => proceed(window, cx),
+                Choice::Other => {
+                    let _ = hud.update(cx, |page, cx| page.save_then(proceed, window, cx));
+                }
             });
-        }
+        });
     })
     .detach();
 }
