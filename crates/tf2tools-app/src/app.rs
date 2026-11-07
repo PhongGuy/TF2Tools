@@ -14,6 +14,7 @@ use crate::activity;
 use crate::assets::{AssetRoot, AssetRootError};
 use crate::audio::{AudioOut, RecordingAudio, RodioOut};
 use crate::crash::{self, notice::CrashNotice};
+use crate::crosshair_repair;
 use crate::local_messages::describe_startup;
 use crate::old_v4::{self, OldV4Notice};
 use crate::picker::{NativePicker, PathPicker};
@@ -99,7 +100,7 @@ impl Boot {
 /// Opens the 1200x900 window (min 800x600, title "TF2Tools", app id com.tf2tools.app) on the loading view,
 /// opens `Services`, reads settings and the HUD list off the UI thread, then shows the shell or the error view.
 /// After the shell's first frame it runs `resolve_tf2` in `run_blocking` and stores the result in `Tf2State`,
-/// starts the tokio runtime, checks for an update once and, when `auto_sync`, syncs every store.
+/// repairs pre-6.0.2 crosshair scripts once TF2 is found, starts the tokio runtime, checks for an update once and, when `auto_sync`, syncs every store.
 pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
     let Boot {
         data,
@@ -179,6 +180,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                     let updates = Updater::install(cx, update_source, updater::system_restart());
                     activity::watch_stores(cx);
                     install_tf2_state(cx, Tf2State::Detecting);
+                    crosshair_repair::install(win, cx);
                     CrashNotice::install(cx, crash);
                     OldV4Notice::install(cx, old_v4, old_v4::system_runner());
                     let shell = cx.new(|cx| Shell::with_huds(collapsed, huds, window, cx));

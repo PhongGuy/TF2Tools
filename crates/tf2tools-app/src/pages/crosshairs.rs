@@ -850,9 +850,17 @@ pub(crate) fn added_message(crosshair: &CrosshairEntry) -> String {
 // v5's toast for an apply: Success, or a Warning naming each skipped assignment and why.
 fn install_outcome(report: &ApplyReport) -> Outcome {
     let title: SharedString = "Crosshairs installed to TF2".into();
+    match skipped_description(report) {
+        None => (ToastKind::Success, title, SharedString::default()),
+        Some(description) => (ToastKind::Warning, title, description.into()),
+    }
+}
+
+/// The apply toast's line naming each skipped assignment and why, or `None` when none was.
+pub(crate) fn skipped_description(report: &ApplyReport) -> Option<String> {
     let skipped = report.skipped();
     if skipped.is_empty() {
-        return (ToastKind::Success, title, SharedString::default());
+        return None;
     }
     let lines: Vec<String> = skipped
         .iter()
@@ -867,8 +875,7 @@ fn install_outcome(report: &ApplyReport) -> Outcome {
             format!("{} ({reason} {})", skip.weapon_script(), skip.reference())
         })
         .collect();
-    let description = format!("Skipped {}: {}", skipped.len(), lines.join(", "));
-    (ToastKind::Warning, title, description.into())
+    Some(format!("Skipped {}: {}", skipped.len(), lines.join(", ")))
 }
 
 // v5's compact yellow-500 box: the icon beside a column of the title and one line per

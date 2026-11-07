@@ -753,7 +753,10 @@ fn no_repair_without_old_weapon_scripts() {
     assert!(!crosshair_scripts_need_repair(&env.tf2));
 
     // Only weapon scripts count, and only those in the managed folder.
-    write_file(&custom.join(SCRIPTS).join("readme.txt"), OLD_SCRIPT.as_bytes());
+    write_file(
+        &custom.join(SCRIPTS).join("readme.txt"),
+        OLD_SCRIPT.as_bytes(),
+    );
     write_file(
         &custom.join("other-mod/scripts/tf_weapon_scattergun.txt"),
         OLD_SCRIPT.as_bytes(),
