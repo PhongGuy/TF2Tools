@@ -21,6 +21,7 @@ mod recipes;
 mod screens;
 mod shortcuts;
 pub mod situation;
+mod snapping;
 mod start_card;
 mod step_name;
 pub mod timeline;
@@ -86,7 +87,7 @@ use crate::shell::external_huds::{HudAction, check_external};
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, lift_toasts, toast, toast_error};
 use crate::widgets::labelled;
-use canvas::{LastPress, PartDrag};
+use canvas::{LastPress, Marquee, PartDrag};
 use editor::{FontAddRefused, HudEditor};
 use panel::PanelDrag;
 pub use situation::SituationSlider;
@@ -339,7 +340,6 @@ pub enum Field {
     Y,
     Wide,
     Tall,
-    Layer,
     RowHeight,
     RowGap,
     SectionGap,
@@ -354,12 +354,11 @@ pub enum Field {
 }
 
 impl Field {
-    const ALL: [Field; 14] = [
+    const ALL: [Field; 13] = [
         Field::X,
         Field::Y,
         Field::Wide,
         Field::Tall,
-        Field::Layer,
         Field::RowHeight,
         Field::RowGap,
         Field::SectionGap,
@@ -371,7 +370,7 @@ impl Field {
         Field::Setting,
     ];
 
-    /// The Number row's key this field edits; None for the box, layer and Text fields.
+    /// The Number row's key this field edits; None for the box and Text fields.
     pub(crate) fn number_key(self) -> Option<&'static str> {
         match self {
             Field::RowHeight => Some("linespacing"),
@@ -384,7 +383,7 @@ impl Field {
         }
     }
 
-    // The schema row key a field shows and commits, beyond the box and layer.
+    // The schema row key a field shows and commits, beyond the box.
     fn row_key(self) -> Option<&'static str> {
         match self {
             Field::Text => Some(TEXT_KEY),
@@ -498,6 +497,8 @@ pub struct HudMakerPage {
     // The latest canvas press, so a second press on its spot steps on to the next part.
     last_press: Option<LastPress>,
     part_drag: Option<PartDrag>,
+    // A box being drawn on empty canvas to select every part inside it.
+    marquee: Option<Marquee>,
     // The canvas's zoom and pan, for the screen shape they were made at; another shape fits.
     zoom: Option<(Screen, Zoom)>,
     // Touchpad travel gathered toward the next Ctrl+wheel zoom step.
@@ -844,6 +845,7 @@ impl HudMakerPage {
             hover_on_canvas: false,
             last_press: None,
             part_drag: None,
+            marquee: None,
             zoom: None,
             zoom_carry: px(0.),
             space_held: false,
@@ -3221,6 +3223,17 @@ impl HudMakerPage {
         self.refresh(window, cx);
     }
 
+    /// Adds `part` to the selection or takes it out, from a Shift- or Ctrl-clicked list row.
+    fn toggle_select(&mut self, part: PartKey, window: &mut Window, cx: &mut Context<Self>) {
+        self.close_start_card_on(true);
+        self.matching_size = false;
+        self.nudge_refused = None;
+        if let Some(editor) = self.editor_mut() {
+            editor.toggle_select(part);
+        }
+        self.refresh(window, cx);
+    }
+
     /// Selects `part`, from a part-list row or the canvas; a new selection ends Match size.
     fn select(&mut self, part: Option<PartKey>, window: &mut Window, cx: &mut Context<Self>) {
         // Picking a part is starting from the HUD as it is, so the Start from card goes.
@@ -3457,9 +3470,6 @@ impl HudMakerPage {
         let Some(b) = editor.layout().get(key) else {
             return Default::default();
         };
-        let layer = part
-            .value("zpos")
-            .map_or_else(|| "0".to_owned(), |line| line.text().trim().to_owned());
         let schema = ClassSchema::for_part(part);
         let size_row = (self.font_size_row.as_ref())
             .filter(|(at, _)| at == key)
@@ -3491,7 +3501,6 @@ impl HudMakerPage {
                 Field::Y => b.y().to_string(),
                 Field::Wide => b.wide().to_string(),
                 Field::Tall => b.tall().to_string(),
-                Field::Layer => layer.clone(),
                 _ => {
                     let row = field.row_key()?;
                     schema.get(row)?;
@@ -3594,7 +3603,7 @@ impl HudMakerPage {
         if self.editor().is_some_and(|e| e.compared().is_some()) {
             return self.stop_comparing(cx);
         }
-        if self.editor().and_then(|e| e.selected()).is_some() {
+        if self.editor().is_some_and(|e| !e.selection().is_empty()) {
             return self.select(None, window, cx);
         }
         cx.propagate();
@@ -3606,6 +3615,23 @@ impl HudMakerPage {
         self.let_go(cx);
         if self.part_drag.is_some() {
             return;
+        }
+        // Several parts hide together, and H shows them again once every one is hidden.
+        if self.editor().is_some_and(HudEditor::several) {
+            let all_hidden = self
+                .editor()
+                .is_some_and(HudEditor::selection_hidden_by_player);
+            return self.edit_selected(window, cx, |e| match (all_hidden, toggle) {
+                (true, true) => {
+                    e.show_selection();
+                }
+                (true, false) => {}
+                (false, _) => {
+                    if let Err(err) = e.hide_selected() {
+                        tracing::debug!("the HUD Maker refused to hide several parts: {err:?}");
+                    }
+                }
+            });
         }
         let Some(part) = self.editor().and_then(|e| e.selected()).cloned() else {
             return cx.propagate();
@@ -3629,6 +3655,13 @@ impl HudMakerPage {
         self.let_go(cx);
         if self.part_drag.is_some() {
             return;
+        }
+        if self.editor().is_some_and(HudEditor::several) {
+            return self.edit_selected(window, cx, |e| {
+                if let Err(err) = e.nudge_selected(dx, dy) {
+                    tracing::debug!("the HUD Maker refused to nudge several parts: {err:?}");
+                }
+            });
         }
         let Some(part) = self.editor().and_then(|e| e.selected()).cloned() else {
             return cx.propagate();
@@ -4115,7 +4148,6 @@ fn commit_typed(
                 Field::Y => editor.move_selected(0, value()? - b.y()),
                 Field::Wide => editor.resize_selected(Some(value()?), None),
                 Field::Tall => editor.resize_selected(None, Some(value()?)),
-                Field::Layer => editor.set_layer_selected(value()?),
                 Field::RowHeight | Field::RowGap | Field::SectionGap => {
                     editor.set_number_selected(row()?, value()?)
                 }
@@ -4153,7 +4185,7 @@ fn typed_value(field: Field, text: &str, screen: Screen) -> Result<i32, String> 
 }
 
 // What a whole-number field takes: a size from 1 to four screens on its axis, a position within
-// four screens either side of the origin, any layer that fits, a Number up to core's four
+// four screens either side of the origin, a Number up to core's four
 // 480-unit screens, or a font size core takes.
 fn number_range(field: Field, screen: Screen) -> Option<std::ops::RangeInclusive<i64>> {
     let reach = |span: u32| 4 * i64::from(span);
@@ -4162,7 +4194,6 @@ fn number_range(field: Field, screen: Screen) -> Option<std::ops::RangeInclusive
         Field::Y => -reach(screen.tall())..=reach(screen.tall()),
         Field::Wide => 1..=reach(screen.wide()),
         Field::Tall => 1..=reach(screen.tall()),
-        Field::Layer => i64::from(i32::MIN)..=i64::from(i32::MAX),
         Field::RowHeight
         | Field::RowGap
         | Field::SectionGap

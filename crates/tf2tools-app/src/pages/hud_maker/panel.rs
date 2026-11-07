@@ -24,6 +24,7 @@ use tf2tools_core::{
 };
 
 use super::canvas::{colour, scene_note};
+use super::editor::{Align, HudEditor, Spread};
 use super::parts::row_label;
 use super::tip::{Spot, record, tip, tip_beside_row, tipped};
 use super::view::{Panel, PanelMode, PanelPlace};
@@ -83,6 +84,42 @@ const ALIGN_ICONS: [IconName; 9] = [
     IconName::ArrowDownRight,
 ];
 const ALIGN_UNSET: &str = "west";
+// The Align buttons for several parts: id name, icon, tooltip and the line they align on.
+const LINE_UPS: [(&str, IconName, &str, Align); 6] = [
+    ("left", IconName::ArrowLeft, "Align left edges", Align::Left),
+    (
+        "centre",
+        IconName::FlipHorizontal2,
+        "Align centres across",
+        Align::Centre,
+    ),
+    (
+        "right",
+        IconName::ArrowRight,
+        "Align right edges",
+        Align::Right,
+    ),
+    ("top", IconName::ArrowUp, "Align top edges", Align::Top),
+    (
+        "middle",
+        IconName::FlipVertical2,
+        "Align middles up and down",
+        Align::Middle,
+    ),
+    (
+        "bottom",
+        IconName::ArrowDown,
+        "Align bottom edges",
+        Align::Bottom,
+    ),
+];
+
+// What one line-up button does.
+#[derive(Clone, Copy)]
+enum LineUp {
+    Align(Align),
+    Spread(Spread),
+}
 // The colour-name and font lists scroll past this height.
 const NAMES_HEIGHT: f32 = 200.;
 const REMOVE_SETTING: &str = "Remove this setting";
@@ -101,6 +138,8 @@ struct SettingRow {
 /// What the side panel shows for the current selection, read out of the editor before drawing.
 enum Body {
     Empty,
+    // Two or more parts picked together, with how many.
+    Several(usize),
     Unreadable,
     // A part drawn from an included file; `incomplete` when some file behind it was not found.
     FromBase { incomplete: bool },
@@ -391,6 +430,9 @@ impl HudMakerPage {
         let title = match panel {
             Panel::Parts => "Parts".into_any_element(),
             Panel::Options => match self.selected_name() {
+                None if self.editor().is_some_and(|e| e.several()) => {
+                    "Several parts".into_any_element()
+                }
                 // The way down sits on its own small line over the part's name, so neither
                 // is cut short in a narrow panel.
                 Some(name) => v_flex()
@@ -617,6 +659,9 @@ impl HudMakerPage {
         let Some(editor) = self.editor() else {
             return Body::Empty;
         };
+        if editor.several() {
+            return Body::Several(editor.selection().len());
+        }
         let model = editor.model();
         let Some((key, part)) = editor
             .selected()
@@ -702,6 +747,13 @@ impl HudMakerPage {
                 out.extend(self.hud_rows(cx));
                 return out;
             }
+            Body::Several(n) => {
+                let said = format!("{n} parts selected. Drag any of them to move them all.");
+                return vec![
+                    note(ids::HUD_MAKER_SEVERAL, said.into()),
+                    self.line_up_rows(cx),
+                ];
+            }
             Body::FromBase { incomplete } => {
                 let mut out = vec![note(ids::HUD_MAKER_PANEL_FROM_BASE, FROM_BASE.into())];
                 if incomplete {
@@ -757,7 +809,7 @@ impl HudMakerPage {
                         el.child(self.number(ids::HUD_MAKER_TALL, "H", Field::Tall, cx))
                     })
                     .into_any_element(),
-                PropertyKind::Layer => self.number(ids::HUD_MAKER_LAYER, "", Field::Layer, cx),
+                PropertyKind::Layer => self.layer_buttons(cx),
                 PropertyKind::Hide => self.hide_switch(rows.hidden, cx),
                 PropertyKind::Number => match Field::of_number(spec.key()) {
                     Some(field) => self.number(ids::hud_maker_number(spec.key()), "", field, cx),
@@ -960,6 +1012,88 @@ impl HudMakerPage {
         self.edit_selected(window, cx, |e| {
             let _ = e.remove_key_selected(key);
         })
+    }
+
+    // Bring forward and Send back, each stepping the part past the sibling drawn next to it that
+    // way; a part already drawn over or under all its siblings has that button off.
+    fn layer_buttons(&self, cx: &mut Context<Self>) -> AnyElement {
+        let can = |forward| self.editor().is_some_and(|e| e.can_layer(forward));
+        let button = |id: &'static str, label: &'static str, forward: bool| {
+            Button::new(id)
+                .outline()
+                .xsmall()
+                .label(label)
+                .disabled(!can(forward))
+                .on_click(cx.listener(move |page, _, window, cx| {
+                    page.edit_selected(window, cx, |e| {
+                        if let Err(err) = e.layer_selected(forward) {
+                            tracing::debug!("the HUD Maker refused a layer step: {err:?}");
+                        }
+                    })
+                }))
+        };
+        h_flex()
+            .id(ids::HUD_MAKER_LAYER)
+            .test_support()
+            .gap_2()
+            .child(button(ids::HUD_MAKER_FORWARD, "Bring forward", true))
+            .child(button(ids::HUD_MAKER_BACKWARD, "Send back", false))
+            .into_any_element()
+    }
+
+    // Align on one line of the box around several parts, then Distribute to even out the gaps,
+    // which needs three parts.
+    fn line_up_rows(&self, cx: &mut Context<Self>) -> AnyElement {
+        let muted = cx.theme().muted_foreground;
+        let spreads = self.editor().is_some_and(HudEditor::can_distribute);
+        let button = |name: &'static str, icon: IconName, tip: &'static str, act: LineUp| {
+            let id = ids::hud_maker_line_up(name);
+            let off = matches!(act, LineUp::Spread(_)) && !spreads;
+            let button = Button::new(id.clone())
+                .outline()
+                .small()
+                .icon(icon)
+                .accessibility_label(tip)
+                .disabled(off)
+                .on_click(cx.listener(move |page, _, window, cx| {
+                    page.edit_selected(window, cx, |e| {
+                        let done = match act {
+                            LineUp::Align(a) => e.align_selected(a),
+                            LineUp::Spread(s) => e.distribute_selected(s),
+                        };
+                        if let Err(err) = done {
+                            tracing::debug!("the HUD Maker refused to line parts up: {err:?}");
+                        }
+                    })
+                }));
+            tipped(&id, tip, button)
+        };
+        let heading = |text: &'static str| div().text_xs().text_color(muted).child(text);
+        let aligns = LINE_UPS
+            .iter()
+            .map(|&(name, icon, tip, a)| button(name, icon, tip, LineUp::Align(a)));
+        v_flex()
+            .gap_2()
+            .child(heading("Align"))
+            .child(h_flex().gap_1().children(aligns))
+            .child(heading("Distribute"))
+            .child(
+                h_flex()
+                    .gap_1()
+                    .child(button(
+                        "across",
+                        IconName::Ellipsis,
+                        "Space out evenly from left to right",
+                        LineUp::Spread(Spread::Across),
+                    ))
+                    .child(button(
+                        "down",
+                        IconName::EllipsisVertical,
+                        "Space out evenly from top to bottom",
+                        LineUp::Spread(Spread::Down),
+                    )),
+            )
+            .into_any_element()
     }
 
     // Mirror, enabled only where the mirror holds on every screen; otherwise its tooltip says why.
@@ -1331,7 +1465,6 @@ impl HudMakerPage {
                 page.discard(match spec.kind() {
                     PropertyKind::Position => &[Field::X, Field::Y],
                     PropertyKind::Size => &[Field::Wide, Field::Tall],
-                    PropertyKind::Layer => &[Field::Layer],
                     PropertyKind::Text => &[Field::Text],
                     PropertyKind::Number => number.as_slice(),
                     PropertyKind::Font

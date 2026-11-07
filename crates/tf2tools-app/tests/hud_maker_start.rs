@@ -139,12 +139,14 @@ fn the_question_mark_opens_the_shortcuts(cx: &mut TestAppContext) {
         .filter_map(|i| support::label_of(cx, s.win, ids::hud_maker_shortcut(i)))
         .collect();
     for want in [
-        "Arrow keys: Move the selected part",
-        "H or Delete: Hide the selected part",
+        "Arrow keys: Move the selected parts",
+        "H or Delete: Hide the selected parts",
         "Escape: Clear the selection",
         "Ctrl+Z: Undo",
         "Space + drag: Move around the canvas",
-        "Ctrl + drag: Move without snapping",
+        "Ctrl + drag: Move or resize without snapping",
+        "Shift + click: Add a part to the selection or take it out",
+        "Drag on empty space: Select every part inside the box",
     ] {
         assert!(rows.iter().any(|r| r == want), "{want} not in {rows:?}");
     }
