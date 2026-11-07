@@ -1139,9 +1139,20 @@ pub fn hud_copy_of(folder: &str) -> ElementId {
     keyed("hud-copy-of", folder)
 }
 
-/// A HUD copy's "Update" button, shown when its HUD's newer version is in the library.
+/// A library HUD card's "Update" button: a copy's when its HUD's newer version is in the
+/// library, an unedited store HUD's when the store has a newer version.
 pub fn hud_update(folder: &str) -> ElementId {
     keyed("hud-update", folder)
+}
+
+/// A store HUD card's "Visit page" button, opening the HUD's own page in the browser.
+pub fn hud_visit(folder: &str) -> ElementId {
+    keyed("hud-visit", folder)
+}
+
+/// An unedited store HUD's "Update available" line, shown when the store has a newer version.
+pub fn hud_update_mark(folder: &str) -> ElementId {
+    keyed("hud-update-mark", folder)
 }
 
 /// A HUD copy's line saying its HUD's newer version is only in the HUD Store.
