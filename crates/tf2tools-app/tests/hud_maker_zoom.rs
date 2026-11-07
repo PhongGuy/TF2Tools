@@ -176,6 +176,7 @@ fn ctrl_plus_minus_and_zero_zoom_the_canvas(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn ctrl_wheel_zooms_around_the_pointer(cx: &mut TestAppContext) {
     let (s, _page) = open(cx);
+    support::put_start_card_away(cx, s.win);
     // At twice the fit the screen overflows the view both ways, so nothing centres it.
     for _ in 0..3 {
         menu(cx, &s, ids::HUD_MAKER_ZOOM_IN);
@@ -199,6 +200,7 @@ fn ctrl_wheel_zooms_around_the_pointer(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn middle_drag_space_drag_and_the_wheel_pan_a_zoomed_canvas(cx: &mut TestAppContext) {
     let (s, page) = open(cx);
+    support::put_start_card_away(cx, s.win);
     support::maker_page::float_panels(cx, &s, &page);
     for _ in 0..3 {
         menu(cx, &s, ids::HUD_MAKER_ZOOM_IN);

@@ -1501,3 +1501,11 @@ pub fn click_scene(cx: &mut TestAppContext, win: AnyWindowHandle, scene: tf2tool
     }
     click_id(cx, win, tf2tools_app::ids::hud_maker_scene(scene));
 }
+
+/// Puts the HUD Maker's Start from card away with Blank, for a test that presses the middle
+/// of the canvas, where the card sits over a new HUD.
+pub fn put_start_card_away(cx: &mut TestAppContext, win: AnyWindowHandle) {
+    if present(cx, win, tf2tools_app::ids::HUD_MAKER_START_BLANK) {
+        click_id(cx, win, tf2tools_app::ids::HUD_MAKER_START_BLANK);
+    }
+}

@@ -682,6 +682,7 @@ impl HudMakerPage {
         frame
             .child(view)
             .children(badge)
+            .children(self.start_card(cx))
             .child(self.floating_toolbar(screen_shape, cx))
             .children(self.panels(cx))
             .into_any_element()

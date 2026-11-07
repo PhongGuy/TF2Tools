@@ -70,7 +70,13 @@ gpui_kit::actions!(
         /// Zooms the canvas out around its middle.
         ZoomOutHud,
         /// Fits the screen to the canvas again.
-        ZoomFitHud
+        ZoomFitHud,
+        /// Hides the selected part, or shows it again when the player hid it.
+        ToggleHudPartHidden,
+        /// Hides the selected part; never shows it.
+        HideHudPart,
+        /// Opens the keyboard shortcuts sheet.
+        ShowHudShortcuts
     ]
 );
 
@@ -128,5 +134,10 @@ pub fn bind(cx: &mut App) {
         KeyBinding::new("secondary-shift-=", ZoomInHud, hud),
         KeyBinding::new("secondary--", ZoomOutHud, hud),
         KeyBinding::new("secondary-0", ZoomFitHud, hud),
+        KeyBinding::new("h", ToggleHudPartHidden, hud),
+        KeyBinding::new("delete", HideHudPart, hud),
+        // "?" arrives as Shift+/ on most layouts and as the bare character on others.
+        KeyBinding::new("shift-/", ShowHudShortcuts, hud),
+        KeyBinding::new("?", ShowHudShortcuts, hud),
     ]);
 }

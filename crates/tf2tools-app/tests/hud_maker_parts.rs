@@ -204,3 +204,56 @@ fn the_row_still_selects_and_lights_its_part_on_hover(cx: &mut TestAppContext) {
     support::settle(cx, s.win);
     assert!(support::present(cx, s.win, ids::HUD_MAKER_HOVER));
 }
+
+#[gpui_kit::test]
+fn a_long_name_beside_the_shows_in_game_mark_stays_readable(cx: &mut TestAppContext) {
+    let env = support::env();
+    let medic = r#""Resource/UI/HudMedicCharge.res" { ChargeLabel { ControlName CExLabel xpos 0 ypos 0 wide 100 tall 20 } UberchargeIndividualChargesLabel { ControlName CExLabel xpos 0 ypos 30 wide 100 tall 20 } }"#;
+    support::seed_stock_game_with(
+        &env.game,
+        &[("resource/ui/hudmediccharge.res", Some(medic))],
+    );
+    let found = Tf2State::Found(Tf2Install::from_path(&env.game).unwrap());
+    let s = support::shell_window(cx, &env, found);
+    support::click_nav(cx, s.win, Page::HudMaker);
+    let page = cx
+        .update(|cx| s.shell.read(cx).hud_maker_page())
+        .expect("a HUD Maker page");
+    support::wait_real(cx, "the HUD to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+    toggle_parts(cx, &s);
+    let long = key("HudMedicCharge/UberchargeIndividualChargesLabel");
+    support::reveal_part_row(cx, s.win, &long);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::hud_maker_row(&long)).as_deref(),
+        Some("Ubercharge individual charges label (shows in game)")
+    );
+    // The mark is one small icon, so the name keeps the rest of the row.
+    let bounds = |cx: &mut TestAppContext, id| support::bounds_of(cx, s.win, id).unwrap();
+    let row = bounds(cx, ids::hud_maker_row(&long));
+    let name = bounds(cx, ids::hud_maker_row_name(&long));
+    let mark = bounds(cx, ids::hud_maker_row_state(&long));
+    assert!(
+        mark.size.width <= gpui_kit::px(20.),
+        "{mark:?} is wider than an icon"
+    );
+    assert!(
+        name.size.width >= row.size.width / 2.,
+        "{name:?} gets too little of {row:?}"
+    );
+    // Hovering the mark says what it means.
+    cx.update_window(s.win, |_, w, cx| {
+        w.hover(ids::hud_maker_row_state(&long), cx)
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(800));
+    support::settle(cx, s.win);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_TIP).as_deref(),
+        Some("Shows in game only when TF2 needs it")
+    );
+}
