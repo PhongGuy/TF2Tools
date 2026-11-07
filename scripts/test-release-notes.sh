@@ -77,6 +77,13 @@ want=$(printf '\n- Small fixes and improvements.\n\n**Full Changelog**: https://
 render v1.0.0 "$WORK/blank.md" || fail "an empty body: exit 1"
 [ "$(changes)" = "$(printf '\n- Small fixes and improvements.\n')" ] || fail "an empty body: [$(changes)]"
 
+# The real template keeps the download checks, attestation line included, word for word.
+"$ROOT/scripts/release-notes.sh" v1.1.0 "$ROOT/packaging/release-notes.md" "$WORK/generated.md" > "$WORK/real" 2> "$WORK/err" \
+  || fail "the real template: exit 1 [$(cat "$WORK/err")]"
+grep -qF 'use `gh attestation verify <file> --repo PhongGuy/TF2Tools`.' "$WORK/real" \
+  || fail "the real template lost the attestation check: [$(cat "$WORK/real")]"
+grep -qF '`sha256sum -c SHA256SUMS`' "$WORK/real" || fail "the real template lost the checksum check"
+
 if render v1.1.0 "$WORK/missing.md"; then fail "a missing generated file: exit 0"; fi
 if "$ROOT/scripts/release-notes.sh" v1.1.0 "$WORK/template.md" > /dev/null 2>&1; then fail "no generated notes argument: exit 0"; fi
 if "$ROOT/scripts/release-notes.sh" v1.1.0 "$WORK/nope.md" "$WORK/generated.md" > /dev/null 2>&1; then fail "no template: exit 0"; fi

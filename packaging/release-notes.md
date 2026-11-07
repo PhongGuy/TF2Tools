@@ -11,7 +11,7 @@
 | Windows x64 | [TF2Tools.exe](https://github.com/PhongGuy/TF2Tools/releases/download/v{version}/TF2Tools.exe) |
 | Linux x86_64 | [tf2tools_{version}_x86_64.AppImage](https://github.com/PhongGuy/TF2Tools/releases/download/v{version}/tf2tools_{version}_x86_64.AppImage) for most Linux systems, or [tf2tools_{version}_amd64.deb](https://github.com/PhongGuy/TF2Tools/releases/download/v{version}/tf2tools_{version}_amd64.deb) for Ubuntu and Debian |
 
-Each file also has a copy with no version in its name, for links that always point at the latest release. Check a download with `sha256sum -c SHA256SUMS`.
+Each file also has a copy with no version in its name, for links that always point at the latest release. Check a download with `sha256sum -c SHA256SUMS`. To check that a file was built by GitHub from this project's own code, use `gh attestation verify <file> --repo PhongGuy/TF2Tools`.
 
 ## Before you install
 
