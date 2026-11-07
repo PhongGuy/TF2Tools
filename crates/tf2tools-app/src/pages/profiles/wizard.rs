@@ -167,6 +167,8 @@ impl ProfileWizard {
         let assigner = cx.new(|cx| WeaponAssigner::new(true, cx));
         // Next, Save and the play buttons read the name and the selects at render, so any change
         // to them just redraws; Enter in the name field acts as Next.
+        // gpui-kit owns InputEvent; every event but Enter only needs a redraw.
+        #[allow(clippy::wildcard_enum_match_arm)]
         let mut subscriptions = vec![
             cx.subscribe_in(
                 &name,

@@ -96,7 +96,10 @@ pub fn store_fetch(store: StoreClient) -> ImageFetch {
                     FetchFailure::Transient
                 }
                 ImageError::Http { status, .. } if status >= 500 => FetchFailure::Transient,
-                _ => FetchFailure::Permanent,
+                ImageError::UntrustedUrl { .. }
+                | ImageError::Http { .. }
+                | ImageError::TooLarge { .. }
+                | _ => FetchFailure::Permanent,
             })
         })
     })

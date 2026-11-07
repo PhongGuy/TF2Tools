@@ -234,7 +234,10 @@ impl HudModel {
             ChangeTarget::AnimationAppend(a) => {
                 (a.check(platform)).is_some_and(|c| c.iter().any(names))
             }
-            _ => false,
+            ChangeTarget::Asset(_)
+            | ChangeTarget::Option(_)
+            | ChangeTarget::Credit(_)
+            | ChangeTarget::Animation(_) => false,
         };
         // A flash's DamagedPlayer trigger goes with its marker lines, matched by group. Every
         // other flash carries its own copy, so the ones left keep firing.

@@ -195,6 +195,11 @@ fn not_found_or_io(failure: IoFailure) -> PresetError {
         PresetError::Io { source, .. } if source.kind() == io::ErrorKind::NotFound => {
             PresetError::NotFound
         }
-        other => other,
+        other @ PresetError::NameBlank
+        | other @ PresetError::NoOptions
+        | other @ PresetError::NameTaken { .. }
+        | other @ PresetError::NotFound
+        | other @ PresetError::Recipe(_)
+        | other @ PresetError::Io { .. } => other,
     }
 }

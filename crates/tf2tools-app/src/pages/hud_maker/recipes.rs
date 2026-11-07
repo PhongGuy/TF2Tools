@@ -813,7 +813,7 @@ fn preset_message(err: &PresetError) -> Option<&'static str> {
         PresetError::NameBlank => Some(NAME_BLANK),
         PresetError::NameTaken { .. } => Some(NAME_TAKEN),
         PresetError::NoOptions => Some(NO_OPTIONS),
-        _ => None,
+        PresetError::NotFound | PresetError::Recipe(_) | PresetError::Io { .. } | _ => None,
     }
 }
 

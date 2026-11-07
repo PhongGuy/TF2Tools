@@ -755,7 +755,7 @@ fn by_provenance(
         Provenance::Curated { hud_id } if kind == LibraryKind::Huds => {
             ("store_hud_id", hud_id.clone().into())
         }
-        _ => return Ok(None),
+        Provenance::Local | Provenance::Curated { .. } => return Ok(None),
     };
     let mut stmt = conn.prepare(&format!(
         "SELECT id, folder_name FROM {table} WHERE {column} = ?1 \
@@ -1089,7 +1089,9 @@ impl Library {
         validated_name(&ProfileDraft::new(name))?;
         let hud = match self.hud_status(tf2)? {
             HudStatus::Managed { id, .. } => DraftSlot::Item(id),
-            _ => DraftSlot::Empty,
+            HudStatus::NotInstalled | HudStatus::Unmanaged { .. } | HudStatus::Multiple { .. } => {
+                DraftSlot::Empty
+            }
         };
         let sounds = self.installed_sounds(tf2)?;
         let sound = |kind| match sounds.slot(kind).managed() {
@@ -1189,7 +1191,11 @@ impl Library {
                 self.unnamed_huds(&game_custom_dir(tf2)?, discard)
                     .map_err(|e| match e {
                         LibraryError::Io { path, source } => ApplyProfileError::Io { path, source },
-                        other => ApplyProfileError::Database {
+                        other @ LibraryError::NotFound { .. }
+                        | other @ LibraryError::InvalidWeaponScript { .. }
+                        | other @ LibraryError::Vpk(_)
+                        | other @ LibraryError::Vtf(_)
+                        | other @ LibraryError::Database { .. } => ApplyProfileError::Database {
                             message: other.to_string(),
                         },
                     })?;
@@ -1277,7 +1283,7 @@ impl Library {
             .iter()
             .filter_map(|m| match &m.kind {
                 MissingKind::Crosshair { weapon_script } => Some(weapon_script.as_str()),
-                _ => None,
+                MissingKind::Hud | MissingKind::Hitsound | MissingKind::Killsound => None,
             })
             .collect();
         let remaining = self

@@ -22,7 +22,12 @@ pub fn describe_map_sync(err: &SyncError) -> StoreFailure {
             "serveme.tf is having problems right now. Try again later."
         }
         SyncError::Io { .. } | SyncError::Database { .. } => DATABASE,
-        _ => "serveme.tf sent something TF2Tools couldn't read. Try again later.",
+        SyncError::Http { .. }
+        | SyncError::TooLarge { .. }
+        | SyncError::Malformed { .. }
+        | SyncError::Archive(_)
+        | SyncError::Interrupted { .. }
+        | _ => "serveme.tf sent something TF2Tools couldn't read. Try again later.",
     };
     StoreFailure::new(message, err.to_string())
 }
@@ -62,7 +67,7 @@ pub fn describe_map_remove(err: &MapRemoveError) -> StoreFailure {
         MapRemoveError::Io { .. } => {
             "Couldn't delete the map. Close TF2 if it is running, then try again."
         }
-        _ => DATABASE,
+        MapRemoveError::Database { .. } | _ => DATABASE,
     };
     StoreFailure::new(message, err.to_string())
 }

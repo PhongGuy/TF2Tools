@@ -77,11 +77,14 @@ pub(crate) fn index_url(base: &str, kind: StoreKind, page: u32) -> Option<String
     let category = match kind {
         StoreKind::Crosshairs => Some(CROSSHAIR_CATEGORY),
         StoreKind::GameBananaHuds => Some(HUD_CATEGORY),
-        _ => None,
+        StoreKind::CuratedHuds | StoreKind::Sounds | StoreKind::Addons => None,
     };
     let sort = match kind {
         StoreKind::Sounds => "Generic_Newest",
-        _ => "Generic_MostLiked",
+        StoreKind::CuratedHuds
+        | StoreKind::GameBananaHuds
+        | StoreKind::Crosshairs
+        | StoreKind::Addons => "Generic_MostLiked",
     };
     let mut url = format!(
         "{base}/{model}/Index?_nPage={page}&_nPerpage={PAGE_SIZE}\

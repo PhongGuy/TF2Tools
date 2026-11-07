@@ -824,7 +824,14 @@ impl SampleSet {
                 Some(Rgba::new(26, 24, 22, 255))
             }
             SampleSet::Spectating if self.code_fill_wins(part) => Some(Rgba::new(52, 48, 45, 255)),
-            _ => None,
+            SampleSet::Empty
+            | SampleSet::Casual
+            | SampleSet::Competitive
+            | SampleSet::Mvm
+            | SampleSet::Killed
+            | SampleSet::Won
+            | SampleSet::ClassPick
+            | SampleSet::Spectating => None,
         }
     }
 
@@ -869,7 +876,14 @@ impl SampleSet {
             SampleSet::Mvm if MVM_CREDIT_PANELS.iter().any(|name| is(name)) => {
                 Some("The credit tables draw in game")
             }
-            _ => None,
+            SampleSet::Empty
+            | SampleSet::Casual
+            | SampleSet::Competitive
+            | SampleSet::Mvm
+            | SampleSet::Killed
+            | SampleSet::Won
+            | SampleSet::ClassPick
+            | SampleSet::Spectating => None,
         }
     }
 

@@ -70,7 +70,7 @@ pub fn progress_label(p: Option<Progress>) -> String {
     };
     match p.phase {
         DownloadPhase::Importing => "Extracting...".to_string(),
-        _ => match p.total {
+        DownloadPhase::Downloading | _ => match p.total {
             Some(total) => {
                 format!(
                     "Downloading... {} / {}",
@@ -345,7 +345,11 @@ impl StoreDownloads {
                 LibraryEntry::Crosshair(c) if c.wanted_name().is_some() => {
                     Some(crate::pages::crosshairs::added_message(c))
                 }
-                _ => None,
+                LibraryEntry::Hud(_)
+                | LibraryEntry::Sound(_)
+                | LibraryEntry::Crosshair(_)
+                | LibraryEntry::Addon(_)
+                | _ => None,
             }),
             _ => None,
         };
@@ -392,7 +396,20 @@ fn failure_description(kind: StoreKind, err: &DownloadError) -> String {
     failure.log("store download");
     let stayed: Vec<String> = match err {
         DownloadError::RollbackFailed { imported, .. } => imported.iter().map(entry_name).collect(),
-        _ => Vec::new(),
+        DownloadError::AlreadyInLibrary { .. }
+        | DownloadError::WrongKind { .. }
+        | DownloadError::RateLimited { .. }
+        | DownloadError::Http { .. }
+        | DownloadError::Network { .. }
+        | DownloadError::TooLarge { .. }
+        | DownloadError::ChecksumMismatch { .. }
+        | DownloadError::NoUsableFiles { .. }
+        | DownloadError::Interrupted { .. }
+        | DownloadError::Io { .. }
+        | DownloadError::Archive(_)
+        | DownloadError::Import(_)
+        | DownloadError::Database { .. }
+        | _ => Vec::new(),
     };
     stayed_description(&failure.message, &stayed)
 }

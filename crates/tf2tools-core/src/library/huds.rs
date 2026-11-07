@@ -306,7 +306,7 @@ impl Library {
     ) -> Result<(String, Option<Rename>), ImportError> {
         let gb_column = match provenance {
             Provenance::GameBanana { gb_id, .. } => Some(gb_id_column(*gb_id)?),
-            _ => None,
+            Provenance::Local | Provenance::Curated { .. } => None,
         };
         let (name, rows) = self
             .db
@@ -856,7 +856,11 @@ impl Library {
     ) -> Result<(), InstallError> {
         let mut unnamed = self.unnamed_huds(custom, discard).map_err(|e| match e {
             LibraryError::Io { path, source } => InstallError::Io { path, source },
-            other => InstallError::Database {
+            other @ LibraryError::NotFound { .. }
+            | other @ LibraryError::InvalidWeaponScript { .. }
+            | other @ LibraryError::Vpk(_)
+            | other @ LibraryError::Vtf(_)
+            | other @ LibraryError::Database { .. } => InstallError::Database {
                 message: other.to_string(),
             },
         })?;
@@ -992,7 +996,11 @@ fn refuse_uncopyable(src: &Path) -> Result<(), KeepHudError> {
 fn keep_library(e: LibraryError) -> KeepHudError {
     match e {
         LibraryError::Io { path, source } => KeepHudError::Io { path, source },
-        other => KeepHudError::Database {
+        other @ LibraryError::NotFound { .. }
+        | other @ LibraryError::InvalidWeaponScript { .. }
+        | other @ LibraryError::Vpk(_)
+        | other @ LibraryError::Vtf(_)
+        | other @ LibraryError::Database { .. } => KeepHudError::Database {
             message: other.to_string(),
         },
     }
@@ -1001,7 +1009,14 @@ fn keep_library(e: LibraryError) -> KeepHudError {
 fn keep_import(e: ImportError) -> KeepHudError {
     match e {
         ImportError::Io { path, source } => KeepHudError::Io { path, source },
-        other => KeepHudError::Database {
+        other @ ImportError::Archive(_)
+        | other @ ImportError::NotAHud { .. }
+        | other @ ImportError::UnsupportedFile { .. }
+        | other @ ImportError::Wav(_)
+        | other @ ImportError::NotAVpk { .. }
+        | other @ ImportError::Vtf(_)
+        | other @ ImportError::UnsupportedProvenance
+        | other @ ImportError::Database { .. } => KeepHudError::Database {
             message: other.to_string(),
         },
     }
@@ -1041,6 +1056,6 @@ fn recorded_install_folder(src: &Path) -> Option<String> {
     let (file, _) = MakerFile::parse(&std::fs::read(&path).ok()?).ok()?;
     match file.base() {
         MakerBase::Copy(base) => base.install_folder().map(str::to_owned),
-        _ => None,
+        MakerBase::Default => None,
     }
 }

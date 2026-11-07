@@ -118,7 +118,7 @@ impl GameSituation {
             TfClass::Pyro | TfClass::Demoman => 175,
             TfClass::Heavy => 300,
             TfClass::Medic => 150,
-            _ => 125,
+            TfClass::Scout | TfClass::Engineer | TfClass::Sniper | TfClass::Spy => 125,
         }
     }
 

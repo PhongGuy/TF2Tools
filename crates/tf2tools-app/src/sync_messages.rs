@@ -61,6 +61,6 @@ pub fn sync_stopped(detail: impl Into<String>) -> SyncFailure {
 pub(crate) fn source_name(kind: StoreKind) -> &'static str {
     match kind {
         StoreKind::CuratedHuds | StoreKind::Addons => "GitHub",
-        _ => "GameBanana",
+        StoreKind::GameBananaHuds | StoreKind::Sounds | StoreKind::Crosshairs | _ => "GameBanana",
     }
 }

@@ -492,7 +492,11 @@ impl Render for StoreDetail {
 pub fn detail_width(kind: StoreKind) -> Pixels {
     match kind {
         StoreKind::Sounds => DIALOG_WIDTH,
-        _ => DETAIL_WIDTH,
+        StoreKind::CuratedHuds
+        | StoreKind::GameBananaHuds
+        | StoreKind::Crosshairs
+        | StoreKind::Addons
+        | _ => DETAIL_WIDTH,
     }
 }
 

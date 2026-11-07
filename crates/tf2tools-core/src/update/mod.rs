@@ -134,6 +134,8 @@ impl UpdateClient {
         if asset.kind() != kind {
             return Err(UpdateDownloadError::Unsupported);
         }
+        // io::ErrorKind is non_exhaustive; any kind but the two read-only ones is plain I/O.
+        #[allow(clippy::wildcard_enum_match_arm)]
         let create_failure = |source: std::io::Error, path: &Path| match source.kind() {
             std::io::ErrorKind::PermissionDenied | std::io::ErrorKind::ReadOnlyFilesystem => {
                 UpdateDownloadError::NotWritable { dir: dir.clone() }

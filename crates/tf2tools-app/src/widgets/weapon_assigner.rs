@@ -37,7 +37,7 @@ pub fn slot_colour(slot: WeaponSlot, primary: Hsla) -> Hsla {
     match slot {
         WeaponSlot::Primary => primary,
         WeaponSlot::Secondary => rgb(BLUE_500).into(),
-        _ => rgb(ORANGE_500).into(),
+        WeaponSlot::Melee | _ => rgb(ORANGE_500).into(),
     }
 }
 

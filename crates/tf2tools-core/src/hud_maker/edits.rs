@@ -402,7 +402,10 @@ impl HudModel {
         value: &str,
         group: u32,
     ) -> Result<Vec<Change>, EditRefused> {
-        use PropertyKind::{Alignment, Choice, Colour, Font, Number, Text, Toggle};
+        use PropertyKind::{
+            Alignment, Choice, Colour, Font, Hide, Image, Layer, Number, Position, Size, Text,
+            Toggle,
+        };
         let part = self.part(part).ok_or(EditRefused::UnknownPart)?;
         let spec = ClassSchema::for_part(part)
             .get(key)
@@ -410,7 +413,7 @@ impl HudModel {
             .filter(|s| match s.kind() {
                 Text | Alignment | Number | Font => s.stage() <= 2,
                 Toggle | Colour | Choice => s.stage() <= 5,
-                _ => false,
+                Position | Size | Layer | Hide | Image => false,
             })
             .ok_or(EditRefused::NotOffered)?;
         if !part.is_readable() {
@@ -434,14 +437,15 @@ impl HudModel {
             Font => (self.scheme().font_names().iter())
                 .any(|f| f.eq_ignore_ascii_case(value) && writable(spec.key(), value, None))
                 .then(|| value.to_owned()),
-            _ => None,
+            Position | Size | Layer | Hide | Image => None,
         }
         .ok_or(EditRefused::BadValue)?;
         // The Stage 1 Colour row writes the slot `recolour_part` picks, so a set slot such as
         // fgcolor_override cannot shadow the edit.
         let key = match spec.kind() {
             Colour if spec.stage() <= 1 => colour_slot(part).unwrap_or(spec.key()),
-            _ => spec.key(),
+            Position | Size | Layer | Hide | Colour | Text | Alignment | Toggle | Font | Image
+            | Number | Choice => spec.key(),
         };
         Ok(set_lines(part, key, group, |_| text.clone()))
     }
@@ -729,7 +733,13 @@ pub(super) fn set_lines(
 fn changed(changes: Vec<Change>) -> impl Iterator<Item = Change> {
     changes.into_iter().filter(|c| match c.target() {
         ChangeTarget::Set(s) => s.old() != Some(s.value()),
-        _ => true,
+        ChangeTarget::Remove(_)
+        | ChangeTarget::AddBlock(_)
+        | ChangeTarget::Asset(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_) => true,
     })
 }
 
@@ -758,7 +768,7 @@ pub(crate) fn shift_pos(text: &str, units: i32) -> String {
         TermOp::Set => {
             let new = clamp_i64(match last.align() {
                 Align::End => old - units,
-                _ => old + units,
+                Align::Start | Align::Centre => old + units,
             });
             let plus = if new >= 0 && last.number().starts_with('+') {
                 "+"
@@ -774,7 +784,7 @@ pub(crate) fn shift_pos(text: &str, units: i32) -> String {
             let op = if new < 0 { '-' } else { '+' };
             format!("{}{op}{}", &text[..start - 1], i64::from(new).abs())
         }
-        _ => append(),
+        TermOp::Add | TermOp::Sub => append(),
     }
 }
 
@@ -817,7 +827,7 @@ pub(crate) fn mirror_pos(text: &str, wide: Option<&str>) -> Result<String, NoMir
         match term.unit() {
             PosUnit::Units => u += i64::from(sign) * i64::from(atoi(number)),
             PosUnit::OwnSize => b += f64::from(sign) * f64::from(atof(number)),
-            _ => return Err(NoMirror::Place),
+            PosUnit::ParentSize => return Err(NoMirror::Place),
         }
     }
     let round = |x: f64| (x * 1e4).round() / 1e4;
@@ -847,7 +857,9 @@ pub(crate) fn mirror_pos(text: &str, wide: Option<&str>) -> Result<String, NoMir
         SizeForm::Units => anchored(1.0 - a, -n - u),
         // An `f` width spans to N short of the far edge, so only a plain start mirrors.
         SizeForm::Full if a == 0.0 => anchored(0.0, n - u),
-        _ => Err(NoMirror::Width),
+        SizeForm::Full | SizeForm::ParentFrac | SizeForm::OwnFrac | SizeForm::OtherAxis => {
+            Err(NoMirror::Width)
+        }
     }
 }
 
@@ -886,7 +898,9 @@ pub(crate) fn resize_size(text: &str, new_px: i32, align_px: i32, scale: ScreenS
             let units = scale.normalise(align_px.saturating_sub(new_px));
             format!("{}{units}", &text[..1])
         }
-        _ => scale.normalise(new_px).to_string(),
+        SizeForm::Units | SizeForm::ParentFrac | SizeForm::OwnFrac | SizeForm::OtherAxis => {
+            scale.normalise(new_px).to_string()
+        }
     }
 }
 

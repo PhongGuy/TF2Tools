@@ -598,7 +598,7 @@ fn map_row(
                 .into_any_element()
         }
         MapState::InGame => state_label("In game").into_any_element(),
-        _ => {
+        MapState::Available | _ => {
             let this_one = running.filter(|r| r.name == map.name);
             let label = match this_one {
                 Some(Running {

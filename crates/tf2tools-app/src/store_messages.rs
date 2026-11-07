@@ -106,7 +106,10 @@ fn download_message(kind: StoreKind, err: &DownloadError) -> String {
 fn archive_message(err: &ArchiveError) -> &'static str {
     match err {
         ArchiveError::Rar { .. } => DL_RAR,
-        _ => DL_UNPACK,
+        ArchiveError::Io { .. }
+        | ArchiveError::Malformed { .. }
+        | ArchiveError::UnsafePath { .. }
+        | _ => DL_UNPACK,
     }
 }
 
@@ -197,7 +200,9 @@ pub fn describe_install(err: &InstallError) -> StoreFailure {
         }
         InstallError::Database { .. } => LIBRARY_UPDATE,
         InstallError::GameMissing { .. } => crate::local_messages::GAME_MOVED,
-        _ => "Something went wrong while installing. Try again later.",
+        InstallError::ExternalHuds(_) | _ => {
+            "Something went wrong while installing. Try again later."
+        }
     };
     StoreFailure::new(message, err.to_string())
 }

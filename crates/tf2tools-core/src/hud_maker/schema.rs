@@ -192,7 +192,12 @@ impl HudModel {
                         .iter()
                         .any(|(f, b)| same_block(remove.file(), remove.block(), f, b)))
             }
-            _ => true,
+            ChangeTarget::AddBlock(_)
+            | ChangeTarget::Asset(_)
+            | ChangeTarget::Option(_)
+            | ChangeTarget::Credit(_)
+            | ChangeTarget::Animation(_)
+            | ChangeTarget::AnimationAppend(_) => true,
         };
         let (kept, dropped): (Vec<&Change>, Vec<&Change>) = changes.iter().partition(keeps);
         // A clone a dropped `Set` named goes with it rather than linger as an orphan, unless a
@@ -262,7 +267,13 @@ fn in_if_block_of(set: &SetKey, blocks: &[(String, Vec<String>)]) -> bool {
 fn set_of(change: &Change) -> Option<&SetKey> {
     match change.target() {
         ChangeTarget::Set(set) => Some(set),
-        _ => None,
+        ChangeTarget::Remove(_)
+        | ChangeTarget::AddBlock(_)
+        | ChangeTarget::Asset(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_) => None,
     }
 }
 
@@ -272,7 +283,11 @@ fn font_of(change: &Change) -> Option<&str> {
         ChangeTarget::AddBlock(add) => (add.file(), add.parent(), Some(add.name())),
         ChangeTarget::Set(set) => (set.file(), set.block(), None),
         ChangeTarget::Remove(remove) => (remove.file(), remove.block(), None),
-        _ => return None,
+        ChangeTarget::Asset(_)
+        | ChangeTarget::Option(_)
+        | ChangeTarget::Credit(_)
+        | ChangeTarget::Animation(_)
+        | ChangeTarget::AnimationAppend(_) => return None,
     };
     if !file.eq_ignore_ascii_case(SCHEME_FILE) {
         return None;

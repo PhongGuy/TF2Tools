@@ -40,7 +40,7 @@ fn block_in<'a>(pairs: &'a [KvPair], name: &str) -> &'a [KvPair] {
         .iter()
         .find_map(|p| match &p.value {
             KvValue::Block(c) if p.key.eq_ignore_ascii_case(name) => Some(c.as_slice()),
-            _ => None,
+            KvValue::Text(_) | KvValue::Block(_) => None,
         })
         .unwrap_or_default()
 }
@@ -48,7 +48,7 @@ fn block_in<'a>(pairs: &'a [KvPair], name: &str) -> &'a [KvPair] {
 fn definition<'a>(section: &'a [KvPair], name: &str) -> Option<&'a [KvPair]> {
     section.iter().find_map(|p| match &p.value {
         KvValue::Block(c) if p.key.eq_ignore_ascii_case(name) => Some(c.as_slice()),
-        _ => None,
+        KvValue::Text(_) | KvValue::Block(_) => None,
     })
 }
 
@@ -186,7 +186,12 @@ impl Run<'_> {
                 ChangeTarget::AddBlock(a) => {
                     a.lines().iter().for_each(|l| note(l.key(), l.value()))
                 }
-                _ => {}
+                ChangeTarget::Remove(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Option(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_) => {}
             }
         }
         uses
@@ -255,7 +260,7 @@ impl Run<'_> {
             }) {
                 let family = variant.iter().find_map(|p| match &p.value {
                     KvValue::Text(t) if p.key.eq_ignore_ascii_case("name") => Some(t.trim()),
-                    _ => None,
+                    KvValue::Text(_) | KvValue::Block(_) => None,
                 });
                 if let Some(family) = family.filter(|f| !f.is_empty())
                     && !families.iter().any(|f| f.eq_ignore_ascii_case(family))

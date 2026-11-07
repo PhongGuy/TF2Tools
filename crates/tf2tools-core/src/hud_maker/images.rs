@@ -122,7 +122,7 @@ impl HudFiles {
         let setting = |key: &str| {
             settings.iter().find_map(|pair| match &pair.value {
                 KvValue::Text(text) if pair.key.eq_ignore_ascii_case(key) => Some(text.as_str()),
-                _ => None,
+                KvValue::Text(_) | KvValue::Block(_) => None,
             })
         };
         let Some(base) = setting("$basetexture") else {

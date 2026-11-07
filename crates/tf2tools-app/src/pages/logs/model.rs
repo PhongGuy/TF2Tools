@@ -88,6 +88,6 @@ pub fn level_name(level: LogLevel) -> &'static str {
     match level {
         LogLevel::Warning => "warning",
         LogLevel::Error => "error",
-        _ => "info",
+        LogLevel::Info | _ => "info",
     }
 }

@@ -69,7 +69,7 @@ pub fn sync_entry(kind: StoreKind, summary: SyncSummary) -> Option<NewLogEntry> 
             "addon_store",
             format!("Synced {} addons from mastercomfig", summary.rows),
         ),
-        _ => ("store", format!("Synced {} curated HUDs", summary.rows)),
+        StoreKind::CuratedHuds | _ => ("store", format!("Synced {} curated HUDs", summary.rows)),
     };
     Some(NewLogEntry::new(LogLevel::Info, category, "sync", message))
 }
@@ -112,7 +112,7 @@ pub fn download_entry(event: &DownloadEvent) -> NewLogEntry {
             format!("Addon download failed: {name}"),
             false,
         ),
-        _ => (
+        StoreKind::CuratedHuds | _ => (
             "store",
             format!("Downloaded HUD: {name}"),
             format!("HUD download failed: {name}"),

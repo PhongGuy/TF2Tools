@@ -96,28 +96,44 @@ impl SchemaValue {
     pub(super) fn get(&self, key: &str) -> Option<&SchemaValue> {
         match self {
             SchemaValue::Object(fields) => fields.iter().find(|(k, _)| k == key).map(|(_, v)| v),
-            _ => None,
+            SchemaValue::Null
+            | SchemaValue::Bool(_)
+            | SchemaValue::Number(_)
+            | SchemaValue::String(_)
+            | SchemaValue::Array(_) => None,
         }
     }
 
     pub(super) fn as_str(&self) -> Option<&str> {
         match self {
             SchemaValue::String(s) => Some(s),
-            _ => None,
+            SchemaValue::Null
+            | SchemaValue::Bool(_)
+            | SchemaValue::Number(_)
+            | SchemaValue::Array(_)
+            | SchemaValue::Object(_) => None,
         }
     }
 
     pub(super) fn as_object(&self) -> Option<&[(String, SchemaValue)]> {
         match self {
             SchemaValue::Object(fields) => Some(fields),
-            _ => None,
+            SchemaValue::Null
+            | SchemaValue::Bool(_)
+            | SchemaValue::Number(_)
+            | SchemaValue::String(_)
+            | SchemaValue::Array(_) => None,
         }
     }
 
     pub(super) fn as_array(&self) -> Option<&[SchemaValue]> {
         match self {
             SchemaValue::Array(items) => Some(items),
-            _ => None,
+            SchemaValue::Null
+            | SchemaValue::Bool(_)
+            | SchemaValue::Number(_)
+            | SchemaValue::String(_)
+            | SchemaValue::Object(_) => None,
         }
     }
 
@@ -542,7 +558,11 @@ fn int(value: Option<&SchemaValue>) -> Option<i32> {
             Some(*n as i32)
         }
         SchemaValue::String(s) => s.trim().parse().ok(),
-        _ => None,
+        SchemaValue::Null
+        | SchemaValue::Bool(_)
+        | SchemaValue::Number(_)
+        | SchemaValue::Array(_)
+        | SchemaValue::Object(_) => None,
     }
 }
 
@@ -552,7 +572,7 @@ fn text(value: Option<&SchemaValue>) -> Option<String> {
         SchemaValue::String(s) => Some(s.clone()),
         SchemaValue::Number(n) => Some(n.to_string()),
         SchemaValue::Bool(b) => Some(b.to_string()),
-        _ => None,
+        SchemaValue::Null | SchemaValue::Array(_) | SchemaValue::Object(_) => None,
     }
 }
 
@@ -966,7 +986,7 @@ impl Fit<'_> {
         match value.as_str() {
             Some(s) if s.eq_ignore_ascii_case(TRANSPARENT_VIEWMODELS) => match leaves {
                 Leaves::Toggle => Ok(Vec::new()),
-                _ => Err(Refused::LeftOut),
+                Leaves::Value | Leaves::Literal | Leaves::Text => Err(Refused::LeftOut),
             },
             Some(s) if s.eq_ignore_ascii_case(STOCK_BACKGROUNDS) => {
                 if menu_art(self.copy.iter().cloned(), MENU_ART_DIR).is_empty() {
@@ -1038,7 +1058,10 @@ impl Fit<'_> {
                 }
                 (on, off)
             }
-            _ => return Err(Refused::LeftOut),
+            SchemaValue::Null
+            | SchemaValue::Bool(_)
+            | SchemaValue::Number(_)
+            | SchemaValue::Object(_) => return Err(Refused::LeftOut),
         };
         self.base_lines(file, on, off)
     }

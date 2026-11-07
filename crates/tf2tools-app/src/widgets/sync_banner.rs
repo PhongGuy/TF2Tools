@@ -17,7 +17,7 @@ pub fn banner_text(kind: StoreKind, has_rows: bool) -> String {
         StoreKind::Sounds => "sounds",
         StoreKind::Crosshairs => "crosshairs",
         StoreKind::GameBananaHuds => "HUDs",
-        _ => "items",
+        StoreKind::CuratedHuds | StoreKind::Addons | _ => "items",
     };
     let mut text = format!("Syncing {noun} from GameBanana...");
     if has_rows {

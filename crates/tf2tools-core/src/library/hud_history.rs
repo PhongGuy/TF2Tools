@@ -276,7 +276,13 @@ impl Library {
         let name = self.made_folder(id).map_err(|e| match e {
             MakeHudError::Io { path, source } => HistoryError::Io { path, source },
             MakeHudError::Database { message } => HistoryError::Database { message },
-            _ => HistoryError::NotMade {
+            MakeHudError::EmptyName
+            | MakeHudError::NameTaken { .. }
+            | MakeHudError::NotFound { .. }
+            | MakeHudError::NotMade { .. }
+            | MakeHudError::NoSpace { .. }
+            | MakeHudError::Files(_)
+            | MakeHudError::BaseChanged => HistoryError::NotMade {
                 id: id.as_str().to_owned(),
             },
         })?;
@@ -304,7 +310,13 @@ pub(super) fn snapshot_sources(folder: &Path) -> Option<BTreeSet<String>> {
         let (snapshot, _skipped) = SnapshotFile::parse(&bytes).ok()?;
         sources.extend(snapshot.changes.iter().filter_map(|c| match c.target() {
             ChangeTarget::Asset(asset) => asset_source(asset),
-            _ => None,
+            ChangeTarget::Set(_)
+            | ChangeTarget::Remove(_)
+            | ChangeTarget::AddBlock(_)
+            | ChangeTarget::Option(_)
+            | ChangeTarget::Credit(_)
+            | ChangeTarget::Animation(_)
+            | ChangeTarget::AnimationAppend(_) => None,
         }));
     }
     Some(sources)
@@ -372,7 +384,15 @@ fn not_found_or_io(failure: IoFailure) -> HistoryError {
         HistoryError::Io { source, .. } if source.kind() == io::ErrorKind::NotFound => {
             HistoryError::NotFound
         }
-        other => other,
+        other @ HistoryError::NameBlank
+        | other @ HistoryError::Full { .. }
+        | other @ HistoryError::TooLarge
+        | other @ HistoryError::NotMade { .. }
+        | other @ HistoryError::NotFound
+        | other @ HistoryError::Damaged { .. }
+        | other @ HistoryError::Newer
+        | other @ HistoryError::Io { .. }
+        | other @ HistoryError::Database { .. } => other,
     }
 }
 

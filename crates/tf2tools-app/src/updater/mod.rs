@@ -128,7 +128,11 @@ impl UpdateState {
             | UpdateState::Ready(offer)
             | UpdateState::Installing(offer)
             | UpdateState::Updated(offer) => Some(offer),
-            _ => None,
+            UpdateState::Unavailable
+            | UpdateState::Idle
+            | UpdateState::Checking
+            | UpdateState::UpToDate
+            | UpdateState::Failed(_) => None,
         }
     }
 }

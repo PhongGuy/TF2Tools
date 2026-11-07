@@ -191,7 +191,7 @@ pub fn ring_icon(kind: StoreKind) -> IconName {
         StoreKind::Sounds => Page::SoundStore,
         StoreKind::Crosshairs => Page::CrosshairStore,
         StoreKind::Addons => Page::AddonStore,
-        _ => Page::HudStore,
+        StoreKind::CuratedHuds | StoreKind::GameBananaHuds | _ => Page::HudStore,
     })
 }
 

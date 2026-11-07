@@ -298,7 +298,14 @@ impl HudOptions {
                 {
                     Some(o.value().clone())
                 }
-                _ => None,
+                ChangeTarget::Set(_)
+                | ChangeTarget::Remove(_)
+                | ChangeTarget::AddBlock(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Option(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_) => None,
             });
         Some(stored.unwrap_or_else(|| self.start(spec)))
     }
@@ -483,8 +490,13 @@ fn pristine_values(
                 (scheme.as_ref().and_then(|s| s.named_colour(key)))
                     .map(|c| OptionValue::Rgba(c.to_array()))
             }
-            kind => line_in_force(files, file, block, key, cond.as_deref(), platform)
-                .and_then(|text| read_as(kind, value, text.trim())),
+            kind @ OptionKind::Toggle
+            | kind @ OptionKind::Number { .. }
+            | kind @ OptionKind::Choice(_)
+            | kind @ OptionKind::Text => {
+                line_in_force(files, file, block, key, cond.as_deref(), platform)
+                    .and_then(|text| read_as(kind, value, text.trim()))
+            }
         };
         if let Some(found) = found {
             out.insert(spec.id().to_owned(), found);
@@ -519,7 +531,9 @@ fn lines_value(files: &HudFiles, spec: &OptionSpec) -> Option<OptionValue> {
                 OptionAction::Switch(SwitchAction::StockBackgrounds { folder }) => {
                     menu_art(files.copy_paths(), folder).is_empty()
                 }
-                _ => return None,
+                OptionAction::SetKey { .. }
+                | OptionAction::Switch(_)
+                | OptionAction::WriteCfg { .. } => return None,
             };
             if out.is_some_and(|o| o != now) {
                 return None;
@@ -533,7 +547,10 @@ fn lines_value(files: &HudFiles, spec: &OptionSpec) -> Option<OptionValue> {
         OptionKind::Choice(choices) if spec.actions().is_empty() => (choices.iter())
             .find(|c| state(c.actions()) == Some(true))
             .map(|c| OptionValue::Pick(c.key().to_owned())),
-        _ => None,
+        OptionKind::Colour { .. }
+        | OptionKind::Number { .. }
+        | OptionKind::Choice(_)
+        | OptionKind::Text => None,
     }
 }
 
@@ -587,7 +604,10 @@ fn read_as(kind: &OptionKind, map: &ValueMap, text: &str) -> Option<OptionValue>
             let value = unfill(template, text)?;
             match kind {
                 OptionKind::Text => text_suits(value).then(|| OptionValue::Text(value.to_owned())),
-                _ => value.parse().ok().map(OptionValue::Int),
+                OptionKind::Toggle
+                | OptionKind::Colour { .. }
+                | OptionKind::Number { .. }
+                | OptionKind::Choice(_) => value.parse().ok().map(OptionValue::Int),
             }
         }
         _ => None,
@@ -608,7 +628,10 @@ fn unfill<'a>(template: &str, text: &'a str) -> Option<&'a str> {
 fn all_actions(spec: &OptionSpec) -> impl Iterator<Item = &OptionAction> {
     let choices = match spec.kind() {
         OptionKind::Choice(choices) => choices.as_slice(),
-        _ => &[],
+        OptionKind::Toggle
+        | OptionKind::Colour { .. }
+        | OptionKind::Number { .. }
+        | OptionKind::Text => &[],
     };
     (spec.actions().iter()).chain(choices.iter().flat_map(|c| c.actions()))
 }
@@ -618,7 +641,13 @@ fn without(changes: &[Change], wanted: impl Fn(&str, &str) -> bool) -> Vec<Chang
     (changes.iter())
         .filter(|change| match change.target() {
             ChangeTarget::Option(o) => !wanted(o.source(), o.id()),
-            _ => true,
+            ChangeTarget::Set(_)
+            | ChangeTarget::Remove(_)
+            | ChangeTarget::AddBlock(_)
+            | ChangeTarget::Asset(_)
+            | ChangeTarget::Credit(_)
+            | ChangeTarget::Animation(_)
+            | ChangeTarget::AnimationAppend(_) => true,
         })
         .cloned()
         .collect()
@@ -678,7 +707,7 @@ pub(super) fn active_bases(text: &str) -> Vec<String> {
                 target,
                 ..
             } => Some(target.to_owned()),
-            _ => None,
+            Line::Blank | Line::Comment(_) | Line::Switch { .. } | Line::Other => None,
         })
         .collect()
 }
@@ -695,7 +724,7 @@ pub(super) fn base_targets(text: &str) -> Option<Vec<String>> {
                 target,
                 trailing: None,
             } => targets.push(target.to_owned()),
-            _ => return None,
+            Line::Comment(_) | Line::Switch { .. } | Line::Other => return None,
         }
     }
     Some(targets)
@@ -1182,7 +1211,9 @@ fn spec_refs(spec: &OptionSpec) -> Vec<String> {
                 value: ValueMap::Template(t),
                 ..
             } => template_refs(t),
-            _ => None,
+            OptionAction::SetKey { .. }
+            | OptionAction::Switch(_)
+            | OptionAction::WriteCfg { .. } => None,
         })
         .flatten()
         .collect()
@@ -1548,7 +1579,7 @@ fn comment_lines(text: &str, file: &str, target: &str, on: bool) -> Option<Strin
         let names = match classify(body, manifest) {
             Line::Switch { target: t, .. } if manifest => check_switch_path(t),
             Line::Switch { target: t, .. } => resolve(file, t),
-            _ => None,
+            Line::Blank | Line::Comment(_) | Line::Other => None,
         };
         if names.as_deref() != Some(target) {
             out.push_str(line);

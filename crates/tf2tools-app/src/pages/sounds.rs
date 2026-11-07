@@ -232,7 +232,7 @@ impl SoundsPage {
         };
         let (done, failed) = match kind {
             SoundKind::Hitsound => ("Hitsound uninstalled", "Failed to uninstall hitsound"),
-            _ => ("Killsound uninstalled", "Failed to uninstall killsound"),
+            SoundKind::Killsound | _ => ("Killsound uninstalled", "Failed to uninstall killsound"),
         };
         self.run(
             Busy::Uninstall(kind),
@@ -304,7 +304,7 @@ impl SoundsPage {
         };
         let (done, failed) = match kind {
             SoundKind::Hitsound => ("Hitsound installed", "Failed to install hitsound"),
-            _ => ("Killsound installed", "Failed to install killsound"),
+            SoundKind::Killsound | _ => ("Killsound installed", "Failed to install killsound"),
         };
         let id = sound.id().clone();
         let name = sound.name().to_owned();
@@ -432,7 +432,7 @@ fn sound_key(folder: &str) -> SharedString {
 fn slot_title(kind: SoundKind) -> &'static str {
     match kind {
         SoundKind::Hitsound => "Hitsound",
-        _ => "Killsound",
+        SoundKind::Killsound | _ => "Killsound",
     }
 }
 
@@ -465,7 +465,7 @@ impl SoundsPage {
         let muted = theme.muted_foreground;
         let icon = match kind {
             SoundKind::Hitsound => IconName::Crosshair,
-            _ => IconName::Target,
+            SoundKind::Killsound | _ => IconName::Target,
         };
         let title = slot_title(kind);
         let slot = self.slot(kind);
@@ -930,6 +930,6 @@ impl Render for SoundsPage {
 fn format_texts(format: SoundFormat) -> (&'static str, &'static str) {
     match format {
         SoundFormat::Vpk => ("vpk", "VPK sound pack"),
-        _ => ("wav", "16-bit PCM, 44100Hz, Stereo"),
+        SoundFormat::Wav | _ => ("wav", "16-bit PCM, 44100Hz, Stereo"),
     }
 }

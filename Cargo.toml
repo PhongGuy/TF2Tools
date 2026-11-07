@@ -22,6 +22,7 @@ panic = "deny"
 ref_option = "warn"
 wildcard_imports = "warn"
 clone_on_ref_ptr = "warn"
+wildcard_enum_match_arm = "warn"
 missing_assert_message = "warn"
 
 [workspace.dependencies]
