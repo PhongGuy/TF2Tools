@@ -387,15 +387,19 @@ impl HudMakerPage {
         let title = match panel {
             Panel::Parts => "Parts".into_any_element(),
             Panel::Options => match self.selected_name() {
-                Some(name) => h_flex()
+                // The way down sits on its own small line over the part's name, so neither
+                // is cut short in a narrow panel.
+                Some(name) => v_flex()
                     .min_w_0()
-                    .gap_1()
-                    .children(self.crumbs(cx))
-                    .child(labelled(
-                        div().flex_none().max_w_full().truncate(),
-                        ids::HUD_MAKER_PANEL_PART,
-                        name,
-                    ))
+                    .child(
+                        h_flex()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .gap_1()
+                            .text_xs()
+                            .children(self.crumbs(cx)),
+                    )
+                    .child(labelled(div().truncate(), ids::HUD_MAKER_PANEL_PART, name))
                     .into_any_element(),
                 None if self.borrow.open => "Borrow a part".into_any_element(),
                 None if self.history_open => "History".into_any_element(),
@@ -512,9 +516,8 @@ impl HudMakerPage {
                     .id(ids::hud_maker_crumb(&key))
                     .aria_label(SharedString::from(name.clone()))
                     .test_support()
-                    .min_w_0()
-                    .flex_shrink(1.)
-                    .truncate()
+                    .flex_none()
+                    .whitespace_nowrap()
                     .font_weight(FontWeight::NORMAL)
                     .text_color(muted)
                     .cursor_pointer()
