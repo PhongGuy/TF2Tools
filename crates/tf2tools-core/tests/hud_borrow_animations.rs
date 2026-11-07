@@ -1,6 +1,6 @@
 //! A borrowed part brings its events and the trigger lines that start them.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{ANIMS, ANIMS_PATH, anim_files, anim_model};
 use common::hud_borrow::source;

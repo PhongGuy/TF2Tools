@@ -1,6 +1,6 @@
 //! The made-up player the Spectator tab watches, and the colour the code gives its labels.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{TARGET_ID, target_id_texts};
 use tf2tools_core::{HudModel, PartKey, Platform, Rgba, SampleSet, Scene, Team};

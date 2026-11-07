@@ -1,6 +1,6 @@
 //! Player-list spacing: the three Stage 1 rows and the number edit behind them.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{scoreboard_with, stock_files};
 use tf2tools_core::{

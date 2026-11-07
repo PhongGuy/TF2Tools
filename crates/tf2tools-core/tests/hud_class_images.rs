@@ -1,6 +1,6 @@
 //! Which picture a part draws in its scene: the code's, the button's default, or the file's.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{class_select, stock_files, stock_files_with};
 use tf2tools_core::{HudFiles, HudModel, PartKey, Platform, Scene, Team, drawn_image, scene_image};

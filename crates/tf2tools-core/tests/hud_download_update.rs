@@ -1,6 +1,6 @@
 //! An unedited store HUD learns whether the store has a newer version of it.
 
-mod common;
+use crate::common;
 
 use common::hud_copy::{import_stock_hud, store_item};
 use common::{LibraryEnv, library_env, sql};

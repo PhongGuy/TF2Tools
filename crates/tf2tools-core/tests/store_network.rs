@@ -1,6 +1,6 @@
 //! Network hardening: client timeouts and the preview redirect allowlist.
 
-mod common;
+use crate::common;
 
 use std::time::{Duration, Instant};
 

@@ -1,6 +1,6 @@
 //! HUD card pictures made from the HUD's own widescreen main-menu background.
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 

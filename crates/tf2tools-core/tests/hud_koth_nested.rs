@@ -1,6 +1,6 @@
 //! The KOTH timers each load the round timer's file: one part per child, if_match on, shared edits.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files_with;
 use tf2tools_core::{

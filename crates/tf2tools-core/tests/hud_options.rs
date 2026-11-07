@@ -1,6 +1,6 @@
 //! Options: the change kind, the built-ins, replay, values and the sample killfeed rows.
 
-mod common;
+use crate::common;
 
 use std::collections::BTreeMap;
 

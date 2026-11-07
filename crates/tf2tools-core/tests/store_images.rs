@@ -1,6 +1,6 @@
 //! Store images: the host allowlist, redirects, the size cap and the disk cache.
 
-mod common;
+use crate::common;
 
 use common::{StoreEnv, store_env, write_file};
 use std::path::PathBuf;

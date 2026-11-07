@@ -1,6 +1,6 @@
 //! What the game's code shows in each scoreboard mode.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files;
 use tf2tools_core::{BoardMode, HiddenBy, HudModel, PartKey, Platform, Scene, SceneRule, Screen};

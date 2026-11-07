@@ -1,6 +1,6 @@
 //! The spectator scene under a #base stub, an edit, and a root block that is gone or zeroed.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{SPECTATOR, spectator_stub, stock_files, stock_files_with};
 use tf2tools_core::{

@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use tf2tools_core::{DetectError, Tf2Install};
 

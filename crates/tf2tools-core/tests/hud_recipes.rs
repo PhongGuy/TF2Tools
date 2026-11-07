@@ -1,6 +1,6 @@
 //! Recipe files: reading untrusted input, writing, exporting and applying.
 
-mod common;
+use crate::common;
 
 use tf2tools_core::{
     AssetFile, Change, HudAssets, OptionChange, OptionValue, Recipe, RecipeError, SetKey,

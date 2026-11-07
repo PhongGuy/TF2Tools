@@ -1,6 +1,6 @@
 //! A file two scenes read: who owns it, and that one change list shows in both.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::target_id_files;
 use tf2tools_core::{ChangeTarget, HudModel, PartKey, Platform, Scene};

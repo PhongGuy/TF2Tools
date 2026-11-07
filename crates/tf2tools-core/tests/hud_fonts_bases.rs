@@ -1,7 +1,7 @@
 //! In a copy, a part's own font and an added font file work when the fonts live only in
 //! `#base` files: the clone and the font entry land in the HUD's own clientscheme.res.
 
-mod common;
+use crate::common;
 
 use common::hud_copy::{game_for, import_stock_hud};
 use common::hud_stock::stock_files_with;

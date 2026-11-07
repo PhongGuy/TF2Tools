@@ -1,6 +1,6 @@
 //! Pictures the player picks: kept by content, saved, capped and reopened.
 
-mod common;
+use crate::common;
 
 use common::hud_pictures::{CODE_VMT, folder, kept, pick, save, tex};
 use common::hud_stock::stock_files;

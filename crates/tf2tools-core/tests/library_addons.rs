@@ -1,6 +1,6 @@
 //! Mastercomfig addons: import into the library, install with addons.cfg, uninstall, delete.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::PathBuf;

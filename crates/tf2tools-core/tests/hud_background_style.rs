@@ -1,6 +1,6 @@
 //! Background style: draw it or not, its colour, square or rounded corners.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, block, stock_files_with, with_blocks};
 use tf2tools_core::{

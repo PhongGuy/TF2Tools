@@ -1,6 +1,6 @@
 //! GameBanana sync: pages, checkpoints, resume, stale-row cleanup and the page cap.
 
-mod common;
+use crate::common;
 
 use std::sync::Mutex;
 

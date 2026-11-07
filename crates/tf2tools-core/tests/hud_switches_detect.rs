@@ -1,6 +1,6 @@
 //! Detected switches: F groups and toggles, manifest lines, C renames, B and B' slots.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files;
 use common::hud_switches::switch_files;

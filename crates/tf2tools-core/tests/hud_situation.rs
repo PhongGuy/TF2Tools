@@ -1,6 +1,6 @@
 //! Game situations: what shows, the sample numbers and the events a moment fires.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::HEALTH_KEY;
 use common::hud_stock::{HEALTH, stock_files, stock_files_with};

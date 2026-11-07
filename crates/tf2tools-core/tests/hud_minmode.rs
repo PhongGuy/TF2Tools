@@ -1,6 +1,6 @@
 //! Minimal-HUD mode: a `_minmode` key replaces its bare key in its own layer when the flag is on.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, HUDLAYOUT, KOTH_PANEL, stock_files_with};
 use tf2tools_core::{HiddenBy, HudModel, PartKey, Platform, Screen};

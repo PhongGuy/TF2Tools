@@ -1,6 +1,6 @@
 //! Saving a copy in place: kept originals, base bytes on reset, untouched files left alone, crash repair.
 
-mod common;
+use crate::common;
 
 use std::fs::read_to_string;
 use std::path::PathBuf;

@@ -1,6 +1,6 @@
 //! Painted crosshairs: the maker's save and reopen contract over a temp library.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::io::Cursor;

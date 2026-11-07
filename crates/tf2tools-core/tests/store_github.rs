@@ -1,7 +1,7 @@
 //! The curated HUD store from hud-db's archive and the addon store from mastercomfig's
 //! latest GitHub release.
 
-mod common;
+use crate::common;
 
 use std::sync::Mutex;
 use std::time::{Duration, Instant};

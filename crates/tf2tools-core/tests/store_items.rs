@@ -1,6 +1,6 @@
 //! Reading whole store tables back for the store grids.
 
-mod common;
+use crate::common;
 
 use common::{sql, store_env};
 use tf2tools_core::{AddonName, GbId, StoreItemId, StoreKind};

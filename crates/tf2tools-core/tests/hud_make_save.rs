@@ -1,6 +1,6 @@
 //! Saving a made HUD: a sparse folder, a local row, unique names, the library boundary and swaps.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, stock_files};
 use common::{LibraryEnv, import_hud_as, library_env, sql, tmp_is_empty, tree, write_file};

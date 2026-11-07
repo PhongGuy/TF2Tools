@@ -1,6 +1,6 @@
 //! The install name: referenced folder, curated repo, a copy's recorded folder, library folder.
 
-mod common;
+use crate::common;
 
 use std::collections::BTreeMap;
 

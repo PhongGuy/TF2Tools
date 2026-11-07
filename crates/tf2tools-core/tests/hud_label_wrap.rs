@@ -1,6 +1,6 @@
 //! Wrapped labels: where the game's line breaks fall, and the text area the checks read.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, block, stock_files_with, with_blocks};
 use tf2tools_core::{GameText, HudModel, PartKey, Platform, Screen, wrap_lines, wrapped_text_left};

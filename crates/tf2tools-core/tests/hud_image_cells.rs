@@ -1,6 +1,6 @@
 //! Image parts: one stretched piece, or nine for a scalable panel.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files_with;
 use tf2tools_core::{HudModel, ImageCell, PartKey, Platform, Screen, image_cells, nine_slice};

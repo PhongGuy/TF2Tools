@@ -1,6 +1,6 @@
 //! The side panel schema and the change-list helpers the panel's reset and unhide use.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, block, stock_files, stock_files_with, with_blocks};
 use tf2tools_core::{ClassSchema, HudModel, PartKey, Platform, PropertyKind, Screen};

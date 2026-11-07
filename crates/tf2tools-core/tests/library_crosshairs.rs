@@ -1,6 +1,6 @@
 //! Crosshair library: PNG and VTF import, previews, and per-weapon assignments.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::io::Cursor;

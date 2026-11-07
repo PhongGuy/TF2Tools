@@ -1,6 +1,6 @@
 //! Schema controls as options: kinds, actions, fit against the copy, refusals.
 
-mod common;
+use crate::common;
 
 use common::hud_schema::schema;
 use common::hud_switches::switch_files;

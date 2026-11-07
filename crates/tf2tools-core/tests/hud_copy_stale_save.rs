@@ -1,6 +1,6 @@
 //! A save from a page opened before an Update is refused and writes nothing.
 
-mod common;
+use crate::common;
 
 use common::hud_copy::{game_for, import_stock_hud, snapshot, store_item};
 use common::hud_switches::{choices, copy_with, dir, switch_layer};

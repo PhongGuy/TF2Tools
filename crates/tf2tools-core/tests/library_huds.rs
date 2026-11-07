@@ -1,6 +1,6 @@
 //! HUD library: import with provenance, listing and deletion.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::PathBuf;

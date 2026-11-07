@@ -1,6 +1,6 @@
 //! The spectator bar's code toggles, and what they do to a file that disagrees.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{SPECTATOR, stock_files, stock_files_with};
 use tf2tools_core::{

@@ -1,6 +1,6 @@
 //! Options shown on the part they change: found and missing #base paths tie them.
 
-mod common;
+use crate::common;
 
 use common::hud_switches::switch_files;
 use tf2tools_core::{HudModel, HudOptions, PartKey, Platform};

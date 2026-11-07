@@ -1,7 +1,7 @@
 //! A borrowed part keeps its `if_*` sub-blocks as sub-blocks, so it behaves in every mode as it
 //! did in its own HUD.
 
-mod common;
+use crate::common;
 
 use common::hud_borrow::source;
 use common::hud_stock::{HEALTH, stock_files, stock_files_with};

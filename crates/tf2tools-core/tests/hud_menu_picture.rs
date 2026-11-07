@@ -1,6 +1,6 @@
 //! The main menu's background from one picture, and pictures left out of shared recipes.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, block, stock_files, stock_files_with, with_blocks};
 use tf2tools_core::{

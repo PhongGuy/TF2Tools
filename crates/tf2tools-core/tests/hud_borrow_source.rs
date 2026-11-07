@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use common::{LibraryEnv, gb, import_hud_as, library_env, temp_tf2_tree, vpk_bytes, write_file};
 use tf2tools_core::{HudFiles, HudId, LibraryKind};

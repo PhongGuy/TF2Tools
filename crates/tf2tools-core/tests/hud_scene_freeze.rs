@@ -1,6 +1,6 @@
 //! The death and freeze cam scene: its files, two roots and the stock-shaped layout.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{stock_files, stock_files_with};
 use tf2tools_core::{

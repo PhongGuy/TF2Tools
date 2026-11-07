@@ -1,6 +1,6 @@
 //! Scene files that are #base stubs: drawn from the merged tree, read-only.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{
     FREEZE_PANEL, HEALTH, MAINMENU, freeze_stub, stock_files, stock_files_with,

@@ -1,7 +1,7 @@
 //! Community maps from serveme.tf: parsing the list page, caching it, and the install and
 //! remove rules for `tf/maps`.
 
-mod common;
+use crate::common;
 
 use std::path::{Path, PathBuf};
 

@@ -1,7 +1,7 @@
 //! Clearing assignments back to the game's default, and telling which weapons an Install
 //! would change.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::{Path, PathBuf};

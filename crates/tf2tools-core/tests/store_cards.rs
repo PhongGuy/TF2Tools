@@ -1,6 +1,6 @@
 //! Paged store reads: sorts, keyset cursors, search, category, counts and single items.
 
-mod common;
+use crate::common;
 
 use common::{sql, temp_data_dir};
 use tempfile::TempDir;

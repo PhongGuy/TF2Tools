@@ -1,6 +1,6 @@
 //! The live link's staged reinstall of the installed HUD.
 
-mod common;
+use crate::common;
 
 use std::fs;
 

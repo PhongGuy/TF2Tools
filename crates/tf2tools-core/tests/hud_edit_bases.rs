@@ -1,6 +1,6 @@
 //! In a copy, edits to parts drawn through #base write the HUD's own file, never the base.
 
-mod common;
+use crate::common;
 
 use common::hud_borrow::files_over_stock;
 use common::hud_stock::{FREEZE_PANEL, HEALTH, freeze_stub, stock_files_with};

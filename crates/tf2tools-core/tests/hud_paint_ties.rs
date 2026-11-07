@@ -2,7 +2,7 @@
 //! the earlier siblings that set the same value, so a label listed before its shadow stays on
 //! top; siblings that never set `zpos` keep file order.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, label, stock_files_with, with_blocks};
 use tf2tools_core::{HudLayout, HudModel, PartKey, Platform, Screen};

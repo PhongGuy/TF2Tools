@@ -1,6 +1,6 @@
 //! Applying a profile: preflight, best-effort steps, the report and the active id.
 
-mod common;
+use crate::common;
 
 #[cfg(unix)]
 use std::{fs, os::unix::fs::PermissionsExt};

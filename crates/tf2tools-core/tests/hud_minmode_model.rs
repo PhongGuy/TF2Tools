@@ -1,6 +1,6 @@
 //! The minimal-HUD flag survives every model rebuild, and a HUD without minimal keys says so.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, KOTH_PANEL, stock_files_with};
 use tf2tools_core::{BoardMode, HudModel, PartKey, Platform, Scene};

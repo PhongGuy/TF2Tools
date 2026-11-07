@@ -1,6 +1,6 @@
 //! The Stage 1 part tree: which blocks are parts, merge order, conditionals and origins.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, HUDLAYOUT, stock_files, stock_files_with};
 use tf2tools_core::{HudModel, PartId, PartKey, Platform, Rgba};

@@ -1,6 +1,6 @@
 //! HUD install into tf/custom, one HUD at a time, and the installed-HUD scan.
 
-mod common;
+use crate::common;
 
 use std::fs;
 

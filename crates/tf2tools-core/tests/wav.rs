@@ -1,6 +1,6 @@
 //! WAV header inspection: TF2's one accepted format, the rejected ones, and broken files.
 
-mod common;
+use crate::common;
 
 use common::wav_bytes;
 use tf2tools_core::{WavError, inspect_wav};

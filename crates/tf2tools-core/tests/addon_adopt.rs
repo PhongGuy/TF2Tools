@@ -1,6 +1,6 @@
 //! Adopting addon VPKs already in tf/custom into an empty addon library, as v5's backfill.
 
-mod common;
+use crate::common;
 
 use std::fs;
 
