@@ -536,13 +536,23 @@ fn hud_zip(name: &str) -> anyhow::Result<Vec<u8>> {
     Ok(zip.finish()?.into_inner())
 }
 
-// The HUD Maker reads the game's own HUD files, so the fake game gets core's stock set in a
-// `tf2_misc_dir.vpk` that `gameinfo.txt` names, as TF2 ships them.
+// The ICE-encrypted stock weapon script core's crosshair tests use.
+const STOCK_WEAPON_CTX: &[u8] =
+    include_bytes!("../../../crates/tf2tools-core/tests/fixtures/crosshair/stock_weapon.ctx");
+
+// The HUD Maker reads the game's own HUD files, and crosshair installs patch the game's own
+// weapon scripts, so the fake game gets core's stock HUD set plus a stock script for every
+// weapon in a `tf2_misc_dir.vpk` that `gameinfo.txt` names, as TF2 ships them.
 fn write_stock_hud(tf: &Path) -> anyhow::Result<()> {
     let files = crate::hud_stock::stock();
+    let scripts: Vec<String> = tf2tools_core::weapons()
+        .iter()
+        .map(|w| format!("scripts/{}.ctx", w.script_name()))
+        .collect();
     let entries: Vec<(&str, &[u8])> = files
         .iter()
         .map(|(path, text)| (path.as_str(), text.as_bytes()))
+        .chain(scripts.iter().map(|path| (path.as_str(), STOCK_WEAPON_CTX)))
         .collect();
     fs::write(
         tf.join("gameinfo.txt"),

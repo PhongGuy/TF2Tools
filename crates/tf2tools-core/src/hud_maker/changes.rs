@@ -271,8 +271,8 @@ impl OptionChange {
     pub const BUILTIN: &'static str = "builtin";
     /// The source string for switches read from the HUD's own files.
     pub const HUD: &'static str = "hud";
-    /// The source string for options read from the HUD's TF2HUD.Editor schema.
-    pub const EDITOR: &'static str = "editor";
+    /// The stored source string for options read from the HUD's option schema.
+    pub const SCHEMA: &'static str = "editor";
 
     /// The choice of `value` for option `id` from `source`.
     pub fn new(source: &str, id: &str, value: OptionValue) -> OptionChange {

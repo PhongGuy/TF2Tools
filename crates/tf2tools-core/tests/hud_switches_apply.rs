@@ -152,7 +152,7 @@ fn unknown_ids_keys_and_sources_are_dropped_and_counted() {
         Change::option(
             1,
             OptionChange::new(
-                OptionChange::EDITOR,
+                OptionChange::SCHEMA,
                 GROUP,
                 OptionValue::Pick("resource/ui/damage_big.res".into()),
             ),

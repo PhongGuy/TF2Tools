@@ -79,7 +79,7 @@ pub use hud_maker::{
     WeaponKind,
 };
 pub use hud_maker::{ChangeNote, both_changed};
-pub use hud_maker::{EditorSchema, EditorSchemas, SchemaOptions, normalise_repo};
+pub use hud_maker::{HudSchema, HudSchemas, SchemaOptions, normalise_repo};
 pub use hud_maker::{NewPart, PinRefused, RemoveRefused};
 pub use hud_maker::{NewPicture, PictureTarget, picture_id, picture_material};
 pub use hud_maker::{background_corners, corner_radius, paints_background};

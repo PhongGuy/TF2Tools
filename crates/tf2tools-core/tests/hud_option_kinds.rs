@@ -28,7 +28,7 @@ fn hud_and_editor_choices_round_trip_under_their_own_kind() {
         Change::option(
             2,
             OptionChange::new(
-                OptionChange::EDITOR,
+                OptionChange::SCHEMA,
                 "e:bh_player_boxes",
                 OptionValue::Bool(true),
             ),
@@ -99,7 +99,7 @@ fn the_model_leaves_hud_choices_to_the_switch_layer() {
         hud(1, "c:customizations/streamermode_", OptionValue::Bool(true)),
         Change::option(
             2,
-            OptionChange::new(OptionChange::EDITOR, "e:x", OptionValue::Pick("1".into())),
+            OptionChange::new(OptionChange::SCHEMA, "e:x", OptionValue::Pick("1".into())),
         ),
     ];
     let edited = model.with_changes(&choices);

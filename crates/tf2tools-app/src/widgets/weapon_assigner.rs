@@ -92,6 +92,10 @@ pub struct AssignerState {
 /// The class bar and weapon rows of v5's Crosshairs page, or of its profile dialog when compact.
 pub struct WeaponAssigner {
     class: TfClass,
+    /// Only this slot's rows show when set.
+    slot: Option<WeaponSlot>,
+    /// Whether the class tabs and bulk buttons show above the rows.
+    bar: bool,
     cells: Vec<AssignedCell>,
     state: AssignerState,
     compact: bool,
@@ -136,6 +140,8 @@ impl WeaponAssigner {
 
         let assigner = Self {
             class: TfClass::Scout,
+            slot: None,
+            bar: true,
             cells: Vec::new(),
             state: AssignerState::default(),
             compact,
@@ -179,6 +185,18 @@ impl WeaponAssigner {
         self.class = class;
         self.want_icons(cx);
         cx.emit(ClassChanged { class });
+        cx.notify();
+    }
+
+    /// Shows only `slot`'s rows, or every slot's.
+    pub fn set_slot(&mut self, slot: Option<WeaponSlot>, cx: &mut Context<Self>) {
+        self.slot = slot;
+        cx.notify();
+    }
+
+    /// Shows or hides the class tabs and bulk buttons, for a host that offers its own.
+    pub fn set_bar(&mut self, bar: bool, cx: &mut Context<Self>) {
+        self.bar = bar;
         cx.notify();
     }
 
@@ -299,7 +317,7 @@ impl WeaponAssigner {
         let border = cx.theme().border;
         let rows = weapons()
             .iter()
-            .filter(|w| w.class() == self.class)
+            .filter(|w| w.class() == self.class && self.slot.is_none_or(|s| w.slot() == s))
             .enumerate()
             .map(|(ix, weapon)| {
                 div()
@@ -434,9 +452,7 @@ impl WeaponAssigner {
 
 impl Render for WeaponAssigner {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        v_flex()
-            .gap_4()
-            .child(self.class_bar(cx))
-            .child(self.weapon_list(cx))
+        let bar = self.bar.then(|| self.class_bar(cx));
+        v_flex().gap_4().children(bar).child(self.weapon_list(cx))
     }
 }

@@ -12,7 +12,7 @@ struct Licences;
 const TITLES: &[(&str, &str)] = &[
     ("Inter-OFL.txt", "Inter font"),
     ("Lucide-ISC.txt", "Lucide icons"),
-    ("TF2HUD.Editor-MIT.txt", "TF2HUD.Editor HUD options"),
+    ("HUD-option-schemas-MIT.txt", "HUD option schemas (MIT)"),
 ];
 
 /// One licence notice: its file under `licenses/`, a plain title and the full text.

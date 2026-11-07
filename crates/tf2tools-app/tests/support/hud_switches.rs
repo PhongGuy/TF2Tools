@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use tf2tools_app::services::Services;
-use tf2tools_core::{EditorSchema, EditorSchemas, HudEntry, HudFiles, LibraryKind};
+use tf2tools_core::{HudEntry, HudFiles, HudSchema, HudSchemas, LibraryKind};
 
 use super::hud_stock::{HEALTH, stock};
 
@@ -62,7 +62,7 @@ pub fn seed_switch_copy(services: &Services, dir: &Path) -> HudEntry {
     services.library.copy_hud(base.id()).unwrap()
 }
 
-/// A TF2HUD.Editor schema for `somehud` with one colour, the scheme's TanLight.
+/// A HUD option schema for `somehud` with one colour, the scheme's TanLight.
 pub const COLOUR_SCHEMA: &str = r#"{
   "Links": { "GitHub": "https://github.com/Someone/SomeHUD" },
   "Controls": {
@@ -75,8 +75,8 @@ pub const COLOUR_SCHEMA: &str = r#"{
 
 /// The schema copies of `Someone/SomeHUD` open with, for `shell_window_tweaked`.
 pub fn with_colour_schema(services: &mut Services) {
-    let schema = EditorSchema::parse("somehud", COLOUR_SCHEMA.as_bytes()).unwrap();
-    (services.library).set_hud_schemas(EditorSchemas::bundled().with(schema));
+    let schema = HudSchema::parse("somehud", COLOUR_SCHEMA.as_bytes()).unwrap();
+    (services.library).set_hud_schemas(HudSchemas::bundled().with(schema));
 }
 
 /// Records `Someone/SomeHUD` as the copy's repo, as a store copy would have, so it opens with
