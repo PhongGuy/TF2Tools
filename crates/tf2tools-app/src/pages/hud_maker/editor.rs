@@ -189,6 +189,8 @@ struct Step {
     changes: Vec<Change>,
     at: Option<(Scene, BoardMode)>,
     meter: Option<MeterKind>,
+    // The edit in player words ("move Health value"), the same whichever way it is stepped.
+    name: Option<String>,
 }
 
 /// A picture's changes and its kept files with their bytes.
@@ -1485,6 +1487,7 @@ impl HudEditor {
                 changes: current,
                 at: prev.at,
                 meter: prev.meter,
+                name: prev.name,
             },
         );
         self.replay();
@@ -1510,11 +1513,22 @@ impl HudEditor {
                 changes: current,
                 at: next.at,
                 meter: next.meter,
+                name: next.name,
             },
         );
         self.replay();
         self.sync_compared();
         true
+    }
+
+    /// The next undo's edit in player words, such as "move Health value".
+    pub fn undo_name(&self) -> Option<&str> {
+        self.undo.back()?.name.as_deref()
+    }
+
+    /// The next redo's edit in player words.
+    pub fn redo_name(&self) -> Option<&str> {
+        self.redo.back()?.name.as_deref()
     }
 
     pub fn can_undo(&self) -> bool {
@@ -1909,10 +1923,12 @@ impl HudEditor {
         let at = step_scene(&self.changes, &before, self.scene())
             .map(|scene| (scene, self.board_mode()));
         let meter = step_file(&self.changes, &before).and_then(MeterKind::for_file);
+        let name = super::step_name::name(&self.pristine, &self.model, &before, &self.changes);
         Step {
             changes: before,
             at,
             meter,
+            name,
         }
     }
 

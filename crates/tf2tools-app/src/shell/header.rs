@@ -93,6 +93,7 @@ fn content(page: Page, tf2_running: bool, cx: &mut Context<Shell>) -> impl IntoE
                 .font_weight(FontWeight::SEMIBOLD)
                 .child(title),
         )
+        .children((page == Page::HudMaker).then(|| shortcuts_button(cx)))
         // v5's status slot: the rings in their own `gap-1.5` row, then the TF2 badge.
         .child(
             h_flex()
@@ -101,6 +102,27 @@ fn content(page: Page, tf2_running: bool, cx: &mut Context<Shell>) -> impl IntoE
                 .children(rings)
                 .children(play_button(tf2_running, cx))
                 .children(tf2_badge(cx)),
+        )
+}
+
+// The HUD Maker's "?" beside its title, which opens the keyboard shortcuts sheet. It sits up
+// here because the maker's own toolbar has no room left at small window sizes.
+fn shortcuts_button(cx: &mut Context<Shell>) -> impl IntoElement + use<> {
+    div()
+        .flex_none()
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .child(
+            Button::new(ids::HUD_MAKER_SHORTCUTS)
+                .ghost()
+                .small()
+                .icon(IconName::CircleQuestionMark)
+                .tooltip("Keyboard shortcuts (?)")
+                .accessibility_label("Keyboard shortcuts")
+                .on_click(cx.listener(|shell, _, window, cx| {
+                    if let Some(page) = shell.hud_maker_page() {
+                        page.update(cx, |page, cx| page.show_shortcuts(window, cx));
+                    }
+                })),
         )
 }
 

@@ -56,6 +56,8 @@ pub const CONFIRM_TITLE: &str = "confirm-title";
 pub const CONFIRM_DESCRIPTION: &str = "confirm-description";
 pub const CONFIRM_OK: &str = "confirm-ok";
 pub const CONFIRM_CANCEL: &str = "confirm-cancel";
+/// The leave dialog's "Save and leave", offered when the open HUD can be saved.
+pub const CONFIRM_SAVE: &str = "confirm-save";
 pub const EXTERNAL_HUDS_DIALOG: &str = "external-huds-dialog";
 pub const EXTERNAL_HUDS_TITLE: &str = "external-huds-title";
 pub const EXTERNAL_HUDS_DESCRIPTION: &str = "external-huds-description";
@@ -438,6 +440,20 @@ pub const HUD_MAKER_START: &str = "hud-maker-start";
 pub const HUD_MAKER_START_WHY: &str = "hud-maker-start-why";
 /// The toolbar's overflow menu button.
 pub const HUD_MAKER_MORE: &str = "hud-maker-more";
+/// The card over a new, unchanged HUD offering where to start.
+pub const HUD_MAKER_START_CARD: &str = "hud-maker-start-card";
+/// The Start from card's "A ready-made HUD", which lists the starting points in the card.
+pub const HUD_MAKER_START_READY: &str = "hud-maker-start-ready";
+/// The Start from card's "One of my HUDs", which goes to the HUDs library.
+pub const HUD_MAKER_START_MINE: &str = "hud-maker-start-mine";
+/// The Start from card's "Blank", which keeps TF2's own HUD and closes the card.
+pub const HUD_MAKER_START_BLANK: &str = "hud-maker-start-blank";
+/// The "?" beside the HUD Maker's title, which opens the keyboard shortcuts sheet.
+pub const HUD_MAKER_SHORTCUTS: &str = "hud-maker-shortcuts";
+/// The keyboard shortcuts sheet.
+pub const HUD_MAKER_SHORTCUTS_SHEET: &str = "hud-maker-shortcuts-sheet";
+/// The keyboard shortcuts sheet's Close button.
+pub const HUD_MAKER_SHORTCUTS_CLOSE: &str = "hud-maker-shortcuts-close";
 /// The toolbar's screen shape button, which opens the shapes.
 pub const HUD_MAKER_SCREEN_MENU: &str = "hud-maker-screen-menu";
 /// The zero-size holder of the open option picker's trigger, under its swatch.
@@ -1746,6 +1762,16 @@ pub fn hud_maker_toggle(key: &str) -> ElementId {
 /// A starting point's button, keyed by its label: "hud-maker-start:Big numbers".
 pub fn hud_maker_start(label: &str) -> ElementId {
     keyed("hud-maker-start", label)
+}
+
+/// A starting point's button in the Start from card: "hud-maker-start-card:Big numbers".
+pub fn hud_maker_start_card_point(label: &str) -> ElementId {
+    keyed("hud-maker-start-card", label)
+}
+
+/// Row `i` of the keyboard shortcuts sheet, labelled "<keys>: <what they do>".
+pub fn hud_maker_shortcut(i: usize) -> ElementId {
+    keyed("hud-maker-shortcut", &i.to_string())
 }
 
 /// A snapshot row's name, keyed by its file: "hud-maker-snapshot:<file>".

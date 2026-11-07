@@ -97,6 +97,7 @@ fn the_hud_scene_draws_three_chat_lines_in_the_history(cx: &mut TestAppContext) 
 #[gpui_kit::test]
 fn a_click_on_a_chat_line_selects_the_history(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx, CHAT);
+    support::put_start_card_away(cx, s.win);
     // The HUD options panel floats over the line's left part, so press its right end.
     let line = bounds(cx, &s, ids::hud_maker_chat_line(0));
     let end = point(line.size.width - px(2.), line.size.height / 2.);
