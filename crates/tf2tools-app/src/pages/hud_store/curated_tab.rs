@@ -227,7 +227,7 @@ impl CuratedTab {
                 .iter()
                 .filter_map(|hud| match hud.provenance() {
                     Provenance::Curated { hud_id } => Some(hud_id.clone()),
-                    _ => None,
+                    Provenance::Local | Provenance::GameBanana { .. } | _ => None,
                 })
                 .collect();
             Ok((huds, downloaded))

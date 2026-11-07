@@ -271,7 +271,13 @@ impl Shell {
             Page::Settings => self.settings.as_ref().map(|p| {
                 p.update(cx, |p, cx| p.set_hidden(hidden, cx));
             }),
-            _ => None,
+            Page::Huds
+            | Page::Sounds
+            | Page::Crosshairs
+            | Page::CrosshairMaker
+            | Page::HudMaker
+            | Page::Profiles
+            | Page::Addons => None,
         };
     }
 

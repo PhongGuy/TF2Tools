@@ -182,7 +182,7 @@ impl SyncHub {
     pub fn progress(&self, kind: StoreKind) -> Option<SyncTick> {
         match self.state(kind) {
             SyncState::Running { tick, .. } => Some(*tick),
-            _ => None,
+            SyncState::Idle { .. } | SyncState::Failed { .. } => None,
         }
     }
 
@@ -190,7 +190,7 @@ impl SyncHub {
     pub fn last(&self, kind: StoreKind) -> Option<SyncSummary> {
         match self.state(kind) {
             SyncState::Idle { last } => *last,
-            _ => None,
+            SyncState::Running { .. } | SyncState::Failed { .. } => None,
         }
     }
 

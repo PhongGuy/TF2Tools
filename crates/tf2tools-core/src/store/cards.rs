@@ -198,7 +198,10 @@ pub(super) fn cards_sql(
     // Only store_sounds has the category and preview columns; the others select constants.
     let sound_columns = match kind {
         StoreKind::Sounds => "s.category, COALESCE(s.preview_url, '') <> ''",
-        _ => "NULL, 0",
+        StoreKind::CuratedHuds
+        | StoreKind::GameBananaHuds
+        | StoreKind::Crosshairs
+        | StoreKind::Addons => "NULL, 0",
     };
     let key = q.sort.column();
     let mut filters = Vec::new();

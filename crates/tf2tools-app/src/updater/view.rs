@@ -52,7 +52,11 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
         UpdateState::Installing(_) => (IconName::RotateCw, "Installing update...".into(), None),
         // The relaunch never quit the app, so the player reopens it by hand; nothing to click.
         UpdateState::Updated(_) => (IconName::RotateCw, REOPEN.into(), None),
-        _ => return None,
+        UpdateState::Unavailable
+        | UpdateState::Idle
+        | UpdateState::Checking
+        | UpdateState::UpToDate
+        | UpdateState::Failed(_) => return None,
     };
     // While downloading, v5 sizes the text to its words and lets a short bar take the rest.
     let progress = match &state {
@@ -70,7 +74,15 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
                 format!("{percent}%"),
             ),
         )),
-        _ => None,
+        UpdateState::Unavailable
+        | UpdateState::Idle
+        | UpdateState::Checking
+        | UpdateState::UpToDate
+        | UpdateState::Available(_)
+        | UpdateState::Ready(_)
+        | UpdateState::Installing(_)
+        | UpdateState::Updated(_)
+        | UpdateState::Failed(_) => None,
     };
     // A line too long for the banner is cut short on one line, so the buttons stay in view.
     let line = div()

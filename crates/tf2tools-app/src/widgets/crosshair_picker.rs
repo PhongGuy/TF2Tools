@@ -469,7 +469,9 @@ impl CrosshairPicker {
                                     CrosshairRef::Builtin(b.name().to_owned()),
                                 )
                             }
-                            _ => unreachable!("the gallery holds no headers"),
+                            Row::BuiltinHeader(_) | Row::LibraryHeader(_) => {
+                                unreachable!("the gallery holds no headers")
+                            }
                         };
                         tile_element(
                             id,
@@ -596,7 +598,7 @@ pub const IN_GAME_SIZE: Pixels = px(64.);
 pub(crate) fn preview_image(preview: Preview, size: Pixels) -> Option<impl IntoElement> {
     match preview {
         Preview::Ready(source) => Some(img(source).size(size)),
-        _ => None,
+        Preview::Pending | Preview::Missing => None,
     }
 }
 
@@ -693,7 +695,7 @@ fn tile_element(
     let preview = previews.read(cx).preview(&crosshair, cx);
     let image = match &preview {
         Preview::Ready(source) => Some(source.clone()),
-        _ => None,
+        Preview::Pending | Preview::Missing => None,
     };
     let ring = if is_selected {
         theme.primary

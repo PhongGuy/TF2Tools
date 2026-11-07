@@ -34,7 +34,14 @@ pub(super) fn name(
     let sets: Vec<&SetKey> = all()
         .filter_map(|t| match t {
             ChangeTarget::Set(set) => Some(set),
-            _ => None,
+            ChangeTarget::Remove(_)
+            | ChangeTarget::AddBlock(_)
+            | ChangeTarget::Asset(_)
+            | ChangeTarget::Option(_)
+            | ChangeTarget::Credit(_)
+            | ChangeTarget::Animation(_)
+            | ChangeTarget::AnimationAppend(_)
+            | _ => None,
         })
         .collect();
     match owners(model, pristine, &sets).as_slice() {

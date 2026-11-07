@@ -310,7 +310,12 @@ impl Run<'_> {
                     let add = AddBlock::new(a.file(), &refs(a.parent()), a.name(), a.cond(), lines);
                     Change::add_block(change.group(), add)
                 }
-                _ => change,
+                ChangeTarget::Remove(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Option(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_) => change,
             })
             .collect();
     }

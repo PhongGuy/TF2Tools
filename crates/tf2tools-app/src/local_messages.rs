@@ -386,7 +386,7 @@ pub fn describe_png_write(err: &PngWriteError) -> LocalFailure {
         PngWriteError::Io { .. } => {
             "Couldn't save the PNG there. Pick another folder, then try again."
         }
-        _ => UNKNOWN,
+        PngWriteError::Encode { .. } | _ => UNKNOWN,
     };
     LocalFailure::new(message, err.to_string())
 }

@@ -203,7 +203,7 @@ impl Parser<'_> {
             match token {
                 Token::Open => open += 1,
                 Token::Close => open -= 1,
-                _ => {}
+                Token::Str(_) | Token::Cond(_) => {}
             }
             if open == 0 {
                 return;
@@ -287,7 +287,7 @@ pub(crate) fn parse(text: &str, platform: Platform) -> KvFile {
         match pair.value {
             KvValue::Text(target) if base => file.directives.push(KvDirective::Base(target)),
             KvValue::Text(target) if include => file.directives.push(KvDirective::Include(target)),
-            value => file.pairs.push(KvPair {
+            value @ KvValue::Text(_) | value @ KvValue::Block(_) => file.pairs.push(KvPair {
                 key: pair.key,
                 value,
             }),
@@ -560,7 +560,7 @@ mod tests {
             .iter()
             .filter_map(|p| match &p.value {
                 KvValue::Block(children) if p.key == key => Some(children.as_slice()),
-                _ => None,
+                KvValue::Text(_) | KvValue::Block(_) => None,
             })
             .nth(nth)
             .unwrap_or_else(|| panic!("no block {key} #{nth}"))

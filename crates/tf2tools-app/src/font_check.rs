@@ -148,7 +148,7 @@ pub fn active_hud(s: &Services, tf2: &Tf2Install) -> Option<String> {
         HudStatus::Managed { folder_name, .. } | HudStatus::Unmanaged { folder_name, .. } => {
             Some(folder_name)
         }
-        _ => None,
+        HudStatus::NotInstalled | HudStatus::Multiple { .. } | _ => None,
     }
 }
 

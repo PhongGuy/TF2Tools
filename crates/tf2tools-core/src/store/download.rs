@@ -270,7 +270,9 @@ fn import(
                 },
                 |entry| match entry {
                     LibraryEntry::Sound(sound) => library.delete_sound(sound.id(), None),
-                    _ => Ok(()),
+                    LibraryEntry::Hud(_) | LibraryEntry::Crosshair(_) | LibraryEntry::Addon(_) => {
+                        Ok(())
+                    }
                 },
             );
         }
@@ -291,7 +293,9 @@ fn import(
                 },
                 |entry| match entry {
                     LibraryEntry::Crosshair(crosshair) => library.delete_crosshair(crosshair.id()),
-                    _ => Ok(()),
+                    LibraryEntry::Hud(_) | LibraryEntry::Sound(_) | LibraryEntry::Addon(_) => {
+                        Ok(())
+                    }
                 },
             );
         }

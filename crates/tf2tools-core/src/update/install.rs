@@ -90,7 +90,7 @@ pub enum Applied {
 pub fn apply(staged: StagedUpdate) -> Result<Applied, UpdateApplyError> {
     let result = match staged.target() {
         InstallTarget::WindowsInstaller => start_installer(&staged),
-        _ => swap(&staged),
+        InstallTarget::AppImage(_) | InstallTarget::Unmanaged => swap(&staged),
     };
     if result.is_err() {
         let _ = std::fs::remove_file(staged.path());

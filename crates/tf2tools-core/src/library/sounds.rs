@@ -415,7 +415,11 @@ impl Library {
         };
         let (folder, format) = self.sound_folder(id).map_err(|e| match e {
             LibraryError::Database { message } => InstallError::Database { message },
-            _ => not_in_library(),
+            LibraryError::Io { .. }
+            | LibraryError::NotFound { .. }
+            | LibraryError::InvalidWeaponScript { .. }
+            | LibraryError::Vpk(_)
+            | LibraryError::Vtf(_) => not_in_library(),
         })?;
         let src = self
             .sound_file(&folder, format)?

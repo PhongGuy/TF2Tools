@@ -86,7 +86,22 @@ pub(crate) fn active_conditions(part: PartId) -> &'static [&'static str] {
         PartId::RoundTimer | PartId::KothTimer => &["if_match"],
         // The main menu previews a wide screen with no holiday running.
         PartId::MainMenu => &["if_wider"],
-        _ => &[],
+        PartId::Health
+        | PartId::ClassPortrait
+        | PartId::Ammo
+        | PartId::UberMeter
+        | PartId::HealNumbers
+        | PartId::DamageNumbers
+        | PartId::TargetId
+        | PartId::ItemMeter
+        | PartId::Killfeed
+        | PartId::Chat
+        | PartId::Scoreboard
+        | PartId::FreezeCam
+        | PartId::WinPanel
+        | PartId::ClassSelect
+        | PartId::Spectator
+        | PartId::SpectatorTargetId => &[],
     }
 }
 

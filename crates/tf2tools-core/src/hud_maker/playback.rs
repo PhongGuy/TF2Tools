@@ -427,7 +427,16 @@ impl HudAnimations {
                         stack.push(open(name, delay));
                     }
                 }
-                other => top.end = top.end.max(delay_of(other)),
+                other @ AnimCommand::StopEvent { .. }
+                | other @ AnimCommand::SetVisible { .. }
+                | other @ AnimCommand::SetInputEnabled { .. }
+                | other @ AnimCommand::FireCommand { .. }
+                | other @ AnimCommand::PlaySound { .. }
+                | other @ AnimCommand::StopAnimation { .. }
+                | other @ AnimCommand::StopPanelAnimations { .. }
+                | other @ AnimCommand::SetFont { .. }
+                | other @ AnimCommand::SetTexture { .. }
+                | other @ AnimCommand::SetString { .. } => top.end = top.end.max(delay_of(other)),
             }
         }
         Some(0.0)
@@ -552,7 +561,12 @@ impl Sim<'_> {
                     self.visible.insert(key, *visible);
                 }
             }
-            _ => {}
+            AnimCommand::SetInputEnabled { .. }
+            | AnimCommand::FireCommand { .. }
+            | AnimCommand::PlaySound { .. }
+            | AnimCommand::SetFont { .. }
+            | AnimCommand::SetTexture { .. }
+            | AnimCommand::SetString { .. } => {}
         }
     }
 
@@ -676,7 +690,7 @@ impl Sim<'_> {
                 Field::Fg => a.fg = v.colour(),
                 Field::Bg => a.bg = v.colour(),
                 Field::Alpha => a.alpha = Some(channel(v.num())),
-                _ => {
+                Field::X | Field::Y | Field::Wide | Field::Tall => {
                     moved.insert(key.clone());
                 }
             }

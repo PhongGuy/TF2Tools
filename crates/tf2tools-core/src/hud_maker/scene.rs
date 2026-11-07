@@ -137,7 +137,12 @@ impl ShowsFor {
     pub fn holds_in(self, s: &GameSituation, model: &HudModel) -> bool {
         match self {
             ShowsFor::Health("pulse") => s.health_pulse(model),
-            _ => self.holds(s),
+            ShowsFor::Class(_)
+            | ShowsFor::Weapon(_)
+            | ShowsFor::Effect(_)
+            | ShowsFor::Mode(_)
+            | ShowsFor::Aim(_)
+            | ShowsFor::Health(_) => self.holds(s),
         }
     }
 
@@ -159,7 +164,9 @@ impl ShowsFor {
             ShowsFor::Mode("not koth") => !s.is_on(SituationSwitch::Koth),
             ShowsFor::Aim(_) => s.is_on(SituationSwitch::Aiming),
             ShowsFor::Health("pulse") => s.health_pulse_under(super::situation::DEATH_WARNING),
-            _ => false,
+            ShowsFor::Weapon(_) | ShowsFor::Effect(_) | ShowsFor::Mode(_) | ShowsFor::Health(_) => {
+                false
+            }
         }
     }
 }

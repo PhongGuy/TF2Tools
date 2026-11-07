@@ -36,7 +36,7 @@ impl RecordingAudio {
             .iter()
             .filter_map(|call| match call {
                 AudioCall::Play { wav, volume } => Some((wav.clone(), *volume)),
-                _ => None,
+                AudioCall::Stop | AudioCall::SetVolume(_) => None,
             })
             .collect()
     }

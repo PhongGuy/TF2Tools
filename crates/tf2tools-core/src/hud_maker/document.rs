@@ -119,7 +119,12 @@ impl KvDocument {
                     }
                 }
                 LexKind::Close => depth = depth.saturating_sub(1),
-                _ => {}
+                LexKind::Bom
+                | LexKind::Space
+                | LexKind::Comment
+                | LexKind::Quoted { .. }
+                | LexKind::Bare
+                | LexKind::Cond { .. } => {}
             }
         }
         Ok(Self::build(bytes.to_vec(), lexemes))
@@ -464,7 +469,12 @@ impl KvDocument {
                         return Some(i);
                     }
                 }
-                _ => {}
+                LexKind::Bom
+                | LexKind::Space
+                | LexKind::Comment
+                | LexKind::Quoted { .. }
+                | LexKind::Bare
+                | LexKind::Cond { .. } => {}
             }
         }
         None
@@ -576,7 +586,12 @@ impl<'a> Builder<'a> {
             LexKind::Quoted { closed } | LexKind::Cond { closed } => {
                 (span.start + 1, span.end - usize::from(closed))
             }
-            _ => (span.start, span.end),
+            LexKind::Bom
+            | LexKind::Space
+            | LexKind::Comment
+            | LexKind::Bare
+            | LexKind::Open
+            | LexKind::Close => (span.start, span.end),
         };
         String::from_utf8_lossy(&self.bytes[start..end]).into_owned()
     }
@@ -616,7 +631,7 @@ impl<'a> Builder<'a> {
                     self.entries(false);
                     continue;
                 }
-                _ => continue,
+                LexKind::Bom | LexKind::Space | LexKind::Comment | LexKind::Cond { .. } => continue,
             }
             let line = self.line_of(key_index);
             let key = self.text(key_index);

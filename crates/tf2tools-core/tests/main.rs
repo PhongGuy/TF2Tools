@@ -5,6 +5,8 @@
 
 // Tests and their helpers may unwrap and panic; the workspace denies it in shipped code.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+// A wildcard arm here is a fallback assertion or filter, not a dispatch a new variant must reach.
+#![allow(clippy::wildcard_enum_match_arm)]
 
 mod activity_log;
 mod addon_adopt;

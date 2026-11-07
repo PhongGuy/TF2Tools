@@ -415,7 +415,7 @@ impl HudMakerPage {
             OptionKind::Number { .. } => self.option_slider_row(spec, cx)?,
             OptionKind::Colour { .. } => self.option_colour_row(spec, cx),
             OptionKind::Choice(choices) => self.option_choices(spec, choices, cx),
-            _ => return None,
+            OptionKind::Text | _ => return None,
         };
         let note = [
             (own_restart && spec.restart()).then_some(RESTART),

@@ -135,7 +135,7 @@ pub(super) fn credit_of(entry: &HudEntry) -> (String, String) {
             (author.clone(), format!("GameBanana item {}", gb_id.get()))
         }
         Provenance::Curated { hud_id } => (String::new(), format!("hud-db {hud_id}")),
-        _ => (String::new(), "a file you imported".to_owned()),
+        Provenance::Local | _ => (String::new(), "a file you imported".to_owned()),
     }
 }
 
@@ -349,7 +349,7 @@ impl HudMakerPage {
         let tf2 = require_tf2(cx);
         let Some((platform, editor)) = (match &self.load {
             Load::Ready(loaded) => Some((loaded.platform, &loaded.editor)),
-            _ => None,
+            Load::Reading | Load::NoGame | Load::CantOpen(_) => None,
         }) else {
             return;
         };

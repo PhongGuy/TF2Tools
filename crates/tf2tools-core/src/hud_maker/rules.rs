@@ -525,7 +525,18 @@ impl PanelRule {
             PartId::ClassSelect => &CLASS_SELECT,
             PartId::Spectator => &SPECTATOR_PANELS[0],
             PartId::SpectatorTargetId => &SPECTATOR_PANELS[1],
-            _ => &RULES[id as usize],
+            PartId::Health
+            | PartId::ClassPortrait
+            | PartId::Ammo
+            | PartId::UberMeter
+            | PartId::HealNumbers
+            | PartId::DamageNumbers
+            | PartId::TargetId
+            | PartId::ItemMeter
+            | PartId::RoundTimer
+            | PartId::Killfeed
+            | PartId::Chat
+            | PartId::KothTimer => &RULES[id as usize],
         }
     }
 

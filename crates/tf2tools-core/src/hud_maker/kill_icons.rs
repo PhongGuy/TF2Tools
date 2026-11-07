@@ -152,6 +152,6 @@ fn block_named<'a>(pairs: &'a [KvPair], name: &str) -> Option<&'a [KvPair]> {
 fn text<'a>(pairs: &'a [KvPair], name: &str) -> Option<&'a str> {
     pairs.iter().find_map(|pair| match &pair.value {
         KvValue::Text(t) if pair.key.eq_ignore_ascii_case(name) => Some(t.as_str()),
-        _ => None,
+        KvValue::Text(_) | KvValue::Block(_) => None,
     })
 }

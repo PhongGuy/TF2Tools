@@ -506,7 +506,7 @@ impl HudMakerPage {
                         .top_0()
                         .w(px(1.))
                         .h(screen.size.height),
-                    _ => div()
+                    GuideAxis::Horizontal | _ => div()
                         .id(ids::HUD_MAKER_GUIDE_Y)
                         .left_0()
                         .top(at.y)
@@ -634,7 +634,13 @@ impl HudMakerPage {
         // part; the main menu draws the game's own menu picture there instead.
         let (backdrop_id, backdrop) = match model.scene() {
             Scene::MainMenu => (ids::HUD_MAKER_MENU_BACKGROUND, self.menu_background()),
-            _ => (ids::HUD_MAKER_BACKDROP_IMAGE, self.backdrop_image()),
+            Scene::Hud
+            | Scene::Scoreboard
+            | Scene::FreezeCam
+            | Scene::WinPanel
+            | Scene::ClassSelect
+            | Scene::Spectator
+            | _ => (ids::HUD_MAKER_BACKDROP_IMAGE, self.backdrop_image()),
         };
         let backdrop = backdrop.map(|image| {
             div()
@@ -1470,7 +1476,14 @@ impl HudMakerPage {
             .then(|| {
                 self.editor().and_then(|e| match handle {
                     Handle::Move => e.snap_move(dx, dy, threshold),
-                    _ => e.snap_resize(handle, dx, dy, threshold),
+                    Handle::Left
+                    | Handle::Right
+                    | Handle::Top
+                    | Handle::Bottom
+                    | Handle::TopLeft
+                    | Handle::TopRight
+                    | Handle::BottomLeft
+                    | Handle::BottomRight => e.snap_resize(handle, dx, dy, threshold),
                 })
             })
             .flatten();
@@ -1758,7 +1771,14 @@ fn draws(part: &Part, look: &Look) -> bool {
             Kind::Portrait => look.images.contains_key(&PartKey::new(MODEL_STAND_IN)),
             Kind::Label(text) => !text.trim().is_empty(),
             Kind::Nothing => false,
-            _ => true,
+            Kind::Rank
+            | Kind::Chat(_)
+            | Kind::List(_)
+            | Kind::RowsInGame
+            | Kind::GameFilled(_)
+            | Kind::StandIn
+            | Kind::Image(_)
+            | Kind::MissingImage => true,
         }
 }
 
@@ -2060,7 +2080,9 @@ pub(super) fn game_hidden_root<'a>(
         match layout.get(at)?.hidden()? {
             HiddenBy::Game => return Some(at),
             HiddenBy::Parent => at = model.part(at)?.parent()?,
-            _ => return None,
+            HiddenBy::SizeZero | HiddenBy::OffScreen | HiddenBy::Visible | HiddenBy::Alpha | _ => {
+                return None;
+            }
         }
     }
 }

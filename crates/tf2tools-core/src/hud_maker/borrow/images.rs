@@ -171,7 +171,12 @@ impl Run<'_> {
                 ChangeTarget::AddBlock(a) => {
                     a.lines().iter().for_each(|l| note(l.key(), l.value()))
                 }
-                _ => {}
+                ChangeTarget::Remove(_)
+                | ChangeTarget::Asset(_)
+                | ChangeTarget::Option(_)
+                | ChangeTarget::Credit(_)
+                | ChangeTarget::Animation(_)
+                | ChangeTarget::AnimationAppend(_) => {}
             }
         }
         names
@@ -198,7 +203,7 @@ impl Run<'_> {
         let base = parsed.pairs.first().and_then(|pair| match &pair.value {
             KvValue::Block(children) => children.iter().find_map(|c| match &c.value {
                 KvValue::Text(t) if c.key.eq_ignore_ascii_case("$basetexture") => Some(t.clone()),
-                _ => None,
+                KvValue::Text(_) | KvValue::Block(_) => None,
             }),
             KvValue::Text(_) => None,
         });

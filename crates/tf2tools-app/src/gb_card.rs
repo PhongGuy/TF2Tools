@@ -28,7 +28,11 @@ const CARD_TAGS: usize = 3;
 fn tag_rows(kind: StoreKind) -> usize {
     match kind {
         StoreKind::Crosshairs => 1,
-        _ => 3,
+        StoreKind::CuratedHuds
+        | StoreKind::GameBananaHuds
+        | StoreKind::Sounds
+        | StoreKind::Addons
+        | _ => 3,
     }
 }
 

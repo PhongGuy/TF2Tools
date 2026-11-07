@@ -472,7 +472,7 @@ impl CrosshairsPage {
                                 sync.update(cx, |sync, cx| sync.mark_removed(cx));
                             }
                         }
-                        _ => {}
+                        Busy::Import | Busy::Export | Busy::Delete => {}
                     }
                 }
             });
@@ -818,7 +818,11 @@ impl CrosshairsPage {
         let icon = match status {
             SyncStatus::Saving => IconName::Loader,
             SyncStatus::Skipped(_) | SyncStatus::Failed => IconName::TriangleAlert,
-            _ => IconName::Check,
+            SyncStatus::Idle
+            | SyncStatus::InGame
+            | SyncStatus::InGameWhileRunning
+            | SyncStatus::WaitingForTf2
+            | SyncStatus::Removed => IconName::Check,
         };
         let removing = self.busy == Some(Busy::Uninstall);
         h_flex()
@@ -1033,7 +1037,16 @@ impl CrosshairsPage {
             let shown = match class {
                 TfClass::Demoman if short_names => "Demo",
                 TfClass::Engineer if short_names => "Engie",
-                _ => class.name(),
+                TfClass::Scout
+                | TfClass::Soldier
+                | TfClass::Pyro
+                | TfClass::Demoman
+                | TfClass::Heavy
+                | TfClass::Engineer
+                | TfClass::Medic
+                | TfClass::Sniper
+                | TfClass::Spy
+                | _ => class.name(),
             };
             page.header(
                 ids::loadout_class(class),

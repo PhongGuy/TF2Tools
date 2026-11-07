@@ -125,7 +125,7 @@ fn flag_labels(check: &ScreenCheck, model: &HudModel) -> FlagLabels {
         let part = flag.part();
         let words = match flag.problem() {
             ScreenProblem::Overlaps(other) => format!("{} overlaps {}", name(part), name(other)),
-            _ => format!("{} goes off the screen", name(part)),
+            ScreenProblem::LeavesScreen | _ => format!("{} goes off the screen", name(part)),
         };
         match at.get(part) {
             Some(&i) => {

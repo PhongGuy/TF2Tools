@@ -82,7 +82,10 @@ impl Library {
                 folder_name,
                 id: installed,
             } if &installed == id && is_restorable_name(&folder_name) => folder_name,
-            _ => return Ok(Reinstall::NotInstalled),
+            HudStatus::NotInstalled
+            | HudStatus::Managed { .. }
+            | HudStatus::Unmanaged { .. }
+            | HudStatus::Multiple { .. } => return Ok(Reinstall::NotInstalled),
         };
         let src = self.reinstall_source(id)?;
         // A folder that is no longer what TF2Tools put there is the player's, so it stays.
@@ -162,7 +165,11 @@ impl Library {
 fn status_error(e: LibraryError) -> ReinstallError {
     match e {
         LibraryError::Io { path, source } => ReinstallError::Unchanged { path, source },
-        other => ReinstallError::Database {
+        other @ LibraryError::NotFound { .. }
+        | other @ LibraryError::InvalidWeaponScript { .. }
+        | other @ LibraryError::Vpk(_)
+        | other @ LibraryError::Vtf(_)
+        | other @ LibraryError::Database { .. } => ReinstallError::Database {
             message: other.to_string(),
         },
     }
