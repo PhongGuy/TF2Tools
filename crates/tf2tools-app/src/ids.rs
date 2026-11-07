@@ -20,6 +20,8 @@ pub const SIDEBAR_GROUPS: &str = "sidebar-groups";
 pub const HEADER: &str = "header";
 pub const HEADER_TITLE: &str = "header-title";
 pub const TF2_BADGE: &str = "tf2-badge";
+/// The header's "Play TF2" button, shown while TF2 is found; disabled while TF2 runs.
+pub const PLAY_TF2: &str = "play-tf2";
 /// One per running kind except Addons, labelled "Syncing {store}: {fetched} / {total}" or "Syncing Curated HUDs...".
 pub const SYNC_RING: &str = "sync-ring";
 pub const TOAST: &str = "toast";
@@ -39,6 +41,8 @@ pub const CRASH_BANNER_TEXT: &str = "crash-banner-text";
 /// "Copy details".
 pub const CRASH_BANNER_COPY: &str = "crash-banner-copy";
 pub const CRASH_BANNER_DISMISS: &str = "crash-banner-dismiss";
+/// The crash banner's "Report a problem" button.
+pub const CRASH_BANNER_REPORT: &str = "crash-banner-report";
 /// The banner offering to remove TF2Tools 4, on Windows when it is still installed.
 pub const OLD_V4_BANNER: &str = "old-v4-banner";
 /// Labelled "The old version of TF2Tools is still installed."
@@ -96,6 +100,10 @@ pub const SETTINGS_NOTICES: &str = "settings-notices";
 pub const SETTINGS_NOTICES_VIEW: &str = "settings-notices-view";
 /// The notices box's scrollbar, over its right edge.
 pub const SETTINGS_NOTICES_SCROLLBAR: &str = "settings-notices-scrollbar";
+/// The Help and feedback card's "Report a problem" button.
+pub const SETTINGS_REPORT_PROBLEM: &str = "settings-report-problem";
+/// The Help and feedback card's "Help" button.
+pub const SETTINGS_HELP: &str = "settings-help";
 /// The conflicts box, labelled "Conflicts Detected. " and one line per conflict.
 pub const SOUNDS_CONFLICTS: &str = "sounds-conflicts";
 /// Wraps the library search input.

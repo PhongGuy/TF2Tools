@@ -1,4 +1,5 @@
-//! The banner under the header on the start after a crash, offering the report to copy.
+//! The banner under the header on the start after a crash, offering the report to copy and
+//! the page to report it on.
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -68,6 +69,13 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
                 "Paste them into your bug report.",
             );
         });
+    let report_page = Button::new(ids::CRASH_BANNER_REPORT)
+        .outline()
+        .small()
+        .label("Report a problem")
+        .accessibility_label("Report a problem")
+        .flex_none()
+        .on_click(|_, _, cx| cx.open_url(crate::links::REPORT_PROBLEM_URL));
     let dismiss = Button::new(ids::CRASH_BANNER_DISMISS)
         .ghost()
         .icon(IconName::X)
@@ -106,6 +114,7 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
                 NOTICE,
             ))
             .child(copy)
+            .child(report_page)
             .child(dismiss)
             .into_any_element(),
     )

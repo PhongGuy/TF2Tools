@@ -5,7 +5,9 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, TitleBar, h_flex};
+use gpui_kit::component::{
+    ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, TitleBar, h_flex,
+};
 use gpui_kit::{
     App, Context, FontWeight, InteractiveElement as _, IntoElement, MouseButton,
     ParentElement as _, Pixels, Role, StatefulInteractiveElement as _, Styled as _,
@@ -24,8 +26,16 @@ use crate::sync::{store_name, store_slug, sync_hub};
 use crate::widgets::Named as _;
 use crate::widgets::sync_ring::{RingColors, SyncRing};
 
+/// Steam's link that starts TF2 (app 440).
+pub const PLAY_TF2_URL: &str = "steam://run/440";
+
 /// Element `header`, `HEADER_HEIGHT` tall, titled for `page`, inside the kit's title bar.
-pub(super) fn render(page: Page, cx: &mut Context<Shell>) -> impl IntoElement + use<> {
+/// `tf2_running` is the shell's remembered answer, so drawing never scans processes.
+pub(super) fn render(
+    page: Page,
+    tf2_running: bool,
+    cx: &mut Context<Shell>,
+) -> impl IntoElement + use<> {
     let (border, bg) = (cx.theme().border, cx.theme().background);
     // The kit bar moves the window from empty space, maximises on double-click and puts the
     // window controls at the right, restyled flat to keep v5's look. The `header` id wraps the
@@ -43,12 +53,12 @@ pub(super) fn render(page: Page, cx: &mut Context<Shell>) -> impl IntoElement + 
                     window.remove_window();
                 }
             })
-            .child(content(page, cx)),
+            .child(content(page, tf2_running, cx)),
     )
 }
 
 // v5's header row: the sidebar toggle, the page title and the status slot.
-fn content(page: Page, cx: &mut Context<Shell>) -> impl IntoElement + use<> {
+fn content(page: Page, tf2_running: bool, cx: &mut Context<Shell>) -> impl IntoElement + use<> {
     let title = page.title();
     // No wrapper while nothing syncs, so an empty row adds no gap before the badge.
     let rings = sync_rings(cx);
@@ -89,8 +99,34 @@ fn content(page: Page, cx: &mut Context<Shell>) -> impl IntoElement + use<> {
                 .ml_auto()
                 .gap_2()
                 .children(rings)
+                .children(play_button(tf2_running, cx))
                 .children(tf2_badge(cx)),
         )
+}
+
+// Starts TF2 through Steam; only while TF2 is found, and waiting while it already runs.
+fn play_button(tf2_running: bool, cx: &App) -> Option<impl IntoElement + use<>> {
+    tf2_state(cx).read(cx).install()?;
+    let button = Button::new(ids::PLAY_TF2)
+        .primary()
+        .small()
+        .icon(IconName::Play)
+        .label("Play TF2")
+        .accessibility_label("Play TF2")
+        .disabled(tf2_running)
+        .on_click(|_, _, cx| cx.open_url(PLAY_TF2_URL));
+    let button = if tf2_running {
+        button.tooltip("TF2 is already running")
+    } else {
+        button
+    };
+    // Like the sidebar toggle, a press on the button must not start a window move.
+    Some(
+        div()
+            .flex_none()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .child(button),
+    )
 }
 
 // v5's rendered "TF2 Connected" width; GPUI's Inter shapes it 4 px narrower than WebKit.
