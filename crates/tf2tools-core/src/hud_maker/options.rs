@@ -263,6 +263,14 @@ pub enum OptionSource {
     },
 }
 
+/// Something outside the HUD an option needs before it shows in game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OptionNeed {
+    /// The Transparent Viewmodels addon, installed in TF2.
+    TransparentViewmodels,
+}
+
 /// One option a player can set: its label, kind, default and the edits it makes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -277,6 +285,7 @@ pub struct OptionSpec {
     restart: bool,
     drawn: bool,
     source: OptionSource,
+    needs: Option<OptionNeed>,
 }
 
 impl OptionSpec {
@@ -301,6 +310,7 @@ impl OptionSpec {
             restart,
             drawn: false,
             source: OptionSource::BuiltIn,
+            needs: None,
         }
     }
 
@@ -327,12 +337,19 @@ impl OptionSpec {
             restart,
             drawn: false,
             source,
+            needs: None,
         }
     }
 
     /// The option with `tooltip` shown beside its control.
     pub(super) fn with_tooltip(mut self, tooltip: Option<String>) -> OptionSpec {
         self.tooltip = tooltip;
+        self
+    }
+
+    /// The option marked as needing `needs` to show in game.
+    pub(super) fn with_needs(mut self, needs: Option<OptionNeed>) -> OptionSpec {
+        self.needs = needs;
         self
     }
 
@@ -394,6 +411,11 @@ impl OptionSpec {
     /// Where the option comes from.
     pub fn source(&self) -> &OptionSource {
         &self.source
+    }
+
+    /// What outside the HUD the option needs to show in game, if anything.
+    pub fn needs(&self) -> Option<OptionNeed> {
+        self.needs
     }
 }
 

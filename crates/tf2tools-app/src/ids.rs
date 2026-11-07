@@ -1906,6 +1906,12 @@ pub fn hud_maker_option_note(id: &str) -> ElementId {
     keyed("hud-maker-option-note", id)
 }
 
+/// What a HUD option still needs outside the HUD, under its control, labelled with it:
+/// "hud-maker-option-need:<id>".
+pub fn hud_maker_option_need(id: &str) -> ElementId {
+    keyed("hud-maker-option-need", id)
+}
+
 /// A Number option's value beside its slider, labelled with it: "hud-maker-option-value:<id>".
 pub fn hud_maker_option_value(id: &str) -> ElementId {
     keyed("hud-maker-option-value", id)

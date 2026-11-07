@@ -15,8 +15,9 @@ use super::hud_options::{
 };
 use super::model::{live_blocks, root_block};
 use super::options::{
-    CROSSHAIR_SYMBOLS, CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionSource,
-    OptionSpec, OptionValue, SwitchAction, ValueMap, is_item_colour, template_refs, text_suits,
+    CROSSHAIR_SYMBOLS, CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionNeed,
+    OptionSource, OptionSpec, OptionValue, SwitchAction, ValueMap, is_item_colour, template_refs,
+    text_suits,
 };
 use crate::error::SchemaError;
 use crate::fonts::Platform;
@@ -418,11 +419,14 @@ impl HudSchemas {
     }
 }
 
-/// What a `Special` names that this build does: switch to the game's stock backgrounds, or
-/// make one of the HUD's shipped backgrounds the menu art. A `Command` names a preview hook
-/// and changes no file, so it is ignored.
+/// What a `Special` names that this build does: switch to the game's stock backgrounds, make
+/// one of the HUD's shipped backgrounds the menu art, or mark a switch as needing the
+/// Transparent Viewmodels addon. `CustomBackground` is left out: it asks for a picture from the
+/// player's disk, which the HUD Maker's own menu background picker already does for any HUD.
+/// A `Command` names a preview hook and changes no file, so it is ignored.
 const STOCK_BACKGROUNDS: &str = "StockBackgrounds";
 const HUD_BACKGROUND: &str = "HUDBackground";
+const TRANSPARENT_VIEWMODELS: &str = "TransparentViewmodels";
 /// The folder holding a HUD's menu art.
 const MENU_ART_DIR: &str = "materials/console";
 
@@ -735,7 +739,10 @@ impl Fit<'_> {
                 schema: schema.to_owned(),
             },
         );
-        Ok(spec.with_tooltip(tooltip))
+        let needs = (fields.get("Special").and_then(SchemaValue::as_str))
+            .filter(|s| s.eq_ignore_ascii_case(TRANSPARENT_VIEWMODELS))
+            .map(|_| OptionNeed::TransparentViewmodels);
+        Ok(spec.with_tooltip(tooltip).with_needs(needs))
     }
 
     /// A ComboBox's choices with the literals each writes; refused choices are dropped, and
@@ -795,7 +802,7 @@ impl Fit<'_> {
                 "RenameFile" => self.rename(value),
                 "WriteFile" => self.write_file(value),
                 "WriteCfg" => self.write_cfg(value),
-                "Special" => self.special(value, fields.get("SpecialParameters")),
+                "Special" => self.special(value, fields.get("SpecialParameters"), leaves),
                 _ => continue,
             };
             match got {
@@ -947,13 +954,20 @@ impl Fit<'_> {
     }
 
     /// `Special`: the stock backgrounds switch, which hides the HUD's menu art, or a shipped
-    /// background (named by the first parameter) made the menu art. Anything else is left out.
+    /// background (named by the first parameter) made the menu art. The viewmodels special adds
+    /// no edit, as the addon lives outside the HUD; only a switch may carry it, so the option
+    /// can say it needs the addon. Anything else is left out.
     fn special(
         &self,
         value: &SchemaValue,
         parameters: Option<&SchemaValue>,
+        leaves: Leaves,
     ) -> Result<Vec<OptionAction>, Refused> {
         match value.as_str() {
+            Some(s) if s.eq_ignore_ascii_case(TRANSPARENT_VIEWMODELS) => match leaves {
+                Leaves::Toggle => Ok(Vec::new()),
+                _ => Err(Refused::LeftOut),
+            },
             Some(s) if s.eq_ignore_ascii_case(STOCK_BACKGROUNDS) => {
                 if menu_art(self.copy.iter().cloned(), MENU_ART_DIR).is_empty() {
                     return Err(Refused::Misfit);

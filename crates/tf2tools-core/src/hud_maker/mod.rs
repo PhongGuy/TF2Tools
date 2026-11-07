@@ -92,8 +92,8 @@ pub use meters::MeterKind;
 pub use model::{Edited, HudModel, KeyLine, Part, PartKey};
 pub use new_parts::{NewPart, RemoveRefused};
 pub use options::{
-    CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue,
-    SwitchAction, ValueMap,
+    CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionNeed, OptionSource, OptionSpec,
+    OptionValue, SwitchAction, ValueMap,
 };
 pub(crate) use pictures::is_picture_path;
 pub use pictures::{NewPicture, PictureTarget, picture_id, picture_material};
