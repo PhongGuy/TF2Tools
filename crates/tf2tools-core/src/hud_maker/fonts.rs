@@ -132,6 +132,35 @@ impl HudModel {
     }
 }
 
+impl HudModel {
+    /// The changes that make font `own` a copy of font `name` at `size` on a `screen_tall`
+    /// screen, its other heights in proportion, or that resize `own` in place when the HUD
+    /// already defines it; `None` when no scheme file defines `name` or a copy is refused.
+    pub(super) fn sized_font(
+        &self,
+        name: &str,
+        own: &str,
+        size: i32,
+        screen_tall: u32,
+    ) -> Option<Vec<Change>> {
+        let edit = FontEdit::Size(size);
+        let doc = self.document(SCHEME_FILE)?;
+        if !edit.is_valid() {
+            return None;
+        }
+        if let Some(found) = OwnFont::find(doc, own) {
+            let active = self.scheme().font(own, screen_tall).map_or(0, |f| f.tall());
+            return Some(found.edit_in_place(&edit, active, 0));
+        }
+        let active = self
+            .scheme()
+            .font(name, screen_tall)
+            .map_or(0, |f| f.tall());
+        let merged = MergedFont::find(self, doc, name)?;
+        merged.clone_as(own, &edit, active, 0).ok()
+    }
+}
+
 /// The primary family (name ID 1, a Windows-platform record first) of the first face of a
 /// TrueType or OpenType file, at most 64 MiB; `None` for anything else. Never panics.
 pub fn font_family(bytes: &[u8]) -> Option<String> {

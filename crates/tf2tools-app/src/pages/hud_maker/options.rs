@@ -43,6 +43,9 @@ const TURN_ON_VIEWMODELS: &str =
     "Needs Transparent viewmodels turned on at the end of the options.";
 const NO_TF2: &str =
     "TF2 wasn't found. Set the TF2 folder in Settings to use Transparent viewmodels.";
+const HUD_CROSSHAIR_GROUP: &str = "HUD crosshair";
+const HUD_CROSSHAIR_NOTE: &str = "This crosshair is drawn by the HUD itself. It is separate from the weapon crosshairs on the Crosshairs page.";
+const TWO_CROSSHAIRS: &str = "You also have weapon crosshairs on the Crosshairs page, so you may see two crosshairs in game. Turn one of them off if you want only one.";
 /// A Choice option with more choices than this shows as a menu instead of buttons.
 pub(super) const MAX_CHOICE_BUTTONS: usize = 8;
 
@@ -125,6 +128,9 @@ impl HudMakerPage {
             let mut rows = v_flex()
                 .gap_2()
                 .child(self.group_heading(group, changed, cx))
+                .when(group == HUD_CROSSHAIR_GROUP, |el| {
+                    el.children(self.hud_crosshair_notes(cx))
+                })
                 .when(shared, |el| {
                     el.child(labelled(
                         div().text_xs().text_color(muted),
@@ -147,14 +153,67 @@ impl HudMakerPage {
             }
             section = section.child(rows.child(swatches));
         }
+        // A HUD whose crosshair only its own options switch gets the note over those.
+        let crosshair_notes = if groups_have_crosshair(&options) {
+            Vec::new()
+        } else {
+            self.hud_crosshair_notes(cx)
+        };
         vec![
             section
+                .children(crosshair_notes)
                 .children(self.hud_option_section(cx))
                 .child(self.reset_all_row(cx))
                 .child(self.viewmodels_rows(cx))
                 .child(self.recipe_rows(cx))
                 .into_any_element(),
         ]
+    }
+
+    // The note that the HUD crosshair is the HUD's own, and while it shows with weapon
+    // crosshairs assigned, the warning about seeing two; nothing for a HUD without one.
+    fn hud_crosshair_notes(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let Some(editor) = self.editor() else {
+            return Vec::new();
+        };
+        let Some(crosshair) = editor.model().hud_crosshair(editor.screen()) else {
+            return Vec::new();
+        };
+        let theme = cx.theme();
+        let note = labelled(
+            div().text_xs().text_color(theme.muted_foreground),
+            ids::HUD_MAKER_HUD_CROSSHAIR_NOTE,
+            HUD_CROSSHAIR_NOTE,
+        );
+        let warning = (crosshair.shown() && self.weapon_crosshairs).then(|| {
+            labelled(
+                div().text_xs().text_color(theme.warning),
+                ids::HUD_MAKER_HUD_CROSSHAIR_WARNING,
+                TWO_CROSSHAIRS,
+            )
+            .into_any_element()
+        });
+        std::iter::once(note.into_any_element())
+            .chain(warning)
+            .collect()
+    }
+
+    /// Reads off the UI thread whether any weapon has a crosshair from the Crosshairs page;
+    /// called when a HUD lands and when the library changes. A failed read warns of nothing.
+    pub(super) fn read_weapon_crosshairs(&mut self, cx: &mut Context<Self>) {
+        let read = run_blocking(cx, |s| {
+            Ok(s.library.assignments().is_ok_and(|rows| !rows.is_empty()))
+        });
+        cx.spawn(async move |page, cx| {
+            let assigned = read.await.unwrap_or(false);
+            let _ = page.update(cx, |page, cx| {
+                if page.weapon_crosshairs != assigned {
+                    page.weapon_crosshairs = assigned;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 
     // The viewmodels switch with its "Applies to every HUD" note, or where to get the addon.
@@ -355,6 +414,7 @@ impl HudMakerPage {
             OptionKind::Toggle => self.option_switch(spec, cx),
             OptionKind::Number { .. } => self.option_slider_row(spec, cx)?,
             OptionKind::Colour { .. } => self.option_colour_row(spec, cx),
+            OptionKind::Choice(choices) => self.option_choices(spec, choices, cx),
             _ => return None,
         };
         let note = [
@@ -407,6 +467,71 @@ impl HudMakerPage {
             true => tipped(&ids::hud_maker_option(id), ALREADY_ON, switch),
             false => switch.into_any_element(),
         }
+    }
+
+    // The option's name over its menu, or over one small button per choice with the chosen
+    // one filled; a pick is one undo step.
+    fn option_choices(
+        &self,
+        spec: &'static OptionSpec,
+        choices: &'static [Choice],
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let id = spec.id();
+        let editor = self.editor();
+        let held = editor.is_some_and(|e| e.previewing());
+        let chosen = match editor.and_then(|e| e.shown_option_value(id)) {
+            Some(OptionValue::Pick(key)) => Some(key),
+            _ => None,
+        };
+        let name = div()
+            .text_sm()
+            .text_color(cx.theme().foreground)
+            .child(spec.label());
+        let control = match self.option_select(id) {
+            Some(select) => div()
+                .id(ids::hud_maker_option(id))
+                .test_support()
+                .child(
+                    Select::new(&select)
+                        .small()
+                        .disabled(held)
+                        .accessibility_label(spec.label()),
+                )
+                .into_any_element(),
+            None => {
+                let buttons = choices.iter().map(|choice| {
+                    let key = choice.key();
+                    let picked = chosen.as_deref() == Some(key);
+                    let button = Button::new(ids::hud_maker_option_choice(id, key))
+                        .xsmall()
+                        .label(choice.label())
+                        .disabled(held)
+                        .on_click(cx.listener(move |page, _, window, cx| {
+                            let value = OptionValue::Pick(key.to_owned());
+                            page.edit_selected(window, cx, |e| {
+                                let _ = e.set_option(id, value);
+                            })
+                        }));
+                    match picked {
+                        true => button.primary(),
+                        false => button.outline(),
+                    }
+                });
+                h_flex()
+                    .id(ids::hud_maker_option(id))
+                    .test_support()
+                    .flex_wrap()
+                    .gap_1()
+                    .children(buttons)
+                    .into_any_element()
+            }
+        };
+        v_flex()
+            .gap_1()
+            .child(name)
+            .child(control)
+            .into_any_element()
     }
 
     // The option's name over its slider, with the value in force beside the slider.
@@ -933,4 +1058,9 @@ fn viewmodels_state(s: &Services, tf2: Option<&Tf2Install>) -> Viewmodels {
             Viewmodels::Absent
         }
     }
+}
+
+// Whether the built-in options include the HUD crosshair group, which carries its own note.
+fn groups_have_crosshair(options: &[&OptionSpec]) -> bool {
+    options.iter().any(|s| s.group() == HUD_CROSSHAIR_GROUP)
 }

@@ -15,8 +15,9 @@ use super::hud_options::{
 };
 use super::model::{live_blocks, root_block};
 use super::options::{
-    CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionNeed, OptionSource, OptionSpec,
-    OptionValue, SwitchAction, ValueMap, is_item_colour, template_refs, text_suits,
+    CROSSHAIR_SYMBOLS, CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionNeed,
+    OptionSource, OptionSpec, OptionValue, SwitchAction, ValueMap, is_item_colour, template_refs,
+    text_suits,
 };
 use crate::error::SchemaError;
 use crate::fonts::Platform;
@@ -1184,11 +1185,6 @@ impl Fit<'_> {
         Some(active_bases(&String::from_utf8_lossy(bytes.bytes())))
     }
 }
-
-/// The symbols of the crosshair font HUDs draw their own crosshair with; the backslash is
-/// left out, as a file would read it as an escape.
-const CROSSHAIR_SYMBOLS: &str =
-    "!#$%'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 
 /// Every control name the texts in `value` name through `{$name ? a : b}`.
 fn references(value: &SchemaValue, out: &mut BTreeSet<String>) {

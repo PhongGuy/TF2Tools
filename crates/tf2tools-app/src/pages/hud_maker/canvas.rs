@@ -291,6 +291,10 @@ impl HudMakerPage {
         // ghost, each cut only at the parents inside the selection.
         let cut_off = editor.selected().filter(|key| cut_off_whole(layout, key));
         let parts = part_elements(model, layout, &look, &fit, screen.origin, editor.selected());
+        // The HUD's own crosshair label stands in for the plain marker while the HUD shows it.
+        let hud_crosshair = (!rule.hides_hud())
+            .then(|| hud_crosshair_element(&look, |x, y, w, h| local(fit.rect(x, y, w, h))))
+            .flatten();
         let measured = self.killfeed_bounds.clone();
         let killfeed = layout.get(&PartKey::new(KILLFEED)).and_then(|b| {
             let r = local(fit.rect(b.x(), b.y(), b.wide(), b.tall()));
@@ -691,10 +695,11 @@ impl HudMakerPage {
             .children(handles)
             .children(guides)
             .children(hover_tag)
-            .children(
-                (!rule.hides_hud())
-                    .then(|| crosshair(screen.size.width / 2., screen.size.height / 2.)),
-            )
+            .children(hud_crosshair.or_else(|| {
+                (!rule.hides_hud()).then(|| {
+                    crosshair(screen.size.width / 2., screen.size.height / 2.).into_any_element()
+                })
+            }))
             .children(compare_chrome);
         // The view's name over the canvas, so the player knows the preview is altered.
         let badge = super::colour_view::badge(self.vision()).map(|text| {
@@ -3050,6 +3055,48 @@ pub(super) fn scene_note(model: &HudModel) -> Option<String> {
             .hidden_by_hud()
             .map(|_| format!("This HUD hides the {scene}"))
     }
+}
+
+// The HUD's own crosshair label when it shows: its symbol in its font, size and colour, in
+// its box; `rect` turns a screen box into the canvas's.
+fn hud_crosshair_element(
+    look: &Look,
+    rect: impl Fn(i32, i32, i32, i32) -> Bounds<Pixels>,
+) -> Option<AnyElement> {
+    let crosshair = look.model.hud_crosshair(look.screen)?;
+    if !crosshair.shown() || crosshair.symbol().is_empty() {
+        return None;
+    }
+    let font = look
+        .model
+        .scheme()
+        .font(crosshair.font(), look.screen.tall());
+    let size = font_px(font, look, crosshair.tall());
+    let symbol = SharedString::from(crosshair.symbol().to_owned());
+    let el = place(
+        div(),
+        rect(
+            crosshair.x(),
+            crosshair.y(),
+            crosshair.wide(),
+            crosshair.tall(),
+        ),
+    )
+    .id(ids::HUD_MAKER_HUD_CROSSHAIR)
+    .aria_label(symbol.clone())
+    .test_support()
+    .flex()
+    .items_center()
+    .justify_center()
+    .whitespace_nowrap()
+    .text_size(px(size))
+    .line_height(px(size))
+    .text_color(look.shade(crosshair.colour()));
+    let el = match font.and_then(|f| drawn_family(f.family(), look.fonts)) {
+        Some(family) => el.font_family(family),
+        None => el,
+    };
+    Some(el.child(symbol).into_any_element())
 }
 
 // A small white plus at the screen's middle, where the game draws the crosshair.
