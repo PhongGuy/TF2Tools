@@ -248,6 +248,10 @@ pub const HUD_MAKER_ZOOM_FIT: &str = "hud-maker-zoom-fit";
 pub const HUD_MAKER_PARTS: &str = "hud-maker-parts";
 /// The part list's scrollbar, over its right edge.
 pub const HUD_MAKER_PARTS_SCROLLBAR: &str = "hud-maker-parts-scrollbar";
+/// The box that narrows the HUD Maker's part list by name.
+pub const HUD_MAKER_PARTS_FILTER: &str = "hud-maker-parts-filter";
+/// The note in the part list when no part's name holds the filter.
+pub const HUD_MAKER_PARTS_NO_MATCH: &str = "hud-maker-parts-no-match";
 /// The tooltip on a part list row's name, shown while the pointer rests on it.
 pub const HUD_MAKER_ROW_TIP: &str = "hud-maker-row-tip";
 /// The tooltip naming an alignment button's place, shown while the pointer rests on it.
@@ -1581,6 +1585,22 @@ pub fn hud_maker_row_name(key: &PartKey) -> ElementId {
 /// "hud-maker-row-state:<key>".
 pub fn hud_maker_row_state(key: &PartKey) -> ElementId {
     keyed("hud-maker-row-state", key.as_str())
+}
+
+/// The eye that hides or shows a part from its part list row: "hud-maker-row-eye:<key>".
+pub fn hud_maker_row_eye(key: &PartKey) -> ElementId {
+    keyed("hud-maker-row-eye", key.as_str())
+}
+
+/// The arrow that folds or unfolds a group's row in the part list: "hud-maker-row-fold:<key>".
+pub fn hud_maker_row_fold(key: &PartKey) -> ElementId {
+    keyed("hud-maker-row-fold", key.as_str())
+}
+
+/// The dot on a part list row whose part differs from the starting HUD:
+/// "hud-maker-row-changed:<key>".
+pub fn hud_maker_row_changed(key: &PartKey) -> ElementId {
+    keyed("hud-maker-row-changed", key.as_str())
 }
 
 /// The pin marker on a part placed against a sibling: "hud-maker-pin:<key>".
