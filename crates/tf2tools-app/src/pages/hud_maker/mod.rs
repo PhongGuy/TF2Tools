@@ -477,8 +477,10 @@ pub struct HudMakerPage {
     // The toast lift last set for the open toolbar, so the theme changes only when it moves.
     toast_lift: Option<Pixels>,
     place_saves: Rc<RefCell<PlaceSaves>>,
-    // The part whose list row the pointer is on, outlined on the canvas.
+    // The part under the pointer, on the canvas or its list row, outlined on the canvas.
     hovered: Option<PartKey>,
+    // Whether the canvas, not a row, set `hovered`, so only a canvas leave clears it.
+    hover_on_canvas: bool,
     // The latest canvas press, so a second press on its spot steps on to the next part.
     last_press: Option<LastPress>,
     part_drag: Option<PartDrag>,
@@ -809,6 +811,7 @@ impl HudMakerPage {
             toast_lift: None,
             place_saves: Rc::default(),
             hovered: None,
+            hover_on_canvas: false,
             last_press: None,
             part_drag: None,
             zoom: None,
@@ -1764,7 +1767,7 @@ impl HudMakerPage {
         self.refresh(window, cx);
     }
 
-    /// The part whose list row the pointer is on, outlined on the canvas.
+    /// The part under the pointer, on the canvas or its list row, outlined on the canvas.
     pub fn hovered(&self) -> Option<&PartKey> {
         self.hovered.as_ref()
     }

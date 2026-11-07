@@ -2041,7 +2041,7 @@ fn hover(cx: &mut TestAppContext, s: &support::ShellWindow, id: gpui_kit::Elemen
 fn hovering_a_row_outlines_its_part(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
     show_parts(cx, &s);
     assert!(!support::present(cx, s.win, ids::HUD_MAKER_HOVER));
     hover(cx, &s, ids::hud_maker_row(&PartKey::new(HV)));
@@ -2054,8 +2054,9 @@ fn hovering_a_row_outlines_its_part(cx: &mut TestAppContext) {
             && f(outline.size.height - part.size.height).abs() <= 1.,
         "{outline:?} vs {part:?}"
     );
+    // Off the row, the outline leaves HV; on the canvas it follows what the pointer is over.
     hover(cx, &s, ids::HUD_MAKER_CANVAS.into());
-    assert!(!support::present(cx, s.win, ids::HUD_MAKER_HOVER));
+    assert_ne!(hovered(cx, &page).as_deref(), Some(HV));
 }
 
 #[gpui_kit::test]
@@ -2106,6 +2107,116 @@ fn scrolling_the_parts_list_takes_the_outline_off_the_row(cx: &mut TestAppContex
             && f(outline.origin.y - part.origin.y).abs() <= 1.
     };
     assert!(!stale, "the scrolled-away row keeps its outline");
+}
+
+/// Moves the pointer to `at` with no button held, as a player's plain hover does.
+fn move_to(cx: &mut TestAppContext, s: &support::ShellWindow, at: gpui_kit::Point<Pixels>) {
+    let moved = gpui_kit::MouseMoveEvent {
+        position: at,
+        pressed_button: None,
+        modifiers: Default::default(),
+    };
+    send(cx, s, moved);
+}
+
+fn hovered(cx: &mut TestAppContext, page: &Entity<HudMakerPage>) -> Option<String> {
+    cx.update(|cx| page.read(cx).hovered().map(|k| k.as_str().to_owned()))
+}
+
+fn near(a: Bounds<Pixels>, b: Bounds<Pixels>) -> bool {
+    f(a.origin.x - b.origin.x).abs() <= 1.
+        && f(a.origin.y - b.origin.y).abs() <= 1.
+        && f(a.size.width - b.size.width).abs() <= 1.
+        && f(a.size.height - b.size.height).abs() <= 1.
+}
+
+const IMAGE: &str = "HudPlayerStatus/HudPlayerHealth/PlayerStatusHealthImage";
+const NOTHING: &str = "draws nothing in this preview";
+
+#[gpui_kit::test]
+fn hovering_a_part_on_the_canvas_outlines_and_names_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    show_parts(cx, &s);
+    let hv = PartKey::new(HV);
+    let part = bounds(cx, &s, ids::hud_maker_part(&hv));
+    move_to(cx, &s, part.center());
+    assert_eq!(hovered(cx, &page).as_deref(), Some(HV));
+    assert!(near(bounds(cx, &s, ids::HUD_MAKER_HOVER), part));
+    // The tag reads as the part's row does, so the canvas and the list name it alike.
+    let name = support::label_of(cx, s.win, ids::hud_maker_row(&hv)).unwrap();
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_HOVER_NAME),
+        Some(name)
+    );
+    // Leaving the screen takes the outline and its name away.
+    let canvas = bounds(cx, &s, ids::HUD_MAKER_CANVAS);
+    move_to(
+        cx,
+        &s,
+        point(canvas.right() + px(4.), canvas.bottom() + px(4.)),
+    );
+    assert_eq!(hovered(cx, &page), None);
+    assert!(!support::present(cx, s.win, ids::HUD_MAKER_HOVER));
+    assert!(!support::present(cx, s.win, ids::HUD_MAKER_HOVER_NAME));
+}
+
+#[gpui_kit::test]
+fn a_canvas_hover_marks_the_row_a_click_there_would_select(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    show_parts(cx, &s);
+    let part = bounds(cx, &s, ids::hud_maker_part(&PartKey::new(HV)));
+    move_to(cx, &s, part.center());
+    let canvas_hover = hovered(cx, &page);
+    assert!(canvas_hover.is_some());
+    let canvas = bounds(cx, &s, ids::HUD_MAKER_CANVAS);
+    let at = part.center() - canvas.origin;
+    cx.update_window(s.win, |_, w, cx| w.click_at(ids::HUD_MAKER_CANVAS, at, cx))
+        .unwrap();
+    support::settle(cx, s.win);
+    assert_eq!(selection(cx, &page), canvas_hover);
+}
+
+#[gpui_kit::test]
+fn hovering_a_row_names_its_part_on_the_canvas(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let _page = open_maker(cx, &s);
+    show_parts(cx, &s);
+    let hv = PartKey::new(HV);
+    hover(cx, &s, ids::hud_maker_row(&hv));
+    let name = support::label_of(cx, s.win, ids::hud_maker_row(&hv)).unwrap();
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_HOVER_NAME),
+        Some(name)
+    );
+    let tag = bounds(cx, &s, ids::HUD_MAKER_HOVER_NAME);
+    assert!(tag.intersects(&bounds(cx, &s, ids::HUD_MAKER_CANVAS)));
+}
+
+#[gpui_kit::test]
+fn a_part_with_no_artwork_is_outlined_dashed_and_says_so(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let _page = open_maker(cx, &s);
+    show_parts(cx, &s);
+    let image = PartKey::new(IMAGE);
+    // A part that draws something keeps a plain outline.
+    hover(cx, &s, ids::hud_maker_row(&PartKey::new(HV)));
+    let plain = support::label_of(cx, s.win, ids::HUD_MAKER_HOVER).unwrap();
+    assert!(!plain.contains(NOTHING), "{plain}");
+    // The stock health image paints nothing in the preview, so its outline is dashed.
+    hover(cx, &s, ids::hud_maker_row(&image));
+    let hover_label = support::label_of(cx, s.win, ids::HUD_MAKER_HOVER).unwrap();
+    assert!(hover_label.ends_with(NOTHING), "{hover_label}");
+    let tag = support::label_of(cx, s.win, ids::HUD_MAKER_HOVER_NAME).unwrap();
+    assert!(tag.contains(NOTHING), "{tag}");
+    support::click_part_row(cx, s.win, &image);
+    let selected = support::label_of(cx, s.win, ids::HUD_MAKER_SELECTION).unwrap();
+    assert!(selected.ends_with(NOTHING), "{selected}");
 }
 
 #[gpui_kit::test]
