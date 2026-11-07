@@ -1,6 +1,6 @@
 //! Attaching a part to a sibling: keys, place kept, cycles refused.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{HEALTH_KEY, HEALTH_RES, VALUE};
 use common::hud_stock::{HEALTH, label, stock_files_with, target_id_files, with_blocks};

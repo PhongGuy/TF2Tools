@@ -1,6 +1,6 @@
 //! Player actions as changes: forms, every line of a key, code-owned keys and refusals.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, label, stock_files, stock_files_with, with_blocks};
 use tf2tools_core::{

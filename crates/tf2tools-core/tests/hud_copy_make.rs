@@ -1,6 +1,6 @@
 //! Making an editable copy of a library HUD.
 
-mod common;
+use crate::common;
 
 use common::hud_copy::{game_for, import_stock_hud, snapshot};
 use common::hud_stock::{HEALTH, stock_files};

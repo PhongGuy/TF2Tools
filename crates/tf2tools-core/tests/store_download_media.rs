@@ -1,7 +1,7 @@
 //! Sound and crosshair downloads: which files inside a download become library entries,
 //! and how they are named.
 
-mod common;
+use crate::common;
 
 use std::io::Cursor;
 use std::path::Path;

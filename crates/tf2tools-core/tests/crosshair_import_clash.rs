@@ -1,7 +1,7 @@
 //! A crosshair imported under a name the library already uses: both are kept, and the
 //! newcomer takes the first free numbered name.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::io::Cursor;

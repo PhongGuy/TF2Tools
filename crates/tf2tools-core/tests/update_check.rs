@@ -1,6 +1,6 @@
 //! The update check: a signed manifest over the store HTTP path, verified before parsing.
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 

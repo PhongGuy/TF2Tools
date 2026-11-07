@@ -1,6 +1,6 @@
 //! A made HUD's added font files: written on save, read back on reopen.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files_with;
 use common::{LibraryEnv, library_env, tree};

@@ -1,6 +1,6 @@
 //! Scoreboard layout: code centring, code-toggled parts and a scoreboard the HUD hides.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{scoreboard_with, stock_files};
 use tf2tools_core::{HiddenBy, HudFiles, HudLayout, HudModel, PartKey, Platform, Scene, Screen};

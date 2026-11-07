@@ -1,6 +1,6 @@
 //! A copy learns of a newer base only from its own source; tree hashes are cached.
 
-mod common;
+use crate::common;
 
 use common::hud_copy::{import_stock_hud, store_item};
 use common::hud_stock::HEALTH;

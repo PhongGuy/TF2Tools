@@ -1,6 +1,6 @@
 //! Edits made while the minimal HUD is on write the `_minmode` line where the part has one.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files_with;
 use tf2tools_core::{Change, ChangeTarget, HudModel, PartKey, Platform, Screen, SetKey};

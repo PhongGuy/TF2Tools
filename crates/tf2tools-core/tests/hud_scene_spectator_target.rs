@@ -1,6 +1,6 @@
 //! The Spectator scene's second root: the watched player's target ID.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{stock_files_with, target_id_files};
 use tf2tools_core::{

@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files;
 use common::{library_env, tree, write_file};

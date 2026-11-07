@@ -1,6 +1,6 @@
 //! Only parts the player added can be deleted, and deleting keeps the player's other edits.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{VALUE, anim_model};
 use common::hud_stock::stock_files;

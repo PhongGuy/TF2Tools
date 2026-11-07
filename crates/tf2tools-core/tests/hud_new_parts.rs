@@ -1,6 +1,6 @@
 //! Adding a shadow, a background box or an anchor beside a part.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{HEALTH_KEY, HEALTH_RES, VALUE};
 use common::hud_stock::{HEALTH, SCHEME, label, stock_files, stock_files_with, with_blocks};

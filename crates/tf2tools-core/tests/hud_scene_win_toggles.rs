@@ -1,6 +1,6 @@
 //! The win panel's code toggles, matched by name at any depth.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{WIN_PANEL, stock_files, stock_files_with};
 use tf2tools_core::{HiddenBy, HudModel, PartKey, Platform, Scene, SceneRule, Screen};

@@ -1,7 +1,7 @@
 //! The download pipeline: streaming into tmp with caps and checksums, one download at a
 //! time, and HUD and addon imports into the library.
 
-mod common;
+use crate::common;
 
 use std::time::{Duration, Instant};
 

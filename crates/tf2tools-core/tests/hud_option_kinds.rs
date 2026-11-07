@@ -1,6 +1,6 @@
 //! The HUD's own option choices: stored as `hud_option`, picked by key, left to the switch layer.
 
-mod common;
+use crate::common;
 
 use std::collections::BTreeMap;
 

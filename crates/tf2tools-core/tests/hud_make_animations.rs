@@ -1,6 +1,6 @@
 //! Saving and reopening a made HUD with animation changes.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{MANIFEST, anim_files};
 use common::{library_env, tree};

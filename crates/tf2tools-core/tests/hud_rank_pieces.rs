@@ -1,6 +1,6 @@
 //! The rank panel's pieces follow the HUD's own pvprankpanel.res.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{RANK_PANEL, stock_files_with};
 use tf2tools_core::{HudModel, PartKey, Platform, RankPieces, Scene, Screen, rank_pieces};

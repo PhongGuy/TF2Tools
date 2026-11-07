@@ -1,6 +1,6 @@
 //! The class select menu's code toggles, and what they do to a file that disagrees.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{class_select, stock_files, stock_files_with};
 use tf2tools_core::{HiddenBy, HudModel, PartKey, Platform, Scene, SceneRule, Screen};

@@ -1,6 +1,6 @@
 //! The bundled starting points, built from the edit builders.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{AMMO, HEALTH, HUDLAYOUT, KILLFEED, stock_files, stock_files_with};
 use tf2tools_core::{ChangeTarget, HudModel, PartKey, Platform, Screen, StartingPoint};

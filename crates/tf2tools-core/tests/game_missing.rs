@@ -1,7 +1,7 @@
 //! Every writer into the game refuses when the game folder has moved away, and creates
 //! nothing where it used to be.
 
-mod common;
+use crate::common;
 
 use common::{
     LibraryEnv, builtin_catalog, import_hud_as, import_png_as, import_wav_as, library_env,

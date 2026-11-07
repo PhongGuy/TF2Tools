@@ -1,6 +1,6 @@
 //! The King of the Hill switch: the game shows the KOTH timers there and the round timer elsewhere.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files_with;
 use tf2tools_core::{

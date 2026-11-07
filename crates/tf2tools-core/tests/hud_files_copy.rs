@@ -1,6 +1,6 @@
 //! A HUD copy's read layers, and the read-only tf/cfg index beside them.
 
-mod common;
+use crate::common;
 
 use common::hud_copy::{empty_game, folder_with};
 use tf2tools_core::{CopyView, HudFiles};

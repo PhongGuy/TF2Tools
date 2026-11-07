@@ -1,7 +1,7 @@
 //! A HUD arriving under a name the library already uses: the same store item updates in
 //! place, anything else is kept beside the old one under a numbered name.
 
-mod common;
+use crate::common;
 
 use std::fs;
 use std::path::PathBuf;

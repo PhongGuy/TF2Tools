@@ -1,6 +1,6 @@
 //! The MvM player table: the SDK's columns at default widths and its row colours.
 
-mod common;
+use crate::common;
 
 use ColumnKind::*;
 use common::hud_stock::stock_files;

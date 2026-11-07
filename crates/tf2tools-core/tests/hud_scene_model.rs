@@ -1,6 +1,6 @@
 //! The scene parameter: which parts a model resolves, shared documents and scoped problems.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{scoreboard_with, stock_files, stock_files_with};
 use tf2tools_core::{Change, HudModel, PartId, PartKey, Platform, Scene, SetKey};

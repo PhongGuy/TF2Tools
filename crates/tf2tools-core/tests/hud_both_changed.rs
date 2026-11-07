@@ -1,6 +1,6 @@
 //! Which kept changes the base update also touched, for every change kind.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{ANIMS, ANIMS_PATH, anim_files};
 use common::hud_stock::{HEALTH, stock_files_with};

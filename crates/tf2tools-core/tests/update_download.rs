@@ -1,6 +1,6 @@
 //! Downloading an offered AppImage beside the running one, checked by size and sha256.
 
-mod common;
+use crate::common;
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};

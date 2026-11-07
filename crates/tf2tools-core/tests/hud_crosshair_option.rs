@@ -1,7 +1,7 @@
 //! The built-in HUD crosshair: the HUD's own on-screen crosshair label, offered only where
 //! hudlayout.res has a CustomCrosshair element.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{hudlayout_with_killfeed, stock_files_with};
 use tf2tools_core::{

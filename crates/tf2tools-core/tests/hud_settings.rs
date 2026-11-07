@@ -1,7 +1,7 @@
 //! Stage 2 settings: replaying removes, added blocks and assets; every resolved setting;
 //! text edits; Stage 2 rows.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files;
 use tf2tools_core::{

@@ -1,6 +1,6 @@
 //! The Item meter reads the chosen weapon's file: its box, its children and its edits.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files_with;
 use tf2tools_core::{

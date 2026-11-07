@@ -1,7 +1,7 @@
 //! Settings files a copy's options write: put in `tf/cfg` on install, taken back when the
 //! option is turned off or the HUD is uninstalled, and a file that was there is put back.
 
-mod common;
+use crate::common;
 
 use std::path::PathBuf;
 

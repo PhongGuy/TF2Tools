@@ -167,7 +167,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # What's Changed lists the commits since the previous tag.
+          # The release notes compare against the previous v* tag.
           fetch-depth: 0
       # A tag that disagrees with Cargo.toml would otherwise surface later as a missing AppImage.
       - name: The tag matches the workspace version
@@ -239,7 +239,14 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           version=${GITHUB_REF_NAME#v}
-          scripts/release-notes.sh "$GITHUB_REF_NAME" packaging/release-notes.md > "$RUNNER_TEMP/notes.md"
+          # GitHub groups the merged PRs since the previous v* tag by label (.github/release.yml); the
+          # script wraps that list in the player-facing template.
+          notes_args=(-f tag_name="$GITHUB_REF_NAME")
+          if prev=$(git describe --tags --abbrev=0 --match 'v*' "$GITHUB_REF_NAME^" 2> /dev/null); then
+            notes_args+=(-f previous_tag_name="$prev")
+          fi
+          gh api "repos/$GH_REPO/releases/generate-notes" "${notes_args[@]}" --jq .body > "$RUNNER_TEMP/generated.md"
+          scripts/release-notes.sh "$GITHUB_REF_NAME" packaging/release-notes.md "$RUNNER_TEMP/generated.md" > "$RUNNER_TEMP/notes.md"
           prerelease=()
           case $version in *-*) prerelease=(--prerelease) ;; esac
           gh release create "$GITHUB_REF_NAME" --draft --verify-tag "${prerelease[@]}" \

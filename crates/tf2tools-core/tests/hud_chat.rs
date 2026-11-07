@@ -1,7 +1,7 @@
 //! The chat part: basechat.res's HudChat over the HUD scene, its code-hidden children, its
 //! sample lines in the chat scheme's colours and font, and the "Chat at the top" option.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HUDLAYOUT, stock_files_with, with_blocks};
 use tf2tools_core::{

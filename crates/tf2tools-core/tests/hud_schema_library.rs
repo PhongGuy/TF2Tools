@@ -1,6 +1,6 @@
 //! A copy opened with the schema for its repo; without a repo, switches only.
 
-mod common;
+use crate::common;
 
 use common::hud_copy::{game_for, import_stock_hud};
 use common::hud_schema::schema;

@@ -1,6 +1,6 @@
 //! Install detection and the AppImage swap, on temp dirs only.
 
-mod common;
+use crate::common;
 
 use std::path::{Path, PathBuf};
 

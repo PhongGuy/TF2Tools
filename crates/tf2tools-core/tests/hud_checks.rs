@@ -1,6 +1,6 @@
 //! The HUD Maker's checking tools: every screen shape at once, contrast and colour-blind views.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, HUDLAYOUT, label, stock_files, stock_files_with, with_blocks};
 use tf2tools_core::{

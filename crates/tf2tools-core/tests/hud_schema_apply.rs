@@ -1,6 +1,6 @@
 //! Schema options with detected switches: overlap, values and key edits in the switch layer.
 
-mod common;
+use crate::common;
 
 use common::hud_schema::schema;
 use common::hud_stock::SCHEME;

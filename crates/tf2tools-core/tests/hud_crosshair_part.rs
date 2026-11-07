@@ -1,6 +1,6 @@
 //! The added crosshair and its flash when you hit someone.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::{ANIMS, ANIMS_PATH, VALUE, anim_model};
 use tf2tools_core::{

@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 use common::hud_borrow::{files_over_stock_bytes, source_over};
 use common::hud_stock::{HUDLAYOUT, stock_files};

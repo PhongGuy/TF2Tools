@@ -1,6 +1,6 @@
 //! Picture copies leave on save unless the HUD or one of its snapshots still names them.
 
-mod common;
+use crate::common;
 
 use common::hud_pictures::{CODE_VMT, folder, kept, pick, save, tex};
 use common::library_env;

@@ -1,6 +1,6 @@
 //! The MvM mode: the nested file, the `if_mvm` condition, edits and the mode's survival.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{stock_files, stock_files_with};
 use tf2tools_core::{BoardMode, HiddenBy, HudModel, PartKey, Platform, Scene, SceneRule, Screen};

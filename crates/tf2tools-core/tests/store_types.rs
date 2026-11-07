@@ -1,7 +1,7 @@
 //! The store's public types: v5's defaults, sharing across tasks, and the per-store sync
 //! status the Settings page shows.
 
-mod common;
+use crate::common;
 
 use std::time::Duration;
 

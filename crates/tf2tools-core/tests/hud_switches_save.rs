@@ -1,6 +1,6 @@
 //! A copy's switches save over base bytes, reopen in force, and turn off back to the base.
 
-mod common;
+use crate::common;
 
 use common::hud_anims::ANIMS;
 use common::hud_copy::{game_for, snapshot};

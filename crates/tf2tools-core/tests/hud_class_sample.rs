@@ -1,6 +1,6 @@
 //! The made-up class menu the class select scene previews, and what the game's code sets on it.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files;
 use tf2tools_core::{HudModel, PartKey, Platform, Rgba, SampleSet, Scene, SceneRule, Team};

@@ -1,6 +1,6 @@
 //! Which tf/custom folder a library HUD installs into.
 
-mod common;
+use crate::common;
 
 use std::fs;
 

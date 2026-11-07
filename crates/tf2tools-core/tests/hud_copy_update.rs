@@ -1,6 +1,6 @@
 //! Updating a copy: replay over the new base, report what no longer fits, refuse and fail safely.
 
-mod common;
+use crate::common;
 
 use common::hud_copy::{game_for, import_stock_hud, snapshot, store_item};
 use common::hud_stock::{HEALTH, stock_files};

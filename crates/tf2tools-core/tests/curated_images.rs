@@ -1,6 +1,6 @@
 //! Curated (hud-db) store items carry their screenshot URLs.
 
-mod common;
+use crate::common;
 
 use common::{sql, temp_data_dir};
 use tf2tools_core::{Database, Endpoints, StoreClient, StoreItemId, StoreKind};

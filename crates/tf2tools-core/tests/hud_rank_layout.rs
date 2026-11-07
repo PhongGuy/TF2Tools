@@ -1,6 +1,6 @@
 //! The rank panel's file: the HUD's own pvprankpanel.res, else the built-in stock tree.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{RANK_PANEL, stock_files, stock_files_with};
 use tf2tools_core::{HudModel, Platform, RankLayout, Scene, SceneRule};

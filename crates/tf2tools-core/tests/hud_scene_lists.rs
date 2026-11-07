@@ -1,6 +1,6 @@
 //! Player rows: code-set columns, the name's remaining width and row spacing.
 
-mod common;
+use crate::common;
 
 use ColumnKind::*;
 use common::hud_stock::{scoreboard_with, stock_files};

@@ -1,6 +1,6 @@
 //! Applying detected switches: exact bytes, moves, exclusivity, pristine when off, drops.
 
-mod common;
+use crate::common;
 
 use common::hud_switches::{DAMAGE_SWITCH, switch_files};
 use tf2tools_core::{

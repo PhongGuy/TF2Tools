@@ -1,6 +1,6 @@
 //! Install and delete of a made HUD whose re-save a crash interrupted, leaving `<folder>.old`.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files;
 use common::{LibraryEnv, import_hud_as, library_env, tree, write_file};

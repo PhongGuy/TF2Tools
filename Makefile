@@ -48,8 +48,8 @@ windows-check:
 # The local merge gate: CI runs only `check`, since the pilot crate needs its git host dependency.
 gate: check pilot-check scripts-check
 
-# The install and demo scripts against temp dirs and a stub binary, and the trailer check and release
-# notes against throwaway repositories (never this one's history).
+# The install and demo scripts against temp dirs and a stub binary, the trailer check against a
+# throwaway repository (never this one's history) and the release notes against canned GitHub notes.
 scripts-check:
 	scripts/test-scripts.sh
 	scripts/test-check-trailers.sh

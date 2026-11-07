@@ -1,6 +1,6 @@
 //! Reading v5 profile rows, deleting a profile and the active profile id.
 
-mod common;
+use crate::common;
 
 use common::{
     V5_PROFILE_ID as V5_ID, count, gb, library_env, seed_v5_profile, set_setting, setting,

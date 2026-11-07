@@ -1,6 +1,6 @@
 //! Replacing a part's picture: by its keys, or by the materials the game's code names.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{HEALTH, block, stock_files, stock_files_with, with_blocks};
 use tf2tools_core::{

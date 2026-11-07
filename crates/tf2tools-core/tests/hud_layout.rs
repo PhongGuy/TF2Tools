@@ -1,6 +1,6 @@
 //! Layout at each screen shape: proportional units, alignment, pins, hiding and hit-testing.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::{
     HEALTH, HUDLAYOUT, block, label, stock_files, stock_files_with, with_blocks,

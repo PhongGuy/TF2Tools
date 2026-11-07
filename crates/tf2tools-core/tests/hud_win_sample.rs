@@ -1,6 +1,6 @@
 //! The made-up won round the win panel previews, and what the game's code sets on its parts.
 
-mod common;
+use crate::common;
 
 use common::hud_stock::stock_files;
 use tf2tools_core::{HudModel, PartKey, Platform, SampleSet, Scene, SceneRule, Team};

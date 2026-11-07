@@ -1,6 +1,6 @@
 //! Checking a scanned HUD against the installed fonts through a fake host.
 
-mod common;
+use crate::common;
 
 use common::fake_host::FakeHost;
 use common::hud_fonts::fixture_hud;
