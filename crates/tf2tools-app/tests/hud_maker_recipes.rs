@@ -369,6 +369,7 @@ fn a_previewed_recipe_draws_with_its_own_fonts(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_bar_keeps_clear_at_800x600(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx);
+    support::maker_page::float_panels(cx, &s, &page);
     cx.simulate_window_resize(
         s.win,
         gpui_kit::size(gpui_kit::px(800.), gpui_kit::px(600.)),

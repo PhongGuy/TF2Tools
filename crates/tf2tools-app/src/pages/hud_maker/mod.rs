@@ -138,9 +138,10 @@ const DOCK_MIN_SCREEN: Pixels = px(200.);
 // The open part list covers at most this share of the screen, but always shows this many rows.
 const PARTS_COVER_MAX: f32 = 0.25;
 const PARTS_MIN_ROWS: f32 = 3.;
-// The narrowest toolbar that holds the screen menu, Undo, Redo and the name on one row, so the
-// whole bar fits two rows; narrower, the save row moves into More.
-const TOOLBAR_TWO_ROWS: Pixels = px(380.);
+// The narrowest toolbar that holds the screen menu, Undo, Redo and the name on one row beside
+// its hide button, padding and border, so the whole bar fits two rows; narrower, the save row
+// moves into More.
+const TOOLBAR_TWO_ROWS: Pixels = px(416.);
 // Estimates for the scene tab row: pixels per label letter and per tab, and the least kept for
 // the note, which cuts itself short rather than push the tabs into a menu.
 const SCENE_TAB_LETTER: f32 = 7.5;
@@ -607,6 +608,8 @@ pub struct HudMakerPage {
     screen_open: bool,
     // The toolbar's zoom menu is open.
     zoom_open: bool,
+    // The docked panel opened over the canvas from its rail while the window is too narrow.
+    peek: Option<Panel>,
     scene_open: bool,
     board_mode_open: bool,
     // The minimal HUD lasts the session, like the colour-blind view: a newly opened HUD gets it.
@@ -789,6 +792,7 @@ impl HudMakerPage {
             win,
             panels: Panel::ALL.map(|panel| PanelState::new(Places::DEFAULT.get(panel))),
             toolbar_collapsed: Places::DEFAULT.toolbar_collapsed,
+            peek: None,
             toolbar_bounds: Rc::new(Cell::new(Bounds::default())),
             killfeed_bounds: Rc::default(),
             chat_bounds: Rc::default(),
@@ -1849,8 +1853,9 @@ impl HudMakerPage {
             self.parts_spot = None;
         }
         self.panels[panel as usize].place = place;
-        // The player placed it, so nothing stays held.
+        // The player placed it, so nothing stays held or opened from a rail.
         self.held = None;
+        self.peek = None;
         // Where the two floating panels can't stand side by side, opening one closes the other.
         let opens = self.mode_shown(panel) == PanelMode::Floating && !place.collapsed;
         let other = panel.other();
@@ -2021,9 +2026,10 @@ impl HudMakerPage {
             }
             None => self.home(panel),
         };
+        let collapsed = place.collapsed && !self.peeking(panel);
         PanelPlace {
             mode: self.mode_shown(panel),
-            collapsed: place.collapsed || folded,
+            collapsed: collapsed || folded || self.is_railed(panel),
             ..place
         }
     }
@@ -2131,6 +2137,13 @@ impl HudMakerPage {
     // selection changes without touching the stored place; otherwise it flips the stored place.
     pub(super) fn toggle_collapsed(&mut self, panel: Panel, cx: &mut Context<Self>) {
         self.held = None;
+        // In a window too narrow for the dock, a rail opens its panel for now and closes it again.
+        let docked = self.place_of(panel).mode != PanelMode::Floating;
+        if docked && (self.peeking(panel) || self.dock_floored() && self.is_railed(panel)) {
+            self.peek = (!self.peeking(panel)).then_some(panel);
+            cx.notify();
+            return;
+        }
         let shown = self.panel_shown(panel);
         let place = self.place_of(panel);
         if shown.collapsed && !place.collapsed {
@@ -2146,6 +2159,10 @@ impl HudMakerPage {
             ..place
         };
         self.set_place_of(panel, place, cx);
+        // Opened, a docked panel can leave too little room for the screen; it opens over it then.
+        if docked && !place.collapsed && self.dock_floored() {
+            self.peek = Some(panel);
+        }
     }
 
     // The player's place kept inside the area. The parts panel's default place, open or
@@ -2178,24 +2195,40 @@ impl HudMakerPage {
             }
             home.x = (home.x - inset).max(0.);
         }
+        // A floating panel keeps off the rails at the area's edges, so both stay in reach.
+        let (left, right) = self.rail_insets();
+        let width = f32::from(self.size_at(panel, px(home.y)).width);
+        let last = f32::from(area.width) - right - width;
+        home.x = home.x.min(last).max(left);
         home
     }
 
-    // The canvas area less the docked columns, or the whole area while a dock is floored.
-    fn columns_area(&self) -> Bounds<Pixels> {
-        match self.dock_floored() {
-            true => self.area.get(),
-            false => self.docked_columns(),
-        }
+    // How far rails reach in from the area's left and right edges, with a gap past them.
+    fn rail_insets(&self) -> (f32, f32) {
+        let reach = |side: PanelMode| {
+            let railed =
+                (Panel::ALL.into_iter()).any(|p| self.mode_shown(p) == side && self.is_railed(p));
+            match railed {
+                true => f32::from(panel::RAIL_WIDTH) + panel::STACK_GAP,
+                false => 0.,
+            }
+        };
+        (reach(PanelMode::DockLeft), reach(PanelMode::DockRight))
     }
 
-    // True when the docked columns would leave the fitted screen shorter than `DOCK_MIN_SCREEN`;
-    // it reads only the area, the screen shape and the stored places, so it cannot oscillate.
+    // The canvas area less the docked columns and rails.
+    fn columns_area(&self) -> Bounds<Pixels> {
+        self.docked_columns(self.dock_floored())
+    }
+
+    // True when the open docked panels would leave the fitted screen shorter than
+    // `DOCK_MIN_SCREEN`; it reads only the area, the screen shape and the stored places, so it
+    // cannot oscillate.
     fn dock_floored(&self) -> bool {
         let Some(editor) = self.editor() else {
             return false;
         };
-        let columns = self.docked_columns();
+        let columns = self.docked_columns(false);
         columns != self.area.get()
             && CanvasFit::new(columns, editor.screen())
                 .screen_bounds()
@@ -2204,29 +2237,47 @@ impl HudMakerPage {
                 < DOCK_MIN_SCREEN
     }
 
-    /// How `panel` is drawn now: as the player placed it, or floating while its dock is floored.
+    /// How `panel` is drawn now: floating or docked, as the player placed it.
     pub fn mode_shown(&self, panel: Panel) -> PanelMode {
-        match self.place_of(panel).mode {
-            PanelMode::Floating => PanelMode::Floating,
-            _ if self.dock_floored() => PanelMode::Floating,
-            mode => mode,
+        self.place_of(panel).mode
+    }
+
+    /// True while docked `panel` shows as a slim rail at its edge: collapsed with nothing open on
+    /// its side, or in a window too narrow for the open dock unless opened from its rail.
+    pub fn is_railed(&self, panel: Panel) -> bool {
+        let place = self.place_of(panel);
+        match place.mode {
+            PanelMode::Floating => false,
+            _ if self.dock_floored() => self.peek != Some(panel),
+            side => place.collapsed && !self.side_open(side),
         }
     }
 
-    // The canvas area less one column per side holding an open docked panel, as wide as the
-    // widest such panel. A collapsed panel gives its column back and lies over the canvas's edge.
-    fn docked_columns(&self) -> Bounds<Pixels> {
+    // The narrow window's panel opened from its rail, drawn over the canvas.
+    pub(super) fn peeking(&self, panel: Panel) -> bool {
+        self.peek == Some(panel) && self.dock_floored()
+    }
+
+    // Some panel docked on `side` is open by the player's choice.
+    fn side_open(&self, side: PanelMode) -> bool {
+        (Panel::ALL.into_iter()).any(|p| {
+            let place = self.place_of(p);
+            place.mode == side && !place.collapsed
+        })
+    }
+
+    // The canvas area less one column per docked side: as wide as its widest open panel, or a
+    // rail where all it holds are rails (every docked panel once `floored`).
+    fn docked_columns(&self, floored: bool) -> Bounds<Pixels> {
         let area = self.area.get();
         let column = |side: PanelMode| {
-            Panel::ALL
-                .into_iter()
-                .filter(|&p| {
-                    let place = self.place_of(p);
-                    place.mode == side && !place.collapsed
-                })
+            let on_side =
+                || (Panel::ALL.into_iter()).filter(move |&p| self.place_of(p).mode == side);
+            let open = (on_side().filter(|&p| !floored && !self.place_of(p).collapsed))
                 .map(|p| p.width() + DOCK_GAP)
-                .max()
-                .unwrap_or_default()
+                .max();
+            let rail = on_side().next().map(|_| panel::RAIL_WIDTH + DOCK_GAP);
+            open.or(rail).unwrap_or_default()
         };
         // A docked side leaves a gutter against its panel; the other side gets the same gutter
         // so the screen never touches the window edge while the canvas is narrowed.
@@ -2389,7 +2440,7 @@ impl HudMakerPage {
         // Docked panels never move, but nothing may settle onto them; they are open-sized, and
         // an open one is as tall as its share of the column.
         let docked: Vec<(Panel, Bounds<Pixels>)> = (Panel::ALL.into_iter())
-            .filter(|&p| self.mode_shown(p) != PanelMode::Floating)
+            .filter(|&p| self.mode_shown(p) != PanelMode::Floating && !self.is_railed(p))
             .map(|p| {
                 let b = self.panels[p as usize].bounds.get();
                 let open = self.stored_size(p);
