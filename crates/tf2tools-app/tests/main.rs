@@ -3,6 +3,9 @@
 //! Each file beside this one is a module of this single binary, so the
 //! suite links once. A new test file must be declared below, or it never runs.
 
+// Tests and their helpers may unwrap and panic; the workspace denies it in shipped code.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
 mod activity;
 mod addon_store;
 mod addon_store_download;

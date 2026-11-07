@@ -1,5 +1,7 @@
 //! The TF2Tools desktop app: a GPUI window over `tf2tools-core` in v5's zinc dark look.
 #![forbid(unsafe_code)]
+// Not yet clean of the workspace's expect_used; a later lint PR removes this.
+#![allow(clippy::expect_used)]
 
 pub mod activity;
 pub mod addon_updates;

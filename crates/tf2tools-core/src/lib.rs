@@ -3,12 +3,9 @@
 //! runs them off the UI thread. Network functions are `async` and must be polled inside
 //! a tokio runtime.
 
-#![deny(unsafe_code)]
 #![deny(missing_docs)]
-#![cfg_attr(
-    not(test),
-    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
-)]
+// The workspace denies these; unit tests and their helpers may still unwrap and panic.
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used, clippy::panic))]
 
 mod activity;
 mod archive;

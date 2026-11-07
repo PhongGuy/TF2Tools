@@ -1,5 +1,7 @@
 //! Embeds the TF2Tools icon into tf2tools.exe on Windows; other targets need no resources.
 //! Also rebuilds when `licenses/` changes, so a new notice file is embedded without a clean.
+// Not yet clean of the workspace's expect_used; a later lint PR removes this.
+#![allow(clippy::expect_used)]
 
 fn main() {
     println!("cargo:rerun-if-changed=windows/tf2tools.rc");

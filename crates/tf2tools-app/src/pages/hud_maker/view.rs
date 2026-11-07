@@ -93,7 +93,7 @@ impl CanvasFit {
     }
 
     /// The screen pixel under window point `at`; `None` outside the screen or at scale 0.
-    pub fn to_screen(&self, at: Point<Pixels>) -> Option<(i32, i32)> {
+    pub fn to_screen(self, at: Point<Pixels>) -> Option<(i32, i32)> {
         if self.scale <= 0. {
             return None;
         }
@@ -261,7 +261,7 @@ impl PanelPlace {
     };
 
     /// `"<floating|left|right> <x> <y> <open|collapsed>"`, with x and y rounded.
-    pub fn to_setting(&self) -> String {
+    pub fn to_setting(self) -> String {
         let mode = match self.mode {
             PanelMode::Floating => "floating",
             PanelMode::DockLeft => "left",
@@ -345,7 +345,7 @@ impl Places {
     }
 
     /// `"<options place>; <parts place>; toolbar <open|collapsed>"`.
-    pub fn to_setting(&self) -> String {
+    pub fn to_setting(self) -> String {
         let toolbar = if self.toolbar_collapsed {
             "collapsed"
         } else {

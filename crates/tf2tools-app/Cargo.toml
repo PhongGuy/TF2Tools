@@ -17,6 +17,9 @@ path = "src/lib.rs"
 name = "tf2tools"
 path = "src/main.rs"
 
+[lints]
+workspace = true
+
 [dependencies]
 tf2tools-core = { path = "../tf2tools-core" }
 gpui-kit.workspace = true
