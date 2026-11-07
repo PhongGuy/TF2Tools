@@ -1,5 +1,6 @@
 //! The release workflow's shape: pinned actions, one write-scoped job, a release build without the
-//! update test seam, signing secrets confined to the draft job, and player-facing release text.
+//! update test seam, signing secrets confined to a `sign` job that compiles nothing, and
+//! player-facing release text.
 
 use std::path::{Path, PathBuf};
 
@@ -79,24 +80,118 @@ fn it_runs_on_version_tags_and_by_hand_only() {
     );
 }
 
-#[test]
-fn only_the_draft_job_may_write_contents() {
-    let text = workflow();
-    assert!(preamble(&text).contains("permissions:\n  contents: read"));
-    assert_eq!(text.matches("contents: write").count(), 1);
-    assert!(job(&text, "draft").contains("contents: write"));
+/// The names of every job in `text`, in order.
+fn jobs(text: &str) -> Vec<String> {
+    text.lines()
+        .skip_while(|l| *l != "jobs:")
+        .skip(1)
+        .filter(|l| l.starts_with("  ") && !l.starts_with("   ") && l.ends_with(':'))
+        .map(|l| l.trim().trim_end_matches(':').to_owned())
+        .collect()
 }
 
 #[test]
-fn the_jobs_run_gate_then_linux_then_a_tag_only_draft() {
+fn only_the_sign_job_may_write_and_it_asks_only_for_attestation_besides() {
     let text = workflow();
-    assert!(job(&text, "linux").contains("needs: gate"));
-    let draft = job(&text, "draft");
-    assert!(draft.contains("needs: [gate, linux, windows]"), "{draft}");
-    assert!(
-        draft.contains("if: startsWith(github.ref, 'refs/tags/v')"),
-        "{draft}"
+    assert!(preamble(&text).contains("permissions:\n  contents: read"));
+    assert_eq!(text.matches("contents: write").count(), 1);
+    let sign = job(&text, "sign");
+    let granted: Vec<&str> = sign
+        .lines()
+        .skip_while(|l| l.trim() != "permissions:")
+        .skip(1)
+        .take_while(|l| l.starts_with("      "))
+        .map(|l| l.split('#').next().unwrap().trim())
+        .collect();
+    assert_eq!(
+        granted,
+        [
+            "contents: write",
+            "id-token: write",
+            "attestations: write",
+            "artifact-metadata: write"
+        ],
+        "{sign}"
     );
+    for other in jobs(&text).iter().filter(|j| *j != "sign") {
+        assert!(!job(&text, other).contains("permissions:"), "{other}");
+    }
+}
+
+#[test]
+fn the_jobs_run_gate_then_builds_then_manifest_then_a_tag_only_sign() {
+    let text = workflow();
+    assert_eq!(
+        jobs(&text),
+        ["gate", "linux", "windows", "manifest", "sign"]
+    );
+    assert!(job(&text, "linux").contains("needs: gate"));
+    assert!(job(&text, "manifest").contains("needs: [linux, windows]"));
+    let sign = job(&text, "sign");
+    assert!(
+        sign.contains("needs: [gate, linux, windows, manifest]"),
+        "{sign}"
+    );
+    assert!(
+        sign.contains("if: startsWith(github.ref, 'refs/tags/v')"),
+        "{sign}"
+    );
+}
+
+#[test]
+fn only_the_sign_job_is_bound_to_the_release_environment() {
+    let text = workflow();
+    assert_eq!(text.matches("environment:").count(), 1);
+    assert!(
+        job(&text, "sign")
+            .lines()
+            .any(|l| l.trim() == "environment: release")
+    );
+}
+
+#[test]
+fn no_job_but_sign_references_a_secret() {
+    let text = workflow();
+    assert!(!preamble(&text).contains("secrets."));
+    for name in jobs(&text).iter().filter(|j| *j != "sign") {
+        assert!(!job(&text, name).contains("secrets."), "{name}");
+    }
+}
+
+#[test]
+fn release_jobs_restore_no_cache() {
+    let text = workflow();
+    for cache in [
+        "Swatinem/rust-cache",
+        "actions/cache",
+        "cache:",
+        "enable-cache",
+        "sccache",
+    ] {
+        assert!(!text.contains(cache), "release.yml uses {cache}");
+    }
+}
+
+#[test]
+fn every_job_in_every_workflow_has_a_timeout_and_a_read_only_default() {
+    let dir = repo().join(".github/workflows");
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        let text = std::fs::read_to_string(&path).unwrap();
+        let file = path.display();
+        assert!(
+            preamble(&text).contains("permissions:\n  contents: read"),
+            "{file}"
+        );
+        let names = jobs(&text);
+        assert!(!names.is_empty(), "{file}");
+        for name in names {
+            assert!(
+                job(&text, &name).contains("    timeout-minutes: "),
+                "{file}: job {name} has no timeout"
+            );
+        }
+    }
 }
 
 #[test]
@@ -153,8 +248,8 @@ fn only_the_packages_are_uploaded_and_released() {
         "{linux}"
     );
     assert!(linux.contains("if-no-files-found: error"), "{linux}");
-    let draft = job(&text, "draft");
-    let create = step(&draft, "Create the draft release");
+    let sign = job(&text, "sign");
+    let create = step(&sign, "Create the draft release");
     let uploads = RELEASED.map(|f| format!("dist/{f}")).join(" ");
     assert!(
         create.contains(&format!("{uploads} dist/SHA256SUMS")),
@@ -175,8 +270,8 @@ const RELEASED: [&str; 7] = [
 ];
 
 #[test]
-fn the_draft_adds_unversioned_copies_and_checksums_after_verifying() {
-    let draft = job(&workflow(), "draft");
+fn the_sign_job_adds_unversioned_copies_and_checksums_after_verifying() {
+    let draft = job(&workflow(), "sign");
     let extras = step(&draft, "Add the unversioned copies and checksums");
     for copy in [
         "cp TF2Tools.exe tf2tools-windows-setup.exe",
@@ -197,8 +292,8 @@ fn the_draft_adds_unversioned_copies_and_checksums_after_verifying() {
 }
 
 #[test]
-fn the_draft_writes_whats_changed_from_the_generated_notes() {
-    let draft = job(&workflow(), "draft");
+fn the_sign_job_writes_whats_changed_from_the_generated_notes() {
+    let draft = job(&workflow(), "sign");
     // The previous tag comes from git history, so the checkout needs every tag.
     assert!(draft.contains("fetch-depth: 0"), "{draft}");
     let create = step(&draft, "Create the draft release");
@@ -230,6 +325,7 @@ fn the_release_notes_template_has_the_sections_in_order() {
         "| Linux x86_64 |",
         "no version in its name",
         "Check a download with `sha256sum -c SHA256SUMS`.",
+        "`gh attestation verify <file> --repo PhongGuy/TF2Tools`",
         "## Before you install",
         "## Updates",
     ] {
@@ -254,6 +350,7 @@ fn the_release_notes_template_has_the_sections_in_order() {
 #[test]
 fn the_signing_secrets_reach_only_the_signing_step() {
     let text = workflow();
+    let sign = step(&job(&text, "sign"), "Sign the update manifest");
     // Named as in the maintainer's other cargo-packager projects; the closing braces keep
     // the key's name from matching inside the password's.
     for secret in [
@@ -261,8 +358,11 @@ fn the_signing_secrets_reach_only_the_signing_step() {
         "secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD }}",
     ] {
         assert_eq!(text.matches(secret).count(), 1, "{secret}");
-        assert!(job(&text, "draft").contains(secret), "{secret}");
+        assert!(sign.contains(secret), "{secret}");
     }
+    // The decrypted key file never outlives the step.
+    assert!(sign.contains("umask 077"), "{sign}");
+    assert!(sign.contains("trap 'rm -f \"$key_file\"' EXIT"), "{sign}");
     assert!(!text.contains("set -x"));
     for line in text.lines().map(str::trim) {
         assert!(
@@ -274,16 +374,23 @@ fn the_signing_secrets_reach_only_the_signing_step() {
 }
 
 #[test]
-fn the_draft_verifies_against_the_compiled_in_keys_and_stays_a_draft() {
-    let draft = job(&workflow(), "draft");
+fn the_sign_job_verifies_against_the_compiled_in_keys_and_stays_a_draft() {
+    let draft = job(&workflow(), "sign");
+    let verify = step(&draft, "Verify it against the compiled-in keys");
+    // The keys the app trusts, read from its source rather than given by hand.
     assert!(
-        draft.contains("make_manifest -- verify --dir dist"),
-        "{draft}"
+        verify.contains("UPDATE_PUBLIC_KEYS")
+            && verify.contains("crates/tf2tools-core/src/update/keys.rs"),
+        "{verify}"
     );
     assert!(
-        !draft.contains("--key"),
-        "verify must use UPDATE_PUBLIC_KEYS"
+        verify.contains("minisign -Vq -m dist/tf2tools-update.json -P \"$key\""),
+        "{verify}"
     );
+    // Every platform's file is checked by size and sha256, as `make_manifest verify` does.
+    for check in ["stat -c %s", "sha256sum <", ".value.sha256", ".value.size"] {
+        assert!(verify.contains(check), "missing {check}:\n{verify}");
+    }
     assert!(
         draft.contains("gh release create \"$GITHUB_REF_NAME\" --draft --verify-tag"),
         "{draft}"
@@ -295,7 +402,7 @@ fn the_draft_verifies_against_the_compiled_in_keys_and_stays_a_draft() {
 fn checkouts_never_keep_credentials() {
     let text = workflow();
     let checkouts = text.matches("actions/checkout@").count();
-    assert_eq!(checkouts, 4);
+    assert_eq!(checkouts, 5);
     assert_eq!(
         text.matches("persist-credentials: false").count(),
         checkouts
@@ -345,36 +452,100 @@ fn step(job: &str, name: &str) -> String {
 }
 
 #[test]
-fn the_signer_is_built_without_the_secrets_and_signing_only_runs_it() {
-    let draft = job(&workflow(), "draft");
-    let build = step(&draft, "Build the manifest signer");
+fn the_manifest_is_written_unsigned_by_a_job_without_secrets() {
+    let manifest = job(&workflow(), "manifest");
+    let write = step(&manifest, "Write the update manifest");
     assert!(
-        build.contains("cargo build --locked -p tf2tools-core --example make_manifest"),
-        "{build}"
+        write.contains(
+            "cargo run --locked -p tf2tools-core --example make_manifest -- manifest --dir dist"
+        ),
+        "{write}"
     );
-    assert!(!build.contains("secrets."), "{build}");
-    let sign = step(&draft, "Sign the update manifest");
+    assert!(manifest.contains("name: update-manifest"), "{manifest}");
     assert!(
-        sign.contains("TF2TOOLS_MINISIGN_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}"),
-        "{sign}"
+        manifest.contains("path: dist/tf2tools-update.json"),
+        "{manifest}"
     );
-    assert!(
-        sign.contains("run: target/debug/examples/make_manifest sign --dir dist"),
-        "{sign}"
-    );
-    assert!(!sign.contains("cargo"), "signing must not compile: {sign}");
-    assert!(draft.find("Build the manifest signer") < draft.find("Sign the update manifest"));
 }
 
 #[test]
-fn the_draft_first_checks_the_tag_matches_the_workspace_version() {
-    let draft = job(&workflow(), "draft");
-    let check = step(&draft, "The tag matches the workspace version");
+fn the_sign_job_compiles_nothing_and_signs_with_a_pinned_minisign() {
+    let sign = job(&workflow(), "sign");
+    for compiler in ["cargo", "rust-toolchain", "make "] {
+        assert!(!sign.contains(compiler), "the sign job runs {compiler}");
+    }
+    let install = step(&sign, "Install minisign");
+    assert!(
+        install.contains(
+            "https://github.com/jedisct1/minisign/releases/download/0.12/minisign-0.12-linux.tar.gz"
+        ),
+        "{install}"
+    );
+    assert!(
+        install.contains(
+            "9a599b48ba6eb7b1e80f12f36b94ceca7c00b7a5173c95c3efc88d9822957e73  $RUNNER_TEMP/minisign.tar.gz\" | sha256sum -c -"
+        ),
+        "{install}"
+    );
+    let signing = step(&sign, "Sign the update manifest");
+    assert!(
+        signing.contains("TF2TOOLS_MINISIGN_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}"),
+        "{signing}"
+    );
+    assert!(
+        signing.contains("minisign -S -s \"$key_file\" -m dist/tf2tools-update.json"),
+        "{signing}"
+    );
+    // An unencrypted key would sign without its password.
+    assert!(signing.contains("!= \"Sc\""), "{signing}");
+    let at = |s: &str| sign.find(s).unwrap_or_else(|| panic!("missing {s}"));
+    assert!(at("Install minisign") < at("Sign the update manifest"));
+    assert!(at("name: update-manifest") < at("Sign the update manifest"));
+}
+
+#[test]
+fn the_manifest_job_first_checks_the_tag_matches_the_workspace_version() {
+    let manifest = job(&workflow(), "manifest");
+    let check = step(&manifest, "The tag matches the workspace version");
     assert!(check.contains("Cargo.toml"), "{check}");
     assert!(check.contains("exit 1"), "{check}");
-    let at = |s: &str| draft.find(s).unwrap_or_else(|| panic!("missing {s}"));
+    let at = |s: &str| manifest.find(s).unwrap_or_else(|| panic!("missing {s}"));
     assert!(at("The tag matches the workspace version") < at("actions/download-artifact@"));
-    assert!(at("The tag matches the workspace version") < at("Sign the update manifest"));
+    assert!(at("The tag matches the workspace version") < at("Write the update manifest"));
+}
+
+#[test]
+fn the_sign_job_signs_only_a_manifest_for_its_tag() {
+    let sign = job(&workflow(), "sign");
+    let check = step(&sign, "The manifest is for this tag");
+    assert!(
+        check.contains("jq -r .version dist/tf2tools-update.json"),
+        "{check}"
+    );
+    assert!(check.contains("${GITHUB_REF_NAME#v}"), "{check}");
+    assert!(check.contains("exit 1"), "{check}");
+    assert!(sign.find("The manifest is for this tag") < sign.find("Sign the update manifest"));
+}
+
+#[test]
+fn the_sign_job_attests_every_release_file_before_the_draft() {
+    let sign = job(&workflow(), "sign");
+    let attest = "- uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2";
+    let at = sign
+        .find(attest)
+        .unwrap_or_else(|| panic!("no attest step:\n{sign}"));
+    let subjects: Vec<&str> = sign[at..]
+        .lines()
+        .skip_while(|l| l.trim() != "subject-path: |")
+        .skip(1)
+        .take_while(|l| l.starts_with("            "))
+        .map(str::trim)
+        .collect();
+    let mut want: Vec<String> = RELEASED.iter().map(|f| format!("dist/{f}")).collect();
+    want.push("dist/SHA256SUMS".to_owned());
+    assert_eq!(subjects, want);
+    assert!(sign.find("Add the unversioned copies") < Some(at));
+    assert!(Some(at) < sign.find("Create the draft release"));
 }
 
 #[test]
@@ -397,6 +568,8 @@ fn the_runbook_names_every_secret_and_gated_step() {
     }
     for needle in [
         "minisign -G",
+        "environment",
+        "gh attestation verify",
         "UPDATE_PUBLIC_KEYS",
         "make_manifest",
         "Co-authored-by",
@@ -456,19 +629,21 @@ fn the_windows_job_builds_the_installer_without_the_test_seam() {
 }
 
 #[test]
-fn the_draft_signs_only_when_both_platforms_are_present() {
-    let draft = job(&workflow(), "draft");
-    assert!(draft.contains("name: windows-installer"), "{draft}");
-    let present = step(&draft, "Both platforms are present");
+fn the_manifest_is_written_only_when_both_platforms_are_present() {
+    let manifest = job(&workflow(), "manifest");
+    assert!(manifest.contains("name: windows-installer"), "{manifest}");
+    let present = step(&manifest, "Both platforms are present");
     assert!(present.contains("dist/TF2Tools.exe"), "{present}");
     assert!(present.contains("_x86_64.AppImage"), "{present}");
     assert!(present.contains("exit 1"), "{present}");
-    assert!(draft.find("Both platforms are present") < draft.find("Sign the update manifest"));
+    assert!(
+        manifest.find("Both platforms are present") < manifest.find("Write the update manifest")
+    );
 }
 
 #[test]
-fn the_draft_fails_unless_the_manifest_holds_the_windows_installer() {
-    let draft = job(&workflow(), "draft");
+fn the_sign_job_fails_unless_the_manifest_holds_the_windows_installer() {
+    let draft = job(&workflow(), "sign");
     let verify = step(&draft, "Verify it against the compiled-in keys");
     // make_manifest verify prints one `<platform>: <file> matches` line per signed asset.
     assert!(

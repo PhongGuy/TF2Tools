@@ -2,11 +2,13 @@
 //!
 //! Usage:
 //! `make_manifest sign --dir DIR --version VERSION [--base URL] [--notes TEXT] [--pub-date RFC3339]`
+//! `make_manifest manifest --dir DIR --version VERSION [--base URL] [--notes TEXT] [--pub-date RFC3339]`
 //! `make_manifest verify --dir DIR [--key BASE64]...`
 //! `make_manifest keygen --dir DIR` (a throwaway encrypted key pair for local runs only)
 //!
 //! `sign` reads `TF2TOOLS_MINISIGN_KEY` and `TF2TOOLS_MINISIGN_PASSWORD` from the environment
-//! and never prints either; `keygen` reads the password.
+//! and never prints either; `keygen` reads the password. `manifest` writes the manifest unsigned and
+//! reads no secret, for a release job that signs it with the minisign CLI.
 
 use std::io::{Cursor, Write};
 use std::path::Path;
@@ -16,6 +18,8 @@ use chrono::{SecondsFormat, Utc};
 use sha2::{Digest, Sha256};
 
 const USAGE: &str = "usage: make_manifest sign --dir DIR --version VERSION [--base URL] \
+                     [--notes TEXT] [--pub-date RFC3339]\n       \
+                     make_manifest manifest --dir DIR --version VERSION [--base URL] \
                      [--notes TEXT] [--pub-date RFC3339]\n       \
                      make_manifest verify --dir DIR [--key BASE64]...\n       \
                      make_manifest keygen --dir DIR";
@@ -48,28 +52,18 @@ fn run(args: &[String], env: &dyn Fn(&str) -> Option<String>) -> Result<String, 
     let (command, rest) = args.split_first().ok_or(USAGE)?;
     let flags = parse_flags(rest)?;
     match command.as_str() {
+        "manifest" => {
+            let (dir, version, json) = manifest_from_flags(&flags)?;
+            let manifest_path = dir.join(MANIFEST);
+            write(&manifest_path, json.as_bytes(), false)?;
+            Ok(format!(
+                "wrote {}\nversion {version}{}",
+                manifest_path.display(),
+                platform_lines(&json)?
+            ))
+        }
         "sign" => {
-            only(
-                &flags,
-                &["--dir", "--version", "--base", "--notes", "--pub-date"],
-            )?;
-            let dir = Path::new(required(&flags, "--dir")?);
-            let version = required(&flags, "--version")?;
-            let pub_date = match single(&flags, "--pub-date")? {
-                Some(date) => {
-                    chrono::DateTime::parse_from_rfc3339(date)
-                        .map_err(|e| format!("--pub-date {date:?} is not RFC 3339: {e}"))?;
-                    date.to_owned()
-                }
-                None => Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
-            };
-            let json = build_manifest(
-                dir,
-                version,
-                single(&flags, "--base")?.unwrap_or("https://github.com"),
-                single(&flags, "--notes")?.unwrap_or(""),
-                &pub_date,
-            )?;
+            let (dir, version, json) = manifest_from_flags(&flags)?;
             // Both files are written only once the manifest has built and signed.
             let signature = sign_manifest(
                 json.as_bytes(),
@@ -79,21 +73,12 @@ fn run(args: &[String], env: &dyn Fn(&str) -> Option<String>) -> Result<String, 
             let (manifest_path, signature_path) = (dir.join(MANIFEST), dir.join(SIGNATURE));
             write(&manifest_path, json.as_bytes(), false)?;
             write(&signature_path, signature.as_bytes(), false)?;
-            let value: serde_json::Value =
-                serde_json::from_str(&json).map_err(|e| e.to_string())?;
-            let mut out = format!(
-                "wrote {}\nwrote {}\nversion {version}",
+            Ok(format!(
+                "wrote {}\nwrote {}\nversion {version}{}",
                 manifest_path.display(),
                 signature_path.display(),
-            );
-            for (key, asset) in value["platforms"].as_object().into_iter().flatten() {
-                out.push_str(&format!(
-                    "\n{key}: sha256 {} size {}",
-                    asset["sha256"].as_str().unwrap_or_default(),
-                    asset["size"],
-                ));
-            }
-            Ok(out)
+                platform_lines(&json)?
+            ))
         }
         "verify" => {
             only(&flags, &["--dir", "--key"])?;
@@ -140,6 +125,51 @@ fn run(args: &[String], env: &dyn Fn(&str) -> Option<String>) -> Result<String, 
         }
         _ => Err(USAGE.to_owned()),
     }
+}
+
+/// The `--dir`, `--version` and manifest JSON that `sign` and `manifest` share, from their flags.
+fn manifest_from_flags<'a>(
+    flags: &'a [(&'a str, &'a str)],
+) -> Result<(&'a Path, &'a str, String), String> {
+    only(
+        flags,
+        &["--dir", "--version", "--base", "--notes", "--pub-date"],
+    )?;
+    let dir = Path::new(required(flags, "--dir")?);
+    let version = required(flags, "--version")?;
+    let pub_date = match single(flags, "--pub-date")? {
+        Some(date) => {
+            chrono::DateTime::parse_from_rfc3339(date)
+                .map_err(|e| format!("--pub-date {date:?} is not RFC 3339: {e}"))?;
+            date.to_owned()
+        }
+        None => Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+    };
+    let json = build_manifest(
+        dir,
+        version,
+        single(flags, "--base")?.unwrap_or("https://github.com"),
+        single(flags, "--notes")?.unwrap_or(""),
+        &pub_date,
+    )?;
+    Ok((dir, version, json))
+}
+
+/// One `\n<platform>: sha256 <hex> size <bytes>` line per platform in `json`.
+fn platform_lines(json: &str) -> Result<String, String> {
+    let value: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
+    Ok(value["platforms"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(key, asset)| {
+            format!(
+                "\n{key}: sha256 {} size {}",
+                asset["sha256"].as_str().unwrap_or_default(),
+                asset["size"],
+            )
+        })
+        .collect())
 }
 
 /// The manifest JSON for the one `tf2tools_<version>_x86_64.AppImage` in `dir`, plus the
@@ -707,6 +737,46 @@ mod tests {
         std::fs::write(dir.path().join("TF2Tools.exe"), b"tampered!").unwrap();
         let err = run(&verify, &env(&[])).unwrap_err();
         assert!(err.contains("TF2Tools.exe sha256 does not match"), "{err}");
+    }
+
+    #[test]
+    fn manifest_writes_the_unsigned_manifest_without_secrets() {
+        let dir = packages();
+        std::fs::write(dir.path().join("TF2Tools.exe"), b"installer").unwrap();
+        let d = dir.path().to_str().unwrap();
+        let out = run(
+            &args(&[
+                "manifest",
+                "--dir",
+                d,
+                "--version",
+                VERSION,
+                "--pub-date",
+                DATE,
+            ]),
+            &env(&[]),
+        )
+        .unwrap();
+        assert!(out.contains("windows-x86_64-nsis"), "{out}");
+        let json = std::fs::read_to_string(dir.path().join("tf2tools-update.json")).unwrap();
+        assert_eq!(
+            json,
+            build_manifest(dir.path(), VERSION, GH, "", DATE).unwrap()
+        );
+        assert!(!dir.path().join("tf2tools-update.json.minisig").exists());
+    }
+
+    #[test]
+    fn manifest_refuses_a_missing_appimage_and_writes_nothing() {
+        let dir = packages();
+        let d = dir.path().to_str().unwrap();
+        let err = run(
+            &args(&["manifest", "--dir", d, "--version", "6.0.2"]),
+            &env(&[]),
+        )
+        .unwrap_err();
+        assert!(err.contains("tf2tools_6.0.2_x86_64.AppImage"), "{err}");
+        assert!(!dir.path().join("tf2tools-update.json").exists());
     }
 
     #[test]

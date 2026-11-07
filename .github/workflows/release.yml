@@ -1,5 +1,6 @@
 # Builds the Linux packages and the Windows installer from a pushed v* tag and stops at a draft release with a signed update
-# manifest; publishing stays with the maintainer (RELEASING.md).
+# manifest; publishing stays with the maintainer (RELEASING.md). Every job that compiles holds no secret: only `sign`, which
+# runs no cargo, is bound to the `release` environment that holds the signing key.
 name: Release
 
 on:
@@ -26,7 +27,7 @@ env:
 jobs:
   gate:
     runs-on: ubuntu-24.04
-    # A release starts from a cold cache, which takes about 20 minutes.
+    # Release jobs restore no cache, so this builds cold in about 20 minutes.
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -34,14 +35,10 @@ jobs:
           persist-credentials: false
           # The trailer check reads every commit since the previous tag.
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          # The key ignores build profiles; bump it when Cargo.toml changes how deps compile.
-          prefix-key: v1-rust
       - name: Install system libraries
         run: |
           sudo apt-get update
@@ -64,13 +61,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          # The key ignores build profiles; bump it when Cargo.toml changes how deps compile.
-          prefix-key: v1-rust
       - name: Install system libraries
         run: |
           sudo apt-get update
@@ -115,13 +108,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          # The key ignores build profiles; bump it when Cargo.toml changes how deps compile.
-          prefix-key: v1-rust
       - name: Install cargo-packager
         run: cargo install cargo-packager --version 0.11.8 --locked
       # The Makefile's package target is Linux-only, so the build and packaging run directly.
@@ -147,7 +136,8 @@ jobs:
           mv "${found[0]}" target/packages/TF2Tools.exe
       # cargo test runs from the package root, so the exe path must be absolute and Windows-style.
       - name: The exe carries the icon
-        run: TF2TOOLS_WINDOWS_EXE="$(cygpath -m "$PWD")/target/release/tf2tools.exe" cargo test --locked -p tf2tools-app --test integration packaging:: -- --ignored
+        run: |
+          TF2TOOLS_WINDOWS_EXE="$(cygpath -m "$PWD")/target/release/tf2tools.exe" cargo test --locked -p tf2tools-app --test integration packaging:: -- --ignored
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-installer
@@ -156,35 +146,29 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
-  draft:
-    needs: [gate, linux, windows]
-    if: startsWith(github.ref, 'refs/tags/v')
+
+  # Builds the update manifest from the downloaded packages, still unsigned, so no compiling job sees the key.
+  manifest:
+    needs: [linux, windows]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # The release notes compare against the previous v* tag.
-          fetch-depth: 0
       # A tag that disagrees with Cargo.toml would otherwise surface later as a missing AppImage.
       - name: The tag matches the workspace version
+        id: version
         run: |
-          tag=${GITHUB_REF_NAME#v}
           crate=$(awk -F'"' '/^\[workspace\.package\]/ { s = 1; next } /^\[/ { s = 0 } s && /^version *=/ { print $2; exit }' Cargo.toml)
-          if [ "$tag" != "$crate" ]; then
-            echo "tag $GITHUB_REF_NAME is version '$tag' but Cargo.toml [workspace.package] says '$crate'" >&2
+          if [[ $GITHUB_REF == refs/tags/v* ]] && [ "${GITHUB_REF_NAME#v}" != "$crate" ]; then
+            echo "tag $GITHUB_REF_NAME is version '${GITHUB_REF_NAME#v}' but Cargo.toml [workspace.package] says '$crate'" >&2
             exit 1
           fi
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+          echo "version=$crate" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          # The key ignores build profiles; bump it when Cargo.toml changes how deps compile.
-          prefix-key: v1-rust
       - name: Install system libraries
         run: |
           sudo apt-get update
@@ -197,7 +181,7 @@ jobs:
         with:
           name: windows-installer
           path: dist
-      # make_manifest skips a missing installer, so a lost artifact would sign a Linux-only manifest.
+      # make_manifest skips a missing installer, so a lost artifact would write a Linux-only manifest.
       - name: Both platforms are present
         run: |
           shopt -s nullglob
@@ -207,17 +191,109 @@ jobs:
             ls -l dist >&2
             exit 1
           fi
-      # Compiled without the secrets, so no build script ever sees them.
-      - name: Build the manifest signer
-        run: cargo build --locked -p tf2tools-core --example make_manifest
+      - name: Write the update manifest
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cargo run --locked -p tf2tools-core --example make_manifest -- manifest --dir dist --version "$VERSION"
+          cat dist/tf2tools-update.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: update-manifest
+          path: dist/tf2tools-update.json
+          if-no-files-found: error
+
+  # The only job that sees the signing key, so it compiles nothing: it signs the manifest with the minisign CLI, checks
+  # it against the app's keys, attests every file and creates the draft. The environment waits for the maintainer.
+  sign:
+    needs: [gate, linux, windows, manifest]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: release
+    permissions:
+      contents: write # creates the draft release
+      id-token: write # signs the attestation with the workflow's identity
+      attestations: write # stores the attestation
+      artifact-metadata: write # links the attestation to the release files
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # The release notes compare against the previous v* tag.
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: linux-packages
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: windows-installer
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: update-manifest
+          path: dist
+      - name: The manifest is for this tag
+        run: |
+          version=$(jq -r .version dist/tf2tools-update.json)
+          if [ "$version" != "${GITHUB_REF_NAME#v}" ]; then
+            echo "the manifest is for version '$version', not tag $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+      # A prebuilt release checked against a pinned hash, so the signer is never compiled here.
+      - name: Install minisign
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/minisign.tar.gz" https://github.com/jedisct1/minisign/releases/download/0.12/minisign-0.12-linux.tar.gz
+          echo "9a599b48ba6eb7b1e80f12f36b94ceca7c00b7a5173c95c3efc88d9822957e73  $RUNNER_TEMP/minisign.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/minisign.tar.gz" -C "$RUNNER_TEMP" minisign-linux/x86_64/minisign
+          sudo install -m 0755 "$RUNNER_TEMP/minisign-linux/x86_64/minisign" /usr/local/bin/minisign
+      # The secret holds the key file as minisign writes it, or the whole file base64-encoded (the packager signer form).
       - name: Sign the update manifest
         env:
           TF2TOOLS_MINISIGN_KEY: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY }}
           TF2TOOLS_MINISIGN_PASSWORD: ${{ secrets.CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD }}
-        run: target/debug/examples/make_manifest sign --dir dist --version "${GITHUB_REF_NAME#v}"
+        run: |
+          umask 077
+          key_file="$RUNNER_TEMP/update.key"
+          trap 'rm -f "$key_file"' EXIT
+          if decoded=$(printf '%s' "$TF2TOOLS_MINISIGN_KEY" | base64 -d 2> /dev/null | tr -d '\0') && [[ $decoded == "untrusted comment:"* ]]; then
+            printf '%s\n' "$decoded" > "$key_file"
+          else
+            printf '%s\n' "$TF2TOOLS_MINISIGN_KEY" > "$key_file"
+          fi
+          # A key made with -W signs without its password; the release key must be encrypted (scrypt, "Sc").
+          if [ "$(sed -n 2p "$key_file" | base64 -d 2> /dev/null | head -c 4 | tail -c 2)" != "Sc" ]; then
+            printf 'the signing key is not a password-protected minisign key\n' >&2
+            exit 1
+          fi
+          # minisign reads the password from stdin when it is not a terminal.
+          printf '%s\n' "$TF2TOOLS_MINISIGN_PASSWORD" | minisign -S -s "$key_file" -m dist/tf2tools-update.json > /dev/null
+      # The same checks as `make_manifest verify`: a signature from one of UPDATE_PUBLIC_KEYS, and every platform's file
+      # matching its size and sha256.
       - name: Verify it against the compiled-in keys
         run: |
-          out=$(cargo run --locked -p tf2tools-core --example make_manifest -- verify --dir dist)
+          mapfile -t keys < <(awk '/UPDATE_PUBLIC_KEYS/ { on = 1 } on { print } on && /\];/ { exit }' crates/tf2tools-core/src/update/keys.rs | grep -oE 'RW[A-Za-z0-9+/]{54}')
+          signed=
+          for key in "${keys[@]}"; do
+            if minisign -Vq -m dist/tf2tools-update.json -P "$key"; then signed=1; fi
+          done
+          if [ -z "$signed" ]; then
+            echo "the manifest signature does not verify with any of ${#keys[@]} UPDATE_PUBLIC_KEYS" >&2
+            exit 1
+          fi
+          out="signature ok for version $(jq .version dist/tf2tools-update.json)"
+          while IFS=$'\t' read -r platform name sha size; do
+            if [ -z "$name" ] || [ "$name" = . ] || [ "$name" = .. ] || [ ! -f "dist/$name" ]; then
+              echo "$platform: no file '$name' in dist" >&2
+              exit 1
+            fi
+            if [ "$(stat -c %s "dist/$name")" != "$size" ] || [ "$(sha256sum < "dist/$name" | cut -d' ' -f1)" != "$sha" ]; then
+              echo "$platform: $name does not match the manifest" >&2
+              exit 1
+            fi
+            out+=$'\n'"$platform: $name matches"
+          done < <(jq -r '.platforms | to_entries[] | [.key, (.value.url | split("/") | last), .value.sha256, (.value.size | tostring)] | @tsv' dist/tf2tools-update.json)
           printf '%s\n' "$out"
           if ! grep -qxF 'windows-x86_64-nsis: TF2Tools.exe matches' <<<"$out"; then
             echo "the signed manifest has no Windows installer" >&2
@@ -233,6 +309,18 @@ jobs:
           cp tf2tools_*_amd64.deb tf2tools-linux-amd64.deb
           sha256sum tf2tools_* TF2Tools.exe tf2tools-update.json tf2tools-update.json.minisig tf2tools-windows-setup.exe tf2tools-linux-x86_64.AppImage tf2tools-linux-amd64.deb > SHA256SUMS
           cat SHA256SUMS
+      # Players check a download with `gh attestation verify <file> --repo PhongGuy/TF2Tools`.
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/tf2tools_*
+            dist/TF2Tools.exe
+            dist/tf2tools-update.json
+            dist/tf2tools-update.json.minisig
+            dist/tf2tools-windows-setup.exe
+            dist/tf2tools-linux-x86_64.AppImage
+            dist/tf2tools-linux-amd64.deb
+            dist/SHA256SUMS
       - name: Create the draft release
         env:
           GH_TOKEN: ${{ github.token }}
