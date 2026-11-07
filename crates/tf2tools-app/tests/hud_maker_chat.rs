@@ -100,13 +100,17 @@ fn a_click_on_a_chat_line_selects_the_history(cx: &mut TestAppContext) {
     // The HUD options panel floats over the line's left part, so press its right end.
     let line = bounds(cx, &s, ids::hud_maker_chat_line(0));
     let end = point(line.size.width - px(2.), line.size.height / 2.);
-    cx.update_window(s.win, |_, w, cx| {
-        w.click_at(ids::hud_maker_chat_line(0), end, cx)
-    })
-    .unwrap();
-    support::settle(cx, s.win);
-    let selected = cx.update(|cx| page.read(cx).editor().and_then(|e| e.selected().cloned()));
-    assert_eq!(selected, Some(PartKey::new(HISTORY)));
+    let mut click = || {
+        cx.update_window(s.win, |_, w, cx| {
+            w.click_at(ids::hud_maker_chat_line(0), end, cx)
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+        cx.update(|cx| page.read(cx).editor().and_then(|e| e.selected().cloned()))
+    };
+    // The first click takes the whole chat, the second goes inside it to the history.
+    assert_eq!(click(), Some(PartKey::new("HudChat")));
+    assert_eq!(click(), Some(PartKey::new(HISTORY)));
 }
 
 #[gpui_kit::test]

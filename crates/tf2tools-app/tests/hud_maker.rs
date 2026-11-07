@@ -289,6 +289,12 @@ fn a_click_selects_the_part_under_the_pointer_and_a_miss_clears(cx: &mut TestApp
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
     click_screen(cx, &s, 220., 947.);
+    assert_eq!(
+        selection(cx, &page).as_deref(),
+        Some(HH),
+        "the part's group first"
+    );
+    press_screen(cx, &s, (220., 947.), alt());
     assert_eq!(selection(cx, &page).as_deref(), Some(HV));
     show_parts(cx, &s);
     assert_eq!(
@@ -1151,7 +1157,7 @@ fn dragging_a_part_selects_and_moves_it_as_one_undo_step(cx: &mut TestAppContext
     let k = scale(cx, &s);
     let from = bounds(cx, &s, ids::hud_maker_part(&PartKey::new(HV))).center();
     drag_window(cx, &s, from, (45. * k, 0.));
-    assert_eq!(selection(cx, &page).as_deref(), Some(HV));
+    assert_eq!(selection(cx, &page).as_deref(), Some(HH));
     assert_eq!(hv_box(cx, &page).0, 216);
     support::click_id(cx, s.win, ids::HUD_MAKER_UNDO);
     assert_eq!(hv_box(cx, &page).0, 171);
@@ -1284,7 +1290,7 @@ fn a_click_whose_release_lands_in_the_same_frame_leaves_no_drag(cx: &mut TestApp
     })
     .unwrap();
     support::settle(cx, s.win);
-    assert_eq!(selection(cx, &page).as_deref(), Some(HV));
+    assert_eq!(selection(cx, &page).as_deref(), Some(HH));
     let x = hv_box(cx, &page).0;
     support::press(cx, s.win, "right");
     assert!(hv_box(cx, &page).0 > x, "the first arrow press nudges");
@@ -2123,13 +2129,6 @@ fn hovered(cx: &mut TestAppContext, page: &Entity<HudMakerPage>) -> Option<Strin
     cx.update(|cx| page.read(cx).hovered().map(|k| k.as_str().to_owned()))
 }
 
-fn near(a: Bounds<Pixels>, b: Bounds<Pixels>) -> bool {
-    f(a.origin.x - b.origin.x).abs() <= 1.
-        && f(a.origin.y - b.origin.y).abs() <= 1.
-        && f(a.size.width - b.size.width).abs() <= 1.
-        && f(a.size.height - b.size.height).abs() <= 1.
-}
-
 const IMAGE: &str = "HudPlayerStatus/HudPlayerHealth/PlayerStatusHealthImage";
 const NOTHING: &str = "draws nothing in this preview";
 
@@ -2142,10 +2141,15 @@ fn hovering_a_part_on_the_canvas_outlines_and_names_it(cx: &mut TestAppContext) 
     let hv = PartKey::new(HV);
     let part = bounds(cx, &s, ids::hud_maker_part(&hv));
     move_to(cx, &s, part.center());
-    assert_eq!(hovered(cx, &page).as_deref(), Some(HV));
-    assert!(near(bounds(cx, &s, ids::HUD_MAKER_HOVER), part));
-    // The tag reads as the part's row does, so the canvas and the list name it alike.
-    let name = support::label_of(cx, s.win, ids::hud_maker_row(&hv)).unwrap();
+    // Over the health value, the outline takes what a click would: the health group.
+    assert_eq!(hovered(cx, &page).as_deref(), Some(HH));
+    let outline = bounds(cx, &s, ids::HUD_MAKER_HOVER);
+    assert!(
+        outline.contains(&part.origin) && outline.contains(&part.bottom_right()),
+        "{outline:?} around {part:?}"
+    );
+    // The tag reads as the group's row does, so the canvas and the list name it alike.
+    let name = support::label_of(cx, s.win, ids::hud_maker_row(&PartKey::new(HH))).unwrap();
     assert_eq!(
         support::label_of(cx, s.win, ids::HUD_MAKER_HOVER_NAME),
         Some(name)
@@ -2425,7 +2429,7 @@ fn the_side_panel_leaves_the_lower_hud_clickable(cx: &mut TestAppContext) {
             "{w}x{h}: side panel {panel:?} reaches past {cap} in {area:?}"
         );
         click_screen(cx, &s, 220., 947.);
-        assert_eq!(selection(cx, &page).as_deref(), Some(HV), "{w}x{h}");
+        assert_eq!(selection(cx, &page).as_deref(), Some(HH), "{w}x{h}");
         // Bottom right lies below the side panel at every size, where the canvas is empty.
         click_screen(cx, &s, 1910., 1070.);
         assert_eq!(selection(cx, &page), None, "{w}x{h}");
@@ -3341,7 +3345,7 @@ fn a_click_picks_the_drawn_health_value_under_invisible_parts(cx: &mut TestAppCo
     let env = support::env();
     let s = covered_shell(cx, &env);
     let page = open_maker(cx, &s);
-    click_screen(cx, &s, 235., 940.);
+    press_screen(cx, &s, (235., 940.), alt());
     assert_eq!(selection(cx, &page).as_deref(), Some(HV));
 }
 
@@ -3356,7 +3360,9 @@ fn alt_or_a_second_click_on_the_spot_steps_through_the_parts_under_it(cx: &mut T
         ..Default::default()
     };
     press_screen(cx, &s, (235., 940.), none);
-    assert_eq!(selection(cx, &page).as_deref(), Some(HV));
+    assert_eq!(selection(cx, &page).as_deref(), Some(HH), "the group first");
+    press_screen(cx, &s, (235., 940.), alt);
+    assert_eq!(selection(cx, &page).as_deref(), Some(HV), "Alt goes inside");
     press_screen(cx, &s, (235., 940.), alt);
     let blank = format!("{HH}/Blank");
     assert_eq!(
@@ -3392,7 +3398,7 @@ fn dragging_over_invisible_parts_moves_the_picked_part(cx: &mut TestAppContext) 
     let k = scale(cx, &s);
     let from = bounds(cx, &s, ids::hud_maker_part(&PartKey::new(HV))).center();
     drag_window(cx, &s, from, (45. * k, 0.));
-    assert_eq!(selection(cx, &page).as_deref(), Some(HV));
+    assert_eq!(selection(cx, &page).as_deref(), Some(HH));
     assert_eq!(hv_box(cx, &page).0, 216);
 }
 
@@ -3430,7 +3436,7 @@ fn a_clear_colour_paints_nothing_and_takes_no_click(cx: &mut TestAppContext) {
     let page = open_maker(cx, &s);
     let heal = PartKey::new("CHealthAccountPanel");
     assert!(!support::present(cx, s.win, ids::hud_maker_fill(&heal)));
-    click_screen(cx, &s, 235., 940.);
+    press_screen(cx, &s, (235., 940.), alt());
     assert_eq!(selection(cx, &page).as_deref(), Some(HV));
 }
 
@@ -3803,7 +3809,7 @@ fn a_pick_on_the_canvas_scrolls_its_row_into_view_once(cx: &mut TestAppContext) 
     let hv = PartKey::new(HV);
     wheel_parts_to_the_end(cx, &s);
     assert!(!row_in_view(cx, &s, &hv), "the list is too short to test");
-    click_screen(cx, &s, 220., 947.);
+    press_screen(cx, &s, (220., 947.), alt());
     assert_eq!(selection(cx, &page).as_deref(), Some(HV));
     assert!(
         row_in_view(cx, &s, &hv),
@@ -4342,4 +4348,127 @@ fn a_docked_panel_leaves_the_screen_the_same_gutter_on_both_sides(cx: &mut TestA
         f(near) > 0. && f(near - far).abs() <= 1.,
         "gutters {near:?} and {far:?}: {canvas:?} in {area:?} beside {panel:?}"
     );
+}
+
+const STATUS: &str = "HudPlayerStatus";
+
+fn alt() -> gpui_kit::Modifiers {
+    gpui_kit::Modifiers {
+        alt: true,
+        ..Default::default()
+    }
+}
+
+/// The screen pixel at the middle of `key`'s box.
+fn middle_of(cx: &mut TestAppContext, page: &Entity<HudMakerPage>, key: &str) -> (f32, f32) {
+    cx.update(|cx| {
+        let editor = page.read(cx).editor().unwrap();
+        let b = editor.layout().get(&PartKey::new(key)).unwrap();
+        ((b.x() + b.wide() / 2) as f32, (b.y() + b.tall() / 2) as f32)
+    })
+}
+
+fn x_of(cx: &mut TestAppContext, page: &Entity<HudMakerPage>, key: &str) -> i32 {
+    cx.update(|cx| {
+        let editor = page.read(cx).editor().unwrap();
+        editor.layout().get(&PartKey::new(key)).unwrap().x()
+    })
+}
+
+#[gpui_kit::test]
+fn a_click_selects_the_parts_group_and_a_double_click_goes_inside(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    let none = gpui_kit::Modifiers::default();
+    let at = middle_of(cx, &page, HV);
+    // The outline shows what a click would take: the whole health group.
+    let canvas = bounds(cx, &s, ids::HUD_MAKER_CANVAS);
+    let k = scale(cx, &s);
+    move_to(cx, &s, canvas.origin + point(px(at.0 * k), px(at.1 * k)));
+    assert_eq!(hovered(cx, &page).as_deref(), Some(HH));
+    press_screen_n(cx, &s, at, none, 1);
+    assert_eq!(selection(cx, &page).as_deref(), Some(HH), "the group first");
+    press_screen_n(cx, &s, at, none, 2);
+    assert_eq!(selection(cx, &page).as_deref(), Some(HV), "then inside it");
+    // Inside the group, a click on another of its parts takes that part.
+    let (ix, iy, _, _) = cx.update(|cx| {
+        let b = page.read(cx).editor().unwrap().layout();
+        let b = b.get(&PartKey::new(IMAGE)).unwrap();
+        (b.x(), b.y(), b.wide(), b.tall())
+    });
+    press_screen(cx, &s, ((ix + 3) as f32, (iy + 3) as f32), none);
+    assert_eq!(selection(cx, &page).as_deref(), Some(IMAGE), "a sibling");
+}
+
+#[gpui_kit::test]
+fn alt_click_goes_straight_to_the_part(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    let alt = gpui_kit::Modifiers {
+        alt: true,
+        ..Default::default()
+    };
+    let at = middle_of(cx, &page, HV);
+    press_screen(cx, &s, at, alt);
+    assert_eq!(selection(cx, &page).as_deref(), Some(HV));
+}
+
+#[gpui_kit::test]
+fn dragging_a_group_moves_all_its_parts_as_one_undo_step(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    let before = [HH, HV, IMAGE].map(|key| x_of(cx, &page, key));
+    let k = scale(cx, &s);
+    let from = bounds(cx, &s, ids::hud_maker_part(&PartKey::new(HV))).center();
+    drag_window(cx, &s, from, (45. * k, 0.));
+    assert_eq!(selection(cx, &page).as_deref(), Some(HH));
+    let after = [HH, HV, IMAGE].map(|key| x_of(cx, &page, key));
+    assert_eq!(after, before.map(|x| x + 45), "every part moves together");
+    support::press(cx, s.win, "ctrl-z");
+    assert_eq!([HH, HV, IMAGE].map(|key| x_of(cx, &page, key)), before);
+}
+
+#[gpui_kit::test]
+fn a_parts_row_still_selects_exactly_its_part(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    select_hv(cx, &s);
+    assert_eq!(selection(cx, &page).as_deref(), Some(HV));
+    let at = middle_of(cx, &page, HV);
+    press_screen(cx, &s, at, gpui_kit::Modifiers::default());
+    assert_eq!(
+        selection(cx, &page).as_deref(),
+        Some(HV),
+        "a click on the selected part keeps it"
+    );
+}
+
+#[gpui_kit::test]
+fn the_panel_title_shows_the_way_down_and_each_step_selects(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    select_hv(cx, &s);
+    let crumb = |key: &str| ids::hud_maker_crumb(&PartKey::new(key));
+    assert_eq!(
+        support::label_of(cx, s.win, crumb(STATUS)).as_deref(),
+        Some("Player status")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, crumb(HH)).as_deref(),
+        Some("Health")
+    );
+    assert!(
+        !support::present(cx, s.win, crumb(HV)),
+        "the part is the title"
+    );
+    support::click_id(cx, s.win, crumb(HH));
+    assert_eq!(selection(cx, &page).as_deref(), Some(HH));
+    assert!(!support::present(cx, s.win, crumb(HH)));
+    support::click_id(cx, s.win, crumb(STATUS));
+    assert_eq!(selection(cx, &page).as_deref(), Some(STATUS));
 }

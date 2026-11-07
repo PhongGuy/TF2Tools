@@ -8,7 +8,7 @@ use gpui_kit::component::input::Input;
 use gpui_kit::component::popover::Popover;
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Selectable as _, Sizable as _, h_flex, v_flex,
+    ActiveTheme as _, Disableable as _, Icon, Selectable as _, Sizable as _, h_flex, v_flex,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -387,9 +387,20 @@ impl HudMakerPage {
         let title = match panel {
             Panel::Parts => "Parts".into_any_element(),
             Panel::Options => match self.selected_name() {
-                Some(name) => {
-                    labelled(div().truncate(), ids::HUD_MAKER_PANEL_PART, name).into_any_element()
-                }
+                // The way down sits on its own small line over the part's name, so neither
+                // is cut short in a narrow panel.
+                Some(name) => v_flex()
+                    .min_w_0()
+                    .child(
+                        h_flex()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .gap_1()
+                            .text_xs()
+                            .children(self.crumbs(cx)),
+                    )
+                    .child(labelled(div().truncate(), ids::HUD_MAKER_PANEL_PART, name))
+                    .into_any_element(),
                 None if self.borrow.open => "Borrow a part".into_any_element(),
                 None if self.history_open => "History".into_any_element(),
                 None => "Part".into_any_element(),
@@ -482,6 +493,51 @@ impl HudMakerPage {
                     .on_click(cx.listener(move |page, _, _, cx| page.toggle_collapsed(panel, cx))),
             )
             .into_any_element()
+    }
+
+    // The parts enclosing the selection, outermost first, each a step that selects it and a
+    // chevron towards the part. A press stops at the step, so it never drags the panel.
+    fn crumbs(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let Some(editor) = self.editor() else {
+            return Vec::new();
+        };
+        let model = editor.model();
+        let mut steps = Vec::new();
+        let mut at = (editor.selected()).and_then(|key| model.part(key)?.parent());
+        while let Some(part) = at.and_then(|key| model.part(key)) {
+            steps.push((part.key().clone(), row_label(part)));
+            at = part.parent();
+        }
+        let theme = cx.theme();
+        let (muted, fg) = (theme.muted_foreground, theme.foreground);
+        (steps.into_iter().rev())
+            .flat_map(|(key, name)| {
+                let step = div()
+                    .id(ids::hud_maker_crumb(&key))
+                    .aria_label(SharedString::from(name.clone()))
+                    .test_support()
+                    .flex_none()
+                    .whitespace_nowrap()
+                    .font_weight(FontWeight::NORMAL)
+                    .text_color(muted)
+                    .cursor_pointer()
+                    .hover(move |el| el.text_color(fg))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |page, _: &MouseDownEvent, window, cx| {
+                            cx.stop_propagation();
+                            page.select(Some(key.clone()), window, cx);
+                            page.focus.focus(window, cx);
+                        }),
+                    )
+                    .child(name);
+                let chevron = Icon::new(IconName::ChevronRight)
+                    .xsmall()
+                    .flex_none()
+                    .text_color(muted);
+                [step.into_any_element(), chevron.into_any_element()]
+            })
+            .collect()
     }
 
     // The selected part named as its part-list row names it.
