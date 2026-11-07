@@ -2,6 +2,19 @@
 
 The maintainer's checklist for tagging, signing and publishing a release. Pushing a tag runs `.github/workflows/release.yml`, which builds the Linux packages and the Windows installer, signs `tf2tools-update.json` and stops at a draft release. Nothing is published until the maintainer publishes the draft.
 
+## The release jobs
+
+Building and signing run in separate jobs, so no dependency's build script ever runs next to the signing key, and no release job restores a cache.
+
+| Job | Runs | Secrets and permissions |
+| --- | --- | --- |
+| `gate` | `scripts/check-trailers.sh HEAD` and `make check` | none, read-only |
+| `linux`, `windows` | build the packages and upload them unsigned as the `linux-packages` and `windows-installer` artifacts | none, read-only |
+| `manifest` | checks the tag against `Cargo.toml` and runs `make_manifest manifest`, which writes `tf2tools-update.json` unsigned, uploaded as `update-manifest` | none, read-only |
+| `sign` (v* tags only) | downloads the three artifacts, signs the manifest with the prebuilt minisign 0.12 CLI (pinned by sha256; nothing is compiled), checks it against `UPDATE_PUBLIC_KEYS`, adds the copies and `SHA256SUMS`, attests every release file with `actions/attest` and creates the draft | the `release` environment's two signing secrets; `contents: write`, `id-token: write`, `attestations: write`, `artifact-metadata: write` |
+
+The `sign` job is the only one bound to `environment: release`, which is limited to `v*` tags and waits for the maintainer's approval before it starts.
+
 Every step marked **(maintainer)** pushes, tags, publishes or handles the real signing key. Only the maintainer does those.
 
 ## Once, before the first release
@@ -28,32 +41,32 @@ pub const UPDATE_PUBLIC_KEYS: &[&str] = &["RW...the second line of tf2tools-upda
 
 Commit it (`feat(update): add the release signing key`). Every build from then on trusts manifests signed with this key.
 
-### 3. Store the two secrets (maintainer)
+### 3. Store the two secrets in the `release` environment (maintainer)
 
-The `draft` job's signing step reads two repository secrets, named as in the maintainer's other cargo-packager projects, and hands them to `make_manifest` as `TF2TOOLS_MINISIGN_KEY` and `TF2TOOLS_MINISIGN_PASSWORD`:
+The `sign` job's signing step reads two secrets of the `release` environment, named as in the maintainer's other cargo-packager projects, writes the key to a private temporary file and pipes the password to `minisign -S`. It refuses a key that is not password-protected. They are environment secrets, never repository secrets: any workflow on any pushed branch can read a repository secret.
 
 - `CARGO_PACKAGER_SIGN_PRIVATE_KEY`: the key file exactly as written, either the two-line minisign text or the single base64 line that `cargo packager signer generate` writes.
 - `CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD`: the key's password.
 
-Set them with the GitHub CLI or on the repository's Settings page under Secrets and variables, Actions:
+Set them with the GitHub CLI or on the repository's Settings page under Environments, `release`:
 
 ```sh
-gh secret set CARGO_PACKAGER_SIGN_PRIVATE_KEY < tf2tools-update.key
-gh secret set CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD   # prompts for the value
+gh secret set CARGO_PACKAGER_SIGN_PRIVATE_KEY --env release < tf2tools-update.key
+gh secret set CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD --env release   # prompts for the value
 ```
+
+The `release` environment allows only `v*` tags and names the maintainer as required reviewer.
 
 ### 4. Dry-run the real key locally (maintainer)
 
-This proves the key file, its password and the compiled-in slot agree before CI ever sees them. It is the only check that a key made by the C minisign CLI parses in `make_manifest`.
+This proves the key file, its password and the compiled-in slot agree before CI ever sees them, the same way the `sign` job does: `make_manifest` writes the manifest, the minisign CLI signs it, and `make_manifest` checks it.
 
 ```sh
 make package
 packages=${CARGO_TARGET_DIR:-target}/packages
-read -rs TF2TOOLS_MINISIGN_PASSWORD; export TF2TOOLS_MINISIGN_PASSWORD
-TF2TOOLS_MINISIGN_KEY="$(cat tf2tools-update.key)" \
-  cargo run -p tf2tools-core --example make_manifest -- sign --dir "$packages" --version <version>
+cargo run -p tf2tools-core --example make_manifest -- manifest --dir "$packages" --version <version>
+minisign -S -s tf2tools-update.key -m "$packages/tf2tools-update.json"   # prompts for the password
 cargo run -p tf2tools-core --example make_manifest -- verify --dir "$packages"
-unset TF2TOOLS_MINISIGN_PASSWORD
 ```
 
 `<version>` is the workspace version in `Cargo.toml` (`[workspace.package]`). Run `verify` without `--key`, so it checks against `UPDATE_PUBLIC_KEYS`; it must print `signature ok`. `make package` writes to `$CARGO_TARGET_DIR/packages` when `CARGO_TARGET_DIR` is set and to `target/packages` otherwise (Makefile `PACKAGES`), hence `$packages`. Delete the generated `tf2tools-update.json` and `.minisig` from it afterwards.
@@ -112,31 +125,33 @@ Any rerun of this loopback test sets `HTTP_PROXY`, `HTTPS_PROXY` and `ALL_PROXY`
    git push origin v<version>
    ```
 
-   The tag must match the workspace version; the `draft` job fails early when it does not.
-5. **(maintainer)** Watch the Release run (`gh run watch` or the Actions tab). It runs `gate`, then `linux` and `windows`, then `draft`, which signs the manifest, adds the unversioned copies and `SHA256SUMS`, writes the notes with `scripts/release-notes.sh` and calls `gh release create --draft`.
-6. **(maintainer)** Review the draft:
+   The tag must match the workspace version; the `manifest` job fails early when it does not.
+5. **(maintainer)** Watch the Release run (`gh run watch` or the Actions tab). It runs `gate`, then `linux` and `windows`, then `manifest`, then waits at `sign` for approval.
+6. **(maintainer)** Approve the `release` environment: on the run's page, click "Review deployments", tick `release` and approve. Only then does `sign` receive the signing key. It signs the manifest, adds the unversioned copies and `SHA256SUMS`, attests every release file, writes the notes with `scripts/release-notes.sh` and calls `gh release create --draft`.
+7. **(maintainer)** Review the draft:
    - The assets are the AppImage, the deb, `TF2Tools.exe`, `tf2tools-update.json` and `tf2tools-update.json.minisig`, plus the unversioned copies `tf2tools-windows-setup.exe`, `tf2tools-linux-x86_64.AppImage` and `tf2tools-linux-amd64.deb`, and `SHA256SUMS`, which covers every other file. In a folder holding the downloads, `sha256sum -c --ignore-missing SHA256SUMS` must print `OK` for each.
    - Download `TF2Tools.exe` on a Windows PC, install it and check it opens and finds TF2 before publishing.
    - Download the manifest and its signature and check them: `minisign -Vm tf2tools-update.json -p tf2tools-update.pub`.
+   - Check the build attestation of a download: `gh attestation verify TF2Tools.exe --repo PhongGuy/TF2Tools`. The release notes tell players the same.
    - A prerelease deb's Version uses `~`, such as `6.0.0~alpha.1`, so it sorts before `6.0.0`: `dpkg-deb -f tf2tools_<version>_amd64.deb Version`.
    - A tag with `-` in it is marked as a prerelease.
-7. **(maintainer)** Replace the placeholder comment at the top of the draft body with one or two sentences on what is new in this release, and read through What's Changed: reword or drop any bullet a player would not understand.
-8. **(maintainer)** Publish.
+8. **(maintainer)** Replace the placeholder comment at the top of the draft body with one or two sentences on what is new in this release, and read through What's Changed: reword or drop any bullet a player would not understand.
+9. **(maintainer)** Publish.
 
 ## Facts to keep in mind
 
 - **Prereleases never reach the in-app updater.** The updater reads `releases/latest`, which skips prereleases, so the update feed starts with the first stable release.
-- **`TF2Tools.exe` is a fixed name.** Every v4 client downloads `TF2Tools.exe` from the latest release, and the manifest's `windows-x86_64-nsis` entry points at it. The `windows` job renames cargo-packager's `tf2tools_<version>_x64-setup.exe` to it, and the `draft` job fails when it is missing from `dist` or from the verified manifest.
+- **`TF2Tools.exe` is a fixed name.** Every v4 client downloads `TF2Tools.exe` from the latest release, and the manifest's `windows-x86_64-nsis` entry points at it. The `windows` job renames cargo-packager's `tf2tools_<version>_x64-setup.exe` to it; the `manifest` job fails when it is missing from `dist`, and the `sign` job when it is missing from the verified manifest.
 - **The unversioned copies are fixed names too.** The README's Linux download points at `releases/latest/download/tf2tools-linux-x86_64.AppImage`. The manifest never names the copies; it points at the versioned files.
 - **A bad published release is fixed by a higher version, never by deleting it.** Clients may already hold its manifest.
-- **A run started by hand from a branch is a dry run.** The `draft` job runs only for `refs/tags/v*`, so a `workflow_dispatch` from a branch stops after uploading the `linux-packages` and `windows-installer` workflow artifacts.
+- **A run started by hand from a branch is a dry run.** The `sign` job runs only for `refs/tags/v*`, so a `workflow_dispatch` from a branch stops after uploading the `linux-packages`, `windows-installer` and unsigned `update-manifest` workflow artifacts.
 - **The release build has no update test seam.** The `linux` and `windows` jobs set `TF2TOOLS_RELEASE_BUILD`, and the `update-test-key` feature refuses to compile with it set.
 - **The trailer gate covers every commit since the previous tag.** The `gate` job runs `scripts/check-trailers.sh HEAD`, which fails on any commit in that range that credits an AI agent (an AI or bot `Co-authored-by:`, a session trailer, a "Generated with" footer, the Anthropic noreply address or the robot emoji); a human `Co-authored-by: Name <email>` passes. It must print `trailers OK`. Every PR also runs `.github/workflows/attribution.yml`, which applies the same library to the PR title, body and commits.
 - **The packages bundle Valve assets.** The bundled crosshair VTFs, VMTs and PNGs and the weapon icons ship in every package, and the weapon scripts are compiled into `crates/tf2tools-core/src/weapons.rs`. Their licensing is the maintainer's call before the repository and its releases go public.
 
 ## The Windows installer
 
-The `windows` job runs on `windows-2025` in Git for Windows' bash. It builds `tf2tools.exe` for the MSVC target with `AWS_LC_SYS_PREBUILT_NASM=1`, packages it with `cargo packager --formats nsis` (cargo-packager downloads NSIS itself), renames the installer to `TF2Tools.exe`, checks the exe carries the icon and uploads only `TF2Tools.exe`. It holds no secrets; `make_manifest` signs the installer in the `draft` job.
+The `windows` job runs on `windows-2025` in Git for Windows' bash. It builds `tf2tools.exe` for the MSVC target with `AWS_LC_SYS_PREBUILT_NASM=1`, packages it with `cargo packager --formats nsis` (cargo-packager downloads NSIS itself), renames the installer to `TF2Tools.exe`, checks the exe carries the icon and uploads only `TF2Tools.exe`. It holds no secrets; the manifest that the `sign` job signs pins the installer by sha256.
 
 Locally, `scripts/check-windows.sh lint` and `scripts/check-windows.sh build` cross-check the gnu target in a container. The MSVC build is only ever seen in CI, so the first runs may fail in ways the local check cannot show:
 
@@ -161,14 +176,14 @@ The updater reads only `releases/latest`, so a client that skips a release jumps
 
 1. Generate the new key as in step 1 and put its public key in the second slot of `UPDATE_PUBLIC_KEYS`. Release that build (call it release N) signed with the old key, so clients learn the new key first.
 2. Keep signing with the old key for several releases or a long period after N, so most clients pass through a build that trusts the new key.
-3. Then replace both secrets with the new key and password and sign the next release with the new key. Clients older than N can no longer update in the app; they must download the new version from the Releases page by hand. Say so in that release's notes.
+3. Then replace both secrets in the `release` environment with the new key and password and sign the next release with the new key. Clients older than N can no longer update in the app; they must download the new version from the Releases page by hand. Say so in that release's notes.
 4. One release after the switch, drop the old key's slot.
 
 If the old key is compromised, that wait is not possible: switch to the new key at once, and everyone older than N reinstalls by hand from the Releases page.
 
 ## Writing release notes
 
-The release page is for players, not developers. The fixed text lives in `packaging/release-notes.md`. The `draft` job asks GitHub to generate the notes for the tag (`gh api repos/PhongGuy/TF2Tools/releases/generate-notes` with the previous `v*` tag as `previous_tag_name`), which lists every merged PR since that tag grouped by its label as `.github/release.yml` says: New features (`feature`), Fixes (`bug`), Usability and accessibility, Performance, then Other changes; PRs labelled `chore`, `ci` or `dependencies`, and Dependabot's, are left out. `scripts/release-notes.sh <tag> packaging/release-notes.md <generated>` then fills in the version and replaces the `{changes}` line with that generated body (a file, or `-` for stdin), minus GitHub's own What's Changed heading, so the list and the Full Changelog link sit inside the template. With no PR listed it writes "Small fixes and improvements." The intro at the top is written by hand in the draft.
+The release page is for players, not developers. The fixed text lives in `packaging/release-notes.md`. The `sign` job asks GitHub to generate the notes for the tag (`gh api repos/PhongGuy/TF2Tools/releases/generate-notes` with the previous `v*` tag as `previous_tag_name`), which lists every merged PR since that tag grouped by its label as `.github/release.yml` says: New features (`feature`), Fixes (`bug`), Usability and accessibility, Performance, then Other changes; PRs labelled `chore`, `ci` or `dependencies`, and Dependabot's, are left out. `scripts/release-notes.sh <tag> packaging/release-notes.md <generated>` then fills in the version and replaces the `{changes}` line with that generated body (a file, or `-` for stdin), minus GitHub's own What's Changed heading, so the list and the Full Changelog link sit inside the template. With no PR listed it writes "Small fixes and improvements." The intro at the top is written by hand in the draft.
 
 To preview the notes before tagging, run the same two steps by hand with `-f tag_name=<new tag> -f target_commitish=master`.
 
