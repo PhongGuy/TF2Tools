@@ -53,7 +53,16 @@ fn every_base_form_becomes_base_lines() {
         spec(got.specs(), "e:w3").actions(),
         base_lines(&["../../../custom/somehud/resource/ui/damage_big.res"], &[])
     );
-    assert_eq!(got.left_out(), 1);
+    // Any other text writes the whole file.
+    assert_eq!(
+        spec(got.specs(), "e:w4").actions(),
+        [OptionAction::Switch(SwitchAction::WriteText {
+            file: FILE.into(),
+            on: "anything else".into(),
+            off: Some(String::new()),
+        })]
+    );
+    assert_eq!(got.left_out(), 0);
 }
 
 #[test]
