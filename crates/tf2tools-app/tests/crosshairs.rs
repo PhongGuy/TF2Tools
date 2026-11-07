@@ -134,7 +134,7 @@ fn clicking_an_option_selects_it(cx: &mut TestAppContext) {
         Some(CrosshairRef::Builtin(first.name().to_owned()))
     );
     assert_eq!(
-        support::label_of(cx, s.win, ids::CROSSHAIRS_SWATCH).as_deref(),
+        support::label_of(cx, s.win, ids::CROSSHAIRS_SELECTED_NAME).as_deref(),
         Some(first.display_name())
     );
     search(cx, &s, &page, "zebra");
@@ -144,7 +144,7 @@ fn clicking_an_option_selects_it(cx: &mut TestAppContext) {
         Some(CrosshairRef::Library(zebra.id().clone()))
     );
     assert_eq!(
-        support::label_of(cx, s.win, ids::CROSSHAIRS_SWATCH).as_deref(),
+        support::label_of(cx, s.win, ids::CROSSHAIRS_SELECTED_NAME).as_deref(),
         Some("Zebra Dot")
     );
 }

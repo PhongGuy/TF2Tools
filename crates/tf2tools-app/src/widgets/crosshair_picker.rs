@@ -1,6 +1,7 @@
 //! v5's crosshair picker: a search row with the selection's swatch over one virtualized list
 //! of the builtin group then the library group. The profile wizard hosts the list; the
-//! Crosshairs page hosts its gallery mode, a virtualized grid of large tiles under source chips.
+//! Crosshairs page hosts its gallery mode, a virtualized grid of large tiles under source chips,
+//! which leaves the swatch to the page's large preview.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -372,7 +373,6 @@ impl CrosshairPicker {
                     .into_any_element(),
             );
         }
-        let swatch = self.swatch(px(28.), cx);
         let body = if tiles.is_empty() {
             v_flex()
                 .flex_1()
@@ -400,8 +400,7 @@ impl CrosshairPicker {
                     .py_1()
                     .border_b_1()
                     .border_color(border)
-                    .child(self.search_box(muted))
-                    .children(swatch),
+                    .child(self.search_box(muted)),
             )
             .child(h_flex().flex_wrap().gap_1().px_2().pt_2().children(chips))
             .child(body)

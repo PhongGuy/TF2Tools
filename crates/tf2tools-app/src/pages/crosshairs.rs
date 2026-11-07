@@ -67,7 +67,7 @@ const WIDE_GALLERY: Pixels = px(1200.);
 /// Below this board width the board turns, classes as rows and slots as columns.
 const BOARD_COLUMNS: Pixels = px(560.);
 /// The board's row header column and its cells' height.
-const HEADER_WIDTH: Pixels = px(76.);
+const HEADER_WIDTH: Pixels = px(84.);
 const CELL_HEIGHT: Pixels = px(68.);
 /// Every Export PNG failure toasts under this action.
 const EXPORT_FAILED: &str = "Failed to export PNG";
@@ -916,7 +916,7 @@ impl CrosshairsPage {
                             .truncate()
                             .text_xs()
                             .text_color(muted)
-                            .child("Pick one, then click or drag it onto the board"),
+                            .child("Click or drag one onto the board"),
                     )
                     .child(
                         Button::new(ids::CROSSHAIRS_IMPORT)
@@ -1065,17 +1065,24 @@ impl CrosshairsPage {
         let short = px(32.);
         let everything = self.header(
             ids::CROSSHAIRS_BOARD_EVERYTHING.into(),
-            "Everything".into(),
+            ("Everything".into(), "Everything".into()),
             None,
             BoardTarget::Everything,
             (Some(HEADER_WIDTH), short),
             cx,
         );
         let primary = cx.theme().primary;
+        // Players' own short names keep narrow class columns readable.
+        let short_names = !turned && self.width.get() < px(1100.);
         let class_header = |page: &Self, class: TfClass, size, cx: &mut Context<Self>| {
+            let shown = match class {
+                TfClass::Demoman if short_names => "Demo",
+                TfClass::Engineer if short_names => "Engie",
+                _ => class.name(),
+            };
             page.header(
                 ids::loadout_class(class),
-                class.name().into(),
+                (class.name().into(), shown.into()),
                 None,
                 BoardTarget::Class(class),
                 size,
@@ -1085,7 +1092,7 @@ impl CrosshairsPage {
         let slot_header = |page: &Self, slot: WeaponSlot, size, cx: &mut Context<Self>| {
             page.header(
                 ids::loadout_slot(slot),
-                slot.name().into(),
+                (slot.name().into(), slot.name().into()),
                 Some(slot_colour(slot, primary)),
                 BoardTarget::Slot(slot),
                 size,
@@ -1143,7 +1150,7 @@ impl CrosshairsPage {
     fn header(
         &self,
         id: gpui_kit::ElementId,
-        label: SharedString,
+        (label, shown): (SharedString, SharedString),
         dot: Option<Hsla>,
         target: BoardTarget,
         size: (Option<Pixels>, Pixels),
@@ -1165,7 +1172,7 @@ impl CrosshairsPage {
             })
             .h(height)
             .id(id)
-            .aria_label(label.clone())
+            .aria_label(label)
             .test_support()
             .px_1()
             .flex()
@@ -1189,7 +1196,7 @@ impl CrosshairsPage {
                 }),
             )
             .children(dot.map(|dot| div().flex_none().size(px(6.)).rounded_full().bg(dot)))
-            .child(div().min_w_0().truncate().child(label))
+            .child(div().min_w_0().truncate().child(shown))
             .into_any_element()
     }
 
@@ -1310,7 +1317,11 @@ impl CrosshairsPage {
                     .flex_none()
                     .size(px(36.))
                     .rounded(px(4.))
-                    .bg(rgb(0x000000))
+                    .bg(if matches!(state, CellState::Default) {
+                        cx.theme().muted
+                    } else {
+                        rgb(0x000000).into()
+                    })
                     .flex()
                     .items_center()
                     .justify_center()
