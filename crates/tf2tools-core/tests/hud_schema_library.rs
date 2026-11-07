@@ -7,7 +7,7 @@ use common::hud_schema::schema;
 use common::hud_switches::{dir, save, switch_layer};
 use common::{LibraryEnv, library_env};
 use tf2tools_core::{
-    Change, EditorSchemas, HudEntry, LibraryKind, OptionChange, OptionValue, Platform, Provenance,
+    Change, HudEntry, HudSchemas, LibraryKind, OptionChange, OptionValue, Platform, Provenance,
     SetKey,
 };
 
@@ -54,7 +54,7 @@ fn option_ids(env: &LibraryEnv, copy: &HudEntry) -> (Vec<String>, usize) {
 fn a_copy_of_a_matching_repo_opens_with_its_schema_options() {
     let mut env = library_env();
     env.lib
-        .set_hud_schemas(EditorSchemas::bundled().with(schema()));
+        .set_hud_schemas(HudSchemas::bundled().with(schema()));
     let copy = copy(&env, "somehud");
     set_repo(&env, &copy, "https://github.com/Someone/SomeHUD");
     let (ids, misfits) = option_ids(&env, &copy);
@@ -71,7 +71,7 @@ fn a_copy_of_a_matching_repo_opens_with_its_schema_options() {
 fn a_copy_without_a_repo_or_with_another_gets_switches_only() {
     let mut env = library_env();
     env.lib
-        .set_hud_schemas(EditorSchemas::bundled().with(schema()));
+        .set_hud_schemas(HudSchemas::bundled().with(schema()));
     let plain = copy(&env, "somehud");
     assert!(
         option_ids(&env, &plain)
@@ -103,7 +103,7 @@ fn the_default_library_uses_the_bundled_set() {
 fn a_schema_key_edit_on_a_scene_file_the_model_also_edits_is_no_game_update() {
     let mut env = library_env();
     env.lib
-        .set_hud_schemas(EditorSchemas::bundled().with(schema()));
+        .set_hud_schemas(HudSchemas::bundled().with(schema()));
     let copy = copy(&env, "somehud");
     set_repo(&env, &copy, "https://github.com/Someone/SomeHUD");
     let tf = game_for(&env, &[]);
@@ -114,7 +114,7 @@ fn a_schema_key_edit_on_a_scene_file_the_model_also_edits_is_no_game_update() {
         Change::option(
             1,
             OptionChange::new(
-                OptionChange::EDITOR,
+                OptionChange::SCHEMA,
                 "e:sh_chat_top",
                 OptionValue::Bool(true),
             ),

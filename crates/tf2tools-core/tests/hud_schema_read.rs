@@ -1,11 +1,11 @@
-//! Reading TF2HUD.Editor schemas: comments, caps, the bundled set and repo matching.
+//! Reading HUD option schemas: comments, caps, the bundled set and repo matching.
 
-use tf2tools_core::{EditorSchema, EditorSchemas, SchemaError, normalise_repo};
+use tf2tools_core::{HudSchema, HudSchemas, SchemaError, normalise_repo};
 
 #[test]
 fn comments_go_and_strings_keep_their_slashes() {
     let text = "\u{feff}{\n  // groups\n  \"Links\": { \"GitHub\": \"https://github.com/Jotunn/kbnhud\" },\n  \"EnabledFolder\": \"^customizations//#enabled\", /* inline */\n  \"Controls\": { \"A\": [ { \"Name\": \"x\", \"Label\": \"X\", \"Type\": \"CheckBox\", \"Restart\": false // why\n } ] }\n}\n";
-    let schema = EditorSchema::parse("kbnhud", text.as_bytes()).unwrap();
+    let schema = HudSchema::parse("kbnhud", text.as_bytes()).unwrap();
     assert_eq!(
         (schema.name(), schema.repo(), schema.control_count()),
         ("kbnhud", Some("jotunn/kbnhud"), 1)
@@ -19,7 +19,7 @@ fn oversized_or_broken_schemas_are_refused() {
         "a".repeat(1024 * 1024)
     );
     assert!(matches!(
-        EditorSchema::parse("big", big.as_bytes()),
+        HudSchema::parse("big", big.as_bytes()),
         Err(SchemaError::TooLarge)
     ));
     let long = format!(
@@ -27,7 +27,7 @@ fn oversized_or_broken_schemas_are_refused() {
         "n".repeat(4097)
     );
     assert!(matches!(
-        EditorSchema::parse("long", long.as_bytes()),
+        HudSchema::parse("long", long.as_bytes()),
         Err(SchemaError::TooLarge)
     ));
     let many: Vec<String> = (0..2001)
@@ -35,7 +35,7 @@ fn oversized_or_broken_schemas_are_refused() {
         .collect();
     let text = format!("{{ \"Controls\": {{ \"A\": [ {} ] }} }}", many.join(","));
     assert!(matches!(
-        EditorSchema::parse("many", text.as_bytes()),
+        HudSchema::parse("many", text.as_bytes()),
         Err(SchemaError::TooLarge)
     ));
     for bad in [
@@ -47,7 +47,7 @@ fn oversized_or_broken_schemas_are_refused() {
     ] {
         assert!(
             matches!(
-                EditorSchema::parse("bad", bad.as_bytes()),
+                HudSchema::parse("bad", bad.as_bytes()),
                 Err(SchemaError::Malformed { .. })
             ),
             "{bad}"
@@ -57,7 +57,7 @@ fn oversized_or_broken_schemas_are_refused() {
 
 #[test]
 fn the_bundled_set_reads_whole() {
-    let schemas = EditorSchemas::bundled();
+    let schemas = HudSchemas::bundled();
     let mut names = schemas.names();
     names.sort_unstable();
     assert_eq!(
@@ -89,14 +89,14 @@ fn the_bundled_set_reads_whole() {
 
 #[test]
 fn a_schema_matches_by_repo_ignoring_case_and_dot_git() {
-    let schemas = EditorSchemas::bundled();
+    let schemas = HudSchemas::bundled();
     for repo in [
         "https://github.com/rbjaxter/budhud",
         "https://GitHub.com/RBJAXTER/budhud.git/",
         "rbjaxter/budhud",
     ] {
         assert_eq!(
-            schemas.for_repo(repo).map(EditorSchema::name),
+            schemas.for_repo(repo).map(HudSchema::name),
             Some("budhud"),
             "{repo}"
         );
@@ -113,7 +113,7 @@ fn a_schema_matches_by_repo_ignoring_case_and_dot_git() {
 #[test]
 fn groups_keep_the_file_order() {
     let text = r#"{ "Controls": { "Zeta": [ { "Name": "z", "Type": "CheckBox" } ], "Alpha": [], "Mid": [], "Alpha": [ { "Name": "dup" } ] } }"#;
-    let schema = EditorSchema::parse("o", text.as_bytes()).unwrap();
+    let schema = HudSchema::parse("o", text.as_bytes()).unwrap();
     assert_eq!(schema.groups(), ["Zeta", "Alpha", "Mid"]);
     assert_eq!(schema.control_count(), 1);
 }
@@ -121,7 +121,7 @@ fn groups_keep_the_file_order() {
 #[test]
 fn the_bundled_files_are_the_editors_bytes() {
     use sha2::Digest as _;
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data/tf2hud-editor");
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data/hud-schemas");
     let mut names: Vec<String> = std::fs::read_dir(&dir)
         .unwrap()
         .map(|e| e.unwrap().file_name().into_string().unwrap())

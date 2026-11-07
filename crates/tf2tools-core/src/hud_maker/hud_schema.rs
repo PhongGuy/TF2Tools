@@ -1,4 +1,4 @@
-//! TF2HUD.Editor schemas: the bundled set, read leniently (comments, a BOM) within caps, in
+//! HUD option schemas: the bundled set, read leniently (comments, a BOM) within caps, in
 //! the file's own order, and matched to a copy by its GitHub repo.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -28,64 +28,52 @@ const MAX_COMBO_OPTIONS: usize = 64;
 /// Any string, key or value, is at most this long.
 const MAX_STRING_BYTES: usize = 4 * 1024;
 
-/// The schemas shipped with the app, copied from TF2HUD.Editor (see `licenses/`).
+/// The schemas shipped with the app, copied from their upstream project (see `licenses/`).
 const BUNDLED: [(&str, &str); 15] = [
     (
         "berryhud",
-        include_str!("../../data/tf2hud-editor/berryhud.json"),
+        include_str!("../../data/hud-schemas/berryhud.json"),
     ),
-    (
-        "budhud",
-        include_str!("../../data/tf2hud-editor/budhud.json"),
-    ),
-    (
-        "darhud",
-        include_str!("../../data/tf2hud-editor/darhud.json"),
-    ),
+    ("budhud", include_str!("../../data/hud-schemas/budhud.json")),
+    ("darhud", include_str!("../../data/hud-schemas/darhud.json")),
     (
         "eve-plus",
-        include_str!("../../data/tf2hud-editor/eve-plus.json"),
+        include_str!("../../data/hud-schemas/eve-plus.json"),
     ),
     (
         "flawhud",
-        include_str!("../../data/tf2hud-editor/flawhud.json"),
+        include_str!("../../data/hud-schemas/flawhud.json"),
     ),
-    (
-        "hexhud",
-        include_str!("../../data/tf2hud-editor/hexhud.json"),
-    ),
+    ("hexhud", include_str!("../../data/hud-schemas/hexhud.json")),
     (
         "hud-fixes",
-        include_str!("../../data/tf2hud-editor/hud-fixes.json"),
+        include_str!("../../data/hud-schemas/hud-fixes.json"),
     ),
     (
         "hypnotize-hud",
-        include_str!("../../data/tf2hud-editor/hypnotize-hud.json"),
+        include_str!("../../data/hud-schemas/hypnotize-hud.json"),
     ),
-    ("idhud", include_str!("../../data/tf2hud-editor/idhud.json")),
-    (
-        "kbnhud",
-        include_str!("../../data/tf2hud-editor/kbnhud.json"),
-    ),
+    ("idhud", include_str!("../../data/hud-schemas/idhud.json")),
+    ("kbnhud", include_str!("../../data/hud-schemas/kbnhud.json")),
     (
         "m0rehud-classic",
-        include_str!("../../data/tf2hud-editor/m0rehud-classic.json"),
+        include_str!("../../data/hud-schemas/m0rehud-classic.json"),
     ),
     (
         "middle-mann",
-        include_str!("../../data/tf2hud-editor/middle-mann.json"),
+        include_str!("../../data/hud-schemas/middle-mann.json"),
     ),
     (
         "rayshud",
-        include_str!("../../data/tf2hud-editor/rayshud.json"),
+        include_str!("../../data/hud-schemas/rayshud.json"),
     ),
     (
         "sunsethud",
-        include_str!("../../data/tf2hud-editor/sunsethud.json"),
+        include_str!("../../data/hud-schemas/sunsethud.json"),
     ),
     (
         "zeeshud",
-        include_str!("../../data/tf2hud-editor/zeeshud.json"),
+        include_str!("../../data/hud-schemas/zeeshud.json"),
     ),
 ];
 
@@ -204,10 +192,10 @@ pub(super) struct Control {
     pub(super) fields: SchemaValue,
 }
 
-/// One TF2HUD.Editor schema: the HUD's repo, its option folders and its grouped controls.
+/// One HUD option schema: the HUD's repo, its option folders and its grouped controls.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct EditorSchema {
+pub struct HudSchema {
     name: String,
     repo: Option<String>,
     customizations: Option<String>,
@@ -216,13 +204,13 @@ pub struct EditorSchema {
     controls: Vec<Control>,
 }
 
-impl EditorSchema {
+impl HudSchema {
     /// Strips `//` and `/* */` comments outside strings and a UTF-8 BOM, then parses.
     ///
     /// # Errors
     /// TooLarge past the byte, string or control cap; Malformed for anything that is no JSON
     /// object holding a `Controls` map of control lists.
-    pub fn parse(name: &str, bytes: &[u8]) -> Result<EditorSchema, SchemaError> {
+    pub fn parse(name: &str, bytes: &[u8]) -> Result<HudSchema, SchemaError> {
         if bytes.len() > MAX_SCHEMA_BYTES {
             return Err(SchemaError::TooLarge);
         }
@@ -276,7 +264,7 @@ impl EditorSchema {
         let repo = (root.get("Links").and_then(|l| l.get("GitHub")))
             .and_then(SchemaValue::as_str)
             .and_then(normalise_repo);
-        Ok(EditorSchema {
+        Ok(HudSchema {
             name: name.to_owned(),
             repo,
             customizations: text_at("CustomizationsFolder"),
@@ -384,22 +372,22 @@ pub fn normalise_repo(repo: &str) -> Option<String> {
 /// A set of schemas by name.
 #[derive(Debug, Clone, Default)]
 #[non_exhaustive]
-pub struct EditorSchemas {
-    schemas: BTreeMap<String, EditorSchema>,
+pub struct HudSchemas {
+    schemas: BTreeMap<String, HudSchema>,
 }
 
 /// The bundled set, parsed once.
-static BUNDLED_SET: LazyLock<EditorSchemas> = LazyLock::new(|| {
+static BUNDLED_SET: LazyLock<HudSchemas> = LazyLock::new(|| {
     let schemas = (BUNDLED.iter())
-        .filter_map(|(name, text)| EditorSchema::parse(name, text.as_bytes()).ok())
+        .filter_map(|(name, text)| HudSchema::parse(name, text.as_bytes()).ok())
         .map(|s| (s.name.clone(), s))
         .collect();
-    EditorSchemas { schemas }
+    HudSchemas { schemas }
 });
 
-impl EditorSchemas {
+impl HudSchemas {
     /// The schemas shipped with the app.
-    pub fn bundled() -> EditorSchemas {
+    pub fn bundled() -> HudSchemas {
         BUNDLED_SET.clone()
     }
 
@@ -409,12 +397,12 @@ impl EditorSchemas {
     }
 
     /// The schema called `name`.
-    pub fn for_name(&self, name: &str) -> Option<&EditorSchema> {
+    pub fn for_name(&self, name: &str) -> Option<&HudSchema> {
         self.schemas.get(name)
     }
 
     /// The schema whose GitHub link names `repo` (any URL or `owner/name` form).
-    pub fn for_repo(&self, repo: &str) -> Option<&EditorSchema> {
+    pub fn for_repo(&self, repo: &str) -> Option<&HudSchema> {
         let repo = normalise_repo(repo)?;
         self.schemas
             .values()
@@ -422,7 +410,7 @@ impl EditorSchemas {
     }
 
     /// This set with `schema` added, replacing one of the same name.
-    pub fn with(mut self, schema: EditorSchema) -> EditorSchemas {
+    pub fn with(mut self, schema: HudSchema) -> HudSchemas {
         self.schemas.insert(schema.name.clone(), schema);
         self
     }
@@ -491,7 +479,7 @@ type Literal = (KeyAt, String);
 /// A literal with the key of the choice that writes it.
 type ChoiceLiteral = (String, Literal);
 
-impl EditorSchema {
+impl HudSchema {
     /// The controls this build supports (the mapping table) whose every path fits the copy.
     pub fn options(&self, files: &HudFiles, platform: Platform) -> SchemaOptions {
         let mut fit = Fit {
@@ -661,7 +649,7 @@ impl Fit<'_> {
                 )
             }
             "combobox" | "dropdown" | "select" => {
-                // TF2HUD.Editor ignores a ComboBox's own Files, so such a control is left out.
+                // The schema format ignores a ComboBox's own Files, so such a control is left out.
                 if fields.get("Files").is_some() {
                     return Err(Refused::LeftOut);
                 }
@@ -700,7 +688,7 @@ impl Fit<'_> {
             default,
             actions,
             flag(fields.get("Restart")),
-            OptionSource::EditorSchema {
+            OptionSource::HudSchema {
                 schema: schema.to_owned(),
             },
         );
@@ -1028,7 +1016,7 @@ fn per_choice(literals: Vec<ChoiceLiteral>) -> Vec<OptionAction> {
 }
 
 /// The derived colours a ColorPicker writes: the item-rarity pair for an item key, then
-/// `Pulse`, or else `Shadow`, as TF2HUD.Editor writes only the pulse when both are set.
+/// `Pulse`, or else `Shadow`, as the schema format writes only the pulse when both are set.
 fn derived(fields: &SchemaValue, actions: &[OptionAction]) -> Vec<Derived> {
     let item = actions.iter().any(|a| match a {
         OptionAction::SetKey { key, .. } => is_item_colour(key),

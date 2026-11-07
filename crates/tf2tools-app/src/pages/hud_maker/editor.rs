@@ -1360,7 +1360,7 @@ impl HudEditor {
         (self.changes.iter())
             .filter(|c| match c.target() {
                 ChangeTarget::Option(o) => {
-                    [OptionChange::HUD, OptionChange::EDITOR].contains(&o.source())
+                    [OptionChange::HUD, OptionChange::SCHEMA].contains(&o.source())
                 }
                 _ => false,
             })

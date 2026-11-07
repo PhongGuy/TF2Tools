@@ -1,4 +1,4 @@
-//! A synthetic TF2HUD.Editor schema over the switch fixture copy.
+//! A synthetic HUD option schema over the switch fixture copy.
 
 pub const SCHEMA: &str = r##"{
   // a comment line
@@ -37,6 +37,6 @@ pub const SCHEMA: &str = r##"{
   }
 }"##;
 
-pub fn schema() -> tf2tools_core::EditorSchema {
-    tf2tools_core::EditorSchema::parse("somehud", SCHEMA.as_bytes()).unwrap()
+pub fn schema() -> tf2tools_core::HudSchema {
+    tf2tools_core::HudSchema::parse("somehud", SCHEMA.as_bytes()).unwrap()
 }

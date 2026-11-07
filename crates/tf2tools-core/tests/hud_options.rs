@@ -356,7 +356,7 @@ fn bad_option_choices_drop_and_count() {
         option(5, "nope", OptionValue::Bool(true)),
         Change::option(
             6,
-            OptionChange::new("editor_schema", "killfeed_rows", OptionValue::Int(6)),
+            OptionChange::new("hud_schema", "killfeed_rows", OptionValue::Int(6)),
         ),
         option(7, "killfeed_rows", OptionValue::Int(5)),
     ];

@@ -31,7 +31,7 @@ use crate::error::{
     LibraryError, MakeHudError, PaintError, PresetError, ProfileError, ReinstallError,
 };
 use crate::fonts::Platform;
-use crate::hud_maker::{EditorSchemas, HudFiles, HudOptions, MakerBase};
+use crate::hud_maker::{HudFiles, HudOptions, HudSchemas, MakerBase};
 use crate::paths::DataDir;
 use crate::tf2::Tf2Install;
 
@@ -67,8 +67,8 @@ pub struct Library {
     dir: DataDir,
     /// Free bytes on the disk holding a path; replaced in tests to simulate a full disk.
     free_space: fn(&Path) -> io::Result<u64>,
-    /// The TF2HUD.Editor schemas a copy's options are read with, matched by its base's repo.
-    hud_schemas: Arc<EditorSchemas>,
+    /// The HUD option schemas a copy's options are read with, matched by its base's repo.
+    hud_schemas: Arc<HudSchemas>,
     /// Held for the whole of a made HUD's save and a copy's update, so a save that checks the
     /// copy's base never interleaves with an update rewriting it.
     writes: Arc<Mutex<()>>,
@@ -81,7 +81,7 @@ impl Library {
             db,
             dir,
             free_space: crate::disk::free_bytes,
-            hud_schemas: Arc::new(EditorSchemas::bundled()),
+            hud_schemas: Arc::new(HudSchemas::bundled()),
             writes: Arc::new(Mutex::new(())),
         }
     }
@@ -93,7 +93,7 @@ impl Library {
     }
 
     /// Replaces the schemas copies are read with; the bundled set is the default.
-    pub fn set_hud_schemas(&mut self, schemas: EditorSchemas) {
+    pub fn set_hud_schemas(&mut self, schemas: HudSchemas) {
         self.hud_schemas = Arc::new(schemas);
     }
 

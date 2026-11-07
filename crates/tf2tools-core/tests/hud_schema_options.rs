@@ -40,7 +40,7 @@ fn each_supported_type_becomes_its_option_kind() {
     assert_eq!((tan.group(), tan.restart()), ("Colours", true));
     assert_eq!(
         tan.source(),
-        &OptionSource::EditorSchema {
+        &OptionSource::HudSchema {
             schema: "somehud".into()
         }
     );
@@ -122,7 +122,7 @@ fn refused_controls_are_counted_and_misfits_hidden() {
 fn files_keys_keep_their_order() {
     let text = r##"{ "Controls": { "A": [ { "Name": "k", "Label": "K", "Type": "CheckBox",
       "Files": { "resource/ui/basechat.res": { "HudChat": { "ypos": { "true": "0", "false": "275" }, "xpos": { "true": "0", "false": "10" } } } } } ] } }"##;
-    let got = tf2tools_core::EditorSchema::parse("x", text.as_bytes())
+    let got = tf2tools_core::HudSchema::parse("x", text.as_bytes())
         .unwrap()
         .options(&switch_files(&[]), Platform::Linux);
     let keys: Vec<&str> = spec(got.specs(), "e:k")
@@ -142,7 +142,7 @@ fn combo_literals_map_per_choice() {
       { "Label": "Low", "Value": "0", "Files": { "resource/ui/basechat.res": { "HudChat": { "ypos": "275" } } } },
       { "Label": "Top", "Value": "1", "Files": { "resource/ui/basechat.res": { "HudChat": { "ypos": "0" } } } },
       { "Label": "Mid", "Value": "2", "Files": { "resource/ui/basechat.res": { "HudChat": { "ypos": "100" } } } } ] } ] } }"##;
-    let got = tf2tools_core::EditorSchema::parse("x", text.as_bytes())
+    let got = tf2tools_core::HudSchema::parse("x", text.as_bytes())
         .unwrap()
         .options(&switch_files(&[]), Platform::Linux);
     let OptionAction::SetKey {
@@ -166,7 +166,7 @@ fn type_names_match_in_any_case() {
     let text = r##"{ "Controls": { "A": [
       { "Name": "a", "Label": "A", "Type": "checkbox", "Files": { "resource/ui/basechat.res": { "HudChat": { "ypos": { "true": "0", "false": "275" } } } } },
       { "Name": "b", "Label": "B", "Type": "COLOURPICKER", "Files": { "resource/clientscheme.res": { "Scheme": { "Colors": { "TanDark": "$value" } } } } } ] } }"##;
-    let got = tf2tools_core::EditorSchema::parse("x", text.as_bytes())
+    let got = tf2tools_core::HudSchema::parse("x", text.as_bytes())
         .unwrap()
         .options(&switch_files(&[]), Platform::Linux);
     let kinds: Vec<(&str, bool)> = got
@@ -184,7 +184,7 @@ fn a_colour_with_both_flags_derives_only_its_pulse_as_the_editor_does() {
         "Files": { "resource/clientscheme.res": { "Scheme": { "Colors": { "TanLight": "$value" } } } } },
       { "Name": "shadow", "Label": "Shadow", "Type": "ColorPicker", "Value": "1 2 3 255", "Shadow": true,
         "Files": { "resource/clientscheme.res": { "Scheme": { "Colors": { "TanDark": "$value" } } } } } ] } }"##;
-    let got = tf2tools_core::EditorSchema::parse("x", text.as_bytes())
+    let got = tf2tools_core::HudSchema::parse("x", text.as_bytes())
         .unwrap()
         .options(&switch_files(&[]), Platform::Linux);
     assert_eq!(
@@ -206,7 +206,7 @@ fn a_combo_with_control_level_files_is_left_out() {
     let text = r##"{ "Controls": { "A": [ { "Name": "c", "Label": "C", "Type": "ComboBox", "Value": "0",
       "Files": { "resource/ui/basechat.res": { "HudChat": { "ypos": "$value" } } },
       "Options": [ { "Label": "Low", "Value": "0" }, { "Label": "Top", "Value": "1" } ] } ] } }"##;
-    let got = tf2tools_core::EditorSchema::parse("x", text.as_bytes())
+    let got = tf2tools_core::HudSchema::parse("x", text.as_bytes())
         .unwrap()
         .options(&switch_files(&[]), Platform::Linux);
     assert!(got.specs().is_empty());
@@ -217,7 +217,7 @@ fn a_combo_with_control_level_files_is_left_out() {
 fn a_combo_whose_choices_all_write_nothing_is_left_out() {
     let text = r##"{ "Controls": { "A": [ { "Name": "c", "Label": "C", "Type": "ComboBox", "Value": "0",
       "Options": [ { "Label": "Low", "Value": "0" }, { "Label": "Top", "Value": "1" } ] } ] } }"##;
-    let got = tf2tools_core::EditorSchema::parse("x", text.as_bytes())
+    let got = tf2tools_core::HudSchema::parse("x", text.as_bytes())
         .unwrap()
         .options(&switch_files(&[]), Platform::Linux);
     assert!(got.specs().is_empty());
@@ -232,7 +232,7 @@ fn a_path_climbing_out_of_the_copy_is_refused_by_the_path_rule() {
         "Files": { "../../resource/ui/basechat.res": { "HudChat": { "ypos": { "true": "0", "false": "275" } } } } },
       { "Name": "m", "Label": "M", "Type": "CheckBox",
         "RenameFile": { "OldName": "customizations/streamermode_/", "NewName": "../../streamermode/" } } ] } }"##;
-    let got = tf2tools_core::EditorSchema::parse("x", text.as_bytes())
+    let got = tf2tools_core::HudSchema::parse("x", text.as_bytes())
         .unwrap()
         .options(&switch_files(&[]), Platform::Linux);
     assert!(
