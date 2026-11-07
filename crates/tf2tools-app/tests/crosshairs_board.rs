@@ -35,6 +35,20 @@ fn toast_text(cx: &mut TestAppContext, s: &support::ShellWindow) -> String {
     support::label_of(cx, s.win, ids::TOAST).unwrap()
 }
 
+/// Waits for the board change and the apply it starts to finish, so the table is final.
+fn wait_saved(cx: &mut TestAppContext, s: &support::ShellWindow) {
+    let sync = cx
+        .update(|cx| tf2tools_app::crosshair_sync::CrosshairSync::global(cx))
+        .expect("the apply queue");
+    support::wait_real(cx, "the save", |cx| {
+        cx.update(|cx| {
+            let sync = sync.read(cx);
+            sync.finished() >= 1 && !sync.is_saving()
+        })
+    });
+    support::settle(cx, s.win);
+}
+
 fn sorted_scripts(s: &support::ShellWindow) -> Vec<String> {
     let mut scripts: Vec<String> = s
         .services
@@ -150,10 +164,7 @@ fn clicking_a_cell_assigns_the_selection_to_its_weapons(cx: &mut TestAppContext)
         s.win,
         ids::loadout_cell(TfClass::Scout, WeaponSlot::Primary),
     );
-    assert_eq!(
-        toast_text(cx, &s),
-        "Crosshair applied to all Scout primary weapons"
-    );
+    wait_saved(cx, &s);
     assert_eq!(sorted_scripts(&s), sorted(target));
     support::wait_real(cx, "the reload", |cx| {
         cell_label(cx, &s, TfClass::Scout, WeaponSlot::Primary).as_deref() == Some(name.as_str())
@@ -167,10 +178,7 @@ fn a_class_header_assigns_the_whole_class(cx: &mut TestAppContext) {
     let _page = open(cx, &s);
     select_first(cx, &s);
     support::click_id(cx, s.win, ids::loadout_class(TfClass::Soldier));
-    assert_eq!(
-        toast_text(cx, &s),
-        "Crosshair applied to all Soldier weapons"
-    );
+    wait_saved(cx, &s);
     assert_eq!(
         sorted_scripts(&s),
         sorted(BoardTarget::Class(TfClass::Soldier))
@@ -184,10 +192,7 @@ fn a_slot_header_assigns_that_slot_for_every_class(cx: &mut TestAppContext) {
     let _page = open(cx, &s);
     select_first(cx, &s);
     support::click_id(cx, s.win, ids::loadout_slot(WeaponSlot::Melee));
-    assert_eq!(
-        toast_text(cx, &s),
-        "Crosshair applied to every class's melee weapons"
-    );
+    wait_saved(cx, &s);
     assert_eq!(
         sorted_scripts(&s),
         sorted(BoardTarget::Slot(WeaponSlot::Melee))
@@ -201,7 +206,7 @@ fn everything_assigns_every_weapon(cx: &mut TestAppContext) {
     let _page = open(cx, &s);
     select_first(cx, &s);
     support::click_id(cx, s.win, ids::CROSSHAIRS_BOARD_EVERYTHING);
-    assert_eq!(toast_text(cx, &s), "Crosshair applied to every weapon");
+    wait_saved(cx, &s);
     assert_eq!(sorted_scripts(&s), sorted(BoardTarget::Everything));
 }
 
@@ -301,7 +306,7 @@ fn a_weapon_row_assigns_one_weapon(cx: &mut TestAppContext) {
     );
     let script = BoardTarget::Cell(TfClass::Scout, WeaponSlot::Primary).scripts()[0];
     support::click_id(cx, s.win, ids::weapon_row(script));
-    assert_eq!(toast_text(cx, &s), "Crosshair assigned");
+    wait_saved(cx, &s);
     assert_eq!(sorted_scripts(&s), [script]);
     support::wait_real(cx, "the reload", |cx| {
         support::label_of(cx, s.win, ids::weapon_assigned(script)).as_deref() == Some(name.as_str())
@@ -321,10 +326,7 @@ fn reset_takes_a_cell_back_to_the_game_crosshair(cx: &mut TestAppContext) {
         ids::loadout_cell_menu(TfClass::Scout, WeaponSlot::Primary),
     );
     support::click_id(cx, s.win, ids::CROSSHAIRS_DETAILS_RESET);
-    assert_eq!(
-        toast_text(cx, &s),
-        "Reset all Scout primary weapons to the game's crosshair"
-    );
+    wait_saved(cx, &s);
     let mut expected = sorted(BoardTarget::Class(TfClass::Scout));
     let primaries = sorted(BoardTarget::Cell(TfClass::Scout, WeaponSlot::Primary));
     expected.retain(|s| !primaries.contains(s));
@@ -345,44 +347,11 @@ fn dragging_a_crosshair_onto_a_cell_assigns_it(cx: &mut TestAppContext) {
         w.drag_to(ids::crosshair_builtin(first.name()), cell, cx)
     })
     .unwrap();
-    assert_eq!(
-        toast_text(cx, &s),
-        "Crosshair applied to all Heavy melee weapons"
-    );
+    wait_saved(cx, &s);
     assert_eq!(
         sorted_scripts(&s),
         sorted(BoardTarget::Cell(TfClass::Heavy, WeaponSlot::Melee))
     );
-}
-
-#[gpui_kit::test]
-fn the_bar_counts_changes_until_they_are_installed(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let (first, _) = first_builtin(&s);
-    assign(
-        &s,
-        BoardTarget::Cell(TfClass::Heavy, WeaponSlot::Primary),
-        &first,
-    );
-    let waiting = BoardTarget::Cell(TfClass::Heavy, WeaponSlot::Primary)
-        .scripts()
-        .len();
-    let _page = open(cx, &s);
-    let line = if waiting == 1 {
-        "1 change not in TF2 yet".to_owned()
-    } else {
-        format!("{waiting} changes not in TF2 yet")
-    };
-    assert_eq!(
-        support::label_of(cx, s.win, ids::CROSSHAIRS_WAITING),
-        Some(line)
-    );
-    support::click_id(cx, s.win, ids::CROSSHAIRS_INSTALL);
-    support::wait_real(cx, "the install", |cx| {
-        support::label_of(cx, s.win, ids::CROSSHAIRS_WAITING).as_deref()
-            == Some("Your crosshairs are in TF2")
-    });
 }
 
 #[gpui_kit::test]

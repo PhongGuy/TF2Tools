@@ -1,10 +1,9 @@
 //! The Crosshairs page: a gallery of crosshair tiles, a large in-game-size preview, and a
-//! loadout board of class columns and slot rows that assigns by click or drag. A bar counts
-//! the changes not in TF2 yet beside Install; each cell opens its per-weapon list.
+//! loadout board of class columns and slot rows that assigns by click or drag. Every change
+//! saves into TF2 on its own through `CrosshairSync`; each cell opens its per-weapon list.
 
 use std::cell::Cell;
 use std::rc::Rc;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gpui_kit::assets::IconName;
@@ -24,14 +23,15 @@ use gpui_kit::{
 };
 
 use tf2tools_core::{
-    ApplyReport, Assignment, BuiltinCrosshairs, CrosshairEntry, CrosshairFormat, CrosshairId,
-    CrosshairRef, InstalledCrosshairs, LibraryError, LogLevel, NewLogEntry, Provenance, SkipReason,
-    TfClass, WeaponSlot, write_png,
+    ApplyReport, Assignment, CrosshairEntry, CrosshairFormat, CrosshairId, CrosshairRef,
+    InstalledCrosshairs, LibraryError, LogLevel, NewLogEntry, Provenance, SkipReason, TfClass,
+    WeaponSlot, write_png,
 };
 
 use super::common::{SM_ICON_PX, YELLOW_500, needs_tf2, no_tf2_notice};
 use crate::activity;
 use crate::assets::BACKGROUNDS;
+use crate::crosshair_sync::{CrosshairSync, SyncStatus};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::loadout::{BoardTarget, CellState, Loadout, SLOTS};
@@ -77,7 +77,6 @@ const EXPORT_FAILED: &str = "Failed to export PNG";
 enum Busy {
     Import,
     Export,
-    Install,
     Uninstall,
     Delete,
     /// Assigning to the weapon with this script.
@@ -111,9 +110,8 @@ pub struct CopyToMaker(pub CrosshairRef);
 /// The Crosshairs page. Built fresh on each visit; it reloads whenever the TF2 state changes.
 pub struct CrosshairsPage {
     win: AnyWindowHandle,
-    builtins: Arc<BuiltinCrosshairs>,
     assignments: Vec<Assignment>,
-    /// The board's view of `assignments` and of what an Install would change.
+    /// The board's view of `assignments` and of what an apply would change.
     loadout: Loadout,
     installed: Option<InstalledCrosshairs>,
     /// The picker's selection, mirrored on each of its notifies so `selected` needs no `cx`.
@@ -134,6 +132,11 @@ pub struct CrosshairsPage {
     timings: PageTimings,
     picker: Entity<CrosshairPicker>,
     assigner: Entity<WeaponAssigner>,
+    /// The app's apply queue, whose status the page's line shows.
+    sync: Entity<CrosshairSync>,
+    /// The queue's finished count the page last reloaded for.
+    sync_seen: usize,
+    _sync: Subscription,
     /// The picker's search box and list scroll, held so their accessors need no `cx`.
     search: Entity<InputState>,
     picker_scroll: ScrollHandle,
@@ -218,10 +221,19 @@ impl CrosshairsPage {
         let backgrounds: Vec<&'static str> = std::iter::once(PLAIN).chain(BACKGROUNDS).collect();
         let background =
             cx.new(|cx| SelectState::new(backgrounds, Some(IndexPath::default()), window, cx));
-        let builtins = cx.global::<Services>().builtins.clone();
+        // Each finished apply changes what is in the game, so the page reloads its scan.
+        let sync = CrosshairSync::get_or_install(window.window_handle(), cx);
+        let observe_sync = cx.observe(&sync, |page: &mut Self, sync, cx| {
+            let finished = sync.read(cx).finished();
+            if finished != page.sync_seen {
+                page.sync_seen = finished;
+                page.reload(cx);
+            }
+            cx.notify();
+        });
+        let sync_seen = sync.read(cx).finished();
         let mut page = Self {
             win: window.window_handle(),
-            builtins,
             assignments: Vec::new(),
             loadout: Loadout::default(),
             installed: None,
@@ -238,6 +250,9 @@ impl CrosshairsPage {
             timings: PageTimings::default(),
             picker,
             assigner,
+            sync,
+            sync_seen,
+            _sync: observe_sync,
             search,
             picker_scroll,
             background,
@@ -421,12 +436,13 @@ impl CrosshairsPage {
         .detach();
     }
 
-    // Marks `busy`, runs `op` in `run_blocking`, toasts its outcome on success or
-    // `toast_error` on failure through the window handle, then clears `busy` and reloads.
+    // Marks `busy`, runs `op` in `run_blocking`, toasts its outcome (if any) on success or
+    // `toast_error` on failure through the window handle, then clears `busy` and reloads. A
+    // changed assignment asks the apply queue to bring the game up to date.
     fn run(
         &mut self,
         busy: Busy,
-        op: impl FnOnce(&Services) -> Result<Outcome, OpError> + Send + 'static,
+        op: impl FnOnce(&Services) -> Result<Option<Outcome>, OpError> + Send + 'static,
         cx: &mut Context<Self>,
     ) {
         self.set_busy(Some(busy), cx);
@@ -437,13 +453,27 @@ impl CrosshairsPage {
             let ok = done.is_ok();
             cx.update(|cx| {
                 let _ = win.update(cx, |_, window, cx| match done {
-                    Ok((kind, title, description)) => toast(window, cx, kind, title, description),
+                    Ok(Some((kind, title, description))) => {
+                        toast(window, cx, kind, title, description)
+                    }
+                    Ok(None) => {}
                     Err(err) => toast_error(window, cx, &err),
                 });
                 // Outside the page, so a success is announced even when the page is gone; a
                 // surviving page reloads through its own LibraryChanged subscription.
                 if ok {
                     LibraryEvents::changed(cx);
+                    match busy {
+                        Busy::Assign(_) | Busy::Board(_) | Busy::Reset(_) => {
+                            CrosshairSync::request_global(cx)
+                        }
+                        Busy::Uninstall => {
+                            if let Some(sync) = CrosshairSync::global(cx) {
+                                sync.update(cx, |sync, cx| sync.mark_removed(cx));
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             });
             let _ = page.update(cx, |page, cx| {
@@ -489,11 +519,11 @@ impl CrosshairsPage {
                         );
                         activity::write(s, &entry);
                         let added = added_message(&crosshair);
-                        Ok((
+                        Ok(Some((
                             ToastKind::Success,
                             "Crosshair imported".into(),
                             added.into(),
-                        ))
+                        )))
                     },
                     cx,
                 ),
@@ -528,12 +558,12 @@ impl CrosshairsPage {
                         let target = with_extension(path.clone(), "png");
                         if target != path && target.exists() {
                             let name = target.file_name().unwrap_or_default().to_string_lossy();
-                            return Ok((
+                            return Ok(Some((
                                 ToastKind::Warning,
                                 format!("A file named {name} is already there. Pick another name.")
                                     .into(),
                                 SharedString::default(),
-                            ));
+                            )));
                         }
                         let drawing = s
                             .library
@@ -541,11 +571,11 @@ impl CrosshairsPage {
                             .map_err(|e| describe_library(&e).into_op(EXPORT_FAILED))?;
                         write_png(&target, &drawing)
                             .map_err(|e| describe_png_write(&e).into_op(EXPORT_FAILED))?;
-                        Ok((
+                        Ok(Some((
                             ToastKind::Success,
                             "PNG exported".into(),
                             SharedString::default(),
-                        ))
+                        )))
                     },
                     cx,
                 ),
@@ -553,38 +583,6 @@ impl CrosshairsPage {
             });
         })
         .detach();
-    }
-
-    // Rebuilds the managed folder from the assignments; skipped rows turn the toast into a
-    // Warning that lists them.
-    fn install(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let tf2 = match require_tf2(cx) {
-            Ok(tf2) => tf2,
-            Err(err) => return toast_error(window, cx, &err),
-        };
-        let builtins = self.builtins.clone();
-        self.run(
-            Busy::Install,
-            move |s| {
-                let report = s.library.apply_crosshairs(&tf2, &builtins).map_err(|e| {
-                    describe_tf2_install(&e).into_op("Failed to install crosshairs")
-                })?;
-                // v5 logs an install only when it wrote at least one weapon script.
-                if !report.applied().is_empty() {
-                    let dest = tf2.custom_dir().join("tf2tools-crosshairs");
-                    tracing::info!(destination = %dest.display(), "installed crosshairs");
-                    let entry = NewLogEntry::new(
-                        LogLevel::Info,
-                        "crosshair",
-                        "install",
-                        format!("Installed {} crosshair assignments", report.applied().len()),
-                    );
-                    activity::write(s, &entry);
-                }
-                Ok(install_outcome(&report))
-            },
-            cx,
-        );
     }
 
     // Removes the managed folder; the assignments stay, as v5.
@@ -607,7 +605,11 @@ impl CrosshairsPage {
                 );
                 activity::write(s, &entry);
                 let done = "Crosshairs uninstalled from TF2";
-                Ok((ToastKind::Success, done.into(), SharedString::default()))
+                Ok(Some((
+                    ToastKind::Success,
+                    done.into(),
+                    SharedString::default(),
+                )))
             },
             cx,
         );
@@ -653,11 +655,11 @@ impl CrosshairsPage {
                             NewLogEntry::new(LogLevel::Info, "crosshair", "delete", message);
                         activity::write(s, &entry);
                         let deleted = format!("{name} has been deleted from your library");
-                        Ok((
+                        Ok(Some((
                             ToastKind::Success,
                             "Crosshair removed".into(),
                             deleted.into(),
-                        ))
+                        )))
                     },
                     cx,
                 );
@@ -677,8 +679,7 @@ impl CrosshairsPage {
                 s.library
                     .assign(script, &crosshair)
                     .map_err(|e| describe_library(&e).into_op("Failed to assign crosshair"))?;
-                let done = "Crosshair assigned";
-                Ok((ToastKind::Success, done.into(), SharedString::default()))
+                Ok(None)
             },
             cx,
         );
@@ -700,7 +701,6 @@ impl CrosshairsPage {
             let none = "Pick a crosshair first";
             return toast(window, cx, ToastKind::Error, none, SharedString::default());
         };
-        let done = format!("Crosshair applied to {}", target.describe());
         let scripts = target.scripts();
         self.run(
             Busy::Board(target),
@@ -708,7 +708,7 @@ impl CrosshairsPage {
                 s.library
                     .assign_many(&scripts, &crosshair)
                     .map_err(|e| describe_library(&e).into_op("Failed to assign crosshairs"))?;
-                Ok((ToastKind::Success, done.into(), SharedString::default()))
+                Ok(None)
             },
             cx,
         );
@@ -719,7 +719,6 @@ impl CrosshairsPage {
         if self.busy.is_some() {
             return;
         }
-        let done = format!("Reset {} to the game's crosshair", target.describe());
         let scripts = target.scripts();
         self.run(
             Busy::Reset(target),
@@ -727,7 +726,7 @@ impl CrosshairsPage {
                 s.library
                     .unassign_many(&scripts)
                     .map_err(|e| describe_library(&e).into_op("Failed to reset crosshairs"))?;
-                Ok((ToastKind::Success, done.into(), SharedString::default()))
+                Ok(None)
             },
             cx,
         );
@@ -807,95 +806,51 @@ impl CrosshairsPage {
         self.picker.read(cx).name_of(crosshair)
     }
 
-    // The bar over the page: what TF2 has now against the board, with Install beside it, and
-    // amber while some change has not reached the game.
+    // The quiet line over the page: where the last change stands in TF2, and a ghost button
+    // that takes every crosshair out of the game while keeping the board.
     fn status_bar(&self, cx: &mut Context<Self>) -> AnyElement {
         let has_tf2 = tf2_state(cx).read(cx).install().is_some();
-        let waiting = self.loadout.waiting_count();
-        let line = if !has_tf2 {
-            "TF2 not found, so nothing can be installed yet".to_owned()
-        } else if waiting == 0 && self.assignments.is_empty() {
-            "TF2 is using its own crosshairs".to_owned()
-        } else {
-            Loadout::waiting_line(waiting)
-        };
+        let sync = self.sync.read(cx);
+        let (status, saving) = (sync.status().clone(), sync.is_saving());
+        let line = status.line(!self.assignments.is_empty(), self.loadout.waiting_count());
         let theme = cx.theme();
-        let amber: Hsla = rgb(YELLOW_500).into();
-        let (border, bg, icon, icon_colour) = if has_tf2 && waiting > 0 {
-            (
-                amber.opacity(0.5),
-                amber.opacity(0.08),
-                IconName::TriangleAlert,
-                amber,
-            )
-        } else {
-            (
-                theme.border,
-                gpui_kit::transparent_black(),
-                IconName::Check,
-                theme.muted_foreground,
-            )
+        let muted = theme.muted_foreground;
+        let icon = match status {
+            SyncStatus::Saving => IconName::Loader,
+            SyncStatus::Skipped(_) | SyncStatus::Failed => IconName::TriangleAlert,
+            _ => IconName::Check,
         };
-        let installing = self.busy == Some(Busy::Install);
         let removing = self.busy == Some(Busy::Uninstall);
         h_flex()
             .id(ids::CROSSHAIRS_STATUS)
             .test_support()
-            .flex_wrap()
-            .gap_3()
-            .px_4()
-            .py_2()
-            .rounded_lg()
-            .border_1()
-            .border_color(border)
-            .bg(bg)
+            .gap_2()
+            .min_h(px(32.))
             .child(
                 Icon::new(icon)
-                    .with_size(Size::Size(px(16.)))
-                    .text_color(icon_colour),
+                    .with_size(Size::Size(px(14.)))
+                    .text_color(muted),
             )
             .child(labelled(
-                div().text_sm().font_weight(FontWeight::MEDIUM),
+                div().flex_1().min_w_0().text_sm().text_color(muted),
                 ids::CROSSHAIRS_WAITING,
                 line,
             ))
-            .child(
-                h_flex()
-                    .ml_auto()
-                    .gap_2()
-                    .child(needs_tf2(
-                        Button::new(ids::CROSSHAIRS_UNINSTALL)
-                            .ghost()
-                            .small()
-                            .icon(IconName::Unplug)
-                            .label(if removing {
-                                "Removing..."
-                            } else {
-                                "Remove from TF2"
-                            })
-                            .loading(removing)
-                            .disabled(self.busy.is_some() && !removing)
-                            .on_click(
-                                cx.listener(|page, _, window, cx| page.uninstall(window, cx)),
-                            ),
-                        has_tf2,
-                    ))
-                    .child(needs_tf2(
-                        Button::new(ids::CROSSHAIRS_INSTALL)
-                            .primary()
-                            .small()
-                            .icon(IconName::Download)
-                            .label(if installing {
-                                "Installing..."
-                            } else {
-                                "Install to TF2"
-                            })
-                            .loading(installing)
-                            .disabled(self.busy.is_some() && !installing)
-                            .on_click(cx.listener(|page, _, window, cx| page.install(window, cx))),
-                        has_tf2,
-                    )),
-            )
+            .child(needs_tf2(
+                Button::new(ids::CROSSHAIRS_UNINSTALL)
+                    .ghost()
+                    .small()
+                    .icon(IconName::Unplug)
+                    .label(if removing {
+                        "Removing..."
+                    } else {
+                        "Remove from TF2"
+                    })
+                    .loading(removing)
+                    .disabled((self.busy.is_some() || saving) && !removing)
+                    .on_click(cx.listener(|page, _, window, cx| page.uninstall(window, cx))),
+                has_tf2,
+            ))
             .into_any_element()
     }
 
@@ -1202,8 +1157,7 @@ impl CrosshairsPage {
 
     // One board cell: the shared crosshair's drawing and name, "Mixed", or "Default" while
     // the game draws its own. A click or a drop assigns; a right-click or the corner button
-    // opens its per-weapon list. An amber dot marks a change not in TF2 yet; cells that use
-    // the selection are ringed.
+    // opens its per-weapon list. Cells that use the selection are ringed.
     fn cell(&self, class: TfClass, slot: WeaponSlot, cx: &mut Context<Self>) -> AnyElement {
         let state = self.loadout.cell(class, slot);
         let label = match &state {
@@ -1243,15 +1197,6 @@ impl CrosshairsPage {
         );
         let target = BoardTarget::Cell(class, slot);
         let running = matches!(self.busy, Some(Busy::Board(t) | Busy::Reset(t)) if t == target);
-        let waiting = self.loadout.cell_waiting(class, slot).then(|| {
-            div()
-                .absolute()
-                .top(px(5.))
-                .left(px(5.))
-                .size(px(6.))
-                .rounded_full()
-                .bg(rgb(YELLOW_500))
-        });
         let menu = div()
             .id(ids::loadout_cell_menu(class, slot))
             .aria_label(format!(
@@ -1340,7 +1285,6 @@ impl CrosshairsPage {
                     })
                     .child(label),
             )
-            .children(waiting)
             .child(menu)
             .into_any_element()
     }
@@ -1418,15 +1362,6 @@ pub(crate) fn added_message(crosshair: &CrosshairEntry) -> String {
     match crosshair.wanted_name() {
         Some(_) => format!("Added to your library as {}", crosshair.name()),
         None => format!("{} added to your library", crosshair.name()),
-    }
-}
-
-// v5's toast for an apply: Success, or a Warning naming each skipped assignment and why.
-fn install_outcome(report: &ApplyReport) -> Outcome {
-    let title: SharedString = "Crosshairs installed to TF2".into();
-    match skipped_description(report) {
-        None => (ToastKind::Success, title, SharedString::default()),
-        Some(description) => (ToastKind::Warning, title, description.into()),
     }
 }
 

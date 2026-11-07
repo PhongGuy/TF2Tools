@@ -395,41 +395,6 @@ fn toast_text(cx: &mut TestAppContext, s: &support::ShellWindow) -> String {
     support::label_of(cx, s.win, ids::TOAST).unwrap()
 }
 
-#[gpui_kit::test]
-fn install_writes_the_assignments(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let first = s.services.builtins.all()[0].name().to_owned();
-    s.services
-        .library
-        .assign("tf_weapon_scattergun", &CrosshairRef::Builtin(first))
-        .unwrap();
-    let _page = open_crosshairs(cx, &s);
-    support::click_id(cx, s.win, ids::CROSSHAIRS_INSTALL);
-    assert_eq!(toast_text(cx, &s), "Crosshairs installed to TF2");
-    assert!(
-        managed(&env)
-            .join("scripts/tf_weapon_scattergun.txt")
-            .is_file()
-    );
-}
-
-#[gpui_kit::test]
-fn install_lists_skipped_assignments_in_a_warning(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    s.services
-        .library
-        .assign("tf_weapon_bat", &CrosshairRef::Builtin("nope".into()))
-        .unwrap();
-    let _page = open_crosshairs(cx, &s);
-    support::click_id(cx, s.win, ids::CROSSHAIRS_INSTALL);
-    assert_eq!(
-        toast_text(cx, &s),
-        "Crosshairs installed to TF2. Skipped 1: tf_weapon_bat (unknown builtin nope)"
-    );
-}
-
 // Sets the shared TF2 state, as Settings or a recheck would.
 fn set_tf2(cx: &mut TestAppContext, s: &support::ShellWindow, state: Tf2State) {
     cx.update(|cx| {
@@ -447,7 +412,7 @@ fn without_tf2_the_page_warns_and_shuts_installs(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     let _page = open_crosshairs(cx, &s);
     assert!(support::present(cx, s.win, ids::CROSSHAIRS_NO_TF2));
-    assert!(support::disabled_of(cx, s.win, ids::CROSSHAIRS_INSTALL));
+    assert!(!support::present(cx, s.win, ids::CROSSHAIRS_INSTALL));
     assert!(support::disabled_of(cx, s.win, ids::CROSSHAIRS_UNINSTALL));
     assert!(!support::disabled_of(cx, s.win, ids::CROSSHAIRS_IMPORT));
     support::click_id(cx, s.win, ids::CROSSHAIRS_NO_TF2_SETTINGS);
@@ -463,7 +428,6 @@ fn finding_tf2_clears_the_warning_and_opens_installs(cx: &mut TestAppContext) {
     assert!(support::present(cx, s.win, ids::CROSSHAIRS_NO_TF2));
     set_tf2(cx, &s, found(&env));
     assert!(!support::present(cx, s.win, ids::CROSSHAIRS_NO_TF2));
-    assert!(!support::disabled_of(cx, s.win, ids::CROSSHAIRS_INSTALL));
     assert!(!support::disabled_of(cx, s.win, ids::CROSSHAIRS_UNINSTALL));
 }
 
@@ -525,7 +489,7 @@ fn select_first_builtin(cx: &mut TestAppContext, s: &support::ShellWindow) -> St
 }
 
 #[gpui_kit::test]
-fn copy_and_export_wait_for_an_import_install_or_uninstall(cx: &mut TestAppContext) {
+fn copy_and_export_wait_for_an_import_or_uninstall(cx: &mut TestAppContext) {
     let env = support::env();
     let path = env.tmp.path().join("Ring.png");
     std::fs::write(&path, support::crosshair_png([255, 0, 0, 255])).unwrap();
@@ -538,11 +502,7 @@ fn copy_and_export_wait_for_an_import_install_or_uninstall(cx: &mut TestAppConte
         s.win,
         ids::CROSSHAIRS_COPY_TO_MAKER
     ));
-    for action in [
-        ids::CROSSHAIRS_IMPORT,
-        ids::CROSSHAIRS_INSTALL,
-        ids::CROSSHAIRS_UNINSTALL,
-    ] {
+    for action in [ids::CROSSHAIRS_IMPORT, ids::CROSSHAIRS_UNINSTALL] {
         // Click and draw before the executor runs the job, so the frame shows it running.
         let disabled = cx
             .update_window(s.win, |_, w, cx| {
@@ -627,7 +587,9 @@ fn clicking_a_row_assigns_the_selected_crosshair(cx: &mut TestAppContext) {
     let weapon = of_class(TfClass::Scout)[0];
     open_weapons(cx, &s, weapon);
     support::click_id(cx, s.win, ids::weapon_row(weapon.script_name()));
-    assert_eq!(toast_text(cx, &s), "Crosshair assigned");
+    support::wait_real(cx, "the save", |_| {
+        s.services.library.assignments().unwrap().len() == 1
+    });
     let assignments = s.services.library.assignments().unwrap();
     assert_eq!(assignments.len(), 1);
     assert_eq!(assignments[0].weapon_script(), weapon.script_name());
@@ -740,7 +702,14 @@ fn crosshair_operations_write_v5s_rows(cx: &mut TestAppContext) {
     };
     support::click_id(cx, s.win, ids::CROSSHAIRS_IMPORT);
     rows_then_revisit(cx, 1);
-    support::click_id(cx, s.win, ids::CROSSHAIRS_INSTALL);
+    // A per-weapon pick saves into TF2 on its own, which logs the install.
+    select_first_builtin(cx, &s);
+    let scattergun = weapons()
+        .iter()
+        .find(|w| w.script_name() == "tf_weapon_scattergun")
+        .unwrap();
+    open_weapons(cx, &s, scattergun);
+    support::click_id(cx, s.win, ids::weapon_row("tf_weapon_scattergun"));
     rows_then_revisit(cx, 2);
     support::click_id(cx, s.win, ids::CROSSHAIRS_UNINSTALL);
     support::wait_real(cx, "the row", |_| support::log_rows(&s.services).len() == 3);
@@ -781,56 +750,25 @@ fn a_library_change_reloads_the_open_page(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn an_install_that_ends_after_leaving_still_announces_the_change(cx: &mut TestAppContext) {
+fn a_save_that_ends_after_leaving_still_reaches_the_game(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
-    let first = s.services.builtins.all()[0].name().to_owned();
-    s.services
-        .library
-        .assign("tf_weapon_scattergun", &CrosshairRef::Builtin(first))
-        .unwrap();
     let page = open_crosshairs(cx, &s);
-    let (count, _sub) = support::library_changes(cx);
-    // Start the install and leave in one update, so the page is gone when the task resumes.
+    select_first_builtin(cx, &s);
+    // Assign and leave in one update, so the page is gone when the apply runs.
     cx.update_window(s.win, |_, window, cx| {
-        window.click(ids::CROSSHAIRS_INSTALL, cx);
+        window.click(ids::loadout_cell(TfClass::Scout, WeaponSlot::Primary), cx);
         s.shell
             .update(cx, |shell, cx| shell.navigate(Page::Huds, cx));
     })
     .unwrap();
     drop(page);
-    support::wait_real(cx, "the install toast", |cx| {
-        support::present(cx, s.win, ids::TOAST)
+    support::wait_real(cx, "the apply", |_| {
+        managed(&env)
+            .join("scripts/tf_weapon_scattergun.txt")
+            .is_file()
     });
     assert!(cx.update(|cx| s.shell.read(cx).crosshairs_page()).is_none());
-    assert_eq!(count.get(), 1);
-}
-
-#[cfg(unix)]
-#[gpui_kit::test]
-fn a_failed_install_announces_no_change(cx: &mut TestAppContext) {
-    use std::os::unix::fs::PermissionsExt as _;
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let first = s.services.builtins.all()[0].name().to_owned();
-    s.services
-        .library
-        .assign("tf_weapon_scattergun", &CrosshairRef::Builtin(first))
-        .unwrap();
-    let _page = open_crosshairs(cx, &s);
-    let (count, _sub) = support::library_changes(cx);
-    let custom = env.game.join("tf/custom");
-    std::fs::set_permissions(&custom, std::fs::Permissions::from_mode(0o555)).unwrap();
-    // Root ignores the mode, so the install could not fail; nothing to test then.
-    if std::fs::write(custom.join("probe"), b"").is_ok() {
-        std::fs::set_permissions(&custom, std::fs::Permissions::from_mode(0o755)).unwrap();
-        return;
-    }
-    support::click_id(cx, s.win, ids::CROSSHAIRS_INSTALL);
-    let toast = toast_text(cx, &s);
-    std::fs::set_permissions(&custom, std::fs::Permissions::from_mode(0o755)).unwrap();
-    assert!(toast.starts_with("Failed to install crosshairs"), "{toast}");
-    assert_eq!(count.get(), 0);
 }
 
 /// Finds `entry` through the search box, since the list builds only its visible rows, and
@@ -934,7 +872,7 @@ fn only_library_crosshairs_can_be_deleted(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn delete_waits_for_a_running_install(cx: &mut TestAppContext) {
+fn delete_waits_for_a_running_removal(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let zebra = support::seed_crosshair(&s.services, &env, "Zebra");
@@ -943,13 +881,13 @@ fn delete_waits_for_a_running_install(cx: &mut TestAppContext) {
     // Click and draw before the executor runs the job, so the frame shows it running.
     let disabled = cx
         .update_window(s.win, |_, w, cx| {
-            w.click(ids::CROSSHAIRS_INSTALL, cx);
+            w.click(ids::CROSSHAIRS_UNINSTALL, cx);
             w.render_frame(cx);
             support::button_disabled(w, ids::CROSSHAIRS_DELETE)
         })
         .unwrap();
     assert!(disabled);
-    support::wait_real(cx, "the install", |cx| {
+    support::wait_real(cx, "the removal", |cx| {
         !support::disabled_of(cx, s.win, ids::CROSSHAIRS_DELETE)
     });
 }

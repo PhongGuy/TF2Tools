@@ -185,22 +185,14 @@ fn assigning_a_target_fills_every_cell_it_covers() {
 }
 
 #[test]
-fn the_waiting_count_is_the_weapons_an_install_would_change() {
-    let primaries = scripts_of(TfClass::Scout, Some(WeaponSlot::Primary));
+fn the_waiting_count_is_the_weapons_an_apply_would_change() {
     let board = Loadout::new(
         Vec::new(),
-        vec![primaries[0].to_owned(), "tf_weapon_minigun".to_owned()],
+        vec![
+            "tf_weapon_scattergun".to_owned(),
+            "tf_weapon_minigun".to_owned(),
+        ],
     );
     assert_eq!(board.waiting_count(), 2);
-    assert!(board.cell_waiting(TfClass::Scout, WeaponSlot::Primary));
-    assert!(board.cell_waiting(TfClass::Heavy, WeaponSlot::Primary));
-    assert!(!board.cell_waiting(TfClass::Scout, WeaponSlot::Melee));
     assert_eq!(loadout(&[]).waiting_count(), 0);
-}
-
-#[test]
-fn the_waiting_line_names_the_count() {
-    assert_eq!(Loadout::waiting_line(1), "1 change not in TF2 yet");
-    assert_eq!(Loadout::waiting_line(5), "5 changes not in TF2 yet");
-    assert_eq!(Loadout::waiting_line(0), "Your crosshairs are in TF2");
 }

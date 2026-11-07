@@ -1,5 +1,5 @@
 //! The Crosshairs page's loadout board model: one cell per class and slot, the weapons each
-//! board click targets, and which weapons wait for an Install. UI-free, so it tests alone.
+//! board click targets, and how many weapons differ from what is in the game. UI-free, so it tests alone.
 
 use std::collections::{HashMap, HashSet};
 
@@ -132,22 +132,5 @@ impl Loadout {
     /// How many weapons an Install would change.
     pub fn waiting_count(&self) -> usize {
         self.waiting.len()
-    }
-
-    /// Whether an Install would change any weapon in the cell.
-    pub fn cell_waiting(&self, class: TfClass, slot: WeaponSlot) -> bool {
-        BoardTarget::Cell(class, slot)
-            .scripts()
-            .iter()
-            .any(|s| self.waiting.contains(*s))
-    }
-
-    /// The status bar's line for `waiting` weapons an Install would change.
-    pub fn waiting_line(waiting: usize) -> String {
-        match waiting {
-            0 => "Your crosshairs are in TF2".into(),
-            1 => "1 change not in TF2 yet".into(),
-            n => format!("{n} changes not in TF2 yet"),
-        }
     }
 }
