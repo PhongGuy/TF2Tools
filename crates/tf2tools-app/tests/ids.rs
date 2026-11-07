@@ -41,6 +41,10 @@ fn keyed_ids_carry_the_stable_key() {
     assert_eq!(name(ids::hud_card("budhud")), "hud-card:budhud");
     assert_eq!(name(ids::hud_uninstall("budhud")), "hud-uninstall:budhud");
     assert_eq!(
+        name(ids::hud_update_mark("budhud")),
+        "hud-update-mark:budhud"
+    );
+    assert_eq!(
         name(ids::hud_installed_name("budhud")),
         "hud-installed-name:budhud"
     );

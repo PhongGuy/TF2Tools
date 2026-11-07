@@ -41,7 +41,7 @@ pub use crosshairs::{
     ApplyReport, Assignment, CrosshairEntry, CrosshairFormat, CrosshairRef, InstalledCrosshairs,
     PaintTarget, PaintedSource, SkipReason, SkippedAssignment, crosshair_scripts_need_repair,
 };
-pub use hud_copy::{CopyUpdate, CopyUpdated, TreeHash};
+pub use hud_copy::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub(crate) use hud_folder::is_safe_folder;
 pub use hud_history::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
 pub use hud_presets::{PresetEntry, read_recipe_file};

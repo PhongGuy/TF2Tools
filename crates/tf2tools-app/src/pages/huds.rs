@@ -22,8 +22,8 @@ use gpui_kit::{
 };
 
 use tf2tools_core::{
-    CopyUpdate, HudEntry, HudId, HudInstall, HudStatus, LibraryError, LogLevel, NewLogEntry,
-    Platform, Provenance, StoreItem, StoreItemId, StoreKind, Tf2Install,
+    CopyUpdate, DownloadUpdate, HudEntry, HudId, HudInstall, HudStatus, LibraryEntry, LibraryError,
+    LogLevel, NewLogEntry, Platform, Provenance, StoreItem, StoreItemId, StoreKind, Tf2Install,
 };
 
 use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, needs_tf2, no_tf2_notice};
@@ -45,7 +45,9 @@ use crate::shell::external_huds::{ExternalPlan, HudAction, check_external};
 use crate::shell::font_check::ask_about_fonts;
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, error_label, toast, toast_error};
+use crate::store_messages::{describe_download, describe_files, download_stopped};
 use crate::timing;
+use crate::tokio_bridge;
 use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::carousel::open_lightbox;
@@ -65,6 +67,8 @@ const EDIT_WAIT: &str = "Wait for TF2Tools to finish, then edit";
 pub(crate) const INSTALL_FAILED: &str = "Failed to install HUD";
 const UNINSTALL_FAILED: &str = "Failed to uninstall HUD";
 /// Added to the update toast when the installed copy could not follow the update.
+const UPDATE_FAILED: &str = "Failed to update HUD";
+const DOWNLOAD_GONE: &str = "This HUD is no longer in the HUD Store.";
 const NOT_REINSTALLED: &str =
     "Updated, but couldn't update the installed copy. Close TF2 and install it again from HUDs.";
 
@@ -81,7 +85,7 @@ enum Busy {
     Delete(String),
     /// Keyed by the copied HUD's folder name.
     Copy(String),
-    /// Keyed by the updated copy's folder name.
+    /// Keyed by the updated HUD's folder name.
     Update(String),
 }
 
@@ -99,6 +103,8 @@ pub struct HudsPage {
     copies: Rc<HashMap<String, String>>,
     /// Copies' folders and whether a newer version of their HUD is out, checked after a load.
     updates: Rc<HashMap<String, CopyUpdate>>,
+    /// Folders of unedited store HUDs whose store version is newer, checked after a load.
+    behind_store: Rc<HashSet<String>>,
     /// Each HUD's name lowercased, index for index with `huds`, so a search keystroke allocates none.
     lowered: Vec<String>,
     /// The tf/custom scan and the folder it scanned, absent while no TF2 install is known.
@@ -195,6 +201,7 @@ impl HudsPage {
             made: Rc::default(),
             copies: Rc::default(),
             updates: Rc::default(),
+            behind_store: Rc::default(),
             status: None,
             loaded,
             busy: None,
@@ -339,27 +346,43 @@ impl HudsPage {
         .detach();
     }
 
-    // Asks core whether each copy's HUD has a newer version, off the UI thread and after the
-    // list landed, since hashing a HUD can be slow. A copy whose check fails shows nothing.
+    // Asks core whether each copy's HUD, and each unedited store download, has a newer
+    // version, off the UI thread and after the list landed, since hashing a HUD can be slow.
+    // A HUD whose check fails shows nothing.
     fn check_updates(&mut self, generation: u64, cx: &mut Context<Self>) {
-        let copies: Vec<(String, HudId)> = (self.huds.iter())
-            .filter(|h| self.copies.contains_key(h.folder_name()))
+        let (copies, downloads): (Vec<_>, Vec<_>) = (self.huds.iter())
+            .filter(|h| {
+                self.copies.contains_key(h.folder_name())
+                    || matches!(h.provenance(), Provenance::Curated { .. })
+                        && !self.made.contains(h.folder_name())
+            })
             .map(|h| (h.folder_name().to_owned(), h.id().clone()))
-            .collect();
-        if copies.is_empty() {
+            .partition(|(folder, _)| self.copies.contains_key(folder));
+        if copies.is_empty() && downloads.is_empty() {
             self.updates = Rc::default();
+            self.behind_store = Rc::default();
             return;
         }
         let checking = run_blocking(cx, move |s| {
-            Ok((copies.into_iter())
+            let updates = (copies.into_iter())
                 .filter_map(|(folder, id)| Some((folder, s.library.copy_update(&id).ok()?)))
-                .collect::<HashMap<_, _>>())
+                .collect::<HashMap<_, _>>();
+            let behind = (downloads.into_iter())
+                .filter(|(_, id)| {
+                    matches!(s.library.download_update(id), Ok(DownloadUpdate::Newer))
+                })
+                .map(|(folder, _)| folder)
+                .collect::<HashSet<_>>();
+            Ok((updates, behind))
         });
         cx.spawn(async move |page, cx| {
-            let Ok(updates) = checking.await else { return };
+            let Ok((updates, behind)) = checking.await else {
+                return;
+            };
             let _ = page.update(cx, |page, cx| {
                 if page.load_generation == generation {
                     page.updates = Rc::new(updates);
+                    page.behind_store = Rc::new(behind);
                     cx.notify();
                 }
             });
@@ -708,6 +731,106 @@ impl HudsPage {
             None,
         );
     }
+}
+
+impl HudsPage {
+    // Downloads the store's current version of unedited store HUD `hud`, then swaps it in:
+    // the new version is installed when the old one was, and the old one leaves the library.
+    // A failed install keeps the old one, so the player is never left without their HUD.
+    fn update_download(&mut self, hud: &HudEntry, window: &mut Window, cx: &mut Context<Self>) {
+        let Provenance::Curated { hud_id } = hud.provenance().clone() else {
+            return;
+        };
+        let busy = Busy::Update(hud.folder_name().to_owned());
+        self.busy = Some(busy.clone());
+        cx.notify();
+        if !tokio_bridge::is_running(cx) {
+            tokio_bridge::init(cx);
+        }
+        let store = cx.global::<Services>().store.clone();
+        let kind = StoreKind::CuratedHuds;
+        let fetching = tokio_bridge::spawn(cx, async move {
+            let item = StoreItemId::Curated(hud_id);
+            let files = (store.item_files(kind, &item).await)
+                .map_err(|e| describe_files(kind, &e).message)?;
+            let file = files.into_iter().next().ok_or(DOWNLOAD_GONE.to_owned())?;
+            (store.download(kind, &file, &|_| {}).await)
+                .map_err(|e| describe_download(kind, &e).message)
+        });
+        let (old, name) = (hud.id().clone(), hud.name().to_owned());
+        let tf2 = tf2_state(cx).read(cx).install().cloned();
+        let win = window.window_handle();
+        cx.spawn(async move |page, cx| {
+            let fetched = fetching.await.unwrap_or_else(|_| {
+                let failure = download_stopped("the HUD update task stopped unexpectedly");
+                failure.log("HUD update");
+                Err(failure.message)
+            });
+            let new = fetched.map(|entries| {
+                entries.into_iter().find_map(|entry| match entry {
+                    LibraryEntry::Hud(hud) => Some(hud.id().clone()),
+                    _ => None,
+                })
+            });
+            let _ = page.update(cx, |page, cx| match new {
+                Ok(Some(new)) => page.run(
+                    busy,
+                    move |s| swap_download(s, &old, &new, &name, tf2.as_ref()),
+                    cx,
+                    None,
+                ),
+                failed => {
+                    let message = failed.err().unwrap_or(DOWNLOAD_GONE.to_owned());
+                    let err = OpError::Core {
+                        action: UPDATE_FAILED,
+                        message,
+                    };
+                    page.busy = None;
+                    cx.notify();
+                    let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
+                }
+            });
+        })
+        .detach();
+    }
+}
+
+// Puts downloaded HUD `new` in place of `old`: installed in its place when `old` was the
+// installed HUD, then `old` deleted. A download into `old`'s own folder only refreshes the
+// installed copy.
+fn swap_download(
+    s: &Services,
+    old: &HudId,
+    new: &HudId,
+    name: &str,
+    tf2: Option<&Tf2Install>,
+) -> Result<Done, OpError> {
+    let installed = tf2.filter(
+        |tf2| matches!(s.library.hud_status(tf2), Ok(HudStatus::Managed { id, .. }) if &id == old),
+    );
+    let updated = format!("{name} is now up to date");
+    let mut done: Done = (ToastKind::Success, "HUD updated".into(), updated.into());
+    if new == old {
+        if let Some(tf2) = installed
+            && let Live::Failed(_) = live_job(s, new, name, tf2)
+        {
+            done.0 = ToastKind::Warning;
+            done.2 = format!("{} {NOT_REINSTALLED}", done.2).into();
+        }
+    } else {
+        if let Some(tf2) = installed {
+            install_job(s, new, tf2, &ExternalPlan::default())?;
+        }
+        s.library
+            .delete_hud(old)
+            .map_err(|e| describe_library(&e).into_op(UPDATE_FAILED))?;
+    }
+    let message = format!("Updated HUD: {name}");
+    activity::write(
+        s,
+        &NewLogEntry::new(LogLevel::Info, "hud", "update", message),
+    );
+    Ok(done)
 }
 
 /// A finished operation's toast: its kind, title and description.
@@ -1080,17 +1203,33 @@ fn screenshot(
     }
 }
 
+/// What one library card shows beyond its HUD entry.
+struct CardState<'a> {
+    /// The store screenshot's URL.
+    url: Option<&'a String>,
+    /// Made in the HUD Maker, so it offers Edit.
+    made: bool,
+    /// A copy's base name and its update check.
+    copy: Option<(&'a String, Option<&'a CopyUpdate>)>,
+    /// An unedited store HUD whose store version is newer.
+    behind_store: bool,
+}
+
 // v5's HudCard: name, author and source badge, then delete and Install bottom right.
 // Store HUDs lead with their 16:9 screenshot area.
 fn hud_card(
     hud: &HudEntry,
-    url: Option<&String>,
-    made: bool,
-    copy: Option<(&String, Option<&CopyUpdate>)>,
+    state: CardState<'_>,
     busy: Option<&Busy>,
     page: &WeakEntity<HudsPage>,
     cx: &App,
 ) -> AnyElement {
+    let CardState {
+        url,
+        made,
+        copy,
+        behind_store,
+    } = state;
     let theme = cx.theme();
     let has_tf2 = tf2_state(cx).read(cx).install().is_some();
     let folder = hud.folder_name();
@@ -1109,6 +1248,23 @@ fn hud_card(
             copy_in_store_text(copy.map_or("", |(base, _)| base.as_str())),
         )
     });
+    let update_mark = behind_store.then(|| {
+        labelled(
+            div()
+                .text_xs()
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(theme.primary),
+            ids::hud_update_mark(folder),
+            "Update available",
+        )
+    });
+    // The card buttons call back into the page through a weak handle and a clone of the entry.
+    let on_page = |act: fn(&mut HudsPage, &HudEntry, &mut Window, &mut Context<HudsPage>)| {
+        let (page, entry) = (page.clone(), hud.clone());
+        move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
+            let _ = page.update(cx, |page, cx| act(page, &entry, window, cx));
+        }
+    };
     let update_button = match update {
         Some(CopyUpdate::InLibrary { from, .. }) => {
             let (page, entry, from) = (page.clone(), hud.clone(), from.clone());
@@ -1127,14 +1283,17 @@ fn hud_card(
                     }),
             )
         }
+        _ if behind_store => Some(
+            Button::new(ids::hud_update(folder))
+                .ghost()
+                .icon(IconName::RefreshCw)
+                .tooltip("Update")
+                .accessibility_label("Update")
+                .loading(updating)
+                .disabled(busy.is_some() && !updating)
+                .on_click(on_page(HudsPage::update_download)),
+        ),
         _ => None,
-    };
-    // Both card buttons call back into the page through a weak handle and a clone of the entry.
-    let on_page = |act: fn(&mut HudsPage, &HudEntry, &mut Window, &mut Context<HudsPage>)| {
-        let (page, entry) = (page.clone(), hud.clone());
-        move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
-            let _ = page.update(cx, |page, cx| act(page, &entry, window, cx));
-        }
     };
     let (badge, text) = if is_store(hud) {
         (Tag::primary(), "Store")
@@ -1186,7 +1345,8 @@ fn hud_card(
                                 .child(hud.name().to_owned()),
                         )
                         .children(author)
-                        .children(store_note),
+                        .children(store_note)
+                        .children(update_mark),
                 )
                 .child(badge_of(
                     ids::hud_badge(folder),
@@ -1318,6 +1478,7 @@ impl HudsPage {
             let any_note = (shown.iter()).any(|&ix| {
                 let folder = self.huds[ix].folder_name();
                 matches!(self.updates.get(folder), Some(CopyUpdate::InStore))
+                    || self.behind_store.contains(folder)
             });
             let height = move |width: Pixels| {
                 let image = if any_store {
@@ -1329,22 +1490,26 @@ impl HudsPage {
                 image + CARD_TEXT_HEIGHT + note
             };
             let (busy, page) = (self.busy.clone(), cx.entity().downgrade());
-            let (huds, urls, made, copies, updates) = (
+            let (huds, urls, made, copies, updates, behind) = (
                 self.huds.clone(),
                 self.image_urls.clone(),
                 self.made.clone(),
                 self.copies.clone(),
                 self.updates.clone(),
+                self.behind_store.clone(),
             );
             Some(
                 self.grid
                     .render_sized(shown.len(), height, move |ix, _, cx| {
                         let hud = &huds[shown[ix]];
-                        let url = urls.get(hud.folder_name());
-                        let made = made.contains(hud.folder_name());
-                        let copy = (copies.get(hud.folder_name()))
-                            .map(|base| (base, updates.get(hud.folder_name())));
-                        hud_card(hud, url, made, copy, busy.as_ref(), &page, cx)
+                        let folder = hud.folder_name();
+                        let state = CardState {
+                            url: urls.get(folder),
+                            made: made.contains(folder),
+                            copy: (copies.get(folder)).map(|base| (base, updates.get(folder))),
+                            behind_store: behind.contains(folder),
+                        };
+                        hud_card(hud, state, busy.as_ref(), &page, cx)
                     }),
             )
         };
