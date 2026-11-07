@@ -9,6 +9,9 @@ publish.workspace = true
 # One integration binary: tests/main.rs declares every test file as a module.
 autotests = false
 
+[lints]
+workspace = true
+
 [dependencies]
 rusqlite.workspace = true
 thiserror.workspace = true

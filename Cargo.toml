@@ -11,6 +11,15 @@ rust-version = "1.99"
 license = "MIT"
 publish = false
 
+# Lint rules live here once; a crate not yet clean of one allows it at its root until fixed.
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+
 [workspace.dependencies]
 rusqlite = { version = "0.40", features = ["bundled"] }
 thiserror = "2"
