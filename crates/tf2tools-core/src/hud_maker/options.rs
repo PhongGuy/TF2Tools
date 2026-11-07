@@ -134,6 +134,26 @@ pub enum OptionAction {
     },
     /// Flips one of the HUD's own file switches.
     Switch(SwitchAction),
+    /// Writes a small settings file that one of the HUD's `#base` lines reads: `on` while on,
+    /// `off` while off, where an empty text writes no file.
+    WriteCfg {
+        /// Where the file goes.
+        place: CfgPlace,
+        /// The text written when on.
+        on: String,
+        /// The text written when off.
+        off: String,
+    },
+}
+
+/// Where a settings file an option writes goes, as the HUD's `#base` line names it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum CfgPlace {
+    /// Under the game's `tf/cfg`, as a lowercase path below it.
+    Game(String),
+    /// Inside the HUD copy, as a copy path.
+    Hud(String),
 }
 
 /// A file switch a HUD ships: lines commented in or out, or files moved.
@@ -443,8 +463,8 @@ impl HudModel {
                     .collect();
                 !live_blocks(doc, &path, self.platform()).is_empty()
             }
-            // No built-in flips a HUD's own switches.
-            OptionAction::Switch(_) => false,
+            // No built-in flips a HUD's own switches or writes a settings file.
+            OptionAction::Switch(_) | OptionAction::WriteCfg { .. } => false,
         })
     }
 }

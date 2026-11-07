@@ -540,6 +540,7 @@ impl Library {
             .map_err(install_db)?;
         // A stale reinstall's staging folder goes too, so its set-aside copy never returns.
         live_link::clear_staging(&custom)?;
+        self.revert_hud_cfg(tf2)?;
         remove_installed_huds(&custom)?;
         // Removal frees names held by HUDs; anything still there is the user's own, so the
         // HUD takes its library folder name, numbered if need be, rather than merging into it.
@@ -555,6 +556,7 @@ impl Library {
             let _ = remove_dir_if_present(&dest);
             return Err(failure.into());
         }
+        self.write_hud_cfg(&src, tf2)?;
         // Without a fingerprint the folder is judged against the library copy, so a failed
         // read costs a question at worst.
         let print = hud_print::fingerprint(&dest).unwrap_or_default();
@@ -635,6 +637,7 @@ impl Library {
         let custom = game_custom_dir(tf2)?;
         self.refuse_unnamed_huds(&custom, discard, None)?;
         live_link::clear_staging(&custom)?;
+        self.revert_hud_cfg(tf2)?;
         remove_installed_huds(&custom)?;
         self.forget_install()
     }
@@ -671,6 +674,7 @@ impl Library {
         // cost that install its way back after a crash.
         if recorded {
             live_link::clear_staging(&custom)?;
+            self.revert_hud_cfg(tf2)?;
         }
         remove_dir_if_present(path)?;
         if recorded {

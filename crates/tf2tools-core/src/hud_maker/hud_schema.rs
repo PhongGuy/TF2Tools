@@ -7,14 +7,14 @@ use std::sync::LazyLock;
 
 use serde::de::{Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 
-use super::changes::check_switch_path;
+use super::changes::{check_cfg_path, check_switch_path};
 use super::document::KvDocument;
 use super::files::HudFiles;
-use super::hud_options::{active_bases, base_target, base_targets};
+use super::hud_options::{active_bases, base_target, base_targets, scan};
 use super::model::{live_blocks, root_block};
 use super::options::{
-    Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue, SwitchAction,
-    ValueMap, is_item_colour,
+    CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue,
+    SwitchAction, ValueMap, is_item_colour,
 };
 use crate::error::SchemaError;
 use crate::fonts::Platform;
@@ -417,8 +417,7 @@ impl HudSchemas {
 }
 
 /// Any of these on a control asks for something this build does not do.
-const UNSUPPORTED: [&str; 6] = [
-    "WriteCfg",
+const UNSUPPORTED: [&str; 5] = [
     "Special",
     "SpecialParameters",
     "ComboDirectories",
@@ -489,6 +488,7 @@ impl HudSchema {
             customizations: self.customizations.as_deref(),
             enabled: self.enabled.as_deref(),
             docs: BTreeMap::new(),
+            bases: None,
         };
         let mut out = SchemaOptions::default();
         let mut seen = BTreeSet::new();
@@ -570,6 +570,8 @@ struct Fit<'a> {
     enabled: Option<&'a str>,
     /// Parsed copy files by path; `None` for one missing or unreadable.
     docs: BTreeMap<String, Option<KvDocument>>,
+    /// Every active `#base` line of the copy as (file, target), read once when first needed.
+    bases: Option<Vec<(String, String)>>,
 }
 
 impl Fit<'_> {
@@ -610,14 +612,18 @@ impl Fit<'_> {
         let value = text(fields.get("Value"));
         let (kind, default, actions) = match kind.as_str() {
             "checkbox" => {
-                let on = value
-                    .as_deref()
-                    .is_some_and(|v| v.trim().eq_ignore_ascii_case("true"));
-                (
-                    OptionKind::Toggle,
-                    OptionValue::Bool(on),
-                    self.actions(fields, Leaves::Toggle, &mut Vec::new())?,
-                )
+                let actions = self.actions(fields, Leaves::Toggle, &mut Vec::new())?;
+                // A switch that only writes settings files starts off when no file is its off
+                // side, whatever the schema says, since that is how the game has it.
+                let file_only = !actions.is_empty()
+                    && actions.iter().all(|a| {
+                        matches!(a, OptionAction::WriteCfg { on, off, .. } if !on.is_empty() && off.is_empty())
+                    });
+                let on = !file_only
+                    && value
+                        .as_deref()
+                        .is_some_and(|v| v.trim().eq_ignore_ascii_case("true"));
+                (OptionKind::Toggle, OptionValue::Bool(on), actions)
             }
             "colorpicker" | "color" | "colour" | "colourpicker" => {
                 let actions = self.actions(fields, Leaves::Value, &mut Vec::new())?;
@@ -751,6 +757,7 @@ impl Fit<'_> {
                 "FileName" => self.file_name(value),
                 "RenameFile" => self.rename(value),
                 "WriteFile" => self.write_file(value),
+                "WriteCfg" => self.write_cfg(value),
                 _ => continue,
             };
             match got {
@@ -917,6 +924,44 @@ impl Fit<'_> {
         Ok(vec![self.base_lines(&file, on, off)?])
     }
 
+    /// `WriteCfg`: a settings file with a text for each side, written where the copy's own
+    /// `#base` line for it lands. Its name must be a plain `.txt` or `.res` file name; a name
+    /// no `#base` line reads would change nothing, so it misfits.
+    fn write_cfg(&mut self, value: &SchemaValue) -> Result<Vec<OptionAction>, Refused> {
+        let side = |k: &str| value.get(k).and_then(SchemaValue::as_str);
+        let name = side("FileName")
+            .filter(|n| !n.contains(['/', '\\']))
+            .and_then(check_cfg_path)
+            .ok_or(Refused::LeftOut)?;
+        let on = side("TrueText").ok_or(Refused::LeftOut)?.to_owned();
+        let off = side("FalseText").unwrap_or_default().to_owned();
+        let bases = self.bases.get_or_insert_with(|| {
+            let copy = self.files.copy_paths().into_iter().collect();
+            let (texts, _) = scan(self.files, &copy);
+            (texts.into_iter())
+                .flat_map(|(file, text)| {
+                    active_bases(&text)
+                        .into_iter()
+                        .map(move |t| (file.clone(), t))
+                })
+                .collect()
+        });
+        let names_it = |target: &str| {
+            let last = target.rsplit(['/', '\\']).next().unwrap_or(target);
+            last.eq_ignore_ascii_case(&name)
+        };
+        let place = (bases.iter())
+            .filter(|(_, target)| names_it(target))
+            .find_map(
+                |(file, target)| match self.files.cfg_landing(file, target)? {
+                    CfgPlace::Game(path) => check_cfg_path(&path).map(CfgPlace::Game),
+                    CfgPlace::Hud(path) => check_switch_path(&path).map(CfgPlace::Hud),
+                },
+            )
+            .ok_or(Refused::Misfit)?;
+        Ok(vec![OptionAction::WriteCfg { place, on, off }])
+    }
+
     /// A `#base` swap on copy file `file`, every target passing the path rule and in the copy.
     fn base_lines(
         &mut self,
@@ -1020,7 +1065,7 @@ fn per_choice(literals: Vec<ChoiceLiteral>) -> Vec<OptionAction> {
 fn derived(fields: &SchemaValue, actions: &[OptionAction]) -> Vec<Derived> {
     let item = actions.iter().any(|a| match a {
         OptionAction::SetKey { key, .. } => is_item_colour(key),
-        OptionAction::Switch(_) => false,
+        OptionAction::Switch(_) | OptionAction::WriteCfg { .. } => false,
     });
     let mut out = Vec::new();
     if item {

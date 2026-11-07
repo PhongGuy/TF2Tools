@@ -7,7 +7,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use super::changes::check_switch_path;
+use super::changes::{check_cfg_path, check_switch_path};
+use super::options::CfgPlace;
 use crate::error::HudFilesError;
 use crate::fonts::Platform;
 use crate::fonts::keyvalues::{self, KvPair, KvSource, KvValue};
@@ -83,11 +84,43 @@ pub struct HudFiles {
     switches: Option<Arc<Switches>>,
 }
 
-/// A switch layer: whole files written over the layers, and paths taken out of them.
+/// A switch layer: whole files written over the layers, and paths taken out of them, plus
+/// the settings files the options write under `tf/cfg`, by lowercase path.
 #[derive(Debug)]
 struct Switches {
-    written: Layer,
+    written: Arc<Layer>,
     removed: BTreeSet<String>,
+    cfg: BTreeMap<String, CfgFile>,
+}
+
+/// A settings file an option writes under the game's `tf/cfg`: its path below `tf/cfg` and
+/// its bytes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct CfgFile {
+    path: String,
+    bytes: Vec<u8>,
+}
+
+impl CfgFile {
+    /// The file at `path` below `tf/cfg`; `None` when the path is no plain `.txt` or `.res`
+    /// path at most three folders deep.
+    pub fn new(path: &str, bytes: Vec<u8>) -> Option<CfgFile> {
+        Some(CfgFile {
+            path: check_cfg_path(path)?,
+            bytes,
+        })
+    }
+
+    /// The lowercase path below `tf/cfg`.
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    /// The file's bytes.
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
 }
 
 /// How a HUD copy is opened: the folder it installs as and the paths hidden from its layer.
@@ -202,8 +235,35 @@ impl HudFiles {
             install_folder: self.install_folder.clone(),
             copy_layers: self.copy_layers,
             tf_cfg: Arc::clone(&self.tf_cfg),
-            switches: Some(Arc::new(Switches { written, removed })),
+            switches: Some(Arc::new(Switches {
+                written: Arc::new(written),
+                removed,
+                cfg: BTreeMap::new(),
+            })),
         }
+    }
+
+    /// This switched view with `cfg` as the settings files the options write; they read
+    /// through `tf/cfg` over the game's own. Later calls replace them.
+    pub fn with_switched_cfg(mut self, cfg: Vec<CfgFile>) -> HudFiles {
+        let (written, removed) = match self.switches.as_deref() {
+            Some(s) => (Arc::clone(&s.written), s.removed.clone()),
+            None => (Arc::default(), BTreeSet::new()),
+        };
+        let cfg = cfg.into_iter().map(|f| (f.path.clone(), f)).collect();
+        self.switches = Some(Arc::new(Switches {
+            written,
+            removed,
+            cfg,
+        }));
+        self
+    }
+
+    /// The settings files the switch layer writes under `tf/cfg`, by path.
+    pub fn switched_cfg(&self) -> Vec<CfgFile> {
+        (self.switches.iter())
+            .flat_map(|s| s.cfg.values().cloned())
+            .collect()
     }
 
     /// As `read`, ignoring the switch layer (removed paths included).
@@ -253,6 +313,13 @@ impl HudFiles {
         let Some(key) = normalise_game_path(rel).map(|k| k.to_ascii_lowercase()) else {
             return Ok(None);
         };
+        if let Some(file) = self.switches.as_ref().and_then(|s| s.cfg.get(&key)) {
+            return Ok(Some(HudFile {
+                bytes: file.bytes.clone(),
+                layer: self.layer_count(),
+                name: file.path.clone(),
+            }));
+        }
         let Some((name, item)) = self.tf_cfg.get(&key) else {
             return Ok(None);
         };
@@ -396,7 +463,7 @@ impl HudFiles {
             return Vec::new();
         };
         let switched = self.switches.as_deref();
-        let mut keys: Vec<String> = (switched.map(|s| &s.written).into_iter())
+        let mut keys: Vec<String> = (switched.map(|s| &*s.written).into_iter())
             .chain(self.layers.iter().map(|layer| &**layer))
             .flat_map(|layer| {
                 layer
@@ -493,10 +560,28 @@ impl HudFiles {
                 from,
                 rel,
                 |key| self.contains(key),
-                |rest| self.tf_cfg.contains_key(rest),
+                |rest| self.holds_cfg(rest),
             ),
             None => locate_in_game(from, rel, |key| self.contains(key)),
         }
+    }
+
+    /// Whether `rest` (lowercase, below `tf/cfg`) is a switched settings file or indexed.
+    fn holds_cfg(&self, rest: &str) -> bool {
+        (self.switches.as_ref()).is_some_and(|s| s.cfg.contains_key(rest))
+            || self.tf_cfg.contains_key(rest)
+    }
+
+    /// Where `#base` target `rel` of copy file `from` lands when it names a settings file:
+    /// under `tf/cfg` or inside the copy, by the engine's rule for a copy; `None` anywhere
+    /// else or for files that are no copy. Whether the file is there is not checked.
+    pub(crate) fn cfg_landing(&self, from: &str, rel: &str) -> Option<CfgPlace> {
+        let folder = self.install_folder.as_deref()?;
+        let at = locate_in_copy(folder, from, rel, |_| true, |_| true).ok()?;
+        Some(match at.strip_prefix(CFG_ID_PREFIX) {
+            Some(rest) => CfgPlace::Game(rest.to_owned()),
+            None => CfgPlace::Hud(at),
+        })
     }
 
     /// The topmost entry for `path`: the switch layer's (layer 0), none when it was removed,

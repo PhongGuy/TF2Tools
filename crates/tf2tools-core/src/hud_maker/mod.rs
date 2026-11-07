@@ -72,7 +72,7 @@ pub use edits::{EditRefused, NoMirror, PartCaps};
 pub use expr::{
     Align, AxisSize, PosExpr, PosTerm, PosUnit, ScreenScale, SizeExpr, SizeForm, TermOp,
 };
-pub use files::{CopyView, HudFile, HudFiles, normalise_game_path};
+pub use files::{CfgFile, CopyView, HudFile, HudFiles, normalise_game_path};
 pub(crate) use fonts::{BORROWED_DIR, FONT_DIR, IMAGES_DIR, KEPT_DIR};
 pub use fonts::{CLONE_PREFIX, FontEdit, FontFile, font_families, font_family, stand_in_families};
 pub use game_text::GameText;
@@ -90,8 +90,8 @@ pub use meters::MeterKind;
 pub use model::{Edited, HudModel, KeyLine, Part, PartKey};
 pub use new_parts::{NewPart, RemoveRefused};
 pub use options::{
-    Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue, SwitchAction,
-    ValueMap,
+    CfgPlace, Choice, Derived, OptionAction, OptionKind, OptionSource, OptionSpec, OptionValue,
+    SwitchAction, ValueMap,
 };
 pub(crate) use pictures::is_picture_path;
 pub use pictures::{NewPicture, PictureTarget, picture_id, picture_material};

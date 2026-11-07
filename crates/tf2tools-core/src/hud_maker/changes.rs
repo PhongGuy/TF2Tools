@@ -553,6 +553,15 @@ pub(crate) fn check_switch_path(path: &str) -> Option<String> {
     check_hud_path(path).filter(|p| !p.split('/').any(|s| s.eq_ignore_ascii_case(".tf2tools")))
 }
 
+/// The rule for a settings file an option writes below `tf/cfg`: [`check_switch_path`]'s
+/// rule, at most three folders deep, and only a `.txt` or `.res` file, so no option can write
+/// a script the game runs.
+pub(crate) fn check_cfg_path(path: &str) -> Option<String> {
+    check_switch_path(path)
+        .filter(|p| p.split('/').count() <= 3)
+        .filter(|p| p.ends_with(".txt") || p.ends_with(".res"))
+}
+
 /// Whether a lowercase segment names a Windows device, with or without an extension.
 pub(crate) fn is_device_name(segment: &str) -> bool {
     let stem = segment
