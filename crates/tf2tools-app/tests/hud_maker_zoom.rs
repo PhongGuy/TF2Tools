@@ -199,6 +199,7 @@ fn ctrl_wheel_zooms_around_the_pointer(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn middle_drag_space_drag_and_the_wheel_pan_a_zoomed_canvas(cx: &mut TestAppContext) {
     let (s, page) = open(cx);
+    support::maker_page::float_panels(cx, &s, &page);
     for _ in 0..3 {
         menu(cx, &s, ids::HUD_MAKER_ZOOM_IN);
     }

@@ -1,0 +1,25 @@
+name: Task
+description: A planned piece of work for the project board (maintainers)
+assignees: ["PhongGuy"]
+body:
+  - type: textarea
+    id: why
+    attributes:
+      label: What and why
+      description: The problem, who it affects, and where in the code it lives.
+    validations:
+      required: true
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      description: A checklist that says when this is done, including tests.
+      value: |
+        - [ ] 
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source
+      description: Where this came from (user report, review, follow-up to #...).

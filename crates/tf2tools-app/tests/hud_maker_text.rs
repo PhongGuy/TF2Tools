@@ -747,7 +747,8 @@ fn all_settings_list_every_key_with_where_it_came_from(cx: &mut TestAppContext) 
 
 #[gpui_kit::test]
 fn a_long_origin_keeps_its_line_number_in_view(cx: &mut TestAppContext) {
-    let (_env, s, _page) = opened(cx);
+    let (_env, s, page) = opened(cx);
+    support::maker_page::float_panels(cx, &s, &page);
     for (w, h) in [(1280., 800.), (800., 600.)] {
         cx.simulate_window_resize(s.win, gpui_kit::size(gpui_kit::px(w), gpui_kit::px(h)));
         support::settle(cx, s.win);
@@ -1310,6 +1311,7 @@ fn a_missing_windows_family_draws_in_its_open_stand_in(cx: &mut TestAppContext) 
 #[gpui_kit::test]
 fn a_text_inset_moves_the_text_in_from_its_aligned_edge(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx);
+    support::maker_page::float_panels(cx, &s, &page);
     // The gap from the aligned edge grows with the inset: none at 0, twice as wide at 10 as at 5.
     let mut gaps = Vec::new();
     for alignment in ["west", "east"] {
@@ -1437,6 +1439,7 @@ fn the_text_clip_cuts_only_across_and_leaves_room_for_ink(cx: &mut TestAppContex
 #[gpui_kit::test]
 fn a_y_inset_moves_the_text_down_whatever_its_alignment(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx);
+    support::maker_page::float_panels(cx, &s, &page);
     // How far the text drops from where it sits with no inset: twice as far at 6 as at 3.
     for alignment in ["north-west", "west", "south-west"] {
         set_hv(cx, &s, &page, "textAlignment", alignment);

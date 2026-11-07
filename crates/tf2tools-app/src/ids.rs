@@ -207,8 +207,11 @@ pub const HUD_MAKER_CANVAS: &str = "hud-maker-canvas";
 pub const HUD_MAKER_CROSSHAIR: &str = "hud-maker-crosshair";
 /// The outline over the selected part; present only with a drawn selection.
 pub const HUD_MAKER_SELECTION: &str = "hud-maker-selection";
-/// The outline over the part whose row the pointer is on; absent for a hidden part.
+/// The outline over the part under the pointer, on the canvas or its row; absent for a hidden
+/// part.
 pub const HUD_MAKER_HOVER: &str = "hud-maker-hover";
+/// The name tag beside the hover outline, labelled with the part's name.
+pub const HUD_MAKER_HOVER_NAME: &str = "hud-maker-hover-name";
 /// The vertical guide line drawn while a dragged part snaps across.
 pub const HUD_MAKER_GUIDE_X: &str = "hud-maker-guide-x";
 /// The horizontal guide line drawn while a dragged part snaps up or down.

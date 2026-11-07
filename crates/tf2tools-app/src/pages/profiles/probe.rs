@@ -6,12 +6,12 @@ use std::sync::Arc;
 
 use gpui_kit::{App, Global};
 
-/// Answers "is TF2 running" for the Profiles page; a scan of the proc root unless replaced.
+/// Answers "is TF2 running" for the Profiles page; core's process check unless replaced.
 pub struct Tf2Probe(Arc<dyn Fn() -> bool + Send + Sync>);
 
 impl Global for Tf2Probe {}
 
-/// The directory the default probe scans; `/proc` unless a test points it elsewhere.
+/// A fake proc tree a test points the default probe at instead of the real processes.
 struct ProcRoot(PathBuf);
 
 impl Global for ProcRoot {}
@@ -49,16 +49,15 @@ impl Tf2Probe {
         cx.set_global(ProcRoot(root));
     }
 
-    /// The installed probe, or a scan of the proc root with core's `tf2_running_in`. It
-    /// reads the file system: call it off the UI thread.
+    /// The installed probe, a scan of the test's proc root, or core's `tf2_running`. It
+    /// reads the system's processes: call it off the UI thread.
     pub fn get(cx: &App) -> Arc<dyn Fn() -> bool + Send + Sync> {
         if let Some(probe) = cx.try_global::<Tf2Probe>() {
             return probe.0.clone();
         }
-        // Off Linux there is no /proc, so the scan reads false, as core's `tf2_running` does.
-        let root = cx
-            .try_global::<ProcRoot>()
-            .map_or_else(|| PathBuf::from("/proc"), |r| r.0.clone());
+        let Some(root) = cx.try_global::<ProcRoot>().map(|r| r.0.clone()) else {
+            return Arc::new(tf2tools_core::tf2_running);
+        };
         Arc::new(move || tf2tools_core::tf2_running_in(&root))
     }
 }

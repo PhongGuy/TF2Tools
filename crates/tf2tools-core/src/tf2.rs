@@ -123,16 +123,36 @@ const TF2_PROCESS_NAMES: [&str; 6] = [
     "hl2.exe",
 ];
 
-/// Whether a TF2 process is running. Linux scans `/proc`; other platforms return false.
+/// Whether a TF2 process is running. Linux scans `/proc`, Windows reads the process list,
+/// other platforms return false.
 pub fn tf2_running() -> bool {
     #[cfg(target_os = "linux")]
     {
         tf2_running_in(Path::new("/proc"))
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(windows)]
+    {
+        let mut system = sysinfo::System::new();
+        system.refresh_processes(sysinfo::ProcessesToUpdate::All);
+        any_tf2_exe(system.processes().values().map(sysinfo::Process::name))
+    }
+    #[cfg(not(any(target_os = "linux", windows)))]
     {
         false
     }
+}
+
+/// Whether a Windows process list holds a TF2 exe. Windows file names ignore case, so
+/// `TF_WIN64.EXE` counts; only the `.exe` names apply, as Windows never runs the others.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn any_tf2_exe<S: AsRef<std::ffi::OsStr>>(names: impl IntoIterator<Item = S>) -> bool {
+    names.into_iter().any(|name| {
+        name.as_ref().to_str().is_some_and(|name| {
+            TF2_PROCESS_NAMES
+                .iter()
+                .any(|exe| exe.ends_with(".exe") && exe.eq_ignore_ascii_case(name))
+        })
+    })
 }
 
 /// Whether a TF2 process is running under `proc_root`, on any platform: numeric
@@ -158,7 +178,7 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{TF2_PROCESS_NAMES, detect_all_in, detect_in, tf2_running_in};
+    use super::{TF2_PROCESS_NAMES, any_tf2_exe, detect_all_in, detect_in, tf2_running_in};
 
     /// A fake Steam root whose `libraryfolders.vdf` lists `libraries`; each library holds
     /// the given `(app id, install dir)` manifests and their `steamapps/common/<dir>` folders.
@@ -348,6 +368,26 @@ mod tests {
     fn a_missing_proc_root_is_not_running() {
         let root = tempfile::tempdir().unwrap();
         assert!(!tf2_running_in(&root.path().join("nope")));
+    }
+
+    #[test]
+    fn a_windows_process_list_with_a_tf2_exe_counts_in_any_case() {
+        for name in ["tf_win64.exe", "TF.EXE", "Hl2.Exe"] {
+            assert!(any_tf2_exe(["System", "steam.exe", name]), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_windows_process_list_without_a_tf2_exe_does_not_count() {
+        assert!(!any_tf2_exe(Vec::<&str>::new()));
+        assert!(!any_tf2_exe([
+            "steam.exe",
+            "tf_linux64",
+            "hl2_linux",
+            "tf.sh",
+            "tf_win64",
+            "tf_win64.exe.bak",
+        ]));
     }
 
     // The kernel truncates comm to 15 bytes, so a longer name could never match a process.

@@ -435,7 +435,8 @@ fn saved_places(s: &support::ShellWindow) -> Option<Places> {
 fn the_panel_floats_at_its_default_place(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let panel = bounds(cx, &s, ids::HUD_MAKER_PANEL);
     let area = bounds(cx, &s, ids::HUD_MAKER_CANVAS_AREA);
     assert_eq!(panel.origin, area.origin + point(px(16.), px(16.)));
@@ -466,7 +467,8 @@ fn docking_right_puts_the_panel_beside_the_canvas_and_is_remembered(cx: &mut Tes
 fn collapsing_keeps_only_the_title_bar(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     assert!(support::present(cx, s.win, ids::HUD_MAKER_PANEL_BODY));
     support::click_id(cx, s.win, ids::HUD_MAKER_PANEL_COLLAPSE);
     assert!(!support::present(cx, s.win, ids::HUD_MAKER_PANEL_BODY));
@@ -482,7 +484,8 @@ fn collapsing_keeps_only_the_title_bar(cx: &mut TestAppContext) {
 fn dragging_the_title_bar_moves_a_floating_panel(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let from = bounds(cx, &s, ids::HUD_MAKER_PANEL_TITLE).center();
     let to = from + point(px(200.), px(100.));
     cx.update_window(s.win, |_, w, cx| w.drag(from, to, cx))
@@ -508,6 +511,7 @@ fn the_panel_moves_off_the_selected_part_without_saving_that(cx: &mut TestAppCon
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let hv = bounds(cx, &s, ids::hud_maker_part(&PartKey::new(HV)));
     let area = bounds(cx, &s, ids::HUD_MAKER_CANVAS_AREA);
     let over = PanelPlace {
@@ -1365,19 +1369,22 @@ fn a_new_drag_ends_one_left_running(cx: &mut TestAppContext) {
 fn a_collapsed_docked_panel_gives_its_column_back(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     support::click_id(cx, s.win, ids::HUD_MAKER_PANEL_DOCK_RIGHT);
+    let open = bounds(cx, &s, ids::HUD_MAKER_CANVAS);
     support::click_id(cx, s.win, ids::HUD_MAKER_PANEL_COLLAPSE);
     let area = bounds(cx, &s, ids::HUD_MAKER_CANVAS_AREA);
     let canvas = bounds(cx, &s, ids::HUD_MAKER_CANVAS);
-    let panel = bounds(cx, &s, ids::HUD_MAKER_PANEL);
+    let rail = bounds(cx, &s, ids::HUD_MAKER_PANEL);
+    // Collapsed, it folds to a slim rail at the right edge, and the canvas takes the rest.
     assert!(
-        (f(canvas.center().x) - f(area.center().x)).abs() <= 1.,
-        "canvas {canvas:?} centred in area {area:?}"
+        canvas.size.width > open.size.width && canvas.right() <= rail.left(),
+        "canvas {canvas:?} beside the rail {rail:?}, was {open:?}"
     );
     assert!(
-        f(panel.right() - area.right()).abs() <= 1.,
-        "the title bar stays at the right edge"
+        f(rail.right() - area.right()).abs() <= 1. && rail.size.width < px(48.),
+        "the rail {rail:?} stays at the right edge of {area:?}"
     );
 }
 
@@ -1397,6 +1404,7 @@ fn handles_sit_outside_the_part_and_a_short_part_drops_its_side_ones(cx: &mut Te
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     select_hv(cx, &s);
     let part = bounds(cx, &s, ids::hud_maker_part(&PartKey::new(HV)));
     assert!(
@@ -1526,7 +1534,8 @@ fn every_place_is_saved_in_the_one_setting(cx: &mut TestAppContext) {
 fn the_parts_panel_starts_collapsed_at_the_top_right(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     assert!(support::present(
         cx,
         s.win,
@@ -1569,6 +1578,7 @@ fn dragging_the_parts_title_moves_the_parts_panel(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let before = bounds(cx, &s, ids::HUD_MAKER_PARTS_PANEL);
     let from = bounds(cx, &s, ids::HUD_MAKER_PARTS_PANEL_TITLE).center();
     cx.update_window(s.win, |_, w, cx| {
@@ -1633,6 +1643,7 @@ fn parts_panel_keeps_off_at(cx: &mut TestAppContext, w: f32, h: f32) {
     let s = stock_shell(cx, &env);
     resize(cx, &s, w, h);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let hv = bounds(cx, &s, ids::hud_maker_part(&PartKey::new(HV)));
     let area = bounds(cx, &s, ids::HUD_MAKER_CANVAS_AREA);
     // The side panel starts at the area's top right, out of HV's column, so the setup below
@@ -1728,6 +1739,7 @@ fn a_large_selection_keeps_the_side_panel_open(cx: &mut TestAppContext) {
     let s = stock_shell(cx, &env);
     resize(cx, &s, 800., 600.);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     select_hv(cx, &s);
     let screen = cx.update(|cx| page.read(cx).editor().unwrap().screen());
     commit(cx, &s, &page, Field::X, "0");
@@ -1777,6 +1789,7 @@ fn comes_to_rest_at(cx: &mut TestAppContext, w: f32, h: f32) {
     let s = stock_shell(cx, &env);
     resize(cx, &s, w, h);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     stretch_hv(cx, &s, &page);
     if cx.update(|cx| page.read(cx).is_folded(Panel::Options)) {
         support::click_id(cx, s.win, ids::HUD_MAKER_PANEL_COLLAPSE);
@@ -1793,7 +1806,8 @@ fn the_toolbar_fits_one_row_at_1024x768(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
     resize(cx, &s, 1024., 768.);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let bar = bounds(cx, &s, ids::HUD_MAKER_TOOLBAR);
     let button = bounds(cx, &s, ids::HUD_MAKER_UNDO);
     // One row of buttons, with the bar's padding and border round it.
@@ -1817,6 +1831,7 @@ fn mirror_under_the_panel(
     let s = stock_shell(cx, &env);
     resize(cx, &s, 800., 600.);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     click_row(cx, &s, &PartKey::new(MEDIC));
     // The narrow window closed the side panel while the part list was open.
     if !support::present(cx, s.win, ids::HUD_MAKER_PANEL_BODY) {
@@ -1945,6 +1960,7 @@ fn a_panel_with_no_room_beside_the_selection_shows_only_its_header_for_now(
     let s = stock_shell(cx, &env);
     resize(cx, &s, 1024., 768.);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     band_hv_without_room(cx, &s, &page);
     let hv = hv_outline(cx, &s);
     assert!(!support::present(cx, s.win, ids::HUD_MAKER_PANEL_BODY));
@@ -1973,6 +1989,7 @@ fn expanding_a_folded_panel_holds_it_open_until_the_selection_changes(cx: &mut T
     let s = stock_shell(cx, &env);
     resize(cx, &s, 1024., 768.);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     band_hv_without_room(cx, &s, &page);
     assert!(!support::present(cx, s.win, ids::HUD_MAKER_PANEL_BODY));
     support::click_id(cx, s.win, ids::HUD_MAKER_PANEL_COLLAPSE);
@@ -2024,7 +2041,7 @@ fn hover(cx: &mut TestAppContext, s: &support::ShellWindow, id: gpui_kit::Elemen
 fn hovering_a_row_outlines_its_part(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
     show_parts(cx, &s);
     assert!(!support::present(cx, s.win, ids::HUD_MAKER_HOVER));
     hover(cx, &s, ids::hud_maker_row(&PartKey::new(HV)));
@@ -2037,8 +2054,9 @@ fn hovering_a_row_outlines_its_part(cx: &mut TestAppContext) {
             && f(outline.size.height - part.size.height).abs() <= 1.,
         "{outline:?} vs {part:?}"
     );
+    // Off the row, the outline leaves HV; on the canvas it follows what the pointer is over.
     hover(cx, &s, ids::HUD_MAKER_CANVAS.into());
-    assert!(!support::present(cx, s.win, ids::HUD_MAKER_HOVER));
+    assert_ne!(hovered(cx, &page).as_deref(), Some(HV));
 }
 
 #[gpui_kit::test]
@@ -2089,6 +2107,116 @@ fn scrolling_the_parts_list_takes_the_outline_off_the_row(cx: &mut TestAppContex
             && f(outline.origin.y - part.origin.y).abs() <= 1.
     };
     assert!(!stale, "the scrolled-away row keeps its outline");
+}
+
+/// Moves the pointer to `at` with no button held, as a player's plain hover does.
+fn move_to(cx: &mut TestAppContext, s: &support::ShellWindow, at: gpui_kit::Point<Pixels>) {
+    let moved = gpui_kit::MouseMoveEvent {
+        position: at,
+        pressed_button: None,
+        modifiers: Default::default(),
+    };
+    send(cx, s, moved);
+}
+
+fn hovered(cx: &mut TestAppContext, page: &Entity<HudMakerPage>) -> Option<String> {
+    cx.update(|cx| page.read(cx).hovered().map(|k| k.as_str().to_owned()))
+}
+
+fn near(a: Bounds<Pixels>, b: Bounds<Pixels>) -> bool {
+    f(a.origin.x - b.origin.x).abs() <= 1.
+        && f(a.origin.y - b.origin.y).abs() <= 1.
+        && f(a.size.width - b.size.width).abs() <= 1.
+        && f(a.size.height - b.size.height).abs() <= 1.
+}
+
+const IMAGE: &str = "HudPlayerStatus/HudPlayerHealth/PlayerStatusHealthImage";
+const NOTHING: &str = "draws nothing in this preview";
+
+#[gpui_kit::test]
+fn hovering_a_part_on_the_canvas_outlines_and_names_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    show_parts(cx, &s);
+    let hv = PartKey::new(HV);
+    let part = bounds(cx, &s, ids::hud_maker_part(&hv));
+    move_to(cx, &s, part.center());
+    assert_eq!(hovered(cx, &page).as_deref(), Some(HV));
+    assert!(near(bounds(cx, &s, ids::HUD_MAKER_HOVER), part));
+    // The tag reads as the part's row does, so the canvas and the list name it alike.
+    let name = support::label_of(cx, s.win, ids::hud_maker_row(&hv)).unwrap();
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_HOVER_NAME),
+        Some(name)
+    );
+    // Leaving the screen takes the outline and its name away.
+    let canvas = bounds(cx, &s, ids::HUD_MAKER_CANVAS);
+    move_to(
+        cx,
+        &s,
+        point(canvas.right() + px(4.), canvas.bottom() + px(4.)),
+    );
+    assert_eq!(hovered(cx, &page), None);
+    assert!(!support::present(cx, s.win, ids::HUD_MAKER_HOVER));
+    assert!(!support::present(cx, s.win, ids::HUD_MAKER_HOVER_NAME));
+}
+
+#[gpui_kit::test]
+fn a_canvas_hover_marks_the_row_a_click_there_would_select(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let page = open_maker(cx, &s);
+    show_parts(cx, &s);
+    let part = bounds(cx, &s, ids::hud_maker_part(&PartKey::new(HV)));
+    move_to(cx, &s, part.center());
+    let canvas_hover = hovered(cx, &page);
+    assert!(canvas_hover.is_some());
+    let canvas = bounds(cx, &s, ids::HUD_MAKER_CANVAS);
+    let at = part.center() - canvas.origin;
+    cx.update_window(s.win, |_, w, cx| w.click_at(ids::HUD_MAKER_CANVAS, at, cx))
+        .unwrap();
+    support::settle(cx, s.win);
+    assert_eq!(selection(cx, &page), canvas_hover);
+}
+
+#[gpui_kit::test]
+fn hovering_a_row_names_its_part_on_the_canvas(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let _page = open_maker(cx, &s);
+    show_parts(cx, &s);
+    let hv = PartKey::new(HV);
+    hover(cx, &s, ids::hud_maker_row(&hv));
+    let name = support::label_of(cx, s.win, ids::hud_maker_row(&hv)).unwrap();
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_HOVER_NAME),
+        Some(name)
+    );
+    let tag = bounds(cx, &s, ids::HUD_MAKER_HOVER_NAME);
+    assert!(tag.intersects(&bounds(cx, &s, ids::HUD_MAKER_CANVAS)));
+}
+
+#[gpui_kit::test]
+fn a_part_with_no_artwork_is_outlined_dashed_and_says_so(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = stock_shell(cx, &env);
+    let _page = open_maker(cx, &s);
+    show_parts(cx, &s);
+    let image = PartKey::new(IMAGE);
+    // A part that draws something keeps a plain outline.
+    hover(cx, &s, ids::hud_maker_row(&PartKey::new(HV)));
+    let plain = support::label_of(cx, s.win, ids::HUD_MAKER_HOVER).unwrap();
+    assert!(!plain.contains(NOTHING), "{plain}");
+    // The stock health image paints nothing in the preview, so its outline is dashed.
+    hover(cx, &s, ids::hud_maker_row(&image));
+    let hover_label = support::label_of(cx, s.win, ids::HUD_MAKER_HOVER).unwrap();
+    assert!(hover_label.ends_with(NOTHING), "{hover_label}");
+    let tag = support::label_of(cx, s.win, ids::HUD_MAKER_HOVER_NAME).unwrap();
+    assert!(tag.contains(NOTHING), "{tag}");
+    support::click_part_row(cx, s.win, &image);
+    let selected = support::label_of(cx, s.win, ids::HUD_MAKER_SELECTION).unwrap();
+    assert!(selected.ends_with(NOTHING), "{selected}");
 }
 
 #[gpui_kit::test]
@@ -2151,6 +2279,7 @@ fn the_default_panels_keep_apart_in_the_smallest_area(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     resize(cx, &s, 800., 600.);
     let wide = f(bounds(cx, &s, ids::HUD_MAKER_CANVAS_AREA).size.width);
     resize(cx, &s, 800. + 544. - wide, 600.);
@@ -2180,7 +2309,8 @@ fn the_default_panels_keep_apart_in_the_smallest_area(cx: &mut TestAppContext) {
 fn a_wide_area_keeps_the_parts_panel_16_px_in(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     resize(cx, &s, 1920., 1080.);
     show_parts(cx, &s);
     let area = bounds(cx, &s, ids::HUD_MAKER_CANVAS_AREA);
@@ -2278,6 +2408,7 @@ fn the_side_panel_leaves_the_lower_hud_clickable(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     for (w, h) in [
         (1920., 1080.),
         (1280., 800.),
@@ -2308,6 +2439,7 @@ fn a_docked_side_panel_takes_the_whole_height_of_the_area(cx: &mut TestAppContex
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     support::click_id(cx, s.win, ids::HUD_MAKER_PANEL_DOCK_RIGHT);
     for (w, h) in [(1920., 1080.), (1280., 800.), (1024., 768.), (800., 600.)] {
         resize(cx, &s, w, h);
@@ -2316,8 +2448,8 @@ fn a_docked_side_panel_takes_the_whole_height_of_the_area(cx: &mut TestAppContex
 }
 
 /// A docked panel's column runs to 16 px above the area's bottom. Where the dock is floored
-/// (800x600) the panel floats instead, and gets back its floating cap: 60% of the area for the
-/// side panel, 75% for the parts panel.
+/// (800x600) the panel folds to a rail instead, a slim tab at the area's top; a floating one
+/// keeps its cap: 60% of the area for the side panel, 75% for the parts panel.
 fn assert_reaches_bottom(
     cx: &mut TestAppContext,
     s: &support::ShellWindow,
@@ -2331,8 +2463,16 @@ fn assert_reaches_bottom(
     };
     let area = bounds(cx, s, ids::HUD_MAKER_CANVAS_AREA);
     let panel = bounds(cx, s, id);
-    let mode = cx.update(|cx| page.read(cx).mode_shown(which));
-    if mode != PanelMode::Floating {
+    let (mode, railed) = cx.update(|cx| {
+        let page = page.read(cx);
+        (page.mode_shown(which), page.is_railed(which))
+    });
+    if railed {
+        assert!(
+            panel.size.width < px(48.) && panel.top() == area.top(),
+            "{w}x{h}: rail {panel:?} in {area:?}"
+        );
+    } else if mode != PanelMode::Floating {
         let foot = f(area.bottom()) - 16.;
         assert!(
             (f(panel.bottom()) - foot).abs() <= 1.,
@@ -2342,7 +2482,7 @@ fn assert_reaches_bottom(
         let cap = f(area.top()) + share * f(area.size.height);
         assert!(
             f(panel.bottom()) <= cap + 1.,
-            "{w}x{h}: floored dock {panel:?} reaches past {cap} in {area:?}"
+            "{w}x{h}: floating {panel:?} reaches past {cap} in {area:?}"
         );
     }
 }
@@ -2359,6 +2499,14 @@ fn arrange(
         PanelMode::DockRight => right,
         _ => float,
     };
+    // A railed panel has no dock buttons until it opens.
+    let open_rail = |cx: &mut TestAppContext, railed: &'static str, collapse: &'static str| {
+        let rail = support::bounds_of(cx, s.win, railed).is_some_and(|b| b.size.width < px(48.));
+        if rail {
+            support::click_id(cx, s.win, collapse);
+        }
+    };
+    open_rail(cx, ids::HUD_MAKER_PANEL, ids::HUD_MAKER_PANEL_COLLAPSE);
     support::click_id(
         cx,
         s.win,
@@ -2368,6 +2516,11 @@ fn arrange(
             ids::HUD_MAKER_PANEL_FLOAT,
             ids::HUD_MAKER_PANEL_DOCK_RIGHT,
         ),
+    );
+    open_rail(
+        cx,
+        ids::HUD_MAKER_PARTS_PANEL,
+        ids::HUD_MAKER_PARTS_PANEL_COLLAPSE,
     );
     support::click_id(
         cx,
@@ -2394,6 +2547,7 @@ fn a_docked_panel_reaches_the_area_bottom(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let (left, right, float) = (
         PanelMode::DockLeft,
         PanelMode::DockRight,
@@ -2416,8 +2570,10 @@ fn a_docked_panel_reaches_the_area_bottom(cx: &mut TestAppContext) {
         for (options, parts, last) in cases {
             arrange(cx, &s, options, parts);
             assert_reaches_bottom(cx, &s, &page, (w, h), last);
-            // Two open panels in one column share it without overlapping.
-            if options.0 == parts.0 && options.1 && parts.1 {
+            // Two open panels in one column share it without overlapping; a narrow window shows
+            // rails instead.
+            let railed = cx.update(|cx| Panel::ALL.map(|p| page.read(cx).is_railed(p)));
+            if options.0 == parts.0 && options.1 && parts.1 && railed == [false; 2] {
                 let top = bounds(cx, &s, ids::HUD_MAKER_PANEL);
                 let under = bounds(cx, &s, ids::HUD_MAKER_PARTS_PANEL);
                 assert!(
@@ -2501,6 +2657,7 @@ fn a_floating_panel_body_shows_a_scrollbar(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     resize(cx, &s, 800., 600.);
     let float = PanelMode::Floating;
     // The part list first, with nothing selected for a floating panel to keep off.
@@ -2522,7 +2679,8 @@ fn a_floating_panel_body_shows_a_scrollbar(cx: &mut TestAppContext) {
 fn a_docked_part_list_fills_its_panel(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     resize(cx, &s, 1920., 1080.);
     arrange(
         cx,
@@ -2543,7 +2701,8 @@ fn a_docked_part_list_fills_its_panel(cx: &mut TestAppContext) {
 fn a_collapsed_docked_panel_stays_its_header(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     resize(cx, &s, 1920., 1080.);
     let left = PanelMode::DockLeft;
     // Collapsed over an open panel, then under one.
@@ -2579,6 +2738,7 @@ fn a_floating_panel_keeps_off_a_tall_docked_panel(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     resize(cx, &s, 1920., 1080.);
     arrange(
         cx,
@@ -2608,6 +2768,7 @@ fn part_row_text_ends_left_of_the_scrollbar(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     resize(cx, &s, 1920., 1080.);
     arrange(
         cx,
@@ -2643,7 +2804,8 @@ fn part_row_text_ends_left_of_the_scrollbar(cx: &mut TestAppContext) {
 fn everything_fits_from_the_smallest_window_to_full_hd(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     for (w, h) in [(800., 600.), (1024., 768.), (1920., 1080.)] {
         resize(cx, &s, w, h);
         let area = bounds(cx, &s, ids::HUD_MAKER_CANVAS_AREA);
@@ -2696,6 +2858,7 @@ fn a_docked_column_fits_the_area_and_its_last_row_can_be_reached(cx: &mut TestAp
     let s = stock_shell(cx, &env);
     resize(cx, &s, 1024., 768.);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     show_parts(cx, &s);
     click_row(cx, &s, &PartKey::new("HudWeaponAmmo"));
     show_parts(cx, &s);
@@ -2746,6 +2909,7 @@ fn a_narrow_area_keeps_one_floating_panel_open(cx: &mut TestAppContext) {
     let s = stock_shell(cx, &env);
     resize(cx, &s, 800., 600.);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     assert!(!collapsed(cx, &page, Panel::Options));
     support::click_id(cx, s.win, ids::HUD_MAKER_PARTS_PANEL_COLLAPSE);
     assert!(!collapsed(cx, &page, Panel::Parts));
@@ -2876,6 +3040,10 @@ fn assert_buttons_work(
             PanelMode::DockLeft,
             "{label}: {panel:?} dock"
         );
+        // A docked panel may fold to a rail, which opens it to show its Float button.
+        if cx.update(|cx| page.read(cx).is_railed(panel)) {
+            support::click_id(cx, s.win, collapse);
+        }
         support::click_id(cx, s.win, float);
         assert_eq!(
             place(cx).mode,
@@ -2912,6 +3080,7 @@ fn keep_apart_at(cx: &mut TestAppContext, w: f32, h: f32) {
         let s = stock_shell(cx, &env);
         resize(cx, &s, w, h);
         let page = open_maker(cx, &s);
+        support::maker_page::float_panels(cx, &s, &page);
         pick_screen(cx, &s, screen);
         show_parts(cx, &s);
         if let Some(key) = part {
@@ -3006,7 +3175,8 @@ fn toasts_stay_at_the_bottom_above_the_toolbar(cx: &mut TestAppContext) {
 fn at_800x600_both_default_panels_keep_a_margin_from_the_area_edges(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     resize(cx, &s, 800., 600.);
     let area = bounds(cx, &s, ids::HUD_MAKER_CANVAS_AREA);
     let options = bounds(cx, &s, ids::HUD_MAKER_PANEL);
@@ -3280,10 +3450,11 @@ fn a_half_clear_colour_paints_and_takes_the_click(cx: &mut TestAppContext) {
     assert_eq!(selection(cx, &page).as_deref(), Some("CHealthAccountPanel"));
 }
 
-// How the toolbar test sets the page up: the sidebar shut (shot 43), the side panel docked
-// left (shot 42), or neither.
+// How the toolbar test sets the page up: the panels as they first open, docked; floating with
+// the sidebar shut (shot 43), the side panel docked left (shot 42), or neither.
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Setup {
+    Default,
     Plain,
     NarrowSidebar,
     DockedLeft,
@@ -3301,6 +3472,9 @@ fn toolbar_keeps_off_the_canvas_at(cx: &mut TestAppContext, w: f32, h: f32, setu
         support::click_id(cx, s.win, ids::SIDEBAR_TOGGLE);
     }
     let page = open_maker(cx, &s);
+    if setup != Setup::Default {
+        support::maker_page::float_panels(cx, &s, &page);
+    }
     if let Some(mode) = match setup {
         Setup::DockedLeft => Some(PanelMode::DockLeft),
         Setup::DockedRight => Some(PanelMode::DockRight),
@@ -3360,6 +3534,21 @@ fn toolbar_keeps_off_the_canvas_at(cx: &mut TestAppContext, w: f32, h: f32, setu
 // One window per test: an edited HUD Maker in an earlier window would hold the next one's
 // sidebar click behind the leave check.
 #[gpui_kit::test]
+fn at_800x600_the_toolbar_keeps_off_the_docked_default_canvas(cx: &mut TestAppContext) {
+    toolbar_keeps_off_the_canvas_at(cx, 800., 600., Setup::Default);
+}
+
+#[gpui_kit::test]
+fn at_1280x800_the_toolbar_keeps_off_the_docked_default_canvas(cx: &mut TestAppContext) {
+    toolbar_keeps_off_the_canvas_at(cx, 1280., 800., Setup::Default);
+}
+
+#[gpui_kit::test]
+fn at_1440x900_the_toolbar_keeps_off_the_docked_default_canvas(cx: &mut TestAppContext) {
+    toolbar_keeps_off_the_canvas_at(cx, 1440., 900., Setup::Default);
+}
+
+#[gpui_kit::test]
 fn at_800x600_the_toolbar_keeps_off_the_canvas(cx: &mut TestAppContext) {
     toolbar_keeps_off_the_canvas_at(cx, 800., 600., Setup::Plain);
 }
@@ -3390,6 +3579,7 @@ fn parts_panel_folds_in_place_at(cx: &mut TestAppContext, w: f32, h: f32) {
     let s = support::shell_window(cx, &env, found(&env));
     resize(cx, &s, w, h);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let place = PanelPlace {
         mode: PanelMode::DockLeft,
         collapsed: false,
@@ -3461,6 +3651,7 @@ fn at_1920x1080_the_open_toolbar_costs_a_16_9_screen_nothing(cx: &mut TestAppCon
     let s = stock_shell(cx, &env);
     resize(cx, &s, 1920., 1080.);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let loss = preview_loss(cx, &s, &page);
     assert!(loss <= 0.5, "the screen lost {loss} px");
     let (bar, canvas) = (
@@ -3476,6 +3667,7 @@ fn at_1920x1080_the_shut_toolbar_sits_beside_a_4_3_screen(cx: &mut TestAppContex
     let s = stock_shell(cx, &env);
     resize(cx, &s, 1920., 1080.);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     pick_screen(cx, &s, Screen::new(1440, 1080));
     support::click_id(cx, s.win, ids::HUD_MAKER_TOOLBAR_COLLAPSE);
     let loss = preview_loss(cx, &s, &page);
@@ -3606,6 +3798,7 @@ fn a_pick_on_the_canvas_scrolls_its_row_into_view_once(cx: &mut TestAppContext) 
     let env = support::env();
     let s = stock_shell(cx, &env);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     show_parts(cx, &s);
     let hv = PartKey::new(HV);
     wheel_parts_to_the_end(cx, &s);
@@ -3730,32 +3923,34 @@ fn the_open_parts_list_stops_above_the_ammo(cx: &mut TestAppContext) {
         assert!(support::present(cx, s.win, ids::HUD_MAKER_PARTS), "{w}x{h}");
     }
 }
-
-// The issue's case: docked right at 800x600 the screen would shrink to 248x140, so the panel
-// floats for now; the dock stays the player's choice and returns in a larger window.
+// A dock that would shrink the screen below its floor folds to a slim rail for now, so the
+// screen keeps nearly all its room; the dock stays the player's choice and returns in a larger
+// window.
 #[gpui_kit::test]
-fn a_dock_that_would_shrink_the_screen_too_far_floats_for_now(cx: &mut TestAppContext) {
+fn a_dock_that_would_shrink_the_screen_too_far_folds_to_a_rail_for_now(cx: &mut TestAppContext) {
     let env = support::env();
     let s = stock_shell(cx, &env);
     resize(cx, &s, 800., 600.);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let before = bounds(cx, &s, ids::HUD_MAKER_CANVAS);
     support::click_id(cx, s.win, ids::HUD_MAKER_PANEL_DOCK_RIGHT);
     assert_at_rest(cx, &s, &page, "docked right at 800x600");
     let canvas = bounds(cx, &s, ids::HUD_MAKER_CANVAS);
     assert!(
-        canvas.size.height >= before.size.height * 0.9,
+        canvas.size.height >= before.size.height * 0.8,
         "the screen shrank from {before:?} to {canvas:?}"
     );
     assert_eq!(
         cx.update(|cx| page.read(cx).place_of(Panel::Options)).mode,
         PanelMode::DockRight
     );
-    // Floating, the panel leaves the screen the area's whole width.
+    assert!(cx.update(|cx| page.read(cx).is_railed(Panel::Options)));
+    let rail = bounds(cx, &s, ids::HUD_MAKER_PANEL);
     let area = bounds(cx, &s, ids::HUD_MAKER_CANVAS_AREA);
     assert!(
-        f(canvas.size.width - area.size.width).abs() <= 1.,
-        "{canvas:?} in {area:?}"
+        f(rail.right() - area.right()).abs() <= 1. && canvas.right() <= rail.left(),
+        "a rail {rail:?} beside {canvas:?}"
     );
     support::wait_real(cx, "the setting", |_| {
         saved_panel(&s).is_some_and(|p| p.starts_with("right "))
@@ -3764,6 +3959,7 @@ fn a_dock_that_would_shrink_the_screen_too_far_floats_for_now(cx: &mut TestAppCo
     let panel = bounds(cx, &s, ids::HUD_MAKER_PANEL);
     let area = bounds(cx, &s, ids::HUD_MAKER_CANVAS_AREA);
     let canvas = bounds(cx, &s, ids::HUD_MAKER_CANVAS);
+    assert!(support::present(cx, s.win, ids::HUD_MAKER_PANEL_BODY));
     assert!(
         f(panel.right() - area.right()).abs() <= 1. && canvas.right() <= panel.left(),
         "docked again: {panel:?} beside {canvas:?}"
@@ -3778,6 +3974,7 @@ fn at_800x600_the_open_parts_list_covers_at_most_a_quarter_of_the_screen(cx: &mu
     let s = stock_shell(cx, &env);
     resize(cx, &s, 800., 600.);
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     show_parts(cx, &s);
     let check = |cx: &mut TestAppContext, when: &str| {
         assert_at_rest(cx, &s, &page, when);
@@ -3810,6 +4007,7 @@ fn a_selection_keeps_the_list_off_the_killfeed_at(cx: &mut TestAppContext, w: f3
         let s = stock_shell(cx, &env);
         resize(cx, &s, w, h);
         let page = open_maker(cx, &s);
+        support::maker_page::float_panels(cx, &s, &page);
         show_parts(cx, &s);
         let list = bounds(cx, &s, ids::HUD_MAKER_PARTS_PANEL);
         support::click_part_row(cx, s.win, &PartKey::new(HV));
@@ -3890,7 +4088,8 @@ fn a_narrow_toolbar_keeps_the_save_row_in_the_more_menu(cx: &mut TestAppContext)
     let env = support::env();
     let s = stock_shell(cx, &env);
     resize(cx, &s, 940., 768.);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     support::click_id(cx, s.win, ids::HUD_MAKER_PANEL_DOCK_RIGHT);
     for id in [
         ids::HUD_MAKER_NAME,
@@ -3943,7 +4142,8 @@ fn the_reserve_ammo_outlines_end_where_its_panel_cuts_it_off(cx: &mut TestAppCon
         &[("resource/ui/hudammoweapons.res", Some(STOCK_RESERVE))],
     );
     let s = support::shell_window(cx, &env, found(&env));
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let reserve = PartKey::new("HudWeaponAmmo/AmmoInReserve");
     let bg = bounds(
         cx,
@@ -4092,6 +4292,7 @@ fn a_side_its_panel_cuts_off_has_no_handles(cx: &mut TestAppContext) {
     );
     let s = support::shell_window(cx, &env, found(&env));
     let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     let reserve = PartKey::new("HudWeaponAmmo/AmmoInReserve");
     click_row(cx, &s, &reserve);
     let cut = [Handle::Right, Handle::TopRight, Handle::BottomRight];
@@ -4130,7 +4331,8 @@ fn a_docked_panel_leaves_the_screen_the_same_gutter_on_both_sides(cx: &mut TestA
     let env = support::env();
     let s = stock_shell(cx, &env);
     resize(cx, &s, 1280., 800.);
-    let _page = open_maker(cx, &s);
+    let page = open_maker(cx, &s);
+    support::maker_page::float_panels(cx, &s, &page);
     support::click_id(cx, s.win, ids::HUD_MAKER_PANEL_DOCK_LEFT);
     let panel = bounds(cx, &s, ids::HUD_MAKER_PANEL);
     let area = bounds(cx, &s, ids::HUD_MAKER_CANVAS_AREA);

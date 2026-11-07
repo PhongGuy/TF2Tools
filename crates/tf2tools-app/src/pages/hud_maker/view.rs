@@ -316,9 +316,17 @@ pub struct Places {
 }
 
 impl Places {
+    /// Docked beside the canvas so it is never covered: the side panel open on the left, the
+    /// part list a rail on the right. Floating starts from the panels' own default places.
     pub const DEFAULT: Places = Places {
-        options: PanelPlace::DEFAULT,
-        parts: PanelPlace::PARTS_DEFAULT,
+        options: PanelPlace {
+            mode: PanelMode::DockLeft,
+            ..PanelPlace::DEFAULT
+        },
+        parts: PanelPlace {
+            mode: PanelMode::DockRight,
+            ..PanelPlace::PARTS_DEFAULT
+        },
         toolbar_collapsed: false,
     };
 

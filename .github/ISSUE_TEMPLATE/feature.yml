@@ -1,0 +1,25 @@
+name: Feature idea
+description: Suggest something new or a better way to do something
+title: "[Idea]: "
+labels: ["feature"]
+assignees: ["PhongGuy"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: Tell us what you're trying to do, or what feels hard today.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How you imagine it working. Sketches and screenshots welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: examples
+    attributes:
+      label: Seen it somewhere else?
+      description: Other tools, HUDs or games that do this well.
