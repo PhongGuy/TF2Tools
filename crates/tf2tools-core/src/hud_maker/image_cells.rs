@@ -1,6 +1,7 @@
 //! How an image part lays its texture over its box: one stretched piece, or the nine pieces
 //! of a scalable panel whose corners keep their size while edges and centre stretch.
 
+use super::Size;
 use super::expr::{ScreenScale, atoi};
 use super::layout::Screen;
 use super::model::Part;
@@ -65,7 +66,7 @@ impl ImageCell {
 /// One axis's pieces: (screen start, screen size, texel start, texel size).
 type Span = (i32, i32, u32, u32);
 
-/// The pieces `part` draws its `texture` (width, height in texels) in, for a box `wide` x
+/// The pieces `part` draws its `texture` (in texels) in, for a box `wide` x
 /// `tall` on `screen`. A scalable panel keeps `draw_corner_*` (proportional units) for the
 /// corners' size and `src_corner_*` texels of the texture for them; pieces with no size on
 /// screen or in the texture are left out. Rows top to bottom, each left to right.
@@ -73,7 +74,7 @@ pub fn image_cells(
     part: &Part,
     wide: i32,
     tall: i32,
-    texture: (u32, u32),
+    texture: Size<u32>,
     screen: Screen,
 ) -> Vec<ImageCell> {
     let scalable = part.class().is_some_and(|class| {
@@ -92,36 +93,36 @@ pub fn image_cells(
         wide,
         tall,
         texture,
-        (key("draw_corner_width"), key("draw_corner_height")),
-        (key("src_corner_width"), key("src_corner_height")),
+        Size::new(key("draw_corner_width"), key("draw_corner_height")),
+        Size::new(key("src_corner_width"), key("src_corner_height")),
         screen,
     )
 }
 
-/// The nine pieces of a `texture` (width, height in texels) stretched over a box `wide` x
+/// The nine pieces of a `texture` (in texels) stretched over a box `wide` x
 /// `tall` on `screen`: corners `draw_corner` proportional units on screen showing `src_corner`
 /// texels, edges and centre stretched. Negative corners count as 0; pieces with no size on
 /// screen or in the texture are left out. Rows top to bottom, each left to right.
 pub fn nine_slice(
     wide: i32,
     tall: i32,
-    texture: (u32, u32),
-    draw_corner: (i32, i32),
-    src_corner: (i32, i32),
+    texture: Size<u32>,
+    draw_corner: Size,
+    src_corner: Size,
     screen: Screen,
 ) -> Vec<ImageCell> {
     let scale = ScreenScale::new(screen.tall());
     let columns = spans(
         wide,
-        scale.scale(draw_corner.0.max(0)),
-        texture.0,
-        src_corner.0.max(0),
+        scale.scale(draw_corner.wide.max(0)),
+        texture.wide,
+        src_corner.wide.max(0),
     );
     let rows = spans(
         tall,
-        scale.scale(draw_corner.1.max(0)),
-        texture.1,
-        src_corner.1.max(0),
+        scale.scale(draw_corner.tall.max(0)),
+        texture.tall,
+        src_corner.tall.max(0),
     );
     let mut cells = Vec::new();
     for &(y, tall, src_y, src_tall) in &rows {

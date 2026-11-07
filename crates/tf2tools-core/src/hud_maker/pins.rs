@@ -3,7 +3,7 @@
 use super::borrow::{READ_AT, px_to_units};
 use super::edits::{code_owns, geometry_ok, set_lines};
 use super::probe;
-use super::{Change, EditRefused, HudModel, KeyLine, Part, PartKey, PinCorner};
+use super::{Change, EditRefused, HudModel, KeyLine, Part, PartKey, PinCorner, Point};
 
 /// Why a pin or unpin made no changes; checked in this order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,15 +53,15 @@ impl HudModel {
         // Pin with zero offsets, then measure how far that moved the part: the gap, with the
         // engine's pin sign undone, is the offset that puts it back.
         let before = self.place_at(part).ok_or(PinRefused::UnknownPart)?;
-        let trial = pin_lines(p, target.name(), own, corner, (0, 0), group);
+        let trial = pin_lines(p, target.name(), own, corner, Point::default(), group);
         let replay = [self.replayed(), &trial].concat();
         let pinned = self.with_changes(&replay).into_model();
         let after = pinned.place_at(part).ok_or(PinRefused::UnknownPart)?;
         let (sign_x, sign_y) = probe::pin_offset_sign(own, corner);
         let units = |px: i32, sign: i32| px_to_units(px, READ_AT.tall()).saturating_mul(sign);
-        let offset = (
-            units(before.0.saturating_sub(after.0), sign_x),
-            units(before.1.saturating_sub(after.1), sign_y),
+        let offset = Point::new(
+            units(before.x.saturating_sub(after.x), sign_x),
+            units(before.y.saturating_sub(after.y), sign_y),
         );
         Ok(pin_lines(p, target.name(), own, corner, offset, group))
     }
@@ -79,7 +79,7 @@ impl HudModel {
         for key in PIN_KEYS {
             changes.extend(self.remove_key(part, key, group).map_err(refused)?);
         }
-        for (key, px) in [("xpos", at.0), ("ypos", at.1)] {
+        for (key, px) in [("xpos", at.x), ("ypos", at.y)] {
             let text = px_to_units(px, READ_AT.tall()).to_string();
             changes.extend(set_lines(p, key, group, |_| text.clone()));
         }
@@ -129,16 +129,16 @@ impl HudModel {
     }
 
     /// The part's place inside its parent at the reference screen, in pixels.
-    fn place_at(&self, part: &PartKey) -> Option<(i32, i32)> {
+    fn place_at(&self, part: &PartKey) -> Option<Point> {
         let layout = self.layout(READ_AT);
         let here = layout.get(part)?;
         let up = (self.part(part)?.parent()).and_then(|k| layout.get(k));
         Some(match up {
-            Some(up) => (
+            Some(up) => Point::new(
                 here.x().saturating_sub(up.x()),
                 here.y().saturating_sub(up.y()),
             ),
-            None => (here.x(), here.y()),
+            None => Point::new(here.x(), here.y()),
         })
     }
 }
@@ -160,7 +160,7 @@ fn pin_lines(
     to: &str,
     own: PinCorner,
     corner: PinCorner,
-    (x, y): (i32, i32),
+    Point { x, y }: Point,
     group: u32,
 ) -> Vec<Change> {
     let (x, y) = (x.to_string(), y.to_string());

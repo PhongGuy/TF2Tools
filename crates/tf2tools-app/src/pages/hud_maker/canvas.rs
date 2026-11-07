@@ -1816,8 +1816,8 @@ fn label_element(
     // Core's text inset, placed as the game places it: the text draws at most the box's width
     // less the x inset, then the x inset moves it in from a west or east edge (out past it when
     // negative) and the y inset moves it down. The box clips what the insets push out.
-    let (inset_x, iy) = look.model.text_inset(part.key(), look.screen);
-    let (ix, iy) = (inset_x as f32 * look.scale, iy as f32 * look.scale);
+    let inset = look.model.text_inset(part.key(), look.screen);
+    let (ix, iy) = (inset.x as f32 * look.scale, inset.y as f32 * look.scale);
     // A label the game widens to its text has no width to cut it at.
     let grows = look.sample.sizes_to_text(part.name());
     let room = match grows {
@@ -1845,7 +1845,7 @@ fn label_element(
         None => el,
     };
     let shift = match column {
-        _ if wrapped.is_some() => wrapped_text_left(column, inset_x) as f32 * look.scale,
+        _ if wrapped.is_some() => wrapped_text_left(column, inset.x) as f32 * look.scale,
         0 => ix,
         2 => -ix,
         _ => 0.,
@@ -1887,7 +1887,7 @@ fn wrapped_lines(
     };
     let room = b
         .wide()
-        .saturating_sub(look.model.text_inset(part.key(), look.screen).0);
+        .saturating_sub(look.model.text_inset(part.key(), look.screen).x);
     let text = shown.replace("\\n", "\n");
     let lines = wrap_lines(&text, room as f32, advance);
     Some(WrappedText {
@@ -2234,9 +2234,9 @@ fn image_pieces(
 }
 
 // A decoded texture's size in texels.
-fn texture_size(image: &Arc<RenderImage>) -> (u32, u32) {
+fn texture_size(image: &Arc<RenderImage>) -> tf2tools_core::Size<u32> {
     let s = image.size(0);
-    (s.width.0.max(0) as u32, s.height.0.max(0) as u32)
+    tf2tools_core::Size::new(s.width.0.max(0) as u32, s.height.0.max(0) as u32)
 }
 
 // Each piece clips a copy of the whole texture, sized and shifted so the piece's texels fill it.
@@ -2260,8 +2260,8 @@ fn pieces(
                 .absolute()
                 .left(px(-(c.src_x() as f32) * fx))
                 .top(px(-(c.src_y() as f32) * fy))
-                .w(px(texture.0 as f32 * fx))
-                .h(px(texture.1 as f32 * fy));
+                .w(px(texture.wide as f32 * fx))
+                .h(px(texture.tall as f32 * fy));
             div()
                 .id(id(i))
                 .test_support()
@@ -2822,8 +2822,8 @@ fn killfeed_lines(
             .h(at(line.icon()));
         let icon = match look.images.get(&kill_icon_key(line.icon_name())) {
             Some(image) => {
-                let (w, h) = texture_size(image);
-                let wide = (w as f32 * line.icon() as f32 / h.max(1) as f32) as i32;
+                let t = texture_size(image);
+                let wide = (t.wide as f32 * line.icon() as f32 / t.tall.max(1) as f32) as i32;
                 icon.w(at(wide)).child(
                     img(Arc::clone(image))
                         .object_fit(ObjectFit::Fill)

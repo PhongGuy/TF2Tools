@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use super::text_wrap::{wrap_lines, wrapped_text_left};
-use super::{ALIGNMENTS, GameText, HiddenBy, HudLayout, HudModel, PartKey, Rect, Screen};
+use super::{ALIGNMENTS, GameText, HiddenBy, HudLayout, HudModel, PartKey, Point, Rect, Screen};
 
 /// The keys whose presence makes a part paint something.
 const PAINTS: [&str; 4] = ["labelText", "image", "bgcolor_override", "fillcolor"];
@@ -261,21 +261,21 @@ impl HudModel {
     /// `textinsety`, scaled from proportional units when `use_proportional_insets` is on (y is
     /// read as a decimal and rounded up). The x inset moves text in from the side it is aligned
     /// to, west or east; the y inset moves text down whatever its alignment.
-    pub fn text_inset(&self, key: &PartKey, screen: Screen) -> (i32, i32) {
+    pub fn text_inset(&self, key: &PartKey, screen: Screen) -> Point {
         let Some(part) = self.part(key) else {
-            return (0, 0);
+            return Point::default();
         };
         let bytes = |k: &str| part.value(k).map(|v| v.text().as_bytes());
         let int = |k: &str| bytes(k).map_or(0, super::expr::atoi);
         let (x, y) = (int("textinsetx"), int("textinsety"));
         if int("use_proportional_insets") <= 0 {
-            return (x, y);
+            return Point::new(x, y);
         }
         let scale = super::ScreenScale::new(screen.tall());
         let y = bytes("textinsety").map_or(0., super::expr::atof);
         // A float to int cast saturates, so a huge inset stays in range.
         let y = (f64::from(y) * f64::from(scale.scale(1000)) / 1000.).ceil() as i32;
-        (scale.scale(x), y)
+        Point::new(scale.scale(x), y)
     }
 
     /// Where a label's `text` lands, estimated from its font's height and placed by its
@@ -295,8 +295,8 @@ impl HudModel {
         // An unknown font draws at 60 % of the box, as the preview does.
         let tall = font.unwrap_or((bottom - t) * 3 / 5);
         let glyph = tall as f64 * GLYPH_WIDTH;
-        let (inset_x, iy) = self.text_inset(part.key(), screen);
-        let (ix, iy) = (i64::from(inset_x), i64::from(iy));
+        let inset = self.text_inset(part.key(), screen);
+        let (ix, iy) = (i64::from(inset.x), i64::from(inset.y));
         let centre_lines = switched_on(part, "centerwrap");
         let wrapped = centre_lines || switched_on(part, "wrap");
         let lines: Vec<&str> = if wrapped {
@@ -326,7 +326,7 @@ impl HudModel {
                 } else {
                     0
                 };
-                l.saturating_add(i64::from(wrapped_text_left(column, inset_x)))
+                l.saturating_add(i64::from(wrapped_text_left(column, inset.x)))
                     .saturating_add(indent)
             }
             0 => l.saturating_add(ix),

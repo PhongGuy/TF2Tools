@@ -5,6 +5,7 @@ use crate::error::HudFilesError;
 use crate::fonts::Platform;
 use crate::fonts::keyvalues::{KvPair, KvValue};
 
+use super::Size;
 use super::document::KvDocument;
 use super::files::{HudFiles, KeptFiles};
 
@@ -120,8 +121,8 @@ impl FontVariant {
 #[non_exhaustive]
 pub struct ImageBorder {
     image: String,
-    src_corner: (i32, i32),
-    draw_corner: (i32, i32),
+    src_corner: Size,
+    draw_corner: Size,
 }
 
 impl ImageBorder {
@@ -130,13 +131,13 @@ impl ImageBorder {
         &self.image
     }
 
-    /// The corners' size in the texture, in texels: (width, height).
-    pub fn src_corner(&self) -> (i32, i32) {
+    /// The corners' size in the texture, in texels.
+    pub fn src_corner(&self) -> Size {
         self.src_corner
     }
 
-    /// The corners' size on screen, in proportional units: (width, height).
-    pub fn draw_corner(&self) -> (i32, i32) {
+    /// The corners' size on screen, in proportional units.
+    pub fn draw_corner(&self) -> Size {
         self.draw_corner
     }
 }
@@ -394,8 +395,8 @@ fn image_border(pairs: &[KvPair]) -> Option<ImageBorder> {
     let number = |key: &str| find_text(pairs, key).map_or(0, atoi);
     scalable.then(|| ImageBorder {
         image: image.to_owned(),
-        src_corner: (number("src_corner_width"), number("src_corner_height")),
-        draw_corner: (number("draw_corner_width"), number("draw_corner_height")),
+        src_corner: Size::new(number("src_corner_width"), number("src_corner_height")),
+        draw_corner: Size::new(number("draw_corner_width"), number("draw_corner_height")),
     })
 }
 

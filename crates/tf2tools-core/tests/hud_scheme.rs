@@ -2,7 +2,7 @@
 
 use crate::common;
 
-use tf2tools_core::{HudFiles, Platform, Rgba, Scheme};
+use tf2tools_core::{HudFiles, Platform, Rgba, Scheme, Size};
 
 const SCHEME: &str = r#"#base "clientscheme_colors.res"
 #base "../../outside.res"
@@ -179,7 +179,11 @@ fn a_scalable_image_border_reads_its_image_and_corners() {
     let border = scheme.image_border("tfthinlineborder").unwrap();
     assert_eq!(
         (border.image(), border.src_corner(), border.draw_corner()),
-        ("../hud/tournament_panel_brown", (23, 23), (8, 8))
+        (
+            "../hud/tournament_panel_brown",
+            Size::new(23, 23),
+            Size::new(8, 8)
+        )
     );
     for name in ["Plain", "NoImage", "Wrong", "Missing"] {
         assert!(scheme.image_border(name).is_none(), "{name}");

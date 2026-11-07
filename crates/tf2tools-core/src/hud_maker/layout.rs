@@ -8,8 +8,8 @@ use super::expr::atoi;
 use super::probe::{self, HideHow};
 use super::scene::Fit;
 use super::{
-    AxisSize, GameSituation, HudModel, Part, PartKey, PinCorner, PosExpr, Rect, ScreenScale,
-    SizeExpr,
+    AxisSize, GameSituation, HudModel, Part, PartKey, PinCorner, Point, PosExpr, Rect, ScreenScale,
+    Size, SizeExpr,
 };
 
 /// A screen shape in pixels.
@@ -411,9 +411,9 @@ impl HudLayout {
 
 /// A part's box before pins are applied: its size and its position inside its parent.
 struct Placed {
-    rel: (i32, i32),
-    size: (i32, i32),
-    align: (i32, i32),
+    rel: Point,
+    size: Size,
+    align: Size,
 }
 
 impl HudModel {
@@ -436,7 +436,7 @@ impl HudModel {
             .map(|p| p.parent().and_then(|k| index.get(k).copied()))
             .collect();
         let scale = ScreenScale::new(screen.tall);
-        let screen_size = (clamp(screen.wide), clamp(screen.tall));
+        let screen_size = Size::new(clamp(screen.wide), clamp(screen.tall));
 
         // Parts come parents first, so each parent's size is known when its children read it.
         let mut placed: Vec<Placed> = Vec::with_capacity(parts.len());
@@ -455,9 +455,9 @@ impl HudModel {
                 parents[s] == parents[i] && parts[s].name().eq_ignore_ascii_case(sibling)
             });
             if let Some(s) = found {
-                let units = i64::from(gap) * i64::from(screen_size.0) / 640;
-                let x = units.saturating_add(i64::from(placed[s].size.0));
-                placed[i].rel.0 = i32::try_from(x).unwrap_or(i32::MAX);
+                let units = i64::from(gap) * i64::from(screen_size.wide) / 640;
+                let x = units.saturating_add(i64::from(placed[s].size.wide));
+                placed[i].rel.x = i32::try_from(x).unwrap_or(i32::MAX);
             }
         }
 
@@ -473,25 +473,25 @@ impl HudModel {
                 |f| f.pixel_tall(screen.tall),
             );
             let tall = font.saturating_add(2);
-            let y = f64::from(placed[chat].size.1) - f64::from(tall) * 1.75;
-            placed[i].rel.1 = y as i32;
-            placed[i].size.1 = tall;
+            let y = f64::from(placed[chat].size.tall) - f64::from(tall) * 1.75;
+            placed[i].rel.y = y as i32;
+            placed[i].size.tall = tall;
         }
 
         let pins: Vec<Option<Pin>> = (0..parts.len())
             .map(|i| pin_of(parts, &parents, i))
             .collect();
-        let mut rel: Vec<Option<(i32, i32)>> = vec![None; parts.len()];
+        let mut rel: Vec<Option<Point>> = vec![None; parts.len()];
         for i in 0..parts.len() {
             pinned_rel(i, parts, &placed, &pins, scale, &mut rel);
         }
 
         let mut boxes: Vec<PartBox> = Vec::with_capacity(parts.len());
         for (i, part) in parts.iter().enumerate() {
-            let (rx, ry) = rel[i].unwrap_or(placed[i].rel);
+            let at = rel[i].unwrap_or(placed[i].rel);
             let (px, py) = parents[i].map_or((0, 0), |p| (boxes[p].x, boxes[p].y));
-            let (wide, tall) = placed[i].size;
-            let (x, y) = (px.saturating_add(rx), py.saturating_add(ry));
+            let Size { wide, tall } = placed[i].size;
+            let (x, y) = (px.saturating_add(at.x), py.saturating_add(at.y));
             // The health element grows its pulse image about its centre as health moves.
             let grow = match GameSituation::is_pulse_image(part) {
                 true => s.health_pulse_grow(self),
@@ -509,8 +509,8 @@ impl HudModel {
             );
             let full_screen = x <= 0
                 && y <= 0
-                && x.saturating_add(wide) >= screen_size.0
-                && y.saturating_add(tall) >= screen_size.1;
+                && x.saturating_add(wide) >= screen_size.wide
+                && y.saturating_add(tall) >= screen_size.tall;
             let painted = ["bgcolor_override", "fillcolor", "image"]
                 .iter()
                 .any(|k| part.value(k).is_some());
@@ -564,13 +564,13 @@ impl HudModel {
         }
         // Place only the chain, top down, so the check never lays out the whole HUD.
         Screen::PRESETS.iter().all(|s| {
-            let screen = (clamp(s.wide), clamp(s.tall));
+            let screen = Size::new(clamp(s.wide), clamp(s.tall));
             let scale = ScreenScale::new(s.tall);
             let mut size = screen;
             chain.iter().rev().all(|p| {
                 let placed = place(p, size, screen, scale);
                 size = placed.size;
-                placed.rel.0 == 0 && placed.size.0 == screen.0
+                placed.rel.x == 0 && placed.size.wide == screen.wide
             })
         })
     }
@@ -663,7 +663,7 @@ fn applies(part: &Part, key: &str) -> bool {
 
 /// Size, then position inside the parent. `r`, `c`, `f` and `p` measure against the screen
 /// unless the block sets `proportionaltoparent`.
-fn place(part: &Part, parent: (i32, i32), screen: (i32, i32), scale: ScreenScale) -> Placed {
+fn place(part: &Part, parent: Size, screen: Size, scale: ScreenScale) -> Placed {
     let align = match int(part, "proportionaltoparent") {
         Some(n) if n != 0 => parent,
         _ => screen,
@@ -676,7 +676,7 @@ fn place(part: &Part, parent: (i32, i32), screen: (i32, i32), scale: ScreenScale
     let wide_expr = part.value("wide").map(|l| SizeExpr::parse(l.text()));
     let tall_expr = part.value("tall").map(|l| SizeExpr::parse(l.text()));
     // The engine starts every panel at 64x24 px before its settings apply.
-    let (wide_axis, tall_axis) = (AxisSize::new(64, align.0), AxisSize::new(24, align.1));
+    let (wide_axis, tall_axis) = (AxisSize::new(64, align.wide), AxisSize::new(24, align.tall));
     let mut wide = wide_expr.as_ref().map_or(64, |e| {
         e.eval(wide_axis, tall_expr.as_ref(), tall_axis, scale)
     });
@@ -684,7 +684,7 @@ fn place(part: &Part, parent: (i32, i32), screen: (i32, i32), scale: ScreenScale
         e.eval(tall_axis, wide_expr.as_ref(), wide_axis, scale)
     });
     if rule.is_some_and(|r| r.fills_screen()) {
-        (wide, tall) = screen;
+        Size { wide, tall } = screen;
     }
     let pos = |key: &str, own: i32, along: i32| {
         part.value(key)
@@ -693,26 +693,26 @@ fn place(part: &Part, parent: (i32, i32), screen: (i32, i32), scale: ScreenScale
     };
     // A rule's root the game re-centres every update ignores its own position on that axis.
     let x = match rule.is_some_and(|r| r.centres_x()) {
-        true => screen.0.saturating_sub(wide) / 2,
-        false => pos("xpos", wide, align.0),
+        true => screen.wide.saturating_sub(wide) / 2,
+        false => pos("xpos", wide, align.wide),
     };
     let y = match rule.is_some_and(|r| r.centres_y()) {
-        true => screen.1.saturating_sub(tall) / 2,
-        false => pos("ypos", tall, align.1),
+        true => screen.tall.saturating_sub(tall) / 2,
+        false => pos("ypos", tall, align.tall),
     };
     // The game fits a code-sized bar after its file loads, so the file's box gives way.
     let (x, y, wide, tall) = match part.code_toggled().map_or(Fit::None, |t| t.fit()) {
         Fit::None => (x, y, wide, tall),
-        Fit::TopBar => (0, 0, screen.0, tall),
-        Fit::BottomBar => (x, y, screen.0, screen.1.saturating_sub(y).max(0)),
+        Fit::TopBar => (0, 0, screen.wide, tall),
+        Fit::BottomBar => (x, y, screen.wide, screen.tall.saturating_sub(y).max(0)),
         // Placed once every sibling's width is known, in `layout`.
         Fit::AfterSibling { .. } => (x, y, wide, tall),
         // Placed once the chat's height is known, in `layout`.
         Fit::ChatInput => (x, y, wide, tall),
     };
     Placed {
-        rel: (x, y),
-        size: (wide, tall),
+        rel: Point::new(x, y),
+        size: Size::new(wide, tall),
         align,
     }
 }
@@ -760,18 +760,18 @@ fn pinned_rel(
     placed: &[Placed],
     pins: &[Option<Pin>],
     scale: ScreenScale,
-    rel: &mut [Option<(i32, i32)>],
-) -> (i32, i32) {
+    rel: &mut [Option<Point>],
+) -> Point {
     if let Some(done) = rel[i] {
         return done;
     }
     let own = &placed[i];
     let at = match pins[i] {
         Some(pin) if !in_cycle(i, pins) => {
-            let (sx, sy) = pinned_rel(pin.sibling, parts, placed, pins, scale, rel);
+            let s = pinned_rel(pin.sibling, parts, placed, pins, scale, rel);
             let sib = placed[pin.sibling].size;
-            let (cx, cy) = pin.corner.point(sib.0, sib.1);
-            let (ox, oy) = pin.own.point(own.size.0, own.size.1);
+            let c = pin.corner.point(sib.wide, sib.tall);
+            let o = pin.own.point(own.size.wide, own.size.tall);
             let (sign_x, sign_y) = probe::pin_offset_sign(pin.own, pin.corner);
             let offset = |key: &str, size: i32, along: i32| {
                 parts[i]
@@ -782,12 +782,12 @@ fn pinned_rel(
                     })
             };
             // Values past i32 saturate, so a far-off part stays far off and layout never fails.
-            let dx = sign_x.saturating_mul(offset("xpos", own.size.0, own.align.0));
-            let dy = sign_y.saturating_mul(offset("ypos", own.size.1, own.align.1));
+            let dx = sign_x.saturating_mul(offset("xpos", own.size.wide, own.align.wide));
+            let dy = sign_y.saturating_mul(offset("ypos", own.size.tall, own.align.tall));
             let along = |s: i32, c: i32, d: i32, o: i32| {
                 s.saturating_add(c).saturating_add(d).saturating_sub(o)
             };
-            (along(sx, cx, dx, ox), along(sy, cy, dy, oy))
+            Point::new(along(s.x, c.x, dx, o.x), along(s.y, c.y, dy, o.y))
         }
         _ => own.rel,
     };
@@ -800,17 +800,15 @@ fn pinned_rel(
 fn hidden_by(
     part: &Part,
     parent_hidden: bool,
-    Rect {
-        x, y, wide, tall, ..
-    }: Rect,
-    screen: (i32, i32),
+    Rect { x, y, wide, tall }: Rect,
+    screen: Size,
     (situation, model): (&GameSituation, &HudModel),
 ) -> Option<HiddenBy> {
     // Top-level parts are hudlayout elements, whose visibility the game resets each frame.
     let element = part.parent().is_none();
     let off = |key: &str| int(part, key) == Some(0) && applies(part, key);
-    let outside = x >= screen.0
-        || y >= screen.1
+    let outside = x >= screen.wide
+        || y >= screen.tall
         || i64::from(x) + i64::from(wide) <= 0
         || i64::from(y) + i64::from(tall) <= 0;
     let toggled = part.code_toggled();
