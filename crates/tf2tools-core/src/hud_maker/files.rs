@@ -131,6 +131,15 @@ impl HudFiles {
         Self::open_over(tf_dir, vec![loose_hud(hud_dir)])
     }
 
+    /// The library HUD folder `hud_dir` alone, without the game beneath it, indexed as
+    /// `open_hud` indexes it. Err `LinkedFolder` when `hud_dir` is a link.
+    pub(crate) fn open_folder(hud_dir: &Path) -> Result<HudFiles, HudFilesError> {
+        refuse_link(hud_dir)?;
+        let mut files = HudFiles::empty();
+        files.push_layer(loose_hud(hud_dir).into_iter());
+        Ok(files)
+    }
+
     /// Layers top first: `<hud>/.tf2tools/original`, `<hud>` minus `.tf2tools/` and hidden paths,
     /// then `open_game`'s; plus the `tf/cfg` index. Err `LinkedFolder` when `hud_dir`,
     /// `<hud>/.tf2tools` or `<hud>/.tf2tools/original` is a link.

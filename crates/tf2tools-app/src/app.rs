@@ -189,6 +189,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                         cx.background_spawn(async move { crash::archive_crash(&archive_dir) })
                             .detach();
                         activity::startup(cx);
+                        crate::pages::huds::make_missing_thumbnails(cx);
                         detect_tf2(win, cx);
                         tokio_bridge::init(cx);
                         updates.update(cx, |updates, cx| updates.check(cx));

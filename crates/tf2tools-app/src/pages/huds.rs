@@ -13,6 +13,7 @@ use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
 };
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, AsyncApp, ClickEvent, Context, Entity,
     EventEmitter, FontWeight, Hsla, InteractiveElement as _, IntoElement, ObjectFit,
@@ -37,7 +38,7 @@ use crate::local_messages::{
 };
 use crate::pages::hud_maker::live::{Live, live_job};
 use crate::picker::PickKind;
-use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
+use crate::remote_images::{ImageKey, RemoteImage, RemoteImages, local_image_url};
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
@@ -111,7 +112,7 @@ pub struct HudsPage {
     loads_in_flight: usize,
     /// The last load failure's toast label, so a repeat stays quiet until a load succeeds.
     last_failure: Option<SharedString>,
-    /// Store HUDs' screenshot URLs by folder, resolved off-thread with the HUD list.
+    /// HUD card picture URLs by folder, store screenshots or local pictures, resolved off-thread.
     image_urls: Rc<HashMap<String, String>>,
     /// The grid's last drawn range, as indices into the filtered HUDs.
     visible: Range<usize>,
@@ -397,7 +398,7 @@ impl HudsPage {
             .collect()
     }
 
-    // Asks for the screenshots of the store cards in the grid's last drawn range.
+    // Asks for the pictures of the cards in the grid's last drawn range.
     fn want_images(&mut self, cx: &mut Context<Self>) {
         let Some(images) = RemoteImages::global(cx) else {
             return;
@@ -966,6 +967,20 @@ fn conflict_box(cx: &App) -> AnyElement {
         .into_any_element()
 }
 
+/// Makes, off the UI thread, the card pictures a library from before them lacks (once per
+/// library), and refreshes the library views when any were made.
+pub fn make_missing_thumbnails(cx: &mut App) {
+    let making = run_blocking(cx, |s| {
+        (s.library.make_missing_hud_thumbnails()).map_err(|e| OpError::core("Make HUD pictures", e))
+    });
+    cx.spawn(async move |cx| match making.await {
+        Ok(0) => {}
+        Ok(_) => cx.update(LibraryEvents::changed),
+        Err(e) => tracing::warn!("making HUD pictures failed: {e:?}"),
+    })
+    .detach();
+}
+
 /// The toast line for a HUD just added to the library, naming the numbered name it took
 /// when another library HUD already had the one it wanted.
 pub(crate) fn added_message(hud: &HudEntry) -> String {
@@ -993,13 +1008,17 @@ fn store_row(s: &Services, provenance: &Provenance) -> Option<StoreItem> {
     s.store.store_item(kind, &id).ok().flatten()
 }
 
-// Each store HUD's card thumbnail from its cached store row, by folder. A HUD without a row
-// or a URL is left out and keeps its placeholder.
+// Each HUD's card picture by folder: a store HUD's thumbnail from its cached store row, else
+// the picture made from the HUD's own menu background. A HUD with neither keeps the plain card.
 fn image_urls(s: &Services, huds: &[HudEntry]) -> HashMap<String, String> {
     huds.iter()
         .filter_map(|hud| {
-            let item = store_row(s, hud.provenance())?;
-            let url = item.thumbnail_url()?.to_owned();
+            let store = store_row(s, hud.provenance())
+                .and_then(|item| Some(item.thumbnail_url()?.to_owned()));
+            let url = store.or_else(|| {
+                let path = s.library.hud_thumbnail(hud)?;
+                Some(local_image_url(&path, hud.updated_at()))
+            })?;
             Some((hud.folder_name().to_owned(), url))
         })
         .collect()
@@ -1037,8 +1056,8 @@ impl HudsPage {
     }
 }
 
-// A store card's 16:9 screenshot area: the image once ready, else the muted placeholder.
-// A click opens the HUD's gallery in the lightbox.
+// A card's 16:9 picture area: the image once ready, else the muted placeholder. On a store
+// card a click opens the HUD's gallery in the lightbox; a HUD of the player's has none.
 fn screenshot(
     hud: &HudEntry,
     url: Option<&String>,
@@ -1052,11 +1071,12 @@ fn screenshot(
     let area = div()
         .id(ids::hud_shot(folder))
         .test_support()
-        .cursor_pointer()
-        .on_click(move |_, window, cx| {
-            let _ = page.update(cx, |page, cx| {
-                page.open_gallery(title.clone(), provenance.clone(), window, cx)
-            });
+        .when(is_store(hud), |area| {
+            area.cursor_pointer().on_click(move |_, window, cx| {
+                let _ = page.update(cx, |page, cx| {
+                    page.open_gallery(title.clone(), provenance.clone(), window, cx)
+                });
+            })
         })
         .flex_none()
         .w_full()
@@ -1081,7 +1101,7 @@ fn screenshot(
 }
 
 // v5's HudCard: name, author and source badge, then delete and Install bottom right.
-// Store HUDs lead with their 16:9 screenshot area.
+// Store HUDs, and HUDs with a picture of their own, lead with a 16:9 picture area.
 fn hud_card(
     hud: &HudEntry,
     url: Option<&String>,
@@ -1169,7 +1189,7 @@ fn hud_card(
         .flex()
         .flex_col()
         .overflow_hidden()
-        .children(is_store(hud).then(|| screenshot(hud, url, page, cx)))
+        .children((is_store(hud) || url.is_some()).then(|| screenshot(hud, url, page, cx)))
         .child(
             h_flex()
                 .px_6()

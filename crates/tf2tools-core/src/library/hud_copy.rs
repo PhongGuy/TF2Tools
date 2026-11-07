@@ -110,7 +110,8 @@ impl Library {
         if !matches!(inserted, Ok(Some(_))) {
             let _ = super::remove_dir_if_present(&live);
         }
-        inserted?.ok_or(CopyHudError::NameTaken { name: base_name })
+        let entry = inserted?.ok_or(CopyHudError::NameTaken { name: base_name })?;
+        Ok(self.refresh_hud_thumbnail(entry))
     }
 
     /// The base a copy records, or `None` for a HUD that is no copy (no `maker.json`, the
@@ -946,7 +947,7 @@ impl Library {
             }
         };
         Ok(CopyUpdated {
-            entry,
+            entry: self.refresh_hud_thumbnail(entry),
             left_out,
             both_changed,
         })

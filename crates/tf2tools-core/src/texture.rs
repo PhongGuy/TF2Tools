@@ -474,6 +474,18 @@ fn nearest_power_of_two(side: u32) -> u32 {
     }
 }
 
+/// `image` stretched to `w` x `h` and encoded as an opaque JPEG; `None` when encoding fails.
+pub(crate) fn thumbnail_jpeg(image: &RgbaImage, w: u32, h: u32) -> Option<Vec<u8>> {
+    // Triangle is plenty for a large shrink and much cheaper than CatmullRom on a 2048 px source.
+    let small = imageops::resize(&as_buffer(image), w, h, imageops::FilterType::Triangle);
+    let rgb = DynamicImage::ImageRgba8(small).to_rgb8();
+    let mut out = Vec::new();
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut out, 85)
+        .encode_image(&rgb)
+        .ok()?;
+    Some(out)
+}
+
 fn as_buffer(image: &RgbaImage) -> image::RgbaImage {
     // `RgbaImage` always holds width * height * 4 bytes, so the copy fills the buffer exactly.
     let mut buffer = image::RgbaImage::new(image.width, image.height);
