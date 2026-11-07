@@ -1,6 +1,8 @@
-//! v5's Crosshairs page: the searchable picker, background and composite preview, install,
-//! the conflicts box, and per-class weapon assignment.
+//! The Crosshairs page: a gallery of crosshair tiles, a large in-game-size preview, and a
+//! loadout board of class columns and slot rows that assigns by click or drag. A bar counts
+//! the changes not in TF2 yet beside Install; each cell opens its per-weapon list.
 
+use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -13,11 +15,12 @@ use gpui_kit::component::select::{Select, SelectState};
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
 };
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, EventEmitter, FontWeight,
-    Hsla, InteractiveElement as _, IntoElement, ObjectFit, ParentElement as _, Pixels, Render,
-    Role, ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _,
-    StyledImage as _, Subscription, TestSupportExt as _, Window, div, img, px, rgb,
+    Hsla, InteractiveElement as _, IntoElement, MouseButton, ObjectFit, ParentElement as _, Pixels,
+    Render, Role, ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _,
+    StyledImage as _, Subscription, TestSupportExt as _, Window, canvas, div, img, px, rgb,
 };
 
 use tf2tools_core::{
@@ -31,6 +34,7 @@ use crate::activity;
 use crate::assets::BACKGROUNDS;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
+use crate::loadout::{BoardTarget, CellState, Loadout, SLOTS};
 use crate::local_messages::{
     describe_import, describe_library, describe_png_write, describe_tf2_install,
 };
@@ -41,13 +45,30 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
-use crate::widgets::crosshair_picker::{CrosshairPicker, IN_GAME_SIZE, preview_image};
+use crate::widgets::crosshair_picker::{
+    CrosshairPicker, DraggedCrosshair, IN_GAME_SIZE, preview_image,
+};
+use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
 use crate::widgets::weapon_assigner::{
     AssignRequested, AssignTarget, AssignedCell, AssignerState, ClassChanged, WeaponAssigner,
+    slot_colour,
 };
 
-const PREVIEW_SIZE: Pixels = px(128.);
+const PREVIEW_SIZE: Pixels = px(160.);
+/// The preview's plain backdrop, listed first in its background picker.
+const PLAIN: &str = "Dark";
+/// The plain backdrop's colour, zinc-900, so a crosshair reads as it does on a dark wall.
+const PLAIN_COLOUR: u32 = 0x18181b;
+/// Below this main width the gallery stacks over the board.
+const SIDE_BY_SIDE: Pixels = px(860.);
+/// The gallery is three tiles wide, or four once the main area is this wide.
+const WIDE_GALLERY: Pixels = px(1200.);
+/// Below this board width the board turns, classes as rows and slots as columns.
+const BOARD_COLUMNS: Pixels = px(560.);
+/// The board's row header column and its cells' height.
+const HEADER_WIDTH: Pixels = px(76.);
+const CELL_HEIGHT: Pixels = px(68.);
 /// Every Export PNG failure toasts under this action.
 const EXPORT_FAILED: &str = "Failed to export PNG";
 
@@ -61,8 +82,10 @@ enum Busy {
     Delete,
     /// Assigning to the weapon with this script.
     Assign(&'static str),
-    /// Assigning to the class's weapons in this slot, or to all of them.
-    Bulk(Option<WeaponSlot>),
+    /// Assigning to what a board click covers.
+    Board(BoardTarget),
+    /// Resetting a board cell to the game's crosshair.
+    Reset(BoardTarget),
 }
 
 /// What a finished action toasts: its kind, title and description.
@@ -90,10 +113,18 @@ pub struct CrosshairsPage {
     win: AnyWindowHandle,
     builtins: Arc<BuiltinCrosshairs>,
     assignments: Vec<Assignment>,
+    /// The board's view of `assignments` and of what an Install would change.
+    loadout: Loadout,
     installed: Option<InstalledCrosshairs>,
     /// The picker's selection, mirrored on each of its notifies so `selected` needs no `cx`.
     selected: Option<CrosshairRef>,
     class: TfClass,
+    /// The board cell whose per-weapon list shows below the board.
+    focus: Option<(TfClass, WeaponSlot)>,
+    /// Set when a cell opens its list, so the next frame scrolls the list into view.
+    reveal: bool,
+    /// The main area's painted width, which picks the layout.
+    width: Rc<Cell<Pixels>>,
     loaded: bool,
     busy: Option<Busy>,
     /// Bumped by each reload, so a slower, older load never overwrites a newer one.
@@ -146,7 +177,7 @@ impl CrosshairsPage {
             }
             cx.notify();
         });
-        let picker = cx.new(|cx| CrosshairPicker::new(false, window, cx));
+        let picker = cx.new(|cx| CrosshairPicker::gallery(window, cx));
         // The composite preview and the weapon rows read the selection, so each picker notify
         // refreshes the mirror and redraws the page.
         let observe_picker = cx.observe(&picker, |page: &mut Self, picker, cx| {
@@ -156,14 +187,22 @@ impl CrosshairsPage {
         });
         // The assigner only asks; the page writes the table, and mirrors the shown class from
         // the assigner's change event so `class` needs no `cx`.
-        let assigner = cx.new(|cx| WeaponAssigner::new(false, cx));
+        let assigner = cx.new(|cx| {
+            let mut assigner = WeaponAssigner::new(false, cx);
+            assigner.set_bar(false, cx);
+            assigner
+        });
         let assign_requested = cx.subscribe_in(
             &assigner,
             window,
             |page: &mut Self, _, event: &AssignRequested, window, cx| match event.target {
                 AssignTarget::Weapon(script) => page.assign(script, cx),
                 AssignTarget::Bulk(slot) => {
-                    page.bulk(slot, event.class, event.scripts.clone(), window, cx)
+                    let target = match slot {
+                        Some(slot) => BoardTarget::Cell(event.class, slot),
+                        None => BoardTarget::Class(event.class),
+                    };
+                    page.board_assign(target, None, window, cx)
                 }
             },
         );
@@ -176,17 +215,21 @@ impl CrosshairsPage {
             (picker.search_input().clone(), picker.scroll())
         };
         // Read at render, so a background change needs no subscription.
-        let background = cx.new(|cx| {
-            SelectState::new(BACKGROUNDS.to_vec(), Some(IndexPath::default()), window, cx)
-        });
+        let backgrounds: Vec<&'static str> = std::iter::once(PLAIN).chain(BACKGROUNDS).collect();
+        let background =
+            cx.new(|cx| SelectState::new(backgrounds, Some(IndexPath::default()), window, cx));
         let builtins = cx.global::<Services>().builtins.clone();
         let mut page = Self {
             win: window.window_handle(),
             builtins,
             assignments: Vec::new(),
+            loadout: Loadout::default(),
             installed: None,
             selected: None,
             class: TfClass::Scout,
+            focus: None,
+            reveal: false,
+            width: Rc::new(Cell::new(px(928.))),
             loaded: false,
             busy: None,
             load_generation: 0,
@@ -236,16 +279,31 @@ impl CrosshairsPage {
         self.selected.as_ref()
     }
 
-    /// The class whose weapons the list shows; Scout until a tab is clicked.
+    /// The class whose weapons the per-weapon list shows; Scout until a cell opens it.
     pub fn class(&self) -> TfClass {
         self.class
     }
 
-    /// Shows `class`'s weapons, as clicking its tab does.
+    /// Opens the per-weapon list on `class`, keeping the open slot (Primary at first).
     pub fn set_class(&mut self, class: TfClass, cx: &mut Context<Self>) {
+        let slot = self.focus.map_or(WeaponSlot::Primary, |(_, slot)| slot);
+        self.open_details(class, slot, cx);
+    }
+
+    /// The board cell whose per-weapon list is open, if any.
+    pub fn focus(&self) -> Option<(TfClass, WeaponSlot)> {
+        self.focus
+    }
+
+    // Shows the weapons of one board cell below the board, for per-weapon picks and reset.
+    fn open_details(&mut self, class: TfClass, slot: WeaponSlot, cx: &mut Context<Self>) {
+        self.focus = Some((class, slot));
+        self.reveal = true;
         self.class = class;
-        self.assigner
-            .update(cx, |assigner, cx| assigner.set_class(class, cx));
+        self.assigner.update(cx, |assigner, cx| {
+            assigner.set_class(class, cx);
+            assigner.set_slot(Some(slot), cx);
+        });
         cx.notify();
     }
 
@@ -254,7 +312,6 @@ impl CrosshairsPage {
     fn sync_assigner(&self, cx: &mut Context<Self>) {
         let running = match self.busy {
             Some(Busy::Assign(script)) => Some(AssignTarget::Weapon(script)),
-            Some(Busy::Bulk(slot)) => Some(AssignTarget::Bulk(slot)),
             _ => None,
         };
         let state = AssignerState {
@@ -305,10 +362,18 @@ impl CrosshairsPage {
             let library = s.library.list_crosshairs().map_err(failed)?;
             let assignments = s.library.assignments().map_err(failed)?;
             let installed = tf2
-                .map(|t| s.library.installed_crosshairs(&t))
+                .as_ref()
+                .map(|t| s.library.installed_crosshairs(t))
                 .transpose()
                 .map_err(failed)?;
-            Ok((library, assignments, installed))
+            let waiting = match &tf2 {
+                Some(t) => s
+                    .library
+                    .crosshairs_not_in_game(t, &s.builtins)
+                    .map_err(failed)?,
+                None => Vec::new(),
+            };
+            Ok((library, assignments, installed, waiting))
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {
@@ -318,8 +383,9 @@ impl CrosshairsPage {
                     if page.load_generation != generation {
                         return false;
                     }
-                    if let Ok((library, assignments, installed)) = &loaded {
+                    if let Ok((library, assignments, installed, waiting)) = &loaded {
                         page.assignments = assignments.clone();
+                        page.loadout = Loadout::from_assignments(assignments, waiting);
                         page.installed = installed.clone();
                         // A crosshair gone from the library takes the selection with it, or
                         // the actions would keep offering it.
@@ -618,34 +684,49 @@ impl CrosshairsPage {
         );
     }
 
-    // Assigns the selection to `scripts`, the class's weapons (in `slot`, if any), in one
-    // background job that changes every weapon or none; without a selection it only says so.
-    fn bulk(
+    // Assigns `crosshair`, or the selection, to every weapon `target` covers in one job that
+    // changes every weapon or none. Without either it asks for a pick; while busy it waits.
+    fn board_assign(
         &mut self,
-        slot: Option<WeaponSlot>,
-        class: TfClass,
-        scripts: Vec<&'static str>,
+        target: BoardTarget,
+        crosshair: Option<CrosshairRef>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(crosshair) = self.selected.clone() else {
-            let none = "No crosshair selected";
+        if self.busy.is_some() {
+            return;
+        }
+        let Some(crosshair) = crosshair.or_else(|| self.selected.clone()) else {
+            let none = "Pick a crosshair first";
             return toast(window, cx, ToastKind::Error, none, SharedString::default());
         };
-        let done = match slot {
-            None => format!("Crosshair applied to all {} weapons", class.name()),
-            Some(slot) => format!(
-                "Crosshair applied to all {} {} weapons",
-                class.name(),
-                slot.name().to_lowercase()
-            ),
-        };
+        let done = format!("Crosshair applied to {}", target.describe());
+        let scripts = target.scripts();
         self.run(
-            Busy::Bulk(slot),
+            Busy::Board(target),
             move |s| {
                 s.library
                     .assign_many(&scripts, &crosshair)
-                    .map_err(|e| describe_library(&e).into_op("Failed to bulk assign"))?;
+                    .map_err(|e| describe_library(&e).into_op("Failed to assign crosshairs"))?;
+                Ok((ToastKind::Success, done.into(), SharedString::default()))
+            },
+            cx,
+        );
+    }
+
+    // Takes every weapon `target` covers back to the game's own crosshair.
+    fn reset(&mut self, target: BoardTarget, cx: &mut Context<Self>) {
+        if self.busy.is_some() {
+            return;
+        }
+        let done = format!("Reset {} to the game's crosshair", target.describe());
+        let scripts = target.scripts();
+        self.run(
+            Busy::Reset(target),
+            move |s| {
+                s.library
+                    .unassign_many(&scripts)
+                    .map_err(|e| describe_library(&e).into_op("Failed to reset crosshairs"))?;
                 Ok((ToastKind::Success, done.into(), SharedString::default()))
             },
             cx,
@@ -663,11 +744,11 @@ impl CrosshairsPage {
             })
     }
 
-    // v5's composite preview: the map background filling the box, the selected crosshair
-    // centred over it, or a muted "No crosshair" without a selection.
+    // The large preview: the backdrop filling the box (plain dark, or a map), the selected
+    // crosshair centred over it at the size the game draws it, or a muted "No crosshair".
     fn preview(&self, background: &'static str, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
-        let (border, muted, muted_fg) = (theme.border, theme.muted, theme.muted_foreground);
+        let (border, muted_fg) = (theme.border, theme.muted_foreground);
         let selection = self
             .selected
             .as_ref()
@@ -675,7 +756,6 @@ impl CrosshairsPage {
         let (label, centre) = match selection {
             Some((selected, name)) => {
                 let preview = self.previews.read(cx).preview(selected, cx);
-                // Drawn as big as the game draws it, the same as the maker's preview.
                 let centre = preview_image(preview, IN_GAME_SIZE).map(|image| {
                     div()
                         .id(ids::CROSSHAIRS_PREVIEW_CROSSHAIR)
@@ -690,7 +770,14 @@ impl CrosshairsPage {
                 ("No crosshair".to_owned(), Some(none.into_any_element()))
             }
         };
-        let path = cx.global::<Services>().assets.background(background);
+        let backdrop = (background != PLAIN).then(|| {
+            let path = cx.global::<Services>().assets.background(background);
+            img(path)
+                .absolute()
+                .inset_0()
+                .size_full()
+                .object_fit(ObjectFit::Cover)
+        });
         div()
             .id(ids::CROSSHAIRS_PREVIEW)
             .aria_label(label)
@@ -701,15 +788,9 @@ impl CrosshairsPage {
             .rounded_lg()
             .border_1()
             .border_color(border)
-            .bg(muted)
+            .bg(rgb(PLAIN_COLOUR))
             .overflow_hidden()
-            .child(
-                img(path)
-                    .absolute()
-                    .inset_0()
-                    .size_full()
-                    .object_fit(ObjectFit::Cover),
-            )
+            .children(backdrop)
             .child(
                 div()
                     .absolute()
@@ -726,10 +807,136 @@ impl CrosshairsPage {
         self.picker.read(cx).name_of(crosshair)
     }
 
-    // Import, Install to TF2 and Uninstall: the running one spins, the others disable. Copy
-    // and Export PNG show for any selected crosshair; Edit only for one drawn in the maker;
-    // Delete only for a library one, since the bundled crosshairs ship with the app.
-    fn actions(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    // The bar over the page: what TF2 has now against the board, with Install beside it, and
+    // amber while some change has not reached the game.
+    fn status_bar(&self, cx: &mut Context<Self>) -> AnyElement {
+        let has_tf2 = tf2_state(cx).read(cx).install().is_some();
+        let waiting = self.loadout.waiting_count();
+        let line = if !has_tf2 {
+            "TF2 not found, so nothing can be installed yet".to_owned()
+        } else if waiting == 0 && self.assignments.is_empty() {
+            "TF2 is using its own crosshairs".to_owned()
+        } else {
+            Loadout::waiting_line(waiting)
+        };
+        let theme = cx.theme();
+        let amber: Hsla = rgb(YELLOW_500).into();
+        let (border, bg, icon, icon_colour) = if has_tf2 && waiting > 0 {
+            (
+                amber.opacity(0.5),
+                amber.opacity(0.08),
+                IconName::TriangleAlert,
+                amber,
+            )
+        } else {
+            (
+                theme.border,
+                gpui_kit::transparent_black(),
+                IconName::Check,
+                theme.muted_foreground,
+            )
+        };
+        let installing = self.busy == Some(Busy::Install);
+        let removing = self.busy == Some(Busy::Uninstall);
+        h_flex()
+            .id(ids::CROSSHAIRS_STATUS)
+            .test_support()
+            .flex_wrap()
+            .gap_3()
+            .px_4()
+            .py_2()
+            .rounded_lg()
+            .border_1()
+            .border_color(border)
+            .bg(bg)
+            .child(
+                Icon::new(icon)
+                    .with_size(Size::Size(px(16.)))
+                    .text_color(icon_colour),
+            )
+            .child(labelled(
+                div().text_sm().font_weight(FontWeight::MEDIUM),
+                ids::CROSSHAIRS_WAITING,
+                line,
+            ))
+            .child(
+                h_flex()
+                    .ml_auto()
+                    .gap_2()
+                    .child(needs_tf2(
+                        Button::new(ids::CROSSHAIRS_UNINSTALL)
+                            .ghost()
+                            .small()
+                            .icon(IconName::Unplug)
+                            .label(if removing {
+                                "Removing..."
+                            } else {
+                                "Remove from TF2"
+                            })
+                            .loading(removing)
+                            .disabled(self.busy.is_some() && !removing)
+                            .on_click(
+                                cx.listener(|page, _, window, cx| page.uninstall(window, cx)),
+                            ),
+                        has_tf2,
+                    ))
+                    .child(needs_tf2(
+                        Button::new(ids::CROSSHAIRS_INSTALL)
+                            .primary()
+                            .small()
+                            .icon(IconName::Download)
+                            .label(if installing {
+                                "Installing..."
+                            } else {
+                                "Install to TF2"
+                            })
+                            .loading(installing)
+                            .disabled(self.busy.is_some() && !installing)
+                            .on_click(cx.listener(|page, _, window, cx| page.install(window, cx))),
+                        has_tf2,
+                    )),
+            )
+            .into_any_element()
+    }
+
+    // The gallery column: a hint and Import over the picker's tile grid.
+    fn gallery(&self, height: Pixels, cx: &mut Context<Self>) -> AnyElement {
+        let importing = self.busy == Some(Busy::Import);
+        let muted = cx.theme().muted_foreground;
+        v_flex()
+            .gap_2()
+            .h(height)
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .truncate()
+                            .text_xs()
+                            .text_color(muted)
+                            .child("Pick one, then click or drag it onto the board"),
+                    )
+                    .child(
+                        Button::new(ids::CROSSHAIRS_IMPORT)
+                            .outline()
+                            .small()
+                            .icon(IconName::Upload)
+                            .label(if importing { "Importing..." } else { "Import" })
+                            .loading(importing)
+                            .disabled(self.busy.is_some() && !importing)
+                            .on_click(cx.listener(|page, _, _, cx| page.import(cx))),
+                    ),
+            )
+            .child(div().flex_1().min_h_0().child(self.picker.clone()))
+            .into_any_element()
+    }
+
+    // The selected crosshair: the large preview, its name and how many weapons use it, the
+    // backdrop picker, and what can be done with it. Edit shows only for one drawn in the
+    // maker; Delete only for a library one, since the bundled crosshairs ship with the app.
+    fn selection_panel(&self, background: &'static str, cx: &mut Context<Self>) -> AnyElement {
         let painted = self.selected.as_ref().and_then(|selected| {
             let CrosshairRef::Library(id) = selected else {
                 return None;
@@ -740,6 +947,7 @@ impl CrosshairsPage {
         let edit = painted.map(|id| {
             Button::new(ids::CROSSHAIRS_EDIT)
                 .outline()
+                .small()
                 .px(SM_ICON_PX)
                 .icon(IconName::Pencil)
                 .label("Edit")
@@ -755,6 +963,7 @@ impl CrosshairsPage {
                 Button::new(ids::CROSSHAIRS_DELETE)
                     .danger()
                     .outline()
+                    .small()
                     .px(SM_ICON_PX)
                     .icon(IconName::Trash)
                     .label(if deleting { "Deleting..." } else { "Delete" })
@@ -768,6 +977,7 @@ impl CrosshairsPage {
         let copy = self.selected.clone().map(|selected| {
             Button::new(ids::CROSSHAIRS_COPY_TO_MAKER)
                 .outline()
+                .small()
                 .px(SM_ICON_PX)
                 .icon(IconName::Copy)
                 .label("Copy to Crosshair Maker")
@@ -778,6 +988,7 @@ impl CrosshairsPage {
         let export = self.selected.is_some().then(|| {
             Button::new(ids::CROSSHAIRS_EXPORT_PNG)
                 .outline()
+                .small()
                 .px(SM_ICON_PX)
                 .icon(IconName::ImageDown)
                 .label(if exporting {
@@ -789,52 +1000,404 @@ impl CrosshairsPage {
                 .disabled(self.busy.is_some() && !exporting)
                 .on_click(cx.listener(|page, _, _, cx| page.export_png(cx)))
         });
-        let importing = self.busy == Some(Busy::Import);
-        let installing = self.busy == Some(Busy::Install);
-        let removing = self.busy == Some(Busy::Uninstall);
-        let has_tf2 = tf2_state(cx).read(cx).install().is_some();
-        v_flex()
-            .gap(px(6.))
+        let muted = cx.theme().muted_foreground;
+        let (title, detail) = match &self.selected {
+            Some(selected) => {
+                let used = self
+                    .assignments
+                    .iter()
+                    .filter(|a| a.crosshair() == selected)
+                    .count();
+                let detail = match used {
+                    0 => "Not on any weapon yet".to_owned(),
+                    1 => "On 1 weapon".to_owned(),
+                    n => format!("On {n} weapons"),
+                };
+                (self.assigned_name(selected, cx), detail)
+            }
+            None => (
+                "No crosshair picked".to_owned(),
+                "Pick one from the gallery to see it at its in-game size".to_owned(),
+            ),
+        };
+        h_flex()
+            .items_start()
+            .gap_4()
+            .child(self.preview(background, cx))
             .child(
-                Button::new(ids::CROSSHAIRS_IMPORT)
-                    .outline()
-                    .px(SM_ICON_PX)
-                    .icon(IconName::Upload)
-                    .label(if importing { "Importing..." } else { "Import" })
-                    .loading(importing)
-                    .disabled(self.busy.is_some() && !importing)
-                    .on_click(cx.listener(|page, _, _, cx| page.import(cx))),
+                v_flex()
+                    .flex_1()
+                    .min_w_0()
+                    .gap_2()
+                    .child(labelled(
+                        div()
+                            .text_base()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .truncate(),
+                        ids::CROSSHAIRS_SELECTED_NAME,
+                        title,
+                    ))
+                    .child(div().text_xs().text_color(muted).child(detail))
+                    .child(
+                        div()
+                            .id(ids::CROSSHAIRS_BACKGROUND)
+                            .aria_label(background)
+                            .test_support()
+                            .w(px(180.))
+                            .child(Select::new(&self.background).small()),
+                    )
+                    .child(
+                        h_flex()
+                            .flex_wrap()
+                            .gap_2()
+                            .children(copy)
+                            .children(export)
+                            .children(edit)
+                            .children(delete),
+                    ),
             )
-            .child(needs_tf2(
-                Button::new(ids::CROSSHAIRS_INSTALL)
-                    .primary()
-                    .px(SM_ICON_PX)
-                    .icon(IconName::Download)
-                    .label(if installing {
-                        "Installing..."
+            .into_any_element()
+    }
+
+    // The loadout board: an "Everything" corner, class headers and slot headers that assign
+    // their whole line, and one cell per class and slot. Narrow boards turn, classes as rows.
+    fn board(&self, turned: bool, cx: &mut Context<Self>) -> AnyElement {
+        let short = px(32.);
+        let everything = self.header(
+            ids::CROSSHAIRS_BOARD_EVERYTHING.into(),
+            "Everything".into(),
+            None,
+            BoardTarget::Everything,
+            (Some(HEADER_WIDTH), short),
+            cx,
+        );
+        let primary = cx.theme().primary;
+        let class_header = |page: &Self, class: TfClass, size, cx: &mut Context<Self>| {
+            page.header(
+                ids::loadout_class(class),
+                class.name().into(),
+                None,
+                BoardTarget::Class(class),
+                size,
+                cx,
+            )
+        };
+        let slot_header = |page: &Self, slot: WeaponSlot, size, cx: &mut Context<Self>| {
+            page.header(
+                ids::loadout_slot(slot),
+                slot.name().into(),
+                Some(slot_colour(slot, primary)),
+                BoardTarget::Slot(slot),
+                size,
+                cx,
+            )
+        };
+        let mut rows = Vec::new();
+        if turned {
+            let mut head = h_flex().gap_1().child(everything);
+            for slot in SLOTS {
+                head = head.child(slot_header(self, slot, (None, short), cx));
+            }
+            rows.push(head);
+            for class in TfClass::ALL {
+                let mut row = h_flex().gap_1().child(class_header(
+                    self,
+                    class,
+                    (Some(HEADER_WIDTH), CELL_HEIGHT),
+                    cx,
+                ));
+                for slot in SLOTS {
+                    row = row.child(self.cell(class, slot, cx));
+                }
+                rows.push(row);
+            }
+        } else {
+            let mut head = h_flex().gap_1().child(everything);
+            for class in TfClass::ALL {
+                head = head.child(class_header(self, class, (None, short), cx));
+            }
+            rows.push(head);
+            for slot in SLOTS {
+                let mut row = h_flex().gap_1().child(slot_header(
+                    self,
+                    slot,
+                    (Some(HEADER_WIDTH), CELL_HEIGHT),
+                    cx,
+                ));
+                for class in TfClass::ALL {
+                    row = row.child(self.cell(class, slot, cx));
+                }
+                rows.push(row);
+            }
+        }
+        v_flex()
+            .id(ids::CROSSHAIRS_BOARD)
+            .test_support()
+            .gap_1()
+            .children(rows)
+            .into_any_element()
+    }
+
+    // A board header: a click assigns the selection to its whole line, and a crosshair
+    // dropped on it does the same.
+    fn header(
+        &self,
+        id: gpui_kit::ElementId,
+        label: SharedString,
+        dot: Option<Hsla>,
+        target: BoardTarget,
+        size: (Option<Pixels>, Pixels),
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let theme = cx.theme();
+        let (hover, muted, primary, input) = (
+            theme.accent,
+            theme.muted_foreground,
+            theme.primary,
+            theme.input,
+        );
+        let running = self.busy == Some(Busy::Board(target));
+        let (width, height) = size;
+        div()
+            .map(|h| match width {
+                Some(width) => h.flex_none().w(width),
+                None => h.flex_1().flex_basis(px(0.)).min_w_0(),
+            })
+            .h(height)
+            .id(id)
+            .aria_label(label.clone())
+            .test_support()
+            .px_1()
+            .flex()
+            .items_center()
+            .justify_center()
+            .gap_1()
+            .rounded(theme.radius)
+            .text_xs()
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(muted)
+            .cursor_pointer()
+            .when(running, |h| h.bg(input.opacity(0.3)))
+            .hover(|h| h.bg(hover).text_color(primary))
+            .drag_over::<DraggedCrosshair>(move |h, _, _, _| h.bg(hover).text_color(primary))
+            .on_click(
+                cx.listener(move |page, _, window, cx| page.board_assign(target, None, window, cx)),
+            )
+            .on_drop(
+                cx.listener(move |page, dragged: &DraggedCrosshair, window, cx| {
+                    page.board_assign(target, Some(dragged.crosshair.clone()), window, cx)
+                }),
+            )
+            .children(dot.map(|dot| div().flex_none().size(px(6.)).rounded_full().bg(dot)))
+            .child(div().min_w_0().truncate().child(label))
+            .into_any_element()
+    }
+
+    // One board cell: the shared crosshair's drawing and name, "Mixed", or "Default" while
+    // the game draws its own. A click or a drop assigns; a right-click or the corner button
+    // opens its per-weapon list. An amber dot marks a change not in TF2 yet; cells that use
+    // the selection are ringed.
+    fn cell(&self, class: TfClass, slot: WeaponSlot, cx: &mut Context<Self>) -> AnyElement {
+        let state = self.loadout.cell(class, slot);
+        let label = match &state {
+            CellState::Default => "Default".to_owned(),
+            CellState::Mixed => "Mixed".to_owned(),
+            CellState::Single(crosshair) => self.assigned_name(crosshair, cx),
+        };
+        let drawing = match &state {
+            CellState::Single(crosshair) => {
+                let preview = self.previews.read(cx).preview(crosshair, cx);
+                preview_image(preview, px(32.)).map(IntoElement::into_any_element)
+            }
+            CellState::Mixed => Some(
+                Icon::new(IconName::Layers)
+                    .with_size(Size::Size(px(16.)))
+                    .text_color(cx.theme().muted_foreground)
+                    .into_any_element(),
+            ),
+            _ => None,
+        };
+        let theme = cx.theme();
+        let uses_selection =
+            matches!((&state, &self.selected), (CellState::Single(c), Some(s)) if c == s);
+        let focused = self.focus == Some((class, slot));
+        let border = if uses_selection {
+            theme.primary
+        } else if focused {
+            theme.ring
+        } else {
+            theme.border
+        };
+        let (hover, muted, fg, accent) = (
+            theme.accent,
+            theme.muted_foreground,
+            theme.foreground,
+            theme.primary,
+        );
+        let target = BoardTarget::Cell(class, slot);
+        let running = matches!(self.busy, Some(Busy::Board(t) | Busy::Reset(t)) if t == target);
+        let waiting = self.loadout.cell_waiting(class, slot).then(|| {
+            div()
+                .absolute()
+                .top(px(5.))
+                .left(px(5.))
+                .size(px(6.))
+                .rounded_full()
+                .bg(rgb(YELLOW_500))
+        });
+        let menu = div()
+            .id(ids::loadout_cell_menu(class, slot))
+            .aria_label(format!(
+                "{} {} weapons",
+                class.name(),
+                slot.name().to_lowercase()
+            ))
+            .test_support()
+            .absolute()
+            .top(px(2.))
+            .right(px(2.))
+            .size(px(18.))
+            .rounded(px(4.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .text_color(muted)
+            .hover(|m| m.bg(theme.secondary).text_color(fg))
+            .on_click(cx.listener(move |page, _, _, cx| {
+                cx.stop_propagation();
+                page.open_details(class, slot, cx);
+            }))
+            .child(Icon::new(IconName::EllipsisVertical).with_size(Size::Size(px(12.))));
+        v_flex()
+            .id(ids::loadout_cell(class, slot))
+            .aria_label(SharedString::from(label.clone()))
+            .test_support()
+            .relative()
+            .flex_1()
+            .flex_basis(px(0.))
+            .min_w_0()
+            .h(CELL_HEIGHT)
+            .items_center()
+            .justify_center()
+            .gap_1()
+            .px_1()
+            .rounded(theme.radius)
+            .border_1()
+            .border_color(border)
+            .bg(if focused {
+                theme.secondary
+            } else {
+                theme.background
+            })
+            .cursor_pointer()
+            .when(running, |c| c.opacity(0.6))
+            .hover(|c| c.bg(hover))
+            .drag_over::<DraggedCrosshair>(move |c, _, _, _| c.border_color(accent).bg(hover))
+            .on_click(
+                cx.listener(move |page, _, window, cx| page.board_assign(target, None, window, cx)),
+            )
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(move |page, _, _, cx| page.open_details(class, slot, cx)),
+            )
+            .on_drop(
+                cx.listener(move |page, dragged: &DraggedCrosshair, window, cx| {
+                    page.board_assign(target, Some(dragged.crosshair.clone()), window, cx)
+                }),
+            )
+            .child(
+                div()
+                    .flex_none()
+                    .size(px(36.))
+                    .rounded(px(4.))
+                    .bg(rgb(0x000000))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .children(drawing),
+            )
+            .child(
+                div()
+                    .w_full()
+                    .text_center()
+                    .truncate()
+                    .text_xs()
+                    .text_color(if matches!(state, CellState::Single(_)) {
+                        fg
                     } else {
-                        "Install to TF2"
+                        muted
                     })
-                    .loading(installing)
-                    .disabled(self.busy.is_some() && !installing)
-                    .on_click(cx.listener(|page, _, window, cx| page.install(window, cx))),
-                has_tf2,
-            ))
-            .child(needs_tf2(
-                Button::new(ids::CROSSHAIRS_UNINSTALL)
-                    .outline()
-                    .px(SM_ICON_PX)
-                    .icon(IconName::Unplug)
-                    .label(if removing { "Removing..." } else { "Uninstall" })
-                    .loading(removing)
-                    .disabled(self.busy.is_some() && !removing)
-                    .on_click(cx.listener(|page, _, window, cx| page.uninstall(window, cx))),
-                has_tf2,
-            ))
-            .children(copy)
-            .children(export)
-            .children(edit)
-            .children(delete)
+                    .child(label),
+            )
+            .children(waiting)
+            .child(menu)
+            .into_any_element()
+    }
+
+    // The open cell's weapons, each assignable on its own, with reset and close.
+    fn details(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let (class, slot) = self.focus?;
+        let target = BoardTarget::Cell(class, slot);
+        let title = format!("{} {} weapons", class.name(), slot.name().to_lowercase());
+        let resetting = self.busy == Some(Busy::Reset(target));
+        let theme = cx.theme();
+        Some(
+            v_flex()
+                .id(ids::CROSSHAIRS_DETAILS)
+                .aria_label(SharedString::from(title.clone()))
+                .test_support()
+                .gap_3()
+                .p_4()
+                .rounded_lg()
+                .border_1()
+                .border_color(theme.border)
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .child(
+                            v_flex()
+                                .flex_1()
+                                .min_w_0()
+                                .child(
+                                    div()
+                                        .text_sm()
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .child(title),
+                                )
+                                .child(
+                                    div()
+                                        .text_xs()
+                                        .text_color(theme.muted_foreground)
+                                        .child("Click a weapon to give it the picked crosshair"),
+                                ),
+                        )
+                        .child(
+                            Button::new(ids::CROSSHAIRS_DETAILS_RESET)
+                                .outline()
+                                .small()
+                                .icon(IconName::RotateCcw)
+                                .label("Reset to default")
+                                .loading(resetting)
+                                .disabled(self.busy.is_some() && !resetting)
+                                .on_click(
+                                    cx.listener(move |page, _, _, cx| page.reset(target, cx)),
+                                ),
+                        )
+                        .child(
+                            Button::new(ids::CROSSHAIRS_DETAILS_CLOSE)
+                                .ghost()
+                                .small()
+                                .icon(IconName::X)
+                                .label("Close")
+                                .on_click(cx.listener(|page, _, _, cx| {
+                                    page.focus = None;
+                                    cx.notify();
+                                })),
+                        ),
+                )
+                .child(self.assigner.clone())
+                .into_any_element(),
+        )
     }
 }
 
@@ -934,7 +1497,8 @@ fn conflict_box(folders: &[String], cx: &App) -> Option<AnyElement> {
 }
 
 impl Render for CrosshairsPage {
-    // The whole page scrolls, as v5's does, since the weapon list runs past the window.
+    // The bar, then the gallery beside (or over) the preview and the board, then the open
+    // cell's weapons; the whole page scrolls when the window is short.
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.timings
             .first_render
@@ -944,7 +1508,7 @@ impl Render for CrosshairsPage {
             .read(cx)
             .selected_value()
             .copied()
-            .unwrap_or(BACKGROUNDS[0]);
+            .unwrap_or(PLAIN);
         let conflicts = self
             .installed
             .as_ref()
@@ -958,6 +1522,68 @@ impl Render for CrosshairsPage {
                 cx,
             )
         });
+
+        // The main area's width picks the layout; a change asks for another frame, since a
+        // refresh requested while drawing is dropped.
+        let measured = self.width.clone();
+        let watch = canvas(
+            move |bounds, window, _| {
+                if measured.get() != bounds.size.width {
+                    measured.set(bounds.size.width);
+                    window.request_animation_frame();
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .size_full();
+        let width = self.width.get();
+        let side_by_side = width >= SIDE_BY_SIDE;
+        let gallery_width = if width >= WIDE_GALLERY {
+            px(408.)
+        } else {
+            px(312.)
+        };
+        let board_width = if side_by_side {
+            width - gallery_width - px(24.)
+        } else {
+            width
+        };
+        let board = self.board(board_width < BOARD_COLUMNS, cx);
+        let selection = self.selection_panel(background, cx);
+        let details = self.details(cx);
+        let main = if side_by_side {
+            h_flex()
+                .items_start()
+                .gap_6()
+                .child(
+                    div()
+                        .flex_none()
+                        .w(gallery_width)
+                        .child(self.gallery(px(560.), cx)),
+                )
+                .child(
+                    v_flex()
+                        .flex_1()
+                        .min_w_0()
+                        .gap_4()
+                        .child(selection)
+                        .child(board),
+                )
+                .into_any_element()
+        } else {
+            v_flex()
+                .gap_4()
+                .child(self.gallery(px(320.), cx))
+                .child(selection)
+                .child(board)
+                .into_any_element()
+        };
+        // The list sits last, after the warning, bar, conflicts and main area that are present.
+        if details.is_some() && std::mem::take(&mut self.reveal) {
+            let ix = usize::from(warning.is_some()) + usize::from(conflicts.is_some()) + 2;
+            self.scroll.scroll_to_item(ix);
+        }
         let content = v_flex()
             .id(ids::page(Page::Crosshairs))
             .test_support()
@@ -967,30 +1593,10 @@ impl Render for CrosshairsPage {
             .p(CONTENT_PADDING)
             .gap_4()
             .children(warning)
-            .child(
-                h_flex()
-                    .gap_4()
-                    .items_center()
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .min_w(px(200.))
-                            .gap_2()
-                            .child(self.picker.clone())
-                            .child(
-                                div()
-                                    .id(ids::CROSSHAIRS_BACKGROUND)
-                                    .aria_label(background)
-                                    .test_support()
-                                    .w_full()
-                                    .child(Select::new(&self.background)),
-                            ),
-                    )
-                    .child(self.preview(background, cx))
-                    .child(self.actions(cx)),
-            )
+            .child(self.status_bar(cx))
             .children(conflicts)
-            .child(self.assigner.clone());
+            .child(div().relative().w_full().child(watch).child(main))
+            .children(details);
         scroll_area(ids::page_scrollbar(Page::Crosshairs), &self.scroll, content).size_full()
     }
 }

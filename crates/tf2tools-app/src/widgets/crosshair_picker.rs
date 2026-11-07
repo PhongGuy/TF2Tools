@@ -1,7 +1,8 @@
 //! v5's crosshair picker: a search row with the selection's swatch over one virtualized list
-//! of the builtin group then the library group. The Crosshairs page and the profile wizard
-//! both host it.
+//! of the builtin group then the library group. The profile wizard hosts the list; the
+//! Crosshairs page hosts its gallery mode, a virtualized grid of large tiles under source chips.
 
+use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -10,10 +11,10 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{ActiveTheme as _, Icon, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _,
-    IntoElement, ParentElement as _, Pixels, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
-    UniformListScrollHandle, WeakEntity, Window, div, img, px, rgb, uniform_list,
+    AnyElement, App, AppContext as _, Context, Entity, FontWeight, ImageSource,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
+    UniformListScrollHandle, WeakEntity, Window, canvas, div, img, px, rgb, uniform_list,
 };
 
 use tf2tools_core::{BuiltinCrosshairs, CrosshairEntry, CrosshairFormat, CrosshairRef};
@@ -26,6 +27,44 @@ use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 
 /// Every picker row, header or option, is this tall; `uniform_list` sizes all rows by the first.
 const ROW_HEIGHT: Pixels = px(28.);
+
+/// A gallery tile's width and height, the gap between tiles, and its drawing's black square.
+const TILE_WIDTH: Pixels = px(88.);
+const TILE_HEIGHT: Pixels = px(106.);
+const TILE_GAP: Pixels = px(8.);
+const TILE_SQUARE: Pixels = px(80.);
+
+/// Which group the gallery shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Source {
+    #[default]
+    All,
+    Builtin,
+    Library,
+}
+
+/// What a gallery tile carries while dragged: the crosshair, and the ghost drawn under the
+/// pointer.
+#[derive(Clone)]
+pub struct DraggedCrosshair {
+    pub crosshair: CrosshairRef,
+    image: Option<ImageSource>,
+}
+
+impl Render for DraggedCrosshair {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .size(px(56.))
+            .rounded(cx.theme().radius)
+            .border_2()
+            .border_color(cx.theme().primary)
+            .bg(rgb(0x000000))
+            .flex()
+            .items_center()
+            .justify_center()
+            .children(self.image.clone().map(|i| img(i).size(px(48.))))
+    }
+}
 
 /// One row of the picker list, indexing into the catalog or the library.
 #[derive(Clone, Copy)]
@@ -47,6 +86,11 @@ pub struct CrosshairPicker {
     library_lowered: Vec<String>,
     selected: Option<CrosshairRef>,
     compact: bool,
+    /// The Crosshairs page's grid of tiles in place of the list.
+    gallery: bool,
+    source: Source,
+    /// The gallery grid's painted width, which sets its columns.
+    width: Rc<Cell<Pixels>>,
     /// A host operation runs: option clicks and the search box are inert.
     disabled: bool,
     previews: Entity<CrosshairPreviews>,
@@ -83,6 +127,9 @@ impl CrosshairPicker {
             library_lowered: Vec::new(),
             selected: None,
             compact,
+            gallery: false,
+            source: Source::All,
+            width: Rc::new(Cell::new(px(300.))),
             disabled: false,
             previews,
             search,
@@ -90,6 +137,21 @@ impl CrosshairPicker {
             _previews: observe_previews,
             _search: search_changed,
         }
+    }
+
+    /// The Crosshairs page's gallery: source chips over a grid of large tiles that can be
+    /// dragged onto the loadout board.
+    pub fn gallery(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        Self {
+            gallery: true,
+            ..Self::new(false, window, cx)
+        }
+    }
+
+    /// Shows only one group, or both.
+    pub fn set_source(&mut self, source: Source, cx: &mut Context<Self>) {
+        self.source = source;
+        cx.notify();
     }
 
     /// Replaces the library group and its lowered names, keeps the selection, and requests a
@@ -229,33 +291,246 @@ impl CrosshairPicker {
     }
 }
 
+impl CrosshairPicker {
+    // The gallery's matching tiles for `query`, the library group first since those are the
+    // player's own, then the counts of each group before the source chip narrows them.
+    fn tiles(&self, query: &str) -> (Vec<Row>, usize, usize) {
+        let library: Vec<Row> = (0..self.library_lowered.len())
+            .filter(|&ix| self.library_lowered[ix].contains(query))
+            .map(Row::Library)
+            .collect();
+        let builtins: Vec<Row> = (0..self.builtins_lowered.len())
+            .filter(|&ix| self.builtins_lowered[ix].contains(query))
+            .map(Row::Builtin)
+            .collect();
+        let counts = (builtins.len(), library.len());
+        let tiles = match self.source {
+            Source::All => library.into_iter().chain(builtins).collect(),
+            Source::Builtin => builtins,
+            Source::Library => library,
+        };
+        (tiles, counts.0, counts.1)
+    }
+
+    // A source chip: the active one filled, hidden when its group has no match.
+    fn chip(
+        &self,
+        id: &'static str,
+        label: String,
+        source: Source,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let theme = cx.theme();
+        let active = self.source == source;
+        let (bg, fg) = if active {
+            (theme.secondary, theme.foreground)
+        } else {
+            (gpui_kit::transparent_black(), theme.muted_foreground)
+        };
+        div()
+            .id(id)
+            .aria_label(SharedString::from(label.clone()))
+            .test_support()
+            .px_2()
+            .h(px(24.))
+            .flex()
+            .items_center()
+            .rounded_full()
+            .border_1()
+            .border_color(theme.border)
+            .text_xs()
+            .bg(bg)
+            .text_color(fg)
+            .cursor_pointer()
+            .hover(|chip| chip.text_color(theme.foreground))
+            .on_click(cx.listener(move |picker, _, _, cx| picker.set_source(source, cx)))
+            .child(label)
+    }
+
+    // The gallery: the search row, the source chips, then the virtualized grid filling the
+    // rest, each list item one row of as many tiles as the measured width holds.
+    fn render_gallery(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme();
+        let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
+        let query = self.search.read(cx).value().to_lowercase();
+        let (tiles, builtins, library) = self.tiles(&query);
+        let mut chips = vec![
+            self.chip(ids::CROSSHAIRS_GROUP_ALL, "All".into(), Source::All, cx)
+                .into_any_element(),
+        ];
+        if builtins > 0 {
+            let label = format!("Built-in ({builtins})");
+            chips.push(
+                self.chip(ids::CROSSHAIRS_GROUP_BUILTIN, label, Source::Builtin, cx)
+                    .into_any_element(),
+            );
+        }
+        if library > 0 {
+            let label = format!("My Crosshairs ({library})");
+            chips.push(
+                self.chip(ids::CROSSHAIRS_GROUP_LIBRARY, label, Source::Library, cx)
+                    .into_any_element(),
+            );
+        }
+        let swatch = self.swatch(px(28.), cx);
+        let body = if tiles.is_empty() {
+            v_flex()
+                .flex_1()
+                .items_center()
+                .justify_center()
+                .child(labelled(
+                    div().text_sm().text_color(muted),
+                    ids::CROSSHAIRS_NO_MATCH,
+                    "No crosshairs match your search",
+                ))
+                .into_any_element()
+        } else {
+            self.grid(tiles.into(), cx)
+        };
+        v_flex()
+            .size_full()
+            .rounded(radius)
+            .border_1()
+            .border_color(border)
+            .overflow_hidden()
+            .child(
+                h_flex()
+                    .gap_2()
+                    .px_2()
+                    .py_1()
+                    .border_b_1()
+                    .border_color(border)
+                    .child(self.search_box(muted))
+                    .children(swatch),
+            )
+            .child(h_flex().flex_wrap().gap_1().px_2().pt_2().children(chips))
+            .child(body)
+            .into_any_element()
+    }
+
+    // The tile grid. The canvas records the painted width; a change asks for another frame,
+    // since a refresh requested while drawing is dropped.
+    fn grid(&self, tiles: Rc<[Row]>, cx: &mut Context<Self>) -> AnyElement {
+        let measured = self.width.clone();
+        let watch = canvas(
+            move |bounds, window, _| {
+                if measured.get() != bounds.size.width {
+                    measured.set(bounds.size.width);
+                    window.request_animation_frame();
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .size_full();
+        let usable = self.width.get() - BAR_WIDTH - TILE_GAP;
+        let columns = (((usable + TILE_GAP) / (TILE_WIDTH + TILE_GAP)).floor() as usize).max(1);
+        let rows = tiles.len().div_ceil(columns);
+        let picker = cx.entity().downgrade();
+        let builtins = self.builtins.clone();
+        let library = self.library.clone();
+        let selected = self.selected.clone();
+        let previews = self.previews.clone();
+        let list = uniform_list(ids::CROSSHAIRS_LIST, rows, move |range, _, cx| {
+            range
+                .map(|row| {
+                    let start = row * columns;
+                    let end = (start + columns).min(tiles.len());
+                    let cells = tiles[start..end].iter().map(|tile| {
+                        let (id, name, crosshair) = match *tile {
+                            Row::Library(i) => {
+                                let c = &library[i];
+                                (
+                                    ids::crosshair_library(c.folder_name()),
+                                    c.name().to_owned(),
+                                    CrosshairRef::Library(c.id().clone()),
+                                )
+                            }
+                            Row::Builtin(i) => {
+                                let b = &builtins.all()[i];
+                                (
+                                    ids::crosshair_builtin(b.name()),
+                                    b.display_name().to_owned(),
+                                    CrosshairRef::Builtin(b.name().to_owned()),
+                                )
+                            }
+                            _ => unreachable!("the gallery holds no headers"),
+                        };
+                        tile_element(id, name, crosshair, &selected, &previews, &picker, cx)
+                    });
+                    h_flex()
+                        .id(("crosshair-tile-row", row))
+                        .gap(TILE_GAP)
+                        .pb(TILE_GAP)
+                        .children(cells)
+                        .into_any_element()
+                })
+                .collect()
+        })
+        .track_scroll(&self.list)
+        .test_support()
+        .size_full()
+        .p(TILE_GAP)
+        .pr(BAR_WIDTH);
+        let grid = div().relative().size_full().child(watch).child(list);
+        div()
+            .flex_1()
+            .min_h_0()
+            .child(scroll_area(ids::CROSSHAIRS_LIST_SCROLLBAR, &self.list, grid).size_full())
+            .into_any_element()
+    }
+
+    // The search input, inert while disabled.
+    fn search_box(&self, muted: gpui_kit::Hsla) -> impl IntoElement {
+        div()
+            .id(ids::CROSSHAIRS_SEARCH)
+            .test_support()
+            .flex_1()
+            .min_w_0()
+            .child(
+                Input::new(&self.search)
+                    .appearance(false)
+                    .h_7()
+                    .disabled(self.disabled)
+                    .prefix(Icon::new(IconName::Search).text_color(muted)),
+            )
+    }
+
+    // The selection's swatch: its preview on black, labelled with its name.
+    fn swatch(&self, size: Pixels, cx: &App) -> Option<impl IntoElement + use<>> {
+        let selected = self.selected.as_ref()?;
+        let name = self.name_of(selected)?;
+        let preview = self.previews.read(cx).preview(selected, cx);
+        Some(
+            div()
+                .id(ids::CROSSHAIRS_SWATCH)
+                .aria_label(name)
+                .test_support()
+                .flex_none()
+                .size(size)
+                .rounded(cx.theme().radius)
+                .bg(rgb(0x000000))
+                .flex()
+                .items_center()
+                .justify_center()
+                .children(preview_image(preview, size - px(8.))),
+        )
+    }
+}
+
 impl Render for CrosshairPicker {
     // v5's picker box: the search row with the selection's swatch, then the grouped list, or
     // the muted no-match line when the search hides every option.
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.gallery {
+            return self.render_gallery(cx);
+        }
         let theme = cx.theme();
         let (border, muted, radius) = (theme.border, theme.muted_foreground, theme.radius);
         let query = self.search.read(cx).value().to_lowercase();
         let rows = self.rows(&query);
         let swatch_size = if self.compact { px(28.) } else { px(36.) };
-        let swatch = self.selected.as_ref().and_then(|selected| {
-            let name = self.name_of(selected)?;
-            let preview = self.previews.read(cx).preview(selected, cx);
-            Some(
-                div()
-                    .id(ids::CROSSHAIRS_SWATCH)
-                    .aria_label(name)
-                    .test_support()
-                    .flex_none()
-                    .size(swatch_size)
-                    .rounded(radius)
-                    .bg(rgb(0x000000))
-                    .flex()
-                    .items_center()
-                    .justify_center()
-                    .children(preview_image(preview, swatch_size - px(8.))),
-            )
-        });
+        let swatch = self.swatch(swatch_size, cx);
         let list = if rows.is_empty() {
             v_flex()
                 .h(self.list_height())
@@ -282,23 +557,11 @@ impl Render for CrosshairPicker {
                     .py_1()
                     .border_b_1()
                     .border_color(border)
-                    .child(
-                        div()
-                            .id(ids::CROSSHAIRS_SEARCH)
-                            .test_support()
-                            .flex_1()
-                            .min_w_0()
-                            .child(
-                                Input::new(&self.search)
-                                    .appearance(false)
-                                    .h_7()
-                                    .disabled(self.disabled)
-                                    .prefix(Icon::new(IconName::Search).text_color(muted)),
-                            ),
-                    )
+                    .child(self.search_box(muted))
                     .children(swatch),
             )
             .child(list)
+            .into_any_element()
     }
 }
 
@@ -387,5 +650,82 @@ fn option(
                 .children(preview_image(preview, px(12.))),
         )
         .child(div().min_w_0().truncate().text_sm().child(name))
+        .into_any_element()
+}
+
+// A gallery tile: the crosshair at its in-game size on a black square, ringed in the theme's
+// primary when selected, and its name under it. A click selects it; a drag carries it to the
+// loadout board.
+fn tile_element(
+    id: gpui_kit::ElementId,
+    name: String,
+    crosshair: CrosshairRef,
+    selected: &Option<CrosshairRef>,
+    previews: &Entity<CrosshairPreviews>,
+    picker: &WeakEntity<CrosshairPicker>,
+    cx: &App,
+) -> AnyElement {
+    let theme = cx.theme();
+    let is_selected = selected.as_ref() == Some(&crosshair);
+    let preview = previews.read(cx).preview(&crosshair, cx);
+    let image = match &preview {
+        Preview::Ready(source) => Some(source.clone()),
+        _ => None,
+    };
+    let ring = if is_selected {
+        theme.primary
+    } else {
+        theme.border
+    };
+    let (hover, fg, muted) = (theme.ring, theme.foreground, theme.muted_foreground);
+    let picker = picker.clone();
+    let name: SharedString = name.into();
+    let dragged = DraggedCrosshair {
+        crosshair: crosshair.clone(),
+        image,
+    };
+    v_flex()
+        .id(id)
+        .aria_label(name.clone())
+        .test_support()
+        .flex_none()
+        .w(TILE_WIDTH)
+        .h(TILE_HEIGHT)
+        .items_center()
+        .gap_1()
+        .cursor_pointer()
+        .on_click(move |_, _, cx| {
+            let _ = picker.update(cx, |picker, cx| {
+                if !picker.disabled {
+                    picker.select(Some(crosshair.clone()), cx)
+                }
+            });
+        })
+        .on_drag(dragged, |dragged, _, _, cx| cx.new(|_| dragged.clone()))
+        .child(
+            div()
+                .flex_none()
+                .size(TILE_SQUARE)
+                .rounded(theme.radius)
+                .border_2()
+                .border_color(ring)
+                .bg(rgb(0x000000))
+                .flex()
+                .items_center()
+                .justify_center()
+                .when(!is_selected, |square| {
+                    square.hover(|square| square.border_color(hover))
+                })
+                .children(preview_image(preview, IN_GAME_SIZE)),
+        )
+        .child(
+            div()
+                .w_full()
+                .text_center()
+                .truncate()
+                .text_xs()
+                .text_color(if is_selected { fg } else { muted })
+                .child(name),
+        )
         .into_any_element()
 }

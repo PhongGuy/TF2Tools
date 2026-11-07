@@ -66,7 +66,7 @@ fn crosshairs_is_a_real_page(cx: &mut TestAppContext) {
         cx,
         s.win,
         ids::page(Page::Crosshairs),
-        ids::CROSSHAIRS_SEARCH,
+        ids::CROSSHAIRS_STATUS,
     );
     assert!(support::present(cx, s.win, ids::CROSSHAIRS_SEARCH));
     assert!(support::present(cx, s.win, ids::CROSSHAIRS_LIST));
@@ -226,7 +226,7 @@ fn the_preview_waits_for_a_selection(cx: &mut TestAppContext) {
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::CROSSHAIRS_BACKGROUND).as_deref(),
-        Some("2fort")
+        Some("Dark")
     );
 }
 
@@ -239,7 +239,7 @@ fn the_preview_shows_the_selection_over_the_background(cx: &mut TestAppContext) 
     support::click_id(cx, s.win, ids::crosshair_builtin(first.name()));
     assert_eq!(
         support::label_of(cx, s.win, ids::CROSSHAIRS_PREVIEW),
-        Some(format!("{} on 2fort", first.display_name()))
+        Some(format!("{} on Dark", first.display_name()))
     );
     background(cx, &s, &page, "badlands");
     assert_eq!(
@@ -518,19 +518,6 @@ fn of_class(class: TfClass) -> Vec<&'static Weapon> {
     weapons().iter().filter(|w| w.class() == class).collect()
 }
 
-fn sorted_scripts(s: &support::ShellWindow) -> Vec<String> {
-    let mut scripts: Vec<String> = s
-        .services
-        .library
-        .assignments()
-        .unwrap()
-        .iter()
-        .map(|a| a.weapon_script().to_owned())
-        .collect();
-    scripts.sort();
-    scripts
-}
-
 fn select_first_builtin(cx: &mut TestAppContext, s: &support::ShellWindow) -> String {
     let first = s.services.builtins.all()[0].clone();
     support::click_id(cx, s.win, ids::crosshair_builtin(first.name()));
@@ -576,21 +563,27 @@ fn copy_and_export_wait_for_an_import_install_or_uninstall(cx: &mut TestAppConte
     }
 }
 
+/// Opens the per-weapon list of `weapon`'s board cell.
+fn open_weapons(cx: &mut TestAppContext, s: &support::ShellWindow, weapon: &Weapon) {
+    support::click_id(
+        cx,
+        s.win,
+        ids::loadout_cell_menu(weapon.class(), weapon.slot()),
+    );
+}
+
 #[gpui_kit::test]
-fn the_scout_tab_lists_scout_weapons(cx: &mut TestAppContext) {
+fn the_per_weapon_list_names_each_weapon_of_the_cell(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let page = open_crosshairs(cx, &s);
     assert_eq!(cx.update(|cx| page.read(cx).class()), TfClass::Scout);
-    assert_eq!(
-        support::label_of(cx, s.win, ids::class_tab("scout")).as_deref(),
-        Some("Scout")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::CROSSHAIRS_BULK_ALL).as_deref(),
-        Some("All Scout")
-    );
-    for weapon in of_class(TfClass::Scout).into_iter().take(3) {
+    let first = of_class(TfClass::Scout)[0];
+    open_weapons(cx, &s, first);
+    for weapon in of_class(TfClass::Scout)
+        .into_iter()
+        .filter(|w| w.slot() == first.slot())
+    {
         let script = weapon.script_name();
         assert_eq!(
             support::label_of(cx, s.win, ids::weapon_row(script)).as_deref(),
@@ -602,23 +595,27 @@ fn the_scout_tab_lists_scout_weapons(cx: &mut TestAppContext) {
         );
         assert!(!support::present(cx, s.win, ids::weapon_check(script)));
     }
+    // The board replaces the class tabs and bulk buttons.
+    assert!(!support::present(cx, s.win, ids::class_tab("scout")));
+    assert!(!support::present(cx, s.win, ids::CROSSHAIRS_BULK_ALL));
 }
 
 #[gpui_kit::test]
-fn a_class_tab_switches_the_list(cx: &mut TestAppContext) {
+fn set_class_switches_the_per_weapon_list(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let page = open_crosshairs(cx, &s);
-    support::click_id(cx, s.win, ids::class_tab("soldier"));
+    cx.update(|cx| page.update(cx, |page, cx| page.set_class(TfClass::Soldier, cx)));
+    support::settle(cx, s.win);
     assert_eq!(cx.update(|cx| page.read(cx).class()), TfClass::Soldier);
-    let soldier = of_class(TfClass::Soldier)[0].script_name();
+    let soldier = of_class(TfClass::Soldier)
+        .into_iter()
+        .find(|w| w.slot() == WeaponSlot::Primary)
+        .unwrap()
+        .script_name();
     let scout = of_class(TfClass::Scout)[0].script_name();
     assert!(support::present(cx, s.win, ids::weapon_row(soldier)));
     assert!(!support::present(cx, s.win, ids::weapon_row(scout)));
-    assert_eq!(
-        support::label_of(cx, s.win, ids::CROSSHAIRS_BULK_ALL).as_deref(),
-        Some("All Soldier")
-    );
 }
 
 #[gpui_kit::test]
@@ -628,6 +625,7 @@ fn clicking_a_row_assigns_the_selected_crosshair(cx: &mut TestAppContext) {
     let _page = open_crosshairs(cx, &s);
     let name = select_first_builtin(cx, &s);
     let weapon = of_class(TfClass::Scout)[0];
+    open_weapons(cx, &s, weapon);
     support::click_id(cx, s.win, ids::weapon_row(weapon.script_name()));
     assert_eq!(toast_text(cx, &s), "Crosshair assigned");
     let assignments = s.services.library.assignments().unwrap();
@@ -661,6 +659,7 @@ fn a_row_does_nothing_without_a_selection(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, found(&env));
     let _page = open_crosshairs(cx, &s);
     let weapon = of_class(TfClass::Scout)[0];
+    open_weapons(cx, &s, weapon);
     support::click_id(cx, s.win, ids::weapon_row(weapon.script_name()));
     support::settle(cx, s.win);
     assert!(s.services.library.assignments().unwrap().is_empty());
@@ -681,6 +680,7 @@ fn a_library_assignment_shows_the_crosshair_name(cx: &mut TestAppContext) {
         )
         .unwrap();
     let _page = open_crosshairs(cx, &s);
+    open_weapons(cx, &s, weapon);
     assert_eq!(
         support::label_of(cx, s.win, ids::weapon_assigned(weapon.script_name())).as_deref(),
         Some("Zebra Dot")
@@ -697,99 +697,24 @@ fn an_unknown_builtin_assignment_shows_its_raw_name(cx: &mut TestAppContext) {
         .assign(weapon.script_name(), &CrosshairRef::Builtin("nope".into()))
         .unwrap();
     let _page = open_crosshairs(cx, &s);
+    open_weapons(cx, &s, weapon);
     assert_eq!(
         support::label_of(cx, s.win, ids::weapon_assigned(weapon.script_name())).as_deref(),
         Some("nope")
     );
 }
 
+// The gallery draws each crosshair at its in-game size on a tile, so tiles are large.
 #[gpui_kit::test]
-fn bulk_primary_assigns_every_scout_primary(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let _page = open_crosshairs(cx, &s);
-    select_first_builtin(cx, &s);
-    support::click_id(cx, s.win, ids::CROSSHAIRS_BULK_PRIMARY);
-    assert_eq!(
-        toast_text(cx, &s),
-        "Crosshair applied to all Scout primary weapons"
-    );
-    let mut expected: Vec<String> = of_class(TfClass::Scout)
-        .into_iter()
-        .filter(|w| w.slot() == WeaponSlot::Primary)
-        .map(|w| w.script_name().to_owned())
-        .collect();
-    expected.sort();
-    assert!(!expected.is_empty());
-    assert_eq!(sorted_scripts(&s), expected);
-}
-
-#[gpui_kit::test]
-fn bulk_all_assigns_the_whole_class(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let _page = open_crosshairs(cx, &s);
-    select_first_builtin(cx, &s);
-    support::click_id(cx, s.win, ids::class_tab("soldier"));
-    support::click_id(cx, s.win, ids::CROSSHAIRS_BULK_ALL);
-    assert_eq!(
-        toast_text(cx, &s),
-        "Crosshair applied to all Soldier weapons"
-    );
-    let mut expected: Vec<String> = of_class(TfClass::Soldier)
-        .into_iter()
-        .map(|w| w.script_name().to_owned())
-        .collect();
-    expected.sort();
-    assert_eq!(sorted_scripts(&s), expected);
-}
-
-#[gpui_kit::test]
-fn bulk_without_a_selection_says_so(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let _page = open_crosshairs(cx, &s);
-    support::click_id(cx, s.win, ids::CROSSHAIRS_BULK_MELEE);
-    assert_eq!(toast_text(cx, &s), "No crosshair selected");
-    assert!(s.services.library.assignments().unwrap().is_empty());
-}
-
-#[gpui_kit::test]
-fn a_failed_bulk_assign_changes_no_weapon(cx: &mut TestAppContext) {
-    let env = support::env();
-    let s = support::shell_window(cx, &env, found(&env));
-    let _page = open_crosshairs(cx, &s);
-    select_first_builtin(cx, &s);
-    // The first row of any batch lands and every later one fails, whatever order the
-    // assigner lists the class's weapons in.
-    rusqlite::Connection::open(env.data.db_path())
-        .unwrap()
-        .execute_batch(
-            "CREATE TRIGGER fail_after_first BEFORE INSERT ON crosshair_assignments
-             WHEN (SELECT count(*) FROM crosshair_assignments) >= 1
-             BEGIN SELECT RAISE(ABORT, 'disk full'); END;",
-        )
-        .unwrap();
-    support::click_id(cx, s.win, ids::CROSSHAIRS_BULK_ALL);
-    let toast = toast_text(cx, &s);
-    assert!(toast.starts_with("Failed to bulk assign"), "{toast}");
-    // The raw database error goes to the developer log, never to the player.
-    assert!(!toast.contains("disk full"), "{toast}");
-    assert_eq!(sorted_scripts(&s), Vec::<String>::new());
-}
-
-// v5's option rows are w-full, so the whole row is the click target and the selection fill.
-#[gpui_kit::test]
-fn an_option_row_spans_the_list(cx: &mut TestAppContext) {
+fn gallery_tiles_are_large_enough_for_the_in_game_size(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let _page = open_crosshairs(cx, &s);
     let first = s.services.builtins.all()[0].name().to_owned();
-    let list = support::bounds_of(cx, s.win, ids::CROSSHAIRS_LIST).unwrap();
-    let row = support::bounds_of(cx, s.win, ids::crosshair_builtin(&first)).unwrap();
+    let tile = support::bounds_of(cx, s.win, ids::crosshair_builtin(&first)).unwrap();
     assert!(
-        row.size.width > list.size.width * 0.9,
-        "row {row:?} should span list {list:?}"
+        tile.size.width >= gpui_kit::px(80.) && tile.size.height >= gpui_kit::px(80.),
+        "tile {tile:?}"
     );
 }
 

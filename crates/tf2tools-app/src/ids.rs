@@ -5,6 +5,7 @@ use gpui_kit::ElementId;
 use tf2tools_core::{
     AddonName, BoardMode, HudId, MeterKind, NewPart, PartKey, PinCorner, ProfileId, Scene,
     SceneRule, Screen, SituationSwitch, SoundKind, StoreItemId, StoreKind, TfClass, WeaponKind,
+    WeaponSlot,
 };
 
 use crate::shell::route::Page;
@@ -157,6 +158,24 @@ pub const CROSSHAIRS_BULK_PRIMARY: &str = "crosshairs-bulk-primary";
 pub const CROSSHAIRS_BULK_SECONDARY: &str = "crosshairs-bulk-secondary";
 /// The "Melee" bulk button.
 pub const CROSSHAIRS_BULK_MELEE: &str = "crosshairs-bulk-melee";
+/// The gallery's "All" source chip, showing both groups.
+pub const CROSSHAIRS_GROUP_ALL: &str = "crosshairs-group-all";
+/// The status bar over the page: the waiting line and the install buttons.
+pub const CROSSHAIRS_STATUS: &str = "crosshairs-status";
+/// The status bar line: "N changes not in TF2 yet", or what TF2 shows now.
+pub const CROSSHAIRS_WAITING: &str = "crosshairs-waiting";
+/// The loadout board of class columns and slot rows.
+pub const CROSSHAIRS_BOARD: &str = "crosshairs-board";
+/// The board's "Everything" corner button, assigning every weapon.
+pub const CROSSHAIRS_BOARD_EVERYTHING: &str = "crosshairs-board-everything";
+/// The per-weapon panel of one board cell, labelled "{Class} {slot} weapons".
+pub const CROSSHAIRS_DETAILS: &str = "crosshairs-details";
+/// The per-weapon panel's "Reset to default" button.
+pub const CROSSHAIRS_DETAILS_RESET: &str = "crosshairs-details-reset";
+/// The per-weapon panel's "Close" button.
+pub const CROSSHAIRS_DETAILS_CLOSE: &str = "crosshairs-details-close";
+/// The selected crosshair's name beside the large preview.
+pub const CROSSHAIRS_SELECTED_NAME: &str = "crosshairs-selected-name";
 /// The "Loading the default HUD..." line while the game's files are read.
 pub const HUD_MAKER_LOADING: &str = "hud-maker-loading";
 /// The view shown without TF2's HUD files, labelled with its sentence.
@@ -1203,6 +1222,35 @@ pub fn crosshair_conflict(folder: &str) -> ElementId {
 /// A TF2 class tab on the crosshairs page.
 pub fn class_tab(class: &str) -> ElementId {
     keyed("class-tab", class)
+}
+
+/// A loadout board cell, labelled with its crosshair, "Mixed" or "Default":
+/// "loadout-cell:<class>:<slot>".
+pub fn loadout_cell(class: TfClass, slot: WeaponSlot) -> ElementId {
+    keyed("loadout-cell", &board_key(class, slot))
+}
+
+/// A board cell's menu button, opening its per-weapon panel.
+pub fn loadout_cell_menu(class: TfClass, slot: WeaponSlot) -> ElementId {
+    keyed("loadout-cell-menu", &board_key(class, slot))
+}
+
+/// A board class header, assigning that class: "loadout-class:<class>".
+pub fn loadout_class(class: TfClass) -> ElementId {
+    keyed("loadout-class", &class.name().to_lowercase())
+}
+
+/// A board slot header, assigning that slot for every class: "loadout-slot:<slot>".
+pub fn loadout_slot(slot: WeaponSlot) -> ElementId {
+    keyed("loadout-slot", &slot.name().to_lowercase())
+}
+
+fn board_key(class: TfClass, slot: WeaponSlot) -> String {
+    format!(
+        "{}:{}",
+        class.name().to_lowercase(),
+        slot.name().to_lowercase()
+    )
 }
 
 /// A weapon row on the crosshairs page, keyed by its weapon script.
