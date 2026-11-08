@@ -1451,10 +1451,12 @@ impl HudEditor {
             let (file, mut changes) =
                 m.add_font_file(file_name, &bytes, group)
                     .inspect_err(|&e| {
+                        // `add_font_file` refuses only a bad name or, as `ReadOnly`, a scheme
+                        // that can't list another file; it reads no part, so the rest can't occur.
                         blame = match e {
                             EditRefused::BadValue => FontAddRefused::BadName,
-                            EditRefused::UnknownPart
-                            | EditRefused::ReadOnly
+                            EditRefused::ReadOnly
+                            | EditRefused::UnknownPart
                             | EditRefused::NotOffered
                             | EditRefused::RunsGameCommands
                             | _ => FontAddRefused::HudFull,
