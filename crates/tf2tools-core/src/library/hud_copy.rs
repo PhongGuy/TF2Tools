@@ -382,6 +382,8 @@ fn copy_library(e: LibraryError) -> CopyHudError {
     }
 }
 
+/// `install_name` only reads the HUD's files and the store table, so it fails with `Io` or
+/// `Database`; the other variants never reach here.
 fn copy_install(e: InstallError) -> CopyHudError {
     match e {
         InstallError::Io { path, source } => CopyHudError::Io { path, source },
@@ -1048,6 +1050,8 @@ fn save_library(e: LibraryError) -> UpdateCopyError {
     }
 }
 
+/// Its callers, `base_row` and `copy_record`, fail only with `Io` or `Database`; the space
+/// and name checks are `copy_hud`'s own, so the other variants never reach here.
 fn save_copy(e: CopyHudError) -> UpdateCopyError {
     match e {
         CopyHudError::Io { path, source } => MakeHudError::Io { path, source }.into(),

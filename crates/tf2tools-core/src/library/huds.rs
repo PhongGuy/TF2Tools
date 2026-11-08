@@ -995,6 +995,8 @@ fn refuse_uncopyable(src: &Path) -> Result<(), KeepHudError> {
     Ok(())
 }
 
+/// `external_in` fails only with `Io` or `Database`; it looks up no single item, so
+/// `NotFound` and the rest never reach here.
 fn keep_library(e: LibraryError) -> KeepHudError {
     match e {
         LibraryError::Io { path, source } => KeepHudError::Io { path, source },

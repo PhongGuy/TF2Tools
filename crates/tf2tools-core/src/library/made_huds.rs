@@ -1421,6 +1421,7 @@ fn load_db(e: rusqlite::Error) -> HudLoadError {
 
 /// A `maker.json` read failure during a save: I/O stays I/O, a file this build cannot read
 /// is reported through the database message, as `made_folder` already vetted it.
+/// `read_maker` never yields `NotFound`, `NotMade` or `Database`.
 fn make_load(e: HudLoadError) -> MakeHudError {
     match e {
         HudLoadError::Io { path, source } => MakeHudError::Io { path, source },
