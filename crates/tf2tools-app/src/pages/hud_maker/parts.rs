@@ -293,7 +293,7 @@ impl HudMakerPage {
                     // Shift or Ctrl adds the row's part to the selection or takes it out.
                     .on_click(cx.listener(move |page, ev: &ClickEvent, window, cx| {
                         let m = ev.modifiers();
-                        match m.shift || m.secondary() {
+                        match m.shift || m.secondary(cx) {
                             true => page.toggle_select(key.clone(), window, cx),
                             false => page.select(Some(key.clone()), window, cx),
                         }

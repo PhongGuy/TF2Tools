@@ -57,6 +57,11 @@ pub fn init(cx: &mut TestAppContext) {
     });
 }
 
+/// The platform's secondary modifier: Ctrl, or Command on macOS.
+pub fn secondary_key(cx: &mut TestAppContext) -> gpui_kit::Modifiers {
+    cx.update(|cx| gpui_kit::Modifiers::secondary_key(cx))
+}
+
 /// The repo's asset directory, which holds `crosshairs/crosshairs.json`.
 pub fn repo_assets() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../assets")
@@ -133,11 +138,11 @@ pub fn focused_of(
         .unwrap()
 }
 
-/// Whether the kit Button `id` renders disabled in `w`'s last frame. gpui-base 0.7.1's Button
-/// binds its focus handle only while enabled, so a disabled one has no observed binding;
-/// tests/button_state.rs pins that. For kit Buttons only; panics when `id` is not drawn.
+/// Whether the kit Button `id` renders disabled in `w`'s last frame, read from the a11y
+/// disabled flag gpui-base 0.9 sets; tests/button_state.rs pins that. Panics when `id` is not
+/// drawn.
 pub fn button_disabled(w: &Window, id: impl Into<ElementId>) -> bool {
-    w.find(id).focused().is_none()
+    w.find(id).disabled() == Some(true)
 }
 
 /// `button_disabled` after a settle.
@@ -286,11 +291,12 @@ pub fn click_nav(
     let item = bounds_of(cx, win, ids::nav(page)).expect("the nav item");
     if item.bottom() > groups.bottom() {
         cx.update_window(win, |_, w, cx| {
-            let wheel = gpui_kit::ScrollWheelEvent {
+            let wheel = gpui_kit::ScrollEvent {
                 position: groups.center(),
                 delta: gpui_kit::ScrollDelta::Lines(point(0., -20.)),
                 modifiers: gpui_kit::Modifiers::default(),
                 touch_phase: gpui_kit::TouchPhase::Moved,
+                source: Default::default(),
             };
             let _ = w.dispatch_event(gpui_kit::InputEvent::to_platform_input(wheel), cx);
         })
@@ -1376,13 +1382,14 @@ pub fn rename_table(env: &Env, from: &str, to: &str) {
         .unwrap();
 }
 
-/// The kit's bottom-layer dialog box (`.id(0usize)` inside "dialog"), after its 250 ms slide-in.
+/// The kit's bottom-layer dialog box ("surface" inside "dialog"), after its 250 ms slide-in,
+/// which runs on the executor clock.
 pub fn dialog_box(cx: &mut TestAppContext, win: AnyWindowHandle) -> Bounds<Pixels> {
     settle(cx, win);
-    std::thread::sleep(Duration::from_millis(300));
+    cx.executor().advance_clock(Duration::from_millis(300));
     settle(cx, win);
     cx.update_window(win, |_, w, _| {
-        w.within("dialog").try_find(0usize).map(|e| e.bounds())
+        w.within("dialog").try_find("surface").map(|e| e.bounds())
     })
     .unwrap()
     .expect("an open dialog box")

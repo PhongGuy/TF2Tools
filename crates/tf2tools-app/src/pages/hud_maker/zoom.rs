@@ -7,7 +7,7 @@ use gpui_kit::component::popover::Popover;
 use gpui_kit::component::{Disableable as _, Sizable as _, v_flex};
 use gpui_kit::{
     Anchor, AnyElement, Bounds, Context, IntoElement, KeyDownEvent, KeyUpEvent, MouseMoveEvent,
-    ParentElement as _, Pixels, Point, ScrollWheelEvent, Styled as _, Window, point, px,
+    ParentElement as _, Pixels, Point, ScrollEvent, Styled as _, Window, point, px,
 };
 use tf2tools_core::Screen;
 
@@ -70,11 +70,11 @@ impl HudMakerPage {
     /// Ctrl+wheel zooms around the pointer; a plain wheel pans, sideways with Shift.
     pub(super) fn wheel_canvas(
         &mut self,
-        ev: &ScrollWheelEvent,
+        ev: &ScrollEvent,
         window: &Window,
         cx: &mut Context<Self>,
     ) {
-        if ev.modifiers.secondary() {
+        if ev.modifiers.secondary(cx) {
             let steps = wheel_zoom_steps(ev.delta, &mut self.zoom_carry);
             let at = ev.position;
             self.change_zoom(cx, |z, area, screen| z.step(steps, at, area, screen));

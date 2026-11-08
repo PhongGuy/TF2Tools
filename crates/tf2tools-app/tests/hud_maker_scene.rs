@@ -2054,7 +2054,7 @@ fn a_press_in_the_selected_parts_empty_area_drags_it_not_the_part_behind(cx: &mu
     let footer = screen_box(cx, &page, FOOTER);
     // Bottom right of the button, clear of its icon, over the drawn footer.
     let (from, k) = window_at(cx, &s, &page, (x + w - 4, y + h - 4));
-    let free = gpui_kit::Modifiers::secondary_key();
+    let free = support::secondary_key(cx);
     press_and_move(cx, &s, from, (-30. * k, 0.), free, 1);
     assert_eq!(selection(cx, &page).as_deref(), Some(ACHIEVEMENTS));
     let moved = screen_box(cx, &page, ACHIEVEMENTS);

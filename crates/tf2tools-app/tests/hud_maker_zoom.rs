@@ -83,12 +83,13 @@ fn selection(cx: &mut TestAppContext, page: &Entity<HudMakerPage>) -> Option<Str
     cx.update(|cx| (page.read(cx).editor()?.selected()).map(|k| k.as_str().to_owned()))
 }
 
-fn wheel(at: Point<Pixels>, lines: f32, modifiers: Modifiers) -> gpui_kit::ScrollWheelEvent {
-    gpui_kit::ScrollWheelEvent {
+fn wheel(at: Point<Pixels>, lines: f32, modifiers: Modifiers) -> gpui_kit::ScrollEvent {
+    gpui_kit::ScrollEvent {
         position: at,
         delta: gpui_kit::ScrollDelta::Lines(point(0., lines)),
         modifiers,
         touch_phase: gpui_kit::TouchPhase::Moved,
+        source: Default::default(),
     }
 }
 
@@ -176,6 +177,7 @@ fn ctrl_plus_minus_and_zero_zoom_the_canvas(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn ctrl_wheel_zooms_around_the_pointer(cx: &mut TestAppContext) {
     let (s, _page) = open(cx);
+    let ctrl = support::secondary_key(cx);
     support::put_start_card_away(cx, s.win);
     // At twice the fit the screen overflows the view both ways, so nothing centres it.
     for _ in 0..3 {
@@ -184,16 +186,16 @@ fn ctrl_wheel_zooms_around_the_pointer(cx: &mut TestAppContext) {
     let view = support::bounds_of(cx, s.win, ids::HUD_MAKER_CANVAS_VIEW).unwrap();
     let at = view.origin + point(view.size.width * 0.3, view.size.height * 0.7);
     let before = under(cx, &s, at);
-    send(cx, &s, wheel(at, 1., Modifiers::secondary_key()));
+    send(cx, &s, wheel(at, 1., ctrl));
     assert_eq!(zoom_label(cx, &s).as_deref(), Some("250%"));
-    send(cx, &s, wheel(at, 1., Modifiers::secondary_key()));
+    send(cx, &s, wheel(at, 1., ctrl));
     assert_eq!(zoom_label(cx, &s).as_deref(), Some("300%"));
     let after = under(cx, &s, at);
     assert!(
         (before.0 - after.0).abs() < 1. && (before.1 - after.1).abs() < 1.,
         "the pointer was over {before:?} and is now over {after:?}"
     );
-    send(cx, &s, wheel(at, -1., Modifiers::secondary_key()));
+    send(cx, &s, wheel(at, -1., ctrl));
     assert_eq!(zoom_label(cx, &s).as_deref(), Some("250%"));
 }
 
@@ -238,10 +240,11 @@ fn middle_drag_space_drag_and_the_wheel_pan_a_zoomed_canvas(cx: &mut TestAppCont
 #[gpui_kit::test]
 fn a_zoomed_press_selects_and_drags_by_hud_units(cx: &mut TestAppContext) {
     let (s, page) = open(cx);
+    let ctrl = support::secondary_key(cx);
     let hv = support::bounds_of(cx, s.win, ids::hud_maker_part(&PartKey::new(HV))).unwrap();
     // Zoom twice around the health value, so it stays in view and grows.
-    send(cx, &s, wheel(hv.center(), 1., Modifiers::secondary_key()));
-    send(cx, &s, wheel(hv.center(), 1., Modifiers::secondary_key()));
+    send(cx, &s, wheel(hv.center(), 1., ctrl));
+    send(cx, &s, wheel(hv.center(), 1., ctrl));
     let c = canvas(cx, &s);
     let scale = f32::from(c.size.width) / 1920.;
     let part = support::bounds_of(cx, s.win, ids::hud_maker_part(&PartKey::new(HV))).unwrap();
@@ -254,10 +257,7 @@ fn a_zoomed_press_selects_and_drags_by_hud_units(cx: &mut TestAppContext) {
         MouseButton::Left,
         part.center(),
         point(px(45. * scale), px(-27. * scale)),
-        Modifiers {
-            alt: true,
-            ..Modifiers::secondary_key()
-        },
+        Modifiers { alt: true, ..ctrl },
     );
     assert_eq!(
         selection(cx, &page).as_deref(),

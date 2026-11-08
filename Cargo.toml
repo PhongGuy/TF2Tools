@@ -61,10 +61,10 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 wiremock = "0.6.5"
 # Windows resources for the exe icon; the version gpui-pre already resolves.
 embed-resource = "=3.0.12"
-# UI: the kit trio is pinned exactly at the proven 0.7.1; a caret resolve picks 0.7.2.
-gpui-kit = "=0.7.1"
-gpui-component = "=0.7.1"
-gpui-base = "=0.7.1"
+# UI: the kit trio is pinned exactly at 0.9.0, so a kit bump is a deliberate change.
+gpui-kit = "=0.9.0"
+gpui-component = "=0.9.0"
+gpui-base = "=0.9.0"
 rust-embed = { version = "=8.13.0", features = ["debug-embed"] }
 anyhow = "1"
 async-channel = "2.5"

@@ -24,9 +24,9 @@ use gpui_kit::{
     AnyElement, AnyWindowHandle, AppContext as _, Context, CursorStyle, DispatchPhase,
     DragMoveEvent, Entity, ExternalPaths, FocusHandle, FontWeight, Hsla, InteractiveElement as _,
     IntoElement, MouseButton, MouseDownEvent, MouseExitEvent, MouseMoveEvent, MouseUpEvent,
-    ObjectFit, ParentElement as _, Pixels, Point, Render, ScrollHandle, ScrollWheelEvent,
-    SharedString, Size, StatefulInteractiveElement as _, Styled as _, StyledImage as _,
-    Subscription, TestSupportExt as _, WeakEntity, Window, canvas, div, fill, img, point, px, size,
+    ObjectFit, ParentElement as _, Pixels, Point, Render, ScrollEvent, ScrollHandle, SharedString,
+    Size, StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription,
+    TestSupportExt as _, WeakEntity, Window, canvas, div, fill, img, point, px, size,
 };
 
 use tf2tools_core::{
@@ -1033,8 +1033,8 @@ impl CrosshairMakerPage {
     }
 
     /// Ctrl+wheel zooms around the pointer; a plain wheel scrolls, sideways with Shift.
-    fn wheel(&mut self, ev: &ScrollWheelEvent, window: &Window, cx: &mut Context<Self>) {
-        if ev.modifiers.secondary() {
+    fn wheel(&mut self, ev: &ScrollEvent, window: &Window, cx: &mut Context<Self>) {
+        if ev.modifiers.secondary(cx) {
             let steps = wheel_zoom_steps(ev.delta, &mut self.zoom_carry);
             let anchor = ev.position - self.view_origin.get();
             self.zoom(cx, |v| v.zoom_at(steps, anchor));
@@ -1583,7 +1583,7 @@ impl CrosshairMakerPage {
                     .min_h_0()
                     .w_full()
                     .overflow_hidden()
-                    .on_scroll_wheel(cx.listener(|page, ev, window, cx| page.wheel(ev, window, cx)))
+                    .on_scroll(cx.listener(|page, ev, window, cx| page.wheel(ev, window, cx)))
                     // Right and middle drags pan; the window-wide move listener in `drag` moves
                     // the grid, and a release anywhere ends the pan.
                     .on_mouse_down(MouseButton::Right, cx.listener(pan_down))

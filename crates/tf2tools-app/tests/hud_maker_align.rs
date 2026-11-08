@@ -224,7 +224,7 @@ fn holding_ctrl_drags_without_snapping(cx: &mut TestAppContext) {
     let (_env, s, page) = opened(cx);
     let k = scale(cx, &s);
     let from = hv_centre(cx, &s);
-    let free = Modifiers::secondary_key();
+    let free = support::secondary_key(cx);
     press_and_move(cx, &s, from, (45. * k, 0.), free);
     assert!(!support::present(cx, s.win, ids::HUD_MAKER_GUIDE_X));
     assert_eq!(hv_box(cx, &page).0, 216);

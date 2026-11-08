@@ -745,7 +745,7 @@ impl HudMakerPage {
             .h(room.size.height)
             .overflow_hidden()
             .when_some(grab, |el, cursor| el.cursor(cursor))
-            .on_scroll_wheel(cx.listener(|page, ev, window, cx| page.wheel_canvas(ev, window, cx)))
+            .on_scroll(cx.listener(|page, ev, window, cx| page.wheel_canvas(ev, window, cx)))
             .on_mouse_down(
                 MouseButton::Middle,
                 cx.listener(|page, ev: &MouseDownEvent, window, cx| {
@@ -1460,7 +1460,7 @@ impl HudMakerPage {
         let by = ev.position - drag.from;
         let screen_px = |d: Pixels| (f32::from(d) / drag.scale).round() as i32;
         drag.pending = Some((screen_px(by.x), screen_px(by.y)));
-        drag.free = ev.modifiers.secondary();
+        drag.free = ev.modifiers.secondary(cx);
         cx.notify();
     }
 

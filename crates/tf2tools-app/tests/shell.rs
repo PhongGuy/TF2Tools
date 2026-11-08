@@ -193,11 +193,12 @@ fn a_short_window_scrolls_the_groups_above_the_footer(cx: &mut TestAppContext) {
         "the groups fit; the test proves nothing"
     );
     cx.update_window(s.win, |_, w, cx| {
-        let wheel = gpui_kit::ScrollWheelEvent {
+        let wheel = gpui_kit::ScrollEvent {
             position: groups.center(),
             delta: gpui_kit::ScrollDelta::Lines(gpui_kit::point(0., -20.)),
             modifiers: gpui_kit::Modifiers::default(),
             touch_phase: gpui_kit::TouchPhase::Moved,
+            source: Default::default(),
         };
         let _ = w.dispatch_event(gpui_kit::InputEvent::to_platform_input(wheel), cx);
     })

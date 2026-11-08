@@ -1051,7 +1051,7 @@ fn a_font_list_and_the_named_colours_never_show_together(cx: &mut TestAppContext
     send(
         cx,
         &s,
-        gpui_kit::ScrollWheelEvent {
+        gpui_kit::ScrollEvent {
             position: point(
                 body.left() + gpui_kit::px(8.),
                 body.bottom() - gpui_kit::px(8.),
@@ -1059,6 +1059,7 @@ fn a_font_list_and_the_named_colours_never_show_together(cx: &mut TestAppContext
             delta: ScrollDelta::Lines(point(0., -40.)),
             modifiers: Default::default(),
             touch_phase: gpui_kit::TouchPhase::Moved,
+            source: Default::default(),
         },
     );
     support::click_id(cx, s.win, ids::HUD_MAKER_COLOUR_NAME);
@@ -1493,11 +1494,12 @@ fn wheel_panel_to_foot(cx: &mut TestAppContext, s: &support::ShellWindow, id: gp
         send(
             cx,
             s,
-            gpui_kit::ScrollWheelEvent {
+            gpui_kit::ScrollEvent {
                 position: point(body.left() + gpui_kit::px(4.), body.center().y),
                 delta: ScrollDelta::Lines(point(0., step)),
                 modifiers: Default::default(),
                 touch_phase: gpui_kit::TouchPhase::Moved,
+                source: Default::default(),
             },
         );
     }
