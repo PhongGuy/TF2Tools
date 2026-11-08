@@ -9,12 +9,15 @@ use std::path::{Path, PathBuf};
 /// When `path` cannot be canonicalised.
 pub(crate) fn free_bytes(path: &Path) -> std::io::Result<u64> {
     let path = path.canonicalize()?;
-    let disks = sysinfo::Disks::new_with_refreshed_list();
-    let disks: Vec<(PathBuf, u64)> = disks
-        .list()
-        .iter()
-        .map(|d| (d.mount_point().to_path_buf(), d.available_space()))
-        .collect();
+    // A platform that cannot list disks reads as no disks, which never blocks a copy.
+    let disks: Vec<(PathBuf, u64)> = sysinfo::Disks::new_with_refreshed_list()
+        .map(|disks| {
+            disks
+                .iter()
+                .map(|d| (d.mount_point().to_path_buf(), d.available_space()))
+                .collect()
+        })
+        .unwrap_or_default();
     Ok(pick(&path, &disks).unwrap_or(u64::MAX))
 }
 
