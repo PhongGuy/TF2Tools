@@ -237,10 +237,13 @@ impl Library {
                 String::new(),
             ),
         };
+        // Deleting a HUD takes no write lock, so its row can vanish between reads.
         let tree = self.hud_tree_hash(entry.id()).map_err(|e| match e {
             LibraryError::Io { path, source } => CopyHudError::Io { path, source },
-            other @ LibraryError::NotFound { .. }
-            | other @ LibraryError::InvalidWeaponScript { .. }
+            LibraryError::NotFound { .. } => CopyHudError::NotFound {
+                id: entry.id().as_str().to_owned(),
+            },
+            other @ LibraryError::InvalidWeaponScript { .. }
             | other @ LibraryError::Vpk(_)
             | other @ LibraryError::Vtf(_)
             | other @ LibraryError::Database { .. } => copy_library(other),
@@ -890,16 +893,21 @@ impl Library {
         // A swap a crash interrupted is finished first, as a save does.
         recover_swap(&self.dir.library_dir(LibraryKind::Huds).join(&folder))
             .map_err(MakeHudError::from)?;
+        // Deleting a HUD takes no write lock, so the copy or `from` can vanish meanwhile.
+        let gone = || UpdateCopyError::SourceGone { id: text(from) };
         let copy = self
             .copy_base(id)
-            .map_err(save_library)?
+            .map_err(|e| save_library(e, || UpdateCopyError::NotFound { id: text(id) }))?
             .ok_or_else(|| UpdateCopyError::NotACopy { id: text(id) })?;
         let row = (self.base_row(from).map_err(save_copy)?)
             .ok_or_else(|| UpdateCopyError::SourceGone { id: text(from) })?;
-        if self.is_made_hud(from).map_err(save_library)? {
+        if self.is_made_hud(from).map_err(|e| save_library(e, gone))? {
             return Err(UpdateCopyError::MadeHud { id: text(from) });
         }
-        if !self.same_source(&copy, &row.entry).map_err(save_library)? {
+        if !self
+            .same_source(&copy, &row.entry)
+            .map_err(|e| save_library(e, gone))?
+        {
             return Err(UpdateCopyError::NotSameSource { id: text(from) });
         }
         let huds = self.dir.library_dir(LibraryKind::Huds);
@@ -1036,11 +1044,12 @@ fn save_db(e: rusqlite::Error) -> UpdateCopyError {
     })
 }
 
-fn save_library(e: LibraryError) -> UpdateCopyError {
+/// `NotFound` becomes `gone()`, the error for whichever HUD that step read.
+fn save_library(e: LibraryError, gone: impl FnOnce() -> UpdateCopyError) -> UpdateCopyError {
     match e {
         LibraryError::Io { path, source } => MakeHudError::Io { path, source }.into(),
-        other @ LibraryError::NotFound { .. }
-        | other @ LibraryError::InvalidWeaponScript { .. }
+        LibraryError::NotFound { .. } => gone(),
+        other @ LibraryError::InvalidWeaponScript { .. }
         | other @ LibraryError::Vpk(_)
         | other @ LibraryError::Vtf(_)
         | other @ LibraryError::Database { .. } => MakeHudError::Database {
@@ -1050,13 +1059,13 @@ fn save_library(e: LibraryError) -> UpdateCopyError {
     }
 }
 
-/// Its callers, `base_row` and `copy_record`, fail only with `Io` or `Database`; the space
-/// and name checks are `copy_hud`'s own, so the other variants never reach here.
+/// Its callers, `base_row` and `copy_record`, read the source HUD, so `NotFound` means it is
+/// gone; the space and name checks are `copy_hud`'s own and never reach here.
 fn save_copy(e: CopyHudError) -> UpdateCopyError {
     match e {
         CopyHudError::Io { path, source } => MakeHudError::Io { path, source }.into(),
-        other @ CopyHudError::NotFound { .. }
-        | other @ CopyHudError::BaseMissing { .. }
+        CopyHudError::NotFound { id } => UpdateCopyError::SourceGone { id },
+        other @ CopyHudError::BaseMissing { .. }
         | other @ CopyHudError::MadeHud { .. }
         | other @ CopyHudError::NameTaken { .. }
         | other @ CopyHudError::NoSpace { .. }
@@ -1069,7 +1078,68 @@ fn save_copy(e: CopyHudError) -> UpdateCopyError {
 
 #[cfg(test)]
 mod tests {
-    use super::TreeCache;
+    use super::{
+        CopyHudError, HudId, Library, LibraryError, TreeCache, UpdateCopyError, save_copy,
+        save_library,
+    };
+    use crate::db::Database;
+    use crate::paths::{DataDir, LibraryKind};
+
+    /// A library holding one local HUD `hud-1` in folder `somehud`.
+    fn library_with_hud() -> (tempfile::TempDir, Library) {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = DataDir::at(tmp.path().join("data"));
+        let lib = Library::new(Database::open(&dir).unwrap(), dir.clone());
+        rusqlite::Connection::open(dir.db_path())
+            .unwrap()
+            .execute(
+                "INSERT INTO library_huds (id, folder_name, name, author, source, created_at,
+                     updated_at)
+                 VALUES ('hud-1', 'somehud', 'somehud', '', 'local', '2026-11-08T00:00:00Z',
+                     '2026-11-08T00:00:00Z')",
+                [],
+            )
+            .unwrap();
+        let folder = dir.library_dir(LibraryKind::Huds).join("somehud");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("info.vdf"), "\"somehud\" {}").unwrap();
+        (tmp, lib)
+    }
+
+    #[test]
+    fn a_hud_deleted_mid_copy_is_not_found() {
+        let (_tmp, lib) = library_with_hud();
+        let id = HudId::new("hud-1");
+        let row = lib.base_row(&id).unwrap().unwrap();
+        lib.delete_hud(&id).unwrap();
+        let src = lib.dir.library_dir(LibraryKind::Huds).join("somehud");
+        let err = lib.copy_record(&row, &src).unwrap_err();
+        assert!(
+            matches!(&err, CopyHudError::NotFound { id } if id == "hud-1"),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn a_hud_gone_while_checking_an_update_takes_the_step_s_gone_error() {
+        let gone = LibraryError::NotFound {
+            what: "HUD hud-1".into(),
+        };
+        let err = save_library(gone, || UpdateCopyError::SourceGone { id: "hud-1".into() });
+        assert!(
+            matches!(&err, UpdateCopyError::SourceGone { id } if id == "hud-1"),
+            "{err:?}"
+        );
+    }
+
+    #[test]
+    fn an_update_source_gone_mid_update_is_source_gone() {
+        let err = save_copy(CopyHudError::NotFound { id: "hud-1".into() });
+        assert!(
+            matches!(&err, UpdateCopyError::SourceGone { id } if id == "hud-1"),
+            "{err:?}"
+        );
+    }
 
     #[test]
     fn the_cache_keeps_the_512_most_recently_used_folders() {
