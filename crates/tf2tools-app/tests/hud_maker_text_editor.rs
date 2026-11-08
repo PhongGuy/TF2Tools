@@ -168,6 +168,24 @@ fn a_good_font_file_is_refused_for_the_part_not_the_file() {
 }
 
 #[test]
+fn a_scheme_with_no_free_font_slot_is_refused_as_full() {
+    let full = FONTS.replacen(
+        r#""Fonts""#,
+        r#""CustomFontFiles" { "4294967295" "resource/a.ttf" } "Fonts""#,
+        1,
+    );
+    let files = stock_files_with(&[("resource/clientscheme.res", Some(full.as_str()))]);
+    let mut e = HudEditor::new(HudModel::load(&files, Platform::Linux).unwrap(), Vec::new());
+    e.select(Some(PartKey::new(HV)));
+    let bytes = support::fonts::sfnt_bytes(&[(1, "Big Numbers")]);
+    assert_eq!(
+        e.add_font_file_selected("font", "Big Numbers.ttf", bytes),
+        Err(FontAddRefused::HudFull)
+    );
+    assert!(e.changes().is_empty() && e.assets().is_empty());
+}
+
+#[test]
 fn a_font_whose_name_belongs_to_the_system_is_refused_for_its_name() {
     let mut e = editor_on(HV);
     let bytes = support::fonts::sfnt_bytes(&[(1, "Marlett")]);

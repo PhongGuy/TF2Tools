@@ -162,6 +162,8 @@ impl Library {
     }
 }
 
+/// `hud_status` and `external_in` fail only with `Io` or `Database`; they look up no single
+/// item, so `NotFound` and the rest never reach here.
 fn status_error(e: LibraryError) -> ReinstallError {
     match e {
         LibraryError::Io { path, source } => ReinstallError::Unchanged { path, source },

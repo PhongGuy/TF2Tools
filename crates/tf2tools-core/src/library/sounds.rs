@@ -413,6 +413,8 @@ impl Library {
         let not_in_library = || InstallError::NotInLibrary {
             what: format!("sound {id}"),
         };
+        // `sound_folder` reads only the database, so it fails with `Database` or `NotFound`;
+        // the file-level variants never reach here.
         let (folder, format) = self.sound_folder(id).map_err(|e| match e {
             LibraryError::Database { message } => InstallError::Database { message },
             LibraryError::Io { .. }
