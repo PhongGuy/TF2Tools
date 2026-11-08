@@ -132,9 +132,11 @@ pub fn tf2_running() -> bool {
     }
     #[cfg(windows)]
     {
-        let mut system = sysinfo::System::new();
-        system.refresh_processes(sysinfo::ProcessesToUpdate::All);
-        any_tf2_exe(system.processes().values().map(sysinfo::Process::name))
+        // A process list that cannot be read counts as TF2 not running.
+        sysinfo::System::new().is_ok_and(|mut system| {
+            system.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+            any_tf2_exe(system.processes().values().map(sysinfo::Process::name))
+        })
     }
     #[cfg(not(any(target_os = "linux", windows)))]
     {
