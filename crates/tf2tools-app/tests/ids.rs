@@ -709,6 +709,8 @@ fn profile_editor_ids_are_stable() {
             ids::PROFILE_PICKER_GRID,
             ids::PROFILE_PICKER_SOUNDS,
             ids::PROFILE_PICKER_SOUNDS_SCROLLBAR,
+            ids::PROFILE_SLOT_HUD_SHOT,
+            ids::PROFILE_SLOT_HUD_IMAGE,
         ],
         [
             "profiles-new",
@@ -727,6 +729,8 @@ fn profile_editor_ids_are_stable() {
             "profile-picker-grid",
             "profile-picker-sounds",
             "profile-picker-sounds-scrollbar",
+            "profile-slot-hud-shot",
+            "profile-slot-hud-image",
         ]
     );
 }

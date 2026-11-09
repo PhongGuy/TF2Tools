@@ -47,6 +47,8 @@ use crate::widgets::{Named as _, labelled};
 
 // A HUD card's name row under its 16:9 picture.
 const PICK_TITLE_HEIGHT: Pixels = px(40.);
+// The HUD slot's picture, about a list thumbnail.
+const SLOT_PICTURE_WIDTH: Pixels = px(64.);
 // The slot column's width; the picker takes the rest.
 const SLOT_COLUMN_WIDTH: Pixels = px(280.);
 // One sound row with the gap under it; `uniform_list` sizes every row alike.
@@ -347,6 +349,7 @@ impl ProfileEditor {
                                     images: Rc::new(images),
                                 });
                                 editor.relabel(cx);
+                                editor.want_images(cx);
                             }
                             Err(err) => toast_error(window, cx, &err),
                         }
@@ -488,7 +491,17 @@ impl ProfileEditor {
             .is_some_and(|now| now.key == sound_key(folder))
     }
 
-    // Asks for the pictures of the HUD cards in the grid's last drawn range.
+    // The saved HUD's picture URL, once the galleries have loaded.
+    fn slot_hud_url(&self) -> Option<&str> {
+        let folder = self.saved.hud()?.folder_name();
+        self.galleries
+            .as_ref()?
+            .images
+            .get(folder)
+            .map(String::as_str)
+    }
+
+    // Asks for the pictures of the HUD slot and of the HUD cards in the grid's last drawn range.
     fn want_images(&mut self, cx: &mut Context<Self>) {
         let (Some(images), Some(galleries)) = (RemoteImages::global(cx), self.galleries.as_ref())
         else {
@@ -499,7 +512,9 @@ impl ProfileEditor {
         let keys: Vec<ImageKey> = shown[self.visible.start.min(end)..end]
             .iter()
             .filter_map(|hud| galleries.images.get(hud.folder_name()))
-            .map(|url| ImageKey::card(url))
+            .map(String::as_str)
+            .chain(self.slot_hud_url())
+            .map(ImageKey::card)
             .collect();
         images.update(cx, |images, cx| images.want(&self.image_viewer, keys, cx));
     }
@@ -901,6 +916,16 @@ impl ProfileEditor {
                     }),
                 )
             });
+        // A set HUD shows its picture, or the HUDs page's muted placeholder until it loads.
+        let picture = (slot == Slot::Hud && matches!(state, SlotState::Set(_))).then(|| {
+            let url = self.slot_hud_url();
+            div().flex_none().w(SLOT_PICTURE_WIDTH).child(hud_picture(
+                ids::PROFILE_SLOT_HUD_SHOT.into(),
+                ids::PROFILE_SLOT_HUD_IMAGE.into(),
+                url,
+                cx,
+            ))
+        });
         let clear = (state != SlotState::Empty).then(|| {
             Button::new(ids::profile_slot_clear(key))
                 .ghost()
@@ -929,6 +954,7 @@ impl ProfileEditor {
             .child(
                 h_flex()
                     .gap_2()
+                    .children(picture)
                     .child(
                         v_flex()
                             .flex_1()

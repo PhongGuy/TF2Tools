@@ -872,6 +872,10 @@ pub const PROFILE_EDITOR_DELETE: &str = "profile-editor-delete";
 pub const PROFILE_EDITOR_NOT_APPLIED: &str = "profile-editor-not-applied";
 /// The HUD picker's card grid.
 pub const PROFILE_PICKER_GRID: &str = "profile-picker-grid";
+/// The HUD slot card's picture area, drawn while the slot holds a HUD.
+pub const PROFILE_SLOT_HUD_SHOT: &str = "profile-slot-hud-shot";
+/// The HUD slot card's picture, once it has loaded.
+pub const PROFILE_SLOT_HUD_IMAGE: &str = "profile-slot-hud-image";
 /// The sound picker's list.
 pub const PROFILE_PICKER_SOUNDS: &str = "profile-picker-sounds";
 /// The sound picker list's scrollbar.

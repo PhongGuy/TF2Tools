@@ -1695,3 +1695,17 @@ fn enqueue_refuses_while_the_page_is_busy(cx: &mut TestAppContext) {
     });
     assert_eq!(saved(&s, comp.id()).hud(), comp.hud());
 }
+
+#[gpui_kit::test]
+fn the_hud_slot_shows_its_picture(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let vanilla = empty_profile(&s, "Vanilla");
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, comp.id());
+    assert!(support::present(cx, s.win, ids::PROFILE_SLOT_HUD_SHOT));
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_BACK);
+    let _editor = open_editor(cx, &s, &page, vanilla.id());
+    assert!(!support::present(cx, s.win, ids::PROFILE_SLOT_HUD_SHOT));
+}
