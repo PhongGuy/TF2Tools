@@ -7,9 +7,11 @@ use tokio::io::AsyncWriteExt;
 
 use super::{StoreClient, StoreKind};
 use crate::archive::VPK_MAGIC;
-use crate::error::{InstallMastercomfigError, ModuleCatalogError, QueryError};
+use crate::error::{ApplyModulesError, InstallMastercomfigError, ModuleCatalogError, QueryError};
 use crate::library::{
-    ModuleCatalog, game_custom_dir, record_install, remove_file_if_present, write_setup_hook,
+    Choices, ModuleCatalog, back_up, game_custom_dir, modules_cfg_path, read_choices,
+    record_install, remove_file_if_present, save_modules, write_modules_cfg, write_setup_hook,
+    written_by_us,
 };
 use crate::templates::BASE_VPK;
 use crate::tf2::Tf2Install;
@@ -179,6 +181,49 @@ impl StoreClient {
         write_setup_hook(&custom, preset)?;
         tracing::info!(version = release.tag(), "mastercomfig installed");
         Ok(release.tag().to_owned())
+    }
+
+    /// Holds the download lock. Refuses an unmanaged install and, unless `replace_foreign`, a
+    /// `tf/cfg/overrides/modules.cfg` that exists and whose first line is not MODULES_HEADER; with
+    /// it, that file is renamed, right before the write, to the first free of modules.cfg.bak,
+    /// .bak.1, .bak.2, ... Writes MODULES_HEADER and one line per kept choice in catalog order
+    /// (`name=value`, `alias name` for NotSet) and saves the kept choices' modules
+    /// (`{"name":"value"|null}`). Returns the dropped names (`Choices::retain_known`).
+    /// `choices.preset()` is not written; the saved preset stays.
+    pub async fn apply_mastercomfig_modules(
+        &self,
+        install: &Tf2Install,
+        catalog: &ModuleCatalog,
+        choices: &Choices,
+        replace_foreign: bool,
+    ) -> Result<Vec<String>, ApplyModulesError> {
+        let _turn = self.download_lock.lock().await;
+        let database = |e: rusqlite::Error| ApplyModulesError::Database {
+            message: e.to_string(),
+        };
+        game_custom_dir(install)?;
+        if read_choices(&self.db).map_err(database)?.is_none() {
+            return Err(ApplyModulesError::NotManaged);
+        }
+        let mut kept = choices.clone();
+        let dropped = kept.retain_known(catalog);
+
+        // Every refusal comes before the first change, so a refused apply leaves all as it was.
+        let path = modules_cfg_path(install);
+        let foreign = path.try_exists().map_err(|source| ApplyModulesError::Io {
+            path: path.clone(),
+            source,
+        })? && !written_by_us(&path)?;
+        if foreign && !replace_foreign {
+            return Err(ApplyModulesError::ForeignModulesCfg { path });
+        }
+
+        if foreign {
+            back_up(&path)?;
+        }
+        write_modules_cfg(&path, catalog, &kept)?;
+        save_modules(&self.db, &kept).map_err(database)?;
+        Ok(dropped)
     }
 
     /// Streams the base VPK into `dest`, failing as soon as it passes the addon cap or its

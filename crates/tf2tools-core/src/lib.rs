@@ -37,15 +37,16 @@ pub use archive::{extract_archive, find_content_root};
 pub use crosshair_catalog::{BuiltinCrosshair, BuiltinCrosshairs};
 pub use db::Database;
 pub use error::{
-    ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError, CatalogError,
-    CopyHudError, DataDirError, DetectError, DownloadError, FilesError, FontCheckError,
-    FontInstallError, HistoryError, HudFilesError, HudLoadError, ImageError, ImportError,
-    InstallError, InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError,
-    MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError,
-    OpenError, PaintError, PngReadError, PngWriteError, PresetError, PreviewError, ProfileError,
-    QueryError, RecipeError, ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError,
-    SchemaError, SettingsError, SyncError, TakeOverError, UpdateApplyError, UpdateCheckError,
-    UpdateCopyError, UpdateDownloadError, VpkError, VtfError, WavError,
+    ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
+    CatalogError, CopyHudError, DataDirError, DetectError, DownloadError, FilesError,
+    FontCheckError, FontInstallError, HistoryError, HudFilesError, HudLoadError, ImageError,
+    ImportError, InstallError, InstallMastercomfigError, KeepHudError, KvParseError, LibraryError,
+    LogError, MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError,
+    ModuleCatalogError, OpenError, PaintError, PngReadError, PngWriteError, PresetError,
+    PreviewError, ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError,
+    RestoreMastercomfigError, SchemaError, SettingsError, SyncError, TakeOverError,
+    UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
+    WavError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,

@@ -1840,6 +1840,80 @@ pub enum RestoreMastercomfigError {
     },
 }
 
+/// Why the player's mastercomfig module choices could not be applied.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ApplyModulesError {
+    /// TF2Tools does not manage this mastercomfig install.
+    #[error("mastercomfig is not installed by TF2Tools")]
+    NotManaged,
+    /// `modules.cfg` exists and TF2Tools did not write it.
+    #[error("{path} was not written by TF2Tools")]
+    ForeignModulesCfg {
+        /// The player's own `modules.cfg`.
+        path: PathBuf,
+    },
+    /// The game folder (`tf/`) is no longer where the install was found.
+    #[error("Team Fortress 2 is no longer at {path}")]
+    GameMissing {
+        /// The `tf` folder that is gone.
+        path: PathBuf,
+    },
+    /// A file could not be read, written, renamed or removed.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// The library database failed.
+    #[error("library database error: {message}")]
+    Database {
+        /// The database's message.
+        message: String,
+    },
+    /// No addon-store sync has recorded a mastercomfig release yet.
+    #[error("no mastercomfig release is known yet")]
+    NoRelease,
+    /// The override file that arrived is not a VPK.
+    #[error("the file at {url} is not a VPK")]
+    NotAVpk {
+        /// The address that was asked.
+        url: String,
+    },
+    /// The server kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// The server answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// The server could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The override file grew past the addon size cap.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+}
+
 /// Why a mastercomfig release's module catalog could not be read.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

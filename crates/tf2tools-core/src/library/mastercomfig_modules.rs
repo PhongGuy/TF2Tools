@@ -256,6 +256,11 @@ impl Choices {
         }
     }
 
+    /// Choices exactly as saved, without dropping any that equal the preset's value.
+    pub(crate) fn from_saved(preset: Preset, modules: BTreeMap<String, ModuleChoice>) -> Self {
+        Self { preset, modules }
+    }
+
     /// The preset the choices sit on.
     pub fn preset(&self) -> Preset {
         self.preset
