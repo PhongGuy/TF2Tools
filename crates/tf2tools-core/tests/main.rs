@@ -190,6 +190,7 @@ mod mastercomfig_catalog;
 mod mastercomfig_catalog_fetch;
 mod mastercomfig_install;
 mod mastercomfig_modules;
+mod mastercomfig_override;
 mod mastercomfig_presets;
 mod mastercomfig_release;
 mod old_v4;
