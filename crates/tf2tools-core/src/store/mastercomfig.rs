@@ -83,6 +83,8 @@ impl StoreClient {
         install: &Tf2Install,
         progress: &(dyn Fn(u64, Option<u64>) + Send + Sync),
     ) -> Result<String, InstallMastercomfigError> {
+        // Waiting first lets a queued install see a sync's fresh release and a moved game.
+        let _turn = self.download_lock.lock().await;
         let database = |e: rusqlite::Error| InstallMastercomfigError::Database {
             message: e.to_string(),
         };
@@ -96,7 +98,6 @@ impl StoreClient {
             })?
             .ok_or(InstallMastercomfigError::NoRelease)?;
         let custom = game_custom_dir(install)?;
-        let _turn = self.download_lock.lock().await;
 
         let io_at = |path: &Path| {
             let path = path.to_path_buf();
@@ -118,6 +119,7 @@ impl StoreClient {
 
         // The game rebuilds a deleted sound cache; a stale one would point into the old VPK.
         remove_file_if_present(&custom.join(format!("{BASE_ASSET}.sound.cache")))?;
+        // A failure from here on leaves the new VPK in place; installing again recovers it.
         let preset = record_install(&self.db, release.tag()).map_err(database)?;
         write_setup_hook(&custom, preset)?;
         tracing::info!(version = release.tag(), "mastercomfig installed");
