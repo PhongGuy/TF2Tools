@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use gpui_kit::assets::IconName;
-use gpui_kit::base::test_support::Observed;
+use gpui_kit::base::ObservedElement;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::tag::Tag;
@@ -1226,7 +1226,7 @@ pub(crate) fn hud_picture(
     image_id: ElementId,
     url: Option<&str>,
     cx: &App,
-) -> Observed<Stateful<Div>> {
+) -> ObservedElement<Stateful<Div>> {
     let area = div()
         .id(area_id)
         .test_support()
