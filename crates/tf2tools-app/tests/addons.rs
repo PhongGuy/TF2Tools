@@ -9,6 +9,7 @@ use gpui_kit::{Entity, TestAppContext, px};
 use tf2tools_app::ids;
 use tf2tools_app::library_events::{LibraryChanged, LibraryEvents};
 use tf2tools_app::pages::addons::AddonsPage;
+use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::widgets::card_grid::{GRID_GAP, SHELL_CHROME_WIDTH, columns_for};
@@ -246,6 +247,7 @@ fn install_copies_the_addon_writes_a_row_and_emits(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk(), false);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
     let _page = open_addons(cx, &s);
     let count = Rc::new(Cell::new(0));
     let seen = Rc::clone(&count);
@@ -344,6 +346,7 @@ fn a_failed_install_toasts_and_writes_no_row(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk(), false);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
     let page = open_addons(cx, &s);
     let (count, _sub) = support::library_changes(cx);
     let custom = env.game.join("tf/custom");
@@ -389,6 +392,7 @@ fn the_page_s_own_install_shows_one_installing_footer(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk(), false);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
     let page = open_addons(cx, &s);
     let pyro = name(PYRO);
     // Click and draw before the executor runs the install job, so the busy card is on screen.
@@ -487,6 +491,7 @@ fn an_install_that_ends_after_leaving_still_announces_the_change(cx: &mut TestAp
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk(), false);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
     let page = open_addons(cx, &s);
     let (count, _sub) = support::library_changes(cx);
     // Start the install and leave in one update, so the page is gone when the task resumes.
@@ -503,4 +508,135 @@ fn an_install_that_ends_after_leaving_still_announces_the_change(cx: &mut TestAp
     assert!(cx.update(|cx| s.shell.read(cx).addons_page()).is_none());
     assert!(env.game.join("tf/custom").join(PYRO).is_file());
     assert_eq!(count.get(), 1);
+}
+
+const BASE: &str = "tf/custom/mastercomfig-base.vpk";
+
+fn shell_with(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    server: &support::StoreServer,
+) -> support::ShellWindow {
+    cx.executor().allow_parking();
+    let endpoints = server.endpoints();
+    support::shell_window_tweaked(cx, env, found(env), |services| {
+        *services = services.clone().with_endpoints(endpoints);
+    })
+}
+
+#[gpui_kit::test]
+fn an_install_without_mastercomfig_asks_then_installs_both(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes(
+        "/gh/mastercomfig/mastercomfig-base.vpk",
+        support::mastercomfig_base("9.100.1"),
+    );
+    let s = shell_with(cx, &env, &server);
+    support::seed_mastercomfig_release(&env, &server.uri(), "9.100.1");
+    support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk(), false);
+    let _page = open_addons(cx, &s);
+    support::click_id(cx, s.win, ids::addon_install(&name(PYRO)));
+    support::wait_real(cx, "the question", |cx| {
+        support::present(cx, s.win, ids::CONFIRM_DIALOG)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
+        Some("This addon needs mastercomfig. Install both?")
+    );
+    assert!(!env.game.join(BASE).exists(), "nothing before the answer");
+    assert!(!env.game.join("tf/custom").join(PYRO).exists());
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    toast_is(cx, &s, "Addon installed. No Pyroland is now active");
+    assert_eq!(
+        std::fs::read(env.game.join(BASE)).unwrap(),
+        support::mastercomfig_base("9.100.1")
+    );
+    assert!(env.game.join("tf/custom").join(PYRO).is_file());
+}
+
+#[gpui_kit::test]
+fn cancelling_the_question_installs_nothing(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk(), false);
+    let page = open_addons(cx, &s);
+    support::click_id(cx, s.win, ids::addon_install(&name(PYRO)));
+    support::wait_real(cx, "the question", |cx| {
+        support::present(cx, s.win, ids::CONFIRM_DIALOG)
+    });
+    support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
+    support::wait_real(cx, "idle", |cx| {
+        cx.update(|cx| !page.read(cx).is_any_busy(cx))
+    });
+    assert!(!env.game.join(BASE).exists());
+    assert!(!env.game.join("tf/custom").join(PYRO).exists());
+    assert!(support::log_rows(&s.services).is_empty());
+}
+
+#[gpui_kit::test]
+fn the_page_stays_busy_while_the_question_is_open(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk(), false);
+    let page = open_addons(cx, &s);
+    support::click_id(cx, s.win, ids::addon_install(&name(PYRO)));
+    support::wait_real(cx, "the question", |cx| {
+        support::present(cx, s.win, ids::CONFIRM_DIALOG)
+    });
+    assert!(cx.update(|cx| page.read(cx).is_any_busy(cx)));
+}
+
+#[gpui_kit::test]
+fn an_install_left_before_the_check_asks_nothing_and_installs_nothing(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk(), false);
+    let page = open_addons(cx, &s);
+    let (count, _sub) = support::library_changes(cx);
+    // Start the install and leave in one update, so the page is gone when the check lands.
+    cx.update_window(s.win, |_, window, cx| {
+        window.click(ids::addon_install(&name(PYRO)), cx);
+        s.shell
+            .update(cx, |shell, cx| shell.navigate(Page::Huds, cx));
+    })
+    .unwrap();
+    drop(page);
+    support::settle(cx, s.win);
+    assert!(cx.update(|cx| s.shell.read(cx).addons_page()).is_none());
+    assert!(!support::present(cx, s.win, ids::CONFIRM_DIALOG));
+    assert!(!support::present(cx, s.win, ids::TOAST));
+    assert!(!env.game.join(BASE).exists());
+    assert!(!env.game.join("tf/custom").join(PYRO).exists());
+    assert_eq!(count.get(), 0);
+}
+
+#[gpui_kit::test]
+fn installing_both_refuses_while_tf2_runs(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes(
+        "/gh/mastercomfig/mastercomfig-base.vpk",
+        support::mastercomfig_base("9.100.1"),
+    );
+    let s = shell_with(cx, &env, &server);
+    support::seed_mastercomfig_release(&env, &server.uri(), "9.100.1");
+    support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk(), false);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    let page = open_addons(cx, &s);
+    support::click_id(cx, s.win, ids::addon_install(&name(PYRO)));
+    support::wait_real(cx, "the question", |cx| {
+        support::present(cx, s.win, ids::CONFIRM_DIALOG)
+    });
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::wait_real(cx, "the refusal", |cx| {
+        support::toast_labels(cx, s.win)
+            .iter()
+            .any(|t| t.contains("Close TF2 first"))
+    });
+    support::wait_real(cx, "idle", |cx| {
+        cx.update(|cx| !page.read(cx).is_any_busy(cx))
+    });
+    assert!(!env.game.join(BASE).exists());
+    assert!(!env.game.join("tf/custom").join(PYRO).exists());
 }

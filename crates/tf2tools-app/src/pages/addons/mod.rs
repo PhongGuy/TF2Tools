@@ -11,11 +11,14 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
 };
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, Context, Entity, EventEmitter, FontWeight,
+    AnyElement, AnyWindowHandle, App, AsyncApp, Context, Entity, EventEmitter, FontWeight,
     InteractiveElement as _, IntoElement, ParentElement, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled, Subscription, TestSupportExt as _, Window, div, px,
+    StatefulInteractiveElement as _, Styled, Subscription, TestSupportExt as _, WeakEntity, Window,
+    div, px,
 };
-use tf2tools_core::{AddonEntry, AddonName, LogLevel, NewLogEntry, StoreItemId, StoreKind};
+use tf2tools_core::{
+    AddonEntry, AddonName, LogLevel, NewLogEntry, StoreItemId, StoreKind, Tf2Install,
+};
 
 use crate::activity;
 use crate::addon_updates::AddonUpdates;
@@ -23,6 +26,7 @@ use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_library, describe_tf2_install};
 use crate::pages::common::{badge_of, card_frame, no_tf2_warning};
+use crate::pages::graphics::jobs;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
@@ -110,31 +114,8 @@ impl AddonsPage {
         cx.notify();
         let running = run_blocking(cx, op);
         let win = self.win;
-        cx.spawn(async move |page, cx| {
-            let done = running.await;
-            let ok = done.is_ok();
-            cx.update(|cx| {
-                let _ = win.update(cx, |_, window, cx| match done {
-                    Ok((title, description)) => {
-                        toast(window, cx, ToastKind::Success, title, description)
-                    }
-                    Err(err) => toast_error(window, cx, &err),
-                });
-                // Outside the page, so a success is announced even when the page is gone; a
-                // surviving page reloads through its own LibraryChanged subscription.
-                if ok {
-                    LibraryEvents::changed(cx);
-                }
-            });
-            let _ = page.update(cx, |page, cx| {
-                page.busy = None;
-                cx.notify();
-                if !ok {
-                    page.reload(cx)
-                }
-            });
-        })
-        .detach();
+        cx.spawn(async move |page, cx| announce(win, page, running.await, cx))
+            .detach();
     }
 
     fn install(
@@ -148,9 +129,28 @@ impl AddonsPage {
             Ok(tf2) => tf2,
             Err(err) => return toast_error(window, cx, &err),
         };
-        self.run(
-            (name.clone(), AddonAction::Install),
-            move |s| {
+        self.copy(name, display, tf2, true, cx);
+    }
+
+    // Copies the addon into TF2 in one background job, which first checks for mastercomfig's
+    // base when `check` holds (false once the player said yes, so it never asks twice). A
+    // missing base asks "Install both?"; `busy` holds from the click to the answer.
+    fn copy(
+        &mut self,
+        name: AddonName,
+        display: String,
+        tf2: Tf2Install,
+        check: bool,
+        cx: &mut Context<Self>,
+    ) {
+        self.busy = Some((name.clone(), AddonAction::Install));
+        cx.notify();
+        let job = {
+            let (name, display, tf2) = (name.clone(), display.clone(), tf2.clone());
+            run_blocking(cx, move |s| {
+                if check && jobs::needs_base(s, &tf2) {
+                    return Ok(Installed::NeedsBase);
+                }
                 s.library
                     .install_addon(&name, &tf2)
                     .map_err(|e| describe_tf2_install(&e).into_op("Failed to install addon"))?;
@@ -159,13 +159,33 @@ impl AddonsPage {
                     s,
                     &NewLogEntry::new(LogLevel::Info, "addon_store", "install", message),
                 );
-                Ok((
+                Ok(Installed::Done(
                     "Addon installed".into(),
                     format!("{display} is now active").into(),
                 ))
-            },
-            cx,
-        );
+            })
+        };
+        let win = self.win;
+        cx.spawn(async move |page, cx| match job.await {
+            Ok(Installed::NeedsBase) => {
+                // Nothing is copied yet; with the page gone there is no one to ask.
+                if page.upgrade().is_none() {
+                    return;
+                }
+                let yes = jobs::ask_and_install_base(win, tf2.clone(), cx).await;
+                let _ = page.update(cx, |page, cx| {
+                    if yes {
+                        page.copy(name, display, tf2, false, cx);
+                    } else {
+                        page.busy = None;
+                        cx.notify();
+                    }
+                });
+            }
+            Ok(Installed::Done(title, text)) => announce(win, page, Ok((title, text)), cx),
+            Err(err) => announce(win, page, Err(err), cx),
+        })
+        .detach();
     }
 
     fn uninstall(
@@ -376,6 +396,40 @@ impl AddonsPage {
         )
         .into_any_element()
     }
+}
+
+// What an install job did: copied (with its toast pair), or found mastercomfig missing and
+// copied nothing.
+enum Installed {
+    Done(SharedString, SharedString),
+    NeedsBase,
+}
+
+// Toasts `done` in `win`, announces LibraryChanged on success outside the page (so it lands
+// even when the page is gone), then clears `busy` and, after a failure, reloads a live page.
+fn announce(
+    win: AnyWindowHandle,
+    page: WeakEntity<AddonsPage>,
+    done: Result<(SharedString, SharedString), OpError>,
+    cx: &mut AsyncApp,
+) {
+    let ok = done.is_ok();
+    cx.update(|cx| {
+        let _ = win.update(cx, |_, window, cx| match done {
+            Ok((title, description)) => toast(window, cx, ToastKind::Success, title, description),
+            Err(err) => toast_error(window, cx, &err),
+        });
+        if ok {
+            LibraryEvents::changed(cx);
+        }
+    });
+    let _ = page.update(cx, |page, cx| {
+        page.busy = None;
+        cx.notify();
+        if !ok {
+            page.reload(cx)
+        }
+    });
 }
 
 impl Render for AddonsPage {

@@ -2,13 +2,15 @@
 
 use std::future::Future;
 
-use gpui_kit::App;
-use tf2tools_core::{StoreClient, StoreKind, Tf2Install};
+use gpui_kit::{AnyWindowHandle, App, AsyncApp};
+use tf2tools_core::{MastercomfigStatus, StoreClient, StoreKind, Tf2Install};
 
 use super::model::describe_install;
 use crate::local_messages::describe_store_status;
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::services::{OpError, Services};
+use crate::shell::confirm::{Confirm, confirm};
+use crate::shell::toast::toast_error;
 use crate::sync_messages::describe_sync;
 use crate::tokio_bridge;
 
@@ -61,6 +63,41 @@ pub fn install_base(
             .map_err(|e| describe_install(&e).into_op(action))
     });
     async move { job.await.map_err(|e| OpError::core(action, e))? }
+}
+
+/// True only when mastercomfig's base is missing from `tf2`; a status error reads as
+/// present, so it never blocks an install. Blocking: call inside a background job.
+pub fn needs_base(s: &Services, tf2: &Tf2Install) -> bool {
+    matches!(
+        s.library.mastercomfig_status(tf2),
+        Ok(MastercomfigStatus::NotInstalled)
+    )
+}
+
+/// Asks `addon_needs_mastercomfig` in `win` and, on yes, installs the base through
+/// `install_base`. True once the base is in. False on cancel, on a window that is gone, or
+/// on a failed base install, which toasts in `win`. Changes nothing before the answer.
+pub async fn ask_and_install_base(
+    win: AnyWindowHandle,
+    tf2: Tf2Install,
+    cx: &mut AsyncApp,
+) -> bool {
+    let Ok(answer) = win.update(cx, |_, window, cx| {
+        confirm(Confirm::addon_needs_mastercomfig(), window, cx)
+    }) else {
+        return false;
+    };
+    if !answer.recv().await.unwrap_or(false) {
+        return false;
+    }
+    let job = cx.update(|cx| install_base(tf2, "Failed to install mastercomfig", cx));
+    match job.await {
+        Ok(_) => true,
+        Err(err) => {
+            let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
+            false
+        }
+    }
 }
 
 /// Forces the addon-store sync, which records GitHub's latest mastercomfig release. A failure
