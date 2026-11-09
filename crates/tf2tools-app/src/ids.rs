@@ -877,49 +877,6 @@ pub const PROFILE_PICKER_SOUNDS: &str = "profile-picker-sounds";
 /// The sound picker list's scrollbar.
 pub const PROFILE_PICKER_SOUNDS_SCROLLBAR: &str = "profile-picker-sounds-scrollbar";
 
-/// The Create New / Edit profile wizard dialog.
-pub const WIZARD_DIALOG: &str = "wizard-dialog";
-/// The wizard's title, "Create New Profile" or "Edit Profile".
-pub const WIZARD_TITLE: &str = "wizard-title";
-/// The current step's description.
-pub const WIZARD_DESCRIPTION: &str = "wizard-description";
-/// The "Profile Name" input.
-pub const WIZARD_NAME: &str = "wizard-name";
-/// The HUD select.
-pub const WIZARD_HUD: &str = "wizard-hud";
-/// The hint shown when the HUD library is empty.
-pub const WIZARD_HUD_EMPTY: &str = "wizard-hud-empty";
-/// The hitsound select.
-pub const WIZARD_HITSOUND: &str = "wizard-hitsound";
-/// The killsound select.
-pub const WIZARD_KILLSOUND: &str = "wizard-killsound";
-/// Plays the selected hitsound.
-pub const WIZARD_HITSOUND_PLAY: &str = "wizard-hitsound-play";
-/// Plays the selected killsound.
-pub const WIZARD_KILLSOUND_PLAY: &str = "wizard-killsound-play";
-/// The hint shown when the sound library is empty.
-pub const WIZARD_SOUNDS_EMPTY: &str = "wizard-sounds-empty";
-/// The "No crosshairs" mode button.
-pub const WIZARD_MODE_NONE: &str = "wizard-mode-none";
-/// The "Copy current (N)" mode button.
-pub const WIZARD_MODE_COPY: &str = "wizard-mode-copy";
-/// The "Customize" mode button.
-pub const WIZARD_MODE_CUSTOM: &str = "wizard-mode-custom";
-/// The note under Copy mode, "Will copy your N current crosshair assignment(s)...".
-pub const WIZARD_COPY_NOTE: &str = "wizard-copy-note";
-/// "N weapon(s) assigned" in Customize mode.
-pub const WIZARD_ASSIGNED_COUNT: &str = "wizard-assigned-count";
-/// The footer's Cancel button; closes the wizard without saving.
-pub const WIZARD_CANCEL: &str = "wizard-cancel";
-/// The footer's Back button, absent on the first step.
-pub const WIZARD_BACK: &str = "wizard-back";
-/// The footer's Next button, replaced by Save on the last step.
-pub const WIZARD_NEXT: &str = "wizard-next";
-/// The name step's line saying another profile has the typed name.
-pub const WIZARD_NAME_TAKEN: &str = "wizard-name-taken";
-/// "Create Profile" or "Save Changes".
-pub const WIZARD_SAVE: &str = "wizard-save";
-
 /// The sidebar item for `page`: "nav-<slug>".
 pub fn nav(page: Page) -> ElementId {
     ElementId::Name(format!("nav-{}", page.slug()).into())
@@ -1211,17 +1168,6 @@ pub fn profile_pick_sound(slot: &str, folder: &str) -> ElementId {
 /// A picker sound row's play button: "profile-pick-play:<folder>".
 pub fn profile_pick_play(folder: &str) -> ElementId {
     keyed("profile-pick-play", folder)
-}
-
-/// A wizard stepper circle: "wizard-step:<1..4>".
-pub fn wizard_step(number: usize) -> ElementId {
-    keyed("wizard-step", &number.to_string())
-}
-
-/// A wizard select option, "wizard-<field>-option:<key>"; field hud|hitsound|killsound, key
-/// none|<folder>|missing.
-pub fn wizard_option(field: &str, key: &str) -> ElementId {
-    keyed(&format!("wizard-{field}-option"), key)
 }
 
 /// A Missing Items row, keyed by its index: "missing-item:<ix>".

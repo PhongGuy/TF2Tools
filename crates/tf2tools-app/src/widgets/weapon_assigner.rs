@@ -1,6 +1,6 @@
 //! v5's per-class weapon assignment: the class tabs and bulk buttons over the class's weapon
 //! rows. It never writes; a click emits `AssignRequested` and the host decides what assigning
-//! means (the Crosshairs page writes the table, the profile wizard edits its draft).
+//! means (the Crosshairs page writes the table, the profile editor saves its crosshairs).
 
 use std::collections::HashMap;
 
@@ -96,7 +96,7 @@ pub struct AssignerState {
     pub running: Option<AssignTarget>,
 }
 
-/// The class bar and weapon rows of v5's Crosshairs page, or of its profile dialog when compact.
+/// The class bar and weapon rows of v5's Crosshairs page, or of the profile editor when compact.
 pub struct WeaponAssigner {
     class: TfClass,
     /// Only this slot's rows show when set.

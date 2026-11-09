@@ -236,66 +236,6 @@ fn profile_ids_are_keyed_by_profile_id() {
 }
 
 #[test]
-fn wizard_ids_are_stable() {
-    assert_eq!(name(ids::wizard_step(1)), "wizard-step:1");
-    assert_eq!(name(ids::wizard_step(4)), "wizard-step:4");
-    assert_eq!(
-        name(ids::wizard_option("hud", "none")),
-        "wizard-hud-option:none"
-    );
-    assert_eq!(
-        name(ids::wizard_option("killsound", "missing")),
-        "wizard-killsound-option:missing"
-    );
-    assert_eq!(
-        [
-            ids::WIZARD_DIALOG,
-            ids::WIZARD_TITLE,
-            ids::WIZARD_DESCRIPTION,
-            ids::WIZARD_NAME,
-            ids::WIZARD_HUD,
-            ids::WIZARD_HUD_EMPTY,
-            ids::WIZARD_HITSOUND,
-            ids::WIZARD_KILLSOUND,
-            ids::WIZARD_HITSOUND_PLAY,
-            ids::WIZARD_KILLSOUND_PLAY,
-            ids::WIZARD_SOUNDS_EMPTY,
-            ids::WIZARD_MODE_NONE,
-            ids::WIZARD_MODE_COPY,
-            ids::WIZARD_MODE_CUSTOM,
-            ids::WIZARD_COPY_NOTE,
-            ids::WIZARD_ASSIGNED_COUNT,
-            ids::WIZARD_CANCEL,
-            ids::WIZARD_BACK,
-            ids::WIZARD_NEXT,
-            ids::WIZARD_SAVE,
-        ],
-        [
-            "wizard-dialog",
-            "wizard-title",
-            "wizard-description",
-            "wizard-name",
-            "wizard-hud",
-            "wizard-hud-empty",
-            "wizard-hitsound",
-            "wizard-killsound",
-            "wizard-hitsound-play",
-            "wizard-killsound-play",
-            "wizard-sounds-empty",
-            "wizard-mode-none",
-            "wizard-mode-copy",
-            "wizard-mode-custom",
-            "wizard-copy-note",
-            "wizard-assigned-count",
-            "wizard-cancel",
-            "wizard-back",
-            "wizard-next",
-            "wizard-save",
-        ]
-    );
-}
-
-#[test]
 fn hud_font_ids_are_stable() {
     assert_eq!(ids::HUD_FONTS_DIALOG, "hud-fonts-dialog");
     assert_eq!(ids::HUD_FONTS_DONT_ASK, "hud-fonts-dont-ask");

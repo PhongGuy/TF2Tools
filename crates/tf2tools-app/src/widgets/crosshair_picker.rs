@@ -1,5 +1,5 @@
 //! v5's crosshair picker: a search row with the selection's swatch over one virtualized list
-//! of the builtin group then the library group. The profile wizard hosts the list; the
+//! of the builtin group then the library group. The profile editor hosts the list; the
 //! Crosshairs page hosts its gallery mode, a virtualized grid of large tiles under source chips,
 //! which leaves the swatch to the page's large preview.
 

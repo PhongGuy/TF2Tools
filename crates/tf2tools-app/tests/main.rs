@@ -149,7 +149,6 @@ mod play_tf2;
 mod player;
 mod previews;
 mod profile_editor_model;
-mod profile_wizard_model;
 mod profiles;
 mod profiles_editor;
 mod profiles_layout;

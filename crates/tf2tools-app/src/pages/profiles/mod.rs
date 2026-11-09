@@ -4,8 +4,6 @@ pub mod editor;
 pub mod editor_model;
 pub mod model;
 pub mod probe;
-pub mod wizard;
-pub mod wizard_model;
 
 use std::rc::Rc;
 
