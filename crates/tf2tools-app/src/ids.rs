@@ -1150,6 +1150,11 @@ pub fn profile_picker_empty(slot: &str) -> ElementId {
     keyed("profile-picker-empty", slot)
 }
 
+/// A picker's note that its search matches nothing: "profile-picker-no-match:<slot>".
+pub fn profile_picker_no_match(slot: &str) -> ElementId {
+    keyed("profile-picker-no-match", slot)
+}
+
 /// An empty picker's button to the store: "profile-picker-store:<slot>".
 pub fn profile_picker_store(slot: &str) -> ElementId {
     keyed("profile-picker-store", slot)

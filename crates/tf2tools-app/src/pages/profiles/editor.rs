@@ -116,6 +116,8 @@ pub struct ProfileEditor {
     preview_key: Option<SharedString>,
     sound_scroll: UniformListScrollHandle,
     crosshair_picker: Entity<CrosshairPicker>,
+    /// Whether a crosshair was picked when the weapon list was last told.
+    crosshair_picked: bool,
     assigner: Entity<WeaponAssigner>,
     _subscriptions: Vec<Subscription>,
 }
@@ -198,7 +200,13 @@ impl ProfileEditor {
             assigner.set_clearable(true, cx);
             assigner
         });
-        subscriptions.push(cx.observe(&crosshair_picker, |editor, _, cx| editor.sync_assigner(cx)));
+        subscriptions.push(cx.observe(&crosshair_picker, |editor, picker, cx| {
+            let picked = picker.read(cx).selected().is_some();
+            if picked != editor.crosshair_picked {
+                editor.crosshair_picked = picked;
+                editor.sync_assigner(cx);
+            }
+        }));
         subscriptions.push(
             cx.subscribe(&assigner, |editor, _, event: &AssignRequested, cx| {
                 let Some(crosshair) = editor.crosshair_picker.read(cx).selected().cloned() else {
@@ -245,6 +253,7 @@ impl ProfileEditor {
             preview_key: None,
             sound_scroll: UniformListScrollHandle::new(),
             crosshair_picker,
+            crosshair_picked: false,
             assigner,
             _subscriptions: subscriptions,
         };
@@ -354,13 +363,13 @@ impl ProfileEditor {
         &self.assigner
     }
 
-    // Shows each saved crosshair on its weapon row, by name or "(missing)".
+    // Shows each saved crosshair on its weapon row, by name or "(missing)". Waits for the
+    // library, or every library crosshair would read "(missing)" until it lands.
     fn relabel(&self, cx: &mut Context<Self>) {
-        let library = self
-            .galleries
-            .as_ref()
-            .map(|g| &g.crosshairs[..])
-            .unwrap_or(&[]);
+        let Some(galleries) = &self.galleries else {
+            return;
+        };
+        let library = &galleries.crosshairs[..];
         let builtins = &cx.global::<Services>().builtins;
         let cells = crosshair_labels(&self.saved, builtins, library)
             .into_iter()
@@ -377,7 +386,7 @@ impl ProfileEditor {
     // The weapon rows and bulk buttons act only while a crosshair is picked.
     fn sync_assigner(&self, cx: &mut Context<Self>) {
         let state = AssignerState {
-            has_selection: self.crosshair_picker.read(cx).selected().is_some(),
+            has_selection: self.crosshair_picked,
             busy: false,
             running: None,
         };
@@ -572,8 +581,8 @@ impl ProfileEditor {
             Ok(Done::Saved(edit, Ok(update))) => {
                 self.saved = update.profile().clone();
                 // A rename leaves the slots alone; any other save may fix or break a missing mark.
-                if let Edit::Rename(_) = edit {
-                    self.renamed(window, cx);
+                if let Edit::Rename(name) = &edit {
+                    self.renamed(name, window, cx);
                 } else {
                     self.queue_refresh();
                 }
@@ -587,31 +596,25 @@ impl ProfileEditor {
             }
             Ok(Done::Refreshed(Err(ProfileError::NotFound { .. }))) => self.gone(None, window, cx),
             // The page's list was stale: say it as the typed check would, and stay put.
-            Ok(Done::Saved(Edit::Rename(_), Err(ProfileError::NameTaken { name, .. }))) => {
-                self.renaming = None;
+            Ok(Done::Saved(Edit::Rename(sent), Err(ProfileError::NameTaken { name, .. }))) => {
+                self.rename_done(&sent);
                 self.name_taken = Some(name);
                 self.after_idle = None;
                 self.queue_refresh();
             }
             // The picked item left the library since the gallery loaded.
-            Ok(Done::Saved(
-                edit @ (Edit::SetHud(_) | Edit::SetSound(..) | Edit::Assign { .. }),
-                Err(ProfileError::ItemNotFound { .. }),
-            )) => {
-                let title = if let Edit::SetHud(_) = edit {
-                    "That HUD is no longer in your library"
-                } else if let Edit::Assign { .. } = edit {
-                    "That crosshair is no longer in your library"
-                } else {
-                    "That sound is no longer in your library"
-                };
-                toast(window, cx, ToastKind::Error, title, "");
-                self.load_galleries(cx);
-                self.queue_refresh();
+            Ok(Done::Saved(Edit::SetHud(_), Err(ProfileError::ItemNotFound { .. }))) => {
+                self.item_gone("That HUD is no longer in your library", window, cx);
+            }
+            Ok(Done::Saved(Edit::SetSound(..), Err(ProfileError::ItemNotFound { .. }))) => {
+                self.item_gone("That sound is no longer in your library", window, cx);
+            }
+            Ok(Done::Saved(Edit::Assign { .. }, Err(ProfileError::ItemNotFound { .. }))) => {
+                self.item_gone("That crosshair is no longer in your library", window, cx);
             }
             Ok(Done::Saved(edit, Err(e))) => {
-                if let Edit::Rename(_) = edit {
-                    self.renaming = None;
+                if let Edit::Rename(sent) = &edit {
+                    self.rename_done(sent);
                 }
                 toast_error(window, cx, &failed(&e));
                 self.queue_refresh();
@@ -652,10 +655,25 @@ impl ProfileEditor {
         page.update(cx, |page, cx| page.close_editor(cx));
     }
 
+    // The picked item is gone: say so, and reload the galleries and the missing marks.
+    fn item_gone(&mut self, title: &str, window: &mut Window, cx: &mut Context<Self>) {
+        toast(window, cx, ToastKind::Error, title, "");
+        self.load_galleries(cx);
+        self.queue_refresh();
+    }
+
+    // A finished rename stops guarding against a repeat only when it is the one last queued;
+    // a later name typed meanwhile is still on its way.
+    fn rename_done(&mut self, sent: &str) {
+        if self.renaming.as_deref() == Some(sent) {
+            self.renaming = None;
+        }
+    }
+
     // A saved rename: clear the taken line and show the trimmed name, unless the player has
     // typed something else since.
-    fn renamed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.renaming = None;
+    fn renamed(&mut self, sent: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.rename_done(sent);
         self.name_taken = None;
         let name = self.saved.name().to_owned();
         if self.name.read(cx).value().trim() == name {
@@ -904,8 +922,8 @@ impl ProfileEditor {
         .detach();
     }
 
-    // The picked slot's search over its gallery, or a pointer to the store while the library
-    // has nothing for it. Crosshairs show their own picker beside the weapon list; builtins are
+    // The picked slot's search over its gallery, "No matches" when it filters out everything,
+    // or a pointer to the store while the library has nothing for it. Crosshairs show their own picker beside the weapon list; builtins are
     // always listed, so they have no empty state.
     fn picker_column(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let slot = self.selected;
@@ -930,15 +948,17 @@ impl ProfileEditor {
             );
         }
         let galleries = self.galleries.as_ref()?;
-        let (empty, empty_text, store_text, store) = match slot {
+        let (empty, no_match, empty_text, store_text, store) = match slot {
             Slot::Hud => (
                 galleries.huds.is_empty(),
+                self.shown_huds(cx).is_empty(),
                 "No HUDs in your library yet",
                 "Browse the HUD Store",
                 Page::HudStore,
             ),
             Slot::Hitsound | Slot::Killsound => (
                 galleries.sounds.is_empty(),
+                self.shown_sounds(cx).is_empty(),
                 "No sounds in your library yet",
                 "Browse the Sound Store",
                 Page::SoundStore,
@@ -964,6 +984,16 @@ impl ProfileEditor {
                             let _ = editor.page.update(cx, |_, cx| cx.emit(NavigateTo(store)));
                         })),
                 )
+                .into_any_element()
+        } else if no_match {
+            v_flex()
+                .items_center()
+                .py_12()
+                .child(labelled(
+                    div().text_color(cx.theme().muted_foreground),
+                    ids::profile_picker_no_match(key),
+                    "No matches",
+                ))
                 .into_any_element()
         } else if slot == Slot::Hud {
             self.hud_gallery(galleries, cx)
@@ -1109,7 +1139,7 @@ impl ProfileEditor {
                     .child(
                         h_flex()
                             .gap_2()
-                            .child(div().flex_1().min_w_0().child(sound_title(sound, cx)))
+                            .child(div().flex_1().min_w_0().child(sound_title(sound)))
                             .child(play),
                     )
                     .on_click(cx.listener(move |editor, _, _, cx| {

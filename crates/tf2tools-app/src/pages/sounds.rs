@@ -669,7 +669,7 @@ fn on_card(
 }
 
 /// The sound's name, truncated, semibold, with the VPK badge (`ids::sound_vpk`) for a VPK sound.
-pub(crate) fn sound_title(sound: &SoundEntry, _cx: &App) -> Div {
+pub(crate) fn sound_title(sound: &SoundEntry) -> Div {
     let vpk = (sound.format() == SoundFormat::Vpk).then(|| {
         badge_of(
             ids::sound_vpk(sound.folder_name()),
@@ -738,7 +738,7 @@ fn sound_card(
         .flex()
         .flex_col()
         .overflow_hidden()
-        .child(sound_title(sound, cx).px_6().pt_6())
+        .child(sound_title(sound).px_6().pt_6())
         .child(
             h_flex()
                 .mt_auto()

@@ -217,6 +217,11 @@ impl WeaponAssigner {
         cx.notify();
     }
 
+    /// The shown assignments.
+    pub fn assigned(&self) -> &[AssignedCell] {
+        &self.cells
+    }
+
     /// Off by default. On, every row with a cell shows a clear button.
     pub fn set_clearable(&mut self, clearable: bool, cx: &mut Context<Self>) {
         self.clearable = clearable;

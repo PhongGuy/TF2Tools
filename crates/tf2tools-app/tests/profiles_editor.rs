@@ -7,6 +7,7 @@ use crate::support;
 
 use gpui_kit::ElementId;
 use gpui_kit::ScrollDelta;
+use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::audio::player::{NowPlaying, sound_player};
@@ -632,6 +633,52 @@ fn enter_then_leaving_the_field_saves_once(cx: &mut TestAppContext) {
     assert_eq!(stamps.borrow().len(), 2, "{:?}", stamps.borrow());
 }
 
+// A rename that lands while a later one waits leaves that later one pending, so Enter on
+// its name then does not queue it a second time.
+#[gpui_kit::test]
+fn a_landed_rename_keeps_a_later_one_pending(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    let input = cx.update(|cx| editor.read(cx).name_input().clone());
+    let enter = |input: &Entity<InputState>, cx: &mut gpui_kit::App| {
+        input.update(cx, |_, cx| {
+            cx.emit(InputEvent::PressEnter {
+                secondary: false,
+                shift: false,
+            })
+        })
+    };
+    // Every distinct save stamp, and Enter pressed again the moment "Pubs" lands.
+    let stamps = std::rc::Rc::new(std::cell::RefCell::new(vec![comp.updated_at().to_owned()]));
+    let sink = std::rc::Rc::clone(&stamps);
+    let again = input.clone();
+    let _watch = cx.update(|cx| {
+        cx.observe(&editor, move |e, cx| {
+            let stamp = e.read(cx).saved().updated_at().to_owned();
+            if sink.borrow().last() != Some(&stamp) {
+                sink.borrow_mut().push(stamp);
+                if e.read(cx).saved().name() == "Pubs" {
+                    enter(&again, cx);
+                }
+            }
+        })
+    });
+    for name in ["Pubs", "Scrims"] {
+        cx.update_window(s.win, |_, window, cx| {
+            input.update(cx, |st, cx| st.set_value(name, window, cx))
+        })
+        .unwrap();
+        cx.update(|cx| enter(&input, cx));
+    }
+    support::settle(cx, s.win);
+    wait_idle(cx, &s, &editor);
+    assert_eq!(saved(&s, comp.id()).name(), "Scrims");
+    assert_eq!(stamps.borrow().len(), 3, "{:?}", stamps.borrow());
+}
+
 #[gpui_kit::test]
 fn delete_saves_a_typed_name_first(cx: &mut TestAppContext) {
     let env = support::env();
@@ -777,15 +824,58 @@ fn clear_empties_a_slot_at_once(cx: &mut TestAppContext) {
     let comp = full_profile(&s, &env, "Comp");
     let page = open_profiles(cx, &s);
     let editor = open_editor(cx, &s, &page, comp.id());
-    support::click_id(cx, s.win, ids::profile_slot_clear("hud"));
+    support::click_id(cx, s.win, ids::profile_slot_clear("hitsound"));
     wait_idle(cx, &s, &editor);
-    assert!(saved(&s, comp.id()).hud().is_none());
+    let after = saved(&s, comp.id());
+    assert!(after.hitsound().is_none());
+    assert_eq!(after.hud(), comp.hud());
+    assert_eq!(after.killsound(), comp.killsound());
     assert_eq!(
-        support::label_of(cx, s.win, ids::profile_slot("hud")).as_deref(),
+        support::label_of(cx, s.win, ids::profile_slot("hitsound")).as_deref(),
         Some("None")
     );
-    assert!(!support::present(cx, s.win, ids::profile_slot_clear("hud")));
-    assert_eq!(saved(&s, comp.id()).hitsound(), comp.hitsound());
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_slot_clear("hitsound")
+    ));
+    // Clear acts on its own card; the HUD slot stays the one shown.
+    assert_eq!(
+        support::selected_of(cx, s.win, ids::profile_slot("hud")),
+        Some(true)
+    );
+    assert_eq!(
+        support::selected_of(cx, s.win, ids::profile_slot("hitsound")),
+        Some(false)
+    );
+}
+
+#[gpui_kit::test]
+fn a_search_with_no_matches_says_so(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    let input = cx.update(|cx| editor.read(cx).search_input().clone());
+    let search = |cx: &mut TestAppContext, text: &str| {
+        cx.update_window(s.win, |_, window, cx| {
+            input.update(cx, |st, cx| st.set_value(text, window, cx))
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+    };
+    search(cx, "zzz");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_picker_no_match("hud")).as_deref(),
+        Some("No matches")
+    );
+    support::click_id(cx, s.win, ids::profile_slot("hitsound"));
+    search(cx, "zzz");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_picker_no_match("hitsound")).as_deref(),
+        Some("No matches")
+    );
 }
 #[gpui_kit::test]
 fn picking_a_hud_deleted_meanwhile_toasts(cx: &mut TestAppContext) {
@@ -1184,6 +1274,55 @@ fn a_missing_library_crosshair_reads_missing(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
     let label = support::label_of(cx, s.win, ids::weapon_assigned("tf_weapon_scattergun")).unwrap();
     assert!(label.ends_with(" (missing)"), "{label}");
+}
+
+// The weapon rows wait for the crosshair library, so a library crosshair never reads
+// "(missing)" while it loads.
+#[gpui_kit::test]
+fn a_library_crosshair_is_never_labelled_missing_before_the_library_loads(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let png = env.tmp.path().join("z.png");
+    std::fs::write(&png, support::crosshair_png([255, 0, 0, 255])).unwrap();
+    let zebra = s
+        .services
+        .library
+        .import_crosshair(&png, "Zebra", Provenance::Local)
+        .unwrap();
+    let draft = ProfileDraft::new("Z").with_crosshairs(vec![DraftCrosshair::Set {
+        weapon_script: "tf_weapon_scattergun".into(),
+        crosshair: CrosshairRef::Library(zebra.id().clone()),
+    }]);
+    let z = s.services.library.create_profile(&draft).unwrap();
+    let page = open_profiles(cx, &s);
+    let id = z.id().clone();
+    // Opening and reading in one update leaves no room for the library load to land.
+    let labels = cx
+        .update_window(s.win, |_, window, cx| {
+            page.update(cx, |p, cx| p.open_editor(id, window, cx));
+            let editor = page.read(cx).editor().expect("an editor");
+            let assigner = editor.read(cx).assigner().clone();
+            let labels: Vec<String> = assigner
+                .read(cx)
+                .assigned()
+                .iter()
+                .map(|c| c.label.clone())
+                .collect();
+            labels
+        })
+        .unwrap();
+    assert!(
+        labels.iter().all(|l| !l.ends_with("(missing)")),
+        "{labels:?}"
+    );
+    let editor = cx.update(|cx| page.read(cx).editor()).expect("an editor");
+    wait_idle(cx, &s, &editor);
+    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
+    support::wait_real(cx, "the crosshair's name", |cx| {
+        support::settle(cx, s.win);
+        support::label_of(cx, s.win, ids::weapon_assigned("tf_weapon_scattergun")).as_deref()
+            == Some("Zebra")
+    });
 }
 
 #[gpui_kit::test]

@@ -67,7 +67,9 @@ impl Edit {
             Self::SetSound(SoundKind::Hitsound, id) => {
                 keep.with_hitsound(DraftSlot::Item(id.clone()))
             }
-            Self::SetSound(_, id) => keep.with_killsound(DraftSlot::Item(id.clone())),
+            Self::SetSound(SoundKind::Killsound | _, id) => {
+                keep.with_killsound(DraftSlot::Item(id.clone()))
+            }
             Self::ClearSlot(Slot::Hud) => keep.with_hud(DraftSlot::Empty),
             Self::ClearSlot(Slot::Hitsound) => keep.with_hitsound(DraftSlot::Empty),
             Self::ClearSlot(Slot::Killsound) => keep.with_killsound(DraftSlot::Empty),

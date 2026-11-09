@@ -674,6 +674,10 @@ fn profile_editor_ids_are_stable() {
             "profile-picker-empty:hitsound",
         ),
         (ids::profile_picker_store("hud"), "profile-picker-store:hud"),
+        (
+            ids::profile_picker_no_match("hud"),
+            "profile-picker-no-match:hud",
+        ),
         (ids::profile_pick_hud("rayshud"), "profile-pick-hud:rayshud"),
         (
             ids::profile_pick_sound("killsound", "bell"),
