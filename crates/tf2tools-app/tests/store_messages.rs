@@ -529,7 +529,7 @@ fn browse_failures_speak_of_gamebanana() {
                 url: GB_URL.into(),
                 status: 404,
             },
-            "This item is no longer on GameBanana.",
+            "GameBanana couldn't find this. Try again later.",
         ),
         (
             BrowseError::Gone {

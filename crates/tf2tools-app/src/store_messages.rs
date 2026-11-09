@@ -148,9 +148,9 @@ pub fn describe_browse(err: &BrowseError) -> StoreFailure {
         BrowseError::RateLimited { .. } => {
             "GameBanana is busy right now. Wait a few minutes, then try again."
         }
-        BrowseError::Http { status: 404, .. } | BrowseError::Gone { .. } => {
-            "This item is no longer on GameBanana."
-        }
+        // A 404 can come from a listing, a search or a category list as well as an item.
+        BrowseError::Http { status: 404, .. } => "GameBanana couldn't find this. Try again later.",
+        BrowseError::Gone { .. } => "This item is no longer on GameBanana.",
         BrowseError::Http { status, .. } if *status >= 500 => {
             "GameBanana is having problems right now. Try again later."
         }
