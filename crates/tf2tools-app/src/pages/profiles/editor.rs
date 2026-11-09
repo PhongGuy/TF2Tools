@@ -95,6 +95,8 @@ pub struct ProfileEditor {
     not_applied: bool,
     queue: VecDeque<Job>,
     running: bool,
+    /// Closes when the running job's save has landed, so a save on release waits for it.
+    in_flight: Option<async_channel::Receiver<()>>,
     name: Entity<InputState>,
     /// The name the player asked for, when core refused the rename as taken.
     name_taken: Option<String>,
@@ -197,6 +199,8 @@ impl ProfileEditor {
                 images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
             }));
         }
+        // The sidebar and the store button drop the editor without Back; it still saves.
+        subscriptions.push(cx.on_release(|editor, cx| editor.save_on_release(cx)));
         // The play icons read the player's sound, so redraw when it starts or ends.
         let player = sound_player(window, cx);
         subscriptions.push(cx.observe(&player, |_, _, cx| cx.notify()));
@@ -244,6 +248,7 @@ impl ProfileEditor {
             not_applied: false,
             queue: VecDeque::new(),
             running: false,
+            in_flight: None,
             name,
             name_taken: None,
             seen_active: active,
@@ -598,9 +603,12 @@ impl ProfileEditor {
                 Ok(Done::Refreshed(read()))
             }),
         };
+        let (landed, in_flight) = async_channel::bounded::<()>(1);
+        self.in_flight = Some(in_flight);
         let win = self.win;
         cx.spawn(async move |editor, cx| {
             let done = task.await;
+            drop(landed);
             let _ = cx.update(|cx| {
                 win.update(cx, |_, window, cx| {
                     let _ = editor.update(cx, |editor, cx| {
@@ -737,9 +745,7 @@ impl ProfileEditor {
                 .update(cx, |input, cx| input.set_value(name, window, cx));
             return true;
         }
-        if text == self.saved.name() && self.renaming.is_none()
-            || self.renaming.as_deref() == Some(text.as_str())
-        {
+        if !self.wants_rename(&text) {
             return true;
         }
         if self.taken_name(cx).is_some() {
@@ -749,6 +755,53 @@ impl ProfileEditor {
         self.renaming = Some(text.clone());
         self.enqueue(Edit::Rename(text), cx);
         true
+    }
+
+    // Whether the trimmed `text` still has to be sent: not blank, not the saved name, and not
+    // the rename already on its way.
+    fn wants_rename(&self, text: &str) -> bool {
+        !(text.is_empty()
+            || text == self.saved.name() && self.renaming.is_none()
+            || self.renaming.as_deref() == Some(text))
+    }
+
+    // Saves the queued edits and a typed name once the running job lands, each draft built on
+    // the profile as stored. No window is left to toast in, so a failure is only logged.
+    fn save_on_release(&mut self, cx: &mut App) {
+        let mut edits: Vec<Edit> = (self.queue.drain(..))
+            .filter_map(|job| match job {
+                Job::Edit(edit) => Some(edit),
+                Job::Refresh => None,
+            })
+            .collect();
+        let text = self.name.read(cx).value().trim().to_owned();
+        if self.wants_rename(&text) {
+            edits.push(Edit::Rename(text));
+        }
+        if edits.is_empty() {
+            return;
+        }
+        let (id, in_flight) = (self.id().clone(), self.in_flight.take());
+        cx.spawn(async move |cx| {
+            if let Some(in_flight) = in_flight {
+                let _ = in_flight.recv().await;
+            }
+            let saving = cx.update(|cx| {
+                run_blocking(cx, move |s| {
+                    for edit in edits {
+                        let saved = s.library.profile(&id);
+                        let done =
+                            saved.and_then(|p| s.library.update_profile(&id, &edit.draft(&p)));
+                        if let Err(e) = done {
+                            tracing::warn!("a profile edit left unsaved on close: {e}");
+                        }
+                    }
+                    Ok(())
+                })
+            });
+            let _ = saving.await;
+        })
+        .detach();
     }
 
     // The other profile holding the typed name: core's answer, or the page's loaded list.

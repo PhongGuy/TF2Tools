@@ -1709,3 +1709,24 @@ fn the_hud_slot_shows_its_picture(cx: &mut TestAppContext) {
     let _editor = open_editor(cx, &s, &page, vanilla.id());
     assert!(!support::present(cx, s.win, ids::PROFILE_SLOT_HUD_SHOT));
 }
+
+// The sidebar drops the editor without Back: a typed name is still saved.
+#[gpui_kit::test]
+fn leaving_by_the_sidebar_saves_a_typed_name(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    type_name(cx, &s, &editor, "Pubs");
+    drop((editor, page));
+    support::click_id(cx, s.win, ids::nav(Page::Huds));
+    support::wait_real(cx, "the typed name saved", |_| {
+        saved(&s, comp.id()).name() == "Pubs"
+    });
+    let page = open_profiles(cx, &s);
+    assert_eq!(
+        cx.update(|cx| page.read(cx).profiles()[0].name().to_owned()),
+        "Pubs"
+    );
+}
