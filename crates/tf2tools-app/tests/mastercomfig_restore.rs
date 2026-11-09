@@ -1,6 +1,6 @@
 //! App start writes back mastercomfig files another tool cleared.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use gpui_kit::{AnyWindowHandle, AppContext as _, TestAppContext};
 use tf2tools_app::app::{Boot, start};
@@ -63,14 +63,45 @@ fn start_writes_back_a_cleared_preset_file(cx: &mut TestAppContext) {
     );
 }
 
+struct Capture(Arc<Mutex<Vec<u8>>>);
+
+impl std::io::Write for Capture {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+// The failure's only trace is the developer log, so the test waits for that line before it
+// counts toasts; without the wait a restore that never ran would pass too.
 #[gpui_kit::test]
 fn a_failed_restore_shows_no_toast(cx: &mut TestAppContext) {
+    // It sets the global tracing subscriber, so it runs alone in a child process.
+    if !support::in_own_process("mastercomfig_restore::a_failed_restore_shows_no_toast") {
+        return;
+    }
+    let buf = Arc::new(Mutex::new(Vec::new()));
+    let sink = Arc::clone(&buf);
+    tracing_subscriber::fmt()
+        .with_ansi(false)
+        .with_writer(move || Capture(Arc::clone(&sink)))
+        .try_init()
+        .expect("the only subscriber in this process");
     let env = support::env();
     managed(&env, "high");
     // A file where the folder must go, so the write back fails.
     std::fs::write(env.game.join("tf/custom/comfig-custom"), b"").unwrap();
     let win = started(cx, &env);
     connected(cx, win);
+    let logged = || String::from_utf8(buf.lock().unwrap().clone()).unwrap();
+    support::wait_real(cx, "the restore's failure", |cx| {
+        support::settle(cx, win);
+        logged().contains("mastercomfig restore at start")
+    });
+    assert!(logged().contains("WARN"), "{}", logged());
     support::settle(cx, win);
     assert_eq!(
         cx.update_window(win, |_, w, cx| toast_count(w, cx))
