@@ -67,6 +67,24 @@ async fn the_catalog_is_fetched_once_per_tag_and_then_read_from_disk() {
 }
 
 #[tokio::test]
+async fn a_corrupt_cached_catalog_is_fetched_again_and_overwritten() {
+    let env = store_env().await;
+    serve(&env, "9.100.1", MC_MODULES, MC_PRESET_MODULES).await;
+    let saved = env.dir.mastercomfig_dir().join("9.100.1");
+    std::fs::create_dir_all(&saved).unwrap();
+    std::fs::write(saved.join("modules.json"), b"{ not json").unwrap();
+    std::fs::write(saved.join("preset_modules.json"), MC_PRESET_MODULES).unwrap();
+    assert!(env.client.cached_mastercomfig_catalog("9.100.1").is_none());
+    let catalog = env.client.mastercomfig_catalog("9.100.1").await.unwrap();
+    assert_eq!(catalog.resolve("lod", Preset::High), Some("high"));
+    assert_eq!(requests(&env).await, 2);
+    assert_eq!(
+        std::fs::read(saved.join("modules.json")).unwrap(),
+        MC_MODULES
+    );
+}
+
+#[tokio::test]
 async fn an_unreadable_catalog_is_a_format_error_and_is_not_saved() {
     let env = store_env().await;
     serve(&env, "9.100.1", br#"{"graphics":{}}"#, MC_PRESET_MODULES).await;
