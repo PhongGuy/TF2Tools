@@ -211,6 +211,7 @@ test_readme_shots_dry_run_drives_every_page_of_the_real_app() {
   # New profile selects its "Profile N" name, so the name is typed with no target (a target
   # clicks first and would append), and Back commits it.
   [[ $out == *'"profiles-new"'*'type {"text": "Competitive"}'*'"profile-editor-back"'* ]] || fail "no neutral profile: [$out]"
+  [[ $out == *'"profiles-new"'*'wait {"target": {"id_suffix": "profile-editor-back"}'*'type {"text": "Competitive"}'* ]] || fail "types before the editor opens: [$out]"
   [[ $out != *profiles-save* ]] || fail "uses the removed Save Current: [$out]"
   [[ $out == *'"profile-delete:example-profile"'*'"confirm-ok"'*'# shot settings'* ]] || fail "the profile stays: [$out]"
   [[ $out == *'"hud-install:example-hud"'*'# shot huds'* ]] || fail "installs no HUD before the HUDs shot: [$out]"

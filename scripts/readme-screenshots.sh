@@ -198,6 +198,8 @@ calls() {
   [ "$ANSWER" = 0 ] || die "a profile matching Competitive exists; rename it first"
   # New profile selects its "Profile N" name, so an untargeted type replaces it; Back saves it.
   click profiles-new
+  # The profile is created off the UI thread; typing before the editor opens would hit the search.
+  send 'wait {"target": {"id_suffix": "profile-editor-back"}, "timeout_ms": 20000}'
   send 'type {"text": "Competitive"}'
   click profile-editor-back
   send 'wait {"ms": 2000}'

@@ -1066,6 +1066,8 @@ fn profile_card(
             ));
         }
     }
+    // v5's hover:bg-accent/50, as on the store cards.
+    let hover = theme.accent.opacity(0.5);
     let border = if active {
         theme.primary.opacity(0.5)
     } else {
@@ -1077,6 +1079,8 @@ fn profile_card(
         .aria_label(profile.name().to_owned())
         .test_support()
         .on_click(on_edit.clone())
+        .cursor_pointer()
+        .hover(move |card| card.bg(hover))
         .size_full()
         .flex()
         .flex_col()
