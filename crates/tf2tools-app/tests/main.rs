@@ -55,6 +55,7 @@ mod font_dialog;
 mod game_moved;
 mod global_player;
 mod graphics;
+mod graphics_model;
 mod help_links;
 mod hud_copy_card;
 mod hud_copy_update;

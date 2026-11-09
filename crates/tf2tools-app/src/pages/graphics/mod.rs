@@ -1,5 +1,7 @@
 //! The Graphics page: mastercomfig's status and the graphics preset picker.
 
+pub mod model;
+
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::{
     AnyWindowHandle, Context, InteractiveElement as _, IntoElement, ParentElement as _, Render,
@@ -9,7 +11,7 @@ use gpui_kit::{
 use tf2tools_core::{MastercomfigRelease, MastercomfigStatus};
 
 use crate::ids;
-use crate::local_messages::LocalFailure;
+use crate::local_messages::describe_store_status;
 use crate::pages::common::no_tf2_warning;
 use crate::services::{Tf2State, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
@@ -74,17 +76,11 @@ impl GraphicsPage {
             let status = tf2
                 .map(|tf2| s.library.mastercomfig_status(&tf2))
                 .transpose()
-                .map_err(|e| {
-                    LocalFailure::new("Couldn't read mastercomfig's state.", e.to_string())
-                        .into_op("Failed to load mastercomfig")
-                })?;
-            let release = s.store.mastercomfig_release().map_err(|e| {
-                LocalFailure::new(
-                    "Couldn't read the latest mastercomfig release.",
-                    e.to_string(),
-                )
-                .into_op("Failed to load mastercomfig")
-            })?;
+                .map_err(|e| model::describe_status(&e).into_op("Failed to load mastercomfig"))?;
+            let release = s
+                .store
+                .mastercomfig_release()
+                .map_err(|e| describe_store_status(&e).into_op("Failed to load mastercomfig"))?;
             Ok((status, release))
         });
         let win = self.win;

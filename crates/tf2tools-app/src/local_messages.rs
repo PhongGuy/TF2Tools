@@ -16,10 +16,11 @@ use crate::store_messages::{LIBRARY_UPDATE, STORE_READ};
 pub const INTERNAL: &str = "TF2Tools hit a problem it didn't expect. Try again, and restart TF2Tools if it keeps happening.";
 
 const LIBRARY_DISK: &str = "TF2Tools couldn't read or save its files. Make sure your disk has free space and TF2Tools can write to its folder, then try again.";
-const LIBRARY_OPEN: &str = "TF2Tools couldn't open your library. Restart TF2Tools and try again.";
+pub(crate) const LIBRARY_OPEN: &str =
+    "TF2Tools couldn't open your library. Restart TF2Tools and try again.";
 const GONE: &str = "This item is no longer in your library. Pick another one.";
 const UNUSABLE: &str = "TF2Tools can't use this kind of file. Pick another file.";
-const TF2_WRITE: &str = "Couldn't change your TF2 folder. Make sure TF2 is closed and TF2Tools can write to it, then try again.";
+pub(crate) const TF2_WRITE: &str = "Couldn't change your TF2 folder. Make sure TF2 is closed and TF2Tools can write to it, then try again.";
 const NEW_EXTERNAL_HUD: &str =
     "Another HUD turned up in your TF2 folder, so nothing was changed. Try again.";
 const PROFILE_GONE: &str = "This profile no longer exists. Pick another profile.";
