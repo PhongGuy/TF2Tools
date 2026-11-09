@@ -1,30 +1,48 @@
-//! The full-page profile editor: a header with Back, the name, Activate and Delete, and a queue
-//! that saves each change in order.
+//! The full-page profile editor: a header with Back, the name, Activate and Delete, the four
+//! slot cards beside the picked slot's gallery, and a queue that saves each change in order.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
+use std::ops::Range;
+use std::rc::Rc;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::tag::Tag;
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, Icon, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyWindowHandle, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, Styled as _, Subscription, TestSupportExt as _, WeakEntity, Window,
-    div, transparent_black,
+    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
+    Window, div, px, transparent_black,
 };
-use tf2tools_core::{MissingItem, Profile, ProfileError, ProfileId, ProfileUpdate};
+use tf2tools_core::{
+    HudEntry, LibraryError, MissingItem, Profile, ProfileError, ProfileId, ProfileUpdate,
+    SoundEntry,
+};
 
 use super::ProfilesPage;
-use super::editor_model::Edit;
+use super::editor_model::{Edit, Slot, SlotState, slot_state, slot_text};
 use super::model;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
-use crate::local_messages::describe_profile;
-use crate::pages::common::{SM_ICON_PX, badge_of};
+use crate::local_messages::{describe_library, describe_profile};
+use crate::pages::common::{SM_ICON_PX, badge_of, card_frame};
+use crate::pages::huds::{card_images, hud_picture, hud_title};
+use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, run_blocking, tf2_state};
-use crate::shell::toast::toast_error;
+use crate::shell::route::{NavigateTo, Page};
+use crate::shell::toast::{ToastKind, toast, toast_error};
+use crate::widgets::card_grid::CardGrid;
 use crate::widgets::{Named as _, labelled};
+
+// A HUD card's name row under its 16:9 picture.
+const PICK_TITLE_HEIGHT: Pixels = px(40.);
+// The slot column's width; the picker takes the rest.
+const SLOT_COLUMN_WIDTH: Pixels = px(280.);
+// The HUD gallery shows at most this many rows before it scrolls.
+const PICKER_MAX_ROWS: usize = 3;
 
 enum Job {
     Edit(Edit),
@@ -34,6 +52,13 @@ enum Job {
 enum Done {
     Saved(Edit, Result<ProfileUpdate, ProfileError>),
     Refreshed(Result<(Profile, Vec<MissingItem>), ProfileError>),
+}
+
+/// The library the galleries pick from, with each HUD card's picture URL by folder.
+struct Galleries {
+    huds: Rc<[HudEntry]>,
+    sounds: Rc<[SoundEntry]>,
+    images: Rc<HashMap<String, String>>,
 }
 
 /// What Back, Activate or Delete does once the queue has saved a typed name.
@@ -61,6 +86,17 @@ pub struct ProfileEditor {
     /// The rename queued or running, so Enter then Blur sends it once.
     renaming: Option<String>,
     after_idle: Option<AfterIdle>,
+    selected: Slot,
+    search: Entity<InputState>,
+    /// None until the first gallery load lands.
+    galleries: Option<Galleries>,
+    /// Bumped per gallery load, so a slower older load never replaces a newer one.
+    gallery_generation: u64,
+    grid: CardGrid,
+    /// The HUD grid's last drawn range, as indices into the shown HUDs.
+    visible: Range<usize>,
+    /// This editor's own `RemoteImages` viewer, handed back on release.
+    image_viewer: String,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -110,9 +146,36 @@ impl ProfileEditor {
         ));
         let events = LibraryEvents::global(cx);
         subscriptions.push(cx.subscribe(&events, |editor, _, _: &LibraryChanged, cx| {
+            editor.load_galleries(cx);
             editor.queue_refresh();
             editor.pump(cx);
         }));
+        // The galleries filter from the search value at render; re-arm the grid so a new filter
+        // asks for its cards' pictures.
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search HUDs..."));
+        subscriptions.push(cx.subscribe(&search, |editor, _, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Change) {
+                editor.grid.rearm();
+                cx.notify();
+            }
+        }));
+        // Pictures redraw the editor as they land; its wants go when it does.
+        let image_viewer = format!("profile-editor:{}", cx.entity_id());
+        if let Some(images) = RemoteImages::global(cx) {
+            subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
+            let released = image_viewer.clone();
+            subscriptions.push(cx.on_release(move |_, cx| {
+                images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
+            }));
+        }
+        let mut grid = CardGrid::new(ids::PROFILE_PICKER_GRID);
+        let this = cx.entity().downgrade();
+        grid.on_visible(move |range, cx| {
+            let _ = this.update(cx, |editor, cx| {
+                editor.visible = range;
+                editor.want_images(cx);
+            });
+        });
         let mut editor = Self {
             page,
             win: window.window_handle(),
@@ -126,11 +189,121 @@ impl ProfileEditor {
             seen_active: active,
             renaming: None,
             after_idle: None,
+            selected: Slot::Hud,
+            search,
+            galleries: None,
+            gallery_generation: 0,
+            grid,
+            visible: 0..0,
+            image_viewer,
             _subscriptions: subscriptions,
         };
+        editor.load_galleries(cx);
         editor.queue_refresh();
         editor.pump(cx);
         editor
+    }
+
+    /// The slot whose picker shows; HUD on open.
+    pub fn selected(&self) -> Slot {
+        self.selected
+    }
+
+    /// Shows `slot`'s picker; a change of slot clears the search.
+    pub fn select(&mut self, slot: Slot, cx: &mut Context<Self>) {
+        if slot == self.selected {
+            return;
+        }
+        self.selected = slot;
+        let (win, search) = (self.win, self.search.clone());
+        let placeholder = match slot {
+            Slot::Hud => "Search HUDs...",
+            Slot::Hitsound | Slot::Killsound => "Search sounds...",
+            Slot::Crosshairs => "Search crosshairs...",
+        };
+        // Setting an input's text needs the window, which a click handler's caller holds.
+        cx.defer(move |cx| {
+            let _ = win.update(cx, |_, window, cx| {
+                search.update(cx, |input, cx| {
+                    input.set_value("", window, cx);
+                    input.set_placeholder(placeholder, window, cx);
+                });
+            });
+        });
+        self.grid.rearm();
+        cx.notify();
+    }
+
+    /// The picker's search field (one field, cleared on a slot change).
+    pub fn search_input(&self) -> &Entity<InputState> {
+        &self.search
+    }
+
+    // Reads the HUDs, sounds and HUD pictures off the UI thread; outside the queue, since the
+    // galleries never touch `saved`.
+    fn load_galleries(&mut self, cx: &mut Context<Self>) {
+        self.gallery_generation += 1;
+        let generation = self.gallery_generation;
+        let loading = run_blocking(cx, |s| {
+            let failed = |e: LibraryError| describe_library(&e).into_op("Failed to load library");
+            let huds = s.library.list_huds().map_err(failed)?;
+            let sounds = s.library.list_sounds().map_err(failed)?;
+            let images = card_images(s, &huds);
+            Ok((huds, sounds, images))
+        });
+        let win = self.win;
+        cx.spawn(async move |editor, cx| {
+            let loaded = loading.await;
+            let _ = cx.update(|cx| {
+                win.update(cx, |_, window, cx| {
+                    let _ = editor.update(cx, |editor, cx| {
+                        if editor.gallery_generation != generation {
+                            return;
+                        }
+                        match loaded {
+                            Ok((huds, sounds, images)) => {
+                                editor.galleries = Some(Galleries {
+                                    huds: huds.into(),
+                                    sounds: sounds.into(),
+                                    images: Rc::new(images),
+                                });
+                            }
+                            Err(err) => toast_error(window, cx, &err),
+                        }
+                        editor.grid.rearm();
+                        cx.notify();
+                    });
+                })
+            });
+        })
+        .detach();
+    }
+
+    // The library HUDs whose name holds the search text.
+    fn shown_huds(&self, cx: &App) -> Vec<HudEntry> {
+        let query = self.search.read(cx).value();
+        self.galleries
+            .iter()
+            .flat_map(|g| g.huds.iter())
+            .filter(|hud| model::matches(hud.name(), &query))
+            .cloned()
+            .collect()
+    }
+
+    // Asks for the pictures of the HUD cards in the grid's last drawn range.
+    fn want_images(&mut self, cx: &mut Context<Self>) {
+        let (Some(images), Some(galleries)) = (RemoteImages::global(cx), self.galleries.as_ref())
+        else {
+            return;
+        };
+        let shown = self.shown_huds(cx);
+        let end = self.visible.end.min(shown.len());
+        let keys: Vec<ImageKey> = shown[self.visible.start.min(end)..end]
+            .iter()
+            .filter_map(|hud| galleries.images.get(hud.folder_name()))
+            .map(|url| ImageKey::card(url))
+            .collect();
+        images.update(cx, |images, cx| images.want(&self.image_viewer, keys, cx));
     }
 
     pub fn id(&self) -> &ProfileId {
@@ -253,6 +426,20 @@ impl ProfileEditor {
                 self.renaming = None;
                 self.name_taken = Some(name);
                 self.after_idle = None;
+                self.queue_refresh();
+            }
+            // The picked item left the library since the gallery loaded.
+            Ok(Done::Saved(
+                edit @ (Edit::SetHud(_) | Edit::SetSound(..)),
+                Err(ProfileError::ItemNotFound { .. }),
+            )) => {
+                let title = if let Edit::SetHud(_) = edit {
+                    "That HUD is no longer in your library"
+                } else {
+                    "That sound is no longer in your library"
+                };
+                toast(window, cx, ToastKind::Error, title, "");
+                self.load_galleries(cx);
                 self.queue_refresh();
             }
             Ok(Done::Saved(edit, Err(e))) => {
@@ -456,12 +643,209 @@ impl ProfileEditor {
     }
 }
 
+// The slot cards and the pickers.
+impl ProfileEditor {
+    // One card per slot: its label and what it holds, or the missing item's name, and Clear
+    // while it holds anything. A click on the card shows its picker.
+    fn slot_card(&self, slot: Slot, cx: &mut Context<Self>) -> AnyElement {
+        let key = slot.key();
+        let state = slot_state(&self.saved, slot, &self.missing);
+        let text = slot_text(&state, slot);
+        let theme = cx.theme();
+        let selected = slot == self.selected;
+        let value = match &state {
+            SlotState::Missing(_) => labelled(
+                div().text_sm().text_color(theme.danger),
+                ids::profile_slot_missing(key),
+                text.clone(),
+            )
+            .into_any_element(),
+            SlotState::Empty | SlotState::Set(_) => div()
+                .text_sm()
+                .truncate()
+                .text_color(theme.muted_foreground)
+                .child(text.clone())
+                .into_any_element(),
+        };
+        let clear = (state != SlotState::Empty).then(|| {
+            Button::new(ids::profile_slot_clear(key))
+                .ghost()
+                .px(SM_ICON_PX)
+                .icon(IconName::X)
+                .named("Clear")
+                .on_click(cx.listener(move |editor, _, _, cx| {
+                    cx.stop_propagation();
+                    editor.enqueue(Edit::ClearSlot(slot), cx);
+                }))
+        });
+        card_frame(cx)
+            .id(ids::profile_slot(key))
+            .aria_label(text)
+            .aria_selected(selected)
+            .test_support()
+            .when(selected, |card| card.border_color(cx.theme().primary))
+            .cursor_pointer()
+            .p_4()
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .gap_1()
+                            .child(div().font_weight(FontWeight::SEMIBOLD).child(slot.label()))
+                            .child(value),
+                    )
+                    .children(clear),
+            )
+            .on_click(cx.listener(move |editor, _, _, cx| editor.select(slot, cx)))
+            .into_any_element()
+    }
+
+    // The picked slot's search over its gallery, or a pointer to the store while the library
+    // has nothing for it. Crosshairs bring their own picker.
+    fn picker(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let slot = self.selected;
+        let key = slot.key();
+        let galleries = self.galleries.as_ref()?;
+        let (empty, empty_text, store_text, store) = match slot {
+            Slot::Hud => (
+                galleries.huds.is_empty(),
+                "No HUDs in your library yet",
+                "Browse the HUD Store",
+                Page::HudStore,
+            ),
+            Slot::Hitsound | Slot::Killsound => (
+                galleries.sounds.is_empty(),
+                "No sounds in your library yet",
+                "Browse the Sound Store",
+                Page::SoundStore,
+            ),
+            Slot::Crosshairs => return None,
+        };
+        let body = if empty {
+            v_flex()
+                .items_center()
+                .gap_3()
+                .py_12()
+                .child(labelled(
+                    div().text_color(cx.theme().muted_foreground),
+                    ids::profile_picker_empty(key),
+                    empty_text,
+                ))
+                .child(
+                    Button::new(ids::profile_picker_store(key))
+                        .outline()
+                        .icon(IconName::Store)
+                        .label(store_text)
+                        .on_click(cx.listener(move |editor, _, _, cx| {
+                            let _ = editor.page.update(cx, |_, cx| cx.emit(NavigateTo(store)));
+                        })),
+                )
+                .into_any_element()
+        } else if slot == Slot::Hud {
+            self.hud_gallery(galleries, cx)
+        } else {
+            div().into_any_element()
+        };
+        let muted = cx.theme().muted_foreground;
+        Some(
+            v_flex()
+                .id(ids::profile_picker(key))
+                .test_support()
+                .flex_1()
+                .min_w_0()
+                .gap_4()
+                .child(
+                    div()
+                        .id(ids::profile_picker_search(key))
+                        .test_support()
+                        .max_w(px(320.))
+                        .child(
+                            Input::new(&self.search)
+                                .h_9()
+                                .prefix(Icon::new(IconName::Search).text_color(muted)),
+                        ),
+                )
+                .child(body)
+                .into_any_element(),
+        )
+    }
+
+    // The library HUDs as picture cards, the saved one marked; a click saves it to the slot.
+    fn hud_gallery(&self, galleries: &Galleries, cx: &mut Context<Self>) -> AnyElement {
+        let shown: Rc<[HudEntry]> = self.shown_huds(cx).into();
+        let height = |width: Pixels| width * (9. / 16.) + PICK_TITLE_HEIGHT;
+        let rows = shown
+            .len()
+            .div_ceil(self.grid.columns())
+            .clamp(1, PICKER_MAX_ROWS);
+        let grid_height = self.grid.row_height_for(height) * rows as f32;
+        let saved = self.saved.hud().map(|h| h.folder_name().to_owned());
+        let images = Rc::clone(&galleries.images);
+        let editor = cx.entity().downgrade();
+        let count = shown.len();
+        div()
+            .h(grid_height)
+            .child(self.grid.render_sized(count, height, move |ix, _, cx| {
+                let hud = &shown[ix];
+                let folder = hud.folder_name();
+                let url = images.get(folder).map(String::as_str);
+                let id = hud.id().clone();
+                let editor = editor.clone();
+                card_frame(cx)
+                    .id(ids::profile_pick_hud(folder))
+                    .aria_label(hud.name().to_owned())
+                    .aria_selected(saved.as_deref() == Some(folder))
+                    .test_support()
+                    .when(saved.as_deref() == Some(folder), |card| {
+                        card.border_color(cx.theme().primary)
+                    })
+                    .size_full()
+                    .overflow_hidden()
+                    .cursor_pointer()
+                    .child(hud_picture(
+                        ids::hud_shot(folder),
+                        ids::hud_image(folder),
+                        url,
+                        cx,
+                    ))
+                    .child(div().px_3().py_2().child(hud_title(hud)))
+                    .on_click(move |_, _, cx| {
+                        let _ = editor.update(cx, |editor, cx| {
+                            editor.enqueue(Edit::SetHud(id.clone()), cx)
+                        });
+                    })
+                    .into_any_element()
+            }))
+            .into_any_element()
+    }
+}
+
 impl Render for ProfileEditor {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let slots: Vec<AnyElement> = Slot::ALL
+            .into_iter()
+            .map(|slot| self.slot_card(slot, cx))
+            .collect();
         v_flex()
             .id(ids::PROFILE_EDITOR)
             .test_support()
             .gap_6()
             .child(self.header(cx))
+            .child(
+                h_flex()
+                    .items_start()
+                    .gap_6()
+                    .child(
+                        v_flex()
+                            .flex_none()
+                            .w(SLOT_COLUMN_WIDTH)
+                            .gap_3()
+                            .children(slots),
+                    )
+                    .children(self.picker(cx)),
+            )
     }
 }

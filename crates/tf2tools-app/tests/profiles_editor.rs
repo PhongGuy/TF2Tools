@@ -1,5 +1,8 @@
 //! The profile editor: header, rename, Delete, Back, Activate and the save queue.
 
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
 use crate::support;
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
@@ -645,4 +648,175 @@ fn delete_saves_a_typed_name_first(cx: &mut TestAppContext) {
     toast_is(cx, &s, "Profile deleted");
     let row = &support::log_rows(&s.services)[0];
     assert_eq!(row.message(), "Deleted profile: Pubs");
+}
+
+/// Every file under `dir` with its bytes, so a test can tell the game folder was left alone.
+fn files_under(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
+    let mut files = BTreeMap::new();
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(next) = stack.pop() {
+        for entry in std::fs::read_dir(&next).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                files.insert(path.clone(), std::fs::read(&path).unwrap());
+            }
+        }
+    }
+    files
+}
+#[gpui_kit::test]
+fn slot_cards_show_the_profile(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let vanilla = empty_profile(&s, "Vanilla");
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, comp.id());
+    let texts = |cx: &mut TestAppContext| -> Vec<Option<String>> {
+        ["hud", "hitsound", "killsound", "crosshairs"]
+            .into_iter()
+            .map(|k| support::label_of(cx, s.win, ids::profile_slot(k)))
+            .collect()
+    };
+    let hud = comp.hud().unwrap().name().to_owned();
+    assert_eq!(
+        texts(cx),
+        [
+            Some(hud),
+            Some("Classic Ding".into()),
+            Some("Bell".into()),
+            Some("1 weapon".into())
+        ]
+    );
+    assert_eq!(
+        support::selected_of(cx, s.win, ids::profile_slot("hud")),
+        Some(true)
+    );
+    assert!(support::present(cx, s.win, ids::profile_picker("hud")));
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_BACK);
+    let _editor = open_editor(cx, &s, &page, vanilla.id());
+    assert_eq!(
+        texts(cx),
+        [
+            Some("None".into()),
+            Some("None".into()),
+            Some("None".into()),
+            Some("Default crosshairs".into())
+        ]
+    );
+    assert!(!support::present(cx, s.win, ids::profile_slot_clear("hud")));
+}
+
+#[gpui_kit::test]
+fn picking_a_hud_saves_at_once_and_marks_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let budhud = seed_hud(&s, &env, "budhud");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    let rays = comp.hud().unwrap().folder_name().to_owned();
+    assert_eq!(
+        support::selected_of(cx, s.win, ids::profile_pick_hud(&rays)),
+        Some(true)
+    );
+    assert_eq!(
+        support::selected_of(cx, s.win, ids::profile_pick_hud(budhud.folder_name())),
+        Some(false)
+    );
+    let custom = env.game.join("tf/custom");
+    let before = files_under(&custom);
+    support::click_id(cx, s.win, ids::profile_pick_hud(budhud.folder_name()));
+    wait_idle(cx, &s, &editor);
+    let after = saved(&s, comp.id());
+    assert_eq!(
+        after.hud().map(|h| h.folder_name()),
+        Some(budhud.folder_name())
+    );
+    assert_eq!(after.hitsound(), comp.hitsound());
+    assert_eq!(after.crosshairs(), comp.crosshairs());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_slot("hud")).as_deref(),
+        Some(budhud.name())
+    );
+    assert_eq!(files_under(&custom), before, "an edit touched the game");
+}
+#[gpui_kit::test]
+fn search_narrows_the_gallery(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let budhud = seed_hud(&s, &env, "budhud");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    let input = cx.update(|cx| editor.read(cx).search_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        input.update(cx, |st, cx| st.set_value("bud", window, cx))
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::profile_pick_hud(budhud.folder_name())
+    ));
+    let rays = comp.hud().unwrap().folder_name().to_owned();
+    assert!(!support::present(cx, s.win, ids::profile_pick_hud(&rays)));
+}
+
+#[gpui_kit::test]
+fn clear_empties_a_slot_at_once(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    support::click_id(cx, s.win, ids::profile_slot_clear("hud"));
+    wait_idle(cx, &s, &editor);
+    assert!(saved(&s, comp.id()).hud().is_none());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_slot("hud")).as_deref(),
+        Some("None")
+    );
+    assert!(!support::present(cx, s.win, ids::profile_slot_clear("hud")));
+    assert_eq!(saved(&s, comp.id()).hitsound(), comp.hitsound());
+}
+#[gpui_kit::test]
+fn picking_a_hud_deleted_meanwhile_toasts(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let budhud = seed_hud(&s, &env, "budhud");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    s.services.library.delete_hud(budhud.id()).unwrap();
+    support::click_id(cx, s.win, ids::profile_pick_hud(budhud.folder_name()));
+    toast_is(cx, &s, "That HUD is no longer in your library");
+    support::wait_real(cx, "the gallery to reload", |cx| {
+        !support::present(cx, s.win, ids::profile_pick_hud(budhud.folder_name()))
+    });
+    wait_idle(cx, &s, &editor);
+    assert_eq!(saved(&s, comp.id()).hud(), comp.hud());
+}
+
+#[gpui_kit::test]
+fn an_empty_library_points_to_the_store(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let vanilla = empty_profile(&s, "Vanilla");
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, vanilla.id());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_picker_empty("hud")).as_deref(),
+        Some("No HUDs in your library yet")
+    );
+    support::click_id(cx, s.win, ids::profile_slot("killsound"));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_picker_empty("killsound")).as_deref(),
+        Some("No sounds in your library yet")
+    );
+    support::click_id(cx, s.win, ids::profile_picker_store("killsound"));
+    assert_eq!(cx.update(|cx| s.shell.read(cx).page()), Page::SoundStore);
 }

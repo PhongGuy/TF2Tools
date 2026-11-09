@@ -17,7 +17,7 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, WindowExt as _, h_flex, v_flex,
 };
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
+    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, EventEmitter, FontWeight,
     InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
     SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
     WeakEntity, Window, div, px, transparent_black,
@@ -44,7 +44,7 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::external_huds::{ExternalPlan, HudAction, ask_external};
 use crate::shell::font_check::ask_about_fonts;
-use crate::shell::route::Page;
+use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_detail::{DetailItem, open_detail};
 use crate::widgets::Named as _;
@@ -62,6 +62,9 @@ const SEARCH_MIN_WIDTH: Pixels = px(160.);
 // v5's Save Current dialog description.
 const SAVE_DESCRIPTION: &str =
     "Save your currently installed HUD, sounds, and crosshair assignments as a reusable profile.";
+
+/// The editor's empty pickers ask for a store page by event.
+impl EventEmitter<NavigateTo> for ProfilesPage {}
 
 // What the page shows: its grid of profiles, or one profile open in the editor.
 enum View {

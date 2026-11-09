@@ -1259,10 +1259,6 @@ pub(crate) fn hud_title(hud: &HudEntry) -> Div {
 }
 
 /// Card picture URLs by library folder: a store screenshot, else the HUD's own picture.
-#[expect(
-    dead_code,
-    reason = "the profile editor's HUD gallery is its first caller"
-)]
 pub(crate) fn card_images(s: &Services, huds: &[HudEntry]) -> HashMap<String, String> {
     store_links(s, huds).images
 }
