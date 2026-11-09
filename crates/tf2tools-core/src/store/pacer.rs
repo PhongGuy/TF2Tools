@@ -25,11 +25,13 @@ pub(crate) enum Priority {
     Background,
 }
 
-/// What one attempt got back: a usable value, or an empty reply the pacer retries.
+/// What one attempt got back: a good value, an empty reply the pacer retries, or a
+/// malformed one whose value is returned without counting as clean toward a reset.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Reply<T> {
     Done(T),
     Empty,
+    Rejected(T),
 }
 
 /// Why a paced call failed.
@@ -127,6 +129,7 @@ impl Pacer {
                     self.clean();
                     return Ok(value);
                 }
+                Ok(Reply::Rejected(value)) => return Ok(value),
                 Ok(Reply::Empty) => {
                     empties += 1;
                     let throttled = empties >= EMPTY_LIMIT;
@@ -186,8 +189,11 @@ impl Pacer {
         }
         s.clean = 0;
         s.gap = s.gap.saturating_mul(2).min(MAX_GAP);
+        // Never pull a pending start forward: a reset gap must not shorten a longer wait.
         let gap = s.gap;
-        s.next = s.last.map(|last| last + gap);
+        s.next = s
+            .last
+            .map(|last| s.next.map_or(last + gap, |next| next.max(last + gap)));
     }
 
     fn clean(&self) {
@@ -407,6 +413,64 @@ mod tests {
         assert_eq!(pacer.gap(), ms(400), "nine clean replies keep the backoff");
         scripted(&pacer, Background, &[], &log, t0).await.unwrap();
         assert_eq!(pacer.gap(), BASE);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_rejected_reply_is_returned_but_does_not_count_as_clean() {
+        let (pacer, log, t0) = (Pacer::new(BASE), Log::default(), Instant::now());
+        scripted(&pacer, Background, &[true], &log, t0)
+            .await
+            .unwrap();
+        for _ in 0..8 {
+            scripted(&pacer, Background, &[], &log, t0).await.unwrap();
+        }
+        let rejected = pacer
+            .call(Background, || async { Ok::<_, ()>(Reply::Rejected(7)) })
+            .await;
+        assert_eq!(rejected, Ok(7));
+        assert_eq!(pacer.gap(), ms(400), "a rejected reply keeps the backoff");
+        scripted(&pacer, Background, &[], &log, t0).await.unwrap();
+        assert_eq!(pacer.gap(), BASE);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_empty_reply_after_a_reset_keeps_a_longer_pending_wait() {
+        // Back off to 800 ms with nine clean replies counted, so the next clean one resets.
+        let (pacer, log, t0) = (Pacer::new(BASE), Log::default(), Instant::now());
+        scripted(&pacer, Background, &[true, true], &log, t0)
+            .await
+            .unwrap();
+        for _ in 0..8 {
+            scripted(&pacer, Background, &[], &log, t0).await.unwrap();
+        }
+        assert_eq!(pacer.gap(), ms(800));
+        // A resets the gap mid-flight; B's empty reply lands after that, while its own
+        // 800 ms wait is still pending, and must not pull its retry forward.
+        let b_starts = Mutex::new(Vec::new());
+        let b_tries = AtomicUsize::new(0);
+        let a = pacer.call(Background, || async {
+            tokio::time::sleep(ms(1000)).await;
+            Ok::<_, ()>(Reply::Done(()))
+        });
+        let b = async {
+            // Queued just after A, so A takes the first slot and B the one after it.
+            tokio::time::sleep(ms(1)).await;
+            pacer
+                .call(Background, || async {
+                    b_starts.lock().unwrap().push(Instant::now());
+                    if b_tries.fetch_add(1, Ordering::SeqCst) == 0 {
+                        tokio::time::sleep(ms(300)).await;
+                        Ok::<_, ()>(Reply::Empty)
+                    } else {
+                        Ok(Reply::Done(()))
+                    }
+                })
+                .await
+        };
+        let (a, b) = tokio::join!(a, b);
+        assert!(a.is_ok() && b.is_ok(), "{a:?} {b:?}");
+        let at = b_starts.lock().unwrap().clone();
+        assert_eq!(at[1] - at[0], ms(800));
     }
 
     #[tokio::test(start_paused = true)]

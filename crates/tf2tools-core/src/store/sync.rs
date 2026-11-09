@@ -137,7 +137,7 @@ pub(crate) async fn gamebanana(
 /// Fetches and parses one index page holding at least one record, as a background call
 /// through the GameBanana pacer. A blank body or a page with no records is an empty reply,
 /// which the pacer retries until it fails as `Throttled`; any other unparseable body fails
-/// `Malformed` at once. Network errors and statuses are returned as they come.
+/// `Malformed` at once, without counting toward the pacer's backoff reset. Network errors and statuses are returned as they come.
 async fn fetch_page(
     client: &StoreClient,
     kind: StoreKind,
@@ -150,7 +150,7 @@ async fn fetch_page(
         Ok(index) if index.records.len() > 0 => Reply::Done(Ok(index)),
         Ok(_) => Reply::Empty,
         Err(_) if body.trim_ascii().is_empty() => Reply::Empty,
-        Err(e) => Reply::Done(Err(e.to_string())),
+        Err(e) => Reply::Rejected(Err(e.to_string())),
     };
     client
         .gamebanana_call(&url, Priority::Background, read)
