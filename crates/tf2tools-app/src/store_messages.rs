@@ -7,7 +7,7 @@ use tf2tools_core::{
 };
 
 use crate::services::OpError;
-use crate::sync_messages::source_name;
+use crate::sync_messages::{THROTTLED, source_name};
 
 const DL_STOPPED: &str = "The download stopped before it finished. Try again.";
 const DL_DISK: &str = "Couldn't save the download. Make sure your disk has free space and TF2Tools can write to its folder, then try again.";
@@ -131,7 +131,8 @@ pub fn describe_files(kind: StoreKind, err: &FilesError) -> StoreFailure {
             format!("{source} sent something TF2Tools couldn't read. Try again later.")
         }
         FilesError::Database { .. } => STORE_READ.into(),
-        FilesError::Throttled { .. } | _ => FILES_UNKNOWN.into(),
+        FilesError::Throttled { .. } => THROTTLED.into(),
+        _ => FILES_UNKNOWN.into(),
     };
     StoreFailure::new(message, err.to_string())
 }
