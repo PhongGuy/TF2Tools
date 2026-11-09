@@ -9,12 +9,12 @@ use serde_json::{Map, Value};
 use walkdir::WalkDir;
 
 use super::http::{API_BODY_LIMIT, NetFailure};
-use super::mastercomfig::{BASE_ASSET, override_slot};
 use super::sync::{database, finish, malformed, stale};
 use super::{StoreClient, StoreKind, SyncOutcome, SyncProgress};
 use crate::archive::extract_archive;
 use crate::error::SyncError;
 use crate::library::{AddonName, display_info, is_override};
+use crate::templates::{BASE_VPK, override_slot};
 use crate::timestamp;
 
 /// One hud-db `hud-data/<id>.json` file as a `store_huds` row.
@@ -159,7 +159,7 @@ pub(crate) async fn addons(
         ) else {
             continue;
         };
-        if name == BASE_ASSET {
+        if name == BASE_VPK {
             base_url = Some(url);
         } else if let Some(slot) = override_slot(name) {
             override_urls[slot] = Some(url);

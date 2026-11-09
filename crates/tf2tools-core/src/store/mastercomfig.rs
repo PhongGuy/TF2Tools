@@ -9,10 +9,8 @@ use super::{StoreClient, StoreKind};
 use crate::archive::VPK_MAGIC;
 use crate::error::{InstallMastercomfigError, QueryError};
 use crate::library::{game_custom_dir, record_install, remove_file_if_present, write_setup_hook};
+use crate::templates::BASE_VPK;
 use crate::tf2::Tf2Install;
-
-/// The release asset holding mastercomfig itself.
-pub(crate) const BASE_ASSET: &str = "mastercomfig-base.vpk";
 
 /// mastercomfig's latest release as the last addon-store sync saw it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,11 +38,6 @@ impl MastercomfigRelease {
         let slot = usize::from(n).checked_sub(1)?;
         self.override_urls.get(slot)?.as_deref()
     }
-}
-
-/// The 0-based slot of an exact `mastercomfig-addon-override-<1..=3>.vpk` asset name.
-pub(crate) fn override_slot(asset: &str) -> Option<usize> {
-    (1..=3).find_map(|n| (asset == format!("mastercomfig-addon-override-{n}.vpk")).then_some(n - 1))
 }
 
 impl StoreClient {
@@ -114,11 +107,11 @@ impl StoreClient {
             .map_err(io_at(&custom))?;
         self.fetch_base(release.base_url(), part.path(), progress)
             .await?;
-        let dest = custom.join(BASE_ASSET);
+        let dest = custom.join(BASE_VPK);
         part.persist(&dest).map_err(|e| io_at(&dest)(e.error))?;
 
         // The game rebuilds a deleted sound cache; a stale one would point into the old VPK.
-        remove_file_if_present(&custom.join(format!("{BASE_ASSET}.sound.cache")))?;
+        remove_file_if_present(&custom.join(format!("{BASE_VPK}.sound.cache")))?;
         // A failure from here on leaves the new VPK in place; installing again recovers it.
         let preset = record_install(&self.db, release.tag()).map_err(database)?;
         write_setup_hook(&custom, preset)?;

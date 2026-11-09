@@ -13,7 +13,7 @@ use super::{
 };
 use crate::error::{ImportError, InstallError, LibraryError};
 use crate::paths::LibraryKind;
-use crate::templates::{self, ADDON_PREFIX};
+use crate::templates::{self, ADDON_PREFIX, OVERRIDE_PREFIX};
 use crate::tf2::Tf2Install;
 
 /// Where mastercomfig reads the list of addons to exec, relative to `tf/custom`.
@@ -93,7 +93,7 @@ impl AddonName {
 /// Whether `name` is one of mastercomfig's override VPKs, which belong to mastercomfig
 /// itself rather than the addon list.
 pub(crate) fn is_override(name: &AddonName) -> bool {
-    name.stem().starts_with("override-")
+    name.as_str().starts_with(OVERRIDE_PREFIX)
 }
 
 /// The non-empty `<name>` of `mastercomfig-addon-<name>.vpk`, extension in any case.

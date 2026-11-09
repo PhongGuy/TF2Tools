@@ -258,7 +258,6 @@ fn v10_database_marks_the_gamebanana_mod_stores_stale_and_keeps_their_rows() {
     assert_eq!(
         keys,
         [
-            "addons_last_synced",
             "curated_last_synced",
             "sounds_last_synced",
             "sounds_sync_page"
@@ -341,4 +340,27 @@ fn v12_database_gains_the_mastercomfig_tables_and_drops_override_addons() {
         [],
     );
     assert!(second.is_err(), "the state table holds one row");
+}
+
+#[test]
+fn v12_database_forgets_the_addon_sync_so_the_release_is_fetched() {
+    let (_tmp, dir) = common::temp_data_dir();
+    drop(Database::open(&dir).expect("create"));
+    let conn = Connection::open(dir.db_path()).unwrap();
+    conn.execute_batch(
+        "DROP TABLE mastercomfig_state; DROP TABLE mastercomfig_release;
+        INSERT OR REPLACE INTO store_cache_meta (key, value) VALUES
+            ('addons_last_synced', '2026-11-08T10:00:00.000000+00:00'),
+            ('curated_last_synced', '2026-11-08T10:00:00.000000+00:00');
+        PRAGMA user_version = 12;",
+    )
+    .unwrap();
+    drop(conn);
+    drop(Database::open(&dir).expect("open v12 database"));
+    assert_eq!(common::meta(&dir, "addons_last_synced"), None);
+    assert_eq!(
+        common::meta(&dir, "curated_last_synced").as_deref(),
+        Some("2026-11-08T10:00:00.000000+00:00"),
+        "only the addon store is forgotten"
+    );
 }

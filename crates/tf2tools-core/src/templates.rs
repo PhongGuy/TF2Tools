@@ -7,6 +7,20 @@ use std::fmt::Write as _;
 use crate::AddonName;
 
 pub(crate) const ADDON_PREFIX: &str = "mastercomfig-addon-";
+/// mastercomfig's base VPK, both as a release asset and in `tf/custom`.
+pub(crate) const BASE_VPK: &str = "mastercomfig-base.vpk";
+/// The name every override VPK starts with; the addon list leaves these out.
+pub(crate) const OVERRIDE_PREFIX: &str = "mastercomfig-addon-override-";
+
+/// The file name of mastercomfig's override VPK in 0-based `slot`; slot 0 is `...-override-1.vpk`.
+pub(crate) fn override_vpk(slot: usize) -> String {
+    format!("{OVERRIDE_PREFIX}{}.vpk", slot + 1)
+}
+
+/// The 0-based slot of an exact override VPK name, for the three slots mastercomfig ships.
+pub(crate) fn override_slot(file: &str) -> Option<usize> {
+    (0..3).find(|&slot| file == override_vpk(slot))
+}
 
 /// The name a crosshair's texture is installed and referenced under: `crosshair` with every
 /// `"` and control character turned into `-`, so it can sit inside a quoted VMT string.

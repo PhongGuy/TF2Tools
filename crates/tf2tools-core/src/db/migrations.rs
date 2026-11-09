@@ -400,7 +400,8 @@ const STEP_12_SQL: &str = "
 ";
 
 /// v6 step 13: mastercomfig's managed state and its latest release, and the override VPKs
-/// leave the addon tables, since they are module overrides, not addons.
+/// leave the addon tables, since they are module overrides, not addons. Forgetting the
+/// addon sync makes the next sync record the release.
 const STEP_13_SQL: &str = "
     CREATE TABLE IF NOT EXISTS mastercomfig_state (
         id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -416,4 +417,5 @@ const STEP_13_SQL: &str = "
     );
     DELETE FROM library_addons WHERE asset_name LIKE 'mastercomfig-addon-override-%';
     DELETE FROM store_addons WHERE asset_name LIKE 'mastercomfig-addon-override-%';
+    DELETE FROM store_cache_meta WHERE key = 'addons_last_synced';
 ";

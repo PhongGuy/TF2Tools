@@ -14,14 +14,13 @@ use crate::error::{
     TakeOverError,
 };
 use crate::pak;
-use crate::templates::ADDON_PREFIX;
+use crate::templates::{BASE_VPK, override_vpk};
 use crate::tf2::Tf2Install;
 
-pub(crate) const BASE_VPK: &str = "mastercomfig-base.vpk";
 /// The cfg mastercomfig's autoexec runs to pick the preset, relative to `tf/custom`.
 const SETUP_HOOK: &str = "comfig-custom/cfg/app/setup_hook.cfg";
 /// The first line of a `modules.cfg` TF2Tools wrote; any other file is the player's.
-pub(crate) const MODULES_HEADER: &str = "// Written by TF2Tools; changes here are replaced";
+const MODULES_HEADER: &str = "// Written by TF2Tools; changes here are replaced";
 
 /// A mastercomfig graphics preset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -130,7 +129,7 @@ impl Library {
         }
 
         // Files go first and the row last, so a failed delete stays Managed and retryable.
-        let overrides = (1..=3).map(|n| format!("{ADDON_PREFIX}override-{n}.vpk"));
+        let overrides = (0..3).map(override_vpk);
         for vpk in std::iter::once(BASE_VPK.to_owned()).chain(overrides) {
             remove_file_if_present(&custom.join(&vpk))?;
             remove_file_if_present(&custom.join(format!("{vpk}.sound.cache")))?;
@@ -305,7 +304,7 @@ fn written_by_us(path: &Path) -> Result<bool, RemoveMastercomfigError> {
 }
 
 /// The release version the base VPK's `cfg/comfig/echo.cfg` names; None when unreadable.
-pub(crate) fn read_base_version(vpk: &Path) -> Option<String> {
+fn read_base_version(vpk: &Path) -> Option<String> {
     const ECHO: &str = "cfg/comfig/echo.cfg";
     let pak = pak::open_vpk(vpk).ok()?;
     let data = pak::read_entry(vpk, ECHO, pak.tree.get(ECHO)?).ok()?;
