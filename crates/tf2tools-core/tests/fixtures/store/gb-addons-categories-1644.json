@@ -1,0 +1,74 @@
+[
+  {
+    "_idRow": 1649,
+    "_sName": "HUDs",
+    "_nItemCount": 806,
+    "_nCategoryCount": 0,
+    "_sUrl": "https://gamebanana.com/mods/cats/1649",
+    "_bIsObsolete": false,
+    "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b4f6d86293.png"
+  },
+  {
+    "_idRow": 1648,
+    "_sName": "Icons",
+    "_nItemCount": 381,
+    "_nCategoryCount": 0,
+    "_sUrl": "https://gamebanana.com/mods/cats/1648",
+    "_bIsObsolete": false,
+    "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b4fd19bb20.png"
+  },
+  {
+    "_idRow": 1655,
+    "_sName": "Language Patches",
+    "_nItemCount": 6,
+    "_nCategoryCount": 0,
+    "_sUrl": "https://gamebanana.com/mods/cats/1655",
+    "_bIsObsolete": false,
+    "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/5e2de6f25fdc8.png"
+  },
+  {
+    "_idRow": 1650,
+    "_sName": "Loading Screen",
+    "_nItemCount": 429,
+    "_nCategoryCount": 0,
+    "_sUrl": "https://gamebanana.com/mods/cats/1650",
+    "_bIsObsolete": false,
+    "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b5213dc1c4.png"
+  },
+  {
+    "_idRow": 1654,
+    "_sName": "Logos",
+    "_nItemCount": 64,
+    "_nCategoryCount": 0,
+    "_sUrl": "https://gamebanana.com/mods/cats/1654",
+    "_bIsObsolete": false,
+    "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b528067fca.png"
+  },
+  {
+    "_idRow": 1653,
+    "_sName": "Menu",
+    "_nItemCount": 93,
+    "_nCategoryCount": 0,
+    "_sUrl": "https://gamebanana.com/mods/cats/1653",
+    "_bIsObsolete": false,
+    "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b551540760.png"
+  },
+  {
+    "_idRow": 1646,
+    "_sName": "Menu Backgrounds",
+    "_nItemCount": 546,
+    "_nCategoryCount": 1,
+    "_sUrl": "https://gamebanana.com/mods/cats/1646",
+    "_bIsObsolete": false,
+    "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b568e9faab.png"
+  },
+  {
+    "_idRow": 1645,
+    "_sName": "Other/Misc",
+    "_nItemCount": 304,
+    "_nCategoryCount": 0,
+    "_sUrl": "https://gamebanana.com/mods/cats/1645",
+    "_bIsObsolete": false,
+    "_sIconUrl": "https://images.gamebanana.com/img/ico/ModCategory/609b5701aa207.png"
+  }
+]

@@ -6,8 +6,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::error::{
-    ApplyModulesError, DownloadError, FilesError, ImageError, InstallMastercomfigError,
-    MapDownloadError, ModuleCatalogError, PreviewError, SyncError,
+    ApplyModulesError, BrowseError, DownloadError, FilesError, ImageError,
+    InstallMastercomfigError, MapDownloadError, ModuleCatalogError, PreviewError, SyncError,
 };
 
 /// Identifies the app to GameBanana and GitHub; never carries user data.
@@ -74,6 +74,7 @@ const OFF_ALLOWLIST: &str = "redirected outside the allowlist";
 from_net_failure!(
     SyncError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     FilesError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
+    BrowseError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     DownloadError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     MapDownloadError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     InstallMastercomfigError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },

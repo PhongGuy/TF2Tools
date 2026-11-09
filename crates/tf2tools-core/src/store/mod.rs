@@ -1,6 +1,7 @@
 //! The online stores: GameBanana HUDs, sounds and crosshairs, the curated hud-db HUDs
 //! and the mastercomfig addons, cached in v5's `store_*` tables.
 
+mod addon_sections;
 mod cards;
 mod download;
 mod gamebanana;
@@ -29,6 +30,7 @@ use crate::db::Database;
 use crate::error::{FilesError, QueryError, SyncError};
 use crate::paths::DataDir;
 use crate::weapons::Weapon;
+pub use addon_sections::AddonSection;
 pub use cards::{StoreCard, StoreCursor, StoreQuery, StoreSort};
 pub use download::{DownloadPhase, DownloadProgress};
 use http::{API_BODY_LIMIT, Http, NetFailure, Redirects, Timeouts};

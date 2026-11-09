@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use crate::library::{ExternalHud, LibraryEntry, MissingItem};
+use crate::library::{ExternalHud, GbId, LibraryEntry, MissingItem};
 use crate::store::StoreKind;
 use crate::wav::WavInfo;
 
@@ -803,6 +803,62 @@ pub enum FilesError {
     Database {
         /// SQLite's description of the failure.
         message: String,
+    },
+}
+
+/// Why a live GameBanana add-on listing, search, category list or profile could not be read.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum BrowseError {
+    /// The server kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// The server answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// The server could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The response body grew past its size cap.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// The response did not have the expected shape.
+    #[error("unexpected response from {url}: {message}")]
+    Malformed {
+        /// The address that was asked.
+        url: String,
+        /// What was wrong with the response.
+        message: String,
+    },
+    /// GameBanana kept answering with an empty reply until the pacer gave up.
+    #[error("{url} kept answering with an empty reply; GameBanana is throttling requests")]
+    Throttled {
+        /// The address that was asked.
+        url: String,
+    },
+    /// The item exists but GameBanana no longer shows it.
+    #[error("GameBanana item {gb_id} is trashed, withheld or private")]
+    Gone {
+        /// The item that was asked for.
+        gb_id: GbId,
     },
 }
 
