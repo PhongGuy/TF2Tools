@@ -582,7 +582,7 @@ async fn an_empty_page_before_the_end_fails_and_keeps_every_cached_row() {
     mount_page(&env.server, "Sound", 2, empty_page(19718)).await;
     let (result, _) = sync_sounds(&env, false).await;
     assert!(
-        matches!(result, Err(SyncError::Malformed { .. })),
+        matches!(result, Err(SyncError::Throttled { .. })),
         "{result:?}"
     );
     assert_eq!(count(&env.dir, "store_sounds"), 4);
@@ -675,7 +675,7 @@ async fn a_full_page_claiming_completeness_is_not_an_end() {
     mount_page(&env.server, "Sound", 2, empty_page(19718)).await;
     let (result, _) = sync_sounds(&env, false).await;
     assert!(
-        matches!(result, Err(SyncError::Malformed { .. })),
+        matches!(result, Err(SyncError::Throttled { .. })),
         "{result:?}"
     );
     assert!(requested_pages(&env.server).await.contains(&"2".to_owned()));
@@ -722,7 +722,7 @@ async fn an_empty_body_is_retried_once() {
 }
 
 #[tokio::test]
-async fn a_page_empty_twice_fails_after_one_retry() {
+async fn a_page_empty_three_times_fails_as_throttled_and_keeps_its_checkpoint() {
     let env = store_env().await;
     mount_page(
         &env.server,
@@ -734,10 +734,23 @@ async fn a_page_empty_twice_fails_after_one_retry() {
     mount_page(&env.server, "Sound", 2, empty_page(19718)).await;
     let (result, _) = sync_sounds(&env, false).await;
     assert!(
+        matches!(result, Err(SyncError::Throttled { .. })),
+        "{result:?}"
+    );
+    assert_eq!(requested_pages(&env.server).await, ["1", "2", "2", "2"]);
+    assert_eq!(meta(&env.dir, "sounds_sync_page").as_deref(), Some("2"));
+}
+
+#[tokio::test]
+async fn a_malformed_page_is_not_retried() {
+    let env = store_env().await;
+    mount_page(&env.server, "Sound", 1, b"<html>busy</html>".to_vec()).await;
+    let (result, _) = sync_sounds(&env, false).await;
+    assert!(
         matches!(result, Err(SyncError::Malformed { .. })),
         "{result:?}"
     );
-    assert_eq!(requested_pages(&env.server).await, ["1", "2", "2"]);
+    assert_eq!(requested_pages(&env.server).await, ["1"]);
 }
 
 #[tokio::test]

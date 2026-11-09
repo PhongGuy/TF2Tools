@@ -98,9 +98,11 @@ impl Services {
         })
     }
 
-    /// Points the store client at `endpoints`; tests aim it at a local or closed port.
+    /// Points the store client at `endpoints`, keeping the GameBanana pacer the old client
+    /// had; tests aim it at a local or closed port.
     pub fn with_endpoints(self, endpoints: Endpoints) -> Self {
-        let store = StoreClient::new(self.db.clone(), self.data.clone(), endpoints);
+        let store = StoreClient::new(self.db.clone(), self.data.clone(), endpoints)
+            .with_pacer_of(&self.store);
         Self { store, ..self }
     }
 

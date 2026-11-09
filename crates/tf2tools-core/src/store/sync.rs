@@ -5,7 +5,7 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
 use super::gamebanana::{self, IndexPage, Records};
-use super::http::API_BODY_LIMIT;
+use super::pacer::{Priority, Reply};
 use super::{StoreClient, StoreKind, SyncOutcome, SyncProgress};
 use crate::error::SyncError;
 use crate::timestamp;
@@ -134,9 +134,9 @@ pub(crate) async fn gamebanana(
     })
 }
 
-/// Fetches and parses one index page holding at least one record. An empty page or an
-/// unparseable body is fetched once more after the retry backoff before it fails as
-/// `Malformed`; network errors and statuses are returned as they come.
+/// Fetches one index page with at least one record, as a background call through the pacer.
+/// A blank body or an empty page is retried until it fails as `Throttled`; any other
+/// unparseable body fails `Malformed` at once, and network errors pass through.
 async fn fetch_page(
     client: &StoreClient,
     kind: StoreKind,
@@ -145,20 +145,16 @@ async fn fetch_page(
     let Some(url) = gamebanana::index_url(client.endpoints.gamebanana(), kind, page) else {
         return Err(malformed(String::new(), "not a GameBanana store"));
     };
-    let mut retried = false;
-    loop {
-        let body = client.http.get_api(&url, API_BODY_LIMIT).await?;
-        let failure = match gamebanana::parse_index(kind, &body) {
-            Ok(index) if index.records.len() > 0 => return Ok(index),
-            Ok(_) => "an empty page before the end of the catalogue".to_owned(),
-            Err(e) => e.to_string(),
-        };
-        if retried {
-            return Err(malformed(url, &failure));
-        }
-        retried = true;
-        tokio::time::sleep(client.config.retry_backoff()).await;
-    }
+    let read = |body: &[u8]| match gamebanana::parse_index(kind, body) {
+        Ok(index) if index.records.len() > 0 => Reply::Done(Ok(index)),
+        Ok(_) => Reply::Empty,
+        Err(_) if body.trim_ascii().is_empty() => Reply::Empty,
+        Err(e) => Reply::Rejected(Err(e.to_string())),
+    };
+    client
+        .gamebanana_call(&url, Priority::Background, read)
+        .await?
+        .map_err(|message| malformed(url, &message))
 }
 
 /// A sync's closing steps inside the caller's transaction: drop rows older than `start`,

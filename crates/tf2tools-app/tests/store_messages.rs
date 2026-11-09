@@ -491,3 +491,17 @@ fn no_addon_update_message_carries_a_path_or_error_text() {
     support::assert_plain(&no_tf2().message);
     support::assert_plain(&release_has_no_file().message);
 }
+
+#[test]
+fn a_throttled_listing_says_gamebanana_is_busy() {
+    let err = FilesError::Throttled { url: GB_URL.into() };
+    let failure = describe_files(StoreKind::GameBananaHuds, &err);
+    assert_eq!(
+        failure,
+        StoreFailure::new(
+            "GameBanana is busy, try again in a minute.",
+            err.to_string()
+        )
+    );
+    support::assert_plain(&failure.message);
+}

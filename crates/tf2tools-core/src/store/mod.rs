@@ -10,6 +10,11 @@ mod images;
 mod items;
 mod maps;
 mod mastercomfig;
+pub(crate) mod pacer;
+#[cfg(test)]
+mod pacing_live;
+#[cfg(test)]
+mod pacing_tests;
 mod sync;
 mod unpack;
 
@@ -21,12 +26,12 @@ use md5::{Digest, Md5};
 use rusqlite::OptionalExtension;
 
 use crate::db::Database;
-use crate::error::{QueryError, SyncError};
+use crate::error::{FilesError, QueryError, SyncError};
 use crate::paths::DataDir;
 use crate::weapons::Weapon;
 pub use cards::{StoreCard, StoreCursor, StoreQuery, StoreSort};
 pub use download::{DownloadPhase, DownloadProgress};
-use http::{Http, Redirects, Timeouts};
+use http::{API_BODY_LIMIT, Http, NetFailure, Redirects, Timeouts};
 pub use items::{StoreFile, StoreItem, StoreItemId};
 pub use maps::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 pub use mastercomfig::MastercomfigRelease;
@@ -342,7 +347,8 @@ impl StoreConfig {
         }
     }
 
-    /// The wait before every API request.
+    /// The gap between API requests: the GameBanana pacer's base gap, measured start to start,
+    /// and the wait before each other API request.
     pub fn request_spacing(&self) -> Duration {
         self.request_spacing
     }
@@ -532,6 +538,8 @@ pub struct StoreClient {
     preview_http: Http,
     /// Follows redirects only under the image allowlist.
     image_http: Http,
+    /// Spaces and orders every GameBanana API call; shared by clones and `with_pacer_of`.
+    pacer: pacer::Pacer,
     /// The on-disk image cache, shared by clones.
     images: Arc<images::DiskCache>,
     download_lock: Arc<tokio::sync::Mutex<()>>,
@@ -552,6 +560,7 @@ impl StoreClient {
             http: http_for(&config, &Redirects::Any),
             preview_http: http_for(&config, &previews(&endpoints)),
             image_http: http_for(&config, &images(&endpoints)),
+            pacer: pacer::Pacer::new(config.request_spacing),
             images: Arc::new(images::DiskCache::new(
                 dir.image_cache_dir(),
                 images::CACHE_HIGH,
@@ -565,13 +574,68 @@ impl StoreClient {
         }
     }
 
-    /// This client with `config`; its HTTP pacing follows the new config.
+    /// This client with `config`; its HTTP pacing follows the new config, through a new
+    /// GameBanana pacer that no other client shares.
     pub fn with_config(mut self, config: StoreConfig) -> Self {
         self.http = http_for(&config, &Redirects::Any);
         self.preview_http = http_for(&config, &previews(&self.endpoints));
         self.image_http = http_for(&config, &images(&self.endpoints));
+        self.pacer = pacer::Pacer::new(config.request_spacing);
         self.config = config;
         self
+    }
+
+    /// This client with `other`'s GameBanana pacer, so both space their calls together.
+    /// Call it after `with_config`, which makes a new pacer.
+    pub fn with_pacer_of(mut self, other: &StoreClient) -> Self {
+        self.pacer = other.pacer.clone();
+        self
+    }
+
+    /// One GameBanana API call through the shared pacer: `read` sorts each body into a
+    /// result or an empty reply, and an empty reply is tried again until the pacer gives up.
+    pub(crate) async fn gamebanana_call<T>(
+        &self,
+        url: &str,
+        priority: pacer::Priority,
+        read: impl Fn(&[u8]) -> pacer::Reply<T>,
+    ) -> Result<T, GbFailure> {
+        // Shared references are Copy, so every attempt's future owns its own captures.
+        let (http, read) = (&self.http, &read);
+        let attempt = move || async move {
+            let body = http
+                .open_retrying(url)
+                .await?
+                .read_to_end(API_BODY_LIMIT)
+                .await?;
+            Ok::<_, NetFailure>(read(&body))
+        };
+        match self.pacer.call(priority, attempt).await {
+            Ok(value) => Ok(value),
+            Err(pacer::Paced::Throttled) => {
+                tracing::warn!(url, "GameBanana kept answering empty");
+                Err(GbFailure::Throttled {
+                    url: url.to_owned(),
+                })
+            }
+            Err(pacer::Paced::Failed(failure)) => Err(GbFailure::Net(failure)),
+        }
+    }
+
+    /// The body; a blank body (after trim_ascii) is an empty reply.
+    pub(crate) async fn gamebanana_get(
+        &self,
+        url: &str,
+        priority: pacer::Priority,
+    ) -> Result<Vec<u8>, GbFailure> {
+        self.gamebanana_call(url, priority, |body| {
+            if body.trim_ascii().is_empty() {
+                pacer::Reply::Empty
+            } else {
+                pacer::Reply::Done(body.to_vec())
+            }
+        })
+        .await
     }
 
     /// True when this client's config refuses every request off loopback.
@@ -675,4 +739,33 @@ fn previews(endpoints: &Endpoints) -> Redirects {
 
 fn images(endpoints: &Endpoints) -> Redirects {
     Redirects::Only(endpoints.image_prefixes.as_slice().into())
+}
+
+/// Why a paced GameBanana call failed.
+#[derive(Debug)]
+pub(crate) enum GbFailure {
+    /// Every try answered empty.
+    Throttled { url: String },
+    /// A try failed on the network or with a status.
+    Net(NetFailure),
+}
+
+/// Throttled stays Throttled; a network failure maps as `NetFailure` does.
+impl From<GbFailure> for SyncError {
+    fn from(failure: GbFailure) -> Self {
+        match failure {
+            GbFailure::Throttled { url } => SyncError::Throttled { url },
+            GbFailure::Net(net) => net.into(),
+        }
+    }
+}
+
+/// Throttled stays Throttled; a network failure maps as `NetFailure` does.
+impl From<GbFailure> for FilesError {
+    fn from(failure: GbFailure) -> Self {
+        match failure {
+            GbFailure::Throttled { url } => FilesError::Throttled { url },
+            GbFailure::Net(net) => net.into(),
+        }
+    }
 }

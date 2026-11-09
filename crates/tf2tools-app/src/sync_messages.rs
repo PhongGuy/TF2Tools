@@ -7,6 +7,8 @@ const STOPPED: &str = "The sync stopped before it finished. Try again.";
 const DISK: &str = "Couldn't save the store data. Make sure your disk has free space and TF2Tools can write to its folder, then try again.";
 const DATABASE: &str = "TF2Tools couldn't update its store data. Restart TF2Tools and try again.";
 const UNKNOWN: &str = "Something went wrong while syncing. Try again later.";
+// Only GameBanana calls are paced, so a throttled call always names GameBanana.
+pub(crate) const THROTTLED: &str = "GameBanana is busy, try again in a minute.";
 
 /// What the player reads about a failed sync, and the raw error for the developer log.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,6 +49,7 @@ pub fn describe_sync(kind: StoreKind, err: &SyncError) -> SyncFailure {
         SyncError::Io { .. } => DISK.to_owned(),
         SyncError::Database { .. } => DATABASE.to_owned(),
         SyncError::Interrupted { .. } => STOPPED.to_owned(),
+        SyncError::Throttled { .. } => THROTTLED.to_owned(),
         _ => UNKNOWN.to_owned(),
     };
     SyncFailure::new(message, err.to_string())

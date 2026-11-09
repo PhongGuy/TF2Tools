@@ -50,7 +50,7 @@ windows-sys.workspace = true
 tempfile.workspace = true
 wiremock.workspace = true
 minisign.workspace = true
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
 
 # A single test executable keeps the link count (and the target dir) small.
 [[test]]

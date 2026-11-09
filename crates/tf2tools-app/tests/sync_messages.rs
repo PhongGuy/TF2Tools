@@ -155,3 +155,22 @@ fn a_stopped_sync_keeps_its_detail() {
         SyncFailure::new(STOPPED, "the sync stopped: task 7 panicked")
     );
 }
+
+#[test]
+fn a_throttled_sync_says_gamebanana_is_busy() {
+    let err = SyncError::Throttled { url: GB_URL.into() };
+    for kind in [
+        StoreKind::Sounds,
+        StoreKind::Crosshairs,
+        StoreKind::GameBananaHuds,
+    ] {
+        assert_eq!(
+            describe_sync(kind, &err),
+            SyncFailure::new(
+                "GameBanana is busy, try again in a minute.",
+                err.to_string()
+            ),
+            "{kind:?}"
+        );
+    }
+}

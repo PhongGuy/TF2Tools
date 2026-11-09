@@ -251,11 +251,16 @@ impl Http {
         }
     }
 
-    /// Waits `spacing`, sends with the User-Agent, retries a 429 after backoff, 2x and 4x
-    /// backoff, then fails RateLimited; any other non-success status is Status. Every 429
-    /// is counted in RATE_LIMITS when a sync is running on this task.
+    /// Waits `spacing`, then opens `url` as `open_retrying` does.
     pub(crate) async fn open_api(&self, url: &str) -> Result<Body, NetFailure> {
         tokio::time::sleep(self.spacing).await;
+        self.open_retrying(url).await
+    }
+
+    /// Sends with the User-Agent and no spacing, retries a 429 after backoff, 2x and 4x
+    /// backoff, then fails RateLimited; any other non-success status is Status. Every 429
+    /// is counted in RATE_LIMITS when a sync is running on this task.
+    pub(crate) async fn open_retrying(&self, url: &str) -> Result<Body, NetFailure> {
         let mut retries = 0;
         loop {
             let result = self.open(url).await;
@@ -524,5 +529,31 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, NetFailure::Network { .. }), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn open_retrying_skips_the_spacing_but_still_retries_a_rate_limit() {
+        let server = MockServer::start().await;
+        Mock::given(path("/x"))
+            .respond_with(ResponseTemplate::new(429))
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        Mock::given(path("/x"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("ok"))
+            .mount(&server)
+            .await;
+        let http = Http::new(Duration::from_secs(5), Duration::from_millis(1), USER_AGENT);
+        let start = Instant::now();
+        let body = http
+            .open_retrying(&format!("{}/x", server.uri()))
+            .await
+            .unwrap()
+            .read_to_end(1024)
+            .await
+            .unwrap();
+        assert_eq!(body, b"ok");
+        assert!(start.elapsed() < Duration::from_secs(5), "no spacing wait");
+        assert_eq!(requests(&server).await, 2);
     }
 }
