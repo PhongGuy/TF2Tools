@@ -10,6 +10,7 @@ mod images;
 mod items;
 mod maps;
 mod mastercomfig;
+pub(crate) mod pacer;
 mod sync;
 mod unpack;
 
