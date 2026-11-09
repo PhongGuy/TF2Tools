@@ -1066,8 +1066,7 @@ fn profile_card(
             ));
         }
     }
-    // v5's hover:bg-accent/50, as on the store cards.
-    let hover = theme.accent.opacity(0.5);
+    let hover = crate::theme::card_hover(theme);
     let border = if active {
         theme.primary.opacity(0.5)
     } else {
