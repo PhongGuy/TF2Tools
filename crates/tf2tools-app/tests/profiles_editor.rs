@@ -92,6 +92,30 @@ fn empty_profile(s: &support::ShellWindow, name: &str) -> Profile {
 fn saved(s: &support::ShellWindow, id: &ProfileId) -> Profile {
     s.services.library.profile(id).unwrap()
 }
+/// Applies `profile` to the fake game, so it opens active.
+fn apply(s: &support::ShellWindow, env: &support::Env, profile: &Profile) {
+    s.services
+        .library
+        .apply_profile(profile.id(), &tf2(env), &s.services.builtins, false)
+        .unwrap();
+}
+/// Focuses the name field and replaces its text, as typing does.
+fn type_name(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    e: &Entity<ProfileEditor>,
+    text: &str,
+) {
+    let input = cx.update(|cx| e.read(cx).name_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        input.update(cx, |st, cx| {
+            st.focus(window, cx);
+            st.set_value(text, window, cx)
+        })
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+}
 /// Pins the TF2 probe to "not running", opens Profiles from the sidebar, waits for the load.
 fn open_profiles(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<ProfilesPage> {
     cx.update(|cx| Tf2Probe::install(cx, || false));
@@ -314,4 +338,162 @@ fn an_edit_to_a_profile_deleted_elsewhere_returns_to_the_grid(cx: &mut TestAppCo
     support::wait_real(cx, "the grid", |cx| {
         !support::present(cx, s.win, ids::PROFILE_EDITOR)
     });
+}
+#[gpui_kit::test]
+fn enter_renames_the_profile(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    type_name(cx, &s, &editor, "  Pubs ");
+    support::press(cx, s.win, "enter");
+    wait_idle(cx, &s, &editor);
+    assert_eq!(saved(&s, comp.id()).name(), "Pubs");
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_BACK);
+    support::wait_real(cx, "the renamed card", |cx| {
+        support::label_of(cx, s.win, ids::profile_card(comp.id())).as_deref() == Some("Pubs")
+    });
+    assert!(
+        support::log_rows(&s.services).is_empty(),
+        "a rename writes no activity row"
+    );
+}
+
+#[gpui_kit::test]
+fn leaving_the_name_field_renames_too(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    // A test window starts inactive, and an inactive window reports no focus changes.
+    cx.update_window(s.win, |_, w, _| w.activate_window())
+        .unwrap();
+    type_name(cx, &s, &editor, "Pubs");
+    cx.update_window(s.win, |_, w, cx| w.blur(cx)).unwrap();
+    support::settle(cx, s.win);
+    wait_idle(cx, &s, &editor);
+    assert_eq!(saved(&s, comp.id()).name(), "Pubs");
+}
+
+#[gpui_kit::test]
+fn a_blank_name_reverts_to_the_saved_one(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    type_name(cx, &s, &editor, "   ");
+    support::press(cx, s.win, "enter");
+    wait_idle(cx, &s, &editor);
+    assert_eq!(field(cx, &editor), "Comp");
+    assert_eq!(saved(&s, comp.id()).name(), "Comp");
+}
+
+#[gpui_kit::test]
+fn a_taken_name_shows_the_line_and_keeps_the_old_name(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    empty_profile(&s, "Pubs");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    type_name(cx, &s, &editor, "pubs");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_EDITOR_NAME_TAKEN).as_deref(),
+        Some("You already have a profile called Pubs. Pick another name.")
+    );
+    support::press(cx, s.win, "enter");
+    wait_idle(cx, &s, &editor);
+    assert_eq!(saved(&s, comp.id()).name(), "Comp");
+    type_name(cx, &s, &editor, "Pubs 2");
+    assert!(!support::present(cx, s.win, ids::PROFILE_EDITOR_NAME_TAKEN));
+}
+
+// The page's list is stale, so only core sees the clash; the editor says it the same way.
+#[gpui_kit::test]
+fn a_name_taken_in_a_race_shows_the_same_line(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    empty_profile(&s, "Pubs");
+    type_name(cx, &s, &editor, "Pubs");
+    support::press(cx, s.win, "enter");
+    wait_idle(cx, &s, &editor);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_EDITOR_NAME_TAKEN).as_deref(),
+        Some("You already have a profile called Pubs. Pick another name.")
+    );
+    assert_eq!(saved(&s, comp.id()).name(), "Comp");
+}
+
+#[gpui_kit::test]
+fn renaming_the_active_profile_keeps_it_active(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    apply(&s, &env, &comp);
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::PROFILE_EDITOR_ACTIVE_BADGE
+    ));
+    assert!(!support::present(cx, s.win, ids::PROFILE_EDITOR_ACTIVATE));
+    type_name(cx, &s, &editor, "Pubs");
+    support::press(cx, s.win, "enter");
+    wait_idle(cx, &s, &editor);
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::PROFILE_EDITOR_ACTIVE_BADGE
+    ));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::PROFILE_EDITOR_NOT_APPLIED
+    ));
+    assert_eq!(
+        s.services.library.active_profile().unwrap().as_ref(),
+        Some(comp.id())
+    );
+}
+// A kit button never takes the focus, so the field never blurs: Back saves what was typed.
+#[gpui_kit::test]
+fn back_saves_a_typed_name(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    type_name(cx, &s, &editor, "Pubs");
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_BACK);
+    support::wait_real(cx, "the grid", |cx| {
+        !support::present(cx, s.win, ids::PROFILE_EDITOR)
+    });
+    assert_eq!(saved(&s, comp.id()).name(), "Pubs");
+    assert!(cx.update(|cx| page.read(cx).editor()).is_none());
+}
+
+#[gpui_kit::test]
+fn activate_saves_a_typed_name_first(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    type_name(cx, &s, &editor, "Pubs");
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_ACTIVATE);
+    support::wait_real(cx, "the Active badge", |cx| {
+        support::present(cx, s.win, ids::PROFILE_EDITOR_ACTIVE_BADGE)
+    });
+    assert_eq!(saved(&s, comp.id()).name(), "Pubs");
+    assert_eq!(
+        s.services.library.active_profile().unwrap().as_ref(),
+        Some(comp.id())
+    );
 }
