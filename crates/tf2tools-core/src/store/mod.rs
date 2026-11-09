@@ -550,6 +550,8 @@ pub struct StoreClient {
     pacer: pacer::Pacer,
     /// The on-disk image cache, shared by clones.
     images: Arc<images::DiskCache>,
+    /// The add-on browsing caches, shared by clones.
+    addon_caches: Arc<addon_catalog::Caches>,
     download_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
@@ -574,6 +576,7 @@ impl StoreClient {
                 images::CACHE_HIGH,
                 images::CACHE_LOW,
             )),
+            addon_caches: Arc::default(),
             db,
             dir,
             endpoints,

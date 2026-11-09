@@ -1,7 +1,9 @@
 //! The Addon Store's live GameBanana catalog: the public query and card types, and the
 //! paged step that reads Index pages, filters them and streams the kept cards.
 
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
 use super::StoreClient;
 use super::addon_api::{self, AddonRecord, ListingPage};
@@ -15,6 +17,72 @@ pub const INDEX_STEP_CALLS: u32 = 4;
 pub const SEARCH_STEP_CALLS: u32 = 6;
 /// A step stops after the page that brings its kept cards to this many.
 pub const STEP_CARDS: usize = 50;
+
+/// How long a fetched listing page is served from the cache.
+pub(crate) const PAGE_TTL: Duration = Duration::from_secs(600);
+/// The most listing pages the cache holds.
+pub(crate) const PAGE_CACHE_CAP: usize = 256;
+
+/// The add-on browsing caches, shared by every clone of a `StoreClient`.
+#[derive(Debug, Default)]
+pub(crate) struct Caches {
+    pub(crate) pages: PageCache,
+}
+
+/// What a cached listing page is filed under: the effective category, the order and the page.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum PageKey {
+    Index {
+        category: u32,
+        sort: AddonSort,
+        page: u32,
+    },
+}
+
+/// Listing pages kept for `PAGE_TTL`, at most `PAGE_CACHE_CAP` of them.
+#[derive(Debug, Default)]
+pub(crate) struct PageCache {
+    entries: Mutex<HashMap<PageKey, (Instant, Arc<ListingPage>)>>,
+}
+
+impl PageCache {
+    /// The page under `key` if it was stored less than `PAGE_TTL` before `now`.
+    pub(crate) fn get(&self, key: &PageKey, now: Instant) -> Option<Arc<ListingPage>> {
+        let entries = self.entries.lock().unwrap_or_else(PoisonError::into_inner);
+        entries
+            .get(key)
+            .filter(|(stored, _)| now.saturating_duration_since(*stored) < PAGE_TTL)
+            .map(|(_, page)| Arc::clone(page))
+    }
+
+    /// Stores `page` under `key` as of `now`, making room by dropping expired pages and then
+    /// the oldest ones.
+    pub(crate) fn put(&self, key: PageKey, page: Arc<ListingPage>, now: Instant) {
+        let mut entries = self.entries.lock().unwrap_or_else(PoisonError::into_inner);
+        entries.retain(|_, (stored, _)| now.saturating_duration_since(*stored) < PAGE_TTL);
+        entries.remove(&key);
+        while entries.len() >= PAGE_CACHE_CAP {
+            let oldest = entries
+                .iter()
+                .min_by_key(|(_, (stored, _))| *stored)
+                .map(|(k, _)| k.clone());
+            match oldest {
+                Some(k) => entries.remove(&k),
+                None => break,
+            };
+        }
+        entries.insert(key, (now, page));
+    }
+
+    /// The number of pages held, expired ones included until the next `put`.
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.entries
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .len()
+    }
+}
 
 /// The order an Addon Store section lists its items in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -229,18 +297,17 @@ impl AddonCatalog {
         })
     }
 
+    /// The page `page` of `query`'s listing, from the cache while it is fresh.
     async fn listing(
         &self,
         query: &AddonQuery,
         page: u32,
     ) -> Result<Arc<ListingPage>, BrowseError> {
-        let category = query.category.unwrap_or(query.section.root_category());
-        let url = addon_api::index_url(
-            self.store.endpoints.gamebanana(),
-            category,
-            query.sort,
-            page,
-        );
+        let (key, url) = self.page_key(query, page);
+        let caches = &self.store.addon_caches;
+        if let Some(hit) = caches.pages.get(&key, Instant::now()) {
+            return Ok(hit);
+        }
         let parsed = self
             .store
             .gamebanana_call(&url, Priority::Interactive, read_listing)
@@ -249,14 +316,39 @@ impl AddonCatalog {
                 url: url.clone(),
                 message,
             })?;
-        Ok(Arc::new(parsed))
+        let parsed = Arc::new(parsed);
+        caches.pages.put(key, Arc::clone(&parsed), Instant::now());
+        Ok(parsed)
+    }
+
+    /// The cache key and URL of one listing page; a chosen subcategory stands in for the
+    /// section's root, since a section is fully described by its root.
+    fn page_key(&self, query: &AddonQuery, page: u32) -> (PageKey, String) {
+        let category = query.category.unwrap_or(query.section.root_category());
+        let url = addon_api::index_url(
+            self.store.endpoints.gamebanana(),
+            category,
+            query.sort,
+            page,
+        );
+        let key = PageKey::Index {
+            category,
+            sort: query.sort,
+            page,
+        };
+        (key, url)
     }
 }
 
-/// Sorts one listing body for the pacer: a parsed page is `Done`; an unparseable body is
-/// `Rejected`, so it keeps any backoff, as `sync.rs::fetch_page` does.
+/// Sorts one listing body for the pacer. A blank body, or no records on a page that is not
+/// the end, is `Empty`, so the pacer retries and throttles; an unparseable body is
+/// `Rejected`, keeping any backoff as `sync.rs::fetch_page` does; anything else is `Done`.
 fn read_listing(body: &[u8]) -> Reply<Result<ListingPage, String>> {
+    if body.trim_ascii().is_empty() {
+        return Reply::Empty;
+    }
     match addon_api::parse_listing(body) {
+        Ok(page) if page.records.is_empty() && !page.complete => Reply::Empty,
         Ok(page) => Reply::Done(Ok(page)),
         Err(e) => Reply::Rejected(Err(e.to_string())),
     }
@@ -277,6 +369,50 @@ fn keeps(query: &AddonQuery, record: &AddonRecord) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
+
+    fn key(page: u32) -> PageKey {
+        PageKey::Index {
+            category: 1644,
+            sort: AddonSort::Newest,
+            page,
+        }
+    }
+
+    #[test]
+    fn a_blank_body_or_an_unfinished_empty_page_is_an_empty_reply() {
+        assert!(matches!(read_listing(b" \n"), Reply::Empty));
+        assert!(matches!(
+            read_listing(br#"{"_aMetadata":{"_bIsComplete":false},"_aRecords":[]}"#),
+            Reply::Empty
+        ));
+    }
+
+    #[test]
+    fn a_page_expires_after_ten_minutes() {
+        let (cache, t0) = (PageCache::default(), Instant::now());
+        cache.put(key(1), Arc::new(ListingPage::default()), t0);
+        assert!(cache.get(&key(1), t0 + Duration::from_secs(599)).is_some());
+        assert!(cache.get(&key(1), t0 + PAGE_TTL).is_none());
+        assert!(cache.get(&key(2), t0).is_none());
+    }
+
+    #[test]
+    fn the_cache_drops_its_oldest_page_past_its_cap() {
+        let (cache, t0) = (PageCache::default(), Instant::now());
+        let cap = u32::try_from(PAGE_CACHE_CAP).unwrap();
+        for page in 0..=cap {
+            cache.put(
+                key(page),
+                Arc::new(ListingPage::default()),
+                t0 + Duration::from_millis(page.into()),
+            );
+        }
+        let now = t0 + Duration::from_secs(1);
+        assert!(cache.get(&key(0), now).is_none());
+        assert!(cache.get(&key(cap), now).is_some());
+        assert_eq!(cache.len(), PAGE_CACHE_CAP);
+    }
 
     /// The pacer's test `a_rejected_reply_is_returned_but_does_not_count_as_clean` shows
     /// `Rejected` keeps the backoff; this pins that a malformed listing is sorted there.

@@ -264,3 +264,111 @@ async fn the_listing_end_stops_the_step_and_mature_and_excluded_records_are_drop
     assert_eq!(flat_ids(&shown), [1, 3, 4]);
     assert!(shown[0].iter().find(|c| c.id.get() == 4).unwrap().mature);
 }
+
+#[tokio::test]
+async fn a_second_step_within_ten_minutes_reads_the_cache() {
+    let env = store_env().await;
+    mount_index(
+        &env.server,
+        7951,
+        MD,
+        1,
+        listing(many(1, 3, 7951, 7962), true),
+    )
+    .await;
+    mount_index(
+        &env.server,
+        7962,
+        MD,
+        1,
+        listing(many(1, 2, 7951, 7962), true),
+    )
+    .await;
+    let query = AddonQuery::new(section("skins"), AddonSort::MostDownloaded);
+    let (first, _) = run(&env, &query, AddonCursor::START).await;
+    let (second, chunks) = run(&env, &query, AddonCursor::START).await;
+    assert_eq!(first.unwrap(), second.unwrap());
+    assert_eq!(flat_ids(&chunks), [1, 2, 3]);
+    assert_eq!(requests_to(&env.server, "/apiv11/Mod/Index").await, 1);
+    let (scout, _) = run(&env, &query.with_category(Some(7962)), AddonCursor::START).await;
+    assert_eq!(scout.unwrap().cards(), 2);
+    assert_eq!(
+        requests_to(&env.server, "/apiv11/Mod/Index").await,
+        2,
+        "another filter is another key"
+    );
+}
+
+#[tokio::test]
+async fn an_empty_category_ends_after_one_call() {
+    let env = store_env().await;
+    mount_index(&env.server, 2774, MD, 1, listing(vec![], true)).await;
+    let (step, chunks) = run(
+        &env,
+        &AddonQuery::new(section("gamefiles"), AddonSort::MostDownloaded),
+        AddonCursor::START,
+    )
+    .await;
+    assert_eq!(step.unwrap().next(), None);
+    assert!(chunks.is_empty());
+    assert_eq!(requests_to(&env.server, "/apiv11/Mod/Index").await, 1);
+}
+
+#[tokio::test]
+async fn a_page_with_no_records_that_is_not_complete_is_throttled() {
+    let env = store_env().await;
+    mount_index(&env.server, 2774, MD, 1, listing(vec![], false)).await;
+    let (step, _) = run(
+        &env,
+        &AddonQuery::new(section("gamefiles"), AddonSort::MostDownloaded),
+        AddonCursor::START,
+    )
+    .await;
+    assert!(
+        matches!(step, Err(BrowseError::Throttled { .. })),
+        "{step:?}"
+    );
+    assert_eq!(requests_to(&env.server, "/apiv11/Mod/Index").await, 3);
+}
+
+#[tokio::test]
+async fn a_server_failure_fails_the_step_with_its_status() {
+    let env = store_env().await;
+    Mock::given(method("GET"))
+        .and(path("/apiv11/Mod/Index"))
+        .respond_with(ResponseTemplate::new(503))
+        .mount(&env.server)
+        .await;
+    let (step, _) = run(
+        &env,
+        &AddonQuery::new(section("skins"), AddonSort::Newest),
+        AddonCursor::START,
+    )
+    .await;
+    assert!(
+        matches!(step, Err(BrowseError::Http { status: 503, .. })),
+        "{step:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_malformed_page_fails_at_once() {
+    let env = store_env().await;
+    mount_index(&env.server, 587, MD, 1, b"<html>busy</html>".to_vec()).await;
+    let (step, chunks) = run(
+        &env,
+        &AddonQuery::new(section("textures"), AddonSort::MostDownloaded),
+        AddonCursor::START,
+    )
+    .await;
+    assert!(
+        matches!(step, Err(BrowseError::Malformed { .. })),
+        "{step:?}"
+    );
+    assert!(chunks.is_empty());
+    assert_eq!(
+        requests_to(&env.server, "/apiv11/Mod/Index").await,
+        1,
+        "not retried"
+    );
+}
