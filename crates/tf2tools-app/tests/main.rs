@@ -56,6 +56,7 @@ mod game_moved;
 mod global_player;
 mod graphics;
 mod graphics_model;
+mod graphics_settings;
 mod graphics_settings_model;
 mod help_links;
 mod hud_copy_card;

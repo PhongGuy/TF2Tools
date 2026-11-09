@@ -39,6 +39,7 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 pub mod fonts;
+pub mod graphics;
 pub mod hud_copies;
 pub mod hud_switches;
 pub mod maker_page;

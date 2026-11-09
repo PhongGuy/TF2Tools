@@ -123,6 +123,8 @@ fn every_button_on_every_page_has_a_name(cx: &mut TestAppContext) {
     support::seed_sounds(&env, &[(1, "Ding", "hitsound", None)]);
     support::seed_crosshairs(&env, [3], 0, false);
     support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_choices(&env, r#"{"fpscap":"120"}"#);
     support::seed_mastercomfig_release(&env, "http://127.0.0.1:9", "9.101.0");
 
     let mut missing = Vec::new();
@@ -137,6 +139,12 @@ fn every_button_on_every_page_has_a_name(cx: &mut TestAppContext) {
     for id in [ids::GRAPHICS_UPDATE, ids::GRAPHICS_REMOVE] {
         assert!(support::present(cx, s.win, id), "{id}");
     }
+    assert!(support::present(cx, s.win, ids::GRAPHICS_RESET_ALL));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::graphics_module_reset("fpscap")
+    ));
     assert!(support::present(
         cx,
         s.win,

@@ -17,8 +17,10 @@ fn found(env: &support::Env) -> Tf2State {
     Tf2State::Found(Tf2Install::from_path(&env.game).unwrap())
 }
 
-/// Opens Graphics from the sidebar and waits for its first load.
+/// Opens Graphics from the sidebar and waits for its first load. A managed install without
+/// a saved catalog fetches one on the tokio bridge, so the executor must be allowed to park.
 fn open_graphics(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<GraphicsPage> {
+    cx.executor().allow_parking();
     support::click_nav(cx, s.win, Page::Graphics);
     let page = cx
         .update(|cx| s.shell.read(cx).graphics_page())

@@ -793,7 +793,7 @@ pub const GRAPHICS_REMOVE: &str = "graphics-remove";
 pub const GRAPHICS_TAKE_OVER: &str = "graphics-take-over";
 /// "Changes apply the next time TF2 starts.", under the preset cards.
 pub const GRAPHICS_FOOTER: &str = "graphics-footer";
-/// The settings list under the preset cards, present for a managed install with a catalog.
+/// The settings section under the preset cards, present for a managed install.
 pub const GRAPHICS_SETTINGS: &str = "graphics-settings";
 /// The note shown in place of the settings list, labelled with its text.
 pub const GRAPHICS_SETTINGS_NOTE: &str = "graphics-settings-note";

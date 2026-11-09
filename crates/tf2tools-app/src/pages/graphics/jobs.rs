@@ -3,9 +3,9 @@
 use std::future::Future;
 
 use gpui_kit::{AnyWindowHandle, App, AsyncApp};
-use tf2tools_core::{MastercomfigStatus, StoreClient, StoreKind, Tf2Install};
+use tf2tools_core::{MastercomfigStatus, ModuleCatalog, StoreClient, StoreKind, Tf2Install};
 
-use super::model::describe_install;
+use super::model::{SettingsNote, catalog_note, describe_install};
 use crate::local_messages::describe_store_status;
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::services::{OpError, Services};
@@ -112,6 +112,25 @@ pub fn check_for_updates(
     }
     let job = tokio_bridge::spawn(cx, async move { force_sync(&store, ACTION).await });
     async move { job.await.map_err(|e| OpError::core(ACTION, e))? }
+}
+
+/// The catalog of `tag` through the store (disk, else GitHub) on the tokio bridge. A failure
+/// is the note shown in place of the list; a job that died reads as offline.
+pub fn fetch_catalog(
+    tag: String,
+    cx: &mut App,
+) -> impl Future<Output = Result<ModuleCatalog, SettingsNote>> + 'static + use<> {
+    let store = cx.global::<Services>().store.clone();
+    if !tokio_bridge::is_running(cx) {
+        tokio_bridge::init(cx);
+    }
+    let job = tokio_bridge::spawn(cx, async move {
+        store.mastercomfig_catalog(&tag).await.map_err(|e| {
+            tracing::warn!("mastercomfig settings list for {tag}: {e}");
+            catalog_note(&e)
+        })
+    });
+    async move { job.await.unwrap_or(Err(SettingsNote::Offline)) }
 }
 
 // Runs the addon-store sync even on a fresh cache; the player sees the sync's own message and
