@@ -114,13 +114,26 @@ TF2 reads its HUD, sounds and crosshairs when it starts, so restart the game to 
 
 ## Privacy
 
-No accounts, no ads, no tracking. TF2Tools goes online for the stores (GameBanana, GitHub and mastercomfig.com) and to check GitHub for a new version of TF2Tools. Your library stays on your computer.
+No accounts, no ads, no tracking. TF2Tools goes online for the stores (GameBanana, GitHub and mastercomfig.com), for the Maps page (serveme.tf) and to check GitHub for a new version of TF2Tools. Your library stays on your computer.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). The bundled Inter font is under the SIL Open Font License, in `licenses/Inter-OFL.txt`. The icons come from Lucide and are under the ISC License, in `licenses/Lucide-ISC.txt`. The app carries these notices inside itself and shows them under Settings, Licences.
+MIT, see [LICENSE](LICENSE). The bundled Inter font is under the SIL Open Font License, in `licenses/Inter-OFL.txt`. The icons come from Lucide and are under the ISC License, in `licenses/Lucide-ISC.txt`. The app carries these notices, and the ones below, inside itself and shows them under Settings, Licences.
 
-Team Fortress 2, its weapon icons, crosshairs and other game artwork are the property of Valve Corporation and are used here with credit, in a free fan tool, for players of the game. TF2Tools is not made, endorsed or supported by Valve. Steam and Team Fortress are trademarks of Valve Corporation.
+### Where the content comes from
+
+- **mastercomfig:** the addons in the Addon Store come from [mastercomfig](https://mastercomfig.com), Copyright (c) 2016-2026 mastercoms, under the MIT License, in `licenses/mastercomfig-MIT.txt`. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with mastercomfig.
+- **hud-db:** the hand-picked HUD list in the HUD Store comes from [hud-db](https://github.com/mastercomfig/hud-db), Copyright (c) 2024-2026 mastercomfig, under the MIT License, in `licenses/hud-db-MIT.txt`. Each HUD belongs to its authors.
+- **GameBanana:** the HUDs, sounds, crosshairs and other items in the GameBanana stores come from [GameBanana](https://gamebanana.com), owned and run by GameBanana Co LLC. Each item belongs to the creators credited on its GameBanana page, and TF2Tools claims no rights to it. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with GameBanana or GameBanana Co LLC.
+- **serveme.tf:** the community map list on the Maps page, and its map files, come from [serveme.tf](https://serveme.tf). Each map belongs to its makers. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with serveme.tf.
+
+### Valve
+
+Team Fortress 2, its weapon icons, crosshairs and other game artwork are the property of Valve Corporation. TF2Tools uses them with credit, in a free fan tool for players of the game. Some weapon icons are loaded from the [Official TF2 Wiki](https://wiki.teamfortress.com).
+
+Valve, the Valve logo, Steam, the Steam logo, Team Fortress and the Team Fortress logo are trademarks and/or registered trademarks of Valve Corporation in the U.S. and/or other countries. All other trademarks are property of their respective owners.
+
+TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with Valve Corporation.
 
 ## For developers
 

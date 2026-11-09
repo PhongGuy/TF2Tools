@@ -316,8 +316,9 @@ fn the_readme_credits_valve() {
         .expect("a License section")
         .1;
     for needle in [
-        "Valve Corporation",
-        "not made, endorsed or supported by Valve",
+        "are the property of Valve Corporation",
+        "are trademarks and/or registered trademarks of Valve Corporation",
+        "not made, sponsored, endorsed or licensed by, or affiliated with Valve Corporation",
     ] {
         assert!(
             license.contains(needle),
