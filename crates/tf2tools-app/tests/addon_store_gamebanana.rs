@@ -585,3 +585,35 @@ fn a_class_left_before_its_weapons_arrive_never_shows_them(cx: &mut TestAppConte
     assert_eq!(weapons(cx), [7980], "the scout's weapons never show");
     assert_eq!(cx.update(|cx| tab.read(cx).category()), Some(7960));
 }
+
+#[gpui_kit::test]
+fn a_step_that_succeeds_after_a_failure_clears_the_error(cx: &mut TestAppContext) {
+    // Pages 1 to 4 fill the first step; page 5 is missing, so the step the grid asks for next
+    // fails. Shown again, the tab's grid asks once more without the player pressing Retry.
+    let (env, server) = (support::env(), support::StoreServer::start());
+    for page in 1..=4u32 {
+        let first = u64::from(page) * 10;
+        let records = (first..first + 2)
+            .map(|i| support::gb_addon(i, 587, None))
+            .collect();
+        server.mount_gb_index(587, MD, page, support::gb_listing(records, false));
+    }
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "textures");
+    support::wait_real(cx, "the failed second step", |cx| {
+        cx.update(|cx| tab.read(cx).error().is_some() && !tab.read(cx).is_loading())
+    });
+    server.mount_gb_index(
+        587,
+        MD,
+        5,
+        support::gb_listing(vec![support::gb_addon(50, 587, None)], true),
+    );
+    support::click_id(cx, w.win, ids::addon_store_tab("mastercomfig"));
+    support::click_id(cx, w.win, ids::addon_store_tab("textures"));
+    support::wait_real(cx, "the second step", |cx| {
+        cx.update(|cx| tab.read(cx).cards().len() == 9 && !tab.read(cx).is_loading())
+    });
+    assert!(cx.update(|cx| tab.read(cx).error().is_none()));
+    assert!(!support::present(cx, w.win, ids::STORE_ERROR));
+}

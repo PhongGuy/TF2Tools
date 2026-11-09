@@ -518,6 +518,8 @@ impl AddonTab {
         if !tokio_bridge::is_running(cx) {
             tokio_bridge::init(cx);
         }
+        // A starting step supersedes the last failure, whether Retry or the grid started it.
+        self.error = None;
         let catalog = cx.global::<Services>().store.addon_catalog();
         let query = self.query();
         let (tx, rx) = async_channel::unbounded::<Vec<AddonCard>>();
