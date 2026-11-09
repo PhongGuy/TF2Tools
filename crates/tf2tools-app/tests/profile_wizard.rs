@@ -849,7 +849,7 @@ fn the_x_stops_a_playing_preview(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let _w = wizard_previewing(cx, &s, &env);
-    support::click_id(cx, s.win, "close");
+    support::click_dialog_x(cx, s.win);
     assert!(!has_dialog(cx, &s));
     assert!(stopped_last(&s), "calls: {:?}", s.audio.calls());
 }
@@ -865,7 +865,7 @@ fn a_save_in_flight_ignores_the_x(cx: &mut TestAppContext) {
     cx.update_window(s.win, |_, win, cx| {
         win.click(ids::WIZARD_SAVE, cx);
         win.render_frame(cx);
-        win.click("close", cx);
+        win.within("dialog-close").click("close", cx);
         win.render_frame(cx);
     })
     .unwrap();
@@ -914,8 +914,8 @@ fn the_x_closes_the_wizard_like_cancel(cx: &mut TestAppContext) {
     let s = support::shell_window(cx, &env, found(&env));
     let page = open_profiles(cx, &s);
     let _w = open_wizard(cx, &s, &page, ids::PROFILES_CREATE);
-    assert!(support::present(cx, s.win, "close"), "the kit's X");
-    support::click_id(cx, s.win, "close");
+    assert!(support::dialog_x_present(cx, s.win), "the kit's X");
+    support::click_dialog_x(cx, s.win);
     assert!(!has_dialog(cx, &s));
     assert!(s.services.library.profiles().unwrap().is_empty());
 }

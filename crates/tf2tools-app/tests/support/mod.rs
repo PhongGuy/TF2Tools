@@ -268,6 +268,23 @@ pub fn click_id(cx: &mut TestAppContext, win: AnyWindowHandle, id: impl Into<Ele
     settle(cx, win);
 }
 
+/// The open dialog's own X. Scoped to the dialog, since the Windows title bar also has a "close".
+pub fn click_dialog_x(cx: &mut TestAppContext, win: AnyWindowHandle) {
+    settle(cx, win);
+    cx.update_window(win, |_, w, cx| w.within("dialog-close").click("close", cx))
+        .unwrap();
+    settle(cx, win);
+}
+
+/// Whether the open dialog shows its own X.
+pub fn dialog_x_present(cx: &mut TestAppContext, win: AnyWindowHandle) -> bool {
+    settle(cx, win);
+    cx.update_window(win, |_, w, _| {
+        w.within("dialog-close").try_find("close").is_some()
+    })
+    .unwrap()
+}
+
 /// Clicks `id` and leaves spawned work unrun, so a second click lands before it.
 pub fn click_without_settling(
     cx: &mut TestAppContext,

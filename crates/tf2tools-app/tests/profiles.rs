@@ -1066,7 +1066,7 @@ fn the_save_dialogs_x_closes_without_saving(cx: &mut TestAppContext) {
     let page = open_profiles(cx, &s);
     support::click_id(cx, s.win, ids::PROFILES_SAVE_CURRENT);
     type_name(cx, &s, &page, "Mine");
-    support::click_id(cx, s.win, "close");
+    support::click_dialog_x(cx, s.win);
     assert!(!has_dialog(cx, &s));
     assert!(s.services.library.profiles().unwrap().is_empty());
 }
