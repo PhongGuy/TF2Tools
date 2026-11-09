@@ -73,6 +73,10 @@ impl Services {
             message: e.to_string(),
         })?;
         let library = Library::new(db.clone(), data.clone());
+        // mastercomfig's override VPKs are not addons; a failure here must not block startup.
+        if let Err(error) = library.retire_override_addons() {
+            tracing::warn!(%error, "could not retire mastercomfig's override addons");
+        }
         // Offline narrows the client to loopback; online keeps the default config `new` built.
         let mut store = StoreClient::new(db.clone(), data.clone(), endpoints);
         if offline {

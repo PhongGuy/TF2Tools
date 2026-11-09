@@ -13,11 +13,11 @@ use super::{
 };
 use crate::error::{ImportError, InstallError, LibraryError};
 use crate::paths::LibraryKind;
-use crate::templates::{self, ADDON_PREFIX};
+use crate::templates::{self, ADDON_PREFIX, OVERRIDE_PREFIX};
 use crate::tf2::Tf2Install;
 
 /// Where mastercomfig reads the list of addons to exec, relative to `tf/custom`.
-const ADDONS_CFG: [&str; 4] = ["comfig-custom", "cfg", "app", "addons.cfg"];
+pub(crate) const ADDONS_CFG: [&str; 4] = ["comfig-custom", "cfg", "app", "addons.cfg"];
 
 /// v5's display names and descriptions for the known addons; the GitHub release only
 /// carries file names.
@@ -62,21 +62,6 @@ const ADDON_METADATA: &[(&str, &str, &str)] = &[
         "Transparent Viewmodels",
         "Enables transparent weapon viewmodels for better visibility",
     ),
-    (
-        "mastercomfig-addon-override-1.vpk",
-        "Config Override 1",
-        "Utility addon for custom config overrides (load order slot 1)",
-    ),
-    (
-        "mastercomfig-addon-override-2.vpk",
-        "Config Override 2",
-        "Utility addon for custom config overrides (load order slot 2)",
-    ),
-    (
-        "mastercomfig-addon-override-3.vpk",
-        "Config Override 3",
-        "Utility addon for custom config overrides (load order slot 3)",
-    ),
 ];
 
 /// A mastercomfig addon's asset name, `mastercomfig-addon-<name>.vpk`, safe to join
@@ -103,6 +88,12 @@ impl AddonName {
     pub(crate) fn stem(&self) -> &str {
         addon_stem(&self.0).unwrap_or_default()
     }
+}
+
+/// Whether `name` is one of mastercomfig's override VPKs, which belong to mastercomfig
+/// itself rather than the addon list.
+pub(crate) fn is_override(name: &AddonName) -> bool {
+    name.as_str().starts_with(OVERRIDE_PREFIX)
 }
 
 /// The non-empty `<name>` of `mastercomfig-addon-<name>.vpk`, extension in any case.
@@ -283,6 +274,7 @@ impl Library {
                     .collect::<Result<Vec<_>, _>>()
             })
             .map_err(library_db)?;
+        addons.retain(|addon| !is_override(&addon.name));
         if let Some(tf2) = tf2 {
             let custom = tf2.custom_dir();
             for addon in &mut addons {
@@ -378,6 +370,7 @@ impl Library {
         let mut names: Vec<AddonName> = custom_files(&custom)?
             .into_iter()
             .filter_map(AddonName::new)
+            .filter(|name| !is_override(name))
             .collect();
         if names.is_empty() {
             return Ok(0);
@@ -438,6 +431,42 @@ impl Library {
         Ok(added)
     }
 
+    /// Forgets the override VPKs as addons: deletes their `library_addons` rows and their
+    /// files in `library/addons`. Idempotent. Returns how many library files it removed.
+    pub fn retire_override_addons(&self) -> Result<usize, LibraryError> {
+        let rows: Vec<String> = self
+            .db
+            .read(|conn| {
+                let mut stmt = conn.prepare("SELECT asset_name FROM library_addons")?;
+                stmt.query_map([], |r| r.get(0))?.collect()
+            })
+            .map_err(library_db)?;
+        let overrides: Vec<String> = rows
+            .into_iter()
+            .filter(|asset| AddonName::new(asset.as_str()).is_some_and(|n| is_override(&n)))
+            .collect();
+        self.db
+            .write(|conn| {
+                let tx = conn.transaction()?;
+                for asset in &overrides {
+                    tx.execute("DELETE FROM library_addons WHERE asset_name = ?1", [asset])?;
+                }
+                tx.commit()
+            })
+            .map_err(library_db)?;
+
+        // Rows go first, as in `delete_addon`, so no row is left pointing at a missing file.
+        let library = self.dir.library_dir(LibraryKind::Addons);
+        let mut removed = 0;
+        for file in custom_files(&library)? {
+            if AddonName::new(file.as_str()).is_some_and(|n| is_override(&n)) {
+                remove_file_if_present(&library.join(&file))?;
+                removed += 1;
+            }
+        }
+        Ok(removed)
+    }
+
     /// Whether `library_addons` has a row for `name`.
     fn addon_recorded(&self, name: &AddonName) -> rusqlite::Result<bool> {
         self.db.read(|conn| {
@@ -471,7 +500,7 @@ fn remove_installed(name: &AddonName, custom: &Path) -> Result<(), IoFailure> {
 
 /// Regenerates `addons.cfg` from the addon VPKs now in `tf/custom`. With none left the
 /// file is removed and its directory kept, as v5 did.
-fn rewrite_addons_cfg(custom: &Path) -> Result<(), IoFailure> {
+pub(crate) fn rewrite_addons_cfg(custom: &Path) -> Result<(), IoFailure> {
     let files = custom_files(custom)?;
     let names: Vec<&str> = files.iter().map(String::as_str).collect();
     let cfg = ADDONS_CFG

@@ -31,6 +31,7 @@ use crate::pages::addons::AddonsPage;
 use crate::pages::crosshair_maker::CrosshairMakerPage;
 use crate::pages::crosshair_store::CrosshairStorePage;
 use crate::pages::crosshairs::{CopyToMaker, CrosshairsPage, EditPainted};
+use crate::pages::graphics::GraphicsPage;
 use crate::pages::hud_maker::HudMakerPage;
 use crate::pages::hud_store::HudStorePage;
 use crate::pages::huds::{EditInHudMaker, HudsPage};
@@ -89,6 +90,7 @@ pub struct Shell {
     logs: Option<Entity<LogsPage>>,
     maps: Option<Entity<MapsPage>>,
     addons: Option<Entity<AddonsPage>>,
+    graphics: Option<Entity<GraphicsPage>>,
     profiles: Option<Entity<ProfilesPage>>,
     /// Whether TF2 ran at the last check, for the header's Play TF2 button.
     tf2_running: bool,
@@ -191,6 +193,7 @@ impl Shell {
             logs: None,
             maps: None,
             addons: None,
+            graphics: None,
             profiles: None,
             tf2_running: false,
         }
@@ -241,6 +244,7 @@ impl Shell {
         self.crosshair_maker = None;
         self.hud_maker = None;
         self.addons = None;
+        self.graphics = None;
         self.profiles = None;
         self.set_kept_hidden(page, false, cx);
         show_idle(page.shows_player(), cx);
@@ -277,7 +281,8 @@ impl Shell {
             | Page::CrosshairMaker
             | Page::HudMaker
             | Page::Profiles
-            | Page::Addons => None,
+            | Page::Addons
+            | Page::Graphics => None,
         };
     }
 
@@ -386,6 +391,11 @@ impl Shell {
     /// The Addons page while it shows.
     pub fn addons_page(&self) -> Option<Entity<AddonsPage>> {
         self.addons.clone()
+    }
+
+    /// The Graphics page while it shows.
+    pub fn graphics_page(&self) -> Option<Entity<GraphicsPage>> {
+        self.graphics.clone()
     }
 
     /// The Profiles page while it shows.
@@ -581,6 +591,11 @@ impl Render for Shell {
                     .detach();
                     page
                 })
+                .clone()
+                .into_any_element(),
+            Page::Graphics => self
+                .graphics
+                .get_or_insert_with(|| cx.new(|cx| GraphicsPage::new(window, cx)))
                 .clone()
                 .into_any_element(),
             Page::Profiles => self

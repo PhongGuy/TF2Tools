@@ -16,6 +16,7 @@ use crate::audio::{AudioOut, RecordingAudio, RodioOut};
 use crate::crash::{self, notice::CrashNotice};
 use crate::crosshair_repair;
 use crate::local_messages::describe_startup;
+use crate::mastercomfig_restore;
 use crate::old_v4::{self, OldV4Notice};
 use crate::picker::{NativePicker, PathPicker};
 use crate::remote_images::{RemoteImages, store_fetch};
@@ -181,6 +182,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                     activity::watch_stores(cx);
                     install_tf2_state(cx, Tf2State::Detecting);
                     crosshair_repair::install(win, cx);
+                    mastercomfig_restore::install(cx);
                     CrashNotice::install(cx, crash);
                     OldV4Notice::install(cx, old_v4, old_v4::system_runner());
                     let shell = cx.new(|cx| Shell::with_huds(collapsed, huds, window, cx));

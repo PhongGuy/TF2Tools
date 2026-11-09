@@ -25,7 +25,7 @@ const V1_SCHEMA: &str = "
     PRAGMA user_version = 1;";
 
 #[test]
-fn v5_database_upgrades_to_v12_without_loss() {
+fn v5_database_upgrades_to_v13_without_loss() {
     let (_tmp, dir) = common::temp_data_dir();
     common::write_v5_database(&dir);
     let before = common::dump_tables(&Connection::open(dir.db_path()).unwrap());
@@ -34,11 +34,16 @@ fn v5_database_upgrades_to_v12_without_loss() {
         "seed fills every table"
     );
     let db = Database::open(&dir).expect("open v5 database");
-    assert_eq!(db.schema_version(), 12);
+    assert_eq!(db.schema_version(), 13);
     drop(db);
     let after = Connection::open(dir.db_path()).unwrap();
     let mut rows = common::dump_tables(&after);
-    for table in ["store_maps", "downloaded_maps"] {
+    for table in [
+        "store_maps",
+        "downloaded_maps",
+        "mastercomfig_state",
+        "mastercomfig_release",
+    ] {
         assert_eq!(
             rows.remove(table).map(|r| r.len()),
             Some(0),
@@ -50,7 +55,7 @@ fn v5_database_upgrades_to_v12_without_loss() {
     let version: u32 = after
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 12);
+    assert_eq!(version, 13);
     let analyzed: i64 = after
         .query_row(
             "SELECT count(*) FROM sqlite_master WHERE name = 'sqlite_stat1'",
@@ -74,12 +79,12 @@ fn v5_database_upgrades_to_v12_without_loss() {
         assert!(sql.ends_with("WHERE store_gb_id IS NOT NULL"), "{sql}");
     }
     drop(after);
-    let db = Database::open(&dir).expect("reopen at v12");
-    assert_eq!(db.schema_version(), 12);
+    let db = Database::open(&dir).expect("reopen at v13");
+    assert_eq!(db.schema_version(), 13);
 }
 
 #[test]
-fn v1_database_upgrades_to_v12() {
+fn v1_database_upgrades_to_v13() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -95,7 +100,7 @@ fn v1_database_upgrades_to_v12() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v1 database");
-    assert_eq!(db.schema_version(), 12);
+    assert_eq!(db.schema_version(), 13);
     drop(db);
 
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -123,7 +128,7 @@ fn newer_schema_is_refused_and_left_untouched() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
-    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 13;")
+    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 14;")
         .unwrap();
     drop(conn);
     let before = std::fs::read(dir.db_path()).unwrap();
@@ -133,7 +138,7 @@ fn newer_schema_is_refused_and_left_untouched() {
 
     let err = Database::open(&dir).expect_err("a newer schema must be refused");
     assert!(
-        matches!(&err, OpenError::NewerSchema { path, found: 13, supported: 12 } if *path == dir.db_path()),
+        matches!(&err, OpenError::NewerSchema { path, found: 14, supported: 13 } if *path == dir.db_path()),
         "{err:?}"
     );
     assert_eq!(std::fs::read(dir.db_path()).unwrap(), before);
@@ -240,7 +245,7 @@ fn v10_database_marks_the_gamebanana_mod_stores_stale_and_keeps_their_rows() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v10 database");
-    assert_eq!(db.schema_version(), 12);
+    assert_eq!(db.schema_version(), 13);
     drop(db);
     let conn = Connection::open(dir.db_path()).unwrap();
     let keys: Vec<String> = conn
@@ -253,7 +258,6 @@ fn v10_database_marks_the_gamebanana_mod_stores_stale_and_keeps_their_rows() {
     assert_eq!(
         keys,
         [
-            "addons_last_synced",
             "curated_last_synced",
             "sounds_last_synced",
             "sounds_sync_page"
@@ -276,8 +280,87 @@ fn v11_database_gains_the_map_tables() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v11 database");
-    assert_eq!(db.schema_version(), 12);
+    assert_eq!(db.schema_version(), 13);
     drop(db);
     assert_eq!(common::count(&dir, "store_maps"), 0);
     assert_eq!(common::count(&dir, "downloaded_maps"), 0);
+}
+
+fn asset_names(dir: &tf2tools_core::DataDir, table: &str) -> Vec<String> {
+    let conn = common::sql(dir);
+    let mut stmt = conn
+        .prepare(&format!(
+            "SELECT asset_name FROM {table} ORDER BY asset_name"
+        ))
+        .unwrap();
+    let names: Vec<String> = stmt
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap();
+    names
+}
+
+#[test]
+fn v12_database_gains_the_mastercomfig_tables_and_drops_override_addons() {
+    let (_tmp, dir) = common::temp_data_dir();
+    drop(Database::open(&dir).expect("create"));
+    let conn = Connection::open(dir.db_path()).unwrap();
+    conn.execute_batch(
+        "DROP TABLE mastercomfig_state; DROP TABLE mastercomfig_release;
+        INSERT INTO library_addons (asset_name, display_name, installed_tag, created_at, updated_at) VALUES
+            ('mastercomfig-addon-override-1.vpk', 'Config Override 1', '9.100.1', 'x', 'x'),
+            ('mastercomfig-addon-override-3.vpk', 'Config Override 3', '9.100.1', 'x', 'x'),
+            ('mastercomfig-addon-flat-mouse.vpk', 'Flat Mouse', '9.100.1', 'x', 'x');
+        INSERT INTO store_addons (asset_name, display_name, download_url, release_tag, fetched_at) VALUES
+            ('mastercomfig-addon-override-2.vpk', 'Config Override 2', 'u', '9.100.1', 'x'),
+            ('mastercomfig-addon-lowmem.vpk', 'Low Memory', 'u', '9.100.1', 'x');
+        PRAGMA user_version = 12;",
+    )
+    .unwrap();
+    drop(conn);
+
+    let db = Database::open(&dir).expect("open v12 database");
+    assert_eq!(db.schema_version(), 13);
+    drop(db);
+    assert_eq!(
+        asset_names(&dir, "library_addons"),
+        ["mastercomfig-addon-flat-mouse.vpk"]
+    );
+    assert_eq!(
+        asset_names(&dir, "store_addons"),
+        ["mastercomfig-addon-lowmem.vpk"]
+    );
+    assert_eq!(common::count(&dir, "mastercomfig_state"), 0);
+    assert_eq!(common::count(&dir, "mastercomfig_release"), 0);
+    let conn = common::sql(&dir);
+    assert_eq!(common::schema_shape(&conn), common::current_shape());
+    let second = conn.execute(
+        "INSERT INTO mastercomfig_state (id, version, preset, modules) VALUES (2, 'v', 'medium', '{}')",
+        [],
+    );
+    assert!(second.is_err(), "the state table holds one row");
+}
+
+#[test]
+fn v12_database_forgets_the_addon_sync_so_the_release_is_fetched() {
+    let (_tmp, dir) = common::temp_data_dir();
+    drop(Database::open(&dir).expect("create"));
+    let conn = Connection::open(dir.db_path()).unwrap();
+    conn.execute_batch(
+        "DROP TABLE mastercomfig_state; DROP TABLE mastercomfig_release;
+        INSERT OR REPLACE INTO store_cache_meta (key, value) VALUES
+            ('addons_last_synced', '2026-11-08T10:00:00.000000+00:00'),
+            ('curated_last_synced', '2026-11-08T10:00:00.000000+00:00');
+        PRAGMA user_version = 12;",
+    )
+    .unwrap();
+    drop(conn);
+    drop(Database::open(&dir).expect("open v12 database"));
+    assert_eq!(common::meta(&dir, "addons_last_synced"), None);
+    assert_eq!(
+        common::meta(&dir, "curated_last_synced").as_deref(),
+        Some("2026-11-08T10:00:00.000000+00:00"),
+        "only the addon store is forgotten"
+    );
 }

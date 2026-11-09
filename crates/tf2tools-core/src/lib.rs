@@ -37,13 +37,15 @@ pub use archive::{extract_archive, find_content_root};
 pub use crosshair_catalog::{BuiltinCrosshair, BuiltinCrosshairs};
 pub use db::Database;
 pub use error::{
-    ApplyProfileError, ArchiveError, BorrowSourceError, CatalogError, CopyHudError, DataDirError,
-    DetectError, DownloadError, FilesError, FontCheckError, FontInstallError, HistoryError,
-    HudFilesError, HudLoadError, ImageError, ImportError, InstallError, KeepHudError, KvParseError,
-    LibraryError, LogError, MakeHudError, MapDownloadError, MapRemoveError, OpenError, PaintError,
+    ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError, CatalogError,
+    CopyHudError, DataDirError, DetectError, DownloadError, FilesError, FontCheckError,
+    FontInstallError, HistoryError, HudFilesError, HudLoadError, ImageError, ImportError,
+    InstallError, InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError,
+    MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError, OpenError, PaintError,
     PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
-    ReinstallError, SchemaError, SettingsError, SyncError, UpdateApplyError, UpdateCheckError,
-    UpdateCopyError, UpdateDownloadError, VpkError, VtfError, WavError,
+    ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError, SchemaError, SettingsError,
+    SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
+    UpdateDownloadError, VpkError, VtfError, WavError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
@@ -86,11 +88,11 @@ pub use library::{
     AddonEntry, AddonName, ApplyProfileReport, ApplyReport, ApplyStep, Assignment, CrosshairEntry,
     CrosshairFormat, CrosshairId, CrosshairRef, DraftCrosshair, DraftSlot, ExternalHud, GbId,
     HudAssets, HudEntry, HudId, HudInstall, HudStatus, InstalledCrosshairs, InstalledSound,
-    InstalledSounds, Library, LibraryEntry, MadeHud, MakeTarget, MissingItem, MissingKind,
-    PaintTarget, PaintedSource, PresetEntry, Profile, ProfileCrosshair, ProfileCrosshairRef,
-    ProfileDraft, ProfileId, ProfileItem, ProfileUpdate, Provenance, Recovery, Reinstall, SavedHud,
-    SkipReason, SkippedAssignment, SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind,
-    crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
+    InstalledSounds, Library, LibraryEntry, MadeHud, MakeTarget, MastercomfigStatus, MissingItem,
+    MissingKind, PaintTarget, PaintedSource, Preset, PresetEntry, Profile, ProfileCrosshair,
+    ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate, Provenance, Recovery,
+    Reinstall, SavedHud, SkipReason, SkippedAssignment, SoundConflict, SoundEntry, SoundFormat,
+    SoundId, SoundKind, crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
 };
 pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
@@ -100,9 +102,9 @@ pub use paths::{DataDir, LibraryKind};
 pub use settings::{Settings, Volume};
 pub use store::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 pub use store::{
-    DownloadPhase, DownloadProgress, Endpoints, StoreCard, StoreClient, StoreConfig, StoreCursor,
-    StoreFile, StoreItem, StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus,
-    SyncOutcome, SyncProgress,
+    DownloadPhase, DownloadProgress, Endpoints, MastercomfigRelease, StoreCard, StoreClient,
+    StoreConfig, StoreCursor, StoreFile, StoreItem, StoreItemId, StoreKind, StoreQuery, StoreSort,
+    StoreSyncStatus, SyncOutcome, SyncProgress,
 };
 pub use texture::{
     FitChange, PNG_MAX_FILE_BYTES, PNG_MAX_SIDE, RgbaImage, decode_vtf, fit_hud_texture,

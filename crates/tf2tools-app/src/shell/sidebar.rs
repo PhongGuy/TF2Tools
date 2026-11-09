@@ -16,12 +16,13 @@ use super::route::Page;
 use super::{SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH, Shell};
 use crate::ids;
 
-const TOOLS: [Page; 5] = [
+const TOOLS: [Page; 6] = [
     Page::Huds,
     Page::Sounds,
     Page::Crosshairs,
     Page::Profiles,
     Page::Addons,
+    Page::Graphics,
 ];
 const STORES: [Page; 4] = [
     Page::HudStore,
@@ -35,7 +36,7 @@ const MAPS: [Page; 1] = [Page::Maps];
 const FOOTER: [Page; 2] = [Page::Settings, Page::Logs];
 // v5's nav item height, and the shorter one a short window uses so every item fits.
 const NAV_HEIGHT: f32 = 32.;
-const NAV_TIGHT_HEIGHT: f32 = 28.;
+const NAV_TIGHT_HEIGHT: f32 = 26.;
 // The window height below which v5's spacing pushes the open rail's last group under its
 // footer; shorter windows tighten the spacing and the items so every item shows whole.
 const ROOMY_HEIGHT: Pixels = px(660.);
@@ -194,5 +195,6 @@ pub fn icon(page: Page) -> IconName {
         Page::Settings => IconName::Settings,
         Page::Logs => IconName::ScrollText,
         Page::Maps => IconName::Map,
+        Page::Graphics => IconName::Gauge,
     }
 }

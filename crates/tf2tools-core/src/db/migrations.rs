@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 12;
+pub(crate) const SCHEMA_VERSION: u32 = 13;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -86,6 +86,11 @@ const STEPS: &[Step] = &[
     Step {
         version: 12,
         sql: STEP_12_SQL,
+        add_columns: &[],
+    },
+    Step {
+        version: 13,
+        sql: STEP_13_SQL,
         add_columns: &[],
     },
 ];
@@ -392,4 +397,25 @@ const STEP_12_SQL: &str = "
         size INTEGER NOT NULL,
         downloaded_at TEXT NOT NULL
     );
+";
+
+/// v6 step 13: mastercomfig's managed state and its latest release, and the override VPKs
+/// leave the addon tables, since they are module overrides, not addons. Forgetting the
+/// addon sync makes the next sync record the release.
+const STEP_13_SQL: &str = "
+    CREATE TABLE IF NOT EXISTS mastercomfig_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        version TEXT NOT NULL,
+        preset TEXT NOT NULL,
+        modules TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS mastercomfig_release (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        tag TEXT NOT NULL,
+        base_url TEXT NOT NULL,
+        override_urls TEXT NOT NULL
+    );
+    DELETE FROM library_addons WHERE asset_name LIKE 'mastercomfig-addon-override-%';
+    DELETE FROM store_addons WHERE asset_name LIKE 'mastercomfig-addon-override-%';
+    DELETE FROM store_cache_meta WHERE key = 'addons_last_synced';
 ";

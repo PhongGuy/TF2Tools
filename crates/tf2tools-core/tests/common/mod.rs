@@ -124,11 +124,28 @@ const M12_TABLES: &str = "
     );
 ";
 
-/// The v5 fixture's shape plus migration 10's indexes and migration 12's map tables: the
-/// schema v6 opens to.
+/// The tables migration 13 adds, as the schema should hold them.
+const M13_TABLES: &str = "
+    CREATE TABLE mastercomfig_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        version TEXT NOT NULL,
+        preset TEXT NOT NULL,
+        modules TEXT NOT NULL
+    );
+    CREATE TABLE mastercomfig_release (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        tag TEXT NOT NULL,
+        base_url TEXT NOT NULL,
+        override_urls TEXT NOT NULL
+    );
+";
+
+/// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables and
+/// migration 13's mastercomfig tables: the schema v6 opens to.
 pub fn current_shape() -> SchemaShape {
     let conn = v5_fixture_connection();
     conn.execute_batch(M12_TABLES).unwrap();
+    conn.execute_batch(M13_TABLES).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape
@@ -697,4 +714,22 @@ pub fn seed_v5_profile(env: &LibraryEnv) {
                      'library', 'dot-5e6f7a8b', 9001);",
         )
         .expect("seed v5 profile");
+}
+
+/// A `mastercomfig-base.vpk` whose `cfg/comfig/echo.cfg` names `version` as a release does.
+pub fn mastercomfig_base(version: &str) -> Vec<u8> {
+    let echo =
+        format!("alias version_comfig\"echo mastercomfig version: {version} | July 3, 2026\"\n");
+    vpk_bytes(&[("cfg/comfig/echo.cfg", echo.as_bytes())])
+}
+
+/// Records mastercomfig as TF2Tools-managed at `version` on `preset`, as an install leaves it.
+pub fn set_mastercomfig_state(dir: &DataDir, version: &str, preset: &str) {
+    sql(dir)
+        .execute(
+            "INSERT OR REPLACE INTO mastercomfig_state (id, version, preset, modules)
+             VALUES (1, ?1, ?2, '{}')",
+            [version, preset],
+        )
+        .expect("state row");
 }

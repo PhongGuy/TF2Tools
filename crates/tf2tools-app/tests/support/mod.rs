@@ -801,6 +801,10 @@ pub fn open_store_grid(
 
 pub const CURATED_HASH: &str = "abc123";
 
+/// Where `StoreServer::endpoints` sends GitHub's latest-release call for mastercomfig.
+pub const MASTERCOMFIG_RELEASE_ROUTE: &str =
+    "/gh-api/repos/mastercomfig/mastercomfig/releases/latest";
+
 /// A wiremock server on its own runtime, standing in for GameBanana and GitHub.
 pub struct StoreServer {
     pub server: MockServer,
@@ -941,6 +945,32 @@ impl StoreServer {
             Mock::given(method("GET"))
                 .and(path(route))
                 .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+                .mount(&self.server),
+        );
+    }
+
+    /// GitHub's latest mastercomfig release `tag`, listing only the base VPK at this server's
+    /// `/gh/mastercomfig/mastercomfig-base.vpk`.
+    pub fn mount_mastercomfig_release(&self, tag: &str) {
+        let body = serde_json::json!({
+            "tag_name": tag,
+            "assets": [{
+                "name": "mastercomfig-base.vpk",
+                "browser_download_url":
+                    format!("{}/gh/mastercomfig/mastercomfig-base.vpk", self.uri()),
+                "size": 100,
+                "download_count": 7
+            }]
+        });
+        self.mount_bytes(MASTERCOMFIG_RELEASE_ROUTE, body.to_string().into_bytes());
+    }
+
+    /// Answers every GET of `route` with `status` and an empty body.
+    pub fn mount_status(&self, route: &str, status: u16) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(route))
+                .respond_with(ResponseTemplate::new(status))
                 .mount(&self.server),
         );
     }
@@ -1556,4 +1586,37 @@ pub fn in_own_process(test: &str) -> bool {
         "the child ran no test: {stdout}"
     );
     false
+}
+
+/// A `mastercomfig-base.vpk` whose `cfg/comfig/echo.cfg` names `version`, as a release carries it.
+pub fn mastercomfig_base(version: &str) -> Vec<u8> {
+    let echo =
+        format!("alias version_comfig\"echo mastercomfig version: {version} | July 3, 2026\"\n");
+    vpk_bytes(&[("cfg/comfig/echo.cfg", echo.as_bytes())])
+}
+
+/// Records release `tag` with its base at `{uri}/gh/mastercomfig/mastercomfig-base.vpk`.
+pub fn seed_mastercomfig_release(env: &Env, uri: &str, tag: &str) {
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute(
+            "INSERT OR REPLACE INTO mastercomfig_release (id, tag, base_url, override_urls)
+             VALUES (1, ?1, ?2, '[null,null,null]')",
+            (tag, format!("{uri}/gh/mastercomfig/mastercomfig-base.vpk")),
+        )
+        .unwrap();
+}
+
+/// Puts `version`'s base VPK in the env's tf/custom and records it as managed on `preset`.
+pub fn seed_managed_mastercomfig(env: &Env, version: &str, preset: &str) {
+    let base = env.game.join("tf/custom/mastercomfig-base.vpk");
+    std::fs::write(base, mastercomfig_base(version)).unwrap();
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute(
+            "INSERT OR REPLACE INTO mastercomfig_state (id, version, preset, modules)
+             VALUES (1, ?1, ?2, '{}')",
+            (version, preset),
+        )
+        .unwrap();
 }

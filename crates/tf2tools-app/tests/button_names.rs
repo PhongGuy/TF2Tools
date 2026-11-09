@@ -12,7 +12,7 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::store_detail::{DetailItem, open_detail};
 use tf2tools_core::{
-    DraftSlot, GbId, ProfileDraft, Provenance, StoreItemId, StoreKind, Tf2Install,
+    DraftSlot, GbId, Preset, ProfileDraft, Provenance, StoreItemId, StoreKind, Tf2Install,
 };
 
 // A short silent stereo WAV the library imports as a sound.
@@ -73,6 +73,9 @@ fn visit(cx: &mut TestAppContext, s: &support::ShellWindow, page: Page) {
                     .settings_page()
                     .is_some_and(|p| p.read(cx).is_loaded()),
                 Page::Logs => shell.logs_page().is_some_and(|p| p.read(cx).is_loaded()),
+                Page::Graphics => shell
+                    .graphics_page()
+                    .is_some_and(|p| p.read(cx).is_loaded()),
                 Page::Maps => shell.maps_page().is_some_and(|p| p.read(cx).is_loaded()),
                 Page::CrosshairMaker => shell
                     .crosshair_maker_page()
@@ -119,6 +122,8 @@ fn every_button_on_every_page_has_a_name(cx: &mut TestAppContext) {
     support::seed_gb_huds(&env, &[(7, "FlawHUD")]);
     support::seed_sounds(&env, &[(1, "Ding", "hitsound", None)]);
     support::seed_crosshairs(&env, [3], 0, false);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_release(&env, "http://127.0.0.1:9", "9.101.0");
 
     let mut missing = Vec::new();
     // HUDs, the start page, loaded before the seeding, so it comes round again at the end.
@@ -126,6 +131,31 @@ fn every_button_on_every_page_has_a_name(cx: &mut TestAppContext) {
         visit(cx, &s, page);
         missing.extend(unnamed(cx, s.win, page.slug()));
     }
+    // Graphics in each card state, so every one of its buttons is drawn: installed (Update,
+    // Remove, the preset cards), a hand install (Take over), then none (Install).
+    visit(cx, &s, Page::Graphics);
+    for id in [ids::GRAPHICS_UPDATE, ids::GRAPHICS_REMOVE] {
+        assert!(support::present(cx, s.win, id), "{id}");
+    }
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::graphics_preset(Preset::Medium)
+    ));
+    missing.extend(unnamed(cx, s.win, "graphics-installed"));
+    visit(cx, &s, Page::Huds);
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute("DELETE FROM mastercomfig_state", [])
+        .unwrap();
+    visit(cx, &s, Page::Graphics);
+    assert!(support::present(cx, s.win, ids::GRAPHICS_TAKE_OVER));
+    missing.extend(unnamed(cx, s.win, "graphics-outside"));
+    visit(cx, &s, Page::Huds);
+    std::fs::remove_file(env.game.join("tf/custom/mastercomfig-base.vpk")).unwrap();
+    visit(cx, &s, Page::Graphics);
+    assert!(support::present(cx, s.win, ids::GRAPHICS_INSTALL));
+    missing.extend(unnamed(cx, s.win, "graphics-not-installed"));
     assert!(missing.is_empty(), "buttons without a name: {missing:#?}");
 }
 

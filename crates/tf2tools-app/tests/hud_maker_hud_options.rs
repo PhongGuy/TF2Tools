@@ -596,6 +596,7 @@ fn a_viewmodels_option_asks_for_the_addon_until_it_is_on(cx: &mut TestAppContext
         |services, env| {
             let vpk = support::vpk_bytes(&[("cfg/addons/x.cfg", b"v1".as_slice())]);
             support::seed_library_addon(services, env, VIEWMODELS, "9.0.0", &vpk, false);
+            support::seed_managed_mastercomfig(env, "9.100.1", "medium");
         },
     );
     support::wait_real(cx, "the addon state", |cx| {

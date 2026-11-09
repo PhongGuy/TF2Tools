@@ -108,3 +108,60 @@ fn a_stale_library_file_is_replaced_by_the_installed_copy() {
         installed
     );
 }
+
+const OVERRIDE_1: &str = "mastercomfig-addon-override-1.vpk";
+const OVERRIDE_3: &str = "mastercomfig-addon-override-3.vpk";
+
+fn add_row(env: &LibraryEnv, asset: &str) {
+    sql(&env.dir)
+        .execute(
+            "INSERT INTO library_addons (asset_name, display_name, installed_tag, created_at, updated_at)
+             VALUES (?1, 'x', '9.100.1', 'x', 'x')",
+            [asset],
+        )
+        .unwrap();
+}
+
+#[test]
+fn override_vpks_in_tf_custom_are_not_adopted() {
+    let env = library_env();
+    install_raw(&env, FLAT);
+    let game_copy = install_raw(&env, OVERRIDE_1);
+    assert_eq!(env.lib.adopt_installed_addons(&env.tf2).unwrap(), 1);
+    let names: Vec<String> = env
+        .lib
+        .list_addons(Some(&env.tf2))
+        .unwrap()
+        .iter()
+        .map(|a| a.name().as_str().to_owned())
+        .collect();
+    assert_eq!(names, [FLAT]);
+    let library = env.dir.library_dir(LibraryKind::Addons);
+    assert!(!library.join(OVERRIDE_1).exists());
+    assert_eq!(
+        fs::read(env.tf2.custom_dir().join(OVERRIDE_1)).unwrap(),
+        game_copy
+    );
+}
+
+#[test]
+fn an_override_row_left_in_the_library_is_not_listed() {
+    let env = library_env();
+    add_row(&env, "mastercomfig-addon-override-2.vpk");
+    assert!(env.lib.list_addons(None).unwrap().is_empty());
+}
+
+#[test]
+fn retiring_overrides_forgets_their_rows_and_library_files_once() {
+    let env = library_env();
+    let library = env.dir.library_dir(LibraryKind::Addons);
+    for asset in [FLAT, OVERRIDE_3] {
+        write_file(&library.join(asset), &addon_bytes(asset));
+        add_row(&env, asset);
+    }
+    assert_eq!(env.lib.retire_override_addons().unwrap(), 1);
+    assert_eq!(env.lib.retire_override_addons().unwrap(), 0);
+    assert_eq!(count(&env.dir, "library_addons"), 1);
+    assert!(library.join(FLAT).is_file());
+    assert!(!library.join(OVERRIDE_3).exists());
+}

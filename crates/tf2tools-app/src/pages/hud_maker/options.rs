@@ -31,6 +31,7 @@ use crate::ids;
 use crate::library_events::LibraryEvents;
 use crate::local_messages::describe_tf2_install;
 use crate::pages::crosshair_maker::model::hsla_of_rgba;
+use crate::pages::graphics::jobs;
 use crate::services::{OpError, Services, require_tf2, run_blocking};
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::toast::toast_error;
@@ -281,25 +282,59 @@ impl HudMakerPage {
             Ok(tf2) => tf2,
             Err(err) => return toast_error(window, cx, &err),
         };
+        self.toggle_with(on, tf2, true, cx);
+    }
+
+    // The toggle itself. With `check`, switching on without mastercomfig copies nothing and
+    // asks "Install both?" while the switch stays held; a yes runs the toggle again unchecked.
+    fn toggle_with(&mut self, on: bool, tf2: Tf2Install, check: bool, cx: &mut Context<Self>) {
+        // The job's answer: the toggle's result and the fresh state, or "ask first".
+        enum Toggled {
+            Done(Result<(), OpError>, Viewmodels),
+            NeedsBase,
+        }
+
         let Some(name) = AddonName::new(VIEWMODELS) else {
             return;
         };
         self.viewmodels = Viewmodels::Busy { on };
         cx.notify();
-        let running = run_blocking(cx, move |s| {
-            let done = match on {
-                true => (s.library.install_addon(&name, &tf2).map(drop))
-                    .map_err(|e| describe_tf2_install(&e).into_op("Failed to install addon")),
-                false => (s.library.uninstall_addon(&name, &tf2).map(drop))
-                    .map_err(|e| describe_tf2_install(&e).into_op("Failed to uninstall addon")),
-            };
-            Ok((done, viewmodels_state(s, Some(&tf2))))
-        });
+        let running = {
+            let tf2 = tf2.clone();
+            run_blocking(cx, move |s| {
+                if on && check && jobs::needs_base(s, &tf2) {
+                    return Ok(Toggled::NeedsBase);
+                }
+                let done = match on {
+                    true => (s.library.install_addon(&name, &tf2).map(drop))
+                        .map_err(|e| describe_tf2_install(&e).into_op("Failed to install addon")),
+                    false => (s.library.uninstall_addon(&name, &tf2).map(drop))
+                        .map_err(|e| describe_tf2_install(&e).into_op("Failed to uninstall addon")),
+                };
+                Ok(Toggled::Done(done, viewmodels_state(s, Some(&tf2))))
+            })
+        };
         let win = self.win;
-        let toggled = cx.spawn(async move |_, cx| {
-            let (done, state) = running
-                .await
-                .unwrap_or_else(|err| (Err(err), Viewmodels::Absent));
+        let toggled = cx.spawn(async move |page, cx| {
+            let (done, state) = match running.await {
+                Ok(Toggled::Done(done, state)) => (done, state),
+                Err(err) => (Err(err), Viewmodels::Absent),
+                Ok(Toggled::NeedsBase) => {
+                    // Nothing is copied yet; with the page gone there is no one to ask.
+                    if page.upgrade().is_none() {
+                        return Ok(Viewmodels::Absent);
+                    }
+                    if jobs::ask_and_install_base(win, tf2.clone(), cx).await {
+                        // The rerun lands its own state, so this task's answer is stale.
+                        let _ = page.update(cx, |p, cx| p.toggle_with(true, tf2, false, cx));
+                        return Ok(Viewmodels::Absent);
+                    }
+                    let read = cx.update(|cx| {
+                        run_blocking(cx, move |s| Ok(viewmodels_state(s, Some(&tf2))))
+                    });
+                    return read.await;
+                }
+            };
             cx.update(|cx| match &done {
                 Ok(()) => LibraryEvents::changed(cx),
                 Err(err) => {

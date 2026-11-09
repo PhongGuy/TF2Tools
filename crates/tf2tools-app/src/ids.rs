@@ -3,7 +3,7 @@
 
 use gpui_kit::ElementId;
 use tf2tools_core::{
-    AddonName, BoardMode, HudId, MeterKind, NewPart, PartKey, PinCorner, ProfileId, Scene,
+    AddonName, BoardMode, HudId, MeterKind, NewPart, PartKey, PinCorner, Preset, ProfileId, Scene,
     SceneRule, Screen, SituationSwitch, SoundKind, StoreItemId, StoreKind, TfClass, WeaponKind,
     WeaponSlot,
 };
@@ -769,6 +769,30 @@ pub const ADDONS_INSTALLED: &str = "addons-installed";
 pub const ADDONS_INSTALLED_EMPTY: &str = "addons-installed-empty";
 /// The "Your Library" section title.
 pub const ADDONS_LIBRARY: &str = "addons-library";
+/// The Graphics page's line under the title.
+pub const GRAPHICS_SUBTITLE: &str = "graphics-subtitle";
+/// The Graphics page's "TF2 not found" warning, present only without a TF2 install.
+pub const GRAPHICS_NO_TF2: &str = "graphics-no-tf2";
+/// The mastercomfig status card.
+pub const GRAPHICS_STATUS: &str = "graphics-status";
+/// The status card's title line, labelled with its text.
+pub const GRAPHICS_HEADLINE: &str = "graphics-headline";
+/// The line under the status card's title, labelled with its text; absent when it has none.
+pub const GRAPHICS_DETAIL: &str = "graphics-detail";
+/// The status card's credit to the mastercomfig team and comfig-app.
+pub const GRAPHICS_CREDIT: &str = "graphics-credit";
+/// Install, shown when mastercomfig is not in tf/custom.
+pub const GRAPHICS_INSTALL: &str = "graphics-install";
+/// Update, shown for a managed install behind the recorded release.
+pub const GRAPHICS_UPDATE: &str = "graphics-update";
+/// Check for updates, shown for a managed install.
+pub const GRAPHICS_CHECK: &str = "graphics-check";
+/// Remove, shown for a managed install.
+pub const GRAPHICS_REMOVE: &str = "graphics-remove";
+/// Take over, shown for an install TF2Tools did not make.
+pub const GRAPHICS_TAKE_OVER: &str = "graphics-take-over";
+/// "Changes apply the next time TF2 starts.", under the preset cards.
+pub const GRAPHICS_FOOTER: &str = "graphics-footer";
 
 /// The "No TF2 installation found" alert on the Profiles page.
 pub const PROFILES_NO_TF2: &str = "profiles-no-tf2";
@@ -898,6 +922,11 @@ pub fn page_scrollbar(page: Page) -> ElementId {
 /// "grid-scrollbar:<grid>".
 pub fn grid_scrollbar(grid: &str) -> ElementId {
     keyed("grid-scrollbar", grid)
+}
+
+/// A preset card on the Graphics page: "graphics-preset:<name>".
+pub fn graphics_preset(preset: Preset) -> ElementId {
+    keyed("graphics-preset", preset.name())
 }
 
 /// An id for one of many like elements, carrying its stable key: "<kind>:<key>".
