@@ -124,11 +124,28 @@ const M12_TABLES: &str = "
     );
 ";
 
-/// The v5 fixture's shape plus migration 10's indexes and migration 12's map tables: the
-/// schema v6 opens to.
+/// The tables migration 13 adds, as the schema should hold them.
+const M13_TABLES: &str = "
+    CREATE TABLE mastercomfig_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        version TEXT NOT NULL,
+        preset TEXT NOT NULL,
+        modules TEXT NOT NULL
+    );
+    CREATE TABLE mastercomfig_release (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        tag TEXT NOT NULL,
+        base_url TEXT NOT NULL,
+        override_urls TEXT NOT NULL
+    );
+";
+
+/// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables and
+/// migration 13's mastercomfig tables: the schema v6 opens to.
 pub fn current_shape() -> SchemaShape {
     let conn = v5_fixture_connection();
     conn.execute_batch(M12_TABLES).unwrap();
+    conn.execute_batch(M13_TABLES).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape
