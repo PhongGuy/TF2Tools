@@ -360,3 +360,79 @@ fn a_preset_card_is_picked_with_the_keyboard(cx: &mut TestAppContext) {
     });
     assert_eq!(hook(&env), "preset=low\n");
 }
+
+#[gpui_kit::test]
+fn remove_refuses_while_tf2_runs(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "high");
+    tf2_running(cx);
+    let page = open_graphics(cx, &s);
+    support::click_id(cx, s.win, ids::GRAPHICS_REMOVE);
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    toasted(cx, &s, "Close TF2 first");
+    idle(cx, &page);
+    assert!(env.game.join(BASE).exists());
+    assert!(installed(cx, &page, "9.100.1"));
+}
+
+#[gpui_kit::test]
+fn check_for_updates_records_a_newer_release(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_mastercomfig_release("9.101.0");
+    let s = shell(cx, &env, &server);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    let page = open_graphics(cx, &s);
+    assert!(!support::present(cx, s.win, ids::GRAPHICS_UPDATE));
+    support::click_id(cx, s.win, ids::GRAPHICS_CHECK);
+    toasted(cx, &s, "Checked for updates");
+    idle(cx, &page);
+    assert_eq!(
+        label(cx, &s, ids::GRAPHICS_DETAIL).as_deref(),
+        Some("Update to 9.101.0")
+    );
+    assert!(support::present(cx, s.win, ids::GRAPHICS_UPDATE));
+}
+
+#[gpui_kit::test]
+fn a_rate_limited_check_says_github_is_busy(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_status(support::MASTERCOMFIG_RELEASE_ROUTE, 403);
+    let s = shell(cx, &env, &server);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    let page = open_graphics(cx, &s);
+    support::click_id(cx, s.win, ids::GRAPHICS_CHECK);
+    toasted(
+        cx,
+        &s,
+        "GitHub is busy right now. Wait a few minutes, then try again.",
+    );
+    idle(cx, &page);
+    assert!(installed(cx, &page, "9.100.1"));
+}
+
+#[gpui_kit::test]
+fn only_the_running_job_s_button_spins(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes(BASE_ROUTE, support::mastercomfig_base("9.101.0"));
+    let s = shell(cx, &env, &server);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "ultra");
+    support::seed_mastercomfig_release(&env, &server.uri(), "9.101.0");
+    let page = open_graphics(cx, &s);
+    support::click_without_settling(cx, s.win, ids::graphics_preset(Preset::High));
+    let (busy, installing, checking) = cx.update(|cx| {
+        let p = page.read(cx);
+        (p.is_busy(), p.is_installing(), p.is_checking())
+    });
+    assert!(busy && !installing && !checking, "a pick spins nothing");
+    idle(cx, &page);
+    support::click_without_settling(cx, s.win, ids::GRAPHICS_UPDATE);
+    assert!(cx.update(|cx| page.read(cx).is_installing()));
+    assert!(!cx.update(|cx| page.read(cx).is_checking()));
+    support::wait_real(cx, "the update", |cx| installed(cx, &page, "9.101.0"));
+    idle(cx, &page);
+    assert!(!cx.update(|cx| page.read(cx).is_installing()));
+}

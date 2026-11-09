@@ -785,6 +785,8 @@ pub const GRAPHICS_CREDIT: &str = "graphics-credit";
 pub const GRAPHICS_INSTALL: &str = "graphics-install";
 /// Update, shown for a managed install behind the recorded release.
 pub const GRAPHICS_UPDATE: &str = "graphics-update";
+/// Check for updates, shown for a managed install.
+pub const GRAPHICS_CHECK: &str = "graphics-check";
 /// Remove, shown for a managed install.
 pub const GRAPHICS_REMOVE: &str = "graphics-remove";
 /// Take over, shown for an install TF2Tools did not make.

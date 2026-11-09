@@ -18,6 +18,7 @@ use tf2tools_core::{MastercomfigRelease, MastercomfigStatus, Preset};
 use crate::ids;
 use crate::local_messages::describe_store_status;
 use crate::pages::common::{card_frame, no_tf2_warning};
+use crate::pages::profiles::probe::Tf2Probe;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
@@ -36,6 +37,13 @@ const FOOTER: &str = "Changes apply the next time TF2 starts.";
 /// A finished action's success toast: (title, description).
 type Done = (SharedString, SharedString);
 
+/// The download job whose button spins; other actions only lock the buttons.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Job {
+    Install,
+    Check,
+}
+
 /// The Graphics page. Built fresh on each visit; it reloads when TF2's state changes.
 pub struct GraphicsPage {
     win: AnyWindowHandle,
@@ -48,6 +56,8 @@ pub struct GraphicsPage {
     busy: bool,
     /// An action has ended and its reload is out; that reload's landing lifts `busy`.
     settling: bool,
+    /// The job whose button spins, held as long as `busy`.
+    running: Option<Job>,
     /// Bumped by each reload, so a slower, older load never overwrites a newer one.
     load_generation: u64,
     scroll: ScrollHandle,
@@ -65,6 +75,7 @@ impl GraphicsPage {
             loaded: false,
             busy: false,
             settling: false,
+            running: None,
             load_generation: 0,
             scroll: ScrollHandle::new(),
             _subscriptions: vec![tf2],
@@ -91,6 +102,16 @@ impl GraphicsPage {
     /// True while an action, or the reload after it, is running; every action button rests.
     pub fn is_busy(&self) -> bool {
         self.busy
+    }
+
+    /// True while an install or update runs, until its reload lands.
+    pub fn is_installing(&self) -> bool {
+        self.running == Some(Job::Install)
+    }
+
+    /// True while a check for updates runs, until its reload lands.
+    pub fn is_checking(&self) -> bool {
+        self.running == Some(Job::Check)
     }
 
     /// The status card from the last load; None without TF2 or before a load.
@@ -122,6 +143,7 @@ impl GraphicsPage {
             "Failed to install mastercomfig"
         };
         let job = jobs::install_base(tf2, action, cx);
+        self.running = Some(Job::Install);
         self.finish(
             async move {
                 let version = job.await?;
@@ -134,6 +156,20 @@ impl GraphicsPage {
                     let ready = format!("mastercomfig {version} is ready. Pick a preset below.");
                     ("mastercomfig installed".into(), ready.into())
                 })
+            },
+            cx,
+        );
+    }
+
+    // Forces the addon-store sync; the reloaded card then says "Up to date" or "Update to X",
+    // so the toast names no version.
+    fn check(&mut self, cx: &mut Context<Self>) {
+        let job = jobs::check_for_updates(cx);
+        self.running = Some(Job::Check);
+        self.finish(
+            async move {
+                job.await?;
+                Ok(("Checked for updates".into(), SharedString::default()))
             },
             cx,
         );
@@ -172,8 +208,10 @@ impl GraphicsPage {
                         return;
                     }
                 };
+                let probe = Tf2Probe::get(cx);
                 page.run(
                     move |s| {
+                        jobs::refuse_while_running(&*probe)?;
                         s.library.remove_mastercomfig(&tf2).map_err(|e| {
                             describe_remove(&e).into_op("Failed to remove mastercomfig")
                         })?;
@@ -283,6 +321,7 @@ impl GraphicsPage {
                     if page.settling {
                         page.settling = false;
                         page.busy = false;
+                        page.running = None;
                     }
                     cx.notify();
                     true
@@ -335,6 +374,8 @@ impl GraphicsPage {
     fn status_card(&self, card: &StatusCard, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
         let busy = self.busy;
+        let installing = self.running == Some(Job::Install);
+        let checking = self.running == Some(Job::Check);
         let mut buttons: Vec<AnyElement> = Vec::new();
         match card {
             StatusCard::NotInstalled => buttons.push(
@@ -342,7 +383,7 @@ impl GraphicsPage {
                     .primary()
                     .icon(IconName::Download)
                     .label("Install")
-                    .loading(busy)
+                    .loading(installing)
                     .disabled(busy)
                     .on_click(cx.listener(|page, _, window, cx| page.install(false, window, cx)))
                     .into_any_element(),
@@ -354,7 +395,7 @@ impl GraphicsPage {
                             .primary()
                             .icon(IconName::RefreshCw)
                             .label("Update")
-                            .loading(busy)
+                            .loading(installing)
                             .disabled(busy)
                             .on_click(
                                 cx.listener(|page, _, window, cx| page.install(true, window, cx)),
@@ -362,6 +403,16 @@ impl GraphicsPage {
                             .into_any_element(),
                     );
                 }
+                buttons.push(
+                    Button::new(ids::GRAPHICS_CHECK)
+                        .outline()
+                        .icon(IconName::RotateCw)
+                        .label("Check for updates")
+                        .loading(checking)
+                        .disabled(busy)
+                        .on_click(cx.listener(|page, _, _, cx| page.check(cx)))
+                        .into_any_element(),
+                );
                 buttons.push(
                     Button::new(ids::GRAPHICS_REMOVE)
                         .outline()
