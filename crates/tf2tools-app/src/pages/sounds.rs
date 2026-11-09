@@ -11,7 +11,7 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
 };
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AppContext as _, ClickEvent, Context, ElementId, Entity,
+    AnyElement, AnyWindowHandle, App, AppContext as _, ClickEvent, Context, Div, ElementId, Entity,
     EventEmitter, FontWeight, Hsla, InteractiveElement as _, IntoElement, ParentElement as _,
     Pixels, Render, Role, ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _,
     Subscription, TestSupportExt as _, WeakEntity, Window, div, px, rgb, transparent_black,
@@ -668,6 +668,41 @@ fn on_card(
     }
 }
 
+/// The sound's name, truncated, semibold, with the VPK badge (`ids::sound_vpk`) for a VPK sound.
+pub(crate) fn sound_title(sound: &SoundEntry, _cx: &App) -> Div {
+    let vpk = (sound.format() == SoundFormat::Vpk).then(|| {
+        badge_of(
+            ids::sound_vpk(sound.folder_name()),
+            Tag::secondary(),
+            transparent_black(),
+            "VPK",
+        )
+    });
+    h_flex()
+        .gap_2()
+        .child(
+            div()
+                .min_w_0()
+                .truncate()
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(sound.name().to_owned()),
+        )
+        .children(vpk)
+}
+
+/// The ghost play button: Play, or Stop while `playing`, named for both.
+pub(crate) fn play_button(id: impl Into<ElementId>, playing: bool) -> Button {
+    Button::new(id)
+        .ghost()
+        .px(SM_ICON_PX)
+        .icon(if playing {
+            IconName::Square
+        } else {
+            IconName::Play
+        })
+        .named(if playing { "Stop" } else { "Play" })
+}
+
 // v5's library sound card: the name with its VPK badge, then play and delete at the bottom
 // left and the outline Hit and Kill installs at the right.
 fn sound_card(
@@ -694,14 +729,6 @@ fn sound_card(
             }));
         needs_tf2(button, has_tf2)
     };
-    let vpk = (sound.format() == SoundFormat::Vpk).then(|| {
-        badge_of(
-            ids::sound_vpk(folder),
-            Tag::secondary(),
-            transparent_black(),
-            "VPK",
-        )
-    });
     card_frame(cx)
         .id(ids::sound_card(folder))
         .accessibility_id(ids::sound_card(folder).to_string())
@@ -711,20 +738,7 @@ fn sound_card(
         .flex()
         .flex_col()
         .overflow_hidden()
-        .child(
-            h_flex()
-                .px_6()
-                .pt_6()
-                .gap_2()
-                .child(
-                    div()
-                        .min_w_0()
-                        .truncate()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(sound.name().to_owned()),
-                )
-                .children(vpk),
-        )
+        .child(sound_title(sound, cx).px_6().pt_6())
         .child(
             h_flex()
                 .mt_auto()
@@ -735,16 +749,11 @@ fn sound_card(
                     h_flex()
                         .gap_1()
                         .child(
-                            Button::new(ids::sound_play(folder))
-                                .ghost()
-                                .px(SM_ICON_PX)
-                                .icon(if playing {
-                                    IconName::Square
-                                } else {
-                                    IconName::Play
-                                })
-                                .named(if playing { "Stop" } else { "Play" })
-                                .on_click(on_card(page, sound, SoundsPage::play_sound)),
+                            play_button(ids::sound_play(folder), playing).on_click(on_card(
+                                page,
+                                sound,
+                                SoundsPage::play_sound,
+                            )),
                         )
                         .child(
                             Button::new(ids::sound_delete(folder))
