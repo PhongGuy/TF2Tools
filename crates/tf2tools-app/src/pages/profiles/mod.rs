@@ -1,5 +1,6 @@
 //! The Profiles page: saved setups of HUD, sounds and crosshairs, activated in one go.
 
+pub mod editor_model;
 pub mod model;
 pub mod probe;
 pub mod wizard;
