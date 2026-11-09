@@ -520,6 +520,30 @@ fn opened_with_viewmodels(
                 "9.0.0",
                 &vpk,
                 false,
+            );
+        });
+        support::seed_managed_mastercomfig(env, "9.100.1", "medium");
+    });
+    support::wait_real(cx, "the addon state", |cx| {
+        support::checked_of(cx, s.win, ids::HUD_MAKER_VIEWMODELS).is_some()
+    });
+    (env, s, page)
+}
+
+/// Like `opened_with_viewmodels`, without mastercomfig in TF2.
+fn opened_with_viewmodels_alone(
+    cx: &mut TestAppContext,
+) -> (support::Env, support::ShellWindow, Entity<HudMakerPage>) {
+    let (env, s, page) = opened_after(cx, |cx, env| {
+        let vpk = support::vpk_bytes(&[("cfg/addons/x.cfg", b"v1".as_slice())]);
+        cx.update(|cx| {
+            support::seed_library_addon(
+                cx.global::<Services>(),
+                env,
+                VIEWMODELS,
+                "9.0.0",
+                &vpk,
+                false,
             )
         });
     });
@@ -527,6 +551,31 @@ fn opened_with_viewmodels(
         support::checked_of(cx, s.win, ids::HUD_MAKER_VIEWMODELS).is_some()
     });
     (env, s, page)
+}
+
+#[gpui_kit::test]
+fn viewmodels_without_mastercomfig_ask_and_a_cancel_installs_nothing(cx: &mut TestAppContext) {
+    let (env, s, page) = opened_with_viewmodels_alone(cx);
+    click_in_panel(cx, &s, ids::HUD_MAKER_VIEWMODELS.into());
+    support::wait_real(cx, "the question", |cx| {
+        support::present(cx, s.win, ids::CONFIRM_DIALOG)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
+        Some("This addon needs mastercomfig. Install both?")
+    );
+    assert!(cx.update(|cx| page.read(cx).viewmodels_held()));
+    support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
+    support::wait_real(cx, "the switch to come back", |cx| {
+        cx.update(|cx| !page.read(cx).viewmodels_held())
+    });
+    support::settle(cx, s.win);
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::HUD_MAKER_VIEWMODELS),
+        Some(false)
+    );
+    assert!(!env.game.join("tf/custom").join(VIEWMODELS).exists());
+    assert!(!env.game.join("tf/custom/mastercomfig-base.vpk").exists());
 }
 
 #[gpui_kit::test]
