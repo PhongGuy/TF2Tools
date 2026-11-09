@@ -510,6 +510,7 @@ fn a_trashed_item_says_it_is_gone_and_keeps_its_link(cx: &mut TestAppContext) {
         support::label_of(cx, w.win, ids::ADDON_DETAIL_ERROR).as_deref(),
         Some("This item is no longer on GameBanana.")
     );
+    assert!(!support::present(cx, w.win, ids::ADDON_DETAIL_RETRY));
     assert!(support::present(
         cx,
         w.win,

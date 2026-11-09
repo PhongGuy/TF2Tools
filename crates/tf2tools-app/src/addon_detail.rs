@@ -11,7 +11,7 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, Task, TestSupportExt as _, Window, div, px,
     transparent_black,
 };
-use tf2tools_core::{AddonCard, AddonFile, AddonProfile};
+use tf2tools_core::{AddonCard, AddonFile, AddonProfile, BrowseError};
 
 use crate::ids;
 use crate::links::gamebanana_page;
@@ -33,6 +33,8 @@ pub enum ProfileState {
     Ready(AddonProfile),
     /// The failure in player words.
     Failed(String),
+    /// The item left GameBanana, so a retry cannot help; the message is in player words.
+    Gone(String),
 }
 
 /// The dialog's view: the card that opened it, and its profile once read.
@@ -81,21 +83,29 @@ impl AddonDetail {
         self.load = Some(cx.spawn(async move |this, cx| {
             let result = match job.await {
                 Ok(Ok(profile)) => Ok(profile),
-                Ok(Err(err)) => Err(describe_browse(&err)),
-                Err(_) => Err(addon_stopped(
-                    "the add-on profile task stopped unexpectedly".to_owned(),
+                Ok(Err(err)) => Err((
+                    describe_browse(&err),
+                    !matches!(err, BrowseError::Gone { .. }),
+                )),
+                Err(_) => Err((
+                    addon_stopped("the add-on profile task stopped unexpectedly".to_owned()),
+                    true,
                 )),
             }
-            .map_err(|failure| {
+            .map_err(|(failure, retryable)| {
                 failure.log("add-on profile");
-                failure.message
+                if retryable {
+                    ProfileState::Failed(failure.message)
+                } else {
+                    ProfileState::Gone(failure.message)
+                }
             });
             let _ = this.update(cx, |d, cx| d.loaded(result, cx));
         }));
         cx.notify();
     }
 
-    fn loaded(&mut self, result: Result<AddonProfile, String>, cx: &mut Context<Self>) {
+    fn loaded(&mut self, result: Result<AddonProfile, ProfileState>, cx: &mut Context<Self>) {
         self.load = None;
         self.profile = match result {
             Ok(profile) => {
@@ -103,7 +113,7 @@ impl AddonDetail {
                 self.carousel.update(cx, |c, cx| c.set_urls(urls, cx));
                 ProfileState::Ready(profile)
             }
-            Err(message) => ProfileState::Failed(message),
+            Err(failed) => failed,
         };
         cx.notify();
     }
@@ -231,7 +241,7 @@ impl Render for AddonDetail {
         // The card names the item until the profile does, so the header never jumps empty.
         let (name, author) = match &self.profile {
             ProfileState::Ready(p) => (p.name().to_owned(), p.author().to_owned()),
-            ProfileState::Loading | ProfileState::Failed(_) => {
+            ProfileState::Loading | ProfileState::Failed(_) | ProfileState::Gone(_) => {
                 (self.card.name.clone(), self.card.author.clone())
             }
         };
@@ -263,6 +273,14 @@ impl Render for AddonDetail {
                         }
                     },
                     cx,
+                )
+                .into_any_element(),
+            ],
+            ProfileState::Gone(message) => vec![
+                labelled(
+                    div().text_sm().text_color(cx.theme().danger),
+                    ids::ADDON_DETAIL_ERROR,
+                    message.clone(),
                 )
                 .into_any_element(),
             ],
