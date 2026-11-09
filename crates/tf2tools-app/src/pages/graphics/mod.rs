@@ -8,8 +8,9 @@ use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, Context, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, Role, ScrollHandle, SharedString, StatefulInteractiveElement as _,
-    Styled as _, Subscription, TestSupportExt as _, Window, div, px,
+    MouseButton, ParentElement as _, Render, Role, ScrollHandle, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
+    px,
 };
 use tf2tools_core::{MastercomfigRelease, MastercomfigStatus, Preset};
 
@@ -45,6 +46,8 @@ pub struct GraphicsPage {
     loaded: bool,
     /// An install, update, take-over, removal or preset pick is running; every action rests.
     busy: bool,
+    /// An action has ended and its reload is out; that reload's landing lifts `busy`.
+    settling: bool,
     /// Bumped by each reload, so a slower, older load never overwrites a newer one.
     load_generation: u64,
     scroll: ScrollHandle,
@@ -61,6 +64,7 @@ impl GraphicsPage {
             release: None,
             loaded: false,
             busy: false,
+            settling: false,
             load_generation: 0,
             scroll: ScrollHandle::new(),
             _subscriptions: vec![tf2],
@@ -82,6 +86,11 @@ impl GraphicsPage {
     /// The recorded mastercomfig release from the last load, if a sync recorded one.
     pub fn release(&self) -> Option<&MastercomfigRelease> {
         self.release.as_ref()
+    }
+
+    /// True while an action, or the reload after it, is running; every action button rests.
+    pub fn is_busy(&self) -> bool {
+        self.busy
     }
 
     /// The status card from the last load; None without TF2 or before a load.
@@ -235,8 +244,9 @@ impl GraphicsPage {
                     Err(err) => toast_error(window, cx, &err),
                 })
             });
+            // `busy` holds until the reload lands, so no button acts on the stale state.
             let _ = page.update(cx, |page, cx| {
-                page.busy = false;
+                page.settling = true;
                 page.reload(cx);
             });
         })
@@ -279,6 +289,10 @@ impl GraphicsPage {
                         page.release = release.clone();
                     }
                     page.loaded = true;
+                    if page.settling {
+                        page.settling = false;
+                        page.busy = false;
+                    }
                     cx.notify();
                     true
                 })
@@ -293,7 +307,7 @@ impl GraphicsPage {
 }
 
 impl Render for GraphicsPage {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let missing = matches!(tf2_state(cx).read(cx), Tf2State::Missing { .. });
         let warning = missing.then(|| {
             no_tf2_warning(
@@ -317,7 +331,10 @@ impl Render for GraphicsPage {
                 "Graphics and game settings from mastercomfig",
             ))
             .children(self.card().map(|card| self.status_card(&card, cx)))
-            .children(self.preset().map(|current| self.presets(current, cx)));
+            .children(
+                self.preset()
+                    .map(|current| self.presets(current, window, cx)),
+            );
         scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content).size_full()
     }
 }
@@ -346,6 +363,7 @@ impl GraphicsPage {
                             .primary()
                             .icon(IconName::RefreshCw)
                             .label("Update")
+                            .loading(busy)
                             .disabled(busy)
                             .on_click(
                                 cx.listener(|page, _, window, cx| page.install(true, window, cx)),
@@ -406,12 +424,14 @@ impl GraphicsPage {
             .into_any_element()
     }
 
-    // The five preset cards in comfig-app's order, the current one in the primary border.
-    fn presets(&self, current: Preset, cx: &mut Context<Self>) -> AnyElement {
+    // The five preset cards in comfig-app's order, the current one in the primary border. Each
+    // is a tab stop where Enter or Space picks it; a click does not take focus, as on the pills.
+    fn presets(&self, current: Preset, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
-        let (primary, border, muted, radius) = (
+        let (primary, border, ring, muted, radius) = (
             theme.primary,
             theme.border,
+            theme.ring,
             theme.muted_foreground,
             theme.radius_lg,
         );
@@ -419,17 +439,31 @@ impl GraphicsPage {
             .into_iter()
             .map(|preset| {
                 let chosen = preset == current;
+                let id = ids::graphics_preset(preset);
+                let focus = window
+                    .use_keyed_state(id.clone(), cx, |_, cx| cx.focus_handle().tab_stop(true))
+                    .read(cx)
+                    .clone();
+                let edge = if focus.is_focused(window) {
+                    ring
+                } else if chosen {
+                    primary
+                } else {
+                    border
+                };
                 card_frame(cx)
-                    .id(ids::graphics_preset(preset))
+                    .id(id)
                     .role(Role::Button)
                     .aria_label(preset_label(preset))
                     .aria_selected(chosen)
                     .test_support()
+                    .track_focus(&focus)
+                    .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
                     .flex_1()
                     .min_w(px(160.))
                     .p_4()
                     .rounded(radius)
-                    .border_color(if chosen { primary } else { border })
+                    .border_color(edge)
                     .cursor_pointer()
                     .when(self.busy, |card| card.opacity(0.6))
                     .on_click(cx.listener(move |page, _, window, cx| page.pick(preset, window, cx)))

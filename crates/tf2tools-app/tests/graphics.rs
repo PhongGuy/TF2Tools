@@ -3,7 +3,7 @@
 use crate::support;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::{Entity, TestAppContext};
+use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::GraphicsPage;
 use tf2tools_app::pages::graphics::model::StatusCard;
@@ -224,4 +224,54 @@ fn remove_asks_first_then_removes_mastercomfig(cx: &mut TestAppContext) {
         card(cx, &page) == Some(StatusCard::NotInstalled)
     });
     assert!(!env.game.join(BASE).exists());
+}
+
+#[gpui_kit::test]
+fn the_buttons_stay_locked_until_the_page_has_reloaded(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "ultra");
+    let page = open_graphics(cx, &s);
+    support::click_without_settling(cx, s.win, ids::graphics_preset(Preset::High));
+    assert!(
+        cx.update(|cx| page.read(cx).is_busy()),
+        "the pick locks the buttons"
+    );
+    // Step the executor one task at a time, so the moment the lock lifts is seen.
+    while cx.executor().tick() {
+        let (busy, preset) = cx.update(|cx| (page.read(cx).is_busy(), page.read(cx).preset()));
+        if !busy {
+            assert_eq!(
+                preset,
+                Some(Preset::High),
+                "unlocked before the reload landed"
+            );
+        }
+    }
+    support::settle(cx, s.win);
+    let disabled = cx
+        .update_window(s.win, |_, w, _| {
+            support::button_disabled(w, ids::GRAPHICS_REMOVE)
+        })
+        .unwrap();
+    assert!(!disabled, "Remove unlocks once the page has reloaded");
+}
+
+#[gpui_kit::test]
+fn a_preset_card_is_picked_with_the_keyboard(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "ultra");
+    let page = open_graphics(cx, &s);
+    support::tab_to(cx, s.win, ids::graphics_preset(Preset::High), 64);
+    support::press(cx, s.win, "enter");
+    support::wait_real(cx, "the Enter pick", |cx| {
+        cx.update(|cx| page.read(cx).preset()) == Some(Preset::High)
+    });
+    support::tab_to(cx, s.win, ids::graphics_preset(Preset::Low), 64);
+    support::press(cx, s.win, "space");
+    support::wait_real(cx, "the Space pick", |cx| {
+        cx.update(|cx| page.read(cx).preset()) == Some(Preset::Low)
+    });
+    assert_eq!(hook(&env), "preset=low\n");
 }
