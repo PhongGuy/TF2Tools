@@ -544,7 +544,7 @@ fn a_failed_step_shows_retry_and_retry_loads(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn the_sort_select_is_labelled_and_as_wide_as_the_store_grids(cx: &mut TestAppContext) {
+fn the_sort_select_is_labelled_and_shows_its_longest_label_whole(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
     server.mount_gb_index(
         587,
@@ -560,7 +560,38 @@ fn the_sort_select_is_labelled_and_as_wide_as_the_store_grids(cx: &mut TestAppCo
         Some("Sort:")
     );
     let sort = support::bounds_of(cx, w.win, ids::ADDON_SORT).unwrap();
-    assert_eq!(sort.size.width, gpui_kit::px(144.));
+    let longest = label_width(cx, w.win, "Most downloaded");
+    assert!(
+        longest + SELECT_CHROME <= sort.size.width,
+        "{longest:?} of label in a {:?} select",
+        sort.size.width
+    );
+}
+
+// The kit's medium Select trigger around its title: two 1 px borders, 10 px padding a side,
+// a 4 px gap and the 16 px caret.
+const SELECT_CHROME: gpui_kit::Pixels = gpui_kit::px(42.);
+
+// `text` shaped at the Select's text-sm in the theme font, as the window lays it out.
+fn label_width(
+    cx: &mut TestAppContext,
+    win: gpui_kit::AnyWindowHandle,
+    text: &str,
+) -> gpui_kit::Pixels {
+    use gpui_kit::AppContext as _;
+    use gpui_kit::component::ActiveTheme as _;
+    cx.update_window(win, |_, w, cx| {
+        let run = gpui_kit::TextRun {
+            len: text.len(),
+            font: gpui_kit::font(cx.theme().font_family.clone()),
+            ..Default::default()
+        };
+        let size = gpui_kit::rems(0.875).to_pixels(w.rem_size());
+        w.text_system()
+            .shape_line(text.to_owned().into(), size, &[run], None)
+            .width
+    })
+    .unwrap()
 }
 
 #[gpui_kit::test]

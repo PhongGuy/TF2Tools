@@ -43,6 +43,9 @@ const MAX_COLUMNS: usize = 4;
 /// v5 draws eight skeleton cards while a store loads.
 const SKELETON_CARDS: usize = 8;
 
+/// Fits "Most downloaded" whole beside the kit's caret and padding, on a 4 px step.
+const SORT_WIDTH: f32 = 172.;
+
 /// The sort Select's labels, in menu order.
 const SORTS: [(&str, AddonSort); 2] = [
     ("Most downloaded", AddonSort::MostDownloaded),
@@ -658,7 +661,7 @@ impl AddonTab {
                     ))
                     .child(select(
                         ids::ADDON_SORT,
-                        144.,
+                        SORT_WIDTH,
                         Select::new(&self.sort_select)
                             .h_9()
                             .disabled(!enabled)
