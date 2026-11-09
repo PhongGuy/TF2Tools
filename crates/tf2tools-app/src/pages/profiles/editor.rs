@@ -55,6 +55,8 @@ const SOUND_ROW_HEIGHT: Pixels = px(56.);
 const SOUND_MAX_ROWS: usize = 8;
 // The HUD gallery shows at most this many rows before it scrolls.
 const PICKER_MAX_ROWS: usize = 3;
+// Slot cards and gallery items fade to this while editing is locked.
+const LOCKED_OPACITY: f32 = 0.5;
 
 enum Job {
     Edit(Edit),
@@ -119,6 +121,8 @@ pub struct ProfileEditor {
     /// Whether a crosshair was picked when the weapon list was last told.
     crosshair_picked: bool,
     assigner: Entity<WeaponAssigner>,
+    /// `editing_locked` as last pushed to the name field and the weapon list.
+    locked: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -147,6 +151,7 @@ impl ProfileEditor {
                         editor.not_applied = false;
                     }
                 }
+                editor.sync_lock(cx);
                 cx.notify();
             }));
         }
@@ -255,6 +260,7 @@ impl ProfileEditor {
             crosshair_picker,
             crosshair_picked: false,
             assigner,
+            locked: false,
             _subscriptions: subscriptions,
         };
         editor.relabel(cx);
@@ -387,11 +393,29 @@ impl ProfileEditor {
     fn sync_assigner(&self, cx: &mut Context<Self>) {
         let state = AssignerState {
             has_selection: self.crosshair_picked,
-            busy: false,
+            busy: self.editing_locked(cx),
             running: None,
         };
         self.assigner
             .update(cx, |assigner, cx| assigner.set_state(state, cx));
+    }
+
+    /// True while the page activates, creates or deletes: apply reads the profile once at the
+    /// start, so an edit saved meanwhile would never reach the game.
+    pub fn editing_locked(&self, cx: &App) -> bool {
+        self.page.upgrade().is_some_and(|p| p.read(cx).is_busy())
+    }
+
+    // Greys the name field and the weapon list while editing is locked.
+    fn sync_lock(&mut self, cx: &mut Context<Self>) {
+        let locked = self.editing_locked(cx);
+        if locked == self.locked {
+            return;
+        }
+        self.locked = locked;
+        self.name
+            .update(cx, |input, cx| input.set_disabled(locked, cx));
+        self.sync_assigner(cx);
     }
 
     // The library HUDs whose name holds the search text.
@@ -515,8 +539,11 @@ impl ProfileEditor {
         self.queue.is_empty() && !self.running
     }
 
-    /// Queues a change; jobs run one at a time, in order.
+    /// Queues a change; jobs run one at a time, in order. Refused while `editing_locked`.
     pub fn enqueue(&mut self, edit: Edit, cx: &mut Context<Self>) {
+        if self.editing_locked(cx) {
+            return;
+        }
         self.queue.push_back(Job::Edit(edit));
         self.pump(cx);
     }
@@ -685,6 +712,9 @@ impl ProfileEditor {
     // The typed name, trimmed: blank puts the saved name back, a name another loaded profile
     // holds shows the taken line, anything new is queued as a rename. False when refused as taken.
     fn commit_name(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if self.editing_locked(cx) {
+            return false;
+        }
         let text = self.name.read(cx).value().trim().to_owned();
         if text.is_empty() {
             let name = self.saved.name().to_owned();
@@ -837,6 +867,7 @@ impl ProfileEditor {
         let key = slot.key();
         let state = slot_state(&self.saved, slot, &self.missing);
         let text = slot_text(&state, slot);
+        let locked = self.editing_locked(cx);
         let theme = cx.theme();
         let selected = slot == self.selected;
         let value = match &state {
@@ -876,6 +907,7 @@ impl ProfileEditor {
                 .px(SM_ICON_PX)
                 .icon(IconName::X)
                 .named("Clear")
+                .disabled(locked)
                 .on_click(cx.listener(move |editor, _, window, cx| {
                     cx.stop_propagation();
                     if slot == Slot::Crosshairs {
@@ -891,7 +923,8 @@ impl ProfileEditor {
             .aria_selected(selected)
             .test_support()
             .when(selected, |card| card.border_color(cx.theme().primary))
-            .cursor_pointer()
+            .when(locked, |card| card.opacity(LOCKED_OPACITY))
+            .when(!locked, |card| card.cursor_pointer())
             .p_4()
             .child(
                 h_flex()
@@ -907,7 +940,11 @@ impl ProfileEditor {
                     .children(play)
                     .children(clear),
             )
-            .on_click(cx.listener(move |editor, _, _, cx| editor.select(slot, cx)))
+            .on_click(cx.listener(move |editor, _, _, cx| {
+                if !editor.editing_locked(cx) {
+                    editor.select(slot, cx)
+                }
+            }))
             .into_any_element()
     }
 
@@ -1039,6 +1076,7 @@ impl ProfileEditor {
         let count = shown.len();
         div()
             .h(grid_height)
+            .when(self.editing_locked(cx), |grid| grid.opacity(LOCKED_OPACITY))
             .child(self.grid.render_sized(count, height, move |ix, _, cx| {
                 let hud = &shown[ix];
                 let folder = hud.folder_name();
@@ -1112,6 +1150,7 @@ impl ProfileEditor {
             Slot::Hud | Slot::Crosshairs => return Vec::new(),
         };
         let saved = saved.map(|item| item.folder_name().to_owned());
+        let locked = self.editing_locked(cx);
         let shown = self.shown_sounds(cx);
         (shown.get(range).unwrap_or_default().iter())
             .map(|sound| {
@@ -1133,7 +1172,8 @@ impl ProfileEditor {
                     .aria_selected(picked)
                     .test_support()
                     .when(picked, |row| row.border_color(cx.theme().primary))
-                    .cursor_pointer()
+                    .when(locked, |row| row.opacity(LOCKED_OPACITY))
+                    .when(!locked, |row| row.cursor_pointer())
                     .px_3()
                     .py_2()
                     .child(

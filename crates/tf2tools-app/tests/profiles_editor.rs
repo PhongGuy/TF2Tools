@@ -1639,3 +1639,59 @@ fn card_buttons_do_not_open_the_editor(cx: &mut TestAppContext) {
     );
     assert!(cx.update(|cx| page.read(cx).editor()).is_none());
 }
+
+// Activate has started but not applied: a slot click lands in the same frame as Activate, so
+// only the lock stands between it and a save the apply would never see.
+#[gpui_kit::test]
+fn the_editor_is_read_only_while_its_profile_activates(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let budhud = seed_hud(&s, &env, "budhud");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    support::settle(cx, s.win);
+    cx.update_window(s.win, |_, w, cx| {
+        w.click(ids::PROFILE_EDITOR_ACTIVATE, cx);
+        w.click(ids::profile_pick_hud(budhud.folder_name()), cx);
+        w.click(ids::profile_slot_clear("hitsound"), cx);
+        w.click(ids::profile_slot("killsound"), cx);
+    })
+    .unwrap();
+    assert!(cx.update(|cx| page.read(cx).activating().is_some()));
+    support::wait_real(cx, "the activate to end", |cx| {
+        cx.update(|cx| page.read(cx).activating().is_none())
+    });
+    wait_idle(cx, &s, &editor);
+    let after = saved(&s, comp.id());
+    assert_eq!(after.hud(), comp.hud());
+    assert_eq!(after.hitsound(), comp.hitsound());
+    assert_eq!(
+        cx.update(|cx| editor.read(cx).selected()),
+        tf2tools_app::pages::profiles::editor_model::Slot::Hud
+    );
+    assert!(!cx.update(|cx| editor.read(cx).not_applied()));
+}
+
+// A create or Delete holds the page busy; an edit asked for meanwhile is refused, not queued.
+#[gpui_kit::test]
+fn enqueue_refuses_while_the_page_is_busy(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let budhud = seed_hud(&s, &env, "budhud");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    let hud = budhud.id().clone();
+    cx.update_window(s.win, |_, w, cx| {
+        page.update(cx, |p, cx| p.new_profile(false, w, cx));
+        assert!(page.read(cx).is_busy());
+        editor.update(cx, |e, cx| e.enqueue(Edit::SetHud(hud), cx));
+        assert!(editor.read(cx).is_idle());
+    })
+    .unwrap();
+    support::wait_real(cx, "the create", |cx| {
+        cx.update(|cx| !page.read(cx).is_busy())
+    });
+    assert_eq!(saved(&s, comp.id()).hud(), comp.hud());
+}
