@@ -125,3 +125,26 @@ fn restore_leaves_an_unmanaged_game_and_an_existing_preset_file_alone() {
     assert!(!env.lib.restore_mastercomfig_files(&env.tf2).unwrap());
     assert_eq!(hook(&env).as_deref(), Some("preset=low\n"));
 }
+
+#[test]
+fn restore_writes_the_addon_list_even_when_mastercomfig_is_not_managed() {
+    let env = library_env();
+    write_file(
+        &env.tf2.custom_dir().join(BASE),
+        &mastercomfig_base("9.100.1"),
+    );
+    write_file(
+        &env.tf2
+            .custom_dir()
+            .join("mastercomfig-addon-flat-mouse.vpk"),
+        b"a",
+    );
+    assert!(env.lib.restore_mastercomfig_files(&env.tf2).unwrap());
+    let addons = fs::read_to_string(env.tf2.custom_dir().join(ADDONS_CFG)).unwrap();
+    assert_eq!(addons, "exec addons/flat-mouse.cfg\n");
+    assert_eq!(
+        hook(&env),
+        None,
+        "the preset file is only restored for a managed install"
+    );
+}

@@ -233,7 +233,8 @@ impl Library {
             }
         }
 
-        // Regenerating a missing addons.cfg writes it only when addon VPKs are present.
+        // addons.cfg is TF2Tools' own addon list, kept even for a hand-installed mastercomfig;
+        // regenerating it writes the file only when addon VPKs are present.
         let addons = ADDONS_CFG.iter().fold(custom.clone(), |p, c| p.join(c));
         if !addons.is_file() {
             rewrite_addons_cfg(&custom)?;
