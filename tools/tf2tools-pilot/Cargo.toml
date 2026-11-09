@@ -17,7 +17,7 @@ tf2tools-core = { path = "../../crates/tf2tools-core" }
 gpui-kit = "=0.9.0"
 gpui-component = "=0.9.0"
 gpui-base = "=0.9.0"
-gpui-pilot-host = { git = "https://github.com/PhongGuy/gpui-pilot", rev = "562bf36a6d66c77ecf8fe46a864e60e1e1c4df90" }
+gpui-pilot-host = { git = "https://github.com/PhongGuy/gpui-pilot", tag = "v0.2.0" }
 anyhow = "1"
 zip = "9"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
