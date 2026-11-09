@@ -201,8 +201,8 @@ impl ProfilesPage {
 
     // Opens the editor on a profile already in hand, such as one just created.
     fn show_editor(&mut self, profile: Profile, window: &mut Window, cx: &mut Context<Self>) {
-        let page = cx.entity().downgrade();
-        let editor = cx.new(|cx| ProfileEditor::new(profile, page, window, cx));
+        let (page, active) = (cx.entity().downgrade(), self.active.clone());
+        let editor = cx.new(|cx| ProfileEditor::new(profile, page, active, window, cx));
         self.view = View::Editor(editor);
         cx.notify();
     }

@@ -54,8 +54,10 @@ pub struct ProfileEditor {
     queue: VecDeque<Job>,
     running: bool,
     name: Entity<InputState>,
-    /// The other profile's name, when core refused a rename as taken.
+    /// The name the player asked for, when core refused the rename as taken.
     name_taken: Option<String>,
+    /// The page's active profile as last seen, so only a change to it can clear `not_applied`.
+    seen_active: Option<ProfileId>,
     /// The rename queued or running, so Enter then Blur sends it once.
     renaming: Option<String>,
     after_idle: Option<AfterIdle>,
@@ -64,35 +66,41 @@ pub struct ProfileEditor {
 
 impl ProfileEditor {
     /// Subscribes to the page (redraw) and to `LibraryEvents` (a Refresh); queues a Refresh.
+    /// `active` is the page's active profile when the editor opens.
     pub fn new(
         profile: Profile,
         page: WeakEntity<ProfilesPage>,
+        active: Option<ProfileId>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
         let initial = profile.name().to_owned();
         let name = cx.new(|cx| InputState::new(window, cx).default_value(initial));
-        // Active, busy and the activating id live on the page, so its changes redraw the header;
-        // once the profile is active again, its edits count as applied.
-        let mut subscriptions: Vec<Subscription> = page
-            .upgrade()
-            .map(|page| {
-                cx.observe(&page, |editor, page, cx| {
-                    if page.read(cx).active() == Some(editor.id()) {
+        // Active, busy and the activating id live on the page, so its changes redraw the header.
+        // Edits count as applied once the page's active profile changes to this one; a redraw
+        // before the page's reload lands still shows the old active id.
+        let mut subscriptions = Vec::new();
+        if let Some(page) = page.upgrade() {
+            subscriptions.push(cx.observe(&page, |editor, page, cx| {
+                let active = page.read(cx).active();
+                if active != editor.seen_active.as_ref() {
+                    editor.seen_active = active.cloned();
+                    if active == Some(editor.id()) {
                         editor.not_applied = false;
                     }
-                    cx.notify();
-                })
-            })
-            .into_iter()
-            .collect();
+                }
+                cx.notify();
+            }));
+        }
         // gpui-kit owns InputEvent; Enter and leaving the field save the name.
         #[allow(clippy::wildcard_enum_match_arm)]
         subscriptions.push(cx.subscribe_in(
             &name,
             window,
             |editor, _, event: &InputEvent, window, cx| match event {
-                InputEvent::PressEnter { .. } | InputEvent::Blur => editor.commit_name(window, cx),
+                InputEvent::PressEnter { .. } | InputEvent::Blur => {
+                    editor.commit_name(window, cx);
+                }
                 InputEvent::Change => {
                     editor.name_taken = None;
                     cx.notify();
@@ -102,7 +110,8 @@ impl ProfileEditor {
         ));
         let events = LibraryEvents::global(cx);
         subscriptions.push(cx.subscribe(&events, |editor, _, _: &LibraryChanged, cx| {
-            editor.enqueue_job(Job::Refresh, cx)
+            editor.queue_refresh();
+            editor.pump(cx);
         }));
         let mut editor = Self {
             page,
@@ -114,11 +123,13 @@ impl ProfileEditor {
             running: false,
             name,
             name_taken: None,
+            seen_active: active,
             renaming: None,
             after_idle: None,
             _subscriptions: subscriptions,
         };
-        editor.enqueue_job(Job::Refresh, cx);
+        editor.queue_refresh();
+        editor.pump(cx);
         editor
     }
 
@@ -159,12 +170,15 @@ impl ProfileEditor {
 
     /// Queues a change; jobs run one at a time, in order.
     pub fn enqueue(&mut self, edit: Edit, cx: &mut Context<Self>) {
-        self.enqueue_job(Job::Edit(edit), cx);
+        self.queue.push_back(Job::Edit(edit));
+        self.pump(cx);
     }
 
-    fn enqueue_job(&mut self, job: Job, cx: &mut Context<Self>) {
-        self.queue.push_back(job);
-        self.pump(cx);
+    // A Refresh already last in the queue will read everything this one would.
+    fn queue_refresh(&mut self) {
+        if !matches!(self.queue.back(), Some(Job::Refresh)) {
+            self.queue.push_back(Job::Refresh);
+        }
     }
 
     // Starts the next job unless one runs. An edit's draft is built here, when it starts, from
@@ -219,8 +233,11 @@ impl ProfileEditor {
         match done {
             Ok(Done::Saved(edit, Ok(update))) => {
                 self.saved = update.profile().clone();
+                // A rename leaves the slots alone; any other save may fix or break a missing mark.
                 if let Edit::Rename(_) = edit {
                     self.renamed(window, cx);
+                } else {
+                    self.queue_refresh();
                 }
                 if update.deactivated() {
                     self.not_applied = true;
@@ -236,14 +253,14 @@ impl ProfileEditor {
                 self.renaming = None;
                 self.name_taken = Some(name);
                 self.after_idle = None;
-                self.queue.push_back(Job::Refresh);
+                self.queue_refresh();
             }
             Ok(Done::Saved(edit, Err(e))) => {
                 if let Edit::Rename(_) = edit {
                     self.renaming = None;
                 }
                 toast_error(window, cx, &failed(&e));
-                self.queue.push_back(Job::Refresh);
+                self.queue_refresh();
             }
             Ok(Done::Refreshed(Ok((profile, missing)))) => {
                 self.saved = profile;
@@ -293,26 +310,27 @@ impl ProfileEditor {
     }
 
     // The typed name, trimmed: blank puts the saved name back, a name another loaded profile
-    // holds shows the taken line, anything new is queued as a rename.
-    fn commit_name(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    // holds shows the taken line, anything new is queued as a rename. False when refused as taken.
+    fn commit_name(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let text = self.name.read(cx).value().trim().to_owned();
         if text.is_empty() {
             let name = self.saved.name().to_owned();
             self.name
                 .update(cx, |input, cx| input.set_value(name, window, cx));
-            return;
+            return true;
         }
         if text == self.saved.name() && self.renaming.is_none()
             || self.renaming.as_deref() == Some(text.as_str())
         {
-            return;
+            return true;
         }
         if self.taken_name(cx).is_some() {
             cx.notify();
-            return;
+            return false;
         }
         self.renaming = Some(text.clone());
         self.enqueue(Edit::Rename(text), cx);
+        true
     }
 
     // The other profile holding the typed name: core's answer, or the page's loaded list.
@@ -325,9 +343,11 @@ impl ProfileEditor {
     }
 
     // A kit Button never blurs the name field, so Back, Activate and Delete save a typed name
-    // first and act once the queue is idle.
+    // first and act once the queue is idle; a taken name stops them, as core's NameTaken does.
     fn leave(&mut self, then: AfterIdle, window: &mut Window, cx: &mut Context<Self>) {
-        self.commit_name(window, cx);
+        if !self.commit_name(window, cx) {
+            return;
+        }
         self.after_idle = Some(then);
         if self.is_idle() {
             self.run_after_idle(window, cx);

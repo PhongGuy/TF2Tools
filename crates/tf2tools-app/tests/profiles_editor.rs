@@ -497,3 +497,152 @@ fn activate_saves_a_typed_name_first(cx: &mut TestAppContext) {
         Some(comp.id())
     );
 }
+
+// An edit that ends the active state lands before the page's reload; a page redraw in between
+// still sees the old active id and must not count the edit as applied.
+#[gpui_kit::test]
+fn a_stale_active_id_keeps_changes_not_applied(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let budhud = seed_hud(&s, &env, "budhud");
+    apply(&s, &env, &comp);
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    // Redraw the page once, in the same tick the save lands.
+    let fired = std::rc::Rc::new(std::cell::Cell::new(false));
+    let (once, redraw) = (std::rc::Rc::clone(&fired), page.clone());
+    let _watch = cx.update(|cx| {
+        cx.observe(&editor, move |e, cx| {
+            if e.read(cx).not_applied() && !once.replace(true) {
+                redraw.update(cx, |_, cx| cx.notify());
+            }
+        })
+    });
+    cx.update(|cx| editor.update(cx, |e, cx| e.enqueue(Edit::SetHud(budhud.id().clone()), cx)));
+    wait_idle(cx, &s, &editor);
+    support::wait_real(cx, "the page's reload", |cx| {
+        cx.update(|cx| page.read(cx).active().is_none())
+    });
+    assert!(fired.get());
+    assert!(cx.update(|cx| editor.read(cx).not_applied()));
+    assert!(support::present(cx, s.win, ids::PROFILE_EDITOR_NOT_APPLIED));
+}
+
+#[gpui_kit::test]
+fn a_slot_save_clears_its_missing_mark(cx: &mut TestAppContext) {
+    use tf2tools_app::pages::profiles::editor_model::{Slot, SlotState, slot_state};
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let rayshud = seed_hud(&s, &env, "rayshud");
+    let budhud = seed_hud(&s, &env, "budhud");
+    let comp = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Comp").with_hud(DraftSlot::Item(rayshud.id().clone())))
+        .unwrap();
+    s.services.library.delete_hud(rayshud.id()).unwrap();
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    let hud_state = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            let e = editor.read(cx);
+            slot_state(e.saved(), Slot::Hud, e.missing())
+        })
+    };
+    assert!(matches!(hud_state(cx), SlotState::Missing(_)));
+    cx.update(|cx| editor.update(cx, |e, cx| e.enqueue(Edit::SetHud(budhud.id().clone()), cx)));
+    wait_idle(cx, &s, &editor);
+    assert!(!matches!(hud_state(cx), SlotState::Missing(_)));
+}
+
+#[gpui_kit::test]
+fn back_with_a_taken_name_stays_in_the_editor(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    empty_profile(&s, "Pubs");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    type_name(cx, &s, &editor, "Pubs");
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_BACK);
+    wait_idle(cx, &s, &editor);
+    assert!(support::present(cx, s.win, ids::PROFILE_EDITOR));
+    assert!(support::present(cx, s.win, ids::PROFILE_EDITOR_NAME_TAKEN));
+    assert_eq!(saved(&s, comp.id()).name(), "Comp");
+}
+
+#[gpui_kit::test]
+fn activate_with_a_taken_name_does_not_activate(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    empty_profile(&s, "Pubs");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    type_name(cx, &s, &editor, "Pubs");
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_ACTIVATE);
+    wait_idle(cx, &s, &editor);
+    support::wait_real(cx, "no activate running", |cx| {
+        cx.update(|cx| page.read(cx).activating().is_none())
+    });
+    assert!(support::present(cx, s.win, ids::PROFILE_EDITOR_NAME_TAKEN));
+    assert_eq!(s.services.library.active_profile().unwrap(), None);
+    assert_eq!(saved(&s, comp.id()).name(), "Comp");
+}
+
+// Enter queues the rename; the blur that follows while it runs must not queue it again.
+#[gpui_kit::test]
+fn enter_then_leaving_the_field_saves_once(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    // Every distinct save stamp the editor has held, starting with the opened one.
+    let stamps = std::rc::Rc::new(std::cell::RefCell::new(vec![comp.updated_at().to_owned()]));
+    let sink = std::rc::Rc::clone(&stamps);
+    let _watch = cx.update(|cx| {
+        cx.observe(&editor, move |e, cx| {
+            let stamp = e.read(cx).saved().updated_at().to_owned();
+            if sink.borrow().last() != Some(&stamp) {
+                sink.borrow_mut().push(stamp);
+            }
+        })
+    });
+    // A test window starts inactive, and an inactive window reports no focus changes.
+    cx.update_window(s.win, |_, w, _| w.activate_window())
+        .unwrap();
+    type_name(cx, &s, &editor, "Pubs");
+    cx.update_window(s.win, |_, w, cx| {
+        gpui_kit::test::TestWindowExt::press(w, "enter", cx);
+        w.blur(cx);
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    wait_idle(cx, &s, &editor);
+    assert_eq!(saved(&s, comp.id()).name(), "Pubs");
+    assert_eq!(stamps.borrow().len(), 2, "{:?}", stamps.borrow());
+}
+
+#[gpui_kit::test]
+fn delete_saves_a_typed_name_first(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    type_name(cx, &s, &editor, "Pubs");
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_DELETE);
+    support::wait_real(cx, "the confirm", |cx| {
+        support::present(cx, s.win, ids::CONFIRM_DESCRIPTION)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
+        Some("Are you sure you want to delete \"Pubs\"? This cannot be undone.")
+    );
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    toast_is(cx, &s, "Profile deleted");
+    let row = &support::log_rows(&s.services)[0];
+    assert_eq!(row.message(), "Deleted profile: Pubs");
+}
