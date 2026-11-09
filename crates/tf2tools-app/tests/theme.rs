@@ -144,3 +144,20 @@ fn the_bundled_inter_faces_run_from_regular_to_bold() {
         .collect();
     assert_eq!(weights, vec![400, 500, 600, 700]);
 }
+
+// The hover fill is painted on the page background in place of the card's group-box fill, so
+// what shows must be clearly lighter than the resting card.
+#[gpui_kit::test]
+fn a_hovered_card_is_visibly_lighter(cx: &mut TestAppContext) {
+    support::init(cx);
+    cx.update(|cx| {
+        let t = Theme::global(cx);
+        let shown = t.background.blend(tf2tools_app::theme::card_hover(t));
+        assert!(
+            shown.l >= t.group_box.l + 0.04,
+            "hover shows {} over a {} card",
+            hex(shown),
+            hex(t.group_box)
+        );
+    });
+}

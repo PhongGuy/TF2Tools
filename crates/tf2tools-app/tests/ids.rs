@@ -206,16 +206,8 @@ fn profile_ids_are_keyed_by_profile_id() {
             ids::PROFILES_ACTIVE_EMPTY,
             ids::PROFILES_NO_ACTIVE,
             ids::PROFILES_SEARCH,
-            ids::PROFILES_CREATE,
-            ids::PROFILES_SAVE_CURRENT,
             ids::PROFILES_EMPTY,
-            ids::PROFILES_EMPTY_CREATE,
-            ids::PROFILES_EMPTY_SAVE,
             ids::PROFILES_NO_MATCH,
-            ids::PROFILES_SAVE_DIALOG,
-            ids::PROFILES_SAVE_NAME,
-            ids::PROFILES_SAVE_CANCEL,
-            ids::PROFILES_SAVE_OK,
             ids::PROFILES_MISSING_DIALOG,
             ids::PROFILES_MISSING_DESCRIPTION,
             ids::PROFILES_MISSING_CANCEL,
@@ -233,80 +225,12 @@ fn profile_ids_are_keyed_by_profile_id() {
             "profiles-active-empty",
             "profiles-no-active",
             "profiles-search",
-            "profiles-create",
-            "profiles-save-current",
             "profiles-empty",
-            "profiles-empty-create",
-            "profiles-empty-save",
             "profiles-no-match",
-            "profiles-save-dialog",
-            "profiles-save-name",
-            "profiles-save-cancel",
-            "profiles-save-ok",
             "profiles-missing-dialog",
             "profiles-missing-description",
             "profiles-missing-cancel",
             "profiles-missing-install",
-        ]
-    );
-}
-
-#[test]
-fn wizard_ids_are_stable() {
-    assert_eq!(name(ids::wizard_step(1)), "wizard-step:1");
-    assert_eq!(name(ids::wizard_step(4)), "wizard-step:4");
-    assert_eq!(
-        name(ids::wizard_option("hud", "none")),
-        "wizard-hud-option:none"
-    );
-    assert_eq!(
-        name(ids::wizard_option("killsound", "missing")),
-        "wizard-killsound-option:missing"
-    );
-    assert_eq!(
-        [
-            ids::WIZARD_DIALOG,
-            ids::WIZARD_TITLE,
-            ids::WIZARD_DESCRIPTION,
-            ids::WIZARD_NAME,
-            ids::WIZARD_HUD,
-            ids::WIZARD_HUD_EMPTY,
-            ids::WIZARD_HITSOUND,
-            ids::WIZARD_KILLSOUND,
-            ids::WIZARD_HITSOUND_PLAY,
-            ids::WIZARD_KILLSOUND_PLAY,
-            ids::WIZARD_SOUNDS_EMPTY,
-            ids::WIZARD_MODE_NONE,
-            ids::WIZARD_MODE_COPY,
-            ids::WIZARD_MODE_CUSTOM,
-            ids::WIZARD_COPY_NOTE,
-            ids::WIZARD_ASSIGNED_COUNT,
-            ids::WIZARD_CANCEL,
-            ids::WIZARD_BACK,
-            ids::WIZARD_NEXT,
-            ids::WIZARD_SAVE,
-        ],
-        [
-            "wizard-dialog",
-            "wizard-title",
-            "wizard-description",
-            "wizard-name",
-            "wizard-hud",
-            "wizard-hud-empty",
-            "wizard-hitsound",
-            "wizard-killsound",
-            "wizard-hitsound-play",
-            "wizard-killsound-play",
-            "wizard-sounds-empty",
-            "wizard-mode-none",
-            "wizard-mode-copy",
-            "wizard-mode-custom",
-            "wizard-copy-note",
-            "wizard-assigned-count",
-            "wizard-cancel",
-            "wizard-back",
-            "wizard-next",
-            "wizard-save",
         ]
     );
 }
@@ -722,4 +646,93 @@ fn situation_switch_ids_name_each_switch() {
         "hud-maker-situation-switch:minimal-hud"
     );
     assert_eq!(ids::HUD_MAKER_MINMODE_CHIP, "hud-maker-minmode-chip");
+}
+
+#[test]
+fn profile_editor_ids_are_stable() {
+    for (el, want) in [
+        (ids::profile_slot("hud"), "profile-slot:hud"),
+        (
+            ids::profile_slot_clear("crosshairs"),
+            "profile-slot-clear:crosshairs",
+        ),
+        (
+            ids::profile_slot_play("hitsound"),
+            "profile-slot-play:hitsound",
+        ),
+        (
+            ids::profile_slot_missing("killsound"),
+            "profile-slot-missing:killsound",
+        ),
+        (ids::profile_picker("hud"), "profile-picker:hud"),
+        (
+            ids::profile_picker_search("hud"),
+            "profile-picker-search:hud",
+        ),
+        (
+            ids::profile_picker_empty("hitsound"),
+            "profile-picker-empty:hitsound",
+        ),
+        (ids::profile_picker_store("hud"), "profile-picker-store:hud"),
+        (
+            ids::profile_picker_no_match("hud"),
+            "profile-picker-no-match:hud",
+        ),
+        (ids::profile_pick_hud("rayshud"), "profile-pick-hud:rayshud"),
+        (
+            ids::profile_pick_sound("killsound", "bell"),
+            "profile-pick-sound:killsound:bell",
+        ),
+        (ids::profile_pick_play("bell"), "profile-pick-play:bell"),
+        (
+            ids::weapon_clear("tf_weapon_bat"),
+            "weapon-clear:tf_weapon_bat",
+        ),
+    ] {
+        assert_eq!(name(el), want);
+    }
+    assert_eq!(
+        [
+            ids::PROFILES_NEW,
+            ids::PROFILES_NEW_MENU,
+            ids::PROFILES_NEW_SPLIT,
+            ids::PROFILES_NEW_EMPTY,
+            ids::PROFILES_EMPTY_NEW,
+            ids::PROFILES_EMPTY_START_EMPTY,
+            ids::PROFILE_EDITOR,
+            ids::PROFILE_EDITOR_BACK,
+            ids::PROFILE_EDITOR_NAME,
+            ids::PROFILE_EDITOR_NAME_TAKEN,
+            ids::PROFILE_EDITOR_ACTIVATE,
+            ids::PROFILE_EDITOR_ACTIVE_BADGE,
+            ids::PROFILE_EDITOR_DELETE,
+            ids::PROFILE_EDITOR_NOT_APPLIED,
+            ids::PROFILE_PICKER_GRID,
+            ids::PROFILE_PICKER_SOUNDS,
+            ids::PROFILE_PICKER_SOUNDS_SCROLLBAR,
+            ids::PROFILE_SLOT_HUD_SHOT,
+            ids::PROFILE_SLOT_HUD_IMAGE,
+        ],
+        [
+            "profiles-new",
+            "profiles-new-menu",
+            "profiles-new-split",
+            "profiles-new-empty",
+            "profiles-empty-new",
+            "profiles-empty-start-empty",
+            "profile-editor",
+            "profile-editor-back",
+            "profile-editor-name",
+            "profile-editor-name-taken",
+            "profile-editor-activate",
+            "profile-editor-active-badge",
+            "profile-editor-delete",
+            "profile-editor-not-applied",
+            "profile-picker-grid",
+            "profile-picker-sounds",
+            "profile-picker-sounds-scrollbar",
+            "profile-slot-hud-shot",
+            "profile-slot-hud-image",
+        ]
+    );
 }

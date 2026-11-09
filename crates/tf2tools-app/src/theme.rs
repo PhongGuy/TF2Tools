@@ -51,3 +51,10 @@ pub fn install(cx: &mut App) {
         }
     });
 }
+
+/// A hovered card's fill. A hover background replaces the card's own instead of layering on
+/// it, so v5's translucent accent/50 would land on the page background and match the card;
+/// the opaque accent keeps v5's step above the resting card.
+pub fn card_hover(theme: &Theme) -> Hsla {
+    theme.accent
+}

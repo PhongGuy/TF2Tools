@@ -598,9 +598,17 @@ impl Render for Shell {
                 .get_or_insert_with(|| cx.new(|cx| GraphicsPage::new(window, cx)))
                 .clone()
                 .into_any_element(),
+            // The editor's empty pickers ask for a store by event.
             Page::Profiles => self
                 .profiles
-                .get_or_insert_with(|| cx.new(|cx| ProfilesPage::new(window, cx)))
+                .get_or_insert_with(|| {
+                    let page = cx.new(|cx| ProfilesPage::new(window, cx));
+                    cx.subscribe(&page, |shell, _, nav: &NavigateTo, cx| {
+                        shell.navigate(nav.0, cx)
+                    })
+                    .detach();
+                    page
+                })
                 .clone()
                 .into_any_element(),
         };

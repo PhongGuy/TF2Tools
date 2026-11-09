@@ -1,6 +1,6 @@
 //! v5's per-class weapon assignment: the class tabs and bulk buttons over the class's weapon
 //! rows. It never writes; a click emits `AssignRequested` and the host decides what assigning
-//! means (the Crosshairs page writes the table, the profile wizard edits its draft).
+//! means (the Crosshairs page writes the table, the profile editor saves its crosshairs).
 
 use std::collections::HashMap;
 
@@ -24,6 +24,7 @@ use crate::pages::common::ORANGE_500;
 use crate::previews::CrosshairPreviews;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
 use crate::services::Services;
+use crate::widgets::Named as _;
 use crate::widgets::crosshair_picker::preview_image;
 use crate::widgets::labelled;
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
@@ -79,6 +80,12 @@ pub struct AssignedCell {
     pub crosshair: Option<CrosshairRef>,
 }
 
+/// A click on an assigned row's clear button, asking the host to drop that weapon's crosshair.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClearRequested {
+    pub script: &'static str,
+}
+
 /// What the host tells the assigner about itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct AssignerState {
@@ -89,7 +96,7 @@ pub struct AssignerState {
     pub running: Option<AssignTarget>,
 }
 
-/// The class bar and weapon rows of v5's Crosshairs page, or of its profile dialog when compact.
+/// The class bar and weapon rows of v5's Crosshairs page, or of the profile editor when compact.
 pub struct WeaponAssigner {
     class: TfClass,
     /// Only this slot's rows show when set.
@@ -99,6 +106,10 @@ pub struct WeaponAssigner {
     cells: Vec<AssignedCell>,
     state: AssignerState,
     compact: bool,
+    /// The compact list grows to the height its host gives it instead of 144 px.
+    fill: bool,
+    /// Whether assigned rows offer a clear button.
+    clearable: bool,
     previews: Entity<CrosshairPreviews>,
     _previews: Subscription,
     /// The session image cache; None in compact mode or when none is installed.
@@ -112,6 +123,7 @@ pub struct WeaponAssigner {
 
 impl EventEmitter<AssignRequested> for WeaponAssigner {}
 impl EventEmitter<ClassChanged> for WeaponAssigner {}
+impl EventEmitter<ClearRequested> for WeaponAssigner {}
 
 impl WeaponAssigner {
     /// Needs the `Services` global. Scout, no cells, default state. Compact is v5's dialog
@@ -145,6 +157,8 @@ impl WeaponAssigner {
             cells: Vec::new(),
             state: AssignerState::default(),
             compact,
+            fill: false,
+            clearable: false,
             list_scroll: ScrollHandle::new(),
             previews,
             _previews: observe_previews,
@@ -194,6 +208,12 @@ impl WeaponAssigner {
         cx.notify();
     }
 
+    /// Lets the compact list grow to fill the height its host gives the assigner.
+    pub fn set_fill(&mut self, fill: bool, cx: &mut Context<Self>) {
+        self.fill = fill;
+        cx.notify();
+    }
+
     /// Shows or hides the class tabs and bulk buttons, for a host that offers its own.
     pub fn set_bar(&mut self, bar: bool, cx: &mut Context<Self>) {
         self.bar = bar;
@@ -203,6 +223,17 @@ impl WeaponAssigner {
     /// Replaces the shown assignments.
     pub fn set_assigned(&mut self, cells: Vec<AssignedCell>, cx: &mut Context<Self>) {
         self.cells = cells;
+        cx.notify();
+    }
+
+    /// The shown assignments.
+    pub fn assigned(&self) -> &[AssignedCell] {
+        &self.cells
+    }
+
+    /// Off by default. On, every row with a cell shows a clear button.
+    pub fn set_clearable(&mut self, clearable: bool, cx: &mut Context<Self>) {
+        self.clearable = clearable;
         cx.notify();
     }
 
@@ -300,10 +331,17 @@ impl WeaponAssigner {
         h_flex()
             .flex_wrap()
             .gap_2()
+            // In a host's fill mode the tabs wrap inside the pill rather than leave a narrow window.
             .child(
                 h_flex()
                     .flex_none()
-                    .h(px(36.))
+                    .map(|pill| {
+                        if self.fill {
+                            pill.flex_wrap().max_w_full()
+                        } else {
+                            pill.h(px(36.))
+                        }
+                    })
                     .p(px(3.))
                     .rounded_lg()
                     .bg(theme.muted)
@@ -331,11 +369,24 @@ impl WeaponAssigner {
             .when(self.compact, |list| {
                 list.track_scroll(&self.list_scroll)
                     .overflow_y_scroll()
-                    .h(px(144.))
+                    .map(|list| {
+                        if self.fill {
+                            list.size_full()
+                        } else {
+                            list.h(px(144.))
+                        }
+                    })
                     .pr(BAR_WIDTH)
             })
             .children(rows);
-        if self.compact {
+        if self.compact && self.fill {
+            let area = scroll_area(ids::WEAPON_LIST_SCROLLBAR, &self.list_scroll, list);
+            div()
+                .flex_1()
+                .min_h_0()
+                .child(area.size_full())
+                .into_any_element()
+        } else if self.compact {
             scroll_area(ids::WEAPON_LIST_SCROLLBAR, &self.list_scroll, list).into_any_element()
         } else {
             list.into_any_element()
@@ -344,8 +395,8 @@ impl WeaponAssigner {
 
     // One weapon: its wiki icon in a slot-coloured frame, or the slot square, and dot,
     // name, the assigned crosshair's preview and name, and a check mark when assigned, or a
-    // spinner in its slot while this weapon is being assigned. Dimmed and inert without a
-    // selection or while the host is busy.
+    // spinner in its slot while this weapon is being assigned. Inert, and its content dimmed,
+    // without a selection or while the host is busy.
     fn weapon_row(&self, weapon: &'static Weapon, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         let (muted, primary, hover) = (theme.muted_foreground, theme.primary, theme.accent);
@@ -378,6 +429,24 @@ impl WeaponAssigner {
         } else {
             div().flex_none().size(px(14.)).into_any_element()
         };
+        // The clear button works without a selection, and stops its click so the row behind
+        // it never assigns. An unassigned row keeps a same-size empty box so the column lines up.
+        let clear = self.clearable.then(|| {
+            if cell.is_none() {
+                return div().flex_none().size_5().into_any_element();
+            }
+            Button::new(ids::weapon_clear(script))
+                .ghost()
+                .xsmall()
+                .icon(IconName::X)
+                .named("Clear crosshair")
+                .disabled(self.state.busy)
+                .on_click(cx.listener(move |_, _, _, cx| {
+                    cx.stop_propagation();
+                    cx.emit(ClearRequested { script });
+                }))
+                .into_any_element()
+        });
         let active = self.state.has_selection && !self.state.busy;
         let icon = (!self.compact).then(|| {
             let ready = self
@@ -412,13 +481,12 @@ impl WeaponAssigner {
                 }
             }
         });
-        h_flex()
-            .id(ids::weapon_row(script))
-            .aria_label(weapon.display_name())
-            .test_support()
+        // Only the row's content dims; the clear button beside it still works.
+        let content = h_flex()
+            .flex_1()
+            .min_w_0()
             .gap(px(8.))
-            .px_2()
-            .py(px(6.))
+            .when(!active, |content| content.opacity(0.5))
             .children(icon)
             .child(div().flex_none().size(px(8.)).rounded_full().bg(dot))
             .child(
@@ -430,22 +498,34 @@ impl WeaponAssigner {
                     .child(weapon.display_name()),
             )
             .children(preview)
+            // A margin on top of the row gap keeps a cut-off weapon name off the crosshair's.
             .child(labelled(
-                div().text_xs().text_color(muted).max_w(px(180.)).truncate(),
+                div()
+                    .ml_2()
+                    .min_w_0()
+                    .text_xs()
+                    .text_color(muted)
+                    .max_w(px(180.))
+                    .truncate(),
                 ids::weapon_assigned(script),
                 label,
             ))
-            .child(check)
-            .map(|row| {
-                if active {
-                    row.cursor_pointer()
-                        .hover(|row| row.bg(hover))
-                        .on_click(cx.listener(move |assigner, _, _, cx| {
-                            assigner.request(AssignTarget::Weapon(script), cx)
-                        }))
-                } else {
-                    row.opacity(0.5)
-                }
+            .child(check);
+        h_flex()
+            .id(ids::weapon_row(script))
+            .aria_label(weapon.display_name())
+            .test_support()
+            .gap(px(8.))
+            .px_2()
+            .py(px(6.))
+            .child(content)
+            .children(clear)
+            .when(active, |row| {
+                row.cursor_pointer()
+                    .hover(|row| row.bg(hover))
+                    .on_click(cx.listener(move |assigner, _, _, cx| {
+                        assigner.request(AssignTarget::Weapon(script), cx)
+                    }))
             })
     }
 }
@@ -453,6 +533,10 @@ impl WeaponAssigner {
 impl Render for WeaponAssigner {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let bar = self.bar.then(|| self.class_bar(cx));
-        v_flex().gap_4().children(bar).child(self.weapon_list(cx))
+        v_flex()
+            .when(self.fill, |assigner| assigner.size_full())
+            .gap_4()
+            .children(bar)
+            .child(self.weapon_list(cx))
     }
 }

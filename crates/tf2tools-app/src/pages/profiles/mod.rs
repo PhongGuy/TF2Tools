@@ -1,21 +1,23 @@
 //! The Profiles page: saved setups of HUD, sounds and crosshairs, activated in one go.
 
+pub mod editor;
+pub mod editor_model;
 pub mod model;
 pub mod probe;
-pub mod wizard;
-pub mod wizard_model;
 
 use std::rc::Rc;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::button::{Button, ButtonVariants as _, DropdownButton};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::menu::PopupMenuItem;
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, WindowExt as _, h_flex, v_flex,
 };
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
+    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, EventEmitter, FontWeight,
     InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
     SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
     WeakEntity, Window, div, px, transparent_black,
@@ -23,11 +25,13 @@ use gpui_kit::{
 
 use tf2tools_core::{
     ApplyProfileError, ApplyProfileReport, ApplyStep, ExternalHud, LogLevel, MissingItem,
-    MissingKind, NewLogEntry, Profile, ProfileError, ProfileId, StoreKind, Tf2Install,
+    MissingKind, NewLogEntry, Profile, ProfileDraft, ProfileError, ProfileId, StoreKind,
+    Tf2Install,
 };
 
+use self::editor::ProfileEditor;
+use self::editor_model::next_profile_name;
 use self::probe::Tf2Probe;
-use self::wizard::{ProfileWizard, WizardMode};
 use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, no_tf2_warning};
 use super::hud_store::bodies::{curated_body, gamebanana_body};
 use crate::activity;
@@ -41,7 +45,7 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::external_huds::{ExternalPlan, HudAction, ask_external};
 use crate::shell::font_check::ask_about_fonts;
-use crate::shell::route::Page;
+use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_detail::{DetailItem, open_detail};
 use crate::widgets::Named as _;
@@ -56,9 +60,16 @@ const CARD_HEIGHT: Pixels = px(196.);
 const LIBRARY_MIN_HEIGHT: Pixels = CARD_HEIGHT;
 // Narrower than this, the search box wraps onto its own row instead of shrinking.
 const SEARCH_MIN_WIDTH: Pixels = px(160.);
-// v5's Save Current dialog description.
-const SAVE_DESCRIPTION: &str =
-    "Save your currently installed HUD, sounds, and crosshair assignments as a reusable profile.";
+
+/// The editor's empty pickers ask for a store page by event.
+impl EventEmitter<NavigateTo> for ProfilesPage {}
+
+// What the page shows: its grid of profiles, or one profile open in the editor (with its id,
+// readable while the editor itself is being updated).
+enum View {
+    Grid,
+    Editor(Entity<ProfileEditor>, ProfileId),
+}
 
 /// The Profiles page. Built fresh on each visit; it reloads on TF2 state and library changes.
 pub struct ProfilesPage {
@@ -69,10 +80,9 @@ pub struct ProfilesPage {
     /// Bumped by each reload, so a slower, older load never overwrites a newer one.
     load_generation: u64,
     search: Entity<InputState>,
-    save_name: Entity<InputState>,
     busy: bool,
     activating: Option<ProfileId>,
-    wizard: Option<WeakEntity<ProfileWizard>>,
+    view: View,
     grid: CardGrid,
     /// The page's own scroll, which moves only in a window too short for the page.
     scroll: ScrollHandle,
@@ -92,8 +102,6 @@ impl ProfilesPage {
                 cx.notify();
             }
         });
-        let save_name =
-            cx.new(|cx| InputState::new(window, cx).placeholder("e.g., Competitive Setup"));
         let mut page = Self {
             win: window.window_handle(),
             profiles: Rc::from([]),
@@ -101,10 +109,9 @@ impl ProfilesPage {
             loaded: false,
             load_generation: 0,
             search,
-            save_name,
             busy: false,
             activating: None,
-            wizard: None,
+            view: View::Grid,
             grid: CardGrid::new(ids::PROFILES_GRID),
             scroll: ScrollHandle::new(),
             _subscriptions: vec![tf2, library, search_changed],
@@ -147,12 +154,7 @@ impl ProfilesPage {
         model::taken_by(&self.profiles, name, except).map(|p| p.name().to_owned())
     }
 
-    /// The Save Current dialog's name field.
-    pub fn save_name_input(&self) -> &Entity<InputState> {
-        &self.save_name
-    }
-
-    /// True while Save Current, Delete or an activate runs.
+    /// True while a create, Delete or an activate runs.
     pub fn is_busy(&self) -> bool {
         self.busy || self.activating.is_some()
     }
@@ -162,18 +164,42 @@ impl ProfilesPage {
         self.activating.as_ref()
     }
 
-    /// The wizard last opened, while it is alive.
-    pub fn wizard(&self) -> Option<Entity<ProfileWizard>> {
-        self.wizard.as_ref()?.upgrade()
-    }
-
-    /// Opens the profile wizard for `mode`; does nothing while `is_busy()`.
-    pub fn open_wizard(&mut self, mode: WizardMode, window: &mut Window, cx: &mut Context<Self>) {
+    /// Shows the editor for `id` in place of the grid; does nothing while `is_busy()` or for an
+    /// id the last load lacks.
+    pub fn open_editor(&mut self, id: ProfileId, window: &mut Window, cx: &mut Context<Self>) {
         if self.is_busy() {
             return;
         }
-        let wizard = ProfileWizard::open(mode, cx.entity().downgrade(), window, cx);
-        self.wizard = Some(wizard.downgrade());
+        let Some(profile) = self.profiles.iter().find(|p| p.id() == &id).cloned() else {
+            return;
+        };
+        self.show_editor(profile, window, cx);
+    }
+
+    // Opens the editor on a profile already in hand, such as one just created.
+    fn show_editor(&mut self, profile: Profile, window: &mut Window, cx: &mut Context<Self>) {
+        let (page, active, id) = (
+            cx.entity().downgrade(),
+            self.active.clone(),
+            profile.id().clone(),
+        );
+        let editor = cx.new(|cx| ProfileEditor::new(profile, page, active, window, cx));
+        self.view = View::Editor(editor, id);
+        cx.notify();
+    }
+
+    /// The open editor, while the page shows one.
+    pub fn editor(&self) -> Option<Entity<ProfileEditor>> {
+        match &self.view {
+            View::Editor(editor, _) => Some(editor.clone()),
+            View::Grid => None,
+        }
+    }
+
+    /// Back to the grid; reloads.
+    pub fn close_editor(&mut self, cx: &mut Context<Self>) {
+        self.view = View::Grid;
+        self.reload(cx);
     }
 
     /// Starts the activate flow for `id` unless a save, delete or activate runs; does nothing
@@ -271,6 +297,10 @@ impl ProfilesPage {
     pub fn reload(&mut self, cx: &mut Context<Self>) {
         self.load_generation += 1;
         let generation = self.load_generation;
+        let open_at_start = match &self.view {
+            View::Editor(_, id) => Some(id.clone()),
+            View::Grid => None,
+        };
         let loading = run_blocking(cx, |s| {
             let failed = |e: ProfileError| describe_profile(&e).into_op("Failed to load profiles");
             let profiles = s.library.profiles().map_err(failed)?;
@@ -288,6 +318,16 @@ impl ProfilesPage {
                     if let Ok((profiles, active)) = &loaded {
                         page.profiles = profiles.as_slice().into();
                         page.active = active.clone();
+                        // A profile deleted here or elsewhere takes its open editor with it.
+                        if let View::Editor(_, open) = &page.view
+                            && model::load_closes_editor(
+                                open_at_start.as_ref(),
+                                open,
+                                profiles.iter().map(Profile::id),
+                            )
+                        {
+                            page.view = View::Grid;
+                        }
                     }
                     page.loaded = true;
                     cx.notify();
@@ -303,7 +343,7 @@ impl ProfilesPage {
     }
 
     // Runs `op` off the UI thread with `busy` set, toasts its texts or its error through the
-    // stored window handle, then reloads; Save Current and Delete touch no other page.
+    // stored window handle, then reloads; Delete touches no other page.
     fn run(
         &mut self,
         op: impl FnOnce(&Services) -> Result<(SharedString, SharedString), OpError> + Send + 'static,
@@ -331,128 +371,97 @@ impl ProfilesPage {
         .detach();
     }
 
-    /// Opens v5's Save Current dialog; does nothing while `is_busy()`.
-    // The builder runs every frame, so it reads the name field each time to decide whether
-    // "Save Profile" is enabled; Enter saves only a non-blank name.
-    pub fn open_save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Makes "Profile N" from what is installed (`from_installed`, needs TF2) or empty, writes
+    /// the create row, toasts, and opens the editor on it with the name focused and selected.
+    /// A NameTaken from a race retries once with the next free name. Does nothing while busy.
+    pub fn new_profile(
+        &mut self,
+        from_installed: bool,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.is_busy() {
             return;
         }
-        let input = self.save_name.clone();
-        input.update(cx, |st, cx| st.set_value("", window, cx));
-        let page = cx.entity().downgrade();
-        window.defer(cx, move |window, cx| {
-            let frame = DialogFrame::new(DIALOG_WIDTH);
-            let field = input.clone();
-            window.open_dialog(cx, move |dialog, window, cx| {
-                let typed = input.read(cx).value();
-                let blank = typed.trim().is_empty();
-                let taken = page
-                    .upgrade()
-                    .and_then(|p| p.read(cx).taken_name(&typed, None));
-                let on_ok = {
-                    let (page, input) = (page.clone(), input.clone());
-                    move |_: &_, _: &mut Window, cx: &mut App| submit_save(&page, &input, cx)
-                };
-                let ok = {
-                    let (page, input) = (page.clone(), input.clone());
-                    move |_: &_, window: &mut Window, cx: &mut App| {
-                        if submit_save(&page, &input, cx) {
-                            window.close_dialog(cx);
-                        }
-                    }
-                };
-                frame.apply(dialog, &*window, &*cx).on_ok(on_ok).child(
-                    frame.measure(
-                        v_flex()
-                            .id(ids::PROFILES_SAVE_DIALOG)
-                            .test_support()
-                            .gap_4()
-                            .child(
-                                v_flex()
-                                    .gap_2()
-                                    .child(
-                                        div()
-                                            .text_lg()
-                                            .font_weight(FontWeight::SEMIBOLD)
-                                            .child("Save Current as Profile"),
-                                    )
-                                    .child(labelled(
-                                        div().text_sm().text_color(cx.theme().muted_foreground),
-                                        ids::PROFILES_SAVE_DESCRIPTION,
-                                        SAVE_DESCRIPTION,
-                                    )),
-                            )
-                            .child(
-                                v_flex()
-                                    .gap_2()
-                                    .child(
-                                        div()
-                                            .text_sm()
-                                            .font_weight(FontWeight::MEDIUM)
-                                            .child("Profile Name"),
-                                    )
-                                    .child(
-                                        div()
-                                            .id(ids::PROFILES_SAVE_NAME)
-                                            .test_support()
-                                            .child(Input::new(&input)),
-                                    )
-                                    .children(taken.as_deref().map(|name| {
-                                        labelled(
-                                            div().text_sm().text_color(cx.theme().danger),
-                                            ids::PROFILES_SAVE_TAKEN,
-                                            model::taken_message(name),
-                                        )
-                                    })),
-                            )
-                            .child(
-                                h_flex()
-                                    .justify_end()
-                                    .gap_2()
-                                    .child(
-                                        Button::new(ids::PROFILES_SAVE_CANCEL)
-                                            .outline()
-                                            .label("Cancel")
-                                            .on_click(|_, window, cx| window.close_dialog(cx)),
-                                    )
-                                    .child(
-                                        Button::new(ids::PROFILES_SAVE_OK)
-                                            .primary()
-                                            .label("Save Profile")
-                                            .disabled(blank || taken.is_some())
-                                            .on_click(ok),
-                                    ),
-                            ),
-                    ),
-                )
-            });
-            // Opening focuses the dialog; the name field takes the keyboard from it.
-            field.update(cx, |st, cx| st.focus(window, cx));
-        });
-    }
-
-    // Saves what tf/custom holds now under `name`; without a TF2 install there is nothing to read.
-    fn save_current(&mut self, name: String, cx: &mut Context<Self>) {
-        if self.is_busy() {
-            return;
-        }
-        let Some(tf2) = tf2_state(cx).read(cx).install().cloned() else {
-            return;
+        let tf2 = match tf2_state(cx).read(cx).install() {
+            Some(tf2) if from_installed => Some(tf2.clone()),
+            None if from_installed => return,
+            _ => None,
         };
-        self.run(
-            move |s| {
-                s.library
-                    .save_current_profile(&name, &tf2)
-                    .map_err(|e| describe_profile(&e).into_op("Failed to save profile"))?;
-                let message = format!("Saved current setup as profile: {name}");
-                let entry = NewLogEntry::new(LogLevel::Info, "profile", "save_current", message);
-                activity::write(s, &entry);
-                let created = format!("\"{name}\" created from current setup");
-                Ok(("Profile saved".into(), created.into()))
-            },
-            cx,
-        );
+        let name = next_profile_name(&self.profiles);
+        self.busy = true;
+        cx.notify();
+        let creating = run_blocking(cx, move |s| {
+            let create = |name: &str| match &tf2 {
+                Some(tf2) => s.library.save_current_profile(name, tf2),
+                None => s.library.create_profile(&ProfileDraft::new(name)),
+            };
+            let failed = |e: ProfileError| describe_profile(&e).into_op("Failed to create profile");
+            let profile = match create(&name) {
+                Err(ProfileError::NameTaken { .. }) => {
+                    let all = s.library.profiles().map_err(failed)?;
+                    create(&next_profile_name(&all))
+                }
+                made => made,
+            }
+            .map_err(failed)?;
+            let name = profile.name();
+            let (action, message) = match tf2 {
+                Some(_) => (
+                    "save_current",
+                    format!("Saved current setup as profile: {name}"),
+                ),
+                None => ("create", format!("Created profile: {name}")),
+            };
+            let entry = NewLogEntry::new(LogLevel::Info, "profile", action, message);
+            activity::write(s, &entry);
+            Ok(profile)
+        });
+        let win = self.win;
+        cx.spawn(async move |page, cx| {
+            let done = creating.await;
+            let _ = cx.update(|cx| {
+                win.update(cx, |_, window, cx| {
+                    let profile = match done {
+                        Ok(profile) => profile,
+                        Err(err) => return toast_error(window, cx, &err),
+                    };
+                    let title = if from_installed {
+                        "Profile created from your current setup"
+                    } else {
+                        "Empty profile created"
+                    };
+                    toast(
+                        window,
+                        cx,
+                        ToastKind::Success,
+                        title,
+                        SharedString::default(),
+                    );
+                    // The reload follows the editor in this same update, so no load that
+                    // started before the create can land after it as the newest.
+                    let _ = page.update(cx, |page, cx| {
+                        page.busy = false;
+                        page.show_editor(profile, window, cx);
+                        page.reload(cx);
+                        // Deferred so the click that started the create cannot take focus back.
+                        if let Some(editor) = page.editor() {
+                            window.defer(cx, move |window, cx| {
+                                editor.update(cx, |e, cx| e.focus_name(window, cx));
+                            });
+                        }
+                    });
+                })
+            });
+            // A failed create, or a window gone meanwhile, still frees the page.
+            let _ = page.update(cx, |page, cx| {
+                if page.busy {
+                    page.busy = false;
+                    page.reload(cx);
+                }
+            });
+        })
+        .detach();
     }
 
     /// Opens v5's delete confirm for `id`, then removes it on yes; does nothing while `is_busy()`.
@@ -834,20 +843,6 @@ fn missing_row(ix: usize, item: &MissingItem, cx: &App) -> AnyElement {
         .into_any_element()
 }
 
-// The Save Current dialog's OK: false (dialog stays open) for a blank or taken name, else
-// starts the save.
-fn submit_save(page: &WeakEntity<ProfilesPage>, input: &Entity<InputState>, cx: &mut App) -> bool {
-    let name = input.read(cx).value().trim().to_owned();
-    let taken = page
-        .upgrade()
-        .is_some_and(|p| p.read(cx).taken_name(&name, None).is_some());
-    if name.is_empty() || taken {
-        return false;
-    }
-    let _ = page.update(cx, |page, cx| page.save_current(name, cx));
-    true
-}
-
 // A badge led by its size-3 icon, as v5 draws a profile's slots on both kinds of card.
 fn icon_badge(
     id: impl Into<gpui_kit::ElementId>,
@@ -988,7 +983,8 @@ fn empty_state(
 }
 
 // v5's ProfileCard: the name (and "Active"), its item badges or "Empty profile", then
-// Activate, Edit (the wizard in edit mode) and Delete.
+// Activate, Edit (opens the editor) and Delete. A click on the body also opens the editor; the
+// buttons stop their clicks so they never reach it.
 fn profile_card(
     profile: &Profile,
     active: bool,
@@ -1003,6 +999,7 @@ fn profile_card(
     let on_activate = {
         let (page, id) = (page.clone(), id.clone());
         move |_: &_, window: &mut Window, cx: &mut App| {
+            cx.stop_propagation();
             let _ = page.update(cx, |page, cx| page.activate(id.clone(), window, cx));
         }
     };
@@ -1015,14 +1012,14 @@ fn profile_card(
     let on_edit = {
         let (page, id) = (page.clone(), id.clone());
         move |_: &_, window: &mut Window, cx: &mut App| {
-            let _ = page.update(cx, |page, cx| {
-                page.open_wizard(WizardMode::Edit(id.clone()), window, cx)
-            });
+            cx.stop_propagation();
+            let _ = page.update(cx, |page, cx| page.open_editor(id.clone(), window, cx));
         }
     };
     let on_delete = {
         let (page, id, name) = (page.clone(), id.clone(), profile.name().to_owned());
         move |_: &_, window: &mut Window, cx: &mut App| {
+            cx.stop_propagation();
             let _ = page.update(cx, |page, cx| page.delete(id.clone(), &name, window, cx));
         }
     };
@@ -1069,6 +1066,7 @@ fn profile_card(
             ));
         }
     }
+    let hover = crate::theme::card_hover(theme);
     let border = if active {
         theme.primary.opacity(0.5)
     } else {
@@ -1079,6 +1077,9 @@ fn profile_card(
         .accessibility_id(ids::profile_card(id).to_string())
         .aria_label(profile.name().to_owned())
         .test_support()
+        .on_click(on_edit.clone())
+        .cursor_pointer()
+        .hover(move |card| card.bg(hover))
         .size_full()
         .flex()
         .flex_col()
@@ -1149,24 +1150,25 @@ impl ProfilesPage {
             let actions = h_flex()
                 .gap_2()
                 .child(
-                    Button::new(ids::PROFILES_EMPTY_CREATE)
-                        .outline()
-                        .px(SM_ICON_PX)
-                        .icon(IconName::Plus)
-                        .label("Create New")
-                        .disabled(busy)
-                        .on_click(cx.listener(|page, _, window, cx| {
-                            page.open_wizard(WizardMode::Create, window, cx)
-                        })),
-                )
-                .child(
-                    Button::new(ids::PROFILES_EMPTY_SAVE)
+                    Button::new(ids::PROFILES_EMPTY_NEW)
                         .primary()
                         .px(SM_ICON_PX)
-                        .icon(IconName::Save)
-                        .label("Save Current Setup")
+                        .icon(IconName::Plus)
+                        .label("New profile")
                         .disabled(!has_tf2 || busy)
-                        .on_click(cx.listener(|page, _, window, cx| page.open_save(window, cx))),
+                        .on_click(
+                            cx.listener(|page, _, window, cx| page.new_profile(true, window, cx)),
+                        ),
+                )
+                .child(
+                    Button::new(ids::PROFILES_EMPTY_START_EMPTY)
+                        .outline()
+                        .px(SM_ICON_PX)
+                        .label("Start empty")
+                        .disabled(busy)
+                        .on_click(
+                            cx.listener(|page, _, window, cx| page.new_profile(false, window, cx)),
+                        ),
                 )
                 .into_any_element();
             Some(empty_state(
@@ -1210,28 +1212,45 @@ impl ProfilesPage {
         let muted = cx.theme().muted_foreground;
         // A narrow page wraps the search and buttons under the title, then the buttons under
         // the search, so nothing passes the margin and the search keeps a usable width.
-        let buttons = h_flex()
+        // New profile saves what is installed; its menu offers an empty one, which needs no TF2.
+        let buttons = div()
+            .id(ids::PROFILES_NEW_MENU)
+            .test_support()
             .flex_none()
-            .gap_3()
             .child(
-                Button::new(ids::PROFILES_CREATE)
-                    .outline()
-                    .px(SM_ICON_PX)
-                    .icon(IconName::Plus)
-                    .label("Create New")
-                    .disabled(busy)
-                    .on_click(cx.listener(|page, _, window, cx| {
-                        page.open_wizard(WizardMode::Create, window, cx)
-                    })),
-            )
-            .child(
-                Button::new(ids::PROFILES_SAVE_CURRENT)
+                DropdownButton::new(ids::PROFILES_NEW_SPLIT)
+                    .button(
+                        Button::new(ids::PROFILES_NEW)
+                            .px(SM_ICON_PX)
+                            .icon(IconName::Plus)
+                            .label("New profile")
+                            .disabled(!has_tf2)
+                            .when(!has_tf2, |b| b.tooltip("TF2 not found"))
+                            .on_click(cx.listener(|page, _, window, cx| {
+                                page.new_profile(true, window, cx)
+                            })),
+                    )
                     .primary()
-                    .px(SM_ICON_PX)
-                    .icon(IconName::Save)
-                    .label("Save Current")
-                    .disabled(!has_tf2 || busy)
-                    .on_click(cx.listener(|page, _, window, cx| page.open_save(window, cx))),
+                    .menu_accessibility_label("More ways to make a profile")
+                    .disabled(busy)
+                    .dropdown_menu({
+                        let page = cx.entity().downgrade();
+                        move |menu, _, _| {
+                            let page = page.clone();
+                            menu.item(
+                                PopupMenuItem::element(|_, _| {
+                                    div()
+                                        .id(ids::PROFILES_NEW_EMPTY)
+                                        .test_support()
+                                        .child("Start empty")
+                                })
+                                .on_click(move |_, window, cx| {
+                                    let _ =
+                                        page.update(cx, |p, cx| p.new_profile(false, window, cx));
+                                }),
+                            )
+                        }
+                    }),
             );
         v_flex()
             .flex_1()
@@ -1286,17 +1305,6 @@ impl Render for ProfilesPage {
         let has_tf2 = state.install().is_some();
         let missing = matches!(state, Tf2State::Missing { .. });
         let busy = self.is_busy();
-        let active = match self.active_profile() {
-            Some(profile) => active_card(profile, cx),
-            None => empty_state(
-                ids::PROFILES_NO_ACTIVE,
-                IconName::Layers,
-                "No active profile",
-                "Activate a profile to apply a saved collection of customizations.",
-                None,
-                cx,
-            ),
-        };
         let warning = missing.then(|| {
             no_tf2_warning(
                 ids::PROFILES_NO_TF2,
@@ -1312,20 +1320,44 @@ impl Render for ProfilesPage {
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
-            .children(warning)
-            .child(
-                v_flex()
-                    .flex_none()
-                    .gap_3()
-                    .child(
-                        div()
-                            .text_lg()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child("Active Profile"),
-                    )
-                    .child(active),
-            )
-            .child(self.library(has_tf2, busy, cx));
+            .children(warning);
+        // The editor takes the place of the Active Profile card and the library.
+        let content = if let View::Editor(editor, _) = &self.view {
+            content.child(editor.clone())
+        } else {
+            content.children(self.grid_view(has_tf2, busy, cx))
+        };
         scroll_area(ids::page_scrollbar(Page::Profiles), &self.scroll, content).size_full()
+    }
+}
+
+impl ProfilesPage {
+    // The Active Profile card over the library.
+    fn grid_view(&self, has_tf2: bool, busy: bool, cx: &mut Context<Self>) -> [AnyElement; 2] {
+        let active = match self.active_profile() {
+            Some(profile) => active_card(profile, cx),
+            None => empty_state(
+                ids::PROFILES_NO_ACTIVE,
+                IconName::Layers,
+                "No active profile",
+                "Activate a profile to apply a saved collection of customizations.",
+                None,
+                cx,
+            ),
+        };
+        [
+            v_flex()
+                .flex_none()
+                .gap_3()
+                .child(
+                    div()
+                        .text_lg()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child("Active Profile"),
+                )
+                .child(active)
+                .into_any_element(),
+            self.library(has_tf2, busy, cx).into_any_element(),
+        ]
     }
 }

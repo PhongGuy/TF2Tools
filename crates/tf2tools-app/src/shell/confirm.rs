@@ -172,6 +172,16 @@ impl Confirm {
         }
     }
 
+    /// The prompt before removing every crosshair from a profile.
+    pub fn clear_profile_crosshairs() -> Self {
+        Self {
+            title: "Clear Crosshairs".into(),
+            description: "Remove all crosshairs from this profile?".into(),
+            confirm_label: "Clear all".into(),
+            cancel_label: "Cancel".into(),
+        }
+    }
+
     /// v5's prompt before activating a profile with no HUD, sounds or crosshairs.
     pub fn activate_empty() -> Self {
         Self {

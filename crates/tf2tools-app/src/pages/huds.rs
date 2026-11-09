@@ -7,6 +7,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 use gpui_kit::assets::IconName;
+use gpui_kit::base::test_support::Observed;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::tag::Tag;
@@ -15,9 +16,9 @@ use gpui_kit::component::{
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AppContext as _, AsyncApp, ClickEvent, Context, Entity,
-    EventEmitter, FontWeight, Hsla, InteractiveElement as _, IntoElement, ObjectFit,
-    ParentElement as _, Pixels, Render, Role, ScrollHandle, SharedString,
+    AnyElement, AnyWindowHandle, App, AppContext as _, AsyncApp, ClickEvent, Context, Div,
+    ElementId, Entity, EventEmitter, FontWeight, Hsla, InteractiveElement as _, IntoElement,
+    ObjectFit, ParentElement as _, Pixels, Render, Role, ScrollHandle, SharedString, Stateful,
     StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription, Task,
     TestSupportExt as _, WeakEntity, Window, div, img, px, relative, rgb, transparent_black,
 };
@@ -1219,8 +1220,51 @@ impl HudsPage {
     }
 }
 
-// A card's 16:9 picture area: the image once ready, else the muted placeholder. On a store
-// card a click opens the HUD's gallery in the lightbox; a HUD of the player's has none.
+/// The 16:9 picture area with the image at `url` once ready, else the muted placeholder.
+pub(crate) fn hud_picture(
+    area_id: ElementId,
+    image_id: ElementId,
+    url: Option<&str>,
+    cx: &App,
+) -> Observed<Stateful<Div>> {
+    let area = div()
+        .id(area_id)
+        .test_support()
+        .flex_none()
+        .w_full()
+        .aspect_ratio(16. / 9.)
+        .overflow_hidden()
+        .bg(cx.theme().muted);
+    let ready = url
+        .zip(RemoteImages::global(cx))
+        .map(|(url, images)| images.read(cx).image(&ImageKey::card(url)));
+    match ready {
+        Some(RemoteImage::Ready(image)) => area.child(
+            img(image)
+                .size_full()
+                .object_fit(ObjectFit::Cover)
+                .id(image_id)
+                .test_support(),
+        ),
+        _ => area,
+    }
+}
+
+/// The HUD's name, truncated, semibold.
+pub(crate) fn hud_title(hud: &HudEntry) -> Div {
+    div()
+        .truncate()
+        .font_weight(FontWeight::SEMIBOLD)
+        .child(hud.name().to_owned())
+}
+
+/// Card picture URLs by library folder: a store screenshot, else the HUD's own picture.
+pub(crate) fn card_images(s: &Services, huds: &[HudEntry]) -> HashMap<String, String> {
+    store_links(s, huds).images
+}
+
+// A library card's picture area. On a store card a click opens the HUD's gallery in the
+// lightbox; a HUD of the player's has none.
 fn screenshot(
     hud: &HudEntry,
     url: Option<&str>,
@@ -1231,9 +1275,7 @@ fn screenshot(
     let title = SharedString::from(hud.name().to_owned());
     let provenance = hud.provenance().clone();
     let page = page.clone();
-    let area = div()
-        .id(ids::hud_shot(folder))
-        .test_support()
+    hud_picture(ids::hud_shot(folder), ids::hud_image(folder), url, cx)
         .when(is_store(hud), |area| {
             area.cursor_pointer().on_click(move |_, window, cx| {
                 let _ = page.update(cx, |page, cx| {
@@ -1241,26 +1283,7 @@ fn screenshot(
                 });
             })
         })
-        .flex_none()
-        .w_full()
-        .aspect_ratio(16. / 9.)
-        .overflow_hidden()
-        .bg(cx.theme().muted);
-    let ready = url
-        .zip(RemoteImages::global(cx))
-        .map(|(url, images)| images.read(cx).image(&ImageKey::card(url)));
-    match ready {
-        Some(RemoteImage::Ready(image)) => area
-            .child(
-                img(image)
-                    .size_full()
-                    .object_fit(ObjectFit::Cover)
-                    .id(ids::hud_image(folder))
-                    .test_support(),
-            )
-            .into_any_element(),
-        _ => area.into_any_element(),
-    }
+        .into_any_element()
 }
 
 /// What one library card shows beyond its HUD entry.
@@ -1401,12 +1424,7 @@ fn hud_card(
                 .child(
                     v_flex()
                         .min_w_0()
-                        .child(
-                            div()
-                                .truncate()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .child(hud.name().to_owned()),
-                        )
+                        .child(hud_title(hud))
                         .children(author)
                         .children(store_note)
                         .children(update_mark),

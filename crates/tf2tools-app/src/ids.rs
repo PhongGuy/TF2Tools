@@ -830,30 +830,10 @@ pub const PROFILES_MISSING_LIST: &str = "profiles-missing-list";
 pub const PROFILES_MISSING_LIST_SCROLLBAR: &str = "profiles-missing-list-scrollbar";
 /// The profile search input.
 pub const PROFILES_SEARCH: &str = "profiles-search";
-/// The header's Create New button.
-pub const PROFILES_CREATE: &str = "profiles-create";
-/// The header's Save Current button.
-pub const PROFILES_SAVE_CURRENT: &str = "profiles-save-current";
 /// The empty state shown when there are no profiles.
 pub const PROFILES_EMPTY: &str = "profiles-empty";
-/// The empty state's Create button.
-pub const PROFILES_EMPTY_CREATE: &str = "profiles-empty-create";
-/// The empty state's Save Current button.
-pub const PROFILES_EMPTY_SAVE: &str = "profiles-empty-save";
 /// Shown when the search matches no profile.
 pub const PROFILES_NO_MATCH: &str = "profiles-no-match";
-/// The Save Current dialog.
-pub const PROFILES_SAVE_DIALOG: &str = "profiles-save-dialog";
-/// The Save Current dialog's description line.
-pub const PROFILES_SAVE_DESCRIPTION: &str = "profiles-save-description";
-/// The Save Current dialog's name input.
-pub const PROFILES_SAVE_NAME: &str = "profiles-save-name";
-/// The Save Current dialog's line saying another profile has the typed name.
-pub const PROFILES_SAVE_TAKEN: &str = "profiles-save-taken";
-/// The Save Current dialog's Cancel button.
-pub const PROFILES_SAVE_CANCEL: &str = "profiles-save-cancel";
-/// The Save Current dialog's Save button.
-pub const PROFILES_SAVE_OK: &str = "profiles-save-ok";
 /// The Missing Items dialog.
 pub const PROFILES_MISSING_DIALOG: &str = "profiles-missing-dialog";
 /// The Missing Items dialog's title, "Missing Items".
@@ -864,49 +844,44 @@ pub const PROFILES_MISSING_DESCRIPTION: &str = "profiles-missing-description";
 pub const PROFILES_MISSING_CANCEL: &str = "profiles-missing-cancel";
 /// The Missing Items dialog's "Install Anyway (skip missing)" button.
 pub const PROFILES_MISSING_INSTALL: &str = "profiles-missing-install";
-
-/// The Create New / Edit profile wizard dialog.
-pub const WIZARD_DIALOG: &str = "wizard-dialog";
-/// The wizard's title, "Create New Profile" or "Edit Profile".
-pub const WIZARD_TITLE: &str = "wizard-title";
-/// The current step's description.
-pub const WIZARD_DESCRIPTION: &str = "wizard-description";
-/// The "Profile Name" input.
-pub const WIZARD_NAME: &str = "wizard-name";
-/// The HUD select.
-pub const WIZARD_HUD: &str = "wizard-hud";
-/// The hint shown when the HUD library is empty.
-pub const WIZARD_HUD_EMPTY: &str = "wizard-hud-empty";
-/// The hitsound select.
-pub const WIZARD_HITSOUND: &str = "wizard-hitsound";
-/// The killsound select.
-pub const WIZARD_KILLSOUND: &str = "wizard-killsound";
-/// Plays the selected hitsound.
-pub const WIZARD_HITSOUND_PLAY: &str = "wizard-hitsound-play";
-/// Plays the selected killsound.
-pub const WIZARD_KILLSOUND_PLAY: &str = "wizard-killsound-play";
-/// The hint shown when the sound library is empty.
-pub const WIZARD_SOUNDS_EMPTY: &str = "wizard-sounds-empty";
-/// The "No crosshairs" mode button.
-pub const WIZARD_MODE_NONE: &str = "wizard-mode-none";
-/// The "Copy current (N)" mode button.
-pub const WIZARD_MODE_COPY: &str = "wizard-mode-copy";
-/// The "Customize" mode button.
-pub const WIZARD_MODE_CUSTOM: &str = "wizard-mode-custom";
-/// The note under Copy mode, "Will copy your N current crosshair assignment(s)...".
-pub const WIZARD_COPY_NOTE: &str = "wizard-copy-note";
-/// "N weapon(s) assigned" in Customize mode.
-pub const WIZARD_ASSIGNED_COUNT: &str = "wizard-assigned-count";
-/// The footer's Cancel button; closes the wizard without saving.
-pub const WIZARD_CANCEL: &str = "wizard-cancel";
-/// The footer's Back button, absent on the first step.
-pub const WIZARD_BACK: &str = "wizard-back";
-/// The footer's Next button, replaced by Save on the last step.
-pub const WIZARD_NEXT: &str = "wizard-next";
-/// The name step's line saying another profile has the typed name.
-pub const WIZARD_NAME_TAKEN: &str = "wizard-name-taken";
-/// "Create Profile" or "Save Changes".
-pub const WIZARD_SAVE: &str = "wizard-save";
+/// The New profile main button, which saves the current setup as a new profile.
+pub const PROFILES_NEW: &str = "profiles-new";
+/// The New split button's wrapper; the caret inside it is the kit's fixed "popup" id.
+pub const PROFILES_NEW_MENU: &str = "profiles-new-menu";
+/// The New button and its caret, the kit's split button inside `PROFILES_NEW_MENU`.
+pub const PROFILES_NEW_SPLIT: &str = "profiles-new-split";
+/// The New menu's "Start empty" item.
+pub const PROFILES_NEW_EMPTY: &str = "profiles-new-empty";
+/// The empty page's New button.
+pub const PROFILES_EMPTY_NEW: &str = "profiles-empty-new";
+/// The empty page's "Start empty" button.
+pub const PROFILES_EMPTY_START_EMPTY: &str = "profiles-empty-start-empty";
+/// The profile editor's root.
+pub const PROFILE_EDITOR: &str = "profile-editor";
+/// The editor's Back button, which returns to the grid.
+pub const PROFILE_EDITOR_BACK: &str = "profile-editor-back";
+/// The editor's name field.
+pub const PROFILE_EDITOR_NAME: &str = "profile-editor-name";
+/// The line under the name field when another profile has that name.
+pub const PROFILE_EDITOR_NAME_TAKEN: &str = "profile-editor-name-taken";
+/// The editor's Activate button.
+pub const PROFILE_EDITOR_ACTIVATE: &str = "profile-editor-activate";
+/// The editor's "Active" badge, shown when the open profile is active.
+pub const PROFILE_EDITOR_ACTIVE_BADGE: &str = "profile-editor-active-badge";
+/// The editor's Delete button.
+pub const PROFILE_EDITOR_DELETE: &str = "profile-editor-delete";
+/// The note that an edit deactivated the profile, so its changes are not in the game yet.
+pub const PROFILE_EDITOR_NOT_APPLIED: &str = "profile-editor-not-applied";
+/// The HUD picker's card grid.
+pub const PROFILE_PICKER_GRID: &str = "profile-picker-grid";
+/// The HUD slot card's picture area, drawn while the slot holds a HUD.
+pub const PROFILE_SLOT_HUD_SHOT: &str = "profile-slot-hud-shot";
+/// The HUD slot card's picture, once it has loaded.
+pub const PROFILE_SLOT_HUD_IMAGE: &str = "profile-slot-hud-image";
+/// The sound picker's list.
+pub const PROFILE_PICKER_SOUNDS: &str = "profile-picker-sounds";
+/// The sound picker list's scrollbar.
+pub const PROFILE_PICKER_SOUNDS_SCROLLBAR: &str = "profile-picker-sounds-scrollbar";
 
 /// The sidebar item for `page`: "nav-<slug>".
 pub fn nav(page: Page) -> ElementId {
@@ -1146,15 +1121,64 @@ pub fn profile_delete(id: &ProfileId) -> ElementId {
     keyed(PROFILE_DELETE, id.as_str())
 }
 
-/// A wizard stepper circle: "wizard-step:<1..4>".
-pub fn wizard_step(number: usize) -> ElementId {
-    keyed("wizard-step", &number.to_string())
+/// An editor slot row, keyed by the slot: "profile-slot:<slot>".
+pub fn profile_slot(slot: &str) -> ElementId {
+    keyed("profile-slot", slot)
 }
 
-/// A wizard select option, "wizard-<field>-option:<key>"; field hud|hitsound|killsound, key
-/// none|<folder>|missing.
-pub fn wizard_option(field: &str, key: &str) -> ElementId {
-    keyed(&format!("wizard-{field}-option"), key)
+/// An editor slot's clear button: "profile-slot-clear:<slot>".
+pub fn profile_slot_clear(slot: &str) -> ElementId {
+    keyed("profile-slot-clear", slot)
+}
+
+/// A sound slot's play button: "profile-slot-play:<slot>".
+pub fn profile_slot_play(slot: &str) -> ElementId {
+    keyed("profile-slot-play", slot)
+}
+
+/// A slot's missing-item note: "profile-slot-missing:<slot>".
+pub fn profile_slot_missing(slot: &str) -> ElementId {
+    keyed("profile-slot-missing", slot)
+}
+
+/// A slot's picker: "profile-picker:<slot>".
+pub fn profile_picker(slot: &str) -> ElementId {
+    keyed("profile-picker", slot)
+}
+
+/// A picker's search field: "profile-picker-search:<slot>".
+pub fn profile_picker_search(slot: &str) -> ElementId {
+    keyed("profile-picker-search", slot)
+}
+
+/// A picker's empty-library note: "profile-picker-empty:<slot>".
+pub fn profile_picker_empty(slot: &str) -> ElementId {
+    keyed("profile-picker-empty", slot)
+}
+
+/// A picker's note that its search matches nothing: "profile-picker-no-match:<slot>".
+pub fn profile_picker_no_match(slot: &str) -> ElementId {
+    keyed("profile-picker-no-match", slot)
+}
+
+/// An empty picker's button to the store: "profile-picker-store:<slot>".
+pub fn profile_picker_store(slot: &str) -> ElementId {
+    keyed("profile-picker-store", slot)
+}
+
+/// A HUD card in the picker, keyed by folder: "profile-pick-hud:<folder>".
+pub fn profile_pick_hud(folder: &str) -> ElementId {
+    keyed("profile-pick-hud", folder)
+}
+
+/// A sound row in a sound slot's picker: "profile-pick-sound:<slot>:<folder>".
+pub fn profile_pick_sound(slot: &str, folder: &str) -> ElementId {
+    keyed("profile-pick-sound", &format!("{slot}:{folder}"))
+}
+
+/// A picker sound row's play button: "profile-pick-play:<folder>".
+pub fn profile_pick_play(folder: &str) -> ElementId {
+    keyed("profile-pick-play", folder)
 }
 
 /// A Missing Items row, keyed by its index: "missing-item:<ix>".
@@ -1407,6 +1431,11 @@ pub fn weapon_assigned(script: &str) -> ElementId {
 /// A weapon row's check mark, present only when the weapon has an assignment.
 pub fn weapon_check(script: &str) -> ElementId {
     keyed("weapon-check", script)
+}
+
+/// A weapon row's clear button, shown only when the assigner is clearable: "weapon-clear:<script>".
+pub fn weapon_clear(script: &str) -> ElementId {
+    keyed("weapon-clear", script)
 }
 
 /// A weapon row's spinner, present only while that weapon is being assigned.
