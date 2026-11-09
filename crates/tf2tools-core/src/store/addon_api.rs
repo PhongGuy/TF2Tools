@@ -2,7 +2,9 @@
 
 use serde_json::Value;
 
-use super::addon_catalog::{AddonCard, AddonCategory, AddonSort};
+use super::addon_catalog::{
+    AddonCard, AddonCategory, AddonCredit, AddonCreditGroup, AddonFile, AddonProfile, AddonSort,
+};
 use super::gamebanana::{TF2_GAME_ID, int, optional_text, preview_images, text};
 use crate::GbId;
 
@@ -137,6 +139,185 @@ fn parse_record(record: &Value) -> Option<AddonRecord> {
             .as_str()
             .and_then(category_id_from_url),
     })
+}
+
+/// The ProfilePage URL of mod `id`.
+pub(crate) fn profile_url(base: &str, id: GbId) -> String {
+    format!("{base}/Mod/{id}/ProfilePage")
+}
+
+/// A parsed ProfilePage plus whether GameBanana has trashed, withheld or hidden the item.
+#[derive(Debug)]
+pub(crate) struct ParsedProfile {
+    pub(crate) profile: AddonProfile,
+    pub(crate) gone: bool,
+}
+
+/// Parses a ProfilePage reply; an error only when the body is not a JSON object with an id.
+pub(crate) fn parse_profile(body: &[u8]) -> Result<ParsedProfile, String> {
+    let record: Value = serde_json::from_slice(body).map_err(|e| e.to_string())?;
+    let id = u64::try_from(int(&record["_idRow"]))
+        .ok()
+        .filter(|&id| id > 0)
+        .ok_or_else(|| "the profile has no _idRow".to_owned())?;
+    // GameBanana sends ratings as a code-to-label map; an array of labels is read too.
+    let rated = &record["_aContentRatings"];
+    let mut ratings: Vec<String> = match (rated.as_object(), rated.as_array()) {
+        (Some(map), _) => map.values().filter_map(optional_text).collect(),
+        (None, Some(list)) => list.iter().filter_map(optional_text).collect(),
+        (None, None) => Vec::new(),
+    };
+    ratings.sort();
+    let credits = record["_aCredits"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+        .iter()
+        .map(|group| AddonCreditGroup {
+            name: text(&group["_sGroupName"]),
+            credits: group["_aAuthors"]
+                .as_array()
+                .map(Vec::as_slice)
+                .unwrap_or_default()
+                .iter()
+                .map(|author| AddonCredit {
+                    name: text(&author["_sName"]),
+                    role: text(&author["_sRole"]),
+                })
+                .collect(),
+        })
+        .collect();
+    let mut files: Vec<AddonFile> = record["_aFiles"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(parse_file)
+        .collect();
+    files.sort_by_key(|file| std::cmp::Reverse(file.date_added));
+    let profile = AddonProfile {
+        id: GbId::new(id),
+        name: text(&record["_sName"]),
+        author: text(&record["_aSubmitter"]["_sName"]),
+        profile_url: text(&record["_sProfileUrl"]),
+        description: html_to_text(record["_sText"].as_str().unwrap_or("")),
+        images: preview_images(&record).0,
+        download_count: u64::try_from(int(&record["_nDownloadCount"])).unwrap_or(0),
+        like_count: int(&record["_nLikeCount"]),
+        obsolete: record["_bIsObsolete"] == true,
+        mature: record["_sInitialVisibility"] == "warn" || !ratings.is_empty(),
+        ratings,
+        credits,
+        files,
+    };
+    let gone = ["_bIsTrashed", "_bIsWithheld", "_bIsPrivate"]
+        .iter()
+        .any(|flag| record[flag] == true);
+    Ok(ParsedProfile { profile, gone })
+}
+
+/// One downloadable file, skipped like `gamebanana::parse_files` when it has no address.
+fn parse_file(file: &Value) -> Option<AddonFile> {
+    let download_url = text(&file["_sDownloadUrl"]);
+    if download_url.is_empty() {
+        return None;
+    }
+    Some(AddonFile {
+        id: u64::try_from(int(&file["_idRow"])).unwrap_or(0),
+        name: text(&file["_sFile"]),
+        size: file["_nFilesize"].as_u64(),
+        date_added: int(&file["_tsDateAdded"]),
+        md5: optional_text(&file["_sMd5Checksum"]).filter(|md5| !md5.is_empty()),
+        av_result: text(&file["_sAvResult"]),
+        download_url,
+    })
+}
+
+/// Turns a GameBanana description into plain lines. Tags go first and entities are decoded
+/// after, so an escaped `&lt;3&gt;` stays text; line-ending tags become newlines.
+pub(crate) fn html_to_text(html: &str) -> String {
+    let mut stripped = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(open) = rest.find('<') {
+        stripped.push_str(&rest[..open]);
+        let Some(close) = rest[open..].find('>') else {
+            // An unclosed `<` is not a tag, so it stays as text.
+            stripped.push_str(&rest[open..]);
+            rest = "";
+            break;
+        };
+        let tag = &rest[open + 1..open + close];
+        let closing = tag.starts_with('/');
+        let name: String = tag
+            .trim_start_matches('/')
+            .chars()
+            .take_while(char::is_ascii_alphanumeric)
+            .map(|c| c.to_ascii_lowercase())
+            .collect();
+        if name == "br" || (closing && matches!(name.as_str(), "p" | "div" | "li")) {
+            stripped.push('\n');
+        }
+        rest = &rest[open + close + 1..];
+    }
+    stripped.push_str(rest);
+
+    let decoded = decode_entities(&stripped);
+    let lines: Vec<&str> = decoded.lines().map(str::trim).collect();
+    let mut text = String::with_capacity(decoded.len());
+    let mut newlines = 0;
+    for (i, line) in lines.iter().enumerate() {
+        if i > 0 {
+            newlines += 1;
+        }
+        if !line.is_empty() {
+            // A run of blank lines shrinks to one empty line between paragraphs.
+            text.push_str(&"\n".repeat(newlines.min(2)));
+            text.push_str(line);
+            newlines = 0;
+        }
+    }
+    text.trim().to_owned()
+}
+
+/// Decodes the entities descriptions use, in one pass so `&amp;lt;` stays `&lt;`.
+fn decode_entities(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(amp) = rest.find('&') {
+        out.push_str(&rest[..amp]);
+        rest = &rest[amp..];
+        let decoded = rest.find(';').filter(|&end| end <= 10).and_then(|end| {
+            let entity = &rest[1..end];
+            let c = match entity {
+                "amp" => Some('&'),
+                "lt" => Some('<'),
+                "gt" => Some('>'),
+                "quot" => Some('"'),
+                "#39" | "apos" => Some('\''),
+                "nbsp" => Some(' '),
+                _ => entity
+                    .strip_prefix('#')
+                    .and_then(|n| match n.strip_prefix(['x', 'X']) {
+                        Some(hex) => u32::from_str_radix(hex, 16).ok(),
+                        None => n.parse().ok(),
+                    })
+                    .and_then(char::from_u32),
+            }?;
+            Some((c, end))
+        });
+        match decoded {
+            Some((c, end)) => {
+                out.push(c);
+                rest = &rest[end + 1..];
+            }
+            None => {
+                out.push('&');
+                rest = &rest[1..];
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 #[cfg(test)]
@@ -318,5 +499,49 @@ mod tests {
                 .chain(&scout)
                 .all(|c| c.id() > 0 && !c.name().is_empty())
         );
+    }
+
+    #[test]
+    fn html_becomes_plain_lines() {
+        assert_eq!(
+            html_to_text(
+                "<p>Hi &amp; bye</p><br>Line<br/>2 &lt;3&gt; &quot;q&quot; it&#39;s<b>!</b>&nbsp;x"
+            ),
+            "Hi & bye\n\nLine\n2 <3> \"q\" it's! x"
+        );
+        assert_eq!(html_to_text("<p>a</p><p></p><p></p><p>b</p>"), "a\n\nb");
+    }
+
+    #[test]
+    fn a_real_profile_lists_files_downloads_and_credits() {
+        let body = fixture("gb-addons-profile-12592.json");
+        let raw: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let parsed = parse_profile(&body).unwrap();
+        let profile = &parsed.profile;
+        assert!(!parsed.gone);
+        assert_eq!(profile.id().get(), 12592);
+        assert!(profile.download_count() > 0);
+        assert!(
+            profile
+                .files()
+                .iter()
+                .any(|f| f.id() == 392820 && f.name() == "toon_muzzle_flashes_v12.rar")
+        );
+        assert!(
+            profile
+                .files()
+                .windows(2)
+                .all(|w| w[0].date_added() >= w[1].date_added())
+        );
+        let groups = raw["_aCredits"].as_array().map_or(0, Vec::len);
+        assert_eq!(profile.credits().len(), groups);
+        assert!(!profile.description().contains('<'));
+    }
+
+    #[test]
+    fn a_rated_profile_is_mature_and_names_its_ratings() {
+        let parsed = parse_profile(&fixture("gb-addons-profile-193786.json")).unwrap();
+        assert!(parsed.profile.mature());
+        assert!(!parsed.profile.ratings().is_empty());
     }
 }

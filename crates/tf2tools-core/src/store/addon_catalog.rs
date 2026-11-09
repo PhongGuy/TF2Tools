@@ -154,6 +154,182 @@ impl AddonCategory {
     }
 }
 
+/// One item's GameBanana page: its description, gallery, files and credits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct AddonProfile {
+    pub(crate) id: GbId,
+    pub(crate) name: String,
+    pub(crate) author: String,
+    pub(crate) profile_url: String,
+    pub(crate) description: String,
+    pub(crate) images: Vec<String>,
+    pub(crate) download_count: u64,
+    pub(crate) like_count: i64,
+    pub(crate) obsolete: bool,
+    pub(crate) mature: bool,
+    pub(crate) ratings: Vec<String>,
+    pub(crate) credits: Vec<AddonCreditGroup>,
+    pub(crate) files: Vec<AddonFile>,
+}
+
+impl AddonProfile {
+    /// The GameBanana item id.
+    pub fn id(&self) -> GbId {
+        self.id
+    }
+
+    /// The item's title.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// The submitter's name.
+    pub fn author(&self) -> &str {
+        &self.author
+    }
+
+    /// The item's GameBanana page.
+    pub fn profile_url(&self) -> &str {
+        &self.profile_url
+    }
+
+    /// The description as plain text, paragraphs split by an empty line.
+    pub fn description(&self) -> &str {
+        &self.description
+    }
+
+    /// The gallery, preferring 530 px renditions.
+    pub fn images(&self) -> &[String] {
+        &self.images
+    }
+
+    /// GameBanana downloads across all files.
+    pub fn download_count(&self) -> u64 {
+        self.download_count
+    }
+
+    /// GameBanana likes.
+    pub fn like_count(&self) -> i64 {
+        self.like_count
+    }
+
+    /// The author marked it obsolete.
+    pub fn obsolete(&self) -> bool {
+        self.obsolete
+    }
+
+    /// Warned or carrying content ratings.
+    pub fn mature(&self) -> bool {
+        self.mature
+    }
+
+    /// The content rating labels, such as "Skimpy Attire", sorted.
+    pub fn ratings(&self) -> &[String] {
+        &self.ratings
+    }
+
+    /// The credit groups in GameBanana's order.
+    pub fn credits(&self) -> &[AddonCreditGroup] {
+        &self.credits
+    }
+
+    /// The downloadable files, newest first.
+    pub fn files(&self) -> &[AddonFile] {
+        &self.files
+    }
+}
+
+/// One downloadable file of an add-on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct AddonFile {
+    pub(crate) id: u64,
+    pub(crate) name: String,
+    pub(crate) size: Option<u64>,
+    pub(crate) date_added: i64,
+    pub(crate) md5: Option<String>,
+    pub(crate) av_result: String,
+    pub(crate) download_url: String,
+}
+
+impl AddonFile {
+    /// The GameBanana file id.
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
+    /// The file name, such as "toon_muzzle_flashes_v12.rar".
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// The size in bytes, when GameBanana gives one.
+    pub fn size(&self) -> Option<u64> {
+        self.size
+    }
+
+    /// When it was uploaded, in Unix seconds.
+    pub fn date_added(&self) -> i64 {
+        self.date_added
+    }
+
+    /// The MD5 checksum in hex, when GameBanana gives one.
+    pub fn md5(&self) -> Option<&str> {
+        self.md5.as_deref()
+    }
+
+    /// GameBanana's virus scan verdict, such as "clean".
+    pub fn av_result(&self) -> &str {
+        &self.av_result
+    }
+
+    /// Where the file downloads from.
+    pub fn download_url(&self) -> &str {
+        &self.download_url
+    }
+}
+
+/// One named group of credits, such as "Key Authors".
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct AddonCreditGroup {
+    pub(crate) name: String,
+    pub(crate) credits: Vec<AddonCredit>,
+}
+
+impl AddonCreditGroup {
+    /// The group's name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// The people credited in it.
+    pub fn credits(&self) -> &[AddonCredit] {
+        &self.credits
+    }
+}
+
+/// One credited person and what they did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct AddonCredit {
+    pub(crate) name: String,
+    pub(crate) role: String,
+}
+
+impl AddonCredit {
+    /// The person's name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Their role, possibly empty.
+    pub fn role(&self) -> &str {
+        &self.role
+    }
+}
+
 /// What one Addon Store grid shows: a section, its order, an optional subcategory or
 /// search text, and whether mature items are kept.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -370,6 +546,24 @@ impl AddonCatalog {
             .collect())
     }
 
+    /// Item `id`'s profile page. Fails `Gone` for a trashed, withheld or private item; a
+    /// missing id keeps its HTTP status.
+    pub async fn profile(&self, id: GbId) -> Result<AddonProfile, BrowseError> {
+        let url = addon_api::profile_url(self.store.endpoints.gamebanana(), id);
+        let parsed = self
+            .store
+            .gamebanana_call(&url, Priority::Interactive, read_profile)
+            .await?
+            .map_err(|message| BrowseError::Malformed {
+                url: url.clone(),
+                message,
+            })?;
+        if parsed.gone {
+            return Err(BrowseError::Gone { gb_id: id });
+        }
+        Ok(parsed.profile)
+    }
+
     /// The page `page` of `query`'s listing, from the cache while it is fresh.
     async fn listing(
         &self,
@@ -439,6 +633,17 @@ fn read_categories(body: &[u8]) -> Reply<Result<Vec<AddonCategory>, String>> {
     match addon_api::parse_categories(body) {
         Ok(all) => Reply::Done(Ok(all)),
         Err(e) => Reply::Rejected(Err(e.to_string())),
+    }
+}
+
+/// Sorts one profile body for the pacer the way `read_listing` does.
+fn read_profile(body: &[u8]) -> Reply<Result<addon_api::ParsedProfile, String>> {
+    if body.trim_ascii().is_empty() {
+        return Reply::Empty;
+    }
+    match addon_api::parse_profile(body) {
+        Ok(parsed) => Reply::Done(Ok(parsed)),
+        Err(e) => Reply::Rejected(Err(e)),
     }
 }
 

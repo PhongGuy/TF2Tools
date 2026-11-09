@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use serde_json::{Value, json};
 use tf2tools_core::{
-    AddonCard, AddonCursor, AddonQuery, AddonSection, AddonSort, AddonStep, BrowseError,
+    AddonCard, AddonCursor, AddonQuery, AddonSection, AddonSort, AddonStep, BrowseError, GbId,
 };
 use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -459,5 +459,78 @@ async fn categories_are_fetched_once_a_session_without_the_game_and_without_excl
             .url
             .query_pairs()
             .any(|(k, v)| k == "_sSort" && v == "a_to_z")
+    );
+}
+
+async fn mount_profile(server: &MockServer, id: u64, body: Value) {
+    Mock::given(method("GET"))
+        .and(path(format!("/apiv11/Mod/{id}/ProfilePage")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(body))
+        .mount(server)
+        .await;
+}
+
+#[tokio::test]
+async fn trashed_withheld_and_private_items_are_gone() {
+    let env = store_env().await;
+    for (id, flag) in [(5, "_bIsTrashed"), (6, "_bIsWithheld"), (7, "_bIsPrivate")] {
+        mount_profile(
+            &env.server,
+            id,
+            json!({"_idRow": id, "_sName": "x", flag: true}),
+        )
+        .await;
+        let result = env.client.addon_catalog().profile(GbId::new(id)).await;
+        assert!(
+            matches!(result, Err(BrowseError::Gone { gb_id }) if gb_id.get() == id),
+            "{flag}: {result:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_profile_reads_its_credits_ratings_and_newest_file_first() {
+    let env = store_env().await;
+    mount_profile(&env.server, 8, json!({
+        "_idRow": 8, "_sName": "Pack", "_sText": "<p>Hello</p>", "_nDownloadCount": 1234,
+        "_aSubmitter": {"_sName": "vex"}, "_aContentRatings": {"sa": "Skimpy Attire"},
+        "_aCredits": [{"_sGroupName": "Key Authors", "_aAuthors": [{"_sName": "vex", "_sRole": "Modeller"}]}],
+        "_aFiles": [
+            {"_idRow": 1, "_sFile": "old.zip", "_nFilesize": 10, "_tsDateAdded": 100, "_sAvResult": "clean", "_sDownloadUrl": "https://gamebanana.com/dl/1"},
+            {"_idRow": 2, "_sFile": "new.zip", "_nFilesize": 20, "_tsDateAdded": 200, "_sAvResult": "clean", "_sDownloadUrl": "https://gamebanana.com/dl/2", "_sMd5Checksum": "ab"}
+        ]
+    })).await;
+    let profile = env
+        .client
+        .addon_catalog()
+        .profile(GbId::new(8))
+        .await
+        .unwrap();
+    assert_eq!(
+        (profile.name(), profile.author(), profile.description()),
+        ("Pack", "vex", "Hello")
+    );
+    assert_eq!(profile.download_count(), 1234);
+    assert!(profile.mature());
+    assert_eq!(profile.ratings(), ["Skimpy Attire"]);
+    assert_eq!(profile.credits()[0].name(), "Key Authors");
+    assert_eq!(
+        (
+            profile.credits()[0].credits()[0].name(),
+            profile.credits()[0].credits()[0].role()
+        ),
+        ("vex", "Modeller")
+    );
+    let files: Vec<_> = profile.files().iter().map(|f| (f.id(), f.md5())).collect();
+    assert_eq!(files, [(2, Some("ab")), (1, None)]);
+}
+
+#[tokio::test]
+async fn a_missing_profile_fails_with_its_status() {
+    let env = store_env().await;
+    let result = env.client.addon_catalog().profile(GbId::new(9)).await;
+    assert!(
+        matches!(result, Err(BrowseError::Http { status: 404, .. })),
+        "{result:?}"
     );
 }

@@ -105,11 +105,11 @@ pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
 pub use settings::{Settings, Volume};
 pub use store::{
-    AddonCard, AddonCatalog, AddonCategory, AddonCursor, AddonQuery, AddonSection, AddonSort,
-    AddonStep, DownloadPhase, DownloadProgress, Endpoints, INDEX_STEP_CALLS, MastercomfigRelease,
-    SEARCH_STEP_CALLS, STEP_CARDS, StoreCard, StoreClient, StoreConfig, StoreCursor, StoreFile,
-    StoreItem, StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome,
-    SyncProgress,
+    AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
+    AddonProfile, AddonQuery, AddonSection, AddonSort, AddonStep, DownloadPhase, DownloadProgress,
+    Endpoints, INDEX_STEP_CALLS, MastercomfigRelease, SEARCH_STEP_CALLS, STEP_CARDS, StoreCard,
+    StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem, StoreItemId, StoreKind,
+    StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
 };
 pub use store::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 pub use texture::{

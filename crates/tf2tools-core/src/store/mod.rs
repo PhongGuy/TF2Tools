@@ -33,8 +33,9 @@ use crate::error::{BrowseError, FilesError, QueryError, SyncError};
 use crate::paths::DataDir;
 use crate::weapons::Weapon;
 pub use addon_catalog::{
-    AddonCard, AddonCatalog, AddonCategory, AddonCursor, AddonQuery, AddonSort, AddonStep,
-    INDEX_STEP_CALLS, SEARCH_STEP_CALLS, STEP_CARDS,
+    AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
+    AddonProfile, AddonQuery, AddonSort, AddonStep, INDEX_STEP_CALLS, SEARCH_STEP_CALLS,
+    STEP_CARDS,
 };
 pub use addon_sections::AddonSection;
 pub use cards::{StoreCard, StoreCursor, StoreQuery, StoreSort};
