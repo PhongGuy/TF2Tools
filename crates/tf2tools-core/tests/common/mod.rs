@@ -502,7 +502,8 @@ pub async fn store_env() -> StoreEnv {
         .with_preview_prefixes([format!("{uri}/preview/")])
         .with_image_prefixes([format!("{uri}/img/")])
         .with_serveme(format!("{uri}/serveme"))
-        .with_map_downloads(format!("{uri}/fastdl/maps"));
+        .with_map_downloads(format!("{uri}/fastdl/maps"))
+        .with_mastercomfig_data(format!("{uri}/gh-raw/mastercomfig"));
     let client = StoreClient::new(db.clone(), dir.clone(), endpoints).with_config(fast_config());
     let lib = Library::new(db, dir.clone());
     StoreEnv {

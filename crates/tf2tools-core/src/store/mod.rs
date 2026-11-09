@@ -102,6 +102,7 @@ pub struct Endpoints {
     wiki_images: String,
     serveme: String,
     map_downloads: String,
+    mastercomfig_data: String,
 }
 
 impl Default for Endpoints {
@@ -125,6 +126,8 @@ impl Default for Endpoints {
             wiki_images: "https://wiki.teamfortress.com/w/images".to_owned(),
             serveme: "https://serveme.tf".to_owned(),
             map_downloads: "https://fastdl.serveme.tf/maps".to_owned(),
+            mastercomfig_data: "https://raw.githubusercontent.com/mastercomfig/mastercomfig"
+                .to_owned(),
         }
     }
 }
@@ -133,7 +136,8 @@ impl Endpoints {
     /// Every base under `base` (no trailing slash): GameBanana `{base}/apiv11`, GitHub API
     /// `{base}/gh-api`, github.com `{base}/gh`, previews `[{base}/preview/]`, images
     /// `[{base}/img/]`, hud-db screenshots `{base}/img/hud-resources`, wiki images
-    /// `{base}/img/wiki`, serveme.tf `{base}/serveme` and map files `{base}/fastdl/maps`.
+    /// `{base}/img/wiki`, serveme.tf `{base}/serveme`, map files `{base}/fastdl/maps` and
+    /// mastercomfig's repository files `{base}/gh-raw/mastercomfig`.
     pub fn loopback(base: &str) -> Self {
         Self {
             gamebanana: format!("{base}/apiv11"),
@@ -145,6 +149,7 @@ impl Endpoints {
             wiki_images: format!("{base}/img/wiki"),
             serveme: format!("{base}/serveme"),
             map_downloads: format!("{base}/fastdl/maps"),
+            mastercomfig_data: format!("{base}/gh-raw/mastercomfig"),
         }
     }
 
@@ -222,6 +227,18 @@ impl Endpoints {
     /// The base a map downloads from, as `{base}/{name}.bsp`.
     pub fn map_downloads(&self) -> &str {
         &self.map_downloads
+    }
+
+    /// The base of mastercomfig's raw repository files; a release's file is
+    /// `{base}/{tag}/{path}`.
+    pub fn mastercomfig_data(&self) -> &str {
+        &self.mastercomfig_data
+    }
+
+    /// These endpoints with another mastercomfig repository file base.
+    pub fn with_mastercomfig_data(mut self, base: impl Into<String>) -> Self {
+        self.mastercomfig_data = base.into();
+        self
     }
 
     /// These endpoints with another serveme.tf base.

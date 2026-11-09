@@ -66,6 +66,12 @@ impl DataDir {
         self.root.join("hud_presets")
     }
 
+    /// mastercomfig's module catalogs, `<root>/mastercomfig`, one folder per release tag.
+    /// Touches no files.
+    pub fn mastercomfig_dir(&self) -> PathBuf {
+        self.root.join("mastercomfig")
+    }
+
     /// Scratch space for downloads and extraction, `<root>/tmp`.
     pub fn tmp_dir(&self) -> PathBuf {
         self.root.join("tmp")

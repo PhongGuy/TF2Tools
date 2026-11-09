@@ -7,10 +7,30 @@ use tokio::io::AsyncWriteExt;
 
 use super::{StoreClient, StoreKind};
 use crate::archive::VPK_MAGIC;
-use crate::error::{InstallMastercomfigError, QueryError};
-use crate::library::{game_custom_dir, record_install, remove_file_if_present, write_setup_hook};
+use crate::error::{InstallMastercomfigError, ModuleCatalogError, QueryError};
+use crate::library::{
+    ModuleCatalog, game_custom_dir, record_install, remove_file_if_present, write_setup_hook,
+};
 use crate::templates::BASE_VPK;
 use crate::tf2::Tf2Install;
+
+/// The catalog's two files, as mastercomfig's repository and the cache folder name them.
+const CATALOG_FILES: [&str; 2] = ["modules.json", "preset_modules.json"];
+/// Far above the real `modules.json` (21 KB), so only a wrong file reaches it.
+const CATALOG_CAP: u64 = 1024 * 1024;
+
+/// A tag names a cache folder, so only a plain version-like name may reach the disk or a URL.
+fn check_tag(tag: &str) -> Result<(), ModuleCatalogError> {
+    let plain = tag
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'));
+    if tag.is_empty() || tag.starts_with('.') || !plain {
+        return Err(ModuleCatalogError::UnsupportedTag {
+            tag: tag.to_owned(),
+        });
+    }
+    Ok(())
+}
 
 /// mastercomfig's latest release as the last addon-store sync saw it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,6 +86,48 @@ impl StoreClient {
 }
 
 impl StoreClient {
+    /// The catalog saved for `tag`; None when missing, unreadable or unparseable. Blocking.
+    pub fn cached_mastercomfig_catalog(&self, tag: &str) -> Option<ModuleCatalog> {
+        check_tag(tag).ok()?;
+        let folder = self.dir.mastercomfig_dir().join(tag);
+        let modules = std::fs::read(folder.join(CATALOG_FILES[0])).ok()?;
+        let presets = std::fs::read(folder.join(CATALOG_FILES[1])).ok()?;
+        ModuleCatalog::parse(tag, &modules, &presets).ok()
+    }
+
+    /// The saved catalog for `tag`, else `{mastercomfig_data}/{tag}/data/modules.json` and
+    /// `preset_modules.json` fetched, parsed and saved under `mastercomfig_dir()/{tag}/`.
+    /// Needs a tokio runtime.
+    pub async fn mastercomfig_catalog(
+        &self,
+        tag: &str,
+    ) -> Result<ModuleCatalog, ModuleCatalogError> {
+        check_tag(tag)?;
+        if let Some(catalog) = self.cached_mastercomfig_catalog(tag) {
+            return Ok(catalog);
+        }
+        let base = self.endpoints.mastercomfig_data();
+        let mut bodies = Vec::with_capacity(CATALOG_FILES.len());
+        for file in CATALOG_FILES {
+            let url = format!("{base}/{tag}/data/{file}");
+            bodies.push(self.http.open(&url).await?.read_to_end(CATALOG_CAP).await?);
+        }
+        let catalog = ModuleCatalog::parse(tag, &bodies[0], &bodies[1])?;
+        // The cache only saves a refetch, so a failed write still returns the catalog.
+        let folder = self.dir.mastercomfig_dir().join(tag);
+        let saved = async {
+            tokio::fs::create_dir_all(&folder).await?;
+            for (file, body) in CATALOG_FILES.iter().zip(&bodies) {
+                tokio::fs::write(folder.join(file), body).await?;
+            }
+            Ok::<_, std::io::Error>(())
+        };
+        if let Err(e) = saved.await {
+            tracing::warn!(tag, error = %e, "cannot save mastercomfig's module catalog");
+        }
+        Ok(catalog)
+    }
+
     /// Downloads the recorded release's base VPK through a temp file in `tf/custom`, renames it
     /// over `mastercomfig-base.vpk`, deletes its .sound.cache, records the state row (keeping
     /// a saved preset and modules, else Medium and none) and writes `setup_hook.cfg`.
