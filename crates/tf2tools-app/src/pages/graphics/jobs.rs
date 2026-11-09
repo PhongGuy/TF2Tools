@@ -86,7 +86,7 @@ pub fn install_base(
     async move { job.await.map_err(|e| OpError::core(action, e))? }
 }
 
-// Applies the saved choices (if any) against `version`'s catalog and returns the names it
+// Applies the saved module choices (if any) against `version`'s catalog and returns the names it
 // dropped, and true when a player's own modules.cfg stood in the way. Every other failure is
 // logged and yields no names, so it never fails the install.
 async fn reapply_choices(
@@ -99,9 +99,10 @@ async fn reapply_choices(
         .await
         .map_err(|e| e.to_string())
         .and_then(|read| read.map_err(|e| e.to_string()));
+    // With no setting changed there is nothing to write, so modules.cfg is left as it is.
     let choices = match saved {
-        Ok(Some(choices)) => choices,
-        Ok(None) => return (Vec::new(), false),
+        Ok(Some(choices)) if !choices.modules().is_empty() => choices,
+        Ok(_) => return (Vec::new(), false),
         Err(e) => {
             tracing::warn!("mastercomfig settings after install: {e}");
             return (Vec::new(), false);

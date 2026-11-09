@@ -147,3 +147,47 @@ fn an_update_says_the_player_s_own_modules_cfg_was_kept(cx: &mut TestAppContext)
     assert_eq!(modules_cfg(&env).as_deref(), Some("fpscap=60\n"));
     assert!(!support::present(cx, s.win, ids::CONFIRM_DIALOG));
 }
+
+// A fresh install with nothing saved; `own_cfg` seeds a player's own modules.cfg first.
+fn fresh_install(cx: &mut TestAppContext, own_cfg: Option<&str>) -> support::Env {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes(
+        "/gh/mastercomfig/mastercomfig-base.vpk",
+        support::mastercomfig_base("9.100.1"),
+    );
+    let s = server_shell(cx, &env, &server);
+    support::seed_mastercomfig_release(&env, &server.uri(), "9.100.1");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    if let Some(text) = own_cfg {
+        let cfg = env.game.join("tf/cfg/overrides/modules.cfg");
+        std::fs::create_dir_all(cfg.parent().unwrap()).unwrap();
+        std::fs::write(&cfg, text).unwrap();
+    }
+    let page = open(cx, &s);
+    support::click_id(cx, s.win, ids::GRAPHICS_INSTALL);
+    toasted(
+        cx,
+        &s,
+        "mastercomfig 9.100.1 is ready. Pick a preset below.",
+    );
+    idle(cx, &page);
+    let labels = support::toast_labels(cx, s.win);
+    assert!(
+        !labels.iter().any(|t| t.contains("was kept")),
+        "no kept note: {labels:?}"
+    );
+    env
+}
+
+#[gpui_kit::test]
+fn a_fresh_install_leaves_the_player_s_own_modules_cfg_alone(cx: &mut TestAppContext) {
+    let env = fresh_install(cx, Some("fpscap=60\n"));
+    assert_eq!(modules_cfg(&env).as_deref(), Some("fpscap=60\n"));
+}
+
+#[gpui_kit::test]
+fn a_fresh_install_writes_no_modules_cfg(cx: &mut TestAppContext) {
+    let env = fresh_install(cx, None);
+    assert_eq!(modules_cfg(&env), None);
+}
