@@ -425,7 +425,7 @@ fn slot_key(kind: SoundKind) -> SharedString {
 }
 
 /// The player key of a library sound.
-fn sound_key(folder: &str) -> SharedString {
+pub(crate) fn sound_key(folder: &str) -> SharedString {
     format!("sound:{folder}").into()
 }
 

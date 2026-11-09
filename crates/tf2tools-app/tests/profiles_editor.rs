@@ -820,3 +820,137 @@ fn an_empty_library_points_to_the_store(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::profile_picker_store("killsound"));
     assert_eq!(cx.update(|cx| s.shell.read(cx).page()), Page::SoundStore);
 }
+
+fn sound_named(s: &support::ShellWindow, name: &str) -> SoundEntry {
+    s.services
+        .library
+        .list_sounds()
+        .unwrap()
+        .into_iter()
+        .find(|x| x.name() == name)
+        .unwrap()
+}
+
+#[gpui_kit::test]
+fn picking_sounds_fills_each_sound_slot(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let (ding, bell) = (sound_named(&s, "Classic Ding"), sound_named(&s, "Bell"));
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    support::click_id(cx, s.win, ids::profile_slot("hitsound"));
+    assert!(support::present(cx, s.win, ids::profile_picker("hitsound")));
+    support::click_id(
+        cx,
+        s.win,
+        ids::profile_pick_sound("hitsound", bell.folder_name()),
+    );
+    wait_idle(cx, &s, &editor);
+    support::click_id(cx, s.win, ids::profile_slot("killsound"));
+    support::click_id(
+        cx,
+        s.win,
+        ids::profile_pick_sound("killsound", ding.folder_name()),
+    );
+    wait_idle(cx, &s, &editor);
+    let after = saved(&s, comp.id());
+    assert_eq!(after.hitsound().map(|x| x.name()), Some("Bell"));
+    assert_eq!(after.killsound().map(|x| x.name()), Some("Classic Ding"));
+}
+
+#[gpui_kit::test]
+fn the_play_buttons_preview_without_picking(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let bell = sound_named(&s, "Bell");
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, comp.id());
+    support::click_id(cx, s.win, ids::profile_slot_play("hitsound"));
+    support::wait_real(cx, "the slot preview", |_| s.audio.plays().len() == 1);
+    support::click_id(cx, s.win, ids::profile_slot("hitsound"));
+    support::click_id(cx, s.win, ids::profile_pick_play(bell.folder_name()));
+    support::wait_real(cx, "the row preview", |_| s.audio.plays().len() >= 2);
+    assert_eq!(saved(&s, comp.id()).hitsound(), comp.hitsound());
+}
+
+// A gallery pick and a slot Clear in the same frame: the queue keeps both.
+#[gpui_kit::test]
+fn two_clicks_in_one_frame_both_land(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let budhud = seed_hud(&s, &env, "budhud");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    support::settle(cx, s.win);
+    support::click_without_settling(cx, s.win, ids::profile_pick_hud(budhud.folder_name()));
+    support::click_without_settling(cx, s.win, ids::profile_slot_clear("hitsound"));
+    wait_idle(cx, &s, &editor);
+    let after = saved(&s, comp.id());
+    assert_eq!(
+        after.hud().map(|h| h.folder_name()),
+        Some(budhud.folder_name())
+    );
+    assert!(after.hitsound().is_none());
+    assert_eq!(after.killsound(), comp.killsound());
+}
+
+#[gpui_kit::test]
+fn editing_the_active_profile_says_changes_are_not_applied(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    apply(&s, &env, &comp);
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    let custom = env.game.join("tf/custom");
+    let before = files_under(&custom);
+    support::click_id(cx, s.win, ids::profile_slot_clear("hud"));
+    wait_idle(cx, &s, &editor);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_EDITOR_NOT_APPLIED).as_deref(),
+        Some("Changes not applied yet")
+    );
+    assert!(cx.update(|cx| editor.read(cx).not_applied()));
+    assert!(support::present(cx, s.win, ids::PROFILE_EDITOR_ACTIVATE));
+    assert_eq!(
+        files_under(&custom),
+        before,
+        "only Activate touches the game"
+    );
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_BACK);
+    support::wait_real(cx, "no active profile", |cx| {
+        support::present(cx, s.win, ids::PROFILES_NO_ACTIVE)
+    });
+}
+
+#[gpui_kit::test]
+fn a_deleted_item_shows_missing(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let rays = s.services.library.list_huds().unwrap()[0].clone();
+    s.services.library.delete_hud(rays.id()).unwrap();
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    let hud = comp.hud().unwrap().name().to_owned();
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_slot_missing("hud")).as_deref(),
+        Some(format!("Missing: {hud}").as_str())
+    );
+    assert!(support::present(cx, s.win, ids::profile_slot_clear("hud")));
+    let ding = sound_named(&s, "Classic Ding");
+    s.services.library.delete_sound(ding.id(), None).unwrap();
+    cx.update(LibraryEvents::changed);
+    support::wait_real(cx, "the hitsound to go missing", |cx| {
+        support::present(cx, s.win, ids::profile_slot_missing("hitsound"))
+    });
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::profile_slot_play("hitsound")
+    ));
+    wait_idle(cx, &s, &editor);
+}

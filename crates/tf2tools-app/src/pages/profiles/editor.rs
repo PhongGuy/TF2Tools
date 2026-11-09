@@ -19,17 +19,19 @@ use gpui_kit::{
 };
 use tf2tools_core::{
     HudEntry, LibraryError, MissingItem, Profile, ProfileError, ProfileId, ProfileUpdate,
-    SoundEntry,
+    SoundEntry, SoundKind,
 };
 
 use super::ProfilesPage;
 use super::editor_model::{Edit, Slot, SlotState, slot_state, slot_text};
 use super::model;
+use crate::audio::player::{NowPlaying, Player, sound_player};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_library, describe_profile};
 use crate::pages::common::{SM_ICON_PX, badge_of, card_frame};
 use crate::pages::huds::{card_images, hud_picture, hud_title};
+use crate::pages::sounds::{play_button, sound_key, sound_title};
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, run_blocking, tf2_state};
 use crate::shell::route::{NavigateTo, Page};
@@ -97,6 +99,8 @@ pub struct ProfileEditor {
     visible: Range<usize>,
     /// This editor's own `RemoteImages` viewer, handed back on release.
     image_viewer: String,
+    /// The app's floating player, which plays the previews.
+    player: Entity<Player>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -168,6 +172,9 @@ impl ProfileEditor {
                 images.update(cx, |images, cx| images.want(&released, Vec::new(), cx));
             }));
         }
+        // The play icons read the player's sound, so redraw when it starts or ends.
+        let player = sound_player(window, cx);
+        subscriptions.push(cx.observe(&player, |_, _, cx| cx.notify()));
         let mut grid = CardGrid::new(ids::PROFILE_PICKER_GRID);
         let this = cx.entity().downgrade();
         grid.on_visible(move |range, cx| {
@@ -196,6 +203,7 @@ impl ProfileEditor {
             grid,
             visible: 0..0,
             image_viewer,
+            player,
             _subscriptions: subscriptions,
         };
         editor.load_galleries(cx);
@@ -215,6 +223,7 @@ impl ProfileEditor {
             return;
         }
         self.selected = slot;
+        self.player.update(cx, |player, cx| player.stop(cx));
         let (win, search) = (self.win, self.search.clone());
         let placeholder = match slot {
             Slot::Hud => "Search HUDs...",
@@ -288,6 +297,64 @@ impl ProfileEditor {
             .filter(|hud| model::matches(hud.name(), &query))
             .cloned()
             .collect()
+    }
+
+    // The library sounds whose name holds the search text.
+    fn shown_sounds(&self, cx: &App) -> Vec<SoundEntry> {
+        let query = self.search.read(cx).value();
+        self.galleries
+            .iter()
+            .flat_map(|g| g.sounds.iter())
+            .filter(|sound| model::matches(sound.name(), &query))
+            .cloned()
+            .collect()
+    }
+
+    // Plays the library sound in `folder`, or stops it when it is the one playing. The bytes are
+    // found by folder, so a slot card can play before the galleries load.
+    fn preview(&mut self, folder: String, name: String, cx: &mut Context<Self>) {
+        let subtitle = self
+            .galleries
+            .iter()
+            .flat_map(|g| g.sounds.iter())
+            .find(|x| x.folder_name() == folder)
+            .map(|x| x.original_filename().to_owned())
+            .unwrap_or_default();
+        let now = NowPlaying {
+            key: sound_key(&folder),
+            name: name.into(),
+            subtitle: subtitle.into(),
+        };
+        self.player
+            .update(cx, |player, cx| {
+                player.toggle(
+                    now,
+                    move |s| {
+                        let failed =
+                            |e: LibraryError| describe_library(&e).into_op("Failed to play sound");
+                        let sounds = s.library.list_sounds().map_err(failed)?;
+                        let sound = sounds
+                            .iter()
+                            .find(|x| x.folder_name() == folder)
+                            .ok_or_else(|| {
+                                OpError::core(
+                                    "Failed to play sound",
+                                    "That sound is no longer in your library",
+                                )
+                            })?;
+                        s.library.sound_bytes(sound.id()).map_err(failed)
+                    },
+                    cx,
+                )
+            })
+            .detach();
+    }
+
+    fn is_playing(&self, folder: &str, cx: &App) -> bool {
+        self.player
+            .read(cx)
+            .now_playing()
+            .is_some_and(|now| now.key == sound_key(folder))
     }
 
     // Asks for the pictures of the HUD cards in the grid's last drawn range.
@@ -667,6 +734,23 @@ impl ProfileEditor {
                 .child(text.clone())
                 .into_any_element(),
         };
+        // A sound slot plays its saved sound; a missing one has nothing to play.
+        let item = match slot {
+            Slot::Hitsound => self.saved.hitsound(),
+            Slot::Killsound => self.saved.killsound(),
+            Slot::Hud | Slot::Crosshairs => None,
+        };
+        let play = item
+            .filter(|_| matches!(state, SlotState::Set(_)))
+            .map(|item| {
+                let (folder, name) = (item.folder_name().to_owned(), item.name().to_owned());
+                play_button(ids::profile_slot_play(key), self.is_playing(&folder, cx)).on_click(
+                    cx.listener(move |editor, _, _, cx| {
+                        cx.stop_propagation();
+                        editor.preview(folder.clone(), name.clone(), cx);
+                    }),
+                )
+            });
         let clear = (state != SlotState::Empty).then(|| {
             Button::new(ids::profile_slot_clear(key))
                 .ghost()
@@ -697,6 +781,7 @@ impl ProfileEditor {
                             .child(div().font_weight(FontWeight::SEMIBOLD).child(slot.label()))
                             .child(value),
                     )
+                    .children(play)
                     .children(clear),
             )
             .on_click(cx.listener(move |editor, _, _, cx| editor.select(slot, cx)))
@@ -747,7 +832,7 @@ impl ProfileEditor {
         } else if slot == Slot::Hud {
             self.hud_gallery(galleries, cx)
         } else {
-            div().into_any_element()
+            self.sound_gallery(slot, cx)
         };
         let muted = cx.theme().muted_foreground;
         Some(
@@ -820,6 +905,58 @@ impl ProfileEditor {
                     .into_any_element()
             }))
             .into_any_element()
+    }
+}
+
+impl ProfileEditor {
+    // The library sounds as rows with a play button, the saved one marked; a click on a row
+    // saves it to the slot, its play button only previews.
+    fn sound_gallery(&self, slot: Slot, cx: &mut Context<Self>) -> AnyElement {
+        let (kind, saved) = match slot {
+            Slot::Hitsound => (SoundKind::Hitsound, self.saved.hitsound()),
+            Slot::Killsound | Slot::Hud | Slot::Crosshairs => {
+                (SoundKind::Killsound, self.saved.killsound())
+            }
+        };
+        let saved = saved.map(|item| item.folder_name().to_owned());
+        let rows: Vec<AnyElement> = self
+            .shown_sounds(cx)
+            .into_iter()
+            .map(|sound| {
+                let folder = sound.folder_name().to_owned();
+                let picked = saved.as_deref() == Some(folder.as_str());
+                let id = sound.id().clone();
+                let (play_folder, name) = (folder.clone(), sound.name().to_owned());
+                let play = play_button(
+                    ids::profile_pick_play(&folder),
+                    self.is_playing(&folder, cx),
+                )
+                .on_click(cx.listener(move |editor, _, _, cx| {
+                    cx.stop_propagation();
+                    editor.preview(play_folder.clone(), name.clone(), cx);
+                }));
+                card_frame(cx)
+                    .id(ids::profile_pick_sound(slot.key(), &folder))
+                    .aria_label(sound.name().to_owned())
+                    .aria_selected(picked)
+                    .test_support()
+                    .when(picked, |row| row.border_color(cx.theme().primary))
+                    .cursor_pointer()
+                    .px_3()
+                    .py_2()
+                    .child(
+                        h_flex()
+                            .gap_2()
+                            .child(div().flex_1().min_w_0().child(sound_title(&sound, cx)))
+                            .child(play),
+                    )
+                    .on_click(cx.listener(move |editor, _, _, cx| {
+                        editor.enqueue(Edit::SetSound(kind, id.clone()), cx)
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+        v_flex().gap_2().children(rows).into_any_element()
     }
 }
 
