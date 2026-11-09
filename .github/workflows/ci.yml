@@ -47,6 +47,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends pkg-config libfontconfig-dev libfreetype-dev libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev libvulkan1 libegl1 libasound2-dev
       - name: Gate
         run: make check
+      - name: Release build check
+        # Lint and test unify dev-dependency features into the app; release.yml builds without them.
+        run: cargo check --locked -p tf2tools-app --bin tf2tools
 
   windows:
     runs-on: windows-2025
