@@ -892,6 +892,10 @@ pub const PROFILE_EDITOR_DELETE: &str = "profile-editor-delete";
 pub const PROFILE_EDITOR_NOT_APPLIED: &str = "profile-editor-not-applied";
 /// The HUD picker's card grid.
 pub const PROFILE_PICKER_GRID: &str = "profile-picker-grid";
+/// The sound picker's list.
+pub const PROFILE_PICKER_SOUNDS: &str = "profile-picker-sounds";
+/// The sound picker list's scrollbar.
+pub const PROFILE_PICKER_SOUNDS_SCROLLBAR: &str = "profile-picker-sounds-scrollbar";
 
 /// The Create New / Edit profile wizard dialog.
 pub const WIZARD_DIALOG: &str = "wizard-dialog";

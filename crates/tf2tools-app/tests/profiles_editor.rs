@@ -9,6 +9,7 @@ use gpui_kit::ElementId;
 use gpui_kit::ScrollDelta;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
+use tf2tools_app::audio::player::{NowPlaying, sound_player};
 use tf2tools_app::ids;
 use tf2tools_app::library_events::LibraryEvents;
 use tf2tools_app::pages::profiles::ProfilesPage;
@@ -869,12 +870,13 @@ fn the_play_buttons_preview_without_picking(cx: &mut TestAppContext) {
     let comp = full_profile(&s, &env, "Comp");
     let bell = sound_named(&s, "Bell");
     let page = open_profiles(cx, &s);
-    let _editor = open_editor(cx, &s, &page, comp.id());
+    let editor = open_editor(cx, &s, &page, comp.id());
     support::click_id(cx, s.win, ids::profile_slot_play("hitsound"));
     support::wait_real(cx, "the slot preview", |_| s.audio.plays().len() == 1);
     support::click_id(cx, s.win, ids::profile_slot("hitsound"));
     support::click_id(cx, s.win, ids::profile_pick_play(bell.folder_name()));
     support::wait_real(cx, "the row preview", |_| s.audio.plays().len() >= 2);
+    wait_idle(cx, &s, &editor);
     assert_eq!(saved(&s, comp.id()).hitsound(), comp.hitsound());
 }
 
@@ -1207,4 +1209,63 @@ fn assigning_a_deleted_crosshair_toasts(cx: &mut TestAppContext) {
     toast_is(cx, &s, "That crosshair is no longer in your library");
     wait_idle(cx, &s, &editor);
     assert!(saved(&s, vanilla.id()).crosshairs().is_empty());
+}
+
+// The sound list builds only the rows in view, yet the last of a long library can be reached.
+#[gpui_kit::test]
+fn a_long_sound_library_scrolls_to_its_last_row(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    for n in 0..60 {
+        seed_sound(&s, &env, &format!("Sound {n:02}"));
+    }
+    let last = s.services.library.list_sounds().unwrap().pop().unwrap();
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    support::click_id(cx, s.win, ids::profile_slot("hitsound"));
+    let row = ids::profile_pick_sound("hitsound", last.folder_name());
+    assert!(
+        !support::present(cx, s.win, row.clone()),
+        "rows out of view are not built"
+    );
+    let down = gpui_kit::ScrollDelta::Lines(gpui_kit::point(0., -1000.));
+    cx.update_window(s.win, |_, w, cx| {
+        w.scroll(ids::PROFILE_PICKER_SOUNDS, down, cx)
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    support::click_id(cx, s.win, row);
+    wait_idle(cx, &s, &editor);
+    assert_eq!(
+        saved(&s, comp.id()).hitsound().map(|x| x.folder_name()),
+        Some(last.folder_name())
+    );
+}
+
+// A slot change stops the editor's own preview, never a sound started elsewhere.
+#[gpui_kit::test]
+fn changing_slot_stops_only_the_editors_preview(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, comp.id());
+    let player = cx
+        .update_window(s.win, |_, w, cx| sound_player(w, cx))
+        .unwrap();
+    let now = NowPlaying {
+        key: "elsewhere".into(),
+        name: "Ding".into(),
+        subtitle: "".into(),
+    };
+    cx.update(|cx| player.update(cx, |p, cx| p.toggle(now, |_| Ok(vec![1]), cx).detach()));
+    support::wait_real(cx, "the outside play", |_| s.audio.plays().len() == 1);
+    support::click_id(cx, s.win, ids::profile_slot("hitsound"));
+    let key = cx.update(|cx| player.read(cx).now_playing().map(|n| n.key.to_string()));
+    assert_eq!(key.as_deref(), Some("elsewhere"), "a slot change kept it");
+    support::click_id(cx, s.win, ids::profile_slot_play("hitsound"));
+    support::wait_real(cx, "the slot preview", |_| s.audio.plays().len() == 2);
+    support::click_id(cx, s.win, ids::profile_slot("killsound"));
+    assert!(cx.update(|cx| player.read(cx).now_playing().is_none()));
 }

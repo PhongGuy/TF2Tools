@@ -779,6 +779,8 @@ fn profile_editor_ids_are_stable() {
             ids::PROFILE_EDITOR_DELETE,
             ids::PROFILE_EDITOR_NOT_APPLIED,
             ids::PROFILE_PICKER_GRID,
+            ids::PROFILE_PICKER_SOUNDS,
+            ids::PROFILE_PICKER_SOUNDS_SCROLLBAR,
         ],
         [
             "profiles-new",
@@ -795,6 +797,8 @@ fn profile_editor_ids_are_stable() {
             "profile-editor-delete",
             "profile-editor-not-applied",
             "profile-picker-grid",
+            "profile-picker-sounds",
+            "profile-picker-sounds-scrollbar",
         ]
     );
 }

@@ -13,9 +13,9 @@ use gpui_kit::component::{ActiveTheme as _, Disableable as _, Icon, h_flex, v_fl
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
-    Window, div, px, transparent_black,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
+    UniformListScrollHandle, WeakEntity, Window, div, px, transparent_black, uniform_list,
 };
 use tf2tools_core::{
     CrosshairEntry, HudEntry, LibraryError, MissingItem, Profile, ProfileError, ProfileId,
@@ -39,6 +39,7 @@ use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::crosshair_picker::CrosshairPicker;
+use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 use crate::widgets::weapon_assigner::{
     AssignRequested, AssignedCell, AssignerState, ClearRequested, WeaponAssigner,
 };
@@ -48,6 +49,10 @@ use crate::widgets::{Named as _, labelled};
 const PICK_TITLE_HEIGHT: Pixels = px(40.);
 // The slot column's width; the picker takes the rest.
 const SLOT_COLUMN_WIDTH: Pixels = px(280.);
+// One sound row with the gap under it; `uniform_list` sizes every row alike.
+const SOUND_ROW_HEIGHT: Pixels = px(56.);
+// The sound list shows at most this many rows before it scrolls.
+const SOUND_MAX_ROWS: usize = 8;
 // The HUD gallery shows at most this many rows before it scrolls.
 const PICKER_MAX_ROWS: usize = 3;
 
@@ -107,6 +112,9 @@ pub struct ProfileEditor {
     image_viewer: String,
     /// The app's floating player, which plays the previews.
     player: Entity<Player>,
+    /// The player key of the last preview this editor started.
+    preview_key: Option<SharedString>,
+    sound_scroll: UniformListScrollHandle,
     crosshair_picker: Entity<CrosshairPicker>,
     assigner: Entity<WeaponAssigner>,
     _subscriptions: Vec<Subscription>,
@@ -234,6 +242,8 @@ impl ProfileEditor {
             visible: 0..0,
             image_viewer,
             player,
+            preview_key: None,
+            sound_scroll: UniformListScrollHandle::new(),
             crosshair_picker,
             assigner,
             _subscriptions: subscriptions,
@@ -256,7 +266,13 @@ impl ProfileEditor {
             return;
         }
         self.selected = slot;
-        self.player.update(cx, |player, cx| player.stop(cx));
+        // Only a preview the editor started stops; a sound from elsewhere plays on.
+        let ours = self.preview_key.take();
+        self.player.update(cx, |player, cx| {
+            if ours.is_some() && player.now_playing().map(|n| &n.key) == ours.as_ref() {
+                player.stop(cx);
+            }
+        });
         let (win, search) = (self.win, self.search.clone());
         let placeholder = match slot {
             Slot::Hud => "Search HUDs...",
@@ -406,6 +422,7 @@ impl ProfileEditor {
             name: name.into(),
             subtitle: subtitle.into(),
         };
+        self.preview_key = Some(now.key.clone());
         self.player
             .update(cx, |player, cx| {
                 player.toggle(
@@ -1028,19 +1045,45 @@ impl ProfileEditor {
 }
 
 impl ProfileEditor {
-    // The library sounds as rows with a play button, the saved one marked; a click on a row
-    // saves it to the slot, its play button only previews.
+    // The library sounds as a list capped at SOUND_MAX_ROWS, built only for the rows in view.
     fn sound_gallery(&self, slot: Slot, cx: &mut Context<Self>) -> AnyElement {
+        let count = self.shown_sounds(cx).len();
+        let tall = SOUND_ROW_HEIGHT * count.clamp(1, SOUND_MAX_ROWS) as f32;
+        let list = uniform_list(
+            ids::PROFILE_PICKER_SOUNDS,
+            count,
+            cx.processor(move |editor, range, _, cx| editor.sound_rows(slot, range, cx)),
+        )
+        .track_scroll(&self.sound_scroll)
+        .test_support()
+        .w_full()
+        .h(tall)
+        .pr(BAR_WIDTH);
+        scroll_area(
+            ids::PROFILE_PICKER_SOUNDS_SCROLLBAR,
+            &self.sound_scroll,
+            list,
+        )
+        .into_any_element()
+    }
+
+    // The sound rows in `range`, the saved one marked; a click on a row saves it to the slot,
+    // its play button only previews.
+    fn sound_rows(
+        &mut self,
+        slot: Slot,
+        range: Range<usize>,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
         let (kind, saved) = match slot {
             Slot::Hitsound => (SoundKind::Hitsound, self.saved.hitsound()),
-            Slot::Killsound | Slot::Hud | Slot::Crosshairs => {
-                (SoundKind::Killsound, self.saved.killsound())
-            }
+            Slot::Killsound => (SoundKind::Killsound, self.saved.killsound()),
+            // Only the sound slots show this list.
+            Slot::Hud | Slot::Crosshairs => return Vec::new(),
         };
         let saved = saved.map(|item| item.folder_name().to_owned());
-        let rows: Vec<AnyElement> = self
-            .shown_sounds(cx)
-            .into_iter()
+        let shown = self.shown_sounds(cx);
+        (shown.get(range).unwrap_or_default().iter())
             .map(|sound| {
                 let folder = sound.folder_name().to_owned();
                 let picked = saved.as_deref() == Some(folder.as_str());
@@ -1054,7 +1097,7 @@ impl ProfileEditor {
                     cx.stop_propagation();
                     editor.preview(play_folder.clone(), name.clone(), cx);
                 }));
-                card_frame(cx)
+                let row = card_frame(cx)
                     .id(ids::profile_pick_sound(slot.key(), &folder))
                     .aria_label(sound.name().to_owned())
                     .aria_selected(picked)
@@ -1066,16 +1109,19 @@ impl ProfileEditor {
                     .child(
                         h_flex()
                             .gap_2()
-                            .child(div().flex_1().min_w_0().child(sound_title(&sound, cx)))
+                            .child(div().flex_1().min_w_0().child(sound_title(sound, cx)))
                             .child(play),
                     )
                     .on_click(cx.listener(move |editor, _, _, cx| {
                         editor.enqueue(Edit::SetSound(kind, id.clone()), cx)
-                    }))
+                    }));
+                div()
+                    .h(SOUND_ROW_HEIGHT)
+                    .pb_2()
+                    .child(row)
                     .into_any_element()
             })
-            .collect();
-        v_flex().gap_2().children(rows).into_any_element()
+            .collect()
     }
 }
 
