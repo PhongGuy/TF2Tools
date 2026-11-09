@@ -216,16 +216,17 @@ impl GraphicsPage {
         self.running = Some(Job::Install);
         self.finish(
             async move {
-                let version = job.await?;
-                Ok(if update {
-                    (
-                        "mastercomfig updated".into(),
-                        format!("Now on {version}.").into(),
-                    )
+                let jobs::Installed { version, dropped } = job.await?;
+                let (title, mut text) = if update {
+                    ("mastercomfig updated", format!("Now on {version}."))
                 } else {
                     let ready = format!("mastercomfig {version} is ready. Pick a preset below.");
-                    ("mastercomfig installed".into(), ready.into())
-                })
+                    ("mastercomfig installed", ready)
+                };
+                if let Some(note) = dropped_note(&dropped) {
+                    text = format!("{text} {note}");
+                }
+                Ok((title.into(), text.into()))
             },
             cx,
         );
@@ -317,7 +318,8 @@ impl GraphicsPage {
     }
 
     // Saves the choices `edit` makes from the saved ones; an edit that changes nothing does
-    // nothing. Only a change to the override VPKs waits for TF2 to close.
+    // nothing. Only a change to the override VPKs waits for TF2 to close. A player's own
+    // modules.cfg is replaced only after they agree; the page stays busy while asking.
     fn change(&mut self, edit: impl FnOnce(&mut Choices, &ModuleCatalog), cx: &mut Context<Self>) {
         let Some(catalog) = self.catalog.clone() else {
             return;
@@ -336,10 +338,36 @@ impl GraphicsPage {
             Err(err) => return self.settle(async move { Err(err) }, cx),
         };
         let guard_tf2 = old.override_mask() != new.override_mask();
-        let job = jobs::apply_modules(tf2, catalog, new, guard_tf2, false, cx);
+        let job = jobs::apply_modules(
+            tf2.clone(),
+            Arc::clone(&catalog),
+            new.clone(),
+            guard_tf2,
+            false,
+            cx,
+        );
+        let win = self.win;
+        let mut acx = cx.to_async();
         self.settle(
             async move {
-                match job.await {
+                let dropped = match job.await {
+                    Err(ModulesFailure::Foreign) => {
+                        let Ok(answer) = win.update(&mut acx, |_, window, cx| {
+                            confirm(Confirm::replace_modules_cfg(), window, cx)
+                        }) else {
+                            return Ok(None);
+                        };
+                        if !answer.recv().await.unwrap_or(false) {
+                            return Ok(None);
+                        }
+                        let again = acx.update(|cx| {
+                            jobs::apply_modules(tf2, catalog, new, guard_tf2, true, cx)
+                        });
+                        again.await
+                    }
+                    first => first,
+                };
+                match dropped {
                     Ok(dropped) => Ok(dropped_note(&dropped).map(|text| {
                         let title = "Some settings went back to the preset";
                         (ToastKind::Warning, title.into(), text.into())

@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use gpui_kit::{AnyWindowHandle, App, AsyncApp};
 use tf2tools_core::{
-    ApplyModulesError, Choices, MastercomfigStatus, ModuleCatalog, StoreClient, StoreKind,
+    ApplyModulesError, Choices, Library, MastercomfigStatus, ModuleCatalog, StoreClient, StoreKind,
     Tf2Install,
 };
 
@@ -35,15 +35,24 @@ pub fn refuse_while_running(probe: &(dyn Fn() -> bool + Send + Sync)) -> Result<
     Ok(())
 }
 
+/// What `install_base` installed: the tag, and the saved settings that tag lacks.
+#[derive(Debug)]
+pub struct Installed {
+    pub version: String,
+    pub dropped: Vec<String>,
+}
+
 /// Installs or updates the base VPK on the tokio bridge. It refuses while TF2 runs. With no
-/// recorded release, it first forces the addon-store sync. It resolves to the installed tag.
-/// Failures are OpErrors titled `action`, except the refusal, which is titled CLOSE_TF2.
+/// recorded release, it first forces the addon-store sync. Saved settings are then re-applied
+/// against the new tag's catalog, leaving a player's own modules.cfg alone; a failure there is
+/// only logged. Failures are OpErrors titled `action`, except the refusal, titled CLOSE_TF2.
 pub fn install_base(
     tf2: Tf2Install,
     action: &'static str,
     cx: &mut App,
-) -> impl Future<Output = Result<String, OpError>> + 'static + use<> {
+) -> impl Future<Output = Result<Installed, OpError>> + 'static + use<> {
     let store = cx.global::<Services>().store.clone();
+    let library = cx.global::<Services>().library.clone();
     let probe = Tf2Probe::get(cx);
     if !tokio_bridge::is_running(cx) {
         tokio_bridge::init(cx);
@@ -61,12 +70,50 @@ pub fn install_base(
         if !known {
             force_sync(&store, action).await?;
         }
-        store
+        let version = store
             .install_mastercomfig(&tf2, &|_, _| {})
             .await
-            .map_err(|e| describe_install(&e).into_op(action))
+            .map_err(|e| describe_install(&e).into_op(action))?;
+        let dropped = reapply_choices(&store, library, &tf2, &version).await;
+        Ok(Installed { version, dropped })
     });
     async move { job.await.map_err(|e| OpError::core(action, e))? }
+}
+
+// Applies the saved choices (if any) against `version`'s catalog and returns the names it
+// dropped. Every failure is logged and yields no names, so it never fails the install.
+async fn reapply_choices(
+    store: &StoreClient,
+    library: Library,
+    tf2: &Tf2Install,
+    version: &str,
+) -> Vec<String> {
+    let saved = tokio::task::spawn_blocking(move || library.mastercomfig_choices())
+        .await
+        .map_err(|e| e.to_string())
+        .and_then(|read| read.map_err(|e| e.to_string()));
+    let choices = match saved {
+        Ok(Some(choices)) => choices,
+        Ok(None) => return Vec::new(),
+        Err(e) => {
+            tracing::warn!("mastercomfig settings after install: {e}");
+            return Vec::new();
+        }
+    };
+    let catalog = match store.mastercomfig_catalog(version).await {
+        Ok(catalog) => catalog,
+        Err(e) => {
+            tracing::warn!("mastercomfig settings list for {version}: {e}");
+            return Vec::new();
+        }
+    };
+    store
+        .apply_mastercomfig_modules(tf2, &catalog, &choices, false)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!("mastercomfig settings after install: {e}");
+            Vec::new()
+        })
 }
 
 /// The title of a setting that could not be saved.
