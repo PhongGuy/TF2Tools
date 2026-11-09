@@ -830,30 +830,10 @@ pub const PROFILES_MISSING_LIST: &str = "profiles-missing-list";
 pub const PROFILES_MISSING_LIST_SCROLLBAR: &str = "profiles-missing-list-scrollbar";
 /// The profile search input.
 pub const PROFILES_SEARCH: &str = "profiles-search";
-/// The header's Create New button.
-pub const PROFILES_CREATE: &str = "profiles-create";
-/// The header's Save Current button.
-pub const PROFILES_SAVE_CURRENT: &str = "profiles-save-current";
 /// The empty state shown when there are no profiles.
 pub const PROFILES_EMPTY: &str = "profiles-empty";
-/// The empty state's Create button.
-pub const PROFILES_EMPTY_CREATE: &str = "profiles-empty-create";
-/// The empty state's Save Current button.
-pub const PROFILES_EMPTY_SAVE: &str = "profiles-empty-save";
 /// Shown when the search matches no profile.
 pub const PROFILES_NO_MATCH: &str = "profiles-no-match";
-/// The Save Current dialog.
-pub const PROFILES_SAVE_DIALOG: &str = "profiles-save-dialog";
-/// The Save Current dialog's description line.
-pub const PROFILES_SAVE_DESCRIPTION: &str = "profiles-save-description";
-/// The Save Current dialog's name input.
-pub const PROFILES_SAVE_NAME: &str = "profiles-save-name";
-/// The Save Current dialog's line saying another profile has the typed name.
-pub const PROFILES_SAVE_TAKEN: &str = "profiles-save-taken";
-/// The Save Current dialog's Cancel button.
-pub const PROFILES_SAVE_CANCEL: &str = "profiles-save-cancel";
-/// The Save Current dialog's Save button.
-pub const PROFILES_SAVE_OK: &str = "profiles-save-ok";
 /// The Missing Items dialog.
 pub const PROFILES_MISSING_DIALOG: &str = "profiles-missing-dialog";
 /// The Missing Items dialog's title, "Missing Items".

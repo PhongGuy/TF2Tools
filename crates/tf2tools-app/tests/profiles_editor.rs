@@ -1409,10 +1409,10 @@ fn a_name_taken_in_a_race_moves_to_the_next_number(cx: &mut TestAppContext) {
     );
 }
 
-// A load whose job read the library before the create lacks the new profile; its result must
-// not close the editor the create opens.
+// Smoke test only: the test scheduler runs each load job at once, so it cannot reproduce the
+// race; the profiles_model test of `load_closes_editor` covers it.
 #[gpui_kit::test]
-fn a_load_running_during_a_create_leaves_the_new_editor_open(cx: &mut TestAppContext) {
+fn smoke_a_create_during_a_load_keeps_the_new_editor_open(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let page = open_profiles(cx, &s);

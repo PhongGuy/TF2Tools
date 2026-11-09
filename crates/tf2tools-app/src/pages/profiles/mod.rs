@@ -299,8 +299,6 @@ impl ProfilesPage {
     pub fn reload(&mut self, cx: &mut Context<Self>) {
         self.load_generation += 1;
         let generation = self.load_generation;
-        // Only an editor already open when the load started can be closed by its result: one
-        // opened since, on a just-created profile, may be newer than what the load read.
         let open_at_start = match &self.view {
             View::Editor(_, id) => Some(id.clone()),
             View::Grid => None,
@@ -324,8 +322,11 @@ impl ProfilesPage {
                         page.active = active.clone();
                         // A profile deleted here or elsewhere takes its open editor with it.
                         if let View::Editor(_, open) = &page.view
-                            && open_at_start.as_ref() == Some(open)
-                            && !profiles.iter().any(|p| p.id() == open)
+                            && model::load_closes_editor(
+                                open_at_start.as_ref(),
+                                open,
+                                profiles.iter().map(Profile::id),
+                            )
                         {
                             page.view = View::Grid;
                         }

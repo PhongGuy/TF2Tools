@@ -23,6 +23,16 @@ pub fn is_empty(profile: &Profile) -> bool {
         && profile.crosshairs().is_empty()
 }
 
+/// Whether a finished load closes the editor open on `open_now`: only when that editor was
+/// already open as the load started (`open_at_start`) and the loaded ids lack it.
+pub fn load_closes_editor<'a>(
+    open_at_start: Option<&ProfileId>,
+    open_now: &ProfileId,
+    loaded: impl IntoIterator<Item = &'a ProfileId>,
+) -> bool {
+    open_at_start == Some(open_now) && !loaded.into_iter().any(|id| id == open_now)
+}
+
 /// The search rule: the trimmed query, ignoring case, is in the name; blank matches all.
 pub fn matches(name: &str, query: &str) -> bool {
     let query = query.trim().to_lowercase();

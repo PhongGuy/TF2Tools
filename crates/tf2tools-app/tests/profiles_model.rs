@@ -2,11 +2,11 @@ use crate::support;
 
 use gpui_kit::TestAppContext;
 use tf2tools_app::pages::profiles::model::{
-    activated_description, crosshair_count, failed_description, kept_parts, kind_label, matches,
-    redownload_target, report_details, step_label, success_title,
+    activated_description, crosshair_count, failed_description, kept_parts, kind_label,
+    load_closes_editor, matches, redownload_target, report_details, step_label, success_title,
 };
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
-use tf2tools_core::{ApplyStep, GbId, MissingKind, Provenance, StoreItemId, StoreKind};
+use tf2tools_core::{ApplyStep, GbId, MissingKind, ProfileId, Provenance, StoreItemId, StoreKind};
 
 fn gb(id: u64) -> Provenance {
     Provenance::GameBanana {
@@ -179,4 +179,14 @@ fn the_default_probe_scans_the_proc_root_and_can_be_pinned(cx: &mut TestAppConte
     assert!(!cx.update(|cx| Tf2Probe::get(cx))());
     cx.update(|cx| Tf2Probe::install(cx, || true));
     assert!(cx.update(|cx| Tf2Probe::get(cx))());
+}
+
+// An editor opened after a load started, such as one on a just-created profile, may be newer
+// than what the load read, so only one already open then can be closed by its result.
+#[test]
+fn a_load_closes_only_an_editor_open_when_it_started_and_missing_from_it() {
+    let (made, other) = (ProfileId::new("made"), ProfileId::new("other"));
+    assert!(!load_closes_editor(None, &made, [&other]));
+    assert!(load_closes_editor(Some(&made), &made, [&other]));
+    assert!(!load_closes_editor(Some(&made), &made, [&other, &made]));
 }
