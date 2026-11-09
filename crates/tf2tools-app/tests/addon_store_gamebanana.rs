@@ -2,6 +2,7 @@ use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use tf2tools_app::ids;
+use tf2tools_app::mature::MatureAddons;
 use tf2tools_app::pages::addon_store::AddonStoreTab;
 use tf2tools_app::pages::addon_store::gamebanana_tab::AddonTab;
 use tf2tools_app::services::Tf2State;
@@ -348,4 +349,68 @@ fn a_listing_that_ends_with_nothing_says_no_results(cx: &mut TestAppContext) {
     settled(cx, &tab, "the end");
     assert!(support::present(cx, w.win, ids::ADDON_EMPTY));
     assert!(!support::present(cx, w.win, ids::ADDON_LOAD_MORE));
+}
+
+#[gpui_kit::test]
+fn mature_items_hide_until_shown_then_blur_until_clicked(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let mut warned = support::gb_addon(2, 587, None);
+    warned["_sInitialVisibility"] = "warn".into();
+    server.mount_gb_index(
+        587,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(1, 587, None), warned], true),
+    );
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "textures");
+    settled(cx, &tab, "the first step");
+    let ids_now = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            tab.read(cx)
+                .cards()
+                .iter()
+                .map(|c| c.id.get())
+                .collect::<Vec<_>>()
+        })
+    };
+    assert_eq!(ids_now(cx), [1]);
+    cx.update(|cx| {
+        let m = MatureAddons::global(cx);
+        m.update(cx, |m, cx| m.set(true, cx))
+    });
+    support::wait_real(cx, "the mature card", |cx| ids_now(cx) == [1, 2]);
+    assert!(support::present(
+        cx,
+        w.win,
+        ids::addon_gb_card_reveal("textures", GbId::new(2))
+    ));
+    assert!(!support::present(
+        cx,
+        w.win,
+        ids::addon_gb_card_reveal("textures", GbId::new(1))
+    ));
+    support::click_id(
+        cx,
+        w.win,
+        ids::addon_gb_card_reveal("textures", GbId::new(2)),
+    );
+    assert!(cx.update(|cx| tab.read(cx).is_revealed(GbId::new(2))));
+    assert!(!support::present(
+        cx,
+        w.win,
+        ids::addon_gb_card_reveal("textures", GbId::new(2))
+    ));
+    assert!(
+        !support::present(cx, w.win, ids::ADDON_DETAIL),
+        "revealing does not open the detail"
+    );
+    assert_eq!(
+        server.gb_index_requests().len(),
+        1,
+        "the toggle reread the cached page"
+    );
+    support::wait_real(cx, "the save", |_| {
+        w.services.db.settings().unwrap().show_mature_addons()
+    });
 }

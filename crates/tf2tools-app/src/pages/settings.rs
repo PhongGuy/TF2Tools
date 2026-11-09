@@ -11,6 +11,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::searchable_list::SearchableListItem;
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
 use gpui_kit::component::slider::{Slider, SliderState};
+use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
@@ -30,6 +31,7 @@ use crate::links;
 use crate::local_messages::{
     describe_detect, describe_settings, describe_store_status, describe_tf2_folder,
 };
+use crate::mature::MatureAddons;
 use crate::notices::{self, Notice};
 use crate::picker::PickKind;
 use crate::services::{Services, Tf2State, run_blocking, tf2_state};
@@ -172,6 +174,8 @@ impl SettingsPage {
         let volume_bound = bind_slider(&volume, window, cx);
         cx.observe(&cache_hours, |_, _, cx| cx.notify()).detach();
         cx.observe(&path, |_, _, cx| cx.notify()).detach();
+        let mature = MatureAddons::global(cx);
+        cx.observe(&mature, |_, _, cx| cx.notify()).detach();
         // The Resync buttons follow the hub's running kinds and failures, so only a change
         // there redraws; every ended run may have written a new stamp, so the statuses are
         // read again. With no hub, Resync stays off.
@@ -583,6 +587,16 @@ pub fn format_hours(hours: u32) -> String {
 
 // The Licences card's content: a toggle and, while shown, a scrollable box with each notice's
 // title over its full text.
+// Saves the moment it flips, outside "Save Settings", as the add-on tabs relist on it.
+fn mature_switch(cx: &mut App) -> AnyElement {
+    let mature = MatureAddons::global(cx);
+    Switch::new(ids::SETTINGS_MATURE_ADDONS)
+        .checked(mature.read(cx).show())
+        .label("Show mature add-ons")
+        .on_click(move |&on, _, cx| mature.update(cx, |m, cx| m.set(on, cx)))
+        .into_any_element()
+}
+
 fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyElement {
     let theme = cx.theme();
     let shown = page.show_notices;
@@ -835,6 +849,12 @@ impl Render for SettingsPage {
                         "Store Cache",
                         "How often to re-sync store data",
                         Some(cache.into_any_element()),
+                        cx,
+                    ))
+                    .child(card(
+                        "Add-ons",
+                        "GameBanana skins, effects, GUIs, textures and game files",
+                        Some(mature_switch(cx)),
                         cx,
                     ))
                     // v5 shows the store cards only once their status has been read.

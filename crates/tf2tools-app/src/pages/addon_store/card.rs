@@ -26,12 +26,14 @@ pub type OpenAddon = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// A GameBanana add-on card in the `gamebanana_card` layout: the 16:9 thumbnail (else a muted
 /// area), the name with an "Outdated" tag when obsolete, "by {author}" and the like count.
-/// A click anywhere on it calls `open`.
+/// A click anywhere on it calls `open`. With `reveal`, a "Mature" cover lies over the thumbnail
+/// and a click on it calls `reveal` instead.
 pub fn gb_addon_card(
     section: &str,
     card: &AddonCard,
     image: Option<RemoteImage>,
     open: OpenAddon,
+    reveal: Option<OpenAddon>,
     cx: &App,
 ) -> AnyElement {
     let theme = cx.theme();
@@ -44,6 +46,7 @@ pub fn gb_addon_card(
         .aspect_ratio(16. / 9.)
         .overflow_hidden()
         .bg(theme.muted)
+        .relative()
         .flex()
         .items_center()
         .justify_center();
@@ -57,6 +60,29 @@ pub fn gb_addon_card(
                 .text_color(theme.muted_foreground),
         ),
     };
+    // The cover swallows its click, so revealing a thumbnail never opens the detail.
+    let cover = reveal.map(|reveal| {
+        h_flex()
+            .id(ids::addon_gb_card_reveal(section, card.id))
+            .test_support()
+            .absolute()
+            .inset_0()
+            .items_center()
+            .justify_center()
+            .gap_2()
+            .bg(theme.background.opacity(0.4))
+            .text_sm()
+            .font_weight(FontWeight::MEDIUM)
+            .text_color(theme.foreground)
+            .cursor_pointer()
+            .on_click(move |_, window, cx| {
+                cx.stop_propagation();
+                reveal(window, cx);
+            })
+            .child(Icon::new(IconName::EyeOff))
+            .child("Mature")
+    });
+    let shot = shot.children(cover);
     let outdated = card.obsolete.then(|| {
         div().flex_none().child(badge_of(
             ids::addon_gb_card_outdated(section, card.id),

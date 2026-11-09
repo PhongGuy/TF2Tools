@@ -22,6 +22,7 @@ pub mod loadout;
 pub mod local_messages;
 pub mod map_messages;
 pub mod mastercomfig_restore;
+pub mod mature;
 pub mod notices;
 pub mod old_v4;
 pub mod pages;

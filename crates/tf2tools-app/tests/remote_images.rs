@@ -272,3 +272,34 @@ fn dropping_the_cache_cancels_its_fetches(cx: &mut TestAppContext) {
         dropped.load(Ordering::SeqCst)
     });
 }
+
+#[test]
+fn a_blurred_card_softens_hard_edges() {
+    let board = RgbaImage::from_fn(64, 36, |x, y| {
+        if (x / 4 + y / 4) % 2 == 0 {
+            Rgba([0, 0, 0, 255])
+        } else {
+            Rgba([255, 255, 255, 255])
+        }
+    });
+    let mut out = Cursor::new(Vec::new());
+    DynamicImage::ImageRgba8(board)
+        .write_to(&mut out, ImageFormat::Png)
+        .unwrap();
+    let bytes = out.into_inner();
+    let pure = |img: &RgbaImage| {
+        img.pixels()
+            .filter(|p| p.0[0] == 0 || p.0[0] == 255)
+            .count()
+    };
+    let sharp =
+        tf2tools_app::remote_images::decode::decode_rgba(&bytes, ImageTarget::Card).unwrap();
+    let soft =
+        tf2tools_app::remote_images::decode::decode_rgba(&bytes, ImageTarget::CardBlurred).unwrap();
+    assert_eq!(sharp.dimensions(), soft.dimensions());
+    assert_eq!(pure(&sharp), 64 * 36);
+    assert!(
+        pure(&soft) < 64 * 36 / 4,
+        "most pixels are mixed after the blur"
+    );
+}

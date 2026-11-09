@@ -1,6 +1,7 @@
 //! One GameBanana section of the Addon Store: a grid that streams cards from
 //! `AddonCatalog::step`, one step at a time, as the player scrolls.
 
+use std::collections::HashSet;
 use std::ops::Range;
 use std::rc::Rc;
 
@@ -23,6 +24,7 @@ use tf2tools_core::{
 use super::card::{CARD_TEXT_HEIGHT, OpenAddon, gb_addon_card};
 use crate::addon_feed::{AddonFeed, Keyed, StepAfter};
 use crate::ids;
+use crate::mature::MatureAddons;
 use crate::pages::common::{SkeletonTop, empty_state_card, skeleton_cards};
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::Services;
@@ -121,7 +123,11 @@ pub struct AddonTab {
     debounce: Option<Task<()>>,
     categories_task: Option<Task<()>>,
     weapons_task: Option<Task<()>>,
+    /// The mature setting the current query uses; no step runs until it is known.
     mature: bool,
+    mature_known: bool,
+    /// Mature cards the player unblurred; cleared when the setting flips.
+    revealed: HashSet<GbId>,
     error: Option<String>,
     step_task: Option<Task<()>>,
     /// This tab's own `RemoteImages` viewer, so tabs alive together keep separate wants.
@@ -132,9 +138,14 @@ pub struct AddonTab {
 }
 
 impl AddonTab {
-    /// Needs the `Services` global. Starts the first step at once.
+    /// Needs the `Services` global. Starts the first step once the mature setting is known.
     pub fn new(section: AddonSection, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let viewer = format!("addon-tab:{}", cx.entity_id());
+        let mature = MatureAddons::global(cx);
+        let (mature_known, show_mature) = {
+            let m = mature.read(cx);
+            (m.known(), m.show())
+        };
         // Thumbnails redraw the grid as they land, and the wants go back when the tab goes.
         let mut subscriptions = Vec::new();
         if let Some(images) = RemoteImages::global(cx) {
@@ -164,6 +175,7 @@ impl AddonTab {
         let rows = CategoryOption::rows(ids::ADDON_WEAPON, "All weapons", &[]);
         let weapon_select = cx.new(|cx| SelectState::new(rows, None, window, cx));
         subscriptions.extend([
+            cx.observe(&mature, Self::mature_changed),
             cx.subscribe(&search_input, |tab, input, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
                     let text = input.read(cx).value().to_string();
@@ -215,7 +227,9 @@ impl AddonTab {
             debounce: None,
             categories_task: None,
             weapons_task: None,
-            mature: false,
+            mature: show_mature,
+            mature_known,
+            revealed: HashSet::new(),
             error: None,
             step_task: None,
             viewer,
@@ -364,9 +378,48 @@ impl AddonTab {
         self.feed.items()
     }
 
-    /// Whether a step runs.
+    /// Whether a step runs, or the first waits for the mature setting.
     pub fn is_loading(&self) -> bool {
-        self.feed.is_loading()
+        self.feed.is_loading() || !self.mature_known
+    }
+
+    /// Whether the player unblurred mature card `id`.
+    pub fn is_revealed(&self, id: GbId) -> bool {
+        self.revealed.contains(&id)
+    }
+
+    /// Unblurs mature card `id` and asks for its sharp thumbnail.
+    pub fn reveal(&mut self, id: GbId, cx: &mut Context<Self>) {
+        if self.revealed.insert(id) {
+            self.want_thumbnails(cx);
+            cx.notify();
+        }
+    }
+
+    // The first known value starts the listing; a later flip relists with or without mature
+    // items, which the page cache answers without new requests.
+    fn mature_changed(&mut self, mature: Entity<MatureAddons>, cx: &mut Context<Self>) {
+        let (known, show) = {
+            let m = mature.read(cx);
+            (m.known(), m.show())
+        };
+        if !known {
+            return;
+        }
+        if !self.mature_known {
+            self.mature_known = true;
+            self.mature = show;
+            self.restart(cx);
+        } else if show != self.mature {
+            self.mature = show;
+            self.revealed.clear();
+            self.restart(cx);
+        }
+    }
+
+    // A mature card stays blurred until the player reveals it.
+    fn blurred(&self, card: &AddonCard) -> bool {
+        card.mature && !self.revealed.contains(&card.id)
     }
 
     /// Whether the tab waits behind "Load more".
@@ -434,7 +487,9 @@ impl AddonTab {
             .base_handle
             .set_offset(point(px(0.), px(0.)));
         self.visible = 0..0;
-        self.next_step(cx);
+        if self.mature_known {
+            self.next_step(cx);
+        }
         cx.notify();
     }
 
@@ -535,7 +590,14 @@ impl AddonTab {
         let start = self.visible.start.min(end);
         let keys: Vec<ImageKey> = cards[start..end]
             .iter()
-            .filter_map(|card| card.thumbnail_url.as_deref().map(ImageKey::card))
+            .filter_map(|card| {
+                let url = card.thumbnail_url.as_deref()?;
+                Some(if self.blurred(card) {
+                    ImageKey::card_blurred(url)
+                } else {
+                    ImageKey::card(url)
+                })
+            })
             .collect();
         images.update(cx, |images, cx| images.want(&self.viewer, keys, cx));
     }
@@ -623,7 +685,7 @@ impl AddonTab {
                     .into_any_element(),
             );
         }
-        if self.feed.is_loading() {
+        if self.is_loading() {
             let columns = columns_for_store(
                 window.viewport_size().width - SHELL_CHROME_WIDTH,
                 MAX_COLUMNS,
@@ -659,21 +721,34 @@ impl AddonTab {
         let height = |width: Pixels| width * (9. / 16.) + CARD_TEXT_HEIGHT;
         self.grid
             .render_sized(self.feed.items().len(), height, move |ix, _, cx| {
-                let card = this
-                    .upgrade()
-                    .and_then(|tab| tab.read(cx).feed.items().get(ix).cloned());
-                let Some(card) = card else {
+                let card = this.upgrade().and_then(|tab| {
+                    let tab = tab.read(cx);
+                    let card = tab.feed.items().get(ix)?;
+                    Some((card.clone(), tab.blurred(card)))
+                });
+                let Some((card, blurred)) = card else {
                     return div().into_any_element();
                 };
                 let image = card.thumbnail_url.as_deref().and_then(|url| {
-                    RemoteImages::global(cx)
-                        .map(|images| images.read(cx).image(&ImageKey::card(url)))
+                    let key = if blurred {
+                        ImageKey::card_blurred(url)
+                    } else {
+                        ImageKey::card(url)
+                    };
+                    RemoteImages::global(cx).map(|images| images.read(cx).image(&key))
                 });
-                let (tab, id) = (this.clone(), card.id);
+                let id = card.id;
+                let tab = this.clone();
                 let open: OpenAddon = Rc::new(move |_, cx: &mut App| {
                     let _ = tab.update(cx, |tab, cx| tab.open(id, cx));
                 });
-                gb_addon_card(section, &card, image, open, cx)
+                let tab = this.clone();
+                let reveal = blurred.then(|| -> OpenAddon {
+                    Rc::new(move |_, cx: &mut App| {
+                        let _ = tab.update(cx, |tab, cx| tab.reveal(id, cx));
+                    })
+                });
+                gb_addon_card(section, &card, image, open, reveal, cx)
             })
     }
 }
