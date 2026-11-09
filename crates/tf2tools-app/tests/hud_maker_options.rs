@@ -506,9 +506,11 @@ fn without_the_addon_the_row_says_where_to_get_it(cx: &mut TestAppContext) {
     );
 }
 
-/// Opens the maker with the viewmodels addon in the library, not installed, once its switch shows.
+/// Opens the maker with the viewmodels addon in the library, not installed, once its switch
+/// shows; mastercomfig is in TF2 only when `with_mastercomfig` holds.
 fn opened_with_viewmodels(
     cx: &mut TestAppContext,
+    with_mastercomfig: bool,
 ) -> (support::Env, support::ShellWindow, Entity<HudMakerPage>) {
     let (env, s, page) = opened_after(cx, |cx, env| {
         let vpk = support::vpk_bytes(&[("cfg/addons/x.cfg", b"v1".as_slice())]);
@@ -522,30 +524,9 @@ fn opened_with_viewmodels(
                 false,
             );
         });
-        support::seed_managed_mastercomfig(env, "9.100.1", "medium");
-    });
-    support::wait_real(cx, "the addon state", |cx| {
-        support::checked_of(cx, s.win, ids::HUD_MAKER_VIEWMODELS).is_some()
-    });
-    (env, s, page)
-}
-
-/// Like `opened_with_viewmodels`, without mastercomfig in TF2.
-fn opened_with_viewmodels_alone(
-    cx: &mut TestAppContext,
-) -> (support::Env, support::ShellWindow, Entity<HudMakerPage>) {
-    let (env, s, page) = opened_after(cx, |cx, env| {
-        let vpk = support::vpk_bytes(&[("cfg/addons/x.cfg", b"v1".as_slice())]);
-        cx.update(|cx| {
-            support::seed_library_addon(
-                cx.global::<Services>(),
-                env,
-                VIEWMODELS,
-                "9.0.0",
-                &vpk,
-                false,
-            )
-        });
+        if with_mastercomfig {
+            support::seed_managed_mastercomfig(env, "9.100.1", "medium");
+        }
     });
     support::wait_real(cx, "the addon state", |cx| {
         support::checked_of(cx, s.win, ids::HUD_MAKER_VIEWMODELS).is_some()
@@ -555,7 +536,7 @@ fn opened_with_viewmodels_alone(
 
 #[gpui_kit::test]
 fn viewmodels_without_mastercomfig_ask_and_a_cancel_installs_nothing(cx: &mut TestAppContext) {
-    let (env, s, page) = opened_with_viewmodels_alone(cx);
+    let (env, s, page) = opened_with_viewmodels(cx, false);
     click_in_panel(cx, &s, ids::HUD_MAKER_VIEWMODELS.into());
     support::wait_real(cx, "the question", |cx| {
         support::present(cx, s.win, ids::CONFIRM_DIALOG)
@@ -580,7 +561,7 @@ fn viewmodels_without_mastercomfig_ask_and_a_cancel_installs_nothing(cx: &mut Te
 
 #[gpui_kit::test]
 fn viewmodels_act_at_once_and_are_not_stored(cx: &mut TestAppContext) {
-    let (env, s, page) = opened_with_viewmodels(cx);
+    let (env, s, page) = opened_with_viewmodels(cx, true);
     assert_eq!(
         support::checked_of(cx, s.win, ids::HUD_MAKER_VIEWMODELS),
         Some(false)
@@ -602,7 +583,7 @@ fn viewmodels_act_at_once_and_are_not_stored(cx: &mut TestAppContext) {
 // lands, or a second click could start a second job. The seeds vary which job runs first.
 #[gpui_kit::test(iterations = 8)]
 fn a_library_change_during_a_toggle_keeps_the_switch_held(cx: &mut TestAppContext) {
-    let (env, s, page) = opened_with_viewmodels(cx);
+    let (env, s, page) = opened_with_viewmodels(cx, true);
     let installed = env.game.join("tf/custom").join(VIEWMODELS);
     let released_early = Rc::new(Cell::new(false));
     let sent = Rc::new(Cell::new(false));
@@ -638,7 +619,7 @@ fn a_library_change_during_a_toggle_keeps_the_switch_held(cx: &mut TestAppContex
 
 #[gpui_kit::test]
 fn without_tf2_the_viewmodels_row_says_so(cx: &mut TestAppContext) {
-    let (_env, s, _page) = opened_with_viewmodels(cx);
+    let (_env, s, _page) = opened_with_viewmodels(cx, true);
     cx.update(|cx| {
         tf2_state(cx).update(cx, |state, cx| {
             *state = Tf2State::Missing { saved: None };
