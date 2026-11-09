@@ -136,6 +136,7 @@ mod logs;
 mod logs_model;
 mod maps;
 mod maps_model;
+mod mastercomfig_restore;
 mod notices;
 mod old_v4_notice;
 mod packaging;
