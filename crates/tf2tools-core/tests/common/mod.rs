@@ -20,8 +20,8 @@ use std::time::Duration;
 use tempfile::TempDir;
 use tf2tools_core::{
     BuiltinCrosshairs, CrosshairEntry, DataDir, Database, DownloadError, DownloadProgress,
-    Endpoints, GbId, HudEntry, Library, LibraryEntry, Provenance, SoundEntry, StoreClient,
-    StoreConfig, StoreFile, StoreItemId, StoreKind, Tf2Install,
+    Endpoints, GbId, HudEntry, Library, LibraryEntry, ModuleCatalog, Provenance, SoundEntry,
+    StoreClient, StoreConfig, StoreFile, StoreItemId, StoreKind, Tf2Install,
 };
 use wiremock::MockServer;
 use wiremock::matchers::{method, path};
@@ -732,4 +732,13 @@ pub fn set_mastercomfig_state(dir: &DataDir, version: &str, preset: &str) {
             [version, preset],
         )
         .expect("state row");
+}
+
+/// mastercomfig 9.100.1's module list and preset levels, trimmed (see fixtures/mastercomfig/NOTICE.txt).
+pub const MC_MODULES: &[u8] = include_bytes!("../fixtures/mastercomfig/modules.json");
+pub const MC_PRESET_MODULES: &[u8] = include_bytes!("../fixtures/mastercomfig/preset_modules.json");
+
+/// The fixture catalog, tagged 9.100.1.
+pub fn module_catalog() -> ModuleCatalog {
+    ModuleCatalog::parse("9.100.1", MC_MODULES, MC_PRESET_MODULES).expect("fixture catalog")
 }

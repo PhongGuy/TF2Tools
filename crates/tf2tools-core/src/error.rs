@@ -1839,3 +1839,51 @@ pub enum RestoreMastercomfigError {
         message: String,
     },
 }
+
+/// Why a mastercomfig release's module catalog could not be read.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ModuleCatalogError {
+    /// `modules.json` or `preset_modules.json` is not in the shape mastercomfig ships.
+    #[error("mastercomfig's module list is not readable: {reason}")]
+    Format {
+        /// What the JSON parser reported.
+        reason: String,
+    },
+    /// The release tag cannot name a cache folder.
+    #[error("unsupported mastercomfig release tag {tag:?}")]
+    UnsupportedTag {
+        /// The rejected tag.
+        tag: String,
+    },
+    /// The server kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// The server answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// The server could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The file grew past the size cap.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+}

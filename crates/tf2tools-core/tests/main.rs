@@ -186,6 +186,7 @@ mod library_sounds;
 mod license;
 mod maps;
 mod mastercomfig;
+mod mastercomfig_catalog;
 mod mastercomfig_install;
 mod mastercomfig_presets;
 mod mastercomfig_release;

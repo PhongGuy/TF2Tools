@@ -16,6 +16,7 @@ mod huds;
 mod live_link;
 mod made_huds;
 mod mastercomfig;
+mod mastercomfig_modules;
 mod sounds;
 mod tree_copy;
 
@@ -54,6 +55,9 @@ pub use live_link::{Recovery, Reinstall};
 pub use made_huds::{HudAssets, MadeHud, MakeTarget, SavedHud, pictures_fit};
 pub use mastercomfig::{MastercomfigStatus, Preset};
 pub(crate) use mastercomfig::{record_install, write_setup_hook};
+pub use mastercomfig_modules::{
+    Choices, ComfigModule, ModuleCatalog, ModuleCategory, ModuleChoice, ModuleValue, readable_name,
+};
 pub use profiles::{
     ApplyProfileReport, ApplyStep, DraftCrosshair, DraftSlot, MissingItem, MissingKind, Profile,
     ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate,
