@@ -73,6 +73,9 @@ fn visit(cx: &mut TestAppContext, s: &support::ShellWindow, page: Page) {
                     .settings_page()
                     .is_some_and(|p| p.read(cx).is_loaded()),
                 Page::Logs => shell.logs_page().is_some_and(|p| p.read(cx).is_loaded()),
+                Page::Graphics => shell
+                    .graphics_page()
+                    .is_some_and(|p| p.read(cx).is_loaded()),
                 Page::Maps => shell.maps_page().is_some_and(|p| p.read(cx).is_loaded()),
                 Page::CrosshairMaker => shell
                     .crosshair_maker_page()

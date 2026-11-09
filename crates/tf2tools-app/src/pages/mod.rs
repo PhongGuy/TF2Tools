@@ -6,6 +6,7 @@ pub(crate) mod common;
 pub mod crosshair_maker;
 pub mod crosshair_store;
 pub mod crosshairs;
+pub mod graphics;
 pub mod hud_maker;
 pub mod hud_store;
 pub mod huds;

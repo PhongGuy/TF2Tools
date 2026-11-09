@@ -54,6 +54,7 @@ mod font_check_flow;
 mod font_dialog;
 mod game_moved;
 mod global_player;
+mod graphics;
 mod help_links;
 mod hud_copy_card;
 mod hud_copy_update;

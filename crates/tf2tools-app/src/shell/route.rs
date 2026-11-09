@@ -10,6 +10,7 @@ pub enum Page {
     HudMaker,
     Profiles,
     Addons,
+    Graphics,
     HudStore,
     SoundStore,
     CrosshairStore,
@@ -21,12 +22,13 @@ pub enum Page {
 
 impl Page {
     /// Every page in sidebar order: tools, stores, makers and Maps, footer.
-    pub const ALL: [Page; 14] = [
+    pub const ALL: [Page; 15] = [
         Page::Huds,
         Page::Sounds,
         Page::Crosshairs,
         Page::Profiles,
         Page::Addons,
+        Page::Graphics,
         Page::HudStore,
         Page::SoundStore,
         Page::CrosshairStore,
@@ -48,6 +50,7 @@ impl Page {
             Page::HudMaker => "hud-maker",
             Page::Profiles => "profiles",
             Page::Addons => "addons",
+            Page::Graphics => "graphics",
             Page::HudStore => "hud-store",
             Page::SoundStore => "sound-store",
             Page::CrosshairStore => "crosshair-store",
@@ -68,6 +71,7 @@ impl Page {
             Page::HudMaker => "HUD Maker",
             Page::Profiles => "Profiles",
             Page::Addons => "Addons",
+            Page::Graphics => "Graphics",
             Page::HudStore => "HUD Store",
             Page::SoundStore => "Sound Store",
             Page::CrosshairStore => "Crosshair Store",
@@ -89,6 +93,7 @@ impl Page {
             | other @ Page::HudMaker
             | other @ Page::Profiles
             | other @ Page::Addons
+            | other @ Page::Graphics
             | other @ Page::HudStore
             | other @ Page::SoundStore
             | other @ Page::CrosshairStore
@@ -113,6 +118,7 @@ impl Page {
                 | Page::SoundStore
                 | Page::AddonStore
                 | Page::Addons
+                | Page::Graphics
                 | Page::Logs
                 | Page::Profiles
                 | Page::Maps

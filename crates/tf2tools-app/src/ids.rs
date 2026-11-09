@@ -769,6 +769,10 @@ pub const ADDONS_INSTALLED: &str = "addons-installed";
 pub const ADDONS_INSTALLED_EMPTY: &str = "addons-installed-empty";
 /// The "Your Library" section title.
 pub const ADDONS_LIBRARY: &str = "addons-library";
+/// The Graphics page's line under the title.
+pub const GRAPHICS_SUBTITLE: &str = "graphics-subtitle";
+/// The Graphics page's "TF2 not found" warning, present only without a TF2 install.
+pub const GRAPHICS_NO_TF2: &str = "graphics-no-tf2";
 
 /// The "No TF2 installation found" alert on the Profiles page.
 pub const PROFILES_NO_TF2: &str = "profiles-no-tf2";

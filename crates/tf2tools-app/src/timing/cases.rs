@@ -817,6 +817,9 @@ fn page_loaded(shell: &Shell, page: Page, cx: &App) -> bool {
             .profiles_page()
             .is_some_and(|p| p.read(cx).is_loaded()),
         Page::Addons => shell.addons_page().is_some_and(|p| p.read(cx).is_loaded()),
+        Page::Graphics => shell
+            .graphics_page()
+            .is_some_and(|p| p.read(cx).is_loaded()),
         Page::Logs => shell.logs_page().is_some_and(|p| p.read(cx).is_loaded()),
         Page::Sounds
         | Page::CrosshairMaker
