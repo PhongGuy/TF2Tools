@@ -695,6 +695,7 @@ fn profile_editor_ids_are_stable() {
         [
             ids::PROFILES_NEW,
             ids::PROFILES_NEW_MENU,
+            ids::PROFILES_NEW_SPLIT,
             ids::PROFILES_NEW_EMPTY,
             ids::PROFILES_EMPTY_NEW,
             ids::PROFILES_EMPTY_START_EMPTY,
@@ -715,6 +716,7 @@ fn profile_editor_ids_are_stable() {
         [
             "profiles-new",
             "profiles-new-menu",
+            "profiles-new-split",
             "profiles-new-empty",
             "profiles-empty-new",
             "profiles-empty-start-empty",

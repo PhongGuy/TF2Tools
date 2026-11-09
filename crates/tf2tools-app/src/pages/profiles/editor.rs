@@ -1038,9 +1038,8 @@ impl ProfileEditor {
         .detach();
     }
 
-    // The picked slot's search over its gallery, "No matches" when it filters out everything,
-    // or a pointer to the store while the library has nothing for it. Crosshairs show their own picker beside the weapon list; builtins are
-    // always listed, so they have no empty state.
+    // The picked slot's search and gallery, "No matches", or a store pointer for an empty
+    // library. Crosshairs show their picker beside the weapon list, never empty for builtins.
     fn picker_column(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let slot = self.selected;
         let key = slot.key();

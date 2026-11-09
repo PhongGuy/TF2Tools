@@ -846,8 +846,10 @@ pub const PROFILES_MISSING_CANCEL: &str = "profiles-missing-cancel";
 pub const PROFILES_MISSING_INSTALL: &str = "profiles-missing-install";
 /// The New profile main button, which saves the current setup as a new profile.
 pub const PROFILES_NEW: &str = "profiles-new";
-/// The New button's menu trigger.
+/// The New split button's wrapper; the caret inside it is the kit's fixed "popup" id.
 pub const PROFILES_NEW_MENU: &str = "profiles-new-menu";
+/// The New button and its caret, the kit's split button inside `PROFILES_NEW_MENU`.
+pub const PROFILES_NEW_SPLIT: &str = "profiles-new-split";
 /// The New menu's "Start empty" item.
 pub const PROFILES_NEW_EMPTY: &str = "profiles-new-empty";
 /// The empty page's New button.

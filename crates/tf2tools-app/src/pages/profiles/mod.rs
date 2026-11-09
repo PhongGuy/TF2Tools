@@ -1219,7 +1219,7 @@ impl ProfilesPage {
             .test_support()
             .flex_none()
             .child(
-                DropdownButton::new("profiles-new-split")
+                DropdownButton::new(ids::PROFILES_NEW_SPLIT)
                     .button(
                         Button::new(ids::PROFILES_NEW)
                             .px(SM_ICON_PX)
