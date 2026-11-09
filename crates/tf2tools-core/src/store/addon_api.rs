@@ -452,6 +452,7 @@ mod tests {
             search_url("b", "pink & red/x", 2),
             "b/Util/Search/Results?_sModelName=Mod&_idGameRow=297&_sSearchString=pink%20%26%20red%2Fx&_nPage=2"
         );
+        assert!(search_url("b", "café", 1).contains("_sSearchString=caf%C3%A9&"));
     }
 
     #[test]
