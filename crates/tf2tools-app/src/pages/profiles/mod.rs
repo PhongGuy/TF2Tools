@@ -1,5 +1,6 @@
 //! The Profiles page: saved setups of HUD, sounds and crosshairs, activated in one go.
 
+pub mod editor;
 pub mod editor_model;
 pub mod model;
 pub mod probe;
@@ -27,6 +28,7 @@ use tf2tools_core::{
     MissingKind, NewLogEntry, Profile, ProfileError, ProfileId, StoreKind, Tf2Install,
 };
 
+use self::editor::ProfileEditor;
 use self::probe::Tf2Probe;
 use self::wizard::{ProfileWizard, WizardMode};
 use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, no_tf2_warning};
@@ -61,6 +63,12 @@ const SEARCH_MIN_WIDTH: Pixels = px(160.);
 const SAVE_DESCRIPTION: &str =
     "Save your currently installed HUD, sounds, and crosshair assignments as a reusable profile.";
 
+// What the page shows: its grid of profiles, or one profile open in the editor.
+enum View {
+    Grid,
+    Editor(Entity<ProfileEditor>),
+}
+
 /// The Profiles page. Built fresh on each visit; it reloads on TF2 state and library changes.
 pub struct ProfilesPage {
     win: AnyWindowHandle,
@@ -74,6 +82,7 @@ pub struct ProfilesPage {
     busy: bool,
     activating: Option<ProfileId>,
     wizard: Option<WeakEntity<ProfileWizard>>,
+    view: View,
     grid: CardGrid,
     /// The page's own scroll, which moves only in a window too short for the page.
     scroll: ScrollHandle,
@@ -106,6 +115,7 @@ impl ProfilesPage {
             busy: false,
             activating: None,
             wizard: None,
+            view: View::Grid,
             grid: CardGrid::new(ids::PROFILES_GRID),
             scroll: ScrollHandle::new(),
             _subscriptions: vec![tf2, library, search_changed],
@@ -175,6 +185,40 @@ impl ProfilesPage {
         }
         let wizard = ProfileWizard::open(mode, cx.entity().downgrade(), window, cx);
         self.wizard = Some(wizard.downgrade());
+    }
+
+    /// Shows the editor for `id` in place of the grid; does nothing while `is_busy()` or for an
+    /// id the last load lacks.
+    pub fn open_editor(&mut self, id: ProfileId, window: &mut Window, cx: &mut Context<Self>) {
+        if self.is_busy() {
+            return;
+        }
+        let Some(profile) = self.profiles.iter().find(|p| p.id() == &id).cloned() else {
+            return;
+        };
+        self.show_editor(profile, window, cx);
+    }
+
+    // Opens the editor on a profile already in hand, such as one just created.
+    fn show_editor(&mut self, profile: Profile, window: &mut Window, cx: &mut Context<Self>) {
+        let page = cx.entity().downgrade();
+        let editor = cx.new(|cx| ProfileEditor::new(profile, page, window, cx));
+        self.view = View::Editor(editor);
+        cx.notify();
+    }
+
+    /// The open editor, while the page shows one.
+    pub fn editor(&self) -> Option<Entity<ProfileEditor>> {
+        match &self.view {
+            View::Editor(editor) => Some(editor.clone()),
+            View::Grid => None,
+        }
+    }
+
+    /// Back to the grid; reloads.
+    pub fn close_editor(&mut self, cx: &mut Context<Self>) {
+        self.view = View::Grid;
+        self.reload(cx);
     }
 
     /// Starts the activate flow for `id` unless a save, delete or activate runs; does nothing
@@ -289,6 +333,13 @@ impl ProfilesPage {
                     if let Ok((profiles, active)) = &loaded {
                         page.profiles = profiles.as_slice().into();
                         page.active = active.clone();
+                        // A profile deleted here or elsewhere takes its open editor with it.
+                        if let View::Editor(editor) = &page.view {
+                            let open = editor.read(cx).id();
+                            if !profiles.iter().any(|p| p.id() == open) {
+                                page.view = View::Grid;
+                            }
+                        }
                     }
                     page.loaded = true;
                     cx.notify();
@@ -1287,17 +1338,6 @@ impl Render for ProfilesPage {
         let has_tf2 = state.install().is_some();
         let missing = matches!(state, Tf2State::Missing { .. });
         let busy = self.is_busy();
-        let active = match self.active_profile() {
-            Some(profile) => active_card(profile, cx),
-            None => empty_state(
-                ids::PROFILES_NO_ACTIVE,
-                IconName::Layers,
-                "No active profile",
-                "Activate a profile to apply a saved collection of customizations.",
-                None,
-                cx,
-            ),
-        };
         let warning = missing.then(|| {
             no_tf2_warning(
                 ids::PROFILES_NO_TF2,
@@ -1313,20 +1353,44 @@ impl Render for ProfilesPage {
             .overflow_y_scroll()
             .p(CONTENT_PADDING)
             .gap_6()
-            .children(warning)
-            .child(
-                v_flex()
-                    .flex_none()
-                    .gap_3()
-                    .child(
-                        div()
-                            .text_lg()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child("Active Profile"),
-                    )
-                    .child(active),
-            )
-            .child(self.library(has_tf2, busy, cx));
+            .children(warning);
+        // The editor takes the place of the Active Profile card and the library.
+        let content = if let View::Editor(editor) = &self.view {
+            content.child(editor.clone())
+        } else {
+            content.children(self.grid_view(has_tf2, busy, cx))
+        };
         scroll_area(ids::page_scrollbar(Page::Profiles), &self.scroll, content).size_full()
+    }
+}
+
+impl ProfilesPage {
+    // The Active Profile card over the library.
+    fn grid_view(&self, has_tf2: bool, busy: bool, cx: &mut Context<Self>) -> [AnyElement; 2] {
+        let active = match self.active_profile() {
+            Some(profile) => active_card(profile, cx),
+            None => empty_state(
+                ids::PROFILES_NO_ACTIVE,
+                IconName::Layers,
+                "No active profile",
+                "Activate a profile to apply a saved collection of customizations.",
+                None,
+                cx,
+            ),
+        };
+        [
+            v_flex()
+                .flex_none()
+                .gap_3()
+                .child(
+                    div()
+                        .text_lg()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child("Active Profile"),
+                )
+                .child(active)
+                .into_any_element(),
+            self.library(has_tf2, busy, cx).into_any_element(),
+        ]
     }
 }

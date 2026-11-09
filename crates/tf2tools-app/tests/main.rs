@@ -152,6 +152,7 @@ mod profile_editor_model;
 mod profile_wizard;
 mod profile_wizard_model;
 mod profiles;
+mod profiles_editor;
 mod profiles_layout;
 mod profiles_model;
 mod remote_images;
