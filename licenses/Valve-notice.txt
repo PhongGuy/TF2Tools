@@ -1,0 +1,13 @@
+Valve and Team Fortress 2
+
+Team Fortress 2, its weapon icons, crosshairs and other game artwork are the property of
+Valve Corporation. TF2Tools uses them with credit, in a free fan tool for players of the
+game. Some weapon icons are loaded from the Official TF2 Wiki
+(https://wiki.teamfortress.com).
+
+Valve, the Valve logo, Steam, the Steam logo, Team Fortress and the Team Fortress logo
+are trademarks and/or registered trademarks of Valve Corporation in the U.S. and/or other
+countries. All other trademarks are property of their respective owners.
+
+TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with Valve
+Corporation.

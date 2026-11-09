@@ -860,7 +860,7 @@ impl Render for SettingsPage {
                     )
                     .child(card(
                         "Licences",
-                        "TF2Tools uses work made by others. These are their licences.",
+                        "TF2Tools uses work and content made by others. These are their licences and credits.",
                         Some(notices_content(self, cx)),
                         cx,
                     ))
