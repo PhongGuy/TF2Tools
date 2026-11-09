@@ -105,6 +105,12 @@ impl AddonName {
     }
 }
 
+/// Whether `name` is one of mastercomfig's override VPKs, which belong to mastercomfig
+/// itself rather than the addon list.
+pub(crate) fn is_override(name: &AddonName) -> bool {
+    name.stem().starts_with("override-")
+}
+
 /// The non-empty `<name>` of `mastercomfig-addon-<name>.vpk`, extension in any case.
 fn addon_stem(file: &str) -> Option<&str> {
     let rest = file.strip_prefix(ADDON_PREFIX)?;

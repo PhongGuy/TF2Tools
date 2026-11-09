@@ -9,11 +9,12 @@ use serde_json::{Map, Value};
 use walkdir::WalkDir;
 
 use super::http::{API_BODY_LIMIT, NetFailure};
+use super::mastercomfig::{BASE_ASSET, override_slot};
 use super::sync::{database, finish, malformed, stale};
 use super::{StoreClient, StoreKind, SyncOutcome, SyncProgress};
 use crate::archive::extract_archive;
 use crate::error::SyncError;
-use crate::library::{AddonName, display_info};
+use crate::library::{AddonName, display_info, is_override};
 use crate::timestamp;
 
 /// One hud-db `hud-data/<id>.json` file as a `store_huds` row.
@@ -140,14 +141,36 @@ pub(crate) async fn addons(
         .get("tag_name")
         .and_then(Value::as_str)
         .unwrap_or("unknown");
-    let assets: Vec<AddonAsset> = release
+    // The base and override VPKs are mastercomfig itself, not addons: their URLs go to
+    // the recorded release and the overrides stay out of the store.
+    let raw_assets: Vec<&Map<String, Value>> = release
         .get("assets")
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
+        .filter_map(Value::as_object)
+        .collect();
+    let mut base_url = None;
+    let mut override_urls: [Option<&str>; 3] = [None; 3];
+    for asset in &raw_assets {
+        let (Some(name), Some(url)) = (
+            asset.get("name").and_then(Value::as_str),
+            asset.get("browser_download_url").and_then(Value::as_str),
+        ) else {
+            continue;
+        };
+        if name == BASE_ASSET {
+            base_url = Some(url);
+        } else if let Some(slot) = override_slot(name) {
+            override_urls[slot] = Some(url);
+        }
+    }
+    let assets: Vec<AddonAsset> = raw_assets
+        .iter()
         .filter_map(|asset| {
+            let name = AddonName::new(asset.get("name")?.as_str()?)?;
             Some(AddonAsset {
-                name: AddonName::new(asset.get("name")?.as_str()?)?,
+                name: (!is_override(&name)).then_some(name)?,
                 url: asset.get("browser_download_url")?.as_str()?.to_owned(),
                 size: asset.get("size").and_then(Value::as_i64).unwrap_or(0),
                 downloads: asset
@@ -181,6 +204,14 @@ pub(crate) async fn addons(
                 tag,
                 start
             ])?;
+        }
+        if let Some(base_url) = base_url {
+            let overrides = serde_json::to_string(&override_urls).unwrap_or_default();
+            conn.execute(
+                "INSERT OR REPLACE INTO mastercomfig_release (id, tag, base_url, override_urls)
+                 VALUES (1, ?1, ?2, ?3)",
+                params![tag, base_url, overrides],
+            )?;
         }
         Ok(())
     })?;

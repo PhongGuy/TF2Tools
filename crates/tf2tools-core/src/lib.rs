@@ -100,9 +100,9 @@ pub use paths::{DataDir, LibraryKind};
 pub use settings::{Settings, Volume};
 pub use store::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 pub use store::{
-    DownloadPhase, DownloadProgress, Endpoints, StoreCard, StoreClient, StoreConfig, StoreCursor,
-    StoreFile, StoreItem, StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus,
-    SyncOutcome, SyncProgress,
+    DownloadPhase, DownloadProgress, Endpoints, MastercomfigRelease, StoreCard, StoreClient,
+    StoreConfig, StoreCursor, StoreFile, StoreItem, StoreItemId, StoreKind, StoreQuery, StoreSort,
+    StoreSyncStatus, SyncOutcome, SyncProgress,
 };
 pub use texture::{
     FitChange, PNG_MAX_FILE_BYTES, PNG_MAX_SIDE, RgbaImage, decode_vtf, fit_hud_texture,

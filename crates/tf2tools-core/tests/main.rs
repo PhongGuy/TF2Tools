@@ -185,6 +185,7 @@ mod library_painted;
 mod library_sounds;
 mod license;
 mod maps;
+mod mastercomfig_release;
 mod old_v4;
 mod panic_mark;
 mod png;

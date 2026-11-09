@@ -9,6 +9,7 @@ pub(crate) mod http;
 mod images;
 mod items;
 mod maps;
+mod mastercomfig;
 mod sync;
 mod unpack;
 
@@ -28,6 +29,7 @@ pub use download::{DownloadPhase, DownloadProgress};
 use http::{Http, Redirects, Timeouts};
 pub use items::{StoreFile, StoreItem, StoreItemId};
 pub use maps::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
+pub use mastercomfig::MastercomfigRelease;
 
 const MB: u64 = 1024 * 1024;
 /// The page limit of a store whose limit is neither fixed nor derived (v5's cap).

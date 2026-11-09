@@ -37,8 +37,8 @@ use crate::hud_maker::{HudFiles, HudOptions, HudSchemas, MakerBase};
 use crate::paths::DataDir;
 use crate::tf2::Tf2Install;
 
-pub(crate) use addons::display_info;
 pub use addons::{AddonEntry, AddonName};
+pub(crate) use addons::{display_info, is_override};
 pub use crosshairs::{
     ApplyReport, Assignment, CrosshairEntry, CrosshairFormat, CrosshairRef, InstalledCrosshairs,
     PaintTarget, PaintedSource, SkipReason, SkippedAssignment, crosshair_scripts_need_repair,
