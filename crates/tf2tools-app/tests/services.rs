@@ -264,3 +264,15 @@ fn services_carry_the_audio_out() {
     let _playback = s.audio.play(vec![1], 0.5);
     assert_eq!(audio.plays(), vec![(vec![1], 0.5)]);
 }
+
+#[test]
+fn opening_the_services_retires_override_addons_from_the_library() {
+    let env = support::env();
+    let addons = env.data.library_dir(tf2tools_core::LibraryKind::Addons);
+    std::fs::create_dir_all(&addons).unwrap();
+    std::fs::write(addons.join("mastercomfig-addon-override-1.vpk"), b"o").unwrap();
+    std::fs::write(addons.join("mastercomfig-addon-flat-mouse.vpk"), b"a").unwrap();
+    let _services = support::services(&env, support::no_steam());
+    assert!(!addons.join("mastercomfig-addon-override-1.vpk").exists());
+    assert!(addons.join("mastercomfig-addon-flat-mouse.vpk").exists());
+}
