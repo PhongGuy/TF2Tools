@@ -347,7 +347,8 @@ impl StoreConfig {
         }
     }
 
-    /// The wait before every API request.
+    /// The gap between API requests: the GameBanana pacer's base gap, measured start to start,
+    /// and the wait before each other API request.
     pub fn request_spacing(&self) -> Duration {
         self.request_spacing
     }
