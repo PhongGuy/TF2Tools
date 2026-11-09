@@ -16,6 +16,7 @@ mod huds;
 mod live_link;
 mod made_huds;
 mod mastercomfig;
+mod mastercomfig_modules;
 mod sounds;
 mod tree_copy;
 
@@ -30,9 +31,10 @@ use walkdir::WalkDir;
 use crate::archive::VPK_MAGIC;
 use crate::db::Database;
 use crate::error::{
-    ApplyPresetError, ApplyProfileError, HistoryError, HudLoadError, ImportError, InstallError,
-    InstallMastercomfigError, KeepHudError, LibraryError, MakeHudError, PaintError, PresetError,
-    ProfileError, ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError,
+    ApplyModulesError, ApplyPresetError, ApplyProfileError, HistoryError, HudLoadError,
+    ImportError, InstallError, InstallMastercomfigError, KeepHudError, LibraryError, MakeHudError,
+    PaintError, PresetError, ProfileError, ReinstallError, RemoveMastercomfigError,
+    RestoreMastercomfigError,
 };
 use crate::fonts::Platform;
 use crate::hud_maker::{HudFiles, HudOptions, HudSchemas, MakerBase};
@@ -53,7 +55,13 @@ pub use huds::{ExternalHud, HudEntry, HudInstall, HudStatus};
 pub use live_link::{Recovery, Reinstall};
 pub use made_huds::{HudAssets, MadeHud, MakeTarget, SavedHud, pictures_fit};
 pub use mastercomfig::{MastercomfigStatus, Preset};
-pub(crate) use mastercomfig::{record_install, write_setup_hook};
+pub(crate) use mastercomfig::{
+    back_up, modules_cfg_path, read_choices, record_install, save_modules, write_modules_cfg,
+    write_setup_hook, written_by_us,
+};
+pub use mastercomfig_modules::{
+    Choices, ComfigModule, ModuleCatalog, ModuleCategory, ModuleChoice, ModuleValue, readable_name,
+};
 pub use profiles::{
     ApplyProfileReport, ApplyStep, DraftCrosshair, DraftSlot, MissingItem, MissingKind, Profile,
     ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate,
@@ -378,6 +386,12 @@ impl From<IoFailure> for InstallMastercomfigError {
     }
 }
 
+impl From<IoFailure> for ApplyModulesError {
+    fn from(IoFailure { path, source }: IoFailure) -> Self {
+        Self::Io { path, source }
+    }
+}
+
 /// The game's `tf` folder has moved away; mapped into each writer's `GameMissing`.
 pub(crate) struct GameMissing {
     path: PathBuf,
@@ -424,6 +438,12 @@ impl From<GameMissing> for ApplyPresetError {
 }
 
 impl From<GameMissing> for InstallMastercomfigError {
+    fn from(GameMissing { path }: GameMissing) -> Self {
+        Self::GameMissing { path }
+    }
+}
+
+impl From<GameMissing> for ApplyModulesError {
     fn from(GameMissing { path }: GameMissing) -> Self {
         Self::GameMissing { path }
     }

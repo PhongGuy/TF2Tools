@@ -195,6 +195,16 @@ impl Confirm {
         }
     }
 
+    /// Before replacing a modules.cfg TF2Tools did not write.
+    pub fn replace_modules_cfg() -> Self {
+        Self {
+            title: "Replace your modules.cfg?".into(),
+            description: "TF2 already has a modules.cfg that TF2Tools didn't write. Your file is kept as a backup next to it.".into(),
+            confirm_label: "Replace it".into(),
+            cancel_label: "Cancel".into(),
+        }
+    }
+
     /// The prompt before installing an addon into a TF2 without mastercomfig's base.
     pub fn addon_needs_mastercomfig() -> Self {
         Self {

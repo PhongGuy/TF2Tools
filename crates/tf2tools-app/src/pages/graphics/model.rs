@@ -1,10 +1,18 @@
-//! The Graphics page's words: the status card, the preset cards and failures in player words.
+//! The Graphics page's words: the status card, the preset cards, the settings list and
+//! failures in player words.
 
+use gpui_kit::component::select::SelectItem;
+use gpui_kit::{
+    App, ElementId, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
+    TestSupportExt as _, Window, div,
+};
 use tf2tools_core::{
-    ApplyPresetError, InstallMastercomfigError, MastercomfigStatus, MastercomfigStatusError,
-    Preset, RemoveMastercomfigError, TakeOverError,
+    ApplyModulesError, ApplyPresetError, Choices, ComfigModule, InstallMastercomfigError,
+    MastercomfigStatus, MastercomfigStatusError, ModuleCatalog, ModuleCatalogError, ModuleChoice,
+    Preset, RemoveMastercomfigError, TakeOverError, readable_name,
 };
 
+use crate::ids;
 use crate::local_messages::{GAME_MOVED, LIBRARY_OPEN, LocalFailure, TF2_WRITE};
 use crate::store_messages::LIBRARY_UPDATE;
 
@@ -13,6 +21,11 @@ const GITHUB_BUSY: &str = "GitHub is busy right now. Wait a few minutes, then tr
 const GITHUB_UNREADABLE: &str = "GitHub sent something TF2Tools couldn't read. Try again later.";
 const NO_RELEASE: &str =
     "GitHub has no mastercomfig release TF2Tools can install right now. Try again later.";
+/// A modules.cfg the player wrote, which TF2Tools does not overwrite unasked.
+pub(crate) const FOREIGN_MODULES_CFG: &str =
+    "TF2 has a modules.cfg that TF2Tools didn't write, so TF2Tools left it alone.";
+/// Added to the install or update toast when a player's own modules.cfg kept the saved settings out.
+pub const OWN_MODULES_CFG_KEPT: &str = "Your own modules.cfg was kept, so the settings below aren't in use. Change one to use them instead.";
 const STALE_PAGE: &str =
     "mastercomfig changed since this page opened. Open the Graphics page again and try once more.";
 
@@ -166,6 +179,27 @@ pub fn describe_apply(err: &ApplyPresetError) -> LocalFailure {
     LocalFailure::new(message, err.to_string())
 }
 
+/// A setting that could not be saved, in player words.
+pub fn describe_apply_modules(err: &ApplyModulesError) -> LocalFailure {
+    let message = match err {
+        ApplyModulesError::NotManaged => STALE_PAGE,
+        ApplyModulesError::ForeignModulesCfg { .. } => FOREIGN_MODULES_CFG,
+        ApplyModulesError::GameMissing { .. } => GAME_MOVED,
+        ApplyModulesError::Io { .. } => TF2_WRITE,
+        ApplyModulesError::Database { .. } => LIBRARY_UPDATE,
+        ApplyModulesError::RateLimited { .. } => GITHUB_BUSY,
+        ApplyModulesError::Network { .. } => GITHUB_DOWN,
+        ApplyModulesError::NoRelease => {
+            "TF2Tools doesn't know where to download this setting's file yet. Use Check for updates, then try again."
+        }
+        ApplyModulesError::NotAVpk { .. }
+        | ApplyModulesError::Http { .. }
+        | ApplyModulesError::TooLarge { .. }
+        | _ => GITHUB_UNREADABLE,
+    };
+    LocalFailure::new(message, err.to_string())
+}
+
 /// A failed take-over of a hand-installed mastercomfig, in player words.
 pub fn describe_take_over(err: &TakeOverError) -> LocalFailure {
     let message = match err {
@@ -174,4 +208,120 @@ pub fn describe_take_over(err: &TakeOverError) -> LocalFailure {
         TakeOverError::Database { .. } | _ => LIBRARY_UPDATE,
     };
     LocalFailure::new(message, err.to_string())
+}
+
+/// The Select entry that leaves a module unset, so the game's own value applies.
+pub const GAME_DEFAULT: &str = "Game default";
+
+/// One entry of a settings row's Select.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValueOption {
+    label: SharedString,
+    choice: ModuleChoice,
+    id: ElementId,
+}
+
+impl ValueOption {
+    pub fn label(&self) -> &str {
+        &self.label
+    }
+
+    pub fn choice(&self) -> &ModuleChoice {
+        &self.choice
+    }
+}
+
+// Each entry carries its pilot id, since the kit's rows have none.
+impl SelectItem for ValueOption {
+    type Value = ModuleChoice;
+
+    fn title(&self) -> SharedString {
+        self.label.clone()
+    }
+
+    fn render(&self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        div()
+            .id(self.id.clone())
+            .test_support()
+            .child(self.label.clone())
+    }
+
+    fn value(&self) -> &ModuleChoice {
+        &self.choice
+    }
+}
+
+/// A row's Select entries: Game default first, then each value in catalog order.
+pub fn value_options(module: &ComfigModule) -> Vec<ValueOption> {
+    let option = |label: &str, choice: ModuleChoice| ValueOption {
+        id: ids::graphics_value(module.name(), &choice),
+        label: SharedString::from(label.to_owned()),
+        choice,
+    };
+    std::iter::once(option(GAME_DEFAULT, ModuleChoice::NotSet))
+        .chain(
+            module
+                .values()
+                .iter()
+                .map(|v| option(v.label(), ModuleChoice::Value(v.value().to_owned()))),
+        )
+        .collect()
+}
+
+/// The value a row shows: the saved choice, else the preset's resolved value, else NotSet.
+pub fn shown_choice(catalog: &ModuleCatalog, choices: &Choices, module: &str) -> ModuleChoice {
+    if let Some(saved) = choices.get(module) {
+        return saved.clone();
+    }
+    catalog
+        .resolve(module, choices.preset())
+        .map_or(ModuleChoice::NotSet, |v| ModuleChoice::Value(v.to_owned()))
+}
+
+/// What shows in place of the settings list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingsNote {
+    Loading,
+    Offline,
+    Unsupported,
+}
+
+/// The note's sentence.
+pub fn settings_note_text(note: SettingsNote) -> &'static str {
+    match note {
+        SettingsNote::Loading => "Loading the settings list...",
+        SettingsNote::Offline => {
+            "The settings list needs an internet connection the first time. Connect, then open this page again."
+        }
+        SettingsNote::Unsupported => {
+            "This mastercomfig version isn't supported yet. The presets above still work."
+        }
+    }
+}
+
+/// The note for a catalog that could not be read: a connection problem reads as offline, and a
+/// release without a readable catalog (a 404 among them) as unsupported.
+pub fn catalog_note(err: &ModuleCatalogError) -> SettingsNote {
+    match err {
+        ModuleCatalogError::Http { status: 404, .. } => SettingsNote::Unsupported,
+        ModuleCatalogError::Network { .. }
+        | ModuleCatalogError::RateLimited { .. }
+        | ModuleCatalogError::Http { .. } => SettingsNote::Offline,
+        ModuleCatalogError::Format { .. }
+        | ModuleCatalogError::UnsupportedTag { .. }
+        | ModuleCatalogError::TooLarge { .. }
+        | _ => SettingsNote::Unsupported,
+    }
+}
+
+/// The sentence naming settings an update dropped; None when nothing was dropped.
+pub fn dropped_note(names: &[String]) -> Option<String> {
+    if names.is_empty() {
+        return None;
+    }
+    let names: Vec<String> = names.iter().map(|n| readable_name(n)).collect();
+    Some(format!(
+        "These settings aren't in this mastercomfig version and went back to the preset: {}.",
+        names.join(", ")
+    ))
 }

@@ -2,12 +2,17 @@
 //! version, its preset, taking over a hand install, writing back files another tool
 //! cleared, and removing a TF2Tools-managed install with the files it wrote.
 
-use std::path::Path;
+use std::collections::BTreeMap;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
 use rusqlite::OptionalExtension;
 
 use super::addons::{ADDONS_CFG, rewrite_addons_cfg};
-use super::{IoFailure, Library, game_custom_dir, io_at, remove_file_if_present};
+use super::{
+    Choices, IoFailure, Library, ModuleCatalog, ModuleChoice, game_custom_dir, io_at,
+    remove_file_if_present,
+};
 use crate::db::Database;
 use crate::error::{
     ApplyPresetError, MastercomfigStatusError, RemoveMastercomfigError, RestoreMastercomfigError,
@@ -135,7 +140,7 @@ impl Library {
             remove_file_if_present(&custom.join(format!("{vpk}.sound.cache")))?;
         }
         remove_file_if_present(&custom.join(SETUP_HOOK))?;
-        let modules = tf2.tf_dir().join("cfg/overrides/modules.cfg");
+        let modules = modules_cfg_path(tf2);
         if written_by_us(&modules)? {
             remove_file_if_present(&modules)?;
         }
@@ -144,6 +149,14 @@ impl Library {
             .write(|conn| conn.execute("DELETE FROM mastercomfig_state", []))
             .map_err(db)?;
         Ok(())
+    }
+
+    /// The saved preset and module choices of a TF2Tools-managed install; None when not managed.
+    /// A modules column that does not parse reads as no choices. Blocking.
+    pub fn mastercomfig_choices(&self) -> Result<Option<Choices>, MastercomfigStatusError> {
+        read_choices(&self.db).map_err(|e| MastercomfigStatusError::Database {
+            message: e.to_string(),
+        })
     }
 
     /// Writes `setup_hook.cfg` = "preset=<name>\n" and saves the preset. Needs a managed install.
@@ -274,6 +287,100 @@ pub(crate) fn record_install(db: &Database, version: &str) -> rusqlite::Result<P
     Ok(Preset::from_name(&preset).unwrap_or(Preset::Medium))
 }
 
+/// The saved preset and modules column as Choices; None without a state row.
+pub(crate) fn read_choices(db: &Database) -> rusqlite::Result<Option<Choices>> {
+    let row: Option<(String, String)> = db.read(|conn| {
+        conn.query_row(
+            "SELECT preset, modules FROM mastercomfig_state WHERE id = 1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()
+    })?;
+    Ok(row.map(|(preset, modules)| {
+        let saved: BTreeMap<String, Option<String>> =
+            serde_json::from_str(&modules).unwrap_or_default();
+        let modules = saved
+            .into_iter()
+            .map(|(name, v)| (name, v.map_or(ModuleChoice::NotSet, ModuleChoice::Value)))
+            .collect();
+        Choices::from_saved(
+            Preset::from_name(&preset).unwrap_or(Preset::Medium),
+            modules,
+        )
+    }))
+}
+
+/// Saves `choices`' modules as `{"name":"value"|null}`, leaving the saved preset alone.
+pub(crate) fn save_modules(db: &Database, choices: &Choices) -> rusqlite::Result<()> {
+    let saved: BTreeMap<&str, Option<&str>> = choices
+        .modules()
+        .iter()
+        .map(|(name, choice)| {
+            let value = match choice {
+                ModuleChoice::Value(v) => Some(v.as_str()),
+                ModuleChoice::NotSet => None,
+            };
+            (name.as_str(), value)
+        })
+        .collect();
+    let json = serde_json::to_string(&saved)
+        .map_err(|e| rusqlite::Error::ToSqlConversionFailure(e.into()))?;
+    db.write(|conn| {
+        conn.execute(
+            "UPDATE mastercomfig_state SET modules = ?1 WHERE id = 1",
+            [json],
+        )
+    })?;
+    Ok(())
+}
+
+/// `tf/cfg/overrides/modules.cfg`, which mastercomfig runs for module choices.
+pub(crate) fn modules_cfg_path(tf2: &Tf2Install) -> PathBuf {
+    tf2.tf_dir().join("cfg/overrides/modules.cfg")
+}
+
+/// Writes MODULES_HEADER and one line per choice in catalog order: `name=value`, or
+/// `alias name` to leave a module unset.
+pub(crate) fn write_modules_cfg(
+    path: &Path,
+    catalog: &ModuleCatalog,
+    choices: &Choices,
+) -> Result<(), IoFailure> {
+    let mut text = format!("{MODULES_HEADER}\n");
+    let modules = catalog.categories().iter().flat_map(|c| c.modules());
+    for (name, choice) in modules.filter_map(|m| Some((m.name(), choices.get(m.name())?))) {
+        match choice {
+            ModuleChoice::Value(v) => text.push_str(&format!("{name}={v}\n")),
+            ModuleChoice::NotSet => text.push_str(&format!("alias {name}\n")),
+        }
+    }
+    // A temp file beside the target, renamed over it, so the game never reads a half-written cfg.
+    let dir = path.parent().unwrap_or(Path::new("."));
+    std::fs::create_dir_all(dir).map_err(io_at(dir))?;
+    let mut part = tempfile::NamedTempFile::new_in(dir).map_err(io_at(dir))?;
+    part.write_all(text.as_bytes())
+        .map_err(io_at(part.path()))?;
+    part.persist(path).map_err(|e| io_at(path)(e.error))?;
+    Ok(())
+}
+
+/// Renames the player's own `path` to the first free of `<name>.bak`, `.bak.1`, `.bak.2`, ...
+pub(crate) fn back_up(path: &Path) -> Result<(), IoFailure> {
+    let mut backup = path.as_os_str().to_owned();
+    backup.push(".bak");
+    let first = PathBuf::from(backup);
+    let mut target = first.clone();
+    let mut n = 0u32;
+    while target.try_exists().map_err(io_at(&target))? {
+        n += 1;
+        let mut next = first.clone().into_os_string();
+        next.push(format!(".{n}"));
+        target = PathBuf::from(next);
+    }
+    std::fs::rename(path, &target).map_err(io_at(path))
+}
+
 /// Writes `comfig-custom/cfg/app/setup_hook.cfg` under `custom` so mastercomfig loads `preset`.
 pub(crate) fn write_setup_hook(custom: &Path, preset: Preset) -> Result<(), IoFailure> {
     let hook = custom.join(SETUP_HOOK);
@@ -293,11 +400,11 @@ fn preset_in(hook: &str) -> Option<Preset> {
 }
 
 /// Whether `path` is a `modules.cfg` TF2Tools wrote; a missing file is not.
-fn written_by_us(path: &Path) -> Result<bool, RemoveMastercomfigError> {
+pub(crate) fn written_by_us(path: &Path) -> Result<bool, IoFailure> {
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-        Err(e) => return Err(io_at(path)(e).into()),
+        Err(e) => return Err(io_at(path)(e)),
     };
     let first = bytes.split(|&b| b == b'\n').next().unwrap_or_default();
     Ok(first.strip_suffix(b"\r").unwrap_or(first) == MODULES_HEADER.as_bytes())

@@ -1,19 +1,24 @@
-//! The Graphics page: mastercomfig's status and the graphics preset picker.
+//! The Graphics page: mastercomfig's status, the graphics preset picker and the settings list.
 
 pub mod jobs;
 pub mod model;
+mod settings;
+
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, Context, FontWeight, InteractiveElement as _, IntoElement,
-    MouseButton, ParentElement as _, Render, Role, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
-    px,
+    AnyElement, AnyWindowHandle, AppContext as _, Context, Entity, FontWeight,
+    InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, Render, Role,
+    ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, Subscription,
+    TestSupportExt as _, Window, div, px,
 };
-use tf2tools_core::{MastercomfigRelease, MastercomfigStatus, Preset};
+use tf2tools_core::{Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, Preset};
 
 use crate::ids;
 use crate::local_messages::describe_store_status;
@@ -26,9 +31,11 @@ use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
+use jobs::{ModulesFailure, SAVE_FAILED};
 use model::{
-    StatusCard, describe_apply, describe_remove, describe_take_over, detail, headline,
-    preset_description, preset_label, status_card, update_to,
+    FOREIGN_MODULES_CFG, OWN_MODULES_CFG_KEPT, SettingsNote, StatusCard, ValueOption,
+    describe_apply, describe_remove, describe_take_over, detail, dropped_note, headline,
+    preset_description, preset_label, shown_choice, status_card, update_to, value_options,
 };
 
 const CREDIT: &str = "mastercomfig is made by the mastercomfig team and shared under the MIT licence. Preset descriptions come from comfig-app.";
@@ -36,6 +43,21 @@ const FOOTER: &str = "Changes apply the next time TF2 starts.";
 
 /// A finished action's success toast: (title, description).
 type Done = (SharedString, SharedString);
+
+/// A finished action's toast, if it has one: (kind, title, description).
+type Outcome = Option<(ToastKind, SharedString, SharedString)>;
+
+/// A settings row's value picker.
+type ValueSelect = Entity<SelectState<Vec<ValueOption>>>;
+
+/// What one load read off the UI thread.
+struct Loaded {
+    status: Option<MastercomfigStatus>,
+    release: Option<MastercomfigRelease>,
+    choices: Option<Choices>,
+    /// The cached catalog of a managed version the page did not hold yet.
+    catalog: Option<ModuleCatalog>,
+}
 
 /// The download job whose button spins; other actions only lock the buttons.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -60,6 +82,18 @@ pub struct GraphicsPage {
     running: Option<Job>,
     /// Bumped by each reload, so a slower, older load never overwrites a newer one.
     load_generation: u64,
+    /// The saved choices of a managed install, from the last load.
+    choices: Option<Choices>,
+    /// The settings list's catalog, always for the managed install's version.
+    catalog: Option<Arc<ModuleCatalog>>,
+    /// One Select per catalog module, built when the catalog arrives.
+    selects: BTreeMap<String, ValueSelect>,
+    /// Each Select's pick handler, rebuilt with the Selects.
+    select_subscriptions: Vec<Subscription>,
+    /// Why there is no catalog yet; None before a fetch is asked.
+    note: Option<SettingsNote>,
+    /// The version whose catalog this visit already asked GitHub for.
+    asked: Option<String>,
     scroll: ScrollHandle,
     _subscriptions: Vec<Subscription>,
 }
@@ -77,6 +111,12 @@ impl GraphicsPage {
             settling: false,
             running: None,
             load_generation: 0,
+            choices: None,
+            catalog: None,
+            selects: BTreeMap::new(),
+            select_subscriptions: Vec::new(),
+            note: None,
+            asked: None,
             scroll: ScrollHandle::new(),
             _subscriptions: vec![tf2],
         };
@@ -130,6 +170,36 @@ impl GraphicsPage {
         }
     }
 
+    /// The catalog of the managed install's version, once loaded.
+    pub fn catalog(&self) -> Option<&ModuleCatalog> {
+        self.catalog.as_deref()
+    }
+
+    /// The saved choices of a managed install.
+    pub fn choices(&self) -> Option<&Choices> {
+        self.choices.as_ref()
+    }
+
+    /// What shows in place of the list while there is no catalog; None with a catalog or unmanaged.
+    pub fn settings_note(&self) -> Option<SettingsNote> {
+        if self.catalog.is_some() || self.managed_version().is_none() {
+            return None;
+        }
+        Some(self.note.unwrap_or(SettingsNote::Loading))
+    }
+
+    /// The Select state of `module`'s row.
+    pub fn module_select(&self, module: &str) -> Option<ValueSelect> {
+        self.selects.get(module).cloned()
+    }
+
+    fn managed_version(&self) -> Option<&str> {
+        match &self.status {
+            Some(MastercomfigStatus::Managed { version, .. }) => Some(version),
+            _ => None,
+        }
+    }
+
     // Downloads the release into tf/custom through `jobs::install_base`; Update is the same
     // download over an older base, and core keeps the saved preset either way.
     fn install(&mut self, update: bool, window: &mut Window, cx: &mut Context<Self>) {
@@ -146,16 +216,24 @@ impl GraphicsPage {
         self.running = Some(Job::Install);
         self.finish(
             async move {
-                let version = job.await?;
-                Ok(if update {
-                    (
-                        "mastercomfig updated".into(),
-                        format!("Now on {version}.").into(),
-                    )
+                let jobs::Installed {
+                    version,
+                    dropped,
+                    own_file_kept,
+                } = job.await?;
+                let (title, mut text) = if update {
+                    ("mastercomfig updated", format!("Now on {version}."))
                 } else {
                     let ready = format!("mastercomfig {version} is ready. Pick a preset below.");
-                    ("mastercomfig installed".into(), ready.into())
-                })
+                    ("mastercomfig installed", ready)
+                };
+                if let Some(note) = dropped_note(&dropped) {
+                    text = format!("{text} {note}");
+                }
+                if own_file_kept {
+                    text = format!("{text} {OWN_MODULES_CFG_KEPT}");
+                }
+                Ok((title.into(), text.into()))
             },
             cx,
         );
@@ -246,6 +324,72 @@ impl GraphicsPage {
         );
     }
 
+    // Saves the choices `edit` makes from the saved ones; an edit that changes nothing does
+    // nothing. Only a change to the override VPKs waits for TF2 to close. A player's own
+    // modules.cfg is replaced only after they agree; the page stays busy while asking.
+    fn change(&mut self, edit: impl FnOnce(&mut Choices, &ModuleCatalog), cx: &mut Context<Self>) {
+        let Some(catalog) = self.catalog.clone() else {
+            return;
+        };
+        if self.busy || self.managed_version().is_none() {
+            return;
+        }
+        let old = self.shown_against();
+        let mut new = old.clone();
+        edit(&mut new, &catalog);
+        if new == old {
+            return;
+        }
+        let tf2 = match require_tf2(cx) {
+            Ok(tf2) => tf2,
+            Err(err) => return self.settle(async move { Err(err) }, cx),
+        };
+        let guard_tf2 = old.override_mask() != new.override_mask();
+        let job = jobs::apply_modules(
+            tf2.clone(),
+            Arc::clone(&catalog),
+            new.clone(),
+            guard_tf2,
+            false,
+            cx,
+        );
+        let win = self.win;
+        let mut acx = cx.to_async();
+        self.settle(
+            async move {
+                let dropped = match job.await {
+                    Err(ModulesFailure::Foreign) => {
+                        let Ok(answer) = win.update(&mut acx, |_, window, cx| {
+                            confirm(Confirm::replace_modules_cfg(), window, cx)
+                        }) else {
+                            return Ok(None);
+                        };
+                        if !answer.recv().await.unwrap_or(false) {
+                            return Ok(None);
+                        }
+                        let again = acx.update(|cx| {
+                            jobs::apply_modules(tf2, catalog, new, guard_tf2, true, cx)
+                        });
+                        again.await
+                    }
+                    first => first,
+                };
+                match dropped {
+                    Ok(dropped) => Ok(dropped_note(&dropped).map(|text| {
+                        let title = "Some settings went back to the preset";
+                        (ToastKind::Warning, title.into(), text.into())
+                    })),
+                    Err(ModulesFailure::Foreign) => Err(OpError::Core {
+                        action: SAVE_FAILED,
+                        message: FOREIGN_MODULES_CFG.to_owned(),
+                    }),
+                    Err(ModulesFailure::Op(err)) => Err(err),
+                }
+            },
+            cx,
+        );
+    }
+
     // Runs a blocking library change off the UI thread through `finish`.
     fn run(
         &mut self,
@@ -256,10 +400,25 @@ impl GraphicsPage {
         self.finish(running, cx);
     }
 
-    // Marks the page busy until `job` ends, toasts its outcome, then reloads the status.
+    // `settle` with a success toast.
     fn finish(
         &mut self,
         job: impl std::future::Future<Output = Result<Done, OpError>> + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        self.settle(
+            async move {
+                job.await
+                    .map(|(title, text)| Some((ToastKind::Success, title, text)))
+            },
+            cx,
+        );
+    }
+
+    // Marks the page busy until `job` ends, toasts its outcome, then reloads the status.
+    fn settle(
+        &mut self,
+        job: impl std::future::Future<Output = Result<Outcome, OpError>> + 'static,
         cx: &mut Context<Self>,
     ) {
         self.busy = true;
@@ -269,7 +428,8 @@ impl GraphicsPage {
             let done = job.await;
             let _ = cx.update(|cx| {
                 win.update(cx, |_, window, cx| match done {
-                    Ok((title, text)) => toast(window, cx, ToastKind::Success, title, text),
+                    Ok(Some((kind, title, text))) => toast(window, cx, kind, title, text),
+                    Ok(None) => {}
                     Err(err) => toast_error(window, cx, &err),
                 })
             });
@@ -282,13 +442,16 @@ impl GraphicsPage {
         .detach();
     }
 
-    // Reads the install's status (only with TF2) and the recorded release in the background;
-    // a failed read toasts through the window and leaves the last good values.
+    // Reads the install's status (only with TF2), the recorded release and, for a managed
+    // install, its saved choices and any cached catalog the page lacks, in the background. A
+    // failed read toasts through the window and leaves the last good values.
     fn reload(&mut self, cx: &mut Context<Self>) {
         self.load_generation += 1;
         let generation = self.load_generation;
         let tf2 = tf2_state(cx).read(cx).install().cloned();
+        let held = self.catalog.as_ref().map(|c| c.tag().to_owned());
         let loading = run_blocking(cx, move |s| {
+            let failed = "Failed to load mastercomfig";
             // Puts back a preset file another tool cleared; a failure only costs the restore.
             if let Some(tf2) = &tf2
                 && let Err(e) = s.library.restore_mastercomfig_files(tf2)
@@ -298,34 +461,65 @@ impl GraphicsPage {
             let status = tf2
                 .map(|tf2| s.library.mastercomfig_status(&tf2))
                 .transpose()
-                .map_err(|e| model::describe_status(&e).into_op("Failed to load mastercomfig"))?;
+                .map_err(|e| model::describe_status(&e).into_op(failed))?;
             let release = s
                 .store
                 .mastercomfig_release()
-                .map_err(|e| describe_store_status(&e).into_op("Failed to load mastercomfig"))?;
-            Ok((status, release))
+                .map_err(|e| describe_store_status(&e).into_op(failed))?;
+            let (choices, catalog) = match &status {
+                Some(MastercomfigStatus::Managed { version, .. }) => {
+                    // Unreadable choices show the preset's values rather than failing the page.
+                    let choices = s.library.mastercomfig_choices().unwrap_or_else(|e| {
+                        tracing::warn!("mastercomfig settings: {e}");
+                        None
+                    });
+                    let catalog = (held.as_deref() != Some(version.as_str()))
+                        .then(|| s.store.cached_mastercomfig_catalog(version))
+                        .flatten();
+                    (choices, catalog)
+                }
+                _ => (None, None),
+            };
+            Ok(Loaded {
+                status,
+                release,
+                choices,
+                catalog,
+            })
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {
             let loaded = loading.await;
-            let current = page
-                .update(cx, |page, cx| {
-                    if page.load_generation != generation {
-                        return false;
-                    }
-                    if let Ok((status, release)) = &loaded {
-                        page.status = status.clone();
-                        page.release = release.clone();
-                    }
-                    page.loaded = true;
-                    if page.settling {
-                        page.settling = false;
-                        page.busy = false;
-                        page.running = None;
-                    }
-                    cx.notify();
-                    true
+            // Through the window, so the catalog and its Selects land in the same update.
+            let current = cx
+                .update(|cx| {
+                    win.update(cx, |_, window, cx| {
+                        page.update(cx, |page, cx| {
+                            if page.load_generation != generation {
+                                return false;
+                            }
+                            if let Ok(loaded) = &loaded {
+                                page.status = loaded.status.clone();
+                                page.release = loaded.release.clone();
+                                page.choices = loaded.choices.clone();
+                                page.sync_list(loaded.catalog.clone(), window, cx);
+                            } else {
+                                // A refused pick still shows on its Select; move it back.
+                                page.show_choices(window, cx);
+                            }
+                            page.loaded = true;
+                            if page.settling {
+                                page.settling = false;
+                                page.busy = false;
+                                page.running = None;
+                            }
+                            cx.notify();
+                            true
+                        })
+                    })
                 })
+                .ok()
+                .and_then(Result::ok)
                 .unwrap_or(false);
             if let (true, Err(err)) = (current, loaded) {
                 let _ =
@@ -333,6 +527,121 @@ impl GraphicsPage {
             }
         })
         .detach();
+    }
+
+    // Keeps the list on the managed version's catalog: a version change swaps the catalog
+    // (`fresh`, the cached one or None) and rebuilds the Selects; otherwise the Selects only
+    // move to the shown values, so focus stays put. A missing catalog is fetched once.
+    fn sync_list(
+        &mut self,
+        fresh: Option<ModuleCatalog>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let version = self.managed_version().map(str::to_owned);
+        if self.catalog.as_ref().map(|c| c.tag()) != version.as_deref() {
+            self.catalog = fresh.map(Arc::new);
+            self.build_selects(window, cx);
+        } else {
+            self.show_choices(window, cx);
+        }
+        if let Some(tag) = version
+            && self.catalog.is_none()
+            && self.asked.as_deref() != Some(tag.as_str())
+        {
+            self.fetch(tag, cx);
+        }
+    }
+
+    // Asks the store for `tag`'s catalog; the answer lands only while `tag` is still managed.
+    fn fetch(&mut self, tag: String, cx: &mut Context<Self>) {
+        self.asked = Some(tag.clone());
+        self.note = Some(SettingsNote::Loading);
+        let job = jobs::fetch_catalog(tag.clone(), cx);
+        let win = self.win;
+        cx.spawn(async move |page, cx| {
+            let fetched = job.await;
+            let _ = cx.update(|cx| {
+                win.update(cx, |_, window, cx| {
+                    page.update(cx, |page, cx| {
+                        if page.managed_version() != Some(tag.as_str()) || page.catalog.is_some() {
+                            return;
+                        }
+                        match fetched {
+                            Ok(catalog) => {
+                                page.catalog = Some(Arc::new(catalog));
+                                page.build_selects(window, cx);
+                            }
+                            Err(note) => page.note = Some(note),
+                        }
+                        cx.notify();
+                    })
+                })
+            });
+        })
+        .detach();
+    }
+
+    // One Select per module of the held catalog, each on its shown value; a pick saves it, and
+    // a cleared Select changes nothing.
+    fn build_selects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.selects.clear();
+        self.select_subscriptions.clear();
+        let Some(catalog) = self.catalog.clone() else {
+            return;
+        };
+        let choices = self.shown_against();
+        for module in catalog.categories().iter().flat_map(|c| c.modules()) {
+            let shown = shown_choice(&catalog, &choices, module.name());
+            let options = value_options(module);
+            let select = cx.new(|cx| {
+                let mut select = SelectState::new(options, None, window, cx);
+                select.set_selected_value(&shown, window, cx);
+                select
+            });
+            let name = module.name().to_owned();
+            self.select_subscriptions.push(cx.subscribe(
+                &select,
+                move |page, _, event: &SelectEvent<Vec<ValueOption>>, cx| {
+                    if let SelectEvent::Confirm(Some(choice)) = event {
+                        let choice = choice.clone();
+                        page.change(|c, catalog| c.set(catalog, &name, choice), cx);
+                    }
+                },
+            ));
+            self.selects.insert(module.name().to_owned(), select);
+        }
+    }
+
+    // Drops `module`'s saved choice, so the preset's value applies.
+    fn reset_module(&mut self, module: &str, cx: &mut Context<Self>) {
+        self.change(|c, _| c.reset(module), cx);
+    }
+
+    // Drops every saved choice and keeps the preset.
+    fn reset_all(&mut self, cx: &mut Context<Self>) {
+        self.change(|c, _| c.clear(), cx);
+    }
+
+    // Moves each existing Select to its row's shown value.
+    fn show_choices(&self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(catalog) = &self.catalog else {
+            return;
+        };
+        let choices = self.shown_against();
+        for (name, select) in &self.selects {
+            let shown = shown_choice(catalog, &choices, name);
+            select.update(cx, |select, cx| {
+                select.set_selected_value(&shown, window, cx)
+            });
+        }
+    }
+
+    // The choices the rows show: the saved ones, else none on top of the current preset.
+    fn shown_against(&self) -> Choices {
+        self.choices
+            .clone()
+            .unwrap_or_else(|| Choices::new(self.preset().unwrap_or(Preset::Medium)))
     }
 }
 
@@ -364,7 +673,15 @@ impl Render for GraphicsPage {
             .children(
                 self.preset()
                     .map(|current| self.presets(current, window, cx)),
-            );
+            )
+            .children(self.preset().map(|_| settings::section(self, cx)))
+            .children(self.preset().map(|_| {
+                labelled(
+                    div().text_sm().text_color(cx.theme().muted_foreground),
+                    ids::GRAPHICS_FOOTER,
+                    FOOTER,
+                )
+            }));
         scroll_area(ids::page_scrollbar(Page::Graphics), &self.scroll, content).size_full()
     }
 }
@@ -536,11 +853,6 @@ impl GraphicsPage {
                     .child("Preset"),
             )
             .child(h_flex().flex_wrap().gap_4().children(cards))
-            .child(labelled(
-                div().text_sm().text_color(muted),
-                ids::GRAPHICS_FOOTER,
-                FOOTER,
-            ))
             .into_any_element()
     }
 }
