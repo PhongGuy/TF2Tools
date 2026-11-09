@@ -8,11 +8,12 @@ use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use image::{DynamicImage, ImageFormat, Rgba, RgbaImage};
 use tf2tools_app::ids;
 use tf2tools_app::pages::huds::HudsPage;
+use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::remote_images::{ImageFetch, RemoteImages};
 use tf2tools_app::services::{Services, Tf2State, install_tf2_state};
 use tf2tools_app::shell::Shell;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::{GbId, HudEntry, Provenance, Tf2Install};
+use tf2tools_core::{GbId, HudEntry, ProfileDraft, Provenance, Tf2Install};
 
 const RAYS: &str =
     "https://raw.githubusercontent.com/mastercomfig/hud-db/main/hud-resources/rayshud/r1.webp";
@@ -316,4 +317,71 @@ fn a_library_from_before_pictures_gets_them_made_in_the_background(cx: &mut Test
     });
     support::settle(cx, s.win);
     assert!(support::present(cx, s.win, ids::hud_image("older")));
+}
+
+// A slot change clears the profile editor's search; the HUD cards that brings back ask for
+// their pictures. The cache arrives only after "bud" filtered out rayshud, so a fetch of
+// rayshud's picture can only come from the cleared search.
+#[gpui_kit::test]
+fn the_profile_hud_gallery_wants_pictures_after_a_slot_change_clears_its_search(
+    cx: &mut TestAppContext,
+) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    cx.executor().allow_parking();
+    store_rows(&env);
+    seed(
+        &s.services,
+        &env,
+        "rayshud",
+        Provenance::Curated {
+            hud_id: "rayshud".into(),
+        },
+    );
+    seed(
+        &s.services,
+        &env,
+        "budhud",
+        Provenance::GameBanana {
+            gb_id: GbId::new(7),
+            author: "Bud".into(),
+        },
+    );
+    let profile = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Comp"))
+        .unwrap();
+    cx.update(|cx| Tf2Probe::install(cx, || false));
+    support::click_id(cx, s.win, ids::nav(Page::Profiles));
+    let page = cx
+        .update(|cx| s.shell.read(cx).profiles_page())
+        .expect("a Profiles page");
+    support::wait_real(cx, "Profiles to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    let id = profile.id().clone();
+    cx.update_window(s.win, |_, window, cx| {
+        page.update(cx, |p, cx| p.open_editor(id, window, cx))
+    })
+    .unwrap();
+    let editor = cx.update(|cx| page.read(cx).editor()).expect("an editor");
+    support::wait_real(cx, "the HUD gallery", |cx| {
+        support::settle(cx, s.win);
+        support::present(cx, s.win, ids::profile_pick_hud("rayshud"))
+    });
+    let search = cx.update(|cx| editor.read(cx).search_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        search.update(cx, |st, cx| st.set_value("bud", window, cx))
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    let (fetch, asked) = fetch_log();
+    cx.update(|cx| RemoteImages::install(cx, fetch));
+    support::click_id(cx, s.win, ids::profile_slot("hitsound"));
+    support::click_id(cx, s.win, ids::profile_slot("hud"));
+    support::wait_real(cx, "rayshud's picture", |cx| {
+        support::settle(cx, s.win);
+        asked.lock().unwrap().iter().any(|url| url == RAYS)
+    });
 }

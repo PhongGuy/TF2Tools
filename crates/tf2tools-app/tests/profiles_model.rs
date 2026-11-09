@@ -189,4 +189,6 @@ fn a_load_closes_only_an_editor_open_when_it_started_and_missing_from_it() {
     assert!(!load_closes_editor(None, &made, [&other]));
     assert!(load_closes_editor(Some(&made), &made, [&other]));
     assert!(!load_closes_editor(Some(&made), &made, [&other, &made]));
+    // The editor open now replaced the one open at the start, so the load predates it.
+    assert!(!load_closes_editor(Some(&other), &made, [&other]));
 }
