@@ -110,7 +110,8 @@ fn a_reset_drops_late_chunks_of_the_old_query() {
     assert_ne!(old, new);
     assert_eq!(feed.chunk(old, cards(&[1])), 0);
     assert!(feed.items().is_empty());
+    assert_eq!(feed.begin_step(), Some((1, new)));
     assert_eq!(feed.step_done(old, Some(2)), StepAfter::Stale);
     feed.step_failed(old);
-    assert_eq!(feed.begin_step(), Some((1, new)));
+    assert!(feed.is_loading(), "the old query cannot end the new step");
 }
