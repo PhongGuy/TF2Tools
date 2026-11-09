@@ -12,8 +12,8 @@ use tf2tools_app::remote_images::queue::IMAGE_BUDGET;
 use tf2tools_app::remote_images::{FetchFailure, ImageFetch, ImageKey, RemoteImage, RemoteImages};
 use tf2tools_app::services::Services;
 use tf2tools_app::widgets::weapon_assigner::{
-    AssignRequested, AssignTarget, AssignedCell, AssignerState, ClassChanged, WeaponAssigner,
-    slot_colour,
+    AssignRequested, AssignTarget, AssignedCell, AssignerState, ClassChanged, ClearRequested,
+    WeaponAssigner, slot_colour,
 };
 use tf2tools_core::{TfClass, Weapon, WeaponSlot, weapons};
 
@@ -568,4 +568,112 @@ fn the_compact_list_shows_a_bar_clear_of_its_rows(cx: &mut TestAppContext) {
         ids::WEAPON_LIST_SCROLLBAR,
     );
     assert_track_scrolls(cx, win, ids::WEAPON_LIST, ids::weapon_row(rows[0]));
+}
+
+type Clears = Rc<RefCell<Vec<ClearRequested>>>;
+
+fn clears(cx: &mut TestAppContext, a: &Entity<WeaponAssigner>) -> Clears {
+    let clears: Clears = Rc::default();
+    let sink = Rc::clone(&clears);
+    cx.update(|cx| {
+        cx.subscribe(a, move |_, e: &ClearRequested, _| {
+            sink.borrow_mut().push(e.clone())
+        })
+        .detach()
+    });
+    clears
+}
+
+/// The scattergun assigned "Dot", and the clear buttons switched on when `clearable`.
+fn scattergun_cell(cx: &mut TestAppContext, a: &Entity<WeaponAssigner>, clearable: bool) {
+    cx.update(|cx| {
+        a.update(cx, |a, cx| {
+            a.set_assigned(
+                vec![AssignedCell {
+                    script: "tf_weapon_scattergun".into(),
+                    label: "Dot".into(),
+                    crosshair: None,
+                }],
+                cx,
+            );
+            a.set_clearable(clearable, cx);
+        })
+    });
+}
+
+#[gpui_kit::test]
+fn the_clear_button_shows_only_when_clearable_and_assigned(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (win, assigner, _) = open(cx, &env, false);
+    scattergun_cell(cx, &assigner, false);
+    assert!(!support::present(
+        cx,
+        win,
+        ids::weapon_clear("tf_weapon_scattergun")
+    ));
+    scattergun_cell(cx, &assigner, true);
+    assert!(support::present(
+        cx,
+        win,
+        ids::weapon_clear("tf_weapon_scattergun")
+    ));
+    assert!(!support::present(
+        cx,
+        win,
+        ids::weapon_clear("tf_weapon_pistol_scout")
+    ));
+}
+
+// The row is dimmed and inert without a selection, yet its clear button still asks; with a
+// selection the click stops at the button, so the row behind it never assigns.
+#[gpui_kit::test]
+fn a_clear_click_asks_with_or_without_a_selection_and_never_assigns(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (win, assigner, assigns) = open(cx, &env, false);
+    let cleared = clears(cx, &assigner);
+    scattergun_cell(cx, &assigner, true);
+    support::click_id(cx, win, ids::weapon_clear("tf_weapon_scattergun"));
+    assert_eq!(
+        *cleared.borrow(),
+        [ClearRequested {
+            script: "tf_weapon_scattergun"
+        }]
+    );
+    state(
+        cx,
+        &assigner,
+        AssignerState {
+            has_selection: true,
+            ..AssignerState::default()
+        },
+    );
+    support::click_id(cx, win, ids::weapon_clear("tf_weapon_scattergun"));
+    assert_eq!(cleared.borrow().len(), 2);
+    assert!(
+        assigns.borrow().is_empty(),
+        "the row behind the button assigned"
+    );
+}
+
+#[gpui_kit::test]
+fn a_busy_host_keeps_the_clear_button_inert(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (win, assigner, _) = open(cx, &env, false);
+    let cleared = clears(cx, &assigner);
+    scattergun_cell(cx, &assigner, true);
+    state(
+        cx,
+        &assigner,
+        AssignerState {
+            busy: true,
+            ..AssignerState::default()
+        },
+    );
+    assert!(support::disabled_of(
+        cx,
+        win,
+        ids::weapon_clear("tf_weapon_scattergun")
+    ));
+    support::click_id(cx, win, ids::weapon_clear("tf_weapon_scattergun"));
+    assert!(cleared.borrow().is_empty());
 }

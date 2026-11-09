@@ -364,3 +364,31 @@ fn the_bar_says_tf2_uses_its_own_crosshairs_when_none_are_set(cx: &mut TestAppCo
         Some("TF2 is using its own crosshairs")
     );
 }
+
+// The Crosshairs page never switches the clear buttons on.
+#[gpui_kit::test]
+fn the_weapons_panel_offers_no_clear_button(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let (first, _) = first_builtin(&s);
+    assign(
+        &s,
+        BoardTarget::Cell(TfClass::Scout, WeaponSlot::Primary),
+        &first,
+    );
+    let _page = open(cx, &s);
+    let cell = ids::loadout_cell(TfClass::Scout, WeaponSlot::Primary);
+    cx.update_window(s.win, |_, w, cx| w.right_click(cell, cx))
+        .unwrap();
+    support::settle(cx, s.win);
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::weapon_check("tf_weapon_scattergun")
+    ));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::weapon_clear("tf_weapon_scattergun")
+    ));
+}

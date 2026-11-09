@@ -24,6 +24,7 @@ use crate::pages::common::ORANGE_500;
 use crate::previews::CrosshairPreviews;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
 use crate::services::Services;
+use crate::widgets::Named as _;
 use crate::widgets::crosshair_picker::preview_image;
 use crate::widgets::labelled;
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
@@ -79,6 +80,12 @@ pub struct AssignedCell {
     pub crosshair: Option<CrosshairRef>,
 }
 
+/// A click on an assigned row's clear button, asking the host to drop that weapon's crosshair.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ClearRequested {
+    pub script: &'static str,
+}
+
 /// What the host tells the assigner about itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct AssignerState {
@@ -99,6 +106,8 @@ pub struct WeaponAssigner {
     cells: Vec<AssignedCell>,
     state: AssignerState,
     compact: bool,
+    /// Whether assigned rows offer a clear button.
+    clearable: bool,
     previews: Entity<CrosshairPreviews>,
     _previews: Subscription,
     /// The session image cache; None in compact mode or when none is installed.
@@ -112,6 +121,7 @@ pub struct WeaponAssigner {
 
 impl EventEmitter<AssignRequested> for WeaponAssigner {}
 impl EventEmitter<ClassChanged> for WeaponAssigner {}
+impl EventEmitter<ClearRequested> for WeaponAssigner {}
 
 impl WeaponAssigner {
     /// Needs the `Services` global. Scout, no cells, default state. Compact is v5's dialog
@@ -145,6 +155,7 @@ impl WeaponAssigner {
             cells: Vec::new(),
             state: AssignerState::default(),
             compact,
+            clearable: false,
             list_scroll: ScrollHandle::new(),
             previews,
             _previews: observe_previews,
@@ -203,6 +214,12 @@ impl WeaponAssigner {
     /// Replaces the shown assignments.
     pub fn set_assigned(&mut self, cells: Vec<AssignedCell>, cx: &mut Context<Self>) {
         self.cells = cells;
+        cx.notify();
+    }
+
+    /// Off by default. On, every row with a cell shows a clear button.
+    pub fn set_clearable(&mut self, clearable: bool, cx: &mut Context<Self>) {
+        self.clearable = clearable;
         cx.notify();
     }
 
@@ -378,6 +395,20 @@ impl WeaponAssigner {
         } else {
             div().flex_none().size(px(14.)).into_any_element()
         };
+        // The clear button works without a selection, and stops its click so the row behind
+        // it never assigns.
+        let clear = (self.clearable && cell.is_some()).then(|| {
+            Button::new(ids::weapon_clear(script))
+                .ghost()
+                .xsmall()
+                .icon(IconName::X)
+                .named("Clear crosshair")
+                .disabled(self.state.busy)
+                .on_click(cx.listener(move |_, _, _, cx| {
+                    cx.stop_propagation();
+                    cx.emit(ClearRequested { script });
+                }))
+        });
         let active = self.state.has_selection && !self.state.busy;
         let icon = (!self.compact).then(|| {
             let ready = self
@@ -436,6 +467,7 @@ impl WeaponAssigner {
                 label,
             ))
             .child(check)
+            .children(clear)
             .map(|row| {
                 if active {
                     row.cursor_pointer()

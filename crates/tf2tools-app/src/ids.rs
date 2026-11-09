@@ -1409,6 +1409,11 @@ pub fn weapon_check(script: &str) -> ElementId {
     keyed("weapon-check", script)
 }
 
+/// A weapon row's clear button, shown only when the assigner is clearable: "weapon-clear:<script>".
+pub fn weapon_clear(script: &str) -> ElementId {
+    keyed("weapon-clear", script)
+}
+
 /// A weapon row's spinner, present only while that weapon is being assigned.
 pub fn weapon_spinner(script: &str) -> ElementId {
     keyed("weapon-spinner", script)
