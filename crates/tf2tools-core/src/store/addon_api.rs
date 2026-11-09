@@ -286,7 +286,11 @@ fn decode_entities(text: &str) -> String {
     while let Some(amp) = rest.find('&') {
         out.push_str(&rest[..amp]);
         rest = &rest[amp..];
-        let decoded = rest.find(';').filter(|&end| end <= 10).and_then(|end| {
+        // An entity is at most ten bytes long, so look for its ';' only that far;
+        // scanning to the end at every '&' is quadratic on hostile text.
+        let window = &rest.as_bytes()[..rest.len().min(11)];
+        let end = window.iter().position(|&b| b == b';');
+        let decoded = end.and_then(|end| {
             let entity = &rest[1..end];
             let c = match entity {
                 "amp" => Some('&'),
@@ -448,6 +452,14 @@ mod tests {
             search_url("b", "pink & red/x", 2),
             "b/Util/Search/Results?_sModelName=Mod&_idGameRow=297&_sSearchString=pink%20%26%20red%2Fx&_nPage=2"
         );
+    }
+
+    #[test]
+    fn a_flood_of_bare_ampersands_decodes_quickly_and_unchanged() {
+        let text = "&".repeat(200_000);
+        let started = std::time::Instant::now();
+        assert_eq!(decode_entities(&text), text);
+        assert!(started.elapsed() < std::time::Duration::from_millis(100));
     }
 
     #[test]
