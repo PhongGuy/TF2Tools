@@ -87,6 +87,8 @@ pub struct CrosshairPicker {
     library_lowered: Vec<String>,
     selected: Option<CrosshairRef>,
     compact: bool,
+    /// The list grows to the height its host gives it instead of its fixed size.
+    fill: bool,
     /// The Crosshairs page's grid of tiles in place of the list.
     gallery: bool,
     source: Source,
@@ -128,6 +130,7 @@ impl CrosshairPicker {
             library_lowered: Vec::new(),
             selected: None,
             compact,
+            fill: false,
             gallery: false,
             source: Source::All,
             width: Rc::new(Cell::new(px(300.))),
@@ -177,6 +180,12 @@ impl CrosshairPicker {
     /// Sets or clears the selection and notifies, as clicking an option does.
     pub fn select(&mut self, crosshair: Option<CrosshairRef>, cx: &mut Context<Self>) {
         self.selected = crosshair;
+        cx.notify();
+    }
+
+    /// Lets the list grow to fill the height its host gives the picker.
+    pub fn set_fill(&mut self, fill: bool, cx: &mut Context<Self>) {
+        self.fill = fill;
         cx.notify();
     }
 
@@ -301,10 +310,25 @@ impl CrosshairPicker {
         })
         .track_scroll(&self.list)
         .test_support()
-        .h(self.list_height())
+        .map(|list| {
+            if self.fill {
+                list.size_full()
+            } else {
+                list.h(self.list_height())
+            }
+        })
         .p_1()
         .pr(BAR_WIDTH);
-        scroll_area(ids::CROSSHAIRS_LIST_SCROLLBAR, &self.list, list).into_any_element()
+        let area = scroll_area(ids::CROSSHAIRS_LIST_SCROLLBAR, &self.list, list);
+        if self.fill {
+            div()
+                .flex_1()
+                .min_h_0()
+                .child(area.size_full())
+                .into_any_element()
+        } else {
+            area.into_any_element()
+        }
     }
 }
 
@@ -558,7 +582,8 @@ impl Render for CrosshairPicker {
         let swatch = self.swatch(swatch_size, cx);
         let list = if rows.is_empty() {
             v_flex()
-                .h(self.list_height())
+                .when(self.fill, |box_| box_.flex_1())
+                .when(!self.fill, |box_| box_.h(self.list_height()))
                 .items_center()
                 .justify_center()
                 .child(labelled(
@@ -571,6 +596,7 @@ impl Render for CrosshairPicker {
             self.list(rows, cx)
         };
         v_flex()
+            .when(self.fill, |picker| picker.size_full())
             .rounded(radius)
             .border_1()
             .border_color(border)

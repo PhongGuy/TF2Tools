@@ -59,6 +59,8 @@ const SOUND_MAX_ROWS: usize = 8;
 const PICKER_MAX_ROWS: usize = 3;
 // Slot cards and gallery items fade to this while editing is locked.
 const LOCKED_OPACITY: f32 = 0.5;
+/// The editor's least height, which still leaves both crosshair lists a few rows each.
+const EDITOR_MIN_HEIGHT: Pixels = px(560.);
 
 enum Job {
     Edit(Edit),
@@ -205,10 +207,15 @@ impl ProfileEditor {
         let player = sound_player(window, cx);
         subscriptions.push(cx.observe(&player, |_, _, cx| cx.notify()));
         // The weapon list waits for a picked crosshair; its clicks and clears save at once.
-        let crosshair_picker = cx.new(|cx| CrosshairPicker::new(true, window, cx));
+        let crosshair_picker = cx.new(|cx| {
+            let mut picker = CrosshairPicker::new(true, window, cx);
+            picker.set_fill(true, cx);
+            picker
+        });
         let assigner = cx.new(|cx| {
             let mut assigner = WeaponAssigner::new(true, cx);
             assigner.set_clearable(true, cx);
+            assigner.set_fill(true, cx);
             assigner
         });
         subscriptions.push(cx.observe(&crosshair_picker, |editor, picker, cx| {
@@ -1039,26 +1046,27 @@ impl ProfileEditor {
     }
 
     // The picked slot's search and gallery, "No matches", or a store pointer for an empty
-    // library. Crosshairs show their picker beside the weapon list, never empty for builtins.
+    // library. Crosshairs stack the full-width class tabs and weapons over the crosshair list,
+    // the two lists sharing the editor's height; never empty for builtins.
     fn picker_column(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let slot = self.selected;
         let key = slot.key();
         if slot == Slot::Crosshairs {
             return Some(
-                h_flex()
+                v_flex()
                     .id(ids::profile_picker(key))
                     .test_support()
                     .flex_1()
                     .min_w_0()
-                    .items_start()
+                    .self_stretch()
                     .gap_4()
+                    .child(div().flex_1().min_h_0().child(self.assigner.clone()))
                     .child(
                         div()
                             .flex_1()
-                            .min_w_0()
+                            .min_h_0()
                             .child(self.crosshair_picker.clone()),
                     )
-                    .child(div().flex_1().min_w_0().child(self.assigner.clone()))
                     .into_any_element(),
             );
         }
@@ -1279,13 +1287,19 @@ impl Render for ProfileEditor {
             .into_iter()
             .map(|slot| self.slot_card(slot, cx))
             .collect();
+        // The editor fills the page so the crosshair lists can grow; below its minimum the page
+        // scrolls instead.
         v_flex()
             .id(ids::PROFILE_EDITOR)
             .test_support()
+            .flex_1()
+            .min_h(EDITOR_MIN_HEIGHT)
             .gap_6()
             .child(self.header(cx))
             .child(
                 h_flex()
+                    .flex_1()
+                    .min_h_0()
                     .items_start()
                     .gap_6()
                     .child(

@@ -1730,3 +1730,36 @@ fn leaving_by_the_sidebar_saves_a_typed_name(cx: &mut TestAppContext) {
         "Pubs"
     );
 }
+
+// At the default 1280x800 window the Crosshairs slot reaches every class tab and lets both
+// lists fill the height the page gives them, rather than v5's dialog-sized boxes.
+#[gpui_kit::test]
+fn the_crosshair_slot_fills_a_1280x800_window(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(1280.), gpui_kit::px(800.)),
+    );
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, comp.id());
+    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
+    let picker = support::bounds_of(cx, s.win, ids::profile_picker("crosshairs")).unwrap();
+    let tabs = TfClass::ALL.map(|class| ids::class_tab(&class.name().to_lowercase()));
+    for control in tabs.into_iter().chain([ids::CROSSHAIRS_BULK_MELEE.into()]) {
+        let b = support::bounds_of(cx, s.win, control.clone()).unwrap();
+        assert!(
+            b.right() <= picker.right() && b.right() <= gpui_kit::px(1280.),
+            "{control} {b:?} runs past the picker {picker:?}"
+        );
+    }
+    for list in [ids::WEAPON_LIST, ids::CROSSHAIRS_LIST] {
+        let b = support::bounds_of(cx, s.win, list).unwrap();
+        assert!(
+            b.size.height >= gpui_kit::px(200.),
+            "{list} is only {:?} tall",
+            b.size.height
+        );
+    }
+}

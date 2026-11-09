@@ -106,6 +106,8 @@ pub struct WeaponAssigner {
     cells: Vec<AssignedCell>,
     state: AssignerState,
     compact: bool,
+    /// The compact list grows to the height its host gives it instead of 144 px.
+    fill: bool,
     /// Whether assigned rows offer a clear button.
     clearable: bool,
     previews: Entity<CrosshairPreviews>,
@@ -155,6 +157,7 @@ impl WeaponAssigner {
             cells: Vec::new(),
             state: AssignerState::default(),
             compact,
+            fill: false,
             clearable: false,
             list_scroll: ScrollHandle::new(),
             previews,
@@ -202,6 +205,12 @@ impl WeaponAssigner {
     /// Shows only `slot`'s rows, or every slot's.
     pub fn set_slot(&mut self, slot: Option<WeaponSlot>, cx: &mut Context<Self>) {
         self.slot = slot;
+        cx.notify();
+    }
+
+    /// Lets the compact list grow to fill the height its host gives the assigner.
+    pub fn set_fill(&mut self, fill: bool, cx: &mut Context<Self>) {
+        self.fill = fill;
         cx.notify();
     }
 
@@ -353,11 +362,24 @@ impl WeaponAssigner {
             .when(self.compact, |list| {
                 list.track_scroll(&self.list_scroll)
                     .overflow_y_scroll()
-                    .h(px(144.))
+                    .map(|list| {
+                        if self.fill {
+                            list.size_full()
+                        } else {
+                            list.h(px(144.))
+                        }
+                    })
                     .pr(BAR_WIDTH)
             })
             .children(rows);
-        if self.compact {
+        if self.compact && self.fill {
+            let area = scroll_area(ids::WEAPON_LIST_SCROLLBAR, &self.list_scroll, list);
+            div()
+                .flex_1()
+                .min_h_0()
+                .child(area.size_full())
+                .into_any_element()
+        } else if self.compact {
             scroll_area(ids::WEAPON_LIST_SCROLLBAR, &self.list_scroll, list).into_any_element()
         } else {
             list.into_any_element()
@@ -469,8 +491,15 @@ impl WeaponAssigner {
                     .child(weapon.display_name()),
             )
             .children(preview)
+            // A margin on top of the row gap keeps a cut-off weapon name off the crosshair's.
             .child(labelled(
-                div().text_xs().text_color(muted).max_w(px(180.)).truncate(),
+                div()
+                    .ml_2()
+                    .min_w_0()
+                    .text_xs()
+                    .text_color(muted)
+                    .max_w(px(180.))
+                    .truncate(),
                 ids::weapon_assigned(script),
                 label,
             ))
@@ -497,6 +526,10 @@ impl WeaponAssigner {
 impl Render for WeaponAssigner {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let bar = self.bar.then(|| self.class_bar(cx));
-        v_flex().gap_4().children(bar).child(self.weapon_list(cx))
+        v_flex()
+            .when(self.fill, |assigner| assigner.size_full())
+            .gap_4()
+            .children(bar)
+            .child(self.weapon_list(cx))
     }
 }
