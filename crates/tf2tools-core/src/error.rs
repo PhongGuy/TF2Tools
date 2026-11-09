@@ -1876,7 +1876,7 @@ pub enum ApplyModulesError {
     /// No addon-store sync has recorded a mastercomfig release yet.
     #[error("no mastercomfig release is known yet")]
     NoRelease,
-    /// The override file comes from the recorded release, which is not the installed one.
+    /// The override file comes from the recorded release, which is newer than the installed one.
     #[error("mastercomfig {installed} is installed but the override file is for {latest}")]
     UpdateWaiting {
         /// The installed mastercomfig version.

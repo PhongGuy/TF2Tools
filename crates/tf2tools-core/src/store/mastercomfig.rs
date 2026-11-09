@@ -290,15 +290,17 @@ impl StoreClient {
                         },
                     })?
                     .ok_or(ApplyModulesError::NoRelease)?;
-                // The release's override belongs to its own version, so it waits for the
-                // update; a hand install whose version could not be read takes it as before.
+                // The release's override belongs to its own version, so it waits for a newer
+                // release to be installed; an unreadable or newer install takes it as before.
                 let installed =
                     installed_version(&self.db).map_err(|e| ApplyModulesError::Database {
                         message: e.to_string(),
                     })?;
                 if let Some(installed) = installed {
                     let (have, want) = (version_parts(&installed), version_parts(release.tag()));
-                    if have.is_some() && want.is_some() && have != want {
+                    if let (Some(have), Some(want)) = (have, want)
+                        && have < want
+                    {
                         return Err(ApplyModulesError::UpdateWaiting {
                             installed,
                             latest: release.tag().to_owned(),

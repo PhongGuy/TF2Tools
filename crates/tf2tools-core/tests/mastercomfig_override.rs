@@ -283,3 +283,16 @@ async fn an_unknown_installed_version_still_swaps_the_override() {
     apply(&env, &tf2, &choices).await.unwrap();
     assert_eq!(overrides(&tf2), ["mastercomfig-addon-override-1.vpk"]);
 }
+
+#[tokio::test]
+async fn an_install_newer_than_the_recorded_release_still_swaps_the_override() {
+    let env = store_env().await;
+    let (_game, tf2) = managed_game(&env);
+    set_mastercomfig_state(&env.dir, "9.100.2", "medium");
+    record_release(&env);
+    serve_overrides(&env).await;
+    let mut choices = Choices::new(Preset::Medium);
+    choices.set(&module_catalog(), "sound", value("low"));
+    apply(&env, &tf2, &choices).await.unwrap();
+    assert_eq!(overrides(&tf2), ["mastercomfig-addon-override-1.vpk"]);
+}
