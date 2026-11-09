@@ -3,9 +3,9 @@
 
 use gpui_kit::ElementId;
 use tf2tools_core::{
-    AddonName, BoardMode, HudId, MeterKind, NewPart, PartKey, PinCorner, Preset, ProfileId, Scene,
-    SceneRule, Screen, SituationSwitch, SoundKind, StoreItemId, StoreKind, TfClass, WeaponKind,
-    WeaponSlot,
+    AddonName, BoardMode, HudId, MeterKind, ModuleChoice, NewPart, PartKey, PinCorner, Preset,
+    ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, StoreItemId, StoreKind,
+    TfClass, WeaponKind, WeaponSlot,
 };
 
 use crate::shell::route::Page;
@@ -793,6 +793,12 @@ pub const GRAPHICS_REMOVE: &str = "graphics-remove";
 pub const GRAPHICS_TAKE_OVER: &str = "graphics-take-over";
 /// "Changes apply the next time TF2 starts.", under the preset cards.
 pub const GRAPHICS_FOOTER: &str = "graphics-footer";
+/// The settings list under the preset cards, present for a managed install with a catalog.
+pub const GRAPHICS_SETTINGS: &str = "graphics-settings";
+/// The note shown in place of the settings list, labelled with its text.
+pub const GRAPHICS_SETTINGS_NOTE: &str = "graphics-settings-note";
+/// "Reset all": drops every setting back to the preset.
+pub const GRAPHICS_RESET_ALL: &str = "graphics-reset-all";
 
 /// The "No TF2 installation found" alert on the Profiles page.
 pub const PROFILES_NO_TF2: &str = "profiles-no-tf2";
@@ -927,6 +933,40 @@ pub fn grid_scrollbar(grid: &str) -> ElementId {
 /// A preset card on the Graphics page: "graphics-preset:<name>".
 pub fn graphics_preset(preset: Preset) -> ElementId {
     keyed("graphics-preset", preset.name())
+}
+
+/// A settings-list category heading: "graphics-category:<key>".
+pub fn graphics_category(key: &str) -> ElementId {
+    keyed("graphics-category", key)
+}
+
+/// A settings row's title, labelled with its text: "graphics-module:<name>".
+pub fn graphics_module(name: &str) -> ElementId {
+    keyed("graphics-module", name)
+}
+
+/// A settings row's description: "graphics-module-description:<name>".
+pub fn graphics_module_description(name: &str) -> ElementId {
+    keyed("graphics-module-description", name)
+}
+
+/// A settings row's value Select: "graphics-module-select:<name>".
+pub fn graphics_module_select(name: &str) -> ElementId {
+    keyed("graphics-module-select", name)
+}
+
+/// A settings row's Reset: "graphics-module-reset:<name>".
+pub fn graphics_module_reset(name: &str) -> ElementId {
+    keyed("graphics-module-reset", name)
+}
+
+/// One entry of a row's Select: "graphics-value:<module>=<value>", empty for Game default.
+pub fn graphics_value(module: &str, choice: &ModuleChoice) -> ElementId {
+    let value = match choice {
+        ModuleChoice::Value(v) => v.as_str(),
+        ModuleChoice::NotSet | _ => "",
+    };
+    keyed("graphics-value", &format!("{module}={value}"))
 }
 
 /// An id for one of many like elements, carrying its stable key: "<kind>:<key>".

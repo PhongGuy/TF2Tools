@@ -544,7 +544,7 @@ fn open_shell(
         picker,
         detector,
         Arc::<RecordingAudio>::clone(&audio),
-        Endpoints::default(),
+        Endpoints::default().with_mastercomfig_data("http://127.0.0.1:9"),
         false,
     )
     .unwrap()
@@ -833,6 +833,17 @@ impl StoreServer {
             .with_github_api(format!("{uri}/gh-api"))
             .with_github(format!("{uri}/gh"))
             .with_preview_prefixes([format!("{uri}/preview/")])
+            .with_mastercomfig_data(format!("{uri}/gh-raw/mastercomfig"))
+    }
+
+    /// Serves the fixture catalog where release `tag`'s settings list is fetched.
+    pub fn mount_mastercomfig_catalog(&self, tag: &str) {
+        let base = format!("/gh-raw/mastercomfig/{tag}/data");
+        self.mount_bytes(&format!("{base}/modules.json"), MC_MODULES.to_vec());
+        self.mount_bytes(
+            &format!("{base}/preset_modules.json"),
+            MC_PRESET_MODULES.to_vec(),
+        );
     }
 
     /// Serves `body` at `{uri}/preview/{gb_id}.mp3` and returns that URL.
@@ -1617,6 +1628,46 @@ pub fn seed_managed_mastercomfig(env: &Env, version: &str, preset: &str) {
             "INSERT OR REPLACE INTO mastercomfig_state (id, version, preset, modules)
              VALUES (1, ?1, ?2, '{}')",
             (version, preset),
+        )
+        .unwrap();
+}
+
+/// Core's trimmed mastercomfig 9.100.1 catalog files.
+pub const MC_MODULES: &[u8] =
+    include_bytes!("../../../tf2tools-core/tests/fixtures/mastercomfig/modules.json");
+pub const MC_PRESET_MODULES: &[u8] =
+    include_bytes!("../../../tf2tools-core/tests/fixtures/mastercomfig/preset_modules.json");
+
+pub fn module_catalog() -> tf2tools_core::ModuleCatalog {
+    tf2tools_core::ModuleCatalog::parse("9.100.1", MC_MODULES, MC_PRESET_MODULES).unwrap()
+}
+
+/// Saves the fixture catalog as release `tag`'s, where the store's cache reads it.
+pub fn seed_mastercomfig_catalog(env: &Env, tag: &str) {
+    let dir = env.data.mastercomfig_dir().join(tag);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("modules.json"), MC_MODULES).unwrap();
+    std::fs::write(dir.join("preset_modules.json"), MC_PRESET_MODULES).unwrap();
+}
+
+/// Sets the saved module choices of a managed install, as JSON (`{"fpscap":"120","lod":null}`).
+pub fn seed_mastercomfig_choices(env: &Env, modules: &str) {
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute("UPDATE mastercomfig_state SET modules = ?1", [modules])
+        .unwrap();
+}
+
+/// Points the recorded release's three override assets at `{uri}/gh/mastercomfig/`.
+pub fn seed_mastercomfig_overrides(env: &Env, uri: &str) {
+    let urls: Vec<String> = (1..=3)
+        .map(|n| format!("{uri}/gh/mastercomfig/mastercomfig-addon-override-{n}.vpk"))
+        .collect();
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute(
+            "UPDATE mastercomfig_release SET override_urls = ?1",
+            [serde_json::to_string(&urls).unwrap()],
         )
         .unwrap();
 }
