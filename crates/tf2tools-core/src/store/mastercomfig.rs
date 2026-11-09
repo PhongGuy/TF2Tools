@@ -36,6 +36,32 @@ fn check_tag(tag: &str) -> Result<(), ModuleCatalogError> {
     Ok(())
 }
 
+/// A dotted numeric version as numbers, ignoring a leading "v" and trailing zero parts (so
+/// 9.100 equals 9.100.0); None if any part isn't a number.
+fn version_parts(tag: &str) -> Option<Vec<u64>> {
+    let tag = tag.strip_prefix('v').unwrap_or(tag);
+    let mut parts: Vec<u64> = tag
+        .split('.')
+        .map(|part| part.parse().ok())
+        .collect::<Option<_>>()?;
+    while parts.last() == Some(&0) {
+        parts.pop();
+    }
+    Some(parts)
+}
+
+/// The recorded version of the managed install, if there is one.
+fn installed_version(db: &crate::db::Database) -> rusqlite::Result<Option<String>> {
+    db.read(|conn| {
+        conn.query_row(
+            "SELECT version FROM mastercomfig_state WHERE id = 1",
+            [],
+            |r| r.get(0),
+        )
+        .optional()
+    })
+}
+
 /// Why a VPK download failed; mapped into the base install's and the override swap's errors.
 #[derive(Debug)]
 enum FetchFailure {
@@ -272,6 +298,24 @@ impl StoreClient {
                         },
                     })?
                     .ok_or(ApplyModulesError::NoRelease)?;
+                // The release's override belongs to its own version, so it waits until the
+                // installed version catches up with the release; an unreadable or newer
+                // install takes it as before.
+                let installed =
+                    installed_version(&self.db).map_err(|e| ApplyModulesError::Database {
+                        message: e.to_string(),
+                    })?;
+                if let Some(installed) = installed {
+                    let (have, want) = (version_parts(&installed), version_parts(release.tag()));
+                    if let (Some(have), Some(want)) = (have, want)
+                        && have < want
+                    {
+                        return Err(ApplyModulesError::UpdateWaiting {
+                            installed,
+                            latest: release.tag().to_owned(),
+                        });
+                    }
+                }
                 let url = release
                     .override_url(mask)
                     .ok_or(ApplyModulesError::NoRelease)?;

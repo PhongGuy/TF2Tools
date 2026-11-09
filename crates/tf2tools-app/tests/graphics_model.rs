@@ -127,4 +127,9 @@ fn only_a_newer_release_is_offered_as_an_update() {
     assert_eq!(offered("9.100.1", "9.100.1"), None);
     assert_eq!(offered("unknown", "9.100.1").as_deref(), Some("9.100.1"));
     assert_eq!(offered("9.100.1", "nightly"), None);
+    assert_eq!(
+        offered("v9.100.1", "9.100.1"),
+        None,
+        "a leading v is ignored"
+    );
 }
