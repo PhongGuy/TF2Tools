@@ -29,10 +29,13 @@ use md5::{Digest, Md5};
 use rusqlite::OptionalExtension;
 
 use crate::db::Database;
-use crate::error::{FilesError, QueryError, SyncError};
+use crate::error::{BrowseError, FilesError, QueryError, SyncError};
 use crate::paths::DataDir;
 use crate::weapons::Weapon;
-pub use addon_catalog::{AddonCard, AddonSort};
+pub use addon_catalog::{
+    AddonCard, AddonCatalog, AddonCursor, AddonQuery, AddonSort, AddonStep, INDEX_STEP_CALLS,
+    SEARCH_STEP_CALLS, STEP_CARDS,
+};
 pub use addon_sections::AddonSection;
 pub use cards::{StoreCard, StoreCursor, StoreQuery, StoreSort};
 pub use download::{DownloadPhase, DownloadProgress};
@@ -643,6 +646,11 @@ impl StoreClient {
         .await
     }
 
+    /// Live add-on browsing over this client's GameBanana pacer.
+    pub fn addon_catalog(&self) -> addon_catalog::AddonCatalog {
+        addon_catalog::AddonCatalog::new(self.clone())
+    }
+
     /// True when this client's config refuses every request off loopback.
     pub fn is_loopback_only(&self) -> bool {
         self.config.loopback_only
@@ -760,6 +768,16 @@ impl From<GbFailure> for SyncError {
     fn from(failure: GbFailure) -> Self {
         match failure {
             GbFailure::Throttled { url } => SyncError::Throttled { url },
+            GbFailure::Net(net) => net.into(),
+        }
+    }
+}
+
+/// Throttled stays Throttled; a network failure maps as `NetFailure` does.
+impl From<GbFailure> for BrowseError {
+    fn from(failure: GbFailure) -> Self {
+        match failure {
+            GbFailure::Throttled { url } => BrowseError::Throttled { url },
             GbFailure::Net(net) => net.into(),
         }
     }

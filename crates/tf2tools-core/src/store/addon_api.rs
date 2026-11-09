@@ -1,5 +1,4 @@
 //! GameBanana Mod Index URLs and the listing parser behind the Addon Store.
-#![cfg_attr(not(test), expect(dead_code, reason = "the catalog arrives in Task 3"))]
 
 use serde_json::Value;
 
