@@ -1533,3 +1533,36 @@ pub fn in_own_process(test: &str) -> bool {
     );
     false
 }
+
+/// A `mastercomfig-base.vpk` whose `cfg/comfig/echo.cfg` names `version`, as a release carries it.
+pub fn mastercomfig_base(version: &str) -> Vec<u8> {
+    let echo =
+        format!("alias version_comfig\"echo mastercomfig version: {version} | July 3, 2026\"\n");
+    vpk_bytes(&[("cfg/comfig/echo.cfg", echo.as_bytes())])
+}
+
+/// Records release `tag` with its base at `{uri}/gh/mastercomfig/mastercomfig-base.vpk`.
+pub fn seed_mastercomfig_release(env: &Env, uri: &str, tag: &str) {
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute(
+            "INSERT OR REPLACE INTO mastercomfig_release (id, tag, base_url, override_urls)
+             VALUES (1, ?1, ?2, '[null,null,null]')",
+            (tag, format!("{uri}/gh/mastercomfig/mastercomfig-base.vpk")),
+        )
+        .unwrap();
+}
+
+/// Puts `version`'s base VPK in the env's tf/custom and records it as managed on `preset`.
+pub fn seed_managed_mastercomfig(env: &Env, version: &str, preset: &str) {
+    let base = env.game.join("tf/custom/mastercomfig-base.vpk");
+    std::fs::write(base, mastercomfig_base(version)).unwrap();
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute(
+            "INSERT OR REPLACE INTO mastercomfig_state (id, version, preset, modules)
+             VALUES (1, ?1, ?2, '{}')",
+            (version, preset),
+        )
+        .unwrap();
+}

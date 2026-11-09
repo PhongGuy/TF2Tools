@@ -183,6 +183,18 @@ impl Confirm {
         }
     }
 
+    /// The prompt before removing mastercomfig from TF2.
+    pub fn remove_mastercomfig() -> Self {
+        Self {
+            title: "Remove mastercomfig".into(),
+            description:
+                "This removes mastercomfig and the preset you picked from TF2. Your own config files stay."
+                    .into(),
+            confirm_label: "Remove".into(),
+            cancel_label: "Cancel".into(),
+        }
+    }
+
     /// The prompt before activating a profile while TF2 runs.
     pub fn tf2_running() -> Self {
         Self {
