@@ -715,3 +715,21 @@ pub fn seed_v5_profile(env: &LibraryEnv) {
         )
         .expect("seed v5 profile");
 }
+
+/// A `mastercomfig-base.vpk` whose `cfg/comfig/echo.cfg` names `version` as a release does.
+pub fn mastercomfig_base(version: &str) -> Vec<u8> {
+    let echo =
+        format!("alias version_comfig\"echo mastercomfig version: {version} | July 3, 2026\"\n");
+    vpk_bytes(&[("cfg/comfig/echo.cfg", echo.as_bytes())])
+}
+
+/// Records mastercomfig as TF2Tools-managed at `version` on `preset`, as an install leaves it.
+pub fn set_mastercomfig_state(dir: &DataDir, version: &str, preset: &str) {
+    sql(dir)
+        .execute(
+            "INSERT OR REPLACE INTO mastercomfig_state (id, version, preset, modules)
+             VALUES (1, ?1, ?2, '{}')",
+            [version, preset],
+        )
+        .expect("state row");
+}

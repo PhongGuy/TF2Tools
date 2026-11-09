@@ -40,10 +40,11 @@ pub use error::{
     ApplyProfileError, ArchiveError, BorrowSourceError, CatalogError, CopyHudError, DataDirError,
     DetectError, DownloadError, FilesError, FontCheckError, FontInstallError, HistoryError,
     HudFilesError, HudLoadError, ImageError, ImportError, InstallError, KeepHudError, KvParseError,
-    LibraryError, LogError, MakeHudError, MapDownloadError, MapRemoveError, OpenError, PaintError,
-    PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
-    ReinstallError, SchemaError, SettingsError, SyncError, UpdateApplyError, UpdateCheckError,
-    UpdateCopyError, UpdateDownloadError, VpkError, VtfError, WavError,
+    LibraryError, LogError, MakeHudError, MapDownloadError, MapRemoveError,
+    MastercomfigStatusError, OpenError, PaintError, PngReadError, PngWriteError, PresetError,
+    PreviewError, ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError,
+    SchemaError, SettingsError, SyncError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
+    UpdateDownloadError, VpkError, VtfError, WavError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
@@ -86,11 +87,11 @@ pub use library::{
     AddonEntry, AddonName, ApplyProfileReport, ApplyReport, ApplyStep, Assignment, CrosshairEntry,
     CrosshairFormat, CrosshairId, CrosshairRef, DraftCrosshair, DraftSlot, ExternalHud, GbId,
     HudAssets, HudEntry, HudId, HudInstall, HudStatus, InstalledCrosshairs, InstalledSound,
-    InstalledSounds, Library, LibraryEntry, MadeHud, MakeTarget, MissingItem, MissingKind,
-    PaintTarget, PaintedSource, PresetEntry, Profile, ProfileCrosshair, ProfileCrosshairRef,
-    ProfileDraft, ProfileId, ProfileItem, ProfileUpdate, Provenance, Recovery, Reinstall, SavedHud,
-    SkipReason, SkippedAssignment, SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind,
-    crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
+    InstalledSounds, Library, LibraryEntry, MadeHud, MakeTarget, MastercomfigStatus, MissingItem,
+    MissingKind, PaintTarget, PaintedSource, Preset, PresetEntry, Profile, ProfileCrosshair,
+    ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate, Provenance, Recovery,
+    Reinstall, SavedHud, SkipReason, SkippedAssignment, SoundConflict, SoundEntry, SoundFormat,
+    SoundId, SoundKind, crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
 };
 pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};

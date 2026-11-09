@@ -1666,3 +1666,44 @@ pub enum SchemaError {
         reason: String,
     },
 }
+
+/// Why mastercomfig's install state could not be read.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum MastercomfigStatusError {
+    /// The library database failed.
+    #[error("library database error: {message}")]
+    Database {
+        /// The database's message.
+        message: String,
+    },
+}
+
+/// Why mastercomfig could not be removed from `tf/custom`.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum RemoveMastercomfigError {
+    /// TF2Tools did not install this mastercomfig, so it leaves it alone.
+    #[error("mastercomfig was not installed by TF2Tools")]
+    NotManaged,
+    /// The game folder (`tf/`) is no longer where the install was found.
+    #[error("Team Fortress 2 is no longer at {path}")]
+    GameMissing {
+        /// The `tf` folder that is gone.
+        path: PathBuf,
+    },
+    /// A file could not be read or removed.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// The library database failed.
+    #[error("library database error: {message}")]
+    Database {
+        /// The database's message.
+        message: String,
+    },
+}
