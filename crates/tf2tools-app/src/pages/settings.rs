@@ -585,8 +585,6 @@ pub fn format_hours(hours: u32) -> String {
     }
 }
 
-// The Licences card's content: a toggle and, while shown, a scrollable box with each notice's
-// title over its full text.
 // Saves the moment it flips, outside "Save Settings", as the add-on tabs relist on it.
 fn mature_switch(cx: &mut App) -> AnyElement {
     let mature = MatureAddons::global(cx);
@@ -597,6 +595,8 @@ fn mature_switch(cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
+// The Licences card's content: a toggle and, while shown, a scrollable box with each notice's
+// title over its full text.
 fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyElement {
     let theme = cx.theme();
     let shown = page.show_notices;
