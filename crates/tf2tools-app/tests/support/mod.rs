@@ -1319,6 +1319,16 @@ impl StoreServer {
         );
     }
 
+    /// Mod `gb_id`'s ProfilePage.
+    pub fn mount_gb_profile(&self, gb_id: u64, body: serde_json::Value) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(format!("/apiv11/Mod/{gb_id}/ProfilePage")))
+                .respond_with(ResponseTemplate::new(200).set_body_json(body))
+                .mount(&self.server),
+        );
+    }
+
     /// GameBanana's Mod search, page `page`, whatever the text.
     pub fn mount_gb_search(&self, page: u32, body: Vec<u8>) {
         self.rt.block_on(

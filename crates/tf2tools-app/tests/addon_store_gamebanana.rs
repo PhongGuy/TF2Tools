@@ -414,3 +414,115 @@ fn mature_items_hide_until_shown_then_blur_until_clicked(cx: &mut TestAppContext
         w.services.db.settings().unwrap().show_mature_addons()
     });
 }
+
+#[gpui_kit::test]
+fn a_card_opens_its_detail_with_downloads_credits_files_and_ratings(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_index(
+        587,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(8, 587, None)], true),
+    );
+    server.mount_gb_profile(8, serde_json::json!({
+        "_idRow": 8, "_sName": "Addon 8", "_sText": "<p>Hello</p>", "_nDownloadCount": 1234, "_bIsObsolete": true,
+        "_aSubmitter": {"_sName": "vex"}, "_sProfileUrl": "https://gamebanana.com/mods/8",
+        "_aContentRatings": {"sa": "Skimpy Attire"},
+        "_aCredits": [{"_sGroupName": "Key Authors", "_aAuthors": [{"_sName": "vex", "_sRole": "Modeller"}]}],
+        "_aFiles": [{"_idRow": 2, "_sFile": "new.zip", "_nFilesize": 2048, "_tsDateAdded": 200, "_sAvResult": "clean", "_sDownloadUrl": "https://gamebanana.com/dl/2"}]
+    }));
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "textures");
+    settled(cx, &tab, "the first step");
+    support::click_id(cx, w.win, ids::addon_gb_card("textures", GbId::new(8)));
+    support::wait_real(cx, "the profile", |cx| {
+        support::present(cx, w.win, ids::ADDON_DETAIL_DOWNLOADS)
+    });
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_NAME).as_deref(),
+        Some("Addon 8")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_DOWNLOADS).as_deref(),
+        Some("1,234 downloads")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_RATINGS).as_deref(),
+        Some("Mature content: Skimpy Attire")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_DESCRIPTION).as_deref(),
+        Some("Hello")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::addon_detail_credit(0, 0)).as_deref(),
+        Some("vex (Modeller)")
+    );
+    assert!(
+        support::label_of(cx, w.win, ids::addon_detail_file(0))
+            .unwrap()
+            .starts_with("new.zip")
+    );
+    assert!(support::present(cx, w.win, ids::ADDON_DETAIL_OUTDATED));
+    assert!(support::present(
+        cx,
+        w.win,
+        ids::store_detail_link("gamebanana")
+    ));
+}
+
+#[gpui_kit::test]
+fn a_trashed_item_says_it_is_gone_and_keeps_its_link(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_index(
+        587,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(5, 587, None)], true),
+    );
+    server.mount_gb_profile(
+        5,
+        serde_json::json!({"_idRow": 5, "_sName": "x", "_bIsTrashed": true}),
+    );
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "textures");
+    settled(cx, &tab, "the first step");
+    support::click_id(cx, w.win, ids::addon_gb_card("textures", GbId::new(5)));
+    support::wait_real(cx, "the failure", |cx| {
+        support::present(cx, w.win, ids::ADDON_DETAIL_ERROR)
+    });
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_ERROR).as_deref(),
+        Some("This item is no longer on GameBanana.")
+    );
+    assert!(support::present(
+        cx,
+        w.win,
+        ids::store_detail_link("gamebanana")
+    ));
+}
+
+#[gpui_kit::test]
+fn a_failed_step_shows_retry_and_retry_loads(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_status("/apiv11/Mod/Index", 503);
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "skins");
+    settled(cx, &tab, "the failure");
+    assert_eq!(
+        support::label_of(cx, w.win, ids::STORE_ERROR).as_deref(),
+        Some("GameBanana is having problems right now. Try again later.")
+    );
+    server.reset();
+    server.mount_gb_index(
+        7951,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(1, 7951, None)], true),
+    );
+    support::click_id(cx, w.win, ids::STORE_RETRY);
+    support::wait_real(cx, "the retry", |cx| {
+        cx.update(|cx| tab.read(cx).cards().len() == 1)
+    });
+    assert!(!support::present(cx, w.win, ids::STORE_ERROR));
+}

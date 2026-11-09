@@ -22,6 +22,7 @@ use tf2tools_core::{
 };
 
 use super::card::{CARD_TEXT_HEIGHT, OpenAddon, gb_addon_card};
+use crate::addon_detail::open_addon_detail;
 use crate::addon_feed::{AddonFeed, Keyed, StepAfter};
 use crate::ids;
 use crate::mature::MatureAddons;
@@ -33,6 +34,7 @@ use crate::store_messages::{StoreFailure, describe_browse, listing_stopped};
 use crate::tokio_bridge;
 use crate::widgets::card_grid::{CardGrid, SHELL_CHROME_WIDTH, columns_for_store};
 use crate::widgets::label_option::LabelOption;
+use crate::widgets::store_error::store_error_line;
 
 /// The most columns an add-on grid lays out.
 const MAX_COLUMNS: usize = 4;
@@ -461,8 +463,12 @@ impl AddonTab {
         cx.notify();
     }
 
-    /// Opens item `id`'s detail.
-    pub fn open(&mut self, _id: GbId, _cx: &mut Context<Self>) {}
+    /// Clears the failure and runs the failed step again from where it stopped.
+    pub fn retry(&mut self, cx: &mut Context<Self>) {
+        self.error = None;
+        self.next_step(cx);
+        cx.notify();
+    }
 
     // The section in the tab's order, narrowed to the weapon or else the subcategory, with
     // mature items as the setting says.
@@ -738,9 +744,9 @@ impl AddonTab {
                     RemoteImages::global(cx).map(|images| images.read(cx).image(&key))
                 });
                 let id = card.id;
-                let tab = this.clone();
-                let open: OpenAddon = Rc::new(move |_, cx: &mut App| {
-                    let _ = tab.update(cx, |tab, cx| tab.open(id, cx));
+                let opened = card.clone();
+                let open: OpenAddon = Rc::new(move |window, cx: &mut App| {
+                    open_addon_detail(&opened, window, cx);
                 });
                 let tab = this.clone();
                 let reveal = blurred.then(|| -> OpenAddon {
@@ -755,10 +761,22 @@ impl AddonTab {
 
 impl Render for AddonTab {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // A failed step's message sits above the grid, or alone before the first card.
+        let error = self.error.clone().map(|message| {
+            let this = cx.entity().downgrade();
+            store_error_line(
+                message,
+                move |_, cx| {
+                    let _ = this.update(cx, |tab, cx| tab.retry(cx));
+                },
+                cx,
+            )
+        });
         v_flex()
             .size_full()
             .gap_6()
             .child(self.toolbar(cx))
+            .children(error)
             .children(self.body(window, cx))
     }
 }

@@ -769,6 +769,10 @@ pub const ADDON_DETAIL_ERROR: &str = "addon-detail-error";
 pub const ADDON_DETAIL_RETRY: &str = "addon-detail-retry";
 /// The add-on detail's "Outdated" badge.
 pub const ADDON_DETAIL_OUTDATED: &str = "addon-detail-outdated";
+/// The add-on detail's scrolled body under its header.
+pub const ADDON_DETAIL_BODY: &str = "addon-detail-body";
+/// The scrollbar beside `ADDON_DETAIL_BODY`.
+pub const ADDON_DETAIL_SCROLLBAR: &str = "addon-detail-scrollbar";
 /// The Settings "Show mature add-ons" switch.
 pub const SETTINGS_MATURE_ADDONS: &str = "settings-mature-addons";
 /// Wraps the Activity Log's category select.

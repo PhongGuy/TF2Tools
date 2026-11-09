@@ -2,6 +2,7 @@
 #![forbid(unsafe_code)]
 
 pub mod activity;
+pub mod addon_detail;
 pub mod addon_feed;
 pub mod addon_updates;
 pub mod app;
