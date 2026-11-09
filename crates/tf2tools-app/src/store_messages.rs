@@ -167,6 +167,22 @@ pub fn listing_stopped(detail: String) -> StoreFailure {
     StoreFailure::new(FILES_STOPPED, detail)
 }
 
+/// An add-on listing step that ended without an outcome, keeping `detail` for the log.
+pub fn addons_stopped(detail: String) -> StoreFailure {
+    StoreFailure::new(
+        "Loading add-ons stopped before it finished. Try again.",
+        detail,
+    )
+}
+
+/// An add-on profile read that ended without an outcome, keeping `detail` for the log.
+pub fn addon_stopped(detail: String) -> StoreFailure {
+    StoreFailure::new(
+        "Loading this add-on stopped before it finished. Try again.",
+        detail,
+    )
+}
+
 /// A failed preview fetch in player words; previews only come from GameBanana.
 pub fn describe_preview(err: &PreviewError) -> StoreFailure {
     let message = match err {

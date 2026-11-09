@@ -4,9 +4,9 @@ use std::path::PathBuf;
 
 use tf2tools_app::services::OpError;
 use tf2tools_app::store_messages::{
-    StoreFailure, describe_browse, describe_download, describe_files, describe_install,
-    describe_preview, describe_store_read, download_stopped, listing_stopped, no_tf2, preview_gone,
-    preview_unavailable, release_has_no_file,
+    StoreFailure, addon_stopped, addons_stopped, describe_browse, describe_download,
+    describe_files, describe_install, describe_preview, describe_store_read, download_stopped,
+    listing_stopped, no_tf2, preview_gone, preview_unavailable, release_has_no_file,
 };
 use tf2tools_core::{
     ArchiveError, BrowseError, DownloadError, FilesError, GbId, ImportError, InstallError,
@@ -564,4 +564,24 @@ fn browse_failures_speak_of_gamebanana() {
         assert_eq!(failure, StoreFailure::new(message, err.to_string()));
         support::assert_plain(&failure.message);
     }
+}
+
+#[test]
+fn a_stopped_add_on_task_names_add_ons_not_files() {
+    assert_eq!(
+        addons_stopped("join error".to_owned()),
+        StoreFailure::new(
+            "Loading add-ons stopped before it finished. Try again.",
+            "join error"
+        )
+    );
+    assert_eq!(
+        addon_stopped("join error".to_owned()),
+        StoreFailure::new(
+            "Loading this add-on stopped before it finished. Try again.",
+            "join error"
+        )
+    );
+    support::assert_plain(&addons_stopped("join error".to_owned()).message);
+    support::assert_plain(&addon_stopped("join error".to_owned()).message);
 }

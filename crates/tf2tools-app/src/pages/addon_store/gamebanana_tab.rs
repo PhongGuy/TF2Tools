@@ -30,7 +30,7 @@ use crate::pages::common::{SkeletonTop, empty_state_card, skeleton_cards};
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::Services;
 use crate::store_grid::SEARCH_DEBOUNCE;
-use crate::store_messages::{StoreFailure, describe_browse, listing_stopped};
+use crate::store_messages::{StoreFailure, addons_stopped, describe_browse};
 use crate::tokio_bridge;
 use crate::widgets::card_grid::{CardGrid, SHELL_CHROME_WIDTH, columns_for_store};
 use crate::widgets::label_option::LabelOption;
@@ -567,7 +567,7 @@ impl AddonTab {
             Ok(Err(err)) => self.fail(generation, describe_browse(&err)),
             Err(_) => self.fail(
                 generation,
-                listing_stopped("the add-on listing task stopped unexpectedly".to_owned()),
+                addons_stopped("the add-on listing task stopped unexpectedly".to_owned()),
             ),
         }
         self.want_thumbnails(cx);

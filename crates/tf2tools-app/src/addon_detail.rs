@@ -19,7 +19,7 @@ use crate::pages::addon_store::model::downloads_label;
 use crate::pages::common::badge_of;
 use crate::services::Services;
 use crate::store_download::format_bytes;
-use crate::store_messages::{describe_browse, listing_stopped};
+use crate::store_messages::{addon_stopped, describe_browse};
 use crate::tokio_bridge;
 use crate::widgets::carousel::Carousel;
 use crate::widgets::dialog_frame::{BOX_CHROME, DETAIL_WIDTH, DialogFrame};
@@ -82,7 +82,7 @@ impl AddonDetail {
             let result = match job.await {
                 Ok(Ok(profile)) => Ok(profile),
                 Ok(Err(err)) => Err(describe_browse(&err)),
-                Err(_) => Err(listing_stopped(
+                Err(_) => Err(addon_stopped(
                     "the add-on profile task stopped unexpectedly".to_owned(),
                 )),
             }
