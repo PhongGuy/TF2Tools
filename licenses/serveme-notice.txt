@@ -1,0 +1,6 @@
+serveme.tf
+
+The community map list on the Maps page, and the map files it downloads, come from
+serveme.tf (https://serveme.tf). Each map belongs to its makers.
+
+TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with serveme.tf.

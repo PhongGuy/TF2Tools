@@ -1,0 +1,10 @@
+GameBanana
+
+The HUDs, sounds, crosshairs and other items in the GameBanana stores, with their
+pictures and descriptions, come from GameBanana (https://gamebanana.com), which is owned
+and run by GameBanana Co LLC. Each item belongs to the creators credited on its
+GameBanana page. TF2Tools only shows the item and downloads it from GameBanana for you;
+it claims no rights to it.
+
+TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with GameBanana
+or GameBanana Co LLC.
