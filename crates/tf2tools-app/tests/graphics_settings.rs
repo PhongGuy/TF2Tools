@@ -6,7 +6,8 @@ use gpui_kit::TestAppContext;
 use support::graphics::{found, open, server_shell, shown, value, wait_for_list};
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::model::{SettingsNote, settings_note_text};
-use tf2tools_core::{ModuleChoice, Preset};
+use tf2tools_app::shell::route::Page;
+use tf2tools_core::{MastercomfigStatus, ModuleChoice, Preset};
 
 fn note(cx: &mut TestAppContext, s: &support::ShellWindow) -> Option<String> {
     support::label_of(cx, s.win, ids::GRAPHICS_SETTINGS_NOTE)
@@ -110,6 +111,52 @@ fn offline_the_list_says_it_needs_the_internet_once(cx: &mut TestAppContext) {
     assert!(
         support::present(cx, s.win, ids::graphics_preset(Preset::High)),
         "presets still work"
+    );
+}
+
+#[gpui_kit::test]
+fn an_offline_note_asks_again_on_the_next_visit(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_status("/gh-raw/mastercomfig/9.100.1/data/modules.json", 500);
+    let s = server_shell(cx, &env, &server);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    let _page = open(cx, &s);
+    let offline = settings_note_text(SettingsNote::Offline);
+    support::wait_real(cx, "the offline note", |cx| {
+        note(cx, &s).as_deref() == Some(offline)
+    });
+    server.reset();
+    server.mount_mastercomfig_catalog("9.100.1");
+    support::click_nav(cx, s.win, Page::Huds);
+    support::settle(cx, s.win);
+    let page = open(cx, &s);
+    wait_for_list(cx, &s, &page);
+    assert_eq!(shown(cx, &page, "lod"), Some(value("medium")));
+}
+
+#[gpui_kit::test]
+fn saved_settings_it_cannot_read_still_load_the_page(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    // A blob where the JSON text belongs: the status still reads, the choices do not.
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute("UPDATE mastercomfig_state SET modules = X'7B7D'", [])
+        .unwrap();
+    let page = open(cx, &s);
+    assert!(matches!(
+        cx.update(|cx| page.read(cx).status().cloned()),
+        Some(MastercomfigStatus::Managed { .. })
+    ));
+    wait_for_list(cx, &s, &page);
+    assert_eq!(shown(cx, &page, "lod"), Some(value("medium")));
+    assert!(
+        !support::toast_labels(cx, s.win)
+            .iter()
+            .any(|t| t.contains("Failed to load mastercomfig"))
     );
 }
 

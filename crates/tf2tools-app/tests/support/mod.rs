@@ -977,6 +977,11 @@ impl StoreServer {
         self.mount_bytes(MASTERCOMFIG_RELEASE_ROUTE, body.to_string().into_bytes());
     }
 
+    /// Forgets every mounted answer, so later mounts take over.
+    pub fn reset(&self) {
+        self.rt.block_on(self.server.reset());
+    }
+
     /// Answers every GET of `route` with `status` and an empty body.
     pub fn mount_status(&self, route: &str, status: u16) {
         self.rt.block_on(

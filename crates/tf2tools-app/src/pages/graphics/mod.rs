@@ -461,10 +461,11 @@ impl GraphicsPage {
                 .map_err(|e| describe_store_status(&e).into_op(failed))?;
             let (choices, catalog) = match &status {
                 Some(MastercomfigStatus::Managed { version, .. }) => {
-                    let choices = s
-                        .library
-                        .mastercomfig_choices()
-                        .map_err(|e| model::describe_status(&e).into_op(failed))?;
+                    // Unreadable choices show the preset's values rather than failing the page.
+                    let choices = s.library.mastercomfig_choices().unwrap_or_else(|e| {
+                        tracing::warn!("mastercomfig settings: {e}");
+                        None
+                    });
                     let catalog = (held.as_deref() != Some(version.as_str()))
                         .then(|| s.store.cached_mastercomfig_catalog(version))
                         .flatten();
