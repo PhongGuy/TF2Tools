@@ -331,10 +331,17 @@ impl WeaponAssigner {
         h_flex()
             .flex_wrap()
             .gap_2()
+            // In a host's fill mode the tabs wrap inside the pill rather than leave a narrow window.
             .child(
                 h_flex()
                     .flex_none()
-                    .h(px(36.))
+                    .map(|pill| {
+                        if self.fill {
+                            pill.flex_wrap().max_w_full()
+                        } else {
+                            pill.h(px(36.))
+                        }
+                    })
                     .p(px(3.))
                     .rounded_lg()
                     .bg(theme.muted)

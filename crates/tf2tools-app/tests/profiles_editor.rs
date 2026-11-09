@@ -1058,8 +1058,8 @@ fn scout_first() -> &'static str {
         .script_name()
 }
 
-/// Brings `script`'s row to the top of the compact weapon list when it is out of view, by
-/// wheeling the list over its first Scout row, then clicks `target`.
+/// Brings `script`'s row to the top of the compact weapon list unless it lies wholly inside
+/// the list, by wheeling the list over its first Scout row, then clicks `target`.
 fn click_in_row(
     cx: &mut TestAppContext,
     s: &support::ShellWindow,
@@ -1068,12 +1068,10 @@ fn click_in_row(
 ) {
     let row = ids::weapon_row(script);
     support::settle(cx, s.win);
-    let visible = cx
-        .update_window(s.win, |_, w, _| {
-            w.try_find(row.clone()).is_some_and(|e| e.visible())
-        })
-        .unwrap();
-    if !visible {
+    let list = support::bounds_of(cx, s.win, ids::WEAPON_LIST).expect("the weapon list");
+    let inside = support::bounds_of(cx, s.win, row.clone())
+        .is_some_and(|b| b.top() >= list.top() && b.bottom() <= list.bottom());
+    if !inside {
         let first = ids::weapon_row(scout_first());
         let top = support::bounds_of(cx, s.win, first.clone()).expect("the first row");
         let at = support::bounds_of(cx, s.win, row.clone()).expect("the row");
@@ -1761,5 +1759,49 @@ fn the_crosshair_slot_fills_a_1280x800_window(cx: &mut TestAppContext) {
             "{list} is only {:?} tall",
             b.size.height
         );
+    }
+}
+
+// Down to the app's 800x600 minimum the editor keeps its controls and every class tab inside
+// the window's width, scrolling the page for height, and the picker stays usable.
+#[gpui_kit::test]
+fn the_editor_fits_narrow_windows(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, comp.id());
+    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
+    for (w, h) in [(800., 600.), (1024., 700.)] {
+        cx.simulate_window_resize(s.win, gpui_kit::size(gpui_kit::px(w), gpui_kit::px(h)));
+        support::settle(cx, s.win);
+        let picker = support::bounds_of(cx, s.win, ids::profile_picker("crosshairs")).unwrap();
+        assert!(
+            picker.size.width >= gpui_kit::px(240.),
+            "at {w}x{h} the picker is squeezed to {picker:?}"
+        );
+        let slots = ["hud", "hitsound", "killsound", "crosshairs"].map(ids::profile_slot);
+        let header = [
+            ids::PROFILE_EDITOR_NAME,
+            ids::PROFILE_EDITOR_ACTIVATE,
+            ids::PROFILE_EDITOR_DELETE,
+        ]
+        .map(ElementId::from);
+        let tabs = TfClass::ALL.map(|class| ids::class_tab(&class.name().to_lowercase()));
+        for control in slots.into_iter().chain(header).chain(tabs) {
+            let b = support::bounds_of(cx, s.win, control.clone()).unwrap();
+            assert!(
+                b.left() >= gpui_kit::px(0.) && b.right() <= gpui_kit::px(w),
+                "at {w}x{h} {control} {b:?} leaves the window"
+            );
+        }
+        let tabs = TfClass::ALL.map(|class| ids::class_tab(&class.name().to_lowercase()));
+        for tab in tabs {
+            let b = support::bounds_of(cx, s.win, tab.clone()).unwrap();
+            assert!(
+                b.right() <= picker.right(),
+                "at {w}x{h} {tab} {b:?} runs past the picker {picker:?}"
+            );
+        }
     }
 }

@@ -61,6 +61,11 @@ const PICKER_MAX_ROWS: usize = 3;
 const LOCKED_OPACITY: f32 = 0.5;
 /// The editor's least height, which still leaves both crosshair lists a few rows each.
 const EDITOR_MIN_HEIGHT: Pixels = px(560.);
+/// Below this window width the slot cards stack above the picker, which would otherwise be
+/// squeezed beside them.
+const STACK_BELOW: Pixels = px(1100.);
+/// The stacked crosshair picker's height, which the page scrolls to.
+const STACKED_PICKER_HEIGHT: Pixels = px(520.);
 
 enum Job {
     Edit(Edit),
@@ -1048,7 +1053,7 @@ impl ProfileEditor {
     // The picked slot's search and gallery, "No matches", or a store pointer for an empty
     // library. Crosshairs stack the full-width class tabs and weapons over the crosshair list,
     // the two lists sharing the editor's height; never empty for builtins.
-    fn picker_column(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn picker_column(&self, stacked: bool, cx: &mut Context<Self>) -> Option<AnyElement> {
         let slot = self.selected;
         let key = slot.key();
         if slot == Slot::Crosshairs {
@@ -1059,6 +1064,9 @@ impl ProfileEditor {
                     .flex_1()
                     .min_w_0()
                     .self_stretch()
+                    .when(stacked, |column| {
+                        column.flex_none().h(STACKED_PICKER_HEIGHT)
+                    })
                     .gap_4()
                     .child(div().flex_1().min_h_0().child(self.assigner.clone()))
                     .child(
@@ -1282,34 +1290,36 @@ impl ProfileEditor {
 }
 
 impl Render for ProfileEditor {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let slots: Vec<AnyElement> = Slot::ALL
             .into_iter()
             .map(|slot| self.slot_card(slot, cx))
             .collect();
-        // The editor fills the page so the crosshair lists can grow; below its minimum the page
-        // scrolls instead.
+        // Side by side, the editor fills the page so the crosshair lists can grow, and the page
+        // scrolls below its minimum. Stacked, it takes its content's height and the page scrolls.
+        let stacked = window.viewport_size().width < STACK_BELOW;
+        let body = if stacked {
+            v_flex().items_stretch()
+        } else {
+            h_flex().flex_1().min_h_0().items_start()
+        };
         v_flex()
             .id(ids::PROFILE_EDITOR)
             .test_support()
-            .flex_1()
-            .min_h(EDITOR_MIN_HEIGHT)
+            .when(!stacked, |editor| editor.flex_1().min_h(EDITOR_MIN_HEIGHT))
+            .when(stacked, |editor| editor.flex_none())
             .gap_6()
             .child(self.header(cx))
             .child(
-                h_flex()
-                    .flex_1()
-                    .min_h_0()
-                    .items_start()
-                    .gap_6()
+                body.gap_6()
                     .child(
                         v_flex()
                             .flex_none()
-                            .w(SLOT_COLUMN_WIDTH)
+                            .when(!stacked, |slots| slots.w(SLOT_COLUMN_WIDTH))
                             .gap_3()
                             .children(slots),
                     )
-                    .children(self.picker_column(cx)),
+                    .children(self.picker_column(stacked, cx)),
             )
     }
 }
