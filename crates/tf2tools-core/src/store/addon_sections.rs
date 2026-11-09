@@ -12,7 +12,7 @@ pub struct AddonSection {
 }
 
 impl AddonSection {
-    /// Every section, in sidebar order. GUIs hides HUDs and Effects hides hitsounds,
+    /// Every section, in tab order. GUIs hides HUDs and Effects hides crosshairs,
     /// since those have their own stores.
     pub const ALL: [AddonSection; 5] = [
         Self::new("skins", "Skins", 7951, &[], SKIN_CLASSES),
