@@ -677,3 +677,23 @@ fn a_busy_host_keeps_the_clear_button_inert(cx: &mut TestAppContext) {
     support::click_id(cx, win, ids::weapon_clear("tf_weapon_scattergun"));
     assert!(cleared.borrow().is_empty());
 }
+
+// A clearable list keeps an empty box where an unassigned row's clear button would sit, so the
+// assigned labels line up; a list without clear buttons keeps no such box.
+#[gpui_kit::test]
+fn a_clearable_list_keeps_its_trailing_column_aligned(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (win, assigner, _) = open(cx, &env, false);
+    let right = |cx: &mut TestAppContext, script: &str| {
+        support::bounds_of(cx, win, ids::weapon_assigned(script))
+            .unwrap()
+            .right()
+    };
+    scattergun_cell(cx, &assigner, false);
+    let plain = right(cx, "tf_weapon_scattergun");
+    assert_eq!(right(cx, "tf_weapon_pistol_scout"), plain);
+    scattergun_cell(cx, &assigner, true);
+    let clearable = right(cx, "tf_weapon_scattergun");
+    assert!(clearable < plain);
+    assert_eq!(right(cx, "tf_weapon_pistol_scout"), clearable);
+}

@@ -361,8 +361,8 @@ impl WeaponAssigner {
 
     // One weapon: its wiki icon in a slot-coloured frame, or the slot square, and dot,
     // name, the assigned crosshair's preview and name, and a check mark when assigned, or a
-    // spinner in its slot while this weapon is being assigned. Dimmed and inert without a
-    // selection or while the host is busy.
+    // spinner in its slot while this weapon is being assigned. Inert, and its content dimmed,
+    // without a selection or while the host is busy.
     fn weapon_row(&self, weapon: &'static Weapon, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         let (muted, primary, hover) = (theme.muted_foreground, theme.primary, theme.accent);
@@ -396,8 +396,11 @@ impl WeaponAssigner {
             div().flex_none().size(px(14.)).into_any_element()
         };
         // The clear button works without a selection, and stops its click so the row behind
-        // it never assigns.
-        let clear = (self.clearable && cell.is_some()).then(|| {
+        // it never assigns. An unassigned row keeps a same-size empty box so the column lines up.
+        let clear = self.clearable.then(|| {
+            if cell.is_none() {
+                return div().flex_none().size_5().into_any_element();
+            }
             Button::new(ids::weapon_clear(script))
                 .ghost()
                 .xsmall()
@@ -408,6 +411,7 @@ impl WeaponAssigner {
                     cx.stop_propagation();
                     cx.emit(ClearRequested { script });
                 }))
+                .into_any_element()
         });
         let active = self.state.has_selection && !self.state.busy;
         let icon = (!self.compact).then(|| {
@@ -443,13 +447,12 @@ impl WeaponAssigner {
                 }
             }
         });
-        h_flex()
-            .id(ids::weapon_row(script))
-            .aria_label(weapon.display_name())
-            .test_support()
+        // Only the row's content dims; the clear button beside it still works.
+        let content = h_flex()
+            .flex_1()
+            .min_w_0()
             .gap(px(8.))
-            .px_2()
-            .py(px(6.))
+            .when(!active, |content| content.opacity(0.5))
             .children(icon)
             .child(div().flex_none().size(px(8.)).rounded_full().bg(dot))
             .child(
@@ -466,18 +469,22 @@ impl WeaponAssigner {
                 ids::weapon_assigned(script),
                 label,
             ))
-            .child(check)
+            .child(check);
+        h_flex()
+            .id(ids::weapon_row(script))
+            .aria_label(weapon.display_name())
+            .test_support()
+            .gap(px(8.))
+            .px_2()
+            .py(px(6.))
+            .child(content)
             .children(clear)
-            .map(|row| {
-                if active {
-                    row.cursor_pointer()
-                        .hover(|row| row.bg(hover))
-                        .on_click(cx.listener(move |assigner, _, _, cx| {
-                            assigner.request(AssignTarget::Weapon(script), cx)
-                        }))
-                } else {
-                    row.opacity(0.5)
-                }
+            .when(active, |row| {
+                row.cursor_pointer()
+                    .hover(|row| row.bg(hover))
+                    .on_click(cx.listener(move |assigner, _, _, cx| {
+                        assigner.request(AssignTarget::Weapon(script), cx)
+                    }))
             })
     }
 }
