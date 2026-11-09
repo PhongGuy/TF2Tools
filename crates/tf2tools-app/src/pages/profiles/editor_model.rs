@@ -2,7 +2,8 @@
 //! profile starts with.
 
 use tf2tools_core::{
-    CrosshairRef, DraftCrosshair, DraftSlot, HudId, Profile, ProfileDraft, SoundId, SoundKind,
+    BuiltinCrosshairs, CrosshairEntry, CrosshairRef, DraftCrosshair, DraftSlot, HudId, MissingItem,
+    MissingKind, Profile, ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, SoundId, SoundKind,
 };
 
 /// One of the editor's four slots, in page order.
@@ -117,4 +118,95 @@ pub fn next_profile_name(profiles: &[Profile]) -> String {
         n += 1;
     }
     format!("Profile {n}")
+}
+
+/// What a slot shows: nothing, its item, or an item the library no longer has.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SlotState {
+    Empty,
+    Set(String),
+    Missing(String),
+}
+
+/// HUD and sounds: the item's name, Missing when `missing` holds that slot's kind, else Empty.
+/// Crosshairs: Set(weapon_count(n)) or Empty; a missing crosshair shows on its weapon row.
+pub fn slot_state(profile: &Profile, slot: Slot, missing: &[MissingItem]) -> SlotState {
+    let (item, kind) = match slot {
+        Slot::Hud => (profile.hud(), MissingKind::Hud),
+        Slot::Hitsound => (profile.hitsound(), MissingKind::Hitsound),
+        Slot::Killsound => (profile.killsound(), MissingKind::Killsound),
+        Slot::Crosshairs => {
+            let n = profile.crosshairs().len();
+            return if n == 0 {
+                SlotState::Empty
+            } else {
+                SlotState::Set(weapon_count(n))
+            };
+        }
+    };
+    match item {
+        None => SlotState::Empty,
+        Some(item) if missing.iter().any(|m| *m.kind() == kind) => {
+            SlotState::Missing(item.name().to_owned())
+        }
+        Some(item) => SlotState::Set(item.name().to_owned()),
+    }
+}
+
+/// Empty: "None" ("Default crosshairs" for Crosshairs); Set: the text; Missing: "Missing: <name>".
+pub fn slot_text(state: &SlotState, slot: Slot) -> String {
+    match state {
+        SlotState::Empty if slot == Slot::Crosshairs => "Default crosshairs".to_owned(),
+        SlotState::Empty => "None".to_owned(),
+        SlotState::Set(text) => text.clone(),
+        SlotState::Missing(name) => format!("Missing: {name}"),
+    }
+}
+
+/// "1 weapon", "N weapons".
+pub fn weapon_count(n: usize) -> String {
+    if n == 1 {
+        "1 weapon".to_owned()
+    } else {
+        format!("{n} weapons")
+    }
+}
+
+/// A kept crosshair's label: the builtin's display name, the library crosshair's name by
+/// folder, or "{name or folder} (missing)".
+pub fn keep_label(
+    saved: &ProfileCrosshair,
+    builtins: &BuiltinCrosshairs,
+    library: &[CrosshairEntry],
+) -> String {
+    match saved.crosshair() {
+        ProfileCrosshairRef::Builtin(name) => builtins
+            .get(name)
+            .map(|b| b.display_name().to_owned())
+            .unwrap_or_else(|| format!("{name} (missing)")),
+        ProfileCrosshairRef::Library { folder_name } => library
+            .iter()
+            .find(|c| c.folder_name() == folder_name)
+            .map(|c| c.name().to_owned())
+            .unwrap_or_else(|| format!("{folder_name} (missing)")),
+        _ => "Unknown (missing)".to_owned(),
+    }
+}
+
+/// (weapon script, keep_label) for each saved crosshair, in the profile's order.
+pub fn crosshair_labels(
+    profile: &Profile,
+    builtins: &BuiltinCrosshairs,
+    library: &[CrosshairEntry],
+) -> Vec<(String, String)> {
+    profile
+        .crosshairs()
+        .iter()
+        .map(|c| {
+            (
+                c.weapon_script().to_owned(),
+                keep_label(c, builtins, library),
+            )
+        })
+        .collect()
 }

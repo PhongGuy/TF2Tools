@@ -864,6 +864,34 @@ pub const PROFILES_MISSING_DESCRIPTION: &str = "profiles-missing-description";
 pub const PROFILES_MISSING_CANCEL: &str = "profiles-missing-cancel";
 /// The Missing Items dialog's "Install Anyway (skip missing)" button.
 pub const PROFILES_MISSING_INSTALL: &str = "profiles-missing-install";
+/// The New profile main button, which saves the current setup as a new profile.
+pub const PROFILES_NEW: &str = "profiles-new";
+/// The New button's menu trigger.
+pub const PROFILES_NEW_MENU: &str = "profiles-new-menu";
+/// The New menu's "Start empty" item.
+pub const PROFILES_NEW_EMPTY: &str = "profiles-new-empty";
+/// The empty page's New button.
+pub const PROFILES_EMPTY_NEW: &str = "profiles-empty-new";
+/// The empty page's "Start empty" button.
+pub const PROFILES_EMPTY_START_EMPTY: &str = "profiles-empty-start-empty";
+/// The profile editor's root.
+pub const PROFILE_EDITOR: &str = "profile-editor";
+/// The editor's Back button, which returns to the grid.
+pub const PROFILE_EDITOR_BACK: &str = "profile-editor-back";
+/// The editor's name field.
+pub const PROFILE_EDITOR_NAME: &str = "profile-editor-name";
+/// The line under the name field when another profile has that name.
+pub const PROFILE_EDITOR_NAME_TAKEN: &str = "profile-editor-name-taken";
+/// The editor's Activate button.
+pub const PROFILE_EDITOR_ACTIVATE: &str = "profile-editor-activate";
+/// The editor's "Active" badge, shown when the open profile is active.
+pub const PROFILE_EDITOR_ACTIVE_BADGE: &str = "profile-editor-active-badge";
+/// The editor's Delete button.
+pub const PROFILE_EDITOR_DELETE: &str = "profile-editor-delete";
+/// The note that an edit deactivated the profile, so its changes are not in the game yet.
+pub const PROFILE_EDITOR_NOT_APPLIED: &str = "profile-editor-not-applied";
+/// The HUD picker's card grid.
+pub const PROFILE_PICKER_GRID: &str = "profile-picker-grid";
 
 /// The Create New / Edit profile wizard dialog.
 pub const WIZARD_DIALOG: &str = "wizard-dialog";
@@ -1144,6 +1172,61 @@ pub fn profile_edit(id: &ProfileId) -> ElementId {
 /// A card's Delete button, keyed by the profile id: "profile-delete:<id>".
 pub fn profile_delete(id: &ProfileId) -> ElementId {
     keyed(PROFILE_DELETE, id.as_str())
+}
+
+/// An editor slot row, keyed by the slot: "profile-slot:<slot>".
+pub fn profile_slot(slot: &str) -> ElementId {
+    keyed("profile-slot", slot)
+}
+
+/// An editor slot's clear button: "profile-slot-clear:<slot>".
+pub fn profile_slot_clear(slot: &str) -> ElementId {
+    keyed("profile-slot-clear", slot)
+}
+
+/// A sound slot's play button: "profile-slot-play:<slot>".
+pub fn profile_slot_play(slot: &str) -> ElementId {
+    keyed("profile-slot-play", slot)
+}
+
+/// A slot's missing-item note: "profile-slot-missing:<slot>".
+pub fn profile_slot_missing(slot: &str) -> ElementId {
+    keyed("profile-slot-missing", slot)
+}
+
+/// A slot's picker: "profile-picker:<slot>".
+pub fn profile_picker(slot: &str) -> ElementId {
+    keyed("profile-picker", slot)
+}
+
+/// A picker's search field: "profile-picker-search:<slot>".
+pub fn profile_picker_search(slot: &str) -> ElementId {
+    keyed("profile-picker-search", slot)
+}
+
+/// A picker's empty-library note: "profile-picker-empty:<slot>".
+pub fn profile_picker_empty(slot: &str) -> ElementId {
+    keyed("profile-picker-empty", slot)
+}
+
+/// An empty picker's button to the store: "profile-picker-store:<slot>".
+pub fn profile_picker_store(slot: &str) -> ElementId {
+    keyed("profile-picker-store", slot)
+}
+
+/// A HUD card in the picker, keyed by folder: "profile-pick-hud:<folder>".
+pub fn profile_pick_hud(folder: &str) -> ElementId {
+    keyed("profile-pick-hud", folder)
+}
+
+/// A sound row in a sound slot's picker: "profile-pick-sound:<slot>:<folder>".
+pub fn profile_pick_sound(slot: &str, folder: &str) -> ElementId {
+    keyed("profile-pick-sound", &format!("{slot}:{folder}"))
+}
+
+/// A picker sound row's play button: "profile-pick-play:<folder>".
+pub fn profile_pick_play(folder: &str) -> ElementId {
+    keyed("profile-pick-play", folder)
 }
 
 /// A wizard stepper circle: "wizard-step:<1..4>".

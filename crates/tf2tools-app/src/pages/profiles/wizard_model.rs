@@ -5,10 +5,11 @@ use std::collections::BTreeMap;
 
 use gpui_kit::SharedString;
 use tf2tools_core::{
-    Assignment, BuiltinCrosshairs, CrosshairEntry, CrosshairRef, DraftCrosshair, DraftSlot,
-    HudEntry, HudId, LogLevel, NewLogEntry, Profile, ProfileCrosshair, ProfileCrosshairRef,
-    ProfileItem, SoundEntry, SoundId,
+    Assignment, CrosshairRef, DraftCrosshair, DraftSlot, HudEntry, HudId, LogLevel, NewLogEntry,
+    Profile, ProfileCrosshair, ProfileItem, SoundEntry, SoundId,
 };
+
+pub use super::editor_model::keep_label;
 
 /// One of the wizard's four steps, in order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -275,26 +276,5 @@ pub fn draft_crosshairs(
                 CustomCrosshair::Keep(saved) => DraftCrosshair::Keep(saved.clone()),
             })
             .collect(),
-    }
-}
-
-/// A kept crosshair's label: the builtin's display name, the library crosshair's name by
-/// folder, or "{name or folder} (missing)".
-pub fn keep_label(
-    saved: &ProfileCrosshair,
-    builtins: &BuiltinCrosshairs,
-    library: &[CrosshairEntry],
-) -> String {
-    match saved.crosshair() {
-        ProfileCrosshairRef::Builtin(name) => builtins
-            .get(name)
-            .map(|b| b.display_name().to_owned())
-            .unwrap_or_else(|| format!("{name} (missing)")),
-        ProfileCrosshairRef::Library { folder_name } => library
-            .iter()
-            .find(|c| c.folder_name() == folder_name)
-            .map(|c| c.name().to_owned())
-            .unwrap_or_else(|| format!("{folder_name} (missing)")),
-        _ => "Unknown (missing)".to_owned(),
     }
 }

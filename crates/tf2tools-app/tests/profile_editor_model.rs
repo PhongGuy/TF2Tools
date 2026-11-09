@@ -3,7 +3,10 @@
 
 use crate::support;
 
-use tf2tools_app::pages::profiles::editor_model::{Edit, Slot, next_profile_name};
+use tf2tools_app::pages::profiles::editor_model::{
+    Edit, Slot, SlotState, crosshair_labels, keep_label, next_profile_name, slot_state, slot_text,
+    weapon_count,
+};
 use tf2tools_app::services::Services;
 use tf2tools_core::{
     CrosshairRef, DraftCrosshair, DraftSlot, HudEntry, Profile, ProfileDraft, Provenance,
@@ -201,4 +204,113 @@ fn clearing_a_weapon_drops_only_that_entry() {
         Edit::ClearWeapon("tf_weapon_bat".into()).draft(&f.comp),
         keep()
     );
+}
+
+#[test]
+fn slots_have_stable_keys_and_labels() {
+    let keys: Vec<_> = Slot::ALL.iter().map(|s| (s.key(), s.label())).collect();
+    assert_eq!(
+        keys,
+        [
+            ("hud", "HUD"),
+            ("hitsound", "Hitsound"),
+            ("killsound", "Killsound"),
+            ("crosshairs", "Crosshairs")
+        ]
+    );
+    assert_eq!(weapon_count(1), "1 weapon");
+    assert_eq!(weapon_count(2), "2 weapons");
+}
+
+#[test]
+fn slot_texts_name_the_item_say_none_or_say_missing() {
+    let f = fixture();
+    let texts = |p: &Profile, missing| -> Vec<String> {
+        Slot::ALL
+            .iter()
+            .map(|&slot| slot_text(&slot_state(p, slot, missing), slot))
+            .collect()
+    };
+    let hud_name = f.comp.hud().unwrap().name().to_owned();
+    assert_eq!(
+        texts(&f.comp, &[]),
+        [
+            hud_name.clone(),
+            "Ding".into(),
+            "Bell".into(),
+            "1 weapon".into()
+        ]
+    );
+    let vanilla =
+        f.s.library
+            .create_profile(&ProfileDraft::new("Vanilla"))
+            .unwrap();
+    assert_eq!(
+        texts(&vanilla, &[]),
+        ["None", "None", "None", "Default crosshairs"]
+    );
+
+    let rayshud =
+        f.s.library
+            .list_huds()
+            .unwrap()
+            .into_iter()
+            .find(|h| h.folder_name() == f.comp.hud().unwrap().folder_name())
+            .unwrap();
+    f.s.library.delete_hud(rayshud.id()).unwrap();
+    let missing = f.s.library.missing_items(f.comp.id()).unwrap();
+    assert_eq!(
+        slot_state(&f.comp, Slot::Hud, &missing),
+        SlotState::Missing(hud_name.clone())
+    );
+    assert_eq!(texts(&f.comp, &missing)[0], format!("Missing: {hud_name}"));
+    assert_eq!(
+        slot_state(&f.comp, Slot::Hitsound, &missing),
+        SlotState::Set("Ding".into())
+    );
+}
+
+#[test]
+fn crosshair_labels_name_builtins_library_and_missing() {
+    let env = support::env();
+    let s = support::services(&env, support::no_steam());
+    let first = s.builtins.all()[0].clone();
+    let png = env.tmp.path().join("z.png");
+    std::fs::write(&png, support::crosshair_png([255, 0, 0, 255])).unwrap();
+    let zebra = s
+        .library
+        .import_crosshair(&png, "Zebra", Provenance::Local)
+        .unwrap();
+    let draft = ProfileDraft::new("P").with_crosshairs(vec![
+        DraftCrosshair::Set {
+            weapon_script: "tf_weapon_scattergun".into(),
+            crosshair: CrosshairRef::Builtin(first.name().into()),
+        },
+        DraftCrosshair::Set {
+            weapon_script: "tf_weapon_rocketlauncher".into(),
+            crosshair: CrosshairRef::Library(zebra.id().clone()),
+        },
+    ]);
+    let profile = s.library.create_profile(&draft).unwrap();
+    let library = s.library.list_crosshairs().unwrap();
+    let mut labels = crosshair_labels(&profile, &s.builtins, &library);
+    labels.sort();
+    assert_eq!(
+        labels,
+        [
+            ("tf_weapon_rocketlauncher".to_owned(), "Zebra".to_owned()),
+            (
+                "tf_weapon_scattergun".to_owned(),
+                first.display_name().to_owned()
+            ),
+        ]
+    );
+    s.library.delete_crosshair(zebra.id()).unwrap();
+    let library = s.library.list_crosshairs().unwrap();
+    let rocket = profile
+        .crosshairs()
+        .iter()
+        .find(|c| c.weapon_script() == "tf_weapon_rocketlauncher")
+        .unwrap();
+    assert!(keep_label(rocket, &s.builtins, &library).ends_with(" (missing)"));
 }

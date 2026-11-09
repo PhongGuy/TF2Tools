@@ -723,3 +723,78 @@ fn situation_switch_ids_name_each_switch() {
     );
     assert_eq!(ids::HUD_MAKER_MINMODE_CHIP, "hud-maker-minmode-chip");
 }
+
+#[test]
+fn profile_editor_ids_are_stable() {
+    for (el, want) in [
+        (ids::profile_slot("hud"), "profile-slot:hud"),
+        (
+            ids::profile_slot_clear("crosshairs"),
+            "profile-slot-clear:crosshairs",
+        ),
+        (
+            ids::profile_slot_play("hitsound"),
+            "profile-slot-play:hitsound",
+        ),
+        (
+            ids::profile_slot_missing("killsound"),
+            "profile-slot-missing:killsound",
+        ),
+        (ids::profile_picker("hud"), "profile-picker:hud"),
+        (
+            ids::profile_picker_search("hud"),
+            "profile-picker-search:hud",
+        ),
+        (
+            ids::profile_picker_empty("hitsound"),
+            "profile-picker-empty:hitsound",
+        ),
+        (ids::profile_picker_store("hud"), "profile-picker-store:hud"),
+        (ids::profile_pick_hud("rayshud"), "profile-pick-hud:rayshud"),
+        (
+            ids::profile_pick_sound("killsound", "bell"),
+            "profile-pick-sound:killsound:bell",
+        ),
+        (ids::profile_pick_play("bell"), "profile-pick-play:bell"),
+        (
+            ids::weapon_clear("tf_weapon_bat"),
+            "weapon-clear:tf_weapon_bat",
+        ),
+    ] {
+        assert_eq!(name(el), want);
+    }
+    assert_eq!(
+        [
+            ids::PROFILES_NEW,
+            ids::PROFILES_NEW_MENU,
+            ids::PROFILES_NEW_EMPTY,
+            ids::PROFILES_EMPTY_NEW,
+            ids::PROFILES_EMPTY_START_EMPTY,
+            ids::PROFILE_EDITOR,
+            ids::PROFILE_EDITOR_BACK,
+            ids::PROFILE_EDITOR_NAME,
+            ids::PROFILE_EDITOR_NAME_TAKEN,
+            ids::PROFILE_EDITOR_ACTIVATE,
+            ids::PROFILE_EDITOR_ACTIVE_BADGE,
+            ids::PROFILE_EDITOR_DELETE,
+            ids::PROFILE_EDITOR_NOT_APPLIED,
+            ids::PROFILE_PICKER_GRID,
+        ],
+        [
+            "profiles-new",
+            "profiles-new-menu",
+            "profiles-new-empty",
+            "profiles-empty-new",
+            "profiles-empty-start-empty",
+            "profile-editor",
+            "profile-editor-back",
+            "profile-editor-name",
+            "profile-editor-name-taken",
+            "profile-editor-activate",
+            "profile-editor-active-badge",
+            "profile-editor-delete",
+            "profile-editor-not-applied",
+            "profile-picker-grid",
+        ]
+    );
+}
