@@ -18,12 +18,12 @@ use gpui_kit::{
     Window, div, px, transparent_black,
 };
 use tf2tools_core::{
-    HudEntry, LibraryError, MissingItem, Profile, ProfileError, ProfileId, ProfileUpdate,
-    SoundEntry, SoundKind,
+    CrosshairEntry, HudEntry, LibraryError, MissingItem, Profile, ProfileError, ProfileId,
+    ProfileUpdate, SoundEntry, SoundKind,
 };
 
 use super::ProfilesPage;
-use super::editor_model::{Edit, Slot, SlotState, slot_state, slot_text};
+use super::editor_model::{Edit, Slot, SlotState, crosshair_labels, slot_state, slot_text};
 use super::model;
 use crate::audio::player::{NowPlaying, Player, sound_player};
 use crate::ids;
@@ -33,10 +33,15 @@ use crate::pages::common::{SM_ICON_PX, badge_of, card_frame};
 use crate::pages::huds::{card_images, hud_picture, hud_title};
 use crate::pages::sounds::{play_button, sound_key, sound_title};
 use crate::remote_images::{ImageKey, RemoteImages};
-use crate::services::{OpError, run_blocking, tf2_state};
+use crate::services::{OpError, Services, run_blocking, tf2_state};
+use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::card_grid::CardGrid;
+use crate::widgets::crosshair_picker::CrosshairPicker;
+use crate::widgets::weapon_assigner::{
+    AssignRequested, AssignedCell, AssignerState, ClearRequested, WeaponAssigner,
+};
 use crate::widgets::{Named as _, labelled};
 
 // A HUD card's name row under its 16:9 picture.
@@ -60,6 +65,7 @@ enum Done {
 struct Galleries {
     huds: Rc<[HudEntry]>,
     sounds: Rc<[SoundEntry]>,
+    crosshairs: Rc<[CrosshairEntry]>,
     images: Rc<HashMap<String, String>>,
 }
 
@@ -101,6 +107,8 @@ pub struct ProfileEditor {
     image_viewer: String,
     /// The app's floating player, which plays the previews.
     player: Entity<Player>,
+    crosshair_picker: Entity<CrosshairPicker>,
+    assigner: Entity<WeaponAssigner>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -175,6 +183,28 @@ impl ProfileEditor {
         // The play icons read the player's sound, so redraw when it starts or ends.
         let player = sound_player(window, cx);
         subscriptions.push(cx.observe(&player, |_, _, cx| cx.notify()));
+        // The weapon list waits for a picked crosshair; its clicks and clears save at once.
+        let crosshair_picker = cx.new(|cx| CrosshairPicker::new(true, window, cx));
+        let assigner = cx.new(|cx| {
+            let mut assigner = WeaponAssigner::new(true, cx);
+            assigner.set_clearable(true, cx);
+            assigner
+        });
+        subscriptions.push(cx.observe(&crosshair_picker, |editor, _, cx| editor.sync_assigner(cx)));
+        subscriptions.push(
+            cx.subscribe(&assigner, |editor, _, event: &AssignRequested, cx| {
+                let Some(crosshair) = editor.crosshair_picker.read(cx).selected().cloned() else {
+                    return;
+                };
+                let scripts = event.scripts.iter().map(|s| (*s).to_owned()).collect();
+                editor.enqueue(Edit::Assign { scripts, crosshair }, cx);
+            }),
+        );
+        subscriptions.push(
+            cx.subscribe(&assigner, |editor, _, event: &ClearRequested, cx| {
+                editor.enqueue(Edit::ClearWeapon(event.script.to_owned()), cx)
+            }),
+        );
         let mut grid = CardGrid::new(ids::PROFILE_PICKER_GRID);
         let this = cx.entity().downgrade();
         grid.on_visible(move |range, cx| {
@@ -204,8 +234,11 @@ impl ProfileEditor {
             visible: 0..0,
             image_viewer,
             player,
+            crosshair_picker,
+            assigner,
             _subscriptions: subscriptions,
         };
+        editor.relabel(cx);
         editor.load_galleries(cx);
         editor.queue_refresh();
         editor.pump(cx);
@@ -257,8 +290,9 @@ impl ProfileEditor {
             let failed = |e: LibraryError| describe_library(&e).into_op("Failed to load library");
             let huds = s.library.list_huds().map_err(failed)?;
             let sounds = s.library.list_sounds().map_err(failed)?;
+            let crosshairs = s.library.list_crosshairs().map_err(failed)?;
             let images = card_images(s, &huds);
-            Ok((huds, sounds, images))
+            Ok((huds, sounds, crosshairs, images))
         });
         let win = self.win;
         cx.spawn(async move |editor, cx| {
@@ -270,12 +304,18 @@ impl ProfileEditor {
                             return;
                         }
                         match loaded {
-                            Ok((huds, sounds, images)) => {
+                            Ok((huds, sounds, crosshairs, images)) => {
+                                let crosshairs: Rc<[CrosshairEntry]> = crosshairs.into();
+                                editor.crosshair_picker.update(cx, |picker, cx| {
+                                    picker.set_library(Rc::clone(&crosshairs), cx)
+                                });
                                 editor.galleries = Some(Galleries {
                                     huds: huds.into(),
                                     sounds: sounds.into(),
+                                    crosshairs,
                                     images: Rc::new(images),
                                 });
+                                editor.relabel(cx);
                             }
                             Err(err) => toast_error(window, cx, &err),
                         }
@@ -286,6 +326,47 @@ impl ProfileEditor {
             });
         })
         .detach();
+    }
+
+    /// The Crosshairs slot's compact picker.
+    pub fn picker(&self) -> &Entity<CrosshairPicker> {
+        &self.crosshair_picker
+    }
+
+    /// The Crosshairs slot's compact, clearable weapon list.
+    pub fn assigner(&self) -> &Entity<WeaponAssigner> {
+        &self.assigner
+    }
+
+    // Shows each saved crosshair on its weapon row, by name or "(missing)".
+    fn relabel(&self, cx: &mut Context<Self>) {
+        let library = self
+            .galleries
+            .as_ref()
+            .map(|g| &g.crosshairs[..])
+            .unwrap_or(&[]);
+        let builtins = &cx.global::<Services>().builtins;
+        let cells = crosshair_labels(&self.saved, builtins, library)
+            .into_iter()
+            .map(|(script, label)| AssignedCell {
+                script,
+                label,
+                crosshair: None,
+            })
+            .collect();
+        self.assigner
+            .update(cx, |assigner, cx| assigner.set_assigned(cells, cx));
+    }
+
+    // The weapon rows and bulk buttons act only while a crosshair is picked.
+    fn sync_assigner(&self, cx: &mut Context<Self>) {
+        let state = AssignerState {
+            has_selection: self.crosshair_picker.read(cx).selected().is_some(),
+            busy: false,
+            running: None,
+        };
+        self.assigner
+            .update(cx, |assigner, cx| assigner.set_state(state, cx));
     }
 
     // The library HUDs whose name holds the search text.
@@ -497,11 +578,13 @@ impl ProfileEditor {
             }
             // The picked item left the library since the gallery loaded.
             Ok(Done::Saved(
-                edit @ (Edit::SetHud(_) | Edit::SetSound(..)),
+                edit @ (Edit::SetHud(_) | Edit::SetSound(..) | Edit::Assign { .. }),
                 Err(ProfileError::ItemNotFound { .. }),
             )) => {
                 let title = if let Edit::SetHud(_) = edit {
                     "That HUD is no longer in your library"
+                } else if let Edit::Assign { .. } = edit {
+                    "That crosshair is no longer in your library"
                 } else {
                     "That sound is no longer in your library"
                 };
@@ -529,6 +612,7 @@ impl ProfileEditor {
             }
             Err(err) => toast_error(window, cx, &err),
         }
+        self.relabel(cx);
         cx.notify();
     }
 
@@ -757,9 +841,13 @@ impl ProfileEditor {
                 .px(SM_ICON_PX)
                 .icon(IconName::X)
                 .named("Clear")
-                .on_click(cx.listener(move |editor, _, _, cx| {
+                .on_click(cx.listener(move |editor, _, window, cx| {
                     cx.stop_propagation();
-                    editor.enqueue(Edit::ClearSlot(slot), cx);
+                    if slot == Slot::Crosshairs {
+                        editor.clear_crosshairs(window, cx);
+                    } else {
+                        editor.enqueue(Edit::ClearSlot(slot), cx);
+                    }
                 }))
         });
         card_frame(cx)
@@ -788,11 +876,42 @@ impl ProfileEditor {
             .into_any_element()
     }
 
+    // Every crosshair in a profile goes at once, so Clear asks first.
+    fn clear_crosshairs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let answer = confirm(Confirm::clear_profile_crosshairs(), window, cx);
+        cx.spawn(async move |editor, cx| {
+            if answer.recv().await.unwrap_or(false) {
+                let _ = editor.update(cx, |editor, cx| editor.enqueue(Edit::ClearCrosshairs, cx));
+            }
+        })
+        .detach();
+    }
+
     // The picked slot's search over its gallery, or a pointer to the store while the library
-    // has nothing for it. Crosshairs bring their own picker.
-    fn picker(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    // has nothing for it. Crosshairs show their own picker beside the weapon list; builtins are
+    // always listed, so they have no empty state.
+    fn picker_column(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let slot = self.selected;
         let key = slot.key();
+        if slot == Slot::Crosshairs {
+            return Some(
+                h_flex()
+                    .id(ids::profile_picker(key))
+                    .test_support()
+                    .flex_1()
+                    .min_w_0()
+                    .items_start()
+                    .gap_4()
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .child(self.crosshair_picker.clone()),
+                    )
+                    .child(div().flex_1().min_w_0().child(self.assigner.clone()))
+                    .into_any_element(),
+            );
+        }
         let galleries = self.galleries.as_ref()?;
         let (empty, empty_text, store_text, store) = match slot {
             Slot::Hud => (
@@ -982,7 +1101,7 @@ impl Render for ProfileEditor {
                             .gap_3()
                             .children(slots),
                     )
-                    .children(self.picker(cx)),
+                    .children(self.picker_column(cx)),
             )
     }
 }

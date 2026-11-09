@@ -233,3 +233,15 @@ fn delete_crosshair_says_what_happens_to_its_weapons() {
         assert_eq!(spec.cancel_label.as_ref(), "Cancel");
     }
 }
+
+#[test]
+fn clear_profile_crosshairs_asks_before_removing_them_all() {
+    let spec = Confirm::clear_profile_crosshairs();
+    assert_eq!(spec.title.as_ref(), "Clear Crosshairs");
+    assert_eq!(
+        spec.description.as_ref(),
+        "Remove all crosshairs from this profile?"
+    );
+    assert_eq!(spec.confirm_label.as_ref(), "Clear all");
+    assert_eq!(spec.cancel_label.as_ref(), "Cancel");
+}

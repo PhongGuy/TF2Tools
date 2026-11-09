@@ -5,6 +5,9 @@ use std::path::{Path, PathBuf};
 
 use crate::support;
 
+use gpui_kit::ElementId;
+use gpui_kit::ScrollDelta;
+use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::library_events::LibraryEvents;
@@ -15,8 +18,8 @@ use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    CrosshairRef, DraftCrosshair, DraftSlot, HudEntry, Profile, ProfileDraft, ProfileId,
-    Provenance, SoundEntry, Tf2Install,
+    CrosshairRef, DraftCrosshair, DraftSlot, HudEntry, Profile, ProfileCrosshairRef, ProfileDraft,
+    ProfileId, Provenance, SoundEntry, Tf2Install, TfClass, weapons,
 };
 
 fn tf2(env: &support::Env) -> Tf2Install {
@@ -953,4 +956,255 @@ fn a_deleted_item_shows_missing(cx: &mut TestAppContext) {
         ids::profile_slot_play("hitsound")
     ));
     wait_idle(cx, &s, &editor);
+}
+
+fn scout_first() -> &'static str {
+    weapons()
+        .iter()
+        .find(|w| w.class() == TfClass::Scout)
+        .unwrap()
+        .script_name()
+}
+
+/// Brings `script`'s row to the top of the compact weapon list when it is out of view, by
+/// wheeling the list over its first Scout row, then clicks `target`.
+fn click_in_row(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    script: &str,
+    target: ElementId,
+) {
+    let row = ids::weapon_row(script);
+    support::settle(cx, s.win);
+    let visible = cx
+        .update_window(s.win, |_, w, _| {
+            w.try_find(row.clone()).is_some_and(|e| e.visible())
+        })
+        .unwrap();
+    if !visible {
+        let first = ids::weapon_row(scout_first());
+        let top = support::bounds_of(cx, s.win, first.clone()).expect("the first row");
+        let at = support::bounds_of(cx, s.win, row.clone()).expect("the row");
+        let dy = top.origin.y - at.origin.y;
+        cx.update_window(s.win, |_, w, cx| {
+            w.scroll(
+                first,
+                ScrollDelta::Pixels(gpui_kit::point(gpui_kit::px(0.), dy)),
+                cx,
+            )
+        })
+        .unwrap();
+    }
+    support::click_id(cx, s.win, target);
+}
+
+fn select_builtin(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    e: &Entity<ProfileEditor>,
+    ix: usize,
+) -> CrosshairRef {
+    let pick = CrosshairRef::Builtin(s.services.builtins.all()[ix].name().to_owned());
+    let picker = cx.update(|cx| e.read(cx).picker().clone());
+    cx.update(|cx| picker.update(cx, |p, cx| p.select(Some(pick.clone()), cx)));
+    support::settle(cx, s.win);
+    pick
+}
+
+fn scout_count() -> usize {
+    weapons()
+        .iter()
+        .filter(|w| w.class() == TfClass::Scout)
+        .count()
+}
+
+#[gpui_kit::test]
+fn the_crosshair_slot_shows_saved_weapons(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, comp.id());
+    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::profile_picker("crosshairs")
+    ));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::weapon_assigned("tf_weapon_scattergun")).as_deref(),
+        Some(s.services.builtins.all()[0].display_name())
+    );
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::weapon_clear("tf_weapon_scattergun")
+    ));
+}
+
+#[gpui_kit::test]
+fn a_weapon_click_saves_the_picked_crosshair(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let vanilla = empty_profile(&s, "Vanilla");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, vanilla.id());
+    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
+    let custom = env.game.join("tf/custom");
+    let before = files_under(&custom);
+    let second = select_builtin(cx, &s, &editor, 1);
+    click_in_row(
+        cx,
+        &s,
+        "tf_weapon_scattergun",
+        ids::weapon_row("tf_weapon_scattergun"),
+    );
+    wait_idle(cx, &s, &editor);
+    let after = saved(&s, vanilla.id());
+    assert_eq!(after.crosshairs().len(), 1);
+    assert_eq!(
+        after.crosshairs()[0].weapon_script(),
+        "tf_weapon_scattergun"
+    );
+    let CrosshairRef::Builtin(name) = second else {
+        unreachable!()
+    };
+    assert_eq!(
+        after.crosshairs()[0].crosshair(),
+        &ProfileCrosshairRef::Builtin(name)
+    );
+    assert!(
+        s.services.library.assignments().unwrap().is_empty(),
+        "the live table moved"
+    );
+    assert_eq!(files_under(&custom), before, "an edit touched the game");
+}
+
+#[gpui_kit::test]
+fn a_bulk_button_sets_every_target(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let vanilla = empty_profile(&s, "Vanilla");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, vanilla.id());
+    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
+    select_builtin(cx, &s, &editor, 0);
+    support::click_id(cx, s.win, ids::CROSSHAIRS_BULK_ALL);
+    wait_idle(cx, &s, &editor);
+    assert_eq!(saved(&s, vanilla.id()).crosshairs().len(), scout_count());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_slot("crosshairs")),
+        Some(format!("{} weapons", scout_count()))
+    );
+    assert!(s.services.library.assignments().unwrap().is_empty());
+}
+
+#[gpui_kit::test]
+fn a_row_clear_removes_one_weapon(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let first = CrosshairRef::Builtin(s.services.builtins.all()[0].name().to_owned());
+    let draft = ProfileDraft::new("Two").with_crosshairs(vec![
+        DraftCrosshair::Set {
+            weapon_script: "tf_weapon_scattergun".into(),
+            crosshair: first.clone(),
+        },
+        DraftCrosshair::Set {
+            weapon_script: "tf_weapon_pistol_scout".into(),
+            crosshair: first,
+        },
+    ]);
+    let two = s.services.library.create_profile(&draft).unwrap();
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, two.id());
+    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
+    click_in_row(
+        cx,
+        &s,
+        "tf_weapon_scattergun",
+        ids::weapon_clear("tf_weapon_scattergun"),
+    );
+    wait_idle(cx, &s, &editor);
+    let left: Vec<String> = saved(&s, two.id())
+        .crosshairs()
+        .iter()
+        .map(|c| c.weapon_script().to_owned())
+        .collect();
+    assert_eq!(left, ["tf_weapon_pistol_scout"]);
+}
+
+#[gpui_kit::test]
+fn clear_all_asks_first_and_cancel_keeps_them(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    support::click_id(cx, s.win, ids::profile_slot_clear("crosshairs"));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
+        Some("Remove all crosshairs from this profile?")
+    );
+    support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
+    wait_idle(cx, &s, &editor);
+    assert_eq!(saved(&s, comp.id()).crosshairs().len(), 1);
+    support::click_id(cx, s.win, ids::profile_slot_clear("crosshairs"));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::wait_real(cx, "the crosshairs to clear", |_| {
+        saved(&s, comp.id()).crosshairs().is_empty()
+    });
+    wait_idle(cx, &s, &editor);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_slot("crosshairs")).as_deref(),
+        Some("Default crosshairs")
+    );
+}
+
+#[gpui_kit::test]
+fn a_missing_library_crosshair_reads_missing(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let png = env.tmp.path().join("z.png");
+    std::fs::write(&png, support::crosshair_png([255, 0, 0, 255])).unwrap();
+    let zebra = s
+        .services
+        .library
+        .import_crosshair(&png, "Zebra", Provenance::Local)
+        .unwrap();
+    let draft = ProfileDraft::new("Z").with_crosshairs(vec![DraftCrosshair::Set {
+        weapon_script: "tf_weapon_scattergun".into(),
+        crosshair: CrosshairRef::Library(zebra.id().clone()),
+    }]);
+    let z = s.services.library.create_profile(&draft).unwrap();
+    s.services.library.delete_crosshair(zebra.id()).unwrap();
+    let page = open_profiles(cx, &s);
+    let _editor = open_editor(cx, &s, &page, z.id());
+    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
+    let label = support::label_of(cx, s.win, ids::weapon_assigned("tf_weapon_scattergun")).unwrap();
+    assert!(label.ends_with(" (missing)"), "{label}");
+}
+
+#[gpui_kit::test]
+fn assigning_a_deleted_crosshair_toasts(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let png = env.tmp.path().join("z.png");
+    std::fs::write(&png, support::crosshair_png([255, 0, 0, 255])).unwrap();
+    let zebra = s
+        .services
+        .library
+        .import_crosshair(&png, "Zebra", Provenance::Local)
+        .unwrap();
+    let vanilla = empty_profile(&s, "Vanilla");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, vanilla.id());
+    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
+    let picker = cx.update(|cx| editor.read(cx).picker().clone());
+    let pick = CrosshairRef::Library(zebra.id().clone());
+    cx.update(|cx| picker.update(cx, |p, cx| p.select(Some(pick), cx)));
+    s.services.library.delete_crosshair(zebra.id()).unwrap();
+    support::click_id(cx, s.win, ids::CROSSHAIRS_BULK_ALL);
+    toast_is(cx, &s, "That crosshair is no longer in your library");
+    wait_idle(cx, &s, &editor);
+    assert!(saved(&s, vanilla.id()).crosshairs().is_empty());
 }
