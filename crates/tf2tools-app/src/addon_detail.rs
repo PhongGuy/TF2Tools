@@ -29,6 +29,7 @@ use crate::widgets::store_error::error_line;
 
 /// Where the item's profile page stands.
 pub enum ProfileState {
+    /// The profile is being read, on open or after a retry.
     Loading,
     Ready(AddonProfile),
     /// The failure in player words.
@@ -61,6 +62,7 @@ impl AddonDetail {
         detail
     }
 
+    /// Where the item's profile read stands now.
     pub fn profile(&self) -> &ProfileState {
         &self.profile
     }

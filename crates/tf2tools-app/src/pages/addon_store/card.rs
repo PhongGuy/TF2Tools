@@ -30,11 +30,9 @@ pub fn card_height(width: Pixels) -> Pixels {
 /// What a click on the card does.
 pub type OpenAddon = Rc<dyn Fn(&mut Window, &mut App)>;
 
-/// A GameBanana add-on card in the `gamebanana_card` layout without tags or a button: the 16:9
-/// thumbnail 24 px below the top (else a muted area), the name with an "Outdated" tag when
-/// obsolete, "by {author}" and the like count.
-/// A click anywhere on it calls `open`. With `reveal`, a "Mature" cover lies over the thumbnail
-/// and a click on it calls `reveal` instead.
+/// A GameBanana add-on card: thumbnail, name (tagged "Outdated" when obsolete), author and
+/// likes. A click calls `open`; with `reveal`, a "Mature" cover hides the thumbnail and a
+/// click on the cover calls `reveal` instead.
 pub fn gb_addon_card(
     section: &str,
     card: &AddonCard,
