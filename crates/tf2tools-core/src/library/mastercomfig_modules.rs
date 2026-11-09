@@ -120,7 +120,8 @@ impl ModuleCatalog {
                 key,
             })
             .collect();
-        // The map already sorts keys, so a stable sort on the known rank keeps the rest alphabetical.
+        // The map already sorts keys, so a stable sort on the known rank keeps the rest
+        // alphabetical.
         categories.sort_by_key(|c| {
             CATEGORY_ORDER
                 .iter()
@@ -276,7 +277,8 @@ impl Choices {
         self.modules.get(module)
     }
 
-    /// Records `choice`; one equal to the preset's resolved value (NotSet equals None) removes the entry.
+    /// Records `choice`; one equal to the preset's resolved value (NotSet equals None) removes
+    /// the entry.
     pub fn set(&mut self, catalog: &ModuleCatalog, module: &str, choice: ModuleChoice) {
         let same = match (&choice, catalog.resolve(module, self.preset)) {
             (ModuleChoice::Value(v), Some(preset)) => v == preset,
@@ -300,7 +302,8 @@ impl Choices {
         self.modules.clear();
     }
 
-    /// Drops entries whose module is not in `catalog` or whose Value is not among its values; returns their names in order.
+    /// Drops entries whose module is not in `catalog` or whose Value is not among its values;
+    /// returns their names in order.
     pub fn retain_known(&mut self, catalog: &ModuleCatalog) -> Vec<String> {
         let mut dropped = Vec::new();
         self.modules.retain(|name, choice| {
@@ -318,8 +321,10 @@ impl Choices {
 
     /// Bit 1 for a saved sound=low, bit 2 for a saved decals=off; 0 for neither.
     pub fn override_mask(&self) -> u8 {
-        let is = |module: &str, value: &str| matches!(self.modules.get(module), Some(ModuleChoice::Value(v)) if v == value);
-        u8::from(is("sound", "low")) | (u8::from(is("decals", "off")) << 1)
+        let chose = |module: &str, value: &str| {
+            self.get(module) == Some(&ModuleChoice::Value(value.to_owned()))
+        };
+        u8::from(chose("sound", "low")) | (u8::from(chose("decals", "off")) << 1)
     }
 }
 

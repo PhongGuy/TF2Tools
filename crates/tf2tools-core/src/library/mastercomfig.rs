@@ -3,6 +3,7 @@
 //! cleared, and removing a TF2Tools-managed install with the files it wrote.
 
 use std::collections::BTreeMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use rusqlite::OptionalExtension;
@@ -354,10 +355,14 @@ pub(crate) fn write_modules_cfg(
             ModuleChoice::NotSet => text.push_str(&format!("alias {name}\n")),
         }
     }
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir).map_err(io_at(dir))?;
-    }
-    std::fs::write(path, text).map_err(io_at(path))
+    // A temp file beside the target, renamed over it, so the game never reads a half-written cfg.
+    let dir = path.parent().unwrap_or(Path::new("."));
+    std::fs::create_dir_all(dir).map_err(io_at(dir))?;
+    let mut part = tempfile::NamedTempFile::new_in(dir).map_err(io_at(dir))?;
+    part.write_all(text.as_bytes())
+        .map_err(io_at(part.path()))?;
+    part.persist(path).map_err(|e| io_at(path)(e.error))?;
+    Ok(())
 }
 
 /// Renames the player's own `path` to the first free of `<name>.bak`, `.bak.1`, `.bak.2`, ...

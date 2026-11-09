@@ -216,3 +216,20 @@ async fn without_a_recorded_release_the_override_cannot_change() {
     assert!(!tf2.tf_dir().join("cfg/overrides/modules.cfg").exists());
     assert_eq!(requests(&env).await, 0);
 }
+
+#[tokio::test]
+async fn a_release_read_failure_carries_sqlites_message_unwrapped() {
+    let env = store_env().await;
+    let (_game, tf2) = managed_game(&env);
+    sql(&env.dir)
+        .execute_batch("DROP TABLE mastercomfig_release")
+        .unwrap();
+    let mut choices = Choices::new(Preset::Medium);
+    choices.set(&module_catalog(), "sound", value("low"));
+    let err = apply(&env, &tf2, &choices).await.unwrap_err();
+    let ApplyModulesError::Database { message } = err else {
+        panic!("{err:?}");
+    };
+    assert!(message.contains("mastercomfig_release"), "{message}");
+    assert!(!message.starts_with("store database error"), "{message}");
+}

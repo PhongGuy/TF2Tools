@@ -3,9 +3,8 @@
 use std::path::Path;
 
 use rusqlite::OptionalExtension;
-use tokio::io::AsyncWriteExt;
-
 use tempfile::NamedTempFile;
+use tokio::io::AsyncWriteExt;
 
 use super::http::NetFailure;
 use super::{StoreClient, StoreKind};
@@ -214,7 +213,8 @@ impl StoreClient {
     /// .bak.1, .bak.2, ... Writes MODULES_HEADER and one line per kept choice in catalog order
     /// (`name=value`, `alias name` for NotSet) and saves the kept choices' modules
     /// (`{"name":"value"|null}`). Returns the dropped names (`Choices::retain_known`).
-    /// `choices.preset()` is not written; the saved preset stays.
+    /// `choices.preset()` is not written; the saved preset stays. A write that fails after the
+    /// override swap heals on the next apply, since the saved mask still differs.
     pub async fn apply_mastercomfig_modules(
         &self,
         install: &Tf2Install,
@@ -242,7 +242,8 @@ impl StoreClient {
         if foreign && !replace_foreign {
             return Err(ApplyModulesError::ForeignModulesCfg { path });
         }
-        // The saved mask, not the files on disk, decides: addon-era overrides stay until it changes.
+        // The saved mask, not the files on disk, decides: addon-era overrides stay until it
+        // changes.
         let mask = kept.override_mask();
         if mask != saved.override_mask() {
             self.swap_override(&custom, mask).await?;
@@ -264,8 +265,11 @@ impl StoreClient {
             Some(slot) => {
                 let release = self
                     .mastercomfig_release()
-                    .map_err(|e| ApplyModulesError::Database {
-                        message: e.to_string(),
+                    .map_err(|e| match e {
+                        QueryError::Database { message } => ApplyModulesError::Database { message },
+                        e @ QueryError::NotPaged { .. } => ApplyModulesError::Database {
+                            message: e.to_string(),
+                        },
                     })?
                     .ok_or(ApplyModulesError::NoRelease)?;
                 let url = release
