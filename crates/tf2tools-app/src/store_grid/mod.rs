@@ -32,6 +32,7 @@ use crate::store_download::SessionDownloads;
 use crate::store_messages::read_failed;
 use crate::sync::{SyncEvent, SyncHub, sync_hub};
 use crate::widgets::card_grid::{CardGrid, SHELL_CHROME_WIDTH, columns_for_store};
+use crate::widgets::label_option::LabelOption;
 use crate::widgets::labelled;
 use crate::widgets::store_error::store_error_line;
 use feed::{
@@ -140,7 +141,7 @@ pub struct StoreGrid {
     feed: Feed<StoreCard>,
     grid: CardGrid,
     search_input: Entity<InputState>,
-    sort_select: Entity<SelectState<Vec<&'static str>>>,
+    sort_select: Entity<SelectState<Vec<LabelOption>>>,
     search: String,
     sort: StoreSort,
     category: Option<String>,
@@ -187,7 +188,7 @@ impl StoreGrid {
     ) -> Self {
         let placeholder = format!("Search {}...", config.noun);
         let search_input = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder));
-        let labels: Vec<&'static str> = SORTS.iter().map(|(label, _)| *label).collect();
+        let labels = LabelOption::all(ids::STORE_SORT, SORTS.iter().map(|(label, _)| *label));
         let sort_select =
             cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
         let mut subscriptions = vec![
@@ -199,7 +200,7 @@ impl StoreGrid {
             }),
             cx.subscribe(
                 &sort_select,
-                |grid, _, event: &SelectEvent<Vec<&'static str>>, cx| {
+                |grid, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
                     let SelectEvent::Confirm(Some(label)) = event else {
                         return;
                     };

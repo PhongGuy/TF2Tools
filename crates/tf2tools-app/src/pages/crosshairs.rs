@@ -48,6 +48,7 @@ use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::crosshair_picker::{
     CrosshairPicker, DraggedCrosshair, IN_GAME_SIZE, preview_image,
 };
+use crate::widgets::label_option::LabelOption;
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
 use crate::widgets::weapon_assigner::{
@@ -140,7 +141,7 @@ pub struct CrosshairsPage {
     /// The picker's search box and list scroll, held so their accessors need no `cx`.
     search: Entity<InputState>,
     picker_scroll: ScrollHandle,
-    background: Entity<SelectState<Vec<&'static str>>>,
+    background: Entity<SelectState<Vec<LabelOption>>>,
     scroll: ScrollHandle,
     _tf2: Subscription,
     _library: Subscription,
@@ -218,7 +219,10 @@ impl CrosshairsPage {
             (picker.search_input().clone(), picker.scroll())
         };
         // Read at render, so a background change needs no subscription.
-        let backgrounds: Vec<&'static str> = std::iter::once(PLAIN).chain(BACKGROUNDS).collect();
+        let backgrounds = LabelOption::all(
+            ids::CROSSHAIRS_BACKGROUND,
+            std::iter::once(PLAIN).chain(BACKGROUNDS),
+        );
         let background =
             cx.new(|cx| SelectState::new(backgrounds, Some(IndexPath::default()), window, cx));
         // Each finished apply changes what is in the game, so the page reloads its scan.
@@ -361,7 +365,7 @@ impl CrosshairsPage {
     }
 
     /// The composite preview's background picker, over `BACKGROUNDS`, starting on "2fort".
-    pub fn background_select(&self) -> &Entity<SelectState<Vec<&'static str>>> {
+    pub fn background_select(&self) -> &Entity<SelectState<Vec<LabelOption>>> {
         &self.background
     }
 

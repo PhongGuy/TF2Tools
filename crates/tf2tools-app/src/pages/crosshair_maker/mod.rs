@@ -52,6 +52,7 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::crosshair_picker::IN_GAME_SIZE;
+use crate::widgets::label_option::LabelOption;
 use crate::widgets::scroll::scroll_area;
 use model::{
     Editor, FIT_TIP, OPACITY_TIP, REDO_TIP, SWATCH_NAMES, SWATCHES, Tool, UNDO_TIP, Viewport,
@@ -122,7 +123,7 @@ pub struct CrosshairMakerPage {
     outline_colour: Entity<ColorPickerState>,
     /// The colour "Add outline" paints with.
     outline_rgb: [u8; 3],
-    background: Entity<SelectState<Vec<&'static str>>>,
+    background: Entity<SelectState<Vec<LabelOption>>>,
     name: Entity<InputState>,
     /// The trimmed name core last refused as taken, and the line shown under the field.
     name_error: Option<(String, String)>,
@@ -210,7 +211,8 @@ impl CrosshairMakerPage {
         }));
         // Read at render, so a background change needs no subscription.
         let background = cx.new(|cx| {
-            SelectState::new(BACKGROUNDS.to_vec(), Some(IndexPath::default()), window, cx)
+            let rows = LabelOption::all(ids::CROSSHAIR_MAKER_BACKGROUND, BACKGROUNDS);
+            SelectState::new(rows, Some(IndexPath::default()), window, cx)
         });
         let focus = cx.focus_handle();
         focus.focus(window, cx);

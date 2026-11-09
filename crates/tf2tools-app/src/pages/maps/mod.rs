@@ -31,6 +31,7 @@ use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_download::format_bytes;
 use crate::store_messages::{BUSY_TEXT, BUSY_TITLE};
 use crate::tokio_bridge;
+use crate::widgets::label_option::LabelOption;
 use crate::widgets::scroll::scroll_beside;
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
@@ -65,7 +66,7 @@ struct Running {
     total: Option<u64>,
 }
 
-type Labels = Entity<SelectState<Vec<&'static str>>>;
+type Labels = Entity<SelectState<Vec<LabelOption>>>;
 
 /// The Maps page. It reads the cached list on creation and asks for a fresh one once; it
 /// is kept while hidden, so search, sort and scroll survive a trip to another page.
@@ -95,7 +96,7 @@ pub struct MapsPage {
 impl MapsPage {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search maps..."));
-        let labels: Vec<&'static str> = SORTS.iter().map(|(l, _)| *l).collect();
+        let labels = LabelOption::all(ids::MAPS_SORT, SORTS.iter().map(|(l, _)| *l));
         let sort_select =
             cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
         let subscriptions = vec![
@@ -108,7 +109,7 @@ impl MapsPage {
             }),
             cx.subscribe(
                 &sort_select,
-                |page, _, event: &SelectEvent<Vec<&'static str>>, cx| {
+                |page, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
                     if let SelectEvent::Confirm(Some(label)) = event
                         && let Some((_, sort)) = SORTS.iter().find(|(l, _)| l == label)
                     {

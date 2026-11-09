@@ -2646,3 +2646,20 @@ fn at_900x600_the_toolbar_keeps_two_rows_and_the_grid_six_pixel_cells(cx: &mut T
         "{last:?} stays out of the panel {panel:?}"
     );
 }
+
+#[gpui_kit::test]
+fn the_background_rows_carry_ids_and_pick_the_background(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = shell(cx, &env);
+    let _page = open_maker(cx, &s);
+    support::click_id(cx, s.win, ids::CROSSHAIR_MAKER_BACKGROUND);
+    support::click_id(
+        cx,
+        s.win,
+        ids::select_option(ids::CROSSHAIR_MAKER_BACKGROUND, "badlands"),
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CROSSHAIR_MAKER_BACKGROUND).as_deref(),
+        Some("badlands")
+    );
+}
