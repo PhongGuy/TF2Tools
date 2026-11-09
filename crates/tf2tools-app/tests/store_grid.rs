@@ -754,3 +754,15 @@ fn a_failed_count_keeps_its_error_line_and_no_no_match_card(cx: &mut TestAppCont
     assert!(support::present(cx, win, ids::STORE_ERROR));
     assert!(!support::present(cx, win, ids::STORE_EMPTY));
 }
+
+#[gpui_kit::test]
+fn the_sort_rows_carry_ids_and_pick_the_sort(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (win, grid) = open(cx, &env, |env| {
+        support::seed_crosshairs(env, 1..=3, 0, false)
+    });
+    loaded(cx, win, &grid);
+    support::click_id(cx, win, ids::STORE_SORT);
+    support::click_id(cx, win, ids::select_option(ids::STORE_SORT, "Newest"));
+    assert_eq!(cx.update(|cx| grid.read(cx).sort()), StoreSort::Newest);
+}

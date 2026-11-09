@@ -207,3 +207,14 @@ fn without_a_list_source_the_page_never_fetches(cx: &mut TestAppContext) {
     assert!(!cx.update(|cx| page.read(cx).is_syncing()));
     assert!(support::present(cx, s.win, ids::MAPS_EMPTY));
 }
+
+#[gpui_kit::test]
+fn the_sort_rows_carry_ids_and_pick_the_sort(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let s = shell(cx, &env, &server, found(&env));
+    let page = open_maps(cx, &s);
+    support::click_id(cx, s.win, ids::MAPS_SORT);
+    support::click_id(cx, s.win, ids::select_option(ids::MAPS_SORT, "Most played"));
+    assert_eq!(cx.update(|cx| page.read(cx).sort()), MapSort::MostPlayed);
+}

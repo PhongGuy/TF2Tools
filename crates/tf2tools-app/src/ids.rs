@@ -1211,6 +1211,12 @@ pub fn settings_resync(kind: StoreKind) -> ElementId {
     keyed(SETTINGS_RESYNC, store_slug(kind))
 }
 
+/// One option row of a labelled Select, under the id of the Select's wrapper and keyed by its
+/// label: "<select>-option:<label>", for example "maps-sort-option:Most played".
+pub fn select_option(select: &str, label: &str) -> ElementId {
+    keyed(&format!("{select}-option"), label)
+}
+
 /// One row of the install select, keyed by its index: "settings-candidate:<i>".
 pub fn settings_candidate(index: usize) -> ElementId {
     keyed("settings-candidate", &index.to_string())

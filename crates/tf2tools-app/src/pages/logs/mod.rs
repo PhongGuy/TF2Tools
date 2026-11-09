@@ -30,6 +30,7 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
+use crate::widgets::label_option::LabelOption;
 use crate::widgets::labelled;
 use crate::widgets::scroll::{scroll_area, scroll_beside};
 use crate::widgets::store_error::error_line;
@@ -41,7 +42,7 @@ use model::{
 const GREEN_500: u32 = 0x22c55e;
 const RED_500: u32 = 0xef4444;
 
-type Labels = Entity<SelectState<Vec<&'static str>>>;
+type Labels = Entity<SelectState<Vec<LabelOption>>>;
 
 /// The Activity Log page. It queries the first page on creation and again on each return,
 /// keeping its filters and open rows.
@@ -71,8 +72,8 @@ pub struct LogsPage {
 impl LogsPage {
     /// Builds the selects and the list, then loads the first page of every category and level.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let categories: Vec<&'static str> = CATEGORIES.iter().map(|(l, _)| *l).collect();
-        let levels: Vec<&'static str> = LEVELS.iter().map(|(l, _)| *l).collect();
+        let categories = LabelOption::all(ids::LOGS_CATEGORY, CATEGORIES.iter().map(|(l, _)| *l));
+        let levels = LabelOption::all(ids::LOGS_LEVEL, LEVELS.iter().map(|(l, _)| *l));
         let category_select =
             cx.new(|cx| SelectState::new(categories, Some(IndexPath::default()), window, cx));
         let level_select =
@@ -81,7 +82,7 @@ impl LogsPage {
         let subscriptions = [
             cx.subscribe(
                 &category_select,
-                |page, _, event: &SelectEvent<Vec<&'static str>>, cx| {
+                |page, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
                     if let SelectEvent::Confirm(Some(label)) = event
                         && let Some((_, category)) = CATEGORIES.iter().find(|(l, _)| l == label)
                     {
@@ -91,7 +92,7 @@ impl LogsPage {
             ),
             cx.subscribe(
                 &level_select,
-                |page, _, event: &SelectEvent<Vec<&'static str>>, cx| {
+                |page, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
                     if let SelectEvent::Confirm(Some(label)) = event
                         && let Some((_, level)) = LEVELS.iter().find(|(l, _)| l == label)
                     {

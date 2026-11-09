@@ -470,3 +470,16 @@ fn expanded_details_match_v5_spacing(cx: &mut TestAppContext) {
     let capped = support::bounds_of(cx, s.win, ids::log_details(tall)).unwrap();
     assert_eq!(capped.size.height, px(192.), "{capped:?}");
 }
+
+#[gpui_kit::test]
+fn the_select_rows_carry_ids_and_pick_the_filters(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, missing());
+    let page = open_logs(cx, &s);
+    support::click_id(cx, s.win, ids::LOGS_CATEGORY);
+    support::click_id(cx, s.win, ids::select_option(ids::LOGS_CATEGORY, "Sounds"));
+    assert_eq!(cx.update(|cx| page.read(cx).category()), Some("sound"));
+    support::click_id(cx, s.win, ids::LOGS_LEVEL);
+    support::click_id(cx, s.win, ids::select_option(ids::LOGS_LEVEL, "Error"));
+    assert_eq!(cx.update(|cx| page.read(cx).level()), Some(LogLevel::Error));
+}

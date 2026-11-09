@@ -1082,3 +1082,20 @@ fn the_preview_draws_the_crosshair_at_its_in_game_size(cx: &mut TestAppContext) 
         gpui_kit::size(gpui_kit::px(64.), gpui_kit::px(64.))
     );
 }
+
+#[gpui_kit::test]
+fn the_background_rows_carry_ids_and_pick_the_background(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let _page = open_crosshairs(cx, &s);
+    support::click_id(cx, s.win, ids::CROSSHAIRS_BACKGROUND);
+    support::click_id(
+        cx,
+        s.win,
+        ids::select_option(ids::CROSSHAIRS_BACKGROUND, "process"),
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CROSSHAIRS_BACKGROUND).as_deref(),
+        Some("process")
+    );
+}
