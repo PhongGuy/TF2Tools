@@ -161,3 +161,26 @@ fn a_hovered_card_is_visibly_lighter(cx: &mut TestAppContext) {
         );
     });
 }
+
+// GPUI hides an element's hover style, so this reads the store card builders' source: each must
+// take its hover fill from `card_hover`, not the translucent accent that matches the resting card.
+#[test]
+fn every_store_card_lights_up_with_the_card_hover_fill() {
+    let builders = [
+        ("gb_card.rs", include_str!("../src/gb_card.rs")),
+        (
+            "sound_store/card.rs",
+            include_str!("../src/pages/sound_store/card.rs"),
+        ),
+        (
+            "hud_store/curated_tab.rs",
+            include_str!("../src/pages/hud_store/curated_tab.rs"),
+        ),
+    ];
+    for (name, source) in builders {
+        assert!(
+            source.contains("card_hover(theme)") && !source.contains("accent.opacity(0.5)"),
+            "{name} must hover with theme::card_hover"
+        );
+    }
+}

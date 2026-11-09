@@ -532,7 +532,7 @@ fn chip(id: gpui_kit::ElementId, label: impl Into<SharedString>, selected: bool)
 // flags, and the button that opens the detail dialog.
 fn curated_card(hud: &CuratedHud, downloaded: bool, cx: &App) -> AnyElement {
     let theme = cx.theme();
-    let hover = theme.accent.opacity(0.5);
+    let hover = crate::theme::card_hover(theme);
     let id = StoreItemId::Curated(hud.hud_id.clone());
     let item = DetailItem {
         kind: KIND,
@@ -604,7 +604,7 @@ fn curated_card(hud: &CuratedHud, downloaded: bool, cx: &App) -> AnyElement {
         .aria_label(hud.name.clone())
         .test_support()
         .cursor_pointer()
-        // v5's hover:bg-accent/50 over the card's group-box background.
+        // v5's hover:bg-accent/50, made opaque because a hover fill replaces the card's own.
         .hover(move |card| card.bg(hover))
         .on_click(move |_, window, cx| open(window, cx))
         .size_full()
