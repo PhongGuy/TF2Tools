@@ -20,7 +20,7 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
     CrosshairRef, DraftCrosshair, DraftSlot, HudEntry, Profile, ProfileCrosshairRef, ProfileDraft,
-    ProfileId, Provenance, SoundEntry, Tf2Install, TfClass, weapons,
+    ProfileId, Provenance, SoundEntry, SoundKind, Tf2Install, TfClass, weapons,
 };
 
 fn tf2(env: &support::Env) -> Tf2Install {
@@ -1268,4 +1268,199 @@ fn changing_slot_stops_only_the_editors_preview(cx: &mut TestAppContext) {
     support::wait_real(cx, "the slot preview", |_| s.audio.plays().len() == 2);
     support::click_id(cx, s.win, ids::profile_slot("killsound"));
     assert!(cx.update(|cx| player.read(cx).now_playing().is_none()));
+}
+
+/// Opens the New profile menu by its caret, the kit's "popup" button inside the split button.
+fn open_new_menu(cx: &mut TestAppContext, s: &support::ShellWindow) {
+    support::settle(cx, s.win);
+    cx.update_window(s.win, |_, w, cx| {
+        w.within(ids::PROFILES_NEW_MENU).click("popup", cx)
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+}
+
+fn wait_editor(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    page: &Entity<ProfilesPage>,
+) -> Entity<ProfileEditor> {
+    support::wait_real(cx, "the editor", |cx| {
+        cx.update(|cx| page.read(cx).editor().is_some())
+    });
+    let editor = cx.update(|cx| page.read(cx).editor()).unwrap();
+    wait_idle(cx, s, &editor);
+    editor
+}
+
+#[gpui_kit::test]
+fn new_profile_saves_the_installed_setup_and_opens_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let hud = seed_hud(&s, &env, "rayshud");
+    s.services
+        .library
+        .install_hud(hud.id(), &tf2(&env))
+        .unwrap();
+    let ding = seed_sound(&s, &env, "Ding");
+    s.services
+        .library
+        .install_sound(ding.id(), SoundKind::Hitsound, &tf2(&env))
+        .unwrap();
+    let first = s.services.builtins.all()[0].name().to_owned();
+    s.services
+        .library
+        .assign("tf_weapon_scattergun", &CrosshairRef::Builtin(first))
+        .unwrap();
+    let page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::PROFILES_EMPTY_NEW);
+    let editor = wait_editor(cx, &s, &page);
+    toast_is(cx, &s, "Profile created from your current setup");
+    let profiles = s.services.library.profiles().unwrap();
+    assert_eq!(profiles.len(), 1);
+    let made = &profiles[0];
+    assert_eq!(made.name(), "Profile 1");
+    assert_eq!(made.hud().map(|h| h.folder_name()), Some("rayshud"));
+    assert_eq!(made.hitsound().map(|h| h.name()), Some("Ding"));
+    assert!(made.killsound().is_none());
+    assert_eq!(made.crosshairs().len(), 1);
+    let input = cx.update(|cx| editor.read(cx).name_input().clone());
+    let (focused, selected) = cx
+        .update_window(s.win, |_, w, cx| {
+            use gpui_kit::Focusable as _;
+            let st = input.read(cx);
+            (
+                st.focus_handle(cx).is_focused(w),
+                st.selected_value().to_string(),
+            )
+        })
+        .unwrap();
+    assert!(focused, "the name field has the keyboard");
+    assert_eq!(selected, "Profile 1");
+    let row = &support::log_rows(&s.services)[0];
+    assert_eq!(
+        (row.category(), row.action(), row.message()),
+        (
+            "profile",
+            "save_current",
+            "Saved current setup as profile: Profile 1"
+        )
+    );
+}
+
+#[gpui_kit::test]
+fn start_empty_from_the_menu_ignores_what_is_installed(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let hud = seed_hud(&s, &env, "rayshud");
+    s.services
+        .library
+        .install_hud(hud.id(), &tf2(&env))
+        .unwrap();
+    empty_profile(&s, "Profile 1");
+    let page = open_profiles(cx, &s);
+    open_new_menu(cx, &s);
+    support::click_id(cx, s.win, ids::PROFILES_NEW_EMPTY);
+    let editor = wait_editor(cx, &s, &page);
+    toast_is(cx, &s, "Empty profile created");
+    let made = cx.update(|cx| editor.read(cx).saved().clone());
+    assert_eq!(made.name(), "Profile 2");
+    assert!(made.hud().is_none() && made.crosshairs().is_empty());
+    let row = &support::log_rows(&s.services)[0];
+    assert_eq!(
+        (row.action(), row.message()),
+        ("create", "Created profile: Profile 2")
+    );
+}
+
+#[gpui_kit::test]
+fn the_empty_state_offers_both_ways(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let page = open_profiles(cx, &s);
+    assert!(support::present(cx, s.win, ids::PROFILES_EMPTY_NEW));
+    support::click_id(cx, s.win, ids::PROFILES_EMPTY_START_EMPTY);
+    let editor = wait_editor(cx, &s, &page);
+    assert_eq!(
+        cx.update(|cx| editor.read(cx).saved().name().to_owned()),
+        "Profile 1"
+    );
+}
+
+// The page loaded before "Profile 1" existed, so it asks for that name; core refuses it and
+// the create moves on to the next free number.
+#[gpui_kit::test]
+fn a_name_taken_in_a_race_moves_to_the_next_number(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let page = open_profiles(cx, &s);
+    empty_profile(&s, "Profile 1");
+    support::click_id(cx, s.win, ids::PROFILES_EMPTY_START_EMPTY);
+    let editor = wait_editor(cx, &s, &page);
+    assert_eq!(
+        cx.update(|cx| editor.read(cx).saved().name().to_owned()),
+        "Profile 2"
+    );
+    assert_eq!(s.services.library.profiles().unwrap().len(), 2);
+    support::settle(cx, s.win);
+    assert!(
+        support::present(cx, s.win, ids::PROFILE_EDITOR),
+        "a reload closed the new editor"
+    );
+}
+
+// A load whose job read the library before the create lacks the new profile; its result must
+// not close the editor the create opens.
+#[gpui_kit::test]
+fn a_load_running_during_a_create_leaves_the_new_editor_open(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let page = open_profiles(cx, &s);
+    let update = |cx: &mut TestAppContext,
+                  f: fn(
+        &mut ProfilesPage,
+        &mut gpui_kit::Window,
+        &mut gpui_kit::Context<ProfilesPage>,
+    )| {
+        cx.update_window(s.win, |_, window, cx| {
+            page.update(cx, |p, cx| f(p, window, cx))
+        })
+        .unwrap();
+        while cx.dispatcher.tick(true) {}
+    };
+    update(cx, |p, _, cx| p.reload(cx));
+    update(cx, |p, window, cx| p.new_profile(false, window, cx));
+    let editor = wait_editor(cx, &s, &page);
+    let made = cx.update(|cx| editor.read(cx).id().clone());
+    support::settle(cx, s.win);
+    let open = cx.update(|cx| page.read(cx).editor().map(|e| e.read(cx).id().clone()));
+    assert_eq!(open, Some(made), "a load closed the new editor");
+}
+
+#[gpui_kit::test]
+fn without_tf2_only_start_empty_works(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let page = open_profiles(cx, &s);
+    assert!(support::disabled_of(cx, s.win, ids::PROFILES_EMPTY_NEW));
+    assert!(!support::disabled_of(
+        cx,
+        s.win,
+        ids::PROFILES_EMPTY_START_EMPTY
+    ));
+    empty_profile(&s, "Old");
+    cx.update(LibraryEvents::changed);
+    support::wait_real(cx, "the grid", |cx| {
+        support::present(cx, s.win, ids::PROFILES_NEW)
+    });
+    assert!(support::disabled_of(cx, s.win, ids::PROFILES_NEW));
+    support::click_id(cx, s.win, ids::PROFILES_NEW);
+    assert!(cx.update(|cx| page.read(cx).editor()).is_none());
+    open_new_menu(cx, &s);
+    support::click_id(cx, s.win, ids::PROFILES_NEW_EMPTY);
+    let editor = wait_editor(cx, &s, &page);
+    assert_eq!(
+        cx.update(|cx| editor.read(cx).saved().name().to_owned()),
+        "Profile 1"
+    );
 }

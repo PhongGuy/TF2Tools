@@ -71,11 +71,7 @@ fn at_900x600_the_page_scrolls_to_a_whole_card_row(cx: &mut TestAppContext) {
     let area = ids::page(Page::Profiles);
     let page_bar = ids::page_scrollbar(Page::Profiles);
     assert_bar_on_right_edge(cx, s.win, area.clone(), page_bar.clone());
-    for control in [
-        ids::PROFILES_SEARCH,
-        ids::PROFILES_CREATE,
-        ids::PROFILES_SAVE_CURRENT,
-    ] {
+    for control in [ids::PROFILES_SEARCH, ids::PROFILES_NEW_MENU] {
         assert_clear_of_bar(cx, s.win, control, page_bar.clone());
     }
     assert_track_scrolls(cx, s.win, area.clone(), ids::PROFILES_LIBRARY);
