@@ -1,13 +1,18 @@
 //! mastercomfig's base VPK in `tf/custom`: whether it is there, who manages it, its
-//! version, and removing a TF2Tools-managed install with the files it wrote.
+//! version, its preset, taking over a hand install, writing back files another tool
+//! cleared, and removing a TF2Tools-managed install with the files it wrote.
 
 use std::path::Path;
 
 use rusqlite::OptionalExtension;
 
+use super::addons::{ADDONS_CFG, rewrite_addons_cfg};
 use super::{IoFailure, Library, game_custom_dir, io_at, remove_file_if_present};
 use crate::db::Database;
-use crate::error::{MastercomfigStatusError, RemoveMastercomfigError};
+use crate::error::{
+    ApplyPresetError, MastercomfigStatusError, RemoveMastercomfigError, RestoreMastercomfigError,
+    TakeOverError,
+};
 use crate::pak;
 use crate::templates::ADDON_PREFIX;
 use crate::tf2::Tf2Install;
@@ -142,6 +147,101 @@ impl Library {
         Ok(())
     }
 
+    /// Writes `setup_hook.cfg` = "preset=<name>\n" and saves the preset. Needs a managed install.
+    pub fn apply_preset(&self, tf2: &Tf2Install, preset: Preset) -> Result<(), ApplyPresetError> {
+        let db = |e: rusqlite::Error| ApplyPresetError::Database {
+            message: e.to_string(),
+        };
+        let custom = game_custom_dir(tf2)?;
+        if self.mastercomfig_state().map_err(db)?.is_none() {
+            return Err(ApplyPresetError::NotManaged);
+        }
+        // The file goes first, so a failed write leaves the saved preset matching the file.
+        write_setup_hook(&custom, preset)?;
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "UPDATE mastercomfig_state SET preset = ?1 WHERE id = 1",
+                    [preset.name()],
+                )
+            })
+            .map_err(db)?;
+        Ok(())
+    }
+
+    /// Records an installed but unmanaged base as managed: version from the VPK ("unknown" when
+    /// unreadable), preset from an existing setup_hook.cfg's `preset=<name>` line (else Medium),
+    /// no modules. Touches no file. Returns the new Managed status.
+    pub fn take_over_mastercomfig(
+        &self,
+        tf2: &Tf2Install,
+    ) -> Result<MastercomfigStatus, TakeOverError> {
+        let db = |e: rusqlite::Error| TakeOverError::Database {
+            message: e.to_string(),
+        };
+        let custom = tf2.custom_dir();
+        let base = custom.join(BASE_VPK);
+        if !base.is_file() {
+            return Err(TakeOverError::NotInstalled);
+        }
+        if self.mastercomfig_state().map_err(db)?.is_some() {
+            return Err(TakeOverError::AlreadyManaged);
+        }
+        let version = read_base_version(&base).unwrap_or_else(|| "unknown".to_owned());
+        let preset = std::fs::read_to_string(custom.join(SETUP_HOOK))
+            .ok()
+            .and_then(|hook| preset_in(&hook))
+            .unwrap_or(Preset::Medium);
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "INSERT INTO mastercomfig_state (id, version, preset, modules)
+                     VALUES (1, ?1, ?2, '{}')",
+                    [version.as_str(), preset.name()],
+                )
+            })
+            .map_err(db)?;
+        Ok(MastercomfigStatus::Managed { version, preset })
+    }
+
+    /// Writes back a missing setup_hook.cfg for a managed install with its base present, and a
+    /// missing addons.cfg when addon VPKs sit in tf/custom. True when it wrote anything.
+    pub fn restore_mastercomfig_files(
+        &self,
+        tf2: &Tf2Install,
+    ) -> Result<bool, RestoreMastercomfigError> {
+        // A game folder that moved away is not recreated; there is nothing to restore into.
+        if !tf2.tf_dir().is_dir() {
+            return Ok(false);
+        }
+        let custom = tf2.custom_dir();
+        let mut wrote = false;
+
+        let hook_missing = !custom.join(SETUP_HOOK).is_file();
+        if hook_missing && custom.join(BASE_VPK).is_file() {
+            let state =
+                self.mastercomfig_state()
+                    .map_err(|e| RestoreMastercomfigError::Database {
+                        message: e.to_string(),
+                    })?;
+            if let Some((_, preset)) = state {
+                write_setup_hook(
+                    &custom,
+                    Preset::from_name(&preset).unwrap_or(Preset::Medium),
+                )?;
+                wrote = true;
+            }
+        }
+
+        // Regenerating a missing addons.cfg writes it only when addon VPKs are present.
+        let addons = ADDONS_CFG.iter().fold(custom.clone(), |p, c| p.join(c));
+        if !addons.is_file() {
+            rewrite_addons_cfg(&custom)?;
+            wrote |= addons.is_file();
+        }
+        Ok(wrote)
+    }
+
     /// The recorded (version, preset) of a TF2Tools-managed install, if there is one.
     fn mastercomfig_state(&self) -> rusqlite::Result<Option<(String, String)>> {
         self.db.read(|conn| {
@@ -181,6 +281,15 @@ pub(crate) fn write_setup_hook(custom: &Path, preset: Preset) -> Result<(), IoFa
         std::fs::create_dir_all(dir).map_err(io_at(dir))?;
     }
     std::fs::write(&hook, format!("preset={}\n", preset.name())).map_err(io_at(&hook))
+}
+
+/// The first `preset=<name>` line naming a known preset, skipping `//` comments.
+fn preset_in(hook: &str) -> Option<Preset> {
+    hook.lines()
+        .map(str::trim)
+        .filter(|line| !line.starts_with("//"))
+        .filter_map(|line| line.strip_prefix("preset="))
+        .find_map(Preset::from_name)
 }
 
 /// Whether `path` is a `modules.cfg` TF2Tools wrote; a missing file is not.

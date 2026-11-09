@@ -1772,3 +1772,70 @@ pub enum InstallMastercomfigError {
         message: String,
     },
 }
+
+/// Why a mastercomfig preset could not be applied.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ApplyPresetError {
+    /// TF2Tools does not manage this mastercomfig, so it does not pick its preset.
+    #[error("mastercomfig was not installed by TF2Tools")]
+    NotManaged,
+    /// The game folder (`tf/`) is no longer where the install was found.
+    #[error("Team Fortress 2 is no longer at {path}")]
+    GameMissing {
+        /// The `tf` folder that is gone.
+        path: PathBuf,
+    },
+    /// The preset file could not be written.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// The library database failed.
+    #[error("library database error: {message}")]
+    Database {
+        /// The database's message.
+        message: String,
+    },
+}
+
+/// Why TF2Tools could not take over a mastercomfig installed by hand.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum TakeOverError {
+    /// There is no `mastercomfig-base.vpk` in `tf/custom` to take over.
+    #[error("mastercomfig is not installed")]
+    NotInstalled,
+    /// TF2Tools already manages this mastercomfig.
+    #[error("TF2Tools already manages mastercomfig")]
+    AlreadyManaged,
+    /// The library database failed.
+    #[error("library database error: {message}")]
+    Database {
+        /// The database's message.
+        message: String,
+    },
+}
+
+/// Why mastercomfig's cleared files could not be written back.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum RestoreMastercomfigError {
+    /// A file could not be read or written.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// The library database failed.
+    #[error("library database error: {message}")]
+    Database {
+        /// The database's message.
+        message: String,
+    },
+}

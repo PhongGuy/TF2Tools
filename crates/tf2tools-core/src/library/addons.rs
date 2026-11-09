@@ -17,7 +17,7 @@ use crate::templates::{self, ADDON_PREFIX};
 use crate::tf2::Tf2Install;
 
 /// Where mastercomfig reads the list of addons to exec, relative to `tf/custom`.
-const ADDONS_CFG: [&str; 4] = ["comfig-custom", "cfg", "app", "addons.cfg"];
+pub(crate) const ADDONS_CFG: [&str; 4] = ["comfig-custom", "cfg", "app", "addons.cfg"];
 
 /// v5's display names and descriptions for the known addons; the GitHub release only
 /// carries file names.
@@ -500,7 +500,7 @@ fn remove_installed(name: &AddonName, custom: &Path) -> Result<(), IoFailure> {
 
 /// Regenerates `addons.cfg` from the addon VPKs now in `tf/custom`. With none left the
 /// file is removed and its directory kept, as v5 did.
-fn rewrite_addons_cfg(custom: &Path) -> Result<(), IoFailure> {
+pub(crate) fn rewrite_addons_cfg(custom: &Path) -> Result<(), IoFailure> {
     let files = custom_files(custom)?;
     let names: Vec<&str> = files.iter().map(String::as_str).collect();
     let cfg = ADDONS_CFG

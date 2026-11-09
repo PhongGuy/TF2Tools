@@ -187,6 +187,7 @@ mod license;
 mod maps;
 mod mastercomfig;
 mod mastercomfig_install;
+mod mastercomfig_presets;
 mod mastercomfig_release;
 mod old_v4;
 mod panic_mark;
