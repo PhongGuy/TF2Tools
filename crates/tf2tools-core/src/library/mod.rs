@@ -30,9 +30,9 @@ use walkdir::WalkDir;
 use crate::archive::VPK_MAGIC;
 use crate::db::Database;
 use crate::error::{
-    ApplyProfileError, HistoryError, HudLoadError, ImportError, InstallError, KeepHudError,
-    LibraryError, MakeHudError, PaintError, PresetError, ProfileError, ReinstallError,
-    RemoveMastercomfigError,
+    ApplyProfileError, HistoryError, HudLoadError, ImportError, InstallError,
+    InstallMastercomfigError, KeepHudError, LibraryError, MakeHudError, PaintError, PresetError,
+    ProfileError, ReinstallError, RemoveMastercomfigError,
 };
 use crate::fonts::Platform;
 use crate::hud_maker::{HudFiles, HudOptions, HudSchemas, MakerBase};
@@ -53,6 +53,7 @@ pub use huds::{ExternalHud, HudEntry, HudInstall, HudStatus};
 pub use live_link::{Recovery, Reinstall};
 pub use made_huds::{HudAssets, MadeHud, MakeTarget, SavedHud, pictures_fit};
 pub use mastercomfig::{MastercomfigStatus, Preset};
+pub(crate) use mastercomfig::{record_install, write_setup_hook};
 pub use profiles::{
     ApplyProfileReport, ApplyStep, DraftCrosshair, DraftSlot, MissingItem, MissingKind, Profile,
     ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate,
@@ -359,6 +360,12 @@ impl From<IoFailure> for RemoveMastercomfigError {
     }
 }
 
+impl From<IoFailure> for InstallMastercomfigError {
+    fn from(IoFailure { path, source }: IoFailure) -> Self {
+        Self::Io { path, source }
+    }
+}
+
 /// The game's `tf` folder has moved away; mapped into each writer's `GameMissing`.
 pub(crate) struct GameMissing {
     path: PathBuf,
@@ -393,6 +400,12 @@ impl From<GameMissing> for ApplyProfileError {
 }
 
 impl From<GameMissing> for RemoveMastercomfigError {
+    fn from(GameMissing { path }: GameMissing) -> Self {
+        Self::GameMissing { path }
+    }
+}
+
+impl From<GameMissing> for InstallMastercomfigError {
     fn from(GameMissing { path }: GameMissing) -> Self {
         Self::GameMissing { path }
     }

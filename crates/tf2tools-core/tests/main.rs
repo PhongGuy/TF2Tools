@@ -186,6 +186,7 @@ mod library_sounds;
 mod license;
 mod maps;
 mod mastercomfig;
+mod mastercomfig_install;
 mod mastercomfig_release;
 mod old_v4;
 mod panic_mark;

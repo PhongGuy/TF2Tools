@@ -5,13 +5,16 @@ use std::path::Path;
 
 use rusqlite::OptionalExtension;
 
-use super::{Library, game_custom_dir, io_at, remove_file_if_present};
+use super::{IoFailure, Library, game_custom_dir, io_at, remove_file_if_present};
+use crate::db::Database;
 use crate::error::{MastercomfigStatusError, RemoveMastercomfigError};
 use crate::pak;
 use crate::templates::ADDON_PREFIX;
 use crate::tf2::Tf2Install;
 
 pub(crate) const BASE_VPK: &str = "mastercomfig-base.vpk";
+/// The cfg mastercomfig's autoexec runs to pick the preset, relative to `tf/custom`.
+const SETUP_HOOK: &str = "comfig-custom/cfg/app/setup_hook.cfg";
 /// The first line of a `modules.cfg` TF2Tools wrote; any other file is the player's.
 pub(crate) const MODULES_HEADER: &str = "// Written by TF2Tools; changes here are replaced";
 
@@ -127,7 +130,7 @@ impl Library {
             remove_file_if_present(&custom.join(&vpk))?;
             remove_file_if_present(&custom.join(format!("{vpk}.sound.cache")))?;
         }
-        remove_file_if_present(&custom.join("comfig-custom/cfg/app/setup_hook.cfg"))?;
+        remove_file_if_present(&custom.join(SETUP_HOOK))?;
         let modules = tf2.tf_dir().join("cfg/overrides/modules.cfg");
         if written_by_us(&modules)? {
             remove_file_if_present(&modules)?;
@@ -150,6 +153,34 @@ impl Library {
             .optional()
         })
     }
+}
+
+/// Records TF2Tools as managing mastercomfig at `version`, keeping a saved preset and
+/// modules or starting on Medium with none. Returns the preset now in effect.
+pub(crate) fn record_install(db: &Database, version: &str) -> rusqlite::Result<Preset> {
+    let preset: String = db.write(|conn| {
+        conn.execute(
+            "INSERT INTO mastercomfig_state (id, version, preset, modules)
+             VALUES (1, ?1, ?2, '{}')
+             ON CONFLICT(id) DO UPDATE SET version = excluded.version",
+            [version, Preset::Medium.name()],
+        )?;
+        conn.query_row(
+            "SELECT preset FROM mastercomfig_state WHERE id = 1",
+            [],
+            |r| r.get(0),
+        )
+    })?;
+    Ok(Preset::from_name(&preset).unwrap_or(Preset::Medium))
+}
+
+/// Writes `comfig-custom/cfg/app/setup_hook.cfg` under `custom` so mastercomfig loads `preset`.
+pub(crate) fn write_setup_hook(custom: &Path, preset: Preset) -> Result<(), IoFailure> {
+    let hook = custom.join(SETUP_HOOK);
+    if let Some(dir) = hook.parent() {
+        std::fs::create_dir_all(dir).map_err(io_at(dir))?;
+    }
+    std::fs::write(&hook, format!("preset={}\n", preset.name())).map_err(io_at(&hook))
 }
 
 /// Whether `path` is a `modules.cfg` TF2Tools wrote; a missing file is not.
