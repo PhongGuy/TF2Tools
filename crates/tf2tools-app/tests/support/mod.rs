@@ -1319,6 +1319,44 @@ impl StoreServer {
         );
     }
 
+    /// GameBanana's Mod search, page `page`, whatever the text.
+    pub fn mount_gb_search(&self, page: u32, body: Vec<u8>) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path("/apiv11/Util/Search/Results"))
+                .and(query_param("_nPage", page.to_string()))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+                .mount(&self.server),
+        );
+    }
+
+    /// How many Search requests have arrived.
+    pub fn gb_search_count(&self) -> usize {
+        let asked = self
+            .rt
+            .block_on(self.server.received_requests())
+            .unwrap_or_default();
+        asked
+            .iter()
+            .filter(|r| r.url.path() == "/apiv11/Util/Search/Results")
+            .count()
+    }
+
+    /// `parent`'s child categories as `(id, name)`.
+    pub fn mount_gb_categories(&self, parent: u32, children: &[(u32, &str)]) {
+        let rows: Vec<_> = children
+            .iter()
+            .map(|(id, name)| serde_json::json!({"_idRow": id, "_sName": name, "_nItemCount": 1}))
+            .collect();
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path("/apiv11/Mod/Categories"))
+                .and(query_param("_idCategoryRow", parent.to_string()))
+                .respond_with(ResponseTemplate::new(200).set_body_json(rows))
+                .mount(&self.server),
+        );
+    }
+
     /// `(category, sort, page)` of each Mod Index request so far, in order.
     pub fn gb_index_requests(&self) -> Vec<(String, String, String)> {
         let asked = self

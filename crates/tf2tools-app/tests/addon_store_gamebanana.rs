@@ -5,7 +5,8 @@ use tf2tools_app::ids;
 use tf2tools_app::pages::addon_store::AddonStoreTab;
 use tf2tools_app::pages::addon_store::gamebanana_tab::AddonTab;
 use tf2tools_app::services::Tf2State;
-use tf2tools_core::{AddonSection, GbId, Tf2Install};
+use tf2tools_app::store_grid::SEARCH_DEBOUNCE;
+use tf2tools_core::{AddonSection, AddonSort, GbId, Tf2Install};
 
 const MD: &str = "Generic_MostDownloaded";
 
@@ -165,5 +166,186 @@ fn scrolling_to_the_end_runs_the_next_step(cx: &mut TestAppContext) {
         w.win,
         ids::addon_gb_card("textures", GbId::new(51))
     ));
+    assert!(!support::present(cx, w.win, ids::ADDON_LOAD_MORE));
+}
+
+#[gpui_kit::test]
+fn the_sort_select_reloads_newest_first(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_index(
+        2774,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(1, 2774, None)], true),
+    );
+    server.mount_gb_index(
+        2774,
+        "Generic_Newest",
+        1,
+        support::gb_listing(vec![support::gb_addon(2, 2774, None)], true),
+    );
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "gamefiles");
+    settled(cx, &tab, "the first step");
+    support::click_id(cx, w.win, ids::ADDON_SORT);
+    support::click_id(cx, w.win, ids::select_option(ids::ADDON_SORT, "Newest"));
+    support::wait_real(cx, "the newest step", |cx| {
+        cx.update(|cx| tab.read(cx).cards().first().map(|c| c.id.get()) == Some(2))
+    });
+    assert_eq!(cx.update(|cx| tab.read(cx).sort()), AddonSort::Newest);
+}
+
+#[gpui_kit::test]
+fn the_subcategory_select_lists_children_without_the_excluded_one(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_categories(1644, &[(1649, "HUDs"), (1648, "Icons")]);
+    server.mount_gb_index(
+        1644,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(1, 1644, Some(1648))], true),
+    );
+    server.mount_gb_index(
+        1648,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(2, 1644, Some(1648))], true),
+    );
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "guis");
+    settled(cx, &tab, "the first step");
+    support::wait_real(cx, "the subcategories", |cx| {
+        cx.update(|cx| tab.read(cx).categories().len() == 1)
+    });
+    support::click_id(cx, w.win, ids::ADDON_CATEGORY);
+    assert!(support::present(
+        cx,
+        w.win,
+        ids::select_option(ids::ADDON_CATEGORY, "1648")
+    ));
+    assert!(!support::present(
+        cx,
+        w.win,
+        ids::select_option(ids::ADDON_CATEGORY, "1649")
+    ));
+    support::click_id(cx, w.win, ids::select_option(ids::ADDON_CATEGORY, "1648"));
+    support::wait_real(cx, "the icons step", |cx| {
+        cx.update(|cx| tab.read(cx).cards().first().map(|c| c.id.get()) == Some(2))
+    });
+    assert_eq!(cx.update(|cx| tab.read(cx).category()), Some(1648));
+    assert!(
+        !support::present(cx, w.win, ids::ADDON_WEAPON),
+        "only Skins classes get a weapon Select"
+    );
+}
+
+#[gpui_kit::test]
+fn choosing_a_class_adds_the_weapon_select(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_categories(7951, &[(7962, "The Scout"), (27900, "Packs")]);
+    server.mount_gb_categories(7962, &[(7972, "Scattergun")]);
+    for (category, id) in [(7951, 1), (7962, 2), (7972, 3), (27900, 4)] {
+        server.mount_gb_index(
+            category,
+            MD,
+            1,
+            support::gb_listing(vec![support::gb_addon(id, 7951, None)], true),
+        );
+    }
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "skins");
+    settled(cx, &tab, "the first step");
+    support::wait_real(cx, "the classes", |cx| {
+        cx.update(|cx| tab.read(cx).categories().len() == 2)
+    });
+    assert!(!support::present(cx, w.win, ids::ADDON_WEAPON));
+    support::click_id(cx, w.win, ids::ADDON_CATEGORY);
+    support::click_id(cx, w.win, ids::select_option(ids::ADDON_CATEGORY, "7962"));
+    support::wait_real(cx, "the weapon list", |cx| {
+        cx.update(|cx| tab.read(cx).weapons().len() == 1)
+            && support::present(cx, w.win, ids::ADDON_WEAPON)
+    });
+    support::click_id(cx, w.win, ids::ADDON_WEAPON);
+    support::click_id(cx, w.win, ids::select_option(ids::ADDON_WEAPON, "7972"));
+    support::wait_real(cx, "the scattergun step", |cx| {
+        cx.update(|cx| tab.read(cx).cards().first().map(|c| c.id.get()) == Some(3))
+    });
+    assert_eq!(
+        server
+            .gb_index_requests()
+            .last()
+            .map(|r| r.0.clone())
+            .as_deref(),
+        Some("7972")
+    );
+    support::click_id(cx, w.win, ids::ADDON_CATEGORY);
+    support::click_id(cx, w.win, ids::select_option(ids::ADDON_CATEGORY, "27900"));
+    support::wait_real(cx, "the packs step", |cx| {
+        cx.update(|cx| {
+            tab.read(cx).weapon().is_none()
+                && tab.read(cx).cards().first().map(|c| c.id.get()) == Some(4)
+        })
+    });
+    assert!(
+        !support::present(cx, w.win, ids::ADDON_WEAPON),
+        "Packs is not a class"
+    );
+}
+
+#[gpui_kit::test]
+fn search_mode_filters_to_the_tab_and_disables_the_selects(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_categories(7951, &[(7962, "The Scout")]);
+    server.mount_gb_index(
+        7951,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(9, 7951, None)], true),
+    );
+    let found = vec![
+        support::gb_addon(1, 7951, Some(7962)),
+        support::gb_addon(2, 1090, Some(1094)),
+        support::gb_addon(3, 7951, None),
+    ];
+    server.mount_gb_search(1, support::gb_listing(found, true));
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "skins");
+    settled(cx, &tab, "the first step");
+    assert!(cx.update(|cx| tab.read(cx).selects_enabled()));
+    cx.update(|cx| tab.update(cx, |t, cx| t.search_typed("pink".into(), cx)));
+    cx.executor().advance_clock(SEARCH_DEBOUNCE);
+    support::wait_real(cx, "the search", |cx| {
+        cx.update(|cx| {
+            tab.read(cx)
+                .cards()
+                .iter()
+                .map(|c| c.id.get())
+                .collect::<Vec<_>>()
+                == [1, 3]
+        })
+    });
+    assert!(!cx.update(|cx| tab.read(cx).selects_enabled()));
+    assert_eq!(server.gb_search_count(), 1);
+    cx.update(|cx| tab.update(cx, |t, cx| t.search_typed(String::new(), cx)));
+    cx.executor().advance_clock(SEARCH_DEBOUNCE);
+    support::wait_real(cx, "the listing again", |cx| {
+        cx.update(|cx| tab.read(cx).cards().first().map(|c| c.id.get()) == Some(9))
+    });
+    assert!(cx.update(|cx| tab.read(cx).selects_enabled()));
+}
+
+#[gpui_kit::test]
+fn a_listing_that_ends_with_nothing_says_no_results(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_index(
+        1644,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(1, 1644, Some(1649))], true),
+    );
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "guis");
+    settled(cx, &tab, "the end");
+    assert!(support::present(cx, w.win, ids::ADDON_EMPTY));
     assert!(!support::present(cx, w.win, ids::ADDON_LOAD_MORE));
 }
