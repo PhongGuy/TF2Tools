@@ -12,6 +12,8 @@ mod maps;
 mod mastercomfig;
 pub(crate) mod pacer;
 #[cfg(test)]
+mod pacing_live;
+#[cfg(test)]
 mod pacing_tests;
 mod sync;
 mod unpack;
