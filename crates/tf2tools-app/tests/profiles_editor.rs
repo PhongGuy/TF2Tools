@@ -7,6 +7,7 @@ use tf2tools_app::ids;
 use tf2tools_app::library_events::LibraryEvents;
 use tf2tools_app::pages::profiles::ProfilesPage;
 use tf2tools_app::pages::profiles::editor::ProfileEditor;
+use tf2tools_app::pages::profiles::editor_model::Edit;
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
@@ -86,6 +87,10 @@ fn empty_profile(s: &support::ShellWindow, name: &str) -> Profile {
         .library
         .create_profile(&ProfileDraft::new(name))
         .unwrap()
+}
+
+fn saved(s: &support::ShellWindow, id: &ProfileId) -> Profile {
+    s.services.library.profile(id).unwrap()
 }
 /// Pins the TF2 probe to "not running", opens Profiles from the sidebar, waits for the load.
 fn open_profiles(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<ProfilesPage> {
@@ -259,4 +264,54 @@ fn without_tf2_activate_is_disabled(cx: &mut TestAppContext) {
         s.win,
         ids::PROFILE_EDITOR_ACTIVATE
     ));
+}
+
+// Two edits queued in one go: the rename's draft is built from the profile the HUD pick saved,
+// so neither is lost.
+#[gpui_kit::test]
+fn queued_edits_build_on_each_other(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let budhud = seed_hud(&s, &env, "budhud");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    cx.update(|cx| {
+        editor.update(cx, |e, cx| {
+            e.enqueue(Edit::SetHud(budhud.id().clone()), cx);
+            e.enqueue(Edit::Rename("Pubs".into()), cx);
+        })
+    });
+    wait_idle(cx, &s, &editor);
+    let after = saved(&s, comp.id());
+    assert_eq!(after.name(), "Pubs");
+    assert_eq!(
+        after.hud().map(|h| h.folder_name()),
+        Some(budhud.folder_name())
+    );
+    assert_eq!(after.hitsound(), comp.hitsound());
+    assert_eq!(after.crosshairs(), comp.crosshairs());
+    assert_eq!(cx.update(|cx| editor.read(cx).saved().clone()), after);
+    assert!(
+        support::log_rows(&s.services).is_empty(),
+        "edits write no activity rows"
+    );
+}
+#[gpui_kit::test]
+fn an_edit_to_a_profile_deleted_elsewhere_returns_to_the_grid(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    let page = open_profiles(cx, &s);
+    let editor = open_editor(cx, &s, &page, comp.id());
+    s.services.library.delete_profile(comp.id()).unwrap();
+    cx.update(|cx| editor.update(cx, |e, cx| e.enqueue(Edit::Rename("Pubs".into()), cx)));
+    toast_is(
+        cx,
+        &s,
+        "Failed to save profile. This profile no longer exists. Pick another profile.",
+    );
+    support::wait_real(cx, "the grid", |cx| {
+        !support::present(cx, s.win, ids::PROFILE_EDITOR)
+    });
 }
