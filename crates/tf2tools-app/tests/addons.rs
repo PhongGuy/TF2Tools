@@ -640,3 +640,35 @@ fn installing_both_refuses_while_tf2_runs(cx: &mut TestAppContext) {
     assert!(!env.game.join(BASE).exists());
     assert!(!env.game.join("tf/custom").join(PYRO).exists());
 }
+
+#[gpui_kit::test]
+fn install_both_left_during_the_base_download_still_copies_the_addon(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes(
+        "/gh/mastercomfig/mastercomfig-base.vpk",
+        support::mastercomfig_base("9.100.1"),
+    );
+    let s = shell_with(cx, &env, &server);
+    support::seed_mastercomfig_release(&env, &server.uri(), "9.100.1");
+    support::seed_library_addon(&s.services, &env, PYRO, "9.100.1", &vpk(), false);
+    let page = open_addons(cx, &s);
+    let (count, _sub) = support::library_changes(cx);
+    support::click_id(cx, s.win, ids::addon_install(&name(PYRO)));
+    support::wait_real(cx, "the question", |cx| {
+        support::present(cx, s.win, ids::CONFIRM_DIALOG)
+    });
+    // Answer and leave in one update, so the page is gone while the base downloads.
+    cx.update_window(s.win, |_, window, cx| {
+        window.click(ids::CONFIRM_OK, cx);
+        s.shell
+            .update(cx, |shell, cx| shell.navigate(Page::Huds, cx));
+    })
+    .unwrap();
+    drop(page);
+    toast_is(cx, &s, "Addon installed. No Pyroland is now active");
+    assert!(cx.update(|cx| s.shell.read(cx).addons_page()).is_none());
+    assert!(env.game.join(BASE).is_file());
+    assert!(env.game.join("tf/custom").join(PYRO).is_file());
+    assert_eq!(count.get(), 1);
+}

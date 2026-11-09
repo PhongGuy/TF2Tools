@@ -129,40 +129,23 @@ impl AddonsPage {
             Ok(tf2) => tf2,
             Err(err) => return toast_error(window, cx, &err),
         };
-        self.copy(name, display, tf2, true, cx);
+        self.copy(name, display, tf2, cx);
     }
 
     // Copies the addon into TF2 in one background job, which first checks for mastercomfig's
-    // base when `check` holds (false once the player said yes, so it never asks twice). A
-    // missing base asks "Install both?"; `busy` holds from the click to the answer.
-    fn copy(
-        &mut self,
-        name: AddonName,
-        display: String,
-        tf2: Tf2Install,
-        check: bool,
-        cx: &mut Context<Self>,
-    ) {
+    // base. A missing base asks "Install both?"; `busy` holds from the click to the answer.
+    // After a yes the copy runs without the page, so leaving during the download still lands.
+    fn copy(&mut self, name: AddonName, display: String, tf2: Tf2Install, cx: &mut Context<Self>) {
         self.busy = Some((name.clone(), AddonAction::Install));
         cx.notify();
         let job = {
-            let (name, display, tf2) = (name.clone(), display.clone(), tf2.clone());
+            let copy = copy_job(name.clone(), display.clone(), tf2.clone());
+            let tf2 = tf2.clone();
             run_blocking(cx, move |s| {
-                if check && jobs::needs_base(s, &tf2) {
+                if jobs::needs_base(s, &tf2) {
                     return Ok(Installed::NeedsBase);
                 }
-                s.library
-                    .install_addon(&name, &tf2)
-                    .map_err(|e| describe_tf2_install(&e).into_op("Failed to install addon"))?;
-                let message = format!("Installed addon: {display}");
-                activity::write(
-                    s,
-                    &NewLogEntry::new(LogLevel::Info, "addon_store", "install", message),
-                );
-                Ok(Installed::Done(
-                    "Addon installed".into(),
-                    format!("{display} is now active").into(),
-                ))
+                copy(s).map(|(title, text)| Installed::Done(title, text))
             })
         };
         let win = self.win;
@@ -172,15 +155,15 @@ impl AddonsPage {
                 if page.upgrade().is_none() {
                     return;
                 }
-                let yes = jobs::ask_and_install_base(win, tf2.clone(), cx).await;
-                let _ = page.update(cx, |page, cx| {
-                    if yes {
-                        page.copy(name, display, tf2, false, cx);
-                    } else {
+                if !jobs::ask_and_install_base(win, tf2.clone(), cx).await {
+                    let _ = page.update(cx, |page, cx| {
                         page.busy = None;
                         cx.notify();
-                    }
-                });
+                    });
+                    return;
+                }
+                let job = cx.update(|cx| run_blocking(cx, copy_job(name, display, tf2)));
+                announce(win, page, job.await, cx);
             }
             Ok(Installed::Done(title, text)) => announce(win, page, Ok((title, text)), cx),
             Err(err) => announce(win, page, Err(err), cx),
@@ -403,6 +386,28 @@ impl AddonsPage {
 enum Installed {
     Done(SharedString, SharedString),
     NeedsBase,
+}
+
+// Copies the addon into TF2 and logs it; resolves to the success toast's title and text.
+fn copy_job(
+    name: AddonName,
+    display: String,
+    tf2: Tf2Install,
+) -> impl FnOnce(&Services) -> Result<(SharedString, SharedString), OpError> + Send + 'static {
+    move |s| {
+        s.library
+            .install_addon(&name, &tf2)
+            .map_err(|e| describe_tf2_install(&e).into_op("Failed to install addon"))?;
+        let message = format!("Installed addon: {display}");
+        activity::write(
+            s,
+            &NewLogEntry::new(LogLevel::Info, "addon_store", "install", message),
+        );
+        Ok((
+            "Addon installed".into(),
+            format!("{display} is now active").into(),
+        ))
+    }
 }
 
 // Toasts `done` in `win`, announces LibraryChanged on success outside the page (so it lands
