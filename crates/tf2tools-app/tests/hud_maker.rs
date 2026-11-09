@@ -1096,7 +1096,7 @@ fn drag_window(
     by: (f32, f32),
 ) {
     let left = gpui_kit::MouseButton::Left;
-    let free = gpui_kit::Modifiers::secondary_key();
+    let free = support::secondary_key(cx);
     let at = |t: f32| from + point(px(by.0 * t), px(by.1 * t));
     send(
         cx,
@@ -1225,6 +1225,7 @@ fn hold_drag(
     from: gpui_kit::Point<Pixels>,
     by: (f32, f32),
 ) {
+    let ctrl = support::secondary_key(cx);
     let left = gpui_kit::MouseButton::Left;
     send(
         cx,
@@ -1232,7 +1233,7 @@ fn hold_drag(
         gpui_kit::MouseDownEvent {
             button: left,
             position: from,
-            modifiers: gpui_kit::Modifiers::secondary_key(),
+            modifiers: ctrl,
             click_count: 1,
             first_mouse: false,
         },
@@ -1243,7 +1244,7 @@ fn hold_drag(
         gpui_kit::MouseMoveEvent {
             position: from + point(px(by.0), px(by.1)),
             pressed_button: Some(left),
-            modifiers: gpui_kit::Modifiers::secondary_key(),
+            modifiers: ctrl,
         },
     );
 }
@@ -2097,11 +2098,12 @@ fn scrolling_the_parts_list_takes_the_outline_off_the_row(cx: &mut TestAppContex
     send(
         cx,
         &s,
-        gpui_kit::ScrollWheelEvent {
+        gpui_kit::ScrollEvent {
             position: row.center(),
             delta: gpui_kit::ScrollDelta::Lines(point(0., -400.)),
             modifiers: gpui_kit::Modifiers::default(),
             touch_phase: gpui_kit::TouchPhase::Moved,
+            source: Default::default(),
         },
     );
     let part = bounds(cx, &s, ids::hud_maker_part(&PartKey::new(HV)));
@@ -2883,11 +2885,12 @@ fn a_docked_column_fits_the_area_and_its_last_row_can_be_reached(cx: &mut TestAp
     send(
         cx,
         &s,
-        gpui_kit::ScrollWheelEvent {
+        gpui_kit::ScrollEvent {
             position: list.center(),
             delta: gpui_kit::ScrollDelta::Lines(point(0., -400.)),
             modifiers: gpui_kit::Modifiers::default(),
             touch_phase: gpui_kit::TouchPhase::Moved,
+            source: Default::default(),
         },
     );
     let row = bounds(cx, &s, ids::hud_maker_row(&last));

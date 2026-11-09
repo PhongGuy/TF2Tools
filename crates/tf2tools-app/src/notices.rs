@@ -1,4 +1,4 @@
-//! The third-party licence notices, compiled into the binary from the repo's `licenses/` folder
+//! The third-party licence and credit notices, compiled into the binary from the repo's `licenses/` folder
 //! so every build carries them whatever the packager ships. Settings shows them.
 
 use rust_embed::RustEmbed;
@@ -13,6 +13,11 @@ const TITLES: &[(&str, &str)] = &[
     ("Inter-OFL.txt", "Inter font"),
     ("Lucide-ISC.txt", "Lucide icons"),
     ("HUD-option-schemas-MIT.txt", "HUD option schemas (MIT)"),
+    ("mastercomfig-MIT.txt", "mastercomfig (MIT)"),
+    ("hud-db-MIT.txt", "hud-db HUD list (MIT)"),
+    ("GameBanana-notice.txt", "GameBanana"),
+    ("serveme-notice.txt", "serveme.tf"),
+    ("Valve-notice.txt", "Valve and Team Fortress 2"),
 ];
 
 /// One licence notice: its file under `licenses/`, a plain title and the full text.

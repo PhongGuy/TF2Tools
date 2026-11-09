@@ -12,6 +12,18 @@ fn words(text: &str) -> String {
     text.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+fn readme_license_section() -> String {
+    let readme = repo_file("README.md");
+    readme
+        .split("\n## License\n")
+        .nth(1)
+        .expect("a License section")
+        .split("\n## ")
+        .next()
+        .unwrap()
+        .to_owned()
+}
+
 #[test]
 fn the_repo_root_holds_the_mit_license() {
     let text = repo_file("LICENSE");
@@ -33,14 +45,7 @@ fn the_repo_root_holds_the_mit_license() {
 #[test]
 fn the_manifest_and_readme_point_at_it() {
     assert!(repo_file("Cargo.toml").contains("license = \"MIT\""));
-    let readme = repo_file("README.md");
-    let section = readme
-        .split("\n## License\n")
-        .nth(1)
-        .expect("a License section")
-        .split("\n## ")
-        .next()
-        .unwrap();
+    let section = readme_license_section();
     assert!(section.contains("[LICENSE](LICENSE)"), "{section}");
     assert!(section.contains("licenses/Inter-OFL.txt"), "{section}");
     assert!(section.contains("licenses/Lucide-ISC.txt"), "{section}");
@@ -55,5 +60,55 @@ fn the_bundled_lucide_icons_carry_their_isc_notice() {
         "The MIT License (MIT) (for the icons listed above) Copyright (c) 2013-present Cole Bemis",
     ] {
         assert!(flat.contains(clause), "missing: {clause}");
+    }
+}
+
+#[test]
+fn the_mastercomfig_and_hud_db_notices_carry_their_mit_licences() {
+    for (file, copyright) in [
+        (
+            "licenses/mastercomfig-MIT.txt",
+            "Copyright (c) 2016-2026 mastercoms",
+        ),
+        (
+            "licenses/hud-db-MIT.txt",
+            "Copyright (c) 2024-2026 mastercomfig",
+        ),
+    ] {
+        let flat = words(&repo_file(file));
+        for clause in [
+            format!("MIT License {copyright} Permission is hereby granted, free of charge,"),
+            "The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.".to_owned(),
+            "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.".to_owned(),
+        ] {
+            assert!(flat.contains(&clause), "{file} misses: {clause}");
+        }
+    }
+}
+
+#[test]
+fn the_readme_credits_every_outside_source() {
+    let section = words(&readme_license_section());
+    for needed in [
+        "Copyright (c) 2016-2026 mastercoms",
+        "Copyright (c) 2024-2026 mastercomfig",
+        "licenses/mastercomfig-MIT.txt",
+        "licenses/hud-db-MIT.txt",
+        "GameBanana Co LLC",
+        "serveme.tf",
+        "Valve Corporation",
+    ] {
+        assert!(section.contains(needed), "missing: {needed}");
+    }
+    for source in [
+        "Valve Corporation",
+        "mastercomfig",
+        "GameBanana",
+        "serveme.tf",
+    ] {
+        let disclaimer = format!(
+            "TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with {source}"
+        );
+        assert!(section.contains(&disclaimer), "missing: {disclaimer}");
     }
 }

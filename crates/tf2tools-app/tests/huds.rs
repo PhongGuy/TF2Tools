@@ -795,11 +795,12 @@ fn at_800x600_the_grid_has_room_and_add_hud_keeps_the_margin(cx: &mut TestAppCon
     assert!(add.left() >= search.right(), "{add:?} over {search:?}");
     // Scrolling the page to its end shows the whole grid.
     cx.update_window(s.win, |_, w, cx| {
-        let wheel = gpui_kit::ScrollWheelEvent {
+        let wheel = gpui_kit::ScrollEvent {
             position: gpui_kit::point(page.center().x, page.top() + px(80.)),
             delta: gpui_kit::ScrollDelta::Lines(gpui_kit::point(0., -40.)),
             modifiers: gpui_kit::Modifiers::default(),
             touch_phase: gpui_kit::TouchPhase::Moved,
+            source: Default::default(),
         };
         let _ = w.dispatch_event(gpui_kit::InputEvent::to_platform_input(wheel), cx);
     })

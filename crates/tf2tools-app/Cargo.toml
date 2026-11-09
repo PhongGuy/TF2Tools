@@ -23,9 +23,9 @@ workspace = true
 [dependencies]
 tf2tools-core = { path = "../tf2tools-core" }
 gpui-kit.workspace = true
-# Unused directly: holds the resolve at =0.7.1 (a caret resolve picks 0.7.2).
+# Unused directly: holds the kit trio at the exact workspace pin.
 gpui-component.workspace = true
-# Unused directly: holds the resolve at =0.7.1 (a caret resolve picks 0.7.2).
+# Unused directly: holds the kit trio at the exact workspace pin.
 gpui-base.workspace = true
 # Unused directly: turns on `debug-embed`, so debug builds carry their icons.
 rust-embed.workspace = true
@@ -57,7 +57,7 @@ wiremock.workspace = true
 sha2.workspace = true
 minisign.workspace = true
 # The real cosmic-text system, so a test can resolve the bundled font weights.
-gpui-pre-wgpu = "=0.3.8"
+gpui-pre-wgpu = "=0.3.11"
 
 # A single test executable keeps the link count (and the target dir) small.
 [[test]]

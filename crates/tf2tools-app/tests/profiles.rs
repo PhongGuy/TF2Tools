@@ -1066,7 +1066,7 @@ fn the_save_dialogs_x_closes_without_saving(cx: &mut TestAppContext) {
     let page = open_profiles(cx, &s);
     support::click_id(cx, s.win, ids::PROFILES_SAVE_CURRENT);
     type_name(cx, &s, &page, "Mine");
-    support::click_id(cx, s.win, "close");
+    support::click_dialog_x(cx, s.win);
     assert!(!has_dialog(cx, &s));
     assert!(s.services.library.profiles().unwrap().is_empty());
 }
@@ -1254,11 +1254,12 @@ fn at_800x600_the_profiles_header_fits_and_the_cards_have_room(cx: &mut TestAppC
     );
     // Scrolling the page to its end shows the whole card area.
     cx.update_window(s.win, |_, w, cx| {
-        let wheel = gpui_kit::ScrollWheelEvent {
+        let wheel = gpui_kit::ScrollEvent {
             position: gpui_kit::point(page.center().x, page.top() + px(80.)),
             delta: gpui_kit::ScrollDelta::Lines(gpui_kit::point(0., -40.)),
             modifiers: gpui_kit::Modifiers::default(),
             touch_phase: gpui_kit::TouchPhase::Moved,
+            source: Default::default(),
         };
         let _ = w.dispatch_event(gpui_kit::InputEvent::to_platform_input(wheel), cx);
     })

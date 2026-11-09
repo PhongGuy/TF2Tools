@@ -120,6 +120,61 @@ fn known_notices_get_plain_titles() {
         notices::title_for("HUD-option-schemas-MIT.txt"),
         "HUD option schemas (MIT)"
     );
+    assert_eq!(
+        notices::title_for("mastercomfig-MIT.txt"),
+        "mastercomfig (MIT)"
+    );
+    assert_eq!(
+        notices::title_for("hud-db-MIT.txt"),
+        "hud-db HUD list (MIT)"
+    );
+    assert_eq!(notices::title_for("GameBanana-notice.txt"), "GameBanana");
+    assert_eq!(notices::title_for("serveme-notice.txt"), "serveme.tf");
+    assert_eq!(
+        notices::title_for("Valve-notice.txt"),
+        "Valve and Team Fortress 2"
+    );
     // A notice nobody titled still shows, named after its file.
     assert_eq!(notices::title_for("Some-Thing-MIT.txt"), "Some Thing MIT");
+}
+
+/// Every outside source the app takes content from, its notice file, and the line that notice
+/// must carry: the upstream copyright line where there is a licence, else the source's name.
+const SOURCES: &[(&str, &str, &str)] = &[
+    (
+        "mastercomfig addons",
+        "mastercomfig-MIT.txt",
+        "Copyright (c) 2016-2026 mastercoms",
+    ),
+    (
+        "hud-db HUD list",
+        "hud-db-MIT.txt",
+        "Copyright (c) 2024-2026 mastercomfig",
+    ),
+    ("GameBanana stores", "GameBanana-notice.txt", "GameBanana"),
+    ("Maps page list", "serveme-notice.txt", "serveme.tf"),
+    ("game artwork", "Valve-notice.txt", "Valve Corporation"),
+];
+
+#[test]
+fn every_outside_source_has_a_notice_that_disclaims_affiliation() {
+    let shipped = notices::all();
+    for (what, file, line) in SOURCES {
+        let notice = shipped
+            .iter()
+            .find(|n| n.file() == *file)
+            .unwrap_or_else(|| panic!("{what} needs licenses/{file}"));
+        let flat = notice
+            .text()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(flat.contains(line), "{file} lacks {line:?}");
+        assert!(
+            flat.contains(
+                "TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with"
+            ),
+            "{file} lacks the not-affiliated statement"
+        );
+    }
 }

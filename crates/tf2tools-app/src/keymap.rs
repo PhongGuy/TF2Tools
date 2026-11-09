@@ -1,6 +1,6 @@
 //! The app's keyboard actions and their bindings.
 
-use gpui_kit::{App, KeyBinding};
+use gpui_kit::{Action, App, KeyBinding, KeyBindingContextPredicate};
 
 use crate::pages::crosshair_maker::model::Tool;
 
@@ -100,26 +100,26 @@ pub fn bind(cx: &mut App) {
     let maker = Some(maker_keys.as_str());
     let hud_keys = format!("{HUD_MAKER_CONTEXT} && !Input");
     let hud = Some(hud_keys.as_str());
-    cx.bind_keys([
-        KeyBinding::new(TOGGLE_SIDEBAR_KEYS, ToggleSidebar, Some("Shell")),
+    let keys = [
+        secondary(TOGGLE_SIDEBAR_KEYS, ToggleSidebar, Some("Shell"), cx),
         KeyBinding::new(Tool::Pencil.key(), UsePencil, maker),
         KeyBinding::new(Tool::Eraser.key(), UseEraser, maker),
         KeyBinding::new(Tool::Fill.key(), UseFill, maker),
         KeyBinding::new(Tool::Line.key(), UseLine, maker),
         KeyBinding::new(Tool::Rectangle.key(), UseRectangle, maker),
         KeyBinding::new(Tool::Circle.key(), UseCircle, maker),
-        KeyBinding::new("secondary-z", UndoDrawing, maker),
-        KeyBinding::new("secondary-y", RedoDrawing, maker),
-        KeyBinding::new("secondary-shift-z", RedoDrawing, maker),
+        secondary("secondary-z", UndoDrawing, maker, cx),
+        secondary("secondary-y", RedoDrawing, maker, cx),
+        secondary("secondary-shift-z", RedoDrawing, maker, cx),
         // Plus arrives as `=`, `+` or Shift+`=` depending on the layout.
-        KeyBinding::new("secondary-=", ZoomInGrid, maker),
-        KeyBinding::new("secondary-+", ZoomInGrid, maker),
-        KeyBinding::new("secondary-shift-=", ZoomInGrid, maker),
-        KeyBinding::new("secondary--", ZoomOutGrid, maker),
-        KeyBinding::new("secondary-0", FitGrid, maker),
-        KeyBinding::new("secondary-z", UndoHudChange, hud),
-        KeyBinding::new("secondary-y", RedoHudChange, hud),
-        KeyBinding::new("secondary-shift-z", RedoHudChange, hud),
+        secondary("secondary-=", ZoomInGrid, maker, cx),
+        secondary("secondary-+", ZoomInGrid, maker, cx),
+        secondary("secondary-shift-=", ZoomInGrid, maker, cx),
+        secondary("secondary--", ZoomOutGrid, maker, cx),
+        secondary("secondary-0", FitGrid, maker, cx),
+        secondary("secondary-z", UndoHudChange, hud, cx),
+        secondary("secondary-y", RedoHudChange, hud, cx),
+        secondary("secondary-shift-z", RedoHudChange, hud, cx),
         KeyBinding::new("escape", CancelHudDrag, hud),
         KeyBinding::new("left", NudgeLeft, hud),
         KeyBinding::new("right", NudgeRight, hud),
@@ -129,15 +129,29 @@ pub fn bind(cx: &mut App) {
         KeyBinding::new("shift-right", NudgeRightFar, hud),
         KeyBinding::new("shift-up", NudgeUpFar, hud),
         KeyBinding::new("shift-down", NudgeDownFar, hud),
-        KeyBinding::new("secondary-=", ZoomInHud, hud),
-        KeyBinding::new("secondary-+", ZoomInHud, hud),
-        KeyBinding::new("secondary-shift-=", ZoomInHud, hud),
-        KeyBinding::new("secondary--", ZoomOutHud, hud),
-        KeyBinding::new("secondary-0", ZoomFitHud, hud),
+        secondary("secondary-=", ZoomInHud, hud, cx),
+        secondary("secondary-+", ZoomInHud, hud, cx),
+        secondary("secondary-shift-=", ZoomInHud, hud, cx),
+        secondary("secondary--", ZoomOutHud, hud, cx),
+        secondary("secondary-0", ZoomFitHud, hud, cx),
         KeyBinding::new("h", ToggleHudPartHidden, hud),
         KeyBinding::new("delete", HideHudPart, hud),
         // "?" arrives as Shift+/ on most layouts and as the bare character on others.
         KeyBinding::new("shift-/", ShowHudShortcuts, hud),
         KeyBinding::new("?", ShowHudShortcuts, hud),
-    ]);
+    ];
+    cx.bind_keys(keys);
+}
+
+/// A binding whose `secondary-` means Ctrl, or Cmd on macOS. `KeyBinding::new` takes only
+/// explicit modifiers, so the alias resolves against the host OS through `KeyBinding::load`;
+/// like `new`, it panics on a malformed literal.
+#[allow(clippy::expect_used)]
+fn secondary<A: Action>(keys: &str, action: A, context: Option<&str>, cx: &App) -> KeyBinding {
+    let context = context.map(|c| {
+        KeyBindingContextPredicate::parse(c)
+            .expect("a static key context")
+            .into()
+    });
+    KeyBinding::load(keys, Box::new(action), context, false, None, cx).expect("a static keystroke")
 }

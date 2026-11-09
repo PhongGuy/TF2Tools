@@ -147,7 +147,7 @@ fn dragging_one_of_several_moves_them_all_as_one_step(cx: &mut TestAppContext) {
     two_selected(cx, &s);
     let (hv, ammo) = (rect(cx, &page, HV), rect(cx, &page, AMMO));
     // Ctrl keeps the drag free of snapping, so the delta is the pointer's.
-    let free = Modifiers::secondary_key();
+    let free = support::secondary_key(cx);
     let from = at(cx, &s, 220., 947.);
     let to = at(cx, &s, 220., 917.);
     down(cx, &s, from, free);
