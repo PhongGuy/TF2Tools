@@ -192,6 +192,9 @@ pub fn describe_apply_modules(err: &ApplyModulesError) -> LocalFailure {
         ApplyModulesError::NoRelease => {
             "TF2Tools doesn't know where to download this setting's file yet. Use Check for updates, then try again."
         }
+        ApplyModulesError::UpdateWaiting { .. } => {
+            "A mastercomfig update is waiting. Update mastercomfig first, then pick this again."
+        }
         ApplyModulesError::NotAVpk { .. }
         | ApplyModulesError::Http { .. }
         | ApplyModulesError::TooLarge { .. }

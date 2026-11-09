@@ -4,8 +4,8 @@ use crate::support;
 
 use gpui_kit::TestAppContext;
 use support::graphics::{
-    HEADER, choose, found, idle, modules_cfg, open, saved, server_shell, toasted, value,
-    wait_for_list,
+    HEADER, choose, found, idle, modules_cfg, open, pick, saved, server_shell, shown, toasted,
+    value, wait_for_list,
 };
 use tf2tools_app::ids;
 
@@ -86,6 +86,40 @@ fn low_sound_downloads_its_override(cx: &mut TestAppContext) {
     assert_eq!(
         modules_cfg(&env).as_deref(),
         Some(format!("{HEADER}sound=low\n").as_str())
+    );
+}
+
+#[gpui_kit::test]
+fn low_sound_asks_for_the_waiting_update_first(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let vpk = support::vpk_bytes(&[("cfg/addons/override-1.cfg", b"echo".as_slice())]);
+    server.mount_bytes("/gh/mastercomfig/mastercomfig-addon-override-1.vpk", vpk);
+    let s = server_shell(cx, &env, &server);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_catalog(&env, "9.100.1");
+    support::seed_mastercomfig_release(&env, &server.uri(), "9.101.0");
+    support::seed_mastercomfig_overrides(&env, &server.uri());
+    let page = open(cx, &s);
+    wait_for_list(cx, &s, &page);
+    pick(cx, &s, &page, "sound", value("low"));
+    toasted(
+        cx,
+        &s,
+        "A mastercomfig update is waiting. Update mastercomfig first, then pick this again.",
+    );
+    idle(cx, &page);
+    assert_eq!(saved(cx, &page, "sound"), None);
+    assert_eq!(
+        shown(cx, &page, "sound"),
+        Some(value("high")),
+        "the Select goes back to the saved choice"
+    );
+    assert_eq!(modules_cfg(&env), None);
+    assert!(
+        !env.game
+            .join("tf/custom/mastercomfig-addon-override-1.vpk")
+            .exists()
     );
 }
 

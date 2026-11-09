@@ -233,3 +233,53 @@ async fn a_release_read_failure_carries_sqlites_message_unwrapped() {
     assert!(message.contains("mastercomfig_release"), "{message}");
     assert!(!message.starts_with("store database error"), "{message}");
 }
+
+#[tokio::test]
+async fn an_override_waits_for_the_installed_version_to_match_the_release() {
+    let env = store_env().await;
+    let (_game, tf2) = managed_game(&env);
+    set_mastercomfig_state(&env.dir, "9.100.0", "medium");
+    record_release(&env);
+    serve_overrides(&env).await;
+    let mut choices = Choices::new(Preset::Medium);
+    choices.set(&module_catalog(), "sound", value("low"));
+    let err = apply(&env, &tf2, &choices).await.unwrap_err();
+    let ApplyModulesError::UpdateWaiting { installed, latest } = &err else {
+        panic!("{err:?}");
+    };
+    assert_eq!(
+        (installed.as_str(), latest.as_str()),
+        ("9.100.0", "9.100.1")
+    );
+    assert_eq!(requests(&env).await, 0);
+    assert_eq!(tree(&tf2.custom_dir()), [BASE]);
+    assert!(!tf2.tf_dir().join("cfg/overrides/modules.cfg").exists());
+    let saved = env.lib.mastercomfig_choices().unwrap().unwrap();
+    assert_eq!(saved.get("sound"), None);
+}
+
+#[tokio::test]
+async fn a_leading_v_on_either_version_still_matches() {
+    let env = store_env().await;
+    let (_game, tf2) = managed_game(&env);
+    set_mastercomfig_state(&env.dir, "v9.100.1", "medium");
+    record_release(&env);
+    serve_overrides(&env).await;
+    let mut choices = Choices::new(Preset::Medium);
+    choices.set(&module_catalog(), "sound", value("low"));
+    apply(&env, &tf2, &choices).await.unwrap();
+    assert_eq!(overrides(&tf2), ["mastercomfig-addon-override-1.vpk"]);
+}
+
+#[tokio::test]
+async fn an_unknown_installed_version_still_swaps_the_override() {
+    let env = store_env().await;
+    let (_game, tf2) = managed_game(&env);
+    set_mastercomfig_state(&env.dir, "unknown", "medium");
+    record_release(&env);
+    serve_overrides(&env).await;
+    let mut choices = Choices::new(Preset::Medium);
+    choices.set(&module_catalog(), "sound", value("low"));
+    apply(&env, &tf2, &choices).await.unwrap();
+    assert_eq!(overrides(&tf2), ["mastercomfig-addon-override-1.vpk"]);
+}

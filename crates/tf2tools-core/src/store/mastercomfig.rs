@@ -36,6 +36,24 @@ fn check_tag(tag: &str) -> Result<(), ModuleCatalogError> {
     Ok(())
 }
 
+/// A dotted numeric version as numbers, ignoring a leading "v"; None if any part isn't one.
+fn version_parts(tag: &str) -> Option<Vec<u64>> {
+    let tag = tag.strip_prefix('v').unwrap_or(tag);
+    tag.split('.').map(|part| part.parse().ok()).collect()
+}
+
+/// The recorded version of the managed install, if there is one.
+fn installed_version(db: &crate::db::Database) -> rusqlite::Result<Option<String>> {
+    db.read(|conn| {
+        conn.query_row(
+            "SELECT version FROM mastercomfig_state WHERE id = 1",
+            [],
+            |r| r.get(0),
+        )
+        .optional()
+    })
+}
+
 /// Why a VPK download failed; mapped into the base install's and the override swap's errors.
 #[derive(Debug)]
 enum FetchFailure {
@@ -272,6 +290,21 @@ impl StoreClient {
                         },
                     })?
                     .ok_or(ApplyModulesError::NoRelease)?;
+                // The release's override belongs to its own version, so it waits for the
+                // update; a hand install whose version could not be read takes it as before.
+                let installed =
+                    installed_version(&self.db).map_err(|e| ApplyModulesError::Database {
+                        message: e.to_string(),
+                    })?;
+                if let Some(installed) = installed {
+                    let (have, want) = (version_parts(&installed), version_parts(release.tag()));
+                    if have.is_some() && want.is_some() && have != want {
+                        return Err(ApplyModulesError::UpdateWaiting {
+                            installed,
+                            latest: release.tag().to_owned(),
+                        });
+                    }
+                }
                 let url = release
                     .override_url(mask)
                     .ok_or(ApplyModulesError::NoRelease)?;
