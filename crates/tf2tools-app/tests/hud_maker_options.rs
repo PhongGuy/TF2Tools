@@ -559,6 +559,38 @@ fn viewmodels_without_mastercomfig_ask_and_a_cancel_installs_nothing(cx: &mut Te
     assert!(!env.game.join("tf/custom/mastercomfig-base.vpk").exists());
 }
 
+// A yes installs mastercomfig's base first, then runs the switch again, which copies the addon.
+#[gpui_kit::test]
+fn viewmodels_without_mastercomfig_and_a_yes_install_both(cx: &mut TestAppContext) {
+    let (env, s, page) = opened_with_viewmodels(cx, false);
+    let server = support::StoreServer::start();
+    server.mount_bytes(
+        "/gh/mastercomfig/mastercomfig-base.vpk",
+        support::mastercomfig_base("9.100.1"),
+    );
+    cx.executor().allow_parking();
+    cx.update(|cx| {
+        let services = cx.global::<Services>().clone();
+        cx.set_global(services.with_endpoints(server.endpoints()));
+    });
+    support::seed_mastercomfig_release(&env, &server.uri(), "9.100.1");
+    click_in_panel(cx, &s, ids::HUD_MAKER_VIEWMODELS.into());
+    support::wait_real(cx, "the question", |cx| {
+        support::present(cx, s.win, ids::CONFIRM_DIALOG)
+    });
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    let installed = env.game.join("tf/custom").join(VIEWMODELS);
+    support::wait_real(cx, "the addon to install", |cx| {
+        installed.is_file() && cx.update(|cx| !page.read(cx).viewmodels_held())
+    });
+    support::settle(cx, s.win);
+    assert!(env.game.join("tf/custom/mastercomfig-base.vpk").is_file());
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::HUD_MAKER_VIEWMODELS),
+        Some(true)
+    );
+}
+
 #[gpui_kit::test]
 fn viewmodels_act_at_once_and_are_not_stored(cx: &mut TestAppContext) {
     let (env, s, page) = opened_with_viewmodels(cx, true);
