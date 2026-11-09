@@ -5,10 +5,10 @@ use crate::support;
 use gpui_kit::ElementId;
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::model::{
-    GAME_DEFAULT, SettingsNote, catalog_note, dropped_note, settings_note_text, shown_choice,
-    value_options,
+    GAME_DEFAULT, SettingsNote, catalog_note, describe_apply_modules, dropped_note,
+    settings_note_text, shown_choice, value_options,
 };
-use tf2tools_core::{Choices, ModuleCatalogError, ModuleChoice, Preset};
+use tf2tools_core::{ApplyModulesError, Choices, ModuleCatalogError, ModuleChoice, Preset};
 
 fn value(v: &str) -> ModuleChoice {
     ModuleChoice::Value(v.to_owned())
@@ -144,4 +144,34 @@ fn row_ids_name_the_module_and_value() {
         name(ids::graphics_value("lod", &ModuleChoice::NotSet)),
         "graphics-value:lod="
     );
+}
+
+#[test]
+fn a_failed_save_says_what_to_do() {
+    let cases = [
+        (
+            ApplyModulesError::NotManaged,
+            "mastercomfig changed since this page opened. Open the Graphics page again and try once more.",
+        ),
+        (
+            ApplyModulesError::Network {
+                url: "u".into(),
+                message: "m".into(),
+            },
+            "Couldn't reach GitHub. Check your internet connection and try again.",
+        ),
+        (
+            ApplyModulesError::ForeignModulesCfg {
+                path: "modules.cfg".into(),
+            },
+            "TF2 has a modules.cfg that TF2Tools didn't write, so TF2Tools left it alone.",
+        ),
+        (
+            ApplyModulesError::NoRelease,
+            "TF2Tools doesn't know where to download this setting's file yet. Use Check for updates, then try again.",
+        ),
+    ];
+    for (err, message) in cases {
+        assert_eq!(describe_apply_modules(&err).message, message, "{err:?}");
+    }
 }

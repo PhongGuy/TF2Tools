@@ -31,7 +31,8 @@ pub(super) fn section(page: &GraphicsPage, cx: &mut Context<GraphicsPage>) -> An
             Button::new(ids::GRAPHICS_RESET_ALL)
                 .outline()
                 .label("Reset all to preset")
-                .disabled(nothing_saved || page.busy),
+                .disabled(nothing_saved || page.busy)
+                .on_click(cx.listener(|page, _, _, cx| page.reset_all(cx))),
         );
     let body = match &page.catalog {
         Some(catalog) => list(page, catalog, cx),
@@ -99,16 +100,19 @@ fn row(page: &GraphicsPage, module: &ComfigModule, cx: &mut Context<GraphicsPage
             .child(
                 Select::new(select)
                     .small()
+                    .disabled(page.busy)
                     .accessibility_label(module.label().to_owned()),
             )
     });
     let saved = page.choices.as_ref().is_some_and(|c| c.get(name).is_some());
     let reset = saved.then(|| {
+        let module = name.to_owned();
         Button::new(ids::graphics_module_reset(name))
             .outline()
             .small()
             .label("Reset")
             .disabled(page.busy)
+            .on_click(cx.listener(move |page, _, _, cx| page.reset_module(&module, cx)))
     });
     h_flex()
         .justify_between()

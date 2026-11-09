@@ -1,11 +1,15 @@
 //! mastercomfig's background jobs, shared by every page that installs its base VPK.
 
 use std::future::Future;
+use std::sync::Arc;
 
 use gpui_kit::{AnyWindowHandle, App, AsyncApp};
-use tf2tools_core::{MastercomfigStatus, ModuleCatalog, StoreClient, StoreKind, Tf2Install};
+use tf2tools_core::{
+    ApplyModulesError, Choices, MastercomfigStatus, ModuleCatalog, StoreClient, StoreKind,
+    Tf2Install,
+};
 
-use super::model::{SettingsNote, catalog_note, describe_install};
+use super::model::{SettingsNote, catalog_note, describe_apply_modules, describe_install};
 use crate::local_messages::describe_store_status;
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::services::{OpError, Services};
@@ -63,6 +67,57 @@ pub fn install_base(
             .map_err(|e| describe_install(&e).into_op(action))
     });
     async move { job.await.map_err(|e| OpError::core(action, e))? }
+}
+
+/// The title of a setting that could not be saved.
+pub const SAVE_FAILED: &str = "Couldn't save the setting";
+
+/// Why `apply_modules` changed nothing.
+#[derive(Debug)]
+pub enum ModulesFailure {
+    /// TF2 has a modules.cfg TF2Tools did not write.
+    Foreign,
+    Op(OpError),
+}
+
+/// Applies `choices` through core on the tokio bridge. With `guard_tf2` it first refuses while
+/// TF2 runs (CLOSE_TF2). Resolves to the dropped module names. Errors are titled SAVE_FAILED.
+pub fn apply_modules(
+    tf2: Tf2Install,
+    catalog: Arc<ModuleCatalog>,
+    choices: Choices,
+    guard_tf2: bool,
+    replace_foreign: bool,
+    cx: &mut App,
+) -> impl Future<Output = Result<Vec<String>, ModulesFailure>> + 'static + use<> {
+    let store = cx.global::<Services>().store.clone();
+    let probe = Tf2Probe::get(cx);
+    if !tokio_bridge::is_running(cx) {
+        tokio_bridge::init(cx);
+    }
+    let died = |e: tokio::task::JoinError| ModulesFailure::Op(OpError::core(SAVE_FAILED, e));
+    let job = tokio_bridge::spawn(cx, async move {
+        if guard_tf2 {
+            tokio::task::spawn_blocking(move || refuse_while_running(&*probe))
+                .await
+                .map_err(died)?
+                .map_err(ModulesFailure::Op)?;
+        }
+        store
+            .apply_mastercomfig_modules(&tf2, &catalog, &choices, replace_foreign)
+            .await
+            .map_err(|e| {
+                if let ApplyModulesError::ForeignModulesCfg { .. } = e {
+                    ModulesFailure::Foreign
+                } else {
+                    ModulesFailure::Op(describe_apply_modules(&e).into_op(SAVE_FAILED))
+                }
+            })
+    });
+    async move {
+        job.await
+            .map_err(|e| ModulesFailure::Op(OpError::core(SAVE_FAILED, e)))?
+    }
 }
 
 /// True only when mastercomfig's base is missing from `tf2`; a status error reads as

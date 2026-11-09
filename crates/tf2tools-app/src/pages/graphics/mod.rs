@@ -5,10 +5,11 @@ pub mod model;
 mod settings;
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::select::SelectState;
+use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -30,10 +31,11 @@ use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
+use jobs::{ModulesFailure, SAVE_FAILED};
 use model::{
-    SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove, describe_take_over,
-    detail, headline, preset_description, preset_label, shown_choice, status_card, update_to,
-    value_options,
+    FOREIGN_MODULES_CFG, SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove,
+    describe_take_over, detail, dropped_note, headline, preset_description, preset_label,
+    shown_choice, status_card, update_to, value_options,
 };
 
 const CREDIT: &str = "mastercomfig is made by the mastercomfig team and shared under the MIT licence. Preset descriptions come from comfig-app.";
@@ -41,6 +43,9 @@ const FOOTER: &str = "Changes apply the next time TF2 starts.";
 
 /// A finished action's success toast: (title, description).
 type Done = (SharedString, SharedString);
+
+/// A finished action's toast, if it has one: (kind, title, description).
+type Outcome = Option<(ToastKind, SharedString, SharedString)>;
 
 /// A settings row's value picker.
 type ValueSelect = Entity<SelectState<Vec<ValueOption>>>;
@@ -80,9 +85,11 @@ pub struct GraphicsPage {
     /// The saved choices of a managed install, from the last load.
     choices: Option<Choices>,
     /// The settings list's catalog, always for the managed install's version.
-    catalog: Option<ModuleCatalog>,
+    catalog: Option<Arc<ModuleCatalog>>,
     /// One Select per catalog module, built when the catalog arrives.
     selects: BTreeMap<String, ValueSelect>,
+    /// Each Select's pick handler, rebuilt with the Selects.
+    select_subscriptions: Vec<Subscription>,
     /// Why there is no catalog yet; None before a fetch is asked.
     note: Option<SettingsNote>,
     /// The version whose catalog this visit already asked GitHub for.
@@ -107,6 +114,7 @@ impl GraphicsPage {
             choices: None,
             catalog: None,
             selects: BTreeMap::new(),
+            select_subscriptions: Vec::new(),
             note: None,
             asked: None,
             scroll: ScrollHandle::new(),
@@ -164,7 +172,7 @@ impl GraphicsPage {
 
     /// The catalog of the managed install's version, once loaded.
     pub fn catalog(&self) -> Option<&ModuleCatalog> {
-        self.catalog.as_ref()
+        self.catalog.as_deref()
     }
 
     /// The saved choices of a managed install.
@@ -308,6 +316,45 @@ impl GraphicsPage {
         );
     }
 
+    // Saves the choices `edit` makes from the saved ones; an edit that changes nothing does
+    // nothing. Only a change to the override VPKs waits for TF2 to close.
+    fn change(&mut self, edit: impl FnOnce(&mut Choices, &ModuleCatalog), cx: &mut Context<Self>) {
+        let Some(catalog) = self.catalog.clone() else {
+            return;
+        };
+        if self.busy || self.managed_version().is_none() {
+            return;
+        }
+        let old = self.shown_against();
+        let mut new = old.clone();
+        edit(&mut new, &catalog);
+        if new == old {
+            return;
+        }
+        let tf2 = match require_tf2(cx) {
+            Ok(tf2) => tf2,
+            Err(err) => return self.settle(async move { Err(err) }, cx),
+        };
+        let guard_tf2 = old.override_mask() != new.override_mask();
+        let job = jobs::apply_modules(tf2, catalog, new, guard_tf2, false, cx);
+        self.settle(
+            async move {
+                match job.await {
+                    Ok(dropped) => Ok(dropped_note(&dropped).map(|text| {
+                        let title = "Some settings went back to the preset";
+                        (ToastKind::Warning, title.into(), text.into())
+                    })),
+                    Err(ModulesFailure::Foreign) => Err(OpError::Core {
+                        action: SAVE_FAILED,
+                        message: FOREIGN_MODULES_CFG.to_owned(),
+                    }),
+                    Err(ModulesFailure::Op(err)) => Err(err),
+                }
+            },
+            cx,
+        );
+    }
+
     // Runs a blocking library change off the UI thread through `finish`.
     fn run(
         &mut self,
@@ -318,10 +365,25 @@ impl GraphicsPage {
         self.finish(running, cx);
     }
 
-    // Marks the page busy until `job` ends, toasts its outcome, then reloads the status.
+    // `settle` with a success toast.
     fn finish(
         &mut self,
         job: impl std::future::Future<Output = Result<Done, OpError>> + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        self.settle(
+            async move {
+                job.await
+                    .map(|(title, text)| Some((ToastKind::Success, title, text)))
+            },
+            cx,
+        );
+    }
+
+    // Marks the page busy until `job` ends, toasts its outcome, then reloads the status.
+    fn settle(
+        &mut self,
+        job: impl std::future::Future<Output = Result<Outcome, OpError>> + 'static,
         cx: &mut Context<Self>,
     ) {
         self.busy = true;
@@ -331,7 +393,8 @@ impl GraphicsPage {
             let done = job.await;
             let _ = cx.update(|cx| {
                 win.update(cx, |_, window, cx| match done {
-                    Ok((title, text)) => toast(window, cx, ToastKind::Success, title, text),
+                    Ok(Some((kind, title, text))) => toast(window, cx, kind, title, text),
+                    Ok(None) => {}
                     Err(err) => toast_error(window, cx, &err),
                 })
             });
@@ -437,8 +500,8 @@ impl GraphicsPage {
         cx: &mut Context<Self>,
     ) {
         let version = self.managed_version().map(str::to_owned);
-        if self.catalog.as_ref().map(ModuleCatalog::tag) != version.as_deref() {
-            self.catalog = fresh;
+        if self.catalog.as_ref().map(|c| c.tag()) != version.as_deref() {
+            self.catalog = fresh.map(Arc::new);
             self.build_selects(window, cx);
         } else {
             self.show_choices(window, cx);
@@ -467,7 +530,7 @@ impl GraphicsPage {
                         }
                         match fetched {
                             Ok(catalog) => {
-                                page.catalog = Some(catalog);
+                                page.catalog = Some(Arc::new(catalog));
                                 page.build_selects(window, cx);
                             }
                             Err(note) => page.note = Some(note),
@@ -480,23 +543,45 @@ impl GraphicsPage {
         .detach();
     }
 
-    // One Select per module of the held catalog, each on its shown value.
+    // One Select per module of the held catalog, each on its shown value; a pick saves it, and
+    // a cleared Select changes nothing.
     fn build_selects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.selects.clear();
-        let Some(catalog) = &self.catalog else {
+        self.select_subscriptions.clear();
+        let Some(catalog) = self.catalog.clone() else {
             return;
         };
         let choices = self.shown_against();
         for module in catalog.categories().iter().flat_map(|c| c.modules()) {
-            let shown = shown_choice(catalog, &choices, module.name());
+            let shown = shown_choice(&catalog, &choices, module.name());
             let options = value_options(module);
             let select = cx.new(|cx| {
                 let mut select = SelectState::new(options, None, window, cx);
                 select.set_selected_value(&shown, window, cx);
                 select
             });
+            let name = module.name().to_owned();
+            self.select_subscriptions.push(cx.subscribe(
+                &select,
+                move |page, _, event: &SelectEvent<Vec<ValueOption>>, cx| {
+                    if let SelectEvent::Confirm(Some(choice)) = event {
+                        let choice = choice.clone();
+                        page.change(|c, catalog| c.set(catalog, &name, choice), cx);
+                    }
+                },
+            ));
             self.selects.insert(module.name().to_owned(), select);
         }
+    }
+
+    // Drops `module`'s saved choice, so the preset's value applies.
+    fn reset_module(&mut self, module: &str, cx: &mut Context<Self>) {
+        self.change(|c, _| c.reset(module), cx);
+    }
+
+    // Drops every saved choice and keeps the preset.
+    fn reset_all(&mut self, cx: &mut Context<Self>) {
+        self.change(|c, _| c.clear(), cx);
     }
 
     // Moves each existing Select to its row's shown value.

@@ -7,9 +7,9 @@ use gpui_kit::{
     TestSupportExt as _, Window, div,
 };
 use tf2tools_core::{
-    ApplyPresetError, Choices, ComfigModule, InstallMastercomfigError, MastercomfigStatus,
-    MastercomfigStatusError, ModuleCatalog, ModuleCatalogError, ModuleChoice, Preset,
-    RemoveMastercomfigError, TakeOverError, readable_name,
+    ApplyModulesError, ApplyPresetError, Choices, ComfigModule, InstallMastercomfigError,
+    MastercomfigStatus, MastercomfigStatusError, ModuleCatalog, ModuleCatalogError, ModuleChoice,
+    Preset, RemoveMastercomfigError, TakeOverError, readable_name,
 };
 
 use crate::ids;
@@ -21,6 +21,9 @@ const GITHUB_BUSY: &str = "GitHub is busy right now. Wait a few minutes, then tr
 const GITHUB_UNREADABLE: &str = "GitHub sent something TF2Tools couldn't read. Try again later.";
 const NO_RELEASE: &str =
     "GitHub has no mastercomfig release TF2Tools can install right now. Try again later.";
+/// A modules.cfg the player wrote, which TF2Tools does not overwrite unasked.
+pub(crate) const FOREIGN_MODULES_CFG: &str =
+    "TF2 has a modules.cfg that TF2Tools didn't write, so TF2Tools left it alone.";
 const STALE_PAGE: &str =
     "mastercomfig changed since this page opened. Open the Graphics page again and try once more.";
 
@@ -170,6 +173,27 @@ pub fn describe_apply(err: &ApplyPresetError) -> LocalFailure {
         ApplyPresetError::GameMissing { .. } => GAME_MOVED,
         ApplyPresetError::Io { .. } => TF2_WRITE,
         ApplyPresetError::Database { .. } | _ => LIBRARY_UPDATE,
+    };
+    LocalFailure::new(message, err.to_string())
+}
+
+/// A setting that could not be saved, in player words.
+pub fn describe_apply_modules(err: &ApplyModulesError) -> LocalFailure {
+    let message = match err {
+        ApplyModulesError::NotManaged => STALE_PAGE,
+        ApplyModulesError::ForeignModulesCfg { .. } => FOREIGN_MODULES_CFG,
+        ApplyModulesError::GameMissing { .. } => GAME_MOVED,
+        ApplyModulesError::Io { .. } => TF2_WRITE,
+        ApplyModulesError::Database { .. } => LIBRARY_UPDATE,
+        ApplyModulesError::RateLimited { .. } => GITHUB_BUSY,
+        ApplyModulesError::Network { .. } => GITHUB_DOWN,
+        ApplyModulesError::NoRelease => {
+            "TF2Tools doesn't know where to download this setting's file yet. Use Check for updates, then try again."
+        }
+        ApplyModulesError::NotAVpk { .. }
+        | ApplyModulesError::Http { .. }
+        | ApplyModulesError::TooLarge { .. }
+        | _ => GITHUB_UNREADABLE,
     };
     LocalFailure::new(message, err.to_string())
 }
