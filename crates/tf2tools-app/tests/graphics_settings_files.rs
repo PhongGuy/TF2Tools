@@ -9,7 +9,7 @@ use support::graphics::{
 };
 use tf2tools_app::ids;
 
-const REPLACE: &str = "TF2 already has a modules.cfg that TF2Tools didn't write. Replace it? Your file is kept as a backup next to it.";
+const REPLACE: &str = "TF2 already has a modules.cfg that TF2Tools didn't write. Your file is kept as a backup next to it.";
 
 #[gpui_kit::test]
 fn a_foreign_modules_cfg_is_replaced_only_after_asking(cx: &mut TestAppContext) {

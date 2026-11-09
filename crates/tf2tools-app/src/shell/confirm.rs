@@ -199,7 +199,7 @@ impl Confirm {
     pub fn replace_modules_cfg() -> Self {
         Self {
             title: "Replace your modules.cfg?".into(),
-            description: "TF2 already has a modules.cfg that TF2Tools didn't write. Replace it? Your file is kept as a backup next to it.".into(),
+            description: "TF2 already has a modules.cfg that TF2Tools didn't write. Your file is kept as a backup next to it.".into(),
             confirm_label: "Replace it".into(),
             cancel_label: "Cancel".into(),
         }
