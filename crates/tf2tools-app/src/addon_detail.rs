@@ -58,10 +58,6 @@ impl AddonDetail {
         detail
     }
 
-    pub fn card(&self) -> &AddonCard {
-        &self.card
-    }
-
     pub fn profile(&self) -> &ProfileState {
         &self.profile
     }
@@ -186,7 +182,7 @@ impl AddonDetail {
         }
         if !profile.files().is_empty() {
             let rows = profile.files().iter().enumerate().map(|(i, file)| {
-                labelled(div().text_sm(), ids::addon_detail_file(i), file_line(file))
+                labelled(div().text_sm(), ids::addon_detail_file(i), file_text(file))
             });
             body.push(
                 v_flex()
@@ -200,16 +196,23 @@ impl AddonDetail {
     }
 }
 
-/// A file row's text: "{file} · {size} · {YYYY-MM-DD}", leaving out an unknown size or date.
-pub fn file_line(file: &AddonFile) -> String {
-    let size = file.size().map(format_bytes);
-    let date = chrono::DateTime::from_timestamp(file.date_added(), 0)
+// A file row's text: "{name} · {size} · {YYYY-MM-DD}", leaving out an unknown size or date.
+// GameBanana's missing date reads as 0, which is no upload date.
+fn file_line(name: &str, size: Option<u64>, date_added: i64) -> String {
+    let size = size.map(format_bytes);
+    let date = (date_added > 0)
+        .then(|| chrono::DateTime::from_timestamp(date_added, 0))
+        .flatten()
         .map(|at| at.format("%Y-%m-%d").to_string());
-    std::iter::once(file.name().to_owned())
+    std::iter::once(name.to_owned())
         .chain(size)
         .chain(date)
         .collect::<Vec<_>>()
         .join(" · ")
+}
+
+fn file_text(file: &AddonFile) -> String {
+    file_line(file.name(), file.size(), file.date_added())
 }
 
 // v5's header link: an outline button with the ExternalLink icon, opening `url` in the browser.
@@ -338,4 +341,21 @@ pub fn open_addon_detail(
         });
     });
     detail
+}
+
+#[cfg(test)]
+mod tests {
+    use super::file_line;
+
+    #[test]
+    fn a_file_line_leaves_out_what_gamebanana_did_not_give() {
+        let size = crate::store_download::format_bytes(2048);
+        assert_eq!(
+            file_line("a.zip", Some(2048), 86_400),
+            format!("a.zip · {size} · 1970-01-02")
+        );
+        assert_eq!(file_line("a.zip", None, 86_400), "a.zip · 1970-01-02");
+        assert_eq!(file_line("a.zip", Some(2048), 0), format!("a.zip · {size}"));
+        assert_eq!(file_line("a.zip", None, 0), "a.zip");
+    }
 }

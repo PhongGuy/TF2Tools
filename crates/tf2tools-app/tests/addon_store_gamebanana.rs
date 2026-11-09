@@ -636,3 +636,36 @@ fn a_step_that_succeeds_after_a_failure_clears_the_error(cx: &mut TestAppContext
     assert!(cx.update(|cx| tab.read(cx).error().is_none()));
     assert!(!support::present(cx, w.win, ids::STORE_ERROR));
 }
+
+#[gpui_kit::test]
+fn the_detail_retries_a_failed_profile(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_index(
+        587,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(8, 587, None)], true),
+    );
+    server.mount_status("/apiv11/Mod/8/ProfilePage", 503);
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "textures");
+    settled(cx, &tab, "the first step");
+    support::click_id(cx, w.win, ids::addon_gb_card("textures", GbId::new(8)));
+    support::wait_real(cx, "the failure", |cx| {
+        support::present(cx, w.win, ids::ADDON_DETAIL_ERROR)
+    });
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_ERROR).as_deref(),
+        Some("GameBanana is having problems right now. Try again later.")
+    );
+    server.reset();
+    server.mount_gb_profile(
+        8,
+        serde_json::json!({"_idRow": 8, "_sName": "Addon 8", "_nDownloadCount": 3}),
+    );
+    support::click_id(cx, w.win, ids::ADDON_DETAIL_RETRY);
+    support::wait_real(cx, "the profile", |cx| {
+        support::present(cx, w.win, ids::ADDON_DETAIL_DOWNLOADS)
+    });
+    assert!(!support::present(cx, w.win, ids::ADDON_DETAIL_ERROR));
+}
