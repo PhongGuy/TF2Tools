@@ -736,3 +736,31 @@ fn profile_editor_ids_are_stable() {
         ]
     );
 }
+
+#[test]
+fn addon_store_tab_and_card_ids_are_keyed_by_section_and_item() {
+    assert_eq!(name(ids::addon_store_tab("skins")), "addon-store-tab:skins");
+    assert_eq!(
+        name(ids::addon_store_tab("mastercomfig")),
+        "addon-store-tab:mastercomfig"
+    );
+    assert_eq!(
+        name(ids::addon_gb_card("effects", GbId::new(12592))),
+        "addon-gb-card:effects:12592"
+    );
+    assert_eq!(
+        name(ids::addon_gb_card_reveal("skins", GbId::new(7))),
+        "addon-gb-card-reveal:skins:7"
+    );
+    assert_eq!(
+        name(ids::addon_gb_card_outdated("guis", GbId::new(3))),
+        "addon-gb-card-outdated:guis:3"
+    );
+    assert_eq!(
+        name(ids::addon_detail_credit(0, 2)),
+        "addon-detail-credit:0:2"
+    );
+    assert_eq!(name(ids::addon_detail_file(1)), "addon-detail-file:1");
+    assert_eq!(ids::ADDON_LOAD_MORE, "addon-load-more");
+    assert_eq!(ids::SETTINGS_MATURE_ADDONS, "settings-mature-addons");
+}

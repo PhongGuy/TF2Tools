@@ -2,8 +2,8 @@
 //! carry URLs, paths or codes; the raw error rides along as `detail` for the developer log.
 
 use tf2tools_core::{
-    ArchiveError, DownloadError, FilesError, GbId, ImportError, InstallError, PreviewError,
-    StoreKind,
+    ArchiveError, BrowseError, DownloadError, FilesError, GbId, ImportError, InstallError,
+    PreviewError, StoreKind,
 };
 
 use crate::services::OpError;
@@ -133,6 +133,31 @@ pub fn describe_files(kind: StoreKind, err: &FilesError) -> StoreFailure {
         FilesError::Database { .. } => STORE_READ.into(),
         FilesError::Throttled { .. } => THROTTLED.into(),
         _ => FILES_UNKNOWN.into(),
+    };
+    StoreFailure::new(message, err.to_string())
+}
+
+/// A failed GameBanana add-on listing, search, category list or profile in player words;
+/// `detail` is the error's own text.
+pub fn describe_browse(err: &BrowseError) -> StoreFailure {
+    let message = match err {
+        BrowseError::Network { .. } => {
+            "Couldn't reach GameBanana. Check your internet connection and try again."
+        }
+        BrowseError::Throttled { .. } => THROTTLED,
+        BrowseError::RateLimited { .. } => {
+            "GameBanana is busy right now. Wait a few minutes, then try again."
+        }
+        BrowseError::Http { status: 404, .. } | BrowseError::Gone { .. } => {
+            "This item is no longer on GameBanana."
+        }
+        BrowseError::Http { status, .. } if *status >= 500 => {
+            "GameBanana is having problems right now. Try again later."
+        }
+        BrowseError::Http { .. } | BrowseError::TooLarge { .. } | BrowseError::Malformed { .. } => {
+            "GameBanana sent something TF2Tools couldn't read. Try again later."
+        }
+        _ => "Couldn't load add-ons. Try again later.",
     };
     StoreFailure::new(message, err.to_string())
 }

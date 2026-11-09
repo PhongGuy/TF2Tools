@@ -3,9 +3,9 @@
 
 use gpui_kit::ElementId;
 use tf2tools_core::{
-    AddonName, BoardMode, HudId, MeterKind, ModuleChoice, NewPart, PartKey, PinCorner, Preset,
-    ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, StoreItemId, StoreKind,
-    TfClass, WeaponKind, WeaponSlot,
+    AddonName, BoardMode, GbId, HudId, MeterKind, ModuleChoice, NewPart, PartKey, PinCorner,
+    Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, StoreItemId,
+    StoreKind, TfClass, WeaponKind, WeaponSlot,
 };
 
 use crate::shell::route::Page;
@@ -735,6 +735,42 @@ pub const ADDON_STORE_INFO: &str = "addon-store-info";
 pub const ADDON_STORE_INFO_TEXT: &str = "addon-store-info-text";
 /// The Addon Store's "TF2 not found" warning, present only without a TF2 install.
 pub const ADDON_STORE_NO_TF2: &str = "addon-store-no-tf2";
+/// The Addon Store's tab strip: mastercomfig, then one tab per GameBanana section.
+pub const ADDON_STORE_TABS: &str = "addon-store-tabs";
+/// Wraps a GameBanana add-on tab's search input.
+pub const ADDON_SEARCH: &str = "addon-search";
+/// Wraps a GameBanana add-on tab's sort select.
+pub const ADDON_SORT: &str = "addon-sort";
+/// Wraps a GameBanana add-on tab's subcategory select.
+pub const ADDON_CATEGORY: &str = "addon-category";
+/// Wraps the weapon select, shown only for a Skins class.
+pub const ADDON_WEAPON: &str = "addon-weapon";
+/// A GameBanana add-on tab's card grid.
+pub const ADDON_GRID: &str = "addon-grid";
+/// A GameBanana add-on tab's loading line, present while a step runs.
+pub const ADDON_LOADING: &str = "addon-loading";
+/// A GameBanana add-on tab's "no add-ons found" line.
+pub const ADDON_EMPTY: &str = "addon-empty";
+/// The "Load more" button shown after steps keep adding no cards.
+pub const ADDON_LOAD_MORE: &str = "addon-load-more";
+/// The GameBanana add-on detail dialog.
+pub const ADDON_DETAIL: &str = "addon-detail";
+/// The add-on detail's name, labelled with it.
+pub const ADDON_DETAIL_NAME: &str = "addon-detail-name";
+/// The add-on detail's download count.
+pub const ADDON_DETAIL_DOWNLOADS: &str = "addon-detail-downloads";
+/// The add-on detail's mature ratings line, present only for a mature add-on.
+pub const ADDON_DETAIL_RATINGS: &str = "addon-detail-ratings";
+/// The add-on detail's description.
+pub const ADDON_DETAIL_DESCRIPTION: &str = "addon-detail-description";
+/// The add-on detail's load failure text.
+pub const ADDON_DETAIL_ERROR: &str = "addon-detail-error";
+/// Retries a failed add-on detail load.
+pub const ADDON_DETAIL_RETRY: &str = "addon-detail-retry";
+/// The add-on detail's "Outdated" badge.
+pub const ADDON_DETAIL_OUTDATED: &str = "addon-detail-outdated";
+/// The Settings "Show mature add-ons" switch.
+pub const SETTINGS_MATURE_ADDONS: &str = "settings-mature-addons";
 /// Wraps the Activity Log's category select.
 pub const LOGS_CATEGORY: &str = "logs-category";
 /// Wraps the Activity Log's level select.
@@ -2413,4 +2449,49 @@ pub fn map_remove(name: &str) -> ElementId {
 /// A row's state, labelled "Downloaded" or "In game": "map-state:<name>".
 pub fn map_state(name: &str) -> ElementId {
     keyed("map-state", name)
+}
+
+/// An Addon Store tab: "addon-store-tab:<key>", the key being "mastercomfig" or a section key.
+pub fn addon_store_tab(key: &str) -> ElementId {
+    keyed("addon-store-tab", key)
+}
+
+/// A GameBanana add-on card: "addon-gb-card:<section>:<id>".
+pub fn addon_gb_card(section: &str, id: GbId) -> ElementId {
+    keyed("addon-gb-card", &format!("{section}:{id}"))
+}
+
+/// A GameBanana add-on card's name: "addon-gb-card-name:<section>:<id>".
+pub fn addon_gb_card_name(section: &str, id: GbId) -> ElementId {
+    keyed("addon-gb-card-name", &format!("{section}:{id}"))
+}
+
+/// A GameBanana add-on card's thumbnail: "addon-gb-card-image:<section>:<id>".
+pub fn addon_gb_card_image(section: &str, id: GbId) -> ElementId {
+    keyed("addon-gb-card-image", &format!("{section}:{id}"))
+}
+
+/// Unblurs a mature card's thumbnail: "addon-gb-card-reveal:<section>:<id>".
+pub fn addon_gb_card_reveal(section: &str, id: GbId) -> ElementId {
+    keyed("addon-gb-card-reveal", &format!("{section}:{id}"))
+}
+
+/// A GameBanana add-on card's "Outdated" badge: "addon-gb-card-outdated:<section>:<id>".
+pub fn addon_gb_card_outdated(section: &str, id: GbId) -> ElementId {
+    keyed("addon-gb-card-outdated", &format!("{section}:{id}"))
+}
+
+/// A GameBanana add-on card's like count: "addon-gb-card-likes:<section>:<id>".
+pub fn addon_gb_card_likes(section: &str, id: GbId) -> ElementId {
+    keyed("addon-gb-card-likes", &format!("{section}:{id}"))
+}
+
+/// One credit in the add-on detail, by group and position: "addon-detail-credit:<g>:<i>".
+pub fn addon_detail_credit(group: usize, index: usize) -> ElementId {
+    keyed("addon-detail-credit", &format!("{group}:{index}"))
+}
+
+/// One file row in the add-on detail, by position: "addon-detail-file:<i>".
+pub fn addon_detail_file(index: usize) -> ElementId {
+    keyed("addon-detail-file", &index.to_string())
 }

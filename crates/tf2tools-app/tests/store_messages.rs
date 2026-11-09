@@ -4,13 +4,13 @@ use std::path::PathBuf;
 
 use tf2tools_app::services::OpError;
 use tf2tools_app::store_messages::{
-    StoreFailure, describe_download, describe_files, describe_install, describe_preview,
-    describe_store_read, download_stopped, listing_stopped, no_tf2, preview_gone,
+    StoreFailure, describe_browse, describe_download, describe_files, describe_install,
+    describe_preview, describe_store_read, download_stopped, listing_stopped, no_tf2, preview_gone,
     preview_unavailable, release_has_no_file,
 };
 use tf2tools_core::{
-    ArchiveError, DownloadError, FilesError, GbId, ImportError, InstallError, LibraryError,
-    PreviewError, StoreKind,
+    ArchiveError, BrowseError, DownloadError, FilesError, GbId, ImportError, InstallError,
+    LibraryError, PreviewError, StoreKind,
 };
 
 const GB: StoreKind = StoreKind::GameBananaHuds;
@@ -504,4 +504,64 @@ fn a_throttled_listing_says_gamebanana_is_busy() {
         )
     );
     support::assert_plain(&failure.message);
+}
+
+#[test]
+fn browse_failures_speak_of_gamebanana() {
+    let cases = [
+        (
+            BrowseError::Network {
+                url: GB_URL.into(),
+                message: "refused".into(),
+            },
+            "Couldn't reach GameBanana. Check your internet connection and try again.",
+        ),
+        (
+            BrowseError::Throttled { url: GB_URL.into() },
+            "GameBanana is busy, try again in a minute.",
+        ),
+        (
+            BrowseError::RateLimited { url: GB_URL.into() },
+            "GameBanana is busy right now. Wait a few minutes, then try again.",
+        ),
+        (
+            BrowseError::Http {
+                url: GB_URL.into(),
+                status: 404,
+            },
+            "This item is no longer on GameBanana.",
+        ),
+        (
+            BrowseError::Gone {
+                gb_id: GbId::new(5),
+            },
+            "This item is no longer on GameBanana.",
+        ),
+        (
+            BrowseError::Http {
+                url: GB_URL.into(),
+                status: 503,
+            },
+            "GameBanana is having problems right now. Try again later.",
+        ),
+        (
+            BrowseError::Http {
+                url: GB_URL.into(),
+                status: 403,
+            },
+            "GameBanana sent something TF2Tools couldn't read. Try again later.",
+        ),
+        (
+            BrowseError::Malformed {
+                url: GB_URL.into(),
+                message: "x".into(),
+            },
+            "GameBanana sent something TF2Tools couldn't read. Try again later.",
+        ),
+    ];
+    for (err, message) in cases {
+        let failure = describe_browse(&err);
+        assert_eq!(failure, StoreFailure::new(message, err.to_string()));
+        support::assert_plain(&failure.message);
+    }
 }
