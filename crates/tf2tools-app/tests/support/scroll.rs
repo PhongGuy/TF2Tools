@@ -65,16 +65,23 @@ pub fn assert_clear_of_bar(
     );
 }
 
-/// Presses the foot of `area`'s scrollbar track; a drawn bar scrolls toward the end.
+/// Presses the foot of the visible part of `area`'s scrollbar track; a drawn bar scrolls
+/// toward the end. The kit hit-tests the press, so the point stays inside the window and
+/// above the floating sound player, which keeps a press made over it.
 pub fn press_track_foot(cx: &mut TestAppContext, win: AnyWindowHandle, area: impl Into<ElementId>) {
     let area = area.into();
     let b = bounds(cx, win, area.clone());
+    let mut foot = b.bottom().min(super::viewport(cx, win).height);
+    let x = b.right() - px(6.);
+    if let Some(player) = super::bounds_of(cx, win, tf2tools_app::ids::SOUND_PLAYER)
+        && player.left() <= x
+        && x <= player.right()
+        && player.top() < foot
+    {
+        foot = player.top();
+    }
     cx.update_window(win, |_, w, cx| {
-        w.click_at(
-            area,
-            point(b.size.width - px(6.), b.size.height - px(6.)),
-            cx,
-        )
+        w.click_at(area, point(x - b.left(), foot - px(6.) - b.top()), cx)
     })
     .unwrap();
     super::settle(cx, win);

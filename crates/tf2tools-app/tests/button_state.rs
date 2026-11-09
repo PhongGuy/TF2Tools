@@ -1,5 +1,5 @@
-//! Pins the kit behaviour `support::disabled_of` reads: gpui-base 0.7.1's Button binds its
-//! focus handle only while enabled, and exposes no a11y disabled flag.
+//! Pins the kit behaviour `support::disabled_of` reads: gpui-base 0.9's Button marks its a11y
+//! node disabled only while it is.
 use crate::support;
 
 use gpui_kit::component::Disableable as _;
@@ -27,9 +27,11 @@ fn a_kit_button_reads_disabled_only_when_it_is(cx: &mut TestAppContext) {
         .0;
     assert!(!support::disabled_of(cx, win, "enabled"));
     assert!(support::disabled_of(cx, win, "disabled"));
-    // When the kit grows an a11y disabled flag, read that in `button_disabled` instead.
-    let flag = cx
-        .update_window(win, |_, w, _| w.find("disabled").disabled())
+    let flags = cx
+        .update_window(win, |_, w, _| {
+            (w.find("enabled").disabled(), w.find("disabled").disabled())
+        })
         .unwrap();
-    assert_eq!(flag, None);
+    assert_ne!(flags.0, Some(true), "the enabled button reads disabled");
+    assert_eq!(flags.1, Some(true), "the disabled button lacks the flag");
 }

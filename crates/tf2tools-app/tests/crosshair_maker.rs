@@ -7,7 +7,7 @@ use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
     App, AppContext as _, Bounds, ElementId, Entity, InputEvent, Modifiers, MouseButton,
     MouseDownEvent, MouseExitEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, ScrollDelta,
-    ScrollWheelEvent, TestAppContext, TouchPhase, Window, point, px,
+    ScrollEvent, TestAppContext, TouchPhase, Window, point, px,
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::crosshair_maker::CrosshairMakerPage;
@@ -1503,6 +1503,15 @@ fn alt_click(cx: &mut TestAppContext, s: &support::ShellWindow, at: Point<Pixels
             click_count: 1,
         },
     );
+    // Let go of Alt, so the window stops holding it for the clicks that follow.
+    send(
+        cx,
+        s,
+        gpui_kit::ModifiersChangedEvent {
+            modifiers: Modifiers::none(),
+            capslock: Default::default(),
+        },
+    );
 }
 
 #[gpui_kit::test]
@@ -2029,12 +2038,13 @@ fn the_hidden_part_of_a_zoomed_grid_takes_no_clicks(cx: &mut TestAppContext) {
 }
 
 /// One wheel event of `lines` notches (up is positive) at `at`.
-fn wheel(at: Point<Pixels>, lines: f32, modifiers: Modifiers) -> ScrollWheelEvent {
-    ScrollWheelEvent {
+fn wheel(at: Point<Pixels>, lines: f32, modifiers: Modifiers) -> ScrollEvent {
+    ScrollEvent {
         position: at,
         delta: ScrollDelta::Lines(point(0., lines)),
         modifiers,
         touch_phase: TouchPhase::Moved,
+        source: Default::default(),
     }
 }
 

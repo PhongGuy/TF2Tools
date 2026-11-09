@@ -12,7 +12,7 @@
 [package]
 edition = "2024"
 name = "gpui-pre-scheduler"
-version = "0.3.8"
+version = "0.3.11"
 build = false
 publish = true
 autolib = false
@@ -20,7 +20,7 @@ autobins = false
 autoexamples = false
 autotests = false
 autobenches = false
-description = "Zed's `scheduler` crate (gpui-pre snapshot of zed@279fe07)"
+description = "Zed's `scheduler` crate (gpui-pre snapshot of zed@f816e1f)"
 readme = false
 license = "Apache-2.0"
 repository = "https://github.com/zed-industries/zed"
@@ -29,7 +29,7 @@ resolver = "2"
 [package.metadata.gpui-pre]
 zed-crate = "scheduler"
 zed-version = "0.1.0"
-zed-rev = "279fe070bb389b79652e52065b2f001edcc0b11b"
+zed-rev = "f816e1f9263e3a8ef63c4baaa02e1441ce1c6038"
 
 [features]
 test-support = []
@@ -51,10 +51,18 @@ version = "0.3"
 
 [dependencies.chrono]
 version = "0.4"
-features = ["serde"]
+features = [
+    "std",
+    "serde",
+    "now",
+    "wasmbind",
+]
+default-features = false
 
 [dependencies.flume]
 version = "0.12"
+features = ["async"]
+default-features = false
 
 [dependencies.futures]
 version = "0.3.34"
@@ -64,6 +72,12 @@ version = "0.12.1"
 
 [dependencies.rand]
 version = "0.9"
+features = [
+    "std",
+    "std_rng",
+    "os_rng",
+]
+default-features = false
 
 [dependencies.web-time]
 version = "1.1.0"
