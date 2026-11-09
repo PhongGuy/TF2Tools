@@ -409,6 +409,25 @@ fn mature_items_hide_until_shown_then_blur_until_clicked(cx: &mut TestAppContext
     support::wait_real(cx, "the save", |_| {
         w.services.db.settings().unwrap().show_mature_addons()
     });
+    let set_mature = |cx: &mut TestAppContext, show: bool| {
+        cx.update(|cx| {
+            let m = MatureAddons::global(cx);
+            m.update(cx, |m, cx| m.set(show, cx))
+        })
+    };
+    set_mature(cx, false);
+    support::wait_real(cx, "the mature card gone", |cx| ids_now(cx) == [1]);
+    set_mature(cx, true);
+    support::wait_real(cx, "the mature card back", |cx| ids_now(cx) == [1, 2]);
+    assert!(
+        !cx.update(|cx| tab.read(cx).is_revealed(GbId::new(2))),
+        "a flip of the setting blurs revealed cards again"
+    );
+    assert!(support::present(
+        cx,
+        w.win,
+        ids::addon_gb_card_reveal("textures", GbId::new(2))
+    ));
 }
 
 #[gpui_kit::test]
