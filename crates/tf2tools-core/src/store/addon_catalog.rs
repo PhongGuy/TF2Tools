@@ -27,6 +27,8 @@ pub(crate) const PAGE_CACHE_CAP: usize = 256;
 #[derive(Debug, Default)]
 pub(crate) struct Caches {
     pub(crate) pages: PageCache,
+    /// Each parent's unfiltered child categories, fetched once a session.
+    pub(crate) categories: Mutex<HashMap<u32, Vec<AddonCategory>>>,
 }
 
 /// What a cached listing page is filed under: the effective category, the order and the page.
@@ -35,6 +37,10 @@ pub(crate) enum PageKey {
     Index {
         category: u32,
         sort: AddonSort,
+        page: u32,
+    },
+    Search {
+        text: String,
         page: u32,
     },
 }
@@ -120,6 +126,32 @@ pub struct AddonCard {
     pub mature: bool,
     /// The item's GameBanana page.
     pub profile_url: String,
+}
+
+/// One GameBanana subcategory a section can be narrowed to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct AddonCategory {
+    pub(crate) id: u32,
+    pub(crate) name: String,
+    pub(crate) items: u64,
+}
+
+impl AddonCategory {
+    /// The GameBanana category id.
+    pub fn id(&self) -> u32 {
+        self.id
+    }
+
+    /// The category's name, such as "HUDs".
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// How many items GameBanana counts in it, across every game.
+    pub fn items(&self) -> u64 {
+        self.items
+    }
 }
 
 /// What one Addon Store grid shows: a section, its order, an optional subcategory or
@@ -297,6 +329,47 @@ impl AddonCatalog {
         })
     }
 
+    /// `parent`'s child categories, A to Z, fetched once a session; `section`'s excluded ids
+    /// left out.
+    pub async fn categories(
+        &self,
+        section: AddonSection,
+        parent: u32,
+    ) -> Result<Vec<AddonCategory>, BrowseError> {
+        let caches = &self.store.addon_caches;
+        let cached = caches
+            .categories
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&parent)
+            .cloned();
+        let all = match cached {
+            Some(all) => all,
+            None => {
+                let url = addon_api::categories_url(self.store.endpoints.gamebanana(), parent);
+                let all = self
+                    .store
+                    .gamebanana_call(&url, Priority::Interactive, read_categories)
+                    .await?
+                    .map_err(|message| BrowseError::Malformed {
+                        url: url.clone(),
+                        message,
+                    })?;
+                caches
+                    .categories
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .insert(parent, all.clone());
+                all
+            }
+        };
+        // The cache keeps the unfiltered list, since sections may share a parent.
+        Ok(all
+            .into_iter()
+            .filter(|c| !section.exclude().contains(&c.id))
+            .collect())
+    }
+
     /// The page `page` of `query`'s listing, from the cache while it is fresh.
     async fn listing(
         &self,
@@ -321,16 +394,20 @@ impl AddonCatalog {
         Ok(parsed)
     }
 
-    /// The cache key and URL of one listing page; a chosen subcategory stands in for the
-    /// section's root, since a section is fully described by its root.
+    /// The cache key and URL of one listing page. Search ignores the subcategory; otherwise a
+    /// chosen subcategory stands in for the section's root, which fully describes a section.
     fn page_key(&self, query: &AddonQuery, page: u32) -> (PageKey, String) {
+        let base = self.store.endpoints.gamebanana();
+        if let Some(text) = &query.search {
+            let url = addon_api::search_url(base, text, page);
+            let key = PageKey::Search {
+                text: text.clone(),
+                page,
+            };
+            return (key, url);
+        }
         let category = query.category.unwrap_or(query.section.root_category());
-        let url = addon_api::index_url(
-            self.store.endpoints.gamebanana(),
-            category,
-            query.sort,
-            page,
-        );
+        let url = addon_api::index_url(base, category, query.sort, page);
         let key = PageKey::Index {
             category,
             sort: query.sort,
@@ -350,6 +427,17 @@ fn read_listing(body: &[u8]) -> Reply<Result<ListingPage, String>> {
     match addon_api::parse_listing(body) {
         Ok(page) if page.records.is_empty() && !page.complete => Reply::Empty,
         Ok(page) => Reply::Done(Ok(page)),
+        Err(e) => Reply::Rejected(Err(e.to_string())),
+    }
+}
+
+/// Sorts one categories body for the pacer the way `read_listing` does.
+fn read_categories(body: &[u8]) -> Reply<Result<Vec<AddonCategory>, String>> {
+    if body.trim_ascii().is_empty() {
+        return Reply::Empty;
+    }
+    match addon_api::parse_categories(body) {
+        Ok(all) => Reply::Done(Ok(all)),
         Err(e) => Reply::Rejected(Err(e.to_string())),
     }
 }

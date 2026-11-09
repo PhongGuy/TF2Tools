@@ -372,3 +372,92 @@ async fn a_malformed_page_fails_at_once() {
         "not retried"
     );
 }
+
+async fn mount_search(server: &MockServer, page: u32, body: Vec<u8>) {
+    Mock::given(method("GET"))
+        .and(path("/apiv11/Util/Search/Results"))
+        .and(query_param("_sModelName", "Mod"))
+        .and(query_param("_idGameRow", "297"))
+        .and(query_param("_nPage", page.to_string()))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+        .mount(server)
+        .await;
+}
+
+#[tokio::test]
+async fn a_search_keeps_only_the_tab_s_root_and_ignores_the_category() {
+    let env = store_env().await;
+    let records = vec![
+        record(1, 7951, Some(7962), false),
+        record(2, 1090, Some(1094), false),
+        record(3, 7951, None, false),
+    ];
+    mount_search(&env.server, 1, listing(records, true)).await;
+    let query = AddonQuery::new(section("skins"), AddonSort::Newest)
+        .with_category(Some(7962))
+        .with_search(" pink ");
+    let (step, chunks) = run(&env, &query, AddonCursor::START).await;
+    assert_eq!(flat_ids(&chunks), [1, 3]);
+    assert_eq!(step.unwrap().next(), None);
+    assert_eq!(requests_to(&env.server, "/apiv11/Mod/Index").await, 0);
+    let asked = env.server.received_requests().await.unwrap();
+    assert!(
+        asked[0]
+            .url
+            .query_pairs()
+            .any(|(k, v)| k == "_sSearchString" && v == "pink")
+    );
+}
+
+#[tokio::test]
+async fn a_search_step_reads_at_most_six_pages() {
+    let env = store_env().await;
+    for page in 1..=8 {
+        mount_search(
+            &env.server,
+            page,
+            listing(many(u64::from(page) * 100, 15, 1090, 1094), false),
+        )
+        .await;
+    }
+    let query = AddonQuery::new(section("skins"), AddonSort::Newest).with_search("red");
+    let (step, chunks) = run(&env, &query, AddonCursor::START).await;
+    let step = step.unwrap();
+    assert!(chunks.is_empty());
+    assert_eq!(
+        (step.pages(), step.next().map(AddonCursor::page)),
+        (6, Some(7))
+    );
+    assert_eq!(
+        requests_to(&env.server, "/apiv11/Util/Search/Results").await,
+        6
+    );
+}
+
+#[tokio::test]
+async fn categories_are_fetched_once_a_session_without_the_game_and_without_excluded_ids() {
+    let env = store_env().await;
+    Mock::given(method("GET"))
+        .and(path("/apiv11/Mod/Categories"))
+        .and(query_param("_idCategoryRow", "1644"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_bytes(store_fixture("gb-addons-categories-1644.json")),
+        )
+        .mount(&env.server)
+        .await;
+    let catalog = env.client.addon_catalog();
+    let first = catalog.categories(section("guis"), 1644).await.unwrap();
+    let again = catalog.categories(section("guis"), 1644).await.unwrap();
+    assert_eq!(first, again);
+    assert!(!first.is_empty() && first.iter().all(|c| c.id() != 1649));
+    let asked = env.server.received_requests().await.unwrap();
+    assert_eq!(asked.len(), 1);
+    assert!(!asked[0].url.query_pairs().any(|(k, _)| k == "_idGameRow"));
+    assert!(
+        asked[0]
+            .url
+            .query_pairs()
+            .any(|(k, v)| k == "_sSort" && v == "a_to_z")
+    );
+}

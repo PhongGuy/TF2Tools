@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 
-use super::addon_catalog::{AddonCard, AddonSort};
+use super::addon_catalog::{AddonCard, AddonCategory, AddonSort};
 use super::gamebanana::{TF2_GAME_ID, int, optional_text, preview_images, text};
 use crate::GbId;
 
@@ -20,6 +20,54 @@ pub(crate) fn index_url(base: &str, category: u32, sort: AddonSort, page: u32) -
          &_aFilters[Generic_Category]={category}&_aFilters[Generic_Game]={TF2_GAME_ID}\
          &_sSort={sort}"
     )
+}
+
+/// The Search URL for `page` of mods matching `text` in TF2. Search spans every category,
+/// so the caller filters records by root category.
+pub(crate) fn search_url(base: &str, text: &str, page: u32) -> String {
+    let text = encode_query(text);
+    format!(
+        "{base}/Util/Search/Results?_sModelName=Mod&_idGameRow={TF2_GAME_ID}\
+         &_sSearchString={text}&_nPage={page}"
+    )
+}
+
+/// The child categories of `parent`, A to Z. Naming the game here returns the game's root
+/// categories instead of the children, so it is left out.
+pub(crate) fn categories_url(base: &str, parent: u32) -> String {
+    format!("{base}/Mod/Categories?_idCategoryRow={parent}&_sSort=a_to_z")
+}
+
+/// Percent-encodes everything outside RFC 3986's unreserved set, `/` and spaces included.
+fn encode_query(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for byte in text.bytes() {
+        if byte.is_ascii_alphanumeric() || b"-._~".contains(&byte) {
+            out.push(char::from(byte));
+        } else {
+            out.push_str(&format!("%{byte:02X}"));
+        }
+    }
+    out
+}
+
+/// Parses a `Mod/Categories` reply, a bare array. Rows without an id or a name are skipped.
+pub(crate) fn parse_categories(body: &[u8]) -> Result<Vec<AddonCategory>, serde_json::Error> {
+    let rows: Vec<Value> = serde_json::from_slice(body)?;
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let id = u32::try_from(int(&row["_idRow"]))
+                .ok()
+                .filter(|&id| id > 0)?;
+            let name = text(&row["_sName"]);
+            (!name.is_empty()).then(|| AddonCategory {
+                id,
+                name,
+                items: u64::try_from(int(&row["_nItemCount"])).unwrap_or(0),
+            })
+        })
+        .collect())
 }
 
 /// The id at the end of a category profile URL such as `.../mods/cats/1105`, with or
@@ -211,5 +259,64 @@ mod tests {
     fn a_reply_without_metadata_counts_as_complete_and_a_non_json_body_fails() {
         assert!(parse_listing(br#"{"_aRecords": []}"#).unwrap().complete);
         assert!(parse_listing(b"<html>busy</html>").is_err());
+    }
+
+    #[test]
+    fn the_search_url_encodes_the_text_and_names_the_game() {
+        assert_eq!(
+            search_url("b", "pink & red/x", 2),
+            "b/Util/Search/Results?_sModelName=Mod&_idGameRow=297&_sSearchString=pink%20%26%20red%2Fx&_nPage=2"
+        );
+    }
+
+    #[test]
+    fn the_categories_url_never_names_the_game() {
+        let url = categories_url("b", 1644);
+        assert_eq!(url, "b/Mod/Categories?_idCategoryRow=1644&_sSort=a_to_z");
+        assert!(!url.contains("_idGameRow"));
+    }
+
+    #[test]
+    fn the_search_fixture_carries_the_fields_filtering_needs() {
+        let body = fixture("gb-addons-search-pink.json");
+        let raw: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        for record in raw["_aRecords"].as_array().unwrap() {
+            assert!(
+                record.get("_sInitialVisibility").is_some(),
+                "{}",
+                record["_idRow"]
+            );
+            assert!(
+                record["_aRootCategory"]["_sProfileUrl"].is_string(),
+                "{}",
+                record["_idRow"]
+            );
+        }
+        let page = parse_listing(&body).unwrap();
+        assert!(page.records.iter().all(|r| r.root_category.is_some()));
+        assert!(
+            page.records.iter().any(|r| r.root_category == Some(7951)),
+            "pink finds skins"
+        );
+    }
+
+    #[test]
+    fn the_real_category_lists_parse() {
+        let guis = parse_categories(&fixture("gb-addons-categories-1644.json")).unwrap();
+        assert!(guis.iter().any(|c| c.id() == 1649 && c.name() == "HUDs"));
+        let skins = parse_categories(&fixture("gb-addons-categories-7951.json")).unwrap();
+        assert!(
+            skins
+                .iter()
+                .any(|c| c.id() == 7962 && c.name().contains("Scout"))
+        );
+        let scout = parse_categories(&fixture("gb-addons-categories-7962.json")).unwrap();
+        assert!(scout.iter().any(|c| c.id() == 7972));
+        assert!(
+            guis.iter()
+                .chain(&skins)
+                .chain(&scout)
+                .all(|c| c.id() > 0 && !c.name().is_empty())
+        );
     }
 }
