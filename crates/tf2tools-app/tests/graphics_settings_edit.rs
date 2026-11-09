@@ -4,7 +4,8 @@ use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use support::graphics::{
-    HEADER, choose, found, idle, modules_cfg, open, saved, shown, toasted, value, wait_for_list,
+    HEADER, choose, found, idle, modules_cfg, open, pick, saved, shown, toasted, value,
+    wait_for_list,
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::GraphicsPage;
@@ -124,10 +125,15 @@ fn low_sound_waits_for_tf2_to_close_but_other_settings_do_not(cx: &mut TestAppCo
     let env = support::env();
     let (s, page) = managed_page(cx, &env, "{}");
     cx.update(|cx| Tf2Probe::install(cx, || true));
-    choose(cx, &page, "sound", Some(value("low")));
+    pick(cx, &s, &page, "sound", value("low"));
     toasted(cx, &s, "Close TF2 first");
     idle(cx, &page);
     assert_eq!(saved(cx, &page, "sound"), None);
+    assert_eq!(
+        shown(cx, &page, "sound"),
+        Some(value("high")),
+        "the Select goes back to the saved choice"
+    );
     assert_eq!(modules_cfg(&env), None);
     assert!(
         !env.game
@@ -143,4 +149,18 @@ fn low_sound_waits_for_tf2_to_close_but_other_settings_do_not(cx: &mut TestAppCo
         modules_cfg(&env).as_deref(),
         Some(format!("{HEADER}fpscap=120\n").as_str())
     );
+}
+
+#[gpui_kit::test]
+fn a_refused_pick_goes_back_even_when_the_reload_fails(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, page) = managed_page(cx, &env, "{}");
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    support::rename_table(&env, "mastercomfig_release", "gone_release");
+    pick(cx, &s, &page, "sound", value("low"));
+    assert_eq!(shown(cx, &page, "sound"), Some(value("low")));
+    toasted(cx, &s, "Close TF2 first");
+    toasted(cx, &s, "Failed to load mastercomfig");
+    idle(cx, &page);
+    assert_eq!(shown(cx, &page, "sound"), Some(value("high")));
 }

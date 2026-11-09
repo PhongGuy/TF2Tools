@@ -496,6 +496,9 @@ impl GraphicsPage {
                                 page.release = loaded.release.clone();
                                 page.choices = loaded.choices.clone();
                                 page.sync_list(loaded.catalog.clone(), window, cx);
+                            } else {
+                                // A refused pick still shows on its Select; move it back.
+                                page.show_choices(window, cx);
                             }
                             page.loaded = true;
                             if page.settling {

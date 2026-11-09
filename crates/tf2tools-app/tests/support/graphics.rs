@@ -1,7 +1,7 @@
 //! Driving the Graphics page's settings list.
 
 use gpui_kit::component::select::SelectEvent;
-use gpui_kit::{Entity, TestAppContext};
+use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::pages::graphics::GraphicsPage;
 use tf2tools_app::pages::graphics::model::ValueOption;
 use tf2tools_app::services::Tf2State;
@@ -91,6 +91,26 @@ pub fn choose(
             cx.emit(SelectEvent::<Vec<ValueOption>>::Confirm(choice))
         })
     });
+}
+
+/// Picks `choice` in `module`'s Select as a click does: the Select shows it, then confirms it.
+pub fn pick(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    page: &Entity<GraphicsPage>,
+    module: &str,
+    choice: ModuleChoice,
+) {
+    let select = cx
+        .update(|cx| page.read(cx).module_select(module))
+        .unwrap_or_else(|| panic!("no row for {module}"));
+    cx.update_window(s.win, |_, window, cx| {
+        select.update(cx, |select, cx| {
+            select.set_selected_value(&choice, window, cx)
+        })
+    })
+    .unwrap();
+    choose(cx, page, module, Some(choice));
 }
 
 pub fn idle(cx: &mut TestAppContext, page: &Entity<GraphicsPage>) {
