@@ -53,7 +53,7 @@ pub fn gamebanana_card(
     cx: &App,
 ) -> AnyElement {
     let theme = cx.theme();
-    let hover = theme.accent.opacity(0.5);
+    let hover = crate::theme::card_hover(theme);
     let shot = div()
         .id(ids::store_card_image(kind, &card.id))
         .test_support()
@@ -96,7 +96,7 @@ pub fn gamebanana_card(
     card_frame(cx)
         .id(ids::GAMEBANANA_CARD)
         .cursor_pointer()
-        // v5's hover:bg-accent/50 over the card's group-box background.
+        // v5's hover:bg-accent/50, made opaque because a hover fill replaces the card's own.
         .hover(move |card| card.bg(hover))
         .on_click(move |_, window, cx| open(window, cx))
         .size_full()

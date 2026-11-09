@@ -75,7 +75,7 @@ pub(super) fn sound_card(
         )
     };
     let theme = cx.theme();
-    let hover = theme.accent.opacity(0.5);
+    let hover = crate::theme::card_hover(theme);
     // The muted header is the card's image area, so tests and the pilot find it by that id.
     let header = div()
         .id(ids::store_card_image(StoreKind::Sounds, &card.id))
@@ -103,7 +103,7 @@ pub(super) fn sound_card(
     card_frame(cx)
         .id(ids::SOUND_STORE_CARD_TARGET)
         .cursor_pointer()
-        // v5's hover:bg-accent/50 over the card's group-box background.
+        // v5's hover:bg-accent/50, made opaque because a hover fill replaces the card's own.
         .hover(move |card| card.bg(hover))
         .on_click(move |_, window, cx| {
             open_detail(item.clone(), sound_body(open_player.clone()), window, cx);
