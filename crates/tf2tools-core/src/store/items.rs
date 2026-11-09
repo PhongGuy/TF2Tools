@@ -4,7 +4,8 @@
 
 use rusqlite::{Connection, OptionalExtension, Row, params_from_iter};
 
-use super::http::{API_BODY_LIMIT, under_prefix};
+use super::http::under_prefix;
+use super::pacer::Priority;
 use super::{StoreClient, StoreKind, gamebanana};
 use crate::error::{FilesError, PreviewError, QueryError};
 use crate::library::{AddonName, GbId};
@@ -319,7 +320,7 @@ impl StoreClient {
             ) => {
                 let url = gamebanana::files_url(self.endpoints.gamebanana(), kind, id.get())
                     .ok_or_else(not_in_store)?;
-                let body = self.http.get_api(&url, API_BODY_LIMIT).await?;
+                let body = self.gamebanana_get(&url, Priority::Interactive).await?;
                 let files = gamebanana::parse_files(&body).map_err(|e| FilesError::Malformed {
                     url: url.clone(),
                     message: e.to_string(),

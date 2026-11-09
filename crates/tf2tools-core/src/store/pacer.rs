@@ -1,9 +1,5 @@
 //! The one pacer every GameBanana API call goes through: calls start at least a gap apart,
 //! calls the player waits on go first, and empty replies back the gap off.
-#![cfg_attr(
-    not(test),
-    expect(dead_code, reason = "callers arrive with the GameBanana routing")
-)]
 
 use std::future::Future;
 use std::pin::pin;

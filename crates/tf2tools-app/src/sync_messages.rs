@@ -47,7 +47,7 @@ pub fn describe_sync(kind: StoreKind, err: &SyncError) -> SyncFailure {
         SyncError::Io { .. } => DISK.to_owned(),
         SyncError::Database { .. } => DATABASE.to_owned(),
         SyncError::Interrupted { .. } => STOPPED.to_owned(),
-        _ => UNKNOWN.to_owned(),
+        SyncError::Throttled { .. } | _ => UNKNOWN.to_owned(),
     };
     SyncFailure::new(message, err.to_string())
 }

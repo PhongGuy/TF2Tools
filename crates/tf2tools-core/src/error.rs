@@ -712,6 +712,12 @@ pub enum SyncError {
         /// SQLite's description of the failure.
         message: String,
     },
+    /// GameBanana kept answering with an empty reply until the pacer gave up.
+    #[error("{url} kept answering with an empty reply; GameBanana is throttling requests")]
+    Throttled {
+        /// The address that was asked.
+        url: String,
+    },
     /// The sync stopped before it finished, for example on a cancelled task.
     #[error("the sync was interrupted: {message}")]
     Interrupted {
@@ -785,6 +791,12 @@ pub enum FilesError {
         url: String,
         /// What was wrong with the response.
         message: String,
+    },
+    /// GameBanana kept answering with an empty reply until the pacer gave up.
+    #[error("{url} kept answering with an empty reply; GameBanana is throttling requests")]
+    Throttled {
+        /// The address that was asked.
+        url: String,
     },
     /// SQLite failed to read or write the store tables.
     #[error("store database error: {message}")]

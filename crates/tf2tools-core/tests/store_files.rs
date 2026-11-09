@@ -1,5 +1,7 @@
 //! Listing an item's downloadable files, and fetching store audio previews.
 
+use std::time::{Duration, Instant};
+
 use crate::common;
 
 use common::{StoreEnv, fast_config, sql, store_env, store_fixture};
@@ -258,5 +260,65 @@ async fn a_preview_over_the_sound_cap_is_refused() {
     assert!(
         matches!(result, Err(PreviewError::TooLarge { limit: 4, .. })),
         "{result:?}"
+    );
+}
+
+#[tokio::test]
+async fn an_empty_file_listing_is_retried_then_listed() {
+    let env = store_env().await;
+    Mock::given(method("GET"))
+        .and(path("/apiv11/Sound/53978"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(""))
+        .up_to_n_times(1)
+        .with_priority(1)
+        .mount(&env.server)
+        .await;
+    mount_files(&env, "Sound", 53978, store_fixture("gb-sound-files.json")).await;
+    let files = env
+        .client
+        .item_files(StoreKind::Sounds, &gb(53978))
+        .await
+        .unwrap();
+    assert_eq!(files.len(), 7);
+    assert_eq!(env.server.received_requests().await.unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn three_empty_file_listings_fail_as_throttled() {
+    let env = store_env().await;
+    mount_files(&env, "Sound", 53978, Vec::new()).await;
+    let result = env.client.item_files(StoreKind::Sounds, &gb(53978)).await;
+    assert!(
+        matches!(result, Err(FilesError::Throttled { .. })),
+        "{result:?}"
+    );
+    assert_eq!(env.server.received_requests().await.unwrap().len(), 3);
+}
+
+#[tokio::test]
+async fn clients_sharing_a_pacer_space_their_gamebanana_calls() {
+    let env = store_env().await;
+    mount_files(&env, "Sound", 53978, store_fixture("gb-sound-files.json")).await;
+    let gap = Duration::from_millis(300);
+    let first = env
+        .client
+        .clone()
+        .with_config(fast_config().with_request_spacing(gap));
+    let db = Database::open(&env.dir).unwrap();
+    let endpoints = Endpoints::default().with_gamebanana(format!("{}/apiv11", env.server.uri()));
+    let second = StoreClient::new(db, env.dir.clone(), endpoints)
+        .with_config(fast_config())
+        .with_pacer_of(&first);
+    let item = gb(53978);
+    let start = Instant::now();
+    let (a, b) = tokio::join!(
+        first.item_files(StoreKind::Sounds, &item),
+        second.item_files(StoreKind::Sounds, &item),
+    );
+    assert!(a.is_ok() && b.is_ok(), "{a:?} {b:?}");
+    assert!(
+        start.elapsed() >= gap,
+        "the second call waited the shared gap: {:?}",
+        start.elapsed()
     );
 }

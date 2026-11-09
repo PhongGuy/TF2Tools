@@ -131,7 +131,7 @@ pub fn describe_files(kind: StoreKind, err: &FilesError) -> StoreFailure {
             format!("{source} sent something TF2Tools couldn't read. Try again later.")
         }
         FilesError::Database { .. } => STORE_READ.into(),
-        _ => FILES_UNKNOWN.into(),
+        FilesError::Throttled { .. } | _ => FILES_UNKNOWN.into(),
     };
     StoreFailure::new(message, err.to_string())
 }
