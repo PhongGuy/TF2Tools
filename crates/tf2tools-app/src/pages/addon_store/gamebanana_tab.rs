@@ -13,15 +13,15 @@ use gpui_kit::component::{ActiveTheme as _, Icon, IndexPath, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, ElementId, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, SharedString,
-    Styled as _, Subscription, Task, TestSupportExt as _, Window, div, point, px,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
+    Subscription, Task, TestSupportExt as _, Window, div, point, px,
 };
 use tf2tools_core::{
     AddonCard, AddonCategory, AddonCursor, AddonQuery, AddonSection, AddonSort, AddonStep,
     BrowseError, GbId,
 };
 
-use super::card::{CARD_TEXT_HEIGHT, OpenAddon, gb_addon_card};
+use super::card::{OpenAddon, card_height, gb_addon_card};
 use crate::addon_detail::open_addon_detail;
 use crate::addon_feed::{AddonFeed, Keyed, StepAfter};
 use crate::ids;
@@ -724,9 +724,8 @@ impl AddonTab {
     fn cards_grid(&self, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity().downgrade();
         let section = self.section.key();
-        let height = |width: Pixels| width * (9. / 16.) + CARD_TEXT_HEIGHT;
         self.grid
-            .render_sized(self.feed.items().len(), height, move |ix, _, cx| {
+            .render_sized(self.feed.items().len(), card_height, move |ix, _, cx| {
                 let card = this.upgrade().and_then(|tab| {
                     let tab = tab.read(cx);
                     let card = tab.feed.items().get(ix)?;

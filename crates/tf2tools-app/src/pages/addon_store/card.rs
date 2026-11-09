@@ -18,14 +18,21 @@ use crate::pages::common::{badge_of, card_frame};
 use crate::remote_images::RemoteImage;
 use crate::widgets::labelled;
 
-/// The card's text area under its 16:9 thumbnail: p-6 around the name, author and stats rows.
-pub const CARD_TEXT_HEIGHT: Pixels = px(116.);
+/// The card's text area under its thumbnail, laid out like `gb_card`: p-6 around a 58 px header
+/// (name, author, pb 14 px), gap-6, then the mt-2 stats row.
+const CARD_TEXT_HEIGHT: Pixels = px(154.);
+
+/// The card's height at `width`: `gb_card`'s pt-6, the 16:9 thumbnail and the text area.
+pub fn card_height(width: Pixels) -> Pixels {
+    px(24.) + width * (9. / 16.) + CARD_TEXT_HEIGHT
+}
 
 /// What a click on the card does.
 pub type OpenAddon = Rc<dyn Fn(&mut Window, &mut App)>;
 
-/// A GameBanana add-on card in the `gamebanana_card` layout: the 16:9 thumbnail (else a muted
-/// area), the name with an "Outdated" tag when obsolete, "by {author}" and the like count.
+/// A GameBanana add-on card in the `gamebanana_card` layout without tags or a button: the 16:9
+/// thumbnail 24 px below the top (else a muted area), the name with an "Outdated" tag when
+/// obsolete, "by {author}" and the like count.
 /// A click anywhere on it calls `open`. With `reveal`, a "Mature" cover lies over the thumbnail
 /// and a click on it calls `reveal` instead.
 pub fn gb_addon_card(
@@ -102,6 +109,7 @@ pub fn gb_addon_card(
         .size_full()
         .flex()
         .flex_col()
+        .pt_6()
         .overflow_hidden()
         .child(shot)
         .child(
@@ -110,29 +118,35 @@ pub fn gb_addon_card(
                 .flex_none()
                 .min_w_0()
                 .p_6()
+                .gap_6()
                 .child(
-                    h_flex()
+                    v_flex()
                         .min_w_0()
-                        .gap_2()
-                        .items_center()
-                        .child(labelled(
-                            div()
+                        .pb(px(14.))
+                        .child(
+                            h_flex()
                                 .min_w_0()
+                                .gap_2()
+                                .items_center()
+                                .child(labelled(
+                                    div()
+                                        .min_w_0()
+                                        .truncate()
+                                        .line_height(px(24.))
+                                        .font_weight(FontWeight::SEMIBOLD),
+                                    ids::addon_gb_card_name(section, card.id),
+                                    card.name.clone(),
+                                ))
+                                .children(outdated),
+                        )
+                        .child(
+                            div()
                                 .truncate()
-                                .line_height(px(24.))
-                                .font_weight(FontWeight::SEMIBOLD),
-                            ids::addon_gb_card_name(section, card.id),
-                            card.name.clone(),
-                        ))
-                        .children(outdated),
-                )
-                .child(
-                    div()
-                        .truncate()
-                        .text_sm()
-                        .line_height(px(20.))
-                        .text_color(theme.muted_foreground)
-                        .child(format!("by {}", card.author)),
+                                .text_sm()
+                                .line_height(px(20.))
+                                .text_color(theme.muted_foreground)
+                                .child(format!("by {}", card.author)),
+                        ),
                 )
                 .child(
                     h_flex()

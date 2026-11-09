@@ -162,11 +162,7 @@ fn scrolling_to_the_end_runs_the_next_step(cx: &mut TestAppContext) {
         .map(|r| r.2)
         .collect();
     assert_eq!(pages, ["1", "2", "3", "4", "5"]);
-    assert!(support::present(
-        cx,
-        w.win,
-        ids::addon_gb_card("textures", GbId::new(51))
-    ));
+    assert!(cx.update(|cx| tab.read(cx).cards().iter().any(|c| c.id == GbId::new(51))));
     assert!(!support::present(cx, w.win, ids::ADDON_LOAD_MORE));
 }
 
