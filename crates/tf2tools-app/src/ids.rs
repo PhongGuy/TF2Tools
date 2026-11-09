@@ -741,6 +741,8 @@ pub const ADDON_STORE_TABS: &str = "addon-store-tabs";
 pub const ADDON_SEARCH: &str = "addon-search";
 /// Wraps a GameBanana add-on tab's sort select.
 pub const ADDON_SORT: &str = "addon-sort";
+/// The "Sort:" label before a GameBanana add-on tab's sort select.
+pub const ADDON_SORT_LABEL: &str = "addon-sort-label";
 /// Wraps a GameBanana add-on tab's subcategory select.
 pub const ADDON_CATEGORY: &str = "addon-category";
 /// Wraps the weapon select, shown only for a Skins class.

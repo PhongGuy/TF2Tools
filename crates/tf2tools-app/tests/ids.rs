@@ -286,6 +286,7 @@ fn the_kit_wrapper_ids_are_stable() {
 #[test]
 fn the_sort_label_id_is_stable() {
     assert_eq!(ids::STORE_SORT_LABEL, "store-sort-label");
+    assert_eq!(ids::ADDON_SORT_LABEL, "addon-sort-label");
 }
 
 #[test]

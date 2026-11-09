@@ -522,3 +522,66 @@ fn a_failed_step_shows_retry_and_retry_loads(cx: &mut TestAppContext) {
     });
     assert!(!support::present(cx, w.win, ids::STORE_ERROR));
 }
+
+#[gpui_kit::test]
+fn the_sort_select_is_labelled_and_as_wide_as_the_store_grids(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_index(
+        587,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(1, 587, None)], true),
+    );
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "textures");
+    settled(cx, &tab, "the first step");
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_SORT_LABEL).as_deref(),
+        Some("Sort:")
+    );
+    let sort = support::bounds_of(cx, w.win, ids::ADDON_SORT).unwrap();
+    assert_eq!(sort.size.width, gpui_kit::px(144.));
+}
+
+#[gpui_kit::test]
+fn a_class_left_before_its_weapons_arrive_never_shows_them(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_categories(7951, &[(7962, "The Scout"), (7960, "The Soldier")]);
+    let slow = std::time::Duration::from_millis(400);
+    server.mount_gb_categories_after(7962, &[(7972, "Scattergun")], slow);
+    server.mount_gb_categories(7960, &[(7980, "Rocket Launcher")]);
+    for category in [7951, 7962, 7960] {
+        server.mount_gb_index(
+            category,
+            MD,
+            1,
+            support::gb_listing(vec![support::gb_addon(1, 7951, None)], true),
+        );
+    }
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "skins");
+    settled(cx, &tab, "the first step");
+    support::wait_real(cx, "the classes", |cx| {
+        cx.update(|cx| tab.read(cx).categories().len() == 2)
+    });
+    let weapons = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            tab.read(cx)
+                .weapons()
+                .iter()
+                .map(|c| c.id())
+                .collect::<Vec<_>>()
+        })
+    };
+    support::click_id(cx, w.win, ids::ADDON_CATEGORY);
+    support::click_id(cx, w.win, ids::select_option(ids::ADDON_CATEGORY, "7962"));
+    support::click_id(cx, w.win, ids::ADDON_CATEGORY);
+    support::click_id(cx, w.win, ids::select_option(ids::ADDON_CATEGORY, "7960"));
+    support::wait_real(cx, "the soldier's weapons", |cx| weapons(cx) == [7980]);
+    let started = std::time::Instant::now();
+    support::wait_real(cx, "the scout's late reply", |_| {
+        started.elapsed() > slow * 2
+    });
+    assert_eq!(weapons(cx), [7980], "the scout's weapons never show");
+    assert_eq!(cx.update(|cx| tab.read(cx).category()), Some(7960));
+}

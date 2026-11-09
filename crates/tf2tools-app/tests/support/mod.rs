@@ -1354,6 +1354,16 @@ impl StoreServer {
 
     /// `parent`'s child categories as `(id, name)`.
     pub fn mount_gb_categories(&self, parent: u32, children: &[(u32, &str)]) {
+        self.mount_gb_categories_after(parent, children, Duration::ZERO);
+    }
+
+    /// `parent`'s child categories as `(id, name)`, answered after `delay`.
+    pub fn mount_gb_categories_after(
+        &self,
+        parent: u32,
+        children: &[(u32, &str)],
+        delay: Duration,
+    ) {
         let rows: Vec<_> = children
             .iter()
             .map(|(id, name)| serde_json::json!({"_idRow": id, "_sName": name, "_nItemCount": 1}))
@@ -1362,7 +1372,11 @@ impl StoreServer {
             Mock::given(method("GET"))
                 .and(path("/apiv11/Mod/Categories"))
                 .and(query_param("_idCategoryRow", parent.to_string()))
-                .respond_with(ResponseTemplate::new(200).set_body_json(rows))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_json(rows)
+                        .set_delay(delay),
+                )
                 .mount(&self.server),
         );
     }

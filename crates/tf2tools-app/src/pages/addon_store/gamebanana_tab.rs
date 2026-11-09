@@ -34,6 +34,7 @@ use crate::store_messages::{StoreFailure, describe_browse, listing_stopped};
 use crate::tokio_bridge;
 use crate::widgets::card_grid::{CardGrid, SHELL_CHROME_WIDTH, columns_for_store};
 use crate::widgets::label_option::LabelOption;
+use crate::widgets::labelled;
 use crate::widgets::store_error::store_error_line;
 
 /// The most columns an add-on grid lays out.
@@ -115,8 +116,9 @@ pub struct AddonTab {
     category: Option<u32>,
     weapon: Option<u32>,
     search: String,
-    /// The root's children, then the chosen class's children; empty until each arrives.
+    /// The root's children, for the subcategory Select; empty until they arrive.
     categories: Vec<AddonCategory>,
+    /// The chosen class's children, for the weapon Select; empty until they arrive.
     weapons: Vec<AddonCategory>,
     search_input: Entity<InputState>,
     sort_select: Labels,
@@ -244,6 +246,7 @@ impl AddonTab {
         tab
     }
 
+    /// The order the tab lists the section in.
     pub fn sort(&self) -> AddonSort {
         self.sort
     }
@@ -265,10 +268,12 @@ impl AddonTab {
         &self.weapons
     }
 
+    /// The chosen subcategory; `None` lists the whole section.
     pub fn category(&self) -> Option<u32> {
         self.category
     }
 
+    /// The chosen weapon of a Skins class, which narrows the listing past the subcategory.
     pub fn weapon(&self) -> Option<u32> {
         self.weapon
     }
@@ -641,16 +646,17 @@ impl AddonTab {
                 h_flex()
                     .gap_2()
                     .items_center()
-                    .child(
+                    .child(labelled(
                         div()
                             .text_sm()
                             .font_weight(FontWeight::MEDIUM)
-                            .text_color(muted)
-                            .child("Sort:"),
-                    )
+                            .text_color(muted),
+                        ids::ADDON_SORT_LABEL,
+                        "Sort:",
+                    ))
                     .child(select(
                         ids::ADDON_SORT,
-                        160.,
+                        144.,
                         Select::new(&self.sort_select)
                             .h_9()
                             .disabled(!enabled)
