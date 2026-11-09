@@ -12,7 +12,8 @@ const GITHUB_DOWN: &str = "Couldn't reach GitHub. Check your internet connection
 const GITHUB_BUSY: &str = "GitHub is busy right now. Wait a few minutes, then try again.";
 const GITHUB_UNREADABLE: &str = "GitHub sent something TF2Tools couldn't read. Try again later.";
 const NO_RELEASE: &str = "TF2Tools doesn't know the latest mastercomfig yet. Open the Addon Store to refresh it, then try again.";
-const STALE_PAGE: &str = "Open the Graphics page again and try once more.";
+const STALE_PAGE: &str =
+    "mastercomfig changed since this page opened. Open the Graphics page again and try once more.";
 
 /// What the status card shows.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -70,17 +71,29 @@ pub fn detail(card: &StatusCard) -> Option<String> {
     }
 }
 
-/// The recorded release tag when it differs from a managed install's version.
+/// The recorded release tag when it is newer than a managed install's version. An install
+/// whose version does not parse (such as "unknown") is offered any tag that does.
 pub fn update_to(card: &StatusCard) -> Option<&str> {
     match card {
         StatusCard::Installed {
             version,
             latest: Some(latest),
-        } if latest != version => Some(latest),
+        } => {
+            let newest = version_parts(latest)?;
+            match version_parts(version) {
+                Some(installed) if installed >= newest => None,
+                _ => Some(latest),
+            }
+        }
         StatusCard::Installed { .. } | StatusCard::NotInstalled | StatusCard::Outside { .. } => {
             None
         }
     }
+}
+
+// A dotted numeric version as numbers, so 9.100.1 sorts after 9.99.3; None if any part isn't one.
+fn version_parts(tag: &str) -> Option<Vec<u64>> {
+    tag.split('.').map(|part| part.parse().ok()).collect()
 }
 
 /// The preset card's title.

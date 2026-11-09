@@ -115,3 +115,16 @@ fn install_failures_read_as_player_words() {
         support::assert_plain(&failure.message);
     }
 }
+
+#[test]
+fn only_a_newer_release_is_offered_as_an_update() {
+    let offered = |installed: &str, latest: &str| {
+        update_to(&status_card(&managed(installed), Some(latest))).map(str::to_owned)
+    };
+    // Numeric per part: 9.100.1 is newer than 9.99.3.
+    assert_eq!(offered("9.99.3", "9.100.1").as_deref(), Some("9.100.1"));
+    assert_eq!(offered("9.100.1", "9.99.3"), None);
+    assert_eq!(offered("9.100.1", "9.100.1"), None);
+    assert_eq!(offered("unknown", "9.100.1").as_deref(), Some("9.100.1"));
+    assert_eq!(offered("9.100.1", "nightly"), None);
+}
