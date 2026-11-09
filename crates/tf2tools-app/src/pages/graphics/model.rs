@@ -105,8 +105,10 @@ pub fn update_to(card: &StatusCard) -> Option<&str> {
     }
 }
 
-// A dotted numeric version as numbers, so 9.100.1 sorts after 9.99.3; None if any part isn't one.
+// A dotted numeric version as numbers, so 9.100.1 sorts after 9.99.3; a leading "v" is
+// ignored and None means some part isn't a number.
 fn version_parts(tag: &str) -> Option<Vec<u64>> {
+    let tag = tag.strip_prefix('v').unwrap_or(tag);
     tag.split('.').map(|part| part.parse().ok()).collect()
 }
 

@@ -296,3 +296,42 @@ async fn an_install_newer_than_the_recorded_release_still_swaps_the_override() {
     apply(&env, &tf2, &choices).await.unwrap();
     assert_eq!(overrides(&tf2), ["mastercomfig-addon-override-1.vpk"]);
 }
+
+#[tokio::test]
+async fn trailing_zeros_do_not_make_a_version_older() {
+    let env = store_env().await;
+    let (_game, tf2) = managed_game(&env);
+    set_mastercomfig_state(&env.dir, "9.100", "medium");
+    record_release(&env);
+    sql(&env.dir)
+        .execute("UPDATE mastercomfig_release SET tag = '9.100.0'", [])
+        .unwrap();
+    serve_overrides(&env).await;
+    let mut choices = Choices::new(Preset::Medium);
+    choices.set(&module_catalog(), "sound", value("low"));
+    apply(&env, &tf2, &choices).await.unwrap();
+    assert_eq!(overrides(&tf2), ["mastercomfig-addon-override-1.vpk"]);
+}
+
+#[tokio::test]
+async fn removing_the_override_does_not_wait_for_the_update() {
+    let env = store_env().await;
+    let (_game, tf2) = managed_game(&env);
+    set_mastercomfig_state(&env.dir, "9.100.0", "medium");
+    sql(&env.dir)
+        .execute(
+            "UPDATE mastercomfig_state SET modules = ?1",
+            [r#"{"sound":"low"}"#],
+        )
+        .unwrap();
+    write_file(
+        &tf2.custom_dir().join("mastercomfig-addon-override-1.vpk"),
+        &override_vpk(1),
+    );
+    record_release(&env);
+    let mut choices = env.lib.mastercomfig_choices().unwrap().unwrap();
+    choices.reset("sound");
+    apply(&env, &tf2, &choices).await.unwrap();
+    assert!(overrides(&tf2).is_empty());
+    assert_eq!(requests(&env).await, 0);
+}

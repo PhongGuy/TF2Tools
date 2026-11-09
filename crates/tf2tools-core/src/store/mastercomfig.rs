@@ -36,10 +36,18 @@ fn check_tag(tag: &str) -> Result<(), ModuleCatalogError> {
     Ok(())
 }
 
-/// A dotted numeric version as numbers, ignoring a leading "v"; None if any part isn't one.
+/// A dotted numeric version as numbers, ignoring a leading "v" and trailing zero parts (so
+/// 9.100 equals 9.100.0); None if any part isn't a number.
 fn version_parts(tag: &str) -> Option<Vec<u64>> {
     let tag = tag.strip_prefix('v').unwrap_or(tag);
-    tag.split('.').map(|part| part.parse().ok()).collect()
+    let mut parts: Vec<u64> = tag
+        .split('.')
+        .map(|part| part.parse().ok())
+        .collect::<Option<_>>()?;
+    while parts.last() == Some(&0) {
+        parts.pop();
+    }
+    Some(parts)
 }
 
 /// The recorded version of the managed install, if there is one.
@@ -290,8 +298,9 @@ impl StoreClient {
                         },
                     })?
                     .ok_or(ApplyModulesError::NoRelease)?;
-                // The release's override belongs to its own version, so it waits for a newer
-                // release to be installed; an unreadable or newer install takes it as before.
+                // The release's override belongs to its own version, so it waits until the
+                // installed version catches up with the release; an unreadable or newer
+                // install takes it as before.
                 let installed =
                     installed_version(&self.db).map_err(|e| ApplyModulesError::Database {
                         message: e.to_string(),
