@@ -208,7 +208,10 @@ test_readme_shots_dry_run_drives_every_page_of_the_real_app() {
   # deleted, and a HUD installed from the library.
   [[ $(printf '%s\n' "$out" | grep -c '"sidebar-toggle"') == 2 ]] || fail "the sidebar is not put back: [$out]"
   [[ $out == *'"profiles-search"}, "text": "Competitive"'* ]] || fail "no neutral profile filter: [$out]"
-  [[ $out == *'"profiles-save-name"}, "text": "Competitive"'* ]] || fail "no neutral profile: [$out]"
+  # New profile selects its "Profile N" name, so the name is typed with no target (a target
+  # clicks first and would append), and Back commits it.
+  [[ $out == *'"profiles-new"'*'type {"text": "Competitive"}'*'"profile-editor-back"'* ]] || fail "no neutral profile: [$out]"
+  [[ $out != *profiles-save* ]] || fail "uses the removed Save Current: [$out]"
   [[ $out == *'"profile-delete:example-profile"'*'"confirm-ok"'*'# shot settings'* ]] || fail "the profile stays: [$out]"
   [[ $out == *'"hud-install:example-hud"'*'# shot huds'* ]] || fail "installs no HUD before the HUDs shot: [$out]"
   [[ $out != *'"hud-fonts-install"'* ]] || fail "installs fonts onto the machine: [$out]"

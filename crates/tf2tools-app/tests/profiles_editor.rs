@@ -1464,3 +1464,39 @@ fn without_tf2_only_start_empty_works(cx: &mut TestAppContext) {
         "Profile 1"
     );
 }
+
+#[gpui_kit::test]
+fn edit_or_a_click_on_a_card_opens_the_editor(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = empty_profile(&s, "Comp");
+    let page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::profile_edit(comp.id()));
+    let _ = wait_editor(cx, &s, &page);
+    support::click_id(cx, s.win, ids::PROFILE_EDITOR_BACK);
+    support::click_id(cx, s.win, ids::profile_card(comp.id()));
+    let editor = wait_editor(cx, &s, &page);
+    assert_eq!(
+        cx.update(|cx| editor.read(cx).id().clone()),
+        comp.id().clone()
+    );
+}
+
+// The card's own buttons do their job only; the click stops before the card behind them.
+#[gpui_kit::test]
+fn card_buttons_do_not_open_the_editor(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = full_profile(&s, &env, "Comp");
+    let page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::profile_delete(comp.id()));
+    support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
+    assert!(cx.update(|cx| page.read(cx).editor()).is_none());
+    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    toast_is(
+        cx,
+        &s,
+        "Profile \"Comp\" activated. Installed: HUD, Hitsound, Killsound, Crosshairs",
+    );
+    assert!(cx.update(|cx| page.read(cx).editor()).is_none());
+}

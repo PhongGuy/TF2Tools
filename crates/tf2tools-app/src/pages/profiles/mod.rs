@@ -985,7 +985,8 @@ fn empty_state(
 }
 
 // v5's ProfileCard: the name (and "Active"), its item badges or "Empty profile", then
-// Activate, Edit (opens the editor) and Delete.
+// Activate, Edit (opens the editor) and Delete. A click on the body also opens the editor; the
+// buttons stop their clicks so they never reach it.
 fn profile_card(
     profile: &Profile,
     active: bool,
@@ -1000,6 +1001,7 @@ fn profile_card(
     let on_activate = {
         let (page, id) = (page.clone(), id.clone());
         move |_: &_, window: &mut Window, cx: &mut App| {
+            cx.stop_propagation();
             let _ = page.update(cx, |page, cx| page.activate(id.clone(), window, cx));
         }
     };
@@ -1012,12 +1014,14 @@ fn profile_card(
     let on_edit = {
         let (page, id) = (page.clone(), id.clone());
         move |_: &_, window: &mut Window, cx: &mut App| {
+            cx.stop_propagation();
             let _ = page.update(cx, |page, cx| page.open_editor(id.clone(), window, cx));
         }
     };
     let on_delete = {
         let (page, id, name) = (page.clone(), id.clone(), profile.name().to_owned());
         move |_: &_, window: &mut Window, cx: &mut App| {
+            cx.stop_propagation();
             let _ = page.update(cx, |page, cx| page.delete(id.clone(), &name, window, cx));
         }
     };
@@ -1074,6 +1078,7 @@ fn profile_card(
         .accessibility_id(ids::profile_card(id).to_string())
         .aria_label(profile.name().to_owned())
         .test_support()
+        .on_click(on_edit.clone())
         .size_full()
         .flex()
         .flex_col()

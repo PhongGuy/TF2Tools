@@ -196,9 +196,10 @@ calls() {
   send 'type {"target": {"id_suffix": "profiles-search"}, "text": "Competitive"}'
   ask "count profile-delete:" 0
   [ "$ANSWER" = 0 ] || die "a profile matching Competitive exists; rename it first"
-  click profiles-save-current
-  send 'type {"target": {"id_suffix": "profiles-save-name"}, "text": "Competitive"}'
-  click profiles-save-ok
+  # New profile selects its "Profile N" name, so an untargeted type replaces it; Back saves it.
+  click profiles-new
+  send 'type {"text": "Competitive"}'
+  click profile-editor-back
   send 'wait {"ms": 2000}'
   ask "first profile-delete:" profile-delete:example-profile
   profile=$ANSWER
