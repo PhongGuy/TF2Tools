@@ -14,7 +14,7 @@ use crate::shell::toast::toast_error;
 use crate::sync_messages::describe_sync;
 use crate::tokio_bridge;
 
-/// The toast title when TF2 holds mastercomfig's files open.
+/// The toast title when an install, update or remove refuses because TF2 is running.
 pub const CLOSE_TF2: &str = "Close TF2 first";
 /// Its description.
 pub const CLOSE_TF2_TEXT: &str = "TF2 is running. Close the game, then try again.";

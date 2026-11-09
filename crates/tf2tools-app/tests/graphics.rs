@@ -435,4 +435,9 @@ fn only_the_running_job_s_button_spins(cx: &mut TestAppContext) {
     support::wait_real(cx, "the update", |cx| installed(cx, &page, "9.101.0"));
     idle(cx, &page);
     assert!(!cx.update(|cx| page.read(cx).is_installing()));
+    support::click_without_settling(cx, s.win, ids::GRAPHICS_CHECK);
+    assert!(cx.update(|cx| page.read(cx).is_checking()));
+    assert!(!cx.update(|cx| page.read(cx).is_installing()));
+    idle(cx, &page);
+    assert!(!cx.update(|cx| page.read(cx).is_checking()));
 }
