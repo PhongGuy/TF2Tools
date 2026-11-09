@@ -14,6 +14,7 @@ use gpui_kit::{
 use tf2tools_core::{AddonCard, AddonFile, AddonProfile};
 
 use crate::ids;
+use crate::links::gamebanana_page;
 use crate::pages::addon_store::model::downloads_label;
 use crate::pages::common::badge_of;
 use crate::services::Services;
@@ -315,7 +316,7 @@ impl Render for AddonDetail {
                     .child(link_button(
                         "gamebanana",
                         "Open on GameBanana",
-                        self.card.profile_url.clone(),
+                        gamebanana_page(&self.card.profile_url, self.card.id),
                     )),
             )
             .child(scroll_beside(ids::ADDON_DETAIL_SCROLLBAR, &self.scroll, scrolled).min_h_0())

@@ -669,3 +669,24 @@ fn the_detail_retries_a_failed_profile(cx: &mut TestAppContext) {
     });
     assert!(!support::present(cx, w.win, ids::ADDON_DETAIL_ERROR));
 }
+
+#[gpui_kit::test]
+fn an_off_site_profile_link_opens_the_items_gamebanana_page(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let mut item = support::gb_addon(8, 587, None);
+    item["_sProfileUrl"] = "https://gamebanana.com.evil.example/mods/8".into();
+    server.mount_gb_index(587, MD, 1, support::gb_listing(vec![item], true));
+    server.mount_gb_profile(8, serde_json::json!({"_idRow": 8, "_sName": "Addon 8"}));
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "textures");
+    settled(cx, &tab, "the first step");
+    support::click_id(cx, w.win, ids::addon_gb_card("textures", GbId::new(8)));
+    support::wait_real(cx, "the profile", |cx| {
+        support::present(cx, w.win, ids::ADDON_DETAIL_DOWNLOADS)
+    });
+    support::click_id(cx, w.win, ids::store_detail_link("gamebanana"));
+    assert_eq!(
+        cx.opened_url().as_deref(),
+        Some("https://gamebanana.com/mods/8")
+    );
+}
