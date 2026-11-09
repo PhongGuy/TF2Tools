@@ -69,7 +69,7 @@ fn the_page_shows_v5_s_header_and_card_states(cx: &mut TestAppContext) {
         cx,
         w.win,
         ids::page(Page::AddonStore),
-        ids::ADDON_STORE_TAG,
+        ids::addon_store_tab("mastercomfig"),
     );
     assert!(!support::present(cx, w.win, ids::ADDON_STORE_NO_TF2));
     assert_eq!(

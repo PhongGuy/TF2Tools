@@ -35,7 +35,7 @@ use tf2tools_core::Endpoints;
 use tf2tools_core::StoreKind;
 use tf2tools_core::{AddonName, CrosshairEntry, DataDir, DetectError, Provenance, Tf2Install};
 use tf2tools_core::{LogEntry, LogQuery};
-use wiremock::matchers::{method, path};
+use wiremock::matchers::{method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 pub mod fonts;
@@ -1303,6 +1303,67 @@ impl StoreServer {
                 .mount(&self.server),
         );
     }
+    /// GameBanana's Mod Index for `category` in `sort` (`Generic_*`), page `page`.
+    pub fn mount_gb_index(&self, category: u32, sort: &str, page: u32, body: Vec<u8>) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path("/apiv11/Mod/Index"))
+                .and(query_param(
+                    "_aFilters[Generic_Category]",
+                    category.to_string(),
+                ))
+                .and(query_param("_sSort", sort))
+                .and(query_param("_nPage", page.to_string()))
+                .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+                .mount(&self.server),
+        );
+    }
+
+    /// `(category, sort, page)` of each Mod Index request so far, in order.
+    pub fn gb_index_requests(&self) -> Vec<(String, String, String)> {
+        let asked = self
+            .rt
+            .block_on(self.server.received_requests())
+            .unwrap_or_default();
+        asked
+            .iter()
+            .filter(|r| r.url.path() == "/apiv11/Mod/Index")
+            .map(|r| {
+                let get = |k: &str| {
+                    r.url
+                        .query_pairs()
+                        .find(|(q, _)| q == k)
+                        .map(|(_, v)| v.into_owned())
+                        .unwrap_or_default()
+                };
+                (
+                    get("_aFilters[Generic_Category]"),
+                    get("_sSort"),
+                    get("_nPage"),
+                )
+            })
+            .collect()
+    }
+}
+
+/// A GameBanana add-on record under `root`, in subcategory `sub`.
+pub fn gb_addon(id: u64, root: u32, sub: Option<u32>) -> serde_json::Value {
+    let mut r = serde_json::json!({"_idRow": id, "_sModelName": "Mod", "_sName": format!("Addon {id}"),
+        "_sProfileUrl": format!("https://gamebanana.com/mods/{id}"), "_tsDateAdded": id, "_nLikeCount": 2,
+        "_bIsObsolete": false, "_sInitialVisibility": "show", "_bHasContentRatings": false,
+        "_aSubmitter": {"_sName": "vex"},
+        "_aRootCategory": {"_sName": "Root", "_sProfileUrl": format!("https://gamebanana.com/mods/cats/{root}")}});
+    if let Some(sub) = sub {
+        r["_aSubCategory"] = serde_json::json!({"_sName": "Sub", "_sProfileUrl": format!("https://gamebanana.com/mods/cats/{sub}")});
+    }
+    r
+}
+
+/// A Mod Index reply holding `records`; `complete` marks the listing's last page.
+pub fn gb_listing(records: Vec<serde_json::Value>, complete: bool) -> Vec<u8> {
+    serde_json::json!({"_aMetadata": {"_bIsComplete": complete}, "_aRecords": records})
+        .to_string()
+        .into_bytes()
 }
 
 /// An Addon Store window over `env` pointed at `server`.
