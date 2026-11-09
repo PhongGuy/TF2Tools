@@ -11,7 +11,8 @@ use crate::store_messages::LIBRARY_UPDATE;
 const GITHUB_DOWN: &str = "Couldn't reach GitHub. Check your internet connection and try again.";
 const GITHUB_BUSY: &str = "GitHub is busy right now. Wait a few minutes, then try again.";
 const GITHUB_UNREADABLE: &str = "GitHub sent something TF2Tools couldn't read. Try again later.";
-const NO_RELEASE: &str = "TF2Tools doesn't know the latest mastercomfig yet. Open the Addon Store to refresh it, then try again.";
+const NO_RELEASE: &str =
+    "GitHub has no mastercomfig release TF2Tools can install right now. Try again later.";
 const STALE_PAGE: &str =
     "mastercomfig changed since this page opened. Open the Graphics page again and try once more.";
 

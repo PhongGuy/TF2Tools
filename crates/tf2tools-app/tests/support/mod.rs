@@ -778,6 +778,10 @@ pub fn open_store_grid(
 
 pub const CURATED_HASH: &str = "abc123";
 
+/// Where `StoreServer::endpoints` sends GitHub's latest-release call for mastercomfig.
+pub const MASTERCOMFIG_RELEASE_ROUTE: &str =
+    "/gh-api/repos/mastercomfig/mastercomfig/releases/latest";
+
 /// A wiremock server on its own runtime, standing in for GameBanana and GitHub.
 pub struct StoreServer {
     pub server: MockServer,
@@ -918,6 +922,32 @@ impl StoreServer {
             Mock::given(method("GET"))
                 .and(path(route))
                 .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+                .mount(&self.server),
+        );
+    }
+
+    /// GitHub's latest mastercomfig release `tag`, listing only the base VPK at this server's
+    /// `/gh/mastercomfig/mastercomfig-base.vpk`.
+    pub fn mount_mastercomfig_release(&self, tag: &str) {
+        let body = serde_json::json!({
+            "tag_name": tag,
+            "assets": [{
+                "name": "mastercomfig-base.vpk",
+                "browser_download_url":
+                    format!("{}/gh/mastercomfig/mastercomfig-base.vpk", self.uri()),
+                "size": 100,
+                "download_count": 7
+            }]
+        });
+        self.mount_bytes(MASTERCOMFIG_RELEASE_ROUTE, body.to_string().into_bytes());
+    }
+
+    /// Answers every GET of `route` with `status` and an empty body.
+    pub fn mount_status(&self, route: &str, status: u16) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(route))
+                .respond_with(ResponseTemplate::new(status))
                 .mount(&self.server),
         );
     }

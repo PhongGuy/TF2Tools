@@ -1,5 +1,6 @@
 //! The Graphics page: mastercomfig's status and the graphics preset picker.
 
+pub mod jobs;
 pub mod model;
 
 use gpui_kit::assets::IconName;
@@ -22,12 +23,11 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
-use crate::tokio_bridge;
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
 use model::{
-    StatusCard, describe_apply, describe_install, describe_remove, describe_take_over, detail,
-    headline, preset_description, preset_label, status_card, update_to,
+    StatusCard, describe_apply, describe_remove, describe_take_over, detail, headline,
+    preset_description, preset_label, status_card, update_to,
 };
 
 const CREDIT: &str = "mastercomfig is made by the mastercomfig team and shared under the MIT licence. Preset descriptions come from comfig-app.";
@@ -109,7 +109,7 @@ impl GraphicsPage {
         }
     }
 
-    // Downloads the recorded release into tf/custom on the tokio bridge; Update is the same
+    // Downloads the release into tf/custom through `jobs::install_base`; Update is the same
     // download over an older base, and core keeps the saved preset either way.
     fn install(&mut self, update: bool, window: &mut Window, cx: &mut Context<Self>) {
         let tf2 = match require_tf2(cx) {
@@ -121,19 +121,10 @@ impl GraphicsPage {
         } else {
             "Failed to install mastercomfig"
         };
-        let store = cx.global::<Services>().store.clone();
-        if !tokio_bridge::is_running(cx) {
-            tokio_bridge::init(cx);
-        }
-        let job = tokio_bridge::spawn(cx, async move {
-            store.install_mastercomfig(&tf2, &|_, _| {}).await
-        });
+        let job = jobs::install_base(tf2, action, cx);
         self.finish(
             async move {
-                let version = job
-                    .await
-                    .map_err(|e| OpError::core(action, e))?
-                    .map_err(|e| describe_install(&e).into_op(action))?;
+                let version = job.await?;
                 Ok(if update {
                     (
                         "mastercomfig updated".into(),

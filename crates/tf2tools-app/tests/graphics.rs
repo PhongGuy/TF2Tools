@@ -7,6 +7,7 @@ use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::graphics::GraphicsPage;
 use tf2tools_app::pages::graphics::model::StatusCard;
+use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::nav_icon;
 use tf2tools_app::shell::route::Page;
@@ -103,6 +104,90 @@ fn selected(cx: &mut TestAppContext, s: &support::ShellWindow, preset: Preset) -
 
 fn label(cx: &mut TestAppContext, s: &support::ShellWindow, id: &'static str) -> Option<String> {
     support::label_of(cx, s.win, id)
+}
+
+fn tf2_running(cx: &mut TestAppContext) {
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+}
+
+fn toasted(cx: &mut TestAppContext, s: &support::ShellWindow, text: &str) {
+    support::wait_real(cx, text, |cx| {
+        support::toast_labels(cx, s.win)
+            .iter()
+            .any(|t| t.contains(text))
+    });
+}
+
+fn idle(cx: &mut TestAppContext, page: &Entity<GraphicsPage>) {
+    support::wait_real(cx, "the page to settle", |cx| {
+        cx.update(|cx| !page.read(cx).is_busy())
+    });
+}
+
+#[gpui_kit::test]
+fn install_without_a_recorded_release_syncs_first_even_on_a_fresh_cache(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_mastercomfig_release("9.100.1");
+    server.mount_bytes(BASE_ROUTE, support::mastercomfig_base("9.100.1"));
+    let s = shell(cx, &env, &server);
+    // Synced an hour ago, before the release table existed: fresh, yet no release row.
+    let an_hour_ago = (chrono::Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute(
+            "INSERT OR REPLACE INTO store_cache_meta (key, value) VALUES ('addons_last_synced', ?1)",
+            [an_hour_ago],
+        )
+        .unwrap();
+    let page = open_graphics(cx, &s);
+    assert!(cx.update(|cx| page.read(cx).release().is_none()));
+    support::click_id(cx, s.win, ids::GRAPHICS_INSTALL);
+    support::wait_real(cx, "the install", |cx| installed(cx, &page, "9.100.1"));
+    assert_eq!(
+        std::fs::read(env.game.join(BASE)).unwrap(),
+        support::mastercomfig_base("9.100.1")
+    );
+    assert_eq!(
+        cx.update(|cx| page.read(cx).release().map(|r| r.tag().to_owned())),
+        Some("9.100.1".to_owned())
+    );
+}
+
+#[gpui_kit::test]
+fn install_refuses_while_tf2_runs(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes(BASE_ROUTE, support::mastercomfig_base("9.100.1"));
+    let s = shell(cx, &env, &server);
+    support::seed_mastercomfig_release(&env, &server.uri(), "9.100.1");
+    tf2_running(cx);
+    let page = open_graphics(cx, &s);
+    support::click_id(cx, s.win, ids::GRAPHICS_INSTALL);
+    toasted(cx, &s, "Close TF2 first");
+    idle(cx, &page);
+    assert!(!env.game.join(BASE).exists());
+    assert_eq!(card(cx, &page), Some(StatusCard::NotInstalled));
+}
+
+#[gpui_kit::test]
+fn update_refuses_while_tf2_runs(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes(BASE_ROUTE, support::mastercomfig_base("9.101.0"));
+    let s = shell(cx, &env, &server);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "low");
+    support::seed_mastercomfig_release(&env, &server.uri(), "9.101.0");
+    tf2_running(cx);
+    let page = open_graphics(cx, &s);
+    support::click_id(cx, s.win, ids::GRAPHICS_UPDATE);
+    toasted(cx, &s, "Close TF2 first");
+    idle(cx, &page);
+    assert!(installed(cx, &page, "9.100.1"));
+    assert_eq!(
+        std::fs::read(env.game.join(BASE)).unwrap(),
+        support::mastercomfig_base("9.100.1")
+    );
 }
 
 #[gpui_kit::test]
