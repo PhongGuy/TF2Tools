@@ -35,11 +35,13 @@ pub fn refuse_while_running(probe: &(dyn Fn() -> bool + Send + Sync)) -> Result<
     Ok(())
 }
 
-/// What `install_base` installed: the tag, and the saved settings that tag lacks.
+/// What `install_base` installed: the tag, the saved settings that tag lacks, and whether a
+/// player's own modules.cfg kept the saved settings from being written.
 #[derive(Debug)]
 pub struct Installed {
     pub version: String,
     pub dropped: Vec<String>,
+    pub own_file_kept: bool,
 }
 
 /// Installs or updates the base VPK on the tokio bridge. It refuses while TF2 runs. With no
@@ -74,46 +76,57 @@ pub fn install_base(
             .install_mastercomfig(&tf2, &|_, _| {})
             .await
             .map_err(|e| describe_install(&e).into_op(action))?;
-        let dropped = reapply_choices(&store, library, &tf2, &version).await;
-        Ok(Installed { version, dropped })
+        let (dropped, own_file_kept) = reapply_choices(&store, library, &tf2, &version).await;
+        Ok(Installed {
+            version,
+            dropped,
+            own_file_kept,
+        })
     });
     async move { job.await.map_err(|e| OpError::core(action, e))? }
 }
 
 // Applies the saved choices (if any) against `version`'s catalog and returns the names it
-// dropped. Every failure is logged and yields no names, so it never fails the install.
+// dropped, and true when a player's own modules.cfg stood in the way. Every other failure is
+// logged and yields no names, so it never fails the install.
 async fn reapply_choices(
     store: &StoreClient,
     library: Library,
     tf2: &Tf2Install,
     version: &str,
-) -> Vec<String> {
+) -> (Vec<String>, bool) {
     let saved = tokio::task::spawn_blocking(move || library.mastercomfig_choices())
         .await
         .map_err(|e| e.to_string())
         .and_then(|read| read.map_err(|e| e.to_string()));
     let choices = match saved {
         Ok(Some(choices)) => choices,
-        Ok(None) => return Vec::new(),
+        Ok(None) => return (Vec::new(), false),
         Err(e) => {
             tracing::warn!("mastercomfig settings after install: {e}");
-            return Vec::new();
+            return (Vec::new(), false);
         }
     };
     let catalog = match store.mastercomfig_catalog(version).await {
         Ok(catalog) => catalog,
         Err(e) => {
             tracing::warn!("mastercomfig settings list for {version}: {e}");
-            return Vec::new();
+            return (Vec::new(), false);
         }
     };
-    store
+    match store
         .apply_mastercomfig_modules(tf2, &catalog, &choices, false)
         .await
-        .unwrap_or_else(|e| {
+    {
+        Ok(dropped) => (dropped, false),
+        Err(e) => {
             tracing::warn!("mastercomfig settings after install: {e}");
-            Vec::new()
-        })
+            (
+                Vec::new(),
+                matches!(e, ApplyModulesError::ForeignModulesCfg { .. }),
+            )
+        }
+    }
 }
 
 /// The title of a setting that could not be saved.

@@ -24,6 +24,8 @@ const NO_RELEASE: &str =
 /// A modules.cfg the player wrote, which TF2Tools does not overwrite unasked.
 pub(crate) const FOREIGN_MODULES_CFG: &str =
     "TF2 has a modules.cfg that TF2Tools didn't write, so TF2Tools left it alone.";
+/// Added to the install or update toast when a player's own modules.cfg kept the saved settings out.
+pub const OWN_MODULES_CFG_KEPT: &str = "Your own modules.cfg was kept, so the settings below aren't in use. Change one to use them instead.";
 const STALE_PAGE: &str =
     "mastercomfig changed since this page opened. Open the Graphics page again and try once more.";
 

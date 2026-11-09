@@ -33,9 +33,9 @@ use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
 use jobs::{ModulesFailure, SAVE_FAILED};
 use model::{
-    FOREIGN_MODULES_CFG, SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove,
-    describe_take_over, detail, dropped_note, headline, preset_description, preset_label,
-    shown_choice, status_card, update_to, value_options,
+    FOREIGN_MODULES_CFG, OWN_MODULES_CFG_KEPT, SettingsNote, StatusCard, ValueOption,
+    describe_apply, describe_remove, describe_take_over, detail, dropped_note, headline,
+    preset_description, preset_label, shown_choice, status_card, update_to, value_options,
 };
 
 const CREDIT: &str = "mastercomfig is made by the mastercomfig team and shared under the MIT licence. Preset descriptions come from comfig-app.";
@@ -216,7 +216,11 @@ impl GraphicsPage {
         self.running = Some(Job::Install);
         self.finish(
             async move {
-                let jobs::Installed { version, dropped } = job.await?;
+                let jobs::Installed {
+                    version,
+                    dropped,
+                    own_file_kept,
+                } = job.await?;
                 let (title, mut text) = if update {
                     ("mastercomfig updated", format!("Now on {version}."))
                 } else {
@@ -225,6 +229,9 @@ impl GraphicsPage {
                 };
                 if let Some(note) = dropped_note(&dropped) {
                     text = format!("{text} {note}");
+                }
+                if own_file_kept {
+                    text = format!("{text} {OWN_MODULES_CFG_KEPT}");
                 }
                 Ok((title.into(), text.into()))
             },

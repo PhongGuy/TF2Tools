@@ -117,3 +117,33 @@ fn an_update_drops_settings_the_new_version_lacks_and_names_them(cx: &mut TestAp
         Some(format!("{HEADER}fpscap=120\n").as_str())
     );
 }
+
+#[gpui_kit::test]
+fn an_update_says_the_player_s_own_modules_cfg_was_kept(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes(
+        "/gh/mastercomfig/mastercomfig-base.vpk",
+        support::mastercomfig_base("9.101.0"),
+    );
+    let s = server_shell(cx, &env, &server);
+    support::seed_managed_mastercomfig(&env, "9.100.1", "medium");
+    support::seed_mastercomfig_release(&env, &server.uri(), "9.101.0");
+    for tag in ["9.100.1", "9.101.0"] {
+        support::seed_mastercomfig_catalog(&env, tag);
+    }
+    support::seed_mastercomfig_choices(&env, r#"{"fpscap":"120"}"#);
+    let cfg = env.game.join("tf/cfg/overrides/modules.cfg");
+    std::fs::create_dir_all(cfg.parent().unwrap()).unwrap();
+    std::fs::write(&cfg, "fpscap=60\n").unwrap();
+    let page = open(cx, &s);
+    support::click_id(cx, s.win, ids::GRAPHICS_UPDATE);
+    toasted(
+        cx,
+        &s,
+        "Now on 9.101.0. Your own modules.cfg was kept, so the settings below aren't in use. Change one to use them instead.",
+    );
+    idle(cx, &page);
+    assert_eq!(modules_cfg(&env).as_deref(), Some("fpscap=60\n"));
+    assert!(!support::present(cx, s.win, ids::CONFIRM_DIALOG));
+}
