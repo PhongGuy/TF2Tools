@@ -52,6 +52,18 @@ fn a_windows_job_lints_and_tests_the_workspace() {
     }
 }
 
+/// Lint and test unify dev-dependency features into the app, so only a plain check sees the
+/// release binary as release.yml builds it.
+#[test]
+fn the_gate_checks_the_app_binary_without_dev_features() {
+    let gate = job(&ci(), "gate");
+    let want = "run: cargo check --locked -p tf2tools-app --bin tf2tools";
+    assert!(
+        gate.lines().any(|l| l.trim() == want),
+        "missing `{want}`:\n{gate}"
+    );
+}
+
 #[test]
 fn the_windows_job_uses_the_gates_pinned_actions() {
     let text = ci();
