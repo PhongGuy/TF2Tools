@@ -100,7 +100,7 @@ impl Payload {
 pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
     let mut vpks = find_vpks(tree)?;
     // A tree already past the limit is refused anyway, so a hostile one with thousands
-    // of VPKs costs no folder walk and no VPK directory reads.
+    // of VPKs skips the folder walk and the VPK directory reads that collapse folders.
     if vpks.len() > MAX_PAYLOADS {
         sort_payloads(&mut vpks);
         return Ok(vpks);

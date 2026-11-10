@@ -1131,8 +1131,9 @@ pub enum GbAddonFetchError {
         /// The store's name for the file.
         file_name: String,
     },
-    /// The download's layout matches no known add-on shape.
-    #[error("{file_name} has {payloads} possible parts, too many to tell which to install")]
+    /// The download's layout matches no known add-on shape: nothing installable, or
+    /// more than `MAX_PAYLOADS` parts.
+    #[error("{}", unknown_layout_message(.file_name, *.payloads))]
     UnknownLayout {
         /// The store's name for the file.
         file_name: String,
@@ -1153,6 +1154,15 @@ pub enum GbAddonFetchError {
         /// What stopped it.
         message: String,
     },
+}
+
+/// Words an unknown layout by whether it found nothing or too much to choose from.
+fn unknown_layout_message(file_name: &str, payloads: usize) -> String {
+    if payloads == 0 {
+        format!("{file_name} holds nothing TF2Tools knows how to install")
+    } else {
+        format!("{file_name} has {payloads} possible parts, too many to tell which to install")
+    }
 }
 
 /// Why an item's audio preview could not be fetched.

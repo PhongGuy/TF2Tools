@@ -284,3 +284,36 @@ async fn a_download_that_is_not_an_archive_is_refused_by_kind() {
         errors[2]
     );
 }
+
+#[tokio::test]
+async fn an_unknown_layout_says_whether_it_found_nothing_or_too_much() {
+    let env = store_env().await;
+    let many: Vec<(String, Vec<u8>)> = (0..17).map(|i| (format!("v{i:02}.vpk"), vpk())).collect();
+    let many_refs: Vec<(&str, &[u8])> = many
+        .iter()
+        .map(|(n, b)| (n.as_str(), b.as_slice()))
+        .collect();
+    let crowded = common::zip_bytes(&many_refs);
+    let cases: [(u64, &str, &[u8]); 2] = [
+        (50, "notes.txt", b"just text"),
+        (51, "crowded.zip", &crowded),
+    ];
+    let mut texts = Vec::new();
+    for (id, name, body) in cases {
+        let file = gb_addon_file(&env, id, 0, name, body, 100).await;
+        let profile = gb_addon_profile(&env, id, name, vec![file]).await;
+        let err = gb_addon_download(&env.client, "skins", &profile)
+            .await
+            .0
+            .unwrap_err();
+        texts.push(err.to_string());
+    }
+    assert_eq!(
+        texts[0],
+        "notes.txt holds nothing TF2Tools knows how to install"
+    );
+    assert_eq!(
+        texts[1],
+        "crowded.zip has 17 possible parts, too many to tell which to install"
+    );
+}
