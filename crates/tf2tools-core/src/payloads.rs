@@ -45,6 +45,7 @@ pub struct Payload {
     kind: PayloadKind,
     path: PathBuf,
     chunks: Vec<PathBuf>,
+    nested: Vec<PathBuf>,
     size: u64,
 }
 
@@ -90,6 +91,12 @@ impl Payload {
     pub(crate) fn chunks(&self) -> &[PathBuf] {
         &self.chunks
     }
+
+    /// Content roots inside a folder payload that are payloads of their own, and so are
+    /// left out of it; empty for a VPK.
+    pub(crate) fn nested(&self) -> &[PathBuf] {
+        &self.nested
+    }
 }
 
 /// The payloads under `tree`, largest first, then by name. Never fails on layout:
@@ -106,19 +113,19 @@ pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
         sort_payloads(&mut vpks);
         return Ok(vpks);
     }
-    let mut folder_dirs = Vec::new();
-    find_folders(tree, &mut folder_dirs)?;
+    let mut folder_roots = Vec::new();
+    find_folders(tree, &mut folder_roots)?;
 
     // A folder is kept only when it brings files that no single VPK already carries,
     // so an add-on shipped both packed and loose installs once, as the VPK.
-    let entries: Vec<HashSet<String>> = if folder_dirs.is_empty() {
+    let entries: Vec<HashSet<String>> = if folder_roots.is_empty() {
         Vec::new()
     } else {
         vpks.iter().map(|v| vpk_entries(&v.path)).collect()
     };
     let mut payloads = vpks;
-    for dir in folder_dirs {
-        let (files, size) = folder_files(&dir)?;
+    for FolderRoot { dir, nested } in folder_roots {
+        let (files, size) = folder_files(&dir, &nested)?;
         let duplicated = entries.iter().any(|e| files.iter().all(|f| e.contains(f)));
         if files.is_empty() || duplicated {
             continue;
@@ -128,6 +135,7 @@ pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
             kind: PayloadKind::Folder,
             path: dir,
             chunks: Vec::new(),
+            nested,
             size,
         });
     }
@@ -139,38 +147,87 @@ fn sort_payloads(payloads: &mut [Payload]) {
     payloads.sort_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
 }
 
-/// Collects content folders: a directory with an `info.vdf` or a content subfolder
-/// is one and is not descended into; any other directory is searched below.
-fn find_folders(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), ArchiveError> {
+/// A content folder found by the walk, with the content roots below it that were split off.
+struct FolderRoot {
+    dir: PathBuf,
+    nested: Vec<PathBuf>,
+}
+
+/// Collects content folders, stopping one past `MAX_PAYLOADS`. A directory with an
+/// `info.vdf` is one, kept whole. A directory with a content subfolder is one too, and its
+/// other subfolders are searched for content roots that become payloads of their own,
+/// since TF2 loads only content at the top of a custom folder. Any other directory is
+/// searched below.
+fn find_folders(dir: &Path, out: &mut Vec<FolderRoot>) -> Result<(), ArchiveError> {
+    if out.len() > MAX_PAYLOADS {
+        return Ok(());
+    }
     let io = |source| ArchiveError::Io {
         path: dir.to_path_buf(),
         source,
     };
-    let mut subdirs = Vec::new();
-    let mut is_payload = false;
+    let mut others = Vec::new();
+    let mut has_content = false;
+    let mut has_info = false;
     for entry in fs::read_dir(dir).map_err(io)? {
         let entry = entry.map_err(io)?;
         let file_type = entry.file_type().map_err(io)?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
         if file_type.is_file() && name.eq_ignore_ascii_case("info.vdf") {
-            is_payload = true;
+            has_info = true;
         } else if file_type.is_dir() {
-            if CONTENT_DIRS.iter().any(|c| name.eq_ignore_ascii_case(c)) {
-                is_payload = true;
+            if is_content_name(&name) && !wraps_game_dir(&entry.path())? {
+                has_content = true;
+            } else {
+                others.push(entry.path());
             }
-            subdirs.push(entry.path());
         }
     }
-    if is_payload {
-        out.push(dir.to_path_buf());
-        return Ok(());
-    }
-    subdirs.sort();
-    for sub in subdirs {
-        find_folders(&sub, out)?;
+    others.sort();
+    if has_info {
+        out.push(FolderRoot {
+            dir: dir.to_path_buf(),
+            nested: Vec::new(),
+        });
+    } else if has_content {
+        let at = out.len();
+        out.push(FolderRoot {
+            dir: dir.to_path_buf(),
+            nested: Vec::new(),
+        });
+        for sub in others {
+            let before = out.len();
+            find_folders(&sub, out)?;
+            let found: Vec<PathBuf> = out[before..].iter().map(|r| r.dir.clone()).collect();
+            out[at].nested.extend(found);
+        }
+    } else {
+        for sub in others {
+            find_folders(&sub, out)?;
+        }
     }
     Ok(())
+}
+
+fn is_content_name(name: &str) -> bool {
+    CONTENT_DIRS.iter().any(|c| name.eq_ignore_ascii_case(c))
+}
+
+/// Whether a content-named folder holds a `tf` folder, as in `Sound/tf/sound/...`: then it
+/// only wraps a game layout and the real content root is further down.
+fn wraps_game_dir(dir: &Path) -> Result<bool, ArchiveError> {
+    let io = |source| ArchiveError::Io {
+        path: dir.to_path_buf(),
+        source,
+    };
+    for entry in fs::read_dir(dir).map_err(io)? {
+        let entry = entry.map_err(io)?;
+        if entry.file_type().map_err(io)?.is_dir() && entry.file_name().eq_ignore_ascii_case("tf") {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Every `.vpk` under `tree` as a payload, with `<base>_NNN.vpk` chunks folded
@@ -217,16 +274,21 @@ fn find_vpks(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
                 path: path.clone(),
                 size: size + parts.iter().map(|(_, s)| s).sum::<u64>(),
                 chunks: parts.into_iter().map(|(p, _)| p).collect(),
+                nested: Vec::new(),
             }
         })
         .collect())
 }
 
-/// A folder's non-`.vpk` files as lowercased `/` paths relative to it, and their total size.
-fn folder_files(dir: &Path) -> Result<(HashSet<String>, u64), ArchiveError> {
+/// A folder's non-`.vpk` files outside `nested`, as lowercased `/` paths relative to it,
+/// and their total size.
+fn folder_files(dir: &Path, nested: &[PathBuf]) -> Result<(HashSet<String>, u64), ArchiveError> {
     let mut files = HashSet::new();
     let mut size = 0;
-    for entry in WalkDir::new(dir) {
+    let walk = WalkDir::new(dir)
+        .into_iter()
+        .filter_entry(|e| !nested.iter().any(|n| n == e.path()));
+    for entry in walk {
         let entry = entry.map_err(|e| walk_failure(dir, e))?;
         if !entry.file_type().is_file() || has_vpk_extension(entry.path()) {
             continue;

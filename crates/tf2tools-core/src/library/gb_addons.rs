@@ -557,7 +557,7 @@ fn stage(
         let mut names = Vec::new();
         match payload.kind() {
             PayloadKind::Folder => {
-                copy_without_vpks(payload.path(), &slot.join(&name))?;
+                copy_without_vpks(payload.path(), payload.nested(), &slot.join(&name))?;
                 names.push(name);
             }
             PayloadKind::Vpk => {
@@ -591,11 +591,16 @@ fn chunk_number(chunk: &Path) -> String {
         .map_or(stem.clone(), |(_, digits)| digits.to_owned())
 }
 
-/// Copies the folder `src` to `dst` without its `.vpk` files or symlinks: a folder
-/// payload installs loose, and its nested VPKs are payloads of their own.
-fn copy_without_vpks(src: &Path, dst: &Path) -> Result<(), IoFailure> {
+/// Copies the folder `src` to `dst` without its `.vpk` files, symlinks or the `skip`
+/// subtrees: a folder payload installs loose, and its nested VPKs and content roots are
+/// payloads of their own.
+fn copy_without_vpks(src: &Path, skip: &[PathBuf], dst: &Path) -> Result<(), IoFailure> {
     create_dir_all(dst)?;
-    for entry in WalkDir::new(src).min_depth(1) {
+    let walk = WalkDir::new(src)
+        .min_depth(1)
+        .into_iter()
+        .filter_entry(|e| !skip.iter().any(|s| s == e.path()));
+    for entry in walk {
         let entry = entry.map_err(|e| walk_failure(src, e))?;
         let Ok(relative) = entry.path().strip_prefix(src) else {
             continue;
@@ -651,7 +656,7 @@ fn copy_slots(library_copy: &Path) -> Vec<(usize, Vec<String>)> {
 /// Copies a library-copy file or folder into the game.
 fn copy_entry(src: &Path, dst: &Path) -> Result<(), IoFailure> {
     if src.is_dir() {
-        copy_without_vpks(src, dst)
+        copy_without_vpks(src, &[], dst)
     } else {
         std::fs::copy(src, dst).map(drop).map_err(io_at(dst))
     }

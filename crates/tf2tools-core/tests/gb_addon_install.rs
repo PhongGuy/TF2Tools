@@ -135,6 +135,21 @@ async fn a_folder_payload_installs_without_its_nested_vpks() {
 }
 
 #[tokio::test]
+async fn a_folder_payload_leaves_out_a_variant_nested_in_it() {
+    let s = setup().await;
+    let body = common::zip_bytes(&[
+        ("mod/models/a.mdl", b"m"),
+        ("mod/Optional/Red/materials/a.vmt", b"r"),
+    ]);
+    let d = download(&s, 8, "Pink Pack", "pack.zip", body, 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["mod"]), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(custom(&s), ["tf2tools-gb-8-pink-pack/models/a.mdl"]);
+}
+
+#[tokio::test]
 async fn a_multi_chunk_vpk_keeps_its_chunk_numbers() {
     let s = setup().await;
     let body = common::zip_bytes(&[("big_dir.vpk", &vpk(b"d")), ("big_000.vpk", &[0u8; 32])]);

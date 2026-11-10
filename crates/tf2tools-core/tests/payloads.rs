@@ -213,3 +213,87 @@ fn an_unreadable_vpk_is_still_a_payload_and_collapses_nothing() {
         ]
     );
 }
+
+/// The shape of GameBanana item 360861: a sound pack wrapped as `Sound/tf/sound` beside
+/// a `Stock Choices` folder of model variants, under each of two weapon variants.
+const CARBINE: [(&str, &[u8]); 6] = [
+    (
+        "cv/clencarbin/Unsilenced/Sound/tf/sound/weapons/smg.wav",
+        b"wav",
+    ),
+    (
+        "cv/clencarbin/Unsilenced/Stock Choices/Folded stock/models/workshop/a.mdl",
+        b"m1",
+    ),
+    (
+        "cv/clencarbin/Unsilenced/Stock Choices/Stockless/models/workshop/a.mdl",
+        b"m2",
+    ),
+    (
+        "cv/clencarbin/Unsilenced/Stock Choices/Unfolded stock/models/workshop/a.mdl",
+        b"m3",
+    ),
+    (
+        "cv/clencarbin/Silenced/Stock choices/Stockless/models/workshop/a.mdl",
+        b"m4",
+    ),
+    (
+        "cv/clencarbin/Silenced/Stock choices/Unfolded/models/workshop/a.mdl",
+        b"m5",
+    ),
+];
+
+#[test]
+fn a_content_dir_wrapping_a_tf_folder_leads_to_the_real_root() {
+    let t = tree_of(&CARBINE);
+    let mut found: Vec<String> = names(t.path()).into_iter().map(|(n, _)| n).collect();
+    found.sort();
+    assert_eq!(
+        found,
+        [
+            "cv/clencarbin/Silenced/Stock choices/Stockless",
+            "cv/clencarbin/Silenced/Stock choices/Unfolded",
+            "cv/clencarbin/Unsilenced/Sound/tf",
+            "cv/clencarbin/Unsilenced/Stock Choices/Folded stock",
+            "cv/clencarbin/Unsilenced/Stock Choices/Stockless",
+            "cv/clencarbin/Unsilenced/Stock Choices/Unfolded stock",
+        ]
+    );
+}
+
+#[test]
+fn a_content_root_nested_in_another_is_its_own_payload() {
+    let t = tree_of(&[
+        ("Mod/models/a.mdl", &[1u8; 64]),
+        ("Mod/Optional/Red/materials/a.vmt", &[2u8; 8]),
+    ]);
+    let found = find_payloads(t.path()).unwrap();
+    assert_eq!(
+        found
+            .iter()
+            .map(|p| (p.name(), p.size()))
+            .collect::<Vec<_>>(),
+        [("Mod", 64), ("Mod/Optional/Red", 8)],
+        "the outer payload's size leaves the nested one out"
+    );
+}
+
+#[test]
+fn an_info_vdf_folder_keeps_its_nested_content_roots() {
+    let t = tree_of(&[
+        ("hud/info.vdf", b"\"hud\" {}"),
+        ("hud/resource/ui/a.res", b"a"),
+        ("hud/extras/alt/materials/x.vmt", b"c"),
+    ]);
+    assert_eq!(names(t.path()), [("hud".to_owned(), PayloadKind::Folder)]);
+}
+
+#[test]
+fn the_folder_search_stops_one_past_the_limit() {
+    let many: Vec<String> = (0..MAX_PAYLOADS * 4)
+        .map(|i| format!("v{i:03}/materials/a.vmt"))
+        .collect();
+    let refs: Vec<(&str, &[u8])> = many.iter().map(|n| (n.as_str(), &b"m"[..])).collect();
+    let t = tree_of(&refs);
+    assert_eq!(find_payloads(t.path()).unwrap().len(), MAX_PAYLOADS + 1);
+}
