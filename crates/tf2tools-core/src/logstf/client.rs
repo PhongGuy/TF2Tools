@@ -43,6 +43,15 @@ impl LogsEndpoints {
     pub fn steam_community(&self) -> &str {
         &self.steam_community
     }
+
+    /// Redirects may only stay on these two bases, so a hop cannot leave them or drop to http.
+    fn redirects(&self) -> Redirects {
+        Redirects::Only(
+            [self.logs_tf.clone(), self.steam_community.clone()]
+                .as_slice()
+                .into(),
+        )
+    }
 }
 
 /// Looks up Steam players and syncs their logs into a `LogsCache`.
@@ -59,7 +68,7 @@ impl LogsClient {
     pub fn new(cache: LogsCache, endpoints: LogsEndpoints) -> Self {
         LogsClient {
             cache,
-            http: crate::store::http_for(&Self::default_config(), &Redirects::Any),
+            http: crate::store::http_for(&Self::default_config(), &endpoints.redirects()),
             endpoints,
         }
     }
@@ -71,7 +80,7 @@ impl LogsClient {
 
     /// This client with `config`'s pacing, timeouts, User-Agent and offline switch.
     pub fn with_config(mut self, config: StoreConfig) -> Self {
-        self.http = crate::store::http_for(&config, &Redirects::Any);
+        self.http = crate::store::http_for(&config, &self.endpoints.redirects());
         self
     }
 
@@ -87,8 +96,9 @@ impl LogsClient {
 
     /// The player behind `input`, named by their Steam persona, without touching the cache.
     ///
-    /// A known Steam ID still resolves when Steam cannot be reached, named by its id64, so
-    /// a player can be added offline. A vanity name needs Steam and fails as Steam did.
+    /// A known Steam ID still resolves when Steam cannot be reached or answers with something
+    /// other than profile XML (a maintenance page), named by its id64, so a player can be
+    /// added offline. A vanity name needs Steam and fails as Steam did.
     pub async fn resolve_player(&self, input: &PlayerInput) -> Result<TrackedPlayer, ResolveError> {
         let steam = self.endpoints.steam_community();
         let url = match input {
@@ -102,7 +112,8 @@ impl LogsClient {
                 Err(
                     ResolveError::Network { .. }
                     | ResolveError::Http { .. }
-                    | ResolveError::RateLimited { .. },
+                    | ResolveError::RateLimited { .. }
+                    | ResolveError::Malformed { .. },
                 ),
             ) => Ok(TrackedPlayer::new(*id, id.to_string())),
             (_, result) => result,

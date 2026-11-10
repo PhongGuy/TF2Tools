@@ -92,3 +92,56 @@ async fn offline_a_vanity_cannot_be_added() {
         .unwrap_err();
     assert!(matches!(err, ResolveError::Network { .. }), "{err:?}");
 }
+
+const MAINTENANCE_HTML: &str =
+    "<!DOCTYPE html><html><body>Steam is down for maintenance</body></html>";
+
+#[tokio::test]
+async fn a_maintenance_page_adds_an_id_under_its_id64() {
+    let env = logs_env().await;
+    serve_xml(
+        &env.server,
+        "/steam/profiles/76561197960287930/",
+        MAINTENANCE_HTML,
+    )
+    .await;
+    let input = PlayerInput::Id(SteamId::from_id64(GABE).unwrap());
+    let player = env.client.resolve_player(&input).await.unwrap();
+    assert_eq!(player.steam_id().id64(), GABE);
+    assert_eq!(player.name(), "76561197960287930");
+}
+
+#[tokio::test]
+async fn a_maintenance_page_fails_a_vanity() {
+    let env = logs_env().await;
+    serve_xml(&env.server, "/steam/id/gabelogannewell/", MAINTENANCE_HTML).await;
+    let err = env
+        .client
+        .resolve_player(&PlayerInput::Vanity("gabelogannewell".into()))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, ResolveError::Malformed { .. }), "{err:?}");
+}
+
+#[tokio::test]
+async fn a_redirect_off_the_logs_and_steam_hosts_is_refused() {
+    let env = logs_env().await;
+    let elsewhere = wiremock::MockServer::start().await;
+    serve_xml(&elsewhere, "/steam/id/gabelogannewell/", FOUND_XML).await;
+    let target = format!("{}/steam/id/gabelogannewell/?xml=1", elsewhere.uri());
+    Mock::given(method("GET"))
+        .and(path("/steam/id/gabelogannewell/"))
+        .respond_with(ResponseTemplate::new(302).insert_header("Location", target.as_str()))
+        .mount(&env.server)
+        .await;
+    let err = env
+        .client
+        .resolve_player(&PlayerInput::Vanity("gabelogannewell".into()))
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(&err, ResolveError::Network { url, .. } if *url == target),
+        "{err:?}"
+    );
+    assert!(elsewhere.received_requests().await.unwrap().is_empty());
+}
