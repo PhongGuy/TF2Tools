@@ -482,3 +482,28 @@ fn a_gone_addon_with_a_newer_file_on_record_offers_no_update(cx: &mut TestAppCon
     assert_eq!(offer, GbAddonOffer::Installed);
     assert_eq!(offer.badge(), Some("Installed"));
 }
+
+#[gpui_kit::test]
+fn a_download_failing_mid_update_keeps_the_old_install(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(31, "Flaky", &[("a.vpk", vpk(b"old"), 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 31));
+    idle(cx);
+    let file = env.game.join("tf/custom/tf2tools-gb-31-flaky.vpk");
+    let before = std::fs::read(&file).unwrap();
+    // The newer file's page reads fine, but its download fails; the first mount wins.
+    server.reset();
+    server.mount_status("/dl/addon/31/0", 500);
+    server.mount_gb_addon(31, "Flaky", &[("a2.vpk", vpk(b"new"), 300)]);
+    act(cx, &w, |i, win, cx| i.update(GbId::new(31), win, cx));
+    idle(cx);
+    support::wait_real(cx, "the failure toast", |cx| {
+        support::toast_labels(cx, w.win)
+            .iter()
+            .any(|l| l.starts_with("Couldn't update the add-on."))
+    });
+    assert_eq!(entry(cx, 31).unwrap().file_date(), 100);
+    assert!(entry(cx, 31).unwrap().is_installed());
+    assert_eq!(std::fs::read(&file).unwrap(), before);
+}
