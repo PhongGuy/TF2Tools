@@ -1,5 +1,7 @@
 //! The logs.tf cache: tracked players, the active player and pruning, over the library database.
 
+use std::collections::HashMap;
+
 use rusqlite::{OptionalExtension, params};
 
 use super::{LogDetail, PROVISIONAL_SECS, SteamId, logstf_class_name};
@@ -278,30 +280,24 @@ impl LogsCache {
                         "UPDATE logstf_players SET name = ?2
                          WHERE steam_id = ?1 AND name = CAST(steam_id AS TEXT)",
                     )?;
+                    for ((id, class), stats) in fold_class_rows(detail) {
+                        let [seconds, kills, deaths, assists, dmg, heal, ubers, drops] = stats;
+                        row.execute(params![
+                            log_id,
+                            sql_id(id)?,
+                            logstf_class_name(class),
+                            seconds,
+                            kills,
+                            deaths,
+                            assists,
+                            dmg,
+                            heal,
+                            ubers,
+                            drops
+                        ])?;
+                    }
                     for p in detail.players() {
-                        let id = sql_id(p.steam_id())?;
-                        for c in p.classes() {
-                            let medic = c.class() == TfClass::Medic;
-                            let (heal, ubers, drops) = if medic {
-                                (p.heal(), p.ubers(), p.drops())
-                            } else {
-                                (0, 0, 0)
-                            };
-                            row.execute(params![
-                                log_id,
-                                id,
-                                logstf_class_name(c.class()),
-                                c.seconds(),
-                                c.kills(),
-                                c.deaths(),
-                                c.assists(),
-                                c.dmg(),
-                                heal,
-                                ubers,
-                                drops
-                            ])?;
-                        }
-                        rename.execute(params![id, p.name()])?;
+                        rename.execute(params![sql_id(p.steam_id())?, p.name()])?;
                     }
                 }
                 tx.commit()
@@ -321,6 +317,33 @@ impl LogsCache {
             .map(drop)
             .map_err(db_error)
     }
+}
+
+/// One row's stats: seconds, kills, deaths, assists, dmg, heal, ubers, drops.
+type ClassStats = [i64; 8];
+
+/// The log's class rows keyed by (player, class), summing repeats: a log may list a class
+/// twice for one player, or name one player under two keys. A player's Medic totals count
+/// once per player line, on the medic row only.
+fn fold_class_rows(detail: &LogDetail) -> HashMap<(SteamId, TfClass), ClassStats> {
+    let mut rows: HashMap<(SteamId, TfClass), ClassStats> = HashMap::new();
+    for p in detail.players() {
+        for c in p.classes() {
+            let row = rows.entry((p.steam_id(), c.class())).or_default();
+            let add = [c.seconds(), c.kills(), c.deaths(), c.assists(), c.dmg()];
+            for (sum, n) in row.iter_mut().zip(add) {
+                *sum += i64::from(n);
+            }
+        }
+        if let Some(row) = rows.get_mut(&(p.steam_id(), TfClass::Medic))
+            && p.classes().iter().any(|c| c.class() == TfClass::Medic)
+        {
+            for (sum, n) in row[5..].iter_mut().zip([p.heal(), p.ubers(), p.drops()]) {
+                *sum += i64::from(n);
+            }
+        }
+    }
+    rows
 }
 
 /// `id` as SQLite stores it; every public-universe SteamID64 fits in an i64.

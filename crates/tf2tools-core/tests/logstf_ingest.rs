@@ -2,7 +2,7 @@
 
 use std::sync::Mutex;
 
-use tf2tools_core::{SteamId, TrackedPlayer};
+use tf2tools_core::{LogsSyncError, SteamId, TrackedPlayer};
 
 use crate::common;
 use crate::common::logstf::{
@@ -103,4 +103,87 @@ async fn medic_heals_go_on_the_medic_row_only_and_unknown_classes_are_dropped() 
             ("scout".to_owned(), 0, 0, 0)
         ]
     );
+}
+
+/// (class, seconds, kills, dmg, heal) of every class row of log `id`, by class.
+fn rows_of(env: &LogsEnv, id: i64) -> Vec<(String, i64, i64, i64, i64)> {
+    common::sql(&env.dir)
+        .prepare(
+            "SELECT class, seconds, kills, dmg, heal FROM logstf_class_rows
+             WHERE log_id = ?1 ORDER BY class",
+        )
+        .unwrap()
+        .query_map([id], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+        })
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn a_class_listed_twice_for_one_player_folds_into_one_row() {
+    let env = tracked_env().await;
+    mount_list(&env.server, ARIE, list_body(&[(40, days_ago(1))])).await;
+    let mut twice = solo(231_702, ("scout", 300, 1, 0, 0, 100));
+    twice.classes.push(("scout", 200, 2, 1, 0, 50));
+    mount_log(&env.server, 40, 200, log_body(500, &[twice])).await;
+
+    env.client
+        .sync_player(arie(), false, &|_| {})
+        .await
+        .unwrap();
+    assert_eq!(log_state(&env.dir, 40), (0, true));
+    assert_eq!(rows_of(&env, 40), [("scout".to_owned(), 500, 3, 150, 0)]);
+}
+
+#[tokio::test]
+async fn two_keys_for_one_steam_id_fold_into_one_row_per_class() {
+    let env = tracked_env().await;
+    mount_list(&env.server, ARIE, list_body(&[(41, days_ago(1))])).await;
+    let medic = |account, heal| PlayerSpec {
+        account,
+        name: "Arie",
+        team: "Red",
+        heal,
+        ubers: 1,
+        drops: 0,
+        classes: vec![("medic", 300, 0, 1, 2, 40)],
+    };
+    // `[U:1:0231702]` names the same account as `[U:1:231702]`.
+    let body = log_body(600, &[medic(231_702, 1000), medic(999, 500)])
+        .replace("[U:1:999]", "[U:1:0231702]");
+    mount_log(&env.server, 41, 200, body).await;
+
+    env.client
+        .sync_player(arie(), false, &|_| {})
+        .await
+        .unwrap();
+    assert_eq!(log_state(&env.dir, 41), (0, true));
+    assert_eq!(rows_of(&env, 41), [("medic".to_owned(), 600, 0, 80, 1500)]);
+}
+
+#[tokio::test]
+async fn a_body_that_is_not_utf8_is_malformed_and_not_stored() {
+    let env = tracked_env().await;
+    mount_list(&env.server, ARIE, list_body(&[(42, days_ago(1))])).await;
+    let mut named = solo(231_702, ("scout", 600, 1, 1, 1, 100));
+    named.name = "BADNAME";
+    let body = log_body(600, &[named]).replace("BADNAME", "\u{1}");
+    let bytes: Vec<u8> = body
+        .bytes()
+        .map(|b| if b == 1 { 0xff } else { b })
+        .collect();
+    wiremock::Mock::given(wiremock::matchers::path("/json/42"))
+        .respond_with(wiremock::ResponseTemplate::new(200).set_body_bytes(bytes))
+        .mount(&env.server)
+        .await;
+
+    let err = env
+        .client
+        .sync_player(arie(), false, &|_| {})
+        .await
+        .unwrap_err();
+    assert!(matches!(err, LogsSyncError::Malformed { .. }), "{err:?}");
+    assert_eq!(log_state(&env.dir, 42), (0, false));
 }

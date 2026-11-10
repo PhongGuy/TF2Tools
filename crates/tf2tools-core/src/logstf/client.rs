@@ -276,11 +276,13 @@ impl LogsClient {
         for (done, log_id) in wanted.into_iter().enumerate() {
             let url = format!("{}/json/{log_id}", self.endpoints.logs_tf());
             let bytes = self.http.get_api(&url, LOG_BODY_LIMIT).await?;
-            let body = String::from_utf8_lossy(&bytes);
-            let detail = parse_log(&body).map_err(|e| LogsSyncError::Malformed {
+            // A body that is not UTF-8 is as unreadable as one that is not a log.
+            let malformed = |message: String| LogsSyncError::Malformed {
                 url: url.clone(),
-                message: e.to_string(),
-            })?;
+                message,
+            };
+            let body = String::from_utf8(bytes).map_err(|e| malformed(e.to_string()))?;
+            let detail = parse_log(&body).map_err(|e| malformed(e.to_string()))?;
             self.cache.ingest(log_id, &body, &detail, now)?;
             summary.downloaded += 1;
             on_progress(LogsProgress {
