@@ -10,9 +10,10 @@ use gpui_kit::{
     ParentElement as _, Pixels, StatefulInteractiveElement as _, Styled as _, StyledImage as _,
     TestSupportExt as _, Window, div, img, px, transparent_black,
 };
-use tf2tools_core::{AddonCard, GbAddonEntry};
+use tf2tools_core::AddonCard;
 
 use crate::counts::count_stat;
+use crate::gb_addon_installs::GbAddonOffer;
 use crate::ids;
 use crate::pages::common::{badge_of, card_frame};
 use crate::remote_images::RemoteImage;
@@ -27,25 +28,11 @@ pub fn card_height(width: Pixels) -> Pixels {
     px(24.) + width * (9. / 16.) + CARD_TEXT_HEIGHT
 }
 
-/// The card badge for an installed add-on with a newer file on GameBanana.
-pub const UPDATE_BADGE: &str = "Update";
-
-/// The card badge for an add-on recorded as `entry`: "Update" when a newer file is known,
-/// else "Installed" while it is in TF2, else none.
-pub fn install_badge(entry: Option<&GbAddonEntry>) -> Option<&'static str> {
-    let entry = entry?;
-    if entry.has_update() {
-        Some(UPDATE_BADGE)
-    } else {
-        entry.is_installed().then_some("Installed")
-    }
-}
-
 /// What a click on the card does.
 pub type OpenAddon = Rc<dyn Fn(&mut Window, &mut App)>;
 
-/// A GameBanana add-on card: thumbnail, name (tagged "Outdated" when obsolete, and with
-/// `badge`, "Installed" or "Update", when given), author and likes. A click calls `open`;
+/// A GameBanana add-on card: thumbnail, name (tagged with `badge`, "Installed" or "Update",
+/// when given, else "Outdated" when obsolete), author and likes. A click calls `open`;
 /// with `reveal`, a "Mature" cover hides the thumbnail and a click on the cover calls
 /// `reveal` instead.
 pub fn gb_addon_card(
@@ -104,7 +91,9 @@ pub fn gb_addon_card(
             .child("Mature")
     });
     let shot = shot.children(cover);
-    let outdated = card.obsolete.then(|| {
+    // One status badge at most, so the name keeps its room on a narrow card; the install
+    // badge wins over "Outdated".
+    let outdated = (card.obsolete && badge.is_none()).then(|| {
         div().flex_none().child(badge_of(
             ids::addon_gb_card_outdated(section, card.id),
             Tag::secondary(),
@@ -114,7 +103,7 @@ pub fn gb_addon_card(
     });
     // An update waiting is the one state worth the accent colour; installed stays quiet.
     let installed = badge.map(|text| {
-        let tag = if text == UPDATE_BADGE {
+        let tag = if text == GbAddonOffer::Update.label() {
             Tag::primary()
         } else {
             Tag::secondary()

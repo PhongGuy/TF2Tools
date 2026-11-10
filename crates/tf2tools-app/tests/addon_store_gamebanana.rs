@@ -826,6 +826,18 @@ fn pin_tf2_idle(cx: &mut TestAppContext) {
     cx.update(|cx| tf2tools_app::pages::profiles::probe::Tf2Probe::install(cx, || false));
 }
 
+// The control is disabled until the profile is read, so a click waits for both.
+fn detail_ready(cx: &mut TestAppContext, w: &support::AddonStoreWindow, label: &str) {
+    support::wait_real(cx, "the read profile", |cx| {
+        support::present(cx, w.win, ids::ADDON_DETAIL_DOWNLOADS)
+    });
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_INSTALL).as_deref(),
+        Some(label),
+        "the control once the profile is read"
+    );
+}
+
 fn addon_vpk() -> Vec<u8> {
     support::vpk_bytes(&[("materials/a.vmt", b"v")])
 }
@@ -850,9 +862,7 @@ fn install_from_the_detail_then_the_card_says_installed(cx: &mut TestAppContext)
         ids::addon_gb_card_badge("textures", GbId::new(8))
     ));
     support::click_id(cx, w.win, ids::addon_gb_card("textures", GbId::new(8)));
-    support::wait_real(cx, "the install button", |cx| {
-        support::label_of(cx, w.win, ids::ADDON_DETAIL_INSTALL).as_deref() == Some("Install")
-    });
+    detail_ready(cx, &w, "Install");
     support::click_id(cx, w.win, ids::ADDON_DETAIL_INSTALL);
     support::wait_real(cx, "installed", |cx| {
         support::label_of(cx, w.win, ids::ADDON_DETAIL_INSTALL).as_deref() == Some("Installed")
@@ -919,9 +929,7 @@ fn a_newer_file_shows_update_on_the_card_and_in_the_detail(cx: &mut TestAppConte
     let tab = open_tab(cx, &w, "textures");
     settled(cx, &tab, "the first step");
     support::click_id(cx, w.win, ids::addon_gb_card("textures", GbId::new(10)));
-    support::wait_real(cx, "install", |cx| {
-        support::label_of(cx, w.win, ids::ADDON_DETAIL_INSTALL).as_deref() == Some("Install")
-    });
+    detail_ready(cx, &w, "Install");
     support::click_id(cx, w.win, ids::ADDON_DETAIL_INSTALL);
     support::wait_real(cx, "installed", |cx| {
         support::label_of(cx, w.win, ids::ADDON_DETAIL_INSTALL).as_deref() == Some("Installed")
@@ -950,4 +958,55 @@ fn a_newer_file_shows_update_on_the_card_and_in_the_detail(cx: &mut TestAppConte
         support::label_of(cx, w.win, ids::ADDON_DETAIL_INSTALL).as_deref(),
         Some("Update")
     );
+}
+
+#[gpui_kit::test]
+fn an_unreadable_profile_still_offers_the_installed_addon(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(11, "Addon 11", &[("a.vpk", addon_vpk(), 100)]);
+    let w = window(cx, &env, &server);
+    pin_tf2_idle(cx);
+    let installs = cx.update(tf2tools_app::gb_addon_installs::GbAddonInstalls::global);
+    let profile = crate::gb_addon_installs::profile(cx, 11);
+    let (win, section) = (w.win, AddonSection::by_key("textures").unwrap());
+    assert!(cx.update(|cx| installs.update(cx, |i, cx| i.install(section, profile, win, cx))));
+    support::wait_real(cx, "the install", |cx| {
+        cx.update(|cx| {
+            installs
+                .read(cx)
+                .entry(GbId::new(11))
+                .is_some_and(|e| e.is_installed())
+        })
+    });
+    // GameBanana is down now; the library still knows the add-on.
+    server.reset();
+    server.mount_gb_index(
+        587,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(11, 587, None)], true),
+    );
+    server.mount_status("/apiv11/Mod/11/ProfilePage", 503);
+    let tab = open_tab(cx, &w, "textures");
+    settled(cx, &tab, "the first step");
+    support::click_id(cx, w.win, ids::addon_gb_card("textures", GbId::new(11)));
+    support::wait_real(cx, "the profile failure", |cx| {
+        support::present(cx, w.win, ids::ADDON_DETAIL_ERROR)
+    });
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_INSTALL).as_deref(),
+        Some("Installed")
+    );
+
+    let vpk = env.game.join("tf/custom/tf2tools-gb-11-addon-11.vpk");
+    std::fs::remove_file(&vpk).unwrap();
+    cx.update(|cx| installs.update(cx, |i, cx| i.reload(cx)));
+    support::wait_real(cx, "install again", |cx| {
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_INSTALL).as_deref() == Some("Install again")
+    });
+    support::click_id(cx, w.win, ids::ADDON_DETAIL_INSTALL);
+    support::wait_real(cx, "installed again", |cx| {
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_INSTALL).as_deref() == Some("Installed")
+    });
+    assert!(vpk.is_file());
 }

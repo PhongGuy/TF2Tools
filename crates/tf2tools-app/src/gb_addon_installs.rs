@@ -30,6 +30,48 @@ pub enum GbAddonStage {
     Removing,
 }
 
+/// What an add-on's install control offers, from its library entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GbAddonOffer {
+    Install,
+    Update,
+    InstallAgain,
+    Installed,
+}
+
+impl GbAddonOffer {
+    /// Update when a newer file is known, Install again when out of TF2, Installed when in it,
+    /// and Install with no entry.
+    pub fn of(entry: Option<&GbAddonEntry>) -> Self {
+        match entry {
+            None => Self::Install,
+            Some(e) if e.has_update() => Self::Update,
+            Some(e) if !e.is_installed() => Self::InstallAgain,
+            Some(_) => Self::Installed,
+        }
+    }
+
+    /// The control's label.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Install => "Install",
+            Self::Update => "Update",
+            Self::InstallAgain => "Install again",
+            Self::Installed => "Installed",
+        }
+    }
+
+    /// The card's badge: "Update" or "Installed", none otherwise.
+    pub fn badge(self) -> Option<&'static str> {
+        matches!(self, Self::Update | Self::Installed).then(|| self.label())
+    }
+
+    /// Whether the offer downloads GameBanana's newest file; the rest use the library copy.
+    pub fn downloads(self) -> bool {
+        matches!(self, Self::Install | Self::Update)
+    }
+}
+
 /// The toast titles of one kind of operation: on success and on failure.
 #[derive(Clone, Copy)]
 struct Titles {

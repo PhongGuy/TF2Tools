@@ -13,11 +13,11 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _, Window,
     div, px, transparent_black,
 };
-use tf2tools_core::{
-    AddonCard, AddonFile, AddonProfile, AddonSection, BrowseError, DownloadPhase, GbAddonEntry,
-};
+use tf2tools_core::{AddonCard, AddonFile, AddonProfile, AddonSection, BrowseError, DownloadPhase};
 
-use crate::gb_addon_installs::{GbAddonInstalls, GbAddonStage, install_blocker};
+use crate::gb_addon_installs::{
+    GbAddonInstalls, GbAddonOffer as Offer, GbAddonStage, install_blocker,
+};
 use crate::ids;
 use crate::links::gamebanana_page;
 use crate::pages::addon_store::model::downloads_label;
@@ -41,40 +41,6 @@ pub enum ProfileState {
     Failed(String),
     /// The item left GameBanana, so a retry cannot help; the message is in player words.
     Gone(String),
-}
-
-/// What the install control offers for an add-on, from its library entry.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Offer {
-    Install,
-    Update,
-    InstallAgain,
-    Installed,
-}
-
-impl Offer {
-    fn of(entry: Option<&GbAddonEntry>) -> Self {
-        match entry {
-            None => Self::Install,
-            Some(e) if e.has_update() => Self::Update,
-            Some(e) if !e.is_installed() => Self::InstallAgain,
-            Some(_) => Self::Installed,
-        }
-    }
-
-    fn label(self) -> &'static str {
-        match self {
-            Self::Install => "Install",
-            Self::Update => "Update",
-            Self::InstallAgain => "Install again",
-            Self::Installed => "Installed",
-        }
-    }
-
-    // Install and Update download GameBanana's newest file; the rest use the library copy.
-    fn downloads(self) -> bool {
-        matches!(self, Self::Install | Self::Update)
-    }
 }
 
 /// The dialog's view: the section and card that opened it, and its profile once read.
@@ -113,6 +79,13 @@ impl AddonDetail {
     /// Where the item's profile read stands now.
     pub fn profile(&self) -> &ProfileState {
         &self.profile
+    }
+
+    fn ready(&self) -> Option<&AddonProfile> {
+        match &self.profile {
+            ProfileState::Ready(profile) => Some(profile),
+            ProfileState::Loading | ProfileState::Failed(_) | ProfileState::Gone(_) => None,
+        }
     }
 
     /// Reads the profile again after a failure.
@@ -156,15 +129,16 @@ impl AddonDetail {
     }
 
     // Starts what the control offers; GbAddonInstalls refuses it while another operation runs.
+    // Only a first install needs the read profile; the rest work from the library entry.
     fn act(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let ProfileState::Ready(profile) = &self.profile else {
-            return;
-        };
-        let (section, profile, id) = (self.section, profile.clone(), self.card.id);
+        let ready = self.ready().cloned();
+        let (section, id) = (self.section, self.card.id);
         let win = window.window_handle();
         self.installs.update(cx, |installs, cx| {
             match Offer::of(installs.entry(id)) {
-                Offer::Install => installs.install(section, profile, win, cx),
+                Offer::Install => {
+                    ready.is_some_and(|profile| installs.install(section, profile, win, cx))
+                }
                 Offer::Update => installs.update(id, win, cx),
                 Offer::InstallAgain => installs.reinstall(id, win, cx),
                 Offer::Installed => false,
@@ -172,20 +146,18 @@ impl AddonDetail {
         });
     }
 
-    // The header's control, or why there is none. It waits for the profile, which decides
-    // the blocker; the blocker applies only to an offer that downloads, since a library copy
-    // or an installed add-on needs no new file.
+    // The header's control from the library entry, so an unreadable profile still offers
+    // what the library holds; or, once the profile is read, why a download can't happen.
+    // A first install waits for the profile, which it downloads from.
     fn install_control(&self, cx: &mut Context<Self>) -> (Option<Button>, Option<AnyElement>) {
-        let ProfileState::Ready(profile) = &self.profile else {
-            return (None, None);
-        };
+        let ready = self.ready();
         let installs = self.installs.read(cx);
         let offer = Offer::of(installs.entry(self.card.id));
         let stage = installs.stage(self.card.id);
         let busy = installs.is_busy();
         if stage.is_none()
             && offer.downloads()
-            && let Some(reason) = install_blocker(profile)
+            && let Some(reason) = ready.and_then(install_blocker)
         {
             let line = labelled(
                 div().text_sm().text_color(cx.theme().muted_foreground),
@@ -202,7 +174,9 @@ impl AddonDetail {
         let button = Button::new(ids::ADDON_DETAIL_INSTALL)
             .label(label)
             .loading(stage.is_some())
-            .disabled(busy || offer == Offer::Installed)
+            .disabled(
+                busy || offer == Offer::Installed || (offer == Offer::Install && ready.is_none()),
+            )
             .on_click(cx.listener(|this, _, window, cx| this.act(window, cx)));
         let button = if offer == Offer::Installed {
             button.secondary()
@@ -427,7 +401,6 @@ impl Render for AddonDetail {
             .track_scroll(&self.scroll)
             .overflow_y_scroll()
             .gap_4()
-            .children(self.progress(cx))
             .children(body);
         // The kit's close X floats into the top right corner, so the header keeps 22 px clear.
         v_flex()
@@ -483,6 +456,8 @@ impl Render for AddonDetail {
                     ),
             )
             .children(blocked)
+            // Pinned under the header so a scrolled body never hides the download.
+            .children(self.progress(cx))
             .child(scroll_beside(ids::ADDON_DETAIL_SCROLLBAR, &self.scroll, scrolled).min_h_0())
     }
 }
