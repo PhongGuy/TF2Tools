@@ -121,18 +121,22 @@ pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
     // a partial list look complete; every root found is listed and the tree is refused.
     if stopped {
         let mut payloads = vpks;
-        payloads.extend(folder_roots.into_iter().map(|FolderRoot { dir, nested }| {
-            let name = tree_name(tree, &dir);
-            Payload {
-                label: name.clone(),
-                name,
-                kind: PayloadKind::Folder,
-                path: dir,
-                chunks: Vec::new(),
-                nested,
-                size: 0,
-            }
-        }));
+        payloads.extend(
+            folder_roots
+                .into_iter()
+                .map(|FolderRoot { dir, nested, .. }| {
+                    let name = tree_name(tree, &dir);
+                    Payload {
+                        label: name.clone(),
+                        name,
+                        kind: PayloadKind::Folder,
+                        path: dir,
+                        chunks: Vec::new(),
+                        nested,
+                        size: 0,
+                    }
+                }),
+        );
         sort_payloads(&mut payloads);
         return Ok(payloads);
     }
@@ -145,7 +149,7 @@ pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
         vpks.iter().map(|v| vpk_entries(&v.path)).collect()
     };
     let mut payloads = vpks;
-    for FolderRoot { dir, nested } in folder_roots {
+    for FolderRoot { dir, nested, .. } in folder_roots {
         let (files, size) = folder_files(&dir, &nested)?;
         let duplicated = entries.iter().any(|e| files.iter().all(|f| e.contains(f)));
         if files.is_empty() || duplicated {
@@ -246,15 +250,16 @@ fn sort_payloads(payloads: &mut [Payload]) {
 struct FolderRoot {
     dir: PathBuf,
     nested: Vec<PathBuf>,
+    /// Has a `resource` folder or `info.vdf`, the shape of a HUD or a HUD's option.
+    hud_like: bool,
 }
 
 /// Collects content folders, stopping one past `MAX_PAYLOADS` and setting `stopped` when a
-/// directory was left unsearched. A directory with an
-/// `info.vdf` or a `resource` folder is one, kept whole, since a HUD or other GUI mod keeps
-/// optional layouts in subfolders for `#base`. A directory with a content subfolder is one too, and its
-/// other subfolders are searched for content roots that become payloads of their own,
-/// since TF2 loads only content at the top of a custom folder. Any other directory is
-/// searched below.
+/// directory was left unsearched. A directory with an `info.vdf` is one, kept whole. A
+/// directory with a content subfolder is one too, and its other subfolders are searched
+/// for content roots: TF2 loads only content at the top of a custom folder, so each becomes
+/// a payload of its own, except a HUD-like one, which a GUI mod keeps for `#base`.
+/// Any other directory is searched below.
 fn find_folders(
     dir: &Path,
     out: &mut Vec<FolderRoot>,
@@ -270,40 +275,46 @@ fn find_folders(
     };
     let mut others = Vec::new();
     let mut has_content = false;
-    let mut whole = false;
+    let mut has_info = false;
+    let mut has_resource = false;
     for entry in fs::read_dir(dir).map_err(io)? {
         let entry = entry.map_err(io)?;
         let file_type = entry.file_type().map_err(io)?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
         if file_type.is_file() && name.eq_ignore_ascii_case("info.vdf") {
-            whole = true;
+            has_info = true;
         } else if file_type.is_dir() {
             if is_content_name(&name) && !wraps_game_dir(&entry.path())? {
                 has_content = true;
-                whole |= name.eq_ignore_ascii_case("resource");
+                has_resource |= name.eq_ignore_ascii_case("resource");
             } else {
                 others.push(entry.path());
             }
         }
     }
     others.sort();
-    if whole {
-        out.push(FolderRoot {
-            dir: dir.to_path_buf(),
-            nested: Vec::new(),
-        });
+    let root = |hud_like| FolderRoot {
+        dir: dir.to_path_buf(),
+        nested: Vec::new(),
+        hud_like,
+    };
+    if has_info {
+        out.push(root(true));
     } else if has_content {
         let at = out.len();
-        out.push(FolderRoot {
-            dir: dir.to_path_buf(),
-            nested: Vec::new(),
-        });
+        out.push(root(has_resource));
         for sub in others {
             let before = out.len();
             find_folders(&sub, out, stopped)?;
-            let found: Vec<PathBuf> = out[before..].iter().map(|r| r.dir.clone()).collect();
-            out[at].nested.extend(found);
+            // HUD-like roots stay in this folder's copy; the rest are split off from it.
+            let found: Vec<FolderRoot> = out.drain(before..).collect();
+            for nested in found {
+                if !nested.hud_like {
+                    out[at].nested.push(nested.dir.clone());
+                    out.push(nested);
+                }
+            }
         }
     } else {
         for sub in others {

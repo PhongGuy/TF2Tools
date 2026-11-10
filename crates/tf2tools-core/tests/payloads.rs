@@ -382,3 +382,21 @@ fn labels_differing_only_in_case_are_made_unique() {
     assert_eq!(labels.len(), 2);
     assert_ne!(labels[0], labels[1], "{labels:?}");
 }
+
+#[test]
+fn a_gui_folder_still_splits_off_a_nested_root_that_is_not_hud_like() {
+    let t = tree_of(&[
+        ("Mod/resource/ui/a.res", &[1u8; 64]),
+        ("Mod/customizations/alt/resource/ui/a.res", &[2u8; 8]),
+        ("Mod/Optional/Red/materials/a.vmt", &[3u8; 4]),
+    ]);
+    let found = find_payloads(t.path()).unwrap();
+    assert_eq!(
+        found
+            .iter()
+            .map(|p| (p.name(), p.size()))
+            .collect::<Vec<_>>(),
+        [("Mod", 72), ("Mod/Optional/Red", 4)],
+        "the HUD-like customization stays inside, the plain root is its own payload"
+    );
+}
