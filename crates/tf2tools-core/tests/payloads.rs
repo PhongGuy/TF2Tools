@@ -370,3 +370,15 @@ fn a_content_folder_whose_tf_holds_no_content_is_still_content() {
     let t = tree_of(&[("pack/sound/tf/a.wav", b"w")]);
     assert_eq!(names(t.path()), [("pack".to_owned(), PayloadKind::Folder)]);
 }
+
+#[test]
+fn labels_differing_only_in_case_are_made_unique() {
+    let t = tree_of(&[("Pack/materials/a.vmt", b"a"), ("pack/models/a.mdl", b"bb")]);
+    let labels: Vec<String> = find_payloads(t.path())
+        .unwrap()
+        .iter()
+        .map(|p| p.label().to_ascii_lowercase())
+        .collect();
+    assert_eq!(labels.len(), 2);
+    assert_ne!(labels[0], labels[1], "{labels:?}");
+}

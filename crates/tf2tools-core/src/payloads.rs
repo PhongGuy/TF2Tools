@@ -168,7 +168,7 @@ pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
 
 /// Labels each payload with its last path part, adding the nearer parent parts that differ
 /// from payloads ending in the same parts. A trailing `tf` wrapper is not a part; a label
-/// that still collides falls back to the full name.
+/// that still collides falls back to the full name, then gains a " (n)" counter.
 fn assign_labels(payloads: &mut [Payload]) {
     let parts: Vec<Vec<&str>> = payloads
         .iter()
@@ -219,6 +219,18 @@ fn assign_labels(payloads: &mut [Payload]) {
         let clash = (0..labels.len()).any(|j| j != i && same(&labels[j], &labels[i]));
         if clash && !payloads[i].name.is_empty() {
             labels[i] = payloads[i].name.replace('/', " / ");
+        }
+    }
+    // Names that differ only in case still match above, so number the later ones.
+    for i in 0..labels.len() {
+        let taken = |label: &str, labels: &[String]| labels[..i].iter().any(|l| same(l, label));
+        if taken(&labels[i], &labels) {
+            let base = labels[i].clone();
+            let mut n = 2;
+            while taken(&format!("{base} ({n})"), &labels) {
+                n += 1;
+            }
+            labels[i] = format!("{base} ({n})");
         }
     }
     for (payload, label) in payloads.iter_mut().zip(labels) {
