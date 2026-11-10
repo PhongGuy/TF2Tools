@@ -2206,3 +2206,12 @@ pub enum ModuleCatalogError {
         limit: u64,
     },
 }
+
+/// Why the player box text could not be read.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum PlayerInputError {
+    /// The text is no Steam link, ID or vanity name.
+    #[error("That doesn't look like a Steam profile link or Steam ID.")]
+    NotSteam,
+}

@@ -17,6 +17,7 @@ mod fonts;
 mod hud_maker;
 mod ice;
 mod library;
+mod logstf;
 mod old_v4;
 mod pak;
 pub mod panic_mark;
@@ -44,10 +45,11 @@ pub use error::{
     HistoryError, HudFilesError, HudLoadError, ImageError, ImportError, InstallError,
     InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError, MakeHudError,
     MapDownloadError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError, OpenError,
-    PaintError, PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError,
-    RecipeError, ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError, SchemaError,
-    SettingsError, SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
-    UpdateDownloadError, VpkError, VtfError, WavError,
+    PaintError, PlayerInputError, PngReadError, PngWriteError, PresetError, PreviewError,
+    ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError,
+    RestoreMastercomfigError, SchemaError, SettingsError, SyncError, TakeOverError,
+    UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
+    WavError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
@@ -102,6 +104,7 @@ pub use library::{
 };
 pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
+pub use logstf::{PlayerInput, STEAM_ID64_BASE, SteamId, logstf_class, parse_player_input};
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
