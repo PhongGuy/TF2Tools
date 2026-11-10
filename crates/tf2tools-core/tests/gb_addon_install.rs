@@ -783,3 +783,66 @@ async fn a_renamed_update_whose_old_files_will_not_delete_keeps_them_on_the_row(
         .unwrap();
     assert!(custom(&s).is_empty(), "Remove clears the old files too");
 }
+
+// Folder permissions that refuse deletes are a Unix feature.
+#[cfg(unix)]
+#[tokio::test]
+async fn install_again_after_a_failed_renamed_update_clears_the_old_files() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let s = setup().await;
+    let body = common::zip_bytes(&[("pack/materials/a.vmt", b"a")]);
+    let d = download(&s, 42, "Old", "pack.zip", body, 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["pack"]), &s.tf2, &no)
+        .unwrap();
+    let locked = s.tf2.custom_dir().join("tf2tools-gb-42-old/materials");
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let d = download(&s, 42, "New", "a.vpk", vpk(b"n"), 200).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap_err();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+    // The copy serves every payload, so the old name is a leftover, not a missing file.
+    let entry = s
+        .env
+        .lib
+        .reinstall_gb_addon(GbId::new(42), &s.tf2, &no)
+        .unwrap();
+    assert!(entry.is_installed());
+    assert_eq!(entry.files(), ["custom/tf2tools-gb-42-new.vpk"]);
+    assert_eq!(custom(&s), ["tf2tools-gb-42-new.vpk"]);
+    let row = &s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap()[0];
+    assert!(row.is_installed());
+    assert_eq!(row.files(), ["custom/tf2tools-gb-42-new.vpk"]);
+}
+
+#[tokio::test]
+async fn install_again_refuses_a_copy_older_than_the_row() {
+    let s = setup().await;
+    let d = download(&s, 43, "Old", "a.vpk", vpk(b"o"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap();
+    // A crash after the pending row was saved but before the copy was swapped.
+    common::sql(&s.env.dir)
+        .execute(
+            "UPDATE library_gb_addons SET name = 'New', installed = 0, files =
+             '[\"custom/tf2tools-gb-43-new.vpk\",\"custom/tf2tools-gb-43-old.vpk\"]'",
+            [],
+        )
+        .unwrap();
+    let err = s
+        .env
+        .lib
+        .reinstall_gb_addon(GbId::new(43), &s.tf2, &no)
+        .unwrap_err();
+    assert!(
+        matches!(err, GbAddonInstallError::NotInLibrary { .. }),
+        "{err:?}"
+    );
+    assert_eq!(custom(&s), ["tf2tools-gb-43-old.vpk"], "nothing changed");
+}

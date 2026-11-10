@@ -251,8 +251,8 @@ impl Library {
             return Err(e);
         }
 
-        // From the clear on, a failure keeps the new row with installed = 0 so the page
-        // offers to install it again from the library copy.
+        // From the clear on, a failure keeps the pending row with installed = 0 so the page
+        // offers to install it again from the library copy, which deletes old leftovers.
         let library_copy = root.join(gb_id.to_string());
         let mut copied = Vec::new();
         let swapped = (|| {
@@ -325,8 +325,10 @@ impl Library {
             .map_err(gb_db)
     }
 
-    /// Copies add-on `gb_id`'s library copy back into `tf/custom` and marks it installed.
-    /// `NotInLibrary` without a row or a copy holding every recorded file.
+    /// Copies add-on `gb_id`'s library copy back into `tf/custom` and marks it installed with
+    /// exactly the files copied. Recorded files no payload of the row's name produces are
+    /// leftovers of a failed update and are deleted. `NotInLibrary` without a row, or when a
+    /// payload slot or a file the row names for it is missing from the copy.
     ///
     /// # Errors
     /// [`GbAddonInstallError::NotInLibrary`], `Tf2Running` when a recorded file is a VPK and
@@ -342,28 +344,44 @@ impl Library {
         let mut entry = self.gb_addon_row(gb_id)?.ok_or_else(not_in_library)?;
         let library_copy = self.dir.gb_addon_dir().join(gb_id.to_string());
         let custom = game_custom_dir(tf2)?;
-        // Every recorded file must sit in one of the copy's slots; a copy missing any of
-        // them is refused whole rather than installed in part.
+        // Each payload slot owns the files named after its installed base; every one of them
+        // must be in that slot of the copy, or the copy is refused whole. A recorded file no
+        // slot owns is a leftover, such as an old name a failed update could not delete.
+        let tf = tf2.tf_dir();
         let slots = copy_slots(&library_copy);
-        let mut wanted = Vec::new();
+        let base = installed_base(gb_id, &entry.name);
+        let mut wanted: Vec<(usize, Vec<String>)> = Vec::new();
+        let mut leftovers = Vec::new();
         for file in &entry.files {
-            let name = recorded_path(&tf2.tf_dir(), gb_id, file)
+            let name = recorded_path(&tf, gb_id, file)
                 .and(file.strip_prefix("custom/"))
                 .ok_or_else(not_in_library)?;
-            let n = slots
+            let Some(n) = (1..=entry.payloads.len()).find(|&n| owns(&slot_base(&base, n), name))
+            else {
+                leftovers.push(file.clone());
+                continue;
+            };
+            let in_copy = slots
                 .iter()
-                .find(|(_, names)| names.iter().any(|x| x == name))
-                .map(|(n, _)| *n)
-                .ok_or_else(not_in_library)?;
+                .any(|(slot, names)| *slot == n && names.iter().any(|x| x == name));
+            if !in_copy {
+                return Err(not_in_library());
+            }
             wanted.push((n, vec![name.to_owned()]));
         }
-        if wanted.is_empty() {
+        let served = (1..=entry.payloads.len()).all(|n| wanted.iter().any(|(w, _)| *w == n));
+        if entry.payloads.is_empty() || !served {
             return Err(not_in_library());
         }
         if entry.files.iter().any(|f| is_vpk(f)) && tf2_running() {
             return Err(GbAddonInstallError::Tf2Running);
         }
 
+        for file in &leftovers {
+            if let Some(path) = recorded_path(&tf, gb_id, file) {
+                remove_entry(&path)?;
+            }
+        }
         let mut copied = Vec::new();
         if let Err(e) = copy_into_game(&library_copy, &custom, &wanted, &mut copied) {
             for path in &copied {
@@ -372,12 +390,14 @@ impl Library {
             let _ = self.mark_not_installed(gb_id);
             return Err(e.into());
         }
+        entry.files.retain(|f| !leftovers.contains(f));
         let id = gb_id_column(gb_id, install_db)?;
+        let files = serde_json::to_string(&entry.files).unwrap_or_else(|_| "[]".into());
         self.db
             .write(|conn| {
                 conn.execute(
-                    "UPDATE library_gb_addons SET installed = 1 WHERE gb_id = ?1",
-                    [id],
+                    "UPDATE library_gb_addons SET installed = 1, files = ?1 WHERE gb_id = ?2",
+                    rusqlite::params![files, id],
                 )
             })
             .map_err(gb_db)?;
@@ -536,6 +556,30 @@ fn installed_base(gb_id: GbId, name: &str) -> String {
     format!("tf2tools-gb-{gb_id}-{slug}")
 }
 
+/// The installed base of payload slot `n`: `base` for the first, `base-n` after it.
+fn slot_base(base: &str, n: usize) -> String {
+    if n == 1 {
+        base.to_owned()
+    } else {
+        format!("{base}-{n}")
+    }
+}
+
+/// Whether `name` is one of the entries a payload installed as `base` produces: the folder
+/// itself, `base.vpk`, or a multi-chunk VPK's `base_dir.vpk` and `base_NNN.vpk`.
+fn owns(base: &str, name: &str) -> bool {
+    if name == base {
+        return true;
+    }
+    let Some(rest) = name.strip_prefix(base).and_then(|r| r.strip_suffix(".vpk")) else {
+        return false;
+    };
+    let chunk = rest.strip_prefix('_');
+    rest.is_empty()
+        || chunk == Some("dir")
+        || chunk.is_some_and(|d| !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()))
+}
+
 /// Copies each picked payload into `staging/<n>/` under its installed name, `n` counting
 /// from 1, and returns each slot with the names it holds. The first payload takes `base`,
 /// the n-th `base-n`; a multi-chunk VPK keeps its `_dir` and `_NNN` suffixes.
@@ -546,11 +590,7 @@ fn stage(
 ) -> Result<Vec<(usize, Vec<String>)>, IoFailure> {
     let mut staged = Vec::new();
     for (n, payload) in (1..).zip(picked) {
-        let name = if n == 1 {
-            base.to_owned()
-        } else {
-            format!("{base}-{n}")
-        };
+        let name = slot_base(base, n);
         let slot = staging.join(n.to_string());
         create_dir_all(&slot)?;
         let mut names = Vec::new();
