@@ -11,7 +11,7 @@ use super::http::NetFailure;
 use super::unpack::{crosshair_files, entry_name, sound_files};
 use super::{StoreClient, StoreFile, StoreItemId, StoreKind};
 use crate::db::Database;
-use crate::error::{DownloadError, LibraryError};
+use crate::error::{DownloadError, GbAddonFetchError, LibraryError};
 use crate::library::{AddonName, GbId, Library, LibraryEntry, Provenance, is_plain_name};
 
 /// What a running download is doing.
@@ -239,24 +239,31 @@ pub(super) enum StreamFailure {
     },
 }
 
-impl From<StreamFailure> for DownloadError {
-    fn from(failure: StreamFailure) -> Self {
-        match failure {
-            StreamFailure::Net(net) => net.into(),
-            StreamFailure::Io { path, source } => Self::Io { path, source },
-            StreamFailure::TooLarge { url, limit } => Self::TooLarge { url, limit },
-            StreamFailure::ChecksumMismatch {
-                file_name,
-                expected,
-                found,
-            } => Self::ChecksumMismatch {
-                file_name,
-                expected,
-                found,
-            },
+/// Both public download errors carry the same four stream failures under the same names.
+macro_rules! from_stream_failure {
+    ($($target:ident),*) => {$(
+        impl From<StreamFailure> for $target {
+            fn from(failure: StreamFailure) -> Self {
+                match failure {
+                    StreamFailure::Net(net) => net.into(),
+                    StreamFailure::Io { path, source } => Self::Io { path, source },
+                    StreamFailure::TooLarge { url, limit } => Self::TooLarge { url, limit },
+                    StreamFailure::ChecksumMismatch {
+                        file_name,
+                        expected,
+                        found,
+                    } => Self::ChecksumMismatch {
+                        file_name,
+                        expected,
+                        found,
+                    },
+                }
+            }
         }
-    }
+    )*};
 }
+
+from_stream_failure!(DownloadError, GbAddonFetchError);
 
 /// How `file` imports for `kind`, or None when the file belongs to another store.
 fn target(kind: StoreKind, file: &StoreFile) -> Option<Target> {
@@ -283,7 +290,7 @@ fn target(kind: StoreKind, file: &StoreFile) -> Option<Target> {
 /// The scratch file name: the store name's last path component when it is a single plain
 /// component, else `download` plus its extension when that is alphanumeric, since the
 /// importers key off the extension.
-fn save_name(store_name: &str) -> String {
+pub(super) fn save_name(store_name: &str) -> String {
     let last = store_name.rsplit(['/', '\\']).next().unwrap_or_default();
     let mut components = Path::new(last).components();
     let single =

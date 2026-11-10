@@ -26,6 +26,7 @@ mod font_check;
 mod font_install;
 mod font_scan;
 mod game_missing;
+mod gb_addon_download;
 mod hud_align;
 mod hud_anim_playback;
 mod hud_anim_script;

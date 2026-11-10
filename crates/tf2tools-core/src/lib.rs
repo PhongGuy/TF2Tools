@@ -40,14 +40,14 @@ pub use db::Database;
 pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
     BrowseError, CatalogError, CopyHudError, DataDirError, DetectError, DownloadError, FilesError,
-    FontCheckError, FontInstallError, HistoryError, HudFilesError, HudLoadError, ImageError,
-    ImportError, InstallError, InstallMastercomfigError, KeepHudError, KvParseError, LibraryError,
-    LogError, MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError,
-    ModuleCatalogError, OpenError, PaintError, PngReadError, PngWriteError, PresetError,
-    PreviewError, ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError,
-    RestoreMastercomfigError, SchemaError, SettingsError, SyncError, TakeOverError,
-    UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
-    WavError,
+    FontCheckError, FontInstallError, GbAddonFetchError, HistoryError, HudFilesError, HudLoadError,
+    ImageError, ImportError, InstallError, InstallMastercomfigError, KeepHudError, KvParseError,
+    LibraryError, LogError, MakeHudError, MapDownloadError, MapRemoveError,
+    MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError, PngReadError,
+    PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
+    ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError, SchemaError, SettingsError,
+    SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
+    UpdateDownloadError, VpkError, VtfError, WavError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
@@ -109,9 +109,9 @@ pub use settings::{Settings, Volume};
 pub use store::{
     AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
     AddonProfile, AddonQuery, AddonSection, AddonSort, AddonStep, DownloadPhase, DownloadProgress,
-    Endpoints, INDEX_STEP_CALLS, MastercomfigRelease, SEARCH_STEP_CALLS, STEP_CARDS, StoreCard,
-    StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem, StoreItemId, StoreKind,
-    StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
+    Endpoints, GbAddonDownload, INDEX_STEP_CALLS, MastercomfigRelease, SEARCH_STEP_CALLS,
+    STEP_CARDS, StoreCard, StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem,
+    StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
 };
 pub use store::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 pub use texture::{

@@ -1064,6 +1064,97 @@ pub enum DownloadError {
     },
 }
 
+/// Why an add-on's newest file could not be made ready to install.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GbAddonFetchError {
+    /// The item lists no files.
+    #[error("GameBanana item {gb_id} has no files to install")]
+    NoFiles {
+        /// The item that was asked for.
+        gb_id: GbId,
+    },
+    /// GameBanana's virus scan did not pass the file.
+    #[error("{file_name} did not pass GameBanana's virus scan ({result:?})")]
+    VirusScan {
+        /// The store's name for the file.
+        file_name: String,
+        /// The scan result GameBanana reported.
+        result: String,
+    },
+    /// The server kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// The server answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// The server could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The file is listed as, or grew past, the add-on size cap.
+    #[error("{url} is more than {limit} bytes")]
+    TooLarge {
+        /// The address of the file.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// The downloaded bytes do not match the store's MD5 checksum.
+    #[error("{file_name} failed its checksum: expected {expected}, got {found}")]
+    ChecksumMismatch {
+        /// The store's name for the file.
+        file_name: String,
+        /// The checksum the store published.
+        expected: String,
+        /// The checksum of the bytes received.
+        found: String,
+    },
+    /// The downloaded archive could not be extracted or walked.
+    #[error(transparent)]
+    Archive(#[from] ArchiveError),
+    /// The download holds only programs, which TF2Tools never runs.
+    #[error("{file_name} holds only programs, nothing to install")]
+    OnlyExe {
+        /// The store's name for the file.
+        file_name: String,
+    },
+    /// The download's layout matches no known add-on shape.
+    #[error("{file_name} has {payloads} possible parts, too many to tell which to install")]
+    UnknownLayout {
+        /// The store's name for the file.
+        file_name: String,
+        /// How many payloads were found.
+        payloads: usize,
+    },
+    /// A file or directory could not be read or written.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// The extraction stopped before it finished, for example on a cancelled task.
+    #[error("the download was interrupted: {message}")]
+    Interrupted {
+        /// What stopped it.
+        message: String,
+    },
+}
+
 /// Why an item's audio preview could not be fetched.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

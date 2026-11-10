@@ -19,9 +19,10 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
 use tf2tools_core::{
-    BuiltinCrosshairs, CrosshairEntry, DataDir, Database, DownloadError, DownloadProgress,
-    Endpoints, GbId, HudEntry, Library, LibraryEntry, ModuleCatalog, Provenance, SoundEntry,
-    StoreClient, StoreConfig, StoreFile, StoreItemId, StoreKind, Tf2Install,
+    AddonProfile, AddonSection, BuiltinCrosshairs, CrosshairEntry, DataDir, Database,
+    DownloadError, DownloadProgress, Endpoints, GbAddonDownload, GbAddonFetchError, GbId, HudEntry,
+    Library, LibraryEntry, ModuleCatalog, Provenance, SoundEntry, StoreClient, StoreConfig,
+    StoreFile, StoreItemId, StoreKind, Tf2Install,
 };
 use wiremock::MockServer;
 use wiremock::matchers::{method, path};
@@ -749,6 +750,70 @@ pub async fn download_collecting(
     let result = env
         .client
         .download(kind, file, &|p: DownloadProgress| {
+            seen.lock().unwrap().push(p)
+        })
+        .await;
+    (result, seen.into_inner().unwrap())
+}
+
+/// Serves `body` at `/dl/addon/<gb_id>/<i>` and returns its ProfilePage `_aFiles` record:
+/// dated `date`, scanned "clean", sized and checksummed from the body.
+pub async fn gb_addon_file(
+    env: &StoreEnv,
+    gb_id: u64,
+    i: usize,
+    name: &str,
+    body: &[u8],
+    date: i64,
+) -> serde_json::Value {
+    let route = format!("/dl/addon/{gb_id}/{i}");
+    Mock::given(method("GET"))
+        .and(path(route.as_str()))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(body.to_vec()))
+        .mount(&env.server)
+        .await;
+    serde_json::json!({
+        "_idRow": 100 + i, "_sFile": name, "_nFilesize": body.len(), "_tsDateAdded": date,
+        "_sMd5Checksum": md5_hex(body), "_sAvResult": "clean",
+        "_sDownloadUrl": format!("{}{route}", env.server.uri()),
+    })
+}
+
+/// Mounts Mod `gb_id`'s ProfilePage named `name` with `files` and reads it back.
+pub async fn gb_addon_profile(
+    env: &StoreEnv,
+    gb_id: u64,
+    name: &str,
+    files: Vec<serde_json::Value>,
+) -> AddonProfile {
+    Mock::given(method("GET"))
+        .and(path(format!("/apiv11/Mod/{gb_id}/ProfilePage")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "_idRow": gb_id, "_sName": name, "_aSubmitter": {"_sName": "vex"},
+            "_sProfileUrl": format!("https://gamebanana.com/mods/{gb_id}"), "_aFiles": files,
+        })))
+        .mount(&env.server)
+        .await;
+    env.client
+        .addon_catalog()
+        .profile(GbId::new(gb_id))
+        .await
+        .expect("profile")
+}
+
+/// Downloads `profile` as a `section` add-on through `client`, collecting its progress.
+pub async fn gb_addon_download(
+    client: &StoreClient,
+    section: &str,
+    profile: &AddonProfile,
+) -> (
+    Result<GbAddonDownload, GbAddonFetchError>,
+    Vec<DownloadProgress>,
+) {
+    let seen = std::sync::Mutex::new(Vec::new());
+    let section = AddonSection::by_key(section).expect("section");
+    let result = client
+        .download_gb_addon(section, profile, &|p: DownloadProgress| {
             seen.lock().unwrap().push(p)
         })
         .await;

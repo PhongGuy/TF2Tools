@@ -7,6 +7,7 @@ mod addon_sections;
 mod cards;
 mod download;
 mod gamebanana;
+mod gb_addon_download;
 mod github;
 pub(crate) mod http;
 mod images;
@@ -40,6 +41,7 @@ pub use addon_catalog::{
 pub use addon_sections::AddonSection;
 pub use cards::{StoreCard, StoreCursor, StoreQuery, StoreSort};
 pub use download::{DownloadPhase, DownloadProgress};
+pub use gb_addon_download::GbAddonDownload;
 use http::{API_BODY_LIMIT, Http, NetFailure, Redirects, Timeouts};
 pub use items::{StoreFile, StoreItem, StoreItemId};
 pub use maps::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
