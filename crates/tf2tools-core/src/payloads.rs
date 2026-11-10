@@ -225,17 +225,24 @@ fn assign_labels(payloads: &mut [Payload]) {
             labels[i] = payloads[i].name.replace('/', " / ");
         }
     }
-    // Names that differ only in case still match above, so number the later ones.
+    // Names that differ only in case still match above, so a label an earlier payload took
+    // gets the first " (n)" no other label uses, a folder named "x (2)" included.
     for i in 0..labels.len() {
-        let taken = |label: &str, labels: &[String]| labels[..i].iter().any(|l| same(l, label));
-        if taken(&labels[i], &labels) {
-            let base = labels[i].clone();
-            let mut n = 2;
-            while taken(&format!("{base} ({n})"), &labels) {
-                n += 1;
-            }
-            labels[i] = format!("{base} ({n})");
+        if !labels[..i].iter().any(|l| same(l, &labels[i])) {
+            continue;
         }
+        let used = |label: &str| {
+            labels
+                .iter()
+                .enumerate()
+                .any(|(j, l)| j != i && same(l, label))
+        };
+        let base = labels[i].clone();
+        let numbered = (2..)
+            .map(|n| format!("{base} ({n})"))
+            .find(|label| !used(label))
+            .unwrap_or(base);
+        labels[i] = numbered;
     }
     for (payload, label) in payloads.iter_mut().zip(labels) {
         payload.label = label;

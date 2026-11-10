@@ -373,14 +373,24 @@ fn a_content_folder_whose_tf_holds_no_content_is_still_content() {
 
 #[test]
 fn labels_differing_only_in_case_are_made_unique() {
-    let t = tree_of(&[("Pack/materials/a.vmt", b"a"), ("pack/models/a.mdl", b"bb")]);
-    let labels: Vec<String> = find_payloads(t.path())
+    let t = tree_of(&[
+        ("Pack/materials/a.vmt", &[1u8; 3]),
+        ("pack/models/a.mdl", &[2u8; 2]),
+        ("pack (2)/sound/a.wav", &[3u8; 1]),
+    ]);
+    let labels: Vec<(String, String)> = find_payloads(t.path())
         .unwrap()
         .iter()
-        .map(|p| p.label().to_ascii_lowercase())
+        .map(|p| (p.name().to_owned(), p.label().to_owned()))
         .collect();
-    assert_eq!(labels.len(), 2);
-    assert_ne!(labels[0], labels[1], "{labels:?}");
+    assert_eq!(
+        labels,
+        [
+            ("Pack".to_owned(), "Pack".to_owned()),
+            ("pack".to_owned(), "pack (3)".to_owned()),
+            ("pack (2)".to_owned(), "pack (2)".to_owned()),
+        ]
+    );
 }
 
 #[test]
