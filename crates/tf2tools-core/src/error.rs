@@ -1165,6 +1165,50 @@ fn unknown_layout_message(file_name: &str, payloads: usize) -> String {
     }
 }
 
+/// Why a GameBanana add-on could not be installed, installed again or removed.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GbAddonInstallError {
+    /// A file or directory could not be read or written.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// SQLite failed to read or record the add-on.
+    #[error("library database error: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+    /// The game folder (`tf/`) is gone, so nothing was written.
+    #[error("Team Fortress 2 is no longer at {path}")]
+    GameMissing {
+        /// The `tf` folder that is missing.
+        path: PathBuf,
+    },
+    /// TF2 holds VPKs open; nothing changed.
+    #[error("TF2 is running and a VPK would change")]
+    Tf2Running,
+    /// No row, or no library copy, for the add-on.
+    #[error("GameBanana add-on {gb_id} is not in the library")]
+    NotInLibrary {
+        /// The add-on that was asked for.
+        gb_id: GbId,
+    },
+    /// A chosen name is not one of the download's payloads.
+    #[error("{name} is not a payload of this download")]
+    UnknownPayload {
+        /// The chosen name.
+        name: String,
+    },
+    /// No payload was chosen.
+    #[error("no payload was chosen")]
+    NothingChosen,
+}
+
 /// Why an item's audio preview could not be fetched.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

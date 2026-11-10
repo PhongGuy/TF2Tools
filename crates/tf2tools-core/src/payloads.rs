@@ -80,12 +80,12 @@ impl Payload {
         }
     }
 
-    #[expect(dead_code, reason = "read by the add-on install")]
+    /// Where the VPK or folder sits in the extracted tree.
     pub(crate) fn path(&self) -> &Path {
         &self.path
     }
 
-    #[expect(dead_code, reason = "read by the add-on install")]
+    /// A `_dir.vpk`'s numbered data files; empty otherwise.
     pub(crate) fn chunks(&self) -> &[PathBuf] {
         &self.chunks
     }
