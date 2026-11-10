@@ -4,7 +4,7 @@ use tf2tools_app::ids;
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::{Services, Tf2State};
 use tf2tools_app::tokio_bridge;
-use tf2tools_core::{AddonProfile, AddonSection, GbId, Tf2Install};
+use tf2tools_core::{AddonProfile, AddonSection, GbId, StoreConfig, Tf2Install};
 
 use crate::support;
 
@@ -135,18 +135,25 @@ fn blockers_are_read_from_the_newest_file(cx: &mut TestAppContext) {
         serde_json::json!({"_idRow": 18, "_sName": "Empty", "_aFiles": []}),
     );
     let _w = window(cx, &env, &server);
-    assert_eq!(install_blocker(&profile(cx, 15)), None);
+    let store = cx.update(|cx| cx.global::<Services>().store.clone());
+    assert_eq!(install_blocker(&store, &profile(cx, 15)), None);
     assert_eq!(
-        install_blocker(&profile(cx, 16)).as_deref(),
+        install_blocker(&store, &profile(cx, 16)).as_deref(),
         Some("GameBanana's virus scan didn't pass this file, so it wasn't installed.")
     );
     assert_eq!(
-        install_blocker(&profile(cx, 17)).as_deref(),
+        install_blocker(&store, &profile(cx, 17)).as_deref(),
         Some("This download is too big for TF2Tools to install.")
     );
     assert_eq!(
-        install_blocker(&profile(cx, 18)).as_deref(),
+        install_blocker(&store, &profile(cx, 18)).as_deref(),
         Some("This add-on has no files to install. Pick another add-on.")
+    );
+    // The cap is the store's configured one, as the download itself enforces.
+    let capped = store.with_config(StoreConfig::default().with_gb_addon_size_cap(1));
+    assert_eq!(
+        install_blocker(&capped, &profile(cx, 15)).as_deref(),
+        Some("This download is too big for TF2Tools to install.")
     );
 }
 

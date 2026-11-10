@@ -155,9 +155,10 @@ impl AddonDetail {
         let offer = Offer::of(installs.entry(self.card.id));
         let stage = installs.stage(self.card.id);
         let busy = installs.is_busy();
+        let store = &cx.global::<Services>().store;
         if stage.is_none()
             && offer.downloads()
-            && let Some(reason) = ready.and_then(install_blocker)
+            && let Some(reason) = ready.and_then(|profile| install_blocker(store, profile))
         {
             let line = labelled(
                 div().text_sm().text_color(cx.theme().muted_foreground),

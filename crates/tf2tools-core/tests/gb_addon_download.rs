@@ -317,3 +317,41 @@ async fn an_unknown_layout_says_whether_it_found_nothing_or_too_much() {
         "crowded.zip has 17 possible parts, too many to tell which to install"
     );
 }
+
+#[tokio::test]
+async fn the_listing_alone_names_each_refusal_with_the_configured_cap() {
+    let env = store_env().await;
+    let client = env
+        .client
+        .clone()
+        .with_config(common::fast_config().with_gb_addon_size_cap(10));
+    let fine = gb_addon_file(&env, 13, 0, "a.vpk", b"tiny", 100).await;
+    let fine = gb_addon_profile(&env, 13, "Fine", vec![fine]).await;
+    assert!(client.gb_addon_refusal(&fine).is_none());
+
+    let big = gb_addon_file(&env, 14, 0, "big.vpk", &[0u8; 64], 100).await;
+    let big = gb_addon_profile(&env, 14, "Big", vec![big]).await;
+    assert!(
+        matches!(
+            client.gb_addon_refusal(&big),
+            Some(GbAddonFetchError::TooLarge { limit: 10, .. })
+        ),
+        "the configured cap, not the default"
+    );
+    assert!(env.client.gb_addon_refusal(&big).is_none());
+
+    let mut bad = gb_addon_file(&env, 15, 0, "bad.zip", b"PK", 100).await;
+    bad["_sAvResult"] = serde_json::json!("infected");
+    let bad = gb_addon_profile(&env, 15, "Bad", vec![bad]).await;
+    assert!(matches!(
+        client.gb_addon_refusal(&bad),
+        Some(GbAddonFetchError::VirusScan { .. })
+    ));
+
+    let empty = gb_addon_profile(&env, 16, "Empty", vec![]).await;
+    assert!(matches!(
+        client.gb_addon_refusal(&empty),
+        Some(GbAddonFetchError::NoFiles { .. })
+    ));
+    assert_eq!(common::download_requests(&env).await, 0);
+}

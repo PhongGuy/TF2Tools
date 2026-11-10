@@ -9,7 +9,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{
     AddonProfile, AddonSection, BrowseError, DownloadProgress, GbAddonCheck, GbAddonDownload,
-    GbAddonEntry, GbAddonFetchError, GbId, StoreConfig, Tf2Install,
+    GbAddonEntry, GbId, StoreClient, Tf2Install,
 };
 
 use crate::library_events::LibraryEvents;
@@ -597,27 +597,10 @@ async fn ask_payloads(
     answer.recv().await.ok().flatten()
 }
 
-/// Why `profile`'s newest file can't be installed, in player words; None when it can.
-/// These are the refusals core makes before downloading, worded as its errors are.
-pub fn install_blocker(profile: &AddonProfile) -> Option<String> {
-    let err = match profile.files().first() {
-        None => GbAddonFetchError::NoFiles {
-            gb_id: profile.id(),
-        },
-        Some(file) if file.av_result() != "clean" => GbAddonFetchError::VirusScan {
-            file_name: file.name().to_owned(),
-            result: file.av_result().to_owned(),
-        },
-        Some(file) => {
-            let limit = StoreConfig::default().gb_addon_size_cap();
-            if !file.size().is_some_and(|size| size > limit) {
-                return None;
-            }
-            GbAddonFetchError::TooLarge {
-                url: file.download_url().to_owned(),
-                limit,
-            }
-        }
-    };
-    Some(describe_gb_fetch(&err).message)
+/// Why `profile`'s newest file can't be installed through `store`, in player words; None
+/// when it can. These are core's own refusals before downloading, with the store's cap.
+pub fn install_blocker(store: &StoreClient, profile: &AddonProfile) -> Option<String> {
+    store
+        .gb_addon_refusal(profile)
+        .map(|err| describe_gb_fetch(&err).message)
 }

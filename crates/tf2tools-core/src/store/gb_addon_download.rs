@@ -126,6 +126,30 @@ impl StoreClient {
 }
 
 impl StoreClient {
+    /// Why [`download_gb_addon`](Self::download_gb_addon) would refuse `profile` from its
+    /// listing alone, before any request: no files, a failed virus scan, or a listed size
+    /// over this client's configured cap. None when the download may start.
+    pub fn gb_addon_refusal(&self, profile: &AddonProfile) -> Option<GbAddonFetchError> {
+        let Some(file) = profile.files().first() else {
+            return Some(GbAddonFetchError::NoFiles {
+                gb_id: profile.id(),
+            });
+        };
+        if file.av_result() != "clean" {
+            return Some(GbAddonFetchError::VirusScan {
+                file_name: file.name().to_owned(),
+                result: file.av_result().to_owned(),
+            });
+        }
+        let limit = self.config.gb_addon_size_cap();
+        file.size()
+            .is_some_and(|size| size > limit)
+            .then(|| GbAddonFetchError::TooLarge {
+                url: file.download_url().to_owned(),
+                limit,
+            })
+    }
+
     /// Downloads `profile`'s newest file for `section` into `<data>/tmp`, one download at a
     /// time, then extracts it and finds its payloads. The scratch dir lives in the returned
     /// download and goes when it is dropped; every error removes it.
@@ -136,22 +160,13 @@ impl StoreClient {
         progress: &(dyn Fn(DownloadProgress) + Send + Sync),
     ) -> Result<GbAddonDownload, GbAddonFetchError> {
         // Every refusal the listing alone can settle comes before any request is made.
+        if let Some(refusal) = self.gb_addon_refusal(profile) {
+            return Err(refusal);
+        }
         let file = profile.files().first().ok_or(GbAddonFetchError::NoFiles {
             gb_id: profile.id(),
         })?;
-        if file.av_result() != "clean" {
-            return Err(GbAddonFetchError::VirusScan {
-                file_name: file.name().to_owned(),
-                result: file.av_result().to_owned(),
-            });
-        }
         let limit = self.config.gb_addon_size_cap();
-        if file.size().is_some_and(|size| size > limit) {
-            return Err(GbAddonFetchError::TooLarge {
-                url: file.download_url().to_owned(),
-                limit,
-            });
-        }
 
         let _turn = self.download_lock.lock().await;
         let tmp = self.dir.tmp_dir();
