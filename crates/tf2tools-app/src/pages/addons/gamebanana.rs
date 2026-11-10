@@ -12,7 +12,7 @@ use gpui_kit::{
 use tf2tools_core::{AddonSection, GbAddonEntry, GbId};
 
 use super::{AddonsPage, section};
-use crate::gb_addon_installs::{GbAddonInstalls, GbAddonStage};
+use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer, GbAddonStage};
 use crate::ids;
 use crate::links::gamebanana_page;
 use crate::pages::common::{badge_of, card_frame};
@@ -34,8 +34,8 @@ fn tag_text(entry: &GbAddonEntry) -> Option<&'static str> {
     }
 }
 
-/// The card's main action, if any: Update for a newer file, else Install again when the files
-/// are missing. An item gone from GameBanana offers neither.
+/// The card's main action, if any, from the same offer the store detail makes: Update for a
+/// newer file still on GameBanana, Install again when the files are missing.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Main {
     Update,
@@ -43,14 +43,10 @@ enum Main {
 }
 
 fn main_action(entry: &GbAddonEntry) -> Option<Main> {
-    if entry.is_gone() {
-        None
-    } else if entry.has_update() {
-        Some(Main::Update)
-    } else if !entry.is_installed() {
-        Some(Main::Reinstall)
-    } else {
-        None
+    match GbAddonOffer::of(Some(entry)) {
+        GbAddonOffer::Update => Some(Main::Update),
+        GbAddonOffer::InstallAgain => Some(Main::Reinstall),
+        GbAddonOffer::Install | GbAddonOffer::Installed => None,
     }
 }
 

@@ -867,6 +867,41 @@ fn an_item_gone_from_gamebanana_keeps_remove(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn a_gone_addon_whose_files_were_deleted_offers_install_again(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(15, "Trashed", &[("a.vpk", gb_vpk(), 100)]);
+    let s = store_shell(cx, &env, &server);
+    install_gb(cx, &s, 15, "skins");
+    support::sql(&env)
+        .execute("UPDATE library_gb_addons SET gone = 1", [])
+        .unwrap();
+    let file = env.game.join("tf/custom/tf2tools-gb-15-trashed.vpk");
+    std::fs::remove_file(&file).unwrap();
+    let _page = open_addons(cx, &s);
+    let id = tf2tools_core::GbId::new(15);
+    // The library copy needs nothing from GameBanana, so the store detail's offer holds here.
+    support::wait_real(cx, "install again", |cx| {
+        support::present(cx, s.win, ids::addons_gb_reinstall(id))
+    });
+    assert_eq!(
+        tf2tools_app::gb_addon_installs::GbAddonOffer::of(env_entry(cx, 15).as_ref()),
+        tf2tools_app::gb_addon_installs::GbAddonOffer::InstallAgain
+    );
+    support::click_id(cx, s.win, ids::addons_gb_reinstall(id));
+    support::wait_real(cx, "the files back", |_| file.is_file());
+}
+
+fn env_entry(cx: &mut TestAppContext, id: u64) -> Option<tf2tools_core::GbAddonEntry> {
+    let installs = cx.update(tf2tools_app::gb_addon_installs::GbAddonInstalls::global);
+    cx.update(|cx| {
+        installs
+            .read(cx)
+            .entry(tf2tools_core::GbId::new(id))
+            .cloned()
+    })
+}
+
+#[gpui_kit::test]
 fn at_800_by_600_a_gamebanana_card_keeps_its_tag_and_buttons_inside(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
     server.mount_gb_addon(8, "A Rather Long Add-on Name", &[("a.vpk", gb_vpk(), 100)]);
