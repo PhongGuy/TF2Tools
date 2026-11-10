@@ -631,3 +631,73 @@ async fn install_again_from_a_partial_library_copy_is_not_in_library() {
     );
     assert!(custom(&s).is_empty());
 }
+
+#[tokio::test]
+async fn a_first_install_cut_short_after_its_files_land_leaves_a_row_to_remove() {
+    let s = setup().await;
+    // Refusing the final installed row stands in for the app dying right after the copy.
+    common::sql(&s.env.dir)
+        .execute_batch(
+            "CREATE TRIGGER cut_short BEFORE INSERT ON library_gb_addons
+             WHEN NEW.installed = 1 BEGIN SELECT RAISE(ABORT, 'cut short'); END",
+        )
+        .unwrap();
+    let d = download(&s, 32, "A", "a.vpk", vpk(b"v"), 100).await;
+    let err = s
+        .env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap_err();
+    assert!(
+        matches!(err, GbAddonInstallError::Database { .. }),
+        "{err:?}"
+    );
+    assert_eq!(custom(&s), ["tf2tools-gb-32-a.vpk"]);
+    let list = s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap();
+    assert_eq!(list.len(), 1, "the files in the game have a row");
+    assert!(!list[0].is_installed());
+    assert_eq!(list[0].files(), ["custom/tf2tools-gb-32-a.vpk"]);
+
+    s.env
+        .lib
+        .remove_gb_addon(GbId::new(32), &s.tf2, &no)
+        .unwrap();
+    assert!(custom(&s).is_empty());
+    assert!(s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn an_update_cut_short_owns_the_old_and_new_files() {
+    let s = setup().await;
+    let d = download(&s, 33, "Old", "a.vpk", vpk(b"v1"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap();
+    common::sql(&s.env.dir)
+        .execute_batch(
+            "CREATE TRIGGER cut_short BEFORE INSERT ON library_gb_addons
+             WHEN NEW.installed = 1 BEGIN SELECT RAISE(ABORT, 'cut short'); END",
+        )
+        .unwrap();
+    // A renamed item installs under a new name, so a cut-short update must own both names.
+    let d = download(&s, 33, "New", "a.vpk", vpk(b"v2"), 200).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap_err();
+    let row = &s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap()[0];
+    assert!(!row.is_installed());
+    assert_eq!(
+        row.files(),
+        [
+            "custom/tf2tools-gb-33-new.vpk",
+            "custom/tf2tools-gb-33-old.vpk"
+        ]
+    );
+    s.env
+        .lib
+        .remove_gb_addon(GbId::new(33), &s.tf2, &no)
+        .unwrap();
+    assert!(custom(&s).is_empty());
+}

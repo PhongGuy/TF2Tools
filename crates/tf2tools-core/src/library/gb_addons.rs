@@ -220,13 +220,6 @@ impl Library {
             .inspect_err(|_| {
                 let _ = remove_entry(&staging);
             })?;
-        if previous.is_some()
-            && let Err(e) = self.mark_not_installed(gb_id)
-        {
-            let _ = remove_entry(&staging);
-            return Err(e);
-        }
-
         let mut entry = GbAddonEntry {
             gb_id,
             section: download.section.to_owned(),
@@ -244,6 +237,19 @@ impl Library {
             gone: false,
             present: false,
         };
+
+        // The row is saved not installed before tf/custom changes, naming the old files as
+        // well as the new, so even a crash part-way leaves every file a row Remove can clear.
+        let mut pending = entry.clone();
+        for file in previous.iter().flat_map(|e| &e.files) {
+            if !pending.files.contains(file) {
+                pending.files.push(file.clone());
+            }
+        }
+        if let Err(e) = self.save_gb_addon(&pending, download.file_id) {
+            let _ = remove_entry(&staging);
+            return Err(e);
+        }
 
         // From the clear on, a failure keeps the new row with installed = 0 so the page
         // offers to install it again from the library copy.
@@ -271,7 +277,7 @@ impl Library {
                 });
             }
             // The I/O failure is the one to report; a row that also failed to save keeps
-            // the old row's installed = 0.
+            // the pending one, still not installed.
             let _ = self.save_gb_addon(&entry, download.file_id);
             return Err(e.into());
         }
