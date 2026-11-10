@@ -234,15 +234,23 @@ fn parse_file(file: &Value) -> Option<AddonFile> {
 }
 
 /// Turns a GameBanana description into plain lines. Tags go first and entities are decoded
-/// after, so an escaped `&lt;3&gt;` stays text; line-ending tags become newlines.
+/// after, so an escaped `&lt;3&gt;` stays text. `<br>` and a closing paragraph, div or list
+/// item end a line; headings, lists, quotes, tables and rules start their own line.
 pub(crate) fn html_to_text(html: &str) -> String {
     let mut stripped = String::with_capacity(html.len());
     let mut rest = html;
+    // As in a browser, a newline in the source is a space; only tags break lines.
+    let push_text = |out: &mut String, text: &str| {
+        out.extend(
+            text.chars()
+                .map(|c| if c == '\n' || c == '\r' { ' ' } else { c }),
+        );
+    };
     while let Some(open) = rest.find('<') {
-        stripped.push_str(&rest[..open]);
+        push_text(&mut stripped, &rest[..open]);
         let Some(close) = rest[open..].find('>') else {
             // An unclosed `<` is not a tag, so it stays as text.
-            stripped.push_str(&rest[open..]);
+            push_text(&mut stripped, &rest[open..]);
             rest = "";
             break;
         };
@@ -254,12 +262,36 @@ pub(crate) fn html_to_text(html: &str) -> String {
             .take_while(char::is_ascii_alphanumeric)
             .map(|c| c.to_ascii_lowercase())
             .collect();
-        if name == "br" || (closing && matches!(name.as_str(), "p" | "div" | "li")) {
+        let ends_line = closing && matches!(name.as_str(), "p" | "div" | "li");
+        let block = matches!(
+            name.as_str(),
+            "h1" | "h2"
+                | "h3"
+                | "h4"
+                | "h5"
+                | "h6"
+                | "ul"
+                | "ol"
+                | "li"
+                | "p"
+                | "div"
+                | "blockquote"
+                | "table"
+                | "tr"
+                | "hr"
+        );
+        if name == "br" || ends_line {
             stripped.push('\n');
+        } else if block {
+            // A block starts on a fresh line, but adds no blank one when already there.
+            let tail = stripped.trim_end_matches(|c: char| c != '\n' && c.is_whitespace());
+            if !tail.is_empty() && !tail.ends_with('\n') {
+                stripped.push('\n');
+            }
         }
         rest = &rest[open + close + 1..];
     }
-    stripped.push_str(rest);
+    push_text(&mut stripped, rest);
 
     let decoded = decode_entities(&stripped);
     let lines: Vec<&str> = decoded.lines().map(str::trim).collect();
@@ -523,6 +555,34 @@ mod tests {
             "Hi & bye\n\nLine\n2 <3> \"q\" it's! x"
         );
         assert_eq!(html_to_text("<p>a</p><p></p><p></p><p>b</p>"), "a\n\nb");
+    }
+
+    // GameBanana's editor writes headings, lists and rules with no break between them.
+    #[test]
+    fn block_tags_break_lines() {
+        assert_eq!(
+            html_to_text("<h1>This Mod Features...</h1><h2>Bot Tweaks</h2><ul><li>a</li></ul>"),
+            "This Mod Features...\nBot Tweaks\na"
+        );
+        assert_eq!(
+            html_to_text("(no knowledge)<h3>WANT MORE MODS!</h3><b>JOIN MY DISCORD!</b>"),
+            "(no knowledge)\nWANT MORE MODS!\nJOIN MY DISCORD!"
+        );
+        assert_eq!(html_to_text("a<hr>b<ol><li>c</li></ol>d"), "a\nb\nc\nd");
+        assert_eq!(
+            html_to_text("<blockquote>q</blockquote>after<table><tr><td>x</td></tr></table>y"),
+            "q\nafter\nx\ny"
+        );
+    }
+
+    #[test]
+    fn breaks_collapse_to_one_blank_line() {
+        assert_eq!(html_to_text("a<br><br><br><br>b<h2>c</h2>"), "a\n\nb\nc");
+        // Newlines in the HTML source are layout, not breaks.
+        assert_eq!(
+            html_to_text("<ul>\n<li>a</li>\n\n<li>b</li>\n</ul>"),
+            "a\nb"
+        );
     }
 
     #[test]
