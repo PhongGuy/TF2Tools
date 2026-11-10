@@ -40,12 +40,12 @@ pub enum GbAddonOffer {
 }
 
 impl GbAddonOffer {
-    /// Update when a newer file is known, Install again when out of TF2, Installed when in it,
-    /// and Install with no entry.
+    /// Update when a newer file is known and the item is still on GameBanana, Install again
+    /// when out of TF2, Installed when in it, and Install with no entry.
     pub fn of(entry: Option<&GbAddonEntry>) -> Self {
         match entry {
             None => Self::Install,
-            Some(e) if e.has_update() => Self::Update,
+            Some(e) if e.has_update() && !e.is_gone() => Self::Update,
             Some(e) if !e.is_installed() => Self::InstallAgain,
             Some(_) => Self::Installed,
         }

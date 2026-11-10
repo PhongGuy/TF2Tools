@@ -1,5 +1,5 @@
 use gpui_kit::{Entity, TestAppContext};
-use tf2tools_app::gb_addon_installs::{GbAddonInstalls, install_blocker};
+use tf2tools_app::gb_addon_installs::{GbAddonInstalls, GbAddonOffer, install_blocker};
 use tf2tools_app::ids;
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::{Services, Tf2State};
@@ -457,4 +457,28 @@ fn install_again_without_the_library_copy_says_install_from_the_store(cx: &mut T
         w.win,
         "Couldn't install the add-on. This add-on's files are no longer in your library. Install it again from the Addon Store.",
     );
+}
+
+#[gpui_kit::test]
+fn a_gone_addon_with_a_newer_file_on_record_offers_no_update(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(30, "Trashed", &[("a.vpk", vpk(b"v"), 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 30));
+    idle(cx);
+    // Gone keeps the newer file date an earlier check stored.
+    support::sql(&env)
+        .execute(
+            "UPDATE library_gb_addons SET latest_file_date = 999, gone = 1",
+            [],
+        )
+        .unwrap();
+    let i = installs(cx);
+    cx.update(|cx| i.update(cx, |i, cx| i.reload(cx)));
+    support::wait_real(cx, "the gone row", |cx| {
+        entry(cx, 30).is_some_and(|e| e.is_gone())
+    });
+    let offer = GbAddonOffer::of(entry(cx, 30).as_ref());
+    assert_eq!(offer, GbAddonOffer::Installed);
+    assert_eq!(offer.badge(), Some("Installed"));
 }
