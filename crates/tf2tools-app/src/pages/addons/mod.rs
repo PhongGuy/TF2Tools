@@ -307,9 +307,9 @@ impl AddonsPage {
     // The count line on the left; v5's outline "Browse Addon Store" on the right.
     fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let gb = self.gb.read(cx).entries();
-        let library = self.addons.len() + gb.len();
+        let library = self.addons.len() + gamebanana::shown(gb).count();
         let installed = self.addons.iter().filter(|a| a.is_installed()).count()
-            + gb.iter().filter(|e| e.is_installed()).count();
+            + gamebanana::shown(gb).filter(|e| e.is_installed()).count();
         h_flex()
             .flex_wrap()
             .items_center()
@@ -334,8 +334,8 @@ impl AddonsPage {
     fn sections(&self, columns: usize, cx: &mut Context<Self>) -> AnyElement {
         let rest = self.is_any_busy(cx);
         let gb = self.gb.clone();
-        let gb_section = (!gb.read(cx).entries().is_empty())
-            .then(|| gamebanana::gb_section(&gb, columns, rest, cx));
+        let any_gb = gamebanana::shown(gb.read(cx).entries()).next().is_some();
+        let gb_section = any_gb.then(|| gamebanana::gb_section(&gb, columns, rest, cx));
         let mastercomfig = (!self.addons.is_empty()).then(|| self.mastercomfig(columns, cx));
         v_flex()
             .gap_6()
@@ -476,7 +476,11 @@ impl Render for AddonsPage {
             )
         });
         let body = self.loaded.then(|| {
-            if self.addons.is_empty() && self.gb.read(cx).entries().is_empty() {
+            if self.addons.is_empty()
+                && gamebanana::shown(self.gb.read(cx).entries())
+                    .next()
+                    .is_none()
+            {
                 self.empty_library(cx)
             } else {
                 let columns = columns_for(window.viewport_size().width - SHELL_CHROME_WIDTH);

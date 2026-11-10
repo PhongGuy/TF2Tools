@@ -868,3 +868,27 @@ fn at_800_by_600_a_gamebanana_card_keeps_its_tag_and_buttons_inside(cx: &mut Tes
         assert!(b.size.width > px(0.), "{part:?} is squeezed away");
     }
 }
+
+#[gpui_kit::test]
+fn a_gamebanana_row_with_an_unknown_section_is_not_counted(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(9, "Known", &[("a.vpk", gb_vpk(), 100)]);
+    server.mount_gb_addon(10, "Stray", &[("b.vpk", gb_vpk(), 100)]);
+    let s = store_shell(cx, &env, &server);
+    install_gb(cx, &s, 9, "skins");
+    install_gb(cx, &s, 10, "skins");
+    support::sql(&env)
+        .execute(
+            "UPDATE library_gb_addons SET section = 'bogus' WHERE gb_id = 10",
+            [],
+        )
+        .unwrap();
+    let _page = open_addons(cx, &s);
+    support::wait_real(cx, "the stray row gone", |cx| {
+        !support::present(cx, s.win, ids::addons_gb_card(tf2tools_core::GbId::new(10)))
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::ADDONS_COUNT).as_deref(),
+        Some("1 in library, 1 installed")
+    );
+}
