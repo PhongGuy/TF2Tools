@@ -320,3 +320,114 @@ async fn a_failed_clear_keeps_the_library_copy_matching_the_row() {
     assert!(entry.is_installed());
     assert_eq!(custom(&s), ["tf2tools-gb-30-new.vpk"]);
 }
+
+#[tokio::test]
+async fn while_tf2_runs_an_update_that_removes_a_vpk_is_refused() {
+    let s = setup().await;
+    let d = download(&s, 13, "Crit", "crit.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["crit.vpk"]), &s.tf2, &no)
+        .unwrap();
+    let body = common::zip_bytes(&[("crit/materials/a.vmt", b"a")]);
+    let d = download(&s, 13, "Crit", "crit.zip", body, 200).await;
+    let err = s
+        .env
+        .lib
+        .install_gb_addon(d, &chosen(&["crit"]), &s.tf2, &yes)
+        .unwrap_err();
+    assert!(matches!(err, GbAddonInstallError::Tf2Running), "{err:?}");
+    assert_eq!(custom(&s), ["tf2tools-gb-13-crit.vpk"]);
+}
+
+#[tokio::test]
+async fn an_update_replaces_the_old_files_and_keeps_one_row() {
+    let s = setup().await;
+    let v1 = common::zip_bytes(&[("pack/materials/a.vmt", b"a")]);
+    let d = download(&s, 15, "Pack", "pack.zip", v1, 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["pack"]), &s.tf2, &no)
+        .unwrap();
+    let d = download(&s, 15, "Pack", "pack.vpk", vpk(b"v2"), 200).await;
+    let entry = s
+        .env
+        .lib
+        .install_gb_addon(d, &chosen(&["pack.vpk"]), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(custom(&s), ["tf2tools-gb-15-pack.vpk"]);
+    assert_eq!(
+        common::tree(&s.env.dir.gb_addon_dir()),
+        ["15/1/tf2tools-gb-15-pack.vpk"]
+    );
+    assert_eq!(entry.file_date(), 200);
+    assert_eq!(s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn a_failed_copy_into_the_game_leaves_a_row_to_install_again() {
+    let s = setup().await;
+    // A file where tf/custom should be makes every copy into the game fail.
+    std::fs::remove_dir_all(s.tf2.custom_dir()).unwrap();
+    std::fs::write(s.tf2.custom_dir(), b"not a folder").unwrap();
+    let d = download(&s, 17, "A", "a.vpk", vpk(b"v"), 100).await;
+    let err = s
+        .env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap_err();
+    assert!(matches!(err, GbAddonInstallError::Io { .. }), "{err:?}");
+    let list = s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap();
+    assert_eq!(list.len(), 1);
+    assert!(!list[0].is_installed());
+    assert_eq!(
+        common::tree(&s.env.dir.gb_addon_dir()),
+        ["17/1/tf2tools-gb-17-a.vpk"]
+    );
+}
+
+#[tokio::test]
+async fn a_stale_staging_dir_is_cleared_first() {
+    let s = setup().await;
+    common::write_file(
+        &s.env.dir.gb_addon_dir().join(".staging-18/9/junk.txt"),
+        b"junk",
+    );
+    let d = download(&s, 18, "A", "a.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(
+        common::tree(&s.env.dir.gb_addon_dir()),
+        ["18/1/tf2tools-gb-18-a.vpk"]
+    );
+}
+
+#[tokio::test]
+async fn a_failed_staging_copy_changes_nothing() {
+    let s = setup().await;
+    let d = download(&s, 19, "A", "a.vpk", vpk(b"v1"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap();
+    let d = download(&s, 19, "A", "a.vpk", vpk(b"v2"), 200).await;
+    // A file where the staging folder goes cannot be cleared as a folder, so staging fails.
+    let root = s.env.dir.gb_addon_dir();
+    let blocker = common::write_file(&root.join(".staging-19"), b"in the way");
+    let result = s
+        .env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no);
+    assert!(
+        matches!(result, Err(GbAddonInstallError::Io { .. })),
+        "{result:?}"
+    );
+    let list = s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap();
+    assert!(list[0].is_installed());
+    assert_eq!(list[0].file_date(), 100);
+    assert_eq!(custom(&s), ["tf2tools-gb-19-a.vpk"]);
+    std::fs::remove_file(blocker).unwrap();
+    assert_eq!(common::tree(&root), ["19/1/tf2tools-gb-19-a.vpk"]);
+}
