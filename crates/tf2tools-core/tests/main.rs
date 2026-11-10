@@ -192,6 +192,7 @@ mod license;
 mod logstf_cache;
 mod logstf_detail;
 mod logstf_ids;
+mod logstf_ingest;
 mod logstf_resolve;
 mod logstf_sync;
 mod maps;

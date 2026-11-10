@@ -158,3 +158,34 @@ pub async fn paths(server: &wiremock::MockServer) -> Vec<String> {
         .map(|r| r.url.path().to_owned())
         .collect()
 }
+
+pub async fn mount_log(server: &wiremock::MockServer, id: u64, status: u16, body: String) {
+    Mock::given(method("GET"))
+        .and(path(format!("/json/{id}")))
+        .respond_with(ResponseTemplate::new(status).set_body_string(body))
+        // Wins over `mount_any_log`'s regex whatever the mount order.
+        .with_priority(1)
+        .mount(server)
+        .await;
+}
+
+/// (state, body is stored) of log `id`.
+pub fn log_state(dir: &tf2tools_core::DataDir, id: i64) -> (i64, bool) {
+    super::sql(dir)
+        .query_row(
+            "SELECT state, body IS NOT NULL FROM logstf_logs WHERE id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap()
+}
+
+pub fn class_rows(dir: &tf2tools_core::DataDir, log_id: i64) -> i64 {
+    super::sql(dir)
+        .query_row(
+            "SELECT COUNT(*) FROM logstf_class_rows WHERE log_id = ?1",
+            [log_id],
+            |r| r.get(0),
+        )
+        .unwrap()
+}
