@@ -200,7 +200,13 @@ impl AddonDetail {
             downloaded,
             total,
         });
-        let label = SharedString::from(progress_label(progress));
+        // Until the first byte the download may still be queued behind other GameBanana
+        // requests, so a byte count of 0 would read as a stalled download.
+        let label = if downloaded == 0 {
+            SharedString::from("Waiting for GameBanana...")
+        } else {
+            SharedString::from(progress_label(progress))
+        };
         Some(
             v_flex()
                 .id(ids::ADDON_DETAIL_PROGRESS)

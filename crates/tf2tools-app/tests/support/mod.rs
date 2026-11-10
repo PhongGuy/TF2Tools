@@ -1343,13 +1343,33 @@ impl StoreServer {
     /// Mod `gb_id` named `name`: its ProfilePage lists `files` (file name, body, date added),
     /// each served at `/dl/addon/<gb_id>/<i>`, scanned "clean", sized and checksum-free.
     pub fn mount_gb_addon(&self, gb_id: u64, name: &str, files: &[(&str, Vec<u8>, i64)]) {
+        self.mount_gb_addon_after(gb_id, name, files, Duration::ZERO);
+    }
+
+    /// `mount_gb_addon` with each file answered only after `delay`.
+    pub fn mount_gb_addon_after(
+        &self,
+        gb_id: u64,
+        name: &str,
+        files: &[(&str, Vec<u8>, i64)],
+        delay: Duration,
+    ) {
         let uri = self.uri();
         let listed: Vec<serde_json::Value> = files
             .iter()
             .enumerate()
             .map(|(i, (file, body, date))| {
                 let route = format!("/dl/addon/{gb_id}/{i}");
-                self.mount_bytes(&route, body.clone());
+                self.rt.block_on(
+                    Mock::given(method("GET"))
+                        .and(path(route.as_str()))
+                        .respond_with(
+                            ResponseTemplate::new(200)
+                                .set_body_bytes(body.clone())
+                                .set_delay(delay),
+                        )
+                        .mount(&self.server),
+                );
                 serde_json::json!({
                     "_idRow": 100 + i, "_sFile": file, "_nFilesize": body.len(),
                     "_tsDateAdded": date, "_sMd5Checksum": "", "_sAvResult": "clean",

@@ -884,6 +884,37 @@ fn install_from_the_detail_then_the_card_says_installed(cx: &mut TestAppContext)
 }
 
 #[gpui_kit::test]
+fn the_detail_says_it_waits_for_gamebanana_until_the_first_byte(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_index(
+        587,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(8, 587, None)], true),
+    );
+    let slow = std::time::Duration::from_millis(1500);
+    server.mount_gb_addon_after(8, "Addon 8", &[("a.vpk", addon_vpk(), 100)], slow);
+    let w = window(cx, &env, &server);
+    pin_tf2_idle(cx);
+    let tab = open_tab(cx, &w, "textures");
+    settled(cx, &tab, "the first step");
+    support::click_id(cx, w.win, ids::addon_gb_card("textures", GbId::new(8)));
+    detail_ready(cx, &w, "Install");
+    support::click_id(cx, w.win, ids::ADDON_DETAIL_INSTALL);
+    support::wait_real(cx, "the progress", |cx| {
+        support::present(cx, w.win, ids::ADDON_DETAIL_PROGRESS)
+    });
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_PROGRESS).as_deref(),
+        Some("Waiting for GameBanana..."),
+        "no byte has arrived yet"
+    );
+    support::wait_real(cx, "installed", |cx| {
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_INSTALL).as_deref() == Some("Installed")
+    });
+}
+
+#[gpui_kit::test]
 fn a_file_that_failed_the_scan_shows_why_instead_of_install(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
     server.mount_gb_index(
