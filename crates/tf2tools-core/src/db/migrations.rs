@@ -488,4 +488,5 @@ const STEP_15_SQL: &str = "
         PRIMARY KEY (log_id, steam_id, class)
     );
     CREATE INDEX IF NOT EXISTS logstf_class_rows_player ON logstf_class_rows(steam_id);
+    CREATE INDEX IF NOT EXISTS logstf_player_logs_log ON logstf_player_logs(log_id);
 ";

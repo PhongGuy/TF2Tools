@@ -190,6 +190,7 @@ const M15_TABLES: &str = "
         PRIMARY KEY (log_id, steam_id, class)
     );
     CREATE INDEX logstf_class_rows_player ON logstf_class_rows(steam_id);
+    CREATE INDEX logstf_player_logs_log ON logstf_player_logs(log_id);
 ";
 
 /// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables,
