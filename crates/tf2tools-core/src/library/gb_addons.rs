@@ -257,16 +257,7 @@ impl Library {
             }
             remove_dir_if_present(&library_copy)?;
             std::fs::rename(&staging, &library_copy).map_err(io_at(&library_copy))?;
-            create_dir_all(&custom)?;
-            for (n, names) in &staged {
-                for name in names {
-                    let target = custom.join(name);
-                    remove_entry(&target)?;
-                    copied.push(target.clone());
-                    copy_entry(&library_copy.join(n.to_string()).join(name), &target)?;
-                }
-            }
-            Ok::<_, IoFailure>(())
+            copy_into_game(&library_copy, &custom, &staged, &mut copied)
         })();
         if let Err(e) = swapped {
             for path in &copied {
@@ -287,6 +278,102 @@ impl Library {
         entry.installed = true;
         entry.present = true;
         self.save_gb_addon(&entry, download.file_id)?;
+        Ok(entry)
+    }
+
+    /// Deletes add-on `gb_id`'s recorded files from the game, its library copy and its row.
+    /// Refuses `Tf2Running` first when a recorded file is a VPK and `tf2_running()` says so.
+    ///
+    /// # Errors
+    /// [`GbAddonInstallError::NotInLibrary`] without a row, `Tf2Running`, or an I/O or
+    /// database failure.
+    pub fn remove_gb_addon(
+        &self,
+        gb_id: GbId,
+        tf2: &Tf2Install,
+        tf2_running: &dyn Fn() -> bool,
+    ) -> Result<(), GbAddonInstallError> {
+        let _writes = self.lock_writes();
+        let entry = self
+            .gb_addon_row(gb_id)?
+            .ok_or(GbAddonInstallError::NotInLibrary { gb_id })?;
+        if entry.files.iter().any(|f| is_vpk(f)) && tf2_running() {
+            return Err(GbAddonInstallError::Tf2Running);
+        }
+        // Only this add-on's own plain names under tf/custom are deleted; a tampered path is
+        // skipped since the row goes anyway.
+        let tf = tf2.tf_dir();
+        for file in &entry.files {
+            if let Some(path) = recorded_path(&tf, gb_id, file) {
+                remove_entry(&path)?;
+            }
+        }
+        remove_dir_if_present(&self.dir.gb_addon_dir().join(gb_id.to_string()))?;
+        let id = gb_id_column(gb_id)?;
+        self.db
+            .write(|conn| conn.execute("DELETE FROM library_gb_addons WHERE gb_id = ?1", [id]))
+            .map(drop)
+            .map_err(gb_db)
+    }
+
+    /// Copies add-on `gb_id`'s library copy back into `tf/custom` and marks it installed.
+    /// `NotInLibrary` without a row or a copy holding every recorded file.
+    ///
+    /// # Errors
+    /// [`GbAddonInstallError::NotInLibrary`], `Tf2Running` when a recorded file is a VPK and
+    /// `tf2_running()` says so, or an I/O or database failure.
+    pub fn reinstall_gb_addon(
+        &self,
+        gb_id: GbId,
+        tf2: &Tf2Install,
+        tf2_running: &dyn Fn() -> bool,
+    ) -> Result<GbAddonEntry, GbAddonInstallError> {
+        let _writes = self.lock_writes();
+        let not_in_library = || GbAddonInstallError::NotInLibrary { gb_id };
+        let mut entry = self.gb_addon_row(gb_id)?.ok_or_else(not_in_library)?;
+        let library_copy = self.dir.gb_addon_dir().join(gb_id.to_string());
+        let custom = game_custom_dir(tf2)?;
+        // Every recorded file must sit in one of the copy's slots; a copy missing any of
+        // them is refused whole rather than installed in part.
+        let slots = copy_slots(&library_copy);
+        let mut wanted = Vec::new();
+        for file in &entry.files {
+            let name = recorded_path(&tf2.tf_dir(), gb_id, file)
+                .and(file.strip_prefix("custom/"))
+                .ok_or_else(not_in_library)?;
+            let n = slots
+                .iter()
+                .find(|(_, names)| names.iter().any(|x| x == name))
+                .map(|(n, _)| *n)
+                .ok_or_else(not_in_library)?;
+            wanted.push((n, vec![name.to_owned()]));
+        }
+        if wanted.is_empty() {
+            return Err(not_in_library());
+        }
+        if entry.files.iter().any(|f| is_vpk(f)) && tf2_running() {
+            return Err(GbAddonInstallError::Tf2Running);
+        }
+
+        let mut copied = Vec::new();
+        if let Err(e) = copy_into_game(&library_copy, &custom, &wanted, &mut copied) {
+            for path in &copied {
+                let _ = remove_entry(path);
+            }
+            let _ = self.mark_not_installed(gb_id);
+            return Err(e.into());
+        }
+        let id = gb_id_column(gb_id)?;
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "UPDATE library_gb_addons SET installed = 1 WHERE gb_id = ?1",
+                    [id],
+                )
+            })
+            .map_err(gb_db)?;
+        entry.installed = true;
+        entry.present = true;
         Ok(entry)
     }
 
@@ -440,6 +527,44 @@ fn copy_without_vpks(src: &Path, dst: &Path) -> Result<(), IoFailure> {
         }
     }
     Ok(())
+}
+
+/// Copies each slot's named entries from the library copy into `custom`, replacing what is
+/// there, and records every target it touched in `copied` so a failure can undo them.
+fn copy_into_game(
+    library_copy: &Path,
+    custom: &Path,
+    slots: &[(usize, Vec<String>)],
+    copied: &mut Vec<PathBuf>,
+) -> Result<(), IoFailure> {
+    create_dir_all(custom)?;
+    for (n, names) in slots {
+        for name in names {
+            let target = custom.join(name);
+            remove_entry(&target)?;
+            copied.push(target.clone());
+            copy_entry(&library_copy.join(n.to_string()).join(name), &target)?;
+        }
+    }
+    Ok(())
+}
+
+/// The numbered slots of a library copy with the names each holds; empty when the copy is
+/// missing or unreadable.
+fn copy_slots(library_copy: &Path) -> Vec<(usize, Vec<String>)> {
+    let names = |dir: &Path| -> Vec<String> {
+        std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect()
+    };
+    names(library_copy)
+        .into_iter()
+        .filter_map(|slot| slot.parse::<usize>().ok().filter(|n| n.to_string() == slot))
+        .map(|n| (n, names(&library_copy.join(n.to_string()))))
+        .collect()
 }
 
 /// Copies a library-copy file or folder into the game.

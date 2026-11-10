@@ -5,7 +5,7 @@ use crate::common::{
 };
 
 use tempfile::TempDir;
-use tf2tools_core::{GbAddonDownload, GbAddonInstallError, Tf2Install};
+use tf2tools_core::{GbAddonDownload, GbAddonInstallError, GbId, Tf2Install};
 
 pub struct Setup {
     pub env: StoreEnv,
@@ -430,4 +430,171 @@ async fn a_failed_staging_copy_changes_nothing() {
     assert_eq!(custom(&s), ["tf2tools-gb-19-a.vpk"]);
     std::fs::remove_file(blocker).unwrap();
     assert_eq!(common::tree(&root), ["19/1/tf2tools-gb-19-a.vpk"]);
+}
+
+#[tokio::test]
+async fn remove_deletes_exactly_its_files_and_forgets_it() {
+    let s = setup().await;
+    let body = common::zip_bytes(&[
+        ("Toon/toon.vpk", &vpk(&[1u8; 64])),
+        ("pack/materials/b.vmt", b"a"),
+    ]);
+    let d = download(&s, 20, "Toon", "toon.zip", body, 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["Toon/toon.vpk", "pack"]), &s.tf2, &no)
+        .unwrap();
+    common::write_file(&s.tf2.custom_dir().join("foreign.vpk"), b"f");
+    common::write_file(&s.tf2.custom_dir().join("foreign/x.txt"), b"f");
+    s.env
+        .lib
+        .remove_gb_addon(GbId::new(20), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(custom(&s), ["foreign.vpk", "foreign/x.txt"]);
+    assert!(s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap().is_empty());
+    assert!(!s.env.dir.gb_addon_dir().join("20").exists());
+}
+
+#[tokio::test]
+async fn remove_refuses_while_tf2_runs_when_a_vpk_is_installed() {
+    let s = setup().await;
+    let d = download(&s, 21, "Crit", "crit.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["crit.vpk"]), &s.tf2, &no)
+        .unwrap();
+    let err = s
+        .env
+        .lib
+        .remove_gb_addon(GbId::new(21), &s.tf2, &yes)
+        .unwrap_err();
+    assert!(matches!(err, GbAddonInstallError::Tf2Running), "{err:?}");
+    assert_eq!(custom(&s), ["tf2tools-gb-21-crit.vpk"]);
+}
+
+#[tokio::test]
+async fn removing_an_unknown_addon_is_not_in_library() {
+    let s = setup().await;
+    let err = s
+        .env
+        .lib
+        .remove_gb_addon(GbId::new(99), &s.tf2, &no)
+        .unwrap_err();
+    assert!(
+        matches!(err, GbAddonInstallError::NotInLibrary { gb_id } if gb_id == GbId::new(99)),
+        "{err:?}"
+    );
+}
+
+#[tokio::test]
+async fn remove_skips_recorded_paths_that_leave_custom() {
+    let s = setup().await;
+    let d = download(&s, 22, "A", "a.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap();
+    let outside = s.tf2.tf_dir().join("outside.txt");
+    common::write_file(&outside, b"keep");
+    common::sql(&s.env.dir)
+        .execute(
+            "UPDATE library_gb_addons SET files = ?1 WHERE gb_id = 22",
+            [r#"["custom/../outside.txt","custom/tf2tools-gb-22-a.vpk","cfg/autoexec.cfg"]"#],
+        )
+        .unwrap();
+    s.env
+        .lib
+        .remove_gb_addon(GbId::new(22), &s.tf2, &no)
+        .unwrap();
+    assert!(outside.exists());
+    assert!(custom(&s).is_empty());
+}
+
+#[tokio::test]
+async fn a_hand_deleted_addon_lists_as_not_installed_and_installs_again() {
+    let s = setup().await;
+    let body = common::zip_bytes(&[("pack/materials/a.vmt", b"a")]);
+    let d = download(&s, 23, "Pack", "pack.zip", body, 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["pack"]), &s.tf2, &no)
+        .unwrap();
+    std::fs::remove_dir_all(s.tf2.custom_dir().join("tf2tools-gb-23-pack")).unwrap();
+    assert!(!s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap()[0].is_installed());
+    let entry = s
+        .env
+        .lib
+        .reinstall_gb_addon(GbId::new(23), &s.tf2, &yes)
+        .unwrap();
+    assert!(entry.is_installed());
+    assert_eq!(custom(&s), ["tf2tools-gb-23-pack/materials/a.vmt"]);
+}
+
+#[tokio::test]
+async fn install_again_refuses_while_tf2_runs_for_a_vpk() {
+    let s = setup().await;
+    let d = download(&s, 25, "Crit", "crit.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["crit.vpk"]), &s.tf2, &no)
+        .unwrap();
+    std::fs::remove_file(s.tf2.custom_dir().join("tf2tools-gb-25-crit.vpk")).unwrap();
+    let err = s
+        .env
+        .lib
+        .reinstall_gb_addon(GbId::new(25), &s.tf2, &yes)
+        .unwrap_err();
+    assert!(matches!(err, GbAddonInstallError::Tf2Running), "{err:?}");
+    assert!(custom(&s).is_empty());
+}
+
+#[tokio::test]
+async fn install_again_without_a_library_copy_is_not_in_library() {
+    let s = setup().await;
+    let d = download(&s, 24, "A", "a.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap();
+    std::fs::remove_dir_all(s.env.dir.gb_addon_dir().join("24")).unwrap();
+    let err = s
+        .env
+        .lib
+        .reinstall_gb_addon(GbId::new(24), &s.tf2, &no)
+        .unwrap_err();
+    assert!(
+        matches!(err, GbAddonInstallError::NotInLibrary { .. }),
+        "{err:?}"
+    );
+}
+
+#[tokio::test]
+async fn install_again_from_a_partial_library_copy_is_not_in_library() {
+    let s = setup().await;
+    let body = common::zip_bytes(&[
+        ("Toon/toon.vpk", &vpk(&[1u8; 64])),
+        ("pack/materials/b.vmt", b"a"),
+    ]);
+    let d = download(&s, 26, "Toon", "toon.zip", body, 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["Toon/toon.vpk", "pack"]), &s.tf2, &no)
+        .unwrap();
+    for name in custom(&s) {
+        let top = name.split('/').next().unwrap().to_owned();
+        let _ = std::fs::remove_dir_all(s.tf2.custom_dir().join(&top));
+        let _ = std::fs::remove_file(s.tf2.custom_dir().join(&top));
+    }
+    // A copy that lost one slot, as a half-replaced copy would, must not install partly.
+    std::fs::remove_dir_all(s.env.dir.gb_addon_dir().join("26/2")).unwrap();
+    let err = s
+        .env
+        .lib
+        .reinstall_gb_addon(GbId::new(26), &s.tf2, &no)
+        .unwrap_err();
+    assert!(
+        matches!(err, GbAddonInstallError::NotInLibrary { .. }),
+        "{err:?}"
+    );
+    assert!(custom(&s).is_empty());
 }
