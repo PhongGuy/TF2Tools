@@ -268,20 +268,24 @@ impl AddonStorePage {
             .on_click(cx.listener(move |page, _, window, cx| page.select(tab, window, cx)))
     }
 
+    // mastercomfig and the GameBanana sections are two joined groups in a wrapping row, so at
+    // the app's narrowest page the sections drop to their own line rather than run past it.
     fn tab_strip(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let tabs = std::iter::once(AddonStoreTab::Mastercomfig)
-            .chain(AddonSection::ALL.into_iter().map(AddonStoreTab::GameBanana));
-        // Six tabs outgrow a narrow page, so the strip scrolls sideways within the page's width.
-        div()
+        let sections = AddonSection::ALL.into_iter().map(AddonStoreTab::GameBanana);
+        h_flex()
             .id(ids::ADDON_STORE_TABS)
             .test_support()
-            .w_full()
-            .flex_none()
-            .overflow_x_scroll()
+            .flex_wrap()
+            .gap_2()
             .child(
                 ButtonGroup::new(ids::ADDON_STORE_TAB_GROUP)
                     .outline()
-                    .children(tabs.map(|tab| self.tab_button(tab, cx))),
+                    .child(self.tab_button(AddonStoreTab::Mastercomfig, cx)),
+            )
+            .child(
+                ButtonGroup::new(ids::ADDON_STORE_SECTION_TABS)
+                    .outline()
+                    .children(sections.map(|tab| self.tab_button(tab, cx))),
             )
     }
 

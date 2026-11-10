@@ -735,11 +735,13 @@ pub const ADDON_STORE_INFO: &str = "addon-store-info";
 pub const ADDON_STORE_INFO_TEXT: &str = "addon-store-info-text";
 /// The Addon Store's "TF2 not found" warning, present only without a TF2 install.
 pub const ADDON_STORE_NO_TF2: &str = "addon-store-no-tf2";
-/// The Addon Store's tab strip: mastercomfig, then one tab per GameBanana section. It
-/// scrolls sideways when the page is narrower than its tabs.
+/// The Addon Store's tab strip: mastercomfig, then one tab per GameBanana section. The
+/// sections wrap to a second line when the page is narrower than the strip.
 pub const ADDON_STORE_TABS: &str = "addon-store-tabs";
-/// The joined button group of tabs inside `ADDON_STORE_TABS`.
+/// The mastercomfig tab's group inside `ADDON_STORE_TABS`.
 pub const ADDON_STORE_TAB_GROUP: &str = "addon-store-tab-group";
+/// The GameBanana sections' joined group of tabs inside `ADDON_STORE_TABS`.
+pub const ADDON_STORE_SECTION_TABS: &str = "addon-store-section-tabs";
 /// Wraps a GameBanana add-on tab's search input.
 pub const ADDON_SEARCH: &str = "addon-search";
 /// Wraps a GameBanana add-on tab's sort select.

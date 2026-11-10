@@ -760,27 +760,23 @@ fn the_search_placeholder_names_the_tab_as_its_title_does() {
     assert_eq!(placeholder("gamefiles"), "Search Game files...");
 }
 
-// At the shell's content width in an 800 px window, the strip of six tabs is wider than the
-// page, so it scrolls inside the page's padding instead of running past the grid.
+// At the shell's content width in an 800 px window (the app's minimum), every tab shows whole
+// inside the page's padding instead of running past the grid.
 #[gpui_kit::test]
-fn the_tab_strip_stays_inside_a_narrow_page(cx: &mut TestAppContext) {
+fn every_tab_fits_a_narrow_page(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
     let w = window(cx, &env, &server);
-    let width = 544.;
-    cx.simulate_window_resize(
-        w.win,
-        gpui_kit::size(gpui_kit::px(width), gpui_kit::px(600.)),
-    );
-    let strip = support::bounds_of(cx, w.win, ids::ADDON_STORE_TABS).unwrap();
+    let width = gpui_kit::px(544.);
+    cx.simulate_window_resize(w.win, gpui_kit::size(width, gpui_kit::px(600.)));
     let padding = tf2tools_app::shell::CONTENT_PADDING;
-    assert!(
-        strip.right() <= gpui_kit::px(width) - padding,
-        "the strip ends at {:?}",
-        strip.right()
-    );
-    let last = support::bounds_of(cx, w.win, ids::addon_store_tab("gamefiles")).unwrap();
-    assert!(
-        last.right() > strip.right(),
-        "the strip should overflow and scroll here"
-    );
+    let keys = std::iter::once("mastercomfig").chain(AddonSection::ALL.iter().map(|s| s.key()));
+    for key in keys {
+        let tab = support::bounds_of(cx, w.win, ids::addon_store_tab(key)).unwrap();
+        assert!(
+            tab.left() >= padding && tab.right() <= width - padding,
+            "tab {key} spans {:?}..{:?}",
+            tab.left(),
+            tab.right()
+        );
+    }
 }
