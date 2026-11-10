@@ -352,3 +352,15 @@ fn a_gui_folder_with_resource_keeps_its_customizations_whole() {
     ]);
     assert_eq!(names(t.path()), [("gui".to_owned(), PayloadKind::Folder)]);
 }
+
+#[test]
+fn roots_past_the_stop_are_never_dropped_silently() {
+    let t = tree_of(&[("r1/materials/a.vmt", b"a"), ("r2/materials/b.vmt", b"b")]);
+    for i in 0..MAX_PAYLOADS {
+        std::fs::create_dir_all(t.path().join(format!("e{i:02}/materials"))).unwrap();
+    }
+    assert!(
+        find_payloads(t.path()).unwrap().len() > MAX_PAYLOADS,
+        "a walk that stopped early must be refused as too many"
+    );
+}

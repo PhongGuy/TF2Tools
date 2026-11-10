@@ -115,7 +115,27 @@ pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
         return Ok(vpks);
     }
     let mut folder_roots = Vec::new();
-    find_folders(tree, &mut folder_roots)?;
+    let mut stopped = false;
+    find_folders(tree, &mut folder_roots, &mut stopped)?;
+    // Roots past the stop were never seen, so dropping empty or duplicate ones could make
+    // a partial list look complete; every root found is listed and the tree is refused.
+    if stopped {
+        let mut payloads = vpks;
+        payloads.extend(folder_roots.into_iter().map(|FolderRoot { dir, nested }| {
+            let name = tree_name(tree, &dir);
+            Payload {
+                label: name.clone(),
+                name,
+                kind: PayloadKind::Folder,
+                path: dir,
+                chunks: Vec::new(),
+                nested,
+                size: 0,
+            }
+        }));
+        sort_payloads(&mut payloads);
+        return Ok(payloads);
+    }
 
     // A folder is kept only when it brings files that no single VPK already carries,
     // so an add-on shipped both packed and loose installs once, as the VPK.
@@ -216,14 +236,20 @@ struct FolderRoot {
     nested: Vec<PathBuf>,
 }
 
-/// Collects content folders, stopping one past `MAX_PAYLOADS`. A directory with an
+/// Collects content folders, stopping one past `MAX_PAYLOADS` and setting `stopped` when a
+/// directory was left unsearched. A directory with an
 /// `info.vdf` or a `resource` folder is one, kept whole, since a HUD or other GUI mod keeps
 /// optional layouts in subfolders for `#base`. A directory with a content subfolder is one too, and its
 /// other subfolders are searched for content roots that become payloads of their own,
 /// since TF2 loads only content at the top of a custom folder. Any other directory is
 /// searched below.
-fn find_folders(dir: &Path, out: &mut Vec<FolderRoot>) -> Result<(), ArchiveError> {
+fn find_folders(
+    dir: &Path,
+    out: &mut Vec<FolderRoot>,
+    stopped: &mut bool,
+) -> Result<(), ArchiveError> {
     if out.len() > MAX_PAYLOADS {
+        *stopped = true;
         return Ok(());
     }
     let io = |source| ArchiveError::Io {
@@ -263,13 +289,13 @@ fn find_folders(dir: &Path, out: &mut Vec<FolderRoot>) -> Result<(), ArchiveErro
         });
         for sub in others {
             let before = out.len();
-            find_folders(&sub, out)?;
+            find_folders(&sub, out, stopped)?;
             let found: Vec<PathBuf> = out[before..].iter().map(|r| r.dir.clone()).collect();
             out[at].nested.extend(found);
         }
     } else {
         for sub in others {
-            find_folders(&sub, out)?;
+            find_folders(&sub, out, stopped)?;
         }
     }
     Ok(())
