@@ -467,11 +467,15 @@ impl Render for StoreDetail {
                         v_flex()
                             .min_w_0()
                             .child(
+                                // The name may shrink and wrap, so a long one stays clear
+                                // of the header button and the close X.
                                 h_flex()
+                                    .min_w_0()
                                     .items_center()
                                     .gap_2()
                                     .child(labelled(
                                         div()
+                                            .min_w_0()
                                             .text_xl()
                                             .line_height(px(28.))
                                             .font_weight(FontWeight::SEMIBOLD),

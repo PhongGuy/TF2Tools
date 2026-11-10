@@ -780,3 +780,44 @@ fn every_tab_fits_a_narrow_page(cx: &mut TestAppContext) {
         );
     }
 }
+
+// A long add-on name wraps beside "Open on GameBanana" instead of running under it.
+#[gpui_kit::test]
+fn a_long_addon_name_wraps_clear_of_the_header_button(cx: &mut TestAppContext) {
+    let name = "Paysus' Engineer First Person Animation Overhaul Deluxe Edition";
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_index(
+        587,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(8, 587, None)], true),
+    );
+    server.mount_gb_profile(
+        8,
+        serde_json::json!({
+            "_idRow": 8, "_sName": name, "_sText": "", "_nDownloadCount": 1,
+            "_aSubmitter": {"_sName": "vex"}, "_sProfileUrl": "https://gamebanana.com/mods/8"
+        }),
+    );
+    let w = window(cx, &env, &server);
+    cx.simulate_window_resize(
+        w.win,
+        gpui_kit::size(gpui_kit::px(544.), gpui_kit::px(600.)),
+    );
+    let tab = open_tab(cx, &w, "textures");
+    settled(cx, &tab, "the first step");
+    support::click_id(cx, w.win, ids::addon_gb_card("textures", GbId::new(8)));
+    support::wait_real(cx, "the profile", |cx| {
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_NAME).as_deref() == Some(name)
+    });
+    let title = support::bounds_of(cx, w.win, ids::ADDON_DETAIL_NAME).unwrap();
+    let link = support::bounds_of(cx, w.win, ids::store_detail_link("gamebanana")).unwrap();
+    assert!(
+        title.right() <= link.left(),
+        "title {title:?} runs under {link:?}"
+    );
+    assert!(
+        title.size.height > link.size.height,
+        "the title should wrap: {title:?}"
+    );
+}

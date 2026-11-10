@@ -591,6 +591,43 @@ fn the_gamebanana_button_sits_beside_the_name(cx: &mut TestAppContext) {
     assert_link_beside_name(cx, win, &d, "gamebanana");
 }
 
+const LONG_NAME: &str = "Paysus' Engineer First Person Animation Overhaul Deluxe Edition";
+
+// A long name wraps beside the header button instead of running under it.
+#[gpui_kit::test]
+fn a_long_name_wraps_clear_of_the_gamebanana_button(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (win, _) = support::store_window(
+        cx,
+        &env,
+        &server,
+        |env| {
+            support::seed_gb_huds(env, &[(7, "FlawHUD")]);
+            rusqlite::Connection::open(env.data.db_path())
+                .unwrap()
+                .execute(
+                    "UPDATE store_huds_gb SET profile_url = 'https://gamebanana.com/mods/7' WHERE gb_id = 7",
+                    (),
+                )
+                .unwrap();
+        },
+        |_, _| support::Blank,
+    );
+    cx.simulate_window_resize(win, gpui_kit::size(gpui_kit::px(544.), gpui_kit::px(600.)));
+    detail(cx, win, item(GB, gb(7), LONG_NAME, false), false);
+    let name = support::bounds_of(cx, win, ids::STORE_DETAIL_NAME).unwrap();
+    let link = support::bounds_of(cx, win, ids::store_detail_link("gamebanana")).unwrap();
+    assert!(
+        name.right() <= link.left(),
+        "name {name:?} runs under {link:?}"
+    );
+    assert!(
+        name.size.height > link.size.height,
+        "the name should wrap: {name:?}"
+    );
+}
+
 // A GameBanana row without a profile page has nothing to open, so its header draws no button.
 #[gpui_kit::test]
 fn a_gamebanana_item_without_a_profile_url_has_no_header_button(cx: &mut TestAppContext) {
