@@ -24,7 +24,7 @@ pub fn vpk(tag: &[u8]) -> Vec<u8> {
 }
 
 // The installed `Services` global points at the mock server; `w.services` predates that.
-fn profile(cx: &mut TestAppContext, id: u64) -> AddonProfile {
+pub fn profile(cx: &mut TestAppContext, id: u64) -> AddonProfile {
     let (rt, store) = cx.update(|cx| {
         (
             tokio_bridge::handle(cx),
@@ -147,4 +147,82 @@ fn blockers_are_read_from_the_newest_file(cx: &mut TestAppContext) {
         install_blocker(&profile(cx, 18)).as_deref(),
         Some("This add-on has no files to install. Pick another add-on.")
     );
+}
+
+#[gpui_kit::test]
+fn several_payloads_ask_and_install_the_chosen_ones(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let body = support::zip_of(&[("A.vpk", &vpk(&[1u8; 64])), ("B.vpk", &vpk(b"b"))]);
+    server.mount_gb_addon(9, "Pack", &[("pack.zip", body, 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 9));
+    support::wait_real(cx, "the checklist", |cx| {
+        support::present(cx, w.win, ids::PAYLOAD_CHECKLIST)
+    });
+    support::click_id(cx, w.win, ids::payload_check(1));
+    support::click_id(cx, w.win, ids::PAYLOAD_INSTALL);
+    toast_is(cx, w.win, "Add-on installed. Pack");
+    let custom = env.game.join("tf/custom");
+    assert!(custom.join("tf2tools-gb-9-pack.vpk").is_file());
+    assert!(custom.join("tf2tools-gb-9-pack-2.vpk").is_file());
+}
+
+#[gpui_kit::test]
+fn a_cancelled_checklist_installs_nothing_and_says_nothing(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let body = support::zip_of(&[("A.vpk", &vpk(&[1u8; 64])), ("B.vpk", &vpk(b"b"))]);
+    server.mount_gb_addon(10, "Pack", &[("pack.zip", body, 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 10));
+    support::wait_real(cx, "the checklist", |cx| {
+        support::present(cx, w.win, ids::PAYLOAD_CHECKLIST)
+    });
+    support::click_id(cx, w.win, ids::PAYLOAD_CANCEL);
+    idle(cx);
+    assert!(
+        std::fs::read_dir(env.game.join("tf/custom"))
+            .unwrap()
+            .next()
+            .is_none()
+    );
+    assert!(!support::present(cx, w.win, ids::TOAST));
+}
+
+#[gpui_kit::test]
+fn escape_on_the_checklist_installs_nothing(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let body = support::zip_of(&[("A.vpk", &vpk(&[1u8; 64])), ("B.vpk", &vpk(b"b"))]);
+    server.mount_gb_addon(19, "Pack", &[("pack.zip", body, 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 19));
+    support::wait_real(cx, "the checklist", |cx| {
+        support::present(cx, w.win, ids::PAYLOAD_CHECKLIST)
+    });
+    support::press(cx, w.win, "escape");
+    idle(cx);
+    assert!(!support::present(cx, w.win, ids::PAYLOAD_CHECKLIST));
+    assert!(
+        std::fs::read_dir(env.game.join("tf/custom"))
+            .unwrap()
+            .next()
+            .is_none()
+    );
+    assert!(!support::present(cx, w.win, ids::TOAST));
+}
+
+#[gpui_kit::test]
+fn a_second_operation_waits_for_the_first(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let body = support::zip_of(&[("A.vpk", &vpk(&[1u8; 64])), ("B.vpk", &vpk(b"b"))]);
+    server.mount_gb_addon(13, "Pack", &[("pack.zip", body, 100)]);
+    server.mount_gb_addon(14, "Crit", &[("crit.vpk", vpk(b"v"), 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 13));
+    support::wait_real(cx, "the checklist", |cx| {
+        support::present(cx, w.win, ids::PAYLOAD_CHECKLIST)
+    });
+    assert!(!start_install(cx, &w, 14), "busy while the checklist waits");
+    support::click_id(cx, w.win, ids::PAYLOAD_CANCEL);
+    idle(cx);
+    assert!(start_install(cx, &w, 14));
 }

@@ -7,13 +7,14 @@ use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, AsyncApp, Context, Entity, Global, Task, WeakEntity,
 };
 use tf2tools_core::{
-    AddonProfile, AddonSection, DownloadProgress, GbAddonEntry, GbAddonFetchError, GbId,
-    StoreConfig, Tf2Install,
+    AddonProfile, AddonSection, DownloadProgress, GbAddonDownload, GbAddonEntry, GbAddonFetchError,
+    GbId, StoreConfig, Tf2Install,
 };
 
 use crate::library_events::LibraryEvents;
 use crate::local_messages::{describe_library, gb_install_op};
 use crate::pages::profiles::probe::Tf2Probe;
+use crate::payload_checklist::{ChecklistItem, open_payload_checklist};
 use crate::services::{OpError, Services, require_tf2, run_blocking, tf2_state};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_messages::{describe_gb_fetch, download_stopped};
@@ -39,6 +40,17 @@ const INSTALL: Titles = Titles {
     done: "Add-on installed",
     failed: "Couldn't install the add-on",
 };
+
+/// One download-choose-install run: what to fetch, the payloads chosen last time, where to
+/// install, and the window that asked.
+struct Run {
+    section: AddonSection,
+    profile: AddonProfile,
+    previous: Vec<String>,
+    tf2: Tf2Install,
+    titles: Titles,
+    win: AnyWindowHandle,
+}
 
 /// How a download-choose-install run ended.
 enum Outcome {
@@ -128,7 +140,15 @@ impl GbAddonInstalls {
         };
         self.active = Some((profile.id(), stage));
         self.task = Some(cx.spawn(async move |this, cx| {
-            let outcome = fetch_and_install(&this, cx, section, profile, &[], tf2, INSTALL).await;
+            let run = Run {
+                section,
+                profile,
+                previous: Vec::new(),
+                tf2,
+                titles: INSTALL,
+                win,
+            };
+            let outcome = fetch_and_install(&this, cx, run).await;
             let _ = this.update(cx, |me, cx| me.finish(outcome, INSTALL, win, cx));
         }));
         cx.notify();
@@ -209,16 +229,20 @@ impl GbAddonInstalls {
 }
 
 /// Downloads `profile`'s newest file, picks its payloads (keeping `previous` when it still
-/// fits) and installs them, reporting each stage on `this`.
+/// fits, else asking in `win`) and installs them, reporting each stage on `this`.
 async fn fetch_and_install(
     this: &WeakEntity<GbAddonInstalls>,
     cx: &mut AsyncApp,
-    section: AddonSection,
-    profile: AddonProfile,
-    previous: &[String],
-    tf2: Tf2Install,
-    titles: Titles,
+    run: Run,
 ) -> Outcome {
+    let Run {
+        section,
+        profile,
+        previous,
+        tf2,
+        titles,
+        win,
+    } = run;
     // The progress callback runs on a tokio worker, so it only sends; the channel closes
     // when the download future ends.
     let (tx, rx) = async_channel::unbounded::<DownloadProgress>();
@@ -251,10 +275,15 @@ async fn fetch_and_install(
         }
     };
 
-    // Several payloads are not asked about yet, so that run ends quietly, as a cancelled
-    // checklist does.
-    let Some(chosen) = download.kept_payloads(previous) else {
-        return Outcome::Cancelled;
+    let chosen = match download.kept_payloads(&previous) {
+        Some(kept) => kept,
+        None => {
+            let _ = this.update(cx, |me, cx| me.set_stage(GbAddonStage::Choosing, cx));
+            match ask_payloads(&download, win, cx).await {
+                Some(chosen) => chosen,
+                None => return Outcome::Cancelled,
+            }
+        }
     };
 
     let _ = this.update(cx, |me, cx| me.set_stage(GbAddonStage::Installing, cx));
@@ -270,6 +299,32 @@ async fn fetch_and_install(
         Ok(entry) => Outcome::Installed(entry),
         Err(err) => Outcome::Failed(err),
     }
+}
+
+/// Asks in `win` which of `download`'s payloads to install. None when the player backs out,
+/// the dialog goes away or `win` is closed.
+async fn ask_payloads(
+    download: &GbAddonDownload,
+    win: AnyWindowHandle,
+    cx: &mut AsyncApp,
+) -> Option<Vec<String>> {
+    let items = download
+        .payloads()
+        .iter()
+        .map(|p| ChecklistItem {
+            name: p.name().to_owned(),
+            label: p.label().to_owned(),
+        })
+        .collect();
+    let name = download.name().to_owned();
+    // The checklist entity holds its own sender, so its handle is dropped before waiting:
+    // a dialog that goes away without answering then closes the channel instead of hanging.
+    let answer = win
+        .update(cx, |_, window, cx| {
+            open_payload_checklist(&name, items, window, cx).1
+        })
+        .ok()?;
+    answer.recv().await.ok().flatten()
 }
 
 /// Why `profile`'s newest file can't be installed, in player words; None when it can.
