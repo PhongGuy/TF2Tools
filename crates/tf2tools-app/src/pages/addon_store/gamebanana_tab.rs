@@ -717,12 +717,18 @@ impl AddonTab {
             ));
         }
         if self.feed.is_no_results() {
+            // Search mode disables the category, so the hint names only what can change.
+            let hint = if self.selects_enabled() {
+                "Try another category."
+            } else {
+                "Try another search."
+            };
             return Some(empty_state_card(
                 ids::ADDON_EMPTY,
                 IconName::Store,
                 "No add-ons found",
-                None,
-                "Try another search or category.",
+                Some(ids::STORE_EMPTY_HINT),
+                hint,
                 cx,
             ));
         }

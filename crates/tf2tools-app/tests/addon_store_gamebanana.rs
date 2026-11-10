@@ -345,6 +345,35 @@ fn a_listing_that_ends_with_nothing_says_no_results(cx: &mut TestAppContext) {
     settled(cx, &tab, "the end");
     assert!(support::present(cx, w.win, ids::ADDON_EMPTY));
     assert!(!support::present(cx, w.win, ids::ADDON_LOAD_MORE));
+    assert_eq!(
+        support::label_of(cx, w.win, ids::STORE_EMPTY_HINT).as_deref(),
+        Some("Try another category.")
+    );
+}
+
+// Search mode disables the category, so its empty hint speaks only of the search.
+#[gpui_kit::test]
+fn a_search_with_nothing_found_says_try_another_search(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_index(
+        1644,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(1, 1644, None)], true),
+    );
+    server.mount_gb_search(1, support::gb_listing(Vec::new(), true));
+    let w = window(cx, &env, &server);
+    let tab = open_tab(cx, &w, "guis");
+    settled(cx, &tab, "the first step");
+    cx.update(|cx| tab.update(cx, |t, cx| t.search_typed("zzz".into(), cx)));
+    cx.executor().advance_clock(SEARCH_DEBOUNCE);
+    support::wait_real(cx, "the empty search", |cx| {
+        cx.update(|cx| tab.read(cx).is_no_results())
+    });
+    assert_eq!(
+        support::label_of(cx, w.win, ids::STORE_EMPTY_HINT).as_deref(),
+        Some("Try another search.")
+    );
 }
 
 #[gpui_kit::test]
