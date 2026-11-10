@@ -2,13 +2,14 @@
 //! global so leaving a page never drops (and so aborts) an install.
 
 use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use gpui_kit::{
     AnyWindowHandle, App, AppContext as _, AsyncApp, Context, Entity, Global, Task, WeakEntity,
 };
 use tf2tools_core::{
-    AddonProfile, AddonSection, DownloadProgress, GbAddonDownload, GbAddonEntry, GbAddonFetchError,
-    GbId, StoreConfig, Tf2Install,
+    AddonProfile, AddonSection, BrowseError, DownloadProgress, GbAddonCheck, GbAddonDownload,
+    GbAddonEntry, GbAddonFetchError, GbId, StoreConfig, Tf2Install,
 };
 
 use crate::library_events::LibraryEvents;
@@ -17,7 +18,7 @@ use crate::pages::profiles::probe::Tf2Probe;
 use crate::payload_checklist::{ChecklistItem, open_payload_checklist};
 use crate::services::{OpError, Services, require_tf2, run_blocking, tf2_state};
 use crate::shell::toast::{ToastKind, toast, toast_error};
-use crate::store_messages::{describe_gb_fetch, download_stopped};
+use crate::store_messages::{describe_browse, describe_gb_fetch, download_stopped};
 use crate::tokio_bridge;
 
 /// What the running operation is doing.
@@ -41,6 +42,16 @@ const INSTALL: Titles = Titles {
     failed: "Couldn't install the add-on",
 };
 
+const UPDATE: Titles = Titles {
+    done: "Add-on updated",
+    failed: "Couldn't update the add-on",
+};
+
+const REMOVE: Titles = Titles {
+    done: "Add-on removed",
+    failed: "Couldn't remove the add-on",
+};
+
 /// One download-choose-install run: what to fetch, the payloads chosen last time, where to
 /// install, and the window that asked.
 struct Run {
@@ -55,6 +66,7 @@ struct Run {
 /// How a download-choose-install run ended.
 enum Outcome {
     Installed(GbAddonEntry),
+    Removed { id: GbId, name: String },
     Cancelled,
     Failed(OpError),
 }
@@ -65,6 +77,8 @@ pub struct GbAddonInstalls {
     active: Option<(GbId, GbAddonStage)>,
     task: Option<Task<()>>,
     reload_task: Option<Task<()>>,
+    check_task: Option<Task<()>>,
+    checked_this_session: bool,
 }
 
 struct InstallsGlobal(Entity<GbAddonInstalls>);
@@ -84,6 +98,8 @@ impl GbAddonInstalls {
                 active: None,
                 task: None,
                 reload_task: None,
+                check_task: None,
+                checked_this_session: false,
             };
             installs.reload(cx);
             installs
@@ -121,24 +137,9 @@ impl GbAddonInstalls {
         win: AnyWindowHandle,
         cx: &mut Context<Self>,
     ) -> bool {
-        if self.is_busy() {
+        let Some(tf2) = self.begin(profile.id(), DOWNLOADING, win, cx) else {
             return false;
-        }
-        let tf2 = match require_tf2(cx) {
-            Ok(tf2) => tf2,
-            Err(err) => {
-                let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
-                return false;
-            }
         };
-        if !tokio_bridge::is_running(cx) {
-            tokio_bridge::init(cx);
-        }
-        let stage = GbAddonStage::Downloading {
-            downloaded: 0,
-            total: None,
-        };
-        self.active = Some((profile.id(), stage));
         self.task = Some(cx.spawn(async move |this, cx| {
             let run = Run {
                 section,
@@ -153,6 +154,127 @@ impl GbAddonInstalls {
         }));
         cx.notify();
         true
+    }
+
+    /// Reads `id`'s profile again, then installs its newest file, keeping the chosen
+    /// payloads when they are still offered and asking otherwise. An item gone from
+    /// GameBanana is recorded as gone. Returns false, doing nothing, while another operation
+    /// runs or when `id` is not recorded, and false after a toast when no TF2 is set.
+    pub fn update(&mut self, id: GbId, win: AnyWindowHandle, cx: &mut Context<Self>) -> bool {
+        let Some(entry) = self.entry(id).cloned() else {
+            return false;
+        };
+        let Some(tf2) = self.begin(id, DOWNLOADING, win, cx) else {
+            return false;
+        };
+        self.task = Some(cx.spawn(async move |this, cx| {
+            let outcome = fetch_and_update(&this, cx, entry, tf2, win).await;
+            let _ = this.update(cx, |me, cx| me.finish(outcome, UPDATE, win, cx));
+        }));
+        cx.notify();
+        true
+    }
+
+    /// Copies `id`'s library copy back into TF2. Returns false as `update` does.
+    pub fn reinstall(&mut self, id: GbId, win: AnyWindowHandle, cx: &mut Context<Self>) -> bool {
+        if self.entry(id).is_none() {
+            return false;
+        }
+        let Some(tf2) = self.begin(id, GbAddonStage::Installing, win, cx) else {
+            return false;
+        };
+        let probe = Tf2Probe::get(cx);
+        let job = run_blocking(cx, move |s: &Services| {
+            s.library
+                .reinstall_gb_addon(id, &tf2, &*probe)
+                .map_err(|e| gb_install_op(&e, INSTALL.failed))
+        });
+        self.task = Some(cx.spawn(async move |this, cx| {
+            let outcome = match job.await {
+                Ok(entry) => Outcome::Installed(entry),
+                Err(err) => Outcome::Failed(err),
+            };
+            let _ = this.update(cx, |me, cx| me.finish(outcome, INSTALL, win, cx));
+        }));
+        cx.notify();
+        true
+    }
+
+    /// Removes `id` from TF2 and the library; the caller has asked the player first.
+    /// Returns false as `update` does.
+    pub fn remove(&mut self, id: GbId, win: AnyWindowHandle, cx: &mut Context<Self>) -> bool {
+        let Some(name) = self.entry(id).map(|e| e.name().to_owned()) else {
+            return false;
+        };
+        let Some(tf2) = self.begin(id, GbAddonStage::Removing, win, cx) else {
+            return false;
+        };
+        let probe = Tf2Probe::get(cx);
+        let job = run_blocking(cx, move |s: &Services| {
+            s.library
+                .remove_gb_addon(id, &tf2, &*probe)
+                .map_err(|e| gb_install_op(&e, REMOVE.failed))
+        });
+        self.task = Some(cx.spawn(async move |this, cx| {
+            let outcome = match job.await {
+                Ok(()) => Outcome::Removed { id, name },
+                Err(err) => Outcome::Failed(err),
+            };
+            let _ = this.update(cx, |me, cx| me.finish(outcome, REMOVE, win, cx));
+        }));
+        cx.notify();
+        true
+    }
+
+    /// Runs core's update check once per app session, then lists the library again. A
+    /// failure is logged and the stored update state stays as it was.
+    pub fn check_updates(&mut self, cx: &mut Context<Self>) {
+        if self.checked_this_session {
+            return;
+        }
+        self.checked_this_session = true;
+        if !tokio_bridge::is_running(cx) {
+            tokio_bridge::init(cx);
+        }
+        let store = cx.global::<Services>().store.clone();
+        let job = tokio_bridge::spawn(
+            cx,
+            async move { store.check_gb_addon_updates(unix_now()).await },
+        );
+        self.check_task = Some(cx.spawn(async move |this, cx| {
+            match job.await {
+                Ok(Ok(_)) => {}
+                Ok(Err(err)) => tracing::warn!("add-on update check failed: {err}"),
+                Err(join) => tracing::warn!("add-on update check stopped: {join}"),
+            }
+            let _ = this.update(cx, |me, cx| me.reload(cx));
+        }));
+    }
+
+    /// Marks `id` busy at `stage` and returns the TF2 install to work on. None, doing nothing,
+    /// while another operation runs, and None after a "TF2 not found" toast in `win`.
+    fn begin(
+        &mut self,
+        id: GbId,
+        stage: GbAddonStage,
+        win: AnyWindowHandle,
+        cx: &mut Context<Self>,
+    ) -> Option<Tf2Install> {
+        if self.is_busy() {
+            return None;
+        }
+        let tf2 = match require_tf2(cx) {
+            Ok(tf2) => tf2,
+            Err(err) => {
+                let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
+                return None;
+            }
+        };
+        if !tokio_bridge::is_running(cx) {
+            tokio_bridge::init(cx);
+        }
+        self.active = Some((id, stage));
+        Some(tf2)
     }
 
     /// Lists the library again off the UI thread (catches hand-deleted files).
@@ -190,6 +312,15 @@ impl GbAddonInstalls {
                 self.put(entry);
                 Some((ToastKind::Success, titles.done.to_owned(), name))
             }
+            Outcome::Removed { id, name } => {
+                self.entries = self
+                    .entries
+                    .iter()
+                    .filter(|e| e.gb_id() != id)
+                    .cloned()
+                    .collect();
+                Some((ToastKind::Success, titles.done.to_owned(), name))
+            }
             Outcome::Failed(err) => Some((
                 ToastKind::Error,
                 err.title().to_owned(),
@@ -225,6 +356,91 @@ impl GbAddonInstalls {
             *current = stage;
             cx.notify();
         }
+    }
+}
+
+/// The stage an operation starts in when it downloads first.
+const DOWNLOADING: GbAddonStage = GbAddonStage::Downloading {
+    downloaded: 0,
+    total: None,
+};
+
+/// The current time in Unix seconds, as core's update records take it.
+fn unix_now() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
+}
+
+/// Reads `entry`'s profile again and runs the install with its payloads as the previous
+/// choice. An item GameBanana reports gone is recorded so, and `this` lists it as gone
+/// before the failure is returned.
+async fn fetch_and_update(
+    this: &WeakEntity<GbAddonInstalls>,
+    cx: &mut AsyncApp,
+    entry: GbAddonEntry,
+    tf2: Tf2Install,
+    win: AnyWindowHandle,
+) -> Outcome {
+    let id = entry.gb_id();
+    let store = cx.update(|cx| cx.global::<Services>().store.clone());
+    let job = cx.update(|cx| {
+        tokio_bridge::spawn(cx, async move { store.addon_catalog().profile(id).await })
+    });
+    let (failure, gone) = match job.await {
+        Ok(Ok(profile)) => {
+            let Some(section) = AddonSection::by_key(entry.section()) else {
+                // Only a tampered row names a section this build does not know.
+                tracing::warn!("add-on {id} has an unknown section {:?}", entry.section());
+                return Outcome::Failed(OpError::core(UPDATE.failed, UPDATE_UNKNOWN_SECTION));
+            };
+            let run = Run {
+                section,
+                profile,
+                previous: entry.payloads().to_vec(),
+                tf2,
+                titles: UPDATE,
+                win,
+            };
+            return fetch_and_install(this, cx, run).await;
+        }
+        Ok(Err(err)) => (
+            describe_browse(&err),
+            matches!(err, BrowseError::Gone { .. }),
+        ),
+        Err(join) => (download_stopped(&join.to_string()), false),
+    };
+    failure.log("add-on update");
+    if gone {
+        mark_gone(this, cx, id, tf2).await;
+    }
+    Outcome::Failed(OpError::core(UPDATE.failed, failure.message))
+}
+
+/// The player words for an update whose recorded section this build does not know.
+const UPDATE_UNKNOWN_SECTION: &str = "TF2Tools can't tell where this add-on goes. Remove it, then install it again from the Addon Store.";
+
+/// Records `id` as gone from GameBanana and puts the listed result into `this`, so the
+/// list shows it before busy ends. A failed write is logged and the list stays as it was.
+async fn mark_gone(
+    this: &WeakEntity<GbAddonInstalls>,
+    cx: &mut AsyncApp,
+    id: GbId,
+    tf2: Tf2Install,
+) {
+    let job = cx.update(|cx| {
+        run_blocking(cx, move |s: &Services| {
+            let fail = |e: &tf2tools_core::LibraryError| {
+                describe_library(e).into_op("Couldn't record the add-on as gone")
+            };
+            s.library
+                .record_gb_addon_check(id, GbAddonCheck::Gone, unix_now())
+                .map_err(|e| fail(&e))?;
+            s.library.list_gb_addons(Some(&tf2)).map_err(|e| fail(&e))
+        })
+    });
+    if let Ok(entries) = job.await {
+        let _ = this.update(cx, |me, _| me.entries = entries.into());
     }
 }
 

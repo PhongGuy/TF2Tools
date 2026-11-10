@@ -47,9 +47,10 @@ fn start_install(cx: &mut TestAppContext, w: &support::AddonStoreWindow, id: u64
     cx.update(|cx| i.update(cx, |i, cx| i.install(section, p, win, cx)))
 }
 
+// A second operation's toast stacks on the first one's, so any visible toast may match.
 pub fn toast_is(cx: &mut TestAppContext, win: gpui_kit::AnyWindowHandle, text: &str) {
     support::wait_real(cx, text, |cx| {
-        support::label_of(cx, win, ids::TOAST).as_deref() == Some(text)
+        support::toast_labels(cx, win).iter().any(|l| l == text)
     });
 }
 
@@ -225,4 +226,235 @@ fn a_second_operation_waits_for_the_first(cx: &mut TestAppContext) {
     support::click_id(cx, w.win, ids::PAYLOAD_CANCEL);
     idle(cx);
     assert!(start_install(cx, &w, 14));
+}
+
+fn act(
+    cx: &mut TestAppContext,
+    w: &support::AddonStoreWindow,
+    f: impl FnOnce(
+        &mut GbAddonInstalls,
+        gpui_kit::AnyWindowHandle,
+        &mut gpui_kit::Context<GbAddonInstalls>,
+    ) -> bool,
+) {
+    let i = installs(cx);
+    let win = w.win;
+    assert!(
+        cx.update(|cx| i.update(cx, |i, cx| f(i, win, cx))),
+        "the operation starts"
+    );
+}
+
+fn entry(cx: &mut TestAppContext, id: u64) -> Option<tf2tools_core::GbAddonEntry> {
+    let i = installs(cx);
+    cx.update(|cx| i.read(cx).entry(GbId::new(id)).cloned())
+}
+
+/// Installs a two-part pack with both parts chosen.
+fn install_both(
+    cx: &mut TestAppContext,
+    w: &support::AddonStoreWindow,
+    server: &support::StoreServer,
+    id: u64,
+) {
+    let body = support::zip_of(&[("A.vpk", &vpk(&[1u8; 64])), ("B.vpk", &vpk(b"b"))]);
+    server.mount_gb_addon(id, "Pack", &[("pack.zip", body, 100)]);
+    assert!(start_install(cx, w, id), "the install starts");
+    support::wait_real(cx, "the checklist", |cx| {
+        support::present(cx, w.win, ids::PAYLOAD_CHECKLIST)
+    });
+    support::click_id(cx, w.win, ids::payload_check(1));
+    support::click_id(cx, w.win, ids::PAYLOAD_INSTALL);
+    toast_is(cx, w.win, "Add-on installed. Pack");
+    idle(cx);
+}
+
+#[gpui_kit::test]
+fn the_entry_is_recorded_before_busy_ends(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(27, "Toon FX", &[("toon.vpk", vpk(b"v"), 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 27));
+    // The first notification after busy ends must already carry the entry; the library
+    // listing that follows it would hide a finish that left the entry to it.
+    let seen = std::rc::Rc::new(std::cell::Cell::new(None));
+    let i = installs(cx);
+    let _sub = cx.update(|cx| {
+        let seen = std::rc::Rc::clone(&seen);
+        cx.observe(&i, move |i, cx| {
+            let me = i.read(cx);
+            if !me.is_busy() && seen.get().is_none() {
+                seen.set(Some(me.entry(GbId::new(27)).is_some()));
+            }
+        })
+    });
+    idle(cx);
+    assert_eq!(seen.get(), Some(true));
+}
+
+#[gpui_kit::test]
+fn install_without_tf2_says_tf2_not_found(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(28, "Toon FX", &[("toon.vpk", vpk(b"v"), 100)]);
+    let state = Tf2State::Missing { saved: None };
+    let w = support::addon_store_window(cx, &env, &server, state, |_, _| {});
+    assert!(!start_install(cx, &w, 28));
+    toast_is(
+        cx,
+        w.win,
+        "TF2 not found. Set the TF2 folder in Settings, then try again.",
+    );
+    let i = installs(cx);
+    assert!(!cx.update(|cx| i.read(cx).is_busy()));
+}
+
+#[gpui_kit::test]
+fn an_update_keeps_the_chosen_parts_without_asking(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let w = window(cx, &env, &server);
+    install_both(cx, &w, &server, 20);
+    server.reset();
+    let body = support::zip_of(&[("A.vpk", &vpk(&[2u8; 64])), ("B.vpk", &vpk(b"b2"))]);
+    server.mount_gb_addon(20, "Pack", &[("pack2.zip", body, 300)]);
+    act(cx, &w, |i, win, cx| i.update(GbId::new(20), win, cx));
+    toast_is(cx, w.win, "Add-on updated. Pack");
+    idle(cx);
+    assert!(!support::present(cx, w.win, ids::PAYLOAD_CHECKLIST));
+    assert_eq!(entry(cx, 20).unwrap().file_date(), 300);
+    assert!(
+        env.game
+            .join("tf/custom/tf2tools-gb-20-pack-2.vpk")
+            .is_file()
+    );
+}
+
+#[gpui_kit::test]
+fn an_update_whose_parts_changed_asks_again(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let w = window(cx, &env, &server);
+    install_both(cx, &w, &server, 21);
+    server.reset();
+    let body = support::zip_of(&[("C.vpk", &vpk(&[3u8; 64])), ("D.vpk", &vpk(b"d"))]);
+    server.mount_gb_addon(21, "Pack", &[("pack2.zip", body, 300)]);
+    act(cx, &w, |i, win, cx| i.update(GbId::new(21), win, cx));
+    support::wait_real(cx, "the checklist", |cx| {
+        support::present(cx, w.win, ids::PAYLOAD_CHECKLIST)
+    });
+    support::click_id(cx, w.win, ids::PAYLOAD_CANCEL);
+    idle(cx);
+    assert_eq!(entry(cx, 21).unwrap().file_date(), 100);
+    assert!(env.game.join("tf/custom/tf2tools-gb-21-pack.vpk").is_file());
+}
+
+#[gpui_kit::test]
+fn updating_an_item_gone_from_gamebanana_says_so_and_marks_it(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(22, "Trashed", &[("a.vpk", vpk(b"v"), 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 22));
+    idle(cx);
+    server.reset();
+    server.mount_gb_profile(
+        22,
+        serde_json::json!({"_idRow": 22, "_sName": "Trashed", "_bIsTrashed": true}),
+    );
+    act(cx, &w, |i, win, cx| i.update(GbId::new(22), win, cx));
+    toast_is(
+        cx,
+        w.win,
+        "Couldn't update the add-on. This item is no longer on GameBanana.",
+    );
+    idle(cx);
+    assert!(entry(cx, 22).unwrap().is_gone());
+    assert!(
+        env.game
+            .join("tf/custom/tf2tools-gb-22-trashed.vpk")
+            .is_file()
+    );
+}
+
+#[gpui_kit::test]
+fn updating_an_item_gamebanana_cannot_find_says_try_later(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(23, "Lost", &[("a.vpk", vpk(b"v"), 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 23));
+    idle(cx);
+    server.reset();
+    act(cx, &w, |i, win, cx| i.update(GbId::new(23), win, cx));
+    toast_is(
+        cx,
+        w.win,
+        "Couldn't update the add-on. GameBanana couldn't find this. Try again later.",
+    );
+    idle(cx);
+    assert!(!entry(cx, 23).unwrap().is_gone());
+}
+
+#[gpui_kit::test]
+fn remove_deletes_and_drops_the_entry(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(24, "Crit", &[("crit.vpk", vpk(b"v"), 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 24));
+    idle(cx);
+    act(cx, &w, |i, win, cx| i.remove(GbId::new(24), win, cx));
+    toast_is(cx, w.win, "Add-on removed. Crit");
+    idle(cx);
+    assert!(entry(cx, 24).is_none());
+    assert!(!env.game.join("tf/custom/tf2tools-gb-24-crit.vpk").exists());
+    assert!(!env.data.gb_addon_dir().join("24").exists());
+}
+
+#[gpui_kit::test]
+fn remove_while_tf2_runs_says_close_tf2_first(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(25, "Crit", &[("crit.vpk", vpk(b"v"), 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 25));
+    idle(cx);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    act(cx, &w, |i, win, cx| i.remove(GbId::new(25), win, cx));
+    toast_is(
+        cx,
+        w.win,
+        "Close TF2 first. TF2 is running. Close the game, then try again.",
+    );
+    idle(cx);
+    assert!(entry(cx, 25).is_some());
+    assert!(env.game.join("tf/custom/tf2tools-gb-25-crit.vpk").is_file());
+}
+
+#[gpui_kit::test]
+fn install_again_puts_the_library_copy_back(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(29, "Back", &[("a.vpk", vpk(b"v"), 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 29));
+    idle(cx);
+    let file = env.game.join("tf/custom/tf2tools-gb-29-back.vpk");
+    std::fs::remove_file(&file).unwrap();
+    server.reset();
+    // Its toast reads as the first install's did, so the outcome is checked on disk.
+    act(cx, &w, |i, win, cx| i.reinstall(GbId::new(29), win, cx));
+    idle(cx);
+    assert!(file.is_file());
+    assert!(entry(cx, 29).unwrap().is_installed());
+}
+
+#[gpui_kit::test]
+fn install_again_without_the_library_copy_says_install_from_the_store(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(26, "Back", &[("a.vpk", vpk(b"v"), 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 26));
+    idle(cx);
+    std::fs::remove_file(env.game.join("tf/custom/tf2tools-gb-26-back.vpk")).unwrap();
+    std::fs::remove_dir_all(env.data.gb_addon_dir().join("26")).unwrap();
+    act(cx, &w, |i, win, cx| i.reinstall(GbId::new(26), win, cx));
+    toast_is(
+        cx,
+        w.win,
+        "Couldn't install the add-on. This add-on's files are no longer in your library. Install it again from the Addon Store.",
+    );
 }
