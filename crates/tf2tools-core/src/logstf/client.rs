@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use crate::error::{LogsSyncError, ResolveError};
 use crate::store::StoreConfig;
-use crate::store::http::{Http, Redirects};
+use crate::store::http::{Http, NetFailure, Redirects};
 
 use super::cache::ListedLog;
 use super::steam_xml::xml_text;
@@ -14,6 +14,11 @@ use super::{
     LOG_BODY_LIMIT, LOG_CAP, LOGS_SPACING, LogsCache, PRUNE_SECS, PlayerInput, STALE_SECS, SteamId,
     TrackedPlayer, parse_log, window_start,
 };
+
+/// `logstf_logs.state` for a log logs.tf answered 404 for.
+const STATE_GONE: i64 = 1;
+/// `logstf_logs.state` for a log whose body could not be read.
+const STATE_UNREADABLE: i64 = 2;
 
 /// How far a sync has got through the logs it needs to download.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -275,16 +280,34 @@ impl LogsClient {
         let total = wanted.len();
         for (done, log_id) in wanted.into_iter().enumerate() {
             let url = format!("{}/json/{log_id}", self.endpoints.logs_tf());
-            let bytes = self.http.get_api(&url, LOG_BODY_LIMIT).await?;
-            // A body that is not UTF-8 is as unreadable as one that is not a log.
-            let malformed = |message: String| LogsSyncError::Malformed {
-                url: url.clone(),
-                message,
+            // A 404 means logs.tf dropped the log; an oversize, non-UTF-8 or non-log body is
+            // unreadable. Both are marked and never asked again; any other failure stops the sync.
+            let readable = match self.http.get_api(&url, LOG_BODY_LIMIT).await {
+                Ok(bytes) => String::from_utf8(bytes)
+                    .ok()
+                    .and_then(|body| parse_log(&body).ok().map(|detail| (body, detail))),
+                Err(NetFailure::TooLarge { .. }) => None,
+                Err(NetFailure::Status { status: 404, .. }) => {
+                    self.cache.mark_failed(log_id, STATE_GONE, now)?;
+                    summary.gone += 1;
+                    on_progress(LogsProgress {
+                        done: done + 1,
+                        total,
+                    });
+                    continue;
+                }
+                Err(failure) => return Err(failure.into()),
             };
-            let body = String::from_utf8(bytes).map_err(|e| malformed(e.to_string()))?;
-            let detail = parse_log(&body).map_err(|e| malformed(e.to_string()))?;
-            self.cache.ingest(log_id, &body, &detail, now)?;
-            summary.downloaded += 1;
+            match readable {
+                Some((body, detail)) => {
+                    self.cache.ingest(log_id, &body, &detail, now)?;
+                    summary.downloaded += 1;
+                }
+                None => {
+                    self.cache.mark_failed(log_id, STATE_UNREADABLE, now)?;
+                    summary.unreadable += 1;
+                }
+            }
             on_progress(LogsProgress {
                 done: done + 1,
                 total,

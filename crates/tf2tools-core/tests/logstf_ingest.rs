@@ -2,7 +2,7 @@
 
 use std::sync::Mutex;
 
-use tf2tools_core::{LogsSyncError, SteamId, TrackedPlayer};
+use tf2tools_core::{SteamId, TrackedPlayer};
 
 use crate::common;
 use crate::common::logstf::{
@@ -164,7 +164,7 @@ async fn two_keys_for_one_steam_id_fold_into_one_row_per_class() {
 }
 
 #[tokio::test]
-async fn a_body_that_is_not_utf8_is_malformed_and_not_stored() {
+async fn a_body_that_is_not_utf8_is_unreadable_and_not_stored() {
     let env = tracked_env().await;
     mount_list(&env.server, ARIE, list_body(&[(42, days_ago(1))])).await;
     let mut named = solo(231_702, ("scout", 600, 1, 1, 1, 100));
@@ -179,11 +179,11 @@ async fn a_body_that_is_not_utf8_is_malformed_and_not_stored() {
         .mount(&env.server)
         .await;
 
-    let err = env
+    let summary = env
         .client
         .sync_player(arie(), false, &|_| {})
         .await
-        .unwrap_err();
-    assert!(matches!(err, LogsSyncError::Malformed { .. }), "{err:?}");
-    assert_eq!(log_state(&env.dir, 42), (0, false));
+        .unwrap();
+    assert_eq!(summary.unreadable(), 1);
+    assert_eq!(log_state(&env.dir, 42), (2, false));
 }

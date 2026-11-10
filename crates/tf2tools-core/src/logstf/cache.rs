@@ -305,6 +305,27 @@ impl LogsCache {
             .map_err(db_error)
     }
 
+    /// Marks a log gone (state 1) or unreadable (state 2) as of `now`. Any earlier body and
+    /// class rows go too, so a marked log never counts and the needs-download rule skips it.
+    pub(crate) fn mark_failed(
+        &self,
+        log_id: i64,
+        state: i64,
+        now: i64,
+    ) -> Result<(), LogsCacheError> {
+        self.db
+            .write(|conn| {
+                let tx = conn.transaction()?;
+                tx.execute(
+                    "UPDATE logstf_logs SET state = ?2, fetched_at = ?3, body = NULL WHERE id = ?1",
+                    params![log_id, state, now],
+                )?;
+                tx.execute("DELETE FROM logstf_class_rows WHERE log_id = ?1", [log_id])?;
+                tx.commit()
+            })
+            .map_err(db_error)
+    }
+
     /// Stamps `player` as synced at `now`.
     pub(crate) fn mark_synced(&self, player: SteamId, now: i64) -> Result<(), LogsCacheError> {
         self.db
