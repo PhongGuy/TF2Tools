@@ -1,6 +1,6 @@
-//! The GameBanana sections the Addon Store browses, each a root category of TF2's Mod Index.
+//! The GameBanana sections the app browses, each a root category of TF2's Mod Index.
 
-/// One Addon Store section: a GameBanana root category and the subcategories it hides.
+/// One GameBanana section: a root category and the subcategories it hides.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct AddonSection {

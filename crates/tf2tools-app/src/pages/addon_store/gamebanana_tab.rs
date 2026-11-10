@@ -51,6 +51,15 @@ pub fn search_placeholder(section: AddonSection) -> String {
     format!("Search {}...", section.title())
 }
 
+/// The subcategory Select's first row: "All gamemodes" for maps, "All" for add-on sections.
+pub fn category_all_label(section: AddonSection) -> &'static str {
+    if section == AddonSection::MAPS {
+        "All gamemodes"
+    } else {
+        "All"
+    }
+}
+
 /// The sort Select's labels, in menu order.
 const SORTS: [(&str, AddonSort); 2] = [
     ("Most downloaded", AddonSort::MostDownloaded),
@@ -181,7 +190,7 @@ impl AddonTab {
         let labels = LabelOption::all(ids::ADDON_SORT, SORTS.iter().map(|(label, _)| *label));
         let sort_select =
             cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
-        let rows = CategoryOption::rows(ids::ADDON_CATEGORY, "All", &[]);
+        let rows = CategoryOption::rows(ids::ADDON_CATEGORY, category_all_label(section), &[]);
         let category_select =
             cx.new(|cx| SelectState::new(rows, Some(IndexPath::default()), window, cx));
         let rows = CategoryOption::rows(ids::ADDON_WEAPON, "All weapons", &[]);
@@ -373,7 +382,11 @@ impl AddonTab {
         cx: &mut Context<Self>,
     ) {
         if parent == self.section.root_category() {
-            let rows = CategoryOption::rows(ids::ADDON_CATEGORY, "All", &children);
+            let rows = CategoryOption::rows(
+                ids::ADDON_CATEGORY,
+                category_all_label(self.section),
+                &children,
+            );
             self.category_select
                 .update(cx, |select, cx| select.set_items(rows, window, cx));
             self.categories = children;

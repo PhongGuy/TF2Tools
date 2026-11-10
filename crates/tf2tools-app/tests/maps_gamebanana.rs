@@ -4,11 +4,11 @@ use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
 use tf2tools_app::ids;
-use tf2tools_app::pages::addon_store::gamebanana_tab::AddonTab;
+use tf2tools_app::pages::addon_store::gamebanana_tab::{AddonTab, category_all_label};
 use tf2tools_app::pages::maps::{MapListSource, MapsPage, MapsSource};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::GbId;
+use tf2tools_core::{AddonSection, GbId};
 
 const MD: &str = "Generic_MostDownloaded";
 
@@ -191,4 +191,82 @@ fn leaving_the_page_hides_the_tab_and_returning_shows_it(cx: &mut TestAppContext
         MapsSource::GameBanana
     );
     assert!(!cx.update(|cx| tab.read(cx).is_hidden()));
+}
+
+#[test]
+fn only_maps_names_its_first_category_row_by_gamemode() {
+    assert_eq!(category_all_label(AddonSection::MAPS), "All gamemodes");
+    for section in AddonSection::ALL {
+        assert_eq!(category_all_label(section), "All", "{}", section.key());
+    }
+}
+
+#[gpui_kit::test]
+fn the_gamemode_select_narrows_the_maps(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_categories(5371, &[(5385, "King of the Hill"), (5386, "Jump")]);
+    one_map_listing(&server);
+    server.mount_gb_index(
+        5385,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(3, 5371, Some(5385))], true),
+    );
+    let s = shell(cx, &env, &server);
+    let page = open_maps(cx, &s);
+    let tab = open_gamebanana(cx, &s, &page);
+    support::wait_real(cx, "the gamemodes", |cx| {
+        cx.update(|cx| tab.read(cx).categories().len() == 2)
+    });
+    support::click_id(cx, s.win, ids::ADDON_CATEGORY);
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::select_option(ids::ADDON_CATEGORY, "all")
+    ));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::select_option(ids::ADDON_CATEGORY, "5386")
+    ));
+    support::click_id(cx, s.win, ids::select_option(ids::ADDON_CATEGORY, "5385"));
+    support::wait_real(cx, "the King of the Hill step", |cx| {
+        cx.update(|cx| tab.read(cx).cards().first().map(|c| c.id.get()) == Some(3))
+    });
+    assert_eq!(cx.update(|cx| tab.read(cx).category()), Some(5385));
+    assert!(!support::present(cx, s.win, ids::ADDON_WEAPON));
+}
+
+#[gpui_kit::test]
+fn a_map_card_opens_its_details_with_the_gamebanana_link(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    one_map_listing(&server);
+    server.mount_gb_profile(1, serde_json::json!({
+        "_idRow": 1, "_sName": "Addon 1", "_sText": "<p>A koth map</p>", "_nDownloadCount": 10,
+        "_aSubmitter": {"_sName": "vex"}, "_sProfileUrl": "https://gamebanana.com/mods/1",
+        "_aCredits": [],
+        "_aFiles": [{"_idRow": 5, "_sFile": "koth_x_b1.zip", "_nFilesize": 4096, "_tsDateAdded": 100,
+            "_sAvResult": "clean", "_sDownloadUrl": "https://gamebanana.com/dl/5"}]
+    }));
+    let s = shell(cx, &env, &server);
+    let page = open_maps(cx, &s);
+    open_gamebanana(cx, &s, &page);
+    support::click_id(cx, s.win, ids::addon_gb_card("maps", GbId::new(1)));
+    support::wait_real(cx, "the map's profile", |cx| {
+        support::present(cx, s.win, ids::ADDON_DETAIL_DOWNLOADS)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::ADDON_DETAIL_NAME).as_deref(),
+        Some("Addon 1")
+    );
+    assert!(
+        support::label_of(cx, s.win, ids::addon_detail_file(0))
+            .unwrap()
+            .starts_with("koth_x_b1.zip")
+    );
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::store_detail_link("gamebanana")
+    ));
 }
