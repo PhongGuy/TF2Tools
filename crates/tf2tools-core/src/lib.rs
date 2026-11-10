@@ -44,11 +44,11 @@ pub use error::{
     FontCheckError, FontInstallError, GbAddonCheckError, GbAddonFetchError, GbAddonInstallError,
     HistoryError, HudFilesError, HudLoadError, ImageError, ImportError, InstallError,
     InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError, LogParseError,
-    LogsCacheError, MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError,
-    ModuleCatalogError, OpenError, PaintError, PlayerInputError, PngReadError, PngWriteError,
-    PresetError, PreviewError, ProfileError, QueryError, RecipeError, ReinstallError,
-    RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError, SettingsError,
-    SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
+    LogsCacheError, LogsSyncError, MakeHudError, MapDownloadError, MapRemoveError,
+    MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError, PlayerInputError,
+    PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
+    ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
+    SettingsError, SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
     UpdateDownloadError, VpkError, VtfError, WavError,
 };
 pub use fonts::{
@@ -105,9 +105,11 @@ pub use library::{
 pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
 pub use logstf::{
-    ClassKills, ClassLine, HealTarget, LOG_BODY_LIMIT, LOGS_SPACING, LogColumns, LogDetail,
-    LogsCache, LogsClient, LogsEndpoints, MedicLine, PlayerInput, PlayerLine, STEAM_ID64_BASE,
-    SteamId, TeamTotals, TrackedPlayer, logstf_class, parse_log, parse_player_input,
+    ClassKills, ClassLine, HealTarget, LOG_BODY_LIMIT, LOG_CAP, LOGS_SPACING, LogColumns,
+    LogDetail, LogsCache, LogsClient, LogsEndpoints, LogsProgress, LogsSyncSummary, MedicLine,
+    PROVISIONAL_SECS, PRUNE_SECS, PlayerInput, PlayerLine, STALE_SECS, STEAM_ID64_BASE, SteamId,
+    TeamTotals, TrackedPlayer, WINDOW_SECS, logstf_class, parse_log, parse_player_input,
+    window_start,
 };
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;

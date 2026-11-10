@@ -1,11 +1,99 @@
-//! The logs.tf client: Steam profile lookups now, log syncs later, all through one paced `Http`.
+//! The logs.tf client: Steam profile lookups and log syncs, all through one paced `Http`.
 
-use crate::error::ResolveError;
+use std::sync::Arc;
+
+use serde::Deserialize;
+
+use crate::error::{LogsSyncError, ResolveError};
 use crate::store::StoreConfig;
 use crate::store::http::{Http, Redirects};
 
+use super::cache::ListedLog;
 use super::steam_xml::xml_text;
-use super::{LOG_BODY_LIMIT, LOGS_SPACING, LogsCache, PlayerInput, SteamId, TrackedPlayer};
+use super::{
+    LOG_BODY_LIMIT, LOG_CAP, LOGS_SPACING, LogsCache, PRUNE_SECS, PlayerInput, STALE_SECS, SteamId,
+    TrackedPlayer, parse_log, window_start,
+};
+
+/// How far a sync has got through the logs it needs to download.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct LogsProgress {
+    done: usize,
+    total: usize,
+}
+
+impl LogsProgress {
+    /// Logs handled so far, downloaded or marked.
+    pub fn done(&self) -> usize {
+        self.done
+    }
+
+    /// Logs this sync needs to download.
+    pub fn total(&self) -> usize {
+        self.total
+    }
+}
+
+/// What one `sync_player` call did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub struct LogsSyncSummary {
+    skipped: bool,
+    listed: usize,
+    downloaded: usize,
+    gone: usize,
+    unreadable: usize,
+    capped: bool,
+}
+
+impl LogsSyncSummary {
+    /// The cache was fresh, so nothing was asked of logs.tf.
+    pub fn skipped(&self) -> bool {
+        self.skipped
+    }
+
+    /// Logs in the window, after the cap.
+    pub fn listed(&self) -> usize {
+        self.listed
+    }
+
+    /// Log bodies downloaded and stored.
+    pub fn downloaded(&self) -> usize {
+        self.downloaded
+    }
+
+    /// Listed logs that logs.tf no longer has.
+    pub fn gone(&self) -> usize {
+        self.gone
+    }
+
+    /// Logs whose body could not be read.
+    pub fn unreadable(&self) -> usize {
+        self.unreadable
+    }
+
+    /// More logs were in the window than `LOG_CAP`; the oldest were left out.
+    pub fn capped(&self) -> bool {
+        self.capped
+    }
+}
+
+/// The part of logs.tf's `/api/v1/log` answer a sync reads.
+#[derive(Deserialize)]
+struct WireList {
+    logs: Vec<WireListed>,
+}
+
+#[derive(Deserialize)]
+struct WireListed {
+    id: i64,
+    #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    map: Option<String>,
+    date: i64,
+}
 
 /// Where logs.tf and the Steam community site live; tests point both at one loopback server.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,6 +149,8 @@ pub struct LogsClient {
     cache: LogsCache,
     http: Http,
     endpoints: LogsEndpoints,
+    /// Held for a whole sync, so two syncs never interleave their writes.
+    sync_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl LogsClient {
@@ -70,6 +160,7 @@ impl LogsClient {
             cache,
             http: crate::store::http_for(&Self::default_config(), &endpoints.redirects()),
             endpoints,
+            sync_lock: Arc::default(),
         }
     }
 
@@ -142,5 +233,89 @@ impl LogsClient {
             .filter(|name| !name.trim().is_empty())
             .unwrap_or(id64);
         Ok(TrackedPlayer::new(id, name))
+    }
+
+    /// Lists the player's logs, downloads every listed log without a body, 1 s apart, and
+    /// prunes. Skips everything when last_synced is under 30 minutes old, unless `force`.
+    /// One sync runs at a time per client (clones share the lock).
+    pub async fn sync_player(
+        &self,
+        id: SteamId,
+        force: bool,
+        on_progress: &(dyn Fn(LogsProgress) + Send + Sync),
+    ) -> Result<LogsSyncSummary, LogsSyncError> {
+        let _held = self.sync_lock.lock().await;
+        let now = chrono::Utc::now().timestamp();
+        let last_synced = self
+            .cache
+            .sync_state(id)?
+            .ok_or(LogsSyncError::NotTracked {
+                steam_id: id.id64(),
+            })?;
+        if !force && last_synced.is_some_and(|at| now - at < STALE_SECS) {
+            return Ok(LogsSyncSummary {
+                skipped: true,
+                ..LogsSyncSummary::default()
+            });
+        }
+
+        // One list request covers the window: the page holds more entries than the cap.
+        let mut logs = self.list(id).await?;
+        logs.retain(|log| log.date >= window_start(now));
+        logs.sort_by(|a, b| b.date.cmp(&a.date).then(b.id.cmp(&a.id)));
+        let capped = logs.len() > LOG_CAP;
+        logs.truncate(LOG_CAP);
+        let wanted = self.cache.record_list(id, &logs, now)?;
+
+        let mut summary = LogsSyncSummary {
+            listed: logs.len(),
+            capped,
+            ..LogsSyncSummary::default()
+        };
+        let total = wanted.len();
+        for (done, log_id) in wanted.into_iter().enumerate() {
+            let url = format!("{}/json/{log_id}", self.endpoints.logs_tf());
+            let bytes = self.http.get_api(&url, LOG_BODY_LIMIT).await?;
+            let body = String::from_utf8_lossy(&bytes);
+            let detail = parse_log(&body).map_err(|e| LogsSyncError::Malformed {
+                url: url.clone(),
+                message: e.to_string(),
+            })?;
+            self.cache.ingest(log_id, &body, &detail, now)?;
+            summary.downloaded += 1;
+            on_progress(LogsProgress {
+                done: done + 1,
+                total,
+            });
+        }
+
+        self.cache.mark_synced(id, now)?;
+        self.cache.prune(now - PRUNE_SECS)?;
+        Ok(summary)
+    }
+
+    /// The player's logs.tf list as logs.tf sent it.
+    async fn list(&self, id: SteamId) -> Result<Vec<ListedLog>, LogsSyncError> {
+        let url = format!(
+            "{}/api/v1/log?player={}&limit=1000&offset=0",
+            self.endpoints.logs_tf(),
+            id.id64()
+        );
+        let bytes = self.http.get_api(&url, LOG_BODY_LIMIT).await?;
+        let list: WireList =
+            serde_json::from_slice(&bytes).map_err(|e| LogsSyncError::Malformed {
+                url: url.clone(),
+                message: e.to_string(),
+            })?;
+        Ok(list
+            .logs
+            .into_iter()
+            .map(|log| ListedLog {
+                id: log.id,
+                title: log.title.unwrap_or_default(),
+                map: log.map.unwrap_or_default(),
+                date: log.date,
+            })
+            .collect())
     }
 }

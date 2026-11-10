@@ -5,7 +5,8 @@ use std::path::Path;
 use serde_json::json;
 use tempfile::TempDir;
 use tf2tools_core::{DataDir, Database, LogsCache, LogsClient, LogsEndpoints};
-use wiremock::MockServer;
+use wiremock::matchers::{method, path, path_regex, query_param};
+use wiremock::{Mock, MockServer, ResponseTemplate};
 
 pub struct LogsEnv {
     pub tmp: TempDir,
@@ -98,4 +99,62 @@ pub fn solo(account: u64, class: ClassSpec) -> PlayerSpec {
         drops: 0,
         classes: vec![class],
     }
+}
+
+pub const ARIE: u64 = 76_561_197_960_497_430;
+
+pub fn now() -> i64 {
+    chrono::Utc::now().timestamp()
+}
+
+pub fn days_ago(days: i64) -> i64 {
+    now() - days * 86_400
+}
+
+/// A list response holding `logs` as (id, upload date), in the order given.
+pub fn list_body(logs: &[(u64, i64)]) -> String {
+    let logs: Vec<_> = logs
+        .iter()
+        .map(|&(id, date)| {
+            json!({"id": id, "title": format!("Log {id}"), "map": "cp_process_f12",
+                   "date": date, "views": 0, "players": 12})
+        })
+        .collect();
+    json!({"success": true, "results": logs.len(), "total": logs.len(),
+           "parameters": {}, "logs": logs})
+    .to_string()
+}
+
+pub async fn mount_list(server: &wiremock::MockServer, player: u64, body: String) {
+    Mock::given(method("GET"))
+        .and(path("/api/v1/log"))
+        .and(query_param("player", player.to_string()))
+        .and(query_param("limit", "1000"))
+        .and(query_param("offset", "0"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(server)
+        .await;
+}
+
+/// Answers every `/json/<id>` with the same one-scout log.
+pub async fn mount_any_log(server: &wiremock::MockServer) {
+    Mock::given(method("GET"))
+        .and(path_regex(r"^/json/\d+$"))
+        .respond_with(ResponseTemplate::new(200).set_body_string(log_body(
+            600,
+            &[solo(231_702, ("scout", 600, 1, 1, 1, 100))],
+        )))
+        .mount(server)
+        .await;
+}
+
+/// The paths the server was asked for, in order.
+pub async fn paths(server: &wiremock::MockServer) -> Vec<String> {
+    server
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|r| r.url.path().to_owned())
+        .collect()
 }

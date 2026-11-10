@@ -11,7 +11,7 @@ use std::time::Duration;
 use crate::weapons::TfClass;
 
 pub use cache::{LogsCache, TrackedPlayer};
-pub use client::{LogsClient, LogsEndpoints};
+pub use client::{LogsClient, LogsEndpoints, LogsProgress, LogsSyncSummary};
 pub use detail::{
     ClassKills, ClassLine, HealTarget, LogColumns, LogDetail, MedicLine, PlayerLine, TeamTotals,
     parse_log,
@@ -27,6 +27,26 @@ pub const LOGS_SPACING: Duration = Duration::from_secs(1);
 /// The largest log or profile body accepted.
 pub const LOG_BODY_LIMIT: u64 = 2 * 1024 * 1024;
 
+/// How far back the log list and the class averages reach.
+pub const WINDOW_SECS: i64 = 90 * 86_400;
+
+/// Logs uploaded longer ago than this are deleted after a sync.
+pub const PRUNE_SECS: i64 = 120 * 86_400;
+
+/// The most logs a player's window holds; older ones past it are left out.
+pub const LOG_CAP: usize = 400;
+
+/// A player synced more recently than this is not synced again unless forced.
+pub const STALE_SECS: i64 = 30 * 60;
+
+/// A log fetched within this long of its upload may still change and is fetched once more.
+pub const PROVISIONAL_SECS: i64 = 60 * 60;
+
+/// The start of the averages and list window for `now` (unix seconds).
+pub fn window_start(now: i64) -> i64 {
+    now - WINDOW_SECS
+}
+
 /// logs.tf's class name ("heavyweapons", "demoman", ...) as a `TfClass`; `None` for anything else.
 pub fn logstf_class(name: &str) -> Option<TfClass> {
     Some(match name {
@@ -41,4 +61,19 @@ pub fn logstf_class(name: &str) -> Option<TfClass> {
         "spy" => TfClass::Spy,
         _ => return None,
     })
+}
+
+/// The inverse of `logstf_class`: the name logs.tf uses for `class`, as the cache stores it.
+pub(crate) fn logstf_class_name(class: TfClass) -> &'static str {
+    match class {
+        TfClass::Scout => "scout",
+        TfClass::Soldier => "soldier",
+        TfClass::Pyro => "pyro",
+        TfClass::Demoman => "demoman",
+        TfClass::Heavy => "heavyweapons",
+        TfClass::Engineer => "engineer",
+        TfClass::Medic => "medic",
+        TfClass::Sniper => "sniper",
+        TfClass::Spy => "spy",
+    }
 }

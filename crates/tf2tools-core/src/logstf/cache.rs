@@ -2,9 +2,10 @@
 
 use rusqlite::{OptionalExtension, params};
 
-use super::SteamId;
+use super::{LogDetail, PROVISIONAL_SECS, SteamId, logstf_class_name};
 use crate::db::Database;
 use crate::error::LogsCacheError;
+use crate::weapons::TfClass;
 
 /// The `settings` key naming the player whose chip is selected.
 const ACTIVE_KEY: &str = "logstf_active_player";
@@ -42,6 +43,15 @@ impl TrackedPlayer {
     pub fn last_synced(&self) -> Option<i64> {
         self.last_synced
     }
+}
+
+/// One entry of a player's logs.tf list, as the sync keeps it.
+#[derive(Debug, Clone)]
+pub(crate) struct ListedLog {
+    pub(crate) id: i64,
+    pub(crate) title: String,
+    pub(crate) map: String,
+    pub(crate) date: i64,
 }
 
 /// The logs.tf tables of the library database.
@@ -176,6 +186,139 @@ impl LogsCache {
     pub fn prune(&self, before: i64) -> Result<usize, LogsCacheError> {
         self.db
             .write(|conn| conn.execute("DELETE FROM logstf_logs WHERE date < ?1", [before]))
+            .map_err(db_error)
+    }
+}
+
+impl LogsCache {
+    /// `Some(last_synced)` for a tracked player, `None` for one with no row.
+    pub(crate) fn sync_state(&self, id: SteamId) -> Result<Option<Option<i64>>, LogsCacheError> {
+        self.db
+            .read(|conn| {
+                conn.query_row(
+                    "SELECT last_synced FROM logstf_players WHERE steam_id = ?1",
+                    [sql_id(id)?],
+                    |row| row.get::<_, Option<i64>>(0),
+                )
+                .optional()
+            })
+            .map_err(db_error)
+    }
+
+    /// Records `logs` and `player`'s membership of each in one transaction, then returns the
+    /// ids among them that need a download, in the order given.
+    ///
+    /// A log needs one while it is not gone or unreadable and either has no body, or was
+    /// fetched while still provisional (within `PROVISIONAL_SECS` of upload) and has since
+    /// settled.
+    pub(crate) fn record_list(
+        &self,
+        player: SteamId,
+        logs: &[ListedLog],
+        now: i64,
+    ) -> Result<Vec<i64>, LogsCacheError> {
+        self.db
+            .write(|conn| {
+                let player = sql_id(player)?;
+                let tx = conn.transaction()?;
+                let mut wanted = Vec::new();
+                {
+                    let mut upsert = tx.prepare(
+                        "INSERT INTO logstf_logs (id, title, map, date) VALUES (?1, ?2, ?3, ?4)
+                         ON CONFLICT(id) DO UPDATE SET
+                             title = excluded.title, map = excluded.map, date = excluded.date",
+                    )?;
+                    let mut member = tx.prepare(
+                        "INSERT OR IGNORE INTO logstf_player_logs (steam_id, log_id) VALUES (?1, ?2)",
+                    )?;
+                    let mut needs = tx.prepare(
+                        "SELECT 1 FROM logstf_logs WHERE id = ?1 AND state = 0 AND (body IS NULL
+                             OR (fetched_at - date < ?2 AND ?3 - date >= ?2))",
+                    )?;
+                    for log in logs {
+                        upsert.execute(params![log.id, log.title, log.map, log.date])?;
+                        member.execute(params![player, log.id])?;
+                        if needs.exists(params![log.id, PROVISIONAL_SECS, now])? {
+                            wanted.push(log.id);
+                        }
+                    }
+                }
+                tx.commit()?;
+                Ok(wanted)
+            })
+            .map_err(db_error)
+    }
+
+    /// Stores a downloaded log: its body and length, a class row per player per class played
+    /// (Medic heals, ubers and drops on the medic row only), and real names for any player
+    /// still named by the offline placeholder. Old class rows go first, so a refetch replaces them.
+    pub(crate) fn ingest(
+        &self,
+        log_id: i64,
+        body: &str,
+        detail: &LogDetail,
+        now: i64,
+    ) -> Result<(), LogsCacheError> {
+        self.db
+            .write(|conn| {
+                let tx = conn.transaction()?;
+                tx.execute(
+                    "UPDATE logstf_logs SET body = ?2, fetched_at = ?3, length = ?4, state = 0
+                     WHERE id = ?1",
+                    params![log_id, body, now, detail.length()],
+                )?;
+                tx.execute("DELETE FROM logstf_class_rows WHERE log_id = ?1", [log_id])?;
+                {
+                    let mut row = tx.prepare(
+                        "INSERT INTO logstf_class_rows (log_id, steam_id, class, seconds, kills,
+                             deaths, assists, dmg, heal, ubers, drops)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                    )?;
+                    let mut rename = tx.prepare(
+                        "UPDATE logstf_players SET name = ?2
+                         WHERE steam_id = ?1 AND name = CAST(steam_id AS TEXT)",
+                    )?;
+                    for p in detail.players() {
+                        let id = sql_id(p.steam_id())?;
+                        for c in p.classes() {
+                            let medic = c.class() == TfClass::Medic;
+                            let (heal, ubers, drops) = if medic {
+                                (p.heal(), p.ubers(), p.drops())
+                            } else {
+                                (0, 0, 0)
+                            };
+                            row.execute(params![
+                                log_id,
+                                id,
+                                logstf_class_name(c.class()),
+                                c.seconds(),
+                                c.kills(),
+                                c.deaths(),
+                                c.assists(),
+                                c.dmg(),
+                                heal,
+                                ubers,
+                                drops
+                            ])?;
+                        }
+                        rename.execute(params![id, p.name()])?;
+                    }
+                }
+                tx.commit()
+            })
+            .map_err(db_error)
+    }
+
+    /// Stamps `player` as synced at `now`.
+    pub(crate) fn mark_synced(&self, player: SteamId, now: i64) -> Result<(), LogsCacheError> {
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "UPDATE logstf_players SET last_synced = ?2 WHERE steam_id = ?1",
+                    params![sql_id(player)?, now],
+                )
+            })
+            .map(drop)
             .map_err(db_error)
     }
 }

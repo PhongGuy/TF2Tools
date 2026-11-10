@@ -2275,6 +2275,70 @@ pub enum ResolveError {
     },
 }
 
+/// Why a player's logs.tf sync stopped.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum LogsSyncError {
+    /// logs.tf kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// logs.tf answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// logs.tf could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The log list grew past its size cap.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// The log list or a log body was not the JSON logs.tf sends.
+    #[error("unexpected response from {url}: {message}")]
+    Malformed {
+        /// The address that was asked.
+        url: String,
+        /// What was wrong with the body.
+        message: String,
+    },
+    /// SQLite failed while writing the cache.
+    #[error("the logs.tf cache could not be read or written: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+    /// The player has no row in the tracked-player list.
+    #[error("{steam_id} is not a tracked player")]
+    NotTracked {
+        /// The player's SteamID64.
+        steam_id: u64,
+    },
+}
+
+impl From<LogsCacheError> for LogsSyncError {
+    fn from(e: LogsCacheError) -> Self {
+        match e {
+            LogsCacheError::Database { message } => LogsSyncError::Database { message },
+        }
+    }
+}
+
 /// Why a stored logs.tf body could not be read as a log.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

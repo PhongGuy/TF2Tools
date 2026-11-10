@@ -193,6 +193,7 @@ mod logstf_cache;
 mod logstf_detail;
 mod logstf_ids;
 mod logstf_resolve;
+mod logstf_sync;
 mod maps;
 mod mastercomfig;
 mod mastercomfig_catalog;
