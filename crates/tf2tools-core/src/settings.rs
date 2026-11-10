@@ -21,6 +21,7 @@ pub struct Settings {
     sync_cache_hours: u32,
     sidebar_collapsed: bool,
     maker_grid_lines: bool,
+    show_mature_addons: bool,
     hud_maker_panel: Option<String>,
     hud_maker_backdrop: Option<PathBuf>,
     old_v4_asked: bool,
@@ -57,6 +58,11 @@ impl Settings {
         self.maker_grid_lines
     }
 
+    /// Whether mature GameBanana add-ons show, `false` by default.
+    pub fn show_mature_addons(&self) -> bool {
+        self.show_mature_addons
+    }
+
     /// Where the HUD Maker's side panel sits, as the app wrote it; `None` by default.
     pub fn hud_maker_panel(&self) -> Option<&str> {
         self.hud_maker_panel.as_deref()
@@ -82,6 +88,7 @@ impl Default for Settings {
             sync_cache_hours: DEFAULT_SYNC_CACHE_HOURS,
             sidebar_collapsed: false,
             maker_grid_lines: false,
+            show_mature_addons: false,
             hud_maker_panel: None,
             hud_maker_backdrop: None,
             old_v4_asked: false,
@@ -145,6 +152,9 @@ impl Database {
                 }
                 "maker_grid_lines" => {
                     settings.maker_grid_lines = matches!(value.as_str(), "true" | "1")
+                }
+                "show_mature_addons" => {
+                    settings.show_mature_addons = matches!(value.as_str(), "true" | "1")
                 }
                 "hud_maker_panel" => settings.hud_maker_panel = Some(value),
                 "hud_maker_backdrop" => {
@@ -218,6 +228,11 @@ impl Database {
     /// Stores the Crosshair Maker grid-lines choice, as `"true"` or `"false"`.
     pub fn set_maker_grid_lines(&self, on: bool) -> Result<(), SettingsError> {
         self.save_setting("maker_grid_lines", if on { "true" } else { "false" })
+    }
+
+    /// Stores whether mature GameBanana add-ons show, as `"true"` or `"false"`.
+    pub fn set_show_mature_addons(&self, on: bool) -> Result<(), SettingsError> {
+        self.save_setting("show_mature_addons", if on { "true" } else { "false" })
     }
 
     /// Stores where the HUD Maker's side panel sits; the text is the app's to read back.

@@ -2,6 +2,8 @@
 #![forbid(unsafe_code)]
 
 pub mod activity;
+pub mod addon_detail;
+pub mod addon_feed;
 pub mod addon_updates;
 pub mod app;
 pub mod assets;
@@ -21,6 +23,7 @@ pub mod loadout;
 pub mod local_messages;
 pub mod map_messages;
 pub mod mastercomfig_restore;
+pub mod mature;
 pub mod notices;
 pub mod old_v4;
 pub mod pages;

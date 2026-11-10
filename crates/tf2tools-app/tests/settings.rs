@@ -430,3 +430,34 @@ fn third_party_notices_open_from_settings(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::SETTINGS_NOTICES);
     assert!(!support::present(cx, s.win, ids::SETTINGS_NOTICES_VIEW));
 }
+
+#[gpui_kit::test]
+fn the_add_ons_card_toggles_mature_add_ons_and_saves_at_once(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(
+        cx,
+        &env,
+        Tf2State::Found(Tf2Install::from_path(&env.game).unwrap()),
+    );
+    let _page = open_settings(cx, &s);
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::SETTINGS_MATURE_ADDONS),
+        Some(false)
+    );
+    cx.update_window(s.win, |_, w, cx| {
+        w.scroll(
+            ids::page(Page::Settings),
+            ScrollDelta::Pixels(point(px(0.), px(-600.))),
+            cx,
+        )
+    })
+    .unwrap();
+    support::click_id(cx, s.win, ids::SETTINGS_MATURE_ADDONS);
+    support::wait_real(cx, "the save", |_| {
+        s.services.db.settings().unwrap().show_mature_addons()
+    });
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::SETTINGS_MATURE_ADDONS),
+        Some(true)
+    );
+}

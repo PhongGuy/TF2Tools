@@ -9,8 +9,10 @@
 #![allow(clippy::wildcard_enum_match_arm)]
 
 mod activity;
+mod addon_feed;
 mod addon_store;
 mod addon_store_download;
+mod addon_store_gamebanana;
 mod addon_store_model;
 mod addon_updates;
 mod addons;

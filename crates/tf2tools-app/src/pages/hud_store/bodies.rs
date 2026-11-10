@@ -8,11 +8,12 @@ use gpui_kit::{
     App, Div, InteractiveElement as _, IntoElement, ParentElement as _, Styled as _,
     TestSupportExt as _, div, px, transparent_black,
 };
-use tf2tools_core::StoreItem;
+use tf2tools_core::{StoreItem, StoreItemId};
 
 use super::curated::CuratedHud;
 use crate::counts::count_stat;
 use crate::ids;
+use crate::links::gamebanana_page;
 use crate::pages::common::badge_of;
 use crate::store_detail::DetailBody;
 
@@ -86,9 +87,12 @@ pub fn gamebanana_body() -> DetailBody {
             .into_any_element()
     })
     .with_action(|item, _, _| {
-        let url = item.profile_url();
-        (!url.is_empty())
-            .then(|| link_button("gamebanana", "GameBanana", url.to_owned()).into_any_element())
+        let (StoreItemId::GameBanana(id), url) = (item.id(), item.profile_url()) else {
+            return None;
+        };
+        (!url.is_empty()).then(|| {
+            link_button("gamebanana", "GameBanana", gamebanana_page(url, *id)).into_any_element()
+        })
     })
 }
 

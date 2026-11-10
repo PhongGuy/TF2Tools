@@ -6,7 +6,7 @@ use serde_json::Value;
 use super::StoreKind;
 
 /// TF2's GameBanana game id.
-const TF2_GAME_ID: u32 = 297;
+pub(super) const TF2_GAME_ID: u32 = 297;
 pub(crate) const PAGE_SIZE: u32 = 15;
 const CROSSHAIR_CATEGORY: u32 = 1105;
 const HUD_CATEGORY: u32 = 1649;
@@ -218,8 +218,25 @@ fn parse_mod(record: &Value) -> Option<ModRecord> {
     if gb_id == 0 {
         return None;
     }
-    // The gallery prefers the 530 px rendition, then the original (most screenshots
-    // carry only that and a 100 px one), then 220 px; the card thumbnail is the first 100 px.
+    let (images, thumbnail_url) = preview_images(record);
+    Some(ModRecord {
+        gb_id,
+        name: text(&record["_sName"]),
+        author: text(&record["_aSubmitter"]["_sName"]),
+        thumbnail_url,
+        images_json: json_list(&images),
+        like_count: int(&record["_nLikeCount"]),
+        view_count: int(&record["_nViewCount"]),
+        tags_json: tags_json(&record["_aTags"]),
+        profile_url: text(&record["_sProfileUrl"]),
+        date_added: int(&record["_tsDateAdded"]),
+    })
+}
+
+/// A record's gallery URLs and card thumbnail. The gallery prefers the 530 px rendition,
+/// then the original (most screenshots carry only that and a 100 px one), then 220 px;
+/// the thumbnail is the first 100 px rendition.
+pub(super) fn preview_images(record: &Value) -> (Vec<String>, Option<String>) {
     let mut images = Vec::new();
     let mut thumbnail_url = None;
     for image in record["_aPreviewMedia"]["_aImages"]
@@ -241,29 +258,18 @@ fn parse_mod(record: &Value) -> Option<ModRecord> {
                 .map(|file| format!("{base}/{file}"));
         }
     }
-    Some(ModRecord {
-        gb_id,
-        name: text(&record["_sName"]),
-        author: text(&record["_aSubmitter"]["_sName"]),
-        thumbnail_url,
-        images_json: json_list(&images),
-        like_count: int(&record["_nLikeCount"]),
-        view_count: int(&record["_nViewCount"]),
-        tags_json: tags_json(&record["_aTags"]),
-        profile_url: text(&record["_sProfileUrl"]),
-        date_added: int(&record["_tsDateAdded"]),
-    })
+    (images, thumbnail_url)
 }
 
-fn int(value: &Value) -> i64 {
+pub(super) fn int(value: &Value) -> i64 {
     value.as_i64().unwrap_or(0)
 }
 
-fn text(value: &Value) -> String {
+pub(super) fn text(value: &Value) -> String {
     value.as_str().unwrap_or("").to_owned()
 }
 
-fn optional_text(value: &Value) -> Option<String> {
+pub(super) fn optional_text(value: &Value) -> Option<String> {
     value.as_str().map(str::to_owned)
 }
 

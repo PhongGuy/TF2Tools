@@ -22,6 +22,8 @@ use queue::{IMAGE_BUDGET, ImageQueue, ImageState};
 pub enum ImageTarget {
     /// A store grid card, 480x270.
     Card,
+    /// A mature add-on card before it is revealed: `Card`'s box, blurred.
+    CardBlurred,
     /// The detail carousel, 1280x720.
     Carousel,
     /// A weapon row icon, 100x75, the wiki thumbnail's size.
@@ -32,7 +34,7 @@ impl ImageTarget {
     /// The (width, height) an image is downsized to fit inside.
     pub fn bounds(self) -> (u32, u32) {
         match self {
-            ImageTarget::Card => (480, 270),
+            ImageTarget::Card | ImageTarget::CardBlurred => (480, 270),
             ImageTarget::Carousel => (1280, 720),
             ImageTarget::WeaponIcon => (100, 75),
         }
@@ -52,6 +54,14 @@ impl ImageKey {
         Self {
             url: url.to_owned(),
             target: ImageTarget::Card,
+        }
+    }
+
+    /// The URL decoded, blurred, for a mature card that is not revealed yet.
+    pub fn card_blurred(url: &str) -> Self {
+        Self {
+            url: url.to_owned(),
+            target: ImageTarget::CardBlurred,
         }
     }
 

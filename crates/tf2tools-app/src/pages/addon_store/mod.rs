@@ -1,23 +1,26 @@
-//! The Addon Store page: mastercomfig addons with Download, Update and Installed states.
+//! The Addon Store page: a mastercomfig tab of addons with Download, Update and Installed
+//! states, then one tab per GameBanana section.
 
+pub mod card;
+pub mod gamebanana_tab;
 pub mod model;
 
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariants as _};
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{
-    ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
+    ActiveTheme as _, Disableable as _, Icon, Selectable as _, Sizable as _, Size, h_flex, v_flex,
 };
 use gpui_kit::{
-    AnyElement, App, Context, EventEmitter, FontWeight, HighlightStyle, InteractiveElement as _,
-    InteractiveText, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
-    StatefulInteractiveElement as _, Styled as _, StyledText, Subscription, Task,
+    AnyElement, App, AppContext as _, Context, Entity, EventEmitter, FontWeight, HighlightStyle,
+    InteractiveElement as _, InteractiveText, IntoElement, ParentElement as _, Pixels, Render,
+    ScrollHandle, StatefulInteractiveElement as _, Styled as _, StyledText, Subscription, Task,
     TestSupportExt as _, UnderlineStyle, WeakEntity, Window, div, px, transparent_black,
 };
-use tf2tools_core::{AddonEntry, AddonName, StoreItem, StoreItemId, StoreKind};
+use tf2tools_core::{AddonEntry, AddonName, AddonSection, StoreItem, StoreItemId, StoreKind};
 
 use crate::addon_updates::{AddonEvent, AddonUpdates};
 use crate::ids;
@@ -33,6 +36,7 @@ use crate::sync::sync_hub;
 use crate::widgets::card_grid::{SHELL_CHROME_WIDTH, columns_for, stretch_rows};
 use crate::widgets::scroll::scroll_beside;
 use crate::widgets::store_error::store_error_line;
+use gamebanana_tab::AddonTab;
 use model::{AddonState, addon_state, downloads_label, ordered, store_release};
 
 const KIND: StoreKind = StoreKind::Addons;
@@ -71,6 +75,30 @@ impl InfoLink {
     }
 }
 
+/// Which of the Addon Store's tabs shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AddonStoreTab {
+    Mastercomfig,
+    GameBanana(AddonSection),
+}
+
+impl AddonStoreTab {
+    // The key in the tab's element id.
+    fn key(self) -> &'static str {
+        match self {
+            Self::Mastercomfig => "mastercomfig",
+            Self::GameBanana(section) => section.key(),
+        }
+    }
+
+    fn title(self) -> &'static str {
+        match self {
+            Self::Mastercomfig => "mastercomfig",
+            Self::GameBanana(section) => section.title(),
+        }
+    }
+}
+
 /// The library's addons by name, as the last load read them.
 type Library = Rc<HashMap<AddonName, AddonEntry>>;
 
@@ -91,6 +119,9 @@ pub struct AddonStorePage {
     scroll: ScrollHandle,
     /// Set while the page is away; it then skips reloads and rereads on return.
     hidden: bool,
+    tab: AddonStoreTab,
+    /// The GameBanana tabs by section key, each built on first show and kept with its feed.
+    gamebanana: HashMap<&'static str, Entity<AddonTab>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -141,6 +172,8 @@ impl AddonStorePage {
             load: None,
             scroll: ScrollHandle::new(),
             hidden: false,
+            tab: AddonStoreTab::Mastercomfig,
+            gamebanana: HashMap::new(),
             _subscriptions: subscriptions,
         };
         page.reload(cx);
@@ -186,11 +219,74 @@ impl AddonStorePage {
     }
 
     /// Hides or shows the page. Shown again, it rereads, since the Addons page may have changed
-    /// the library meanwhile; the scroll stays where it was.
+    /// the library meanwhile; the scroll stays where it was. Hiding hides every GameBanana tab,
+    /// and showing wakes only the selected one.
     pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
         if hidden != std::mem::replace(&mut self.hidden, hidden) && !hidden {
             self.reload(cx);
         }
+        self.wake_only(if hidden { None } else { Some(self.tab) }, cx);
+    }
+
+    /// The tab showing.
+    pub fn tab(&self) -> AddonStoreTab {
+        self.tab
+    }
+
+    /// Shows `tab`, building a GameBanana tab the first time, which starts its first step.
+    pub fn select(&mut self, tab: AddonStoreTab, window: &mut Window, cx: &mut Context<Self>) {
+        self.tab = tab;
+        if let AddonStoreTab::GameBanana(section) = tab
+            && !self.gamebanana.contains_key(section.key())
+        {
+            let built = cx.new(|cx| AddonTab::new(section, window, cx));
+            self.gamebanana.insert(section.key(), built);
+        }
+        self.wake_only(Some(tab), cx);
+        cx.notify();
+    }
+
+    /// `section`'s tab, once built.
+    pub fn gamebanana(&self, section: AddonSection) -> Option<Entity<AddonTab>> {
+        self.gamebanana.get(section.key()).cloned()
+    }
+
+    // Hides every built GameBanana tab but `shown`, so only a drawn tab holds image wants.
+    fn wake_only(&self, shown: Option<AddonStoreTab>, cx: &mut Context<Self>) {
+        for (key, tab) in &self.gamebanana {
+            let hidden = shown.is_none_or(|shown| shown.key() != *key);
+            tab.update(cx, |tab, cx| tab.set_hidden(hidden, cx));
+        }
+    }
+
+    // v5's TabsList is h-9, as on the HUD Store.
+    fn tab_button(&self, tab: AddonStoreTab, cx: &mut Context<Self>) -> Button {
+        Button::new(ids::addon_store_tab(tab.key()))
+            .label(tab.title())
+            .h(px(36.))
+            .selected(self.tab == tab)
+            .on_click(cx.listener(move |page, _, window, cx| page.select(tab, window, cx)))
+    }
+
+    // mastercomfig and the GameBanana sections are two joined groups in a wrapping row, so at
+    // the app's narrowest page the sections drop to their own line rather than run past it.
+    fn tab_strip(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let sections = AddonSection::ALL.into_iter().map(AddonStoreTab::GameBanana);
+        h_flex()
+            .id(ids::ADDON_STORE_TABS)
+            .test_support()
+            .flex_wrap()
+            .gap_2()
+            .child(
+                ButtonGroup::new(ids::ADDON_STORE_TAB_GROUP)
+                    .outline()
+                    .child(self.tab_button(AddonStoreTab::Mastercomfig, cx)),
+            )
+            .child(
+                ButtonGroup::new(ids::ADDON_STORE_SECTION_TABS)
+                    .outline()
+                    .children(sections.map(|tab| self.tab_button(tab, cx))),
+            )
     }
 
     /// Rereads the store's addons and the library's off the UI thread; a newer reload drops an
@@ -427,13 +523,19 @@ impl AddonStorePage {
 impl Render for AddonStorePage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let viewport_width = window.viewport_size().width;
-        v_flex()
+        let page = v_flex()
             .id(ids::page(Page::AddonStore))
             .test_support()
             .size_full()
             .p(CONTENT_PADDING)
             .gap_6()
-            .children(self.no_tf2(cx))
+            .child(self.tab_strip(cx));
+        // Only the selected tab renders, so the GameBanana tabs' shared ids never collide.
+        if let AddonStoreTab::GameBanana(section) = self.tab {
+            let tab = self.gamebanana(section);
+            return page.child(div().flex_1().min_h_0().children(tab));
+        }
+        page.children(self.no_tf2(cx))
             .child(self.header(cx))
             .child(self.info(cx))
             .children(self.error_line(cx))

@@ -2,8 +2,8 @@
 //! carry URLs, paths or codes; the raw error rides along as `detail` for the developer log.
 
 use tf2tools_core::{
-    ArchiveError, DownloadError, FilesError, GbId, ImportError, InstallError, PreviewError,
-    StoreKind,
+    ArchiveError, BrowseError, DownloadError, FilesError, GbId, ImportError, InstallError,
+    PreviewError, StoreKind,
 };
 
 use crate::services::OpError;
@@ -137,9 +137,50 @@ pub fn describe_files(kind: StoreKind, err: &FilesError) -> StoreFailure {
     StoreFailure::new(message, err.to_string())
 }
 
+/// A failed GameBanana add-on listing, search, category list or profile in player words;
+/// `detail` is the error's own text.
+pub fn describe_browse(err: &BrowseError) -> StoreFailure {
+    let message = match err {
+        BrowseError::Network { .. } => {
+            "Couldn't reach GameBanana. Check your internet connection and try again."
+        }
+        BrowseError::Throttled { .. } => THROTTLED,
+        BrowseError::RateLimited { .. } => {
+            "GameBanana is busy right now. Wait a few minutes, then try again."
+        }
+        // A 404 can come from a listing, a search or a category list as well as an item.
+        BrowseError::Http { status: 404, .. } => "GameBanana couldn't find this. Try again later.",
+        BrowseError::Gone { .. } => "This item is no longer on GameBanana.",
+        BrowseError::Http { status, .. } if *status >= 500 => {
+            "GameBanana is having problems right now. Try again later."
+        }
+        BrowseError::Http { .. } | BrowseError::TooLarge { .. } | BrowseError::Malformed { .. } => {
+            "GameBanana sent something TF2Tools couldn't read. Try again later."
+        }
+        _ => "Couldn't load add-ons. Try again later.",
+    };
+    StoreFailure::new(message, err.to_string())
+}
+
 /// A listing task that ended without an outcome, keeping `detail` for the log.
 pub fn listing_stopped(detail: String) -> StoreFailure {
     StoreFailure::new(FILES_STOPPED, detail)
+}
+
+/// An add-on listing step that ended without an outcome, keeping `detail` for the log.
+pub fn addons_stopped(detail: String) -> StoreFailure {
+    StoreFailure::new(
+        "Loading add-ons stopped before it finished. Try again.",
+        detail,
+    )
+}
+
+/// An add-on profile read that ended without an outcome, keeping `detail` for the log.
+pub fn addon_stopped(detail: String) -> StoreFailure {
+    StoreFailure::new(
+        "Loading this add-on stopped before it finished. Try again.",
+        detail,
+    )
 }
 
 /// A failed preview fetch in player words; previews only come from GameBanana.

@@ -10,6 +10,7 @@
 
 mod activity_log;
 mod addon_adopt;
+mod addon_catalog;
 mod archive;
 mod ci_workflow;
 mod common;

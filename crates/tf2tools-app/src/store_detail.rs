@@ -26,7 +26,7 @@ use crate::store_download::{
 use crate::store_messages::{DETAILS_FAILED_TITLE, describe_files, listing_stopped, read_failed};
 use crate::tokio_bridge;
 use crate::widgets::carousel::Carousel;
-use crate::widgets::dialog_frame::{BOX_CHROME, DETAIL_WIDTH, DIALOG_WIDTH, DialogFrame};
+use crate::widgets::dialog_frame::{DETAIL_WIDTH, DIALOG_WIDTH, DialogFrame, content_max_height};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_beside;
 
@@ -451,7 +451,7 @@ impl Render for StoreDetail {
             .id(ids::STORE_DETAIL)
             .test_support()
             .w_full()
-            .max_h(window.viewport_size().height * 0.9 - BOX_CHROME)
+            .max_h(content_max_height(window, cx))
             .gap_4()
             // v5's header: the badge rides 8 px after the name, the author on the line below,
             // and the kind's action at the top right beside that block. v5 draws the header
@@ -467,11 +467,15 @@ impl Render for StoreDetail {
                         v_flex()
                             .min_w_0()
                             .child(
+                                // The name may shrink and wrap, so a long one stays clear
+                                // of the header button and the close X.
                                 h_flex()
+                                    .min_w_0()
                                     .items_center()
                                     .gap_2()
                                     .child(labelled(
                                         div()
+                                            .min_w_0()
                                             .text_xl()
                                             .line_height(px(28.))
                                             .font_weight(FontWeight::SEMIBOLD),

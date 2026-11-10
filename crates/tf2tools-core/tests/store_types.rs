@@ -6,6 +6,10 @@ use crate::common;
 use std::time::Duration;
 
 use common::{sql, temp_data_dir};
+use tf2tools_core::{
+    AddonCard, AddonCatalog, AddonCursor, AddonQuery, AddonSection, AddonSort, AddonStep,
+    BrowseError,
+};
 use tf2tools_core::{CommunityMap, MapDownloadError, MapEntry, MapRemoveError, MapState};
 use tf2tools_core::{
     Database, DownloadError, DownloadPhase, DownloadProgress, Endpoints, FilesError, ImageError,
@@ -42,6 +46,27 @@ fn store_types_are_send_sync_debug() {
     assert_send_sync::<MapState>();
     assert_send_sync::<MapDownloadError>();
     assert_send_sync::<MapRemoveError>();
+    assert_send_sync::<AddonCard>();
+    assert_send_sync::<AddonQuery>();
+    assert_send_sync::<AddonCursor>();
+    assert_send_sync::<AddonStep>();
+    assert_send_sync::<AddonSection>();
+    assert_send_sync::<AddonCatalog>();
+    assert_send_sync::<BrowseError>();
+}
+
+#[test]
+fn the_addon_step_future_is_send() {
+    let (_tmp, dir) = temp_data_dir();
+    let client = StoreClient::new(
+        Database::open(&dir).unwrap(),
+        dir.clone(),
+        Endpoints::default(),
+    );
+    let query = AddonQuery::new(AddonSection::ALL[0], AddonSort::Newest);
+    let sink = |_: Vec<AddonCard>| {};
+    let catalog = client.addon_catalog();
+    assert_send(&catalog.step(&query, AddonCursor::START, &sink));
 }
 
 #[test]

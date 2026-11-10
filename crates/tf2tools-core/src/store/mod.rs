@@ -1,6 +1,9 @@
 //! The online stores: GameBanana HUDs, sounds and crosshairs, the curated hud-db HUDs
 //! and the mastercomfig addons, cached in v5's `store_*` tables.
 
+mod addon_api;
+mod addon_catalog;
+mod addon_sections;
 mod cards;
 mod download;
 mod gamebanana;
@@ -26,9 +29,15 @@ use md5::{Digest, Md5};
 use rusqlite::OptionalExtension;
 
 use crate::db::Database;
-use crate::error::{FilesError, QueryError, SyncError};
+use crate::error::{BrowseError, FilesError, QueryError, SyncError};
 use crate::paths::DataDir;
 use crate::weapons::Weapon;
+pub use addon_catalog::{
+    AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
+    AddonProfile, AddonQuery, AddonSort, AddonStep, INDEX_STEP_CALLS, SEARCH_STEP_CALLS,
+    STEP_CARDS,
+};
+pub use addon_sections::AddonSection;
 pub use cards::{StoreCard, StoreCursor, StoreQuery, StoreSort};
 pub use download::{DownloadPhase, DownloadProgress};
 use http::{API_BODY_LIMIT, Http, NetFailure, Redirects, Timeouts};
@@ -542,6 +551,8 @@ pub struct StoreClient {
     pacer: pacer::Pacer,
     /// The on-disk image cache, shared by clones.
     images: Arc<images::DiskCache>,
+    /// The add-on browsing caches, shared by clones.
+    addon_caches: Arc<addon_catalog::Caches>,
     download_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
@@ -566,6 +577,7 @@ impl StoreClient {
                 images::CACHE_HIGH,
                 images::CACHE_LOW,
             )),
+            addon_caches: Arc::default(),
             db,
             dir,
             endpoints,
@@ -636,6 +648,11 @@ impl StoreClient {
             }
         })
         .await
+    }
+
+    /// Live add-on browsing over this client's GameBanana pacer.
+    pub fn addon_catalog(&self) -> addon_catalog::AddonCatalog {
+        addon_catalog::AddonCatalog::new(self.clone())
     }
 
     /// True when this client's config refuses every request off loopback.
@@ -755,6 +772,16 @@ impl From<GbFailure> for SyncError {
     fn from(failure: GbFailure) -> Self {
         match failure {
             GbFailure::Throttled { url } => SyncError::Throttled { url },
+            GbFailure::Net(net) => net.into(),
+        }
+    }
+}
+
+/// Throttled stays Throttled; a network failure maps as `NetFailure` does.
+impl From<GbFailure> for BrowseError {
+    fn from(failure: GbFailure) -> Self {
+        match failure {
+            GbFailure::Throttled { url } => BrowseError::Throttled { url },
             GbFailure::Net(net) => net.into(),
         }
     }

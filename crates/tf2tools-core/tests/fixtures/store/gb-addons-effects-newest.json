@@ -1,0 +1,1989 @@
+{
+  "_aMetadata": {
+    "_nRecordCount": 1356,
+    "_bIsComplete": false,
+    "_nPerpage": 50
+  },
+  "_aRecords": [
+    {
+      "_idRow": 738216,
+      "_sModelName": "Mod",
+      "_sName": "Capri Crit Icon (Animated)",
+      "_sProfileUrl": "https://gamebanana.com/mods/738216",
+      "_tsDateAdded": 1794192096,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6af1259f5793b.jpg",
+            "_sFile220": "220-90_6af1259f5793b.jpg",
+            "_hFile220": 220,
+            "_wFile220": 220,
+            "_sFile530": "6af1259f5793b.jpg",
+            "_hFile530": 500,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6af1259f5793b.jpg",
+            "_hFile100": 100,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "Disareks"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "hide",
+      "_bHasContentRatings": true,
+      "_nLikeCount": 4
+    },
+    {
+      "_idRow": 738031,
+      "_sModelName": "Mod",
+      "_sName": "Floating Soul Particle Console Spam Fix",
+      "_sProfileUrl": "https://gamebanana.com/mods/738031",
+      "_tsDateAdded": 1794161650,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "The ERROR of TERROR!",
+            "_sFile": "6af0ae6da3f41.jpg",
+            "_sFile220": "220-90_6af0ae6da3f41.jpg",
+            "_hFile220": 182,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6af0ae6da3f41.jpg",
+            "_hFile530": 438,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6af0ae6da3f41.jpg",
+            "_hFile100": 83,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "Yakibomb"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Other/Misc",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1091"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 5
+    },
+    {
+      "_idRow": 736535,
+      "_sModelName": "Mod",
+      "_sName": "Malo SCP-1471 CRITICAL ICON",
+      "_sProfileUrl": "https://gamebanana.com/mods/736535",
+      "_tsDateAdded": 1793852763,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6aebfb2cb3188.jpg",
+            "_sFile220": "220-90_6aebfb2cb3188.jpg",
+            "_hFile220": 220,
+            "_wFile220": 220,
+            "_sFile530": "6aebfb2cb3188.jpg",
+            "_hFile530": 500,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6aebfb2cb3188.jpg",
+            "_hFile100": 100,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "Disareks"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "warn",
+      "_bHasContentRatings": true,
+      "_nLikeCount": 6
+    },
+    {
+      "_idRow": 736525,
+      "_sModelName": "Mod",
+      "_sName": "Violent Violet Electrical Event",
+      "_sProfileUrl": "https://gamebanana.com/mods/736525",
+      "_tsDateAdded": 1793850370,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6aebf0e1acb0c.jpg",
+            "_sFile220": "220-90_6aebf0e1acb0c.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6aebf0e1acb0c.jpg",
+            "_hFile530": 299,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6aebf0e1acb0c.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Other/Misc",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1091"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 6
+    },
+    {
+      "_idRow": 734772,
+      "_sModelName": "Mod",
+      "_sName": "Oil & Sparks (DE Orange Box blood recreation)",
+      "_sProfileUrl": "https://gamebanana.com/mods/734772",
+      "_tsDateAdded": 1793484339,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "note: robot gibs aren't part of this mod",
+            "_sFile": "6ae6659f198da.jpg",
+            "_sFile220": "220-90_6ae6659f198da.jpg",
+            "_hFile220": 127,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6ae6659f198da.jpg",
+            "_hFile530": 307,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6ae6659f198da.jpg",
+            "_hFile100": 58,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "IronFoxGaming"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Blood",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1096"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 6
+    },
+    {
+      "_idRow": 734325,
+      "_sModelName": "Mod",
+      "_sName": "Charge Meter Bars",
+      "_sProfileUrl": "https://gamebanana.com/mods/734325",
+      "_tsDateAdded": 1793413194,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6ae54d03c89ef.jpg",
+            "_sFile220": "220-90_6ae54d03c89ef.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6ae54d03c89ef.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6ae54d03c89ef.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "mbars"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Crosshairs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1105"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 2
+    },
+    {
+      "_idRow": 734131,
+      "_sModelName": "Mod",
+      "_sName": "Reito replace the crit icons",
+      "_sProfileUrl": "https://gamebanana.com/mods/734131",
+      "_tsDateAdded": 1793384585,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6ae4dd9f3b2b0.jpg",
+            "_sFile220": "220-90_6ae4dd9f3b2b0.jpg",
+            "_hFile220": 220,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6ae4dd9f3b2b0.jpg",
+            "_hFile530": 530,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6ae4dd9f3b2b0.jpg",
+            "_hFile100": 100,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "Reito_Ryoko_Sha"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "hide",
+      "_bHasContentRatings": true,
+      "_nLikeCount": 13
+    },
+    {
+      "_idRow": 733047,
+      "_sModelName": "Mod",
+      "_sName": "Burning Armamentarium",
+      "_sProfileUrl": "https://gamebanana.com/mods/733047",
+      "_tsDateAdded": 1793152427,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6ae151b587d4e.jpg",
+            "_sFile220": "220-90_6ae151b587d4e.jpg",
+            "_hFile220": 153,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6ae151b587d4e.jpg",
+            "_hFile530": 368,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6ae151b587d4e.jpg",
+            "_hFile100": 69,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 1
+    },
+    {
+      "_idRow": 732292,
+      "_sModelName": "Mod",
+      "_sName": "CRITICAL T#TS (Limbus Company)",
+      "_sProfileUrl": "https://gamebanana.com/mods/732292",
+      "_tsDateAdded": 1792963482,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6ade722636305.jpg",
+            "_sFile220": "220-90_6ade722636305.jpg",
+            "_hFile220": 216,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6ade722636305.jpg",
+            "_hFile530": 521,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6ade722636305.jpg",
+            "_hFile100": 98,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "Tsimi"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "hide",
+      "_bHasContentRatings": true,
+      "_nLikeCount": 20
+    },
+    {
+      "_idRow": 731759,
+      "_sModelName": "Mod",
+      "_sName": "boobies crits",
+      "_sProfileUrl": "https://gamebanana.com/mods/731759",
+      "_tsDateAdded": 1792866240,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6adde556b0a4c.jpg",
+            "_sFile220": "220-90_6adde556b0a4c.jpg",
+            "_hFile220": 220,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6adde556b0a4c.jpg",
+            "_hFile530": 530,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6adde556b0a4c.jpg",
+            "_hFile100": 100,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "klausss"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "warn",
+      "_bHasContentRatings": true,
+      "_nLikeCount": 9
+    },
+    {
+      "_idRow": 731019,
+      "_sModelName": "Mod",
+      "_sName": "Murky Rocket Trails",
+      "_sProfileUrl": "https://gamebanana.com/mods/731019",
+      "_tsDateAdded": 1792714182,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6adaa4ed24f05.jpg",
+            "_sFile220": "220-90_6adaa4ed24f05.jpg",
+            "_hFile220": 125,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6adaa4ed24f05.jpg",
+            "_hFile530": 301,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6adaa4ed24f05.jpg",
+            "_hFile100": 57,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Rocket Trails",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1100"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 1
+    },
+    {
+      "_idRow": 728818,
+      "_sModelName": "Mod",
+      "_sName": "死 crit",
+      "_sProfileUrl": "https://gamebanana.com/mods/728818",
+      "_tsDateAdded": 1792252696,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6ad39ac241263.jpg",
+            "_sFile220": "220-90_6ad39ac241263.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6ad39ac241263.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6ad39ac241263.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "rmgdn"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 1
+    },
+    {
+      "_idRow": 726884,
+      "_sModelName": "Mod",
+      "_sName": "Fell Bullet Scope",
+      "_sProfileUrl": "https://gamebanana.com/mods/726884",
+      "_tsDateAdded": 1791778294,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "WATCH OUT",
+            "_sFile": "6acc5c69ea2d1.jpg",
+            "_sFile220": "220-90_6acc5c69ea2d1.jpg",
+            "_hFile220": 164,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6acc5c69ea2d1.jpg",
+            "_hFile530": 396,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6acc5c69ea2d1.jpg",
+            "_hFile100": 75,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "UNcertified_Larper29"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Scopes",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1095"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 4
+    },
+    {
+      "_idRow": 723286,
+      "_sModelName": "Mod",
+      "_sName": "Risen",
+      "_sProfileUrl": "https://gamebanana.com/mods/723286",
+      "_tsDateAdded": 1790981807,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6ac036405c5bf.jpg",
+            "_sFile220": "220-90_6ac036405c5bf.jpg",
+            "_hFile220": 185,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6ac036405c5bf.jpg",
+            "_hFile530": 446,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6ac036405c5bf.jpg",
+            "_hFile100": 84,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 5
+    },
+    {
+      "_idRow": 713362,
+      "_sModelName": "Mod",
+      "_sName": "Galactitope (Isotope)",
+      "_sProfileUrl": "https://gamebanana.com/mods/713362",
+      "_tsDateAdded": 1789135890,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a99e282a3d6d.jpg",
+            "_sFile220": "220-90_6a99e282a3d6d.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a99e282a3d6d.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a99e282a3d6d.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "xeltre"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Other/Misc",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1091"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 7
+    },
+    {
+      "_idRow": 715557,
+      "_sModelName": "Mod",
+      "_sName": "Spring '07 Explosions",
+      "_sProfileUrl": "https://gamebanana.com/mods/715557",
+      "_tsDateAdded": 1788972910,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6aa18f5fc5d5b.jpg",
+            "_sFile220": "220-90_6aa18f5fc5d5b.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6aa18f5fc5d5b.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6aa18f5fc5d5b.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "UltraArio99"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Explosions",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1101"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 15
+    },
+    {
+      "_idRow": 712835,
+      "_sModelName": "Mod",
+      "_sName": "Starry (Purple) Isotope \"Full\" Recreation",
+      "_sProfileUrl": "https://gamebanana.com/mods/712835",
+      "_tsDateAdded": 1788335714,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a97d51d492f9.jpg",
+            "_sFile220": "220-90_6a97d51d492f9.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a97d51d492f9.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a97d51d492f9.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "chrouu"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 9
+    },
+    {
+      "_idRow": 712093,
+      "_sModelName": "Mod",
+      "_sName": "Minecraft Crit/Mini-Crit Text",
+      "_sProfileUrl": "https://gamebanana.com/mods/712093",
+      "_tsDateAdded": 1788165767,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "MrBeast donated $1.99 cents through superchat",
+            "_sFile": "6ac06d8810fa2.jpg",
+            "_sFile220": "220-90_6ac06d8810fa2.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6ac06d8810fa2.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6ac06d8810fa2.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "joshadam"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 6
+    },
+    {
+      "_idRow": 712075,
+      "_sModelName": "Mod",
+      "_sName": "Marinas Double Donkers/crits",
+      "_sProfileUrl": "https://gamebanana.com/mods/712075",
+      "_tsDateAdded": 1788159470,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a95254f33b07.jpg",
+            "_sFile220": "220-90_6a95254f33b07.jpg",
+            "_hFile220": 220,
+            "_wFile220": 220,
+            "_sFile530": "6a95254f33b07.jpg",
+            "_hFile530": 400,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a95254f33b07.jpg",
+            "_hFile100": 100,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "K11T"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "hide",
+      "_bHasContentRatings": true,
+      "_nLikeCount": 56
+    },
+    {
+      "_idRow": 711462,
+      "_sModelName": "Mod",
+      "_sName": "True Crosshairs",
+      "_sProfileUrl": "https://gamebanana.com/mods/711462",
+      "_tsDateAdded": 1788112065,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "True Crosshairs",
+            "_sFile": "6a93638ff227b.jpg",
+            "_sFile220": "220-90_6a93638ff227b.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a93638ff227b.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a93638ff227b.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "outoftune"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Crosshairs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1105"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 15
+    },
+    {
+      "_idRow": 709122,
+      "_sModelName": "Mod",
+      "_sName": "white_guns",
+      "_sProfileUrl": "https://gamebanana.com/mods/709122",
+      "_tsDateAdded": 1787578655,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a8c481af3e87.jpg",
+            "_sFile220": "220-90_6a8c481af3e87.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a8c481af3e87.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a8c481af3e87.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "_gx"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 20
+    },
+    {
+      "_idRow": 709120,
+      "_sModelName": "Mod",
+      "_sName": "white_arms",
+      "_sProfileUrl": "https://gamebanana.com/mods/709120",
+      "_tsDateAdded": 1787578304,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a8c47927232d.jpg",
+            "_sFile220": "220-90_6a8c47927232d.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a8c47927232d.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a8c47927232d.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "_gx"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 19
+    },
+    {
+      "_idRow": 706718,
+      "_sModelName": "Mod",
+      "_sName": "White Weapon Sheens",
+      "_sProfileUrl": "https://gamebanana.com/mods/706718",
+      "_tsDateAdded": 1787170213,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a860cdaccd70.jpg",
+            "_sFile220": "220-90_6a860cdaccd70.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a860cdaccd70.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a860cdaccd70.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "cukei"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 18
+    },
+    {
+      "_idRow": 705079,
+      "_sModelName": "Mod",
+      "_sName": "Koyuki Crit Icon Casual Compatible",
+      "_sProfileUrl": "https://gamebanana.com/mods/705079",
+      "_tsDateAdded": 1786878897,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a819b065dc4c.jpg",
+            "_sFile220": "220-90_6a819b065dc4c.jpg",
+            "_hFile220": 220,
+            "_wFile220": 220,
+            "_sFile530": "6a819b065dc4c.jpg",
+            "_hFile530": 512,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a819b065dc4c.jpg",
+            "_hFile100": 100,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "olivertzeng"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 4
+    },
+    {
+      "_idRow": 704285,
+      "_sModelName": "Mod",
+      "_sName": "cat angel crit",
+      "_sProfileUrl": "https://gamebanana.com/mods/704285",
+      "_tsDateAdded": 1786737161,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "normal ver.",
+            "_sFile": "6a7f7134e5950.jpg",
+            "_sFile220": "220-90_6a7f7134e5950.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a7f7134e5950.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a7f7134e5950.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "deph12"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 2
+    },
+    {
+      "_idRow": 702834,
+      "_sModelName": "Mod",
+      "_sName": "Corruptive Chromatic I",
+      "_sProfileUrl": "https://gamebanana.com/mods/702834",
+      "_tsDateAdded": 1786420184,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a7a9b458dee6.jpg",
+            "_sFile220": "220-90_6a7a9b458dee6.jpg",
+            "_hFile220": 206,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a7a9b458dee6.jpg",
+            "_hFile530": 496,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a7a9b458dee6.jpg",
+            "_hFile100": 94,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 4
+    },
+    {
+      "_idRow": 701486,
+      "_sModelName": "Mod",
+      "_sName": "Burning SnipeR",
+      "_sProfileUrl": "https://gamebanana.com/mods/701486",
+      "_tsDateAdded": 1786132872,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a76390a66a33.jpg",
+            "_sFile220": "220-90_6a76390a66a33.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a76390a66a33.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a76390a66a33.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Other/Misc",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1091"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 3
+    },
+    {
+      "_idRow": 698777,
+      "_sModelName": "Mod",
+      "_sName": "Princess Luna NSFW Crit Icons",
+      "_sProfileUrl": "https://gamebanana.com/mods/698777",
+      "_tsDateAdded": 1785380599,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a6abcba9cfcc.jpg",
+            "_sFile220": "220-90_6a6abcba9cfcc.jpg",
+            "_hFile220": 146,
+            "_wFile220": 220,
+            "_sFile530": "6a6abcba9cfcc.jpg",
+            "_hFile530": 265,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a6abcba9cfcc.jpg",
+            "_hFile100": 66,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "lunaTheQueen"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "hide",
+      "_bHasContentRatings": true,
+      "_nLikeCount": 13
+    },
+    {
+      "_idRow": 698002,
+      "_sModelName": "Mod",
+      "_sName": "Butterfly CritHit",
+      "_sProfileUrl": "https://gamebanana.com/mods/698002",
+      "_tsDateAdded": 1785172941,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a67911aed7d3.jpg",
+            "_sFile220": "220-90_6a67911aed7d3.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a67911aed7d3.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a67911aed7d3.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "xiety"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 10
+    },
+    {
+      "_idRow": 697880,
+      "_sModelName": "Mod",
+      "_sName": "Astolfo Crits",
+      "_sProfileUrl": "https://gamebanana.com/mods/697880",
+      "_tsDateAdded": 1785126408,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a66ec10451f7.jpg",
+            "_sFile220": "220-90_6a66ec10451f7.jpg",
+            "_hFile220": 168,
+            "_wFile220": 220,
+            "_sFile530": "6a66ec10451f7.jpg",
+            "_hFile530": 404,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a66ec10451f7.jpg",
+            "_hFile100": 76,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "JynxTheJester"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "hide",
+      "_bHasContentRatings": true,
+      "_nLikeCount": 22
+    },
+    {
+      "_idRow": 696872,
+      "_sModelName": "Mod",
+      "_sName": "No Rocket Trails+Small Explosions",
+      "_sProfileUrl": "https://gamebanana.com/mods/696872",
+      "_tsDateAdded": 1784848852,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a62a28e8d813.jpg",
+            "_sFile220": "220-90_6a62a28e8d813.jpg",
+            "_hFile220": 109,
+            "_wFile220": 220,
+            "_sFile530": "6a62a28e8d813.jpg",
+            "_hFile530": 263,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a62a28e8d813.jpg",
+            "_hFile100": 50,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "tigui555"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Explosions",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1101"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false
+    },
+    {
+      "_idRow": 696490,
+      "_sModelName": "Mod",
+      "_sName": "nutt medibeam",
+      "_sProfileUrl": "https://gamebanana.com/mods/696490",
+      "_tsDateAdded": 1784742375,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a60ffba5cd9f.jpg",
+            "_sFile220": "220-90_6a60ffba5cd9f.jpg",
+            "_hFile220": 165,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a60ffba5cd9f.jpg",
+            "_hFile530": 398,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a60ffba5cd9f.jpg",
+            "_hFile100": 75,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "nsxtf2"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Medic Beam",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1092"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 7
+    },
+    {
+      "_idRow": 695501,
+      "_sModelName": "Mod",
+      "_sName": "Kirby Crits",
+      "_sProfileUrl": "https://gamebanana.com/mods/695501",
+      "_tsDateAdded": 1784419833,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a5c14b6598db.jpg",
+            "_sFile220": "220-90_6a5c14b6598db.jpg",
+            "_hFile220": 220,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a5c14b6598db.jpg",
+            "_hFile530": 530,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a5c14b6598db.jpg",
+            "_hFile100": 100,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "RidireGeas"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 4
+    },
+    {
+      "_idRow": 694340,
+      "_sModelName": "Mod",
+      "_sName": "N. Noir's Revenge",
+      "_sProfileUrl": "https://gamebanana.com/mods/694340",
+      "_tsDateAdded": 1784065701,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a56ae248b368.jpg",
+            "_sFile220": "220-90_6a56ae248b368.jpg",
+            "_hFile220": 149,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a56ae248b368.jpg",
+            "_hFile530": 359,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a56ae248b368.jpg",
+            "_hFile100": 68,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 12
+    },
+    {
+      "_idRow": 694326,
+      "_sModelName": "Mod",
+      "_sName": "Burning Shotgun",
+      "_sProfileUrl": "https://gamebanana.com/mods/694326",
+      "_tsDateAdded": 1784061795,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a569f0bae67e.jpg",
+            "_sFile220": "220-90_6a569f0bae67e.jpg",
+            "_hFile220": 170,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a569f0bae67e.jpg",
+            "_hFile530": 409,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a569f0bae67e.jpg",
+            "_hFile100": 77,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false
+    },
+    {
+      "_idRow": 694324,
+      "_sModelName": "Mod",
+      "_sName": "Burning ScorchS",
+      "_sProfileUrl": "https://gamebanana.com/mods/694324",
+      "_tsDateAdded": 1784060938,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a569baccb9d5.jpg",
+            "_sFile220": "220-90_6a569baccb9d5.jpg",
+            "_hFile220": 123,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a569baccb9d5.jpg",
+            "_hFile530": 296,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a569baccb9d5.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 1
+    },
+    {
+      "_idRow": 693411,
+      "_sModelName": "Mod",
+      "_sName": "3D Spinning Crit/Minicrit Text",
+      "_sProfileUrl": "https://gamebanana.com/mods/693411",
+      "_tsDateAdded": 1783781808,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a5257e0d0ce5.jpg",
+            "_sFile220": "220-90_6a5257e0d0ce5.jpg",
+            "_hFile220": 109,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a5257e0d0ce5.jpg",
+            "_hFile530": 263,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a5257e0d0ce5.jpg",
+            "_hFile100": 50,
+            "_wFile100": 100,
+            "_sFile800": "6a5257e0d0ce5.jpg",
+            "_hFile800": 328,
+            "_wFile800": 800
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "tigui555"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 43
+    },
+    {
+      "_idRow": 693232,
+      "_sModelName": "Mod",
+      "_sName": "Teto booba double-donks",
+      "_sProfileUrl": "https://gamebanana.com/mods/693232",
+      "_tsDateAdded": 1783725495,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "\"a pair of DONKERS\"",
+            "_sFile": "6a517d9c5037d.jpg",
+            "_sFile220": "220-90_6a517d9c5037d.jpg",
+            "_hFile220": 270,
+            "_wFile220": 220,
+            "_sFile530": "6a517d9c5037d.jpg",
+            "_hFile530": 579,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a517d9c5037d.jpg",
+            "_hFile100": 123,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "Tsimi"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Other/Misc",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1091"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "warn",
+      "_bHasContentRatings": true,
+      "_nLikeCount": 35
+    },
+    {
+      "_idRow": 692613,
+      "_sModelName": "Mod",
+      "_sName": "SWOON and MINI-SWOON Crit and Mini-Crit effects",
+      "_sProfileUrl": "https://gamebanana.com/mods/692613",
+      "_tsDateAdded": 1783523882,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a4e67806c0d2.jpg",
+            "_sFile220": "220-90_6a4e67806c0d2.jpg",
+            "_hFile220": 143,
+            "_wFile220": 220,
+            "_sFile530": "6a4e67806c0d2.jpg",
+            "_hFile530": 277,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a4e67806c0d2.jpg",
+            "_hFile100": 65,
+            "_wFile100": 100,
+            "_sFile800": "6a4e67806c0d2.jpg",
+            "_hFile800": 277,
+            "_wFile800": 800
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "L0ckett07"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 8
+    },
+    {
+      "_idRow": 692274,
+      "_sModelName": "Mod",
+      "_sName": "BURNING 3L4DE",
+      "_sProfileUrl": "https://gamebanana.com/mods/692274",
+      "_tsDateAdded": 1783403525,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a4c93f1dd85a.jpg",
+            "_sFile220": "220-90_6a4c93f1dd85a.jpg",
+            "_hFile220": 130,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a4c93f1dd85a.jpg",
+            "_hFile530": 312,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a4c93f1dd85a.jpg",
+            "_hFile100": 59,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Other/Misc",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1091"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 5
+    },
+    {
+      "_idRow": 692183,
+      "_sModelName": "Mod",
+      "_sName": "Burning Scatt",
+      "_sProfileUrl": "https://gamebanana.com/mods/692183",
+      "_tsDateAdded": 1783375171,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a4c24a98f441.jpg",
+            "_sFile220": "220-90_6a4c24a98f441.jpg",
+            "_hFile220": 138,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a4c24a98f441.jpg",
+            "_hFile530": 334,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a4c24a98f441.jpg",
+            "_hFile100": 63,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Other/Misc",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1091"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 3
+    },
+    {
+      "_idRow": 691767,
+      "_sModelName": "Mod",
+      "_sName": "Burning StickyBL",
+      "_sProfileUrl": "https://gamebanana.com/mods/691767",
+      "_tsDateAdded": 1783255129,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a4a4eed4fc0c.jpg",
+            "_sFile220": "220-90_6a4a4eed4fc0c.jpg",
+            "_hFile220": 125,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a4a4eed4fc0c.jpg",
+            "_hFile530": 300,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a4a4eed4fc0c.jpg",
+            "_hFile100": 57,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "user.7"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Other/Misc",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1091"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false
+    },
+    {
+      "_idRow": 691539,
+      "_sModelName": "Mod",
+      "_sName": "ANDRUXA SAMOSVAL",
+      "_sProfileUrl": "https://gamebanana.com/mods/691539",
+      "_tsDateAdded": 1783182968,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a4934e87ad89.jpg",
+            "_sFile220": "220-90_6a4934e87ad89.jpg",
+            "_hFile220": 110,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a4934e87ad89.jpg",
+            "_hFile530": 265,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a4934e87ad89.jpg",
+            "_hFile100": 50,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "Noobik21vek"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false
+    },
+    {
+      "_idRow": 688731,
+      "_sModelName": "Mod",
+      "_sName": "Better No Explosion and No Trails Mod",
+      "_sProfileUrl": "https://gamebanana.com/mods/688731",
+      "_tsDateAdded": 1782327184,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "rocket launcher",
+            "_sFile": "6a3c276823952.jpg",
+            "_sFile220": "220-90_6a3c276823952.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a3c276823952.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a3c276823952.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "beats.exe"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 10
+    },
+    {
+      "_idRow": 687611,
+      "_sModelName": "Mod",
+      "_sName": "Star of David & Star and crescent Unusual Effects",
+      "_sProfileUrl": "https://gamebanana.com/mods/687611",
+      "_tsDateAdded": 1781992430,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a370b63b4745.jpg",
+            "_sFile220": "220-90_6a370b63b4745.jpg",
+            "_hFile220": 124,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a370b63b4745.jpg",
+            "_hFile530": 298,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a370b63b4745.jpg",
+            "_hFile100": 56,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "coremov"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Other/Misc",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1091"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 2
+    },
+    {
+      "_idRow": 685761,
+      "_sModelName": "Mod",
+      "_sName": "Fanged",
+      "_sProfileUrl": "https://gamebanana.com/mods/685761",
+      "_tsDateAdded": 1781388556,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a2dd446bd956.jpg",
+            "_sFile220": "220-90_6a2dd446bd956.jpg",
+            "_hFile220": 164,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a2dd446bd956.jpg",
+            "_hFile530": 396,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a2dd446bd956.jpg",
+            "_hFile100": 75,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "generic_user536927"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 4
+    },
+    {
+      "_idRow": 680643,
+      "_sModelName": "Mod",
+      "_sName": "Half-Life 2 or Beta Fire",
+      "_sProfileUrl": "https://gamebanana.com/mods/680643",
+      "_tsDateAdded": 1779832983,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "FlameThrowin'",
+            "_sFile": "6a16183de0c57.jpg",
+            "_sFile220": "220-90_6a16183de0c57.jpg",
+            "_hFile220": 102,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a16183de0c57.jpg",
+            "_hFile530": 245,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a16183de0c57.jpg",
+            "_hFile100": 46,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "BeytahAtlas"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Flamethrowers",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1103"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 13
+    },
+    {
+      "_idRow": 680467,
+      "_sModelName": "Mod",
+      "_sName": "Eerie Orbital Fire to Eerie Flames [CASUAL]",
+      "_sProfileUrl": "https://gamebanana.com/mods/680467",
+      "_tsDateAdded": 1779785212,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a1561d64dcc1.jpg",
+            "_sFile220": "220-90_6a1561d64dcc1.jpg",
+            "_hFile220": 145,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a1561d64dcc1.jpg",
+            "_hFile530": 348,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a1561d64dcc1.jpg",
+            "_hFile100": 66,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "Codename_Zeto"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Other/Misc",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1091"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 3
+    },
+    {
+      "_idRow": 679012,
+      "_sModelName": "Mod",
+      "_sName": "Swoon Critical Hit icon",
+      "_sProfileUrl": "https://gamebanana.com/mods/679012",
+      "_tsDateAdded": 1779386404,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sCaption": "Normal",
+            "_sFile": "6a0f4732e58ab.jpg",
+            "_sFile220": "220-90_6a0f4732e58ab.jpg",
+            "_hFile220": 178,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a0f4732e58ab.jpg",
+            "_hFile530": 428,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a0f4732e58ab.jpg",
+            "_hFile100": 81,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "Mythrix"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Critical Hit Icons",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1094"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 1
+    },
+    {
+      "_idRow": 678861,
+      "_sModelName": "Mod",
+      "_sName": "Accurate Demoman Grenade/Stick Launcher Crosshairs",
+      "_sProfileUrl": "https://gamebanana.com/mods/678861",
+      "_tsDateAdded": 1779327177,
+      "_aPreviewMedia": {
+        "_aImages": [
+          {
+            "_sType": "screenshot",
+            "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+            "_sFile": "6a13b0a62606b.jpg",
+            "_sFile220": "220-90_6a13b0a62606b.jpg",
+            "_hFile220": 115,
+            "_wFile220": 220,
+            "_sFile530": "530-90_6a13b0a62606b.jpg",
+            "_hFile530": 278,
+            "_wFile530": 530,
+            "_sFile100": "100-90_6a13b0a62606b.jpg",
+            "_hFile100": 52,
+            "_wFile100": 100
+          }
+        ]
+      },
+      "_aSubmitter": {
+        "_sName": "MisterM4n"
+      },
+      "_aRootCategory": {
+        "_sName": "Effects",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1090"
+      },
+      "_aSubCategory": {
+        "_sName": "Crosshairs",
+        "_sProfileUrl": "https://gamebanana.com/mods/cats/1105"
+      },
+      "_bIsObsolete": false,
+      "_sInitialVisibility": "show",
+      "_bHasContentRatings": false,
+      "_nLikeCount": 3
+    }
+  ]
+}

@@ -38,7 +38,7 @@ pub use crosshair_catalog::{BuiltinCrosshair, BuiltinCrosshairs};
 pub use db::Database;
 pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
-    CatalogError, CopyHudError, DataDirError, DetectError, DownloadError, FilesError,
+    BrowseError, CatalogError, CopyHudError, DataDirError, DetectError, DownloadError, FilesError,
     FontCheckError, FontInstallError, HistoryError, HudFilesError, HudLoadError, ImageError,
     ImportError, InstallError, InstallMastercomfigError, KeepHudError, KvParseError, LibraryError,
     LogError, MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError,
@@ -104,12 +104,14 @@ pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
 pub use settings::{Settings, Volume};
-pub use store::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 pub use store::{
-    DownloadPhase, DownloadProgress, Endpoints, MastercomfigRelease, StoreCard, StoreClient,
-    StoreConfig, StoreCursor, StoreFile, StoreItem, StoreItemId, StoreKind, StoreQuery, StoreSort,
-    StoreSyncStatus, SyncOutcome, SyncProgress,
+    AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
+    AddonProfile, AddonQuery, AddonSection, AddonSort, AddonStep, DownloadPhase, DownloadProgress,
+    Endpoints, INDEX_STEP_CALLS, MastercomfigRelease, SEARCH_STEP_CALLS, STEP_CARDS, StoreCard,
+    StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem, StoreItemId, StoreKind,
+    StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
 };
+pub use store::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 pub use texture::{
     FitChange, PNG_MAX_FILE_BYTES, PNG_MAX_SIDE, RgbaImage, decode_vtf, fit_hud_texture,
     fit_to_maker, hud_texture_vtf, menu_textures, png_to_vtf, read_picture, read_png, rgba_to_vtf,

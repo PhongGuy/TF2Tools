@@ -314,3 +314,18 @@ fn hud_maker_backdrop_defaults_to_none_round_trips_and_clears() {
     assert_eq!(raw_setting(&dir, "hud_maker_backdrop"), None);
     assert_eq!(db.settings().unwrap().hud_maker_backdrop(), None);
 }
+
+#[test]
+fn mature_add_ons_default_off_and_round_trip() {
+    let (_tmp, dir) = common::temp_data_dir();
+    let db = Database::open(&dir).unwrap();
+    assert!(!db.settings().unwrap().show_mature_addons());
+    db.set_show_mature_addons(true).unwrap();
+    assert_eq!(
+        raw_setting(&dir, "show_mature_addons").as_deref(),
+        Some("true")
+    );
+    assert!(db.settings().unwrap().show_mature_addons());
+    db.set_show_mature_addons(false).unwrap();
+    assert!(!db.settings().unwrap().show_mature_addons());
+}

@@ -116,6 +116,8 @@ fn addon_store_ids_are_stable() {
     assert_eq!(ids::ADDON_STORE_TAG, "addon-store-tag");
     assert_eq!(ids::ADDON_STORE_INFO, "addon-store-info");
     assert_eq!(ids::ADDON_STORE_NO_TF2, "addon-store-no-tf2");
+    assert_eq!(ids::ADDON_STORE_TAB_GROUP, "addon-store-tab-group");
+    assert_eq!(ids::ADDON_STORE_SECTION_TABS, "addon-store-section-tabs");
     let flat = StoreItemId::Addon(AddonName::new("mastercomfig-addon-flat-mouse.vpk").unwrap());
     assert_eq!(
         name(ids::store_state(StoreKind::Addons, &flat)),
@@ -286,6 +288,7 @@ fn the_kit_wrapper_ids_are_stable() {
 #[test]
 fn the_sort_label_id_is_stable() {
     assert_eq!(ids::STORE_SORT_LABEL, "store-sort-label");
+    assert_eq!(ids::ADDON_SORT_LABEL, "addon-sort-label");
 }
 
 #[test]
@@ -735,4 +738,32 @@ fn profile_editor_ids_are_stable() {
             "profile-slot-hud-image",
         ]
     );
+}
+
+#[test]
+fn addon_store_tab_and_card_ids_are_keyed_by_section_and_item() {
+    assert_eq!(name(ids::addon_store_tab("skins")), "addon-store-tab:skins");
+    assert_eq!(
+        name(ids::addon_store_tab("mastercomfig")),
+        "addon-store-tab:mastercomfig"
+    );
+    assert_eq!(
+        name(ids::addon_gb_card("effects", GbId::new(12592))),
+        "addon-gb-card:effects:12592"
+    );
+    assert_eq!(
+        name(ids::addon_gb_card_reveal("skins", GbId::new(7))),
+        "addon-gb-card-reveal:skins:7"
+    );
+    assert_eq!(
+        name(ids::addon_gb_card_outdated("guis", GbId::new(3))),
+        "addon-gb-card-outdated:guis:3"
+    );
+    assert_eq!(
+        name(ids::addon_detail_credit(0, 2)),
+        "addon-detail-credit:0:2"
+    );
+    assert_eq!(name(ids::addon_detail_file(1)), "addon-detail-file:1");
+    assert_eq!(ids::ADDON_LOAD_MORE, "addon-load-more");
+    assert_eq!(ids::SETTINGS_MATURE_ADDONS, "settings-mature-addons");
 }

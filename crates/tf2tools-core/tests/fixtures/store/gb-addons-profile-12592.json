@@ -1,0 +1,117 @@
+{
+  "_idRow": 12592,
+  "_sName": "Toon Muzzle Flashes",
+  "_sProfileUrl": "https://gamebanana.com/mods/12592",
+  "_sText": "<iframe width=\"560\" height=\"315\" src=\"https://www.youtube.com/embed/VZESeW7Vyw0\" frameborder=\"0\" allowfullscreen=\"\"></iframe><br><br>A cartoonish overhaul for muzzle flashes, bullet tracers, and critical weapon lightning! Jazz up your viewmodels today!<br><br>",
+  "_nDownloadCount": 252233,
+  "_nLikeCount": 291,
+  "_bIsObsolete": false,
+  "_sInitialVisibility": "show",
+  "_aContentRatings": null,
+  "_bIsTrashed": false,
+  "_bIsWithheld": false,
+  "_bIsPrivate": false,
+  "_aSubmitter": {
+    "_sName": "Chaofanatic"
+  },
+  "_aFiles": [
+    {
+      "_idRow": 392820,
+      "_sFile": "toon_muzzle_flashes_v12.rar",
+      "_nFilesize": 998985,
+      "_tsDateAdded": 1533854285,
+      "_nDownloadCount": 193492,
+      "_sDownloadUrl": "https://gamebanana.com/dl/392820",
+      "_sMd5Checksum": "7fa3865ea1449c1fa374e816c2e05ff5",
+      "_sAnalysisState": "done",
+      "_sAnalysisResult": "ok",
+      "_sAnalysisResultVerbose": "File passed preliminary analysis",
+      "_sAvState": "done",
+      "_sAvResult": "clean",
+      "_bIsArchived": false,
+      "_bHasContents": true,
+      "_aModManagerIntegrations": [
+        {
+          "_sIconClasses": "ModboyIcon",
+          "_idToolRow": 6321,
+          "_aGameRowIds": [
+            4254,
+            2,
+            4660,
+            4,
+            34,
+            262,
+            263,
+            6651,
+            312,
+            9,
+            5,
+            249,
+            292,
+            222,
+            3456,
+            296,
+            4537,
+            297,
+            5418,
+            3370,
+            5306,
+            4214,
+            10,
+            5237,
+            73,
+            66,
+            124,
+            157,
+            150,
+            5531,
+            5694,
+            1843,
+            6,
+            6137,
+            6131,
+            2929,
+            6705,
+            8679,
+            7553
+          ],
+          "_sModManagerAlias": "Modboy",
+          "_sInstallerName": "Modboy",
+          "_idSubmitterRow": 142413,
+          "_sInstallerUrl": "https://gamebanana.com/tools/6321",
+          "_sIconUrl": "https://images.gamebanana.com/img/ico/tools/60b4e38695538.png",
+          "_sDownloadUrl": "modboy://Mod,12592,392820"
+        }
+      ]
+    }
+  ],
+  "_aCredits": [
+    {
+      "_sGroupName": "Key Authors",
+      "_aAuthors": [
+        {
+          "_sRole": "Vfx artist",
+          "_sName": "Chaofanatic"
+        }
+      ]
+    }
+  ],
+  "_aPreviewMedia": {
+    "_aImages": [
+      {
+        "_sType": "screenshot",
+        "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+        "_sFile": "567c355746617.webp",
+        "_sFile530": "530-90_567c355746617.webp",
+        "_sFile100": "100-90_567c355746617.webp",
+        "_sFile220": "220-90_567c355746617.webp"
+      },
+      {
+        "_sType": "screenshot",
+        "_sBaseUrl": "https://images.gamebanana.com/img/ss/mods",
+        "_sFile": "567c35580d24a.webp",
+        "_sFile100": "100-90_567c35580d24a.webp"
+      }
+    ]
+  }
+}
