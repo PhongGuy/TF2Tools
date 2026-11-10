@@ -1165,6 +1165,18 @@ fn unknown_layout_message(file_name: &str, payloads: usize) -> String {
     }
 }
 
+/// Why a GameBanana add-on update check stopped before every due add-on was asked.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GbAddonCheckError {
+    /// GameBanana could not be reached, was rate limiting or kept sending empty replies.
+    #[error(transparent)]
+    Browse(#[from] BrowseError),
+    /// The library's rows could not be read or written.
+    #[error(transparent)]
+    Library(#[from] LibraryError),
+}
+
 /// Why a GameBanana add-on could not be installed, installed again or removed.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

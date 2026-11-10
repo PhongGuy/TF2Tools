@@ -6,12 +6,13 @@ use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 use super::download::save_name;
-use super::{AddonProfile, AddonSection, DownloadProgress, StoreClient};
+use super::pacer::Priority;
+use super::{AddonFile, AddonProfile, AddonSection, DownloadProgress, StoreClient};
 use walkdir::WalkDir;
 
 use crate::archive::{VPK_MAGIC, extract_archive, sniff};
-use crate::error::GbAddonFetchError;
-use crate::library::GbId;
+use crate::error::{BrowseError, GbAddonCheckError, GbAddonFetchError};
+use crate::library::{GbAddonCheck, GbId, Library};
 use crate::payloads::{MAX_PAYLOADS, Payload, find_payloads};
 
 /// A downloaded, extracted add-on waiting to be installed. Its scratch dir, which holds
@@ -70,6 +71,57 @@ impl GbAddonDownload {
     /// What the download could install, largest first.
     pub fn payloads(&self) -> &[Payload] {
         &self.payloads
+    }
+
+    /// The payloads to install over an add-on that had `previous` chosen, without asking,
+    /// or None to ask. A lone payload is kept whatever it is called; otherwise the previous
+    /// names are kept, in their order, only when every one of them is still offered.
+    pub fn kept_payloads(&self, previous: &[String]) -> Option<Vec<String>> {
+        if let [only] = self.payloads.as_slice() {
+            return Some(vec![only.name().to_owned()]);
+        }
+        let all_offered = !previous.is_empty()
+            && previous
+                .iter()
+                .all(|name| self.payloads.iter().any(|p| p.name() == name.as_str()));
+        all_offered.then(|| previous.to_vec())
+    }
+}
+
+impl StoreClient {
+    /// Checks every due add-on once, through the pacer at background priority, and returns
+    /// how many were checked. Unreachable (Network, RateLimited, Throttled) stops the run;
+    /// any other failure records `Unchanged` for that item and goes on.
+    pub async fn check_gb_addon_updates(&self, now: i64) -> Result<usize, GbAddonCheckError> {
+        let library = Library::new(self.db.clone(), self.dir.clone());
+        let catalog = self.addon_catalog();
+        let mut checked = 0;
+        for gb_id in library.gb_addons_due_for_check(now)? {
+            // Only an unreachable GameBanana ends the run, so the rest stay due for later;
+            // one item's bad page waits a day like a clean check.
+            let check = match catalog.profile_at(gb_id, Priority::Background).await {
+                Ok(profile) => profile
+                    .files()
+                    .iter()
+                    .map(AddonFile::date_added)
+                    .max()
+                    .map_or(GbAddonCheck::Unchanged, |file_date| GbAddonCheck::Latest {
+                        file_date,
+                    }),
+                Err(BrowseError::Gone { .. } | BrowseError::Http { status: 404, .. }) => {
+                    GbAddonCheck::Gone
+                }
+                Err(
+                    e @ (BrowseError::Network { .. }
+                    | BrowseError::RateLimited { .. }
+                    | BrowseError::Throttled { .. }),
+                ) => return Err(e.into()),
+                Err(_) => GbAddonCheck::Unchanged,
+            };
+            library.record_gb_addon_check(gb_id, check, now)?;
+            checked += 1;
+        }
+        Ok(checked)
     }
 }
 

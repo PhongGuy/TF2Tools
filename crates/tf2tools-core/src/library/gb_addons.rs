@@ -439,6 +439,79 @@ impl Library {
     }
 }
 
+/// What one update check found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum GbAddonCheck {
+    /// The newest file's `_tsDateAdded`.
+    Latest {
+        /// The newest file's upload date, in Unix seconds.
+        file_date: i64,
+    },
+    /// Nothing learned (no files, or this item's page failed): only `checked_at` moves.
+    Unchanged,
+    /// Trashed, withheld, private or 404.
+    Gone,
+}
+
+/// How long a check stays fresh, so GameBanana is asked about each add-on once a day.
+const CHECK_INTERVAL: i64 = 86_400;
+
+impl Library {
+    /// Add-ons whose `checked_at` is more than a day before `now`, oldest check first.
+    pub fn gb_addons_due_for_check(&self, now: i64) -> Result<Vec<GbId>, LibraryError> {
+        let ids = self
+            .db
+            .read(|conn| {
+                let mut stmt = conn.prepare(
+                    "SELECT gb_id FROM library_gb_addons WHERE checked_at < ?1
+                     ORDER BY checked_at ASC, gb_id ASC",
+                )?;
+                let rows = stmt.query_map([now.saturating_sub(CHECK_INTERVAL)], |row| {
+                    row.get::<_, i64>(0)
+                })?;
+                rows.collect::<Result<Vec<_>, _>>()
+            })
+            .map_err(library_db)?;
+        // A negative id cannot come from an install; such a row is skipped, not checked.
+        Ok(ids
+            .into_iter()
+            .filter_map(|id| u64::try_from(id).ok().map(GbId::new))
+            .collect())
+    }
+
+    /// Stores `check` and `checked_at = now` for `gb_id`; `Gone` sets `gone`, `Latest`
+    /// sets `latest_file_date` and clears `gone`, and `Unchanged` moves only `checked_at`.
+    pub fn record_gb_addon_check(
+        &self,
+        gb_id: GbId,
+        check: GbAddonCheck,
+        now: i64,
+    ) -> Result<(), LibraryError> {
+        let id = i64::try_from(gb_id.get()).map_err(|e| LibraryError::Database {
+            message: format!("GameBanana id {gb_id} does not fit the database: {e}"),
+        })?;
+        self.db
+            .write(|conn| match check {
+                GbAddonCheck::Latest { file_date } => conn.execute(
+                    "UPDATE library_gb_addons SET checked_at = ?1, latest_file_date = ?2,
+                     gone = 0 WHERE gb_id = ?3",
+                    rusqlite::params![now, file_date, id],
+                ),
+                GbAddonCheck::Unchanged => conn.execute(
+                    "UPDATE library_gb_addons SET checked_at = ?1 WHERE gb_id = ?2",
+                    rusqlite::params![now, id],
+                ),
+                GbAddonCheck::Gone => conn.execute(
+                    "UPDATE library_gb_addons SET checked_at = ?1, gone = 1 WHERE gb_id = ?2",
+                    rusqlite::params![now, id],
+                ),
+            })
+            .map(drop)
+            .map_err(library_db)
+    }
+}
+
 /// `tf/custom/<name>` for a recorded `custom/<name>` that is a plain name of this add-on's
 /// own (`tf2tools-gb-<id>-...`, no `:` that Windows reads as a drive). Any other shape, such
 /// as a tampered row's `../x`, an absolute path or another add-on's folder, is never followed.

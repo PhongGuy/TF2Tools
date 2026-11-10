@@ -40,13 +40,13 @@ pub use db::Database;
 pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
     BrowseError, CatalogError, CopyHudError, DataDirError, DetectError, DownloadError, FilesError,
-    FontCheckError, FontInstallError, GbAddonFetchError, GbAddonInstallError, HistoryError,
-    HudFilesError, HudLoadError, ImageError, ImportError, InstallError, InstallMastercomfigError,
-    KeepHudError, KvParseError, LibraryError, LogError, MakeHudError, MapDownloadError,
-    MapRemoveError, MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError,
-    PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
-    ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError, SchemaError, SettingsError,
-    SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
+    FontCheckError, FontInstallError, GbAddonCheckError, GbAddonFetchError, GbAddonInstallError,
+    HistoryError, HudFilesError, HudLoadError, ImageError, ImportError, InstallError,
+    InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError, MakeHudError,
+    MapDownloadError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError, OpenError,
+    PaintError, PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError,
+    RecipeError, ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError, SchemaError,
+    SettingsError, SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
     UpdateDownloadError, VpkError, VtfError, WavError,
 };
 pub use fonts::{
@@ -89,13 +89,13 @@ pub use hud_maker::{wrap_lines, wrapped_text_left};
 pub use library::{
     AddonEntry, AddonName, ApplyProfileReport, ApplyReport, ApplyStep, Assignment, CrosshairEntry,
     CrosshairFormat, CrosshairId, CrosshairRef, DraftCrosshair, DraftSlot, ExternalHud,
-    GbAddonEntry, GbId, HudAssets, HudEntry, HudId, HudInstall, HudStatus, InstalledCrosshairs,
-    InstalledSound, InstalledSounds, Library, LibraryEntry, MadeHud, MakeTarget,
-    MastercomfigStatus, MissingItem, MissingKind, PaintTarget, PaintedSource, Preset, PresetEntry,
-    Profile, ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem,
-    ProfileUpdate, Provenance, Recovery, Reinstall, SavedHud, SkipReason, SkippedAssignment,
-    SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind, crosshair_scripts_need_repair,
-    pictures_fit, read_recipe_file,
+    GbAddonCheck, GbAddonEntry, GbId, HudAssets, HudEntry, HudId, HudInstall, HudStatus,
+    InstalledCrosshairs, InstalledSound, InstalledSounds, Library, LibraryEntry, MadeHud,
+    MakeTarget, MastercomfigStatus, MissingItem, MissingKind, PaintTarget, PaintedSource, Preset,
+    PresetEntry, Profile, ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId,
+    ProfileItem, ProfileUpdate, Provenance, Recovery, Reinstall, SavedHud, SkipReason,
+    SkippedAssignment, SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind,
+    crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
 };
 pub use library::{
     Choices, ComfigModule, ModuleCatalog, ModuleCategory, ModuleChoice, ModuleValue, readable_name,
