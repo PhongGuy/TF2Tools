@@ -293,6 +293,9 @@ pub(crate) fn html_to_text(html: &str) -> String {
                 stripped.push('\n');
                 at_line_start = true;
             }
+        } else if !closing && matches!(name.as_str(), "td" | "th") {
+            // Cells in a row stay apart; the space is trimmed off a line's first cell.
+            stripped.push(' ');
         }
         rest = &rest[open + close + 1..];
     }
@@ -590,6 +593,16 @@ mod tests {
             start.elapsed() < std::time::Duration::from_secs(2),
             "{:?}",
             start.elapsed()
+        );
+    }
+
+    #[test]
+    fn table_cells_stay_apart() {
+        assert_eq!(
+            html_to_text(
+                "<table><tr><td>x</td><td>y</td></tr><tr><th>z</th><th>w</th></tr></table>"
+            ),
+            "x y\nz w"
         );
     }
 
