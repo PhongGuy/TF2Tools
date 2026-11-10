@@ -130,24 +130,31 @@ impl StoreClient {
     /// listing alone, before any request: no files, a failed virus scan, or a listed size
     /// over this client's configured cap. None when the download may start.
     pub fn gb_addon_refusal(&self, profile: &AddonProfile) -> Option<GbAddonFetchError> {
-        let Some(file) = profile.files().first() else {
-            return Some(GbAddonFetchError::NoFiles {
-                gb_id: profile.id(),
-            });
-        };
+        self.listed_file(profile).err()
+    }
+
+    /// `profile`'s newest file when its listing passes every pre-download check.
+    fn listed_file<'p>(
+        &self,
+        profile: &'p AddonProfile,
+    ) -> Result<&'p AddonFile, GbAddonFetchError> {
+        let file = profile.files().first().ok_or(GbAddonFetchError::NoFiles {
+            gb_id: profile.id(),
+        })?;
         if file.av_result() != "clean" {
-            return Some(GbAddonFetchError::VirusScan {
+            return Err(GbAddonFetchError::VirusScan {
                 file_name: file.name().to_owned(),
                 result: file.av_result().to_owned(),
             });
         }
         let limit = self.config.gb_addon_size_cap();
-        file.size()
-            .is_some_and(|size| size > limit)
-            .then(|| GbAddonFetchError::TooLarge {
+        if file.size().is_some_and(|size| size > limit) {
+            return Err(GbAddonFetchError::TooLarge {
                 url: file.download_url().to_owned(),
                 limit,
-            })
+            });
+        }
+        Ok(file)
     }
 
     /// Downloads `profile`'s newest file for `section` into `<data>/tmp`, one download at a
@@ -160,12 +167,7 @@ impl StoreClient {
         progress: &(dyn Fn(DownloadProgress) + Send + Sync),
     ) -> Result<GbAddonDownload, GbAddonFetchError> {
         // Every refusal the listing alone can settle comes before any request is made.
-        if let Some(refusal) = self.gb_addon_refusal(profile) {
-            return Err(refusal);
-        }
-        let file = profile.files().first().ok_or(GbAddonFetchError::NoFiles {
-            gb_id: profile.id(),
-        })?;
+        let file = self.listed_file(profile)?;
         let limit = self.config.gb_addon_size_cap();
 
         let _turn = self.download_lock.lock().await;
