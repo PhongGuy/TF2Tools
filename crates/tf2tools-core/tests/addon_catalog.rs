@@ -121,7 +121,8 @@ fn the_sections_table_matches_the_spec() {
         AddonSection::by_key("guis").map(AddonSection::root_category),
         Some(1644)
     );
-    assert_eq!(AddonSection::by_key("maps"), None);
+    assert_eq!(AddonSection::by_key("maps"), Some(AddonSection::MAPS));
+    assert_eq!(AddonSection::by_key("sprays"), None);
     assert_eq!(
         AddonSection::ALL[0].weapon_parents(),
         [7962, 7960, 7956, 7968, 7954, 7958, 7964, 7966, 7952]
@@ -533,4 +534,43 @@ async fn a_missing_profile_fails_with_its_status() {
         matches!(result, Err(BrowseError::Http { status: 404, .. })),
         "{result:?}"
     );
+}
+
+#[test]
+fn maps_is_a_section_outside_the_addon_store_tabs() {
+    let maps = AddonSection::MAPS;
+    assert_eq!(
+        (maps.key(), maps.title(), maps.root_category()),
+        ("maps", "Maps", 5371)
+    );
+    assert!(maps.exclude().is_empty());
+    assert!(maps.weapon_parents().is_empty());
+    assert!(!AddonSection::ALL.contains(&maps));
+}
+
+#[tokio::test]
+async fn a_maps_step_lists_its_category_and_a_maps_search_keeps_only_maps() {
+    let env = store_env().await;
+    mount_index(
+        &env.server,
+        5371,
+        MD,
+        1,
+        listing(vec![record(1, 5371, Some(5385), false)], true),
+    )
+    .await;
+    let query = AddonQuery::new(AddonSection::MAPS, AddonSort::MostDownloaded);
+    let (step, chunks) = run(&env, &query, AddonCursor::START).await;
+    assert_eq!(flat_ids(&chunks), [1]);
+    assert_eq!(step.unwrap().next(), None);
+
+    let records = vec![
+        record(2, 5371, None, false),
+        record(3, 7951, Some(7962), false),
+        record(4, 5371, Some(5386), false),
+    ];
+    mount_search(&env.server, 1, listing(records, true)).await;
+    let query = AddonQuery::new(AddonSection::MAPS, AddonSort::Newest).with_search("koth");
+    let (_, chunks) = run(&env, &query, AddonCursor::START).await;
+    assert_eq!(flat_ids(&chunks), [2, 4]);
 }

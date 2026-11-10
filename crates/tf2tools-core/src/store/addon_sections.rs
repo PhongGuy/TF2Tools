@@ -22,6 +22,9 @@ impl AddonSection {
         Self::new("gamefiles", "Game files", 2774, &[], &[]),
     ];
 
+    /// GameBanana's TF2 maps, browsed on the Maps page; not an Addon Store tab, so not in `ALL`.
+    pub const MAPS: AddonSection = Self::new("maps", "Maps", 5371, &[], &[]);
+
     const fn new(
         key: &'static str,
         title: &'static str,
@@ -38,9 +41,12 @@ impl AddonSection {
         }
     }
 
-    /// The section whose stable key is `key`, if any.
+    /// The section whose stable key is `key`, from `ALL` or `MAPS`.
     pub fn by_key(key: &str) -> Option<AddonSection> {
-        Self::ALL.into_iter().find(|section| section.key == key)
+        Self::ALL
+            .into_iter()
+            .chain([Self::MAPS])
+            .find(|section| section.key == key)
     }
 
     /// The stable key used in settings and element ids.
