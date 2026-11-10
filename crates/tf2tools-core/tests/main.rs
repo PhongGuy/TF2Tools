@@ -196,6 +196,7 @@ mod mastercomfig_presets;
 mod mastercomfig_release;
 mod old_v4;
 mod panic_mark;
+mod payloads;
 mod png;
 mod profile_apply;
 mod profile_edit;

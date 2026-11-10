@@ -21,6 +21,7 @@ mod old_v4;
 mod pak;
 pub mod panic_mark;
 mod paths;
+mod payloads;
 mod settings;
 mod store;
 mod templates;
@@ -103,6 +104,7 @@ pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
+pub use payloads::{MAX_PAYLOADS, Payload, PayloadKind, find_payloads};
 pub use settings::{Settings, Volume};
 pub use store::{
     AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
