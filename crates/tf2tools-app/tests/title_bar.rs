@@ -95,3 +95,54 @@ fn a_drag_on_the_header_title_moves_the_window(cx: &mut TestAppContext) {
         .unwrap_or_default();
     assert!(message.contains("not implemented"), "no move: {message:?}");
 }
+
+// At 800 px Linux draws three 34 px window buttons right of the header row; the test platform
+// draws none, so a 698 px window leaves the row the same room. With every status item showing,
+// the row must fit that room, so the buttons beyond it stay whole.
+#[gpui_kit::test]
+fn a_full_header_fits_beside_the_window_buttons_at_800_px(cx: &mut TestAppContext) {
+    use tf2tools_app::shell::route::Page;
+    use tf2tools_core::StoreKind;
+
+    let env = support::env();
+    let (hub, runs) = support::fake_hub(cx);
+    let found = Tf2Install::from_path(&env.game).unwrap();
+    let s = support::shell_window(cx, &env, Tf2State::Found(found));
+    cx.update(|cx| {
+        s.shell
+            .update(cx, |shell, cx| shell.navigate(Page::CrosshairStore, cx))
+    });
+    let kinds = [
+        StoreKind::Sounds,
+        StoreKind::Crosshairs,
+        StoreKind::GameBananaHuds,
+        StoreKind::CuratedHuds,
+    ];
+    let mut held = Vec::new();
+    for kind in kinds {
+        assert!(cx.update(|cx| hub.update(cx, |h, cx| h.start(kind, false, cx))));
+        let run = runs
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap();
+        run.report(3450, 3450);
+        held.push(run);
+    }
+    let width = px(698.);
+    cx.simulate_window_resize(s.win, gpui_kit::size(width, px(600.)));
+    support::next_repaint(cx);
+    for kind in kinds {
+        assert!(
+            support::present(cx, s.win, ids::sync_ring(kind)),
+            "{kind:?}"
+        );
+    }
+    let header = support::bounds_of(cx, s.win, ids::HEADER).unwrap();
+    let row = support::bounds_of(cx, s.win, ids::HEADER_ROW).unwrap();
+    let title = support::bounds_of(cx, s.win, ids::HEADER_TITLE).unwrap();
+    let ring = support::bounds_of(cx, s.win, ids::sync_ring(StoreKind::Sounds)).unwrap();
+    let badge = support::bounds_of(cx, s.win, ids::TF2_BADGE).unwrap();
+    assert!(header.right() <= width, "{header:?}");
+    assert!(row.right() <= header.right(), "{row:?} {header:?}");
+    assert!(badge.right() <= row.right(), "{badge:?} {row:?}");
+    assert!(title.right() <= ring.left(), "{title:?} {ring:?}");
+}
