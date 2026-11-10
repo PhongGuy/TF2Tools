@@ -547,3 +547,25 @@ fn a_category_with_no_match_says_so(cx: &mut TestAppContext) {
         Some("No sounds match your filters")
     );
 }
+
+// At the shell's content width in an 800 px window, the banner's count stays inside the banner,
+// beside its text, instead of running past the page's right padding.
+#[gpui_kit::test]
+fn the_banner_count_fits_a_narrow_page(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (hub, runs) = support::fake_hub(cx);
+    let w = support::sound_store_window(cx, &env, &server, seed);
+    let width = gpui_kit::px(544.);
+    cx.simulate_window_resize(w.win, gpui_kit::size(width, gpui_kit::px(600.)));
+    cx.update(|cx| hub.update(cx, |h, cx| h.start(S, false, cx)));
+    let run = runs.recv_timeout(Duration::from_secs(5)).unwrap();
+    run.report(3450, 3450);
+    support::next_repaint(cx);
+    let text = support::bounds_of(cx, w.win, ids::SYNC_BANNER).unwrap();
+    let count = support::bounds_of(cx, w.win, ids::SYNC_BANNER_COUNT).unwrap();
+    let edge = width - tf2tools_app::shell::CONTENT_PADDING;
+    assert!(count.right() <= edge, "{count:?} past {edge:?}");
+    assert!(text.right() <= count.left(), "{text:?} {count:?}");
+    run.finish(Ok(SyncSummary::default()));
+}
