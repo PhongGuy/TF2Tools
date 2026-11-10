@@ -297,3 +297,48 @@ fn the_folder_search_stops_one_past_the_limit() {
     let t = tree_of(&refs);
     assert_eq!(find_payloads(t.path()).unwrap().len(), MAX_PAYLOADS + 1);
 }
+
+#[test]
+fn labels_keep_only_the_path_parts_that_tell_payloads_apart() {
+    let t = tree_of(&CARBINE);
+    let mut labels: Vec<(String, String)> = find_payloads(t.path())
+        .unwrap()
+        .iter()
+        .map(|p| (p.name().to_owned(), p.label().to_owned()))
+        .collect();
+    labels.sort();
+    let labels: Vec<&str> = labels.iter().map(|(_, l)| l.as_str()).collect();
+    assert_eq!(
+        labels,
+        [
+            "Silenced / Stockless",
+            "Unfolded",
+            "Sound",
+            "Folded stock",
+            "Unsilenced / Stockless",
+            "Unfolded stock",
+        ]
+    );
+
+    let t = tree_of(&[
+        (
+            "54 FOV/X.vpk",
+            &common::vpk_bytes(&[("models/a.mdl", b"a")]),
+        ),
+        (
+            "70+ FOV/X.vpk",
+            &common::vpk_bytes(&[("models/b.mdl", b"b")]),
+        ),
+    ]);
+    let labels: Vec<String> = find_payloads(t.path())
+        .unwrap()
+        .iter()
+        .map(|p| p.label().to_owned())
+        .collect();
+    assert_eq!(labels, ["54 FOV / X.vpk", "70+ FOV / X.vpk"]);
+
+    let t = tree_of(&[("team fortress 2/tf/custom/mymod/materials/a.vmt", b"m")]);
+    assert_eq!(find_payloads(t.path()).unwrap()[0].label(), "mymod");
+    let t = tree_of(&[("tf/materials/vgui/a.vmt", b"m")]);
+    assert_eq!(find_payloads(t.path()).unwrap()[0].label(), "Main files");
+}

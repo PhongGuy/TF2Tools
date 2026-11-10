@@ -42,6 +42,7 @@ pub enum PayloadKind {
 #[non_exhaustive]
 pub struct Payload {
     name: String,
+    label: String,
     kind: PayloadKind,
     path: PathBuf,
     chunks: Vec<PathBuf>,
@@ -55,13 +56,10 @@ impl Payload {
         &self.name
     }
 
-    /// `name`, or "Main files" for the tree root.
+    /// A short name for the player: the last parts of `name` that tell it apart from the
+    /// other payloads, joined with " / ", or "Main files" for the tree root.
     pub fn label(&self) -> &str {
-        if self.name.is_empty() {
-            "Main files"
-        } else {
-            &self.name
-        }
+        &self.label
     }
 
     /// Whether this is a VPK or a folder.
@@ -111,6 +109,9 @@ pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
     // of VPKs skips the folder walk and the VPK directory reads that collapse folders.
     if vpks.len() > MAX_PAYLOADS {
         sort_payloads(&mut vpks);
+        for vpk in &mut vpks {
+            vpk.label.clone_from(&vpk.name);
+        }
         return Ok(vpks);
     }
     let mut folder_roots = Vec::new();
@@ -132,6 +133,7 @@ pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
         }
         payloads.push(Payload {
             name: tree_name(tree, &dir),
+            label: String::new(),
             kind: PayloadKind::Folder,
             path: dir,
             chunks: Vec::new(),
@@ -140,7 +142,68 @@ pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
         });
     }
     sort_payloads(&mut payloads);
+    assign_labels(&mut payloads);
     Ok(payloads)
+}
+
+/// Labels each payload with its last path part, adding the nearer parent parts that differ
+/// from payloads ending in the same parts. A trailing `tf` wrapper is not a part; a label
+/// that still collides falls back to the full name.
+fn assign_labels(payloads: &mut [Payload]) {
+    let parts: Vec<Vec<&str>> = payloads
+        .iter()
+        .map(|p| {
+            let mut parts: Vec<&str> = p.name.split('/').filter(|s| !s.is_empty()).collect();
+            if parts.last().is_some_and(|l| l.eq_ignore_ascii_case("tf")) {
+                parts.pop();
+            }
+            parts
+        })
+        .collect();
+    let same = |a: &str, b: &str| a.eq_ignore_ascii_case(b);
+    let mut labels: Vec<String> = parts
+        .iter()
+        .enumerate()
+        .map(|(i, own)| {
+            let Some(last) = own.last() else {
+                return "Main files".to_owned();
+            };
+            let mut rivals: Vec<&Vec<&str>> = parts
+                .iter()
+                .enumerate()
+                .filter(|&(j, other)| j != i && other.last().is_some_and(|l| same(l, last)))
+                .map(|(_, other)| other)
+                .collect();
+            // Walk up from the end, keeping a part only where some rival differs there.
+            let mut kept = vec![*last];
+            for back in 2..=own.len() {
+                if rivals.is_empty() {
+                    break;
+                }
+                let part = own[own.len() - back];
+                let differs = |r: &&Vec<&str>| r.len() < back || !same(r[r.len() - back], part);
+                if rivals.iter().any(differs) {
+                    kept.push(part);
+                    rivals.retain(|r| !differs(r));
+                }
+            }
+            if rivals.is_empty() {
+                kept.reverse();
+                kept.join(" / ")
+            } else {
+                own.join(" / ")
+            }
+        })
+        .collect();
+    for i in 0..labels.len() {
+        let clash = (0..labels.len()).any(|j| j != i && same(&labels[j], &labels[i]));
+        if clash && !payloads[i].name.is_empty() {
+            labels[i] = payloads[i].name.replace('/', " / ");
+        }
+    }
+    for (payload, label) in payloads.iter_mut().zip(labels) {
+        payload.label = label;
+    }
 }
 
 fn sort_payloads(payloads: &mut [Payload]) {
@@ -270,6 +333,7 @@ fn find_vpks(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
             let parts = chunks.remove(&i).unwrap_or_default();
             Payload {
                 name: tree_name(tree, path),
+                label: String::new(),
                 kind: PayloadKind::Vpk,
                 path: path.clone(),
                 size: size + parts.iter().map(|(_, s)| s).sum::<u64>(),
