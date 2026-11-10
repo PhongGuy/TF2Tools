@@ -32,10 +32,10 @@ use walkdir::WalkDir;
 use crate::archive::VPK_MAGIC;
 use crate::db::Database;
 use crate::error::{
-    ApplyModulesError, ApplyPresetError, ApplyProfileError, GbAddonInstallError, HistoryError,
-    HudLoadError, ImportError, InstallError, InstallMastercomfigError, KeepHudError, LibraryError,
-    MakeHudError, PaintError, PresetError, ProfileError, ReinstallError, RemoveMastercomfigError,
-    RestoreMastercomfigError,
+    ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, GbAddonFetchError,
+    GbAddonInstallError, HistoryError, HudLoadError, ImportError, InstallError,
+    InstallMastercomfigError, KeepHudError, LibraryError, MakeHudError, PaintError, PresetError,
+    ProfileError, ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError,
 };
 use crate::fonts::Platform;
 use crate::hud_maker::{HudFiles, HudOptions, HudSchemas, MakerBase};
@@ -456,6 +456,18 @@ impl From<GameMissing> for ApplyModulesError {
 impl From<GameMissing> for GbAddonInstallError {
     fn from(GameMissing { path }: GameMissing) -> Self {
         Self::GameMissing { path }
+    }
+}
+
+impl From<IoFailure> for ArchiveError {
+    fn from(IoFailure { path, source }: IoFailure) -> Self {
+        Self::Io { path, source }
+    }
+}
+
+impl From<IoFailure> for GbAddonFetchError {
+    fn from(IoFailure { path, source }: IoFailure) -> Self {
+        Self::Io { path, source }
     }
 }
 

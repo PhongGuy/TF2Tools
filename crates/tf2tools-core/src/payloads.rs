@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 use crate::error::ArchiveError;
+use crate::library::walk_failure;
 use crate::pak;
 
 /// More payloads than this, or none, means the layout isn't recognised.
@@ -177,9 +178,9 @@ fn find_folders(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), ArchiveError> 
 fn find_vpks(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
     let mut files = Vec::new();
     for entry in WalkDir::new(tree).sort_by_file_name() {
-        let entry = entry.map_err(|e| walk_error(tree, e))?;
+        let entry = entry.map_err(|e| walk_failure(tree, e))?;
         if entry.file_type().is_file() && has_vpk_extension(entry.path()) {
-            let size = entry.metadata().map_err(|e| walk_error(tree, e))?.len();
+            let size = entry.metadata().map_err(|e| walk_failure(tree, e))?.len();
             files.push((entry.into_path(), size));
         }
     }
@@ -226,11 +227,11 @@ fn folder_files(dir: &Path) -> Result<(HashSet<String>, u64), ArchiveError> {
     let mut files = HashSet::new();
     let mut size = 0;
     for entry in WalkDir::new(dir) {
-        let entry = entry.map_err(|e| walk_error(dir, e))?;
+        let entry = entry.map_err(|e| walk_failure(dir, e))?;
         if !entry.file_type().is_file() || has_vpk_extension(entry.path()) {
             continue;
         }
-        size += entry.metadata().map_err(|e| walk_error(dir, e))?.len();
+        size += entry.metadata().map_err(|e| walk_failure(dir, e))?.len();
         files.insert(tree_name(dir, entry.path()).to_ascii_lowercase());
     }
     Ok((files, size))
@@ -277,12 +278,4 @@ fn tree_name(root: &Path, path: &Path) -> String {
         .map(|c| c.as_os_str().to_string_lossy())
         .collect::<Vec<_>>()
         .join("/")
-}
-
-fn walk_error(root: &Path, e: walkdir::Error) -> ArchiveError {
-    let path = e.path().unwrap_or(root).to_path_buf();
-    let source = e
-        .into_io_error()
-        .unwrap_or_else(|| std::io::Error::other("filesystem loop"));
-    ArchiveError::Io { path, source }
 }

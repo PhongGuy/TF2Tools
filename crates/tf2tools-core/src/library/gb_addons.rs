@@ -309,7 +309,7 @@ impl Library {
             }
         }
         remove_dir_if_present(&self.dir.gb_addon_dir().join(gb_id.to_string()))?;
-        let id = gb_id_column(gb_id)?;
+        let id = gb_id_column(gb_id, install_db)?;
         self.db
             .write(|conn| conn.execute("DELETE FROM library_gb_addons WHERE gb_id = ?1", [id]))
             .map(drop)
@@ -363,7 +363,7 @@ impl Library {
             let _ = self.mark_not_installed(gb_id);
             return Err(e.into());
         }
-        let id = gb_id_column(gb_id)?;
+        let id = gb_id_column(gb_id, install_db)?;
         self.db
             .write(|conn| {
                 conn.execute(
@@ -378,7 +378,7 @@ impl Library {
     }
 
     fn gb_addon_row(&self, gb_id: GbId) -> Result<Option<GbAddonEntry>, GbAddonInstallError> {
-        let id = gb_id_column(gb_id)?;
+        let id = gb_id_column(gb_id, install_db)?;
         self.db
             .read(|conn| {
                 conn.query_row(
@@ -392,7 +392,7 @@ impl Library {
     }
 
     fn mark_not_installed(&self, gb_id: GbId) -> Result<(), GbAddonInstallError> {
-        let id = gb_id_column(gb_id)?;
+        let id = gb_id_column(gb_id, install_db)?;
         self.db
             .write(|conn| {
                 conn.execute(
@@ -406,7 +406,7 @@ impl Library {
 
     /// Writes `entry` as the add-on's whole row, replacing any earlier one.
     fn save_gb_addon(&self, entry: &GbAddonEntry, file_id: u64) -> Result<(), GbAddonInstallError> {
-        let id = gb_id_column(entry.gb_id)?;
+        let id = gb_id_column(entry.gb_id, install_db)?;
         let file_id = i64::try_from(file_id).map_err(|e| GbAddonInstallError::Database {
             message: format!("file id {file_id} does not fit the database: {e}"),
         })?;
@@ -488,9 +488,7 @@ impl Library {
         check: GbAddonCheck,
         now: i64,
     ) -> Result<(), LibraryError> {
-        let id = i64::try_from(gb_id.get()).map_err(|e| LibraryError::Database {
-            message: format!("GameBanana id {gb_id} does not fit the database: {e}"),
-        })?;
+        let id = gb_id_column(gb_id, |message| LibraryError::Database { message })?;
         self.db
             .write(|conn| match check {
                 GbAddonCheck::Latest { file_date } => conn.execute(
@@ -672,10 +670,17 @@ fn unix_now() -> i64 {
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
 }
 
-fn gb_id_column(gb_id: GbId) -> Result<i64, GbAddonInstallError> {
-    i64::try_from(gb_id.get()).map_err(|e| GbAddonInstallError::Database {
-        message: format!("GameBanana id {gb_id} does not fit the database: {e}"),
+/// `gb_id` as its INTEGER column; an id past `i64` fails through `database` with a message.
+fn gb_id_column<E>(gb_id: GbId, database: impl FnOnce(String) -> E) -> Result<i64, E> {
+    i64::try_from(gb_id.get()).map_err(|e| {
+        database(format!(
+            "GameBanana id {gb_id} does not fit the database: {e}"
+        ))
     })
+}
+
+fn install_db(message: String) -> GbAddonInstallError {
+    GbAddonInstallError::Database { message }
 }
 
 fn gb_db(e: rusqlite::Error) -> GbAddonInstallError {

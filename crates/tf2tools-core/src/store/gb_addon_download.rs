@@ -1,7 +1,7 @@
 //! Downloading a GameBanana add-on's newest file into a scratch dir and listing the
 //! payloads it could install. Nothing here writes to `tf/custom`.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use tempfile::TempDir;
 
@@ -12,7 +12,7 @@ use walkdir::WalkDir;
 
 use crate::archive::{VPK_MAGIC, extract_archive, sniff};
 use crate::error::{BrowseError, GbAddonCheckError, GbAddonFetchError};
-use crate::library::{GbAddonCheck, GbId, Library};
+use crate::library::{GbAddonCheck, GbId, Library, io_at};
 use crate::payloads::{MAX_PAYLOADS, Payload, find_payloads};
 
 /// A downloaded, extracted add-on waiting to be installed. Its scratch dir, which holds
@@ -20,8 +20,8 @@ use crate::payloads::{MAX_PAYLOADS, Payload, find_payloads};
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct GbAddonDownload {
-    #[expect(dead_code, reason = "held for its Drop, which removes the scratch dir")]
-    pub(crate) scratch: TempDir,
+    /// Held for its Drop, which removes the scratch dir.
+    pub(crate) _scratch: TempDir,
     pub(crate) gb_id: GbId,
     pub(crate) section: &'static str,
     pub(crate) name: String,
@@ -187,7 +187,7 @@ impl StoreClient {
         })??;
 
         Ok(GbAddonDownload {
-            scratch,
+            _scratch: scratch,
             gb_id: profile.id(),
             section: section.key(),
             name: profile.name().to_owned(),
@@ -246,11 +246,4 @@ fn holds_exe(tree: &Path) -> bool {
         .into_iter()
         .filter_map(Result::ok)
         .any(|e| e.file_type().is_file() && has_extension(e.path(), "exe"))
-}
-
-fn io_at(path: &Path) -> impl FnOnce(std::io::Error) -> GbAddonFetchError + '_ {
-    move |source| GbAddonFetchError::Io {
-        path: PathBuf::from(path),
-        source,
-    }
 }
