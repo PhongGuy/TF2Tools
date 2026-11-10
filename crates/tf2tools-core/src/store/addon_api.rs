@@ -239,18 +239,22 @@ fn parse_file(file: &Value) -> Option<AddonFile> {
 pub(crate) fn html_to_text(html: &str) -> String {
     let mut stripped = String::with_capacity(html.len());
     let mut rest = html;
+    // Whether only blanks follow the last line break; tracked as text is pushed, so a block
+    // tag never rescans what came before it.
+    let mut at_line_start = true;
     // As in a browser, a newline in the source is a space; only tags break lines.
-    let push_text = |out: &mut String, text: &str| {
-        out.extend(
-            text.chars()
-                .map(|c| if c == '\n' || c == '\r' { ' ' } else { c }),
-        );
+    let push_text = |out: &mut String, at_line_start: &mut bool, text: &str| {
+        for c in text.chars() {
+            let c = if c == '\n' || c == '\r' { ' ' } else { c };
+            *at_line_start &= c.is_whitespace();
+            out.push(c);
+        }
     };
     while let Some(open) = rest.find('<') {
-        push_text(&mut stripped, &rest[..open]);
+        push_text(&mut stripped, &mut at_line_start, &rest[..open]);
         let Some(close) = rest[open..].find('>') else {
             // An unclosed `<` is not a tag, so it stays as text.
-            push_text(&mut stripped, &rest[open..]);
+            push_text(&mut stripped, &mut at_line_start, &rest[open..]);
             rest = "";
             break;
         };
@@ -282,16 +286,17 @@ pub(crate) fn html_to_text(html: &str) -> String {
         );
         if name == "br" || ends_line {
             stripped.push('\n');
+            at_line_start = true;
         } else if block {
             // A block starts on a fresh line, but adds no blank one when already there.
-            let tail = stripped.trim_end_matches(|c: char| c != '\n' && c.is_whitespace());
-            if !tail.is_empty() && !tail.ends_with('\n') {
+            if !at_line_start {
                 stripped.push('\n');
+                at_line_start = true;
             }
         }
         rest = &rest[open + close + 1..];
     }
-    push_text(&mut stripped, rest);
+    push_text(&mut stripped, &mut at_line_start, rest);
 
     let decoded = decode_entities(&stripped);
     let lines: Vec<&str> = decoded.lines().map(str::trim).collect();
@@ -572,6 +577,19 @@ mod tests {
         assert_eq!(
             html_to_text("<blockquote>q</blockquote>after<table><tr><td>x</td></tr></table>y"),
             "q\nafter\nx\ny"
+        );
+    }
+
+    // Any uploader controls the text, so block tags after runs of spaces must stay linear.
+    #[test]
+    fn hostile_block_tags_stay_linear() {
+        let html = format!("a{}", " <ul>".repeat(200_000));
+        let start = std::time::Instant::now();
+        assert_eq!(html_to_text(&html), "a");
+        assert!(
+            start.elapsed() < std::time::Duration::from_secs(2),
+            "{:?}",
+            start.elapsed()
         );
     }
 
