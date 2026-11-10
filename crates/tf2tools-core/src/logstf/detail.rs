@@ -566,7 +566,7 @@ fn player_line(
         da_per_min: p.dapm,
         kapd: p
             .kapd
-            .unwrap_or_else(|| f64::from(p.kills + p.assists) / deaths),
+            .unwrap_or_else(|| (f64::from(p.kills) + f64::from(p.assists)) / deaths),
         kpd: p.kpd.unwrap_or_else(|| f64::from(p.kills) / deaths),
         dt: p.dt,
         dt_per_min: per_min(p.dt),

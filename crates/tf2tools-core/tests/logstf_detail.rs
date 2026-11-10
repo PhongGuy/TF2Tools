@@ -202,3 +202,19 @@ fn bad_player_keys_and_unknown_classes_are_skipped() {
     assert_eq!(p.classes()[0].class(), TfClass::Soldier);
     assert!(close(p.kapd(), 4.0), "computed (3 + 1) / max(0, 1)");
 }
+
+#[test]
+fn computing_kapd_from_huge_kills_and_assists_does_not_overflow() {
+    let body = r#"{
+        "length": 600,
+        "teams": {"Red": {}, "Blue": {}},
+        "names": {"[U:1:5]": "five"},
+        "players": {
+            "[U:1:5]": {"team": "Blue", "kills": 4294967295, "assists": 4294967295, "deaths": 0,
+                "class_stats": []}
+        }
+    }"#;
+    let log = parse_log(body).unwrap();
+    let p = &log.players()[0];
+    assert!(close(p.kapd(), 2.0 * f64::from(u32::MAX)));
+}
