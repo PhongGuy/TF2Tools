@@ -276,9 +276,8 @@ impl Library {
                     std::fs::rename(&staging, &library_copy).map_err(io_at(&staging))
                 });
             }
-            // The I/O failure is the one to report; a row that also failed to save keeps
-            // the pending one, still not installed.
-            let _ = self.save_gb_addon(&entry, download.file_id);
+            // The pending row saved before the swap stays as it is: it names the old files
+            // and the new, so Remove clears whatever a failed delete left behind.
             return Err(e.into());
         }
         entry.installed = true;

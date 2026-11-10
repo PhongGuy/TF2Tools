@@ -320,7 +320,14 @@ async fn a_failed_clear_keeps_the_library_copy_matching_the_row() {
         "the library copy holds the new files the row names"
     );
     let row = &s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap()[0];
-    assert_eq!(row.files(), ["custom/tf2tools-gb-30-new.vpk"]);
+    assert_eq!(
+        row.files(),
+        [
+            "custom/tf2tools-gb-30-new.vpk",
+            "custom/tf2tools-gb-30-old.vpk"
+        ],
+        "the old file the clear could not reach stays on the row for Remove"
+    );
     assert_eq!(row.file_date(), 300);
     assert!(!row.is_installed());
 
@@ -739,4 +746,40 @@ async fn remove_also_deletes_a_leftover_staging_dir() {
         [".staging-340/1/x"],
         "only this add-on's staging goes"
     );
+}
+
+// Folder permissions that refuse deletes are a Unix feature.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_renamed_update_whose_old_files_will_not_delete_keeps_them_on_the_row() {
+    use std::os::unix::fs::PermissionsExt as _;
+    let s = setup().await;
+    let body = common::zip_bytes(&[("pack/materials/a.vmt", b"a")]);
+    let d = download(&s, 41, "Old", "pack.zip", body, 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["pack"]), &s.tf2, &no)
+        .unwrap();
+    // A folder that refuses deletes makes clearing the old install fail part-way.
+    let locked = s.tf2.custom_dir().join("tf2tools-gb-41-old/materials");
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let d = download(&s, 41, "New", "a.vpk", vpk(b"n"), 200).await;
+    let err = s
+        .env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap_err();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(matches!(err, GbAddonInstallError::Io { .. }), "{err:?}");
+    let row = &s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap()[0];
+    assert!(!row.is_installed());
+    assert_eq!(
+        row.files(),
+        ["custom/tf2tools-gb-41-new.vpk", "custom/tf2tools-gb-41-old"]
+    );
+    s.env
+        .lib
+        .remove_gb_addon(GbId::new(41), &s.tf2, &no)
+        .unwrap();
+    assert!(custom(&s).is_empty(), "Remove clears the old files too");
 }
