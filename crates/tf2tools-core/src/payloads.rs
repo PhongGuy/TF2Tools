@@ -305,20 +305,37 @@ fn is_content_name(name: &str) -> bool {
     CONTENT_DIRS.iter().any(|c| name.eq_ignore_ascii_case(c))
 }
 
-/// Whether a content-named folder holds a `tf` folder, as in `Sound/tf/sound/...`: then it
-/// only wraps a game layout and the real content root is further down.
+/// Whether a content-named folder holds a `tf` folder with content folders of its own, as
+/// in `Sound/tf/sound/...`: then it only wraps a game layout and the real root is further
+/// down. A `tf` without them is ordinary content such as `sound/tf/a.wav`.
 fn wraps_game_dir(dir: &Path) -> Result<bool, ArchiveError> {
-    let io = |source| ArchiveError::Io {
-        path: dir.to_path_buf(),
-        source,
-    };
-    for entry in fs::read_dir(dir).map_err(io)? {
-        let entry = entry.map_err(io)?;
-        if entry.file_type().map_err(io)?.is_dir() && entry.file_name().eq_ignore_ascii_case("tf") {
+    for tf in subdirs(dir)? {
+        if tf.file_name().is_some_and(|n| n.eq_ignore_ascii_case("tf"))
+            && subdirs(&tf)?.iter().any(|d| {
+                d.file_name()
+                    .is_some_and(|n| is_content_name(&n.to_string_lossy()))
+            })
+        {
             return Ok(true);
         }
     }
     Ok(false)
+}
+
+/// The directories directly inside `dir`.
+fn subdirs(dir: &Path) -> Result<Vec<PathBuf>, ArchiveError> {
+    let io = |source| ArchiveError::Io {
+        path: dir.to_path_buf(),
+        source,
+    };
+    let mut dirs = Vec::new();
+    for entry in fs::read_dir(dir).map_err(io)? {
+        let entry = entry.map_err(io)?;
+        if entry.file_type().map_err(io)?.is_dir() {
+            dirs.push(entry.path());
+        }
+    }
+    Ok(dirs)
 }
 
 /// Every `.vpk` under `tree` as a payload, with `<base>_NNN.vpk` chunks folded

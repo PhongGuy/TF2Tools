@@ -364,3 +364,9 @@ fn roots_past_the_stop_are_never_dropped_silently() {
         "a walk that stopped early must be refused as too many"
     );
 }
+
+#[test]
+fn a_content_folder_whose_tf_holds_no_content_is_still_content() {
+    let t = tree_of(&[("pack/sound/tf/a.wav", b"w")]);
+    assert_eq!(names(t.path()), [("pack".to_owned(), PayloadKind::Folder)]);
+}
