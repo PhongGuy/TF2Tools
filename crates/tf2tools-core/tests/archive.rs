@@ -195,6 +195,102 @@ fn vpk_traversal_is_refused_before_anything_is_written() {
     }
 }
 
+const HOSTILE: &[&str] = &[
+    "../evil.txt",
+    "..\\evil.txt",
+    "sub/../../evil.txt",
+    "/abs/evil.txt",
+    "C:\\evil.txt",
+    "C:/evil.txt",
+    "c:evil.txt",
+];
+
+/// Every format, each holding `ok.txt` first and then `name`.
+fn hostile_archives(dir: &Path, i: usize, name: &str) -> Vec<PathBuf> {
+    let ok: &[u8] = b"ok";
+    let evil: &[u8] = b"evil";
+    let seven = dir.join(format!("s{i}.7z"));
+    common::write_7z(&seven, &[("ok.txt", ok), (name, evil)]);
+    vec![
+        write(
+            &dir.join(format!("z{i}.zip")),
+            &common::zip_bytes(&[("ok.txt", ok), (name, evil)]),
+        ),
+        write(
+            &dir.join(format!("v{i}.vpk")),
+            &common::vpk_bytes(&[("ok.txt", ok), (name, evil)]),
+        ),
+        write(
+            &dir.join(format!("r4w{i}.rar")),
+            &common::rar4_stored(&["ok.txt", name], 2),
+        ),
+        write(
+            &dir.join(format!("r4u{i}.rar")),
+            &common::rar4_stored(&["ok.txt", name], 3),
+        ),
+        write(
+            &dir.join(format!("r5w{i}.rar")),
+            &common::rar5_stored(&["ok.txt", name], 0),
+        ),
+        write(
+            &dir.join(format!("r5u{i}.rar")),
+            &common::rar5_stored(&["ok.txt", name], 1),
+        ),
+        seven,
+    ]
+}
+
+#[test]
+fn hostile_names_are_refused_in_every_format() {
+    let tmp = tempfile::tempdir().unwrap();
+    for (i, name) in HOSTILE.iter().enumerate() {
+        let sources = tmp.path().join(format!("src{i}"));
+        fs::create_dir_all(&sources).unwrap();
+        for archive in hostile_archives(&sources, i, name) {
+            let case = tmp.path().join(format!(
+                "case-{}",
+                archive.file_name().unwrap().to_string_lossy()
+            ));
+            fs::create_dir_all(&case).unwrap();
+            let dest = case.join("box").join("out");
+            let err = extract_archive(&archive, &dest).unwrap_err();
+            assert!(
+                matches!(err, ArchiveError::UnsafePath { .. }),
+                "{name:?} in {}: {err:?}",
+                archive.display()
+            );
+            assert!(
+                !case.join("box").join("evil.txt").exists(),
+                "{name:?}: wrote outside dest"
+            );
+            assert!(
+                !dest.join("ok.txt").exists(),
+                "{name:?}: wrote before refusing"
+            );
+        }
+    }
+}
+
+#[test]
+fn names_that_only_look_odd_are_accepted() {
+    let tmp = tempfile::tempdir().unwrap();
+    let entries: &[(&str, &[u8])] = &[("..foo/a.txt", b"a"), ("c/b.txt", b"b"), ("a..b.txt", b"c")];
+    let zip = write(&tmp.path().join("odd.zip"), &common::zip_bytes(entries));
+    let dest = tmp.path().join("out");
+    extract_archive(&zip, &dest).unwrap();
+    assert_eq!(common::tree(&dest), ["..foo/a.txt", "a..b.txt", "c/b.txt"]);
+    let rar = write(
+        &tmp.path().join("odd.rar"),
+        &common::rar5_stored(&["..foo/a.txt"], 1),
+    );
+    let dest = tmp.path().join("out-rar");
+    extract_archive(&rar, &dest).unwrap();
+    assert_eq!(
+        fs::read(dest.join("..foo/a.txt")).unwrap(),
+        common::STORED_DATA
+    );
+}
+
 #[test]
 fn corrupt_archives_are_malformed_without_panicking() {
     let tmp = tempfile::tempdir().unwrap();

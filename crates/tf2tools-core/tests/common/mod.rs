@@ -341,6 +341,113 @@ pub fn rar_bytes(
     out
 }
 
+/// CRC-32 (IEEE), bitwise; fixtures are tiny.
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut crc = !0u32;
+    for &b in bytes {
+        crc ^= u32::from(b);
+        for _ in 0..8 {
+            crc = if crc & 1 == 1 {
+                (crc >> 1) ^ 0xEDB8_8320
+            } else {
+                crc >> 1
+            };
+        }
+    }
+    !crc
+}
+
+/// What every entry of `rar4_stored` and `rar5_stored` holds.
+pub const STORED_DATA: &[u8] = b"escaped\n";
+
+/// A stored RAR4 archive with `names` written verbatim; `host` 2 is Windows, 3 Unix.
+pub fn rar4_stored(names: &[&str], host: u8) -> Vec<u8> {
+    let crc = crc32(STORED_DATA);
+    let len = STORED_DATA.len() as u32;
+    let mut out = b"Rar!\x1a\x07\x00".to_vec();
+    let mut main = vec![0x73u8];
+    main.extend(0u16.to_le_bytes());
+    main.extend(13u16.to_le_bytes());
+    main.extend(0u16.to_le_bytes());
+    main.extend(0u32.to_le_bytes());
+    out.extend(((crc32(&main) & 0xffff) as u16).to_le_bytes());
+    out.extend(&main);
+    for name in names {
+        let n = name.as_bytes();
+        let attr: u32 = if host == 3 { 0o100644 } else { 0x20 };
+        let mut body = vec![0x74u8];
+        body.extend(0x8000u16.to_le_bytes());
+        body.extend((32 + n.len() as u16).to_le_bytes());
+        body.extend(len.to_le_bytes());
+        body.extend(len.to_le_bytes());
+        body.push(host);
+        body.extend(crc.to_le_bytes());
+        body.extend(0x2100_0000u32.to_le_bytes());
+        body.push(20);
+        body.push(0x30);
+        body.extend((n.len() as u16).to_le_bytes());
+        body.extend(attr.to_le_bytes());
+        body.extend(n);
+        out.extend(((crc32(&body) & 0xffff) as u16).to_le_bytes());
+        out.extend(&body);
+        out.extend(STORED_DATA);
+    }
+    let end = [0x7bu8, 0x00, 0x40, 0x07, 0x00];
+    out.extend(((crc32(&end) & 0xffff) as u16).to_le_bytes());
+    out.extend(end);
+    out
+}
+
+fn vint(mut v: u64) -> Vec<u8> {
+    let mut out = Vec::new();
+    loop {
+        let c = (v & 0x7f) as u8;
+        v >>= 7;
+        out.push(c | if v != 0 { 0x80 } else { 0 });
+        if v == 0 {
+            return out;
+        }
+    }
+}
+
+fn rar5_header(body: &[u8]) -> Vec<u8> {
+    let mut h = vint(body.len() as u64);
+    h.extend(body);
+    let mut out = crc32(&h).to_le_bytes().to_vec();
+    out.extend(h);
+    out
+}
+
+/// A stored RAR5 archive with `names` written verbatim; `host` 0 is Windows, 1 Unix.
+pub fn rar5_stored(names: &[&str], host: u64) -> Vec<u8> {
+    let crc = crc32(STORED_DATA);
+    let len = STORED_DATA.len() as u64;
+    let mut out = b"Rar!\x1a\x07\x01\x00".to_vec();
+    out.extend(rar5_header(&[vint(1), vint(0), vint(0)].concat()));
+    for name in names {
+        let n = name.as_bytes();
+        let attr = if host == 1 { 0o100644 } else { 0x20 };
+        let body = [
+            vint(2),
+            vint(0x0002),
+            vint(len),
+            vint(0x0004),
+            vint(len),
+            vint(attr),
+            crc.to_le_bytes().to_vec(),
+            vint(0),
+            vint(host),
+            vint(n.len() as u64),
+            n.to_vec(),
+        ]
+        .concat();
+        out.extend(rar5_header(&body));
+        out.extend(STORED_DATA);
+    }
+    out.extend(rar5_header(&[vint(5), vint(0), vint(0)].concat()));
+    out
+}
+
 /// Bytes of a zip holding `entries`; a name ending in `/` becomes a directory entry.
 pub fn zip_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
     use std::io::Write;

@@ -77,9 +77,12 @@ fn extract_zip(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
     let mut targets = Vec::with_capacity(zip.len());
     for i in 0..zip.len() {
         let entry = zip.by_index(i).map_err(|e| malformed(archive, e))?;
+        // `enclosed_name` quietly strips `C:` and a leading `/`, so the raw name is
+        // judged first and `enclosed_name` stays only as a second guard.
+        let raw = entry.name().map_err(|e| malformed(archive, e))?;
+        check_entry_name(archive, &raw)?;
         let Some(relative) = entry.enclosed_name() else {
-            let name = entry.name().map(|n| n.into_owned()).unwrap_or_default();
-            return Err(unsafe_path(archive, name));
+            return Err(unsafe_path(archive, raw.into_owned()));
         };
         targets.push((dest.join(relative), entry.is_dir()));
     }
@@ -238,13 +241,17 @@ fn rar_error(archive: &Path, error: &rars::Error) -> ArchiveError {
     }
 }
 
-/// Accepts a 7z, RAR or VPK entry name only if, with `\` read as a separator, every
-/// component is a plain name or `.`, so it cannot climb out of or replace `dest`.
+/// Accepts an entry name of any format only if, with `\` read as a separator, every
+/// component is a plain name or `.` and the first is not a drive prefix (`C:`), so it
+/// cannot climb out of or replace `dest` on any platform.
 fn check_entry_name(archive: &Path, name: &str) -> Result<(), ArchiveError> {
     let normalized = name.replace('\\', "/");
-    let safe = Path::new(&normalized)
-        .components()
-        .all(|c| matches!(c, Component::Normal(_) | Component::CurDir));
+    let first = normalized.split('/').next().unwrap_or_default().as_bytes();
+    let drive = first.len() >= 2 && first[0].is_ascii_alphabetic() && first[1] == b':';
+    let safe = !drive
+        && Path::new(&normalized)
+            .components()
+            .all(|c| matches!(c, Component::Normal(_) | Component::CurDir));
     if safe {
         Ok(())
     } else {
