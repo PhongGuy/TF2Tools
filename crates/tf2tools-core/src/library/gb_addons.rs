@@ -287,7 +287,8 @@ impl Library {
         Ok(entry)
     }
 
-    /// Deletes add-on `gb_id`'s recorded files from the game, its library copy and its row.
+    /// Deletes add-on `gb_id`'s recorded files from the game, its library copy, any leftover
+    /// staging dir and its row.
     /// Refuses `Tf2Running` first when a recorded file is a VPK and `tf2_running()` says so.
     ///
     /// # Errors
@@ -314,7 +315,10 @@ impl Library {
                 remove_entry(&path)?;
             }
         }
-        remove_dir_if_present(&self.dir.gb_addon_dir().join(gb_id.to_string()))?;
+        // A staging dir an interrupted install left behind belongs to the add-on too.
+        let root = self.dir.gb_addon_dir();
+        remove_dir_if_present(&root.join(gb_id.to_string()))?;
+        remove_entry(&root.join(format!(".staging-{gb_id}")))?;
         let id = gb_id_column(gb_id, install_db)?;
         self.db
             .write(|conn| conn.execute("DELETE FROM library_gb_addons WHERE gb_id = ?1", [id]))

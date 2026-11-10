@@ -701,3 +701,27 @@ async fn an_update_cut_short_owns_the_old_and_new_files() {
         .unwrap();
     assert!(custom(&s).is_empty());
 }
+
+#[tokio::test]
+async fn remove_also_deletes_a_leftover_staging_dir() {
+    let s = setup().await;
+    let d = download(&s, 34, "A", "a.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap();
+    common::write_file(
+        &s.env.dir.gb_addon_dir().join(".staging-34/1/junk.vpk"),
+        b"junk",
+    );
+    common::write_file(&s.env.dir.gb_addon_dir().join(".staging-340/1/x"), b"x");
+    s.env
+        .lib
+        .remove_gb_addon(GbId::new(34), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(
+        common::tree(&s.env.dir.gb_addon_dir()),
+        [".staging-340/1/x"],
+        "only this add-on's staging goes"
+    );
+}
