@@ -215,15 +215,15 @@ impl Library {
         let root = self.dir.gb_addon_dir();
         let staging = root.join(format!(".staging-{gb_id}"));
         let base = installed_base(gb_id, &download.name);
-        let staged = remove_dir_if_present(&staging)
+        let staged = remove_entry(&staging)
             .and_then(|()| stage(&staging, &picked, &base))
             .inspect_err(|_| {
-                let _ = remove_dir_if_present(&staging);
+                let _ = remove_entry(&staging);
             })?;
         if previous.is_some()
             && let Err(e) = self.mark_not_installed(gb_id)
         {
-            let _ = remove_dir_if_present(&staging);
+            let _ = remove_entry(&staging);
             return Err(e);
         }
 

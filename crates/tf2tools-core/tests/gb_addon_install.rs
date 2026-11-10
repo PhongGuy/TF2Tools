@@ -405,6 +405,21 @@ async fn a_stale_staging_dir_is_cleared_first() {
 }
 
 #[tokio::test]
+async fn a_stale_staging_file_is_cleared_first() {
+    let s = setup().await;
+    common::write_file(&s.env.dir.gb_addon_dir().join(".staging-27"), b"junk");
+    let d = download(&s, 27, "A", "a.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(
+        common::tree(&s.env.dir.gb_addon_dir()),
+        ["27/1/tf2tools-gb-27-a.vpk"]
+    );
+}
+
+#[tokio::test]
 async fn a_failed_staging_copy_changes_nothing() {
     let s = setup().await;
     let d = download(&s, 19, "A", "a.vpk", vpk(b"v1"), 100).await;
@@ -413,9 +428,9 @@ async fn a_failed_staging_copy_changes_nothing() {
         .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
         .unwrap();
     let d = download(&s, 19, "A", "a.vpk", vpk(b"v2"), 200).await;
-    // A file where the staging folder goes cannot be cleared as a folder, so staging fails.
+    // The download's extracted files vanishing makes the staging copy fail part-way.
+    std::fs::remove_dir_all(s.env.dir.tmp_dir()).unwrap();
     let root = s.env.dir.gb_addon_dir();
-    let blocker = common::write_file(&root.join(".staging-19"), b"in the way");
     let result = s
         .env
         .lib
@@ -428,7 +443,6 @@ async fn a_failed_staging_copy_changes_nothing() {
     assert!(list[0].is_installed());
     assert_eq!(list[0].file_date(), 100);
     assert_eq!(custom(&s), ["tf2tools-gb-19-a.vpk"]);
-    std::fs::remove_file(blocker).unwrap();
     assert_eq!(common::tree(&root), ["19/1/tf2tools-gb-19-a.vpk"]);
 }
 
