@@ -28,7 +28,8 @@ pub fn centred_top(view_height: Pixels, box_height: Pixels, margin: Pixels) -> P
 /// v5's `max-h-[90vh]` content cap for a window `viewport_height` tall that spends
 /// `insets` on its frame: 90% of the visible window, but never past the kit's surface,
 /// which keeps `margin` clear above and below. An outgrown surface scrolls itself and
-/// takes the wheel from the dialog's own body.
+/// takes the wheel from the dialog's own body. It assumes the first dialog layer; the kit
+/// lowers each stacked dialog by a further 16 px.
 pub fn content_cap(viewport_height: Pixels, insets: Pixels, margin: Pixels) -> Pixels {
     let visible = viewport_height - insets;
     (visible * 0.9).min(visible - margin * 2.) - BOX_CHROME
