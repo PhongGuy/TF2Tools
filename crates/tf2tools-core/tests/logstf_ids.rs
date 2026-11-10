@@ -114,3 +114,52 @@ fn logs_tf_class_names_map_to_classes() {
     assert_eq!(logstf_class("undefined"), None);
     assert_eq!(logstf_class("heavy"), None);
 }
+
+#[test]
+fn ids_above_the_7656119_prefix_are_ids_not_vanity() {
+    let high = STEAM_ID64_BASE + u64::from(u32::MAX);
+    assert_eq!(id("76561202255233023"), high);
+    assert_eq!(id("76561200000000000"), 76_561_200_000_000_000);
+    assert_eq!(
+        parse_player_input("76561202255233024"),
+        Err(PlayerInputError::NotSteam)
+    );
+}
+
+#[test]
+fn pasted_links_may_carry_query_fragment_path_case_and_mobile_host() {
+    assert_eq!(
+        id("https://steamcommunity.com/profiles/76561197960287930/?l=english"),
+        GABE
+    );
+    assert_eq!(
+        id("https://steamcommunity.com/profiles/76561197960287930?l=english"),
+        GABE
+    );
+    assert_eq!(
+        id("https://steamcommunity.com/profiles/76561197960287930#top"),
+        GABE
+    );
+    assert_eq!(
+        id("https://steamcommunity.com/profiles/76561197960287930/games"),
+        GABE
+    );
+    assert_eq!(
+        id("HTTPS://SteamCommunity.com/profiles/76561197960287930"),
+        GABE
+    );
+    assert_eq!(
+        id("https://m.steamcommunity.com/profiles/76561197960287930"),
+        GABE
+    );
+    assert_eq!(id("https://logs.tf/profile/76561197960497430#x"), ARIE);
+    assert_eq!(
+        vanity("https://steamcommunity.com/id/gabelogannewell/home"),
+        "gabelogannewell"
+    );
+    assert_eq!(
+        vanity("https://steamcommunity.com/id/gabelogannewell?l=english"),
+        "gabelogannewell"
+    );
+    assert_eq!(vanity("Steamcommunity.com/id/Gabe"), "Gabe");
+}

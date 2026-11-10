@@ -95,26 +95,32 @@ fn legacy(rest: &str) -> Option<SteamId> {
 }
 
 fn is_id64_shaped(text: &str) -> bool {
-    text.len() == 17 && text.starts_with("7656119") && text.bytes().all(|b| b.is_ascii_digit())
+    text.len() == 17 && text.starts_with("7656") && text.bytes().all(|b| b.is_ascii_digit())
 }
 
 // A steamcommunity.com or logs.tf link; anything on another host is not Steam.
+// Query, fragment and trailing path are dropped, and scheme and host ignore case.
 fn link(text: &str) -> Result<PlayerInput, PlayerInputError> {
-    let text = text
-        .strip_prefix("https://")
-        .or_else(|| text.strip_prefix("http://"))
-        .unwrap_or(text);
-    let text = text.strip_prefix("www.").unwrap_or(text);
-    if let Some(rest) = text.strip_prefix("steamcommunity.com/profiles/") {
-        return id64_text(rest);
+    let text = text.split(['?', '#']).next().unwrap_or(text);
+    let lower = text.to_ascii_lowercase();
+    let skip = ["https://", "http://"]
+        .iter()
+        .find(|scheme| lower.starts_with(*scheme))
+        .map_or(0, |scheme| scheme.len());
+    let text = &text[skip..];
+    let (host, path) = text.split_once('/').ok_or(PlayerInputError::NotSteam)?;
+    let host = host.to_ascii_lowercase();
+    let host = host
+        .strip_prefix("www.")
+        .or_else(|| host.strip_prefix("m."))
+        .unwrap_or(&host);
+    let mut parts = path.split('/');
+    let (kind, value) = (parts.next().unwrap_or(""), parts.next().unwrap_or(""));
+    match (host, kind) {
+        ("steamcommunity.com", "profiles") | ("logs.tf", "profile") => id64_text(value),
+        ("steamcommunity.com", "id") => vanity(value),
+        _ => Err(PlayerInputError::NotSteam),
     }
-    if let Some(rest) = text.strip_prefix("steamcommunity.com/id/") {
-        return vanity(rest);
-    }
-    if let Some(rest) = text.strip_prefix("logs.tf/profile/") {
-        return id64_text(rest);
-    }
-    Err(PlayerInputError::NotSteam)
 }
 
 fn id64_text(text: &str) -> Result<PlayerInput, PlayerInputError> {
