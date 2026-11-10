@@ -3,7 +3,7 @@
 use crate::common::{self, gb_addon_download, gb_addon_file, gb_addon_profile, store_env};
 
 use rars::ArchiveVersion;
-use tf2tools_core::{GbAddonFetchError, GbId, PayloadKind};
+use tf2tools_core::{ArchiveError, GbAddonFetchError, GbId, PayloadKind};
 
 fn vpk() -> Vec<u8> {
     common::vpk_bytes(&[("materials/a.vmt", b"a")])
@@ -156,4 +156,131 @@ async fn a_failed_download_leaves_tmp_empty() {
         "{err:?}"
     );
     assert!(common::tmp_is_empty(&env.dir));
+}
+
+#[tokio::test]
+async fn a_bare_vpk_download_is_one_payload() {
+    let env = store_env().await;
+    let files = vec![gb_addon_file(&env, 8, 0, "Crit.vpk", &vpk(), 100).await];
+    let profile = gb_addon_profile(&env, 8, "Crit", files).await;
+    let download = gb_addon_download(&env.client, "effects", &profile)
+        .await
+        .0
+        .unwrap();
+    let names: Vec<&str> = download.payloads().iter().map(|p| p.name()).collect();
+    assert_eq!(names, ["Crit.vpk"]);
+}
+
+#[tokio::test]
+async fn refusals_name_their_reason_and_leave_tmp_empty() {
+    let env = store_env().await;
+    let exe = common::zip_bytes(&[("Setup.exe", b"MZ"), ("readme.txt", b"r")]);
+    let loose = common::zip_bytes(&[("readme.txt", b"r")]);
+    let many: Vec<(String, Vec<u8>)> = (0..17).map(|i| (format!("v{i:02}.vpk"), vpk())).collect();
+    let many_refs: Vec<(&str, &[u8])> = many
+        .iter()
+        .map(|(n, b)| (n.as_str(), b.as_slice()))
+        .collect();
+    let crowded = common::zip_bytes(&many_refs);
+    let locked = common::rar_bytes(ArchiveVersion::Rar50, &[("a.vpk", &vpk())], Some(b"pw"));
+    let evil = common::rar5_stored(&["ok.txt", "..\\evil.txt"], 0);
+    let cases: [(u64, &str, &[u8]); 5] = [
+        (20, "exe.zip", &exe),
+        (21, "loose.zip", &loose),
+        (22, "crowded.zip", &crowded),
+        (23, "locked.rar", &locked),
+        (24, "evil.rar", &evil),
+    ];
+    let mut errors = Vec::new();
+    for (id, name, body) in cases {
+        let file = gb_addon_file(&env, id, 0, name, body, 100).await;
+        let profile = gb_addon_profile(&env, id, name, vec![file]).await;
+        errors.push(
+            gb_addon_download(&env.client, "skins", &profile)
+                .await
+                .0
+                .unwrap_err(),
+        );
+        assert!(common::tmp_is_empty(&env.dir), "{name} left files in tmp");
+    }
+    assert!(
+        matches!(&errors[0], GbAddonFetchError::OnlyExe { file_name } if file_name == "exe.zip"),
+        "{:?}",
+        errors[0]
+    );
+    assert!(
+        matches!(
+            errors[1],
+            GbAddonFetchError::UnknownLayout { payloads: 0, .. }
+        ),
+        "{:?}",
+        errors[1]
+    );
+    assert!(
+        matches!(
+            errors[2],
+            GbAddonFetchError::UnknownLayout { payloads: 17, .. }
+        ),
+        "{:?}",
+        errors[2]
+    );
+    assert!(
+        matches!(
+            errors[3],
+            GbAddonFetchError::Archive(ArchiveError::Encrypted { .. })
+        ),
+        "{:?}",
+        errors[3]
+    );
+    assert!(
+        matches!(
+            errors[4],
+            GbAddonFetchError::Archive(ArchiveError::UnsafePath { .. })
+        ),
+        "{:?}",
+        errors[4]
+    );
+}
+
+#[tokio::test]
+async fn a_download_that_is_not_an_archive_is_refused_by_kind() {
+    let env = store_env().await;
+    let cases: [(u64, &str, &[u8]); 3] = [
+        (40, "notes.txt", b"just text"),
+        (41, "fake.vpk", b"not a vpk"),
+        (42, "Setup.exe", b"MZ\x90\x00"),
+    ];
+    let mut errors = Vec::new();
+    for (id, name, body) in cases {
+        let file = gb_addon_file(&env, id, 0, name, body, 100).await;
+        let profile = gb_addon_profile(&env, id, name, vec![file]).await;
+        errors.push(
+            gb_addon_download(&env.client, "skins", &profile)
+                .await
+                .0
+                .unwrap_err(),
+        );
+        assert!(common::tmp_is_empty(&env.dir), "{name} left files in tmp");
+    }
+    assert!(
+        matches!(
+            errors[0],
+            GbAddonFetchError::UnknownLayout { payloads: 0, .. }
+        ),
+        "{:?}",
+        errors[0]
+    );
+    assert!(
+        matches!(
+            errors[1],
+            GbAddonFetchError::UnknownLayout { payloads: 0, .. }
+        ),
+        "{:?}",
+        errors[1]
+    );
+    assert!(
+        matches!(&errors[2], GbAddonFetchError::OnlyExe { file_name } if file_name == "Setup.exe"),
+        "{:?}",
+        errors[2]
+    );
 }

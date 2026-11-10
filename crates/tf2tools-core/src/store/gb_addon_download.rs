@@ -7,10 +7,12 @@ use tempfile::TempDir;
 
 use super::download::save_name;
 use super::{AddonProfile, AddonSection, DownloadProgress, StoreClient};
-use crate::archive::extract_archive;
+use walkdir::WalkDir;
+
+use crate::archive::{VPK_MAGIC, extract_archive, sniff};
 use crate::error::GbAddonFetchError;
 use crate::library::GbId;
-use crate::payloads::{Payload, find_payloads};
+use crate::payloads::{MAX_PAYLOADS, Payload, find_payloads};
 
 /// A downloaded, extracted add-on waiting to be installed. Its scratch dir, which holds
 /// every payload, is removed when it is dropped.
@@ -120,9 +122,10 @@ impl StoreClient {
         // The blocking half owns the scratch dir, so a dropped future cannot remove files
         // it is still extracting; it hands the dir back only when the walk succeeded.
         // Tokio turns a panic in it into Interrupted, so it runs marked as handled.
+        let file_name = file.name().to_owned();
         let (scratch, payloads) = tokio::task::spawn_blocking(move || {
             crate::panic_mark::marked(|| {
-                let payloads = unpack(&saved, &scratch.path().join("tree"))?;
+                let payloads = unpack(&saved, &scratch.path().join("tree"), &file_name)?;
                 Ok::<_, GbAddonFetchError>((scratch, payloads))
             })
         })
@@ -145,11 +148,52 @@ impl StoreClient {
     }
 }
 
-/// Extracts `saved` into `tree` and walks the tree for payloads.
-fn unpack(saved: &Path, tree: &Path) -> Result<Vec<Payload>, GbAddonFetchError> {
+/// Unpacks `saved` into `tree` and returns its payloads, refusing a download that holds
+/// only programs or no recognisable layout. `file_name` is the store's name for it.
+fn unpack(saved: &Path, tree: &Path, file_name: &str) -> Result<Vec<Payload>, GbAddonFetchError> {
     std::fs::create_dir_all(tree).map_err(io_at(tree))?;
-    extract_archive(saved, tree)?;
-    Ok(find_payloads(tree)?)
+    let unknown = |payloads| GbAddonFetchError::UnknownLayout {
+        file_name: file_name.to_owned(),
+        payloads,
+    };
+    let only_exe = || GbAddonFetchError::OnlyExe {
+        file_name: file_name.to_owned(),
+    };
+
+    // A bare VPK is installed as the file it is, so it moves into the tree whole;
+    // anything else that is not an archive has nothing a walk could find.
+    if has_extension(saved, "vpk") && sniff(saved)?.starts_with(VPK_MAGIC) {
+        let dest = tree.join(saved.file_name().unwrap_or_default());
+        std::fs::rename(saved, &dest).map_err(io_at(&dest))?;
+    } else if extract_archive(saved, tree)? == saved {
+        return Err(if has_extension(saved, "exe") {
+            only_exe()
+        } else {
+            unknown(0)
+        });
+    }
+
+    let payloads = find_payloads(tree)?;
+    if payloads.is_empty() && holds_exe(tree) {
+        return Err(only_exe());
+    }
+    if payloads.is_empty() || payloads.len() > MAX_PAYLOADS {
+        return Err(unknown(payloads.len()));
+    }
+    Ok(payloads)
+}
+
+fn has_extension(path: &Path, ext: &str) -> bool {
+    path.extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case(ext))
+}
+
+/// Whether any `.exe` sits in `tree`; an unreadable entry counts as none.
+fn holds_exe(tree: &Path) -> bool {
+    WalkDir::new(tree)
+        .into_iter()
+        .filter_map(Result::ok)
+        .any(|e| e.file_type().is_file() && has_extension(e.path(), "exe"))
 }
 
 fn io_at(path: &Path) -> impl FnOnce(std::io::Error) -> GbAddonFetchError + '_ {

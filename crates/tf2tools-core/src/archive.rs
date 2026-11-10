@@ -58,7 +58,7 @@ pub fn find_content_root(dir: &Path) -> Result<PathBuf, ArchiveError> {
 }
 
 /// Reads up to the first 8 bytes; a shorter file is sniffed on what it has.
-fn sniff(archive: &Path) -> Result<Vec<u8>, ArchiveError> {
+pub(crate) fn sniff(archive: &Path) -> Result<Vec<u8>, ArchiveError> {
     let io = |source| io_error(archive, source);
     let mut header = Vec::with_capacity(8);
     File::open(archive)
