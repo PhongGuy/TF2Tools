@@ -22,7 +22,7 @@ use crate::store_download::format_bytes;
 use crate::store_messages::{addon_stopped, describe_browse};
 use crate::tokio_bridge;
 use crate::widgets::carousel::Carousel;
-use crate::widgets::dialog_frame::{BOX_CHROME, DETAIL_WIDTH, DialogFrame};
+use crate::widgets::dialog_frame::{DETAIL_WIDTH, DialogFrame, content_max_height};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_beside;
 use crate::widgets::store_error::error_line;
@@ -301,7 +301,7 @@ impl Render for AddonDetail {
             .id(ids::ADDON_DETAIL)
             .test_support()
             .w_full()
-            .max_h(window.viewport_size().height * 0.9 - BOX_CHROME)
+            .max_h(content_max_height(window, cx))
             .gap_4()
             .child(
                 h_flex()
