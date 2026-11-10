@@ -329,6 +329,12 @@ async fn while_tf2_runs_an_update_that_removes_a_vpk_is_refused() {
         .lib
         .install_gb_addon(d, &chosen(&["crit.vpk"]), &s.tf2, &no)
         .unwrap();
+    let library = s.env.dir.gb_addon_dir();
+    let copy_before = common::tree(&library);
+    let bytes_before: Vec<Vec<u8>> = copy_before
+        .iter()
+        .map(|f| std::fs::read(library.join(f)).unwrap())
+        .collect();
     let body = common::zip_bytes(&[("crit/materials/a.vmt", b"a")]);
     let d = download(&s, 13, "Crit", "crit.zip", body, 200).await;
     let err = s
@@ -338,6 +344,19 @@ async fn while_tf2_runs_an_update_that_removes_a_vpk_is_refused() {
         .unwrap_err();
     assert!(matches!(err, GbAddonInstallError::Tf2Running), "{err:?}");
     assert_eq!(custom(&s), ["tf2tools-gb-13-crit.vpk"]);
+    let row = &s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap()[0];
+    assert!(row.is_installed());
+    assert_eq!(row.file_date(), 100);
+    assert_eq!(
+        common::tree(&library),
+        copy_before,
+        "the library copy is untouched"
+    );
+    let bytes_after: Vec<Vec<u8>> = copy_before
+        .iter()
+        .map(|f| std::fs::read(library.join(f)).unwrap())
+        .collect();
+    assert_eq!(bytes_after, bytes_before);
 }
 
 #[tokio::test]
