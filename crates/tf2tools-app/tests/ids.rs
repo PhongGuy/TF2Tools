@@ -768,4 +768,8 @@ fn addon_store_tab_and_card_ids_are_keyed_by_section_and_item() {
     assert_eq!(name(ids::addon_detail_file(1)), "addon-detail-file:1");
     assert_eq!(ids::ADDON_LOAD_MORE, "addon-load-more");
     assert_eq!(ids::SETTINGS_MATURE_ADDONS, "settings-mature-addons");
+    assert_eq!(
+        name(ids::addon_gb_card_badge("skins", GbId::new(5))),
+        "addon-gb-card-badge:skins:5"
+    );
 }

@@ -780,6 +780,14 @@ pub const ADDON_DETAIL_OUTDATED: &str = "addon-detail-outdated";
 pub const ADDON_DETAIL_BODY: &str = "addon-detail-body";
 /// The scrollbar beside `ADDON_DETAIL_BODY`.
 pub const ADDON_DETAIL_SCROLLBAR: &str = "addon-detail-scrollbar";
+/// The add-on detail's Install, Update, "Install again" or "Installed" button.
+pub const ADDON_DETAIL_INSTALL: &str = "addon-detail-install";
+/// The add-on detail's download progress, labelled with its text.
+pub const ADDON_DETAIL_PROGRESS: &str = "addon-detail-progress";
+/// The add-on detail's download progress bar.
+pub const ADDON_DETAIL_BAR: &str = "addon-detail-bar";
+/// Why the add-on detail offers no install, in its place.
+pub const ADDON_DETAIL_BLOCKED: &str = "addon-detail-blocked";
 /// The Settings "Show mature add-ons" switch.
 pub const SETTINGS_MATURE_ADDONS: &str = "settings-mature-addons";
 /// Wraps the Activity Log's category select.
@@ -2485,6 +2493,11 @@ pub fn addon_gb_card_reveal(section: &str, id: GbId) -> ElementId {
 /// A GameBanana add-on card's "Outdated" badge: "addon-gb-card-outdated:<section>:<id>".
 pub fn addon_gb_card_outdated(section: &str, id: GbId) -> ElementId {
     keyed("addon-gb-card-outdated", &format!("{section}:{id}"))
+}
+
+/// A GameBanana add-on card's "Installed" or "Update" badge: "addon-gb-card-badge:<section>:<id>".
+pub fn addon_gb_card_badge(section: &str, id: GbId) -> ElementId {
+    keyed("addon-gb-card-badge", &format!("{section}:{id}"))
 }
 
 /// A GameBanana add-on card's like count: "addon-gb-card-likes:<section>:<id>".
