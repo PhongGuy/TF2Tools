@@ -1590,11 +1590,6 @@ pub fn store_file(index: usize) -> ElementId {
     keyed("store-file", &index.to_string())
 }
 
-/// A detail dialog file row's note, present only for an unsupported archive: "store-file-note:<i>".
-pub fn store_file_note(index: usize) -> ElementId {
-    keyed("store-file-note", &index.to_string())
-}
-
 /// A detail body's link button, keyed by what it opens ("repo", "gamebanana", a social key).
 pub fn store_detail_link(key: &str) -> ElementId {
     keyed("store-detail-link", key)

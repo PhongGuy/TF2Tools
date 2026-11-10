@@ -2,12 +2,14 @@
 //! carry paths or raw error text; the raw error rides along as `detail` for the developer log.
 
 use tf2tools_core::{
-    ApplyProfileError, CopyHudError, DetectError, FontInstallError, HudLoadError, ImportError,
-    InstallError, KeepHudError, LibraryError, LogError, MakeHudError, PaintError, PngReadError,
-    PngWriteError, ProfileError, QueryError, SettingsError, UpdateCopyError, WavError,
+    ApplyProfileError, CopyHudError, DetectError, FontInstallError, GbAddonInstallError,
+    HudLoadError, ImportError, InstallError, KeepHudError, LibraryError, LogError, MakeHudError,
+    PaintError, PngReadError, PngWriteError, ProfileError, QueryError, SettingsError,
+    UpdateCopyError, WavError,
 };
 
 use crate::audio::AudioError;
+use crate::pages::graphics::jobs::{CLOSE_TF2, CLOSE_TF2_TEXT};
 use crate::services::{OpError, StartupError};
 use crate::store_messages::{LIBRARY_UPDATE, STORE_READ};
 
@@ -62,6 +64,35 @@ impl LocalFailure {
             message: self.message,
         }
     }
+}
+
+/// A failed add-on install, reinstall or remove in player words.
+pub fn describe_gb_install(err: &GbAddonInstallError) -> LocalFailure {
+    let message = match err {
+        GbAddonInstallError::Tf2Running => CLOSE_TF2_TEXT,
+        GbAddonInstallError::GameMissing { .. } => GAME_MOVED,
+        GbAddonInstallError::Io { .. } => {
+            "Couldn't write the add-on into TF2. Make sure your disk has free space, then try again."
+        }
+        GbAddonInstallError::NotInLibrary { .. } => {
+            "This add-on's files are no longer in your library. Install it again from the Addon Store."
+        }
+        GbAddonInstallError::Database { .. } => LIBRARY_UPDATE,
+        GbAddonInstallError::UnknownPayload { .. } | GbAddonInstallError::NothingChosen | _ => {
+            UNKNOWN
+        }
+    };
+    LocalFailure::new(message, err.to_string())
+}
+
+/// The toast for a failed add-on operation titled `action`: "Close TF2 first" when TF2 runs.
+pub fn gb_install_op(err: &GbAddonInstallError, action: &'static str) -> OpError {
+    let action = if matches!(err, GbAddonInstallError::Tf2Running) {
+        CLOSE_TF2
+    } else {
+        action
+    };
+    describe_gb_install(err).into_op(action)
 }
 
 /// A failed read or change of the library in player words; `detail` is the error's own text.
