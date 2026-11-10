@@ -34,6 +34,7 @@ tempfile = "3"
 zip = "9"
 sevenz-rust2 = "0.24"
 vpk = "0.3"
+rars = { version = "=0.12.4", default-features = false }
 vtf = "0.4.1"
 image = { version = "0.25", default-features = false, features = ["png", "webp"] }
 serde = { version = "1", features = ["derive"] }

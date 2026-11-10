@@ -21,7 +21,6 @@ const DL_DISK: &str = "Couldn't save the download. Make sure your disk has free 
 const DL_LIBRARY: &str = "TF2Tools couldn't update your library. Restart TF2Tools and try again.";
 const DL_STOPPED: &str = "The download stopped before it finished. Try again.";
 const DL_UNUSABLE: &str = "This download has nothing TF2Tools can use. Pick another file.";
-const DL_RAR: &str = "This file is a RAR archive, which TF2Tools can't open. Pick another file.";
 const DL_UNPACK: &str = "The download couldn't be unpacked. Try again, or pick another file.";
 
 fn io(text: &str) -> std::io::Error {
@@ -131,10 +130,10 @@ fn download_cases() -> Vec<(StoreKind, DownloadError, &'static str)> {
         ),
         (
             GB,
-            DownloadError::Archive(ArchiveError::Rar {
+            DownloadError::Archive(ArchiveError::Encrypted {
                 path: PathBuf::from("/tmp/hud.rar"),
             }),
-            DL_RAR,
+            DL_UNPACK,
         ),
         (
             GB,
@@ -146,10 +145,10 @@ fn download_cases() -> Vec<(StoreKind, DownloadError, &'static str)> {
         ),
         (
             GB,
-            DownloadError::Import(ImportError::Archive(ArchiveError::Rar {
+            DownloadError::Import(ImportError::Archive(ArchiveError::Encrypted {
                 path: PathBuf::from("/tmp/hud.rar"),
             })),
-            DL_RAR,
+            DL_UNPACK,
         ),
         (
             GB,

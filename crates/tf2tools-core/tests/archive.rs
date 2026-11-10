@@ -2,6 +2,7 @@
 
 use crate::common;
 
+use rars::ArchiveVersion;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tf2tools_core::{ArchiveError, extract_archive, find_content_root};
@@ -83,14 +84,62 @@ fn vpk_is_detected_by_magic_and_fully_extracted() {
     assert_eq!(fs::read(dest.join("readme.txt")).unwrap(), b"R");
 }
 
+const TWIN: &[(&str, &[u8])] = &[
+    ("pack/materials/models/a.vmt", b"\"VertexLitGeneric\" {}"),
+    ("pack/materials/models/a.vtf", &[7u8; 4096]),
+    ("pack/readme.txt", b"hello hello hello hello"),
+];
+
 #[test]
-fn rar_is_rejected_and_dest_untouched() {
+fn rar4_and_rar5_extract_to_the_same_tree_as_their_zip_twin() {
+    let tmp = tempfile::tempdir().unwrap();
+    let zip = write(&tmp.path().join("twin.zip"), &common::zip_bytes(TWIN));
+    let zip_root = extract_archive(&zip, &tmp.path().join("zip")).unwrap();
+    for (file, version) in [
+        ("v4.rar", ArchiveVersion::Rar29),
+        ("v5.rar", ArchiveVersion::Rar50),
+    ] {
+        let rar = write(
+            &tmp.path().join(file),
+            &common::rar_bytes(version, TWIN, None),
+        );
+        let dest = tmp.path().join(format!("out-{file}"));
+        let root = extract_archive(&rar, &dest).unwrap();
+        assert_eq!(root, dest.join("pack"), "{file}");
+        assert_eq!(common::tree(&root), common::tree(&zip_root), "{file}");
+        for (name, bytes) in TWIN {
+            assert_eq!(fs::read(dest.join(name)).unwrap(), *bytes, "{file}: {name}");
+        }
+    }
+}
+
+#[test]
+fn an_encrypted_rar_is_refused_as_encrypted() {
+    let tmp = tempfile::tempdir().unwrap();
+    for (file, version) in [
+        ("v4.rar", ArchiveVersion::Rar29),
+        ("v5.rar", ArchiveVersion::Rar50),
+    ] {
+        let rar = write(
+            &tmp.path().join(file),
+            &common::rar_bytes(version, &[("a.txt", b"secret secret")], Some(b"pw")),
+        );
+        let err = extract_archive(&rar, &tmp.path().join(format!("out-{file}"))).unwrap_err();
+        assert!(
+            matches!(err, ArchiveError::Encrypted { ref path } if *path == rar),
+            "{file}: {err:?}"
+        );
+    }
+}
+
+#[test]
+fn a_corrupt_rar_is_malformed_and_dest_untouched() {
     let tmp = tempfile::tempdir().unwrap();
     let archive = write(&tmp.path().join("hud.rar"), b"Rar!\x1a\x07\x01\x00junk");
     let dest = tmp.path().join("out");
     let err = extract_archive(&archive, &dest).unwrap_err();
     assert!(
-        matches!(err, ArchiveError::Rar { ref path } if *path == archive),
+        matches!(err, ArchiveError::Malformed { ref path, .. } if *path == archive),
         "{err:?}"
     );
     assert!(!dest.exists());

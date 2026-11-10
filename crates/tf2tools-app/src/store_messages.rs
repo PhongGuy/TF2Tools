@@ -14,7 +14,6 @@ const DL_DISK: &str = "Couldn't save the download. Make sure your disk has free 
 pub(crate) const LIBRARY_UPDATE: &str =
     "TF2Tools couldn't update your library. Restart TF2Tools and try again.";
 const DL_UNUSABLE: &str = "This download has nothing TF2Tools can use. Pick another file.";
-const DL_RAR: &str = "This file is a RAR archive, which TF2Tools can't open. Pick another file.";
 const DL_UNPACK: &str = "The download couldn't be unpacked. Try again, or pick another file.";
 const DL_UNKNOWN: &str = "Something went wrong with the download. Try again later.";
 const FILES_STOPPED: &str = "Loading the files stopped before it finished. Try again.";
@@ -105,8 +104,8 @@ fn download_message(kind: StoreKind, err: &DownloadError) -> String {
 
 fn archive_message(err: &ArchiveError) -> &'static str {
     match err {
-        ArchiveError::Rar { .. } => DL_RAR,
         ArchiveError::Io { .. }
+        | ArchiveError::Encrypted { .. }
         | ArchiveError::Malformed { .. }
         | ArchiveError::UnsafePath { .. }
         | _ => DL_UNPACK,

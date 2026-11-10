@@ -144,9 +144,9 @@ pub enum ArchiveError {
         /// The underlying I/O error.
         source: std::io::Error,
     },
-    /// The file is a RAR archive, which is not supported.
-    #[error("{path} is a RAR archive, which is not supported; pick a zip or 7z file")]
-    Rar {
+    /// The archive is password-protected.
+    #[error("{path} is password-protected")]
+    Encrypted {
         /// The archive.
         path: PathBuf,
     },

@@ -321,6 +321,26 @@ pub fn game_with_vpk(vpk: &[u8]) -> (tempfile::TempDir, std::path::PathBuf) {
     (dir, tf)
 }
 
+/// Bytes of a RAR archive of `version` holding `entries`, built by `rars` itself, so names
+/// must be safe; `password` encrypts every entry.
+pub fn rar_bytes(
+    version: rars::ArchiveVersion,
+    entries: &[(&str, &[u8])],
+    password: Option<&[u8]>,
+) -> Vec<u8> {
+    let mut builder = rars::Builder::new(version).password(password.map(<[u8]>::to_vec));
+    for &(name, bytes) in entries {
+        builder
+            .add_bytes(name.as_bytes().to_vec(), bytes.to_vec(), None, None)
+            .unwrap();
+    }
+    let mut out = Vec::new();
+    builder
+        .write_to(&mut out, &rars::WriterResources::default(), None)
+        .unwrap();
+    out
+}
+
 /// Bytes of a zip holding `entries`; a name ending in `/` becomes a directory entry.
 pub fn zip_bytes(entries: &[(&str, &[u8])]) -> Vec<u8> {
     use std::io::Write;

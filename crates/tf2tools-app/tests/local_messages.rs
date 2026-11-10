@@ -130,10 +130,10 @@ fn import_cases() -> Vec<(ImportError, &'static str)> {
             "Couldn't read that file or save it to your library. Make sure your disk has free space, then try again.",
         ),
         (
-            ImportError::Archive(ArchiveError::Rar {
+            ImportError::Archive(ArchiveError::Encrypted {
                 path: PathBuf::from("/tmp/hud.rar"),
             }),
-            "This file is a RAR archive, which TF2Tools can't open. Pick a ZIP file instead.",
+            "This archive couldn't be unpacked. Pick another file.",
         ),
         (
             ImportError::Archive(ArchiveError::Malformed {

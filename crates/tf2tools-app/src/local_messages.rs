@@ -2,10 +2,9 @@
 //! carry paths or raw error text; the raw error rides along as `detail` for the developer log.
 
 use tf2tools_core::{
-    ApplyProfileError, ArchiveError, CopyHudError, DetectError, FontInstallError, HudLoadError,
-    ImportError, InstallError, KeepHudError, LibraryError, LogError, MakeHudError, PaintError,
-    PngReadError, PngWriteError, ProfileError, QueryError, SettingsError, UpdateCopyError,
-    WavError,
+    ApplyProfileError, CopyHudError, DetectError, FontInstallError, HudLoadError, ImportError,
+    InstallError, KeepHudError, LibraryError, LogError, MakeHudError, PaintError, PngReadError,
+    PngWriteError, ProfileError, QueryError, SettingsError, UpdateCopyError, WavError,
 };
 
 use crate::audio::AudioError;
@@ -346,9 +345,6 @@ pub fn describe_import(err: &ImportError) -> LocalFailure {
     let message = match err {
         ImportError::Io { .. } => {
             "Couldn't read that file or save it to your library. Make sure your disk has free space, then try again."
-        }
-        ImportError::Archive(ArchiveError::Rar { .. }) => {
-            "This file is a RAR archive, which TF2Tools can't open. Pick a ZIP file instead."
         }
         ImportError::Archive(_) => "This archive couldn't be unpacked. Pick another file.",
         ImportError::NotAHud { .. } => "This file doesn't contain a HUD. Pick another file.",
