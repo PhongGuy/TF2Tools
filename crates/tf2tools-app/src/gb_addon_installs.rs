@@ -286,9 +286,7 @@ impl GbAddonInstalls {
                 return;
             }
             let job = cx.update(|cx| {
-                if !tokio_bridge::is_running(cx) {
-                    tokio_bridge::init(cx);
-                }
+                tokio_bridge::init(cx);
                 let store = cx.global::<Services>().store.clone();
                 tokio_bridge::spawn(
                     cx,
@@ -323,9 +321,7 @@ impl GbAddonInstalls {
                 return None;
             }
         };
-        if !tokio_bridge::is_running(cx) {
-            tokio_bridge::init(cx);
-        }
+        tokio_bridge::init(cx);
         self.active = Some((id, stage));
         Some(tf2)
     }
@@ -338,8 +334,8 @@ impl GbAddonInstalls {
                 .list_gb_addons(tf2.as_ref())
                 .map_err(|e| describe_library(&e).into_op("Couldn't list add-ons"))
         });
-        // A failed listing is already logged; the list on screen stays as it was.
         self.reload_task = Some(cx.spawn(async move |this, cx| {
+            // A failed listing is already logged; the list on screen stays as it was.
             if let Ok(entries) = list.await {
                 let _ = this.update(cx, |me, cx| {
                     me.entries = entries.into();
