@@ -550,7 +550,12 @@ async fn fetch_and_install(
             let _ = this.update(cx, |me, cx| me.set_stage(GbAddonStage::Choosing, cx));
             match ask_payloads(&download, win, cx).await {
                 Some(chosen) => chosen,
-                None => return Outcome::Cancelled,
+                None => {
+                    // Dropping the download deletes its extracted files, which for a big
+                    // pack is slow disk work that must stay off the UI thread.
+                    cx.background_spawn(async move { drop(download) }).detach();
+                    return Outcome::Cancelled;
+                }
             }
         }
     };
