@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 14;
+pub(crate) const SCHEMA_VERSION: u32 = 15;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -96,6 +96,11 @@ const STEPS: &[Step] = &[
     Step {
         version: 14,
         sql: STEP_14_SQL,
+        add_columns: &[],
+    },
+    Step {
+        version: 15,
+        sql: STEP_15_SQL,
         add_columns: &[],
     },
 ];
@@ -442,4 +447,45 @@ const STEP_14_SQL: &str = "
         installed INTEGER NOT NULL,
         gone INTEGER NOT NULL DEFAULT 0
     );
+";
+
+/// v6 step 15: the logs.tf cache. Bodies stay as received so the expanded view needs no
+/// download; class rows hold every player of a downloaded log.
+const STEP_15_SQL: &str = "
+    CREATE TABLE IF NOT EXISTS logstf_players (
+        steam_id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        last_synced INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS logstf_logs (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        map TEXT NOT NULL,
+        date INTEGER NOT NULL,
+        length INTEGER,
+        body TEXT,
+        fetched_at INTEGER,
+        state INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS logstf_player_logs (
+        steam_id INTEGER NOT NULL,
+        log_id INTEGER NOT NULL REFERENCES logstf_logs(id) ON DELETE CASCADE,
+        PRIMARY KEY (steam_id, log_id)
+    );
+    CREATE TABLE IF NOT EXISTS logstf_class_rows (
+        log_id INTEGER NOT NULL REFERENCES logstf_logs(id) ON DELETE CASCADE,
+        steam_id INTEGER NOT NULL,
+        class TEXT NOT NULL,
+        seconds INTEGER NOT NULL,
+        kills INTEGER NOT NULL,
+        deaths INTEGER NOT NULL,
+        assists INTEGER NOT NULL,
+        dmg INTEGER NOT NULL,
+        heal INTEGER NOT NULL DEFAULT 0,
+        ubers INTEGER NOT NULL DEFAULT 0,
+        drops INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (log_id, steam_id, class)
+    );
+    CREATE INDEX IF NOT EXISTS logstf_class_rows_player ON logstf_class_rows(steam_id);
 ";

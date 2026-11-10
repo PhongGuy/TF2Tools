@@ -2215,3 +2215,15 @@ pub enum PlayerInputError {
     #[error("That doesn't look like a Steam profile link or Steam ID.")]
     NotSteam,
 }
+
+/// Why the logs.tf cache could not be read or written.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum LogsCacheError {
+    /// SQLite failed on one of the `logstf_` tables or the active-player setting.
+    #[error("the logs.tf cache could not be read or written: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+}

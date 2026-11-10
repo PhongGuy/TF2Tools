@@ -1,10 +1,12 @@
 //! logs.tf: Steam IDs, the player cache and the log client.
 
+mod cache;
 mod steam_id;
 mod steam_xml;
 
 use crate::weapons::TfClass;
 
+pub use cache::{LogsCache, TrackedPlayer};
 pub use steam_id::{PlayerInput, SteamId, parse_player_input};
 
 /// The SteamID64 of account number 0 in the public universe.

@@ -189,6 +189,7 @@ mod library_huds;
 mod library_painted;
 mod library_sounds;
 mod license;
+mod logstf_cache;
 mod logstf_ids;
 mod maps;
 mod mastercomfig;

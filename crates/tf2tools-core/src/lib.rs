@@ -43,10 +43,10 @@ pub use error::{
     BrowseError, CatalogError, CopyHudError, DataDirError, DetectError, DownloadError, FilesError,
     FontCheckError, FontInstallError, GbAddonCheckError, GbAddonFetchError, GbAddonInstallError,
     HistoryError, HudFilesError, HudLoadError, ImageError, ImportError, InstallError,
-    InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError, MakeHudError,
-    MapDownloadError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError, OpenError,
-    PaintError, PlayerInputError, PngReadError, PngWriteError, PresetError, PreviewError,
-    ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError,
+    InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError, LogsCacheError,
+    MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError,
+    OpenError, PaintError, PlayerInputError, PngReadError, PngWriteError, PresetError,
+    PreviewError, ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError,
     RestoreMastercomfigError, SchemaError, SettingsError, SyncError, TakeOverError,
     UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
     WavError,
@@ -104,7 +104,10 @@ pub use library::{
 };
 pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
-pub use logstf::{PlayerInput, STEAM_ID64_BASE, SteamId, logstf_class, parse_player_input};
+pub use logstf::{
+    LogsCache, PlayerInput, STEAM_ID64_BASE, SteamId, TrackedPlayer, logstf_class,
+    parse_player_input,
+};
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
