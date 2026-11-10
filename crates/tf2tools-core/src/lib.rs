@@ -88,13 +88,14 @@ pub use hud_maker::{background_corners, corner_radius, paints_background};
 pub use hud_maker::{wrap_lines, wrapped_text_left};
 pub use library::{
     AddonEntry, AddonName, ApplyProfileReport, ApplyReport, ApplyStep, Assignment, CrosshairEntry,
-    CrosshairFormat, CrosshairId, CrosshairRef, DraftCrosshair, DraftSlot, ExternalHud, GbId,
-    HudAssets, HudEntry, HudId, HudInstall, HudStatus, InstalledCrosshairs, InstalledSound,
-    InstalledSounds, Library, LibraryEntry, MadeHud, MakeTarget, MastercomfigStatus, MissingItem,
-    MissingKind, PaintTarget, PaintedSource, Preset, PresetEntry, Profile, ProfileCrosshair,
-    ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate, Provenance, Recovery,
-    Reinstall, SavedHud, SkipReason, SkippedAssignment, SoundConflict, SoundEntry, SoundFormat,
-    SoundId, SoundKind, crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
+    CrosshairFormat, CrosshairId, CrosshairRef, DraftCrosshair, DraftSlot, ExternalHud,
+    GbAddonEntry, GbId, HudAssets, HudEntry, HudId, HudInstall, HudStatus, InstalledCrosshairs,
+    InstalledSound, InstalledSounds, Library, LibraryEntry, MadeHud, MakeTarget,
+    MastercomfigStatus, MissingItem, MissingKind, PaintTarget, PaintedSource, Preset, PresetEntry,
+    Profile, ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem,
+    ProfileUpdate, Provenance, Recovery, Reinstall, SavedHud, SkipReason, SkippedAssignment,
+    SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind, crosshair_scripts_need_repair,
+    pictures_fit, read_recipe_file,
 };
 pub use library::{
     Choices, ComfigModule, ModuleCatalog, ModuleCategory, ModuleChoice, ModuleValue, readable_name,

@@ -141,12 +141,24 @@ const M13_TABLES: &str = "
     );
 ";
 
-/// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables and
-/// migration 13's mastercomfig tables: the schema v6 opens to.
+/// The table migration 14 adds, as the schema should hold it.
+const M14_TABLES: &str = "
+    CREATE TABLE library_gb_addons (
+        gb_id INTEGER PRIMARY KEY, section TEXT NOT NULL, name TEXT NOT NULL,
+        author TEXT NOT NULL, file_id INTEGER NOT NULL, file_date INTEGER NOT NULL,
+        latest_file_date INTEGER NOT NULL, checked_at INTEGER NOT NULL,
+        payloads TEXT NOT NULL, files TEXT NOT NULL, installed INTEGER NOT NULL,
+        gone INTEGER NOT NULL DEFAULT 0
+    );
+";
+
+/// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables,
+/// migration 13's mastercomfig tables and migration 14's add-on table: the schema v6 opens to.
 pub fn current_shape() -> SchemaShape {
     let conn = v5_fixture_connection();
     conn.execute_batch(M12_TABLES).unwrap();
     conn.execute_batch(M13_TABLES).unwrap();
+    conn.execute_batch(M14_TABLES).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape

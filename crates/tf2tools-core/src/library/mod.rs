@@ -5,6 +5,7 @@
 mod addons;
 mod borrow;
 mod crosshairs;
+mod gb_addons;
 mod hud_cfg;
 mod hud_copy;
 mod hud_folder;
@@ -47,6 +48,7 @@ pub use crosshairs::{
     ApplyReport, Assignment, CrosshairEntry, CrosshairFormat, CrosshairRef, InstalledCrosshairs,
     PaintTarget, PaintedSource, SkipReason, SkippedAssignment, crosshair_scripts_need_repair,
 };
+pub use gb_addons::GbAddonEntry;
 pub use hud_copy::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub(crate) use hud_folder::is_safe_folder;
 pub use hud_history::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};

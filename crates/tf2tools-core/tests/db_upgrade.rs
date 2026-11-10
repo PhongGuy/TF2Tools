@@ -25,7 +25,7 @@ const V1_SCHEMA: &str = "
     PRAGMA user_version = 1;";
 
 #[test]
-fn v5_database_upgrades_to_v13_without_loss() {
+fn v5_database_upgrades_to_v14_without_loss() {
     let (_tmp, dir) = common::temp_data_dir();
     common::write_v5_database(&dir);
     let before = common::dump_tables(&Connection::open(dir.db_path()).unwrap());
@@ -34,7 +34,7 @@ fn v5_database_upgrades_to_v13_without_loss() {
         "seed fills every table"
     );
     let db = Database::open(&dir).expect("open v5 database");
-    assert_eq!(db.schema_version(), 13);
+    assert_eq!(db.schema_version(), 14);
     drop(db);
     let after = Connection::open(dir.db_path()).unwrap();
     let mut rows = common::dump_tables(&after);
@@ -43,6 +43,7 @@ fn v5_database_upgrades_to_v13_without_loss() {
         "downloaded_maps",
         "mastercomfig_state",
         "mastercomfig_release",
+        "library_gb_addons",
     ] {
         assert_eq!(
             rows.remove(table).map(|r| r.len()),
@@ -55,7 +56,7 @@ fn v5_database_upgrades_to_v13_without_loss() {
     let version: u32 = after
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 13);
+    assert_eq!(version, 14);
     let analyzed: i64 = after
         .query_row(
             "SELECT count(*) FROM sqlite_master WHERE name = 'sqlite_stat1'",
@@ -79,12 +80,12 @@ fn v5_database_upgrades_to_v13_without_loss() {
         assert!(sql.ends_with("WHERE store_gb_id IS NOT NULL"), "{sql}");
     }
     drop(after);
-    let db = Database::open(&dir).expect("reopen at v13");
-    assert_eq!(db.schema_version(), 13);
+    let db = Database::open(&dir).expect("reopen at v14");
+    assert_eq!(db.schema_version(), 14);
 }
 
 #[test]
-fn v1_database_upgrades_to_v13() {
+fn v1_database_upgrades_to_v14() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -100,7 +101,7 @@ fn v1_database_upgrades_to_v13() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v1 database");
-    assert_eq!(db.schema_version(), 13);
+    assert_eq!(db.schema_version(), 14);
     drop(db);
 
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -128,7 +129,7 @@ fn newer_schema_is_refused_and_left_untouched() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
-    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 14;")
+    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 15;")
         .unwrap();
     drop(conn);
     let before = std::fs::read(dir.db_path()).unwrap();
@@ -138,7 +139,7 @@ fn newer_schema_is_refused_and_left_untouched() {
 
     let err = Database::open(&dir).expect_err("a newer schema must be refused");
     assert!(
-        matches!(&err, OpenError::NewerSchema { path, found: 14, supported: 13 } if *path == dir.db_path()),
+        matches!(&err, OpenError::NewerSchema { path, found: 15, supported: 14 } if *path == dir.db_path()),
         "{err:?}"
     );
     assert_eq!(std::fs::read(dir.db_path()).unwrap(), before);
@@ -245,7 +246,7 @@ fn v10_database_marks_the_gamebanana_mod_stores_stale_and_keeps_their_rows() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v10 database");
-    assert_eq!(db.schema_version(), 13);
+    assert_eq!(db.schema_version(), 14);
     drop(db);
     let conn = Connection::open(dir.db_path()).unwrap();
     let keys: Vec<String> = conn
@@ -280,7 +281,7 @@ fn v11_database_gains_the_map_tables() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v11 database");
-    assert_eq!(db.schema_version(), 13);
+    assert_eq!(db.schema_version(), 14);
     drop(db);
     assert_eq!(common::count(&dir, "store_maps"), 0);
     assert_eq!(common::count(&dir, "downloaded_maps"), 0);
@@ -321,7 +322,7 @@ fn v12_database_gains_the_mastercomfig_tables_and_drops_override_addons() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v12 database");
-    assert_eq!(db.schema_version(), 13);
+    assert_eq!(db.schema_version(), 14);
     drop(db);
     assert_eq!(
         asset_names(&dir, "library_addons"),
