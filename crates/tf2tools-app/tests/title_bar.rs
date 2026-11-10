@@ -96,9 +96,9 @@ fn a_drag_on_the_header_title_moves_the_window(cx: &mut TestAppContext) {
     assert!(message.contains("not implemented"), "no move: {message:?}");
 }
 
-// At 800 px Linux draws three 34 px window buttons right of the header row; the test platform
-// draws none, so a 698 px window leaves the row the same room. With every status item showing,
-// the row must fit that room, so the buttons beyond it stay whole.
+// At 800 px the app shows three 34 px window buttons right of the header row. On Windows the
+// test window draws them too, so it runs at 800 px; elsewhere it draws none, so a 698 px window
+// leaves the row the same room. With every status item showing, the row must fit that room.
 #[gpui_kit::test]
 fn a_full_header_fits_beside_the_window_buttons_at_800_px(cx: &mut TestAppContext) {
     use tf2tools_app::shell::route::Page;
@@ -127,7 +127,7 @@ fn a_full_header_fits_beside_the_window_buttons_at_800_px(cx: &mut TestAppContex
         run.report(3450, 3450);
         held.push(run);
     }
-    let width = px(698.);
+    let width = px(if cfg!(windows) { 800. } else { 698. });
     cx.simulate_window_resize(s.win, gpui_kit::size(width, px(600.)));
     support::next_repaint(cx);
     for kind in kinds {
