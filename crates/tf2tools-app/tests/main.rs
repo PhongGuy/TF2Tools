@@ -55,6 +55,7 @@ mod font_check;
 mod font_check_flow;
 mod font_dialog;
 mod game_moved;
+mod gb_addon_installs;
 mod global_player;
 mod graphics;
 mod graphics_model;

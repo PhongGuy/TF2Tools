@@ -14,6 +14,7 @@ pub mod crosshair_repair;
 pub mod crosshair_sync;
 pub mod diagnostics;
 pub mod font_check;
+pub mod gb_addon_installs;
 pub mod gb_card;
 pub mod ids;
 pub mod keymap;
