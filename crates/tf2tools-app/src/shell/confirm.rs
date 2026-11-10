@@ -159,6 +159,19 @@ impl Confirm {
         }
     }
 
+    /// The prompt before removing the GameBanana add-on called `name` from TF2 and the library.
+    pub fn remove_gb_addon(name: &str) -> Self {
+        Self {
+            title: "Remove Add-on".into(),
+            description: format!(
+                "Are you sure you want to remove {name}? It will be removed from TF2 and from your library."
+            )
+            .into(),
+            confirm_label: "Remove".into(),
+            cancel_label: "Cancel".into(),
+        }
+    }
+
     /// v5's ProfileCard delete prompt for the profile called `name`.
     pub fn delete_profile(name: &str) -> Self {
         Self {

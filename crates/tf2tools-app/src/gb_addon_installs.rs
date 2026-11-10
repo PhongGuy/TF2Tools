@@ -226,22 +226,33 @@ impl GbAddonInstalls {
         true
     }
 
-    /// Runs core's update check once per app session, then lists the library again. A
-    /// failure is logged and the stored update state stays as it was.
+    /// Runs core's update check once per app session when any add-on is due, then lists the
+    /// library again. A failure is logged and the stored update state stays as it was.
     pub fn check_updates(&mut self, cx: &mut Context<Self>) {
         if self.checked_this_session {
             return;
         }
         self.checked_this_session = true;
-        if !tokio_bridge::is_running(cx) {
-            tokio_bridge::init(cx);
-        }
-        let store = cx.global::<Services>().store.clone();
-        let job = tokio_bridge::spawn(
-            cx,
-            async move { store.check_gb_addon_updates(unix_now()).await },
-        );
+        // Asks the library first, so a page with nothing due never starts the network runtime.
+        let due = run_blocking(cx, |s: &Services| {
+            s.library
+                .gb_addons_due_for_check(unix_now())
+                .map_err(|e| describe_library(&e).into_op("Couldn't list add-ons"))
+        });
         self.check_task = Some(cx.spawn(async move |this, cx| {
+            if !due.await.is_ok_and(|due| !due.is_empty()) {
+                return;
+            }
+            let job = cx.update(|cx| {
+                if !tokio_bridge::is_running(cx) {
+                    tokio_bridge::init(cx);
+                }
+                let store = cx.global::<Services>().store.clone();
+                tokio_bridge::spawn(
+                    cx,
+                    async move { store.check_gb_addon_updates(unix_now()).await },
+                )
+            });
             match job.await {
                 Ok(Ok(_)) => {}
                 Ok(Err(err)) => tracing::warn!("add-on update check failed: {err}"),

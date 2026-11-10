@@ -1837,3 +1837,8 @@ pub fn seed_mastercomfig_overrides(env: &Env, uri: &str) {
         )
         .unwrap();
 }
+
+/// Opens the env's database, for tests that set up a state no flow reaches.
+pub fn sql(env: &Env) -> rusqlite::Connection {
+    rusqlite::Connection::open(env.data.db_path()).unwrap()
+}

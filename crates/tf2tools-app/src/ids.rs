@@ -824,6 +824,8 @@ pub const ADDONS_INSTALLED: &str = "addons-installed";
 pub const ADDONS_INSTALLED_EMPTY: &str = "addons-installed-empty";
 /// The "Your Library" section title.
 pub const ADDONS_LIBRARY: &str = "addons-library";
+/// The Addons page's "GameBanana add-ons" section title.
+pub const ADDONS_GB: &str = "addons-gb";
 /// The Graphics page's line under the title.
 pub const GRAPHICS_SUBTITLE: &str = "graphics-subtitle";
 /// The Graphics page's "TF2 not found" warning, present only without a TF2 install.
@@ -2503,6 +2505,47 @@ pub fn addon_gb_card_badge(section: &str, id: GbId) -> ElementId {
 /// A GameBanana add-on card's like count: "addon-gb-card-likes:<section>:<id>".
 pub fn addon_gb_card_likes(section: &str, id: GbId) -> ElementId {
     keyed("addon-gb-card-likes", &format!("{section}:{id}"))
+}
+
+/// One section's GameBanana add-ons on the Addons page, titled: "addons-gb-group:<key>".
+pub fn addons_gb_group(key: &str) -> ElementId {
+    keyed("addons-gb-group", key)
+}
+
+/// An installed GameBanana add-on's card on the Addons page: "addons-gb-card:<id>".
+pub fn addons_gb_card(id: GbId) -> ElementId {
+    keyed("addons-gb-card", &id.to_string())
+}
+
+/// The card's "Remove" button: "addons-gb-remove:<id>".
+pub fn addons_gb_remove(id: GbId) -> ElementId {
+    keyed("addons-gb-remove", &id.to_string())
+}
+
+/// The card's "Update" button, present only with a newer file: "addons-gb-update:<id>".
+pub fn addons_gb_update(id: GbId) -> ElementId {
+    keyed("addons-gb-update", &id.to_string())
+}
+
+/// The card's "Install again" button, present only when not installed: "addons-gb-reinstall:<id>".
+pub fn addons_gb_reinstall(id: GbId) -> ElementId {
+    keyed("addons-gb-reinstall", &id.to_string())
+}
+
+/// The card's one loading button while an operation works on it: "addons-gb-busy:<id>".
+pub fn addons_gb_busy(id: GbId) -> ElementId {
+    keyed("addons-gb-busy", &id.to_string())
+}
+
+/// The card's "Open on GameBanana" button: "addons-gb-open:<id>".
+pub fn addons_gb_open(id: GbId) -> ElementId {
+    keyed("addons-gb-open", &id.to_string())
+}
+
+/// The card's state tag ("No longer on GameBanana", "Update available" or "Not installed"),
+/// absent when installed and current: "addons-gb-tag:<id>".
+pub fn addons_gb_tag(id: GbId) -> ElementId {
+    keyed("addons-gb-tag", &id.to_string())
 }
 
 /// One credit in the add-on detail, by group and position: "addon-detail-credit:<g>:<i>".

@@ -773,3 +773,17 @@ fn addon_store_tab_and_card_ids_are_keyed_by_section_and_item() {
         "addon-gb-card-badge:skins:5"
     );
 }
+
+#[test]
+fn addons_page_gamebanana_ids_are_keyed_by_section_and_item() {
+    let id = GbId::new(5);
+    assert_eq!(ids::ADDONS_GB, "addons-gb");
+    assert_eq!(name(ids::addons_gb_group("skins")), "addons-gb-group:skins");
+    assert_eq!(name(ids::addons_gb_card(id)), "addons-gb-card:5");
+    assert_eq!(name(ids::addons_gb_remove(id)), "addons-gb-remove:5");
+    assert_eq!(name(ids::addons_gb_update(id)), "addons-gb-update:5");
+    assert_eq!(name(ids::addons_gb_reinstall(id)), "addons-gb-reinstall:5");
+    assert_eq!(name(ids::addons_gb_open(id)), "addons-gb-open:5");
+    assert_eq!(name(ids::addons_gb_tag(id)), "addons-gb-tag:5");
+    assert_eq!(name(ids::addons_gb_busy(id)), "addons-gb-busy:5");
+}
