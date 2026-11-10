@@ -47,7 +47,7 @@ pub use error::{
     MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError,
     OpenError, PaintError, PlayerInputError, PngReadError, PngWriteError, PresetError,
     PreviewError, ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError,
-    RestoreMastercomfigError, SchemaError, SettingsError, SyncError, TakeOverError,
+    ResolveError, RestoreMastercomfigError, SchemaError, SettingsError, SyncError, TakeOverError,
     UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
     WavError,
 };
@@ -105,8 +105,8 @@ pub use library::{
 pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
 pub use logstf::{
-    LogsCache, PlayerInput, STEAM_ID64_BASE, SteamId, TrackedPlayer, logstf_class,
-    parse_player_input,
+    LOG_BODY_LIMIT, LOGS_SPACING, LogsCache, LogsClient, LogsEndpoints, PlayerInput,
+    STEAM_ID64_BASE, SteamId, TrackedPlayer, logstf_class, parse_player_input,
 };
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;

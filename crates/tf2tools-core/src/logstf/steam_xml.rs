@@ -1,10 +1,6 @@
 //! A tiny text extractor for Steam profile XML bodies.
 
 /// The text of the first `<tag>` element, CDATA unwrapped and the five XML entities decoded.
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "resolve_player in Task 3 calls it")
-)]
 pub(crate) fn xml_text(body: &str, tag: &str) -> Option<String> {
     // The `>` in the needle keeps `<steamID>` from matching `<steamID64>`.
     let open = format!("<{tag}>");

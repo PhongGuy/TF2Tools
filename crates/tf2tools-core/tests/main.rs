@@ -191,6 +191,7 @@ mod library_sounds;
 mod license;
 mod logstf_cache;
 mod logstf_ids;
+mod logstf_resolve;
 mod maps;
 mod mastercomfig;
 mod mastercomfig_catalog;

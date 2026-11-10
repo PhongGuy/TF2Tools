@@ -2227,3 +2227,50 @@ pub enum LogsCacheError {
         message: String,
     },
 }
+
+/// Why a Steam profile could not be looked up.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ResolveError {
+    /// Steam answered that no such profile exists.
+    #[error("We couldn't find that Steam profile.")]
+    NotFound,
+    /// Steam kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// Steam answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// Steam could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The profile body grew past its size cap.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// The profile body named neither a Steam ID nor an error.
+    #[error("unexpected response from {url}: {message}")]
+    Malformed {
+        /// The address that was asked.
+        url: String,
+        /// What was wrong with the body.
+        message: String,
+    },
+}

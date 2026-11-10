@@ -7,7 +7,8 @@ use std::time::Duration;
 
 use crate::error::{
     ApplyModulesError, BrowseError, DownloadError, FilesError, GbAddonFetchError, ImageError,
-    InstallMastercomfigError, MapDownloadError, ModuleCatalogError, PreviewError, SyncError,
+    InstallMastercomfigError, MapDownloadError, ModuleCatalogError, PreviewError, ResolveError,
+    SyncError,
 };
 
 /// Identifies the app to GameBanana and GitHub; never carries user data.
@@ -81,6 +82,7 @@ from_net_failure!(
     InstallMastercomfigError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     ModuleCatalogError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     ApplyModulesError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
+    ResolveError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     PreviewError: url => Self::UntrustedUrl { url },
     ImageError: url => Self::UntrustedUrl { url },
 );
