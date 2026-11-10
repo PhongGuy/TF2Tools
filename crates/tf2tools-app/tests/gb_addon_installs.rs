@@ -450,20 +450,49 @@ fn install_again_puts_the_library_copy_back(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn install_again_without_the_library_copy_says_install_from_the_store(cx: &mut TestAppContext) {
+fn install_again_from_a_broken_library_copy_downloads_it_with_the_same_parts(
+    cx: &mut TestAppContext,
+) {
     let (env, server) = (support::env(), support::StoreServer::start());
-    server.mount_gb_addon(26, "Back", &[("a.vpk", vpk(b"v"), 100)]);
     let w = window(cx, &env, &server);
-    assert!(start_install(cx, &w, 26));
-    idle(cx);
-    std::fs::remove_file(env.game.join("tf/custom/tf2tools-gb-26-back.vpk")).unwrap();
-    std::fs::remove_dir_all(env.data.gb_addon_dir().join("26")).unwrap();
+    install_both(cx, &w, &server, 26);
+    let custom = env.game.join("tf/custom");
+    for name in ["tf2tools-gb-26-pack.vpk", "tf2tools-gb-26-pack-2.vpk"] {
+        std::fs::remove_file(custom.join(name)).unwrap();
+    }
+    // A copy missing a slot, as a crash part-way through an update leaves it.
+    std::fs::remove_dir_all(env.data.gb_addon_dir().join("26/2")).unwrap();
     act(cx, &w, |i, win, cx| i.reinstall(GbId::new(26), win, cx));
+    toast_is(cx, w.win, "Add-on installed. Pack");
+    idle(cx);
+    assert!(!support::present(cx, w.win, ids::PAYLOAD_CHECKLIST));
+    assert!(custom.join("tf2tools-gb-26-pack.vpk").is_file());
+    assert!(custom.join("tf2tools-gb-26-pack-2.vpk").is_file());
+    assert!(entry(cx, 26).unwrap().is_installed());
+}
+
+#[gpui_kit::test]
+fn install_again_of_a_gone_addon_without_its_copy_says_remove_it(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(32, "Back", &[("a.vpk", vpk(b"v"), 100)]);
+    let w = window(cx, &env, &server);
+    assert!(start_install(cx, &w, 32));
+    idle(cx);
+    std::fs::remove_file(env.game.join("tf/custom/tf2tools-gb-32-back.vpk")).unwrap();
+    std::fs::remove_dir_all(env.data.gb_addon_dir().join("32")).unwrap();
+    server.reset();
+    server.mount_gb_profile(
+        32,
+        serde_json::json!({"_idRow": 32, "_sName": "Back", "_bIsTrashed": true}),
+    );
+    act(cx, &w, |i, win, cx| i.reinstall(GbId::new(32), win, cx));
     toast_is(
         cx,
         w.win,
-        "Couldn't install the add-on. This add-on's files are no longer in your library. Install it again from the Addon Store.",
+        "Couldn't install the add-on. This add-on is no longer on GameBanana and its copy in your library is incomplete, so it can't be installed again. Remove it.",
     );
+    idle(cx);
+    assert!(entry(cx, 32).unwrap().is_gone());
 }
 
 #[gpui_kit::test]

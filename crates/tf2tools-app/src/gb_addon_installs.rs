@@ -9,7 +9,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{
     AddonProfile, AddonSection, BrowseError, DownloadProgress, GbAddonCheck, GbAddonDownload,
-    GbAddonEntry, GbId, StoreClient, Tf2Install,
+    GbAddonEntry, GbAddonInstallError, GbId, StoreClient, Tf2Install,
 };
 
 use crate::library_events::LibraryEvents;
@@ -210,30 +210,42 @@ impl GbAddonInstalls {
             return false;
         };
         self.task = Some(cx.spawn(async move |this, cx| {
-            let outcome = fetch_and_update(&this, cx, entry, tf2, win).await;
+            let outcome = refetch(&this, cx, entry, tf2, win, UPDATE, None).await;
             let _ = this.update(cx, |me, cx| me.finish(outcome, UPDATE, win, cx));
         }));
         cx.notify();
         true
     }
 
-    /// Copies `id`'s library copy back into TF2. Returns false as `update` does.
+    /// Copies `id`'s library copy back into TF2. A copy that cannot serve the row is
+    /// replaced by downloading the newest file with the same payloads, as `update` does.
+    /// Returns false as `update` does.
     pub fn reinstall(&mut self, id: GbId, win: AnyWindowHandle, cx: &mut Context<Self>) -> bool {
-        if self.entry(id).is_none() {
+        let Some(entry) = self.entry(id).cloned() else {
             return false;
-        }
+        };
         let Some(tf2) = self.begin(id, GbAddonStage::Installing, win, cx) else {
             return false;
         };
         let probe = Tf2Probe::get(cx);
+        let copy_tf2 = tf2.clone();
+        // NotInLibrary comes back as None: the download below is the way out, not an error.
         let job = run_blocking(cx, move |s: &Services| {
-            s.library
-                .reinstall_gb_addon(id, &tf2, &*probe)
-                .map_err(|e| gb_install_op(&e, INSTALL.failed))
+            match s.library.reinstall_gb_addon(id, &copy_tf2, &*probe) {
+                Ok(entry) => Ok(Some(entry)),
+                Err(GbAddonInstallError::NotInLibrary { .. }) => Ok(None),
+                Err(e) => Err(gb_install_op(&e, INSTALL.failed)),
+            }
         });
         self.task = Some(cx.spawn(async move |this, cx| {
             let outcome = match job.await {
-                Ok(entry) => Outcome::Installed(entry),
+                Ok(Some(entry)) => Outcome::Installed(entry),
+                Ok(None) => {
+                    tracing::info!("add-on {id}'s library copy is incomplete; downloading it");
+                    let _ = this.update(cx, |me, cx| me.set_stage(DOWNLOADING, cx));
+                    let gone = Some(REINSTALL_GONE);
+                    refetch(&this, cx, entry, tf2, win, INSTALL, gone).await
+                }
                 Err(err) => Outcome::Failed(err),
             };
             let _ = this.update(cx, |me, cx| me.finish(outcome, INSTALL, win, cx));
@@ -422,33 +434,35 @@ fn unix_now() -> i64 {
 }
 
 /// Reads `entry`'s profile again and runs the install with its payloads as the previous
-/// choice. An item GameBanana reports gone is recorded so, and `this` lists it as gone
-/// before the failure is returned.
-async fn fetch_and_update(
+/// choice, toasting under `titles`. An item GameBanana reports gone is recorded so, and
+/// `this` lists it as gone before the failure, worded as `gone` when given, is returned.
+async fn refetch(
     this: &WeakEntity<GbAddonInstalls>,
     cx: &mut AsyncApp,
     entry: GbAddonEntry,
     tf2: Tf2Install,
     win: AnyWindowHandle,
+    titles: Titles,
+    gone: Option<&'static str>,
 ) -> Outcome {
     let id = entry.gb_id();
     let store = cx.update(|cx| cx.global::<Services>().store.clone());
     let job = cx.update(|cx| {
         tokio_bridge::spawn(cx, async move { store.addon_catalog().profile(id).await })
     });
-    let (failure, gone) = match job.await {
+    let (mut failure, is_gone) = match job.await {
         Ok(Ok(profile)) => {
             let Some(section) = AddonSection::by_key(entry.section()) else {
                 // Only a tampered row names a section this build does not know.
                 tracing::warn!("add-on {id} has an unknown section {:?}", entry.section());
-                return Outcome::Failed(OpError::core(UPDATE.failed, UPDATE_UNKNOWN_SECTION));
+                return Outcome::Failed(OpError::core(titles.failed, UPDATE_UNKNOWN_SECTION));
             };
             let run = Run {
                 section,
                 profile,
                 previous: entry.payloads().to_vec(),
                 tf2,
-                titles: UPDATE,
+                titles,
                 win,
             };
             return fetch_and_install(this, cx, run).await;
@@ -459,12 +473,19 @@ async fn fetch_and_update(
         ),
         Err(join) => (download_stopped(&join.to_string()), false),
     };
-    failure.log("add-on update");
-    if gone {
+    failure.log("add-on profile");
+    if is_gone {
         mark_gone(this, cx, id, tf2).await;
+        if let Some(gone) = gone {
+            failure.message = gone.to_owned();
+        }
     }
-    Outcome::Failed(OpError::core(UPDATE.failed, failure.message))
+    Outcome::Failed(OpError::core(titles.failed, failure.message))
 }
+
+/// The player words for Install again when the library copy is incomplete and GameBanana no
+/// longer has the item to download.
+const REINSTALL_GONE: &str = "This add-on is no longer on GameBanana and its copy in your library is incomplete, so it can't be installed again. Remove it.";
 
 /// The player words for an update whose recorded section this build does not know.
 const UPDATE_UNKNOWN_SECTION: &str = "TF2Tools can't tell where this add-on goes. Remove it, then install it again from the Addon Store.";

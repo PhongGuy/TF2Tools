@@ -794,6 +794,28 @@ fn a_hand_deleted_addon_offers_install_again(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn install_again_without_a_library_copy_downloads_it(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(14, "Lost Copy", &[("a.vpk", gb_vpk(), 100)]);
+    let s = store_shell(cx, &env, &server);
+    install_gb(cx, &s, 14, "skins");
+    let file = env.game.join("tf/custom/tf2tools-gb-14-lost-copy.vpk");
+    std::fs::remove_file(&file).unwrap();
+    std::fs::remove_dir_all(env.data.gb_addon_dir().join("14")).unwrap();
+    let _page = open_addons(cx, &s);
+    let id = tf2tools_core::GbId::new(14);
+    support::wait_real(cx, "the not installed tag", |cx| {
+        support::label_of(cx, s.win, ids::addons_gb_tag(id)).as_deref() == Some("Not installed")
+    });
+    support::click_id(cx, s.win, ids::addons_gb_reinstall(id));
+    support::wait_real(cx, "the installed card", |cx| {
+        !support::present(cx, s.win, ids::addons_gb_tag(id))
+    });
+    assert!(file.is_file());
+    assert!(env.data.gb_addon_dir().join("14").is_dir());
+}
+
+#[gpui_kit::test]
 fn opening_the_page_checks_for_updates_and_update_installs_the_newer_file(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
     server.mount_gb_addon(6, "Fresh", &[("a.vpk", gb_vpk(), 100)]);
