@@ -188,6 +188,19 @@ async fn a_download_over_the_cap_is_refused_and_leaves_nothing() {
 }
 
 #[tokio::test]
+async fn an_empty_body_for_a_listed_file_is_a_busy_server_not_a_bad_checksum() {
+    let env = store_env().await;
+    let real = hud_zip("x");
+    let file = gb_file(&env, HUDS, 2, "hud.zip", Vec::new(), &md5_hex(&real)).await;
+    let (result, _) = download_collecting(&env, HUDS, &file).await;
+    assert!(
+        matches!(result, Err(DownloadError::EmptyBody { .. })),
+        "{result:?}"
+    );
+    assert!(tmp_is_empty(&env.dir));
+}
+
+#[tokio::test]
 async fn a_checksum_mismatch_is_refused_and_leaves_nothing() {
     let env = store_env().await;
     let file = gb_file(

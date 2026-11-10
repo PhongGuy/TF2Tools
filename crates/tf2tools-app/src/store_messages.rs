@@ -88,6 +88,9 @@ fn download_message(kind: StoreKind, err: &DownloadError) -> String {
         DownloadError::TooLarge { .. } => {
             "This file is too big for TF2Tools. Pick another file.".into()
         }
+        DownloadError::EmptyBody { .. } => {
+            format!("{source} is busy and sent an empty file. Try again in a moment.")
+        }
         DownloadError::ChecksumMismatch { .. } => "The download was damaged. Try again.".into(),
         DownloadError::Archive(archive) | DownloadError::Import(ImportError::Archive(archive)) => {
             archive_message(archive).into()
@@ -191,6 +194,9 @@ pub fn describe_gb_fetch(err: &GbAddonFetchError) -> StoreFailure {
         }
         GbAddonFetchError::Archive(ArchiveError::Io { .. }) | GbAddonFetchError::Io { .. } => {
             DL_DISK
+        }
+        GbAddonFetchError::EmptyBody { .. } => {
+            "GameBanana is busy and sent an empty file. Try again in a moment."
         }
         GbAddonFetchError::ChecksumMismatch { .. } => {
             "The download was damaged on the way. Try again."

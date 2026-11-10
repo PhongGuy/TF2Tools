@@ -100,6 +100,11 @@ fn download_cases() -> Vec<(StoreKind, DownloadError, &'static str)> {
         ),
         (
             GB,
+            DownloadError::EmptyBody { url: GB_URL.into() },
+            "GameBanana is busy and sent an empty file. Try again in a moment.",
+        ),
+        (
+            GB,
             DownloadError::ChecksumMismatch {
                 file_name: "flawhud.zip".into(),
                 expected: "abc123".into(),
@@ -649,6 +654,10 @@ fn addon_fetch_failures_read_as_plain_words() {
                 message: "bad".into(),
             }),
             "This download can't be opened. Pick another add-on.",
+        ),
+        (
+            GbAddonFetchError::EmptyBody { url: GB_URL.into() },
+            "GameBanana is busy and sent an empty file. Try again in a moment.",
         ),
         (
             GbAddonFetchError::ChecksumMismatch {

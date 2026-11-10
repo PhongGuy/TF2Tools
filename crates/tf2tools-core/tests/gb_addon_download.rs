@@ -355,3 +355,21 @@ async fn the_listing_alone_names_each_refusal_with_the_configured_cap() {
     ));
     assert_eq!(common::download_requests(&env).await, 0);
 }
+
+#[tokio::test]
+async fn an_empty_body_for_a_listed_file_is_a_busy_server_not_a_bad_checksum() {
+    let env = store_env().await;
+    let mut file = gb_addon_file(&env, 12, 0, "fx.zip", &vpk(), 100).await;
+    wiremock::Mock::given(wiremock::matchers::path("/dl/empty"))
+        .respond_with(wiremock::ResponseTemplate::new(200))
+        .mount(&env.server)
+        .await;
+    file["_sDownloadUrl"] = format!("{}/dl/empty", env.server.uri()).into();
+    let profile = gb_addon_profile(&env, 12, "Busy FX", vec![file]).await;
+    let (result, _) = gb_addon_download(&env.client, "effects", &profile).await;
+    assert!(
+        matches!(result, Err(GbAddonFetchError::EmptyBody { .. })),
+        "{result:?}"
+    );
+    assert!(common::tmp_is_empty(&env.dir));
+}

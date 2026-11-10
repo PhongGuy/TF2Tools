@@ -1010,6 +1010,12 @@ pub enum DownloadError {
         /// The cap in bytes.
         limit: u64,
     },
+    /// The server sent no bytes for a file listed with content, as GameBanana does when busy.
+    #[error("{url} sent an empty body")]
+    EmptyBody {
+        /// The address of the file.
+        url: String,
+    },
     /// The downloaded bytes do not match the store's MD5 checksum.
     #[error("{file_name} failed its checksum: expected {expected}, got {found}")]
     ChecksumMismatch {
@@ -1111,6 +1117,12 @@ pub enum GbAddonFetchError {
         url: String,
         /// The cap in bytes.
         limit: u64,
+    },
+    /// The server sent no bytes for a file listed with content, as GameBanana does when busy.
+    #[error("{url} sent an empty body")]
+    EmptyBody {
+        /// The address of the file.
+        url: String,
     },
     /// The downloaded bytes do not match the store's MD5 checksum.
     #[error("{file_name} failed its checksum: expected {expected}, got {found}")]

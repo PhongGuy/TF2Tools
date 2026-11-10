@@ -202,6 +202,13 @@ impl StoreClient {
         out.flush().await.map_err(io)?;
         drop(out);
 
+        // A busy GameBanana can answer 200 with no bytes; a checksum other than the empty
+        // file's says the file has content, so this is the server, not a damaged file.
+        if downloaded == 0 && md5.is_some_and(|m| !m.eq_ignore_ascii_case(EMPTY_MD5)) {
+            return Err(StreamFailure::EmptyBody {
+                url: url.to_owned(),
+            });
+        }
         if let Some(expected) = md5 {
             let found: String = hasher
                 .finalize()
@@ -220,6 +227,9 @@ impl StoreClient {
     }
 }
 
+/// The MD5 of zero bytes.
+const EMPTY_MD5: &str = "d41d8cd98f00b204e9800998ecf8427e";
+
 /// Why streaming a file to disk stopped. Each public download error takes these over
 /// through its own From impl.
 pub(super) enum StreamFailure {
@@ -231,6 +241,9 @@ pub(super) enum StreamFailure {
     TooLarge {
         url: String,
         limit: u64,
+    },
+    EmptyBody {
+        url: String,
     },
     ChecksumMismatch {
         file_name: String,
@@ -248,6 +261,7 @@ macro_rules! from_stream_failure {
                     StreamFailure::Net(net) => net.into(),
                     StreamFailure::Io { path, source } => Self::Io { path, source },
                     StreamFailure::TooLarge { url, limit } => Self::TooLarge { url, limit },
+                    StreamFailure::EmptyBody { url } => Self::EmptyBody { url },
                     StreamFailure::ChecksumMismatch {
                         file_name,
                         expected,
