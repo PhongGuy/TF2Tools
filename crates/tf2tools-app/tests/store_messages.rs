@@ -21,6 +21,7 @@ const DL_DISK: &str = "Couldn't save the download. Make sure your disk has free 
 const DL_LIBRARY: &str = "TF2Tools couldn't update your library. Restart TF2Tools and try again.";
 const DL_STOPPED: &str = "The download stopped before it finished. Try again.";
 const DL_UNUSABLE: &str = "This download has nothing TF2Tools can use. Pick another file.";
+const DL_LOCKED: &str = "This download is locked with a password, so TF2Tools can't open it.";
 const DL_UNPACK: &str = "The download couldn't be unpacked. Try again, or pick another file.";
 
 fn io(text: &str) -> std::io::Error {
@@ -133,7 +134,7 @@ fn download_cases() -> Vec<(StoreKind, DownloadError, &'static str)> {
             DownloadError::Archive(ArchiveError::Encrypted {
                 path: PathBuf::from("/tmp/hud.rar"),
             }),
-            DL_UNPACK,
+            DL_LOCKED,
         ),
         (
             GB,
@@ -148,7 +149,7 @@ fn download_cases() -> Vec<(StoreKind, DownloadError, &'static str)> {
             DownloadError::Import(ImportError::Archive(ArchiveError::Encrypted {
                 path: PathBuf::from("/tmp/hud.rar"),
             })),
-            DL_UNPACK,
+            DL_LOCKED,
         ),
         (
             GB,
@@ -595,7 +596,7 @@ fn addon_fetch_failures_read_as_plain_words() {
             GbAddonFetchError::NoFiles {
                 gb_id: GbId::new(1),
             },
-            "This add-on has no files to install.",
+            "This add-on has no files to install. Pick another add-on.",
         ),
         (
             GbAddonFetchError::VirusScan {
@@ -640,14 +641,14 @@ fn addon_fetch_failures_read_as_plain_words() {
         ),
         (
             GbAddonFetchError::Archive(ArchiveError::Encrypted { path: p() }),
-            "This download is locked with a password, so TF2Tools can't open it.",
+            DL_LOCKED,
         ),
         (
             GbAddonFetchError::Archive(ArchiveError::Malformed {
                 path: p(),
                 message: "bad".into(),
             }),
-            "This download can't be opened.",
+            "This download can't be opened. Pick another add-on.",
         ),
         (
             GbAddonFetchError::ChecksumMismatch {

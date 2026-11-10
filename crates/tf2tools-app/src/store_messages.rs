@@ -14,6 +14,7 @@ const DL_DISK: &str = "Couldn't save the download. Make sure your disk has free 
 pub(crate) const LIBRARY_UPDATE: &str =
     "TF2Tools couldn't update your library. Restart TF2Tools and try again.";
 const DL_UNUSABLE: &str = "This download has nothing TF2Tools can use. Pick another file.";
+const DL_LOCKED: &str = "This download is locked with a password, so TF2Tools can't open it.";
 const DL_UNPACK: &str = "The download couldn't be unpacked. Try again, or pick another file.";
 const DL_UNKNOWN: &str = "Something went wrong with the download. Try again later.";
 const FILES_STOPPED: &str = "Loading the files stopped before it finished. Try again.";
@@ -104,8 +105,8 @@ fn download_message(kind: StoreKind, err: &DownloadError) -> String {
 
 fn archive_message(err: &ArchiveError) -> &'static str {
     match err {
+        ArchiveError::Encrypted { .. } => DL_LOCKED,
         ArchiveError::Io { .. }
-        | ArchiveError::Encrypted { .. }
         | ArchiveError::Malformed { .. }
         | ArchiveError::UnsafePath { .. }
         | _ => DL_UNPACK,
@@ -164,7 +165,9 @@ pub fn describe_browse(err: &BrowseError) -> StoreFailure {
 /// A failed add-on download or unpack in player words; `detail` is the error's own text.
 pub fn describe_gb_fetch(err: &GbAddonFetchError) -> StoreFailure {
     let message = match err {
-        GbAddonFetchError::NoFiles { .. } => "This add-on has no files to install.",
+        GbAddonFetchError::NoFiles { .. } => {
+            "This add-on has no files to install. Pick another add-on."
+        }
         GbAddonFetchError::VirusScan { .. } => {
             "GameBanana's virus scan didn't pass this file, so it wasn't installed."
         }
@@ -182,11 +185,9 @@ pub fn describe_gb_fetch(err: &GbAddonFetchError) -> StoreFailure {
         GbAddonFetchError::Archive(ArchiveError::UnsafePath { .. }) => {
             "This download looks unsafe and was not installed."
         }
-        GbAddonFetchError::Archive(ArchiveError::Encrypted { .. }) => {
-            "This download is locked with a password, so TF2Tools can't open it."
-        }
+        GbAddonFetchError::Archive(ArchiveError::Encrypted { .. }) => DL_LOCKED,
         GbAddonFetchError::Archive(ArchiveError::Malformed { .. }) => {
-            "This download can't be opened."
+            "This download can't be opened. Pick another add-on."
         }
         GbAddonFetchError::Archive(ArchiveError::Io { .. }) | GbAddonFetchError::Io { .. } => {
             DL_DISK
