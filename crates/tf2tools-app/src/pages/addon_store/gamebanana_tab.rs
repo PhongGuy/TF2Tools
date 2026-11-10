@@ -460,6 +460,11 @@ impl AddonTab {
         }
     }
 
+    /// Whether the tab is hidden, holding no image wants.
+    pub fn is_hidden(&self) -> bool {
+        self.hidden
+    }
+
     /// Hides or shows the tab. Hidden, it drops its image wants; shown again, it rearms the
     /// grid's hooks so the drawn range and the near end are reported afresh.
     pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {

@@ -141,6 +141,7 @@ mod local_messages;
 mod logs;
 mod logs_model;
 mod maps;
+mod maps_gamebanana;
 mod maps_model;
 mod mastercomfig_restore;
 mod notices;
