@@ -892,3 +892,77 @@ fn a_gamebanana_row_with_an_unknown_section_is_not_counted(cx: &mut TestAppConte
         Some("1 in library, 1 installed")
     );
 }
+
+/// The ids of add-on `id`'s Update, Remove and link buttons.
+fn gb_buttons(id: u64) -> [gpui_kit::ElementId; 3] {
+    let id = tf2tools_core::GbId::new(id);
+    [
+        ids::addons_gb_update(id),
+        ids::addons_gb_remove(id),
+        ids::addons_gb_open(id),
+    ]
+}
+
+/// Installs add-on `id` and records a newer file, so its card offers Update.
+fn install_gb_with_update(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    env: &support::Env,
+    id: u64,
+) {
+    install_gb(cx, s, id, "skins");
+    support::sql(env)
+        .execute("UPDATE library_gb_addons SET latest_file_date = 999", [])
+        .unwrap();
+}
+
+#[gpui_kit::test]
+fn without_tf2_gamebanana_buttons_rest_but_the_link(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(11, "Rests", &[("a.vpk", gb_vpk(), 100)]);
+    let s = store_shell(cx, &env, &server);
+    install_gb_with_update(cx, &s, &env, 11);
+    cx.update(|cx| {
+        tf2tools_app::services::tf2_state(cx).update(cx, |state, cx| {
+            *state = Tf2State::Missing { saved: None };
+            cx.notify();
+        })
+    });
+    let _page = open_addons(cx, &s);
+    let [update, remove, open] = gb_buttons(11);
+    assert_eq!(
+        support::disabled_ids(cx, s.win, &[update.clone(), remove.clone(), open]),
+        vec![update, remove]
+    );
+}
+
+#[gpui_kit::test]
+fn while_another_addon_works_gamebanana_buttons_rest_but_the_link(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(12, "Waits", &[("a.vpk", gb_vpk(), 100)]);
+    let pack = support::zip_of(&[("A.vpk", &gb_vpk()), ("B.vpk", &gb_vpk())]);
+    server.mount_gb_addon(13, "Pack", &[("pack.zip", pack, 100)]);
+    let s = store_shell(cx, &env, &server);
+    install_gb_with_update(cx, &s, &env, 12);
+    let _page = open_addons(cx, &s);
+    let [update, remove, open] = gb_buttons(12);
+    let all = [update.clone(), remove.clone(), open];
+    assert!(support::disabled_ids(cx, s.win, &all).is_empty());
+    // The pack waits on its checklist, so its install stays running.
+    let rt = cx.update(|cx| tf2tools_app::tokio_bridge::handle(cx));
+    let profile = rt
+        .block_on(
+            s.services
+                .store
+                .addon_catalog()
+                .profile(tf2tools_core::GbId::new(13)),
+        )
+        .unwrap();
+    let installs = cx.update(tf2tools_app::gb_addon_installs::GbAddonInstalls::global);
+    let (win, section) = (s.win, tf2tools_core::AddonSection::by_key("skins").unwrap());
+    assert!(cx.update(|cx| installs.update(cx, |i, cx| i.install(section, profile, win, cx))));
+    support::wait_real(cx, "the checklist", |cx| {
+        support::present(cx, s.win, ids::PAYLOAD_CHECKLIST)
+    });
+    assert_eq!(support::disabled_ids(cx, s.win, &all), vec![update, remove]);
+}
