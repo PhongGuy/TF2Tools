@@ -2,6 +2,7 @@
 
 use std::path::Path;
 
+use serde_json::json;
 use tempfile::TempDir;
 use tf2tools_core::{DataDir, Database, LogsCache, LogsClient, LogsEndpoints};
 use wiremock::MockServer;
@@ -42,3 +43,59 @@ pub const FOUND_XML: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone
     <onlineState>offline</onlineState></profile>";
 pub const NOT_FOUND_XML: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
     <response><error><![CDATA[The specified profile could not be found.]]></error></response>";
+
+/// One class_stats entry: (type, seconds, kills, deaths, assists, dmg).
+pub type ClassSpec = (&'static str, u32, u32, u32, u32, u32);
+
+/// One player of a synthetic log.
+pub struct PlayerSpec {
+    pub account: u64,
+    pub name: &'static str,
+    pub team: &'static str,
+    pub heal: u32,
+    pub ubers: u32,
+    pub drops: u32,
+    pub classes: Vec<ClassSpec>,
+}
+
+/// A minimal log body `parse_log` accepts, `length` seconds long.
+pub fn log_body(length: u32, players: &[PlayerSpec]) -> String {
+    let mut map = serde_json::Map::new();
+    let mut names = serde_json::Map::new();
+    for p in players {
+        let key = format!("[U:1:{}]", p.account);
+        let (k, d, a, dmg) = p.classes.iter().fold((0, 0, 0, 0), |t, c| {
+            (t.0 + c.2, t.1 + c.3, t.2 + c.4, t.3 + c.5)
+        });
+        let stats: Vec<_> = p
+            .classes
+            .iter()
+            .map(|&(ty, secs, k, d, a, dmg)| {
+                json!({"type": ty, "total_time": secs, "kills": k, "deaths": d,
+                       "assists": a, "dmg": dmg})
+            })
+            .collect();
+        map.insert(
+            key.clone(),
+            json!({"team": p.team, "kills": k, "deaths": d, "assists": a, "dmg": dmg,
+                   "heal": p.heal, "ubers": p.ubers, "drops": p.drops, "class_stats": stats}),
+        );
+        names.insert(key, json!(p.name));
+    }
+    json!({"version": 3, "length": length, "teams": {"Red": {}, "Blue": {}},
+           "players": map, "names": names, "info": {}})
+    .to_string()
+}
+
+/// A one-class player on Red.
+pub fn solo(account: u64, class: ClassSpec) -> PlayerSpec {
+    PlayerSpec {
+        account,
+        name: "solo",
+        team: "Red",
+        heal: 0,
+        ubers: 0,
+        drops: 0,
+        classes: vec![class],
+    }
+}

@@ -2,6 +2,7 @@
 
 mod cache;
 mod client;
+mod detail;
 mod steam_id;
 mod steam_xml;
 
@@ -11,6 +12,10 @@ use crate::weapons::TfClass;
 
 pub use cache::{LogsCache, TrackedPlayer};
 pub use client::{LogsClient, LogsEndpoints};
+pub use detail::{
+    ClassKills, ClassLine, HealTarget, LogColumns, LogDetail, MedicLine, PlayerLine, TeamTotals,
+    parse_log,
+};
 pub use steam_id::{PlayerInput, SteamId, parse_player_input};
 
 /// The SteamID64 of account number 0 in the public universe.

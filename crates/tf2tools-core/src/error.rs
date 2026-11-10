@@ -2274,3 +2274,15 @@ pub enum ResolveError {
         message: String,
     },
 }
+
+/// Why a stored logs.tf body could not be read as a log.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum LogParseError {
+    /// The body is not JSON or lacks `length`, `teams` or `players`.
+    #[error("the log could not be read: {message}")]
+    Format {
+        /// What the JSON reader objected to.
+        message: String,
+    },
+}
