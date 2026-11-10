@@ -326,6 +326,31 @@ impl LogsCache {
             .map_err(db_error)
     }
 
+    /// Handles a log whose download could not be read. A log that already holds a good body
+    /// (a provisional refetch) keeps it and is stamped settled as of `now`; any other is marked
+    /// unreadable. Returns true when the log was marked.
+    pub(crate) fn mark_unreadable(
+        &self,
+        log_id: i64,
+        state: i64,
+        now: i64,
+    ) -> Result<bool, LogsCacheError> {
+        let kept = self
+            .db
+            .write(|conn| {
+                conn.execute(
+                    "UPDATE logstf_logs SET fetched_at = ?2 WHERE id = ?1 AND body IS NOT NULL",
+                    params![log_id, now],
+                )
+            })
+            .map_err(db_error)?;
+        if kept > 0 {
+            return Ok(false);
+        }
+        self.mark_failed(log_id, state, now)?;
+        Ok(true)
+    }
+
     /// Stamps `player` as synced at `now`.
     pub(crate) fn mark_synced(&self, player: SteamId, now: i64) -> Result<(), LogsCacheError> {
         self.db

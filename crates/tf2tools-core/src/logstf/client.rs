@@ -281,7 +281,8 @@ impl LogsClient {
         for (done, log_id) in wanted.into_iter().enumerate() {
             let url = format!("{}/json/{log_id}", self.endpoints.logs_tf());
             // A 404 means logs.tf dropped the log; an oversize, non-UTF-8 or non-log body is
-            // unreadable. Both are marked and never asked again; any other failure stops the sync.
+            // unreadable, unless a provisional refetch already holds a good copy. Marked logs are
+            // never asked again; any other failure stops the sync.
             let readable = match self.http.get_api(&url, LOG_BODY_LIMIT).await {
                 Ok(bytes) => String::from_utf8(bytes)
                     .ok()
@@ -304,8 +305,9 @@ impl LogsClient {
                     summary.downloaded += 1;
                 }
                 None => {
-                    self.cache.mark_failed(log_id, STATE_UNREADABLE, now)?;
-                    summary.unreadable += 1;
+                    if self.cache.mark_unreadable(log_id, STATE_UNREADABLE, now)? {
+                        summary.unreadable += 1;
+                    }
                 }
             }
             on_progress(LogsProgress {

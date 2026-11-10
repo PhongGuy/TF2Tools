@@ -4,8 +4,8 @@ use tf2tools_core::{SteamId, TrackedPlayer};
 
 use crate::common;
 use crate::common::logstf::{
-    ARIE, LogsEnv, days_ago, list_body, logs_env, logstf_fixture, mount_any_log, mount_list,
-    mount_log, now, paths,
+    ARIE, LogsEnv, days_ago, list_body, log_state, logs_env, logstf_fixture, mount_any_log,
+    mount_list, mount_log, now, paths,
 };
 
 fn arie() -> SteamId {
@@ -108,6 +108,68 @@ async fn a_provisional_log_is_fetched_again_once() {
         1,
         "old rows replaced, not doubled"
     );
+}
+
+/// A synced log 20 that was fetched ten minutes after upload, so the next sync refetches it,
+/// with the refetch answered by `status` and `body`.
+async fn provisional_env(status: u16, body: String) -> LogsEnv {
+    let env = env_with("Arie").await;
+    let uploaded = now() - 2 * 3600;
+    mount_list(&env.server, ARIE, list_body(&[(20, uploaded)])).await;
+    mount_any_log(&env.server).await;
+    env.client
+        .sync_player(arie(), false, &|_| {})
+        .await
+        .unwrap();
+    common::sql(&env.dir)
+        .execute(
+            "UPDATE logstf_logs SET fetched_at = ?1 WHERE id = 20",
+            [uploaded + 600],
+        )
+        .unwrap();
+    mount_log(&env.server, 20, status, body).await;
+    env
+}
+
+/// A refetch that cannot be read keeps the earlier good copy and settles it, so it is not
+/// counted as unreadable and is not asked for again.
+async fn assert_kept_after_unreadable_refetch(env: &LogsEnv) {
+    let summary = env.client.sync_player(arie(), true, &|_| {}).await.unwrap();
+    assert_eq!(summary.unreadable(), 0, "a kept log is not unreadable");
+    assert_eq!(log_state(&env.dir, 20), (0, true), "the good body stays");
+    assert_eq!(
+        common::count(&env.dir, "logstf_class_rows"),
+        1,
+        "the class rows stay"
+    );
+    env.client.sync_player(arie(), true, &|_| {}).await.unwrap();
+    assert_eq!(
+        json_requests(&paths(&env.server).await),
+        2,
+        "settled, not asked again"
+    );
+}
+
+#[tokio::test]
+async fn a_provisional_log_keeps_its_body_when_the_refetch_will_not_parse() {
+    let env = provisional_env(200, "not a log".to_owned()).await;
+    assert_kept_after_unreadable_refetch(&env).await;
+}
+
+#[tokio::test]
+async fn a_provisional_log_keeps_its_body_when_the_refetch_is_too_large() {
+    let limit = usize::try_from(tf2tools_core::LOG_BODY_LIMIT).unwrap();
+    let env = provisional_env(200, "x".repeat(limit + 1)).await;
+    assert_kept_after_unreadable_refetch(&env).await;
+}
+
+#[tokio::test]
+async fn a_provisional_log_that_is_now_404_is_gone() {
+    let env = provisional_env(404, String::new()).await;
+    let summary = env.client.sync_player(arie(), true, &|_| {}).await.unwrap();
+    assert_eq!(summary.gone(), 1);
+    assert_eq!(log_state(&env.dir, 20), (1, false));
+    assert_eq!(common::count(&env.dir, "logstf_class_rows"), 0);
 }
 
 #[tokio::test]
