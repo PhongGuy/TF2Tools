@@ -458,18 +458,18 @@ pub enum GbAddonCheck {
 const CHECK_INTERVAL: i64 = 86_400;
 
 impl Library {
-    /// Add-ons whose `checked_at` is more than a day before `now`, oldest check first.
+    /// Add-ons whose `checked_at` is more than a day before `now`, or after it (the clock
+    /// went back), oldest check first.
     pub fn gb_addons_due_for_check(&self, now: i64) -> Result<Vec<GbId>, LibraryError> {
         let ids = self
             .db
             .read(|conn| {
                 let mut stmt = conn.prepare(
-                    "SELECT gb_id FROM library_gb_addons WHERE checked_at < ?1
+                    "SELECT gb_id FROM library_gb_addons WHERE checked_at < ?1 OR checked_at > ?2
                      ORDER BY checked_at ASC, gb_id ASC",
                 )?;
-                let rows = stmt.query_map([now.saturating_sub(CHECK_INTERVAL)], |row| {
-                    row.get::<_, i64>(0)
-                })?;
+                let stale = now.saturating_sub(CHECK_INTERVAL);
+                let rows = stmt.query_map([stale, now], |row| row.get::<_, i64>(0))?;
                 rows.collect::<Result<Vec<_>, _>>()
             })
             .map_err(library_db)?;

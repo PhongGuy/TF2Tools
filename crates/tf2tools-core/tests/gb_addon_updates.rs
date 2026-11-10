@@ -191,3 +191,16 @@ async fn an_update_keeps_the_previous_payloads_only_when_all_still_exist() {
         Some(vec!["one.vpk".to_owned()])
     );
 }
+
+#[tokio::test]
+async fn a_check_recorded_in_the_future_is_due_again() {
+    let s = setup().await;
+    installed(&s, 11, 100).await;
+    set_checked(&s, 11, NOW + 30 * DAY);
+    let due = s.env.lib.gb_addons_due_for_check(NOW).unwrap();
+    assert_eq!(
+        due,
+        [GbId::new(11)],
+        "a clock set back must not stall checks"
+    );
+}
