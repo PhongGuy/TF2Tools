@@ -230,11 +230,16 @@ async fn an_install_over_a_tampered_row_never_follows_paths_out_of_custom() {
     common::write_file(&absolute, b"keep");
     std::fs::create_dir_all(s.tf2.custom_dir().join("sub")).unwrap();
     common::write_file(&s.tf2.custom_dir().join("sub/nested"), b"keep");
+    common::write_file(&s.tf2.custom_dir().join("somehud/info.vdf"), b"keep");
+    common::write_file(&s.tf2.custom_dir().join("tf2tools-gb-2-other.vpk"), b"keep");
     let files = serde_json::json!([
         "../outside",
         absolute.to_str().unwrap(),
         "custom/sub/nested",
-        "custom/.."
+        "custom/..",
+        "custom/somehud",
+        "custom/tf2tools-gb-2-other.vpk",
+        "custom/tf2tools-gb-20-C:x",
     ]);
     common::sql(&s.env.dir)
         .execute(
@@ -258,5 +263,60 @@ async fn an_install_over_a_tampered_row_never_follows_paths_out_of_custom() {
         .unwrap();
     assert!(game.join("outside").exists() && absolute.exists());
     assert!(s.tf2.custom_dir().join("sub/nested").exists());
-    assert!(s.tf2.custom_dir().exists());
+    assert!(
+        s.tf2.custom_dir().join("somehud/info.vdf").exists(),
+        "another add-on's folder"
+    );
+    assert!(
+        s.tf2.custom_dir().join("tf2tools-gb-2-other.vpk").exists(),
+        "another id's file"
+    );
+}
+
+#[tokio::test]
+async fn a_failed_clear_keeps_the_library_copy_matching_the_row() {
+    let s = setup().await;
+    let old_copy = s.env.dir.gb_addon_dir().join("30/1/tf2tools-gb-30-old.vpk");
+    common::write_file(&old_copy, b"old");
+    common::sql(&s.env.dir)
+        .execute(
+            "INSERT INTO library_gb_addons (gb_id, section, name, author, file_id, file_date,
+             latest_file_date, checked_at, payloads, files, installed, gone)
+             VALUES (30, 'effects', 'Old', 'vex', 1, 1, 1, 0, '[\"old.vpk\"]',
+             '[\"custom/tf2tools-gb-30-old.vpk\"]', 1, 0)",
+            [],
+        )
+        .unwrap();
+    // A file where tf/custom should be makes every old path unreadable, so the clear fails.
+    let custom_dir = s.tf2.custom_dir();
+    std::fs::remove_dir_all(&custom_dir).unwrap();
+    common::write_file(&custom_dir, b"not a folder");
+
+    let d = download(&s, 30, "New", "new.vpk", vpk(b"n"), 300).await;
+    let err = s
+        .env
+        .lib
+        .install_gb_addon(d, &chosen(&["new.vpk"]), &s.tf2, &no)
+        .unwrap_err();
+    assert!(matches!(err, GbAddonInstallError::Io { .. }), "{err:?}");
+    assert_eq!(
+        common::tree(&s.env.dir.gb_addon_dir()),
+        ["30/1/tf2tools-gb-30-new.vpk"],
+        "the library copy holds the new files the row names"
+    );
+    let row = &s.env.lib.list_gb_addons(Some(&s.tf2)).unwrap()[0];
+    assert_eq!(row.files(), ["custom/tf2tools-gb-30-new.vpk"]);
+    assert_eq!(row.file_date(), 300);
+    assert!(!row.is_installed());
+
+    std::fs::remove_file(&custom_dir).unwrap();
+    std::fs::create_dir_all(&custom_dir).unwrap();
+    let d = download(&s, 30, "New", "new.vpk", vpk(b"n"), 300).await;
+    let entry = s
+        .env
+        .lib
+        .install_gb_addon(d, &chosen(&["new.vpk"]), &s.tf2, &no)
+        .unwrap();
+    assert!(entry.is_installed());
+    assert_eq!(custom(&s), ["tf2tools-gb-30-new.vpk"]);
 }

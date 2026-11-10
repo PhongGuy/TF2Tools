@@ -162,7 +162,7 @@ impl Library {
                     && entry
                         .files
                         .iter()
-                        .all(|f| recorded_path(&tf, f).is_some_and(|p| p.exists()));
+                        .all(|f| recorded_path(&tf, entry.gb_id, f).is_some_and(|p| p.exists()));
             }
         }
         Ok(entries)
@@ -251,7 +251,7 @@ impl Library {
         let mut copied = Vec::new();
         let swapped = (|| {
             for file in previous.iter().flat_map(|e| &e.files) {
-                if let Some(path) = recorded_path(&tf, file) {
+                if let Some(path) = recorded_path(&tf, gb_id, file) {
                     remove_entry(&path)?;
                 }
             }
@@ -272,8 +272,16 @@ impl Library {
             for path in &copied {
                 let _ = remove_entry(path);
             }
-            let _ = remove_dir_if_present(&staging);
-            self.save_gb_addon(&entry, download.file_id)?;
+            // A clear or rename that failed leaves the new files only in staging; they
+            // replace the library copy so it always matches the row the page reinstalls from.
+            if staging.exists() {
+                let _ = remove_dir_if_present(&library_copy).and_then(|()| {
+                    std::fs::rename(&staging, &library_copy).map_err(io_at(&staging))
+                });
+            }
+            // The I/O failure is the one to report; a row that also failed to save keeps
+            // the old row's installed = 0.
+            let _ = self.save_gb_addon(&entry, download.file_id);
             return Err(e.into());
         }
         entry.installed = true;
@@ -344,11 +352,13 @@ impl Library {
     }
 }
 
-/// `tf/custom/<name>` for a recorded `custom/<name>` with a plain name. Any other shape,
-/// such as a tampered row's `../x` or absolute path, is never followed.
-fn recorded_path(tf: &Path, file: &str) -> Option<PathBuf> {
+/// `tf/custom/<name>` for a recorded `custom/<name>` that is a plain name of this add-on's
+/// own (`tf2tools-gb-<id>-...`, no `:` that Windows reads as a drive). Any other shape, such
+/// as a tampered row's `../x`, an absolute path or another add-on's folder, is never followed.
+fn recorded_path(tf: &Path, gb_id: GbId, file: &str) -> Option<PathBuf> {
     let name = file.strip_prefix("custom/")?;
-    is_plain_name(name).then(|| tf.join("custom").join(name))
+    let own = name.starts_with(&format!("tf2tools-gb-{gb_id}-"));
+    (own && is_plain_name(name) && !name.contains(':')).then(|| tf.join("custom").join(name))
 }
 
 /// `tf2tools-gb-<id>-<slug>`: the name's slug capped and trimmed of `-`, or `addon`.
