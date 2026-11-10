@@ -46,6 +46,11 @@ const SKELETON_CARDS: usize = 8;
 /// Fits "Most downloaded" whole beside the kit's caret and padding, on a 4 px step.
 const SORT_WIDTH: f32 = 172.;
 
+/// The search box's placeholder for `section`, naming it as its tab does ("Search GUIs...").
+pub fn search_placeholder(section: AddonSection) -> String {
+    format!("Search {}...", section.title())
+}
+
 /// The sort Select's labels, in menu order.
 const SORTS: [(&str, AddonSort); 2] = [
     ("Most downloaded", AddonSort::MostDownloaded),
@@ -171,7 +176,7 @@ impl AddonTab {
         grid.on_near_end(move |cx| {
             let _ = this.update(cx, |tab, cx| tab.next_step(cx));
         });
-        let placeholder = format!("Search {}...", section.title().to_lowercase());
+        let placeholder = search_placeholder(section);
         let search_input = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder));
         let labels = LabelOption::all(ids::ADDON_SORT, SORTS.iter().map(|(label, _)| *label));
         let sort_select =

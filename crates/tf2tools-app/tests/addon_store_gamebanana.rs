@@ -4,7 +4,7 @@ use gpui_kit::{Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::mature::MatureAddons;
 use tf2tools_app::pages::addon_store::AddonStoreTab;
-use tf2tools_app::pages::addon_store::gamebanana_tab::AddonTab;
+use tf2tools_app::pages::addon_store::gamebanana_tab::{AddonTab, search_placeholder};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::store_grid::SEARCH_DEBOUNCE;
 use tf2tools_core::{AddonSection, AddonSort, GbId, Tf2Install};
@@ -750,4 +750,12 @@ fn an_off_site_profile_link_opens_the_items_gamebanana_page(cx: &mut TestAppCont
         cx.opened_url().as_deref(),
         Some("https://gamebanana.com/mods/8")
     );
+}
+
+#[test]
+fn the_search_placeholder_names_the_tab_as_its_title_does() {
+    let placeholder = |key| search_placeholder(AddonSection::by_key(key).unwrap());
+    assert_eq!(placeholder("guis"), "Search GUIs...");
+    assert_eq!(placeholder("skins"), "Search Skins...");
+    assert_eq!(placeholder("gamefiles"), "Search Game files...");
 }
