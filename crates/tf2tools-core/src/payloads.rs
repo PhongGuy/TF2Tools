@@ -92,12 +92,19 @@ impl Payload {
 }
 
 /// The payloads under `tree`, largest first, then by name. Never fails on layout:
-/// none or more than `MAX_PAYLOADS` is the caller's to refuse.
+/// none or more than `MAX_PAYLOADS` is the caller's to refuse. Past `MAX_PAYLOADS`
+/// VPKs only the VPKs are listed and no folder is searched.
 ///
 /// # Errors
 /// [`ArchiveError::Io`] when a directory or file's metadata cannot be read.
 pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
-    let vpks = find_vpks(tree)?;
+    let mut vpks = find_vpks(tree)?;
+    // A tree already past the limit is refused anyway, so a hostile one with thousands
+    // of VPKs costs no folder walk and no VPK directory reads.
+    if vpks.len() > MAX_PAYLOADS {
+        sort_payloads(&mut vpks);
+        return Ok(vpks);
+    }
     let mut folder_dirs = Vec::new();
     find_folders(tree, &mut folder_dirs)?;
 
@@ -123,8 +130,12 @@ pub fn find_payloads(tree: &Path) -> Result<Vec<Payload>, ArchiveError> {
             size,
         });
     }
-    payloads.sort_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
+    sort_payloads(&mut payloads);
     Ok(payloads)
+}
+
+fn sort_payloads(payloads: &mut [Payload]) {
+    payloads.sort_by(|a, b| b.size.cmp(&a.size).then_with(|| a.name.cmp(&b.name)));
 }
 
 /// Collects content folders: a directory with an `info.vdf` or a content subfolder

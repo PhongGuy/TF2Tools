@@ -183,6 +183,23 @@ fn more_than_the_limit_and_none_are_both_reported_as_found() {
 }
 
 #[test]
+fn too_many_vpks_stop_the_walk_before_any_folder() {
+    let vpk = common::vpk_bytes(&[("models/a.mdl", b"a")]);
+    let mut many: Vec<(String, Vec<u8>)> = (0..=MAX_PAYLOADS)
+        .map(|i| (format!("v{i:02}.vpk"), vpk.clone()))
+        .collect();
+    many.push(("Loose/materials/a.vmt".to_owned(), b"m".to_vec()));
+    let refs: Vec<(&str, &[u8])> = many
+        .iter()
+        .map(|(n, b)| (n.as_str(), b.as_slice()))
+        .collect();
+    let t = tree_of(&refs);
+    let found = names(t.path());
+    assert_eq!(found.len(), MAX_PAYLOADS + 1);
+    assert!(found.iter().all(|(_, kind)| *kind == PayloadKind::Vpk));
+}
+
+#[test]
 fn an_unreadable_vpk_is_still_a_payload_and_collapses_nothing() {
     let t = tree_of(&[
         ("Pack/materials/a.vmt", b"a"),
