@@ -7,6 +7,7 @@ use md5::{Digest, Md5};
 use rusqlite::OptionalExtension;
 use tokio::io::AsyncWriteExt;
 
+use super::http::NetFailure;
 use super::unpack::{crosshair_files, entry_name, sound_files};
 use super::{StoreClient, StoreFile, StoreItemId, StoreKind};
 use crate::db::Database;
@@ -141,8 +142,7 @@ impl StoreClient {
         Ok(())
     }
 
-    /// Streams the file to `dest`, failing as soon as it passes the cap, then checks the
-    /// md5. Returns the bytes received and the announced size.
+    /// Streams the file to `dest` under the kind's size cap and checks its md5.
     async fn fetch(
         &self,
         kind: StoreKind,
@@ -150,21 +150,47 @@ impl StoreClient {
         dest: &Path,
         progress: &(dyn Fn(DownloadProgress) + Send + Sync),
     ) -> Result<(u64, Option<u64>), DownloadError> {
-        let limit = self.config.size_cap(kind);
-        let mut body = self.http.open(file.url()).await?;
+        self.stream_to(
+            file.url(),
+            file.md5(),
+            file.file_name(),
+            self.config.size_cap(kind),
+            dest,
+            progress,
+        )
+        .await
+        .map_err(DownloadError::from)
+    }
+
+    /// Streams `url` to `dest`, failing as soon as it passes `limit`, then checks `md5`
+    /// when given (case-insensitive). Returns the bytes received and the announced size.
+    pub(super) async fn stream_to(
+        &self,
+        url: &str,
+        md5: Option<&str>,
+        file_name: &str,
+        limit: u64,
+        dest: &Path,
+        progress: &(dyn Fn(DownloadProgress) + Send + Sync),
+    ) -> Result<(u64, Option<u64>), StreamFailure> {
+        let io = |source| StreamFailure::Io {
+            path: dest.to_path_buf(),
+            source,
+        };
+        let mut body = self.http.open(url).await.map_err(StreamFailure::Net)?;
         let total = body.total();
-        let mut out = tokio::fs::File::create(dest).await.map_err(io_at(dest))?;
+        let mut out = tokio::fs::File::create(dest).await.map_err(io)?;
         let mut hasher = Md5::new();
         let mut downloaded = 0u64;
-        while let Some(chunk) = body.chunk().await? {
+        while let Some(chunk) = body.chunk().await.map_err(StreamFailure::Net)? {
             downloaded += chunk.len() as u64;
             if downloaded > limit {
-                return Err(DownloadError::TooLarge {
-                    url: file.url().to_owned(),
+                return Err(StreamFailure::TooLarge {
+                    url: url.to_owned(),
                     limit,
                 });
             }
-            out.write_all(&chunk).await.map_err(io_at(dest))?;
+            out.write_all(&chunk).await.map_err(io)?;
             hasher.update(&chunk);
             progress(DownloadProgress {
                 phase: DownloadPhase::Downloading,
@@ -173,24 +199,62 @@ impl StoreClient {
             });
         }
         // Tokio finishes file writes in the background; flush before the importer reads it.
-        out.flush().await.map_err(io_at(dest))?;
+        out.flush().await.map_err(io)?;
         drop(out);
 
-        if let Some(expected) = file.md5() {
+        if let Some(expected) = md5 {
             let found: String = hasher
                 .finalize()
                 .iter()
                 .map(|b| format!("{b:02x}"))
                 .collect();
             if found != expected.to_lowercase() {
-                return Err(DownloadError::ChecksumMismatch {
-                    file_name: file.file_name().to_owned(),
+                return Err(StreamFailure::ChecksumMismatch {
+                    file_name: file_name.to_owned(),
                     expected: expected.to_owned(),
                     found,
                 });
             }
         }
         Ok((downloaded, total))
+    }
+}
+
+/// Why streaming a file to disk stopped. Each public download error takes these over
+/// through its own From impl.
+pub(super) enum StreamFailure {
+    Net(NetFailure),
+    Io {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    TooLarge {
+        url: String,
+        limit: u64,
+    },
+    ChecksumMismatch {
+        file_name: String,
+        expected: String,
+        found: String,
+    },
+}
+
+impl From<StreamFailure> for DownloadError {
+    fn from(failure: StreamFailure) -> Self {
+        match failure {
+            StreamFailure::Net(net) => net.into(),
+            StreamFailure::Io { path, source } => Self::Io { path, source },
+            StreamFailure::TooLarge { url, limit } => Self::TooLarge { url, limit },
+            StreamFailure::ChecksumMismatch {
+                file_name,
+                expected,
+                found,
+            } => Self::ChecksumMismatch {
+                file_name,
+                expected,
+                found,
+            },
+        }
     }
 }
 

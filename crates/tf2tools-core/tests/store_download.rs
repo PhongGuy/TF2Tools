@@ -11,7 +11,7 @@ use common::{
 };
 use tf2tools_core::{
     AddonName, DownloadError, DownloadPhase, GbId, LibraryEntry, LibraryKind, Provenance,
-    StoreItemId, StoreKind,
+    StoreConfig, StoreItemId, StoreKind,
 };
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
@@ -326,4 +326,11 @@ async fn a_download_can_run_on_a_spawned_task() {
         .unwrap()
         .unwrap();
     assert_eq!(entries.len(), 1);
+}
+
+#[test]
+fn the_addon_size_cap_defaults_to_300_mib_and_can_be_lowered() {
+    let config = StoreConfig::default();
+    assert_eq!(config.gb_addon_size_cap(), 300 * 1024 * 1024);
+    assert_eq!(config.with_gb_addon_size_cap(10).gb_addon_size_cap(), 10);
 }
