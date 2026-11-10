@@ -342,3 +342,13 @@ fn labels_keep_only_the_path_parts_that_tell_payloads_apart() {
     let t = tree_of(&[("tf/materials/vgui/a.vmt", b"m")]);
     assert_eq!(find_payloads(t.path()).unwrap()[0].label(), "Main files");
 }
+
+#[test]
+fn a_gui_folder_with_resource_keeps_its_customizations_whole() {
+    let t = tree_of(&[
+        ("gui/resource/ui/a.res", b"a"),
+        ("gui/customizations/alt/resource/ui/a.res", b"b"),
+        ("gui/customizations/alt/materials/x.vmt", b"c"),
+    ]);
+    assert_eq!(names(t.path()), [("gui".to_owned(), PayloadKind::Folder)]);
+}

@@ -217,7 +217,8 @@ struct FolderRoot {
 }
 
 /// Collects content folders, stopping one past `MAX_PAYLOADS`. A directory with an
-/// `info.vdf` is one, kept whole. A directory with a content subfolder is one too, and its
+/// `info.vdf` or a `resource` folder is one, kept whole, since a HUD or other GUI mod keeps
+/// optional layouts in subfolders for `#base`. A directory with a content subfolder is one too, and its
 /// other subfolders are searched for content roots that become payloads of their own,
 /// since TF2 loads only content at the top of a custom folder. Any other directory is
 /// searched below.
@@ -231,24 +232,25 @@ fn find_folders(dir: &Path, out: &mut Vec<FolderRoot>) -> Result<(), ArchiveErro
     };
     let mut others = Vec::new();
     let mut has_content = false;
-    let mut has_info = false;
+    let mut whole = false;
     for entry in fs::read_dir(dir).map_err(io)? {
         let entry = entry.map_err(io)?;
         let file_type = entry.file_type().map_err(io)?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
         if file_type.is_file() && name.eq_ignore_ascii_case("info.vdf") {
-            has_info = true;
+            whole = true;
         } else if file_type.is_dir() {
             if is_content_name(&name) && !wraps_game_dir(&entry.path())? {
                 has_content = true;
+                whole |= name.eq_ignore_ascii_case("resource");
             } else {
                 others.push(entry.path());
             }
         }
     }
     others.sort();
-    if has_info {
+    if whole {
         out.push(FolderRoot {
             dir: dir.to_path_buf(),
             nested: Vec::new(),
