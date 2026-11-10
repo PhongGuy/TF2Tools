@@ -67,6 +67,7 @@ fn keyed_ids_carry_the_stable_key() {
         name(ids::weapon_row("tf_weapon_scattergun")),
         "weapon-row:tf_weapon_scattergun"
     );
+    assert_eq!(name(ids::payload_check(3)), "payload-check:3");
 }
 
 #[test]
@@ -371,13 +372,14 @@ fn the_grid_and_list_ids_are_stable() {
 
 // ids.rs is the one place element ids are spelt, so pilot QA and tests read them from there.
 fn literal_ids_in(dir: &std::path::Path, hits: &mut Vec<String>) {
-    const LITERALS: [&str; 6] = [
+    const LITERALS: [&str; 7] = [
         "\"sound-card\"",
         "\"huds-grid\"",
         "\"sounds-grid\"",
         "\"profiles-grid\"",
         "\"profiles-missing-list\"",
         "\"addon-store-info-text\"",
+        "\"payload-check\"",
     ];
     for entry in std::fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();

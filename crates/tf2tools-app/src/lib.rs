@@ -27,6 +27,7 @@ pub mod mature;
 pub mod notices;
 pub mod old_v4;
 pub mod pages;
+pub mod payload_checklist;
 pub mod picker;
 pub mod previews;
 pub mod remote_images;

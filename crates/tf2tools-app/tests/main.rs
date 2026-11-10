@@ -146,6 +146,7 @@ mod mastercomfig_restore;
 mod notices;
 mod old_v4_notice;
 mod packaging;
+mod payload_checklist;
 mod picker;
 mod play_tf2;
 mod player;

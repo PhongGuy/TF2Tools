@@ -2501,3 +2501,23 @@ pub fn addon_detail_credit(group: usize, index: usize) -> ElementId {
 pub fn addon_detail_file(index: usize) -> ElementId {
     keyed("addon-detail-file", &index.to_string())
 }
+
+/// The "Choose what to install" dialog for an add-on with several parts.
+pub const PAYLOAD_CHECKLIST: &str = "payload-checklist";
+/// The checklist's title, "Choose what to install".
+pub const PAYLOAD_CHECKLIST_TITLE: &str = "payload-checklist-title";
+/// The checklist's description, naming the add-on.
+pub const PAYLOAD_CHECKLIST_DESCRIPTION: &str = "payload-checklist-description";
+/// The checklist's rows, which scroll when there are many.
+pub const PAYLOAD_CHECKLIST_ROWS: &str = "payload-checklist-rows";
+/// The scrollbar beside the checklist's rows.
+pub const PAYLOAD_CHECKLIST_SCROLLBAR: &str = "payload-checklist-scrollbar";
+/// The checklist's Install button, disabled while nothing is checked.
+pub const PAYLOAD_INSTALL: &str = "payload-install";
+/// The checklist's Cancel button.
+pub const PAYLOAD_CANCEL: &str = "payload-cancel";
+
+/// One part's checkbox in the checklist, by row: "payload-check:<i>".
+pub fn payload_check(index: usize) -> ElementId {
+    keyed("payload-check", &index.to_string())
+}
