@@ -271,9 +271,18 @@ impl AddonStorePage {
     fn tab_strip(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let tabs = std::iter::once(AddonStoreTab::Mastercomfig)
             .chain(AddonSection::ALL.into_iter().map(AddonStoreTab::GameBanana));
-        ButtonGroup::new(ids::ADDON_STORE_TABS)
-            .outline()
-            .children(tabs.map(|tab| self.tab_button(tab, cx)))
+        // Six tabs outgrow a narrow page, so the strip scrolls sideways within the page's width.
+        div()
+            .id(ids::ADDON_STORE_TABS)
+            .test_support()
+            .w_full()
+            .flex_none()
+            .overflow_x_scroll()
+            .child(
+                ButtonGroup::new(ids::ADDON_STORE_TAB_GROUP)
+                    .outline()
+                    .children(tabs.map(|tab| self.tab_button(tab, cx))),
+            )
     }
 
     /// Rereads the store's addons and the library's off the UI thread; a newer reload drops an

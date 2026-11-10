@@ -116,6 +116,7 @@ fn addon_store_ids_are_stable() {
     assert_eq!(ids::ADDON_STORE_TAG, "addon-store-tag");
     assert_eq!(ids::ADDON_STORE_INFO, "addon-store-info");
     assert_eq!(ids::ADDON_STORE_NO_TF2, "addon-store-no-tf2");
+    assert_eq!(ids::ADDON_STORE_TAB_GROUP, "addon-store-tab-group");
     let flat = StoreItemId::Addon(AddonName::new("mastercomfig-addon-flat-mouse.vpk").unwrap());
     assert_eq!(
         name(ids::store_state(StoreKind::Addons, &flat)),
