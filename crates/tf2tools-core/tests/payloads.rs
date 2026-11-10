@@ -371,7 +371,9 @@ fn a_content_folder_whose_tf_holds_no_content_is_still_content() {
     assert_eq!(names(t.path()), [("pack".to_owned(), PayloadKind::Folder)]);
 }
 
+// Windows folders ignore case, so "Pack" and "pack" can't sit side by side there.
 #[test]
+#[cfg(not(windows))]
 fn labels_differing_only_in_case_are_made_unique() {
     let t = tree_of(&[
         ("Pack/materials/a.vmt", &[1u8; 3]),
