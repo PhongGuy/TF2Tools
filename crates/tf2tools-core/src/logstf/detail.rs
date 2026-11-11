@@ -667,7 +667,7 @@ impl MedicLine {
     pub fn heal_per_min(&self) -> f64 {
         self.heal_per_min
     }
-    /// Charges used per medigun, in logs.tf key order.
+    /// Charges used per medigun, in alphabetical order of the logs.tf key.
     pub fn charges(&self) -> &[(Medigun, u32)] {
         &self.charges
     }
