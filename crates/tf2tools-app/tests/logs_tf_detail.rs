@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AppContext as _, Entity, TestAppContext};
+use gpui_kit::{AppContext as _, Entity, InputEvent as _, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
 use tf2tools_app::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players};
@@ -149,6 +149,111 @@ fn hovering_a_class_icon_opens_its_card(cx: &mut TestAppContext) {
         .as_deref(),
         Some("scattergun 7 (100%) 3334 (86%) 56%")
     );
+}
+
+// Hovers Arie's Scout icon in log 3 and lets its open delay run in full.
+fn open_scout_card(cx: &mut TestAppContext, s: &support::ShellWindow, page: &Entity<LogsTfPage>) {
+    let icon = ids::logstf_class_card(sid(ARIE), TfClass::Scout);
+    scroll_to_in_log(cx, s, page, 3, icon.clone());
+    cx.update_window(s.win, |_, w, cx| w.hover(icon, cx))
+        .unwrap();
+    support::settle(cx, s.win);
+    cx.executor().advance_clock(Duration::from_millis(300));
+    support::settle(cx, s.win);
+}
+
+#[gpui_kit::test]
+fn the_card_opens_after_a_tenth_of_a_second_and_closes_when_left(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened(cx, 3);
+    let icon = ids::logstf_class_card(sid(ARIE), TfClass::Scout);
+    let card = ids::logstf_class_popover(sid(ARIE), TfClass::Scout);
+    scroll_to_in_log(cx, &s, &page, 3, icon.clone());
+    cx.update_window(s.win, |_, w, cx| w.hover(icon, cx))
+        .unwrap();
+    support::settle(cx, s.win);
+    cx.executor().advance_clock(Duration::from_millis(50));
+    assert!(!support::present(cx, s.win, card.clone()), "shut at 50 ms");
+    cx.executor().advance_clock(Duration::from_millis(100));
+    assert!(support::present(cx, s.win, card.clone()), "open at 150 ms");
+
+    cx.update_window(s.win, |_, w, cx| {
+        let away = gpui_kit::MouseMoveEvent {
+            position: gpui_kit::point(gpui_kit::px(2.), gpui_kit::px(2.)),
+            ..Default::default()
+        };
+        let _ = w.dispatch_event(away.to_platform_input(), cx);
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    cx.executor().advance_clock(Duration::from_millis(500));
+    assert!(
+        !support::present(cx, s.win, card),
+        "shut once the pointer leaves"
+    );
+}
+
+// `text` shaped at text-sm in the theme font, as a card cell lays it out.
+fn text_width(cx: &mut TestAppContext, win: gpui_kit::AnyWindowHandle, text: &str) -> f32 {
+    use gpui_kit::component::ActiveTheme as _;
+    cx.update_window(win, |_, w, cx| {
+        let run = gpui_kit::TextRun {
+            len: text.len(),
+            font: gpui_kit::font(cx.theme().font_family.clone()),
+            ..Default::default()
+        };
+        let size = gpui_kit::rems(0.875).to_pixels(w.rem_size());
+        f32::from(
+            w.text_system()
+                .shape_line(text.to_owned().into(), size, &[run], None)
+                .width,
+        )
+    })
+    .unwrap()
+}
+
+#[gpui_kit::test]
+fn the_widest_card_cells_in_the_fixtures_fit_their_columns(cx: &mut TestAppContext) {
+    use tf2tools_app::pages::logs_tf::tables::weapon_rows;
+    let (_env, _server, s, page) = opened(cx, 3);
+    open_scout_card(cx, &s, &page);
+    // Every weapon row of every player and class in both fixtures, as the card words them.
+    let mut kills = Vec::new();
+    let mut dmg = Vec::new();
+    for body in [SIXES, HIGHLANDER] {
+        let log = tf2tools_core::parse_log(body).unwrap();
+        for player in log.players() {
+            for class in player.classes() {
+                for w in weapon_rows(player, class) {
+                    kills.push(format!("{} ({})", w.kills, w.kill_share));
+                    dmg.push(format!("{} ({})", w.dmg, w.dmg_share));
+                }
+            }
+        }
+    }
+    let card = support::bounds_of(
+        cx,
+        s.win,
+        ids::logstf_class_popover(sid(ARIE), TfClass::Scout),
+    )
+    .expect("the card is open");
+    let width = f32::from(card.size.width);
+    assert!((320. ..=360.).contains(&width), "card width {width}");
+    for (title, cells) in [("K", kills), ("DA", dmg)] {
+        let column = ids::logstf_card_column(sid(ARIE), TfClass::Scout, title);
+        let column = support::bounds_of(cx, s.win, column).expect("the column header");
+        let widest = cells
+            .iter()
+            .map(|c| (text_width(cx, s.win, c), c))
+            .max_by(|a, b| a.0.total_cmp(&b.0))
+            .expect("the fixtures have weapons");
+        assert!(
+            widest.0 <= f32::from(column.size.width),
+            "{title}: {:?} is {} px in a {} px column",
+            widest.1,
+            widest.0,
+            f32::from(column.size.width)
+        );
+    }
 }
 
 #[gpui_kit::test]

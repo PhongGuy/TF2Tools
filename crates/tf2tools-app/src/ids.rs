@@ -2629,6 +2629,15 @@ pub fn logstf_weapon(id: SteamId, class: TfClass, weapon: &str) -> ElementId {
     )
 }
 
+/// A column's header in a class card, by its title ("K", "DA"):
+/// "logstf-card-column:<id64>:<class>:<title>".
+pub fn logstf_card_column(id: SteamId, class: TfClass, title: &str) -> ElementId {
+    keyed(
+        "logstf-card-column",
+        &format!("{}:{title}", player_class(id, class)),
+    )
+}
+
 fn player_class(id: SteamId, class: TfClass) -> String {
     format!("{}:{}", id.id64(), class.name().to_lowercase())
 }

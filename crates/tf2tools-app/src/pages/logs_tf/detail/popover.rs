@@ -6,20 +6,26 @@ use gpui_kit::component::hover_card::HoverCard;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
     App, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
-    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
+    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity,
+    div, px,
 };
-use tf2tools_core::{ClassLine, PlayerLine, SteamId, TfClass};
+use tf2tools_core::{PlayerLine, SteamId, TfClass};
 
 use crate::ids;
+use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::tables::{WeaponRow, weapon_rows};
 use crate::pages::logs_tf::text::duration_text;
 
 // logs.tf opens its card a tenth of a second after the pointer arrives.
 const OPEN_DELAY: Duration = Duration::from_millis(100);
-const CARD_WIDTH: Pixels = px(320.);
-const CELL: Pixels = px(64.);
+// The kills and damage columns fit the fixtures' widest, "46 (100%)" and "14029 (100%)"; the
+// weapon name takes what is left.
+const CARD_WIDTH: Pixels = px(360.);
+const KILLS: Pixels = px(80.);
+const DAMAGE: Pixels = px(104.);
+const ACCURACY: Pixels = px(40.);
 
-// What one card shows, worded up front so the hover card's builder owns its data.
+// What one card shows, worded once the card opens.
 struct Card {
     id: SteamId,
     class: TfClass,
@@ -27,34 +33,53 @@ struct Card {
     weapons: Vec<WeaponRow>,
 }
 
-/// `icon` wrapped in a hover card showing `player`'s time, kills and weapons on `class`.
+/// `icon` wrapped in a hover card showing `player`'s time, kills and weapons on `class`. The
+/// card reads the open log from `page` only while it is open, so a closed one costs nothing.
 pub(super) fn class_hover(
-    player: &PlayerLine,
-    class: &ClassLine,
+    page: WeakEntity<LogsTfPage>,
+    player: SteamId,
+    class: TfClass,
     icon: impl IntoElement + 'static,
 ) -> HoverCard {
-    let card = Card {
-        id: player.steam_id(),
-        class: class.class(),
-        facts: [
-            ("Played", duration_text(class.seconds())),
-            ("K", class.kills().to_string()),
-            ("A", class.assists().to_string()),
-            ("D", class.deaths().to_string()),
-            ("DA", class.dmg().to_string()),
-        ],
-        weapons: weapon_rows(player, class),
-    };
-    HoverCard::new(ids::logstf_class_hover(card.id, card.class))
+    HoverCard::new(ids::logstf_class_hover(player, class))
         .open_delay(OPEN_DELAY)
         .trigger(icon)
-        .content(move |_, _, cx| class_card(&card, cx))
+        .content(move |_, _, cx| {
+            let card = page
+                .upgrade()
+                .and_then(|page| card_for(page.read(cx).detail()?.players(), player, class));
+            div().children(card.map(|card| class_card(&card, cx)))
+        })
+}
+
+// `player`'s numbers on `class` in the open log, worded for the card.
+fn card_for(players: &[PlayerLine], player: SteamId, class: TfClass) -> Option<Card> {
+    let line = players.iter().find(|p| p.steam_id() == player)?;
+    let on = line.classes().iter().find(|c| c.class() == class)?;
+    Some(Card {
+        id: player,
+        class,
+        facts: [
+            ("Played", duration_text(on.seconds())),
+            ("K", on.kills().to_string()),
+            ("A", on.assists().to_string()),
+            ("D", on.deaths().to_string()),
+            ("DA", on.dmg().to_string()),
+        ],
+        weapons: weapon_rows(line, on),
+    })
 }
 
 // The class's totals in a row, then one line per weapon with its shares and accuracy.
 fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
     let muted = cx.theme().muted_foreground;
-    let cell = || div().w(CELL).flex_none().text_right();
+    let cell = |width: Pixels| div().w(width).flex_none().text_right();
+    let column = |title: &'static str, width: Pixels| {
+        cell(width)
+            .id(ids::logstf_card_column(card.id, card.class, title))
+            .test_support()
+            .child(title)
+    };
     let facts = h_flex()
         .gap_3()
         .children(card.facts.iter().map(|(label, value)| {
@@ -68,9 +93,9 @@ fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
         .text_color(muted)
         .font_weight(FontWeight::MEDIUM)
         .child(div().flex_1().child("Weapon"))
-        .child(cell().child("K"))
-        .child(cell().child("DA"))
-        .child(cell().w(px(40.)).child("Acc"));
+        .child(column("K", KILLS))
+        .child(column("DA", DAMAGE))
+        .child(cell(ACCURACY).child("Acc"));
     let rows = card.weapons.iter().map(|w| {
         let kills = format!("{} ({})", w.kills, w.kill_share);
         let dmg = format!("{} ({})", w.dmg, w.dmg_share);
@@ -83,10 +108,10 @@ fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
             .py_0p5()
             .border_t_1()
             .border_color(cx.theme().border)
-            .child(div().flex_1().truncate().child(w.name.clone()))
-            .child(cell().child(kills))
-            .child(cell().child(dmg))
-            .child(cell().w(px(40.)).child(w.accuracy.clone()))
+            .child(div().flex_1().min_w_0().truncate().child(w.name.clone()))
+            .child(cell(KILLS).child(kills))
+            .child(cell(DAMAGE).child(dmg))
+            .child(cell(ACCURACY).child(w.accuracy.clone()))
     });
     v_flex()
         .id(ids::logstf_class_popover(card.id, card.class))

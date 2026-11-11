@@ -76,7 +76,7 @@ pub(super) fn players_table(
                 .flex_none()
                 .when(n > 0, |el| el.opacity(0.5))
                 .child(icon);
-            class_hover(player, c, icon)
+            class_hover(page.clone(), player.steam_id(), c.class(), icon)
         });
         table = table.child(
             h_flex()
