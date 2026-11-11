@@ -2516,6 +2516,29 @@ pub fn logstf_log_open(id: u64) -> ElementId {
     keyed("logstf-log-open", &id.to_string())
 }
 
+/// The open log's score, RED first, labelled "3 : 2".
+pub const LOGSTF_TEAM_SCORE: &str = "logstf-team-score";
+
+/// A players table column header in the open log, keyed by its title: "logstf-col:K/D".
+pub fn logstf_col(name: &str) -> ElementId {
+    keyed("logstf-col", name)
+}
+
+/// One player's line in the open log's players table: "logstf-player:<id64>".
+pub fn logstf_player_row(id: SteamId) -> ElementId {
+    keyed("logstf-player", &id.id64().to_string())
+}
+
+/// One Medic's block in the open log: "logstf-medic:<id64>".
+pub fn logstf_medic(id: SteamId) -> ElementId {
+    keyed("logstf-medic", &id.id64().to_string())
+}
+
+/// A tracked player's kills by victim class in the open log: "logstf-class-kills:<id64>".
+pub fn logstf_class_kills(id: SteamId) -> ElementId {
+    keyed("logstf-class-kills", &id.id64().to_string())
+}
+
 /// One tracked player's chip, selected while active: "logstf-chip:<id64>".
 pub fn logstf_chip(id: SteamId) -> ElementId {
     keyed("logstf-chip", &id.id64().to_string())

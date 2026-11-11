@@ -658,3 +658,94 @@ fn the_grid_scrolls_away_with_the_logs(cx: &mut TestAppContext) {
     let after = support::bounds_of(cx, s.win, scout).unwrap();
     assert!(after.top() < before.top(), "{before:?} then {after:?}");
 }
+
+/// Opens log `id`'s row and waits for its body to be parsed and drawn.
+fn open_log(cx: &mut TestAppContext, s: &support::ShellWindow, page: &Entity<LogsTfPage>, id: u64) {
+    to_end(cx, page);
+    support::click_id(cx, s.win, ids::logstf_log(id));
+    support::wait_real(cx, "the parsed log", |cx| {
+        cx.update(|cx| page.read(cx).detail().is_some())
+    });
+    support::settle(cx, s.win);
+}
+
+#[gpui_kit::test]
+fn an_open_6v6_log_hides_columns_logs_tf_hides(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_TEAM_SCORE).as_deref(),
+        Some("3 : 2")
+    );
+    for shown in [
+        "K", "A", "D", "DA", "DA/M", "KA/D", "K/D", "DT", "DT/M", "HP", "AS", "CAP",
+    ] {
+        assert!(
+            support::present(cx, s.win, ids::logstf_col(shown)),
+            "{shown}"
+        );
+    }
+    for hidden in ["HS", "BS"] {
+        assert!(
+            !support::present(cx, s.win, ids::logstf_col(hidden)),
+            "{hidden}"
+        );
+    }
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::logstf_player_row(sid(ARIE))
+    ));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::logstf_player_row(sid(103_548_491))
+    ));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::logstf_medic(sid(175_790_976))
+    ));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::logstf_medic(sid(98_265_577))
+    ));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::logstf_class_kills(sid(ARIE))
+    ));
+    assert!(
+        !support::present(cx, s.win, ids::logstf_class_kills(sid(103_548_491))),
+        "class kills only for tracked players"
+    );
+    assert!(support::present(cx, s.win, ids::logstf_log_open(3)));
+}
+
+#[gpui_kit::test]
+fn a_highlander_log_shows_every_column_and_closing_drops_the_detail(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 2);
+    for shown in ["HS", "BS", "HP", "DT", "AS", "CAP"] {
+        assert!(
+            support::present(cx, s.win, ids::logstf_col(shown)),
+            "{shown}"
+        );
+    }
+    assert_eq!(
+        cx.update(|cx| page.read(cx).detail().map(|d| d.players().len())),
+        Some(18)
+    );
+    support::click_id(cx, s.win, ids::logstf_log(2));
+    assert!(cx.update(|cx| page.read(cx).detail().is_none()));
+}

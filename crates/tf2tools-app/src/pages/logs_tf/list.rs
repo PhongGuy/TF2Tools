@@ -12,11 +12,11 @@ use gpui_kit::{
 };
 use tf2tools_core::{LogRow, LogState, SteamId};
 
-use super::LogsTfPage;
 use super::text::{
     LOG_GONE, LOG_PENDING, LOG_UNREADABLE, NO_LOGS_TEXT, date_text, duration_text, log_url,
     profile_url, whole,
 };
+use super::{LogsTfPage, detail};
 use crate::ids;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
@@ -49,7 +49,7 @@ pub(super) fn page_list(page: &LogsTfPage, cx: &mut Context<LogsTfPage>) -> Div 
             }
             let page = page.read(cx);
             match page.rows.get(ix - 1) {
-                Some(row) => log_item(row, page.expanded == Some(row.id()), this.clone(), cx),
+                Some(row) => log_item(row, page, this.clone(), cx),
                 None => div().into_any_element(),
             }
         })
@@ -102,9 +102,15 @@ pub(super) fn no_logs(id: SteamId, cx: &App) -> impl IntoElement {
 
 // One log: its row, then its panel while open. Only a downloaded log opens; the rest carry
 // a note in place of the stats, and an unreadable one links to logs.tf instead.
-fn log_item(row: &LogRow, open: bool, page: WeakEntity<LogsTfPage>, cx: &App) -> AnyElement {
+fn log_item(
+    row: &LogRow,
+    state: &LogsTfPage,
+    page: WeakEntity<LogsTfPage>,
+    cx: &App,
+) -> AnyElement {
     let theme = cx.theme();
     let id = row.id();
+    let open = state.expanded == Some(id);
     let ready = row.state() == LogState::Ready;
     let chevron = div().w(CHEVRON).flex_none().children(ready.then(|| {
         Icon::new(if open {
@@ -157,7 +163,14 @@ fn log_item(row: &LogRow, open: bool, page: WeakEntity<LogsTfPage>, cx: &App) ->
         .border_b_1()
         .border_color(theme.border)
         .child(line)
-        .children(open.then(|| panel(id, cx)))
+        .children(open.then(|| {
+            let opened = state
+                .detail
+                .as_ref()
+                .filter(|(log, _)| *log == id)
+                .map(|(_, detail)| detail.as_ref());
+            detail::panel(row, opened, &state.players, cx)
+        }))
         .into_any_element()
 }
 
@@ -214,19 +227,8 @@ fn note(id: u64, state: LogState, cx: &App) -> impl IntoElement {
         .children((state == LogState::Unreadable).then(|| open_link(id)))
 }
 
-// The open log's panel; Task 8 fills it with the log itself.
-fn panel(id: u64, cx: &App) -> impl IntoElement {
-    v_flex()
-        .id(ids::logstf_log_panel(id))
-        .test_support()
-        .items_start()
-        .px_3()
-        .py_3()
-        .bg(cx.theme().muted)
-        .child(open_link(id))
-}
-
-fn open_link(id: u64) -> Button {
+/// "Open on logs.tf" for log `id`.
+pub(super) fn open_link(id: u64) -> Button {
     Button::new(ids::logstf_log_open(id))
         .ghost()
         .xsmall()

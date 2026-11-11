@@ -1,5 +1,6 @@
 //! The logs.tf page: tracked players as chips, their 90-day class averages and their logs.
 
+mod detail;
 mod grid;
 mod list;
 pub mod text;
@@ -16,8 +17,8 @@ use gpui_kit::{
     div, px,
 };
 use tf2tools_core::{
-    ClassAverage, LogRow, LogState, LogsProgress, LogsSyncError, LogsSyncSummary, SteamId,
-    TrackedPlayer, parse_player_input, window_start,
+    ClassAverage, LogDetail, LogRow, LogState, LogsProgress, LogsSyncError, LogsSyncSummary,
+    SteamId, TrackedPlayer, parse_log, parse_player_input, window_start,
 };
 
 use crate::ids;
@@ -46,6 +47,9 @@ pub struct LogsTfPage {
     averages: Option<[ClassAverage; 9]>,
     // The open log's id; the list's item 0 is the page top, so row `i` is item `i + 1`.
     expanded: Option<u64>,
+    // The open log as read from its stored body, keyed by its id so a read that lands after
+    // its row closed is dropped; None inside means the body could not be read.
+    detail: Option<(u64, Option<LogDetail>)>,
     list: ListState,
     // One sync runs at a time and is never cancelled; a player chosen meanwhile waits in
     // `queued`, so `syncing` stays true until the queue is empty.
@@ -88,6 +92,7 @@ impl LogsTfPage {
             rows: Vec::new(),
             averages: None,
             expanded: None,
+            detail: None,
             list: ListState::new(1, ListAlignment::Top, px(200.)),
             syncing: false,
             running: None,
@@ -161,11 +166,21 @@ impl LogsTfPage {
         self.expanded
     }
 
+    /// The open row's log, once its body is read and parsed.
+    pub fn detail(&self) -> Option<&LogDetail> {
+        self.detail
+            .as_ref()
+            .filter(|(id, _)| self.expanded == Some(*id))
+            .and_then(|(_, detail)| detail.as_ref())
+    }
+
     /// Opens log `id`'s row, closing any other; on the open row it closes it.
     pub fn toggle(&mut self, id: u64, cx: &mut Context<Self>) {
         let closing = self.expanded.take();
+        self.detail = None;
         if closing != Some(id) {
             self.expanded = Some(id);
+            self.read_detail(id, cx);
         }
         // Both rows change height, so both remeasure and the rows below move with them.
         for changed in closing.into_iter().chain([id]) {
@@ -174,6 +189,37 @@ impl LogsTfPage {
             }
         }
         cx.notify();
+    }
+
+    // Reads and parses log `id`'s stored body off the UI thread. It lands only if that row is
+    // still the open one, and its row remeasures to fit the panel.
+    fn read_detail(&mut self, id: u64, cx: &mut Context<Self>) {
+        let reading = run_blocking(cx, move |s| {
+            let body = s
+                .logs
+                .cache()
+                .log_body(id)
+                .map_err(|e| OpError::core("Failed to read a logs.tf log", e))?
+                .ok_or_else(|| OpError::core("Failed to read a logs.tf log", "no stored body"))?;
+            parse_log(&body).map_err(|e| OpError::core("Failed to read a logs.tf log", e))
+        });
+        cx.spawn(async move |page, cx| {
+            let read = reading.await;
+            let _ = page.update(cx, |page, cx| {
+                if page.expanded != Some(id) {
+                    return;
+                }
+                let detail = read
+                    .inspect_err(|error| tracing::warn!(%error, id, "reading a logs.tf log failed"))
+                    .ok();
+                page.detail = Some((id, detail));
+                if let Some(ix) = page.rows.iter().position(|r| r.id() == id) {
+                    page.list.remeasure_items(ix + 1..ix + 2);
+                }
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     /// The player whose chip is selected, if any is tracked.
@@ -456,6 +502,7 @@ impl LogsTfPage {
         let open = |r: &LogRow| Some(r.id()) == self.expanded && r.state() == LogState::Ready;
         if !self.rows.iter().any(open) {
             self.expanded = None;
+            self.detail = None;
         }
     }
 
