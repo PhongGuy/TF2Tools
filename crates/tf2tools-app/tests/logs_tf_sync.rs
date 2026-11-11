@@ -454,3 +454,55 @@ fn a_retried_sync_counts_the_logs_its_first_try_saved(cx: &mut TestAppContext) {
     gate.open();
     idle(cx, &sync);
 }
+
+#[gpui_kit::test]
+fn a_new_run_keeps_the_last_download_count_until_it_downloads(cx: &mut TestAppContext) {
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, ResponseTemplate};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // The first run lists at once, saves log 3 and fails on log 2; the next run's listing
+    // is held at the gate, where the first run's count and estimate must still show.
+    server.mount(
+        Mock::given(method("GET"))
+            .and(path("/api/v1/log"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_bytes(list_body(&[(3, day_ago(1)), (2, day_ago(2))])),
+            )
+            .up_to_n_times(1),
+    );
+    let gate = Gate::default();
+    mount_held(
+        &server,
+        &gate,
+        "/api/v1/log",
+        None,
+        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
+    );
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    server.mount(
+        Mock::given(method("GET"))
+            .and(path("/json/2"))
+            .respond_with(ResponseTemplate::new(500)),
+    );
+    let _s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    impatient_client(cx, &server.uri());
+    let sync = hub_without_retry_pause(cx);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    idle(cx, &sync);
+    assert!(cx.update(|cx| sync.read(cx).error(sid(ARIE))).is_some());
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    held(cx, &gate);
+    assert_eq!(
+        cx.update(|cx| sync.read(cx).progress()),
+        Some(SyncProgress::Downloading {
+            done: 1,
+            total: 2,
+            left: Duration::ZERO,
+        }),
+        "the listing keeps the last run's count"
+    );
+    gate.open();
+    idle(cx, &sync);
+}

@@ -83,6 +83,9 @@ pub struct LogsSync {
     run: Option<Run>,
     queued: Option<Request>,
     error: Option<(SteamId, &'static str)>,
+    // The player's last download count and estimate, kept through a retry's or a new run's
+    // listing until a fresh count replaces it, so the time left does not blink out.
+    last_download: Option<(SteamId, SyncProgress)>,
     // Tests take the pause out; None is RETRY_DELAY.
     retry_delay: Option<Duration>,
 }
@@ -159,9 +162,15 @@ impl LogsSync {
         self.run.is_some() || self.queued.is_some()
     }
 
-    /// The running player's progress, once core has reported any.
+    /// The running player's progress, once core has reported any. While a run lists, the
+    /// player's last download count stands in until this run downloads.
     pub fn progress(&self) -> Option<SyncProgress> {
-        self.run.as_ref().and_then(|run| run.progress)
+        let run = self.run.as_ref()?;
+        match (run.progress, self.last_download) {
+            (Some(now @ SyncProgress::Downloading { .. }), _) => Some(now),
+            (_, Some((id, last))) if id == run.request.id => Some(last),
+            (listing, _) => listing,
+        }
     }
 
     /// Sets the pause before retrying a sync that could not reach logs.tf.
@@ -264,6 +273,9 @@ impl LogsSync {
     ) {
         if let Some(run) = self.run.as_mut().filter(|run| run.request.id == id) {
             run.progress = progress;
+            if let Some(downloading @ SyncProgress::Downloading { .. }) = progress {
+                self.last_download = Some((id, downloading));
+            }
             cx.emit(LogsSyncEvent::Progress(id));
             cx.notify();
         }
@@ -289,7 +301,10 @@ impl LogsSync {
             .as_ref()
             .is_some_and(|run| run.cancel.is_cancelled());
         match joined {
-            Ok((Ok(_) | Err(LogsSyncError::NotTracked { .. }), _)) => self.clear_error(id),
+            Ok((Ok(_) | Err(LogsSyncError::NotTracked { .. }), _)) => {
+                self.clear_error(id);
+                self.last_download = None;
+            }
             _ if stopped => self.clear_error(id),
             Ok((Err(error), has_saved)) => {
                 tracing::warn!(%error, "syncing logs.tf logs failed");
