@@ -2339,6 +2339,54 @@ impl From<LogsCacheError> for LogsSyncError {
     }
 }
 
+/// Why a log opened before the sync reached it could not be fetched.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum LogsFetchError {
+    /// logs.tf no longer has the log; it is marked gone.
+    #[error("logs.tf no longer has this log")]
+    Gone,
+    /// The body was not UTF-8 or not a log; it is marked unreadable.
+    #[error("logs.tf sent a log that could not be read")]
+    Unreadable,
+    /// logs.tf could not be reached, answered an error status or redirected off the allowlist.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// What went wrong.
+        message: String,
+    },
+    /// logs.tf kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// The body grew past its size cap; it is marked unreadable.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// SQLite failed while writing the cache.
+    #[error("the logs.tf cache could not be read or written: {message}")]
+    Cache {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+}
+
+impl From<LogsCacheError> for LogsFetchError {
+    fn from(e: LogsCacheError) -> Self {
+        match e {
+            LogsCacheError::Database { message } => LogsFetchError::Cache { message },
+        }
+    }
+}
+
 /// Why a stored logs.tf body could not be read as a log.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

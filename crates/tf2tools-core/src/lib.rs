@@ -44,7 +44,7 @@ pub use error::{
     FontCheckError, FontInstallError, GbAddonCheckError, GbAddonFetchError, GbAddonInstallError,
     HistoryError, HudFilesError, HudLoadError, ImageError, ImportError, InstallError,
     InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError, LogParseError,
-    LogsCacheError, LogsSyncError, MakeHudError, MapDownloadError, MapRemoveError,
+    LogsCacheError, LogsFetchError, LogsSyncError, MakeHudError, MapDownloadError, MapRemoveError,
     MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError, PlayerInputError,
     PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
     ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,

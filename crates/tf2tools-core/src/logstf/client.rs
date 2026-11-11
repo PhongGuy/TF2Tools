@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use serde::Deserialize;
 
-use crate::error::{LogsSyncError, ResolveError};
+use crate::error::{LogsCacheError, LogsFetchError, LogsSyncError, ResolveError};
 use crate::store::StoreConfig;
 use crate::store::http::{Http, NetFailure, Redirects};
 use crate::store::pacer::{Pacer, Priority};
@@ -15,8 +15,8 @@ use crate::store::pacer::{Pacer, Priority};
 use super::cache::{ListedLog, STATE_GONE};
 use super::steam_xml::xml_text;
 use super::{
-    LOG_BODY_LIMIT, LOGS_LONG_SPACING, LOGS_SPACING, LONG_PULL, LogsCache, LogsRange, PlayerInput,
-    STALE_SECS, SteamId, TrackedPlayer, parse_log, window_start,
+    LOG_BODY_LIMIT, LOGS_LONG_SPACING, LOGS_SPACING, LONG_PULL, LogDetail, LogsCache, LogsRange,
+    PlayerInput, STALE_SECS, SteamId, TrackedPlayer, parse_log, window_start,
 };
 
 /// Asks a running sync to stop before its next request; clones share one flag.
@@ -367,33 +367,16 @@ impl LogsClient {
                 summary.cancelled = true;
                 return Ok(summary);
             }
-            let url = format!("{}/json/{log_id}", self.endpoints.logs_tf());
-            // A 404 means logs.tf dropped the log; an oversize, non-UTF-8 or non-log body is
-            // unreadable, unless a provisional refetch already holds a good copy. Marked logs are
-            // never asked again; any other failure stops the sync.
-            let readable = match self.get(&url, Priority::Background).await {
-                Ok(bytes) => String::from_utf8(bytes)
-                    .ok()
-                    .and_then(|body| parse_log(&body).ok().map(|detail| (body, detail))),
-                Err(NetFailure::TooLarge { .. }) => None,
-                Err(NetFailure::Status { status: 404, .. }) => {
-                    self.cache.mark_failed(log_id, STATE_GONE, now)?;
-                    summary.gone += 1;
-                    on_progress(progress(done + 1));
-                    continue;
-                }
-                Err(failure) => return Err(failure.into()),
-            };
-            match readable {
-                Some((body, detail)) => {
-                    self.cache.ingest(log_id, &body, &detail, now)?;
-                    summary.downloaded += 1;
-                }
-                None => {
-                    if self.cache.mark_unreadable(log_id, now)? {
-                        summary.unreadable += 1;
-                    }
-                }
+            // Gone and unreadable logs are marked and never asked again; any other failure
+            // stops the sync.
+            match self
+                .download::<LogsSyncError>(log_id, Priority::Background, now)
+                .await?
+            {
+                Downloaded::Ready(_) => summary.downloaded += 1,
+                Downloaded::Gone => summary.gone += 1,
+                Downloaded::Unreadable { marked: true, .. } => summary.unreadable += 1,
+                Downloaded::Unreadable { marked: false, .. } => {}
             }
             on_progress(progress(done + 1));
         }
@@ -401,6 +384,66 @@ impl LogsClient {
         self.cache.mark_synced(id, now)?;
         self.cache.prune()?;
         Ok(summary)
+    }
+
+    /// Downloads one log the player opened before the sync reached it, at interactive
+    /// priority and without waiting for a running sync, and stores it as the sync would.
+    /// A gone, unreadable or oversized log is marked like the sync marks it; a failed request
+    /// leaves the log pending.
+    pub async fn fetch_log(&self, log_id: u64) -> Result<LogDetail, LogsFetchError> {
+        // The cache keys logs by i64, so an id past it names no log logs.tf could have.
+        let Ok(log_id) = i64::try_from(log_id) else {
+            return Err(LogsFetchError::Gone);
+        };
+        let now = chrono::Utc::now().timestamp();
+        match self
+            .download::<LogsFetchError>(log_id, Priority::Interactive, now)
+            .await?
+        {
+            Downloaded::Ready(detail) => Ok(*detail),
+            Downloaded::Gone => Err(LogsFetchError::Gone),
+            Downloaded::Unreadable {
+                too_large: Some((url, limit)),
+                ..
+            } => Err(LogsFetchError::TooLarge { url, limit }),
+            Downloaded::Unreadable {
+                too_large: None, ..
+            } => Err(LogsFetchError::Unreadable),
+        }
+    }
+
+    /// Asks for one log body and records the outcome, shared by the sync and `fetch_log` so
+    /// the two never mark a log differently. A 404 marks it gone; an oversize, non-UTF-8 or
+    /// non-log body marks it unreadable unless a good copy is already stored.
+    async fn download<E>(&self, log_id: i64, priority: Priority, now: i64) -> Result<Downloaded, E>
+    where
+        E: From<NetFailure> + From<LogsCacheError>,
+    {
+        let url = format!("{}/json/{log_id}", self.endpoints.logs_tf());
+        let (readable, too_large) = match self.get(&url, priority).await {
+            Ok(bytes) => (
+                String::from_utf8(bytes)
+                    .ok()
+                    .and_then(|body| parse_log(&body).ok().map(|detail| (body, detail))),
+                None,
+            ),
+            Err(NetFailure::TooLarge { url, limit }) => (None, Some((url, limit))),
+            Err(NetFailure::Status { status: 404, .. }) => {
+                self.cache.mark_failed(log_id, STATE_GONE, now)?;
+                return Ok(Downloaded::Gone);
+            }
+            Err(failure) => return Err(failure.into()),
+        };
+        Ok(match readable {
+            Some((body, detail)) => {
+                self.cache.ingest(log_id, &body, &detail, now)?;
+                Downloaded::Ready(Box::new(detail))
+            }
+            None => Downloaded::Unreadable {
+                marked: self.cache.mark_unreadable(log_id, now)?,
+                too_large,
+            },
+        })
     }
 
     /// Reads the player's list page by page, recording each page's logs inside `range`'s
@@ -517,5 +560,36 @@ impl<'a> GapGuard<'a> {
 impl Drop for GapGuard<'_> {
     fn drop(&mut self) {
         self.pacer.set_base(self.configured);
+    }
+}
+
+/// What became of one log body download; every outcome is already recorded in the cache.
+enum Downloaded {
+    Ready(Box<LogDetail>),
+    Gone,
+    /// `marked` is false when a good copy was already stored; `too_large` names the cap hit.
+    Unreadable {
+        marked: bool,
+        too_large: Option<(String, u64)>,
+    },
+}
+
+/// A fetch-on-open has no HTTP-status variant: only a 404 means something to the player, so
+/// every other status and a refused redirect read as a network failure.
+impl From<NetFailure> for LogsFetchError {
+    fn from(failure: NetFailure) -> Self {
+        match failure {
+            NetFailure::RateLimited { url } => LogsFetchError::RateLimited { url },
+            NetFailure::Status { url, status } => LogsFetchError::Network {
+                url,
+                message: format!("HTTP {status}"),
+            },
+            NetFailure::Network { url, message } => LogsFetchError::Network { url, message },
+            NetFailure::TooLarge { url, limit } => LogsFetchError::TooLarge { url, limit },
+            NetFailure::Untrusted { url } => LogsFetchError::Network {
+                url,
+                message: "redirected outside the allowlist".to_owned(),
+            },
+        }
     }
 }
