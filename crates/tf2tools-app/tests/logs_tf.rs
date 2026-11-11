@@ -749,3 +749,56 @@ fn a_highlander_log_shows_every_column_and_closing_drops_the_detail(cx: &mut Tes
     support::click_id(cx, s.win, ids::logstf_log(2));
     assert!(cx.update(|cx| page.read(cx).detail().is_none()));
 }
+
+#[gpui_kit::test]
+fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
+    use gpui_kit::{InputEvent as _, ListOffset, ScrollDelta, ScrollEvent, point, px, size};
+
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 2);
+
+    // The row keeps a readable title by dropping its lower-priority columns.
+    let title = support::bounds_of(cx, s.win, ids::logstf_log_title(2)).unwrap();
+    assert!(title.size.width >= px(100.), "title {title:?}");
+
+    // The players table keeps every column, so its name column never collapses.
+    let first = cx.update(|cx| page.read(cx).detail().unwrap().players()[0].steam_id());
+    let header = support::bounds_of(cx, s.win, ids::logstf_col("Name")).unwrap();
+    let name = support::bounds_of(cx, s.win, ids::logstf_player_name(first)).unwrap();
+    assert!(header.size.width >= px(100.), "header {header:?}");
+    assert!(name.size.width >= px(100.), "name {name:?}");
+
+    // The table scrolls sideways to its last column: bring it into view, then wheel right.
+    let row = support::bounds_of(cx, s.win, ids::logstf_log(2)).unwrap();
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
+    let state = cx.update(|cx| page.read(cx).list_state().clone());
+    state.scroll_to(ListOffset {
+        item_ix: 2,
+        offset_in_item: table.top() - row.top(),
+    });
+    support::settle(cx, s.win);
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    assert!(cap.right() > table.right(), "the table overflows at 800 px");
+    let wheel = ScrollEvent {
+        position: point(table.center().x, table.top() + px(10.)),
+        delta: ScrollDelta::Pixels(point(px(-2000.), px(0.))),
+        ..Default::default()
+    };
+    cx.update_window(s.win, |_, w, cx| {
+        let _ = w.dispatch_event(wheel.to_platform_input(), cx);
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    assert!(
+        cap.right() <= table.right() + px(1.) && cap.left() >= table.left(),
+        "CAP {cap:?} outside {table:?}"
+    );
+}

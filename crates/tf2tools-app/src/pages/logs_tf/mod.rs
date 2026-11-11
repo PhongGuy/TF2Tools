@@ -51,6 +51,9 @@ pub struct LogsTfPage {
     // its row closed is dropped; None inside means the body could not be read.
     detail: Option<(u64, Option<LogDetail>)>,
     list: ListState,
+    // Which optional row columns fit, from the list's width at the last frame; the list's
+    // state cannot be asked while it lays its own items out.
+    fit: list::Fit,
     // One sync runs at a time and is never cancelled; a player chosen meanwhile waits in
     // `queued`, so `syncing` stays true until the queue is empty.
     syncing: bool,
@@ -94,6 +97,7 @@ impl LogsTfPage {
             expanded: None,
             detail: None,
             list: ListState::new(1, ListAlignment::Top, px(200.)),
+            fit: list::Fit::ALL,
             syncing: false,
             running: None,
             queued: None,
@@ -693,7 +697,7 @@ impl LogsTfPage {
             )
             .children(empty.then(|| self.empty_state(cx)))
             .children(no_logs.map(|id| list::no_logs(id, cx)))
-            .children((!self.rows.is_empty()).then(|| list::column_header(cx)))
+            .children((!self.rows.is_empty()).then(|| list::column_header(self.fit, cx)))
     }
 
     // The no-player explanation and its way to track someone.
@@ -719,6 +723,7 @@ impl LogsTfPage {
 
 impl Render for LogsTfPage {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.fit = list::fit(&self.list);
         // The page scrolls as one list, so the grid and the logs move together.
         v_flex()
             .id(ids::page(Page::LogsTf))

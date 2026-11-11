@@ -2516,6 +2516,22 @@ pub fn logstf_log_open(id: u64) -> ElementId {
     keyed("logstf-log-open", &id.to_string())
 }
 
+/// A log row's title cell: "logstf-log-title:<id>".
+pub fn logstf_log_title(id: u64) -> ElementId {
+    keyed("logstf-log-title", &id.to_string())
+}
+
+/// The open log's team totals, which scroll sideways in a narrow window.
+pub const LOGSTF_TEAMS_SCROLL: &str = "logstf-teams-scroll";
+
+/// The open log's players table, which scrolls sideways in a narrow window.
+pub const LOGSTF_PLAYERS_SCROLL: &str = "logstf-players-scroll";
+
+/// One player's name cell in the open log's players table: "logstf-player-name:<id64>".
+pub fn logstf_player_name(id: SteamId) -> ElementId {
+    keyed("logstf-player-name", &id.id64().to_string())
+}
+
 /// The open log's score, RED first, labelled "3 : 2".
 pub const LOGSTF_TEAM_SCORE: &str = "logstf-team-score";
 

@@ -6,7 +6,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, App, Context, Div, FontWeight, InteractiveElement as _, IntoElement,
+    AnyElement, App, Context, Div, FontWeight, InteractiveElement as _, IntoElement, ListState,
     ParentElement as _, Pixels, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _,
     WeakEntity, div, list, px,
 };
@@ -33,6 +33,34 @@ const KDA: Pixels = px(80.);
 const DPM: Pixels = px(48.);
 const GAP: Pixels = px(16.);
 const ICON: Pixels = px(18.);
+const TITLE_MIN: Pixels = px(100.);
+// The row's horizontal padding, both sides.
+const PADDING: Pixels = px(24.);
+
+/// Which optional row columns fit the list's width. A narrow window gives up Length first,
+/// then Map, so the title keeps room; before the first frame the list has no width yet.
+#[derive(Clone, Copy)]
+pub(super) struct Fit {
+    map: bool,
+    length: bool,
+}
+
+impl Fit {
+    pub(super) const ALL: Self = Self {
+        map: true,
+        length: true,
+    };
+}
+
+pub(super) fn fit(list: &ListState) -> Fit {
+    let width = list.viewport_bounds().size.width;
+    let core = CHEVRON + DATE + CLASSES + KDA + DPM + TITLE_MIN + GAP * 5. + PADDING;
+    let unknown = width <= px(0.);
+    Fit {
+        map: unknown || width >= core + MAP + GAP,
+        length: unknown || width >= core + MAP + LENGTH + GAP * 2.,
+    }
+}
 
 /// The whole page as a virtualized list over `page`'s list state: item 0 is everything above
 /// the logs, item `n` is the log at `rows[n - 1]`. The caller sizes it to fill the page.
@@ -49,7 +77,7 @@ pub(super) fn page_list(page: &LogsTfPage, cx: &mut Context<LogsTfPage>) -> Div 
             }
             let page = page.read(cx);
             match page.rows.get(ix - 1) {
-                Some(row) => log_item(row, page, this.clone(), cx),
+                Some(row) => log_item(row, page, page.fit, this.clone(), cx),
                 None => div().into_any_element(),
             }
         })
@@ -59,7 +87,7 @@ pub(super) fn page_list(page: &LogsTfPage, cx: &mut Context<LogsTfPage>) -> Div 
 }
 
 /// The column titles over the rows, in the rows' widths.
-pub(super) fn column_header(cx: &App) -> impl IntoElement {
+pub(super) fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
     let cell = |w: Pixels, text: &'static str| div().w(w).flex_none().child(text);
     h_flex()
         .gap(GAP)
@@ -72,9 +100,11 @@ pub(super) fn column_header(cx: &App) -> impl IntoElement {
         .text_color(cx.theme().muted_foreground)
         .child(div().w(CHEVRON).flex_none())
         .child(cell(DATE, "Date"))
-        .child(div().flex_1().min_w_0().child("Title"))
-        .child(cell(MAP, "Map"))
-        .child(cell(LENGTH, "Length").text_right())
+        .child(div().flex_1().min_w(TITLE_MIN).child("Title"))
+        .when(fit.map, |el| el.child(cell(MAP, "Map")))
+        .when(fit.length, |el| {
+            el.child(cell(LENGTH, "Length").text_right())
+        })
         .child(cell(CLASSES, "Class"))
         .child(cell(KDA, "K/D/A").text_right())
         .child(cell(DPM, "DPM").text_right())
@@ -105,6 +135,7 @@ pub(super) fn no_logs(id: SteamId, cx: &App) -> impl IntoElement {
 fn log_item(
     row: &LogRow,
     state: &LogsTfPage,
+    fit: Fit,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> AnyElement {
@@ -134,28 +165,32 @@ fn log_item(
         .child(div().w(DATE).flex_none().child(date_text(row.date())))
         .child(
             div()
+                .id(ids::logstf_log_title(id))
+                .test_support()
                 .flex_1()
-                .min_w_0()
+                .min_w(TITLE_MIN)
                 .truncate()
                 .child(row.title().to_owned()),
         )
-        .child(
-            div()
-                .w(MAP)
-                .flex_none()
-                .truncate()
-                .child(row.map().to_owned()),
-        );
+        .when(fit.map, |el| {
+            el.child(
+                div()
+                    .w(MAP)
+                    .flex_none()
+                    .truncate()
+                    .child(row.map().to_owned()),
+            )
+        });
     line = match row.state() {
         LogState::Ready => line
-            .children(stats(row, cx))
+            .children(stats(row, fit, cx))
             .cursor_pointer()
             .hover(|s| s.bg(theme.muted))
             .on_click(move |_, _, cx| {
                 let _ = page.update(cx, |page, cx| page.toggle(id, cx));
             }),
         state @ (LogState::Pending | LogState::Gone | LogState::Unreadable | _) => {
-            line.child(note(id, state, cx))
+            line.child(note(id, state, fit, cx))
         }
     };
     v_flex()
@@ -175,7 +210,7 @@ fn log_item(
 }
 
 // A downloaded log's numbers for the player: length, classes, K/D/A and damage per minute.
-fn stats(row: &LogRow, cx: &App) -> [AnyElement; 4] {
+fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
     let assets = &cx.global::<Services>().assets;
     let icons = h_flex().w(CLASSES).flex_none().gap_1().children(
         row.classes()
@@ -185,13 +220,15 @@ fn stats(row: &LogRow, cx: &App) -> [AnyElement; 4] {
     let length = row.length().map(duration_text).unwrap_or_default();
     let kda = format!("{}/{}/{}", row.kills(), row.deaths(), row.assists());
     let dpm = row.dmg_per_min().map(whole).unwrap_or_else(|| "-".into());
-    [
+    let length = fit.length.then(|| {
         div()
             .w(LENGTH)
             .flex_none()
             .text_right()
             .child(length)
-            .into_any_element(),
+            .into_any_element()
+    });
+    length.into_iter().chain([
         icons.into_any_element(),
         div()
             .w(KDA)
@@ -205,18 +242,19 @@ fn stats(row: &LogRow, cx: &App) -> [AnyElement; 4] {
             .text_right()
             .child(dpm)
             .into_any_element(),
-    ]
+    ])
 }
 
 // Why a row has no stats, muted and spanning the stats columns.
-fn note(id: u64, state: LogState, cx: &App) -> impl IntoElement {
+fn note(id: u64, state: LogState, fit: Fit, cx: &App) -> impl IntoElement {
     let text = match state {
         LogState::Gone => LOG_GONE,
         LogState::Unreadable => LOG_UNREADABLE,
         LogState::Pending | LogState::Ready | _ => LOG_PENDING,
     };
+    let length = if fit.length { LENGTH + GAP } else { px(0.) };
     h_flex()
-        .w(LENGTH + CLASSES + KDA + DPM + GAP * 3.)
+        .w(length + CLASSES + KDA + DPM + GAP * 2.)
         .flex_none()
         .gap_2()
         .child(labelled(

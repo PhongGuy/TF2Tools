@@ -1,6 +1,7 @@
 //! An open log's panel, laid out like its page on logs.tf: the header, team totals, the
 //! players table, one block per Medic and the tracked players' kills by class.
 
+use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -20,6 +21,7 @@ use crate::widgets::labelled;
 
 // The players table's fixed columns; the name takes what is left.
 const TEAM: Pixels = px(40.);
+const NAME_MIN: Pixels = px(120.);
 const CLASSES: Pixels = px(76.);
 const NUMBER: Pixels = px(44.);
 const ICON: Pixels = px(16.);
@@ -106,8 +108,11 @@ fn log_body(log: &LogDetail, tracked: &[TrackedPlayer], cx: &App) -> impl IntoEl
         .w_full()
         .gap_6()
         .text_xs()
-        .child(team_totals(log, cx))
-        .child(players_table(log, &is_tracked, cx))
+        .child(sideways(ids::LOGSTF_TEAMS_SCROLL, team_totals(log, cx)))
+        .child(sideways(
+            ids::LOGSTF_PLAYERS_SCROLL,
+            players_table(log, &is_tracked, cx),
+        ))
         .when(!log.medics().is_empty(), |el| {
             el.child(section(
                 "Medics",
@@ -150,6 +155,19 @@ fn log_body(log: &LogDetail, tracked: &[TrackedPlayer], cx: &App) -> impl IntoEl
             }
             el.child(section("Class kills", table.max_w(px(560.)), cx))
         })
+}
+
+// A wide table in a box that scrolls sideways when the panel is narrower, so every column
+// stays reachable as on logs.tf; the table fills the box when there is room.
+fn sideways(id: &'static str, table: impl IntoElement) -> impl IntoElement {
+    // The kit's scroll wrapper keeps no test support, so the id sits on a box around it.
+    div().id(id).test_support().w_full().child(
+        h_flex()
+            .id("scroll")
+            .w_full()
+            .child(div().flex_none().min_w_full().child(table))
+            .overflow_x_scrollbar(),
+    )
 }
 
 // A titled part of the body.
@@ -229,7 +247,7 @@ fn players_table(log: &LogDetail, is_tracked: &dyn Fn(SteamId) -> bool, cx: &App
             .text_color(cx.theme().muted_foreground)
             .font_weight(FontWeight::MEDIUM)
             .child(title("Team").w(TEAM).flex_none())
-            .child(title("Name").flex_1().min_w_0())
+            .child(title("Name").flex_1().min_w(NAME_MIN))
             .child(title("Classes").w(CLASSES).flex_none())
             .children(
                 columns
@@ -259,8 +277,10 @@ fn players_table(log: &LogDetail, is_tracked: &dyn Fn(SteamId) -> bool, cx: &App
                 .child(team_cell(player.team(), cx).w(TEAM))
                 .child(
                     div()
+                        .id(ids::logstf_player_name(player.steam_id()))
+                        .test_support()
                         .flex_1()
-                        .min_w_0()
+                        .min_w(NAME_MIN)
                         .truncate()
                         .child(player.name().to_owned()),
                 )
@@ -328,7 +348,7 @@ fn medic_block(medic: &MedicLine, cx: &App) -> impl IntoElement {
         ),
         (
             "Avg uber length".to_owned(),
-            format!("{}s", whole(medic.avg_uber_length())),
+            format!("{}s", one_decimal(medic.avg_uber_length())),
         ),
         (
             "Deaths within 20s after uber".to_owned(),
