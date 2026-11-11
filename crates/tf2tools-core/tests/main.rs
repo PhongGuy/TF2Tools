@@ -196,7 +196,6 @@ mod logstf_cancel;
 mod logstf_detail;
 mod logstf_fetch;
 mod logstf_full_log;
-mod logstf_gate;
 mod logstf_ids;
 mod logstf_incremental;
 mod logstf_ingest;

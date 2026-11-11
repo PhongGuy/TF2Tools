@@ -5,6 +5,8 @@ use tf2tools_core::{
     TrackedPlayer,
 };
 
+use wiremock::MockServer;
+
 use crate::common;
 use crate::common::logstf::{
     ARIE, LogsEnv, days_ago, hourly, list_body, list_offsets, logs_env, mount_any_log, mount_list,
@@ -54,13 +56,13 @@ async fn sync_until_closed(client: &LogsClient, id: SteamId, range: LogsRange, n
     }
 }
 
-/// A new client over the same database and server, as the next start builds it. A second
-/// `Database::open` on a live data dir is safe: no exclusive locking mode is set, and other
-/// store tests already open one beside a running env.
-fn restarted(env: &LogsEnv) -> LogsClient {
+/// A new client over the same database, as the next start builds it, asking `server`. A
+/// second `Database::open` on a live data dir is safe: no exclusive locking mode is set, and
+/// other store tests already open one beside a running env.
+fn restarted(env: &LogsEnv, server: &MockServer) -> LogsClient {
     LogsClient::new(
         LogsCache::new(Database::open(&env.dir).unwrap()),
-        LogsEndpoints::loopback(&env.server.uri()),
+        LogsEndpoints::loopback(&server.uri()),
     )
     .with_config(common::fast_config())
 }
@@ -76,7 +78,16 @@ fn saved(env: &LogsEnv) -> Vec<String> {
         .collect()
 }
 
-/// Forgets the first run's requests and mocks, then serves the same list and logs again.
+/// A new server with the same list and logs for the restarted client. The dropped run's
+/// in-flight download can still land on the old server, so it never counts here.
+async fn next_server() -> MockServer {
+    let server = MockServer::start().await;
+    mount_list(&server, ARIE, list_body(&six_logs())).await;
+    mount_any_log(&server).await;
+    server
+}
+
+/// Forgets a cancelled run's requests and mocks, then serves the same list and logs again.
 async fn fresh_server(env: &LogsEnv) {
     env.server.reset().await;
     mount_list(&env.server, ARIE, list_body(&six_logs())).await;
@@ -97,9 +108,9 @@ async fn a_sync_closed_mid_download_resumes_without_downloading_a_saved_log() {
     let kept = saved(&env);
     // The close lands while the 4th download may be in flight, so 3 or 4 are saved.
     assert!((3..=4).contains(&kept.len()), "{kept:?}");
-    fresh_server(&env).await;
+    let server = next_server().await;
 
-    let summary = restarted(&env)
+    let summary = restarted(&env, &server)
         .sync_player(
             arie(),
             LogsRange::Months3,
@@ -113,7 +124,7 @@ async fn a_sync_closed_mid_download_resumes_without_downloading_a_saved_log() {
         !summary.skipped(),
         "an unfinished sync never stamped last_synced"
     );
-    let fetched = downloads(&paths(&env.server).await);
+    let fetched = downloads(&paths(&server).await);
     assert!(
         fetched.iter().all(|p| !kept.contains(p)),
         "{fetched:?} vs {kept:?}"
@@ -135,9 +146,9 @@ async fn plain_text_and_compressed_bodies_both_count_as_saved() {
         .unwrap();
     assert_eq!(text, 1);
     let kept = saved(&env);
-    fresh_server(&env).await;
+    let server = next_server().await;
 
-    restarted(&env)
+    restarted(&env, &server)
         .sync_player(
             arie(),
             LogsRange::Months3,
@@ -147,7 +158,7 @@ async fn plain_text_and_compressed_bodies_both_count_as_saved() {
         )
         .await
         .unwrap();
-    let fetched = downloads(&paths(&env.server).await);
+    let fetched = downloads(&paths(&server).await);
     assert!(!fetched.contains(&"/json/1".to_owned()), "{fetched:?}");
     assert!(
         fetched.iter().all(|p| !kept.contains(p)),
@@ -223,13 +234,12 @@ async fn an_all_pull_past_1000_logs_relists_on_restart_but_downloads_only_the_re
         .add_player(&TrackedPlayer::new(arie(), "Arie"))
         .unwrap();
     let logs = hourly(900_000, days_ago(1), 1500);
-    let (server, logs) = (&env.server, &logs);
-    let mount = move || async move {
+    async fn mount(server: &MockServer, logs: &[(u64, i64)]) {
         mount_page(server, ARIE, 0, page_body(&logs[..1000], 1500)).await;
         mount_page(server, ARIE, 1000, page_body(&logs[1000..], 1500)).await;
         mount_any_log(server).await;
-    };
-    mount().await;
+    }
+    mount(&env.server, &logs).await;
     sync_until_closed(&env.client, arie(), LogsRange::All, 5).await;
     let kept = saved(&env);
     assert!((5..=6).contains(&kept.len()), "{kept:?}");
@@ -238,13 +248,13 @@ async fn an_all_pull_past_1000_logs_relists_on_restart_but_downloads_only_the_re
         1500,
         "both pages recorded"
     );
-    env.server.reset().await;
-    mount().await;
+    let server = MockServer::start().await;
+    mount(&server, &logs).await;
 
     // The restart lists both pages again, then is cancelled as downloads begin.
     let cancel = LogsCancel::new();
     let total = std::sync::Mutex::new(None);
-    restarted(&env)
+    restarted(&env, &server)
         .sync_player(arie(), LogsRange::All, false, &cancel, &|p| {
             if let LogsProgress::Downloading { total: t, .. } = p {
                 total.lock().unwrap().get_or_insert(t);
@@ -253,7 +263,7 @@ async fn an_all_pull_past_1000_logs_relists_on_restart_but_downloads_only_the_re
         })
         .await
         .unwrap();
-    assert_eq!(list_offsets(&env.server).await, ["0", "1000"]);
-    assert!(downloads(&paths(&env.server).await).is_empty());
+    assert_eq!(list_offsets(&server).await, ["0", "1000"]);
+    assert!(downloads(&paths(&server).await).is_empty());
     assert_eq!(total.into_inner().unwrap(), Some(1500 - kept.len()));
 }

@@ -1,8 +1,6 @@
 //! A logs.tf client against wiremock, and the recorded logs.tf bodies.
 
 use std::path::Path;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
 
 use serde_json::json;
 use tempfile::TempDir;
@@ -17,14 +15,16 @@ pub struct LogsEnv {
     pub client: LogsClient,
 }
 
-/// A fresh database and a client pointed at a new wiremock server, without spacing.
+/// A fresh database and a client pointed at a new wiremock server, without spacing, long
+/// pulls included.
 pub async fn logs_env() -> LogsEnv {
     let tmp = tempfile::tempdir().expect("tempdir");
     let dir = DataDir::at(tmp.path().join("com.tf2tools.app"));
     let db = Database::open(&dir).expect("open database");
     let server = MockServer::start().await;
     let client = LogsClient::new(LogsCache::new(db), LogsEndpoints::loopback(&server.uri()))
-        .with_config(super::fast_config());
+        .with_config(super::fast_config())
+        .with_long_spacing(std::time::Duration::ZERO);
     LogsEnv {
         tmp,
         dir,
@@ -230,43 +230,4 @@ pub fn class_rows(dir: &tf2tools_core::DataDir, log_id: i64) -> i64 {
             |r| r.get(0),
         )
         .unwrap()
-}
-
-/// Arrival times of the requests answered through `answer`; clones share them.
-#[derive(Clone, Default)]
-pub struct Stamps(Arc<Mutex<Vec<Instant>>>);
-
-struct Stamped {
-    stamps: Stamps,
-    template: ResponseTemplate,
-}
-
-impl wiremock::Respond for Stamped {
-    fn respond(&self, _: &wiremock::Request) -> ResponseTemplate {
-        self.stamps.0.lock().unwrap().push(Instant::now());
-        self.template.clone()
-    }
-}
-
-impl Stamps {
-    pub fn answer(&self, template: ResponseTemplate) -> impl wiremock::Respond + use<> {
-        Stamped {
-            stamps: self.clone(),
-            template,
-        }
-    }
-
-    pub fn arrivals(&self) -> usize {
-        self.0.lock().unwrap().len()
-    }
-
-    /// The smallest gap between two consecutive arrivals.
-    pub fn min_gap(&self) -> Duration {
-        let mut at = self.0.lock().unwrap().clone();
-        at.sort();
-        at.windows(2)
-            .map(|w| w[1] - w[0])
-            .min()
-            .unwrap_or(Duration::MAX)
-    }
 }

@@ -593,3 +593,7 @@ impl From<NetFailure> for LogsFetchError {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "client_tests.rs"]
+mod tests;

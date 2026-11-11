@@ -63,6 +63,9 @@ struct State {
     clean: u32,
     interactive_waiting: usize,
     stats: PacerStats,
+    /// Every start with the gap it reserved after itself, so tests check spacing exactly.
+    #[cfg(test)]
+    starts: Vec<(Instant, Duration)>,
 }
 
 #[derive(Debug)]
@@ -87,6 +90,8 @@ impl Pacer {
             clean: 0,
             interactive_waiting: 0,
             stats: PacerStats::default(),
+            #[cfg(test)]
+            starts: Vec::new(),
         };
         Self {
             shared: Arc::new(Shared {
@@ -110,6 +115,12 @@ impl Pacer {
     )]
     pub(crate) fn stats(&self) -> PacerStats {
         self.lock().stats
+    }
+
+    /// Every start given out so far, in order, each with the gap it reserved after itself.
+    #[cfg(test)]
+    pub(crate) fn starts(&self) -> Vec<(Instant, Duration)> {
+        self.lock().starts.clone()
     }
 
     pub(crate) async fn call<T, E, F, Fut>(
@@ -174,6 +185,8 @@ impl Pacer {
                     let gap = s.gap;
                     s.next = Some(now + gap);
                     s.last = Some(now);
+                    #[cfg(test)]
+                    s.starts.push((now, gap));
                     match priority {
                         Priority::Interactive => s.stats.interactive += 1,
                         Priority::Background => s.stats.background += 1,

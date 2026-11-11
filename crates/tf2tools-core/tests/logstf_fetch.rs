@@ -1,15 +1,11 @@
-//! Fetching one log when it is opened, alongside a running sync.
+//! Fetching one log when it is opened; its spacing against a running sync is checked
+//! inside the crate, where the gate's starts can be read.
 
-use std::time::Duration;
-
-use tf2tools_core::{LogState, LogsCancel, LogsFetchError, LogsRange, SteamId, TrackedPlayer};
-use wiremock::matchers::{method, path, path_regex};
-use wiremock::{Mock, ResponseTemplate};
+use tf2tools_core::{LogState, LogsFetchError, LogsRange, SteamId, TrackedPlayer};
 
 use crate::common;
 use crate::common::logstf::{
-    ARIE, LogsEnv, Stamps, class_rows, days_ago, list_body, log_body, log_state, logs_env,
-    logstf_fixture, mount_log, solo,
+    ARIE, LogsEnv, class_rows, days_ago, log_state, logs_env, logstf_fixture, mount_log,
 };
 
 fn arie() -> SteamId {
@@ -96,47 +92,4 @@ async fn an_offline_fetch_is_a_network_error_and_sends_nothing() {
         Err(LogsFetchError::Network { .. })
     ));
     assert_eq!(log_state(&env.dir, 3), (0, false));
-}
-
-#[tokio::test]
-async fn a_fetch_during_a_sync_never_sends_two_requests_inside_one_spacing() {
-    let env = pending_env(&[9]).await;
-    let spacing = Duration::from_millis(90);
-    let client = env
-        .client
-        .clone()
-        .with_config(common::fast_config().with_request_spacing(spacing));
-    let stamps = Stamps::default();
-    let list = list_body(&[(3, days_ago(2)), (2, days_ago(3)), (1, days_ago(4))]);
-    Mock::given(method("GET"))
-        .and(path("/api/v1/log"))
-        .respond_with(stamps.answer(ResponseTemplate::new(200).set_body_string(list)))
-        .mount(&env.server)
-        .await;
-    let log = log_body(600, &[solo(231_702, ("scout", 600, 1, 1, 1, 100))]);
-    Mock::given(method("GET"))
-        .and(path_regex(r"^/json/\d+$"))
-        .respond_with(stamps.answer(ResponseTemplate::new(200).set_body_string(log)))
-        .mount(&env.server)
-        .await;
-    let cancel = LogsCancel::new();
-    let (synced, fetched) = tokio::join!(
-        client.sync_player(arie(), LogsRange::Months3, true, &cancel, &|_| {}),
-        async {
-            tokio::time::sleep(Duration::from_millis(130)).await;
-            client.fetch_log(9).await
-        },
-    );
-    synced.unwrap();
-    fetched.unwrap();
-    assert_eq!(
-        stamps.arrivals(),
-        5,
-        "the list, three sync downloads and the fetch"
-    );
-    assert!(
-        stamps.min_gap() >= Duration::from_millis(60),
-        "{:?}",
-        stamps.min_gap()
-    );
 }
