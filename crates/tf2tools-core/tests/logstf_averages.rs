@@ -185,8 +185,6 @@ async fn a_log_row_carries_the_players_line_and_state() {
         (7, 21, 6, 3896)
     );
     assert_eq!(ready.seconds(), 1714);
-    assert!((ready.dmg_per_min().unwrap() - 136.38).abs() < 0.01);
-    assert_eq!(rows[0].dmg_per_min(), None);
     assert!(env.client.cache().log_body(3).unwrap().is_some());
     assert_eq!(env.client.cache().log_body(2).unwrap(), None);
 }

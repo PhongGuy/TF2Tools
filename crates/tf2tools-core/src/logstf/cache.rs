@@ -161,11 +161,6 @@ impl LogRow {
     pub fn dmg(&self) -> u32 {
         self.dmg
     }
-
-    /// Damage per minute over the player's time; `None` when they have no time.
-    pub fn dmg_per_min(&self) -> Option<f64> {
-        (self.seconds > 0).then(|| f64::from(self.dmg) / f64::from(self.seconds) * 60.0)
-    }
 }
 
 /// One entry of a player's logs.tf list, as the sync keeps it.
