@@ -3,7 +3,7 @@
 
 use std::cmp::Ordering;
 
-use tf2tools_core::{PlayerLine, Team, TfClass};
+use tf2tools_core::{LogColumns, PlayerLine, Team, TfClass};
 
 /// One players table column, in logs.tf's order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +77,28 @@ impl PlayerColumn {
         !matches!(self, Self::Team | Self::Name | Self::Class)
     }
 
+    /// Whether a log with `columns` shows this column; the first ten always show.
+    pub fn recorded(self, columns: &LogColumns) -> bool {
+        match self {
+            Self::DamageTaken | Self::DamageTakenPerMin => columns.dt(),
+            Self::Medkits => columns.hp(),
+            Self::Backstabs => columns.bs(),
+            Self::Headshots => columns.hs(),
+            Self::Airshots => columns.airshots(),
+            Self::Caps => columns.caps(),
+            Self::Team
+            | Self::Name
+            | Self::Class
+            | Self::Kills
+            | Self::Assists
+            | Self::Deaths
+            | Self::Damage
+            | Self::DamagePerMin
+            | Self::KaPerD
+            | Self::KPerD => true,
+        }
+    }
+
     // This column's ascending order of two players.
     fn compare(self, a: &PlayerLine, b: &PlayerLine) -> Ordering {
         let num = |f: fn(&PlayerLine) -> f64| f(a).total_cmp(&f(b));
@@ -129,6 +151,12 @@ impl PlayerSort {
             column.descending_first()
         };
         PlayerSort { column, descending }
+    }
+
+    /// The sort a log with `columns` shows and highlights; None for the default order or a
+    /// column the log hides, which then lists in the default order with no header lit.
+    pub fn shown_in(self, columns: &LogColumns) -> Option<PlayerSort> {
+        (self != Self::default() && self.column.recorded(columns)).then_some(self)
     }
 }
 

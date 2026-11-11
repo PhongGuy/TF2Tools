@@ -14,7 +14,7 @@ use super::{ICON, NUMBER, team_cell};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players};
-use crate::pages::logs_tf::text::{one_decimal, whole};
+use crate::pages::logs_tf::text::{one_decimal, reads_zero, whole};
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 
@@ -36,13 +36,15 @@ pub(super) fn players_table(
     cx: &App,
 ) -> Div {
     let columns = player_columns(log.columns());
+    // A kept sort by a column this log hides lists in the default order, but stays saved.
+    let shown = sort.shown_in(log.columns());
     let header = |column: PlayerColumn| {
         let page = page.clone();
         Button::new(ids::logstf_sort(column.title()))
             .ghost()
             .xsmall()
             .label(column.title())
-            .selected(sort.column == column)
+            .selected(shown.is_some_and(|s| s.column == column))
             .flex_none()
             .on_click(move |_, _, cx| {
                 let _ = page.update(cx, |page, cx| page.sort_players_by(column, cx));
@@ -62,7 +64,7 @@ pub(super) fn players_table(
     );
     let assets = &cx.global::<Services>().assets;
     let players = log.players();
-    for i in sort_players(players, sort) {
+    for i in sort_players(players, shown.unwrap_or_default()) {
         let player = &players[i];
         // Classes come longest first; the main one is solid, the rest fade.
         // Hovering one opens its class card.
@@ -109,7 +111,7 @@ pub(super) fn players_table(
                 )
                 .children(columns.iter().map(|(_, cell)| {
                     let text = cell(player);
-                    let zero = text == "0";
+                    let zero = reads_zero(&text);
                     super::number(text).when(zero, |el| el.text_color(cx.theme().muted_foreground))
                 })),
         );
@@ -120,23 +122,23 @@ pub(super) fn players_table(
 // logs.tf's number columns in its order, without the ones the log did not record.
 fn player_columns(c: &LogColumns) -> Vec<Column> {
     use PlayerColumn as P;
-    let all: [(bool, Column); 14] = [
-        (true, (P::Kills, |p| p.kills().to_string())),
-        (true, (P::Assists, |p| p.assists().to_string())),
-        (true, (P::Deaths, |p| p.deaths().to_string())),
-        (true, (P::Damage, |p| p.dmg().to_string())),
-        (true, (P::DamagePerMin, |p| p.da_per_min().to_string())),
-        (true, (P::KaPerD, |p| one_decimal(p.kapd()))),
-        (true, (P::KPerD, |p| one_decimal(p.kpd()))),
-        (c.dt(), (P::DamageTaken, |p| p.dt().to_string())),
-        (c.dt(), (P::DamageTakenPerMin, |p| whole(p.dt_per_min()))),
-        (c.hp(), (P::Medkits, |p| p.medkits().to_string())),
-        (c.bs(), (P::Backstabs, |p| p.backstabs().to_string())),
-        (c.hs(), (P::Headshots, |p| p.headshots().to_string())),
-        (c.airshots(), (P::Airshots, |p| p.airshots().to_string())),
-        (c.caps(), (P::Caps, |p| p.caps().to_string())),
+    let all: [Column; 14] = [
+        (P::Kills, |p| p.kills().to_string()),
+        (P::Assists, |p| p.assists().to_string()),
+        (P::Deaths, |p| p.deaths().to_string()),
+        (P::Damage, |p| p.dmg().to_string()),
+        (P::DamagePerMin, |p| p.da_per_min().to_string()),
+        (P::KaPerD, |p| one_decimal(p.kapd())),
+        (P::KPerD, |p| one_decimal(p.kpd())),
+        (P::DamageTaken, |p| p.dt().to_string()),
+        (P::DamageTakenPerMin, |p| whole(p.dt_per_min())),
+        (P::Medkits, |p| p.medkits().to_string()),
+        (P::Backstabs, |p| p.backstabs().to_string()),
+        (P::Headshots, |p| p.headshots().to_string()),
+        (P::Airshots, |p| p.airshots().to_string()),
+        (P::Caps, |p| p.caps().to_string()),
     ];
     all.into_iter()
-        .filter_map(|(shown, column)| shown.then_some(column))
+        .filter(|(column, _)| column.recorded(c))
         .collect()
 }

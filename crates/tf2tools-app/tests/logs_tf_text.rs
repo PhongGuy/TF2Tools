@@ -5,8 +5,8 @@ use std::time::Duration;
 use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
     EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, count_text, duration_text, fetch_message,
-    finding_text, one_decimal, progress_line, progress_text, range_label, resolve_message,
-    ring_label, share_text, summary_text, sync_message, time_played_text, whole,
+    finding_text, one_decimal, progress_line, progress_text, range_label, reads_zero,
+    resolve_message, ring_label, share_text, summary_text, sync_message, time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
@@ -310,4 +310,13 @@ fn arie_scout_weapons_read_like_logs_tf() {
         .find(|r| r.name == "flamethrower")
         .unwrap();
     assert_eq!(flames.accuracy, "-", "no shots, no accuracy");
+}
+
+#[test]
+fn zero_cells_read_as_zero_whole_or_with_a_decimal() {
+    assert!(reads_zero("0"));
+    assert!(reads_zero("0.0"));
+    assert!(!reads_zero("0.4"));
+    assert!(!reads_zero("10"));
+    assert!(!reads_zero("-"));
 }

@@ -142,3 +142,19 @@ fn numbers_open_high_to_low_and_a_second_click_flips() {
         ]
     );
 }
+
+#[test]
+fn a_sort_by_a_column_the_log_hides_falls_back_to_the_default_unhighlighted() {
+    let sixes = six();
+    let hl = parse_log(HIGHLANDER).unwrap();
+    let hs = PlayerSort::default().clicked(PlayerColumn::Headshots);
+    assert_eq!(hs.shown_in(hl.columns()), Some(hs), "Highlander records HS");
+    assert_eq!(hs.shown_in(sixes.columns()), None, "6v6 hides HS");
+    let da = PlayerSort::default().clicked(PlayerColumn::Damage);
+    assert_eq!(da.shown_in(sixes.columns()), Some(da));
+    assert_eq!(
+        PlayerSort::default().shown_in(sixes.columns()),
+        None,
+        "logs.tf highlights no header until one is clicked"
+    );
+}

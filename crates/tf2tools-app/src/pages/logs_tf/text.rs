@@ -239,3 +239,8 @@ fn percent(part: u32, whole: u32) -> u64 {
     }
     (u64::from(part) * 100 + u64::from(whole) / 2) / u64::from(whole)
 }
+
+/// Whether a players table cell reads zero, whole or to one decimal, so it can be muted.
+pub fn reads_zero(cell: &str) -> bool {
+    matches!(cell, "0" | "0.0")
+}

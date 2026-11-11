@@ -6,12 +6,13 @@ use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
-use tf2tools_app::pages::logs_tf::sort::{PlayerColumn, PlayerSort};
+use tf2tools_app::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players};
 use tf2tools_core::TfClass;
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, open_log, open_page, scroll_to_in_log, serve_two_logs, shell, sid,
+    ARIE, HIGHLANDER, SIXES, day_ago, list_body, open_log, open_page, scroll_to_in_log,
+    serve_two_logs, shell, sid,
 };
 
 /// Arie's two logs synced, log `log` open; the env and server live as long as the test.
@@ -64,6 +65,50 @@ fn clicking_a_header_sorts_the_players_and_again_flips_it(cx: &mut TestAppContex
             descending: false
         },
         "the sort is kept while the page lives"
+    );
+}
+
+#[gpui_kit::test]
+fn a_sort_by_a_column_the_next_log_hides_shows_it_in_the_default_order(cx: &mut TestAppContext) {
+    // A 6v6 log whose hidden HS column still carries a number, so sorting by it would show.
+    let mut sixes: serde_json::Value = serde_json::from_str(SIXES).unwrap();
+    sixes["players"]["[U:1:231702]"]["headshots"] = 5.into();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes(
+        "/api/v1/log",
+        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
+    );
+    server.mount_bytes("/json/3", HIGHLANDER.as_bytes().to_vec());
+    server.mount_bytes("/json/2", serde_json::to_vec(&sixes).unwrap());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_sort("HS"));
+    support::click_id(cx, s.win, ids::logstf_sort("HS"));
+    let hs = PlayerSort {
+        column: PlayerColumn::Headshots,
+        descending: true,
+    };
+    assert_eq!(cx.update(|cx| page.read(cx).player_sort()), hs);
+
+    open_log(cx, &s, &page, 2);
+    assert_eq!(
+        cx.update(|cx| page.read(cx).player_sort()),
+        hs,
+        "the sort is kept"
+    );
+    let players = cx.update(|cx| page.read(cx).detail().unwrap().players().to_vec());
+    let tops: Vec<_> = sort_players(&players, PlayerSort::default())
+        .into_iter()
+        .map(|i| {
+            let row = ids::logstf_player_row(players[i].steam_id());
+            support::bounds_of(cx, s.win, row).unwrap().top()
+        })
+        .collect();
+    assert!(
+        tops.windows(2).all(|w| w[0] < w[1]),
+        "default order: {tops:?}"
     );
 }
 
