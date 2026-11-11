@@ -322,3 +322,16 @@ fn a_log_with_only_the_required_keys_opens_with_its_sections_left_out(cx: &mut T
         "nothing to show"
     );
 }
+
+#[gpui_kit::test]
+fn the_matrix_total_column_is_named_for_its_tab(cx: &mut TestAppContext) {
+    use tf2tools_core::MatrixKind;
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_MATRIX);
+    let total = |cx: &mut TestAppContext| support::label_of(cx, s.win, ids::LOGSTF_MATRIX_TOTAL);
+    assert_eq!(total(cx).as_deref(), Some("K"));
+    support::click_id(cx, s.win, ids::logstf_matrix_tab(MatrixKind::KillsAssists));
+    assert_eq!(total(cx).as_deref(), Some("KA"));
+    support::click_id(cx, s.win, ids::logstf_matrix_tab(MatrixKind::Deaths));
+    assert_eq!(total(cx).as_deref(), Some("D"));
+}

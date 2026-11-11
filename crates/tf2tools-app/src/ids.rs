@@ -2698,6 +2698,8 @@ pub fn logstf_heal_target(medic: SteamId, target: SteamId) -> ElementId {
 
 /// The open log's kill matrix section: "logstf-matrix".
 pub const LOGSTF_MATRIX: &str = "logstf-matrix";
+/// The kill matrix's total header, labelled K, KA or D by tab: "logstf-matrix-total".
+pub const LOGSTF_MATRIX_TOTAL: &str = "logstf-matrix-total";
 /// The kill matrix's tab group: "logstf-matrix-tabs".
 pub const LOGSTF_MATRIX_TABS: &str = "logstf-matrix-tabs";
 /// The kill matrix's sideways scroll: "logstf-matrix-scroll".

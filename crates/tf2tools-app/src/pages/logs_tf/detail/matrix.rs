@@ -18,6 +18,7 @@ use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::tables::matrix_rows;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
+use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
 
 // The fixed columns before the nine classes; the name takes what is left.
@@ -25,10 +26,11 @@ const TEAM: Pixels = px(40.);
 const NAME_MIN: Pixels = px(120.);
 const MAIN: Pixels = px(24.);
 
-const TABS: [(MatrixKind, &str); 3] = [
-    (MatrixKind::Kills, "Kills"),
-    (MatrixKind::KillsAssists, "Kills+Assists"),
-    (MatrixKind::Deaths, "Deaths"),
+// Each tab's title and its total column's header, as logs.tf names them.
+const TABS: [(MatrixKind, &str, &str); 3] = [
+    (MatrixKind::Kills, "Kills", "K"),
+    (MatrixKind::KillsAssists, "Kills+Assists", "KA"),
+    (MatrixKind::Deaths, "Deaths", "D"),
 ];
 
 /// The tabs over `kind`'s matrix, every player a row, K high to low. A tab asks `page` to
@@ -42,7 +44,7 @@ pub(super) fn matrix(
 ) -> Div {
     // A kit Button paints its selected state but never reports it, so each sits in a tab
     // that carries the id and says whether it is shown.
-    let tab = |(tab, title): (MatrixKind, &'static str)| {
+    let tab = |(tab, title, _): (MatrixKind, &'static str, &'static str)| {
         let page = page.clone();
         let button = Button::new(ids::logstf_matrix_tab_button(tab))
             .outline()
@@ -62,6 +64,7 @@ pub(super) fn matrix(
     };
     let tabs = h_flex()
         .id(ids::LOGSTF_MATRIX_TABS)
+        .role(Role::TabList)
         .test_support()
         .gap_1()
         .children(TABS.map(tab));
@@ -74,6 +77,7 @@ pub(super) fn matrix(
 fn table(log: &LogDetail, kind: MatrixKind, is_tracked: &dyn Fn(SteamId) -> bool, cx: &App) -> Div {
     let muted = cx.theme().muted_foreground;
     let heading = |text: &'static str| div().flex_none().child(text);
+    let total = TABS.iter().find(|t| t.0 == kind).map_or("K", |t| t.2);
     let mut table = v_flex().w_full().child(
         h_flex()
             .gap_1()
@@ -85,7 +89,11 @@ fn table(log: &LogDetail, kind: MatrixKind, is_tracked: &dyn Fn(SteamId) -> bool
             .child(heading("Player").flex_1().min_w(NAME_MIN))
             .child(heading("C").w(MAIN))
             .children(TfClass::ALL.map(|class| class_cell(class, cx)))
-            .child(super::number("K".into())),
+            .child(labelled(
+                super::number(String::new()),
+                ids::LOGSTF_MATRIX_TOTAL,
+                total,
+            )),
     );
     let players: HashMap<SteamId, &PlayerLine> =
         log.players().iter().map(|p| (p.steam_id(), p)).collect();
