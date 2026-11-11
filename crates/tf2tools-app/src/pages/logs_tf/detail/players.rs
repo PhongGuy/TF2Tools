@@ -25,7 +25,7 @@ use crate::widgets::class_icon::class_icon;
 const TEAM: Pixels = px(40.);
 const NAME_MIN: Pixels = px(100.);
 // A class icon, a size up from the other tables' because the art leaves empty borders; and
-// room for four of them with their gaps, as many as a player shows before the rest clip.
+// room for four of them, as many as a player shows before the rest clip: 4 x 24 plus 3 x 2 gaps.
 const CLASS_ICON: Pixels = px(24.);
 const CLASSES: Pixels = px(102.);
 // The sort arrow's row under every header, kept empty when unsorted so sorting never moves
