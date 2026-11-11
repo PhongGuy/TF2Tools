@@ -11,7 +11,8 @@ use tf2tools_core::{LogState, LogsRange, SteamId};
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, HIGHLANDER, SIXES, day_ago, list_body, list_requests, serve_two_logs, shell, sid,
+    ARIE, Gate, HIGHLANDER, SIXES, day_ago, list_body, list_requests, mount_held,
+    mount_held_status, serve_two_logs, shell, sid,
 };
 
 fn hub(cx: &mut TestAppContext) -> Entity<LogsSync> {
@@ -109,10 +110,13 @@ fn a_resumed_sync_counts_the_logs_already_saved(cx: &mut TestAppContext) {
         "/api/v1/log",
         list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
     );
-    server.mount_bytes_after(
+    let gate = Gate::default();
+    mount_held(
+        &server,
+        &gate,
         "/json/2",
+        None,
         HIGHLANDER.as_bytes().to_vec(),
-        Duration::from_secs(1),
     );
     start(cx, &sync, ARIE, LogsRange::Months3);
     assert_eq!(
@@ -128,39 +132,44 @@ fn a_resumed_sync_counts_the_logs_already_saved(cx: &mut TestAppContext) {
                 left: Duration::ZERO,
             })
     });
+    gate.open();
     idle(cx, &sync);
 }
 
-/// Serves logs 3 and 2 with log 3's body answering after `delay`.
-fn serve_slow_download(server: &support::StoreServer, delay: Duration) {
+/// Serves logs 3 and 2 with log 3's body held until the returned gate opens. While it is
+/// held the server answers nothing else, so a run stays mid-download until the test says.
+fn serve_held_download(server: &support::StoreServer) -> Gate {
+    let gate = Gate::default();
     server.mount_bytes(
         "/api/v1/log",
         list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
     );
-    server.mount_bytes_after("/json/3", SIXES.as_bytes().to_vec(), delay);
+    mount_held(server, &gate, "/json/3", None, SIXES.as_bytes().to_vec());
     server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
+    gate
+}
+
+// Waits until the run's first download is held at the server.
+fn held(cx: &mut TestAppContext, gate: &Gate) {
+    support::wait_real(cx, "the held download", |_| gate.arrived() >= 1);
 }
 
 #[gpui_kit::test]
 fn a_request_for_another_player_cancels_the_run_and_follows_it(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    serve_slow_download(&server, Duration::from_millis(500));
+    let gate = serve_held_download(&server);
     let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
     let sync = hub(cx);
     start(cx, &sync, ARIE, LogsRange::Months3);
-    support::wait_real(cx, "Arie's downloads", |cx| {
-        matches!(
-            cx.update(|cx| sync.read(cx).progress()),
-            Some(SyncProgress::Downloading { .. })
-        )
-    });
+    held(cx, &gate);
     start(cx, &sync, 1, LogsRange::Months3);
     assert_eq!(
         cx.update(|cx| (sync.read(cx).running(), sync.read(cx).queued())),
         (Some(sid(ARIE)), Some(sid(1))),
         "the cancelled run ends before the next starts"
     );
+    gate.open();
     idle(cx, &sync);
     assert_eq!(
         last_synced(&s, sid(ARIE)),
@@ -178,12 +187,14 @@ fn a_request_for_another_player_cancels_the_run_and_follows_it(cx: &mut TestAppC
 fn the_same_request_again_is_ignored(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    serve_slow_download(&server, Duration::from_millis(300));
+    let gate = serve_held_download(&server);
     let _s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
     let sync = hub(cx);
     start(cx, &sync, ARIE, LogsRange::Months3);
+    held(cx, &gate);
     start(cx, &sync, ARIE, LogsRange::Months3);
     assert_eq!(cx.update(|cx| sync.read(cx).queued()), None);
+    gate.open();
     idle(cx, &sync);
     assert_eq!(list_requests(&server), 1, "one listing for one request");
 }
@@ -192,15 +203,14 @@ fn the_same_request_again_is_ignored(cx: &mut TestAppContext) {
 fn a_request_with_another_range_restarts_the_run(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    serve_slow_download(&server, Duration::from_millis(500));
+    let gate = serve_held_download(&server);
     let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
     let sync = hub(cx);
     start(cx, &sync, ARIE, LogsRange::Months3);
-    support::wait_real(cx, "Arie's downloads", |cx| {
-        cx.update(|cx| sync.read(cx).progress()).is_some()
-    });
+    held(cx, &gate);
     start(cx, &sync, ARIE, LogsRange::Year1);
     assert_eq!(cx.update(|cx| sync.read(cx).queued()), Some(sid(ARIE)));
+    gate.open();
     idle(cx, &sync);
     assert_eq!(list_requests(&server), 2, "the wider range lists again");
     assert!(
@@ -213,16 +223,15 @@ fn a_request_with_another_range_restarts_the_run(cx: &mut TestAppContext) {
 fn asking_again_for_a_cancelled_player_queues_a_fresh_run(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    serve_slow_download(&server, Duration::from_millis(500));
+    let gate = serve_held_download(&server);
     let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
     let sync = hub(cx);
     start(cx, &sync, ARIE, LogsRange::Months3);
-    support::wait_real(cx, "Arie's downloads", |cx| {
-        cx.update(|cx| sync.read(cx).progress()).is_some()
-    });
+    held(cx, &gate);
     start(cx, &sync, 1, LogsRange::Months3);
     start(cx, &sync, ARIE, LogsRange::Months3);
     assert_eq!(cx.update(|cx| sync.read(cx).queued()), Some(sid(ARIE)));
+    gate.open();
     idle(cx, &sync);
     assert!(
         last_synced(&s, sid(ARIE)).is_some(),
@@ -234,13 +243,15 @@ fn asking_again_for_a_cancelled_player_queues_a_fresh_run(cx: &mut TestAppContex
 fn stopping_a_queued_player_drops_them(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    serve_slow_download(&server, Duration::from_millis(300));
+    let gate = serve_held_download(&server);
     let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
     let sync = hub(cx);
     start(cx, &sync, ARIE, LogsRange::Months3);
+    held(cx, &gate);
     start(cx, &sync, 1, LogsRange::Months3);
     let _stopped = cx.update(|cx| sync.update(cx, |s, cx| s.stop(sid(1), cx)));
     assert_eq!(cx.update(|cx| sync.read(cx).queued()), None);
+    gate.open();
     idle(cx, &sync);
     assert_eq!(
         last_synced(&s, sid(1)),
@@ -253,7 +264,7 @@ fn stopping_a_queued_player_drops_them(cx: &mut TestAppContext) {
 fn the_header_ring_follows_a_logs_tf_sync_and_opens_the_page(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    serve_slow_download(&server, Duration::from_secs(1));
+    let gate = serve_held_download(&server);
     let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
     assert!(
         !support::present(cx, s.win, ids::logstf_sync_ring()),
@@ -271,6 +282,7 @@ fn the_header_ring_follows_a_logs_tf_sync_and_opens_the_page(cx: &mut TestAppCon
     );
     support::click_id(cx, s.win, ids::logstf_sync_ring());
     assert_eq!(cx.update(|cx| s.shell.read(cx).page()), Page::LogsTf);
+    gate.open();
     support::wait_real(cx, "the sync", |cx| {
         !support::present(cx, s.win, ids::logstf_sync_ring())
     });
@@ -280,19 +292,24 @@ fn the_header_ring_follows_a_logs_tf_sync_and_opens_the_page(cx: &mut TestAppCon
 fn the_ring_spins_while_the_list_is_read(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    server.mount_bytes_after(
+    let gate = Gate::default();
+    mount_held(
+        &server,
+        &gate,
         "/api/v1/log",
+        None,
         list_body(&[(3, day_ago(1))]),
-        Duration::from_millis(500),
     );
     server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
     let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
     let sync = hub(cx);
     start(cx, &sync, ARIE, LogsRange::Months3);
+    support::wait_real(cx, "the held listing", |_| gate.arrived() >= 1);
     assert_eq!(
         support::label_of(cx, s.win, ids::logstf_sync_ring()).as_deref(),
         Some("Syncing logs.tf...")
     );
+    gate.open();
     idle(cx, &sync);
 }
 
@@ -305,17 +322,14 @@ fn a_stopped_run_keeps_no_error_for_the_player(cx: &mut TestAppContext) {
         "/api/v1/log",
         list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
     );
-    server.mount_status_after("/json/3", 503, Duration::from_millis(500));
+    let gate = Gate::default();
+    mount_held_status(&server, &gate, "/json/3", 503);
     let _s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
     let sync = hub(cx);
     start(cx, &sync, ARIE, LogsRange::Months3);
-    support::wait_real(cx, "Arie's downloads", |cx| {
-        matches!(
-            cx.update(|cx| sync.read(cx).progress()),
-            Some(SyncProgress::Downloading { .. })
-        )
-    });
+    held(cx, &gate);
     let _stopped = cx.update(|cx| sync.update(cx, |s, cx| s.stop(sid(ARIE), cx)));
+    gate.open();
     idle(cx, &sync);
     assert_eq!(cx.update(|cx| sync.read(cx).error(sid(ARIE))), None);
 }
