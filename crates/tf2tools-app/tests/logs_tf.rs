@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use crate::support;
 
-use gpui_kit::{Entity, TestAppContext};
+use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use serde_json::json;
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
@@ -218,4 +218,100 @@ fn a_failed_removal_toasts_and_keeps_the_chip(cx: &mut TestAppContext) {
     support::assert_plain(&toast);
     assert_eq!(players_of(cx, &page), ["a", "b"]);
     assert!(support::present(cx, s.win, ids::logstf_chip(sid(2))));
+}
+
+const FOUND_XML: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
+    <profile><steamID64>76561197960287930</steamID64><steamID><![CDATA[Rabscuttle]]></steamID></profile>";
+const NOT_FOUND_XML: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\
+    <response><error><![CDATA[The specified profile could not be found.]]></error></response>";
+const GABE: u64 = 76_561_197_960_287_930;
+
+fn type_into_add(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    page: &Entity<LogsTfPage>,
+    text: &str,
+) {
+    let input = cx.update(|cx| page.read(cx).add_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        input.update(cx, |st, cx| st.set_value(text, window, cx))
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+}
+
+#[gpui_kit::test]
+fn adding_by_profile_link_tracks_and_activates_the_player(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/steam/id/gabelogannewell/", FOUND_XML.as_bytes().to_vec());
+    server.mount_bytes("/api/v1/log", list_body(&[]));
+    let s = shell(cx, &env, &server.uri(), &[]);
+    let page = open_page(cx, &s);
+
+    support::click_id(cx, s.win, ids::LOGSTF_EMPTY_ADD);
+    assert!(support::disabled_of(cx, s.win, ids::LOGSTF_ADD_CONFIRM));
+    type_into_add(
+        cx,
+        &s,
+        &page,
+        "https://steamcommunity.com/id/gabelogannewell/",
+    );
+    assert!(!support::disabled_of(cx, s.win, ids::LOGSTF_ADD_CONFIRM));
+    support::click_id(cx, s.win, ids::LOGSTF_ADD_CONFIRM);
+    support::wait_real(cx, "the new chip", |cx| {
+        cx.update(|cx| page.read(cx).players().len()) == 1
+    });
+    let gabe = SteamId::from_id64(GABE).unwrap();
+    assert_eq!(players_of(cx, &page), ["Rabscuttle"]);
+    assert_eq!(cx.update(|cx| page.read(cx).active()), Some(gabe));
+    assert!(
+        !support::present(cx, s.win, ids::LOGSTF_ADD_INPUT),
+        "the dialog closed"
+    );
+}
+
+#[gpui_kit::test]
+fn a_bad_input_or_unknown_profile_keeps_the_dialog_with_a_message(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/steam/id/nobody9z8y7x/", NOT_FOUND_XML.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::LOGSTF_EMPTY_ADD);
+
+    type_into_add(cx, &s, &page, "has space");
+    support::click_id(cx, s.win, ids::LOGSTF_ADD_CONFIRM);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_ADD_ERROR).as_deref(),
+        Some("That doesn't look like a Steam profile link or Steam ID.")
+    );
+
+    type_into_add(cx, &s, &page, "nobody9z8y7x");
+    support::click_id(cx, s.win, ids::LOGSTF_ADD_CONFIRM);
+    support::wait_real(cx, "the lookup", |cx| {
+        support::label_of(cx, s.win, ids::LOGSTF_ADD_ERROR).as_deref()
+            == Some("We couldn't find that Steam profile.")
+    });
+    assert!(support::present(cx, s.win, ids::LOGSTF_ADD_INPUT));
+    let typed = cx.update(|cx| page.read(cx).add_input().read(cx).value().to_string());
+    assert_eq!(typed, "nobody9z8y7x");
+    assert!(players_of(cx, &page).is_empty());
+}
+
+#[gpui_kit::test]
+fn adding_a_tracked_player_just_activates_them(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[]));
+    // No Steam route: the lookup fails and an Id input falls back to its placeholder.
+    let s = shell(cx, &env, &server.uri(), &[(1, "a"), (2, "b")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::LOGSTF_ADD);
+    type_into_add(cx, &s, &page, "[U:1:1]");
+    support::click_id(cx, s.win, ids::LOGSTF_ADD_CONFIRM);
+    support::wait_real(cx, "the switch", |cx| {
+        cx.update(|cx| page.read(cx).active()) == Some(sid(1))
+    });
+    assert_eq!(players_of(cx, &page), ["a", "b"]);
 }

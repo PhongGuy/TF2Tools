@@ -2455,6 +2455,12 @@ pub const LOGSTF_EMPTY: &str = "logstf-empty";
 pub const LOGSTF_EMPTY_ADD: &str = "logstf-empty-add";
 /// The "+ Add player" chip after the tracked players.
 pub const LOGSTF_ADD: &str = "logstf-add";
+/// The add-player dialog's Steam link or ID field.
+pub const LOGSTF_ADD_INPUT: &str = "logstf-add-input";
+/// The add-player dialog's Add button, disabled while the field is blank.
+pub const LOGSTF_ADD_CONFIRM: &str = "logstf-add-confirm";
+/// Labelled with why the add-player dialog could not add the player.
+pub const LOGSTF_ADD_ERROR: &str = "logstf-add-error";
 
 /// One tracked player's chip, selected while active: "logstf-chip:<id64>".
 pub fn logstf_chip(id: SteamId) -> ElementId {

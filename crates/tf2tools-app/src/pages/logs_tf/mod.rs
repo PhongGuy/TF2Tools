@@ -5,22 +5,26 @@ pub mod text;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{Sizable as _, h_flex, v_flex};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::{Disableable as _, Sizable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::{
-    App, Context, InteractiveElement as _, IntoElement, ParentElement as _, Render,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window, div,
+    AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
+    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
+    Subscription, TestSupportExt as _, Window, div,
 };
-use tf2tools_core::{SteamId, TrackedPlayer};
+use tf2tools_core::{SteamId, TrackedPlayer, parse_player_input};
 
 use crate::ids;
 use crate::pages::common::filter_badge;
-use crate::services::{OpError, run_blocking};
+use crate::services::{OpError, Services, run_blocking};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::toast_error;
+use crate::tokio_bridge;
+use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 use crate::widgets::{Named as _, labelled};
-use text::{EMPTY_TEXT, LOGS_TF_URL, SAVE_FAILED};
+use text::{EMPTY_TEXT, LOGS_TF_URL, SAVE_FAILED, STEAM_UNREACHABLE, resolve_message};
 
 /// The logs.tf page. It reads the tracked players from the cache on creation and is kept
 /// while hidden, so a visit elsewhere leaves it as it was.
@@ -28,14 +32,36 @@ pub struct LogsTfPage {
     players: Vec<TrackedPlayer>,
     active: Option<SteamId>,
     loaded: bool,
+    // The add dialog's field, its last failure and whether a lookup is running. They live
+    // here because the dialog builder runs every frame.
+    add_input: Entity<InputState>,
+    add_error: Option<SharedString>,
+    adding: bool,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl LogsTfPage {
-    pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let add_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Steam profile link or Steam ID"));
+        // gpui-kit owns InputEvent; Enter in the field adds like the Add button.
+        let enter = cx.subscribe_in(
+            &add_input,
+            window,
+            |page, _, event: &InputEvent, window, cx| {
+                if matches!(event, InputEvent::PressEnter { .. }) {
+                    page.submit_add(window, cx);
+                }
+            },
+        );
         let mut page = Self {
             players: Vec::new(),
             active: None,
             loaded: false,
+            add_input,
+            add_error: None,
+            adding: false,
+            _subscriptions: vec![enter],
         };
         page.load(cx);
         page
@@ -62,6 +88,11 @@ impl LogsTfPage {
     /// The player whose chip is selected, if any is tracked.
     pub fn active(&self) -> Option<SteamId> {
         self.active
+    }
+
+    /// The add dialog's Steam link or ID field, emptied after a successful add.
+    pub fn add_input(&self) -> &Entity<InputState> {
+        &self.add_input
     }
 
     /// Makes `id`'s chip the active one, saves that choice and reloads the page from the cache.
@@ -100,6 +131,131 @@ impl LogsTfPage {
                         .map_err(|_| OpError::core("Failed to stop tracking", SAVE_FAILED))
                 });
                 page.after_write(removing, window, cx);
+            });
+        })
+        .detach();
+    }
+
+    // Opens the add dialog over the page. It reads the field, error and busy flag from the
+    // page on every frame, so a failure shows in place and the typed text stays.
+    fn open_add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.add_error = None;
+        let page = cx.entity().downgrade();
+        let input = self.add_input.clone();
+        // Deferred so the click that opened it cannot pull focus back out of the field.
+        window.defer(cx, move |window, cx| {
+            input.update(cx, |state, cx| state.focus(window, cx));
+            let frame = DialogFrame::new(DIALOG_WIDTH);
+            window.open_dialog(cx, move |dialog, window, cx| {
+                let Some(entity) = page.upgrade() else {
+                    return dialog;
+                };
+                let this = entity.read(cx);
+                let blank = this.add_input.read(cx).value().trim().is_empty();
+                let content = v_flex()
+                    .gap_4()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("Add player"),
+                    )
+                    .child(
+                        div()
+                            .id(ids::LOGSTF_ADD_INPUT)
+                            .test_support()
+                            .child(Input::new(&this.add_input)),
+                    )
+                    .children(this.add_error.clone().map(|error| {
+                        labelled(
+                            div().text_sm().text_color(cx.theme().danger),
+                            ids::LOGSTF_ADD_ERROR,
+                            error,
+                        )
+                    }))
+                    .child(
+                        h_flex().justify_end().child(
+                            Button::new(ids::LOGSTF_ADD_CONFIRM)
+                                .primary()
+                                .label("Add")
+                                .disabled(blank || this.adding)
+                                .on_click(move |_, window, cx| {
+                                    entity.update(cx, |page, cx| page.submit_add(window, cx));
+                                }),
+                        ),
+                    );
+                // Enter belongs to the field, which adds; the kit's Confirm never closes it.
+                frame
+                    .apply(dialog, &*window, &*cx)
+                    .on_ok(|_, _, _| false)
+                    .child(frame.measure(content))
+            });
+        });
+    }
+
+    // Reads the field, looks the player up on Steam, then tracks and activates them. A bad
+    // input or a failed lookup or write stays in the dialog with its text kept.
+    fn submit_add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let typed = self.add_input.read(cx).value();
+        if self.adding || typed.trim().is_empty() {
+            return;
+        }
+        let input = match parse_player_input(typed.trim()) {
+            Ok(input) => input,
+            Err(error) => {
+                self.add_error = Some(error.to_string().into());
+                cx.notify();
+                return;
+            }
+        };
+        self.add_error = None;
+        self.adding = true;
+        cx.notify();
+        if !tokio_bridge::is_running(cx) {
+            tokio_bridge::init(cx);
+        }
+        let client = cx.global::<Services>().logs.clone();
+        let resolving = tokio_bridge::spawn(cx, async move { client.resolve_player(&input).await });
+        cx.spawn_in(window, async move |page, cx| {
+            let added = match resolving.await {
+                Ok(Ok(player)) => {
+                    let saving = page.update(cx, |_, cx| {
+                        run_blocking(cx, move |s| {
+                            s.logs
+                                .cache()
+                                .add_player(&player)
+                                .map_err(|e| OpError::core("Failed to add player", e))
+                        })
+                    });
+                    match saving {
+                        Ok(saving) => saving.await.map_err(|error| {
+                            tracing::warn!(%error, "saving a logs.tf player failed");
+                            SAVE_FAILED
+                        }),
+                        Err(_) => return,
+                    }
+                }
+                Ok(Err(error)) => {
+                    tracing::warn!(%error, "looking up a Steam profile failed");
+                    Err(resolve_message(&error))
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "the Steam lookup task stopped");
+                    Err(STEAM_UNREACHABLE)
+                }
+            };
+            let _ = page.update_in(cx, |page, window, cx| {
+                page.adding = false;
+                match added {
+                    Ok(()) => {
+                        page.add_input
+                            .update(cx, |state, cx| state.set_value("", window, cx));
+                        window.close_dialog(cx);
+                        page.load(cx);
+                    }
+                    Err(message) => page.add_error = Some(message.into()),
+                }
+                cx.notify();
             });
         })
         .detach();
@@ -177,17 +333,14 @@ impl LogsTfPage {
                 }));
             row = row.child(h_flex().gap_0p5().child(chip).child(remove));
         }
-        row.child(filter_badge(
-            ids::LOGSTF_ADD,
-            false,
-            "+ Add player",
-            window,
-            cx,
-        ))
+        row.child(
+            filter_badge(ids::LOGSTF_ADD, false, "+ Add player", window, cx)
+                .on_click(cx.listener(|page, _, window, cx| page.open_add(window, cx))),
+        )
     }
 
     // The no-player explanation and its way to track someone.
-    fn empty_state(&self, cx: &App) -> impl IntoElement {
+    fn empty_state(&self, cx: &mut Context<Self>) -> impl IntoElement {
         v_flex()
             .items_center()
             .gap_4()
@@ -201,7 +354,8 @@ impl LogsTfPage {
                 Button::new(ids::LOGSTF_EMPTY_ADD)
                     .primary()
                     .icon(IconName::Plus)
-                    .label("Add player"),
+                    .label("Add player")
+                    .on_click(cx.listener(|page, _, window, cx| page.open_add(window, cx))),
             )
     }
 }
