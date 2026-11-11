@@ -6,9 +6,9 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, Div, FontWeight, HighlightStyle, InteractiveElement as _, IntoElement, ParentElement as _,
-    Pixels, StatefulInteractiveElement as _, Styled as _, StyledText, TestSupportExt as _,
-    WeakEntity, div, px,
+    App, Div, ElementId, FontWeight, HighlightStyle, InteractiveElement as _, IntoElement,
+    ParentElement as _, Pixels, StatefulInteractiveElement as _, Styled as _, StyledText,
+    TestSupportExt as _, WeakEntity, div, px,
 };
 use tf2tools_core::{LogDetail, RoundLine, SteamId, Team};
 
@@ -17,6 +17,7 @@ use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::text::{EventPart, duration_text, event_parts, team_name};
 use crate::widgets::labelled;
+use crate::widgets::scroll::sideways;
 
 // The rounds table's least column widths, which share out the table's width as on logs.tf,
 // and the open round's fixed columns.
@@ -29,7 +30,11 @@ const TEAM: Pixels = px(40.);
 const NAME: Pixels = px(200.);
 const ROUND_NUMBER: Pixels = px(56.);
 const TYPE: Pixels = px(96.);
-const DESCRIPTION: Pixels = px(280.);
+// A description wraps within the panel down to this width.
+const DESCRIPTION_MIN: Pixels = px(160.);
+// The least space between two rounds columns, so a right-aligned number never meets the
+// next column's text.
+const COLUMN_GAP: Pixels = px(12.);
 // The open/closed chevron's box, which the header leaves empty so the columns line up.
 const CHEVRON: Pixels = px(16.);
 
@@ -46,7 +51,9 @@ const COLUMNS: [Column; 6] = [
 ];
 
 /// Log `log`'s rounds in logs.tf's columns, one row each. A click on a row asks `page` to open
-/// or close it; each round in `open` shows its players and events under its row.
+/// or close it; each round in `open` shows its players and events under its row. The rows
+/// scroll sideways in boxes that break at each open round, so a box's bar sits under its rows
+/// and the round's panel, sized to the window, never scrolls with them.
 pub(super) fn rounds_table(
     log: u64,
     detail: &LogDetail,
@@ -63,31 +70,37 @@ pub(super) fn rounds_table(
             .find(|p| p.steam_id() == id)
             .map(|p| p.team())
     };
-    let mut table = v_flex().child(
-        h_flex()
-            .id(ids::LOGSTF_ROUNDS_HEAD)
-            .test_support()
-            .gap_1()
-            .px_1()
-            .py_1()
-            .text_color(cx.theme().muted_foreground)
-            .font_weight(FontWeight::MEDIUM)
-            .child(spread(ROUND).child("Round"))
-            .child(spread(LENGTH).child("Length"))
-            .child(spread(SCORE).child("Score"))
-            .children(COLUMNS.map(|(title, _)| {
-                spread(TEAM_NUMBER)
-                    .id(ids::logstf_rounds_column(title))
-                    .test_support()
-                    .text_right()
-                    .child(title)
-            }))
-            .child(spread(MIDFIGHTS).child("Midfights"))
-            .child(div().w(CHEVRON).flex_none()),
-    );
+    let head = h_flex()
+        .id(ids::LOGSTF_ROUNDS_HEAD)
+        .test_support()
+        .gap(COLUMN_GAP)
+        .px_1()
+        .py_1()
+        .text_color(cx.theme().muted_foreground)
+        .font_weight(FontWeight::MEDIUM)
+        .child(spread(ROUND).child("Round"))
+        .child(spread(LENGTH).child("Length"))
+        .child(spread(SCORE).child("Score"))
+        .children(COLUMNS.map(|(title, _)| {
+            spread(TEAM_NUMBER)
+                .id(ids::logstf_rounds_column(title))
+                .test_support()
+                .text_right()
+                .child(title)
+        }))
+        .child(spread(MIDFIGHTS).child("Midfights"))
+        .child(div().w(CHEVRON).flex_none());
+    let mut table = v_flex();
+    let mut rows = v_flex().child(head);
+    let mut scroll_id: ElementId = ids::LOGSTF_ROUNDS_SCROLL.into();
+    let last = detail.rounds().len().saturating_sub(1);
     for (n, round) in detail.rounds().iter().enumerate() {
         let is_open = open.contains(&n);
-        table = table.child(round_row(log, n, round, is_open, page.clone(), cx));
+        rows = rows.child(round_row(log, n, round, is_open, page.clone(), cx));
+        if is_open || n == last {
+            table = table.child(sideways(scroll_id, std::mem::replace(&mut rows, v_flex())));
+            scroll_id = ids::logstf_rounds_scroll_after(n);
+        }
         if is_open {
             table = table.child(round_panel(
                 log, n, round, name_of, is_tracked, &team_of, cx,
@@ -138,7 +151,7 @@ fn round_row(
     h_flex()
         .id(ids::logstf_round(log, n))
         .test_support()
-        .gap_1()
+        .gap(COLUMN_GAP)
         .px_1()
         .py_1()
         .border_t_1()
@@ -219,7 +232,7 @@ fn round_panel(
             head()
                 .child(div().w(NUMBER).flex_none().child("Time"))
                 .child(div().w(TYPE).flex_none().child("Type"))
-                .child(div().w(DESCRIPTION).flex_none().child("Description")),
+                .child(div().flex_1().min_w(DESCRIPTION_MIN).child("Description")),
         )
         .children(round.events().iter().enumerate().map(|(ix, event)| {
             let time = duration_text(event.at());
@@ -238,8 +251,8 @@ fn round_panel(
                 .child(div().w(TYPE).flex_none().child(ty))
                 .child(
                     div()
-                        .w(DESCRIPTION)
-                        .flex_none()
+                        .flex_1()
+                        .min_w(DESCRIPTION_MIN)
                         .child(StyledText::new(description).with_highlights(colours)),
                 )
         }));

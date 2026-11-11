@@ -895,6 +895,30 @@ fn xs_width(
 }
 
 #[gpui_kit::test]
+fn round_columns_keep_a_gap_between_them(cx: &mut TestAppContext) {
+    let (_env, _server, s, _page) = opened_at(cx, 3, 1280., 800., ids::LOGSTF_ROUNDS);
+    let red_da = support::bounds_of(cx, s.win, ids::logstf_round_cell(3, 0, "RED DA")).unwrap();
+    let midfight = support::bounds_of(cx, s.win, ids::logstf_round_midfight(3, 0)).unwrap();
+    assert!(
+        red_da.right() + gpui_kit::px(12.) <= midfight.left(),
+        "{red_da:?} {midfight:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn an_open_round_sits_below_the_rounds_sideways_bar_at_800(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened_at(cx, 3, 800., 600., ids::LOGSTF_ROUNDS);
+    support::click_id(cx, s.win, ids::logstf_round(3, 0));
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_round_panel(3, 0));
+    let rows = support::bounds_of(cx, s.win, ids::LOGSTF_ROUNDS_SCROLL).unwrap();
+    let panel = support::bounds_of(cx, s.win, ids::logstf_round_panel(3, 0)).unwrap();
+    assert!(rows.bottom() <= panel.top(), "{rows:?} over {panel:?}");
+    // The events fit the window's width rather than scrolling with the rounds.
+    let event = support::bounds_of(cx, s.win, ids::logstf_event(3, 0, 0)).unwrap();
+    assert!(event.right() <= rows.right(), "{event:?} past {rows:?}");
+}
+
+#[gpui_kit::test]
 fn the_team_table_fits_the_smallest_window(cx: &mut TestAppContext) {
     use tf2tools_core::Team;
     let (_env, _server, s, _page) = opened_at(cx, 3, 800., 600., ids::LOGSTF_TEAMS_SCROLL);

@@ -2692,6 +2692,12 @@ pub const LOGSTF_ROUNDS: &str = "logstf-rounds";
 /// The sideways scroll around the open log's rounds table.
 pub const LOGSTF_ROUNDS_SCROLL: &str = "logstf-rounds-scroll";
 
+/// The sideways scroll around the rounds after open round `n`, which sits between them:
+/// "logstf-rounds-scroll-after:<n>".
+pub fn logstf_rounds_scroll_after(n: usize) -> ElementId {
+    keyed("logstf-rounds-scroll-after", &n.to_string())
+}
+
 /// The rounds table's header line: "logstf-rounds-head".
 pub const LOGSTF_ROUNDS_HEAD: &str = "logstf-rounds-head";
 

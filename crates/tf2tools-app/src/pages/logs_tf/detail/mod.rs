@@ -127,7 +127,7 @@ fn log_body(
                 cx,
             );
             el.child(
-                section("Rounds", sideways(ids::LOGSTF_ROUNDS_SCROLL, table), cx)
+                section("Rounds", table, cx)
                     .id(ids::LOGSTF_ROUNDS)
                     .test_support(),
             )
