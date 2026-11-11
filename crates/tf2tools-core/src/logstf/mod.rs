@@ -7,6 +7,7 @@ mod detail;
 mod range;
 mod steam_id;
 mod steam_xml;
+mod weapons;
 
 use std::time::Duration;
 

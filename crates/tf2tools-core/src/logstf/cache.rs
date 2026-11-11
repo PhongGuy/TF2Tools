@@ -7,6 +7,7 @@ use rusqlite::types::ValueRef;
 use rusqlite::{OptionalExtension, params};
 
 use super::averages::{CLASS_SUMS, ClassAverage, ClassSums, WINDOW_LOGS};
+use super::weapons::write_weapon_rows;
 use super::{
     LOG_BODY_LIMIT, LogDetail, LogsRange, PROVISIONAL_SECS, SteamId, logstf_class,
     logstf_class_name,
@@ -553,8 +554,9 @@ impl LogsCache {
     }
 
     /// Stores a downloaded log: its body and length, a class row per player per class played
-    /// (Medic heals, ubers and drops on the medic row only), and real names for any player
-    /// still named by the offline placeholder. Old class rows go first, so a refetch replaces them.
+    /// (Medic heals, ubers and drops on the medic row only), its weapon rows, and real names for
+    /// any player still named by the offline placeholder. Old rows go first, so a refetch
+    /// replaces them.
     /// Returns false, storing nothing, when the log's row is gone (pruned or its player removed).
     pub(crate) fn ingest(
         &self,
@@ -608,14 +610,19 @@ impl LogsCache {
                         rename.execute(params![sql_id(p.steam_id())?, p.name()])?;
                     }
                 }
+                write_weapon_rows(&tx, log_id, detail)?;
+                tx.execute(
+                    "UPDATE logstf_logs SET weapons_counted = 1 WHERE id = ?1",
+                    [log_id],
+                )?;
                 tx.commit()?;
                 Ok(true)
             })
             .map_err(db_error)
     }
 
-    /// Marks a log `STATE_GONE` or `STATE_UNREADABLE` as of `now`. Any earlier body and
-    /// class rows go too, so a marked log never counts and the needs-download rule skips it.
+    /// Marks a log `STATE_GONE` or `STATE_UNREADABLE` as of `now`. Any earlier body, class
+    /// and weapon rows go too, so a marked log never counts and the needs-download rule skips it.
     pub(crate) fn mark_failed(
         &self,
         log_id: i64,
@@ -630,6 +637,7 @@ impl LogsCache {
                     params![log_id, state, now],
                 )?;
                 tx.execute("DELETE FROM logstf_class_rows WHERE log_id = ?1", [log_id])?;
+                tx.execute("DELETE FROM logstf_weapon_rows WHERE log_id = ?1", [log_id])?;
                 tx.commit()
             })
             .map_err(db_error)
@@ -761,7 +769,7 @@ fn fold_class_rows(detail: &LogDetail) -> HashMap<(SteamId, TfClass), ClassStats
 }
 
 /// `id` as SQLite stores it; every public-universe SteamID64 fits in an i64.
-fn sql_id(id: SteamId) -> rusqlite::Result<i64> {
+pub(super) fn sql_id(id: SteamId) -> rusqlite::Result<i64> {
     i64::try_from(id.id64()).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
 }
 
