@@ -1,6 +1,6 @@
 # TF2Tools
 
-Set up your Team Fortress 2 HUD, hitsounds, killsounds and crosshairs in a few clicks, and find new ones from the community without leaving the app.
+Set up your Team Fortress 2 HUD, hitsounds, killsounds, crosshairs and graphics in a few clicks, and find new ones from the community without leaving the app.
 
 **[Download for Windows](https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.exe)** · **[Download for Linux](https://github.com/PhongGuy/TF2Tools/releases/latest/download/tf2tools-linux-x86_64.AppImage)**
 
@@ -36,9 +36,13 @@ Install mastercomfig's addons from the Addon Store. The Addons page shows what y
 
 ![The Addon Store](.github/readme/addon-store.webp)
 
+### Graphics
+
+The Graphics page sets TF2's graphics with mastercomfig. Install mastercomfig in one click, update it when a new version is out, or let TF2Tools take over the copy you already have. Pick a graphics preset, from Ultra down to Low, then change any of its settings one by one, or reset them to the preset. Changes apply the next time TF2 starts.
+
 ### The stores
 
-Browse sounds and crosshairs from GameBanana, preview sounds before you download them, search and sort the GameBanana stores, and filter the hand-picked HUDs.
+Browse sounds and crosshairs from GameBanana, preview sounds before you download them, search and sort the GameBanana stores, and filter the hand-picked HUDs. Next to its mastercomfig tab, the Addon Store has GameBanana tabs for skins, effects, GUIs, textures and game files. Install one from its details; if a download holds several versions, you pick which to install. TF2Tools checks your add-ons for updates once a day, and the Addons page lists them with Update and Remove. Files that failed GameBanana's virus scan, or are only a program, are refused, and add-ons are never changed while TF2 is running.
 
 ![The Sound Store](.github/readme/sound-store.webp)
 
@@ -56,6 +60,14 @@ The HUD Maker shows your HUD the way the game draws it: in a fight, on the score
 
 ![The HUD Maker: the main menu with the Items button picked and its settings open beside it](.github/readme/hud-maker.webp)
 
+### Maps
+
+The Maps page lists the community maps from serveme.tf. Search them by name, sort them by name, by most played or by recently played, and download a map straight into your game. Remove a map you downloaded when you no longer need it.
+
+### logs.tf stats
+
+The logs.tf page shows your competitive stats from logs.tf. Paste your Steam profile link or Steam ID to track yourself, and add teammates the same way. Each player gets a card per class with their averages, and below it a list of their logs. Drag the range slider to look at only your most recent logs. Open a log to see it the way logs.tf shows it: the players, the kills between classes, the rounds and the events. TF2Tools downloads your logs once and keeps them, so the page works offline, and a download that stopped picks up where it left off.
+
 ### Profiles
 
 Save your HUD, sounds and crosshairs together as a profile, for example one for competitive and one for casual, and switch your whole setup at once.
@@ -64,7 +76,7 @@ Save your HUD, sounds and crosshairs together as a profile, for example one for 
 
 ### Settings
 
-Point TF2Tools at your game if it didn't find it, set the preview volume and refresh the stores. The Logs page lists what TF2Tools did, and TF2Tools checks for new versions of itself (see [Updates](#updates)).
+Point TF2Tools at your game if it didn't find it, set the preview volume and refresh the stores. The Activity Log (**Logs** in the sidebar) lists what TF2Tools did, and TF2Tools checks for new versions of itself (see [Updates](#updates)).
 
 ![The Settings page: the preview volume, how often the stores refresh, and each store's last sync](.github/readme/settings.webp)
 
@@ -114,7 +126,7 @@ TF2 reads its HUD, sounds and crosshairs when it starts, so restart the game to 
 
 ## Privacy
 
-No accounts, no ads, no tracking. TF2Tools goes online for the stores (GameBanana, GitHub and mastercomfig.com), for the Maps page (serveme.tf) and to check GitHub for a new version of TF2Tools. Your library stays on your computer.
+No accounts, no ads, no tracking. TF2Tools goes online for the stores (GameBanana, GitHub and mastercomfig.com), for the Maps page (serveme.tf), for the logs.tf page (logs.tf, and Steam to look up a profile link) and to check GitHub for a new version of TF2Tools. Your library stays on your computer.
 
 ## License
 
@@ -126,6 +138,7 @@ MIT, see [LICENSE](LICENSE). The bundled Inter font is under the SIL Open Font L
 - **hud-db:** the hand-picked HUD list in the HUD Store comes from [hud-db](https://github.com/mastercomfig/hud-db), Copyright (c) 2024-2026 mastercomfig, under the MIT License, in `licenses/hud-db-MIT.txt`. Each HUD belongs to its authors.
 - **GameBanana:** the HUDs, sounds, crosshairs and other items in the GameBanana stores come from [GameBanana](https://gamebanana.com), owned and run by GameBanana Co LLC. Each item belongs to the creators credited on its GameBanana page, and TF2Tools claims no rights to it. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with GameBanana or GameBanana Co LLC.
 - **serveme.tf:** the community map list on the Maps page, and its map files, come from [serveme.tf](https://serveme.tf). Each map belongs to its makers. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with serveme.tf.
+- **logs.tf:** the stats and logs on the logs.tf page come from [logs.tf](https://logs.tf). TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with logs.tf.
 
 ### Valve
 

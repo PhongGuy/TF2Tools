@@ -26,8 +26,8 @@ env:
 jobs:
   gate:
     runs-on: ubuntu-24.04
-    # About 10 minutes with a warm cache; the margin covers a cold one.
-    timeout-minutes: 20
+    # About 10 minutes with a warm cache; a cold one after a dependency bump runs past 20.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
