@@ -787,10 +787,11 @@ pub fn parse_log(body: &str) -> Result<LogDetail, LogParseError> {
 /// their order.
 fn build(wire: WireLog) -> LogDetail {
     let info = wire.info.unwrap_or_default();
-    let minutes = f64::from(wire.length) / 60.0;
+    // Scale the count up before one division: both operands are exact integers, so a
+    // whole answer comes out exactly whole and a floored readout never shows one less.
     let per_min = |x: u32| {
-        if minutes > 0.0 {
-            f64::from(x) / minutes
+        if wire.length > 0 {
+            f64::from(x) * 60.0 / f64::from(wire.length)
         } else {
             0.0
         }
