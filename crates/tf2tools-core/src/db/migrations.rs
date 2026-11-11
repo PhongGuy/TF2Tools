@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 15;
+pub(crate) const SCHEMA_VERSION: u32 = 16;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -102,6 +102,15 @@ const STEPS: &[Step] = &[
         version: 15,
         sql: STEP_15_SQL,
         add_columns: &[],
+    },
+    Step {
+        version: 16,
+        sql: STEP_16_SQL,
+        add_columns: &[(
+            "logstf_logs",
+            "weapons_counted",
+            "INTEGER NOT NULL DEFAULT 0",
+        )],
     },
 ];
 
@@ -490,4 +499,21 @@ const STEP_15_SQL: &str = "
     );
     CREATE INDEX IF NOT EXISTS logstf_class_rows_player ON logstf_class_rows(steam_id);
     CREATE INDEX IF NOT EXISTS logstf_player_logs_log ON logstf_player_logs(log_id);
+";
+
+/// v6 step 16: weapon sums per player, class and weapon of each stored log. The
+/// `weapons_counted` marker is the weapon backfill's only progress state.
+const STEP_16_SQL: &str = "
+    CREATE TABLE IF NOT EXISTS logstf_weapon_rows (
+        log_id INTEGER NOT NULL REFERENCES logstf_logs(id) ON DELETE CASCADE,
+        steam_id INTEGER NOT NULL,
+        class TEXT NOT NULL,
+        weapon TEXT NOT NULL,
+        kills INTEGER NOT NULL,
+        dmg INTEGER NOT NULL,
+        shots INTEGER NOT NULL,
+        hits INTEGER NOT NULL,
+        PRIMARY KEY (log_id, steam_id, class, weapon)
+    );
+    CREATE INDEX IF NOT EXISTS logstf_weapon_rows_player ON logstf_weapon_rows(steam_id);
 ";
