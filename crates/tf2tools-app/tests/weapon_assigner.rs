@@ -406,6 +406,25 @@ fn compact_rows_show_neither_icon(cx: &mut TestAppContext) {
     assert!(!support::present(cx, win, ids::weapon_icon(script)));
 }
 
+// A compact list over a found TF2 starts no icon load. TF2 goes missing before the session's
+// icons are fetched, so only an entity the compact list made would already count a load.
+#[gpui_kit::test]
+fn a_compact_list_never_loads_icons(cx: &mut TestAppContext) {
+    let env = support::env();
+    support::init(cx);
+    support::install_services(cx, support::services(&env, support::no_steam()));
+    let tf2 = cx.update(|cx| install_tf2_state(cx, found(&env)));
+    let (_win, _assigner) = assigner_window(cx, true);
+    cx.update(|cx| {
+        tf2.update(cx, |t, cx| {
+            *t = Tf2State::Missing { saved: None };
+            cx.notify();
+        })
+    });
+    let loads = cx.update(|cx| WeaponIcons::global(cx).read(cx).loads());
+    assert_eq!(loads, 0);
+}
+
 // Icons that land after the list opens replace the squares, and a row is as tall with its
 // framed icon as with its slot square, so nothing jumps.
 #[gpui_kit::test]
