@@ -249,3 +249,29 @@ fn accessibility_ids_are_the_documented_element_id_strings() {
     assert_eq!(ids::nav(Page::HudStore).to_string(), "nav-hud-store");
     assert_eq!(ids::hud_card("Some Hud").to_string(), "hud-card:Some Hud");
 }
+
+// From the 600 px minimum up to a 768 px laptop screen, the rail switches between tight and
+// roomy spacing without ever cutting off a nav item.
+#[gpui_kit::test]
+fn every_nav_item_shows_whole_at_every_height_up_to_768(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    for height in (600..=768).step_by(4) {
+        cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(height as f32)));
+        support::settle(cx, s.win);
+        let groups = support::bounds_of(cx, s.win, ids::SIDEBAR_GROUPS).unwrap();
+        let sidebar = support::bounds_of(cx, s.win, ids::SIDEBAR).unwrap();
+        for page in Page::ALL {
+            let item = support::bounds_of(cx, s.win, ids::nav(page)).unwrap();
+            let shown = if matches!(page, Page::Settings | Page::Logs) {
+                item.bottom() <= sidebar.bottom()
+            } else {
+                item.top() >= groups.top() && item.bottom() <= groups.bottom()
+            };
+            assert!(
+                shown,
+                "at {height} px {page:?} {item:?} cut off by {groups:?}"
+            );
+        }
+    }
+}
