@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::error::{
-    ApplyModulesError, BrowseError, DownloadError, FilesError, ImageError,
+    ApplyModulesError, BrowseError, DownloadError, FilesError, GbAddonFetchError, ImageError,
     InstallMastercomfigError, MapDownloadError, ModuleCatalogError, PreviewError, SyncError,
 };
 
@@ -76,6 +76,7 @@ from_net_failure!(
     FilesError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     BrowseError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     DownloadError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
+    GbAddonFetchError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     MapDownloadError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     InstallMastercomfigError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },
     ModuleCatalogError: url => Self::Network { url, message: OFF_ALLOWLIST.to_owned() },

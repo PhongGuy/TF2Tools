@@ -134,6 +134,10 @@ fn known_notices_get_plain_titles() {
         notices::title_for("Valve-notice.txt"),
         "Valve and Team Fortress 2"
     );
+    assert_eq!(
+        notices::title_for("rars-Apache-2.0.txt"),
+        "rars RAR reader (Apache-2.0)"
+    );
     // A notice nobody titled still shows, named after its file.
     assert_eq!(notices::title_for("Some-Thing-MIT.txt"), "Some Thing MIT");
 }

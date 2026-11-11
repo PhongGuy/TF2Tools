@@ -2,8 +2,8 @@
 //! carry URLs, paths or codes; the raw error rides along as `detail` for the developer log.
 
 use tf2tools_core::{
-    ArchiveError, BrowseError, DownloadError, FilesError, GbId, ImportError, InstallError,
-    PreviewError, StoreKind,
+    ArchiveError, BrowseError, DownloadError, FilesError, GbAddonFetchError, GbId, ImportError,
+    InstallError, PreviewError, StoreKind,
 };
 
 use crate::services::OpError;
@@ -14,7 +14,7 @@ const DL_DISK: &str = "Couldn't save the download. Make sure your disk has free 
 pub(crate) const LIBRARY_UPDATE: &str =
     "TF2Tools couldn't update your library. Restart TF2Tools and try again.";
 const DL_UNUSABLE: &str = "This download has nothing TF2Tools can use. Pick another file.";
-const DL_RAR: &str = "This file is a RAR archive, which TF2Tools can't open. Pick another file.";
+const DL_LOCKED: &str = "This download is locked with a password, so TF2Tools can't open it.";
 const DL_UNPACK: &str = "The download couldn't be unpacked. Try again, or pick another file.";
 const DL_UNKNOWN: &str = "Something went wrong with the download. Try again later.";
 const FILES_STOPPED: &str = "Loading the files stopped before it finished. Try again.";
@@ -88,6 +88,9 @@ fn download_message(kind: StoreKind, err: &DownloadError) -> String {
         DownloadError::TooLarge { .. } => {
             "This file is too big for TF2Tools. Pick another file.".into()
         }
+        DownloadError::EmptyBody { .. } => {
+            format!("{source} is busy and sent an empty file. Try again in a moment.")
+        }
         DownloadError::ChecksumMismatch { .. } => "The download was damaged. Try again.".into(),
         DownloadError::Archive(archive) | DownloadError::Import(ImportError::Archive(archive)) => {
             archive_message(archive).into()
@@ -105,7 +108,7 @@ fn download_message(kind: StoreKind, err: &DownloadError) -> String {
 
 fn archive_message(err: &ArchiveError) -> &'static str {
     match err {
-        ArchiveError::Rar { .. } => DL_RAR,
+        ArchiveError::Encrypted { .. } => DL_LOCKED,
         ArchiveError::Io { .. }
         | ArchiveError::Malformed { .. }
         | ArchiveError::UnsafePath { .. }
@@ -158,6 +161,63 @@ pub fn describe_browse(err: &BrowseError) -> StoreFailure {
             "GameBanana sent something TF2Tools couldn't read. Try again later."
         }
         _ => "Couldn't load add-ons. Try again later.",
+    };
+    StoreFailure::new(message, err.to_string())
+}
+
+/// A failed add-on download or unpack in player words; `detail` is the error's own text.
+pub fn describe_gb_fetch(err: &GbAddonFetchError) -> StoreFailure {
+    let message = match err {
+        GbAddonFetchError::NoFiles { .. } => {
+            "This add-on has no files to install. Pick another add-on."
+        }
+        GbAddonFetchError::VirusScan { .. } => {
+            "GameBanana's virus scan didn't pass this file, so it wasn't installed."
+        }
+        GbAddonFetchError::TooLarge { .. } => "This download is too big for TF2Tools to install.",
+        GbAddonFetchError::OnlyExe { .. } => {
+            "This download only holds a program, which TF2Tools won't run. It wasn't installed."
+        }
+        // Nothing recognisable and too many parts to choose from need different next steps.
+        GbAddonFetchError::UnknownLayout { payloads: 0, .. } => {
+            "TF2Tools found nothing in this download it knows how to install, so it wasn't installed."
+        }
+        GbAddonFetchError::UnknownLayout { .. } => {
+            "This download holds too many parts for TF2Tools to tell which to install, so it wasn't installed."
+        }
+        GbAddonFetchError::Archive(ArchiveError::UnsafePath { .. }) => {
+            "This download looks unsafe and was not installed."
+        }
+        GbAddonFetchError::Archive(ArchiveError::Encrypted { .. }) => DL_LOCKED,
+        GbAddonFetchError::Archive(ArchiveError::Malformed { .. }) => {
+            "This download can't be opened. Pick another add-on."
+        }
+        GbAddonFetchError::Archive(ArchiveError::Io { .. }) | GbAddonFetchError::Io { .. } => {
+            DL_DISK
+        }
+        GbAddonFetchError::EmptyBody { .. } => {
+            "GameBanana is busy and sent an empty file. Try again in a moment."
+        }
+        GbAddonFetchError::ChecksumMismatch { .. } => {
+            "The download was damaged on the way. Try again."
+        }
+        GbAddonFetchError::Network { .. } => {
+            "Couldn't reach GameBanana. Check your internet connection and try again."
+        }
+        GbAddonFetchError::RateLimited { .. } => {
+            "GameBanana is busy right now. Wait a few minutes, then try again."
+        }
+        GbAddonFetchError::Http { status: 404, .. } => {
+            "GameBanana couldn't find this file. Try again later."
+        }
+        GbAddonFetchError::Http { status, .. } if *status >= 500 => {
+            "GameBanana is having problems right now. Try again later."
+        }
+        GbAddonFetchError::Http { .. } => {
+            "GameBanana sent something TF2Tools couldn't read. Try again later."
+        }
+        GbAddonFetchError::Interrupted { .. } => DL_STOPPED,
+        GbAddonFetchError::Archive(_) | _ => DL_UNKNOWN,
     };
     StoreFailure::new(message, err.to_string())
 }

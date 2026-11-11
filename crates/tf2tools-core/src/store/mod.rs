@@ -7,6 +7,7 @@ mod addon_sections;
 mod cards;
 mod download;
 mod gamebanana;
+mod gb_addon_download;
 mod github;
 pub(crate) mod http;
 mod images;
@@ -40,6 +41,7 @@ pub use addon_catalog::{
 pub use addon_sections::AddonSection;
 pub use cards::{StoreCard, StoreCursor, StoreQuery, StoreSort};
 pub use download::{DownloadPhase, DownloadProgress};
+pub use gb_addon_download::GbAddonDownload;
 use http::{API_BODY_LIMIT, Http, NetFailure, Redirects, Timeouts};
 pub use items::{StoreFile, StoreItem, StoreItemId};
 pub use maps::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
@@ -323,6 +325,7 @@ pub struct StoreConfig {
     read_timeout: Duration,
     loopback_only: bool,
     map_size_cap: u64,
+    gb_addon_size_cap: u64,
 }
 
 impl Default for StoreConfig {
@@ -337,6 +340,7 @@ impl Default for StoreConfig {
             read_timeout: Duration::from_secs(30),
             loopback_only: false,
             map_size_cap: 512 * MB,
+            gb_addon_size_cap: 300 * MB,
         }
     }
 }
@@ -380,6 +384,17 @@ impl StoreConfig {
     /// This config with another map size cap.
     pub fn with_map_size_cap(mut self, bytes: u64) -> Self {
         self.map_size_cap = bytes;
+        self
+    }
+
+    /// The largest GameBanana add-on download accepted, in bytes; 300 MiB by default.
+    pub fn gb_addon_size_cap(&self) -> u64 {
+        self.gb_addon_size_cap
+    }
+
+    /// This config with another GameBanana add-on size cap.
+    pub fn with_gb_addon_size_cap(mut self, bytes: u64) -> Self {
+        self.gb_addon_size_cap = bytes;
         self
     }
 

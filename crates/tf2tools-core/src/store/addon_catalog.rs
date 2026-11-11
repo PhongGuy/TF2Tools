@@ -549,10 +549,19 @@ impl AddonCatalog {
     /// Item `id`'s profile page. Fails `Gone` for a trashed, withheld or private item; a
     /// missing id keeps its HTTP status.
     pub async fn profile(&self, id: GbId) -> Result<AddonProfile, BrowseError> {
+        self.profile_at(id, Priority::Interactive).await
+    }
+
+    /// [`Self::profile`], asked through the pacer at `priority`.
+    pub(crate) async fn profile_at(
+        &self,
+        id: GbId,
+        priority: Priority,
+    ) -> Result<AddonProfile, BrowseError> {
         let url = addon_api::profile_url(self.store.endpoints.gamebanana(), id);
         let parsed = self
             .store
-            .gamebanana_call(&url, Priority::Interactive, read_profile)
+            .gamebanana_call(&url, priority, read_profile)
             .await?
             .map_err(|message| BrowseError::Malformed {
                 url: url.clone(),

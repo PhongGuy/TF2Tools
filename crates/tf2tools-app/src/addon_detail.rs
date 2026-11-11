@@ -1,24 +1,29 @@
 //! A GameBanana add-on's detail dialog: it reads the item's profile page on open and shows
-//! its ratings, images, downloads, description, credits and files, with "Open on GameBanana".
+//! its ratings, images, downloads, description, credits and files, with the install control
+//! and "Open on GameBanana".
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::Button;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::progress::Progress as ProgressBar;
 use gpui_kit::component::tag::Tag;
-use gpui_kit::component::{ActiveTheme as _, WindowExt as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _,
     IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Task, TestSupportExt as _, Window, div, px,
-    transparent_black,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _, Window,
+    div, px, transparent_black,
 };
-use tf2tools_core::{AddonCard, AddonFile, AddonProfile, BrowseError};
+use tf2tools_core::{AddonCard, AddonFile, AddonProfile, AddonSection, BrowseError, DownloadPhase};
 
+use crate::gb_addon_installs::{
+    GbAddonInstalls, GbAddonOffer as Offer, GbAddonStage, install_blocker,
+};
 use crate::ids;
 use crate::links::gamebanana_page;
 use crate::pages::addon_store::model::downloads_label;
-use crate::pages::common::badge_of;
-use crate::services::Services;
-use crate::store_download::format_bytes;
+use crate::pages::common::{badge_of, needs_tf2};
+use crate::services::{Services, tf2_state};
+use crate::store_download::{Progress, format_bytes, progress_label, progress_percent};
 use crate::store_messages::{addon_stopped, describe_browse};
 use crate::tokio_bridge;
 use crate::widgets::carousel::Carousel;
@@ -38,9 +43,12 @@ pub enum ProfileState {
     Gone(String),
 }
 
-/// The dialog's view: the card that opened it, and its profile once read.
+/// The dialog's view: the section and card that opened it, and its profile once read.
 pub struct AddonDetail {
+    section: AddonSection,
     card: AddonCard,
+    installs: Entity<GbAddonInstalls>,
+    _installs_changed: Subscription,
     profile: ProfileState,
     carousel: Entity<Carousel>,
     scroll: ScrollHandle,
@@ -48,11 +56,17 @@ pub struct AddonDetail {
 }
 
 impl AddonDetail {
-    /// Needs the `Services` global; starts reading `card`'s profile at once.
-    pub fn new(card: AddonCard, cx: &mut Context<Self>) -> Self {
+    /// Needs the `Services` global and the TF2 state; starts reading `card`'s profile at once.
+    /// Installs go into `section`.
+    pub fn new(section: AddonSection, card: AddonCard, cx: &mut Context<Self>) -> Self {
         let carousel = cx.new(|cx| Carousel::new(Vec::new(), cx));
+        let installs = GbAddonInstalls::global(cx);
+        let installs_changed = cx.observe(&installs, |_, _, cx| cx.notify());
         let mut detail = Self {
+            section,
             card,
+            installs,
+            _installs_changed: installs_changed,
             profile: ProfileState::Loading,
             carousel,
             scroll: ScrollHandle::new(),
@@ -65,6 +79,13 @@ impl AddonDetail {
     /// Where the item's profile read stands now.
     pub fn profile(&self) -> &ProfileState {
         &self.profile
+    }
+
+    fn ready(&self) -> Option<&AddonProfile> {
+        match &self.profile {
+            ProfileState::Ready(profile) => Some(profile),
+            ProfileState::Loading | ProfileState::Failed(_) | ProfileState::Gone(_) => None,
+        }
     }
 
     /// Reads the profile again after a failure.
@@ -105,6 +126,97 @@ impl AddonDetail {
             let _ = this.update(cx, |d, cx| d.loaded(result, cx));
         }));
         cx.notify();
+    }
+
+    // Starts what the control offers; GbAddonInstalls refuses it while another operation runs.
+    // Only a first install needs the read profile; the rest work from the library entry.
+    fn act(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let ready = self.ready().cloned();
+        let (section, id) = (self.section, self.card.id);
+        let win = window.window_handle();
+        self.installs.update(cx, |installs, cx| {
+            match Offer::of(installs.entry(id)) {
+                Offer::Install => {
+                    ready.is_some_and(|profile| installs.install(section, profile, win, cx))
+                }
+                Offer::Update => installs.update(id, win, cx),
+                Offer::InstallAgain => installs.reinstall(id, win, cx),
+                Offer::Installed => false,
+            };
+        });
+    }
+
+    // The header's control from the library entry, so an unreadable profile still offers
+    // what the library holds; or, once the profile is read, why a download can't happen.
+    // A first install waits for the profile, which it downloads from.
+    fn install_control(&self, cx: &mut Context<Self>) -> (Option<Button>, Option<AnyElement>) {
+        let ready = self.ready();
+        let installs = self.installs.read(cx);
+        let offer = Offer::of(installs.entry(self.card.id));
+        let stage = installs.stage(self.card.id);
+        let busy = installs.is_busy();
+        let store = &cx.global::<Services>().store;
+        if stage.is_none()
+            && offer.downloads()
+            && let Some(reason) = ready.and_then(|profile| install_blocker(store, profile))
+        {
+            let line = labelled(
+                div().text_sm().text_color(cx.theme().muted_foreground),
+                ids::ADDON_DETAIL_BLOCKED,
+                reason,
+            );
+            return (None, Some(line.into_any_element()));
+        }
+        let label = match stage {
+            Some(GbAddonStage::Removing) => "Removing...",
+            Some(_) => "Installing...",
+            None => offer.label(),
+        };
+        let button = Button::new(ids::ADDON_DETAIL_INSTALL)
+            .label(label)
+            .loading(stage.is_some())
+            .disabled(
+                busy || offer == Offer::Installed || (offer == Offer::Install && ready.is_none()),
+            )
+            .on_click(cx.listener(|this, _, window, cx| this.act(window, cx)));
+        let button = if offer == Offer::Installed {
+            button.secondary()
+        } else {
+            button.primary()
+        };
+        let has_tf2 = tf2_state(cx).read(cx).install().is_some();
+        (Some(needs_tf2(button, has_tf2)), None)
+    }
+
+    // The download's text and bar while this item downloads.
+    fn progress(&self, cx: &App) -> Option<AnyElement> {
+        let GbAddonStage::Downloading { downloaded, total } =
+            self.installs.read(cx).stage(self.card.id)?
+        else {
+            return None;
+        };
+        let progress = Some(Progress {
+            phase: DownloadPhase::Downloading,
+            downloaded,
+            total,
+        });
+        // Until the first byte the download may still be queued behind other GameBanana
+        // requests, so a byte count of 0 would read as a stalled download.
+        let label = if downloaded == 0 {
+            SharedString::from("Waiting for GameBanana...")
+        } else {
+            SharedString::from(progress_label(progress))
+        };
+        Some(
+            v_flex()
+                .id(ids::ADDON_DETAIL_PROGRESS)
+                .aria_label(label.clone())
+                .test_support()
+                .gap_1()
+                .child(div().text_sm().child(label))
+                .child(ProgressBar::new(ids::ADDON_DETAIL_BAR).value(progress_percent(progress)))
+                .into_any_element(),
+        )
     }
 
     fn loaded(&mut self, result: Result<AddonProfile, ProfileState>, cx: &mut Context<Self>) {
@@ -288,6 +400,7 @@ impl Render for AddonDetail {
             ],
             ProfileState::Ready(profile) => self.ready_body(profile, cx),
         };
+        let (control, blocked) = self.install_control(cx);
         let scrolled = v_flex()
             .id(ids::ADDON_DETAIL_BODY)
             .test_support()
@@ -337,24 +450,35 @@ impl Render for AddonDetail {
                                     .child(format!("by {author}")),
                             ),
                     )
-                    .child(link_button(
-                        "gamebanana",
-                        "Open on GameBanana",
-                        gamebanana_page(&self.card.profile_url, self.card.id),
-                    )),
+                    .child(
+                        h_flex()
+                            .flex_none()
+                            .gap_2()
+                            .children(control)
+                            .child(link_button(
+                                "gamebanana",
+                                "Open on GameBanana",
+                                gamebanana_page(&self.card.profile_url, self.card.id),
+                            )),
+                    ),
             )
+            .children(blocked)
+            // Pinned under the header so a scrolled body never hides the download.
+            .children(self.progress(cx))
             .child(scroll_beside(ids::ADDON_DETAIL_SCROLLBAR, &self.scroll, scrolled).min_h_0())
     }
 }
 
-/// Opens the dialog (`ids::ADDON_DETAIL`) for `card` and returns its view.
+/// Opens the dialog (`ids::ADDON_DETAIL`) for `card`, installing into `section`, and returns
+/// its view.
 pub fn open_addon_detail(
+    section: AddonSection,
     card: &AddonCard,
     window: &mut Window,
     cx: &mut App,
 ) -> Entity<AddonDetail> {
     let card = card.clone();
-    let detail = cx.new(|cx| AddonDetail::new(card, cx));
+    let detail = cx.new(|cx| AddonDetail::new(section, card, cx));
     let view = detail.clone();
     let frame = DialogFrame::new(DETAIL_WIDTH);
     // Deferred, as confirm does, so the click that opened it cannot pull focus back out.

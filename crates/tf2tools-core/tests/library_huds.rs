@@ -6,9 +6,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use common::{LibraryEnv, library_env, sql, tree, write_file, zip_bytes};
-use tf2tools_core::{
-    ArchiveError, GbId, HudId, ImportError, LibraryError, LibraryKind, Provenance,
-};
+use tf2tools_core::{GbId, HudId, ImportError, LibraryError, LibraryKind, Provenance};
 
 fn hud_zip(env: &LibraryEnv, file: &str, entries: &[(&str, &[u8])]) -> PathBuf {
     write_file(
@@ -248,15 +246,23 @@ fn a_bare_file_is_not_a_hud() {
 }
 
 #[test]
-fn a_rar_is_refused_as_an_archive_error() {
+fn a_rar_hud_imports_like_a_zip() {
     let env = library_env();
-    let file = write_file(&env.tmp.path().join("hud.rar"), b"Rar!\x1a\x07\x00rest");
-    let err = env.lib.import_hud(&file, Provenance::Local).unwrap_err();
-    assert!(
-        matches!(err, ImportError::Archive(ArchiveError::Rar { .. })),
-        "{err:?}"
+    let file = write_file(
+        &env.tmp.path().join("downloads").join("hud.rar"),
+        &common::rar_bytes(
+            rars::ArchiveVersion::Rar50,
+            &[
+                ("myhud/info.vdf", b"\"myhud\" {}"),
+                ("myhud/resource/ui/a.res", b"res"),
+            ],
+            None,
+        ),
     );
-    assert_eq!(fs::read_dir(env.dir.tmp_dir()).unwrap().count(), 0);
+    let entry = env.lib.import_hud(&file, Provenance::Local).unwrap();
+    assert_eq!(entry.folder_name(), "myhud");
+    let dest = env.dir.library_dir(LibraryKind::Huds).join("myhud");
+    assert_eq!(tree(&dest), ["info.vdf", "resource/ui/a.res"]);
 }
 
 #[test]

@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 13;
+pub(crate) const SCHEMA_VERSION: u32 = 14;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -91,6 +91,11 @@ const STEPS: &[Step] = &[
     Step {
         version: 13,
         sql: STEP_13_SQL,
+        add_columns: &[],
+    },
+    Step {
+        version: 14,
+        sql: STEP_14_SQL,
         add_columns: &[],
     },
 ];
@@ -418,4 +423,23 @@ const STEP_13_SQL: &str = "
     DELETE FROM library_addons WHERE asset_name LIKE 'mastercomfig-addon-override-%';
     DELETE FROM store_addons WHERE asset_name LIKE 'mastercomfig-addon-override-%';
     DELETE FROM store_cache_meta WHERE key = 'addons_last_synced';
+";
+
+/// v6 step 14: GameBanana add-ons installed from the Addon Store. `payloads` and `files`
+/// are JSON arrays; `files` is relative to `tf/`.
+const STEP_14_SQL: &str = "
+    CREATE TABLE IF NOT EXISTS library_gb_addons (
+        gb_id INTEGER PRIMARY KEY,
+        section TEXT NOT NULL,
+        name TEXT NOT NULL,
+        author TEXT NOT NULL,
+        file_id INTEGER NOT NULL,
+        file_date INTEGER NOT NULL,
+        latest_file_date INTEGER NOT NULL,
+        checked_at INTEGER NOT NULL,
+        payloads TEXT NOT NULL,
+        files TEXT NOT NULL,
+        installed INTEGER NOT NULL,
+        gone INTEGER NOT NULL DEFAULT 0
+    );
 ";

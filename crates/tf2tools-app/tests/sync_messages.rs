@@ -82,7 +82,7 @@ fn cases() -> Vec<(StoreKind, SyncError, &'static str)> {
         ),
         (
             StoreKind::CuratedHuds,
-            SyncError::Archive(ArchiveError::Rar {
+            SyncError::Archive(ArchiveError::Encrypted {
                 path: PathBuf::from("/tmp/hud-db.rar"),
             }),
             GH_UNREADABLE,

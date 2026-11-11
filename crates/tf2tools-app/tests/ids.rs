@@ -67,6 +67,7 @@ fn keyed_ids_carry_the_stable_key() {
         name(ids::weapon_row("tf_weapon_scattergun")),
         "weapon-row:tf_weapon_scattergun"
     );
+    assert_eq!(name(ids::payload_check(3)), "payload-check:3");
 }
 
 #[test]
@@ -371,13 +372,14 @@ fn the_grid_and_list_ids_are_stable() {
 
 // ids.rs is the one place element ids are spelt, so pilot QA and tests read them from there.
 fn literal_ids_in(dir: &std::path::Path, hits: &mut Vec<String>) {
-    const LITERALS: [&str; 6] = [
+    const LITERALS: [&str; 7] = [
         "\"sound-card\"",
         "\"huds-grid\"",
         "\"sounds-grid\"",
         "\"profiles-grid\"",
         "\"profiles-missing-list\"",
         "\"addon-store-info-text\"",
+        "\"payload-check\"",
     ];
     for entry in std::fs::read_dir(dir).unwrap() {
         let path = entry.unwrap().path();
@@ -766,4 +768,22 @@ fn addon_store_tab_and_card_ids_are_keyed_by_section_and_item() {
     assert_eq!(name(ids::addon_detail_file(1)), "addon-detail-file:1");
     assert_eq!(ids::ADDON_LOAD_MORE, "addon-load-more");
     assert_eq!(ids::SETTINGS_MATURE_ADDONS, "settings-mature-addons");
+    assert_eq!(
+        name(ids::addon_gb_card_badge("skins", GbId::new(5))),
+        "addon-gb-card-badge:skins:5"
+    );
+}
+
+#[test]
+fn addons_page_gamebanana_ids_are_keyed_by_section_and_item() {
+    let id = GbId::new(5);
+    assert_eq!(ids::ADDONS_GB, "addons-gb");
+    assert_eq!(name(ids::addons_gb_group("skins")), "addons-gb-group:skins");
+    assert_eq!(name(ids::addons_gb_card(id)), "addons-gb-card:5");
+    assert_eq!(name(ids::addons_gb_remove(id)), "addons-gb-remove:5");
+    assert_eq!(name(ids::addons_gb_update(id)), "addons-gb-update:5");
+    assert_eq!(name(ids::addons_gb_reinstall(id)), "addons-gb-reinstall:5");
+    assert_eq!(name(ids::addons_gb_open(id)), "addons-gb-open:5");
+    assert_eq!(name(ids::addons_gb_tag(id)), "addons-gb-tag:5");
+    assert_eq!(name(ids::addons_gb_busy(id)), "addons-gb-busy:5");
 }

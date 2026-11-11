@@ -130,10 +130,10 @@ fn import_cases() -> Vec<(ImportError, &'static str)> {
             "Couldn't read that file or save it to your library. Make sure your disk has free space, then try again.",
         ),
         (
-            ImportError::Archive(ArchiveError::Rar {
+            ImportError::Archive(ArchiveError::Encrypted {
                 path: PathBuf::from("/tmp/hud.rar"),
             }),
-            "This file is a RAR archive, which TF2Tools can't open. Pick a ZIP file instead.",
+            "This archive couldn't be unpacked. Pick another file.",
         ),
         (
             ImportError::Archive(ArchiveError::Malformed {
@@ -1003,4 +1003,57 @@ fn every_update_failure_reads_in_player_words() {
         copy_in_store_text("rayshud"),
         "A newer version of rayshud is in the HUD Store. Download it, then choose Update here."
     );
+}
+
+#[test]
+fn addon_install_failures_read_as_plain_words() {
+    use tf2tools_app::local_messages::{describe_gb_install, gb_install_op};
+    use tf2tools_app::pages::graphics::jobs::{CLOSE_TF2, CLOSE_TF2_TEXT};
+    use tf2tools_core::{GbAddonInstallError, GbId};
+    let cases: Vec<(GbAddonInstallError, &str)> = vec![
+        (GbAddonInstallError::Tf2Running, CLOSE_TF2_TEXT),
+        (
+            GbAddonInstallError::GameMissing {
+                path: PathBuf::from("/g/tf"),
+            },
+            "TF2 wasn't found where it used to be. Check the TF2 folder in Settings.",
+        ),
+        (
+            GbAddonInstallError::Io {
+                path: PathBuf::from("/g/tf/custom"),
+                source: io("Permission denied (os error 13)"),
+            },
+            "Couldn't write the add-on into TF2. Make sure your disk has free space, then try again.",
+        ),
+        (
+            GbAddonInstallError::NotInLibrary {
+                gb_id: GbId::new(3),
+            },
+            "This add-on's files are no longer in your library. Install it again from the Addon Store.",
+        ),
+        (
+            GbAddonInstallError::Database {
+                message: "locked".into(),
+            },
+            "TF2Tools couldn't update your library. Restart TF2Tools and try again.",
+        ),
+    ];
+    for (err, want) in cases {
+        assert_eq!(describe_gb_install(&err).message, want, "{err:?}");
+        support::assert_plain(want);
+    }
+    assert!(matches!(
+        gb_install_op(&GbAddonInstallError::Tf2Running, "Couldn't install the add-on"),
+        OpError::Core { action, ref message } if action == CLOSE_TF2 && message == CLOSE_TF2_TEXT
+    ));
+    assert!(matches!(
+        gb_install_op(
+            &GbAddonInstallError::NothingChosen,
+            "Couldn't install the add-on"
+        ),
+        OpError::Core {
+            action: "Couldn't install the add-on",
+            ..
+        }
+    ));
 }

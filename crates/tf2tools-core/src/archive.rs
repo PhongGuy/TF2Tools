@@ -1,10 +1,12 @@
-//! Archive extraction for downloaded content: zip, 7z and VPK, told apart by magic
+//! Archive extraction for downloaded content: zip, 7z, RAR and VPK, told apart by magic
 //! bytes. Every entry name is checked before anything is written, so an archive
 //! with one unsafe entry extracts nothing at all.
 
+use std::cell::RefCell;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Component, Path, PathBuf};
+use std::rc::Rc;
 
 use crate::error::{ArchiveError, VpkError};
 use crate::pak;
@@ -16,7 +18,7 @@ const SEVEN_Z_MAGIC: &[u8] = &[0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
 pub(crate) const VPK_MAGIC: &[u8] = &[0x34, 0x12, 0xAA, 0x55];
 const RAR_MAGIC: &[u8] = b"Rar!";
 
-/// Extracts a zip, 7z or VPK (by magic bytes) into `dest` and returns its content root.
+/// Extracts a zip, 7z, RAR or VPK (by magic bytes) into `dest` and returns its content root.
 /// An unrecognised file is not extracted: its own path is returned and `dest` is untouched.
 /// A failure part-way through can leave `dest` partly written, so extract into a scratch
 /// directory and remove it on error.
@@ -29,9 +31,7 @@ pub fn extract_archive(archive: &Path, dest: &Path) -> Result<PathBuf, ArchiveEr
     } else if header.starts_with(VPK_MAGIC) {
         extract_vpk(archive, dest)?;
     } else if header.starts_with(RAR_MAGIC) {
-        return Err(ArchiveError::Rar {
-            path: archive.to_path_buf(),
-        });
+        extract_rar(archive, dest)?;
     } else {
         // A bare WAV or VTF download is its own content.
         return Ok(archive.to_path_buf());
@@ -58,7 +58,7 @@ pub fn find_content_root(dir: &Path) -> Result<PathBuf, ArchiveError> {
 }
 
 /// Reads up to the first 8 bytes; a shorter file is sniffed on what it has.
-fn sniff(archive: &Path) -> Result<Vec<u8>, ArchiveError> {
+pub(crate) fn sniff(archive: &Path) -> Result<Vec<u8>, ArchiveError> {
     let io = |source| io_error(archive, source);
     let mut header = Vec::with_capacity(8);
     File::open(archive)
@@ -77,9 +77,12 @@ fn extract_zip(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
     let mut targets = Vec::with_capacity(zip.len());
     for i in 0..zip.len() {
         let entry = zip.by_index(i).map_err(|e| malformed(archive, e))?;
+        // `enclosed_name` quietly strips `C:` and a leading `/`, so the raw name is
+        // judged first and `enclosed_name` stays only as a second guard.
+        let raw = entry.name().map_err(|e| malformed(archive, e))?;
+        check_entry_name(archive, &raw)?;
         let Some(relative) = entry.enclosed_name() else {
-            let name = entry.name().map(|n| n.into_owned()).unwrap_or_default();
-            return Err(unsafe_path(archive, name));
+            return Err(unsafe_path(archive, raw.into_owned()));
         };
         targets.push((dest.join(relative), entry.is_dir()));
     }
@@ -136,13 +139,119 @@ fn extract_vpk(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
     Ok(())
 }
 
-/// Accepts a 7z or VPK entry name only if, with `\` read as a separator, every
-/// component is a plain name or `.`, so it cannot climb out of or replace `dest`.
+/// RAR names come as raw bytes, so every member is checked from the index before
+/// `dest` exists, and again as it is written in case the stream disagrees with the index.
+fn extract_rar(archive: &Path, dest: &Path) -> Result<(), ArchiveError> {
+    let reader = rars::ArchiveReader::read_path(archive).map_err(|e| rar_error(archive, &e))?;
+    for member in reader.index().members() {
+        check_entry_name(archive, &String::from_utf8_lossy(member.name_bytes()))?;
+    }
+
+    create_dir(dest)?;
+    // `rars` can only carry its own error type out, so our failures (an unsafe name, a
+    // failed write) are kept in this slot and win over whatever `rars` reports.
+    let failure: RarFailure = Rc::default();
+    let result = reader.extract_to(None, |meta| {
+        open_rar_target(archive, dest, meta, &failure).map_err(|e| {
+            let message = e.to_string();
+            *failure.borrow_mut() = Some(e);
+            rars::Error::from(std::io::Error::other(message))
+        })
+    });
+    match (failure.take(), result) {
+        (Some(e), _) => Err(e),
+        (None, Err(e)) => Err(rar_error(archive, &e)),
+        (None, Ok(())) => Ok(()),
+    }
+}
+
+type RarFailure = Rc<RefCell<Option<ArchiveError>>>;
+
+/// A directory member is created and its (empty) stream discarded; a file member
+/// streams straight into a file under `dest`.
+fn open_rar_target(
+    archive: &Path,
+    dest: &Path,
+    meta: &rars::ExtractedEntryMeta,
+    failure: &RarFailure,
+) -> Result<Box<dyn Write>, ArchiveError> {
+    let name = String::from_utf8_lossy(&meta.name);
+    check_entry_name(archive, &name)?;
+    let target = dest.join(name.replace('\\', "/"));
+    if meta.is_directory {
+        create_dir(&target)?;
+        return Ok(Box::new(std::io::sink()));
+    }
+    if let Some(parent) = target.parent() {
+        create_dir(parent)?;
+    }
+    let file = File::create(&target).map_err(|e| io_error(&target, e))?;
+    Ok(Box::new(RarFile {
+        file,
+        target,
+        failure: Rc::clone(failure),
+    }))
+}
+
+/// An unbuffered output file that records its own write failure as `Io`, so a full disk
+/// is not reported as a corrupt archive.
+struct RarFile {
+    file: File,
+    target: PathBuf,
+    failure: RarFailure,
+}
+
+impl Write for RarFile {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.file.write(buf).inspect_err(|e| self.record(e))
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.file.flush().inspect_err(|e| self.record(e))
+    }
+}
+
+impl RarFile {
+    fn record(&self, error: &std::io::Error) {
+        let copy = std::io::Error::new(error.kind(), error.to_string());
+        self.failure
+            .borrow_mut()
+            .get_or_insert_with(|| io_error(&self.target, copy));
+    }
+}
+
+/// A password problem is `Encrypted` whichever way `rars` was built: with the
+/// `encryption` feature it asks for a password, without it the feature is disabled.
+fn rar_error(archive: &Path, error: &rars::Error) -> ArchiveError {
+    let encrypted = matches!(
+        error.kind(),
+        rars::ErrorKind::PasswordRequired | rars::ErrorKind::BadPassword
+    ) || matches!(
+        error.root_cause(),
+        rars::Error::FeatureDisabled {
+            feature: "encryption"
+        } | rars::Error::UnsupportedEncryption { .. }
+    );
+    if encrypted {
+        ArchiveError::Encrypted {
+            path: archive.to_path_buf(),
+        }
+    } else {
+        malformed(archive, error)
+    }
+}
+
+/// Accepts an entry name of any format only if, with `\` read as a separator, every
+/// component is a plain name or `.` and the first is not a drive prefix (`C:`), so it
+/// cannot climb out of or replace `dest` on any platform.
 fn check_entry_name(archive: &Path, name: &str) -> Result<(), ArchiveError> {
     let normalized = name.replace('\\', "/");
-    let safe = Path::new(&normalized)
-        .components()
-        .all(|c| matches!(c, Component::Normal(_) | Component::CurDir));
+    let first = normalized.split('/').next().unwrap_or_default().as_bytes();
+    let drive = first.len() >= 2 && first[0].is_ascii_alphabetic() && first[1] == b':';
+    let safe = !drive
+        && Path::new(&normalized)
+            .components()
+            .all(|c| matches!(c, Component::Normal(_) | Component::CurDir));
     if safe {
         Ok(())
     } else {

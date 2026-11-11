@@ -5,6 +5,7 @@
 mod addons;
 mod borrow;
 mod crosshairs;
+mod gb_addons;
 mod hud_cfg;
 mod hud_copy;
 mod hud_folder;
@@ -31,10 +32,10 @@ use walkdir::WalkDir;
 use crate::archive::VPK_MAGIC;
 use crate::db::Database;
 use crate::error::{
-    ApplyModulesError, ApplyPresetError, ApplyProfileError, HistoryError, HudLoadError,
-    ImportError, InstallError, InstallMastercomfigError, KeepHudError, LibraryError, MakeHudError,
-    PaintError, PresetError, ProfileError, ReinstallError, RemoveMastercomfigError,
-    RestoreMastercomfigError,
+    ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, GbAddonFetchError,
+    GbAddonInstallError, HistoryError, HudLoadError, ImportError, InstallError,
+    InstallMastercomfigError, KeepHudError, LibraryError, MakeHudError, PaintError, PresetError,
+    ProfileError, ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError,
 };
 use crate::fonts::Platform;
 use crate::hud_maker::{HudFiles, HudOptions, HudSchemas, MakerBase};
@@ -47,6 +48,7 @@ pub use crosshairs::{
     ApplyReport, Assignment, CrosshairEntry, CrosshairFormat, CrosshairRef, InstalledCrosshairs,
     PaintTarget, PaintedSource, SkipReason, SkippedAssignment, crosshair_scripts_need_repair,
 };
+pub use gb_addons::{GbAddonCheck, GbAddonEntry};
 pub use hud_copy::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub(crate) use hud_folder::is_safe_folder;
 pub use hud_history::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
@@ -248,12 +250,16 @@ pub(crate) fn is_plain_name(name: &str) -> bool {
     !name.is_empty() && name != "." && name != ".." && !name.contains(['/', '\\', '\0'])
 }
 
-/// v5's `<slug>-<first 8 chars of id>` folder name for sounds and crosshairs. The slug is
-/// the lowercased name with every char but alphanumerics, `-` and `_` turned into `-`,
-/// so no display name can form a path.
+/// v5's `<slug>-<first 8 chars of id>` folder name for sounds and crosshairs.
 pub(crate) fn folder_name(name: &str, id: &str) -> String {
-    let slug: String = name
-        .to_lowercase()
+    let short = id.get(..8).unwrap_or(id);
+    format!("{}-{short}", slug(name))
+}
+
+/// The lowercased name with every char but alphanumerics, `-` and `_` turned into `-`,
+/// so no display name can form a path.
+pub(crate) fn slug(name: &str) -> String {
+    name.to_lowercase()
         .chars()
         .map(|c| {
             if c.is_alphanumeric() || c == '-' || c == '_' {
@@ -262,9 +268,7 @@ pub(crate) fn folder_name(name: &str, id: &str) -> String {
                 '-'
             }
         })
-        .collect();
-    let short = id.get(..8).unwrap_or(id);
-    format!("{slug}-{short}")
+        .collect()
 }
 
 /// A GameBanana id as v5's signed `store_gb_id` column.
@@ -446,6 +450,30 @@ impl From<GameMissing> for InstallMastercomfigError {
 impl From<GameMissing> for ApplyModulesError {
     fn from(GameMissing { path }: GameMissing) -> Self {
         Self::GameMissing { path }
+    }
+}
+
+impl From<GameMissing> for GbAddonInstallError {
+    fn from(GameMissing { path }: GameMissing) -> Self {
+        Self::GameMissing { path }
+    }
+}
+
+impl From<IoFailure> for ArchiveError {
+    fn from(IoFailure { path, source }: IoFailure) -> Self {
+        Self::Io { path, source }
+    }
+}
+
+impl From<IoFailure> for GbAddonFetchError {
+    fn from(IoFailure { path, source }: IoFailure) -> Self {
+        Self::Io { path, source }
+    }
+}
+
+impl From<IoFailure> for GbAddonInstallError {
+    fn from(IoFailure { path, source }: IoFailure) -> Self {
+        Self::Io { path, source }
     }
 }
 
