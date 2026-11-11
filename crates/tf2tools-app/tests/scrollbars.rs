@@ -692,7 +692,15 @@ fn parts_sharing_an_offset_each_keep_their_own_bar_strip(cx: &mut TestAppContext
     for frame in 0..4 {
         let narrow = bounds(cx, win, "probe-narrow").size.height;
         let wide = bounds(cx, win, "probe-wide").size.height;
-        assert_eq!(narrow, px(20.), "frame {frame}: the narrow part has no strip");
-        assert_eq!(wide, px(20.) + BAR_WIDTH, "frame {frame}: the wide part has a strip");
+        assert_eq!(
+            narrow,
+            px(20.),
+            "frame {frame}: the narrow part has no strip"
+        );
+        assert_eq!(
+            wide,
+            px(20.) + BAR_WIDTH,
+            "frame {frame}: the wide part has a strip"
+        );
     }
 }
