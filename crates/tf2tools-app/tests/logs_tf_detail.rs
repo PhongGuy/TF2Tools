@@ -762,7 +762,10 @@ fn killstreak_names_show_whole(cx: &mut TestAppContext) {
     let (_env, _server, s, page) = opened(cx, 3);
     scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_CHAT_TOGGLE);
     support::click_id(cx, s.win, ids::LOGSTF_STREAKS_TOGGLE);
-    for ix in 0..13 {
+    let rows = (0..).take_while(|&ix| support::present(cx, s.win, ids::logstf_streak(ix)));
+    let rows: Vec<usize> = rows.collect();
+    assert!(!rows.is_empty(), "the dialog lists no streaks");
+    for ix in rows {
         let id = ids::logstf_streak_name(ix);
         let name = support::label_of(cx, s.win, id.clone()).expect("a streak's name");
         let cell = support::bounds_of(cx, s.win, id).unwrap();
