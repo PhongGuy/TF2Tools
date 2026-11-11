@@ -19,9 +19,10 @@ use crate::pages::logs_tf::text::{one_decimal, reads_zero, whole};
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 
-// The table's fixed columns; the name takes what is left.
+// The table's fixed columns. The name is sized at its minimum so a long one never widens the
+// table, and grows into any room the window leaves, truncating what still does not fit.
 const TEAM: Pixels = px(40.);
-const NAME_MIN: Pixels = px(120.);
+const NAME_MIN: Pixels = px(100.);
 // Room for four class icons, as many as a player shows before the rest clip.
 const CLASSES: Pixels = px(88.);
 // The sort arrow's row under every header, kept empty when unsorted so sorting never moves
@@ -77,8 +78,8 @@ pub(super) fn players_table(
             .text_color(cx.theme().muted_foreground)
             .font_weight(FontWeight::MEDIUM)
             .child(header(PlayerColumn::Team).w(TEAM))
-            .child(header(PlayerColumn::Name).flex_1().min_w(NAME_MIN))
-            .child(header(PlayerColumn::Class).w(CLASSES))
+            .child(header(PlayerColumn::Name).w(NAME_MIN).flex_grow(1.))
+            .child(header(PlayerColumn::Class).w(CLASSES).ml_2())
             .children(columns.iter().map(|(c, _)| header(*c).w(NUMBER))),
     );
     let assets = &cx.global::<Services>().assets;
@@ -114,14 +115,16 @@ pub(super) fn players_table(
                 div()
                     .id(ids::logstf_player_name(player.steam_id()))
                     .test_support()
-                    .flex_1()
-                    .min_w(NAME_MIN)
+                    .w(NAME_MIN)
+                    .flex_grow(1.)
                     .truncate()
                     .child(player.name().to_owned()),
             )
             .child(
+                // Kept clear of a cut-off name before it.
                 h_flex()
                     .w(CLASSES)
+                    .ml_2()
                     .flex_none()
                     .gap_0p5()
                     .overflow_hidden()

@@ -682,6 +682,73 @@ fn every_players_column_fits_a_1280_window(cx: &mut TestAppContext) {
     assert_eq!(last, table.bottom(), "{last:?} {table:?}");
 }
 
+// The longest name seen in a real log, which pushed CAP out of a 1280 window.
+const LONG_NAME: &str = "cheveuxbrillantenneigé39800";
+
+/// The highlander log, one player renamed `LONG_NAME`, open in a `width` by `height` window
+/// with the default sidebar; returns the long-named player's id and main class with it.
+fn opened_long_name(
+    cx: &mut TestAppContext,
+    width: f32,
+    height: f32,
+) -> (
+    support::Env,
+    support::StoreServer,
+    support::ShellWindow,
+    tf2tools_core::SteamId,
+    TfClass,
+) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[(2, day_ago(1))]));
+    let log = HIGHLANDER.replace("\"cabo marola\"", &format!("\"{LONG_NAME}\""));
+    server.mount_bytes("/json/2", log.into_bytes());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 2);
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(width), gpui_kit::px(height)),
+    );
+    support::settle(cx, s.win);
+    scroll_to_in_log(cx, &s, &page, 2, ids::LOGSTF_PLAYERS_SCROLL);
+    let id = cx.update(|cx| {
+        let log = page.read(cx).detail().unwrap();
+        let p = log.players().iter().find(|p| p.name() == LONG_NAME);
+        let p = p.expect("the renamed player");
+        (p.steam_id(), p.classes()[0].class())
+    });
+    (env, server, s, id.0, id.1)
+}
+
+#[gpui_kit::test]
+fn a_long_name_truncates_so_every_players_column_fits_1280(cx: &mut TestAppContext) {
+    let (_env, _server, s, id, class) = opened_long_name(cx, 1280., 800.);
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
+    assert!(cap.right() <= table.right(), "CAP {cap:?} past {table:?}");
+    let name = support::bounds_of(cx, s.win, ids::logstf_player_name(id)).unwrap();
+    assert!(
+        f32::from(name.size.width) < text_width(cx, s.win, LONG_NAME),
+        "the name is cut short: {name:?}"
+    );
+    // A gap keeps the cut name off its class icons.
+    let icon = support::bounds_of(cx, s.win, ids::logstf_class_card(id, class)).unwrap();
+    assert!(
+        name.right() + gpui_kit::px(8.) <= icon.left(),
+        "{name:?} {icon:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn a_long_name_gives_way_to_the_numbers_at_800(cx: &mut TestAppContext) {
+    let (_env, _server, s, id, _) = opened_long_name(cx, 800., 600.);
+    let name = support::bounds_of(cx, s.win, ids::logstf_player_name(id)).unwrap();
+    let head = support::bounds_of(cx, s.win, ids::logstf_sort("Name")).unwrap();
+    assert!(name.size.width <= gpui_kit::px(100.), "{name:?}");
+    assert!(head.size.width <= gpui_kit::px(100.), "{head:?}");
+}
+
 #[gpui_kit::test]
 fn class_icons_in_the_players_table_read_like_logs_tf(cx: &mut TestAppContext) {
     let (_env, _server, s, page) = opened(cx, 3);
