@@ -441,8 +441,8 @@ impl LogsCache {
             .map_err(db_error)?;
         let mut counted = 0;
         for id in ids {
-            // Read and parse outside the write lock; None means "count it with no rows".
             hook(BackfillStep::BeforeRead, id);
+            // Read and parse outside the write lock; None means "count it with no rows".
             let detail = match self.read_body(id)? {
                 BodyRead::Missing => continue,
                 BodyRead::Damaged => {
@@ -931,6 +931,7 @@ pub(super) enum BodyRead {
     Missing,
     /// A body that does not inflate or decode to text.
     Damaged,
+    /// The body as inflated, decoded text.
     Text(String),
 }
 
