@@ -371,6 +371,10 @@ impl LogsClient {
                 summary.cancelled = true;
                 return Ok(summary);
             }
+            // A removed player has nothing left to store or resume, so the sync just ends.
+            if self.cache.sync_state(id)?.is_none() {
+                return Ok(summary);
+            }
             // A log opened during the sync may already be stored; it is never downloaded twice.
             if !self.cache.needs_download(log_id, now)? {
                 on_progress(progress(done + 1));

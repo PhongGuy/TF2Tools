@@ -286,6 +286,15 @@ async fn a_player_removed_mid_sync_ends_it_cleanly_without_storing_their_logs() 
         .await
         .unwrap();
     assert_eq!(summary.downloaded(), 1, "only log 3 was stored");
+    assert!(
+        !summary.cancelled(),
+        "a removed player ends the sync, not cancels it"
+    );
+    assert_eq!(
+        paths(&env.server).await,
+        ["/api/v1/log", "/json/3", "/json/2"],
+        "nothing is asked after the player is gone"
+    );
     assert_eq!(common::count(&env.dir, "logstf_logs"), 0);
     assert_eq!(common::count(&env.dir, "logstf_class_rows"), 0);
 }
