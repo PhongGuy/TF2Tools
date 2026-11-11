@@ -1,62 +1,17 @@
-//! Tooltips for the HUD Maker's panels on GPUI's own tooltip, not the kit's window-wide one:
-//! it drops on any press or scroll and whenever its control leaves the pointer, so it never
-//! stays behind when a panel scrolls or redraws under a still pointer.
+//! The HUD Maker's tooltip helpers: holders that show a tooltip over a possibly disabled
+//! control, and tooltips anchored beside a panel row.
 
 use std::cell::Cell;
 use std::rc::Rc;
 
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::{
-    AnyElement, AnyView, App, AppContext as _, Bounds, Context, ElementId, InteractiveElement as _,
-    IntoElement, ParentElement as _, Pixels, Point, Render, SharedString,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window, canvas, div, point,
-    px,
+    AnyElement, AnyView, App, Bounds, ElementId, InteractiveElement as _, IntoElement,
+    ParentElement as _, Pixels, Point, SharedString, StatefulInteractiveElement as _, Styled as _,
+    TestSupportExt as _, Window, canvas, div, point, px,
 };
 
 use crate::ids;
-
-// The tooltip's content, under `id` so tests and the pilot can read its words.
-struct Tip {
-    id: &'static str,
-    text: SharedString,
-    shift: Point<Pixels>,
-}
-
-impl Render for Tip {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let content = div()
-            .id(self.id)
-            .aria_label(self.text.clone())
-            .test_support()
-            .child(Tooltip::new(self.text.clone()).build(window, cx));
-        if self.shift == Point::default() {
-            return content.into_any_element();
-        }
-        // GPUI starts a tooltip at the pointer. A shifted one is an out-of-flow child instead,
-        // so the shift moves where it paints without touching the size GPUI places it by.
-        div()
-            .relative()
-            .child(content.absolute().left(self.shift.x).top(self.shift.y))
-            .into_any_element()
-    }
-}
-
-/// A builder for `.tooltip(...)` showing `text`, its content readable under `id`.
-pub(super) fn tip(
-    id: &'static str,
-    text: impl Into<SharedString>,
-) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
-    let text = text.into();
-    move |_, cx| {
-        let text = text.clone();
-        cx.new(|_| Tip {
-            id,
-            text,
-            shift: Point::default(),
-        })
-        .into()
-    }
-}
+use crate::widgets::tip::{tip, tip_view};
 
 /// `control` inside a holder (`ids::hud_maker_tip_for(of)`) that shows `text` as a tooltip read
 /// under `ids::HUD_MAKER_TIP`; the holder still shows it while the control is disabled.
@@ -109,9 +64,8 @@ pub(super) fn tip_beside_row(
 ) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {
     let text = text.into();
     move |window, cx| {
-        let text = text.clone();
         let shift = beside_row(window.mouse_position(), control.get(), row.get());
-        cx.new(|_| Tip { id, text, shift }).into()
+        tip_view(id, text.clone(), shift, cx)
     }
 }
 

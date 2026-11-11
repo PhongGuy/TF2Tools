@@ -2,18 +2,16 @@
 
 use crate::weapons::TfClass;
 
-/// Player ?1's window: their logs from ?2 seconds before their newest cached log up to it,
-/// newest first, at most ?3. The list, the averages and the pending check all select from it,
-/// so "N logs" always matches the grid; a player with no logs has an empty window.
+/// Player ?1's window: their logs from ?2 seconds before their newest cached log up to it, or
+/// all of them when ?2 is NULL. The list, the averages and the pending check all select from
+/// it, so "N logs" always matches the grid; a player with no logs has an empty window.
 pub(super) const WINDOW_LOGS: &str = "WITH window_logs AS (
         SELECT l.id FROM logstf_logs l
         JOIN logstf_player_logs m ON m.log_id = l.id AND m.steam_id = ?1
-        WHERE l.date >= (
+        WHERE ?2 IS NULL OR l.date >= (
             SELECT MAX(a.date) FROM logstf_logs a
             JOIN logstf_player_logs am ON am.log_id = a.id AND am.steam_id = ?1
         ) - ?2
-        ORDER BY l.date DESC, l.id DESC
-        LIMIT ?3
     )";
 
 /// The player's summed class rows over the window, one row per class played.

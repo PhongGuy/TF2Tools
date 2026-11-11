@@ -1,15 +1,22 @@
-//! The logs.tf page: tracked players as chips, their 90-day class averages and their logs.
+//! The logs.tf page: tracked players as chips, their class averages and their logs over the
+//! history range the player picks.
 
 mod detail;
 mod grid;
 mod list;
+pub mod sort;
+pub mod tables;
 pub mod text;
+
+use std::collections::{BTreeSet, HashSet};
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{Disableable as _, Sizable as _, WindowExt as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
     ListAlignment, ListOffset, ListState, ParentElement as _, Render, SharedString,
@@ -17,25 +24,44 @@ use gpui_kit::{
     div, px,
 };
 use tf2tools_core::{
-    ClassAverage, LogDetail, LogRow, LogState, LogsProgress, LogsSyncError, LogsSyncSummary,
-    SteamId, TrackedPlayer, parse_log, parse_player_input,
+    ClassAverage, LogDetail, LogRow, LogState, LogsRange, MatrixKind, SteamId, TrackedPlayer,
+    parse_log, parse_player_input,
 };
 
 use crate::ids;
+use crate::logs_sync::{LogsSync, LogsSyncEvent, SyncProgress, logs_sync};
 use crate::pages::common::filter_badge;
+use crate::picker::PickKind;
 use crate::services::{OpError, Services, run_blocking};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
-use crate::shell::toast::toast_error;
+use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::tokio_bridge;
-use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
+use crate::widgets::dialog_frame::{DETAIL_WIDTH, DIALOG_WIDTH, DialogFrame};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
+use sort::{PlayerColumn, PlayerSort};
 use text::{
-    EMPTY_TEXT, LOGS_TF_DOWN, LOGS_TF_URL, LOOKING_UP, SAVE_FAILED, STEAM_UNREACHABLE, profile_url,
-    progress_text, resolve_message, sync_message,
+    DOWNLOAD_FAILED, DOWNLOADED, EMPTY_TEXT, LOG_UNREADABLE, LOGS_TF_DOWN, LOGS_TF_URL, LOOKING_UP,
+    REMOVING, SAVE_FAILED, STEAM_UNREACHABLE, WRITE_FAILED, download_reason, fetch_message,
+    profile_url, progress_line, resolve_message,
 };
+
+// The open log: its id, how far its body got and which of its rounds are open.
+pub(super) struct OpenLog {
+    pub(super) id: u64,
+    pub(super) state: OpenState,
+    pub(super) rounds: BTreeSet<usize>,
+}
+
+// A downloaded log reads its stored body and a pending one is fetched; either lands Ready,
+// or Failed with the panel's line for why.
+pub(super) enum OpenState {
+    Loading,
+    Ready(Box<LogDetail>),
+    Failed(&'static str),
+}
 
 /// The logs.tf page. It reads the tracked players from the cache on creation and is kept
 /// while hidden, so a visit elsewhere leaves it as it was.
@@ -45,22 +71,33 @@ pub struct LogsTfPage {
     loaded: bool,
     rows: Vec<LogRow>,
     averages: Option<[ClassAverage; 9]>,
-    // The open log's id; the list's item 0 is the page top, so row `i` is item `i + 1`.
-    expanded: Option<u64>,
-    // The open log as read from its stored body, keyed by its id so a read that lands after
-    // its row closed is dropped; None inside means the body could not be read.
-    detail: Option<(u64, Option<LogDetail>)>,
+    // The history range as the settings keep it, and the slider that picks it. `slider_range`
+    // is the stop last pushed into the slider, so a drag is never snapped back mid-way.
+    range: LogsRange,
+    range_slider: Entity<SliderState>,
+    slider_range: LogsRange,
+    // Range picks not yet saved; a cache read meanwhile may still hold the old range. Reads
+    // dropped for that are counted, so a test can see the guard fire.
+    range_writes: u32,
+    stale_reads: u32,
+    // The open log and how far its body got; the list's item 0 is the page top, so row `i`
+    // is item `i + 1`. A read or fetch that lands after its row closed is dropped.
+    open: Option<OpenLog>,
+    // The players table's order, kept across logs while the page lives.
+    player_sort: PlayerSort,
+    // The kill matrix tab, kept the same way.
+    matrix: MatrixKind,
     list: ListState,
     // Which optional row columns fit, from the list's width at the last frame; the list's
     // state cannot be asked while it lays its own items out.
     fit: list::Fit,
-    // One sync runs at a time and is never cancelled; a player chosen meanwhile waits in
-    // `queued`, so `syncing` stays true until the queue is empty.
-    syncing: bool,
-    running: Option<SteamId>,
-    queued: Option<SteamId>,
-    progress: Option<LogsProgress>,
-    error: Option<&'static str>,
+    // The app-wide sync the page starts and watches; it keeps running while the page hides.
+    sync: Entity<LogsSync>,
+    // At most one reread follows the sync at a time; events meanwhile ask for one more.
+    rereading: bool,
+    reread_wanted: bool,
+    // Players whose removal waits on their sync; nothing syncs them again meanwhile.
+    removing: HashSet<SteamId>,
     // Cache reads can land out of order; only the newest applies, and it starts the sync a
     // superseded read asked for.
     load_generation: u64,
@@ -88,28 +125,59 @@ impl LogsTfPage {
                 }
             },
         );
+        // The active player's sync moving rereads the cache, so logs appear as they land.
+        let sync = logs_sync(cx);
+        let heard = cx.subscribe(&sync, |page, _, event: &LogsSyncEvent, cx| {
+            let (LogsSyncEvent::Progress(id) | LogsSyncEvent::Finished(id)) = *event;
+            if page.active == Some(id) {
+                page.reread(cx);
+            }
+        });
+        let redraw = cx.observe(&sync, |_, _, cx| cx.notify());
+        // The slider commits on release only, so a drag across stops syncs once.
+        let range_slider = cx.new(|_| {
+            SliderState::new()
+                .min(0.)
+                .max((LogsRange::STOPS.len() - 1) as f32)
+                .step(1.)
+                .default_value(stop_index(LogsRange::default()) as f32)
+        });
+        let released = cx.subscribe_in(
+            &range_slider,
+            window,
+            |page, _, event: &SliderEvent, window, cx| {
+                if let SliderEvent::Release(value) = event {
+                    page.set_range(stop_at(value.start()), window, cx);
+                }
+            },
+        );
         let mut page = Self {
             players: Vec::new(),
             active: None,
             loaded: false,
             rows: Vec::new(),
             averages: None,
-            expanded: None,
-            detail: None,
+            range: LogsRange::default(),
+            range_slider,
+            slider_range: LogsRange::default(),
+            range_writes: 0,
+            stale_reads: 0,
+            open: None,
+            player_sort: PlayerSort::default(),
+            matrix: MatrixKind::Kills,
             list: ListState::new(1, ListAlignment::Top, px(200.)),
             fit: list::Fit::ALL,
-            syncing: false,
-            running: None,
-            queued: None,
-            progress: None,
-            error: None,
+            sync,
+            rereading: false,
+            reread_wanted: false,
+            removing: HashSet::new(),
             load_generation: 0,
             sync_wanted: false,
             add_input,
             add_error: None,
             adding: false,
             add_open: false,
-            _subscriptions: vec![enter],
+            _subscriptions: vec![enter, heard, redraw, released],
         };
         page.load(true, cx).detach();
         page
@@ -129,8 +197,8 @@ impl LogsTfPage {
     }
 
     /// True while a player's logs sync or another player's sync waits its turn.
-    pub fn is_syncing(&self) -> bool {
-        self.syncing
+    pub fn is_syncing(&self, cx: &App) -> bool {
+        self.sync.read(cx).busy()
     }
 
     /// The tracked players, in the order they were added.
@@ -148,16 +216,69 @@ impl LogsTfPage {
         self.averages.as_ref()
     }
 
-    /// Why the last sync failed, shown under the chips.
-    pub fn error(&self) -> Option<&str> {
-        self.error
+    /// Why the active player's last sync failed, shown under the chips.
+    pub fn error(&self, cx: &App) -> Option<&'static str> {
+        self.active.and_then(|id| self.sync.read(cx).error(id))
     }
 
     /// Forces a sync of the active player; a no-op while a sync runs.
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
-        if let (false, Some(id)) = (self.syncing, self.active) {
+        if let (false, Some(id)) = (self.is_syncing(cx), self.active) {
             self.sync(id, true, cx);
         }
+    }
+
+    /// How far back the list, averages and sync reach, as the settings keep it.
+    pub fn range(&self) -> LogsRange {
+        self.range
+    }
+
+    /// How many cache reads were dropped for seeing a range a pick had not yet replaced.
+    pub fn stale_reads_dropped(&self) -> u32 {
+        self.stale_reads
+    }
+
+    /// The history range slider: stops 0 to 5 in `LogsRange::STOPS` order, step 1.
+    pub fn range_slider(&self) -> &Entity<SliderState> {
+        &self.range_slider
+    }
+
+    /// Picks the history range: the slider moves to it, the settings keep it and the reload
+    /// that follows syncs the active player with it. Picking the current range does nothing.
+    pub fn set_range(&mut self, range: LogsRange, window: &mut Window, cx: &mut Context<Self>) {
+        if range == self.range {
+            return;
+        }
+        self.range = range;
+        // A cache read already out holds the old range; it must not land and put it back.
+        self.load_generation += 1;
+        self.move_slider(window, cx);
+        self.range_writes += 1;
+        let saving = run_blocking(cx, move |s| {
+            s.logs.cache().set_range(range).map_err(|error| {
+                tracing::warn!(%error, "saving the logs.tf history range failed");
+                OpError::core("Failed to change the history range", SAVE_FAILED)
+            })
+        });
+        cx.spawn_in(window, async move |page, cx| {
+            let written = saving.await;
+            let _ = page.update_in(cx, |page, window, cx| {
+                page.range_writes -= 1;
+                page.written(written, window, cx);
+            });
+        })
+        .detach();
+    }
+
+    // Puts the slider's thumb on `self.range`'s stop when it was last put elsewhere.
+    fn move_slider(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.slider_range == self.range {
+            return;
+        }
+        self.slider_range = self.range;
+        let stop = stop_index(self.range) as f32;
+        self.range_slider
+            .update(cx, |slider, cx| slider.set_value(stop, window, cx));
     }
 
     /// The page's one scrolling list: the top, then a row per log.
@@ -165,34 +286,99 @@ impl LogsTfPage {
         &self.list
     }
 
+    /// The open log's players table order.
+    pub fn player_sort(&self) -> PlayerSort {
+        self.player_sort
+    }
+
+    /// A click on the players table's `column` header: sorts by it, or flips it if it leads.
+    pub fn sort_players_by(&mut self, column: PlayerColumn, cx: &mut Context<Self>) {
+        self.player_sort = self.player_sort.clicked(column);
+        cx.notify();
+    }
+
+    /// The open log's kill matrix tab.
+    pub fn matrix_kind(&self) -> MatrixKind {
+        self.matrix
+    }
+
+    /// A click on the kill matrix's `kind` tab.
+    pub fn show_matrix(&mut self, kind: MatrixKind, cx: &mut Context<Self>) {
+        self.matrix = kind;
+        cx.notify();
+    }
+
     /// The log whose row is open, if any.
     pub fn expanded(&self) -> Option<u64> {
-        self.expanded
+        self.open.as_ref().map(|open| open.id)
     }
 
     /// The open row's log, once its body is read and parsed.
     pub fn detail(&self) -> Option<&LogDetail> {
-        self.detail
-            .as_ref()
-            .filter(|(id, _)| self.expanded == Some(*id))
-            .and_then(|(_, detail)| detail.as_ref())
+        match &self.open.as_ref()?.state {
+            OpenState::Ready(detail) => Some(detail),
+            OpenState::Loading | OpenState::Failed(_) => None,
+        }
     }
 
-    /// Opens log `id`'s row, closing any other; on the open row it closes it.
+    /// Opens log `id`'s row, closing any other; on the open row it closes it. A downloaded
+    /// log reads its stored body, one still pending is fetched from logs.tf.
     pub fn toggle(&mut self, id: u64, cx: &mut Context<Self>) {
-        let closing = self.expanded.take();
-        self.detail = None;
+        let closing = self.open.take().map(|open| open.id);
         if closing != Some(id) {
-            self.expanded = Some(id);
-            self.read_detail(id, cx);
+            self.open = Some(OpenLog {
+                id,
+                state: OpenState::Loading,
+                rounds: BTreeSet::new(),
+            });
+            match self.rows.iter().find(|r| r.id() == id).map(LogRow::state) {
+                Some(LogState::Pending) => self.fetch_detail(id, cx),
+                _ => self.read_detail(id, cx),
+            }
         }
         // Both rows change height, so both remeasure and the rows below move with them.
         for changed in closing.into_iter().chain([id]) {
-            if let Some(ix) = self.rows.iter().position(|r| r.id() == changed) {
-                self.list.remeasure_items(ix + 1..ix + 2);
-            }
+            self.remeasure_log(changed);
         }
         cx.notify();
+    }
+
+    /// The open log's open rounds, ascending.
+    pub fn open_rounds(&self) -> Vec<usize> {
+        self.open
+            .as_ref()
+            .map_or_else(Vec::new, |open| open.rounds.iter().copied().collect())
+    }
+
+    /// Opens round `round` of the open log, or closes it if open; any number stay open.
+    pub fn toggle_round(&mut self, round: usize, cx: &mut Context<Self>) {
+        let Some(open) = &mut self.open else {
+            return;
+        };
+        if !open.rounds.remove(&round) {
+            open.rounds.insert(round);
+        }
+        let id = open.id;
+        self.remeasure_log(id);
+        cx.notify();
+    }
+
+    // Remeasures log `id`'s list item, whose panel changed height.
+    fn remeasure_log(&mut self, id: u64) {
+        if let Some(ix) = self.rows.iter().position(|r| r.id() == id) {
+            self.list.remeasure_items(ix + 1..ix + 2);
+        }
+    }
+
+    // Moves open log `id` to `state`, unless its row closed or another opened meanwhile.
+    fn land(&mut self, id: u64, state: OpenState, cx: &mut Context<Self>) -> bool {
+        match &mut self.open {
+            Some(open) if open.id == id => open.state = state,
+            _ => return false,
+        }
+        self.remeasure_log(id);
+        cx.notify();
+        true
     }
 
     // Reads and parses log `id`'s stored body off the UI thread. It lands only if that row is
@@ -210,20 +396,79 @@ impl LogsTfPage {
         cx.spawn(async move |page, cx| {
             let read = reading.await;
             let _ = page.update(cx, |page, cx| {
-                if page.expanded != Some(id) {
-                    return;
-                }
-                let detail = read
-                    .inspect_err(|error| tracing::warn!(%error, id, "reading a logs.tf log failed"))
-                    .ok();
-                page.detail = Some((id, detail));
-                if let Some(ix) = page.rows.iter().position(|r| r.id() == id) {
-                    page.list.remeasure_items(ix + 1..ix + 2);
-                }
-                cx.notify();
+                let state = match read {
+                    Ok(detail) => OpenState::Ready(Box::new(detail)),
+                    Err(error) => {
+                        tracing::warn!(%error, id, "reading a logs.tf log failed");
+                        OpenState::Failed(LOG_UNREADABLE)
+                    }
+                };
+                page.land(id, state, cx);
             });
         })
         .detach();
+    }
+
+    // Fetches pending log `id` from logs.tf, which also stores it. A fetch the row's note will
+    // explain (removed, unreadable) closes the row; any other failure keeps it open with why.
+    // Either way the list is reread, since core marked the row.
+    fn fetch_detail(&mut self, id: u64, cx: &mut Context<Self>) {
+        if !tokio_bridge::is_running(cx) {
+            tokio_bridge::init(cx);
+        }
+        let client = cx.global::<Services>().logs.clone();
+        let fetching = tokio_bridge::spawn(cx, async move { client.fetch_log(id).await });
+        cx.spawn(async move |page, cx| {
+            let fetched = fetching.await;
+            let _ = page.update(cx, |page, cx| {
+                let state = match fetched {
+                    Ok(Ok(detail)) => Some(OpenState::Ready(Box::new(detail))),
+                    Ok(Err(error)) => {
+                        tracing::warn!(%error, id, "fetching a logs.tf log failed");
+                        fetch_message(&error).map(OpenState::Failed)
+                    }
+                    Err(error) => {
+                        tracing::warn!(%error, id, "the logs.tf fetch task stopped");
+                        Some(OpenState::Failed(LOGS_TF_DOWN))
+                    }
+                };
+                // Core stored or marked the log unless the failure has a line, so its row is
+                // reread even when the result no longer lands.
+                let marked = !matches!(state, Some(OpenState::Failed(_)));
+                // The sync may have stored the log while this fetch failed; then it reads.
+                let stored = page
+                    .rows
+                    .iter()
+                    .any(|r| r.id() == id && r.state() == LogState::Ready);
+                match state {
+                    Some(OpenState::Failed(_)) if stored => {
+                        if page.land(id, OpenState::Loading, cx) {
+                            page.read_detail(id, cx);
+                        }
+                    }
+                    Some(state) => {
+                        page.land(id, state, cx);
+                    }
+                    None if page.expanded() == Some(id) => {
+                        page.open = None;
+                        page.remeasure_log(id);
+                        cx.notify();
+                    }
+                    None => {}
+                }
+                if marked {
+                    page.reread(cx);
+                }
+            });
+        })
+        .detach();
+    }
+
+    /// Fetches open log `id` again after a failed fetch, showing it as loading meanwhile.
+    pub fn retry(&mut self, id: u64, cx: &mut Context<Self>) {
+        if self.land(id, OpenState::Loading, cx) {
+            self.fetch_detail(id, cx);
+        }
     }
 
     /// The player whose chip is selected, if any is tracked.
@@ -247,7 +492,8 @@ impl LogsTfPage {
         self.after_write(saving, window, cx);
     }
 
-    // Asks before forgetting a player; their logs stay cached until pruned.
+    // Asks before forgetting a player, stops their sync, then drops them with every log no
+    // other tracked player shares.
     fn remove(&mut self, id: SteamId, name: &str, window: &mut Window, cx: &mut Context<Self>) {
         let answer = confirm(
             Confirm {
@@ -264,14 +510,29 @@ impl LogsTfPage {
             if answer.recv().await != Ok(true) {
                 return;
             }
-            let _ = page.update_in(cx, |page, window, cx| {
-                let removing = run_blocking(cx, move |s| {
+            // Their sync ends first, so a list page it was recording cannot outlive the removal.
+            let Ok(stopped) = page.update(cx, |page, cx| {
+                page.removing.insert(id);
+                cx.notify();
+                page.sync.update(cx, |sync, cx| sync.stop(id, cx))
+            }) else {
+                return;
+            };
+            stopped.await;
+            let Ok(removing) = page.update(cx, |_, cx| {
+                run_blocking(cx, move |s| {
                     s.logs.cache().remove_player(id).map_err(|error| {
                         tracing::warn!(%error, "removing a logs.tf player failed");
                         OpError::core("Failed to stop tracking", SAVE_FAILED)
                     })
-                });
-                page.after_write(removing, window, cx);
+                })
+            }) else {
+                return;
+            };
+            let removed = removing.await;
+            let _ = page.update_in(cx, |page, window, cx| {
+                page.removing.remove(&id);
+                page.written(removed, window, cx);
             });
         })
         .detach();
@@ -353,6 +614,96 @@ impl LogsTfPage {
         });
     }
 
+    // Opens the open log's chat over the page. The rows are shaped once, since the log they
+    // come from never changes while the dialog is up.
+    fn open_chat(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(rows) = self.detail().map(tables::chat_rows) else {
+            return;
+        };
+        open_detail_dialog(window, cx, move |window, cx| {
+            detail::footer::chat_dialog(&rows, window, cx)
+        });
+    }
+
+    // Opens the open log's killstreaks over the page, shaped once as the chat is.
+    fn open_streaks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(rows) = self.detail().map(detail::footer::streak_rows) else {
+            return;
+        };
+        open_detail_dialog(window, cx, move |window, cx| {
+            detail::footer::streaks_dialog(&rows, window, cx)
+        });
+    }
+
+    // Asks where to save log `id`'s raw zip, downloads it from logs.tf, then writes it off the
+    // UI thread. A cancelled dialog ends it; any failure toasts why and leaves no file.
+    fn download_log(&mut self, id: u64, window: &mut Window, cx: &mut Context<Self>) {
+        let picking = cx.global::<Services>().picker.save_to(
+            PickKind::LogZip,
+            &format!("log_{id}.log.zip"),
+            cx,
+        );
+        cx.spawn_in(window, async move |page, cx| {
+            let Some(path) = picking.await else {
+                return;
+            };
+            let downloading = page.update(cx, |_, cx| {
+                if !tokio_bridge::is_running(cx) {
+                    tokio_bridge::init(cx);
+                }
+                let client = cx.global::<Services>().logs.clone();
+                tokio_bridge::spawn(cx, async move { client.download_zip(id).await })
+            });
+            let Ok(downloading) = downloading else {
+                return;
+            };
+            let saved = match downloading.await {
+                Ok(Ok(bytes)) => {
+                    let target = path.clone();
+                    let writing = page.update(cx, |_, cx| {
+                        run_blocking(cx, move |_| Ok(write_replacing(&target, &bytes)))
+                    });
+                    let Ok(writing) = writing else {
+                        return;
+                    };
+                    match writing.await {
+                        Ok(Ok(())) => Ok(()),
+                        Ok(Err(error)) => {
+                            tracing::warn!(%error, id, "writing a logs.tf zip failed");
+                            Err(WRITE_FAILED)
+                        }
+                        Err(error) => {
+                            tracing::warn!(%error, id, "the logs.tf zip write stopped");
+                            Err(WRITE_FAILED)
+                        }
+                    }
+                }
+                Ok(Err(error)) => {
+                    tracing::warn!(%error, id, "downloading a logs.tf zip failed");
+                    Err(download_reason(&error))
+                }
+                Err(error) => {
+                    tracing::warn!(%error, id, "the logs.tf zip download stopped");
+                    Err(LOGS_TF_DOWN)
+                }
+            };
+            let _ = page.update_in(cx, |_, window, cx| match saved {
+                Ok(()) => {
+                    let name = path.file_name().unwrap_or_default().to_string_lossy();
+                    toast(
+                        window,
+                        cx,
+                        ToastKind::Success,
+                        DOWNLOADED,
+                        name.into_owned(),
+                    );
+                }
+                Err(why) => toast(window, cx, ToastKind::Error, DOWNLOAD_FAILED, why),
+            });
+        })
+        .detach();
+    }
+
     // Reads the field, looks the player up on Steam, then tracks and activates them. A bad
     // input or a failed lookup or write stays in the dialog with its text kept.
     fn submit_add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -424,8 +775,7 @@ impl LogsTfPage {
         .detach();
     }
 
-    // Every chip write ends the same way: a failure toasts, then the page rereads the cache,
-    // which is the truth either way.
+    // Awaits a chip write, then ends it with `written`.
     fn after_write(
         &mut self,
         write: impl Future<Output = Result<(), OpError>> + 'static,
@@ -434,14 +784,23 @@ impl LogsTfPage {
     ) {
         cx.spawn_in(window, async move |page, cx| {
             let written = write.await;
-            let _ = page.update_in(cx, |page, window, cx| {
-                if let Err(err) = written {
-                    toast_error(window, cx, &err);
-                }
-                page.load(true, cx).detach();
-            });
+            let _ = page.update_in(cx, |page, window, cx| page.written(written, window, cx));
         })
         .detach();
+    }
+
+    // Every chip write ends the same way: a failure toasts, then the page rereads the cache,
+    // which is the truth either way.
+    fn written(
+        &mut self,
+        written: Result<(), OpError>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Err(err) = written {
+            toast_error(window, cx, &err);
+        }
+        self.load(true, cx).detach();
     }
 
     // Reads the players, the active chip and that player's logs and averages off the UI
@@ -456,29 +815,37 @@ impl LogsTfPage {
             let read = |e| OpError::core("Failed to load logs.tf players", e);
             let players = cache.players().map_err(read)?;
             let active = cache.active_player().map_err(read)?;
+            let range = cache.range().map_err(read)?;
             let logs = match active {
                 Some(id) => Some((
-                    cache.logs(id).map_err(read)?,
-                    cache.class_averages(id).map_err(read)?,
+                    cache.logs(id, range).map_err(read)?,
+                    cache.class_averages(id, range).map_err(read)?,
                 )),
                 None => None,
             };
-            Ok((players, active, logs))
+            Ok((players, active, range, logs))
         });
         cx.spawn(async move |page, cx| {
             let loaded = loading.await;
             let _ = page.update(cx, |page, cx| {
-                if page.load_generation != generation {
+                // A read that ran before a range pick was saved saw the old range; the pick's
+                // own reread follows, so this one is dropped like a superseded one.
+                let before_pick = matches!(&loaded, Ok((_, _, range, _))
+                    if stale_read(page.range_writes, page.range, *range));
+                page.stale_reads += u32::from(before_pick);
+                if page.load_generation != generation || before_pick {
                     return;
                 }
                 match loaded {
-                    Ok((players, active, logs)) => {
+                    Ok((players, active, range, logs)) => {
                         page.players = players;
                         page.active = active;
+                        page.range = range;
                         let (rows, averages) = logs.unzip();
                         let old = std::mem::replace(&mut page.rows, rows.unwrap_or_default());
                         page.averages = averages;
                         page.fit_list(&old);
+                        page.read_downloaded(&old, cx);
                     }
                     Err(error) => tracing::warn!(%error, "reading the logs.tf cache failed"),
                 }
@@ -495,7 +862,8 @@ impl LogsTfPage {
 
     // Matches the list to fresh rows that replaced `old`: added or dropped rows splice in
     // after the top, and every item remeasures since a row's state or the top's height may
-    // have changed. An open row that is gone or no longer downloaded closes.
+    // have changed. An open row that is gone from the list, or that logs.tf removed or sent
+    // unreadable, closes.
     fn fit_list(&mut self, old: &[LogRow]) {
         let items = self.rows.len() + 1;
         let count = self.list.item_count();
@@ -513,88 +881,63 @@ impl LogsTfPage {
             }
         }
         self.list.remeasure_items(0..items);
-        let open = |r: &LogRow| Some(r.id()) == self.expanded && r.state() == LogState::Ready;
-        if !self.rows.iter().any(open) {
-            self.expanded = None;
-            self.detail = None;
+        let opens = |r: &LogRow| matches!(r.state(), LogState::Ready | LogState::Pending);
+        let still_open = |r: &LogRow| Some(r.id()) == self.expanded() && opens(r);
+        if !self.rows.iter().any(still_open) {
+            self.open = None;
         }
     }
 
-    // Syncs `id` on the tokio runtime, rereading the cache after each progress event so logs
-    // appear as they land. While another sync runs, `id` replaces whoever waits next.
+    // An open log whose fetch failed reads its stored body once the sync has downloaded it,
+    // that is when it was pending in `old` and is ready now.
+    fn read_downloaded(&mut self, old: &[LogRow], cx: &mut Context<Self>) {
+        let Some(OpenLog {
+            id,
+            state: OpenState::Failed(_),
+            ..
+        }) = self.open
+        else {
+            return;
+        };
+        let was = |rows: &[LogRow], state| rows.iter().any(|r| r.id() == id && r.state() == state);
+        let downloaded = was(old, LogState::Pending) && was(&self.rows, LogState::Ready);
+        if downloaded && self.land(id, OpenState::Loading, cx) {
+            self.read_detail(id, cx);
+        }
+    }
+
+    // Asks the app-wide sync for `id`; a run for anyone else is cancelled in its favour.
     fn sync(&mut self, id: SteamId, force: bool, cx: &mut Context<Self>) {
-        if self.syncing {
-            self.queued = (self.running != Some(id)).then_some(id);
+        if self.removing.contains(&id) {
             return;
         }
-        self.syncing = true;
-        self.running = Some(id);
-        self.progress = None;
-        cx.notify();
-        if !tokio_bridge::is_running(cx) {
-            tokio_bridge::init(cx);
+        self.sync
+            .update(cx, |sync, cx| sync.start(id, self.range, force, cx));
+    }
+
+    // Each reread lands before the next starts, so a burst of events costs one more read.
+    fn reread(&mut self, cx: &mut Context<Self>) {
+        if self.rereading {
+            self.reread_wanted = true;
+            return;
         }
-        let client = cx.global::<Services>().logs.clone();
-        // Only the newest count is kept, so a slow frame skips counts rather than queueing them.
-        let (tx, mut rx) = tokio::sync::watch::channel(None::<LogsProgress>);
-        let job = tokio_bridge::spawn(cx, async move {
-            let report = move |progress| {
-                tx.send_replace(Some(progress));
-            };
-            client.sync_player(id, force, &report).await
-        });
-        // Each reread lands before the next event is taken, so events that arrive meanwhile
-        // collapse into one reread of the newest count.
+        self.rereading = true;
+        let reading = self.load(false, cx);
         cx.spawn(async move |page, cx| {
-            while rx.changed().await.is_ok() {
-                let progress = *rx.borrow_and_update();
-                let reread = page.update(cx, |page, cx| {
-                    page.progress = progress;
-                    cx.notify();
-                    page.load(false, cx)
-                });
-                match reread {
-                    Ok(reread) => reread.await,
-                    Err(_) => return,
+            reading.await;
+            let _ = page.update(cx, |page, cx| {
+                page.rereading = false;
+                if std::mem::take(&mut page.reread_wanted) {
+                    page.reread(cx);
                 }
-            }
-            let joined = job.await;
-            let _ = page.update(cx, |page, cx| page.synced(joined, cx));
+            });
         })
         .detach();
     }
 
-    // Ends a sync: keeps or clears the error line, starts the queued player's sync if any and
-    // rereads the cache. A queued player removed before their turn is no failure.
-    fn synced(
-        &mut self,
-        joined: Result<Result<LogsSyncSummary, LogsSyncError>, tokio_bridge::JoinError>,
-        cx: &mut Context<Self>,
-    ) {
-        match joined {
-            Ok(Ok(_) | Err(LogsSyncError::NotTracked { .. })) => self.error = None,
-            Ok(Err(error)) => {
-                tracing::warn!(%error, "syncing logs.tf logs failed");
-                self.error = Some(sync_message(&error));
-            }
-            Err(error) => {
-                tracing::warn!(%error, "the logs.tf sync task stopped");
-                self.error = Some(LOGS_TF_DOWN);
-            }
-        }
-        self.syncing = false;
-        self.running = None;
-        self.progress = None;
-        if let Some(next) = self.queued.take() {
-            self.sync(next, false, cx);
-        }
-        self.load(false, cx).detach();
-        cx.notify();
-    }
-
     // Refresh and the active player's logs.tf profile, beside the chips.
     fn actions(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let syncing = self.syncing;
+        let syncing = self.is_syncing(cx);
         h_flex()
             .flex_none()
             .gap_2()
@@ -620,16 +963,23 @@ impl LogsTfPage {
     // The active player's progress line while their logs download, then the last failure
     // with its Retry, hidden while a sync runs since Retry could not start another.
     fn status(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let ours = self.syncing && self.running == self.active;
+        let sync = self.sync.read(cx);
+        let ours = self.active.is_some() && sync.running() == self.active;
         // A count of 0 of 0 says nothing, so the line waits for the list to arrive.
-        let progress = self.progress.filter(|p| ours && p.total() > 0).map(|p| {
+        let progress = sync.progress().filter(|progress| {
+            let (SyncProgress::Finding { total, .. } | SyncProgress::Downloading { total, .. }) =
+                *progress;
+            ours && total > 0
+        });
+        let busy = sync.busy();
+        let progress = progress.map(|progress| {
             labelled(
                 div().text_sm().text_color(cx.theme().muted_foreground),
                 ids::LOGSTF_PROGRESS,
-                progress_text(p.done(), p.total()),
+                progress_line(progress),
             )
         });
-        let error = self.error.filter(|_| !self.syncing).map(|error| {
+        let error = self.error(cx).filter(|_| !busy).map(|error| {
             let page = cx.entity().downgrade();
             let on_retry = move |_: &mut Window, cx: &mut App| {
                 let _ = page.update(cx, |page, cx| page.refresh(cx));
@@ -645,19 +995,24 @@ impl LogsTfPage {
         for player in &self.players {
             let id = player.steam_id();
             let name = player.name().to_owned();
+            // A chip being removed says so and takes no clicks until it goes.
+            let removing = self.removing.contains(&id);
             let chip = filter_badge(
                 ids::logstf_chip(id),
                 self.active == Some(id),
-                name.clone(),
+                if removing { REMOVING } else { name.as_str() }.to_owned(),
                 window,
                 cx,
             )
-            .on_click(cx.listener(move |page, _, window, cx| page.select(id, window, cx)));
+            .when(!removing, |chip| {
+                chip.on_click(cx.listener(move |page, _, window, cx| page.select(id, window, cx)))
+            });
             let remove = Button::new(ids::logstf_chip_remove(id))
                 .ghost()
                 .xsmall()
                 .icon(IconName::X)
                 .named(format!("Stop tracking {name}"))
+                .disabled(removing)
                 .on_click(cx.listener(move |page, _, window, cx| {
                     page.remove(id, &name, window, cx);
                 }));
@@ -675,7 +1030,9 @@ impl LogsTfPage {
         let empty = self.loaded && self.players.is_empty();
         // Only a finished sync can say a player has no logs: one still running or waiting
         // its turn may bring some, and a player never synced shows the error line instead.
-        let fetching = self.syncing && (self.running == self.active || self.queued == self.active);
+        let sync = self.sync.read(cx);
+        let fetching = self.active.is_some()
+            && (sync.running() == self.active || sync.queued() == self.active);
         let synced = |id: &SteamId| {
             self.players
                 .iter()
@@ -709,7 +1066,17 @@ impl LogsTfPage {
                 self.averages
                     .as_ref()
                     .filter(|_| !self.players.is_empty())
-                    .map(|averages| grid::class_grid(averages, &self.rows, cx)),
+                    .map(|averages| {
+                        grid::class_grid(
+                            averages,
+                            self.rows.len(),
+                            self.rows.first().map(LogRow::date),
+                            self.range,
+                            &self.range_slider,
+                            cx.entity().downgrade(),
+                            cx,
+                        )
+                    }),
             )
             .children(empty.then(|| self.empty_state(cx)))
             .children(no_logs.map(|id| list::no_logs(id, cx)))
@@ -738,8 +1105,10 @@ impl LogsTfPage {
 }
 
 impl Render for LogsTfPage {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.fit = list::fit(&self.list);
+        // A cache read has no window to move the slider with, so the frame after it does.
+        self.move_slider(window, cx);
         // The page scrolls as one list, so the grid and the logs move together.
         v_flex()
             .id(ids::page(Page::LogsTf))
@@ -747,5 +1116,79 @@ impl Render for LogsTfPage {
             .size_full()
             .p(CONTENT_PADDING)
             .child(list::page_list(self, cx).flex_1().min_h_0())
+    }
+}
+
+// A read-only dialog of the log's detail width, deferred as the add dialog is so the click
+// that opened it cannot pull focus back out.
+fn open_detail_dialog<E: IntoElement>(
+    window: &mut Window,
+    cx: &mut Context<LogsTfPage>,
+    content: impl Fn(&Window, &App) -> E + 'static,
+) {
+    window.defer(cx, move |window, cx| {
+        let frame = DialogFrame::new(DETAIL_WIDTH);
+        window.open_dialog(cx, move |dialog, window, cx| {
+            frame
+                .apply(dialog, &*window, &*cx)
+                .child(frame.measure(content(&*window, &*cx)))
+        });
+    });
+}
+
+// A cache read that saw `read_range` while `pending_picks` range picks wait to be saved ran
+// before the newest pick, `picked`, landed; the pick's own reread follows it.
+fn stale_read(pending_picks: u32, picked: LogsRange, read_range: LogsRange) -> bool {
+    pending_picks > 0 && read_range != picked
+}
+
+// A range's place on the slider, narrow to wide.
+fn stop_index(range: LogsRange) -> usize {
+    LogsRange::STOPS
+        .iter()
+        .position(|stop| *stop == range)
+        .unwrap_or_default()
+}
+
+// The range at a slider value, rounded to the nearest stop; a NaN reads as the first.
+fn stop_at(value: f32) -> LogsRange {
+    let ix = if value.is_nan() {
+        0
+    } else {
+        value.round().clamp(0., (LogsRange::STOPS.len() - 1) as f32) as usize
+    };
+    LogsRange::STOPS[ix]
+}
+
+// Writes `bytes` to a temporary file beside `path`, then renames it over `path`, so a failed
+// write never leaves a partial file where the player asked for one.
+fn write_replacing(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let dir = path.parent().filter(|d| !d.as_os_str().is_empty());
+    let mut part = tempfile::NamedTempFile::new_in(dir.unwrap_or(std::path::Path::new(".")))?;
+    part.write_all(bytes)?;
+    part.as_file().sync_all()?;
+    part.persist(path).map_err(|e| e.error)?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_read_is_stale_only_while_a_pick_is_unsaved_and_it_saw_another_range() {
+        use LogsRange::{Months3, Year1};
+        assert!(
+            stale_read(1, Year1, Months3),
+            "it saw the range the pick replaced"
+        );
+        assert!(stale_read(2, Year1, Months3), "two picks out");
+        assert!(!stale_read(1, Year1, Year1), "it already saw the pick");
+        assert!(
+            !stale_read(0, Year1, Months3),
+            "no pick out: the cache is the truth"
+        );
+        assert!(!stale_read(0, Year1, Year1));
     }
 }

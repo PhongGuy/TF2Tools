@@ -1,12 +1,14 @@
 //! The logs.tf cache: tracked players, the active player and pruning, over the library database.
 
 use std::collections::HashMap;
+use std::io::{Read, Write};
 
+use rusqlite::types::ValueRef;
 use rusqlite::{OptionalExtension, params};
 
 use super::averages::{CLASS_SUMS, ClassAverage, ClassSums, WINDOW_LOGS};
 use super::{
-    LOG_CAP, LogDetail, PROVISIONAL_SECS, PRUNE_SECS, SteamId, WINDOW_SECS, logstf_class,
+    LOG_BODY_LIMIT, LogDetail, LogsRange, PROVISIONAL_SECS, SteamId, logstf_class,
     logstf_class_name,
 };
 use crate::db::Database;
@@ -15,6 +17,17 @@ use crate::weapons::TfClass;
 
 /// The `settings` key naming the player whose chip is selected.
 const ACTIVE_KEY: &str = "logstf_active_player";
+
+/// The `settings` key holding the chosen history range's key.
+const RANGE_KEY: &str = "logstf_range";
+
+/// The `settings` key prefix, followed by a SteamID64, for the range a player was last listed in.
+const LISTED_RANGE_PREFIX: &str = "logstf_listed_range:";
+
+/// Deletes every log no tracked player is a member of; memberships and class rows cascade.
+const PRUNE_SQL: &str = "DELETE FROM logstf_logs WHERE id NOT IN (
+        SELECT m.log_id FROM logstf_player_logs m
+        JOIN logstf_players p ON p.steam_id = m.steam_id)";
 
 /// `logstf_logs.state` for a log logs.tf answered 404 for.
 pub(super) const STATE_GONE: i64 = 1;
@@ -148,11 +161,6 @@ impl LogRow {
     pub fn dmg(&self) -> u32 {
         self.dmg
     }
-
-    /// Damage per minute over the player's time; `None` when they have no time.
-    pub fn dmg_per_min(&self) -> Option<f64> {
-        (self.seconds > 0).then(|| f64::from(self.dmg) / f64::from(self.seconds) * 60.0)
-    }
 }
 
 /// One entry of a player's logs.tf list, as the sync keeps it.
@@ -244,14 +252,18 @@ impl LogsCache {
             .map_err(db_error)
     }
 
-    /// Deletes the player row and their memberships; their logs stay until pruned.
+    /// Deletes the player, their memberships, their listed-range setting and then every log
+    /// no remaining tracked player is a member of, in one transaction.
     pub fn remove_player(&self, id: SteamId) -> Result<(), LogsCacheError> {
         self.db
             .write(|conn| {
+                let listed_key = format!("{LISTED_RANGE_PREFIX}{}", id.id64());
                 let id = sql_id(id)?;
                 let tx = conn.transaction()?;
                 tx.execute("DELETE FROM logstf_player_logs WHERE steam_id = ?1", [id])?;
                 tx.execute("DELETE FROM logstf_players WHERE steam_id = ?1", [id])?;
+                tx.execute("DELETE FROM settings WHERE key = ?1", [listed_key])?;
+                tx.execute(PRUNE_SQL, [])?;
                 tx.commit()
             })
             .map_err(db_error)
@@ -291,9 +303,40 @@ impl LogsCache {
             .map_err(db_error)
     }
 
-    /// The player's logs in their window (the `WINDOW_SECS` ending at their newest log),
-    /// newest first, at most LOG_CAP.
-    pub fn logs(&self, id: SteamId) -> Result<Vec<LogRow>, LogsCacheError> {
+    /// The chosen history range; a missing or unknown setting reads as the default, three months.
+    pub fn range(&self) -> Result<LogsRange, LogsCacheError> {
+        let key = self
+            .db
+            .read(|conn| {
+                conn.query_row(
+                    "SELECT value FROM settings WHERE key = ?1",
+                    [RANGE_KEY],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+            })
+            .map_err(db_error)?;
+        Ok(key
+            .as_deref()
+            .and_then(LogsRange::from_key)
+            .unwrap_or_default())
+    }
+
+    /// Stores `range` as the chosen history range.
+    pub fn set_range(&self, range: LogsRange) -> Result<(), LogsCacheError> {
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+                    params![RANGE_KEY, range.key()],
+                )
+            })
+            .map(drop)
+            .map_err(db_error)
+    }
+
+    /// The player's logs in `range`'s window ending at their newest log, newest first.
+    pub fn logs(&self, id: SteamId, range: LogsRange) -> Result<Vec<LogRow>, LogsCacheError> {
         // One row per (log, class played), longest class first and ties by class name; a log with no class rows
         // comes once with NULL stats. Consecutive rows of one log fold into its LogRow.
         let sql = format!(
@@ -308,7 +351,7 @@ impl LogsCache {
         self.db
             .read(|conn| {
                 let mut stmt = conn.prepare(&sql)?;
-                let mut rows = stmt.query(params![sql_id(id)?, WINDOW_SECS, LOG_CAP as i64])?;
+                let mut rows = stmt.query(params![sql_id(id)?, range.reach_secs()])?;
                 let mut out: Vec<LogRow> = Vec::new();
                 while let Some(row) = rows.next()? {
                     let log_id = u64::try_from(row.get::<_, i64>(0)?).unwrap_or(0);
@@ -355,32 +398,57 @@ impl LogsCache {
             .map_err(db_error)
     }
 
-    /// The stored `/json/<id>` body of a downloaded log; `None` for any other.
+    /// The stored `/json/<id>` body of a downloaded log; `None` for any other. A compressed
+    /// body that does not inflate to UTF-8 within `LOG_BODY_LIMIT` is a `Database` error.
     pub fn log_body(&self, log_id: u64) -> Result<Option<String>, LogsCacheError> {
         let Ok(log_id) = i64::try_from(log_id) else {
             return Ok(None);
         };
-        self.db
+        // Copy the stored value out as is and inflate after the read, so the connection is
+        // free while inflating. A BLOB is a compressed body; TEXT is an earlier build's plain one.
+        let stored = self
+            .db
             .read(|conn| {
                 conn.query_row(
                     "SELECT body FROM logstf_logs WHERE id = ?1",
                     [log_id],
-                    |row| row.get::<_, Option<String>>(0),
+                    |row| {
+                        Ok(match row.get_ref(0)? {
+                            ValueRef::Null => None,
+                            ValueRef::Blob(bytes) => Some(Stored::Compressed(bytes.to_vec())),
+                            ValueRef::Text(text) => Some(Stored::Plain(text.to_vec())),
+                            ValueRef::Integer(_) | ValueRef::Real(_) => Some(Stored::Other),
+                        })
+                    },
                 )
                 .optional()
             })
-            .map(Option::flatten)
-            .map_err(db_error)
+            .map_err(db_error)?
+            .flatten();
+        match stored {
+            None => Ok(None),
+            Some(Stored::Plain(text)) => String::from_utf8(text)
+                .map(Some)
+                .map_err(|_| damaged(log_id)),
+            Some(Stored::Compressed(bytes)) => {
+                inflate(&bytes).map(Some).ok_or_else(|| damaged(log_id))
+            }
+            Some(Stored::Other) => Err(damaged(log_id)),
+        }
     }
 
     /// The nine classes in TfClass::ALL order, over exactly the logs `logs` returns.
-    pub fn class_averages(&self, id: SteamId) -> Result<[ClassAverage; 9], LogsCacheError> {
+    pub fn class_averages(
+        &self,
+        id: SteamId,
+        range: LogsRange,
+    ) -> Result<[ClassAverage; 9], LogsCacheError> {
         let sql = format!("{WINDOW_LOGS} {CLASS_SUMS}");
         let sums = self
             .db
             .read(|conn| {
                 let mut stmt = conn.prepare(&sql)?;
-                stmt.query_map(params![sql_id(id)?, WINDOW_SECS, LOG_CAP as i64], |row| {
+                stmt.query_map(params![sql_id(id)?, range.reach_secs()], |row| {
                     Ok((
                         row.get::<_, String>(0)?,
                         ClassSums {
@@ -408,28 +476,11 @@ impl LogsCache {
         }))
     }
 
-    /// Deletes logs no tracked player's window still needs; returns how many. A tracked
-    /// player keeps their logs up to `PRUNE_SECS` before their newest one; a log no tracked
-    /// player lists goes once it is `PRUNE_SECS` older than `now`. Memberships and class rows
-    /// go with them through the foreign-key cascade.
-    pub fn prune(&self, now: i64) -> Result<usize, LogsCacheError> {
-        // `listed` pairs each tracked membership with whether that player's own reach covers
-        // the log; a log survives while any pair covers it.
-        let sql = "WITH anchors AS (
-                SELECT m.steam_id, MAX(l.date) AS anchor FROM logstf_player_logs m
-                JOIN logstf_players p ON p.steam_id = m.steam_id
-                JOIN logstf_logs l ON l.id = m.log_id
-                GROUP BY m.steam_id
-            ), listed AS (
-                SELECT m.log_id, l.date >= a.anchor - ?2 AS covered FROM logstf_player_logs m
-                JOIN anchors a ON a.steam_id = m.steam_id
-                JOIN logstf_logs l ON l.id = m.log_id
-            )
-            DELETE FROM logstf_logs
-            WHERE id NOT IN (SELECT log_id FROM listed WHERE covered)
-              AND (id IN (SELECT log_id FROM listed) OR date < ?1 - ?2)";
+    /// Deletes every log no tracked player is a member of, whatever its age; returns how
+    /// many. Memberships and class rows go with them through the foreign-key cascade.
+    pub fn prune(&self) -> Result<usize, LogsCacheError> {
         self.db
-            .write(|conn| conn.execute(sql, params![now, PRUNE_SECS]))
+            .write(|conn| conn.execute(PRUNE_SQL, []))
             .map_err(db_error)
     }
 }
@@ -475,10 +526,7 @@ impl LogsCache {
                     let mut member = tx.prepare(
                         "INSERT OR IGNORE INTO logstf_player_logs (steam_id, log_id) VALUES (?1, ?2)",
                     )?;
-                    let mut needs = tx.prepare(
-                        "SELECT 1 FROM logstf_logs WHERE id = ?1 AND state = 0 AND (body IS NULL
-                             OR (fetched_at - date < ?2 AND ?3 - date >= ?2))",
-                    )?;
+                    let mut needs = tx.prepare(NEEDS_DOWNLOAD_SQL)?;
                     for log in logs {
                         upsert.execute(params![log.id, log.title, log.map, log.date])?;
                         member.execute(params![player, log.id])?;
@@ -493,24 +541,42 @@ impl LogsCache {
             .map_err(db_error)
     }
 
+    /// Whether `log_id` still needs a download by `record_list`'s rule; false once a body was
+    /// stored meanwhile or the row is gone.
+    pub(crate) fn needs_download(&self, log_id: i64, now: i64) -> Result<bool, LogsCacheError> {
+        self.db
+            .read(|conn| {
+                conn.prepare(NEEDS_DOWNLOAD_SQL)?
+                    .exists(params![log_id, PROVISIONAL_SECS, now])
+            })
+            .map_err(db_error)
+    }
+
     /// Stores a downloaded log: its body and length, a class row per player per class played
     /// (Medic heals, ubers and drops on the medic row only), and real names for any player
     /// still named by the offline placeholder. Old class rows go first, so a refetch replaces them.
+    /// Returns false, storing nothing, when the log's row is gone (pruned or its player removed).
     pub(crate) fn ingest(
         &self,
         log_id: i64,
         body: &str,
         detail: &LogDetail,
         now: i64,
-    ) -> Result<(), LogsCacheError> {
+    ) -> Result<bool, LogsCacheError> {
+        let stored = deflate(body)?;
         self.db
             .write(|conn| {
                 let tx = conn.transaction()?;
-                tx.execute(
+                let updated = tx.execute(
                     "UPDATE logstf_logs SET body = ?2, fetched_at = ?3, length = ?4, state = 0
                      WHERE id = ?1",
-                    params![log_id, body, now, detail.length()],
+                    params![log_id, stored, now, detail.length()],
                 )?;
+                // The row vanished between listing and download; its class rows have no log
+                // to point at, so there is nothing to store.
+                if updated == 0 {
+                    return Ok(false);
+                }
                 tx.execute("DELETE FROM logstf_class_rows WHERE log_id = ?1", [log_id])?;
                 {
                     let mut row = tx.prepare(
@@ -542,7 +608,8 @@ impl LogsCache {
                         rename.execute(params![sql_id(p.steam_id())?, p.name()])?;
                     }
                 }
-                tx.commit()
+                tx.commit()?;
+                Ok(true)
             })
             .map_err(db_error)
     }
@@ -589,7 +656,11 @@ impl LogsCache {
     }
 
     /// Whether any of `player`'s logs `logs` would return is still pending.
-    pub(crate) fn has_pending(&self, player: SteamId) -> Result<bool, LogsCacheError> {
+    pub(crate) fn has_pending(
+        &self,
+        player: SteamId,
+        range: LogsRange,
+    ) -> Result<bool, LogsCacheError> {
         let sql = format!(
             "{WINDOW_LOGS}
              SELECT 1 FROM logstf_logs
@@ -598,8 +669,48 @@ impl LogsCache {
         self.db
             .read(|conn| {
                 conn.prepare(&sql)?
-                    .exists(params![sql_id(player)?, WINDOW_SECS, LOG_CAP as i64])
+                    .exists(params![sql_id(player)?, range.reach_secs()])
             })
+            .map_err(db_error)
+    }
+
+    /// The range `player` was last fully listed in. A missing or unknown row reads as
+    /// three months, the window every earlier build listed, so an upgrade does not relist.
+    pub(crate) fn listed_range(&self, player: SteamId) -> Result<LogsRange, LogsCacheError> {
+        let key = self
+            .db
+            .read(|conn| {
+                conn.query_row(
+                    "SELECT value FROM settings WHERE key = ?1",
+                    [format!("{LISTED_RANGE_PREFIX}{}", player.id64())],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+            })
+            .map_err(db_error)?;
+        Ok(key
+            .as_deref()
+            .and_then(LogsRange::from_key)
+            .unwrap_or(LogsRange::Months3))
+    }
+
+    /// Records that `player`'s list was read through to the end of `range`.
+    pub(crate) fn set_listed_range(
+        &self,
+        player: SteamId,
+        range: LogsRange,
+    ) -> Result<(), LogsCacheError> {
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+                    params![
+                        format!("{LISTED_RANGE_PREFIX}{}", player.id64()),
+                        range.key()
+                    ],
+                )
+            })
+            .map(drop)
             .map_err(db_error)
     }
 
@@ -616,6 +727,11 @@ impl LogsCache {
             .map_err(db_error)
     }
 }
+
+/// Matches log ?1 while it needs a download: not gone or unreadable, and without a body or
+/// fetched while provisional (within ?2 seconds of upload) and settled by ?3.
+const NEEDS_DOWNLOAD_SQL: &str = "SELECT 1 FROM logstf_logs WHERE id = ?1 AND state = 0
+    AND (body IS NULL OR (fetched_at - date < ?2 AND ?3 - date >= ?2))";
 
 /// One row's stats: seconds, kills, deaths, assists, dmg, heal, ubers, drops.
 type ClassStats = [i64; 8];
@@ -656,6 +772,45 @@ fn clamp_u32(n: i64) -> u32 {
 
 fn from_sql_id(id: i64) -> Option<SteamId> {
     SteamId::from_id64(u64::try_from(id).ok()?)
+}
+
+/// A `logstf_logs.body` value as SQLite stored it.
+enum Stored {
+    Compressed(Vec<u8>),
+    Plain(Vec<u8>),
+    /// A number, which no build ever stored as a body.
+    Other,
+}
+
+/// A body compressed for storage: zlib at level 6.
+fn deflate(body: &str) -> Result<Vec<u8>, LogsCacheError> {
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::new(6));
+    encoder
+        .write_all(body.as_bytes())
+        .and_then(|()| encoder.finish())
+        .map_err(|e| LogsCacheError::Database {
+            message: format!("a log body could not be compressed: {e}"),
+        })
+}
+
+/// A stored compressed body, or `None` when it is not zlib, not UTF-8, or inflates past
+/// `LOG_BODY_LIMIT` (no log the client accepted could be that large).
+fn inflate(bytes: &[u8]) -> Option<String> {
+    let mut out = Vec::new();
+    flate2::read::ZlibDecoder::new(bytes)
+        .take(LOG_BODY_LIMIT + 1)
+        .read_to_end(&mut out)
+        .ok()?;
+    if out.len() as u64 > LOG_BODY_LIMIT {
+        return None;
+    }
+    String::from_utf8(out).ok()
+}
+
+fn damaged(log_id: i64) -> LogsCacheError {
+    LogsCacheError::Database {
+        message: format!("the stored body of log {log_id} is damaged"),
+    }
 }
 
 fn db_error(e: rusqlite::Error) -> LogsCacheError {

@@ -1,8 +1,6 @@
 //! The tracked-player list, the active player and pruning.
 
-use tf2tools_core::{
-    DataDir, Database, LogsCache, PRUNE_SECS, STEAM_ID64_BASE, SteamId, TrackedPlayer,
-};
+use tf2tools_core::{DataDir, Database, LogsCache, STEAM_ID64_BASE, SteamId, TrackedPlayer};
 
 use crate::common;
 
@@ -103,23 +101,59 @@ fn a_stale_active_setting_means_the_first_chip() {
     assert_eq!(cache.active_player().unwrap(), Some(sid(1)));
 }
 
-#[test]
-fn removing_a_player_drops_memberships_but_keeps_their_logs() {
-    let (_tmp, dir, cache) = open();
-    cache.add_player(&TrackedPlayer::new(sid(1), "a")).unwrap();
-    seed_log(&dir, 10, 1_700_000_000, 1);
-    cache.remove_player(sid(1)).unwrap();
-    assert_eq!(common::count(&dir, "logstf_player_logs"), 0);
-    assert_eq!(common::count(&dir, "logstf_logs"), 1);
+fn ids(dir: &DataDir) -> Vec<i64> {
+    common::sql(dir)
+        .prepare("SELECT id FROM logstf_logs ORDER BY id")
+        .unwrap()
+        .query_map([], |r| r.get(0))
+        .unwrap()
+        .collect::<Result<_, _>>()
+        .unwrap()
 }
 
 #[test]
-fn pruning_deletes_old_untracked_logs_and_cascades_to_their_rows() {
+fn pruning_keeps_every_tracked_players_log_whatever_its_age() {
     let (_tmp, dir, cache) = open();
+    cache.add_player(&TrackedPlayer::new(sid(1), "a")).unwrap();
     seed_log(&dir, 1, 1_000, 1);
-    seed_log(&dir, 2, 5_000, 1);
-    assert_eq!(cache.prune(2_000 + PRUNE_SECS).unwrap(), 1);
-    assert_eq!(common::count(&dir, "logstf_logs"), 1);
+    seed_log(&dir, 2, 1_790_000_000, 1);
+    seed_log(&dir, 3, 1_790_000_000, 9);
+    common::sql(&dir)
+        .execute(
+            "INSERT INTO logstf_logs (id, title, map, date) VALUES (4, 't', 'm', 5)",
+            [],
+        )
+        .unwrap();
+    assert_eq!(cache.prune().unwrap(), 2);
+    assert_eq!(ids(&dir), [1, 2]);
+    assert_eq!(common::count(&dir, "logstf_player_logs"), 2);
+    assert_eq!(common::count(&dir, "logstf_class_rows"), 2);
+}
+
+#[test]
+fn removing_a_player_deletes_their_unshared_logs_and_listed_range_at_once() {
+    let (_tmp, dir, cache) = open();
+    cache.add_player(&TrackedPlayer::new(sid(1), "a")).unwrap();
+    cache.add_player(&TrackedPlayer::new(sid(2), "b")).unwrap();
+    seed_log(&dir, 10, 1_000, 1);
+    seed_log(&dir, 11, 2_000, 1);
+    let (a, b) = (STEAM_ID64_BASE + 1, STEAM_ID64_BASE + 2);
+    common::sql(&dir)
+        .execute_batch(&format!(
+            "INSERT INTO logstf_player_logs (steam_id, log_id) VALUES ({b}, 11);
+             INSERT INTO settings (key, value) VALUES ('logstf_listed_range:{a}', 'all');
+             INSERT INTO settings (key, value) VALUES ('logstf_listed_range:{b}', '3m');"
+        ))
+        .unwrap();
+    cache.remove_player(sid(1)).unwrap();
+    assert_eq!(ids(&dir), [11]);
     assert_eq!(common::count(&dir, "logstf_player_logs"), 1);
-    assert_eq!(common::count(&dir, "logstf_class_rows"), 1);
+    assert_eq!(
+        common::setting(&dir, &format!("logstf_listed_range:{a}")),
+        None
+    );
+    assert_eq!(
+        common::setting(&dir, &format!("logstf_listed_range:{b}")).as_deref(),
+        Some("3m")
+    );
 }

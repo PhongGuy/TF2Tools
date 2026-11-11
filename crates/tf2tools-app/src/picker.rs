@@ -25,6 +25,8 @@ pub enum PickKind {
     Backdrop,
     /// A PNG or JPEG for a HUD part's picture or the main menu's background.
     HudPicture,
+    /// Where to save a logs.tf log's raw zip.
+    LogZip,
 }
 
 /// Asks the user for one path; `None` means cancelled or unavailable.
