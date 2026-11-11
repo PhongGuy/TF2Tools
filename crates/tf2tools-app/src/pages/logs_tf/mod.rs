@@ -961,10 +961,16 @@ impl LogsTfPage {
                 )),
                 None => None,
             };
+            // A failed weapon read costs only the panel, which keeps its last rows; the rest
+            // of the load still lands.
             let weapons = match (active, selected) {
-                (Some(id), Some(class)) => {
-                    Some((class, cache.class_weapons(id, range, class).map_err(read)?))
-                }
+                (Some(id), Some(class)) => match cache.class_weapons(id, range, class) {
+                    Ok(weapons) => Some((class, weapons)),
+                    Err(error) => {
+                        tracing::warn!(%error, "reading the logs.tf class weapons failed");
+                        None
+                    }
+                },
                 _ => None,
             };
             Ok((players, active, range, logs, weapons))

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use gpui_kit::{ElementId, Entity, TestAppContext};
+use gpui_kit::{AppContext, ElementId, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
 use tf2tools_app::pages::logs_tf::text::{NO_WEAPONS_TEXT, counting_text, weapons_title};
@@ -613,4 +613,45 @@ fn a_read_from_before_a_close_never_lands_after_a_reopen(cx: &mut TestAppContext
         seen.borrow()
     );
     assert_eq!(picked(cx, &page), Some(TfClass::Scout));
+}
+
+// A weapon read that fails inside a page load costs only the panel: the averages still land.
+#[gpui_kit::test]
+fn a_failed_weapon_read_does_not_stop_the_page_load(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    wait_for(cx, &page, TfClass::Scout);
+    let scout_kills = |cx: &mut TestAppContext| {
+        cx.update(|cx| page.read(cx).averages().map(|a| a[0].kills_per_min()))
+    };
+    let before = scout_kills(cx);
+
+    // Only the weapon query breaks, and Scout gains kills the next load must show.
+    let conn = support::sql(&env);
+    conn.execute_batch(
+        "ALTER TABLE logstf_weapon_rows RENAME TO logstf_weapon_rows_away;
+         UPDATE logstf_class_rows SET kills = kills + 100 WHERE class = 'scout';",
+    )
+    .unwrap();
+    cx.update_window(s.win, |_, window, cx| {
+        page.update(cx, |p, cx| p.select(sid(ARIE), window, cx))
+    })
+    .unwrap();
+    support::wait_real(cx, "the averages after a failed weapon read", |cx| {
+        scout_kills(cx) != before
+    });
+    assert_eq!(
+        shown(cx, &page),
+        Some(TfClass::Scout),
+        "the panel keeps its rows"
+    );
+    conn.execute(
+        "ALTER TABLE logstf_weapon_rows_away RENAME TO logstf_weapon_rows",
+        [],
+    )
+    .unwrap();
 }
