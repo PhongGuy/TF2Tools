@@ -117,18 +117,13 @@ fn table(log: &LogDetail, kind: MatrixKind, is_tracked: &dyn Fn(SteamId) -> bool
         };
         let counts = row.counts();
         table = table.child(
-            h_flex()
-                .id(ids::logstf_matrix_row(id))
+            super::player_row(h_flex().id(ids::logstf_matrix_row(id)), is_tracked(id), cx)
                 .test_support()
                 .gap_1()
                 .px_1()
                 .py_1()
                 .border_t_1()
                 .border_color(cx.theme().border)
-                .when(is_tracked(id), |el| {
-                    el.bg(cx.theme().primary.opacity(0.12))
-                        .font_weight(FontWeight::SEMIBOLD)
-                })
                 .child(team_cell(player.team(), cx).w(TEAM))
                 .child(
                     div()

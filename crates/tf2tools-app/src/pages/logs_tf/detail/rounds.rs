@@ -47,6 +47,7 @@ pub(super) fn rounds_table(
     detail: &LogDetail,
     open: &BTreeSet<usize>,
     name_of: &dyn Fn(SteamId) -> String,
+    is_tracked: &dyn Fn(SteamId) -> bool,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> Div {
@@ -76,7 +77,9 @@ pub(super) fn rounds_table(
         let is_open = open.contains(&n);
         table = table.child(round_row(log, n, round, is_open, page.clone(), cx));
         if is_open {
-            table = table.child(round_panel(log, n, round, name_of, &team_of, cx));
+            table = table.child(round_panel(
+                log, n, round, name_of, is_tracked, &team_of, cx,
+            ));
         }
     }
     table
@@ -156,6 +159,7 @@ fn round_panel(
     n: usize,
     round: &RoundLine,
     name_of: &dyn Fn(SteamId) -> String,
+    is_tracked: &dyn Fn(SteamId) -> bool,
     team_of: &dyn Fn(SteamId) -> Option<Team>,
     cx: &App,
 ) -> impl IntoElement {
@@ -183,8 +187,8 @@ fn round_panel(
         )
         .children(round.players().iter().map(|p| {
             let name = name_of(p.steam_id());
-            line()
-                .id(ids::logstf_round_player(log, n, p.steam_id()))
+            let row = line().id(ids::logstf_round_player(log, n, p.steam_id()));
+            super::player_row(row, is_tracked(p.steam_id()), cx)
                 .aria_label(format!("{name} {} {}", p.kills(), p.dmg()))
                 .test_support()
                 .child(team_cell(p.team(), cx).w(TEAM))

@@ -2696,11 +2696,19 @@ pub fn logstf_medic_fact(id: SteamId, label: &str) -> ElementId {
     keyed("logstf-medic-fact", &format!("{}:{label}", id.id64()))
 }
 
-/// One heal target's row in a Medic's block, labelled with its share:
+/// One heal target's share in a Medic's block, labelled with it:
 /// "logstf-heal-target:<medic id64>:<target id64>".
 pub fn logstf_heal_target(medic: SteamId, target: SteamId) -> ElementId {
     keyed(
         "logstf-heal-target",
+        &format!("{}:{}", medic.id64(), target.id64()),
+    )
+}
+
+/// One heal target's row in a Medic's block: "logstf-heal-row:<medic id64>:<target id64>".
+pub fn logstf_heal_row(medic: SteamId, target: SteamId) -> ElementId {
+    keyed(
+        "logstf-heal-row",
         &format!("{}:{}", medic.id64(), target.id64()),
     )
 }

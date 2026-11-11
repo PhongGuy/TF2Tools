@@ -355,6 +355,33 @@ fn a_round_names_its_players_and_says_who_won(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn a_tracked_player_stays_highlighted_in_a_round(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_ROUNDS);
+    support::click_id(cx, s.win, ids::logstf_round(3, 0));
+    let other = cx.update(|cx| {
+        let log = page.read(cx).detail().unwrap();
+        let round = &log.rounds()[0];
+        let other = round.players().iter().find(|p| p.steam_id() != sid(ARIE));
+        other.unwrap().steam_id()
+    });
+    // The tint is said in words too, which is what a test can read.
+    support::settle(cx, s.win);
+    let said = |cx: &mut TestAppContext, id: tf2tools_core::SteamId| {
+        let row = ids::logstf_round_player(3, 0, id);
+        cx.update_window(s.win, |_, w, _| {
+            w.try_find(row)
+                .expect("the round's row")
+                .description()
+                .map(str::to_owned)
+        })
+        .unwrap()
+    };
+    assert_eq!(said(cx, sid(ARIE)).as_deref(), Some("Tracked player"));
+    assert_eq!(said(cx, other), None);
+}
+
+#[gpui_kit::test]
 fn a_medic_block_reads_like_logs_tf(cx: &mut TestAppContext) {
     let (_env, _server, s, page) = opened(cx, 3);
     let rahmed = sid(175_790_976);

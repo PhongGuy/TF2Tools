@@ -6,7 +6,7 @@ use gpui_kit::{
     App, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
     Styled as _, TestSupportExt as _, div, px,
 };
-use tf2tools_core::{LogDetail, MedicLine};
+use tf2tools_core::{LogDetail, MedicLine, SteamId};
 
 use super::{ICON, NUMBER, number, team_cell};
 use crate::ids;
@@ -21,18 +21,26 @@ const MEDIC_WIDTH: Pixels = px(300.);
 const CLASS: Pixels = px(40.);
 
 /// One block per Medic in `log`, wrapping onto new lines as the width runs out.
-pub(super) fn medics(log: &LogDetail, cx: &App) -> impl IntoElement {
+pub(super) fn medics(
+    log: &LogDetail,
+    is_tracked: &dyn Fn(SteamId) -> bool,
+    cx: &App,
+) -> impl IntoElement {
     h_flex()
         .id(ids::LOGSTF_MEDICS)
         .test_support()
         .flex_wrap()
         .items_start()
         .gap_4()
-        .children(log.medics().iter().map(|m| medic_block(m, cx)))
+        .children(log.medics().iter().map(|m| medic_block(m, is_tracked, cx)))
 }
 
 // The Medic's name in team colour, the ten rows logs.tf shows, then the heal-target table.
-fn medic_block(medic: &MedicLine, cx: &App) -> impl IntoElement {
+fn medic_block(
+    medic: &MedicLine,
+    is_tracked: &dyn Fn(SteamId) -> bool,
+    cx: &App,
+) -> impl IntoElement {
     let id = medic.steam_id();
     let fact = |label: &str, key: &str, value: String| {
         h_flex()
@@ -102,11 +110,11 @@ fn medic_block(medic: &MedicLine, cx: &App) -> impl IntoElement {
             ]
             .map(|(label, value)| fact(label, label, value)),
         )
-        .child(heal_table(medic, cx))
+        .child(heal_table(medic, is_tracked, cx))
 }
 
 // Heal Target, Class, Heals and a bold share, most healed first.
-fn heal_table(medic: &MedicLine, cx: &App) -> Div {
+fn heal_table(medic: &MedicLine, is_tracked: &dyn Fn(SteamId) -> bool, cx: &App) -> Div {
     let assets = &cx.global::<Services>().assets;
     let header = h_flex()
         .gap_1()
@@ -131,7 +139,9 @@ fn heal_table(medic: &MedicLine, cx: &App) -> Div {
             ids::logstf_heal_target(medic.steam_id(), row.steam_id),
             row.share,
         );
-        h_flex()
+        let line = h_flex().id(ids::logstf_heal_row(medic.steam_id(), row.steam_id));
+        super::player_row(line, is_tracked(row.steam_id), cx)
+            .test_support()
             .gap_1()
             .py_0p5()
             .border_t_1()

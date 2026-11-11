@@ -14,7 +14,8 @@ use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Div, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    ParentElement as _, Pixels, Styled as _, TestSupportExt as _, WeakEntity, Window, div, px,
+    ParentElement as _, Pixels, StatefulInteractiveElement, Styled, TestSupportExt as _,
+    WeakEntity, Window, div, px,
 };
 use tf2tools_core::{
     LogDetail, LogRow, LogState, MatrixKind, SteamId, Team, TfClass, TrackedPlayer,
@@ -115,8 +116,15 @@ fn log_body(
             banner::team_table(log, cx),
         ))
         .when(!log.rounds().is_empty(), |el| {
-            let table =
-                rounds::rounds_table(open.id, log, &open.rounds, &name_of, page.clone(), cx);
+            let table = rounds::rounds_table(
+                open.id,
+                log,
+                &open.rounds,
+                &name_of,
+                &is_tracked,
+                page.clone(),
+                cx,
+            );
             el.child(
                 section("Rounds", sideways(ids::LOGSTF_ROUNDS_SCROLL, table), cx)
                     .id(ids::LOGSTF_ROUNDS)
@@ -124,7 +132,7 @@ fn log_body(
             )
         })
         .when(!log.medics().is_empty(), |el| {
-            el.child(section("Medics", medics::medics(log, cx), cx))
+            el.child(section("Medics", medics::medics(log, &is_tracked, cx), cx))
         })
         .child(
             section(
@@ -136,6 +144,20 @@ fn log_body(
             .test_support(),
         )
         .child(footer::footer(open.id, log, page))
+}
+
+// A row of any player table: a tracked player's is tinted and bold, and says so in words for
+// readers that cannot see the tint.
+pub(super) fn player_row<E>(row: E, tracked: bool, cx: &App) -> E
+where
+    E: StatefulInteractiveElement + Styled,
+{
+    if !tracked {
+        return row;
+    }
+    row.bg(cx.theme().primary.opacity(0.12))
+        .font_weight(FontWeight::SEMIBOLD)
+        .aria_description("Tracked player")
 }
 
 // A titled part of the body.

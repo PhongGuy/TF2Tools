@@ -1178,10 +1178,16 @@ mod tests {
     #[test]
     fn a_read_is_stale_only_while_a_pick_is_unsaved_and_it_saw_another_range() {
         use LogsRange::{Months3, Year1};
-        assert!(stale_read(1, Year1, Months3), "it saw the range the pick replaced");
+        assert!(
+            stale_read(1, Year1, Months3),
+            "it saw the range the pick replaced"
+        );
         assert!(stale_read(2, Year1, Months3), "two picks out");
         assert!(!stale_read(1, Year1, Year1), "it already saw the pick");
-        assert!(!stale_read(0, Year1, Months3), "no pick out: the cache is the truth");
+        assert!(
+            !stale_read(0, Year1, Months3),
+            "no pick out: the cache is the truth"
+        );
         assert!(!stale_read(0, Year1, Year1));
     }
 }

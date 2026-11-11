@@ -79,41 +79,40 @@ pub(super) fn players_table(
             class_hover(page.clone(), player.steam_id(), c.class(), icon)
         });
         table = table.child(
-            h_flex()
-                .id(ids::logstf_player_row(player.steam_id()))
-                .test_support()
-                .gap_1()
-                .px_1()
-                .py_1()
-                .border_t_1()
-                .border_color(cx.theme().border)
-                .when(is_tracked(player.steam_id()), |el| {
-                    el.bg(cx.theme().primary.opacity(0.12))
-                        .font_weight(FontWeight::SEMIBOLD)
-                })
-                .child(team_cell(player.team(), cx).w(TEAM))
-                .child(
-                    div()
-                        .id(ids::logstf_player_name(player.steam_id()))
-                        .test_support()
-                        .flex_1()
-                        .min_w(NAME_MIN)
-                        .truncate()
-                        .child(player.name().to_owned()),
-                )
-                .child(
-                    h_flex()
-                        .w(CLASSES)
-                        .flex_none()
-                        .gap_0p5()
-                        .overflow_hidden()
-                        .children(icons),
-                )
-                .children(columns.iter().map(|(_, cell)| {
-                    let text = cell(player);
-                    let zero = reads_zero(&text);
-                    super::number(text).when(zero, |el| el.text_color(cx.theme().muted_foreground))
-                })),
+            super::player_row(
+                h_flex().id(ids::logstf_player_row(player.steam_id())),
+                is_tracked(player.steam_id()),
+                cx,
+            )
+            .test_support()
+            .gap_1()
+            .px_1()
+            .py_1()
+            .border_t_1()
+            .border_color(cx.theme().border)
+            .child(team_cell(player.team(), cx).w(TEAM))
+            .child(
+                div()
+                    .id(ids::logstf_player_name(player.steam_id()))
+                    .test_support()
+                    .flex_1()
+                    .min_w(NAME_MIN)
+                    .truncate()
+                    .child(player.name().to_owned()),
+            )
+            .child(
+                h_flex()
+                    .w(CLASSES)
+                    .flex_none()
+                    .gap_0p5()
+                    .overflow_hidden()
+                    .children(icons),
+            )
+            .children(columns.iter().map(|(_, cell)| {
+                let text = cell(player);
+                let zero = reads_zero(&text);
+                super::number(text).when(zero, |el| el.text_color(cx.theme().muted_foreground))
+            })),
         );
     }
     table
