@@ -2463,6 +2463,16 @@ pub const LOGSTF_ADD_CONFIRM: &str = "logstf-add-confirm";
 pub const LOGSTF_ADD_CANCEL: &str = "logstf-add-cancel";
 /// Labelled with why the add-player dialog could not add the player.
 pub const LOGSTF_ADD_ERROR: &str = "logstf-add-error";
+/// Forces a fresh logs.tf sync of the active player.
+pub const LOGSTF_REFRESH: &str = "logstf-refresh";
+/// "Open profile on logs.tf" for the active player.
+pub const LOGSTF_PROFILE: &str = "logstf-profile";
+/// Labelled "Downloading logs: <done> of <total>" while a sync downloads logs.
+pub const LOGSTF_PROGRESS: &str = "logstf-progress";
+/// Labelled with why the last logs.tf sync failed.
+pub const LOGSTF_ERROR: &str = "logstf-error";
+/// Retries a failed logs.tf sync.
+pub const LOGSTF_RETRY: &str = "logstf-retry";
 
 /// One tracked player's chip, selected while active: "logstf-chip:<id64>".
 pub fn logstf_chip(id: SteamId) -> ElementId {

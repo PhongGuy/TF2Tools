@@ -1,6 +1,6 @@
 //! The logs.tf page's wording and links, kept free of UI so tests read them without a window.
 
-use tf2tools_core::{ResolveError, SteamId};
+use tf2tools_core::{LogsSyncError, ResolveError, SteamId};
 
 /// logs.tf's front page, which the page's credit opens.
 pub const LOGS_TF_URL: &str = "https://logs.tf";
@@ -35,5 +35,25 @@ pub fn resolve_message(error: &ResolveError) -> &'static str {
         | ResolveError::TooLarge { .. }
         | ResolveError::Malformed { .. }
         | _ => STEAM_UNREACHABLE,
+    }
+}
+
+/// Why a sync could not reach logs.tf or got an error page back, in player words.
+pub const LOGS_TF_DOWN: &str = "logs.tf isn't responding right now. Try again later.";
+
+/// The progress line while a sync downloads logs: "Downloading logs: 12 of 87".
+pub fn progress_text(done: usize, total: usize) -> String {
+    format!("Downloading logs: {done} of {total}")
+}
+
+/// The line under the chips for a failed sync. A cache failure and a player removed while
+/// their sync waited both mean the logs could not be kept.
+pub fn sync_message(error: &LogsSyncError) -> &'static str {
+    match error {
+        LogsSyncError::Network { .. } => "You're offline. Showing saved logs.",
+        LogsSyncError::RateLimited { .. } => "logs.tf is busy. Try again in a few minutes.",
+        LogsSyncError::Malformed { .. } => "logs.tf sent something we didn't understand.",
+        LogsSyncError::Database { .. } | LogsSyncError::NotTracked { .. } => SAVE_FAILED,
+        LogsSyncError::Http { .. } | LogsSyncError::TooLarge { .. } | _ => LOGS_TF_DOWN,
     }
 }

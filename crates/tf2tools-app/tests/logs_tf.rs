@@ -360,3 +360,136 @@ fn the_add_dialog_cancels_without_adding(cx: &mut TestAppContext) {
     assert!(!support::present(cx, s.win, ids::LOGSTF_ADD_INPUT));
     assert!(players_of(cx, &page).is_empty());
 }
+
+const SIXES: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../tf2tools-core/tests/fixtures/logstf/log-4137103-6v6.json"
+));
+const HIGHLANDER: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../tf2tools-core/tests/fixtures/logstf/log-4150405-hl.json"
+));
+
+const ARIE: u64 = 231_702;
+
+fn unix_now() -> i64 {
+    chrono::Utc::now().timestamp()
+}
+
+fn day_ago(days: i64) -> i64 {
+    unix_now() - days * 86_400
+}
+
+/// Serves Arie's list of logs 3 (the 6v6 fixture) and 2 (the highlander fixture).
+fn serve_two_logs(server: &support::StoreServer) {
+    server.mount_bytes(
+        "/api/v1/log",
+        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
+    );
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
+}
+
+fn row_ids(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) -> Vec<u64> {
+    cx.update(|cx| page.read(cx).rows().iter().map(|r| r.id()).collect())
+}
+
+#[gpui_kit::test]
+fn opening_the_page_syncs_the_active_player(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    assert_eq!(row_ids(cx, &page), [3, 2]);
+    assert!(cx.update(|cx| page.read(cx).averages().is_some()));
+    assert_eq!(
+        cx.update(|cx| page.read(cx).error().map(str::to_owned)),
+        None
+    );
+    assert!(!support::present(cx, s.win, ids::LOGSTF_PROGRESS));
+    assert!(support::present(cx, s.win, ids::LOGSTF_PROFILE));
+}
+
+#[gpui_kit::test]
+fn a_failed_refresh_keeps_the_saved_logs_and_says_why(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+
+    server.reset();
+    server.mount_status("/api/v1/log", 503);
+    support::click_id(cx, s.win, ids::LOGSTF_REFRESH);
+    support::wait_real(cx, "the failed refresh", |cx| {
+        cx.update(|cx| page.read(cx).error().is_some() && !page.read(cx).is_syncing())
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_ERROR).as_deref(),
+        Some("logs.tf isn't responding right now. Try again later.")
+    );
+    assert_eq!(row_ids(cx, &page), [3, 2]);
+}
+
+#[gpui_kit::test]
+fn offline_the_page_says_so(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = shell(cx, &env, "http://127.0.0.1:9", &[(ARIE, "Arie")]);
+    let _page = open_page(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_ERROR).as_deref(),
+        Some("You're offline. Showing saved logs.")
+    );
+}
+
+#[gpui_kit::test]
+fn switching_chips_mid_sync_finishes_the_first_and_shows_the_second(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // The list answers slowly, so Arie's sync is still open when the chip is clicked.
+    server.mount_bytes_after(
+        "/api/v1/log",
+        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
+        Duration::from_millis(500),
+    );
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
+    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    support::wait_real(cx, "the chips", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    assert!(
+        cx.update(|cx| page.read(cx).is_syncing()),
+        "Arie's sync is open"
+    );
+    assert_eq!(cx.update(|cx| page.read(cx).active()), Some(sid(ARIE)));
+    support::click_id(cx, s.win, ids::logstf_chip(sid(1)));
+    support::wait_real(cx, "both syncs", |cx| {
+        cx.update(|cx| {
+            let p = page.read(cx);
+            p.active() == Some(sid(1)) && !p.is_syncing()
+        }) && s
+            .services
+            .logs
+            .cache()
+            .players()
+            .unwrap()
+            .iter()
+            .all(|p| p.last_synced().is_some())
+    });
+    let since = tf2tools_core::window_start(unix_now());
+    assert_eq!(
+        s.services
+            .logs
+            .cache()
+            .logs(sid(ARIE), since)
+            .unwrap()
+            .len(),
+        2
+    );
+    // "other" shares the same served list, so it shows the same two logs, from its own load.
+    assert_eq!(row_ids(cx, &page), [3, 2]);
+}

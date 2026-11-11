@@ -8,11 +8,14 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Disableable as _, Sizable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::{
-    AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
+    App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
     ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
     Subscription, TestSupportExt as _, Window, div,
 };
-use tf2tools_core::{SteamId, TrackedPlayer, parse_player_input};
+use tf2tools_core::{
+    ClassAverage, LogRow, LogsProgress, LogsSyncError, LogsSyncSummary, SteamId, TrackedPlayer,
+    parse_player_input, window_start,
+};
 
 use crate::ids;
 use crate::pages::common::filter_badge;
@@ -23,8 +26,12 @@ use crate::shell::route::Page;
 use crate::shell::toast::toast_error;
 use crate::tokio_bridge;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
+use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
-use text::{EMPTY_TEXT, LOGS_TF_URL, SAVE_FAILED, STEAM_UNREACHABLE, resolve_message};
+use text::{
+    EMPTY_TEXT, LOGS_TF_DOWN, LOGS_TF_URL, SAVE_FAILED, STEAM_UNREACHABLE, profile_url,
+    progress_text, resolve_message, sync_message,
+};
 
 /// The logs.tf page. It reads the tracked players from the cache on creation and is kept
 /// while hidden, so a visit elsewhere leaves it as it was.
@@ -32,6 +39,19 @@ pub struct LogsTfPage {
     players: Vec<TrackedPlayer>,
     active: Option<SteamId>,
     loaded: bool,
+    rows: Vec<LogRow>,
+    averages: Option<[ClassAverage; 9]>,
+    // One sync runs at a time and is never cancelled; a player chosen meanwhile waits in
+    // `queued`, so `syncing` stays true until the queue is empty.
+    syncing: bool,
+    running: Option<SteamId>,
+    queued: Option<SteamId>,
+    progress: Option<LogsProgress>,
+    error: Option<&'static str>,
+    // Cache reads can land out of order; only the newest applies, and it starts the sync a
+    // superseded read asked for.
+    load_generation: u64,
+    sync_wanted: bool,
     // The add dialog's field, its last failure, whether a lookup is running and whether the
     // dialog is still up. They live here because the dialog builder runs every frame.
     add_input: Entity<InputState>,
@@ -59,32 +79,68 @@ impl LogsTfPage {
             players: Vec::new(),
             active: None,
             loaded: false,
+            rows: Vec::new(),
+            averages: None,
+            syncing: false,
+            running: None,
+            queued: None,
+            progress: None,
+            error: None,
+            load_generation: 0,
+            sync_wanted: false,
             add_input,
             add_error: None,
             adding: false,
             add_open: false,
             _subscriptions: vec![enter],
         };
-        page.load(cx);
+        page.load(true, cx);
         page
     }
 
-    /// Kept pages hear when they leave and return; logs.tf keeps everything as it was.
-    pub fn set_hidden(&mut self, _hidden: bool, _cx: &mut Context<Self>) {}
+    /// Kept pages hear when they leave and return; coming back rereads the cache and syncs
+    /// the active player if their logs are stale.
+    pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        if !hidden {
+            self.load(true, cx);
+        }
+    }
 
     /// True once the first read of the cache has landed.
     pub fn is_loaded(&self) -> bool {
         self.loaded
     }
 
-    /// True while a player's logs sync.
+    /// True while a player's logs sync or another player's sync waits its turn.
     pub fn is_syncing(&self) -> bool {
-        false
+        self.syncing
     }
 
     /// The tracked players, in the order they were added.
     pub fn players(&self) -> &[TrackedPlayer] {
         &self.players
+    }
+
+    /// The active player's logs in the 90-day window, newest first, from the cache.
+    pub fn rows(&self) -> &[LogRow] {
+        &self.rows
+    }
+
+    /// The active player's class averages; None before the first load.
+    pub fn averages(&self) -> Option<&[ClassAverage; 9]> {
+        self.averages.as_ref()
+    }
+
+    /// Why the last sync failed, shown under the chips.
+    pub fn error(&self) -> Option<&str> {
+        self.error
+    }
+
+    /// Forces a sync of the active player; a no-op while a sync runs.
+    pub fn refresh(&mut self, cx: &mut Context<Self>) {
+        if let (false, Some(id)) = (self.syncing, self.active) {
+            self.sync(id, true, cx);
+        }
     }
 
     /// The player whose chip is selected, if any is tracked.
@@ -274,7 +330,7 @@ impl LogsTfPage {
                             page.add_open = false;
                             window.close_dialog(cx);
                         }
-                        page.load(cx);
+                        page.load(true, cx);
                     }
                     Err(message) => page.add_error = Some(message.into()),
                 }
@@ -298,38 +354,173 @@ impl LogsTfPage {
                 if let Err(err) = written {
                     toast_error(window, cx, &err);
                 }
-                page.load(cx);
+                page.load(true, cx);
             });
         })
         .detach();
     }
 
-    // Reads the players and the active chip off the UI thread. A failed read leaves the page
-    // empty rather than stuck loading; the warning keeps the cause for the log.
-    fn load(&mut self, cx: &mut Context<Self>) {
+    // Reads the players, the active chip and that player's logs and averages off the UI
+    // thread. With `sync`, the landing also syncs the active player, in the same update that
+    // sets `loaded`. A failed read leaves the page as it was; the warning keeps the cause.
+    fn load(&mut self, sync: bool, cx: &mut Context<Self>) {
+        self.sync_wanted |= sync;
+        self.load_generation += 1;
+        let generation = self.load_generation;
         let loading = run_blocking(cx, |s| {
             let cache = s.logs.cache();
             let read = |e| OpError::core("Failed to load logs.tf players", e);
-            Ok((
-                cache.players().map_err(read)?,
-                cache.active_player().map_err(read)?,
-            ))
+            let players = cache.players().map_err(read)?;
+            let active = cache.active_player().map_err(read)?;
+            let since = window_start(chrono::Utc::now().timestamp());
+            let logs = match active {
+                Some(id) => Some((
+                    cache.logs(id, since).map_err(read)?,
+                    cache.class_averages(id, since).map_err(read)?,
+                )),
+                None => None,
+            };
+            Ok((players, active, logs))
         });
         cx.spawn(async move |page, cx| {
             let loaded = loading.await;
             let _ = page.update(cx, |page, cx| {
+                if page.load_generation != generation {
+                    return;
+                }
                 match loaded {
-                    Ok((players, active)) => {
+                    Ok((players, active, logs)) => {
                         page.players = players;
                         page.active = active;
+                        let (rows, averages) = logs.unzip();
+                        page.rows = rows.unwrap_or_default();
+                        page.averages = averages;
                     }
-                    Err(error) => tracing::warn!(%error, "reading the logs.tf players failed"),
+                    Err(error) => tracing::warn!(%error, "reading the logs.tf cache failed"),
                 }
                 page.loaded = true;
+                if std::mem::take(&mut page.sync_wanted)
+                    && let Some(id) = page.active
+                {
+                    page.sync(id, false, cx);
+                }
                 cx.notify();
             });
         })
         .detach();
+    }
+
+    // Syncs `id` on the tokio runtime, rereading the cache after each progress event so logs
+    // appear as they land. While another sync runs, `id` replaces whoever waits next.
+    fn sync(&mut self, id: SteamId, force: bool, cx: &mut Context<Self>) {
+        if self.syncing {
+            self.queued = (self.running != Some(id)).then_some(id);
+            return;
+        }
+        self.syncing = true;
+        self.running = Some(id);
+        self.progress = None;
+        cx.notify();
+        if !tokio_bridge::is_running(cx) {
+            tokio_bridge::init(cx);
+        }
+        let client = cx.global::<Services>().logs.clone();
+        // Only the newest count is kept, so a slow frame skips counts rather than queueing them.
+        let (tx, mut rx) = tokio::sync::watch::channel(None::<LogsProgress>);
+        let job = tokio_bridge::spawn(cx, async move {
+            let report = move |progress| {
+                tx.send_replace(Some(progress));
+            };
+            client.sync_player(id, force, &report).await
+        });
+        cx.spawn(async move |page, cx| {
+            while rx.changed().await.is_ok() {
+                let progress = *rx.borrow_and_update();
+                let shown = page.update(cx, |page, cx| {
+                    page.progress = progress;
+                    page.load(false, cx);
+                });
+                if shown.is_err() {
+                    return;
+                }
+            }
+            let joined = job.await;
+            let _ = page.update(cx, |page, cx| page.synced(joined, cx));
+        })
+        .detach();
+    }
+
+    // Ends a sync: keeps or clears the error line, starts the queued player's sync if any and
+    // rereads the cache. A queued player removed before their turn is no failure.
+    fn synced(
+        &mut self,
+        joined: Result<Result<LogsSyncSummary, LogsSyncError>, tokio_bridge::JoinError>,
+        cx: &mut Context<Self>,
+    ) {
+        match joined {
+            Ok(Ok(_)) => self.error = None,
+            Ok(Err(LogsSyncError::NotTracked { .. })) => {}
+            Ok(Err(error)) => {
+                tracing::warn!(%error, "syncing logs.tf logs failed");
+                self.error = Some(sync_message(&error));
+            }
+            Err(error) => {
+                tracing::warn!(%error, "the logs.tf sync task stopped");
+                self.error = Some(LOGS_TF_DOWN);
+            }
+        }
+        self.syncing = false;
+        self.running = None;
+        self.progress = None;
+        if let Some(next) = self.queued.take() {
+            self.sync(next, false, cx);
+        }
+        self.load(false, cx);
+        cx.notify();
+    }
+
+    // Refresh and the active player's logs.tf profile, beside the chips.
+    fn actions(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let syncing = self.syncing;
+        h_flex()
+            .flex_none()
+            .gap_2()
+            .child(
+                Button::new(ids::LOGSTF_REFRESH)
+                    .outline()
+                    .icon(IconName::RefreshCw)
+                    .label(if syncing { "Refreshing..." } else { "Refresh" })
+                    .loading(syncing)
+                    .loading_icon(IconName::RefreshCw)
+                    .disabled(syncing)
+                    .on_click(cx.listener(|page, _, _, cx| page.refresh(cx))),
+            )
+            .children(self.active.map(|id| {
+                Button::new(ids::LOGSTF_PROFILE)
+                    .ghost()
+                    .icon(IconName::ExternalLink)
+                    .label("Open profile on logs.tf")
+                    .on_click(move |_, _, cx| cx.open_url(&profile_url(id)))
+            }))
+    }
+
+    // The progress line while logs download, then the last failure with its Retry.
+    fn status(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let progress = self.progress.filter(|_| self.syncing).map(|p| {
+            labelled(
+                div().text_sm().text_color(cx.theme().muted_foreground),
+                ids::LOGSTF_PROGRESS,
+                progress_text(p.done(), p.total()),
+            )
+        });
+        let error = self.error.map(|error| {
+            let page = cx.entity().downgrade();
+            let on_retry = move |_: &mut Window, cx: &mut App| {
+                let _ = page.update(cx, |page, cx| page.refresh(cx));
+            };
+            error_line(ids::LOGSTF_ERROR, ids::LOGSTF_RETRY, error, on_retry, cx)
+        });
+        v_flex().gap_2().children(progress).children(error)
     }
 
     // One chip per tracked player in order, each with its x, then "+ Add player", wrapping.
@@ -401,7 +592,14 @@ impl Render for LogsTfPage {
                         .on_click(|_, _, cx| cx.open_url(LOGS_TF_URL)),
                 ),
             )
-            .children((!self.players.is_empty()).then(|| self.chips(window, cx)))
+            .children((!self.players.is_empty()).then(|| {
+                h_flex()
+                    .items_start()
+                    .gap_4()
+                    .child(div().flex_1().min_w_0().child(self.chips(window, cx)))
+                    .child(self.actions(cx))
+            }))
+            .child(self.status(cx))
             .children(empty.then(|| self.empty_state(cx)))
     }
 }
