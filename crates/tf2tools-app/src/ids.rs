@@ -2447,6 +2447,13 @@ pub const MAPS_RETRY: &str = "maps-retry";
 /// The Maps page's "TF2 not found" warning, present only without a TF2 install.
 pub const MAPS_NO_TF2: &str = "maps-no-tf2";
 
+/// The logs.tf page's "Stats from logs.tf" credit, which opens logs.tf.
+pub const LOGSTF_CREDIT: &str = "logstf-credit";
+/// Labelled with the logs.tf page's explanation while no player is tracked.
+pub const LOGSTF_EMPTY: &str = "logstf-empty";
+/// The empty logs.tf page's "Add player" button.
+pub const LOGSTF_EMPTY_ADD: &str = "logstf-empty-add";
+
 /// One map's row: "map-row:<name>".
 pub fn map_row(name: &str) -> ElementId {
     keyed("map-row", name)

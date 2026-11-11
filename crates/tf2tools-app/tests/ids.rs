@@ -29,6 +29,7 @@ fn page_ids_use_kebab_slugs() {
             "crosshair-maker",
             "hud-maker",
             "maps",
+            "logs-tf",
             "settings",
             "logs"
         ]
@@ -89,6 +90,7 @@ fn labels_and_titles_match_v5() {
             ("Crosshair Maker", "Crosshair Maker"),
             ("HUD Maker", "HUD Maker"),
             ("Maps", "Maps"),
+            ("logs.tf", "logs.tf"),
             ("Settings", "Settings"),
             ("Logs", "Activity Log"),
         ]

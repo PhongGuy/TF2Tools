@@ -8,7 +8,7 @@ use gpui_kit::AppContext as _;
 use gpui_kit::{App, Entity, Global, Task};
 use tf2tools_core::{
     ActivityLog, BuiltinCrosshairs, DataDir, Database, DetectError, Endpoints, FontHost, Library,
-    OpenError, StoreClient, StoreConfig, Tf2Install,
+    LogsCache, LogsClient, LogsEndpoints, OpenError, StoreClient, StoreConfig, Tf2Install,
 };
 
 use crate::assets::{AssetRoot, AssetRootError};
@@ -39,6 +39,8 @@ pub struct Services {
     pub activity: ActivityLog,
     /// Lists and installs system fonts for the HUD font check; `None` skips the check.
     pub font_host: Option<Arc<dyn FontHost>>,
+    /// Syncs tracked players' logs from logs.tf into the cache the logs.tf page reads.
+    pub logs: LogsClient,
 }
 
 impl Global for Services {}
@@ -83,6 +85,10 @@ impl Services {
             store = store.with_config(StoreConfig::default().with_loopback_only(true));
         }
         let activity = ActivityLog::new(db.clone());
+        let mut logs = LogsClient::new(LogsCache::new(db.clone()), LogsEndpoints::default());
+        if offline {
+            logs = logs.with_config(LogsClient::default_config().with_loopback_only(true));
+        }
         Ok(Self {
             db,
             data,
@@ -95,6 +101,7 @@ impl Services {
             store,
             activity,
             font_host: None,
+            logs,
         })
     }
 
@@ -104,6 +111,11 @@ impl Services {
         let store = StoreClient::new(self.db.clone(), self.data.clone(), endpoints)
             .with_pacer_of(&self.store);
         Self { store, ..self }
+    }
+
+    /// The same services with `logs` as the logs.tf client; tests aim it at a local or closed port.
+    pub fn with_logs(self, logs: LogsClient) -> Self {
+        Self { logs, ..self }
     }
 
     /// The same services with `host` as the font host; `open` leaves it `None`.

@@ -142,6 +142,7 @@ mod local_log;
 mod local_messages;
 mod logs;
 mod logs_model;
+mod logs_tf;
 mod maps;
 mod maps_model;
 mod mastercomfig_restore;

@@ -11,6 +11,7 @@ pub mod hud_maker;
 pub mod hud_store;
 pub mod huds;
 pub mod logs;
+pub mod logs_tf;
 pub mod maps;
 pub mod placeholder;
 pub mod profiles;

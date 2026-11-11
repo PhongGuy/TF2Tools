@@ -821,6 +821,7 @@ fn page_loaded(shell: &Shell, page: Page, cx: &App) -> bool {
             .graphics_page()
             .is_some_and(|p| p.read(cx).is_loaded()),
         Page::Logs => shell.logs_page().is_some_and(|p| p.read(cx).is_loaded()),
+        Page::LogsTf => shell.logs_tf_page().is_some_and(|p| p.read(cx).is_loaded()),
         Page::Sounds
         | Page::CrosshairMaker
         | Page::HudMaker
