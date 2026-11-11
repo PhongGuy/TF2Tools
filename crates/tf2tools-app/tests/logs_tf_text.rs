@@ -575,18 +575,20 @@ fn heal_targets_run_high_to_low_with_class_and_share() {
 }
 
 #[test]
-fn matrix_rows_run_k_high_to_low_and_count_every_player() {
+fn matrix_rows_run_k_high_to_low_and_leave_out_players_with_none_of_the_tab() {
     use tf2tools_app::pages::logs_tf::tables::matrix_rows;
     use tf2tools_core::MatrixKind;
     let log = tf2tools_core::parse_log(crate::support::logstf::SIXES).unwrap();
     let sid = crate::support::logstf::sid;
-    for kind in [
-        MatrixKind::Kills,
-        MatrixKind::KillsAssists,
-        MatrixKind::Deaths,
+    // logs.tf lists only players its JSON has an entry for in that tab: the medic with no
+    // kills is left out of K but has assists and deaths.
+    for (kind, players) in [
+        (MatrixKind::Kills, 11),
+        (MatrixKind::KillsAssists, 12),
+        (MatrixKind::Deaths, 12),
     ] {
         let rows = matrix_rows(&log, kind);
-        assert_eq!(rows.len(), 12, "{kind:?} has every player");
+        assert_eq!(rows.len(), players, "{kind:?}");
         assert!(
             rows.iter().all(|(p, r)| p.steam_id() == r.steam_id()),
             "{kind:?} pairs each row with its own player"
@@ -603,14 +605,9 @@ fn matrix_rows_run_k_high_to_low_and_count_every_player() {
         sid(285_837_700),
         "39 kills tops the table"
     );
-    let (_, meta) = kills
-        .iter()
-        .find(|(_, r)| r.steam_id() == sid(98_265_577))
-        .unwrap();
-    assert_eq!(
-        (meta.counts(), meta.total()),
-        ([0; 9], 0),
-        "a medic with no kills reads as zeros"
+    assert!(
+        kills.iter().all(|(_, r)| r.steam_id() != sid(98_265_577)),
+        "a medic with no kills has no K row"
     );
 }
 

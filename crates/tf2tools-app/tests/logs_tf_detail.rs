@@ -428,7 +428,7 @@ fn a_medic_block_reads_like_logs_tf(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn the_matrix_tabs_switch_and_list_every_player(cx: &mut TestAppContext) {
+fn the_matrix_tabs_switch_and_list_the_players_with_a_count(cx: &mut TestAppContext) {
     use tf2tools_core::MatrixKind;
     let (_env, _server, s, page) = opened(cx, 3);
     scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_MATRIX);
@@ -440,13 +440,17 @@ fn the_matrix_tabs_switch_and_list_every_player(cx: &mut TestAppContext) {
         support::selected_of(cx, s.win, ids::logstf_matrix_tab(MatrixKind::Kills)),
         Some(true)
     );
-    for account in [ARIE, 98_265_577, 285_837_700] {
+    for account in [ARIE, 285_837_700] {
         assert!(
             support::present(cx, s.win, ids::logstf_matrix_row(sid(account))),
             "{account}"
         );
     }
+    // The medic with no kills is left out of K, as on logs.tf, but has deaths.
+    let medic = ids::logstf_matrix_row(sid(98_265_577));
+    assert!(!support::present(cx, s.win, medic.clone()), "no K row");
     support::click_id(cx, s.win, ids::logstf_matrix_tab(MatrixKind::Deaths));
+    assert!(support::present(cx, s.win, medic), "a D row");
     assert_eq!(
         cx.update(|cx| page.read(cx).matrix_kind()),
         MatrixKind::Deaths
@@ -520,8 +524,8 @@ fn a_log_with_only_the_required_keys_opens_with_its_sections_left_out(cx: &mut T
         "no medic section"
     );
     assert!(
-        support::present(cx, s.win, ids::logstf_matrix_row(sid(ARIE))),
-        "matrix rows read as zeros"
+        !support::present(cx, s.win, ids::logstf_matrix_row(sid(ARIE))),
+        "no matrix row without a count"
     );
     assert!(
         support::disabled_of(cx, s.win, ids::LOGSTF_STREAKS_TOGGLE),
@@ -849,9 +853,11 @@ fn a_wide_table_keeps_its_sideways_bar_under_its_last_row(cx: &mut TestAppContex
     );
 
     scroll_to_in_log(cx, &s, &page, 2, ids::LOGSTF_MATRIX_SCROLL);
+    // A player with no kills has no K row.
     let last = players
         .iter()
-        .map(|p| bottom(cx, ids::logstf_matrix_row(p.steam_id())))
+        .filter_map(|p| support::bounds_of(cx, s.win, ids::logstf_matrix_row(p.steam_id())))
+        .map(|b| b.bottom())
         .fold(gpui_kit::px(0.), gpui_kit::Pixels::max);
     let matrix = bottom(cx, ids::LOGSTF_MATRIX_SCROLL.into());
     assert!(

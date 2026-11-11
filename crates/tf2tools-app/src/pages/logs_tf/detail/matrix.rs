@@ -33,7 +33,7 @@ const TABS: [(MatrixKind, &str, &str); 3] = [
     (MatrixKind::Deaths, "Deaths", "D"),
 ];
 
-/// The tabs over `kind`'s matrix, every player a row, K high to low. A tab asks `page` to
+/// The tabs over `kind`'s matrix, a row for each player with a count, K high to low. A tab asks `page` to
 /// show its kind; tracked players stay highlighted as in the players table.
 pub(super) fn matrix(
     log: &LogDetail,
