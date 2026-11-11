@@ -105,3 +105,15 @@ async fn a_log_removed_while_it_downloads_is_still_returned() {
     assert_eq!(common::count(&env.dir, "logstf_logs"), 0);
     assert_eq!(common::count(&env.dir, "logstf_class_rows"), 0);
 }
+
+#[tokio::test]
+async fn an_unreadable_refetch_of_a_stored_log_returns_the_stored_one() {
+    let env = pending_env(&[3]).await;
+    mount_log(&env.server, 3, 200, logstf_fixture("log-4137103-6v6.json")).await;
+    env.client.fetch_log(3).await.unwrap();
+    env.server.reset().await;
+    mount_log(&env.server, 3, 200, "not a log".to_owned()).await;
+    let detail = env.client.fetch_log(3).await.unwrap();
+    assert_eq!(detail.players().len(), 12);
+    assert_eq!(log_state(&env.dir, 3), (0, true), "the good body is kept");
+}

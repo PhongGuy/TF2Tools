@@ -1,7 +1,7 @@
 //! Log bodies are stored compressed, and plain-text bodies from earlier builds still open.
 
 use tf2tools_core::{
-    Database, LogsCache, LogsCancel, LogsRange, SteamId, TrackedPlayer, parse_log,
+    Database, LOG_BODY_LIMIT, LogsCache, LogsCancel, LogsRange, SteamId, TrackedPlayer, parse_log,
 };
 
 use crate::common;
@@ -147,4 +147,30 @@ fn a_damaged_blob_is_an_error_not_a_missing_body() {
     assert!(cache.log_body(5).is_err());
     assert_eq!(cache.log_body(6).unwrap(), None);
     assert_eq!(cache.log_body(99).unwrap(), None);
+}
+
+/// Stores `len` bytes of `a` as log 5's zlib body, as the client would compress it.
+fn stored_body_of(dir: &tf2tools_core::DataDir, len: u64) {
+    use std::io::Write;
+    let mut zlib = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::new(6));
+    zlib.write_all(&vec![b'a'; usize::try_from(len).unwrap()])
+        .unwrap();
+    common::sql(dir)
+        .execute(
+            "INSERT OR REPLACE INTO logstf_logs (id, title, map, date, body)
+             VALUES (5, 't', 'm', 1, ?1)",
+            [zlib.finish().unwrap()],
+        )
+        .unwrap();
+}
+
+#[test]
+fn a_stored_body_reads_up_to_the_size_cap_and_no_further() {
+    let (_tmp, dir) = common::temp_data_dir();
+    let cache = LogsCache::new(Database::open(&dir).unwrap());
+    stored_body_of(&dir, LOG_BODY_LIMIT);
+    let body = cache.log_body(5).unwrap().unwrap();
+    assert_eq!(body.len() as u64, LOG_BODY_LIMIT);
+    stored_body_of(&dir, LOG_BODY_LIMIT + 1);
+    assert!(cache.log_body(5).is_err());
 }

@@ -435,7 +435,9 @@ impl LogsCache {
             Some(Stored::Plain(text)) => String::from_utf8(text)
                 .map(Some)
                 .map_err(|_| damaged(log_id)),
-            Some(Stored::Compressed(bytes)) => inflate(&bytes).map(Some).ok_or(damaged(log_id)),
+            Some(Stored::Compressed(bytes)) => {
+                inflate(&bytes).map(Some).ok_or_else(|| damaged(log_id))
+            }
             Some(Stored::Other) => Err(damaged(log_id)),
         }
     }

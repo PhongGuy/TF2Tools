@@ -1,6 +1,6 @@
 //! The logs.tf client: Steam profile lookups and log syncs, every request through one gate.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -45,6 +45,7 @@ impl LogsCancel {
 #[non_exhaustive]
 pub enum LogsProgress {
     /// The player's list is being read, page by page.
+    #[non_exhaustive]
     Listing {
         /// Logs listed so far.
         listed: usize,
@@ -52,6 +53,7 @@ pub enum LogsProgress {
         total: usize,
     },
     /// Logs without a body are being downloaded.
+    #[non_exhaustive]
     Downloading {
         /// Logs handled so far, downloaded or marked.
         done: usize,
@@ -294,9 +296,10 @@ impl LogsClient {
     }
 
     /// Lists the player's logs in `range` page by page, downloads every listed log without a
-    /// body, one configured gap apart (`LOGS_LONG_SPACING` when more than `LONG_PULL`), and prunes. Skips everything when last_synced is under 30 minutes old,
-    /// `range` is no wider than the last full listing and no log in the window is still
-    /// pending, unless `force`.
+    /// body, and prunes. Requests start the configured gap apart; only the downloads slow to
+    /// `LOGS_LONG_SPACING` (or `with_long_spacing`'s gap) when more than `LONG_PULL` are due.
+    /// Skips everything when last_synced is under 30 minutes old, `range` is no wider than
+    /// the last full listing and no log in the window is still pending, unless `force`.
     ///
     /// `cancel` is checked before every request; a cancelled sync returns `Ok` with what it
     /// saved, leaving last_synced unstamped and nothing pruned so the next sync resumes.
@@ -387,10 +390,14 @@ impl LogsClient {
         Ok(summary)
     }
 
-    /// Downloads one log the player opened before the sync reached it, at interactive
-    /// priority and without waiting for a running sync, and stores it as the sync would.
+    /// Downloads one log the player opened, at interactive priority and without waiting for
+    /// a running sync, and stores it as the sync would. Callers read the stored body first
+    /// (`LogsCache::log_body`) and call this only for a log without one.
+    ///
     /// A gone, unreadable or oversized log is marked like the sync marks it; a failed request
-    /// leaves the log pending.
+    /// leaves the log pending. When a good body is already stored and the new download is
+    /// unreadable, the stored body is kept and its detail returned. A log removed while it
+    /// downloads is returned without being stored.
     pub async fn fetch_log(&self, log_id: u64) -> Result<LogDetail, LogsFetchError> {
         // The cache keys logs by i64, so an id past it names no log logs.tf could have.
         let Ok(log_id) = i64::try_from(log_id) else {
@@ -403,6 +410,12 @@ impl LogsClient {
         {
             Downloaded::Ready(detail) | Downloaded::Vanished(detail) => Ok(*detail),
             Downloaded::Gone => Err(LogsFetchError::Gone),
+            // A refetch that came back unreadable kept the good body, so the player gets that.
+            Downloaded::Unreadable { marked: false, .. }
+                if let Some(detail) = self.stored_detail(log_id) =>
+            {
+                Ok(detail)
+            }
             Downloaded::Unreadable {
                 too_large: Some((url, limit)),
                 ..
@@ -411,6 +424,12 @@ impl LogsClient {
                 too_large: None, ..
             } => Err(LogsFetchError::Unreadable),
         }
+    }
+
+    /// The detail of `log_id`'s stored body, when one is stored and still parses.
+    fn stored_detail(&self, log_id: i64) -> Option<LogDetail> {
+        let body = self.cache.log_body(u64::try_from(log_id).ok()?).ok()??;
+        parse_log(&body).ok()
     }
 
     /// Asks for one log body and records the outcome, shared by the sync and `fetch_log` so
@@ -463,7 +482,8 @@ impl LogsClient {
     ) -> Result<Option<(usize, Vec<i64>)>, LogsSyncError> {
         let mut offset = 0;
         let mut start = None;
-        let mut listed = 0;
+        // A log can sit on two pages when one is uploaded mid-listing, so count each once.
+        let mut seen = HashSet::new();
         let mut wanted = Vec::new();
         loop {
             if cancel.is_cancelled() {
@@ -484,7 +504,8 @@ impl LogsClient {
             let dates: HashMap<i64, i64> = page.iter().map(|log| (log.id, log.date)).collect();
             let asked = self.cache.record_list(id, &page, now)?;
             wanted.extend(asked.into_iter().map(|log_id| (dates[&log_id], log_id)));
-            listed += page.len();
+            seen.extend(page.iter().map(|log| log.id));
+            let listed = seen.len();
             offset += fetched;
 
             // A short page, the API's total or a page reaching past the window start ends it.
@@ -505,7 +526,7 @@ impl LogsClient {
         wanted.sort_unstable_by(|a, b| b.cmp(a));
         wanted.dedup();
         Ok(Some((
-            listed,
+            seen.len(),
             wanted.into_iter().map(|(_, id)| id).collect(),
         )))
     }

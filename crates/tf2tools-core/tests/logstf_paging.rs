@@ -30,7 +30,7 @@ async fn list_only(env: &LogsEnv, range: LogsRange) -> (LogsSyncSummary, Vec<(us
     let summary = env
         .client
         .sync_player(arie(), range, true, &cancel, &|p| match p {
-            LogsProgress::Listing { listed, total } => {
+            LogsProgress::Listing { listed, total, .. } => {
                 listing.lock().unwrap().push((listed, total))
             }
             LogsProgress::Downloading { .. } => cancel.cancel(),
@@ -154,4 +154,73 @@ async fn a_wider_range_relists_a_fresh_player_and_a_narrower_one_does_not() {
     assert!(sync(LogsRange::All).await.skipped());
     assert!(sync(LogsRange::Month1).await.skipped());
     assert_eq!(list_offsets(&env.server).await, ["0", "0"]);
+}
+
+#[tokio::test]
+async fn a_log_on_two_pages_is_listed_and_downloaded_once() {
+    // Log 899_001 ends page 0 and, shifted by a new upload, starts page 1 again.
+    let env = tracked_env().await;
+    let logs = hourly(900_000, days_ago(1), 1010);
+    mount_page(&env.server, ARIE, 0, page_body(&logs[..1000], 1011)).await;
+    mount_page(&env.server, ARIE, 1000, page_body(&logs[999..], 1011)).await;
+    let cancel = LogsCancel::new();
+    let (listing, wanted) = (Mutex::new(Vec::new()), Mutex::new(None));
+    let summary = env
+        .client
+        .sync_player(arie(), LogsRange::All, true, &cancel, &|p| match p {
+            LogsProgress::Listing { listed, total, .. } => {
+                listing.lock().unwrap().push((listed, total))
+            }
+            LogsProgress::Downloading { total, .. } => {
+                wanted.lock().unwrap().get_or_insert(total);
+                cancel.cancel();
+            }
+            _ => {}
+        })
+        .await
+        .unwrap();
+    assert_eq!(summary.listed(), 1010);
+    assert_eq!(listing.into_inner().unwrap(), [(1000, 1011), (1010, 1010)]);
+    assert_eq!(wanted.into_inner().unwrap(), Some(1010));
+}
+
+#[tokio::test]
+async fn a_page_without_a_total_ticks_the_count_so_far() {
+    let env = tracked_env().await;
+    let logs = hourly(900_000, days_ago(1), 1500);
+    let page = |logs: &[(u64, i64)]| {
+        let mut body: serde_json::Value = serde_json::from_str(&page_body(logs, 0)).unwrap();
+        body.as_object_mut().unwrap().remove("total");
+        body.to_string()
+    };
+    mount_page(&env.server, ARIE, 0, page(&logs[..1000])).await;
+    mount_page(&env.server, ARIE, 1000, page(&logs[1000..])).await;
+    let (summary, listing) = list_only(&env, LogsRange::All).await;
+    assert_eq!(listing, [(1000, 1000), (1500, 1500)]);
+    assert_eq!(summary.listed(), 1500);
+}
+
+#[tokio::test]
+async fn an_unknown_listed_range_reads_as_three_months() {
+    let env = tracked_env().await;
+    mount_list(&env.server, ARIE, list_body(&[(2, days_ago(1))])).await;
+    mount_any_log(&env.server).await;
+    let sync = |range| {
+        let client = env.client.clone();
+        async move {
+            client
+                .sync_player(arie(), range, false, &LogsCancel::new(), &|_| {})
+                .await
+                .unwrap()
+        }
+    };
+    assert!(!sync(LogsRange::Months3).await.skipped());
+    common::sql(&env.dir)
+        .execute(
+            "UPDATE settings SET value = 'fortnight' WHERE key = ?1",
+            [format!("logstf_listed_range:{ARIE}")],
+        )
+        .unwrap();
+    assert!(sync(LogsRange::Months3).await.skipped());
+    assert!(!sync(LogsRange::Months6).await.skipped());
 }
