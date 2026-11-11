@@ -1,7 +1,6 @@
 //! An open log's panel, laid out like its page on logs.tf: the header, team totals, the
 //! players table, one block per Medic and the tracked players' kills by class.
 
-use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -18,6 +17,7 @@ use crate::ids;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
+use crate::widgets::scroll::sideways;
 
 // The players table's fixed columns; the name takes what is left.
 const TEAM: Pixels = px(40.);
@@ -155,19 +155,6 @@ fn log_body(log: &LogDetail, tracked: &[TrackedPlayer], cx: &App) -> impl IntoEl
             }
             el.child(section("Class kills", table.max_w(px(560.)), cx))
         })
-}
-
-// A wide table in a box that scrolls sideways when the panel is narrower, so every column
-// stays reachable as on logs.tf; the table fills the box when there is room.
-fn sideways(id: &'static str, table: impl IntoElement) -> impl IntoElement {
-    // The kit's scroll wrapper keeps no test support, so the id sits on a box around it.
-    div().id(id).test_support().w_full().child(
-        h_flex()
-            .id("scroll")
-            .w_full()
-            .child(div().flex_none().min_w_full().child(table))
-            .overflow_x_scrollbar(),
-    )
 }
 
 // A titled part of the body.

@@ -866,3 +866,85 @@ fn a_row_still_downloading_does_not_open(cx: &mut TestAppContext) {
         cx.update(|cx| !page.read(cx).is_syncing())
     });
 }
+
+/// Opens log 2 at 800 by 600 and scrolls the page so the players table sits mid-window.
+fn players_table_in_view(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    page: &Entity<LogsTfPage>,
+) {
+    use gpui_kit::{ListOffset, px, size};
+
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    open_log(cx, s, page, 2);
+    let row = support::bounds_of(cx, s.win, ids::logstf_log(2)).unwrap();
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
+    let state = cx.update(|cx| page.read(cx).list_state().clone());
+    state.scroll_to(ListOffset {
+        item_ix: 2,
+        offset_in_item: table.top() - row.top() - px(100.),
+    });
+    support::settle(cx, s.win);
+}
+
+/// Sends one wheel event at `at` and lets the window redraw.
+fn wheel(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    at: gpui_kit::Point<gpui_kit::Pixels>,
+    delta: gpui_kit::ScrollDelta,
+) {
+    use gpui_kit::{InputEvent as _, ScrollEvent};
+
+    let event = ScrollEvent {
+        position: at,
+        delta,
+        ..Default::default()
+    };
+    cx.update_window(s.win, |_, w, cx| {
+        let _ = w.dispatch_event(event.to_platform_input(), cx);
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+}
+
+fn page_offset(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) -> gpui_kit::Pixels {
+    let state = cx.update(|cx| page.read(cx).list_state().clone());
+    -state.scroll_px_offset_for_scrollbar().y
+}
+
+#[gpui_kit::test]
+fn a_mouse_wheel_over_a_wide_table_scrolls_the_page(cx: &mut TestAppContext) {
+    use gpui_kit::{ScrollDelta, point, px};
+
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    players_table_in_view(cx, &s, &page);
+
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let before = page_offset(cx, &page);
+    let at = point(table.center().x, table.top() + px(10.));
+    wheel(cx, &s, at, ScrollDelta::Lines(point(0., -3.)));
+    let after = page_offset(cx, &page);
+    let moved = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    assert!(
+        after > before,
+        "the page scrolls down: {before:?} then {after:?}"
+    );
+    assert_eq!(moved.left(), cap.left(), "the table stays put sideways");
+
+    // A sideways wheel, as shift+wheel or a trackpad sends, still scrolls the table.
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
+    let at = point(table.center().x, table.top() + px(10.));
+    let before = page_offset(cx, &page);
+    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    wheel(cx, &s, at, ScrollDelta::Lines(point(-3., 0.)));
+    let moved = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    assert!(moved.left() < cap.left(), "{cap:?} then {moved:?}");
+    assert_eq!(page_offset(cx, &page), before, "the page stays put");
+}
