@@ -57,7 +57,7 @@ wiremock.workspace = true
 sha2.workspace = true
 minisign.workspace = true
 # The real cosmic-text system, so a test can resolve the bundled font weights.
-gpui-pre-wgpu = "=0.3.11"
+gpui-pre-wgpu = "=0.3.12"
 
 # A single test executable keeps the link count (and the target dir) small.
 [[test]]
