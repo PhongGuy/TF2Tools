@@ -101,7 +101,8 @@ pub(super) fn rounds_table(
         rows = rows.child(round_row(log, n, round, is_open, page.clone(), cx));
         if is_open || n == last {
             let part = sideways(scroll_id, std::mem::replace(&mut rows, v_flex()));
-            table = table.child(part.shared(ids::LOGSTF_ROUNDS_SCROLL));
+            // Keyed by log too, so another log opens at its own start.
+            table = table.child(part.shared((ids::LOGSTF_ROUNDS_SCROLL, log)));
             scroll_id = ids::logstf_rounds_scroll_after(n);
         }
         if is_open {
