@@ -227,6 +227,8 @@ impl LogsTfPage {
             return;
         }
         self.range = range;
+        // A cache read already out holds the old range; it must not land and put it back.
+        self.load_generation += 1;
         self.move_slider(window, cx);
         let saving = run_blocking(cx, move |s| {
             s.logs.cache().set_range(range).map_err(|error| {
@@ -359,7 +361,17 @@ impl LogsTfPage {
                 // Core stored or marked the log unless the failure has a line, so its row is
                 // reread even when the result no longer lands.
                 let marked = !matches!(state, Some(OpenState::Failed(_)));
+                // The sync may have stored the log while this fetch failed; then it reads.
+                let stored = page
+                    .rows
+                    .iter()
+                    .any(|r| r.id() == id && r.state() == LogState::Ready);
                 match state {
+                    Some(OpenState::Failed(_)) if stored => {
+                        if page.land(id, OpenState::Loading, cx) {
+                            page.read_detail(id, cx);
+                        }
+                    }
                     Some(state) => {
                         page.land(id, state, cx);
                     }

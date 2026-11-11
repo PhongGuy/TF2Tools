@@ -178,13 +178,14 @@ pub fn range_label(range: LogsRange) -> &'static str {
 /// The line under the class grid: the range, then how many logs it holds:
 /// "Last 3 months, 87 logs", "Last month, 1 log", "All logs, 4,812".
 pub fn summary_text(range: LogsRange, logs: usize) -> String {
+    // "Last month" and "Last year" drop the stop label's "1".
     let span = match range {
         LogsRange::Month1 => "month",
-        LogsRange::Months3 => "3 months",
-        LogsRange::Months6 => "6 months",
         LogsRange::Year1 => "year",
-        LogsRange::Years2 => "2 years",
-        LogsRange::All | _ => return format!("All logs, {}", count_text(logs)),
+        LogsRange::All => return format!("All logs, {}", count_text(logs)),
+        other @ (LogsRange::Months3 | LogsRange::Months6 | LogsRange::Years2 | _) => {
+            range_label(other)
+        }
     };
     let noun = if logs == 1 { "log" } else { "logs" };
     format!("Last {span}, {} {noun}", count_text(logs))

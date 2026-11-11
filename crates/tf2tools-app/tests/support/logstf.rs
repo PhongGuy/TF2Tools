@@ -238,6 +238,19 @@ pub fn mount_held(
         .block_on(mock.respond_with(held).mount(&server.server));
 }
 
+/// Answers `route` with `status` behind `gate`.
+pub fn mount_held_status(server: &super::StoreServer, gate: &Gate, route: &str, status: u16) {
+    use wiremock::matchers::{method, path};
+    let held = Held {
+        gate: gate.clone(),
+        reply: wiremock::ResponseTemplate::new(status),
+    };
+    let mock = wiremock::Mock::given(method("GET")).and(path(route));
+    server
+        .rt
+        .block_on(mock.respond_with(held).mount(&server.server));
+}
+
 /// How many requests for `route` the server has had.
 pub fn requests_to(server: &super::StoreServer, route: &str) -> usize {
     server

@@ -2,6 +2,9 @@
 //! reads the cache.
 
 use gpui_kit::component::slider::{SliderEvent, SliderValue};
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
@@ -113,4 +116,61 @@ fn a_stop_label_picks_its_range_and_a_saved_range_is_kept(cx: &mut TestAppContex
         support::label_of(cx, s.win, ids::LOGSTF_SUMMARY).as_deref(),
         Some("All logs, 2")
     );
+}
+
+#[gpui_kit::test]
+fn a_read_in_flight_does_not_put_the_old_range_back(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    // A reread reads the old range off the UI thread and waits to land; then a year is picked.
+    cx.update(|cx| page.update(cx, |p, cx| p.set_hidden(false, cx)));
+    while cx.dispatcher.scheduler().tick_background_only() {}
+    cx.update_window(s.win, |_, window, cx| {
+        page.update(cx, |p, cx| p.set_range(LogsRange::Year1, window, cx))
+    })
+    .unwrap();
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let _watch = cx.update(|cx| {
+        let seen = Rc::clone(&seen);
+        cx.observe(&page, move |page, cx| {
+            seen.borrow_mut().push(page.read(cx).range())
+        })
+    });
+    settled(cx, &page, &[3, 2]);
+    assert!(
+        !seen.borrow().contains(&LogsRange::Months3),
+        "the range went back: {:?}",
+        seen.borrow()
+    );
+}
+
+#[gpui_kit::test]
+fn the_stop_labels_take_keyboard_focus(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let _page = open_page(cx, &s);
+    for range in LogsRange::STOPS {
+        assert!(
+            support::focused_of(cx, s.win, ids::logstf_range_stop(range)).is_some(),
+            "{range:?} is no focus stop"
+        );
+    }
+}
+
+#[gpui_kit::test]
+fn a_player_whose_last_game_is_old_still_sees_it_in_a_short_range(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // The range reaches back from the newest log, not from today, so it is never empty.
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(400))]));
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    assert_eq!(row_ids(cx, &page), [3]);
+    assert!(!support::present(cx, s.win, ids::LOGSTF_NO_LOGS));
 }

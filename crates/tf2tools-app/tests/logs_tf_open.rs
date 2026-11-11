@@ -11,8 +11,8 @@ use tf2tools_core::LogState;
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, Gate, SIXES, day_ago, download_beside, expanded, list_body, mount_held, open_page, shell,
-    sid, to_end,
+    ARIE, Gate, SIXES, day_ago, download_beside, expanded, list_body, mount_held,
+    mount_held_status, open_page, shell, sid, to_end,
 };
 
 #[gpui_kit::test]
@@ -220,4 +220,30 @@ fn a_failed_log_shows_once_the_sync_downloads_it(cx: &mut TestAppContext) {
     support::wait_real(cx, "the sync", |cx| {
         cx.update(|cx| !page.read(cx).is_syncing(cx))
     });
+}
+
+#[gpui_kit::test]
+fn a_fetch_that_fails_after_the_sync_downloaded_the_log_shows_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let beside = support::StoreServer::start();
+    beside.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let (s, page) = pending_page(cx, &env, &server);
+    server.reset();
+    let gate = Gate::default();
+    mount_held_status(&server, &gate, "/json/3", 503);
+    to_end(cx, &page);
+    support::click_id(cx, s.win, ids::logstf_log(3));
+    support::wait_real(cx, "the held fetch", |_| gate.arrived() == 1);
+    download_beside(cx, &beside, 3);
+    let sync = cx.update(logs_sync);
+    sync.update(cx, |_, cx| cx.emit(LogsSyncEvent::Progress(sid(ARIE))));
+    support::wait_real(cx, "the downloaded row", |cx| {
+        state_of(cx, &page) == Some(LogState::Ready)
+    });
+    gate.open();
+    support::wait_real(cx, "the stored log", |cx| {
+        cx.update(|cx| page.read(cx).detail().is_some())
+    });
+    assert_eq!(expanded(cx, &page), Some(3));
 }

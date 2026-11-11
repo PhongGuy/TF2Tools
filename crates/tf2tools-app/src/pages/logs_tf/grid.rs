@@ -1,8 +1,9 @@
 //! The class averages grid: one card per class in TF2 order, then how many logs it covers
 //! beside the history range slider.
 
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::{Slider, SliderState};
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     App, Entity, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, div, px,
@@ -57,27 +58,20 @@ pub(super) fn class_grid(
                         summary_text(range, logs),
                     )
                 }))
-                .child(range_picker(slider, page, cx)),
+                .child(range_picker(slider, page)),
         )
 }
 
 // The slider over its six stop labels; a label click picks its stop like a release there.
-fn range_picker(
-    slider: &Entity<SliderState>,
-    page: WeakEntity<LogsTfPage>,
-    cx: &App,
-) -> impl IntoElement {
+// The labels are buttons so the keyboard can pick a range: the kit's slider takes no focus,
+// and its assistive Increment and Decrement move the thumb without any event to commit on.
+fn range_picker(slider: &Entity<SliderState>, page: WeakEntity<LogsTfPage>) -> impl IntoElement {
     let labels = LogsRange::STOPS.map(|range| {
         let page = page.clone();
-        div()
-            .id(ids::logstf_range_stop(range))
-            .aria_label(range_label(range))
-            .test_support()
-            .cursor_pointer()
-            .text_xs()
-            .text_color(cx.theme().muted_foreground)
-            .hover(|style| style.text_color(cx.theme().foreground))
-            .child(range_label(range))
+        Button::new(ids::logstf_range_stop(range))
+            .ghost()
+            .xsmall()
+            .label(range_label(range))
             .on_click(move |_, window, cx| {
                 let _ = page.update(cx, |page, cx| page.set_range(range, window, cx));
             })
@@ -94,7 +88,7 @@ fn range_picker(
                 .px(px(THUMB_REACH))
                 .child(Slider::new(slider)),
         )
-        .child(h_flex().justify_between().children(labels))
+        .child(h_flex().justify_between().text_xs().children(labels))
 }
 
 // The icon and name, then the rates as label and value rows; Medic's two extra rates only
