@@ -308,3 +308,61 @@ async fn sync_progress_reports_the_widened_gap() {
     assert_eq!((reported[0], reported[1]), (base, base * 2));
     assert_eq!(reported[22], base);
 }
+
+#[tokio::test]
+async fn a_cancel_ends_a_sync_waiting_out_a_long_retry_after() {
+    let env = env(Duration::ZERO).await;
+    let list = list_body(&[(3, now() - DAY), (2, now() - 2 * DAY)]);
+    mount(&env.server, r"^/api/v1/log$", list).await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"^/json/\d+$"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "60"))
+        .mount(&env.server)
+        .await;
+    let cancel = LogsCancel::new();
+    // Cancel once the first download has met its 429, so the sync sits in the minute's wait.
+    let canceller = async {
+        while arrivals(&env.server).await < 2 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        cancel.cancel();
+    };
+    let sync = env
+        .client
+        .sync_player(arie(), LogsRange::Months3, true, &cancel, &|_| {});
+    let (summary, ()) = tokio::time::timeout(Duration::from_secs(5), async {
+        tokio::join!(sync, canceller)
+    })
+    .await
+    .expect("the cancel ends the 429 wait");
+    assert!(summary.unwrap().cancelled());
+    assert_eq!(arrivals(&env.server).await, 2, "the list and one download");
+}
+
+#[tokio::test]
+async fn a_cancel_ends_a_listing_waiting_out_a_long_retry_after() {
+    let env = env(Duration::ZERO).await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"^/api/v1/log$"))
+        .respond_with(ResponseTemplate::new(429).insert_header("retry-after", "60"))
+        .mount(&env.server)
+        .await;
+    let cancel = LogsCancel::new();
+    let canceller = async {
+        while arrivals(&env.server).await < 1 {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        cancel.cancel();
+    };
+    let sync = env
+        .client
+        .sync_player(arie(), LogsRange::Months3, true, &cancel, &|_| {});
+    let (summary, ()) = tokio::time::timeout(Duration::from_secs(5), async {
+        tokio::join!(sync, canceller)
+    })
+    .await
+    .expect("the cancel ends the 429 wait");
+    assert!(summary.unwrap().cancelled());
+}

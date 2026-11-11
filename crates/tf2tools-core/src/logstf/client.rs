@@ -2,6 +2,7 @@
 
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
+use std::pin::pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -20,9 +21,17 @@ use super::{
     LogsCache, LogsRange, PlayerInput, STALE_SECS, SteamId, TrackedPlayer, parse_log, window_start,
 };
 
-/// Asks a running sync to stop before its next request; clones share one flag.
+/// Asks a running sync to stop before its next request, cutting short a 429 wait; clones
+/// share one flag.
 #[derive(Debug, Clone, Default)]
-pub struct LogsCancel(Arc<AtomicBool>);
+pub struct LogsCancel(Arc<CancelFlag>);
+
+#[derive(Debug, Default)]
+struct CancelFlag {
+    raised: AtomicBool,
+    /// Wakes every `cancelled` waiter when the flag is raised.
+    wake: tokio::sync::Notify,
+}
 
 impl LogsCancel {
     /// A flag nobody has raised yet.
@@ -32,12 +41,26 @@ impl LogsCancel {
 
     /// Stops every sync holding this flag or a clone of it.
     pub fn cancel(&self) {
-        self.0.store(true, Ordering::Relaxed);
+        self.0.raised.store(true, Ordering::SeqCst);
+        self.0.wake.notify_waiters();
     }
 
     /// Whether `cancel` was called on this flag or a clone.
     pub fn is_cancelled(&self) -> bool {
-        self.0.load(Ordering::Relaxed)
+        self.0.raised.load(Ordering::SeqCst)
+    }
+
+    /// Resolves once the flag is raised; a fresh flag nobody raises stands for "no cancel".
+    async fn cancelled(&self) {
+        loop {
+            // Registered before the flag is read, so a cancel in between still wakes it.
+            let mut woken = pin!(self.0.wake.notified());
+            woken.as_mut().enable();
+            if self.is_cancelled() {
+                return;
+            }
+            woken.await;
+        }
     }
 }
 
@@ -231,12 +254,22 @@ impl LogsClient {
 
     /// One GET through the gate: it starts at least one gap after this client's last request.
     /// Each 429 it met widens the gate and an answer without one helps ease it back, so
-    /// logs.tf is asked less often while it is pushing back.
-    async fn get(&self, url: &str, priority: Priority, limit: u64) -> Result<Vec<u8>, NetFailure> {
+    /// logs.tf is asked less often while it is pushing back. Raising `cancel` ends a 429
+    /// wait at once as RateLimited; a request already on the wire still finishes.
+    async fn get(
+        &self,
+        url: &str,
+        priority: Priority,
+        limit: u64,
+        cancel: &LogsCancel,
+    ) -> Result<Vec<u8>, NetFailure> {
         self.pacer.slot(priority).await;
         let (result, rate_limits) = RATE_LIMITS
             .scope(Cell::new(0), async {
-                let result = self.http.get_api(url, limit).await;
+                let result = self
+                    .http
+                    .get_api_until(url, limit, cancel.cancelled())
+                    .await;
                 (result, RATE_LIMITS.with(Cell::get))
             })
             .await;
@@ -289,7 +322,10 @@ impl LogsClient {
     /// Reads one profile XML body: an `<error>` means no such profile, otherwise
     /// `<steamID64>` must be a valid id and `<steamID>` names it.
     async fn lookup(&self, url: &str) -> Result<TrackedPlayer, ResolveError> {
-        let bytes = self.get(url, Priority::Interactive, LOG_BODY_LIMIT).await?;
+        let no_cancel = LogsCancel::new();
+        let bytes = self
+            .get(url, Priority::Interactive, LOG_BODY_LIMIT, &no_cancel)
+            .await?;
         let body = String::from_utf8_lossy(&bytes);
         if xml_text(&body, "error").is_some() {
             return Err(ResolveError::NotFound);
@@ -316,8 +352,8 @@ impl LogsClient {
     /// Skips everything when last_synced is under 30 minutes old, `range` is no wider than
     /// the last full listing and no log in the window is still pending, unless `force`.
     ///
-    /// `cancel` is checked before every request; a cancelled sync returns `Ok` with what it
-    /// saved, leaving last_synced unstamped and nothing pruned so the next sync resumes.
+    /// `cancel` is checked before every request and cuts short a 429 wait; a cancelled sync
+    /// returns `Ok` with what it saved, leaving last_synced unstamped and nothing pruned so the next sync resumes.
     /// A log stored meanwhile is not downloaded again.
     /// One sync runs at a time per client (clones share the lock).
     pub async fn sync_player(
@@ -398,10 +434,18 @@ impl LogsClient {
             }
             // Gone and unreadable logs are marked and never asked again; any other failure
             // stops the sync.
-            match self
-                .download::<LogsSyncError>(log_id, Priority::Background, now)
-                .await?
+            // A failure after the cancel is the cut-short 429 wait, so the sync just stops.
+            let downloaded = match self
+                .download::<LogsSyncError>(log_id, Priority::Background, now, cancel)
+                .await
             {
+                Err(_) if cancel.is_cancelled() => {
+                    summary.cancelled = true;
+                    return Ok(summary);
+                }
+                downloaded => downloaded?,
+            };
+            match downloaded {
                 Downloaded::Ready(_) => summary.downloaded += 1,
                 Downloaded::Vanished(_) => {}
                 Downloaded::Gone => summary.gone += 1,
@@ -430,8 +474,9 @@ impl LogsClient {
             return Err(LogsFetchError::Gone);
         };
         let now = chrono::Utc::now().timestamp();
+        let no_cancel = LogsCancel::new();
         match self
-            .download::<LogsFetchError>(log_id, Priority::Interactive, now)
+            .download::<LogsFetchError>(log_id, Priority::Interactive, now, &no_cancel)
             .await?
         {
             Downloaded::Ready(detail) | Downloaded::Vanished(detail) => Ok(*detail),
@@ -456,7 +501,11 @@ impl LogsClient {
     /// interactive priority; 404 is Gone, past `LOG_ZIP_LIMIT` is TooLarge; the cache is untouched.
     pub async fn download_zip(&self, log_id: u64) -> Result<Vec<u8>, LogsFetchError> {
         let url = format!("{}/logs/log_{log_id}.log.zip", self.endpoints.logs_tf());
-        match self.get(&url, Priority::Interactive, LOG_ZIP_LIMIT).await {
+        let no_cancel = LogsCancel::new();
+        match self
+            .get(&url, Priority::Interactive, LOG_ZIP_LIMIT, &no_cancel)
+            .await
+        {
             Ok(bytes) => Ok(bytes),
             Err(NetFailure::Status { status: 404, .. }) => Err(LogsFetchError::Gone),
             Err(failure) => Err(failure.into()),
@@ -472,12 +521,18 @@ impl LogsClient {
     /// Asks for one log body and records the outcome, shared by the sync and `fetch_log` so
     /// the two never mark a log differently. A 404 marks it gone; an oversize, non-UTF-8 or
     /// non-log body marks it unreadable unless a good copy is already stored.
-    async fn download<E>(&self, log_id: i64, priority: Priority, now: i64) -> Result<Downloaded, E>
+    async fn download<E>(
+        &self,
+        log_id: i64,
+        priority: Priority,
+        now: i64,
+        cancel: &LogsCancel,
+    ) -> Result<Downloaded, E>
     where
         E: From<NetFailure> + From<LogsCacheError>,
     {
         let url = format!("{}/json/{log_id}", self.endpoints.logs_tf());
-        let (readable, too_large) = match self.get(&url, priority, LOG_BODY_LIMIT).await {
+        let (readable, too_large) = match self.get(&url, priority, LOG_BODY_LIMIT, cancel).await {
             Ok(bytes) => (
                 String::from_utf8(bytes)
                     .ok()
@@ -508,7 +563,7 @@ impl LogsClient {
 
     /// Reads the player's list page by page, recording each page's logs inside `range`'s
     /// window as it arrives, and returns the in-window count with the ids to download, newest
-    /// first. `None` when `cancel` stopped it between pages; recorded pages stay recorded.
+    /// first. `None` when `cancel` stopped it; recorded pages stay recorded.
     async fn list_window(
         &self,
         id: SteamId,
@@ -526,7 +581,10 @@ impl LogsClient {
             if cancel.is_cancelled() {
                 return Ok(None);
             }
-            let (mut page, api_total) = self.list_page(id, offset).await?;
+            let (mut page, api_total) = match self.list_page(id, offset, cancel).await {
+                Err(_) if cancel.is_cancelled() => return Ok(None),
+                page => page?,
+            };
             let fetched = page.len();
             let oldest = page.iter().map(|log| log.date).min();
             // The window ends at the player's newest log, which tops the first page, so the
@@ -574,13 +632,16 @@ impl LogsClient {
         &self,
         id: SteamId,
         offset: usize,
+        cancel: &LogsCancel,
     ) -> Result<(Vec<ListedLog>, Option<usize>), LogsSyncError> {
         let url = format!(
             "{}/api/v1/log?player={}&limit={LIST_PAGE}&offset={offset}",
             self.endpoints.logs_tf(),
             id.id64()
         );
-        let bytes = self.get(&url, Priority::Background, LOG_BODY_LIMIT).await?;
+        let bytes = self
+            .get(&url, Priority::Background, LOG_BODY_LIMIT, cancel)
+            .await?;
         let list: WireList =
             serde_json::from_slice(&bytes).map_err(|e| LogsSyncError::Malformed {
                 url: url.clone(),
