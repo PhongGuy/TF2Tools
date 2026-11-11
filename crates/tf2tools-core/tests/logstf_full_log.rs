@@ -470,6 +470,12 @@ fn class_matrices_have_a_row_for_every_player() {
         (arie.counts(), arie.total()),
         ([4, 5, 2, 2, 0, 0, 0, 0, 0], 13)
     );
+    // Arie died once to a Heavy, so the Heavy column carries a count too.
+    let arie = row(MatrixKind::Deaths, 231_702);
+    assert_eq!(
+        (arie.counts(), arie.total()),
+        ([5, 5, 0, 10, 1, 0, 0, 0, 0], 21)
+    );
     // The Blue medic has no classkills entry: the row reads as zeros.
     let meta = row(MatrixKind::Kills, 98_265_577);
     assert_eq!((meta.counts(), meta.total()), ([0; 9], 0));
