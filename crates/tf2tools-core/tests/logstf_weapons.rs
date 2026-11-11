@@ -4,12 +4,13 @@
 use std::collections::HashMap;
 
 use tf2tools_core::{
-    ClassWeapons, LogsCancel, LogsRange, SteamId, TfClass, TrackedPlayer, logstf_class, parse_log,
+    ClassWeapons, LogsCacheError, LogsCancel, LogsRange, SteamId, TfClass, TrackedPlayer,
+    logstf_class, parse_log,
 };
 
 use crate::common;
 use crate::common::logstf::{
-    ARIE, LogsEnv, days_ago, list_body, logs_env, logstf_fixture, mount_list, mount_log,
+    ARIE, LogsEnv, days_ago, list_body, log_state, logs_env, logstf_fixture, mount_list, mount_log,
 };
 
 fn arie() -> SteamId {
@@ -241,4 +242,101 @@ async fn logs_not_yet_counted_show_as_pending() {
         (pyro.logs(), pyro.pending(), pyro.weapons().len()),
         (0, 1, 0)
     );
+}
+
+/// Clears every weapon row and marker, as a database from before step 16 had them.
+fn reset_weapons(env: &LogsEnv) {
+    common::sql(&env.dir)
+        .execute_batch(
+            "DELETE FROM logstf_weapon_rows; UPDATE logstf_logs SET weapons_counted = 0;",
+        )
+        .unwrap();
+}
+
+#[tokio::test]
+async fn the_backfill_counts_bodies_stored_without_weapon_rows() {
+    let env = two_logs().await;
+    let (three, two) = (stored_weapons(&env, 3), stored_weapons(&env, 2));
+    reset_weapons(&env);
+    let cache = env.client.cache();
+    let before = cache
+        .class_weapons(arie(), LogsRange::Year1, TfClass::Scout)
+        .unwrap();
+    assert_eq!((before.logs(), before.pending()), (0, 2));
+
+    let done = cache.count_weapons(50).unwrap();
+    assert_eq!((done.counted(), done.left()), (2, 0));
+    assert_eq!(stored_weapons(&env, 3), three);
+    assert_eq!(stored_weapons(&env, 2), two);
+    assert_eq!((weapons_counted(&env, 3), weapons_counted(&env, 2)), (1, 1));
+    let again = cache.count_weapons(50).unwrap();
+    assert_eq!((again.counted(), again.left()), (0, 0));
+}
+
+#[tokio::test]
+async fn an_interrupted_backfill_resumes_oldest_first() {
+    let env = two_logs().await;
+    reset_weapons(&env);
+    let cache = env.client.cache();
+    let first = cache.count_weapons(1).unwrap();
+    assert_eq!((first.counted(), first.left()), (1, 1));
+    assert_eq!((weapons_counted(&env, 2), weapons_counted(&env, 3)), (1, 0));
+    let partial = cache
+        .class_weapons(arie(), LogsRange::Year1, TfClass::Scout)
+        .unwrap();
+    assert_eq!((partial.logs(), partial.pending()), (1, 1));
+    let rest = cache.count_weapons(1).unwrap();
+    assert_eq!((rest.counted(), rest.left()), (1, 0));
+}
+
+#[tokio::test]
+async fn a_damaged_body_is_counted_with_no_rows() {
+    let env = logs_env().await;
+    let steam = i64::try_from(ARIE).unwrap();
+    common::sql(&env.dir)
+        .execute_batch(&format!(
+            "INSERT INTO logstf_logs (id, title, map, date, body, state) VALUES
+                 (11, 'not zlib', 'm', 1, x'00010203', 0),
+                 (12, 'not utf-8', 'm', 1, CAST(x'fffe' AS TEXT), 0),
+                 (13, 'a number', 'm', 1, 7, 0),
+                 (14, 'not a log', 'm', 1, '{{}}', 0);
+             INSERT INTO logstf_class_rows (log_id, steam_id, class, seconds, kills, deaths, assists, dmg)
+                 VALUES (14, {steam}, 'scout', 60, 0, 0, 0, 0);"
+        ))
+        .unwrap();
+    let done = env.client.cache().count_weapons(50).unwrap();
+    assert_eq!((done.counted(), done.left()), (4, 0));
+    for id in 11..=14 {
+        assert_eq!(weapons_counted(&env, id), 1, "log {id}");
+    }
+    assert_eq!(common::count(&env.dir, "logstf_weapon_rows"), 0);
+    assert_eq!(
+        common::count(&env.dir, "logstf_class_rows"),
+        1,
+        "class rows stay"
+    );
+    assert_eq!(log_state(&env.dir, 14).0, 0, "the state stays");
+}
+
+#[tokio::test]
+async fn a_failed_write_leaves_the_log_for_the_next_run() {
+    let env = two_logs().await;
+    reset_weapons(&env);
+    common::sql(&env.dir)
+        .execute_batch(
+            "CREATE TRIGGER no_mark BEFORE UPDATE OF weapons_counted ON logstf_logs
+             BEGIN SELECT RAISE(ABORT, 'disk full'); END;",
+        )
+        .unwrap();
+    let cache = env.client.cache();
+    assert!(matches!(
+        cache.count_weapons(50),
+        Err(LogsCacheError::Database { .. })
+    ));
+    assert_eq!((weapons_counted(&env, 2), weapons_counted(&env, 3)), (0, 0));
+    assert_eq!(common::count(&env.dir, "logstf_weapon_rows"), 0);
+    common::sql(&env.dir)
+        .execute_batch("DROP TRIGGER no_mark;")
+        .unwrap();
+    assert_eq!(cache.count_weapons(50).unwrap().left(), 0);
 }

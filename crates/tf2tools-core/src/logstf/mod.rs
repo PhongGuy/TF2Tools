@@ -23,7 +23,7 @@ pub use detail::{
 };
 pub use range::{LogsRange, window_start};
 pub use steam_id::{PlayerInput, SteamId, parse_player_input};
-pub use weapons::{ClassWeapons, WeaponSum};
+pub use weapons::{ClassWeapons, WeaponBackfill, WeaponSum};
 
 /// The SteamID64 of account number 0 in the public universe.
 pub const STEAM_ID64_BASE: u64 = 76_561_197_960_265_728;

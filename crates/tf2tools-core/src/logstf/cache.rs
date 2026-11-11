@@ -8,11 +8,12 @@ use rusqlite::{OptionalExtension, params};
 
 use super::averages::{CLASS_SUMS, ClassAverage, ClassSums, WINDOW_LOGS};
 use super::weapons::{
-    ClassWeapons, WEAPON_LOGS, WEAPON_PENDING, WEAPON_SUMS, WeaponSum, write_weapon_rows,
+    ClassWeapons, MARK_COUNTED_SQL, UNCOUNTED_LEFT_SQL, UNCOUNTED_SQL, WEAPON_LOGS, WEAPON_PENDING,
+    WEAPON_SUMS, WeaponBackfill, WeaponSum, write_weapon_rows,
 };
 use super::{
     LOG_BODY_LIMIT, LogDetail, LogsRange, PROVISIONAL_SECS, SteamId, logstf_class,
-    logstf_class_name,
+    logstf_class_name, parse_log,
 };
 use crate::db::Database;
 use crate::error::LogsCacheError;
@@ -407,6 +408,81 @@ impl LogsCache {
         let Ok(log_id) = i64::try_from(log_id) else {
             return Ok(None);
         };
+        match self.read_body(log_id)? {
+            BodyRead::Missing => Ok(None),
+            BodyRead::Damaged => Err(damaged(log_id)),
+            BodyRead::Text(body) => Ok(Some(body)),
+        }
+    }
+
+    /// Counts weapon rows for up to `limit` stored logs without them, oldest id first.
+    ///
+    /// A damaged or unparsable body is marked counted with no rows; a database error leaves
+    /// the current log unmarked so the next run retries it.
+    pub fn count_weapons(&self, limit: usize) -> Result<WeaponBackfill, LogsCacheError> {
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX);
+        let ids = self
+            .db
+            .read(|conn| {
+                conn.prepare(UNCOUNTED_SQL)?
+                    .query_map([limit], |row| row.get::<_, i64>(0))?
+                    .collect::<rusqlite::Result<Vec<_>>>()
+            })
+            .map_err(db_error)?;
+        let mut counted = 0;
+        for id in ids {
+            // Read and parse outside the write lock; None means "count it with no rows".
+            let detail = match self.read_body(id)? {
+                BodyRead::Missing => continue,
+                BodyRead::Damaged => {
+                    tracing::warn!(
+                        id,
+                        "stored logs.tf body is damaged; counting it without weapons"
+                    );
+                    None
+                }
+                BodyRead::Text(body) => match parse_log(&body) {
+                    Ok(detail) => Some(detail),
+                    Err(error) => {
+                        tracing::warn!(
+                            %error,
+                            id,
+                            "stored logs.tf body does not parse; counting it without weapons"
+                        );
+                        None
+                    }
+                },
+            };
+            let wrote = self
+                .db
+                .write(|conn| {
+                    let tx = conn.transaction()?;
+                    // The guard first: if the log changed since the read, dropping `tx`
+                    // unwritten keeps whatever that change left.
+                    if tx.execute(MARK_COUNTED_SQL, [id])? == 0 {
+                        return Ok(false);
+                    }
+                    if let Some(detail) = &detail {
+                        write_weapon_rows(&tx, id, detail)?;
+                    }
+                    tx.commit()?;
+                    Ok(true)
+                })
+                .map_err(db_error)?;
+            counted += usize::from(wrote);
+        }
+        let left: i64 = self
+            .db
+            .read(|conn| conn.query_row(UNCOUNTED_LEFT_SQL, [], |row| row.get(0)))
+            .map_err(db_error)?;
+        Ok(WeaponBackfill::new(
+            counted,
+            usize::try_from(left).unwrap_or(0),
+        ))
+    }
+
+    /// Log `log_id`'s stored body, telling a damaged one apart from a database error.
+    pub(super) fn read_body(&self, log_id: i64) -> Result<BodyRead, LogsCacheError> {
         // Copy the stored value out as is and inflate after the read, so the connection is
         // free while inflating. A BLOB is a compressed body; TEXT is an earlier build's plain one.
         let stored = self
@@ -428,16 +504,16 @@ impl LogsCache {
             })
             .map_err(db_error)?
             .flatten();
-        match stored {
-            None => Ok(None),
-            Some(Stored::Plain(text)) => String::from_utf8(text)
-                .map(Some)
-                .map_err(|_| damaged(log_id)),
-            Some(Stored::Compressed(bytes)) => {
-                inflate(&bytes).map(Some).ok_or_else(|| damaged(log_id))
+        Ok(match stored {
+            None => BodyRead::Missing,
+            Some(Stored::Plain(text)) => {
+                String::from_utf8(text).map_or(BodyRead::Damaged, BodyRead::Text)
             }
-            Some(Stored::Other) => Err(damaged(log_id)),
-        }
+            Some(Stored::Compressed(bytes)) => {
+                inflate(&bytes).map_or(BodyRead::Damaged, BodyRead::Text)
+            }
+            Some(Stored::Other) => BodyRead::Damaged,
+        })
     }
 
     /// The nine classes in TfClass::ALL order, over exactly the logs `logs` returns.
@@ -819,6 +895,15 @@ enum Stored {
     Plain(Vec<u8>),
     /// A number, which no build ever stored as a body.
     Other,
+}
+
+/// A stored body as `read_body` found it.
+pub(super) enum BodyRead {
+    /// No such log, or no body stored.
+    Missing,
+    /// A body that does not inflate or decode to text.
+    Damaged,
+    Text(String),
 }
 
 /// A body compressed for storage: zlib at level 6.

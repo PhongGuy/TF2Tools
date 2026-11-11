@@ -78,6 +78,55 @@ pub(super) const WEAPON_PENDING: &str = "SELECT COUNT(*) FROM logstf_logs l
       AND EXISTS (SELECT 1 FROM logstf_class_rows r
                   WHERE r.log_id = l.id AND r.steam_id = ?1 AND r.class = ?3)";
 
+/// The selection `count_weapons` works through, shared by its guard so the two cannot drift.
+macro_rules! uncounted {
+    () => {
+        "body IS NOT NULL AND state = 0 AND weapons_counted = 0"
+    };
+}
+
+/// Up to ?1 uncounted log ids, oldest first.
+pub(super) const UNCOUNTED_SQL: &str = concat!(
+    "SELECT id FROM logstf_logs WHERE ",
+    uncounted!(),
+    " ORDER BY id LIMIT ?1"
+);
+
+/// How many logs are still uncounted.
+pub(super) const UNCOUNTED_LEFT_SQL: &str =
+    concat!("SELECT COUNT(*) FROM logstf_logs WHERE ", uncounted!());
+
+/// Marks log ?1 counted only while it is still the uncounted log that was read; zero rows
+/// changed means it was pruned, marked failed or re-ingested in between.
+pub(super) const MARK_COUNTED_SQL: &str = concat!(
+    "UPDATE logstf_logs SET weapons_counted = 1 WHERE id = ?1 AND ",
+    uncounted!()
+);
+
+/// What one `count_weapons` batch did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct WeaponBackfill {
+    counted: usize,
+    left: usize,
+}
+
+impl WeaponBackfill {
+    pub(super) fn new(counted: usize, left: usize) -> Self {
+        WeaponBackfill { counted, left }
+    }
+
+    /// Logs this batch marked counted, damaged ones included.
+    pub fn counted(&self) -> usize {
+        self.counted
+    }
+
+    /// Logs still waiting to be counted after the batch.
+    pub fn left(&self) -> usize {
+        self.left
+    }
+}
+
 /// One weapon's stats summed over a player's window on one class.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
