@@ -1,6 +1,6 @@
 //! Reading a logs.tf log body into the expanded view's shape.
 
-use tf2tools_core::{LogParseError, STEAM_ID64_BASE, SteamId, Team, TfClass, parse_log};
+use tf2tools_core::{LogParseError, Medigun, STEAM_ID64_BASE, SteamId, Team, TfClass, parse_log};
 
 use crate::common::logstf::{PlayerSpec, log_body, logstf_fixture};
 
@@ -92,7 +92,7 @@ fn a_highlander_medic_has_charges_spread_and_class_kills() {
         "{}",
         medic.heal_per_min()
     );
-    assert_eq!(medic.charges(), [("medigun".to_owned(), 17)]);
+    assert_eq!(medic.charges(), [(Medigun::MediGun, 17)]);
     assert_eq!(medic.drops(), 2);
     assert!(close(medic.avg_time_to_build(), 56.74));
     assert!(close(medic.avg_uber_length(), 6.56));

@@ -2,6 +2,8 @@
 
 use tf2tools_core::{EventKind, LogDetail, Medigun, STEAM_ID64_BASE, SteamId, Team, parse_log};
 
+use tf2tools_core::TfClass;
+
 use crate::common::logstf::logstf_fixture;
 
 fn sid(account: u64) -> SteamId {
@@ -324,4 +326,106 @@ fn a_round_whose_team_stats_do_not_read_keeps_zero_team_stats() {
         .map(|r| (r.winner(), r.blue().score(), r.red().score()))
         .collect();
     assert_eq!(rows, [(Some(Team::Red), 0, 0), (Some(Team::Blue), 0, 2)]);
+}
+
+fn close(a: f64, b: f64) -> bool {
+    (a - b).abs() < 0.01
+}
+
+#[test]
+fn medics_read_the_logs_tf_rows() {
+    let log = six();
+    let medic = |account: u64| {
+        log.medics()
+            .iter()
+            .find(|m| m.steam_id() == sid(account))
+            .unwrap()
+    };
+    let rahmed = medic(175_790_976);
+    assert_eq!(rahmed.charges(), [(Medigun::MediGun, 12)]);
+    assert!(
+        close(rahmed.avg_time_before_using(), 37.08),
+        "{}",
+        rahmed.avg_time_before_using()
+    );
+    assert_eq!(
+        (
+            rahmed.near_full_deaths(),
+            rahmed.advantages_lost(),
+            rahmed.biggest_advantage_lost()
+        ),
+        (0, 1, 21)
+    );
+    let meta = medic(98_265_577);
+    assert!(close(meta.avg_time_before_using(), 29.29));
+    assert_eq!(
+        (
+            meta.near_full_deaths(),
+            meta.advantages_lost(),
+            meta.biggest_advantage_lost()
+        ),
+        (0, 1, 10)
+    );
+    let hl = hl();
+    let jefrey = hl
+        .medics()
+        .iter()
+        .find(|m| m.steam_id() == sid(302_123_669))
+        .unwrap();
+    assert!(close(jefrey.avg_time_before_using(), 10.76));
+    assert_eq!(
+        (
+            jefrey.near_full_deaths(),
+            jefrey.advantages_lost(),
+            jefrey.biggest_advantage_lost()
+        ),
+        (0, 1, 23)
+    );
+    let manchester = hl
+        .medics()
+        .iter()
+        .find(|m| m.steam_id() == sid(306_968_798))
+        .unwrap();
+    assert_eq!(manchester.charges(), [(Medigun::MediGun, 19)]);
+    assert!(close(manchester.avg_time_before_using(), 12.0));
+    assert_eq!(
+        (
+            manchester.near_full_deaths(),
+            manchester.advantages_lost(),
+            manchester.biggest_advantage_lost()
+        ),
+        (0, 0, 0)
+    );
+}
+
+#[test]
+fn heal_targets_carry_their_longest_class_and_charges_name_their_medigun() {
+    let log = hl();
+    let jefrey = log
+        .medics()
+        .iter()
+        .find(|m| m.steam_id() == sid(302_123_669))
+        .unwrap();
+    let top = &jefrey.heal_spread()[0];
+    assert_eq!(
+        (top.steam_id(), top.healing(), top.class()),
+        (sid(866_286_911), 13_725, Some(TfClass::Demoman))
+    );
+    let body = r#"{"length": 60, "teams": {"Red": {}, "Blue": {}},
+        "players": {"[U:1:5]": {"team": "Red", "heal": 10,
+            "ubertypes": {"medigun": 3, "kritzkrieg": 2},
+            "class_stats": [{"type": "medic", "total_time": 60}]}},
+        "healspread": {"[U:1:5]": {"[U:1:6]": 10}}}"#;
+    let log = parse_log(body).unwrap();
+    let medic = &log.medics()[0];
+    assert_eq!(
+        medic.heal_spread()[0].class(),
+        None,
+        "not a player in this log"
+    );
+    assert_eq!(
+        medic.charges(),
+        [(Medigun::Kritzkrieg, 2), (Medigun::MediGun, 3)]
+    );
+    assert_eq!(medic.near_full_deaths(), 0, "no medicstats reads as zeros");
 }

@@ -568,11 +568,15 @@ pub struct MedicLine {
     team: Team,
     heal: u32,
     heal_per_min: f64,
-    charges: Vec<(String, u32)>,
+    charges: Vec<(Medigun, u32)>,
     drops: u32,
     avg_time_to_build: f64,
     avg_uber_length: f64,
     deaths_after_uber: u32,
+    avg_time_before_using: f64,
+    near_full_deaths: u32,
+    advantages_lost: u32,
+    biggest_advantage_lost: u32,
     heal_spread: Vec<HealTarget>,
 }
 
@@ -597,8 +601,8 @@ impl MedicLine {
     pub fn heal_per_min(&self) -> f64 {
         self.heal_per_min
     }
-    /// Charges used per medigun type, by type name.
-    pub fn charges(&self) -> &[(String, u32)] {
+    /// Charges used per medigun, in logs.tf key order.
+    pub fn charges(&self) -> &[(Medigun, u32)] {
         &self.charges
     }
     /// Ubercharges dropped.
@@ -617,6 +621,22 @@ impl MedicLine {
     pub fn deaths_after_uber(&self) -> u32 {
         self.deaths_after_uber
     }
+    /// Average seconds a full charge was held before it was used.
+    pub fn avg_time_before_using(&self) -> f64 {
+        self.avg_time_before_using
+    }
+    /// Deaths with a 95 to 99 percent charge.
+    pub fn near_full_deaths(&self) -> u32 {
+        self.near_full_deaths
+    }
+    /// Times the Medic lost an uber advantage.
+    pub fn advantages_lost(&self) -> u32 {
+        self.advantages_lost
+    }
+    /// The longest uber advantage lost, in seconds.
+    pub fn biggest_advantage_lost(&self) -> u32 {
+        self.biggest_advantage_lost
+    }
     /// The players this Medic healed, most healing first.
     pub fn heal_spread(&self) -> &[HealTarget] {
         &self.heal_spread
@@ -630,6 +650,7 @@ pub struct HealTarget {
     steam_id: SteamId,
     name: String,
     healing: u32,
+    class: Option<TfClass>,
 }
 
 impl HealTarget {
@@ -644,6 +665,11 @@ impl HealTarget {
     /// Health given to them.
     pub fn healing(&self) -> u32 {
         self.healing
+    }
+    /// The healed player's longest-played class; `None` when they are not a player in
+    /// this log or played none of the nine.
+    pub fn class(&self) -> Option<TfClass> {
+        self.class
     }
 }
 
@@ -706,6 +732,10 @@ fn build(wire: WireLog) -> LogDetail {
         players.push((key, line, p));
     }
     players.sort_by(|a, b| sort_key(&a.1).cmp(&sort_key(&b.1)));
+    let class_of: BTreeMap<&str, TfClass> = players
+        .iter()
+        .filter_map(|(key, line, _)| Some((key.as_str(), line.classes.first()?.class)))
+        .collect();
 
     let medics = players
         .iter()
@@ -718,12 +748,20 @@ fn build(wire: WireLog) -> LogDetail {
                 team: line.team,
                 heal: p.heal,
                 heal_per_min: per_min(p.heal),
-                charges: p.ubertypes.iter().map(|(k, v)| (k.clone(), *v)).collect(),
+                charges: p
+                    .ubertypes
+                    .iter()
+                    .map(|(k, v)| (Medigun::from_key(k), *v))
+                    .collect(),
                 drops: p.drops,
                 avg_time_to_build: stats.avg_time_to_build,
                 avg_uber_length: stats.avg_uber_length,
                 deaths_after_uber: stats.deaths_within_20s_after_uber,
-                heal_spread: heal_spread(wire.healspread.get(key), &name_of),
+                avg_time_before_using: stats.avg_time_before_using,
+                near_full_deaths: stats.deaths_with_95_99_uber,
+                advantages_lost: stats.advantages_lost,
+                biggest_advantage_lost: stats.biggest_advantage_lost,
+                heal_spread: heal_spread(wire.healspread.get(key), &name_of, &class_of),
             }
         })
         .collect();
@@ -930,6 +968,7 @@ fn player_line(
 fn heal_spread(
     spread: Option<&BTreeMap<String, u32>>,
     name_of: &impl Fn(&str, SteamId) -> String,
+    class_of: &BTreeMap<&str, TfClass>,
 ) -> Vec<HealTarget> {
     let mut targets: Vec<HealTarget> = spread
         .into_iter()
@@ -940,6 +979,7 @@ fn heal_spread(
                 steam_id,
                 name: name_of(key, steam_id),
                 healing,
+                class: class_of.get(key.as_str()).copied(),
             })
         })
         .collect();
@@ -1157,6 +1197,14 @@ struct WireMedicStats {
     avg_uber_length: f64,
     #[serde(deserialize_with = "count")]
     deaths_within_20s_after_uber: u32,
+    #[serde(deserialize_with = "real")]
+    avg_time_before_using: f64,
+    #[serde(deserialize_with = "count")]
+    deaths_with_95_99_uber: u32,
+    #[serde(deserialize_with = "count")]
+    advantages_lost: u32,
+    #[serde(deserialize_with = "count")]
+    biggest_advantage_lost: u32,
 }
 
 #[derive(Deserialize, Default)]

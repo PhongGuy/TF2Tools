@@ -321,12 +321,12 @@ fn medic_block(medic: &MedicLine, cx: &App) -> impl IntoElement {
         ("Healing".to_owned(), medic.heal().to_string()),
         ("Heals/min".to_owned(), whole(medic.heal_per_min())),
     ];
-    facts.extend(
-        medic
-            .charges()
-            .iter()
-            .map(|(kind, n)| (format!("Charges ({})", charge_name(kind)), n.to_string())),
-    );
+    facts.extend(medic.charges().iter().map(|(kind, n)| {
+        (
+            format!("Charges ({})", charge_name(kind.key())),
+            n.to_string(),
+        )
+    }));
     facts.extend([
         ("Drops".to_owned(), medic.drops().to_string()),
         (
