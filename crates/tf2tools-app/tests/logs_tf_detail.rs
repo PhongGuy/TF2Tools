@@ -678,3 +678,33 @@ fn class_icons_in_the_players_table_read_like_logs_tf(cx: &mut TestAppContext) {
         support::bounds_of(cx, s.win, ids::logstf_class_card(sid(ARIE), TfClass::Scout)).unwrap();
     assert!(icon.size.width >= gpui_kit::px(20.), "{icon:?}");
 }
+
+#[gpui_kit::test]
+fn a_wide_table_keeps_its_sideways_bar_under_its_last_row(cx: &mut TestAppContext) {
+    use tf2tools_app::widgets::scroll::BAR_WIDTH;
+    let (_env, _server, s, page) = opened_at(cx, 2, 800., 600., ids::LOGSTF_PLAYERS_SCROLL);
+    let players = cx.update(|cx| page.read(cx).detail().unwrap().players().to_vec());
+    let bottom = |cx: &mut TestAppContext, id: gpui_kit::ElementId| {
+        support::bounds_of(cx, s.win, id).unwrap().bottom()
+    };
+    let last = players
+        .iter()
+        .map(|p| bottom(cx, ids::logstf_player_row(p.steam_id())))
+        .fold(gpui_kit::px(0.), gpui_kit::Pixels::max);
+    let table = bottom(cx, ids::LOGSTF_PLAYERS_SCROLL.into());
+    assert!(
+        last + BAR_WIDTH <= table,
+        "row ends {last:?}, table {table:?}"
+    );
+
+    scroll_to_in_log(cx, &s, &page, 2, ids::LOGSTF_MATRIX_SCROLL);
+    let last = players
+        .iter()
+        .map(|p| bottom(cx, ids::logstf_matrix_row(p.steam_id())))
+        .fold(gpui_kit::px(0.), gpui_kit::Pixels::max);
+    let matrix = bottom(cx, ids::LOGSTF_MATRIX_SCROLL.into());
+    assert!(
+        last + BAR_WIDTH <= matrix,
+        "row ends {last:?}, matrix {matrix:?}"
+    );
+}
