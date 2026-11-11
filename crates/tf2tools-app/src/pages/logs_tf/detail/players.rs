@@ -11,7 +11,7 @@ use gpui_kit::{
 use tf2tools_core::{LogColumns, LogDetail, PlayerLine, SteamId};
 
 use super::popover::class_hover;
-use super::{ICON, NUMBER, team_cell};
+use super::{NUMBER, team_cell};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players};
@@ -23,8 +23,10 @@ use crate::widgets::class_icon::class_icon;
 // table, and grows into any room the window leaves, truncating what still does not fit.
 const TEAM: Pixels = px(40.);
 const NAME_MIN: Pixels = px(100.);
-// Room for four class icons, as many as a player shows before the rest clip.
-const CLASSES: Pixels = px(88.);
+// A class icon, a size up from the other tables' because the art leaves empty borders; and
+// room for four of them with their gaps, as many as a player shows before the rest clip.
+const CLASS_ICON: Pixels = px(24.);
+const CLASSES: Pixels = px(102.);
 // The sort arrow's row under every header, kept empty when unsorted so sorting never moves
 // the table; an xsmall icon's height.
 const ARROW: Pixels = px(12.);
@@ -89,9 +91,10 @@ pub(super) fn players_table(
         // Classes come longest first; the main one is solid, the rest fade.
         // Hovering one opens its class card.
         let icons = player.classes().iter().enumerate().map(|(n, c)| {
-            let icon = class_icon(c.class(), assets.class_icon(c.class()).as_deref(), ICON);
+            let class = c.class();
+            let icon = class_icon(class, assets.class_icon(class).as_deref(), CLASS_ICON);
             let icon = div()
-                .id(ids::logstf_class_card(player.steam_id(), c.class()))
+                .id(ids::logstf_class_card(player.steam_id(), class))
                 .test_support()
                 .flex_none()
                 .when(n > 0, |el| el.opacity(0.5))

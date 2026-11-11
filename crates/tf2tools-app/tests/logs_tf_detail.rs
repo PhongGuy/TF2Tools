@@ -780,7 +780,7 @@ fn class_icons_in_the_players_table_read_like_logs_tf(cx: &mut TestAppContext) {
     scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_PLAYERS_SCROLL);
     let icon =
         support::bounds_of(cx, s.win, ids::logstf_class_card(sid(ARIE), TfClass::Scout)).unwrap();
-    assert!(icon.size.width >= gpui_kit::px(20.), "{icon:?}");
+    assert!(icon.size.width >= gpui_kit::px(24.), "{icon:?}");
 }
 
 #[gpui_kit::test]
