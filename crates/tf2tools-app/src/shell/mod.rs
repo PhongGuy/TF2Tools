@@ -26,6 +26,7 @@ use tf2tools_core::{CrosshairId, CrosshairRef, HudEntry, HudId};
 use crate::audio::player::show_idle;
 use crate::keymap::ToggleSidebar;
 use crate::local_messages::describe_settings;
+use crate::logs_sync::logs_sync;
 use crate::pages::addon_store::AddonStorePage;
 use crate::pages::addons::AddonsPage;
 use crate::pages::crosshair_maker::CrosshairMakerPage;
@@ -145,6 +146,9 @@ impl Shell {
                 }),
             ]
         });
+        // The header's logs.tf ring reads the app-wide sync, created here so the ring always has one.
+        let logs = logs_sync(cx);
+        cx.observe(&logs, |_, _, cx| cx.notify()).detach();
         // The banner reads the updater, and a download or install the player asked for toasts when it fails.
         let update_subscriptions = updater(cx).map(|u| {
             [

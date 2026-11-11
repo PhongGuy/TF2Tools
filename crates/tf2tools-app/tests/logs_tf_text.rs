@@ -6,7 +6,8 @@ use chrono::NaiveDate;
 use tf2tools_app::logs_sync::SyncProgress;
 use tf2tools_app::pages::logs_tf::text::{
     EMPTY_TEXT, NO_LOGS_TEXT, count_text, duration_text, finding_text, one_decimal, progress_line,
-    progress_text, resolve_message, summary_text, sync_message, time_played_text, whole,
+    progress_text, resolve_message, ring_label, summary_text, sync_message, time_played_text,
+    whole,
 };
 use tf2tools_core::{LogsSyncError, ResolveError};
 
@@ -172,5 +173,25 @@ fn progress_reads_in_two_phases_with_an_estimate() {
             left: Duration::ZERO
         }),
         "Downloading logs: 1 of 2"
+    );
+}
+
+#[test]
+fn the_ring_label_matches_the_store_rings() {
+    assert_eq!(ring_label(None), "Syncing logs.tf...");
+    assert_eq!(
+        ring_label(Some(SyncProgress::Finding {
+            listed: 0,
+            total: 9
+        })),
+        "Syncing logs.tf..."
+    );
+    assert_eq!(
+        ring_label(Some(SyncProgress::Downloading {
+            done: 120,
+            total: 1000,
+            left: Duration::ZERO
+        })),
+        "Syncing logs.tf: 120 / 1000"
     );
 }

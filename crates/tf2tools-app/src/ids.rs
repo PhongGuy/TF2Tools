@@ -1258,6 +1258,11 @@ pub fn sync_ring(kind: StoreKind) -> ElementId {
     keyed(SYNC_RING, store_slug(kind))
 }
 
+/// The header's logs.tf sync ring: "sync-ring:logs-tf".
+pub fn logstf_sync_ring() -> ElementId {
+    keyed(SYNC_RING, "logs-tf")
+}
+
 /// A Settings sync card's status line, keyed by the store's slug: "settings-sync:<slug>".
 pub fn settings_sync(kind: StoreKind) -> ElementId {
     keyed(SETTINGS_SYNC, store_slug(kind))

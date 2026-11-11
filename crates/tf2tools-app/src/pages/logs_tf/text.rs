@@ -90,6 +90,17 @@ pub fn progress_text(done: usize, total: usize, left: Duration) -> String {
     format!("{line}, about {estimate} left")
 }
 
+/// The header ring's tooltip, worded like the store rings: counts once logs download, and a
+/// plain "Syncing logs.tf..." while the list is still read.
+pub fn ring_label(progress: Option<SyncProgress>) -> String {
+    match progress {
+        Some(SyncProgress::Downloading { done, total, .. }) => {
+            format!("Syncing logs.tf: {done} / {total}")
+        }
+        _ => "Syncing logs.tf...".to_owned(),
+    }
+}
+
 /// The line for a running sync in whichever phase it is.
 pub fn progress_line(progress: SyncProgress) -> String {
     match progress {

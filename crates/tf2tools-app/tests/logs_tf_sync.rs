@@ -4,7 +4,9 @@
 use std::time::Duration;
 
 use gpui_kit::{Entity, TestAppContext};
+use tf2tools_app::ids;
 use tf2tools_app::logs_sync::{LogsSync, SyncProgress, downloading, logs_sync};
+use tf2tools_app::shell::route::Page;
 use tf2tools_core::{LogState, LogsRange, SteamId};
 
 use crate::support;
@@ -245,4 +247,51 @@ fn stopping_a_queued_player_drops_them(cx: &mut TestAppContext) {
         None,
         "the dropped player never synced"
     );
+}
+
+#[gpui_kit::test]
+fn the_header_ring_follows_a_logs_tf_sync_and_opens_the_page(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_slow_download(&server, Duration::from_secs(1));
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    assert!(
+        !support::present(cx, s.win, ids::logstf_sync_ring()),
+        "no ring while idle"
+    );
+    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
+    support::wait_real(cx, "the ring", |cx| {
+        support::label_of(cx, s.win, ids::logstf_sync_ring()).as_deref()
+            == Some("Syncing logs.tf: 0 / 2")
+    });
+    support::click_id(cx, s.win, ids::nav(Page::Huds));
+    assert!(
+        support::present(cx, s.win, ids::logstf_sync_ring()),
+        "the sync runs on while the page is hidden"
+    );
+    support::click_id(cx, s.win, ids::logstf_sync_ring());
+    assert_eq!(cx.update(|cx| s.shell.read(cx).page()), Page::LogsTf);
+    support::wait_real(cx, "the sync", |cx| {
+        !support::present(cx, s.win, ids::logstf_sync_ring())
+    });
+}
+
+#[gpui_kit::test]
+fn the_ring_spins_while_the_list_is_read(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes_after(
+        "/api/v1/log",
+        list_body(&[(3, day_ago(1))]),
+        Duration::from_millis(500),
+    );
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let sync = hub(cx);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_sync_ring()).as_deref(),
+        Some("Syncing logs.tf...")
+    );
+    idle(cx, &sync);
 }
