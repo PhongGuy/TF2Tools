@@ -574,13 +574,28 @@ impl LogsCache {
         range: LogsRange,
         class: TfClass,
     ) -> Result<ClassWeapons, LogsCacheError> {
+        self.class_weapons_with(id, range, class, &|| {})
+    }
+
+    /// `class_weapons` with `between` called after the sums read and before the counts, so a
+    /// test can commit a backfill batch in that gap.
+    pub(super) fn class_weapons_with(
+        &self,
+        id: SteamId,
+        range: LogsRange,
+        class: TfClass,
+        between: &dyn Fn(),
+    ) -> Result<ClassWeapons, LogsCacheError> {
         let sums_sql = format!("{WINDOW_LOGS} {WEAPON_SUMS}");
         let logs_sql = format!("{WINDOW_LOGS} {WEAPON_LOGS}");
         let pending_sql = format!("{WINDOW_LOGS} {WEAPON_PENDING}");
         self.db
             .read(|conn| {
+                // One read transaction, so a batch committing between the three statements
+                // cannot leave `logs` and `pending` describing a different state than the sums.
+                let tx = conn.unchecked_transaction()?;
                 let args = params![sql_id(id)?, range.reach_secs(), logstf_class_name(class)];
-                let weapons = conn
+                let weapons = tx
                     .prepare(&sums_sql)?
                     .query_map(args, |row| {
                         Ok(WeaponSum::new(
@@ -589,8 +604,9 @@ impl LogsCache {
                         ))
                     })?
                     .collect::<rusqlite::Result<Vec<_>>>()?;
-                let logs: i64 = conn.query_row(&logs_sql, args, |row| row.get(0))?;
-                let pending: i64 = conn.query_row(&pending_sql, args, |row| row.get(0))?;
+                between();
+                let logs: i64 = tx.query_row(&logs_sql, args, |row| row.get(0))?;
+                let pending: i64 = tx.query_row(&pending_sql, args, |row| row.get(0))?;
                 Ok(ClassWeapons::new(logs, pending, weapons))
             })
             .map_err(db_error)

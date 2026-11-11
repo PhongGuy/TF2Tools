@@ -7,8 +7,9 @@ use super::BackfillStep;
 use crate::db::Database;
 use crate::error::LogsCacheError;
 use crate::logstf::cache::{ListedLog, STATE_GONE};
-use crate::logstf::{LogsCache, SteamId, TrackedPlayer, parse_log};
+use crate::logstf::{LogsCache, LogsRange, SteamId, TrackedPlayer, parse_log};
 use crate::paths::DataDir;
+use crate::weapons::TfClass;
 
 const ARIE: u64 = 76_561_197_960_497_430;
 const SIXES: &str = include_str!("../../tests/fixtures/logstf/log-4137103-6v6.json");
@@ -223,4 +224,21 @@ fn a_database_error_on_read_leaves_the_marker_unset() {
         .execute_batch("ALTER TABLE logstf_logs_away RENAME TO logstf_logs;")
         .unwrap();
     assert_eq!(mark(&dir, 3), Some(0));
+}
+
+#[test]
+fn a_batch_committed_mid_read_does_not_skew_the_counts() {
+    let (_tmp, dir, cache) = cache();
+    uncounted(&dir, &cache);
+    // A second handle on the same file stands in for the backfill task; it has its own locks.
+    let backfill = LogsCache::new(Database::open(&dir).unwrap());
+    let between = || {
+        assert_eq!(backfill.count_weapons(50).unwrap().counted(), 1);
+    };
+    let scout = cache
+        .class_weapons_with(arie(), LogsRange::All, TfClass::Scout, &between)
+        .unwrap();
+    // The sums were read before the batch, so the counts must describe that same state.
+    assert!(scout.weapons().is_empty());
+    assert_eq!((scout.logs(), scout.pending()), (0, 1));
 }
