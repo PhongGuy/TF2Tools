@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use tf2tools_app::logs_sync::SyncProgress;
 use tf2tools_app::pages::logs_tf::text::{
-    EMPTY_TEXT, NO_LOGS_TEXT, count_text, duration_text, finding_text, one_decimal, progress_line,
-    progress_text, range_label, resolve_message, ring_label, summary_text, sync_message,
-    time_played_text, whole,
+    EMPTY_TEXT, NO_LOGS_TEXT, count_text, duration_text, fetch_message, finding_text, one_decimal,
+    progress_line, progress_text, range_label, resolve_message, ring_label, summary_text,
+    sync_message, time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
@@ -184,4 +184,39 @@ fn the_ring_label_matches_the_store_rings() {
         })),
         "Syncing logs.tf: 120 / 1000"
     );
+}
+
+#[test]
+fn fetch_failures_read_in_player_words_or_leave_it_to_the_row() {
+    use tf2tools_core::LogsFetchError;
+    let network = LogsFetchError::Network {
+        url: "u".into(),
+        message: "m".into(),
+    };
+    assert_eq!(
+        fetch_message(&network),
+        Some("Can't load this log while you're offline.")
+    );
+    let busy = LogsFetchError::RateLimited { url: "u".into() };
+    assert_eq!(
+        fetch_message(&busy),
+        Some("logs.tf is busy. Try again in a few minutes.")
+    );
+    let cache = LogsFetchError::Cache {
+        message: "m".into(),
+    };
+    assert_eq!(
+        fetch_message(&cache),
+        Some("Couldn't save logs.tf data on this computer.")
+    );
+    for row_says_it in [
+        LogsFetchError::Gone,
+        LogsFetchError::Unreadable,
+        LogsFetchError::TooLarge {
+            url: "u".into(),
+            limit: 1,
+        },
+    ] {
+        assert_eq!(fetch_message(&row_says_it), None, "{row_says_it:?}");
+    }
 }

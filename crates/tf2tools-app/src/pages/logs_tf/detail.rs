@@ -12,8 +12,9 @@ use tf2tools_core::{
     TrackedPlayer,
 };
 
+use super::OpenState;
 use super::list::open_link;
-use super::text::{LOG_UNREADABLE, date_text, duration_text, one_decimal, whole};
+use super::text::{LOG_LOADING, date_text, duration_text, one_decimal, whole};
 use crate::ids;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
@@ -31,24 +32,22 @@ const MEDIC_WIDTH: Pixels = px(280.);
 // One players table column: its logs.tf title and how a player's cell reads.
 type Column = (&'static str, fn(&PlayerLine) -> String);
 
-/// The panel under open log `row`. The header comes from the row at once; the rest waits
-/// for `opened`, which is None while the body is read and Some(None) when it could not be.
+/// The panel under open log `row`. The header comes from the row at once; under it the
+/// parsed log once `opened` is ready, or a line saying it is loading or why it failed.
 pub(super) fn panel(
     row: &LogRow,
-    opened: Option<Option<&LogDetail>>,
+    opened: &OpenState,
     tracked: &[TrackedPlayer],
     cx: &App,
 ) -> AnyElement {
+    let status = |text: &'static str| {
+        let line = div().text_sm().text_color(cx.theme().muted_foreground);
+        labelled(line, ids::logstf_log_status(row.id()), text).into_any_element()
+    };
     let body = match opened {
-        Some(Some(log)) => Some(log_body(log, tracked, cx).into_any_element()),
-        Some(None) => Some(
-            div()
-                .text_sm()
-                .text_color(cx.theme().muted_foreground)
-                .child(LOG_UNREADABLE)
-                .into_any_element(),
-        ),
-        None => None,
+        OpenState::Ready(log) => log_body(log, tracked, cx).into_any_element(),
+        OpenState::Loading => status(LOG_LOADING),
+        OpenState::Failed(why) => status(why),
     };
     v_flex()
         .id(ids::logstf_log_panel(row.id()))
@@ -59,7 +58,7 @@ pub(super) fn panel(
         .py_3()
         .bg(cx.theme().muted)
         .child(header(row, cx))
-        .children(body)
+        .child(body)
         .into_any_element()
 }
 

@@ -1020,35 +1020,6 @@ fn a_player_waiting_for_their_first_sync_is_not_shown_as_without_logs(cx: &mut T
     });
 }
 
-#[gpui_kit::test]
-fn a_row_still_downloading_does_not_open(cx: &mut TestAppContext) {
-    let env = support::env();
-    let server = support::StoreServer::start();
-    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
-    server.mount_bytes_after("/json/3", SIXES.as_bytes().to_vec(), Duration::from_secs(1));
-    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
-    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
-    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
-    support::wait_real(cx, "the pending row", |cx| {
-        cx.update(|cx| {
-            page.read(cx)
-                .rows()
-                .iter()
-                .any(|r| r.id() == 3 && r.state() == tf2tools_core::LogState::Pending)
-        })
-    });
-    to_end(cx, &page);
-    support::click_id(cx, s.win, ids::logstf_log(3));
-    assert_eq!(expanded(cx, &page), None);
-    assert_eq!(
-        support::label_of(cx, s.win, ids::logstf_log_note(3)).as_deref(),
-        Some("Downloading...")
-    );
-    support::wait_real(cx, "the sync", |cx| {
-        cx.update(|cx| !page.read(cx).is_syncing(cx))
-    });
-}
-
 /// Opens log 2 at 800 by 600 and scrolls the page so the players table sits mid-window.
 fn players_table_in_view(
     cx: &mut TestAppContext,

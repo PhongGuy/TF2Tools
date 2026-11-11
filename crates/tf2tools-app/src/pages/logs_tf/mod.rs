@@ -39,9 +39,23 @@ use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 use text::{
-    EMPTY_TEXT, LOGS_TF_URL, LOOKING_UP, REMOVING, SAVE_FAILED, STEAM_UNREACHABLE, profile_url,
-    progress_line, resolve_message,
+    EMPTY_TEXT, LOG_UNREADABLE, LOGS_TF_DOWN, LOGS_TF_URL, LOOKING_UP, REMOVING, SAVE_FAILED,
+    STEAM_UNREACHABLE, fetch_message, profile_url, progress_line, resolve_message,
 };
+
+// The open log: its id and how far its body got.
+pub(super) struct OpenLog {
+    pub(super) id: u64,
+    pub(super) state: OpenState,
+}
+
+// A downloaded log reads its stored body and a pending one is fetched; either lands Ready,
+// or Failed with the panel's line for why.
+pub(super) enum OpenState {
+    Loading,
+    Ready(Box<LogDetail>),
+    Failed(&'static str),
+}
 
 /// The logs.tf page. It reads the tracked players from the cache on creation and is kept
 /// while hidden, so a visit elsewhere leaves it as it was.
@@ -56,11 +70,9 @@ pub struct LogsTfPage {
     range: LogsRange,
     range_slider: Entity<SliderState>,
     slider_range: LogsRange,
-    // The open log's id; the list's item 0 is the page top, so row `i` is item `i + 1`.
-    expanded: Option<u64>,
-    // The open log as read from its stored body, keyed by its id so a read that lands after
-    // its row closed is dropped; None inside means the body could not be read.
-    detail: Option<(u64, Option<LogDetail>)>,
+    // The open log and how far its body got; the list's item 0 is the page top, so row `i`
+    // is item `i + 1`. A read or fetch that lands after its row closed is dropped.
+    open: Option<OpenLog>,
     list: ListState,
     // Which optional row columns fit, from the list's width at the last frame; the list's
     // state cannot be asked while it lays its own items out.
@@ -134,8 +146,7 @@ impl LogsTfPage {
             range: LogsRange::default(),
             range_slider,
             slider_range: LogsRange::default(),
-            expanded: None,
-            detail: None,
+            open: None,
             list: ListState::new(1, ListAlignment::Top, px(200.)),
             fit: list::Fit::ALL,
             sync,
@@ -244,32 +255,54 @@ impl LogsTfPage {
 
     /// The log whose row is open, if any.
     pub fn expanded(&self) -> Option<u64> {
-        self.expanded
+        self.open.as_ref().map(|open| open.id)
     }
 
     /// The open row's log, once its body is read and parsed.
     pub fn detail(&self) -> Option<&LogDetail> {
-        self.detail
-            .as_ref()
-            .filter(|(id, _)| self.expanded == Some(*id))
-            .and_then(|(_, detail)| detail.as_ref())
+        match &self.open.as_ref()?.state {
+            OpenState::Ready(detail) => Some(detail),
+            OpenState::Loading | OpenState::Failed(_) => None,
+        }
     }
 
-    /// Opens log `id`'s row, closing any other; on the open row it closes it.
+    /// Opens log `id`'s row, closing any other; on the open row it closes it. A downloaded
+    /// log reads its stored body, one still pending is fetched from logs.tf.
     pub fn toggle(&mut self, id: u64, cx: &mut Context<Self>) {
-        let closing = self.expanded.take();
-        self.detail = None;
+        let closing = self.open.take().map(|open| open.id);
         if closing != Some(id) {
-            self.expanded = Some(id);
-            self.read_detail(id, cx);
+            self.open = Some(OpenLog {
+                id,
+                state: OpenState::Loading,
+            });
+            match self.rows.iter().find(|r| r.id() == id).map(LogRow::state) {
+                Some(LogState::Pending) => self.fetch_detail(id, cx),
+                _ => self.read_detail(id, cx),
+            }
         }
         // Both rows change height, so both remeasure and the rows below move with them.
         for changed in closing.into_iter().chain([id]) {
-            if let Some(ix) = self.rows.iter().position(|r| r.id() == changed) {
-                self.list.remeasure_items(ix + 1..ix + 2);
-            }
+            self.remeasure_log(changed);
         }
         cx.notify();
+    }
+
+    // Remeasures log `id`'s list item, whose panel changed height.
+    fn remeasure_log(&mut self, id: u64) {
+        if let Some(ix) = self.rows.iter().position(|r| r.id() == id) {
+            self.list.remeasure_items(ix + 1..ix + 2);
+        }
+    }
+
+    // Moves open log `id` to `state`, unless its row closed or another opened meanwhile.
+    fn land(&mut self, id: u64, state: OpenState, cx: &mut Context<Self>) -> bool {
+        match &mut self.open {
+            Some(open) if open.id == id => open.state = state,
+            _ => return false,
+        }
+        self.remeasure_log(id);
+        cx.notify();
+        true
     }
 
     // Reads and parses log `id`'s stored body off the UI thread. It lands only if that row is
@@ -287,17 +320,55 @@ impl LogsTfPage {
         cx.spawn(async move |page, cx| {
             let read = reading.await;
             let _ = page.update(cx, |page, cx| {
-                if page.expanded != Some(id) {
-                    return;
+                let state = match read {
+                    Ok(detail) => OpenState::Ready(Box::new(detail)),
+                    Err(error) => {
+                        tracing::warn!(%error, id, "reading a logs.tf log failed");
+                        OpenState::Failed(LOG_UNREADABLE)
+                    }
+                };
+                page.land(id, state, cx);
+            });
+        })
+        .detach();
+    }
+
+    // Fetches pending log `id` from logs.tf, which also stores it. A fetch the row's note will
+    // explain (removed, unreadable) closes the row; any other failure keeps it open with why.
+    // Either way the list is reread, since core marked the row.
+    fn fetch_detail(&mut self, id: u64, cx: &mut Context<Self>) {
+        if !tokio_bridge::is_running(cx) {
+            tokio_bridge::init(cx);
+        }
+        let client = cx.global::<Services>().logs.clone();
+        let fetching = tokio_bridge::spawn(cx, async move { client.fetch_log(id).await });
+        cx.spawn(async move |page, cx| {
+            let fetched = fetching.await;
+            let _ = page.update(cx, |page, cx| {
+                let state = match fetched {
+                    Ok(Ok(detail)) => Some(OpenState::Ready(Box::new(detail))),
+                    Ok(Err(error)) => {
+                        tracing::warn!(%error, id, "fetching a logs.tf log failed");
+                        fetch_message(&error).map(OpenState::Failed)
+                    }
+                    Err(error) => {
+                        tracing::warn!(%error, id, "the logs.tf fetch task stopped");
+                        Some(OpenState::Failed(LOGS_TF_DOWN))
+                    }
+                };
+                let landed = match state {
+                    Some(state) => page.land(id, state, cx),
+                    None if page.expanded() == Some(id) => {
+                        page.open = None;
+                        page.remeasure_log(id);
+                        cx.notify();
+                        true
+                    }
+                    None => false,
+                };
+                if landed {
+                    page.reread(cx);
                 }
-                let detail = read
-                    .inspect_err(|error| tracing::warn!(%error, id, "reading a logs.tf log failed"))
-                    .ok();
-                page.detail = Some((id, detail));
-                if let Some(ix) = page.rows.iter().position(|r| r.id() == id) {
-                    page.list.remeasure_items(ix + 1..ix + 2);
-                }
-                cx.notify();
             });
         })
         .detach();
@@ -598,7 +669,8 @@ impl LogsTfPage {
 
     // Matches the list to fresh rows that replaced `old`: added or dropped rows splice in
     // after the top, and every item remeasures since a row's state or the top's height may
-    // have changed. An open row that is gone or no longer downloaded closes.
+    // have changed. An open row that is gone from the list, or that logs.tf removed or sent
+    // unreadable, closes.
     fn fit_list(&mut self, old: &[LogRow]) {
         let items = self.rows.len() + 1;
         let count = self.list.item_count();
@@ -616,10 +688,10 @@ impl LogsTfPage {
             }
         }
         self.list.remeasure_items(0..items);
-        let open = |r: &LogRow| Some(r.id()) == self.expanded && r.state() == LogState::Ready;
-        if !self.rows.iter().any(open) {
-            self.expanded = None;
-            self.detail = None;
+        let opens = |r: &LogRow| matches!(r.state(), LogState::Ready | LogState::Pending);
+        let still_open = |r: &LogRow| Some(r.id()) == self.expanded() && opens(r);
+        if !self.rows.iter().any(still_open) {
+            self.open = None;
         }
     }
 

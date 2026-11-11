@@ -148,8 +148,8 @@ pub(super) fn no_logs(id: SteamId, cx: &App) -> impl IntoElement {
         )
 }
 
-// One log: its row, then its panel while open. Only a downloaded log opens; the rest carry
-// a note in place of the stats, and an unreadable one links to logs.tf instead.
+// One log: its row, then its panel while open. A downloaded or still pending log opens; the
+// rest carry a note in place of the stats, and an unreadable one links to logs.tf instead.
 fn log_item(
     row: &LogRow,
     state: &LogsTfPage,
@@ -159,9 +159,9 @@ fn log_item(
 ) -> AnyElement {
     let theme = cx.theme();
     let id = row.id();
-    let open = state.expanded == Some(id);
-    let ready = row.state() == LogState::Ready;
-    let chevron = div().w(CHEVRON).flex_none().children(ready.then(|| {
+    let open = state.expanded() == Some(id);
+    let opens = matches!(row.state(), LogState::Ready | LogState::Pending);
+    let chevron = div().w(CHEVRON).flex_none().children(opens.then(|| {
         Icon::new(if open {
             IconName::ChevronDown
         } else {
@@ -201,30 +201,31 @@ fn log_item(
             el.child(map_cell(div().w(MAP).flex_none(), id, row.map()))
         });
     line = match row.state() {
-        LogState::Ready => line
-            .children(stats(row, fit, cx))
-            .cursor_pointer()
-            .hover(|s| s.bg(theme.muted))
-            .on_click(move |_, _, cx| {
-                let _ = page.update(cx, |page, cx| page.toggle(id, cx));
-            }),
+        LogState::Ready => line.children(stats(row, fit, cx)),
         state @ (LogState::Pending | LogState::Gone | LogState::Unreadable | _) => {
             line.child(note(id, state, fit, cx))
         }
     };
+    if opens {
+        line = line
+            .cursor_pointer()
+            .hover(|s| s.bg(theme.muted))
+            .on_click(move |_, _, cx| {
+                let _ = page.update(cx, |page, cx| page.toggle(id, cx));
+            });
+    }
     v_flex()
         .w_full()
         .border_b_1()
         .border_color(theme.border)
         .child(line)
-        .children(open.then(|| {
-            let opened = state
-                .detail
+        .children(
+            state
+                .open
                 .as_ref()
-                .filter(|(log, _)| *log == id)
-                .map(|(_, detail)| detail.as_ref());
-            detail::panel(row, opened, &state.players, cx)
-        }))
+                .filter(|open| open.id == id)
+                .map(|open| detail::panel(row, &open.state, &state.players, cx)),
+        )
         .into_any_element()
 }
 

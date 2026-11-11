@@ -2520,6 +2520,11 @@ pub fn logstf_log_panel(id: u64) -> ElementId {
     keyed("logstf-log-panel", &id.to_string())
 }
 
+/// The open log's loading or failure line in its panel: "logstf-log-status:<id>".
+pub fn logstf_log_status(id: u64) -> ElementId {
+    keyed("logstf-log-status", &id.to_string())
+}
+
 /// A row's note in place of its stats, labelled with why it has none: "logstf-log-note:<id>".
 pub fn logstf_log_note(id: u64) -> ElementId {
     keyed("logstf-log-note", &id.to_string())

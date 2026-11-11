@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use tf2tools_core::{LogsRange, LogsSyncError, ResolveError, SteamId};
+use tf2tools_core::{LogsFetchError, LogsRange, LogsSyncError, ResolveError, SteamId};
 
 use crate::logs_sync::SyncProgress;
 
@@ -49,6 +49,9 @@ pub fn resolve_message(error: &ResolveError) -> &'static str {
 
 /// Why a sync could not reach logs.tf or got an error page back, in player words.
 pub const LOGS_TF_DOWN: &str = "logs.tf isn't responding right now. Try again later.";
+
+/// Why logs.tf turned a request away after every retry, in player words.
+pub const LOGS_TF_BUSY: &str = "logs.tf is busy. Try again in a few minutes.";
 
 /// A count with thousands separators: "4,812".
 pub fn count_text(n: usize) -> String {
@@ -115,10 +118,28 @@ pub fn progress_line(progress: SyncProgress) -> String {
 pub fn sync_message(error: &LogsSyncError) -> &'static str {
     match error {
         LogsSyncError::Network { .. } => "You're offline. Showing saved logs.",
-        LogsSyncError::RateLimited { .. } => "logs.tf is busy. Try again in a few minutes.",
+        LogsSyncError::RateLimited { .. } => LOGS_TF_BUSY,
         LogsSyncError::Malformed { .. } => "logs.tf sent something we didn't understand.",
         LogsSyncError::Database { .. } => SAVE_FAILED,
         LogsSyncError::Http { .. } | LogsSyncError::TooLarge { .. } | _ => LOGS_TF_DOWN,
+    }
+}
+
+/// The open panel's line while a log not yet downloaded is fetched.
+pub const LOG_LOADING: &str = "Loading log...";
+
+/// The open panel's line when a log can't be fetched for lack of a connection.
+pub const LOG_OFFLINE: &str = "Can't load this log while you're offline.";
+
+/// The open panel's line for a failed fetch; None when the row's own note says it (gone,
+/// unreadable, too large).
+pub fn fetch_message(error: &LogsFetchError) -> Option<&'static str> {
+    match error {
+        LogsFetchError::Network { .. } => Some(LOG_OFFLINE),
+        LogsFetchError::RateLimited { .. } => Some(LOGS_TF_BUSY),
+        LogsFetchError::Cache { .. } => Some(SAVE_FAILED),
+        LogsFetchError::Gone | LogsFetchError::Unreadable | LogsFetchError::TooLarge { .. } => None,
+        _ => Some(LOGS_TF_DOWN),
     }
 }
 

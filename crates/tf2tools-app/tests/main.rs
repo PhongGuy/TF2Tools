@@ -144,6 +144,7 @@ mod local_messages;
 mod logs;
 mod logs_model;
 mod logs_tf;
+mod logs_tf_open;
 mod logs_tf_range;
 mod logs_tf_sync;
 mod logs_tf_text;
