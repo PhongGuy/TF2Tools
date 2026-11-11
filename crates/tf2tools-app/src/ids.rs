@@ -2689,6 +2689,17 @@ pub const LOGSTF_ROUNDS_SCROLL: &str = "logstf-rounds-scroll";
 /// The rounds table's header line: "logstf-rounds-head".
 pub const LOGSTF_ROUNDS_HEAD: &str = "logstf-rounds-head";
 
+/// One column's title in the rounds table's header, keyed by it: "logstf-rounds-column:RED DA".
+pub fn logstf_rounds_column(title: &str) -> ElementId {
+    keyed("logstf-rounds-column", title)
+}
+
+/// One team number in a round's row, keyed by its column's title:
+/// "logstf-round-cell:<log>:<n>:RED DA".
+pub fn logstf_round_cell(log: u64, round: usize, title: &str) -> ElementId {
+    keyed("logstf-round-cell", &format!("{log}:{round}:{title}"))
+}
+
 /// The header line over an open round's players: "logstf-round-players-head:<log>:<n>".
 pub fn logstf_round_players_head(log: u64, round: usize) -> ElementId {
     keyed("logstf-round-players-head", &format!("{log}:{round}"))

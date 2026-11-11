@@ -751,6 +751,17 @@ fn sorting_keeps_the_players_header_height(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn round_columns_line_up_with_their_headers(cx: &mut TestAppContext) {
+    let (_env, _server, s, _page) = opened_at(cx, 3, 1280., 800., ids::LOGSTF_ROUNDS);
+    let head = support::bounds_of(cx, s.win, ids::logstf_rounds_column("RED DA")).unwrap();
+    let cell = support::bounds_of(cx, s.win, ids::logstf_round_cell(3, 0, "RED DA")).unwrap();
+    assert!(
+        (f32::from(head.left()) - f32::from(cell.left())).abs() < 0.5,
+        "{head:?} {cell:?}"
+    );
+}
+
+#[gpui_kit::test]
 fn round_headers_stay_on_one_line_and_spread_across_the_table(cx: &mut TestAppContext) {
     let (_env, _server, s, _page) = opened_at(cx, 3, 1280., 800., ids::LOGSTF_ROUNDS);
     let head = support::bounds_of(cx, s.win, ids::LOGSTF_ROUNDS_HEAD).unwrap();

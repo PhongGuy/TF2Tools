@@ -30,6 +30,8 @@ const NAME: Pixels = px(200.);
 const ROUND_NUMBER: Pixels = px(56.);
 const TYPE: Pixels = px(96.);
 const DESCRIPTION: Pixels = px(280.);
+// The open/closed chevron's box, which the header leaves empty so the columns line up.
+const CHEVRON: Pixels = px(16.);
 
 // One team number column: its logs.tf title and how a round reads it.
 type Column = (&'static str, fn(&RoundLine) -> u32);
@@ -73,9 +75,15 @@ pub(super) fn rounds_table(
             .child(spread(ROUND).child("Round"))
             .child(spread(LENGTH).child("Length"))
             .child(spread(SCORE).child("Score"))
-            .children(COLUMNS.map(|(title, _)| spread(TEAM_NUMBER).text_right().child(title)))
+            .children(COLUMNS.map(|(title, _)| {
+                spread(TEAM_NUMBER)
+                    .id(ids::logstf_rounds_column(title))
+                    .test_support()
+                    .text_right()
+                    .child(title)
+            }))
             .child(spread(MIDFIGHTS).child("Midfights"))
-            .child(div().w(px(16.)).flex_none()),
+            .child(div().w(CHEVRON).flex_none()),
     );
     for (n, round) in detail.rounds().iter().enumerate() {
         let is_open = open.contains(&n);
@@ -143,13 +151,21 @@ fn round_row(
         .child(spread(ROUND).child((n + 1).to_string()))
         .child(spread(LENGTH).child(duration_text(round.length())))
         .child(score)
-        .children(COLUMNS.map(|(_, read)| {
+        .children(COLUMNS.map(|(title, read)| {
             spread(TEAM_NUMBER)
+                .id(ids::logstf_round_cell(log, n, title))
+                .test_support()
                 .text_right()
                 .child(read(round).to_string())
         }))
         .child(midfight)
-        .child(Icon::new(chevron).xsmall().flex_none())
+        .child(
+            h_flex()
+                .w(CHEVRON)
+                .flex_none()
+                .justify_center()
+                .child(Icon::new(chevron).xsmall()),
+        )
 }
 
 // An open round: its players by kills then damage, then its events on the log's clock with
