@@ -1,5 +1,6 @@
 //! The logs.tf client: Steam profile lookups and log syncs, all through one paced `Http`.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -108,7 +109,12 @@ impl LogsSyncSummary {
 #[derive(Deserialize)]
 struct WireList {
     logs: Vec<WireListed>,
+    #[serde(default)]
+    total: Option<usize>,
 }
+
+/// Logs asked for per list request, the most logs.tf serves at once.
+const LIST_PAGE: usize = 1000;
 
 #[derive(Deserialize)]
 struct WireListed {
@@ -266,9 +272,10 @@ impl LogsClient {
         Ok(TrackedPlayer::new(id, name))
     }
 
-    /// Lists the player's logs in `range`, downloads every listed log without a body, 1 s
-    /// apart, and prunes. Skips everything when last_synced is under 30 minutes old and no log
-    /// in the window is still pending, unless `force`.
+    /// Lists the player's logs in `range` page by page, downloads every listed log without a
+    /// body, 1 s apart, and prunes. Skips everything when last_synced is under 30 minutes old,
+    /// `range` is no wider than the last full listing and no log in the window is still
+    /// pending, unless `force`.
     ///
     /// `cancel` is checked before every request; a cancelled sync returns `Ok` with what it
     /// saved, leaving last_synced unstamped and nothing pruned so the next sync resumes.
@@ -291,32 +298,31 @@ impl LogsClient {
             })?;
         // A sync that stopped partway leaves pending logs, so the next open finishes it.
         let fresh = last_synced.is_some_and(|at| now - at < STALE_SECS);
-        if !force && fresh && !self.cache.has_pending(id, range)? {
+        if !force
+            && fresh
+            && range <= self.cache.listed_range(id)?
+            && !self.cache.has_pending(id, range)?
+        {
             return Ok(LogsSyncSummary {
                 skipped: true,
                 ..LogsSyncSummary::default()
             });
         }
 
-        if cancel.is_cancelled() {
+        let Some((listed, wanted)) = self
+            .list_window(id, range, now, cancel, on_progress)
+            .await?
+        else {
             return Ok(LogsSyncSummary {
                 cancelled: true,
                 ..LogsSyncSummary::default()
             });
-        }
-
-        // The window ends at the player's newest log, which tops the list, so the first page
-        // always reaches it however long ago they played.
-        let mut logs = self.list(id).await?;
-        let anchor = logs.iter().map(|log| log.date).max().unwrap_or(0);
-        if let Some(start) = window_start(anchor, range) {
-            logs.retain(|log| log.date >= start);
-        }
-        logs.sort_by(|a, b| b.date.cmp(&a.date).then(b.id.cmp(&a.id)));
-        let wanted = self.cache.record_list(id, &logs, now)?;
+        };
+        // Written before the downloads, so a sync cancelled from here on still counts as listed.
+        self.cache.set_listed_range(id, range)?;
 
         let mut summary = LogsSyncSummary {
-            listed: logs.len(),
+            listed,
             ..LogsSyncSummary::default()
         };
         let total = wanted.len();
@@ -369,10 +375,75 @@ impl LogsClient {
         Ok(summary)
     }
 
-    /// The player's logs.tf list as logs.tf sent it.
-    async fn list(&self, id: SteamId) -> Result<Vec<ListedLog>, LogsSyncError> {
+    /// Reads the player's list page by page, recording each page's logs inside `range`'s
+    /// window as it arrives, and returns the in-window count with the ids to download, newest
+    /// first. `None` when `cancel` stopped it between pages; recorded pages stay recorded.
+    async fn list_window(
+        &self,
+        id: SteamId,
+        range: LogsRange,
+        now: i64,
+        cancel: &LogsCancel,
+        on_progress: &(dyn Fn(LogsProgress) + Send + Sync),
+    ) -> Result<Option<(usize, Vec<i64>)>, LogsSyncError> {
+        let mut offset = 0;
+        let mut start = None;
+        let mut listed = 0;
+        let mut wanted = Vec::new();
+        loop {
+            if cancel.is_cancelled() {
+                return Ok(None);
+            }
+            let (mut page, api_total) = self.list_page(id, offset).await?;
+            let fetched = page.len();
+            let oldest = page.iter().map(|log| log.date).min();
+            // The window ends at the player's newest log, which tops the first page, so the
+            // window is known however long ago they played.
+            let start = *start.get_or_insert_with(|| {
+                let anchor = page.iter().map(|log| log.date).max().unwrap_or(0);
+                window_start(anchor, range)
+            });
+            if let Some(start) = start {
+                page.retain(|log| log.date >= start);
+            }
+            let dates: HashMap<i64, i64> = page.iter().map(|log| (log.id, log.date)).collect();
+            let asked = self.cache.record_list(id, &page, now)?;
+            wanted.extend(asked.into_iter().map(|log_id| (dates[&log_id], log_id)));
+            listed += page.len();
+            offset += fetched;
+
+            // A short page, the API's total or a page reaching past the window start ends it.
+            let past_start =
+                matches!((start, oldest), (Some(start), Some(oldest)) if oldest < start);
+            let done = fetched < LIST_PAGE || api_total.is_some_and(|t| offset >= t) || past_start;
+            let total = if done {
+                listed
+            } else {
+                api_total.unwrap_or(listed)
+            };
+            on_progress(LogsProgress::Listing { listed, total });
+            if done {
+                break;
+            }
+        }
+        // Pages can overlap when a log is uploaded mid-listing, so a log is downloaded once.
+        wanted.sort_unstable_by(|a, b| b.cmp(a));
+        wanted.dedup();
+        Ok(Some((
+            listed,
+            wanted.into_iter().map(|(_, id)| id).collect(),
+        )))
+    }
+
+    /// One page of the player's logs.tf list starting at `offset`, and the total logs.tf
+    /// reports for the player when it sends one.
+    async fn list_page(
+        &self,
+        id: SteamId,
+        offset: usize,
+    ) -> Result<(Vec<ListedLog>, Option<usize>), LogsSyncError> {
         let url = format!(
-            "{}/api/v1/log?player={}&limit=1000&offset=0",
+            "{}/api/v1/log?player={}&limit={LIST_PAGE}&offset={offset}",
             self.endpoints.logs_tf(),
             id.id64()
         );
@@ -382,7 +453,7 @@ impl LogsClient {
                 url: url.clone(),
                 message: e.to_string(),
             })?;
-        Ok(list
+        let logs = list
             .logs
             .into_iter()
             .map(|log| ListedLog {
@@ -391,6 +462,7 @@ impl LogsClient {
                 map: log.map.unwrap_or_default(),
                 date: log.date,
             })
-            .collect())
+            .collect();
+        Ok((logs, list.total))
     }
 }

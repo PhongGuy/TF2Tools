@@ -113,6 +113,11 @@ pub fn days_ago(days: i64) -> i64 {
 
 /// A list response holding `logs` as (id, upload date), in the order given.
 pub fn list_body(logs: &[(u64, i64)]) -> String {
+    page_body(logs, logs.len())
+}
+
+/// A list page holding `logs` as (id, upload date), claiming `total` logs in all.
+pub fn page_body(logs: &[(u64, i64)], total: usize) -> String {
     let logs: Vec<_> = logs
         .iter()
         .map(|&(id, date)| {
@@ -120,9 +125,44 @@ pub fn list_body(logs: &[(u64, i64)]) -> String {
                    "date": date, "views": 0, "players": 12})
         })
         .collect();
-    json!({"success": true, "results": logs.len(), "total": logs.len(),
+    json!({"success": true, "results": logs.len(), "total": total,
            "parameters": {}, "logs": logs})
     .to_string()
+}
+
+pub async fn mount_page(server: &wiremock::MockServer, player: u64, offset: usize, body: String) {
+    Mock::given(method("GET"))
+        .and(path("/api/v1/log"))
+        .and(query_param("player", player.to_string()))
+        .and(query_param("limit", "1000"))
+        .and(query_param("offset", offset.to_string()))
+        .respond_with(ResponseTemplate::new(200).set_body_string(body))
+        .mount(server)
+        .await;
+}
+
+/// `count` logs one hour apart going back from `newest`, ids counting down from `first_id`.
+pub fn hourly(first_id: u64, newest: i64, count: usize) -> Vec<(u64, i64)> {
+    (0..count)
+        .map(|i| (first_id - i as u64, newest - 3_600 * i as i64))
+        .collect()
+}
+
+/// The `offset` of each list request the server saw, in order.
+pub async fn list_offsets(server: &wiremock::MockServer) -> Vec<String> {
+    server
+        .received_requests()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .filter(|r| r.url.path() == "/api/v1/log")
+        .filter_map(|r| {
+            r.url
+                .query_pairs()
+                .find(|(k, _)| k == "offset")
+                .map(|(_, v)| v.into_owned())
+        })
+        .collect()
 }
 
 pub async fn mount_list(server: &wiremock::MockServer, player: u64, body: String) {

@@ -662,6 +662,46 @@ impl LogsCache {
             .map_err(db_error)
     }
 
+    /// The range `player` was last fully listed in. A missing or unknown row reads as
+    /// three months, the window every earlier build listed, so an upgrade does not relist.
+    pub(crate) fn listed_range(&self, player: SteamId) -> Result<LogsRange, LogsCacheError> {
+        let key = self
+            .db
+            .read(|conn| {
+                conn.query_row(
+                    "SELECT value FROM settings WHERE key = ?1",
+                    [format!("{LISTED_RANGE_PREFIX}{}", player.id64())],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+            })
+            .map_err(db_error)?;
+        Ok(key
+            .as_deref()
+            .and_then(LogsRange::from_key)
+            .unwrap_or(LogsRange::Months3))
+    }
+
+    /// Records that `player`'s list was read through to the end of `range`.
+    pub(crate) fn set_listed_range(
+        &self,
+        player: SteamId,
+        range: LogsRange,
+    ) -> Result<(), LogsCacheError> {
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+                    params![
+                        format!("{LISTED_RANGE_PREFIX}{}", player.id64()),
+                        range.key()
+                    ],
+                )
+            })
+            .map(drop)
+            .map_err(db_error)
+    }
+
     /// Stamps `player` as synced at `now`.
     pub(crate) fn mark_synced(&self, player: SteamId, now: i64) -> Result<(), LogsCacheError> {
         self.db
