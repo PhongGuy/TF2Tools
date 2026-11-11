@@ -2496,7 +2496,7 @@ pub fn logstf_class(class: TfClass) -> ElementId {
     keyed("logstf-class", &class.name().to_lowercase())
 }
 
-/// A class card's rate name, by its label: "logstf-class-label:<class>:<label>".
+/// A class card's stat name, by its label: "logstf-class-label:<class>:<label>".
 pub fn logstf_class_label(class: TfClass, label: &str) -> ElementId {
     keyed(
         "logstf-class-label",
@@ -2504,7 +2504,7 @@ pub fn logstf_class_label(class: TfClass, label: &str) -> ElementId {
     )
 }
 
-/// A class card's rate value, labelled with its text: "logstf-class-value:<class>:<label>".
+/// A class card's stat value, labelled with its text: "logstf-class-value:<class>:<label>".
 pub fn logstf_class_value(class: TfClass, label: &str) -> ElementId {
     keyed(
         "logstf-class-value",
