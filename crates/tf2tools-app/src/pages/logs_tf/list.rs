@@ -14,8 +14,8 @@ use gpui_kit::{
 use tf2tools_core::{LogRow, LogState, SteamId};
 
 use super::text::{
-    LOG_GONE, LOG_PENDING, LOG_UNREADABLE, NO_LOGS_TEXT, date_text, duration_text, log_url,
-    profile_url, whole,
+    LOG_GONE, LOG_PENDING, LOG_UNREADABLE, NO_LOGS_TEXT, date_text, duration_text, list_dpm_text,
+    log_url, profile_url,
 };
 use super::{LogsTfPage, detail};
 use crate::ids;
@@ -287,7 +287,7 @@ fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
         }));
     let length = row.length().map(duration_text).unwrap_or_default();
     let kda = format!("{}/{}/{}", row.kills(), row.deaths(), row.assists());
-    let dpm = row.dmg_per_min().map(whole).unwrap_or_else(|| "-".into());
+    let dpm = list_dpm_text(row.dmg(), row.length());
     let length = fit.length.then(|| {
         div()
             .w(LENGTH)

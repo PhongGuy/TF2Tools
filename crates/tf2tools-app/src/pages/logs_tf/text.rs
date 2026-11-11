@@ -193,6 +193,16 @@ pub fn whole(value: f64) -> String {
     format!("{value:.0}")
 }
 
+/// The log list's DPM: the open log's DA/M, damage over the whole log floored, or "-"
+/// before the log's length is known.
+pub fn list_dpm_text(dmg: u32, length: Option<u32>) -> String {
+    // Whole-number math, as core's per-minute rates, so an exact answer never floors one less.
+    match length.filter(|&length| length > 0) {
+        Some(length) => (u64::from(dmg) * 60 / u64::from(length)).to_string(),
+        None => "-".to_owned(),
+    }
+}
+
 /// A number logs.tf shows whole, cut down as logs.tf does: 154.9 reads "154". These counts
 /// are never negative, so anything below zero, -0.0 included, reads "0".
 pub fn floored(value: f64) -> String {

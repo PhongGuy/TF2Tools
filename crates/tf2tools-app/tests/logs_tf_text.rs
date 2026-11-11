@@ -6,9 +6,10 @@ use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
     DOWNLOAD_FAILED, EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, charge_text, count_text,
     download_reason, duration_text, event_parts, event_text, fetch_message, finding_text, floored,
-    floored_share_text, healing_text, medigun_name, one_decimal, progress_line, progress_text,
-    range_label, reads_zero, resolve_message, ring_label, round_length_text, seconds_text,
-    share_text, streaks_label, summary_text, sync_message, tenths_text, time_played_text, whole,
+    floored_share_text, healing_text, list_dpm_text, medigun_name, one_decimal, progress_line,
+    progress_text, range_label, reads_zero, resolve_message, ring_label, round_length_text,
+    seconds_text, share_text, streaks_label, summary_text, sync_message, tenths_text,
+    time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
@@ -503,6 +504,15 @@ fn open_log_whole_numbers_floor_like_logs_tf() {
     );
     assert_eq!(seconds_text(58.9167), "58 s");
     assert_eq!(seconds_text(35.7), "35 s");
+}
+
+#[test]
+fn the_list_dpm_is_the_open_logs_da_per_minute() {
+    // phong in 3319519: 6011 damage over 1769 s is 203.9, which logs.tf shows as 203.
+    assert_eq!(list_dpm_text(6011, Some(1769)), "203");
+    assert_eq!(list_dpm_text(300, Some(60)), "300");
+    assert_eq!(list_dpm_text(6011, Some(0)), "-");
+    assert_eq!(list_dpm_text(6011, None), "-");
 }
 
 #[test]
