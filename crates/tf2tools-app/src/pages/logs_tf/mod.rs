@@ -12,7 +12,7 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Disableable as _, Sizable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::{
     App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
-    ListAlignment, ListState, ParentElement as _, Render, SharedString,
+    ListAlignment, ListOffset, ListState, ParentElement as _, Render, SharedString,
     StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _, Window,
     div, px,
 };
@@ -476,9 +476,9 @@ impl LogsTfPage {
                         page.players = players;
                         page.active = active;
                         let (rows, averages) = logs.unzip();
-                        page.rows = rows.unwrap_or_default();
+                        let old = std::mem::replace(&mut page.rows, rows.unwrap_or_default());
                         page.averages = averages;
-                        page.fit_list();
+                        page.fit_list(&old);
                     }
                     Err(error) => tracing::warn!(%error, "reading the logs.tf cache failed"),
                 }
@@ -493,14 +493,24 @@ impl LogsTfPage {
         })
     }
 
-    // Matches the list to fresh rows: added or dropped rows splice in after the top, and
-    // every item remeasures since a row's state or the top's height may have changed. An open
-    // row that is gone or no longer downloaded closes.
-    fn fit_list(&mut self) {
+    // Matches the list to fresh rows that replaced `old`: added or dropped rows splice in
+    // after the top, and every item remeasures since a row's state or the top's height may
+    // have changed. An open row that is gone or no longer downloaded closes.
+    fn fit_list(&mut self, old: &[LogRow]) {
         let items = self.rows.len() + 1;
-        let old = self.list.item_count();
-        if old != items {
-            self.list.splice(1..old, self.rows.len());
+        let count = self.list.item_count();
+        if count != items {
+            // A splice over the scroll top moves it to the first row, so the page keeps the
+            // log it showed at the top where it was, wherever that log now sits.
+            let top = self.list.logical_scroll_top();
+            let shown = top.item_ix.checked_sub(1).and_then(|ix| old.get(ix));
+            self.list.splice(1..count, self.rows.len());
+            if let Some(ix) = shown.and_then(|r| self.rows.iter().position(|n| n.id() == r.id())) {
+                self.list.scroll_to(ListOffset {
+                    item_ix: ix + 1,
+                    offset_in_item: top.offset_in_item,
+                });
+            }
         }
         self.list.remeasure_items(0..items);
         let open = |r: &LogRow| Some(r.id()) == self.expanded && r.state() == LogState::Ready;

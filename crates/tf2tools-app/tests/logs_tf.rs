@@ -948,3 +948,77 @@ fn a_mouse_wheel_over_a_wide_table_scrolls_the_page(cx: &mut TestAppContext) {
     assert!(moved.left() < cap.left(), "{cap:?} then {moved:?}");
     assert_eq!(page_offset(cx, &page), before, "the page stays put");
 }
+
+#[gpui_kit::test]
+fn the_page_keeps_its_scroll_while_a_sync_lands(cx: &mut TestAppContext) {
+    use gpui_kit::{ScrollDelta, point, px, size};
+
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Enough slow downloads that the sync reports progress all through the scrolling.
+    let logs: Vec<_> = (100..140).map(|id| (id, day_ago(1))).collect();
+    server.mount_bytes("/api/v1/log", list_body(&logs));
+    for (id, _) in &logs {
+        server.mount_bytes_after(
+            &format!("/json/{id}"),
+            SIXES.as_bytes().to_vec(),
+            Duration::from_millis(150),
+        );
+    }
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    support::wait_real(cx, "the progress line", |cx| {
+        support::label_of(cx, s.win, ids::LOGSTF_PROGRESS).is_some()
+    });
+
+    // Over the grid, each wheel step moves the page by its own distance and each progress
+    // event after it leaves the page where it was.
+    let mut expected = page_offset(cx, &page);
+    for step in 0..6 {
+        wheel(
+            cx,
+            &s,
+            point(px(350.), px(400.)),
+            ScrollDelta::Pixels(point(px(0.), px(-100.))),
+        );
+        expected += px(100.);
+        assert_eq!(page_offset(cx, &page), expected, "after wheel step {step}");
+        let shown = support::label_of(cx, s.win, ids::LOGSTF_PROGRESS);
+        support::wait_real(cx, "the next progress event", |cx| {
+            support::label_of(cx, s.win, ids::LOGSTF_PROGRESS) != shown
+        });
+        support::settle(cx, s.win);
+        assert_eq!(page_offset(cx, &page), expected, "after progress {step}");
+    }
+    support::wait_real(cx, "the sync", |cx| {
+        cx.update(|cx| !page.read(cx).is_syncing())
+    });
+}
+
+#[gpui_kit::test]
+fn a_new_log_keeps_the_open_log_where_it_was(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    players_table_in_view(cx, &s, &page);
+    let before = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
+
+    // A refresh finds a newer log, which lands above the open one.
+    server.reset();
+    server.mount_bytes(
+        "/api/v1/log",
+        list_body(&[(4, unix_now()), (3, day_ago(1)), (2, day_ago(2))]),
+    );
+    server.mount_bytes("/json/4", SIXES.as_bytes().to_vec());
+    cx.update(|cx| page.update(cx, |page, cx| page.refresh(cx)));
+    support::wait_real(cx, "the refresh", |cx| {
+        cx.update(|cx| !page.read(cx).is_syncing() && page.read(cx).rows().len() == 3)
+    });
+    support::settle(cx, s.win);
+    let after = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL);
+    assert_eq!(after, Some(before), "the open log stays put");
+}
