@@ -9,6 +9,9 @@ pub const LOGS_TF_URL: &str = "https://logs.tf";
 pub const EMPTY_TEXT: &str =
     "Track a player to see their class averages and logs from the last 90 days.";
 
+/// Why a logs.tf change could not be kept, in player words.
+pub const SAVE_FAILED: &str = "Couldn't save logs.tf data on this computer.";
+
 /// One log's page on logs.tf.
 pub fn log_url(id: u64) -> String {
     format!("{LOGS_TF_URL}/{id}")

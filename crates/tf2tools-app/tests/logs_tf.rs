@@ -191,3 +191,31 @@ fn removing_a_chip_asks_first(cx: &mut TestAppContext) {
     assert_eq!(s.services.logs.cache().players().unwrap().len(), 1);
     assert_eq!(cx.update(|cx| page.read(cx).active()), Some(sid(1)));
 }
+
+#[gpui_kit::test]
+fn a_failed_removal_toasts_and_keeps_the_chip(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[]));
+    let s = shell(cx, &env, &server.uri(), &[(1, "a"), (2, "b")]);
+    let page = open_page(cx, &s);
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute_batch(
+            "CREATE TRIGGER keep_players BEFORE DELETE ON logstf_players
+             BEGIN SELECT RAISE(ABORT, 'disk full'); END;",
+        )
+        .unwrap();
+
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(2)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::wait_real(cx, "the toast", |cx| {
+        support::present(cx, s.win, ids::TOAST)
+    });
+    let toast = support::label_of(cx, s.win, ids::TOAST).unwrap();
+    assert!(toast.starts_with("Failed to stop tracking"), "{toast}");
+    assert!(!toast.contains("disk full"), "{toast}");
+    support::assert_plain(&toast);
+    assert_eq!(players_of(cx, &page), ["a", "b"]);
+    assert!(support::present(cx, s.win, ids::logstf_chip(sid(2))));
+}

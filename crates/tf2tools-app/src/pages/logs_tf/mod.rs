@@ -18,8 +18,9 @@ use crate::services::{OpError, run_blocking};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
+use crate::shell::toast::toast_error;
 use crate::widgets::{Named as _, labelled};
-use text::{EMPTY_TEXT, LOGS_TF_URL};
+use text::{EMPTY_TEXT, LOGS_TF_URL, SAVE_FAILED};
 
 /// The logs.tf page. It reads the tracked players from the cache on creation and is kept
 /// while hidden, so a visit elsewhere leaves it as it was.
@@ -64,14 +65,14 @@ impl LogsTfPage {
     }
 
     /// Makes `id`'s chip the active one, saves that choice and reloads the page from the cache.
-    pub fn select(&mut self, id: SteamId, cx: &mut Context<Self>) {
+    pub fn select(&mut self, id: SteamId, window: &mut Window, cx: &mut Context<Self>) {
         let saving = run_blocking(cx, move |s| {
             s.logs
                 .cache()
                 .set_active_player(id)
-                .map_err(|e| OpError::core("Failed to save the logs.tf player", e))
+                .map_err(|_| OpError::core("Failed to switch player", SAVE_FAILED))
         });
-        self.after_write(saving, cx);
+        self.after_write(saving, window, cx);
     }
 
     // Asks before forgetting a player; their logs stay cached until pruned.
@@ -91,31 +92,35 @@ impl LogsTfPage {
             if answer.recv().await != Ok(true) {
                 return;
             }
-            let _ = page.update(cx, |page, cx| {
+            let _ = page.update_in(cx, |page, window, cx| {
                 let removing = run_blocking(cx, move |s| {
                     s.logs
                         .cache()
                         .remove_player(id)
-                        .map_err(|e| OpError::core("Failed to stop tracking the player", e))
+                        .map_err(|_| OpError::core("Failed to stop tracking", SAVE_FAILED))
                 });
-                page.after_write(removing, cx);
+                page.after_write(removing, window, cx);
             });
         })
         .detach();
     }
 
-    // Every chip write ends the same way: the cache is the truth, so reread it, and a failed
-    // write is worth a warning in the log but leaves the page as the cache has it.
+    // Every chip write ends the same way: a failure toasts, then the page rereads the cache,
+    // which is the truth either way.
     fn after_write(
         &mut self,
         write: impl Future<Output = Result<(), OpError>> + 'static,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        cx.spawn(async move |page, cx| {
-            if let Err(error) = write.await {
-                tracing::warn!(%error, "a logs.tf player change failed");
-            }
-            let _ = page.update(cx, |page, cx| page.load(cx));
+        cx.spawn_in(window, async move |page, cx| {
+            let written = write.await;
+            let _ = page.update_in(cx, |page, window, cx| {
+                if let Err(err) = written {
+                    toast_error(window, cx, &err);
+                }
+                page.load(cx);
+            });
         })
         .detach();
     }
@@ -161,14 +166,13 @@ impl LogsTfPage {
                 window,
                 cx,
             )
-            .on_click(cx.listener(move |page, _, _, cx| page.select(id, cx)));
+            .on_click(cx.listener(move |page, _, window, cx| page.select(id, window, cx)));
             let remove = Button::new(ids::logstf_chip_remove(id))
                 .ghost()
                 .xsmall()
                 .icon(IconName::X)
                 .named(format!("Stop tracking {name}"))
                 .on_click(cx.listener(move |page, _, window, cx| {
-                    cx.stop_propagation();
                     page.remove(id, &name, window, cx);
                 }));
             row = row.child(h_flex().gap_0p5().child(chip).child(remove));
