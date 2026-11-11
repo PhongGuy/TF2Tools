@@ -2525,6 +2525,8 @@ pub const LOGSTF_CLASS_WEAPONS_TITLE: &str = "logstf-class-weapons-title";
 pub const LOGSTF_CLASS_WEAPONS_NOTE: &str = "logstf-class-weapons-note";
 /// Closes the class weapons panel.
 pub const LOGSTF_CLASS_WEAPONS_CLOSE: &str = "logstf-class-weapons-close";
+/// The column titles atop the class weapons table.
+pub const LOGSTF_CLASS_WEAPONS_HEAD: &str = "logstf-class-weapons-head";
 /// The sideways scroll box around the class weapons table.
 pub const LOGSTF_CLASS_WEAPONS_TABLE: &str = "logstf-class-weapons-table";
 

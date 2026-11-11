@@ -18,11 +18,12 @@ use crate::ids;
 use crate::widgets::scroll::sideways;
 use crate::widgets::{Named as _, labelled};
 
-// The name column keeps room for long logs.tf names; the rest fit "14029 (100%)".
+// The name column keeps room for long logs.tf names; the rest fit "14029 (100%)" and
+// their own title on one line.
 const NAME: Pixels = px(200.);
 const KILLS: Pixels = px(80.);
 const DAMAGE: Pixels = px(104.);
-const ACCURACY: Pixels = px(56.);
+const ACCURACY: Pixels = px(80.);
 
 /// The panel for `weapons`, read for `class` over `range`; its close button closes it on `page`.
 pub(super) fn class_weapons_panel(
@@ -87,7 +88,10 @@ fn weapon_table(class: TfClass, weapons: &ClassWeapons, cx: &App) -> impl IntoEl
     let border = cx.theme().border;
     let cell = |width: Pixels| div().w(width).flex_none().text_right();
     let head = h_flex()
+        .id(ids::LOGSTF_CLASS_WEAPONS_HEAD)
+        .test_support()
         .gap_2()
+        .whitespace_nowrap()
         .text_color(cx.theme().muted_foreground)
         .font_weight(FontWeight::MEDIUM)
         .child(div().flex_1().min_w(NAME).child("Weapon"))

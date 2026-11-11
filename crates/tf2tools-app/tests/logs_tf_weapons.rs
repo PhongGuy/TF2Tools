@@ -129,6 +129,29 @@ fn a_played_card_opens_its_weapons_and_a_second_click_closes_them(cx: &mut TestA
     );
 }
 
+// Each column title stays on one line, so the title row is no taller than a weapon row.
+#[gpui_kit::test]
+fn the_column_titles_keep_to_one_line(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    wait_for(cx, &page, TfClass::Scout);
+    let head = support::bounds_of(cx, s.win, ids::LOGSTF_CLASS_WEAPONS_HEAD).expect("the titles");
+    let row = support::bounds_of(
+        cx,
+        s.win,
+        ids::logstf_class_weapon(TfClass::Scout, "scattergun"),
+    )
+    .expect("a weapon row");
+    assert!(
+        head.size.height <= row.size.height,
+        "titles {head:?} are taller than a row {row:?}"
+    );
+}
+
 #[gpui_kit::test]
 fn close_switch_unplayed_and_no_shots(cx: &mut TestAppContext) {
     let env = support::env();
