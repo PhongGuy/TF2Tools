@@ -2516,6 +2516,14 @@ pub fn logstf_log_open(id: u64) -> ElementId {
     keyed("logstf-log-open", &id.to_string())
 }
 
+/// The DPM column title over the logs.tf rows.
+pub const LOGSTF_HEAD_DPM: &str = "logstf-head-dpm";
+
+/// A log row's damage-per-minute cell: "logstf-log-dpm:<id>".
+pub fn logstf_log_dpm(id: u64) -> ElementId {
+    keyed("logstf-log-dpm", &id.to_string())
+}
+
 /// A log row's title cell: "logstf-log-title:<id>".
 pub fn logstf_log_title(id: u64) -> ElementId {
     keyed("logstf-log-title", &id.to_string())

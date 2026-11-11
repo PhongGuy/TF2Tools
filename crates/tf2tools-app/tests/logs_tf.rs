@@ -768,7 +768,14 @@ fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
 
     // The row keeps a readable title by dropping its lower-priority columns.
     let title = support::bounds_of(cx, s.win, ids::logstf_log_title(2)).unwrap();
-    assert!(title.size.width >= px(100.), "title {title:?}");
+    assert!(title.size.width >= px(72.), "title {title:?}");
+
+    // Every core column stays whole: DPM, the last, ends inside the list.
+    let list = support::bounds_of(cx, s.win, ids::LOGSTF_LIST).unwrap();
+    for dpm in [ids::LOGSTF_HEAD_DPM.into(), ids::logstf_log_dpm(2)] {
+        let cell = support::bounds_of(cx, s.win, dpm).unwrap();
+        assert!(cell.right() <= list.right(), "DPM {cell:?} past {list:?}");
+    }
 
     // The players table keeps every column, so its name column never collapses.
     let first = cx.update(|cx| page.read(cx).detail().unwrap().players()[0].steam_id());

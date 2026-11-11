@@ -34,21 +34,29 @@ const DPM: Pixels = px(48.);
 const GAP: Pixels = px(16.);
 const ICON: Pixels = px(18.);
 const TITLE_MIN: Pixels = px(100.);
+// Below the core columns' width the rows tighten their gaps and title, so DPM, the last
+// column, still ends inside the smallest window's 448 px list.
+const GAP_NARROW: Pixels = px(8.);
+const TITLE_MIN_NARROW: Pixels = px(72.);
 // The row's horizontal padding, both sides.
 const PADDING: Pixels = px(24.);
 
-/// Which optional row columns fit the list's width. A narrow window gives up Length first,
-/// then Map, so the title keeps room; before the first frame the list has no width yet.
+/// How the rows fit the list's width. A narrow window gives up Length first, then Map, then
+/// tightens the gaps and the title's minimum; before the first frame the list has no width yet.
 #[derive(Clone, Copy)]
 pub(super) struct Fit {
     map: bool,
     length: bool,
+    gap: Pixels,
+    title_min: Pixels,
 }
 
 impl Fit {
     pub(super) const ALL: Self = Self {
         map: true,
         length: true,
+        gap: GAP,
+        title_min: TITLE_MIN,
     };
 }
 
@@ -56,9 +64,12 @@ pub(super) fn fit(list: &ListState) -> Fit {
     let width = list.viewport_bounds().size.width;
     let core = CHEVRON + DATE + CLASSES + KDA + DPM + TITLE_MIN + GAP * 5. + PADDING;
     let unknown = width <= px(0.);
+    let roomy = unknown || width >= core;
     Fit {
         map: unknown || width >= core + MAP + GAP,
         length: unknown || width >= core + MAP + LENGTH + GAP * 2.,
+        gap: if roomy { GAP } else { GAP_NARROW },
+        title_min: if roomy { TITLE_MIN } else { TITLE_MIN_NARROW },
     }
 }
 
@@ -90,7 +101,7 @@ pub(super) fn page_list(page: &LogsTfPage, cx: &mut Context<LogsTfPage>) -> Div 
 pub(super) fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
     let cell = |w: Pixels, text: &'static str| div().w(w).flex_none().child(text);
     h_flex()
-        .gap(GAP)
+        .gap(fit.gap)
         .px_3()
         .py_2()
         .border_b_1()
@@ -100,14 +111,19 @@ pub(super) fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
         .text_color(cx.theme().muted_foreground)
         .child(div().w(CHEVRON).flex_none())
         .child(cell(DATE, "Date"))
-        .child(div().flex_1().min_w(TITLE_MIN).child("Title"))
+        .child(div().flex_1().min_w(fit.title_min).child("Title"))
         .when(fit.map, |el| el.child(cell(MAP, "Map")))
         .when(fit.length, |el| {
             el.child(cell(LENGTH, "Length").text_right())
         })
         .child(cell(CLASSES, "Class"))
         .child(cell(KDA, "K/D/A").text_right())
-        .child(cell(DPM, "DPM").text_right())
+        .child(
+            cell(DPM, "DPM")
+                .id(ids::LOGSTF_HEAD_DPM)
+                .test_support()
+                .text_right(),
+        )
 }
 
 /// The line for a player with no logs in the window, with a way to their logs.tf profile.
@@ -156,7 +172,7 @@ fn log_item(
         .id(ids::logstf_log(id))
         .aria_label(row.title().to_owned())
         .test_support()
-        .gap(GAP)
+        .gap(fit.gap)
         .px_3()
         .py_2()
         .text_sm()
@@ -168,7 +184,7 @@ fn log_item(
                 .id(ids::logstf_log_title(id))
                 .test_support()
                 .flex_1()
-                .min_w(TITLE_MIN)
+                .min_w(fit.title_min)
                 .truncate()
                 .child(row.title().to_owned()),
         )
@@ -211,6 +227,7 @@ fn log_item(
 
 // A downloaded log's numbers for the player: length, classes, K/D/A and damage per minute.
 fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
+    let id = row.id();
     let assets = &cx.global::<Services>().assets;
     let icons = h_flex().w(CLASSES).flex_none().gap_1().children(
         row.classes()
@@ -237,6 +254,8 @@ fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
             .child(kda)
             .into_any_element(),
         div()
+            .id(ids::logstf_log_dpm(id))
+            .test_support()
             .w(DPM)
             .flex_none()
             .text_right()
@@ -252,9 +271,9 @@ fn note(id: u64, state: LogState, fit: Fit, cx: &App) -> impl IntoElement {
         LogState::Unreadable => LOG_UNREADABLE,
         LogState::Pending | LogState::Ready | _ => LOG_PENDING,
     };
-    let length = if fit.length { LENGTH + GAP } else { px(0.) };
+    let length = if fit.length { LENGTH + fit.gap } else { px(0.) };
     h_flex()
-        .w(length + CLASSES + KDA + DPM + GAP * 2.)
+        .w(length + CLASSES + KDA + DPM + fit.gap * 2.)
         .flex_none()
         .gap_2()
         .child(labelled(
