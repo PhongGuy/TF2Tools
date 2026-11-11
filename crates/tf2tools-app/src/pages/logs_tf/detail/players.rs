@@ -24,6 +24,9 @@ const TEAM: Pixels = px(40.);
 const NAME_MIN: Pixels = px(120.);
 // Room for four class icons, as many as a player shows before the rest clip.
 const CLASSES: Pixels = px(88.);
+// The sort arrow's row under every header, kept empty when unsorted so sorting never moves
+// the table; an xsmall icon's height.
+const ARROW: Pixels = px(12.);
 
 // One number column: which sort it is and how a player's cell reads.
 type Column = (PlayerColumn, fn(&PlayerLine) -> String);
@@ -54,16 +57,19 @@ pub(super) fn players_table(
             .on_click(move |_, _, cx| {
                 let _ = page.update(cx, |page, cx| page.sort_players_by(column, cx));
             });
+        let arrow = div().h(ARROW).flex_none().when_some(sorted, |el, sort| {
+            el.child(sort_arrow(column, sort.descending))
+        });
         v_flex()
             .flex_none()
             .items_center()
             .child(button)
-            .when_some(sorted, |el, sort| {
-                el.child(sort_arrow(column, sort.descending))
-            })
+            .child(arrow)
     };
     let mut table = v_flex().w_full().child(
         h_flex()
+            .id(ids::LOGSTF_PLAYERS_HEAD)
+            .test_support()
             .items_start()
             .gap_1()
             .px_1()

@@ -738,6 +738,19 @@ fn the_sorted_header_shows_its_direction(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn sorting_keeps_the_players_header_height(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_sort("DA"));
+    let before = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_HEAD).unwrap();
+    support::click_id(cx, s.win, ids::logstf_sort("DA"));
+    let after = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_HEAD).unwrap();
+    assert_eq!(
+        before.size.height, after.size.height,
+        "{before:?} {after:?}"
+    );
+}
+
+#[gpui_kit::test]
 fn round_headers_stay_on_one_line_and_spread_across_the_table(cx: &mut TestAppContext) {
     let (_env, _server, s, _page) = opened_at(cx, 3, 1280., 800., ids::LOGSTF_ROUNDS);
     let head = support::bounds_of(cx, s.win, ids::LOGSTF_ROUNDS_HEAD).unwrap();

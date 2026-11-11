@@ -2628,6 +2628,9 @@ pub fn logstf_sort(title: &str) -> ElementId {
     keyed("logstf-sort", title)
 }
 
+/// The players table's header line in the open log: "logstf-players-head".
+pub const LOGSTF_PLAYERS_HEAD: &str = "logstf-players-head";
+
 /// The arrow on the sorted players header, labelled "high to low" or "low to high":
 /// "logstf-sort-arrow:K/D".
 pub fn logstf_sort_arrow(title: &str) -> ElementId {
