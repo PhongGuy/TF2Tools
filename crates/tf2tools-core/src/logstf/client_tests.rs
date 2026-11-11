@@ -12,7 +12,7 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 use super::{LogsCancel, LogsClient, LogsEndpoints, LogsProgress};
 use crate::db::Database;
 use crate::logstf::cache::ListedLog;
-use crate::logstf::{LogsCache, LogsRange, PlayerInput, SteamId, TrackedPlayer};
+use crate::logstf::{LOGS_LONG_SPACING, LogsCache, LogsRange, PlayerInput, SteamId, TrackedPlayer};
 use crate::paths::DataDir;
 use crate::store::StoreConfig;
 use crate::store::pacer::PacerStats;
@@ -212,4 +212,44 @@ async fn a_pull_over_400_logs_uses_the_long_spacing_and_then_restores_the_short(
     assert!(starts.iter().all(|(_, gap)| gap.is_zero()), "{starts:?}");
     // The 400 ids overlap the cancelled pull's, all still pending, so exactly 400 are wanted.
     assert_eq!(first_spacing(&env, &client, 400).await, Duration::ZERO);
+}
+
+#[tokio::test]
+async fn a_long_pull_reserves_the_long_gap_after_each_download_but_not_after_the_list() {
+    let env = env(Duration::ZERO).await;
+    let long = Duration::from_millis(60);
+    let client = env.client.clone().with_long_spacing(long);
+    let logs: Vec<_> = (0..401)
+        .map(|i| (100_401 - i, now() - DAY - 3_600 * i))
+        .collect();
+    mount(&env.server, r"^/api/v1/log$", list_body(&logs)).await;
+    mount(&env.server, r"^/json/\d+$", log_body()).await;
+    // Two downloads go through, so the second shows the first one's gap was kept.
+    let cancel = LogsCancel::new();
+    client
+        .sync_player(arie(), LogsRange::Months3, true, &cancel, &|p| {
+            if let LogsProgress::Downloading { done: 2, .. } = p {
+                cancel.cancel();
+            }
+        })
+        .await
+        .unwrap();
+    let starts = client.pacer.starts();
+    let reserved: Vec<_> = starts.iter().map(|(_, gap)| *gap).collect();
+    assert_eq!(
+        reserved,
+        [Duration::ZERO, long, long],
+        "the list, then two downloads"
+    );
+    assert!(starts[2].0 - starts[1].0 >= long, "{starts:?}");
+}
+
+#[tokio::test]
+async fn a_client_from_new_slows_a_long_pull_to_the_long_spacing() {
+    // `env` builds on `new` and only swaps the config, so the long gap is the default one.
+    let env = env(Duration::ZERO).await;
+    assert_eq!(
+        first_spacing(&env, &env.client, 401).await,
+        LOGS_LONG_SPACING
+    );
 }
