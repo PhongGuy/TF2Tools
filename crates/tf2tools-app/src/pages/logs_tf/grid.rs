@@ -23,6 +23,7 @@ pub(super) fn class_grid(averages: &[ClassAverage; 9], logs: usize, cx: &App) ->
         .child(
             h_flex()
                 .flex_wrap()
+                .items_start()
                 .gap_3()
                 .children(averages.iter().map(|average| class_card(average, cx))),
         )
