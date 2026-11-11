@@ -232,7 +232,7 @@ impl HudMakerPage {
                     .text_sm()
                     .when_some(tip, |name, tip| {
                         let tip = SharedString::from(tip);
-                        name.tooltip(super::tip::tip(ids::HUD_MAKER_ROW_TIP, tip))
+                        name.tooltip(crate::widgets::tip::tip(ids::HUD_MAKER_ROW_TIP, tip))
                     })
                     .child(name.clone())
                     .child(measure);
@@ -251,7 +251,10 @@ impl HudMakerPage {
                         .flex()
                         .items_center()
                         .justify_center()
-                        .tooltip(super::tip::tip(ids::HUD_MAKER_TIP, SHOWS_IN_GAME_TIP))
+                        .tooltip(crate::widgets::tip::tip(
+                            ids::HUD_MAKER_TIP,
+                            SHOWS_IN_GAME_TIP,
+                        ))
                         .child(Icon::new(IconName::Gamepad2).small())
                 });
                 // A part hovered on the canvas lights its row as the pointer on the row would.
@@ -379,7 +382,7 @@ impl HudMakerPage {
             .rounded(radius)
             .when(!hidden, |el| el.opacity(0.6))
             .hover(|el| el.bg(hover).opacity(1.))
-            .tooltip(super::tip::tip(ids::HUD_MAKER_TIP, words))
+            .tooltip(crate::widgets::tip::tip(ids::HUD_MAKER_TIP, words))
             .child(
                 Icon::new(match hidden {
                     true => IconName::EyeOff,
@@ -432,7 +435,7 @@ fn changed_dot(key: &PartKey, colour: Hsla) -> AnyElement {
         .size(px(6.))
         .rounded_full()
         .bg(colour)
-        .tooltip(super::tip::tip(
+        .tooltip(crate::widgets::tip::tip(
             ids::HUD_MAKER_TIP,
             "Changed from the starting HUD",
         ))

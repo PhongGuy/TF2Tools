@@ -13,12 +13,12 @@ use tf2tools_core::{LogColumns, LogDetail, PlayerLine, SteamId};
 use super::popover::class_hover;
 use super::{NUMBER, team_cell};
 use crate::ids;
-use crate::pages::hud_maker::tip::tip;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players};
 use crate::pages::logs_tf::text::{one_decimal, reads_zero, whole};
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
+use crate::widgets::tip::tip;
 
 // The table's fixed columns. The name is sized at its minimum so a long one never widens the
 // table, and grows into any room the window leaves, truncating what still does not fit.

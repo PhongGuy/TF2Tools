@@ -12,13 +12,13 @@ use tf2tools_core::{LogDetail, MatrixKind, SteamId, TfClass};
 
 use super::{ICON, class_cell, team_cell};
 use crate::ids;
-use crate::pages::hud_maker::tip::tip;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::tables::matrix_rows;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
+use crate::widgets::tip::tip;
 
 // The fixed columns before the nine classes. The name is sized at its minimum so a long one
 // never widens the table, and grows into any room the window leaves, truncating the rest.
