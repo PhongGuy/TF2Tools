@@ -103,6 +103,13 @@ pub(super) const MARK_COUNTED_SQL: &str = concat!(
     uncounted!()
 );
 
+/// Where `count_weapons_with` calls its hook, so a test can race a change against a batch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum BackfillStep {
+    BeforeRead,
+    BeforeWrite,
+}
+
 /// What one `count_weapons` batch did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]

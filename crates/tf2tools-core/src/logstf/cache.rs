@@ -8,8 +8,8 @@ use rusqlite::{OptionalExtension, params};
 
 use super::averages::{CLASS_SUMS, ClassAverage, ClassSums, WINDOW_LOGS};
 use super::weapons::{
-    ClassWeapons, MARK_COUNTED_SQL, UNCOUNTED_LEFT_SQL, UNCOUNTED_SQL, WEAPON_LOGS, WEAPON_PENDING,
-    WEAPON_SUMS, WeaponBackfill, WeaponSum, write_weapon_rows,
+    BackfillStep, ClassWeapons, MARK_COUNTED_SQL, UNCOUNTED_LEFT_SQL, UNCOUNTED_SQL, WEAPON_LOGS,
+    WEAPON_PENDING, WEAPON_SUMS, WeaponBackfill, WeaponSum, write_weapon_rows,
 };
 use super::{
     LOG_BODY_LIMIT, LogDetail, LogsRange, PROVISIONAL_SECS, SteamId, logstf_class,
@@ -420,6 +420,16 @@ impl LogsCache {
     /// A damaged or unparsable body is marked counted with no rows; a database error leaves
     /// the current log unmarked so the next run retries it.
     pub fn count_weapons(&self, limit: usize) -> Result<WeaponBackfill, LogsCacheError> {
+        self.count_weapons_with(limit, &|_, _| {})
+    }
+
+    /// `count_weapons` with `hook` called before each log's body read and before its write.
+    /// Both calls sit outside `db.write`, so a hook may write through the cache itself.
+    pub(super) fn count_weapons_with(
+        &self,
+        limit: usize,
+        hook: &dyn Fn(BackfillStep, i64),
+    ) -> Result<WeaponBackfill, LogsCacheError> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX);
         let ids = self
             .db
@@ -432,6 +442,7 @@ impl LogsCache {
         let mut counted = 0;
         for id in ids {
             // Read and parse outside the write lock; None means "count it with no rows".
+            hook(BackfillStep::BeforeRead, id);
             let detail = match self.read_body(id)? {
                 BodyRead::Missing => continue,
                 BodyRead::Damaged => {
@@ -453,6 +464,7 @@ impl LogsCache {
                     }
                 },
             };
+            hook(BackfillStep::BeforeWrite, id);
             let wrote = self
                 .db
                 .write(|conn| {
