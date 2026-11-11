@@ -1,4 +1,5 @@
-//! The logs.tf page: tracked players as chips, their 90-day class averages and their logs.
+//! The logs.tf page: tracked players as chips, their class averages and their logs over the
+//! history range the player picks.
 
 mod detail;
 mod grid;
@@ -9,6 +10,7 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::component::{Disableable as _, Sizable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -47,6 +49,11 @@ pub struct LogsTfPage {
     loaded: bool,
     rows: Vec<LogRow>,
     averages: Option<[ClassAverage; 9]>,
+    // The history range as the settings keep it, and the slider that picks it. `slider_range`
+    // is the stop last pushed into the slider, so a drag is never snapped back mid-way.
+    range: LogsRange,
+    range_slider: Entity<SliderState>,
+    slider_range: LogsRange,
     // The open log's id; the list's item 0 is the page top, so row `i` is item `i + 1`.
     expanded: Option<u64>,
     // The open log as read from its stored body, keyed by its id so a read that lands after
@@ -99,12 +106,32 @@ impl LogsTfPage {
             }
         });
         let redraw = cx.observe(&sync, |_, _, cx| cx.notify());
+        // The slider commits on release only, so a drag across stops syncs once.
+        let range_slider = cx.new(|_| {
+            SliderState::new()
+                .min(0.)
+                .max((LogsRange::STOPS.len() - 1) as f32)
+                .step(1.)
+                .default_value(stop_index(LogsRange::default()) as f32)
+        });
+        let released = cx.subscribe_in(
+            &range_slider,
+            window,
+            |page, _, event: &SliderEvent, window, cx| {
+                if let SliderEvent::Release(value) = event {
+                    page.set_range(stop_at(value.start()), window, cx);
+                }
+            },
+        );
         let mut page = Self {
             players: Vec::new(),
             active: None,
             loaded: false,
             rows: Vec::new(),
             averages: None,
+            range: LogsRange::default(),
+            range_slider,
+            slider_range: LogsRange::default(),
             expanded: None,
             detail: None,
             list: ListState::new(1, ListAlignment::Top, px(200.)),
@@ -119,7 +146,7 @@ impl LogsTfPage {
             add_error: None,
             adding: false,
             add_open: false,
-            _subscriptions: vec![enter, heard, redraw],
+            _subscriptions: vec![enter, heard, redraw, released],
         };
         page.load(true, cx).detach();
         page
@@ -168,6 +195,44 @@ impl LogsTfPage {
         if let (false, Some(id)) = (self.is_syncing(cx), self.active) {
             self.sync(id, true, cx);
         }
+    }
+
+    /// How far back the list, averages and sync reach, as the settings keep it.
+    pub fn range(&self) -> LogsRange {
+        self.range
+    }
+
+    /// The history range slider: stops 0 to 5 in `LogsRange::STOPS` order, step 1.
+    pub fn range_slider(&self) -> &Entity<SliderState> {
+        &self.range_slider
+    }
+
+    /// Picks the history range: the slider moves to it, the settings keep it and the reload
+    /// that follows syncs the active player with it. Picking the current range does nothing.
+    pub fn set_range(&mut self, range: LogsRange, window: &mut Window, cx: &mut Context<Self>) {
+        if range == self.range {
+            return;
+        }
+        self.range = range;
+        self.move_slider(window, cx);
+        let saving = run_blocking(cx, move |s| {
+            s.logs.cache().set_range(range).map_err(|error| {
+                tracing::warn!(%error, "saving the logs.tf history range failed");
+                OpError::core("Failed to change the history range", SAVE_FAILED)
+            })
+        });
+        self.after_write(saving, window, cx);
+    }
+
+    // Puts the slider's thumb on `self.range`'s stop when it was last put elsewhere.
+    fn move_slider(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.slider_range == self.range {
+            return;
+        }
+        self.slider_range = self.range;
+        let stop = stop_index(self.range) as f32;
+        self.range_slider
+            .update(cx, |slider, cx| slider.set_value(stop, window, cx));
     }
 
     /// The page's one scrolling list: the top, then a row per log.
@@ -490,16 +555,15 @@ impl LogsTfPage {
             let read = |e| OpError::core("Failed to load logs.tf players", e);
             let players = cache.players().map_err(read)?;
             let active = cache.active_player().map_err(read)?;
+            let range = cache.range().map_err(read)?;
             let logs = match active {
                 Some(id) => Some((
-                    cache.logs(id, LogsRange::default()).map_err(read)?,
-                    cache
-                        .class_averages(id, LogsRange::default())
-                        .map_err(read)?,
+                    cache.logs(id, range).map_err(read)?,
+                    cache.class_averages(id, range).map_err(read)?,
                 )),
                 None => None,
             };
-            Ok((players, active, logs))
+            Ok((players, active, range, logs))
         });
         cx.spawn(async move |page, cx| {
             let loaded = loading.await;
@@ -508,9 +572,10 @@ impl LogsTfPage {
                     return;
                 }
                 match loaded {
-                    Ok((players, active, logs)) => {
+                    Ok((players, active, range, logs)) => {
                         page.players = players;
                         page.active = active;
+                        page.range = range;
                         let (rows, averages) = logs.unzip();
                         let old = std::mem::replace(&mut page.rows, rows.unwrap_or_default());
                         page.averages = averages;
@@ -561,9 +626,8 @@ impl LogsTfPage {
         if self.removing == Some(id) {
             return;
         }
-        self.sync.update(cx, |sync, cx| {
-            sync.start(id, LogsRange::default(), force, cx)
-        });
+        self.sync
+            .update(cx, |sync, cx| sync.start(id, self.range, force, cx));
     }
 
     // Each reread lands before the next starts, so a burst of events costs one more read.
@@ -717,7 +781,16 @@ impl LogsTfPage {
                 self.averages
                     .as_ref()
                     .filter(|_| !self.players.is_empty())
-                    .map(|averages| grid::class_grid(averages, &self.rows, cx)),
+                    .map(|averages| {
+                        grid::class_grid(
+                            averages,
+                            self.rows.len(),
+                            self.range,
+                            &self.range_slider,
+                            cx.entity().downgrade(),
+                            cx,
+                        )
+                    }),
             )
             .children(empty.then(|| self.empty_state(cx)))
             .children(no_logs.map(|id| list::no_logs(id, cx)))
@@ -746,8 +819,10 @@ impl LogsTfPage {
 }
 
 impl Render for LogsTfPage {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.fit = list::fit(&self.list);
+        // A cache read has no window to move the slider with, so the frame after it does.
+        self.move_slider(window, cx);
         // The page scrolls as one list, so the grid and the logs move together.
         v_flex()
             .id(ids::page(Page::LogsTf))
@@ -756,4 +831,22 @@ impl Render for LogsTfPage {
             .p(CONTENT_PADDING)
             .child(list::page_list(self, cx).flex_1().min_h_0())
     }
+}
+
+// A range's place on the slider, narrow to wide.
+fn stop_index(range: LogsRange) -> usize {
+    LogsRange::STOPS
+        .iter()
+        .position(|stop| *stop == range)
+        .unwrap_or_default()
+}
+
+// The range at a slider value, rounded to the nearest stop; a NaN reads as the first.
+fn stop_at(value: f32) -> LogsRange {
+    let ix = if value.is_nan() {
+        0
+    } else {
+        value.round().clamp(0., (LogsRange::STOPS.len() - 1) as f32) as usize
+    };
+    LogsRange::STOPS[ix]
 }

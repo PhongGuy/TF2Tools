@@ -12,9 +12,7 @@ use crate::support::logstf::{
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
-use tf2tools_app::pages::logs_tf::text::{
-    LOOKING_UP, local_date, log_url, profile_url, summary_text,
-};
+use tf2tools_app::pages::logs_tf::text::{LOOKING_UP, log_url, profile_url};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{SteamId, TfClass};
@@ -633,17 +631,9 @@ fn the_grid_shows_nine_classes_and_dims_the_unplayed(cx: &mut TestAppContext) {
             "{class:?}"
         );
     }
-    // The window runs 90 days back from the newest log, in this computer's dates.
-    let newest = cx.update(|cx| page.read(cx).rows()[0].date());
-    let local = |unix| local_date(unix).unwrap();
     assert_eq!(
-        support::label_of(cx, s.win, ids::LOGSTF_SUMMARY),
-        Some(summary_text(
-            local(tf2tools_core::window_start(newest, tf2tools_core::LogsRange::Months3).unwrap()),
-            local(newest),
-            2,
-            false
-        ))
+        support::label_of(cx, s.win, ids::LOGSTF_SUMMARY).as_deref(),
+        Some("Last 3 months, 2 logs")
     );
     let scout = cx.update(|cx| page.read(cx).averages().unwrap()[0].clone());
     assert_eq!(scout.seconds(), 1559);

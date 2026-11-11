@@ -2,8 +2,7 @@
 
 use std::time::Duration;
 
-use chrono::{Datelike as _, NaiveDate};
-use tf2tools_core::{LogsSyncError, ResolveError, SteamId};
+use tf2tools_core::{LogsRange, LogsSyncError, ResolveError, SteamId};
 
 use crate::logs_sync::SyncProgress;
 
@@ -11,8 +10,7 @@ use crate::logs_sync::SyncProgress;
 pub const LOGS_TF_URL: &str = "https://logs.tf";
 
 /// The empty page's explanation, shown until a player is tracked.
-pub const EMPTY_TEXT: &str =
-    "Track a player to see their class averages and logs from their last 90 days of play.";
+pub const EMPTY_TEXT: &str = "Track a player to see their class averages and logs from logs.tf.";
 
 /// Why a logs.tf change could not be kept, in player words.
 pub const SAVE_FAILED: &str = "Couldn't save logs.tf data on this computer.";
@@ -143,33 +141,31 @@ pub fn whole(value: f64) -> String {
     format!("{value:.0}")
 }
 
-/// The line under the class grid: the dates the logs span, then how many there are:
-/// "Aug 12 to Nov 10, 2026: 247 logs"; at the log cap, "...: last 400 logs".
-pub fn summary_text(first: NaiveDate, last: NaiveDate, logs: usize, capped: bool) -> String {
-    let count = match (capped, logs) {
-        (true, _) => format!("last {logs} logs"),
-        (false, 1) => "1 log".to_owned(),
-        (false, _) => format!("{logs} logs"),
-    };
-    format!("{}: {count}", range_text(first, last))
-}
-
-// The year is written once when both ends share it, and on each end when they don't.
-fn range_text(first: NaiveDate, last: NaiveDate) -> String {
-    const DAY: &str = "%b %-d";
-    const FULL: &str = "%b %-d, %Y";
-    if first == last {
-        last.format(FULL).to_string()
-    } else if first.year() == last.year() {
-        format!("{} to {}", first.format(DAY), last.format(FULL))
-    } else {
-        format!("{} to {}", first.format(FULL), last.format(FULL))
+/// A history range's stop label under the slider: "1 month" up to "All".
+pub fn range_label(range: LogsRange) -> &'static str {
+    match range {
+        LogsRange::Month1 => "1 month",
+        LogsRange::Months3 => "3 months",
+        LogsRange::Months6 => "6 months",
+        LogsRange::Year1 => "1 year",
+        LogsRange::Years2 => "2 years",
+        LogsRange::All | _ => "All",
     }
 }
 
-/// The calendar date of an upload time on this computer's clock.
-pub fn local_date(unix: i64) -> Option<NaiveDate> {
-    chrono::DateTime::from_timestamp(unix, 0).map(|t| t.with_timezone(&chrono::Local).date_naive())
+/// The line under the class grid: the range, then how many logs it holds:
+/// "Last 3 months, 87 logs", "Last month, 1 log", "All logs, 4,812".
+pub fn summary_text(range: LogsRange, logs: usize) -> String {
+    let span = match range {
+        LogsRange::Month1 => "month",
+        LogsRange::Months3 => "3 months",
+        LogsRange::Months6 => "6 months",
+        LogsRange::Year1 => "year",
+        LogsRange::Years2 => "2 years",
+        LogsRange::All | _ => return format!("All logs, {}", count_text(logs)),
+    };
+    let noun = if logs == 1 { "log" } else { "logs" };
+    format!("Last {span}, {} {noun}", count_text(logs))
 }
 
 /// The log list's line when logs.tf has no logs for the active player.

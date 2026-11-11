@@ -3,9 +3,9 @@
 
 use gpui_kit::ElementId;
 use tf2tools_core::{
-    AddonName, BoardMode, GbId, HudId, MeterKind, ModuleChoice, NewPart, PartKey, PinCorner,
-    Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, SteamId, StoreItemId,
-    StoreKind, TfClass, WeaponKind, WeaponSlot,
+    AddonName, BoardMode, GbId, HudId, LogsRange, MeterKind, ModuleChoice, NewPart, PartKey,
+    PinCorner, Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, SteamId,
+    StoreItemId, StoreKind, TfClass, WeaponKind, WeaponSlot,
 };
 
 use crate::shell::route::Page;
@@ -2479,9 +2479,17 @@ pub const LOGSTF_ERROR: &str = "logstf-error";
 /// Retries a failed logs.tf sync.
 pub const LOGSTF_RETRY: &str = "logstf-retry";
 
-/// Labelled "<first> to <last date>: <n> logs" (or "...: last 400 logs" at the cap) under the
-/// class grid, once the player has logs.
+/// Labelled "Last <range>, <n> logs" (or "All logs, <n>") under the class grid, once the
+/// player has logs.
 pub const LOGSTF_SUMMARY: &str = "logstf-summary";
+/// The history range slider beside the summary, six stops from 1 month to All.
+pub const LOGSTF_RANGE: &str = "logstf-range";
+
+/// One stop's label under the history range slider, a click picks it:
+/// "logstf-range-stop:<key>".
+pub fn logstf_range_stop(range: LogsRange) -> ElementId {
+    keyed("logstf-range-stop", range.key())
+}
 
 /// One class's card in the logs.tf averages grid: "logstf-class:<class>".
 pub fn logstf_class(class: TfClass) -> ElementId {

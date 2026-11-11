@@ -2,14 +2,13 @@
 
 use std::time::Duration;
 
-use chrono::NaiveDate;
 use tf2tools_app::logs_sync::SyncProgress;
 use tf2tools_app::pages::logs_tf::text::{
     EMPTY_TEXT, NO_LOGS_TEXT, count_text, duration_text, finding_text, one_decimal, progress_line,
-    progress_text, resolve_message, ring_label, summary_text, sync_message, time_played_text,
-    whole,
+    progress_text, range_label, resolve_message, ring_label, summary_text, sync_message,
+    time_played_text, whole,
 };
-use tf2tools_core::{LogsSyncError, ResolveError};
+use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
 #[test]
 fn resolve_failures_read_as_the_spec_words_them() {
@@ -94,37 +93,28 @@ fn grid_numbers_format_like_the_spec() {
     assert_eq!(whole(136.38), "136");
 }
 
-fn day(y: i32, m: u32, d: u32) -> NaiveDate {
-    NaiveDate::from_ymd_opt(y, m, d).unwrap()
-}
-
 #[test]
-fn the_summary_names_the_window_it_covers() {
-    let (aug, nov) = (day(2026, 8, 12), day(2026, 11, 10));
+fn the_summary_names_the_range_and_counts_its_logs() {
+    assert_eq!(summary_text(LogsRange::Month1, 1), "Last month, 1 log");
     assert_eq!(
-        summary_text(aug, nov, 247, false),
-        "Aug 12 to Nov 10, 2026: 247 logs"
+        summary_text(LogsRange::Months3, 87),
+        "Last 3 months, 87 logs"
     );
+    assert_eq!(summary_text(LogsRange::Months6, 2), "Last 6 months, 2 logs");
     assert_eq!(
-        summary_text(aug, nov, 1, false),
-        "Aug 12 to Nov 10, 2026: 1 log"
+        summary_text(LogsRange::Year1, 1_400),
+        "Last year, 1,400 logs"
     );
+    assert_eq!(summary_text(LogsRange::Years2, 12), "Last 2 years, 12 logs");
+    assert_eq!(summary_text(LogsRange::All, 4_812), "All logs, 4,812");
+    let labels: Vec<&str> = LogsRange::STOPS.into_iter().map(range_label).collect();
     assert_eq!(
-        summary_text(day(2022, 6, 3), day(2022, 9, 1), 31, false),
-        "Jun 3 to Sep 1, 2022: 31 logs"
+        labels,
+        [
+            "1 month", "3 months", "6 months", "1 year", "2 years", "All"
+        ]
     );
-    assert_eq!(
-        summary_text(day(2021, 11, 20), day(2022, 2, 18), 64, false),
-        "Nov 20, 2021 to Feb 18, 2022: 64 logs"
-    );
-    assert_eq!(
-        summary_text(aug, nov, 400, true),
-        "Aug 12 to Nov 10, 2026: last 400 logs"
-    );
-    assert_eq!(
-        summary_text(nov, nov, 400, true),
-        "Nov 10, 2026: last 400 logs"
-    );
+    assert!(!EMPTY_TEXT.contains("90 days"), "{EMPTY_TEXT}");
 }
 
 #[test]
@@ -132,7 +122,7 @@ fn no_wording_promises_the_last_90_days_from_today() {
     assert_eq!(NO_LOGS_TEXT, "No logs on logs.tf for this player yet.");
     assert_eq!(
         EMPTY_TEXT,
-        "Track a player to see their class averages and logs from their last 90 days of play."
+        "Track a player to see their class averages and logs from logs.tf."
     );
 }
 
