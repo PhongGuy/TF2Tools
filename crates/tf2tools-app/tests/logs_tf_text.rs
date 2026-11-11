@@ -506,6 +506,12 @@ fn open_log_whole_numbers_floor_like_logs_tf() {
 }
 
 #[test]
+fn a_floored_negative_zero_reads_plain_zero() {
+    assert_eq!(floored(-0.0), "0");
+    assert_eq!(floored(-0.4), "0");
+}
+
+#[test]
 fn one_decimal_numbers_round_half_up_like_logs_tf() {
     assert_eq!(tenths_text(6.66), "6.7 s");
     assert_eq!(one_decimal(0.25), "0.3");

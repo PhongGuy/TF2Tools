@@ -193,9 +193,13 @@ pub fn whole(value: f64) -> String {
     format!("{value:.0}")
 }
 
-/// A number logs.tf shows whole, cut down as logs.tf does: 154.9 reads "154".
+/// A number logs.tf shows whole, cut down as logs.tf does: 154.9 reads "154". These counts
+/// are never negative, so anything below zero, -0.0 included, reads "0".
 pub fn floored(value: f64) -> String {
-    format!("{}", value.floor())
+    // The cast saturates, so a negative or NaN value lands on 0 rather than printing "-0".
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let whole = value.floor().max(0.0) as u64;
+    whole.to_string()
 }
 
 /// A history range's stop label under the slider: "1 month" up to "All".
