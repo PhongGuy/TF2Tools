@@ -167,7 +167,7 @@ const M15_TABLES: &str = "
         map TEXT NOT NULL,
         date INTEGER NOT NULL,
         length INTEGER,
-        body TEXT,
+        body BLOB,
         fetched_at INTEGER,
         state INTEGER NOT NULL DEFAULT 0
     );

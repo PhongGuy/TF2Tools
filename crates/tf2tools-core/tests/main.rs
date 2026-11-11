@@ -190,6 +190,7 @@ mod library_painted;
 mod library_sounds;
 mod license;
 mod logstf_averages;
+mod logstf_body;
 mod logstf_cache;
 mod logstf_detail;
 mod logstf_full_log;

@@ -1,12 +1,15 @@
 //! The logs.tf cache: tracked players, the active player and pruning, over the library database.
 
 use std::collections::HashMap;
+use std::io::{Read, Write};
 
+use rusqlite::types::ValueRef;
 use rusqlite::{OptionalExtension, params};
 
 use super::averages::{CLASS_SUMS, ClassAverage, ClassSums, WINDOW_LOGS};
 use super::{
-    LogDetail, LogsRange, PROVISIONAL_SECS, PRUNE_SECS, SteamId, logstf_class, logstf_class_name,
+    LOG_BODY_LIMIT, LogDetail, LogsRange, PROVISIONAL_SECS, PRUNE_SECS, SteamId, logstf_class,
+    logstf_class_name,
 };
 use crate::db::Database;
 use crate::error::LogsCacheError;
@@ -388,22 +391,41 @@ impl LogsCache {
             .map_err(db_error)
     }
 
-    /// The stored `/json/<id>` body of a downloaded log; `None` for any other.
+    /// The stored `/json/<id>` body of a downloaded log; `None` for any other. A compressed
+    /// body that does not inflate to UTF-8 within `LOG_BODY_LIMIT` is a `Database` error.
     pub fn log_body(&self, log_id: u64) -> Result<Option<String>, LogsCacheError> {
         let Ok(log_id) = i64::try_from(log_id) else {
             return Ok(None);
         };
-        self.db
+        // Copy the stored value out as is and inflate after the read, so the connection is
+        // free while inflating. A BLOB is a compressed body; TEXT is an earlier build's plain one.
+        let stored = self
+            .db
             .read(|conn| {
                 conn.query_row(
                     "SELECT body FROM logstf_logs WHERE id = ?1",
                     [log_id],
-                    |row| row.get::<_, Option<String>>(0),
+                    |row| {
+                        Ok(match row.get_ref(0)? {
+                            ValueRef::Null => None,
+                            ValueRef::Blob(bytes) => Some(Stored::Compressed(bytes.to_vec())),
+                            ValueRef::Text(text) => Some(Stored::Plain(text.to_vec())),
+                            ValueRef::Integer(_) | ValueRef::Real(_) => Some(Stored::Other),
+                        })
+                    },
                 )
                 .optional()
             })
-            .map(Option::flatten)
-            .map_err(db_error)
+            .map_err(db_error)?
+            .flatten();
+        match stored {
+            None => Ok(None),
+            Some(Stored::Plain(text)) => String::from_utf8(text)
+                .map(Some)
+                .map_err(|_| damaged(log_id)),
+            Some(Stored::Compressed(bytes)) => inflate(&bytes).map(Some).ok_or(damaged(log_id)),
+            Some(Stored::Other) => Err(damaged(log_id)),
+        }
     }
 
     /// The nine classes in TfClass::ALL order, over exactly the logs `logs` returns.
@@ -540,13 +562,14 @@ impl LogsCache {
         detail: &LogDetail,
         now: i64,
     ) -> Result<(), LogsCacheError> {
+        let stored = deflate(body)?;
         self.db
             .write(|conn| {
                 let tx = conn.transaction()?;
                 tx.execute(
                     "UPDATE logstf_logs SET body = ?2, fetched_at = ?3, length = ?4, state = 0
                      WHERE id = ?1",
-                    params![log_id, body, now, detail.length()],
+                    params![log_id, stored, now, detail.length()],
                 )?;
                 tx.execute("DELETE FROM logstf_class_rows WHERE log_id = ?1", [log_id])?;
                 {
@@ -697,6 +720,45 @@ fn clamp_u32(n: i64) -> u32 {
 
 fn from_sql_id(id: i64) -> Option<SteamId> {
     SteamId::from_id64(u64::try_from(id).ok()?)
+}
+
+/// A `logstf_logs.body` value as SQLite stored it.
+enum Stored {
+    Compressed(Vec<u8>),
+    Plain(Vec<u8>),
+    /// A number, which no build ever stored as a body.
+    Other,
+}
+
+/// A body compressed for storage: zlib at level 6.
+fn deflate(body: &str) -> Result<Vec<u8>, LogsCacheError> {
+    let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::new(6));
+    encoder
+        .write_all(body.as_bytes())
+        .and_then(|()| encoder.finish())
+        .map_err(|e| LogsCacheError::Database {
+            message: format!("a log body could not be compressed: {e}"),
+        })
+}
+
+/// A stored compressed body, or `None` when it is not zlib, not UTF-8, or inflates past
+/// `LOG_BODY_LIMIT` (no log the client accepted could be that large).
+fn inflate(bytes: &[u8]) -> Option<String> {
+    let mut out = Vec::new();
+    flate2::read::ZlibDecoder::new(bytes)
+        .take(LOG_BODY_LIMIT + 1)
+        .read_to_end(&mut out)
+        .ok()?;
+    if out.len() as u64 > LOG_BODY_LIMIT {
+        return None;
+    }
+    String::from_utf8(out).ok()
+}
+
+fn damaged(log_id: i64) -> LogsCacheError {
+    LogsCacheError::Database {
+        message: format!("the stored body of log {log_id} is damaged"),
+    }
 }
 
 fn db_error(e: rusqlite::Error) -> LogsCacheError {
