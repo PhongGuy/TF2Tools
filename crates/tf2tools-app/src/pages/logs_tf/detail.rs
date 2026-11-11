@@ -5,21 +5,22 @@ use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Div, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    ParentElement as _, Pixels, Styled as _, TestSupportExt as _, div, px,
+    ParentElement as _, Pixels, Styled as _, TestSupportExt as _, WeakEntity, Window, div, px,
 };
 use tf2tools_core::{
-    LogColumns, LogDetail, LogRow, MatrixKind, MedicLine, PlayerLine, SteamId, Team, TfClass,
-    TrackedPlayer,
+    LogColumns, LogDetail, LogRow, LogState, MatrixKind, MedicLine, PlayerLine, SteamId, Team,
+    TfClass, TrackedPlayer,
 };
 
-use super::OpenState;
 use super::list::open_link;
 use super::text::{LOG_LOADING, date_text, duration_text, one_decimal, whole};
+use super::{LogsTfPage, OpenState};
 use crate::ids;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
+use crate::widgets::store_error::error_line;
 
 // The players table's fixed columns; the name takes what is left.
 const TEAM: Pixels = px(40.);
@@ -33,20 +34,30 @@ const MEDIC_WIDTH: Pixels = px(280.);
 type Column = (&'static str, fn(&PlayerLine) -> String);
 
 /// The panel under open log `row`. The header comes from the row at once; under it the
-/// parsed log once `opened` is ready, or a line saying it is loading or why it failed.
+/// parsed log once `opened` is ready, or a line saying it is loading or why it failed. A
+/// failed fetch of a pending log offers Retry, which asks `page` to fetch it again.
 pub(super) fn panel(
     row: &LogRow,
     opened: &OpenState,
     tracked: &[TrackedPlayer],
+    page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> AnyElement {
+    let id = row.id();
     let status = |text: &'static str| {
         let line = div().text_sm().text_color(cx.theme().muted_foreground);
-        labelled(line, ids::logstf_log_status(row.id()), text).into_any_element()
+        labelled(line, ids::logstf_log_status(id), text).into_any_element()
     };
     let body = match opened {
         OpenState::Ready(log) => log_body(log, tracked, cx).into_any_element(),
         OpenState::Loading => status(LOG_LOADING),
+        OpenState::Failed(why) if row.state() == LogState::Pending => {
+            let on_retry = move |_: &mut Window, cx: &mut App| {
+                let _ = page.update(cx, |page, cx| page.retry(id, cx));
+            };
+            let retry = ids::logstf_log_retry(id);
+            error_line(ids::logstf_log_status(id), retry, *why, on_retry, cx).into_any_element()
+        }
         OpenState::Failed(why) => status(why),
     };
     v_flex()

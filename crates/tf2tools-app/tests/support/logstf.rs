@@ -270,3 +270,14 @@ pub fn list_requests_for(server: &super::StoreServer, account: u64) -> usize {
 pub fn list_requests(server: &super::StoreServer) -> usize {
     requests_to(server, "/api/v1/log")
 }
+
+/// Downloads log `id` into the shell's cache through a second client on `beside`, as the
+/// sync would, while the shell's own server may be held.
+pub fn download_beside(cx: &mut TestAppContext, beside: &support::StoreServer, id: u64) {
+    let services = cx.update(|cx| cx.global::<Services>().clone());
+    let client = logs_client(&services, &beside.uri());
+    beside
+        .rt
+        .block_on(client.fetch_log(id))
+        .expect("the log downloads");
+}

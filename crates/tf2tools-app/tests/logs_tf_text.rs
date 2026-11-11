@@ -197,6 +197,14 @@ fn fetch_failures_read_in_player_words_or_leave_it_to_the_row() {
         fetch_message(&network),
         Some("Can't load this log while you're offline.")
     );
+    let server = LogsFetchError::Http {
+        url: "u".into(),
+        status: 503,
+    };
+    assert_eq!(
+        fetch_message(&server),
+        Some("logs.tf isn't responding right now. Try again later.")
+    );
     let busy = LogsFetchError::RateLimited { url: "u".into() };
     assert_eq!(
         fetch_message(&busy),

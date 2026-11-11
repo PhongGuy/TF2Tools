@@ -207,6 +207,7 @@ fn log_item(
         }
     };
     if opens {
+        let page = page.clone();
         line = line
             .cursor_pointer()
             .hover(|s| s.bg(theme.muted))
@@ -224,7 +225,7 @@ fn log_item(
                 .open
                 .as_ref()
                 .filter(|open| open.id == id)
-                .map(|open| detail::panel(row, &open.state, &state.players, cx)),
+                .map(|open| detail::panel(row, &open.state, &state.players, page, cx)),
         )
         .into_any_element()
 }

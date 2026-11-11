@@ -356,22 +356,33 @@ impl LogsTfPage {
                         Some(OpenState::Failed(LOGS_TF_DOWN))
                     }
                 };
-                let landed = match state {
-                    Some(state) => page.land(id, state, cx),
+                // Core stored or marked the log unless the failure has a line, so its row is
+                // reread even when the result no longer lands.
+                let marked = !matches!(state, Some(OpenState::Failed(_)));
+                match state {
+                    Some(state) => {
+                        page.land(id, state, cx);
+                    }
                     None if page.expanded() == Some(id) => {
                         page.open = None;
                         page.remeasure_log(id);
                         cx.notify();
-                        true
                     }
-                    None => false,
-                };
-                if landed {
+                    None => {}
+                }
+                if marked {
                     page.reread(cx);
                 }
             });
         })
         .detach();
+    }
+
+    /// Fetches open log `id` again after a failed fetch, showing it as loading meanwhile.
+    pub fn retry(&mut self, id: u64, cx: &mut Context<Self>) {
+        if self.land(id, OpenState::Loading, cx) {
+            self.fetch_detail(id, cx);
+        }
     }
 
     /// The player whose chip is selected, if any is tracked.
@@ -653,6 +664,7 @@ impl LogsTfPage {
                         let old = std::mem::replace(&mut page.rows, rows.unwrap_or_default());
                         page.averages = averages;
                         page.fit_list(&old);
+                        page.read_downloaded(&old, cx);
                     }
                     Err(error) => tracing::warn!(%error, "reading the logs.tf cache failed"),
                 }
@@ -692,6 +704,23 @@ impl LogsTfPage {
         let still_open = |r: &LogRow| Some(r.id()) == self.expanded() && opens(r);
         if !self.rows.iter().any(still_open) {
             self.open = None;
+        }
+    }
+
+    // An open log whose fetch failed reads its stored body once the sync has downloaded it,
+    // that is when it was pending in `old` and is ready now.
+    fn read_downloaded(&mut self, old: &[LogRow], cx: &mut Context<Self>) {
+        let Some(OpenLog {
+            id,
+            state: OpenState::Failed(_),
+        }) = self.open
+        else {
+            return;
+        };
+        let was = |rows: &[LogRow], state| rows.iter().any(|r| r.id() == id && r.state() == state);
+        let downloaded = was(old, LogState::Pending) && was(&self.rows, LogState::Ready);
+        if downloaded && self.land(id, OpenState::Loading, cx) {
+            self.read_detail(id, cx);
         }
     }
 

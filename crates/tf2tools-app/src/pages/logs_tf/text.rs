@@ -137,6 +137,7 @@ pub fn fetch_message(error: &LogsFetchError) -> Option<&'static str> {
     match error {
         LogsFetchError::Network { .. } => Some(LOG_OFFLINE),
         LogsFetchError::RateLimited { .. } => Some(LOGS_TF_BUSY),
+        LogsFetchError::Http { .. } => Some(LOGS_TF_DOWN),
         LogsFetchError::Cache { .. } => Some(SAVE_FAILED),
         LogsFetchError::Gone | LogsFetchError::Unreadable | LogsFetchError::TooLarge { .. } => None,
         _ => Some(LOGS_TF_DOWN),
