@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 
@@ -23,7 +24,12 @@ pub struct LogDetail {
     players: Vec<PlayerLine>,
     columns: LogColumns,
     medics: Vec<MedicLine>,
-    class_kills: Vec<ClassKills>,
+    class_kills: Vec<MatrixRow>,
+    class_kill_assists: Vec<MatrixRow>,
+    class_deaths: Vec<MatrixRow>,
+    rounds: Vec<RoundLine>,
+    killstreaks: Vec<Killstreak>,
+    chat: Vec<LogChatLine>,
 }
 
 impl LogDetail {
@@ -59,13 +65,287 @@ impl LogDetail {
     pub fn columns(&self) -> &LogColumns {
         &self.columns
     }
-    /// Every player who played Medic, in the players' order.
+    /// Every player logs.tf kept Medic stats for, in the players' order.
     pub fn medics(&self) -> &[MedicLine] {
         &self.medics
     }
-    /// Kills by victim class, one entry per player with any, in the players' order.
-    pub fn class_kills(&self) -> &[ClassKills] {
-        &self.class_kills
+    /// One row per player in the players' order, counting `kind` by the other player's
+    /// class; a player logs.tf has no entry for reads as zeros.
+    pub fn class_matrix(&self, kind: MatrixKind) -> &[MatrixRow] {
+        match kind {
+            MatrixKind::Kills => &self.class_kills,
+            MatrixKind::KillsAssists => &self.class_kill_assists,
+            MatrixKind::Deaths => &self.class_deaths,
+        }
+    }
+    /// The rounds in play order; empty when the log has none or they do not read.
+    pub fn rounds(&self) -> &[RoundLine] {
+        &self.rounds
+    }
+    /// Killstreaks by the time they happened; tied times keep logs.tf's order.
+    pub fn killstreaks(&self) -> &[Killstreak] {
+        &self.killstreaks
+    }
+    /// The chat in the order it was said.
+    pub fn chat(&self) -> &[LogChatLine] {
+        &self.chat
+    }
+}
+
+/// One player's killstreak.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct Killstreak {
+    steam_id: SteamId,
+    streak: u32,
+    at: u32,
+}
+
+impl Killstreak {
+    /// The player on the streak.
+    pub fn steam_id(&self) -> SteamId {
+        self.steam_id
+    }
+    /// Kills in the streak.
+    pub fn streak(&self) -> u32 {
+        self.streak
+    }
+    /// Seconds since the first round's start.
+    pub fn at(&self) -> u32 {
+        self.at
+    }
+}
+
+/// One chat message.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct LogChatLine {
+    steam_id: Option<SteamId>,
+    name: String,
+    msg: String,
+}
+
+impl LogChatLine {
+    /// The sender, `None` for a non-player such as the console.
+    pub fn steam_id(&self) -> Option<SteamId> {
+        self.steam_id
+    }
+    /// The sender's name as logs.tf shows it.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    /// The message text.
+    pub fn msg(&self) -> &str {
+        &self.msg
+    }
+}
+
+/// One round: its result, each team's share and the events on the log's clock.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct RoundLine {
+    length: u32,
+    winner: Option<Team>,
+    midfight: Option<Team>,
+    blue: RoundTeam,
+    red: RoundTeam,
+    players: Vec<RoundPlayer>,
+    events: Vec<RoundEvent>,
+}
+
+impl RoundLine {
+    /// The round's length in seconds.
+    pub fn length(&self) -> u32 {
+        self.length
+    }
+    /// The team that won the round, `None` for a stalemate or an unfinished round.
+    pub fn winner(&self) -> Option<Team> {
+        self.winner
+    }
+    /// The team that took the first point, `None` when no point was taken.
+    pub fn midfight(&self) -> Option<Team> {
+        self.midfight
+    }
+    /// Blue's share of the round.
+    pub fn blue(&self) -> &RoundTeam {
+        &self.blue
+    }
+    /// Red's share of the round.
+    pub fn red(&self) -> &RoundTeam {
+        &self.red
+    }
+    /// Players by kills, then damage (both high to low), then SteamID64.
+    pub fn players(&self) -> &[RoundPlayer] {
+        &self.players
+    }
+    /// The round's events in the log's order.
+    pub fn events(&self) -> &[RoundEvent] {
+        &self.events
+    }
+}
+
+/// One team's share of one round; `score` is the running score after it.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct RoundTeam {
+    score: u32,
+    kills: u32,
+    dmg: u32,
+    ubers: u32,
+}
+
+impl RoundTeam {
+    /// Rounds won so far, this one included.
+    pub fn score(&self) -> u32 {
+        self.score
+    }
+    /// Kills in the round.
+    pub fn kills(&self) -> u32 {
+        self.kills
+    }
+    /// Damage dealt in the round.
+    pub fn dmg(&self) -> u32 {
+        self.dmg
+    }
+    /// Ubercharges used in the round.
+    pub fn ubers(&self) -> u32 {
+        self.ubers
+    }
+}
+
+/// One player's line in one round.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct RoundPlayer {
+    steam_id: SteamId,
+    team: Team,
+    kills: u32,
+    dmg: u32,
+}
+
+impl RoundPlayer {
+    /// The player's Steam ID.
+    pub fn steam_id(&self) -> SteamId {
+        self.steam_id
+    }
+    /// The player's team.
+    pub fn team(&self) -> Team {
+        self.team
+    }
+    /// Kills in the round.
+    pub fn kills(&self) -> u32 {
+        self.kills
+    }
+    /// Damage dealt in the round.
+    pub fn dmg(&self) -> u32 {
+        self.dmg
+    }
+}
+
+/// One event in a round.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct RoundEvent {
+    at: u32,
+    kind: EventKind,
+}
+
+impl RoundEvent {
+    /// Seconds since the first round's start.
+    pub fn at(&self) -> u32 {
+        self.at
+    }
+    /// What happened.
+    pub fn kind(&self) -> &EventKind {
+        &self.kind
+    }
+}
+
+/// What a round event records; a type this app does not know, or a known one missing its
+/// team or medic, keeps its raw name in `Other`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum EventKind {
+    /// A team captured a control point.
+    PointCap {
+        /// The capturing team.
+        team: Team,
+        /// The point's number.
+        point: u32,
+    },
+    /// A Medic used a charge.
+    Charge {
+        /// The Medic's team.
+        team: Team,
+        /// The Medic.
+        medic: SteamId,
+        /// The medigun charged.
+        medigun: Medigun,
+    },
+    /// A Medic died.
+    MedicDeath {
+        /// The Medic's team.
+        team: Team,
+        /// The Medic.
+        medic: SteamId,
+        /// The killer, `None` when the log does not name one.
+        killer: Option<SteamId>,
+    },
+    /// A Medic died holding a full charge.
+    Drop {
+        /// The Medic's team.
+        team: Team,
+        /// The Medic.
+        medic: SteamId,
+    },
+    /// A team won the round.
+    RoundWin {
+        /// The winning team.
+        team: Team,
+    },
+    /// Any other event, by its logs.tf type.
+    Other {
+        /// The raw type.
+        name: String,
+    },
+}
+
+/// The medigun behind a charge.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Medigun {
+    /// The stock Medi Gun.
+    MediGun,
+    /// The Kritzkrieg.
+    Kritzkrieg,
+    /// The Quick-Fix.
+    QuickFix,
+    /// The Vaccinator.
+    Vaccinator,
+    /// A medigun logs.tf names otherwise, by that name.
+    Other(String),
+}
+
+impl Medigun {
+    /// The medigun logs.tf names `key`; an unknown name is kept in `Other`.
+    pub fn from_key(key: &str) -> Medigun {
+        match key {
+            "medigun" => Medigun::MediGun,
+            "kritzkrieg" => Medigun::Kritzkrieg,
+            "quickfix" => Medigun::QuickFix,
+            "vaccinator" => Medigun::Vaccinator,
+            other => Medigun::Other(other.to_owned()),
+        }
+    }
+    /// The name logs.tf uses for this medigun.
+    pub fn key(&self) -> &str {
+        match self {
+            Medigun::MediGun => "medigun",
+            Medigun::Kritzkrieg => "kritzkrieg",
+            Medigun::QuickFix => "quickfix",
+            Medigun::Vaccinator => "vaccinator",
+            Medigun::Other(name) => name,
+        }
     }
 }
 
@@ -79,6 +359,7 @@ pub struct TeamTotals {
     charges: u32,
     drops: u32,
     caps: u32,
+    midfights: u32,
 }
 
 impl TeamTotals {
@@ -105,6 +386,10 @@ impl TeamTotals {
     /// Points captured.
     pub fn caps(&self) -> u32 {
         self.caps
+    }
+    /// Midfights won (first captures of a round).
+    pub fn midfights(&self) -> u32 {
+        self.midfights
     }
 }
 
@@ -232,6 +517,7 @@ pub struct ClassLine {
     deaths: u32,
     assists: u32,
     dmg: u32,
+    weapons: Vec<WeaponLine>,
 }
 
 impl ClassLine {
@@ -258,6 +544,44 @@ impl ClassLine {
     /// Damage dealt on it.
     pub fn dmg(&self) -> u32 {
         self.dmg
+    }
+    /// The weapons used on it, most kills first, then most damage, then by name.
+    pub fn weapons(&self) -> &[WeaponLine] {
+        &self.weapons
+    }
+}
+
+/// One weapon a player used on one class.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct WeaponLine {
+    name: String,
+    kills: u32,
+    dmg: u32,
+    shots: u32,
+    hits: u32,
+}
+
+impl WeaponLine {
+    /// The logs.tf weapon name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    /// Kills with it.
+    pub fn kills(&self) -> u32 {
+        self.kills
+    }
+    /// Damage dealt with it.
+    pub fn dmg(&self) -> u32 {
+        self.dmg
+    }
+    /// Shots fired.
+    pub fn shots(&self) -> u32 {
+        self.shots
+    }
+    /// Shots that hit.
+    pub fn hits(&self) -> u32 {
+        self.hits
     }
 }
 
@@ -309,11 +633,15 @@ pub struct MedicLine {
     team: Team,
     heal: u32,
     heal_per_min: f64,
-    charges: Vec<(String, u32)>,
+    charges: Vec<(Medigun, u32)>,
     drops: u32,
     avg_time_to_build: f64,
     avg_uber_length: f64,
     deaths_after_uber: u32,
+    avg_time_before_using: f64,
+    near_full_deaths: u32,
+    advantages_lost: u32,
+    biggest_advantage_lost: u32,
     heal_spread: Vec<HealTarget>,
 }
 
@@ -338,8 +666,8 @@ impl MedicLine {
     pub fn heal_per_min(&self) -> f64 {
         self.heal_per_min
     }
-    /// Charges used per medigun type, by type name.
-    pub fn charges(&self) -> &[(String, u32)] {
+    /// Charges used per medigun, in alphabetical order of the logs.tf key.
+    pub fn charges(&self) -> &[(Medigun, u32)] {
         &self.charges
     }
     /// Ubercharges dropped.
@@ -358,6 +686,22 @@ impl MedicLine {
     pub fn deaths_after_uber(&self) -> u32 {
         self.deaths_after_uber
     }
+    /// Average seconds a full charge was held before it was used.
+    pub fn avg_time_before_using(&self) -> f64 {
+        self.avg_time_before_using
+    }
+    /// Deaths with a 95 to 99 percent charge.
+    pub fn near_full_deaths(&self) -> u32 {
+        self.near_full_deaths
+    }
+    /// Times the Medic lost an uber advantage.
+    pub fn advantages_lost(&self) -> u32 {
+        self.advantages_lost
+    }
+    /// The longest uber advantage lost, in seconds.
+    pub fn biggest_advantage_lost(&self) -> u32 {
+        self.biggest_advantage_lost
+    }
     /// The players this Medic healed, most healing first.
     pub fn heal_spread(&self) -> &[HealTarget] {
         &self.heal_spread
@@ -371,6 +715,7 @@ pub struct HealTarget {
     steam_id: SteamId,
     name: String,
     healing: u32,
+    class: Option<TfClass>,
 }
 
 impl HealTarget {
@@ -386,24 +731,46 @@ impl HealTarget {
     pub fn healing(&self) -> u32 {
         self.healing
     }
+    /// The healed player's longest-played class; `None` when they are not a player in
+    /// this log or played none of the nine.
+    pub fn class(&self) -> Option<TfClass> {
+        self.class
+    }
 }
 
-/// One player's kills by victim class.
-#[derive(Debug, Clone, PartialEq)]
+/// Which of logs.tf's three class matrices to read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct ClassKills {
-    steam_id: SteamId,
-    kills: Vec<(TfClass, u32)>,
+pub enum MatrixKind {
+    /// Kills by victim class (`classkills`).
+    Kills,
+    /// Kills plus assists by victim class (`classkillassists`).
+    KillsAssists,
+    /// Deaths by killer class (`classdeaths`).
+    Deaths,
 }
 
-impl ClassKills {
-    /// The killer's Steam ID.
+/// One player's row of a class matrix.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MatrixRow {
+    steam_id: SteamId,
+    counts: [u32; 9],
+    total: u32,
+}
+
+impl MatrixRow {
+    /// The player's Steam ID.
     pub fn steam_id(&self) -> SteamId {
         self.steam_id
     }
-    /// Kills per victim class in TF2 order, classes with none left out.
-    pub fn kills(&self) -> &[(TfClass, u32)] {
-        &self.kills
+    /// The count against each class, in `TfClass::ALL` order.
+    pub fn counts(&self) -> [u32; 9] {
+        self.counts
+    }
+    /// The sum of `counts`.
+    pub fn total(&self) -> u32 {
+        self.total
     }
 }
 
@@ -420,10 +787,11 @@ pub fn parse_log(body: &str) -> Result<LogDetail, LogParseError> {
 /// their order.
 fn build(wire: WireLog) -> LogDetail {
     let info = wire.info.unwrap_or_default();
-    let minutes = f64::from(wire.length) / 60.0;
+    // Scale the count up before one division: both operands are exact integers, so a
+    // whole answer comes out exactly whole and a floored readout never shows one less.
     let per_min = |x: u32| {
-        if minutes > 0.0 {
-            f64::from(x) / minutes
+        if wire.length > 0 {
+            f64::from(x) * 60.0 / f64::from(wire.length)
         } else {
             0.0
         }
@@ -447,49 +815,62 @@ fn build(wire: WireLog) -> LogDetail {
         players.push((key, line, p));
     }
     players.sort_by(|a, b| sort_key(&a.1).cmp(&sort_key(&b.1)));
+    let class_of: BTreeMap<&str, TfClass> = players
+        .iter()
+        .filter_map(|(key, line, _)| Some((key.as_str(), line.classes.first()?.class)))
+        .collect();
 
     let medics = players
         .iter()
-        .filter(|(_, line, _)| line.classes.iter().any(|c| c.class == TfClass::Medic))
-        .map(|(key, line, p)| {
-            let stats = p.medicstats.clone().unwrap_or_default();
-            MedicLine {
-                steam_id: line.steam_id,
-                name: line.name.clone(),
-                team: line.team,
-                heal: p.heal,
-                heal_per_min: per_min(p.heal),
-                charges: p.ubertypes.iter().map(|(k, v)| (k.clone(), *v)).collect(),
-                drops: p.drops,
-                avg_time_to_build: stats.avg_time_to_build,
-                avg_uber_length: stats.avg_uber_length,
-                deaths_after_uber: stats.deaths_within_20s_after_uber,
-                heal_spread: heal_spread(wire.healspread.get(key), &name_of),
-            }
+        .filter_map(|(key, line, p)| Some((key, line, p, p.medicstats.clone()?)))
+        .map(|(key, line, p, stats)| MedicLine {
+            steam_id: line.steam_id,
+            name: line.name.clone(),
+            team: line.team,
+            heal: p.heal,
+            heal_per_min: per_min(p.heal),
+            charges: p
+                .ubertypes
+                .iter()
+                .map(|(k, v)| (Medigun::from_key(k), *v))
+                .collect(),
+            drops: p.drops,
+            avg_time_to_build: stats.avg_time_to_build,
+            avg_uber_length: stats.avg_uber_length,
+            deaths_after_uber: stats.deaths_within_20s_after_uber,
+            avg_time_before_using: stats.avg_time_before_using,
+            near_full_deaths: stats.deaths_with_95_99_uber,
+            advantages_lost: stats.advantages_lost,
+            biggest_advantage_lost: stats.biggest_advantage_lost,
+            heal_spread: heal_spread(wire.healspread.get(key), &name_of, &class_of),
         })
         .collect();
 
-    let class_kills = players
-        .iter()
-        .filter_map(|(key, line, _)| {
-            let by_class = wire.classkills.get(key)?;
-            let kills: Vec<(TfClass, u32)> = TfClass::ALL
-                .iter()
-                .filter_map(|&class| {
-                    let n = by_class
-                        .iter()
-                        .filter(|(name, _)| logstf_class(name) == Some(class))
-                        .map(|(_, n)| *n)
-                        .sum::<u32>();
-                    (n > 0).then_some((class, n))
-                })
-                .collect();
-            (!kills.is_empty()).then_some(ClassKills {
-                steam_id: line.steam_id,
-                kills,
+    // Every player gets a row: a missing entry or class reads as 0, and names fold
+    // through logstf_class so `heavyweapons` lands on Heavy.
+    let matrix = |wire_map: &BTreeMap<String, BTreeMap<String, u32>>| -> Vec<MatrixRow> {
+        players
+            .iter()
+            .map(|(key, line, _)| {
+                let by_class = wire_map.get(key);
+                let counts = TfClass::ALL.map(|class| {
+                    by_class.map_or(0, |m| {
+                        m.iter()
+                            .filter(|(name, _)| logstf_class(name) == Some(class))
+                            .fold(0u32, |sum, (_, n)| sum.saturating_add(*n))
+                    })
+                });
+                MatrixRow {
+                    steam_id: line.steam_id,
+                    counts,
+                    total: counts.iter().fold(0u32, |sum, n| sum.saturating_add(*n)),
+                }
             })
-        })
-        .collect();
+            .collect()
+    };
+    let class_kills = matrix(&wire.classkills);
+    let class_kill_assists = matrix(&wire.classkillassists);
+    let class_deaths = matrix(&wire.classdeaths);
 
     LogDetail {
         length: wire.length,
@@ -509,7 +890,105 @@ fn build(wire: WireLog) -> LogDetail {
         },
         medics,
         class_kills,
+        class_kill_assists,
+        class_deaths,
+        rounds: wire.rounds.into_iter().map(round_line).collect(),
+        killstreaks: killstreaks(wire.killstreaks),
+        chat: wire
+            .chat
+            .into_iter()
+            .map(|c| LogChatLine {
+                steam_id: SteamId::from_steam3(&c.steamid),
+                name: c.name,
+                msg: c.msg,
+            })
+            .collect(),
     }
+}
+
+/// Streaks whose player reads, by time; the stable sort keeps tied times in JSON order.
+fn killstreaks(wire: Vec<WireKillstreak>) -> Vec<Killstreak> {
+    let mut streaks: Vec<Killstreak> = wire
+        .into_iter()
+        .filter_map(|k| {
+            Some(Killstreak {
+                steam_id: SteamId::from_steam3(&k.steamid)?,
+                streak: k.streak,
+                at: k.time,
+            })
+        })
+        .collect();
+    streaks.sort_by_key(Killstreak::at);
+    streaks
+}
+
+fn round_line(round: WireRound) -> RoundLine {
+    let side = |t: &WireRoundTeam| RoundTeam {
+        score: t.score,
+        kills: t.kills,
+        dmg: t.dmg,
+        ubers: t.ubers,
+    };
+    let mut players: Vec<RoundPlayer> = round
+        .players
+        .iter()
+        .filter_map(|(key, p)| {
+            Some(RoundPlayer {
+                steam_id: SteamId::from_steam3(key)?,
+                team: team(&p.team)?,
+                kills: p.kills,
+                dmg: p.dmg,
+            })
+        })
+        .collect();
+    players.sort_by(|a, b| {
+        b.kills
+            .cmp(&a.kills)
+            .then(b.dmg.cmp(&a.dmg))
+            .then(a.steam_id.id64().cmp(&b.steam_id.id64()))
+    });
+    RoundLine {
+        length: round.length,
+        winner: team(&round.winner),
+        midfight: team(&round.firstcap),
+        blue: side(&round.team.blue),
+        red: side(&round.team.red),
+        players,
+        events: round
+            .events
+            .into_iter()
+            .map(|e| RoundEvent {
+                at: e.time,
+                kind: event_kind(e),
+            })
+            .collect(),
+    }
+}
+
+/// The event's kind; a known type whose team or medic does not read falls back to `Other`.
+fn event_kind(e: WireEvent) -> EventKind {
+    let team = team(&e.team);
+    let medic = SteamId::from_steam3(&e.steamid);
+    let known = match (e.kind.as_str(), team, medic) {
+        ("pointcap", Some(team), _) => Some(EventKind::PointCap {
+            team,
+            point: e.point,
+        }),
+        ("charge", Some(team), Some(medic)) => Some(EventKind::Charge {
+            team,
+            medic,
+            medigun: Medigun::from_key(&e.medigun),
+        }),
+        ("medic_death", Some(team), Some(medic)) => Some(EventKind::MedicDeath {
+            team,
+            medic,
+            killer: SteamId::from_steam3(&e.killer),
+        }),
+        ("drop", Some(team), Some(medic)) => Some(EventKind::Drop { team, medic }),
+        ("round_win", Some(team), _) => Some(EventKind::RoundWin { team }),
+        _ => None,
+    };
+    known.unwrap_or(EventKind::Other { name: e.kind })
 }
 
 fn team(name: &str) -> Option<Team> {
@@ -541,6 +1020,13 @@ fn player_line(
         .class_stats
         .iter()
         .filter_map(|c| {
+            let mut weapons = c.weapon.clone();
+            weapons.sort_by(|a, b| {
+                b.kills
+                    .cmp(&a.kills)
+                    .then_with(|| b.dmg.cmp(&a.dmg))
+                    .then_with(|| a.name.cmp(&b.name))
+            });
             Some(ClassLine {
                 class: logstf_class(&c.kind)?,
                 seconds: c.total_time,
@@ -548,6 +1034,7 @@ fn player_line(
                 deaths: c.deaths,
                 assists: c.assists,
                 dmg: c.dmg,
+                weapons,
             })
         })
         .collect();
@@ -593,6 +1080,7 @@ fn player_line(
 fn heal_spread(
     spread: Option<&BTreeMap<String, u32>>,
     name_of: &impl Fn(&str, SteamId) -> String,
+    class_of: &BTreeMap<&str, TfClass>,
 ) -> Vec<HealTarget> {
     let mut targets: Vec<HealTarget> = spread
         .into_iter()
@@ -603,6 +1091,7 @@ fn heal_spread(
                 steam_id,
                 name: name_of(key, steam_id),
                 healing,
+                class: class_of.get(key.as_str()).copied(),
             })
         })
         .collect();
@@ -627,6 +1116,107 @@ struct WireLog {
     healspread: BTreeMap<String, BTreeMap<String, u32>>,
     #[serde(default, deserialize_with = "count_maps")]
     classkills: BTreeMap<String, BTreeMap<String, u32>>,
+    #[serde(default, deserialize_with = "count_maps")]
+    classkillassists: BTreeMap<String, BTreeMap<String, u32>>,
+    #[serde(default, deserialize_with = "count_maps")]
+    classdeaths: BTreeMap<String, BTreeMap<String, u32>>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    rounds: Vec<WireRound>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    killstreaks: Vec<WireKillstreak>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    chat: Vec<WireChat>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireKillstreak {
+    #[serde(deserialize_with = "text")]
+    steamid: String,
+    #[serde(deserialize_with = "count")]
+    streak: u32,
+    #[serde(deserialize_with = "count")]
+    time: u32,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireChat {
+    #[serde(deserialize_with = "text")]
+    steamid: String,
+    #[serde(deserialize_with = "text")]
+    name: String,
+    #[serde(deserialize_with = "text")]
+    msg: String,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireRound {
+    #[serde(deserialize_with = "count")]
+    length: u32,
+    #[serde(deserialize_with = "text")]
+    winner: String,
+    #[serde(deserialize_with = "text")]
+    firstcap: String,
+    #[serde(deserialize_with = "lenient")]
+    team: WireRoundTeams,
+    #[serde(deserialize_with = "lenient_map")]
+    players: BTreeMap<String, WireRoundPlayer>,
+    #[serde(deserialize_with = "lenient_list")]
+    events: Vec<WireEvent>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireRoundTeams {
+    #[serde(rename = "Red", deserialize_with = "lenient")]
+    red: WireRoundTeam,
+    #[serde(rename = "Blue", deserialize_with = "lenient")]
+    blue: WireRoundTeam,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireRoundTeam {
+    #[serde(deserialize_with = "count")]
+    score: u32,
+    #[serde(deserialize_with = "count")]
+    kills: u32,
+    #[serde(deserialize_with = "count")]
+    dmg: u32,
+    #[serde(deserialize_with = "count")]
+    ubers: u32,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireRoundPlayer {
+    #[serde(deserialize_with = "text")]
+    team: String,
+    #[serde(deserialize_with = "count")]
+    kills: u32,
+    #[serde(deserialize_with = "count")]
+    dmg: u32,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireEvent {
+    #[serde(rename = "type", deserialize_with = "text")]
+    kind: String,
+    #[serde(deserialize_with = "count")]
+    time: u32,
+    #[serde(deserialize_with = "text")]
+    team: String,
+    #[serde(deserialize_with = "count")]
+    point: u32,
+    #[serde(deserialize_with = "text")]
+    steamid: String,
+    #[serde(deserialize_with = "text")]
+    killer: String,
+    #[serde(deserialize_with = "text")]
+    medigun: String,
 }
 
 #[derive(Deserialize)]
@@ -652,6 +1242,8 @@ struct WireTeam {
     drops: u32,
     #[serde(deserialize_with = "count")]
     caps: u32,
+    #[serde(deserialize_with = "count")]
+    firstcaps: u32,
 }
 
 impl WireTeam {
@@ -663,6 +1255,7 @@ impl WireTeam {
             charges: self.charges,
             drops: self.drops,
             caps: self.caps,
+            midfights: self.firstcaps,
         }
     }
 }
@@ -746,6 +1339,14 @@ struct WireMedicStats {
     avg_uber_length: f64,
     #[serde(deserialize_with = "count")]
     deaths_within_20s_after_uber: u32,
+    #[serde(deserialize_with = "real")]
+    avg_time_before_using: f64,
+    #[serde(deserialize_with = "count")]
+    deaths_with_95_99_uber: u32,
+    #[serde(deserialize_with = "count")]
+    advantages_lost: u32,
+    #[serde(deserialize_with = "count")]
+    biggest_advantage_lost: u32,
 }
 
 #[derive(Deserialize, Default)]
@@ -763,6 +1364,8 @@ struct WireClass {
     assists: u32,
     #[serde(deserialize_with = "count")]
     dmg: u32,
+    #[serde(deserialize_with = "weapon_lines")]
+    weapon: Vec<WeaponLine>,
 }
 
 /// A number, or numeric text, as an `f64`; anything else is `None`.
@@ -815,6 +1418,35 @@ fn count_map<'de, D: Deserializer<'de>>(d: D) -> Result<BTreeMap<String, u32>, D
     Ok(object_counts(Value::deserialize(d)?))
 }
 
+/// A value that reads as its default when it does not have the expected shape.
+fn lenient<'de, D: Deserializer<'de>, T: DeserializeOwned + Default>(d: D) -> Result<T, D::Error> {
+    Ok(serde_json::from_value(Value::deserialize(d)?).unwrap_or_default())
+}
+
+/// A list whose unreadable entries are skipped; anything but an array reads as empty.
+fn lenient_list<'de, D: Deserializer<'de>, T: DeserializeOwned>(d: D) -> Result<Vec<T>, D::Error> {
+    let Value::Array(items) = Value::deserialize(d)? else {
+        return Ok(Vec::new());
+    };
+    Ok(items
+        .into_iter()
+        .filter_map(|v| serde_json::from_value(v).ok())
+        .collect())
+}
+
+/// A map whose unreadable entries are skipped; anything but an object reads as empty.
+fn lenient_map<'de, D: Deserializer<'de>, T: DeserializeOwned>(
+    d: D,
+) -> Result<BTreeMap<String, T>, D::Error> {
+    let Value::Object(map) = Value::deserialize(d)? else {
+        return Ok(BTreeMap::new());
+    };
+    Ok(map
+        .into_iter()
+        .filter_map(|(k, v)| Some((k, serde_json::from_value(v).ok()?)))
+        .collect())
+}
+
 fn count_maps<'de, D: Deserializer<'de>>(
     d: D,
 ) -> Result<BTreeMap<String, BTreeMap<String, u32>>, D::Error> {
@@ -824,5 +1456,25 @@ fn count_maps<'de, D: Deserializer<'de>>(
     Ok(map
         .into_iter()
         .map(|(k, v)| (k, object_counts(v)))
+        .collect())
+}
+
+/// A class's weapon map as lines; entries that are not objects are skipped, and a
+/// `weapon` that is not an object reads as none.
+fn weapon_lines<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<WeaponLine>, D::Error> {
+    let Value::Object(map) = Value::deserialize(d)? else {
+        return Ok(Vec::new());
+    };
+    let field = |v: &Value, key: &str| v.get(key).map_or(0, to_count);
+    Ok(map
+        .into_iter()
+        .filter(|(_, v)| v.is_object())
+        .map(|(name, v)| WeaponLine {
+            kills: field(&v, "kills"),
+            dmg: field(&v, "dmg"),
+            shots: field(&v, "shots"),
+            hits: field(&v, "hits"),
+            name,
+        })
         .collect())
 }

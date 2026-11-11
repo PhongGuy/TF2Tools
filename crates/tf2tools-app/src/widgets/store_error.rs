@@ -2,7 +2,9 @@
 
 use gpui_kit::component::button::Button;
 use gpui_kit::component::{ActiveTheme as _, h_flex};
-use gpui_kit::{App, IntoElement, ParentElement as _, SharedString, Styled as _, Window, div};
+use gpui_kit::{
+    App, ElementId, IntoElement, ParentElement as _, SharedString, Styled as _, Window, div,
+};
 
 use crate::ids;
 use crate::widgets::labelled;
@@ -19,8 +21,8 @@ pub fn store_error_line(
 /// An inline error: the message in the danger colour (`text_id`, labelled with the message)
 /// and an outline "Retry" button (`retry_id`) that calls `on_retry`.
 pub fn error_line(
-    text_id: &'static str,
-    retry_id: &'static str,
+    text_id: impl Into<ElementId>,
+    retry_id: impl Into<ElementId>,
     error: impl Into<SharedString>,
     on_retry: impl Fn(&mut Window, &mut App) + 'static,
     cx: &App,

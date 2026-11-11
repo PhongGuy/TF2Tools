@@ -32,6 +32,7 @@ dirs = "7"
 steamlocate = "2.1"
 tempfile = "3"
 zip = "9"
+flate2 = "1.1.10"
 sevenz-rust2 = "0.24"
 vpk = "0.3"
 rars = { version = "=0.12.4", default-features = false }

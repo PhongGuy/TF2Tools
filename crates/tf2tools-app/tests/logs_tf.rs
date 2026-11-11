@@ -3,40 +3,19 @@
 use std::time::Duration;
 
 use crate::support;
+use crate::support::logstf::{
+    ARIE, Gate, HIGHLANDER, SIXES, day_ago, expanded, list_body, list_requests, list_requests_for,
+    mount_held, mount_list_for, open_log, open_page, players_of, requests_to, row_ids,
+    serve_two_logs, shell, sid, to_end, unix_now,
+};
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
-use serde_json::json;
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
-use tf2tools_app::pages::logs_tf::text::{
-    LOOKING_UP, local_date, log_url, profile_url, summary_text,
-};
-use tf2tools_app::services::{Services, Tf2State};
+use tf2tools_app::pages::logs_tf::text::{LOOKING_UP, log_url, profile_url};
+use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::{
-    LogsCache, LogsClient, LogsEndpoints, STEAM_ID64_BASE, SteamId, StoreConfig, TfClass,
-    TrackedPlayer,
-};
-
-fn sid(account: u64) -> SteamId {
-    SteamId::from_id64(STEAM_ID64_BASE + account).unwrap()
-}
-
-/// Opens logs.tf through the sidebar and waits for its first load and any sync to finish.
-fn open_page(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<LogsTfPage> {
-    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
-    let page = cx
-        .update(|cx| s.shell.read(cx).logs_tf_page())
-        .expect("a logs.tf page");
-    support::wait_real(cx, "the logs.tf page", |cx| {
-        cx.update(|cx| {
-            let p = page.read(cx);
-            p.is_loaded() && !p.is_syncing()
-        })
-    });
-    support::settle(cx, s.win);
-    page
-}
+use tf2tools_core::{SteamId, TfClass};
 
 #[gpui_kit::test]
 fn logs_tf_sits_under_maps_and_starts_empty(cx: &mut TestAppContext) {
@@ -70,69 +49,6 @@ fn links_point_at_logs_tf() {
         profile_url(sid(231_702)),
         "https://logs.tf/profile/76561197960497430"
     );
-}
-
-/// A logs client on `base` with no request spacing, over the services' own database.
-fn logs_client(services: &Services, base: &str) -> LogsClient {
-    LogsClient::new(
-        LogsCache::new(services.db.clone()),
-        LogsEndpoints::loopback(base),
-    )
-    .with_config(
-        StoreConfig::default()
-            .with_request_spacing(Duration::ZERO)
-            .with_retry_backoff(Duration::from_millis(1)),
-    )
-}
-
-/// A shell whose logs client talks to `base`, with `players` (account, name) tracked in order.
-fn shell(
-    cx: &mut TestAppContext,
-    env: &support::Env,
-    base: &str,
-    players: &[(u64, &'static str)],
-) -> support::ShellWindow {
-    cx.executor().allow_parking();
-    let base = base.to_owned();
-    let players = players.to_vec();
-    support::shell_window_tweaked(
-        cx,
-        env,
-        Tf2State::Missing { saved: None },
-        move |services| {
-            let logs = logs_client(services, &base);
-            for (account, name) in &players {
-                logs.cache()
-                    .add_player(&TrackedPlayer::new(sid(*account), *name))
-                    .unwrap();
-            }
-            *services = services.clone().with_logs(logs);
-        },
-    )
-}
-
-/// A logs.tf list response holding (id, upload date) pairs.
-fn list_body(logs: &[(u64, i64)]) -> Vec<u8> {
-    let logs: Vec<_> = logs
-        .iter()
-        .map(|&(id, date)| {
-            json!({"id": id, "title": format!("Log {id}"), "map": "cp_process_f12",
-                   "date": date, "views": 0, "players": 12})
-        })
-        .collect();
-    json!({"success": true, "results": logs.len(), "total": logs.len(), "parameters": {}, "logs": logs})
-        .to_string()
-        .into_bytes()
-}
-
-fn players_of(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) -> Vec<String> {
-    cx.update(|cx| {
-        page.read(cx)
-            .players()
-            .iter()
-            .map(|p| p.name().to_owned())
-            .collect()
-    })
 }
 
 #[gpui_kit::test]
@@ -364,39 +280,6 @@ fn the_add_dialog_cancels_without_adding(cx: &mut TestAppContext) {
     assert!(players_of(cx, &page).is_empty());
 }
 
-const SIXES: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../tf2tools-core/tests/fixtures/logstf/log-4137103-6v6.json"
-));
-const HIGHLANDER: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../tf2tools-core/tests/fixtures/logstf/log-4150405-hl.json"
-));
-
-const ARIE: u64 = 231_702;
-
-fn unix_now() -> i64 {
-    chrono::Utc::now().timestamp()
-}
-
-fn day_ago(days: i64) -> i64 {
-    unix_now() - days * 86_400
-}
-
-/// Serves Arie's list of logs 3 (the 6v6 fixture) and 2 (the highlander fixture).
-fn serve_two_logs(server: &support::StoreServer) {
-    server.mount_bytes(
-        "/api/v1/log",
-        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
-    );
-    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
-    server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
-}
-
-fn row_ids(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) -> Vec<u64> {
-    cx.update(|cx| page.read(cx).rows().iter().map(|r| r.id()).collect())
-}
-
 #[gpui_kit::test]
 fn opening_the_page_syncs_the_active_player(cx: &mut TestAppContext) {
     let env = support::env();
@@ -407,7 +290,7 @@ fn opening_the_page_syncs_the_active_player(cx: &mut TestAppContext) {
     assert_eq!(row_ids(cx, &page), [3, 2]);
     assert!(cx.update(|cx| page.read(cx).averages().is_some()));
     assert_eq!(
-        cx.update(|cx| page.read(cx).error().map(str::to_owned)),
+        cx.update(|cx| page.read(cx).error(cx).map(str::to_owned)),
         None
     );
     assert!(!support::present(cx, s.win, ids::LOGSTF_PROGRESS));
@@ -426,7 +309,7 @@ fn a_failed_refresh_keeps_the_saved_logs_and_says_why(cx: &mut TestAppContext) {
     server.mount_status("/api/v1/log", 503);
     support::click_id(cx, s.win, ids::LOGSTF_REFRESH);
     support::wait_real(cx, "the failed refresh", |cx| {
-        cx.update(|cx| page.read(cx).error().is_some() && !page.read(cx).is_syncing())
+        cx.update(|cx| page.read(cx).error(cx).is_some() && !page.read(cx).is_syncing(cx))
     });
     assert_eq!(
         support::label_of(cx, s.win, ids::LOGSTF_ERROR).as_deref(),
@@ -436,14 +319,18 @@ fn a_failed_refresh_keeps_the_saved_logs_and_says_why(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn offline_the_page_says_so(cx: &mut TestAppContext) {
+fn offline_with_nothing_saved_the_page_says_logs_tf_was_not_reached(cx: &mut TestAppContext) {
     let env = support::env();
     let s = shell(cx, &env, "http://127.0.0.1:9", &[(ARIE, "Arie")]);
+    // The retry after an unreachable run comes at once, so the test waits on no clock.
+    let sync = cx.update(tf2tools_app::logs_sync::logs_sync);
+    cx.update(|cx| sync.update(cx, |s, _| s.set_retry_delay(Duration::ZERO)));
     let _page = open_page(cx, &s);
     assert_eq!(
         support::label_of(cx, s.win, ids::LOGSTF_ERROR).as_deref(),
-        Some("You're offline. Showing saved logs.")
+        Some("Couldn't reach logs.tf. Check your connection and try again.")
     );
+    assert!(support::present(cx, s.win, ids::LOGSTF_RETRY));
     assert!(
         !support::present(cx, s.win, ids::LOGSTF_NO_LOGS),
         "a player never synced is not a player without logs"
@@ -451,10 +338,10 @@ fn offline_the_page_says_so(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn switching_chips_mid_sync_finishes_the_first_and_shows_the_second(cx: &mut TestAppContext) {
+fn switching_chips_mid_sync_cancels_the_first_and_syncs_the_second(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    // The list answers slowly, so Arie's sync is still open when the chip is clicked.
+    // The list answers slowly, so Arie's sync is still listing when the chip is clicked.
     server.mount_bytes_after(
         "/api/v1/log",
         list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
@@ -465,31 +352,347 @@ fn switching_chips_mid_sync_finishes_the_first_and_shows_the_second(cx: &mut Tes
     let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
     support::click_id(cx, s.win, ids::nav(Page::LogsTf));
     let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
-    support::wait_real(cx, "the chips", |cx| {
-        cx.update(|cx| page.read(cx).is_loaded())
+    support::wait_real(cx, "Arie's sync", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded() && page.read(cx).is_syncing(cx))
     });
-    assert!(
-        cx.update(|cx| page.read(cx).is_syncing()),
-        "Arie's sync is open"
-    );
-    assert_eq!(cx.update(|cx| page.read(cx).active()), Some(sid(ARIE)));
     support::click_id(cx, s.win, ids::logstf_chip(sid(1)));
-    support::wait_real(cx, "both syncs", |cx| {
+    support::wait_real(cx, "the switch", |cx| {
         cx.update(|cx| {
             let p = page.read(cx);
-            p.active() == Some(sid(1)) && !p.is_syncing()
-        }) && s
-            .services
+            p.active() == Some(sid(1)) && !p.is_syncing(cx)
+        })
+    });
+    let synced = |id: SteamId| {
+        s.services
             .logs
             .cache()
             .players()
             .unwrap()
-            .iter()
-            .all(|p| p.last_synced().is_some())
-    });
-    assert_eq!(s.services.logs.cache().logs(sid(ARIE)).unwrap().len(), 2);
-    // "other" shares the same served list, so it shows the same two logs, from its own load.
+            .into_iter()
+            .find(|p| p.steam_id() == id)
+            .and_then(|p| p.last_synced())
+    };
+    assert_eq!(
+        synced(sid(ARIE)),
+        None,
+        "Arie's sync was cancelled, so it is not stamped"
+    );
+    assert!(synced(sid(1)).is_some(), "the chosen player synced");
     assert_eq!(row_ids(cx, &page), [3, 2]);
+
+    // Choosing Arie again resumes their sync.
+    support::click_id(cx, s.win, ids::logstf_chip(sid(ARIE)));
+    support::wait_real(cx, "Arie's resumed sync", |cx| {
+        cx.update(|cx| !page.read(cx).is_syncing(cx)) && synced(sid(ARIE)).is_some()
+    });
+}
+
+#[gpui_kit::test]
+fn removing_a_player_mid_sync_stops_their_sync_before_their_logs_go(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Arie's list answers slowly, so the removal lands while it is in flight. The other
+    // player's list is empty; their sync still lists (no listed range is stamped, so it is
+    // not skipped), finds nothing and downloads nothing.
+    mount_list_for(
+        &server,
+        ARIE,
+        &[(3, day_ago(1))],
+        Duration::from_millis(500),
+    );
+    mount_list_for(&server, 1, &[], Duration::ZERO);
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
+    let other = i64::try_from(sid(1).id64()).unwrap();
+    support::sql(&env)
+        .execute(
+            "UPDATE logstf_players SET last_synced = ?1 WHERE steam_id = ?2",
+            [unix_now() - 60, other],
+        )
+        .unwrap();
+    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    // Waiting for the request itself means the removal meets a list that is on the wire.
+    support::wait_real(cx, "Arie's list request", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded() && page.read(cx).is_syncing(cx))
+            && list_requests(&server) == 1
+    });
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::wait_real(cx, "the removal and the next sync", |cx| {
+        cx.update(|cx| {
+            let p = page.read(cx);
+            p.players().len() == 1 && !p.is_syncing(cx)
+        })
+    });
+    let conn = support::sql(&env);
+    let count = |sql: &str| conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap();
+    assert_eq!(
+        count("SELECT COUNT(*) FROM logstf_player_logs"),
+        0,
+        "no membership outlives Arie's removal"
+    );
+    assert_eq!(
+        count("SELECT COUNT(*) FROM logstf_logs"),
+        0,
+        "Arie's unshared log went with them"
+    );
+    assert_eq!(
+        requests_to(&server, "/json/3"),
+        0,
+        "Arie's stopped sync downloaded nothing"
+    );
+    assert_eq!(cx.update(|cx| page.read(cx).error(cx)), None);
+    assert!(
+        support::toast_labels(cx, s.win).is_empty(),
+        "nothing failed"
+    );
+}
+
+/// Opens logs.tf with "other" (stamped as synced) and Arie tracked, Arie active.
+fn removal_page(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    server: &support::StoreServer,
+) -> (support::ShellWindow, Entity<LogsTfPage>) {
+    let s = shell(cx, env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
+    let other = i64::try_from(sid(1).id64()).unwrap();
+    support::sql(env)
+        .execute(
+            "UPDATE logstf_players SET last_synced = ?1 WHERE steam_id = ?2",
+            [unix_now() - 60, other],
+        )
+        .unwrap();
+    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    (s, page)
+}
+
+/// Memberships and stored logs left in the database.
+fn stored_rows(env: &support::Env) -> (i64, i64) {
+    let conn = support::sql(env);
+    let count = |sql: &str| conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap();
+    (
+        count("SELECT COUNT(*) FROM logstf_player_logs"),
+        count("SELECT COUNT(*) FROM logstf_logs"),
+    )
+}
+
+#[gpui_kit::test]
+fn removing_a_player_mid_download_waits_for_the_download(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Arie's list answers at once and both bodies wait on the gate, so the removal meets a
+    // download on the wire.
+    mount_list_for(
+        &server,
+        ARIE,
+        &[(3, day_ago(1)), (2, day_ago(2))],
+        Duration::ZERO,
+    );
+    mount_list_for(&server, 1, &[], Duration::ZERO);
+    let downloads = Gate::default();
+    mount_held(
+        &server,
+        &downloads,
+        "/json/3",
+        None,
+        SIXES.as_bytes().to_vec(),
+    );
+    mount_held(
+        &server,
+        &downloads,
+        "/json/2",
+        None,
+        HIGHLANDER.as_bytes().to_vec(),
+    );
+    let (s, page) = removal_page(cx, &env, &server);
+    support::wait_real(cx, "Arie's first download", |_| downloads.arrived() == 1);
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_chip(sid(ARIE))).as_deref(),
+        Some("Removing...")
+    );
+    let tracked = s.services.logs.cache().players().unwrap();
+    assert!(
+        tracked.iter().any(|p| p.steam_id() == sid(ARIE)),
+        "Arie stays tracked until their download ends"
+    );
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    assert!(
+        !support::present(cx, s.win, ids::CONFIRM_OK),
+        "a player being removed cannot be asked about again"
+    );
+    downloads.open();
+    support::wait_real(cx, "the removal and the next sync", |cx| {
+        cx.update(|cx| {
+            let p = page.read(cx);
+            p.players().len() == 1 && !p.is_syncing(cx)
+        })
+    });
+    assert_eq!(
+        downloads.arrived(),
+        1,
+        "no download started after the removal"
+    );
+    assert_eq!(
+        stored_rows(&env),
+        (0, 0),
+        "nothing of Arie's outlives the removal"
+    );
+    assert!(
+        support::toast_labels(cx, s.win).is_empty(),
+        "nothing failed"
+    );
+}
+
+#[gpui_kit::test]
+fn confirming_a_removal_closes_the_dialog_while_the_sync_stops(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Arie's one download waits on the gate, so their sync's stop cannot end yet.
+    mount_list_for(&server, ARIE, &[(3, day_ago(1))], Duration::ZERO);
+    mount_list_for(&server, 1, &[], Duration::ZERO);
+    let downloads = Gate::default();
+    mount_held(
+        &server,
+        &downloads,
+        "/json/3",
+        None,
+        SIXES.as_bytes().to_vec(),
+    );
+    let (s, page) = removal_page(cx, &env, &server);
+    support::wait_real(cx, "Arie's download", |_| downloads.arrived() == 1);
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    // The app plays the dialog's exit, so this test does too.
+    cx.update(|cx| cx.set_reduce_motion(false));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    // Frames come only as the app's own would: next-frame callbacks fire, and a window
+    // draws only once something invalidated it. No forced redraw stands in for the page.
+    for _ in 0..60 {
+        cx.executor().advance_clock(Duration::from_millis(16));
+        cx.update_window(s.win, |_, w, cx| w.simulate_next_frame(cx))
+            .unwrap();
+        cx.run_until_parked();
+    }
+    let shown = cx
+        .update_window(s.win, |_, w, _| {
+            use gpui_kit::test::TestWindowExt as _;
+            w.try_find(ids::CONFIRM_DIALOG).is_some()
+        })
+        .unwrap();
+    assert!(!shown, "the dialog leaves before the sync has stopped");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_chip(sid(ARIE))).as_deref(),
+        Some("Removing...")
+    );
+    downloads.open();
+    support::wait_real(cx, "the removal", |cx| {
+        cx.update(|cx| page.read(cx).players().len() == 1)
+    });
+}
+
+#[gpui_kit::test]
+fn choosing_a_player_being_removed_starts_no_sync_for_them(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Arie's list waits on the gate, so the chip click lands while the removal waits on it.
+    let list = Gate::default();
+    mount_held(
+        &server,
+        &list,
+        "/api/v1/log",
+        Some(ARIE),
+        list_body(&[(3, day_ago(1))]),
+    );
+    mount_list_for(&server, 1, &[], Duration::ZERO);
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let (s, page) = removal_page(cx, &env, &server);
+    support::wait_real(cx, "Arie's list request", |_| list.arrived() == 1);
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::click_id(cx, s.win, ids::logstf_chip(sid(ARIE)));
+    list.open();
+    support::wait_real(cx, "the removal and the next sync", |cx| {
+        cx.update(|cx| {
+            let p = page.read(cx);
+            p.players().len() == 1 && !p.is_syncing(cx)
+        })
+    });
+    assert_eq!(
+        list_requests_for(&server, ARIE),
+        1,
+        "no second sync for Arie started"
+    );
+    assert_eq!(
+        stored_rows(&env),
+        (0, 0),
+        "nothing of Arie's outlives the removal"
+    );
+}
+
+#[gpui_kit::test]
+fn removing_two_players_back_to_back_syncs_neither(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Arie's list waits on the gate, so the other player's removal starts and ends while
+    // Arie's removal still waits for Arie's sync.
+    let list = Gate::default();
+    mount_held(
+        &server,
+        &list,
+        "/api/v1/log",
+        Some(ARIE),
+        list_body(&[(3, day_ago(1))]),
+    );
+    mount_list_for(&server, 1, &[], Duration::ZERO);
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let (s, page) = removal_page(cx, &env, &server);
+    support::wait_real(cx, "Arie's list request", |_| list.arrived() == 1);
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(1)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    // The other player has no sync to wait for, so their chip may already be gone.
+    let other = support::label_of(cx, s.win, ids::logstf_chip(sid(1)));
+    assert!(
+        matches!(other.as_deref(), None | Some("Removing...")),
+        "{other:?}"
+    );
+    support::wait_real(cx, "the other player's removal", |cx| {
+        cx.update(|cx| page.read(cx).players().len() == 1)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_chip(sid(ARIE))).as_deref(),
+        Some("Removing..."),
+        "Arie is still being removed after the other removal ended"
+    );
+    support::click_id(cx, s.win, ids::logstf_chip(sid(ARIE)));
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    assert!(!support::present(cx, s.win, ids::CONFIRM_OK));
+    list.open();
+    support::wait_real(cx, "both removals", |cx| {
+        cx.update(|cx| {
+            let p = page.read(cx);
+            p.players().is_empty() && !p.is_syncing(cx)
+        })
+    });
+    assert_eq!(
+        list_requests_for(&server, ARIE),
+        1,
+        "no second sync for Arie"
+    );
+    assert_eq!(
+        list_requests_for(&server, 1),
+        0,
+        "no sync for the other player"
+    );
+    assert_eq!(
+        stored_rows(&env),
+        (0, 0),
+        "nothing of either player is left"
+    );
 }
 
 #[gpui_kit::test]
@@ -517,12 +720,12 @@ fn the_progress_line_belongs_to_the_active_player(cx: &mut TestAppContext) {
     });
     support::settle(cx, s.win);
     assert!(
-        cx.update(|cx| page.read(cx).is_syncing()),
+        cx.update(|cx| page.read(cx).is_syncing(cx)),
         "Arie's sync is open"
     );
     assert!(!support::present(cx, s.win, ids::LOGSTF_PROGRESS));
     support::wait_real(cx, "both syncs", |cx| {
-        cx.update(|cx| !page.read(cx).is_syncing())
+        cx.update(|cx| !page.read(cx).is_syncing(cx))
     });
 }
 
@@ -552,30 +755,12 @@ fn the_grid_shows_nine_classes_and_dims_the_unplayed(cx: &mut TestAppContext) {
             "{class:?}"
         );
     }
-    // The window runs 90 days back from the newest log, in this computer's dates.
-    let newest = cx.update(|cx| page.read(cx).rows()[0].date());
-    let local = |unix| local_date(unix).unwrap();
     assert_eq!(
-        support::label_of(cx, s.win, ids::LOGSTF_SUMMARY),
-        Some(summary_text(
-            local(tf2tools_core::window_start(newest)),
-            local(newest),
-            2,
-            false
-        ))
+        support::label_of(cx, s.win, ids::LOGSTF_SUMMARY).as_deref(),
+        Some("Last 3 months, 2 logs")
     );
     let scout = cx.update(|cx| page.read(cx).averages().unwrap()[0].clone());
     assert_eq!(scout.seconds(), 1559);
-}
-
-fn expanded(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) -> Option<u64> {
-    cx.update(|cx| page.read(cx).expanded())
-}
-
-/// Scrolls the page to its last log, since the grid fills most of the window above the list.
-fn to_end(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) {
-    let state = cx.update(|cx| page.read(cx).list_state().clone());
-    state.scroll_to_end();
 }
 
 #[gpui_kit::test]
@@ -664,16 +849,6 @@ fn the_grid_scrolls_away_with_the_logs(cx: &mut TestAppContext) {
     assert!(after.top() < before.top(), "{before:?} then {after:?}");
 }
 
-/// Opens log `id`'s row and waits for its body to be parsed and drawn.
-fn open_log(cx: &mut TestAppContext, s: &support::ShellWindow, page: &Entity<LogsTfPage>, id: u64) {
-    to_end(cx, page);
-    support::click_id(cx, s.win, ids::logstf_log(id));
-    support::wait_real(cx, "the parsed log", |cx| {
-        cx.update(|cx| page.read(cx).detail().is_some())
-    });
-    support::settle(cx, s.win);
-}
-
 #[gpui_kit::test]
 fn an_open_6v6_log_hides_columns_logs_tf_hides(cx: &mut TestAppContext) {
     let env = support::env();
@@ -683,21 +858,17 @@ fn an_open_6v6_log_hides_columns_logs_tf_hides(cx: &mut TestAppContext) {
     let page = open_page(cx, &s);
     open_log(cx, &s, &page, 3);
 
-    assert_eq!(
-        support::label_of(cx, s.win, ids::LOGSTF_TEAM_SCORE).as_deref(),
-        Some("3 : 2")
-    );
     for shown in [
         "K", "A", "D", "DA", "DA/M", "KA/D", "K/D", "DT", "DT/M", "HP", "AS", "CAP",
     ] {
         assert!(
-            support::present(cx, s.win, ids::logstf_col(shown)),
+            support::present(cx, s.win, ids::logstf_sort(shown)),
             "{shown}"
         );
     }
     for hidden in ["HS", "BS"] {
         assert!(
-            !support::present(cx, s.win, ids::logstf_col(hidden)),
+            !support::present(cx, s.win, ids::logstf_sort(hidden)),
             "{hidden}"
         );
     }
@@ -721,14 +892,43 @@ fn an_open_6v6_log_hides_columns_logs_tf_hides(cx: &mut TestAppContext) {
         s.win,
         ids::logstf_medic(sid(98_265_577))
     ));
-    assert!(support::present(
-        cx,
-        s.win,
-        ids::logstf_class_kills(sid(ARIE))
-    ));
+    assert!(support::present(cx, s.win, ids::logstf_log_open(3)));
+}
+
+#[gpui_kit::test]
+fn the_banner_and_team_table_read_like_logs_tf(cx: &mut TestAppContext) {
+    use tf2tools_core::Team;
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_banner(3)).as_deref(),
+        Some("BLU 2, RED 3")
+    );
+    let cells = [
+        (Team::Blue, "Kills", "117"),
+        (Team::Red, "Damage", "37145"),
+        (Team::Blue, "Charges", "14"),
+        (Team::Red, "Drops", "0"),
+        (Team::Red, "Caps", "17"),
+        (Team::Blue, "Midfights", "4"),
+        (Team::Red, "Midfights", "1"),
+    ];
+    for (team, column, value) in cells {
+        assert_eq!(
+            support::label_of(cx, s.win, ids::logstf_team_cell(team, column)).as_deref(),
+            Some(value),
+            "{team:?} {column}"
+        );
+    }
+    let red = support::bounds_of(cx, s.win, ids::logstf_team_cell(Team::Red, "Kills")).unwrap();
+    let blu = support::bounds_of(cx, s.win, ids::logstf_team_cell(Team::Blue, "Kills")).unwrap();
     assert!(
-        !support::present(cx, s.win, ids::logstf_class_kills(sid(103_548_491))),
-        "class kills only for tracked players"
+        red.top() < blu.top(),
+        "RED's row comes first, as on logs.tf"
     );
     assert!(support::present(cx, s.win, ids::logstf_log_open(3)));
 }
@@ -743,7 +943,7 @@ fn a_highlander_log_shows_every_column_and_closing_drops_the_detail(cx: &mut Tes
     open_log(cx, &s, &page, 2);
     for shown in ["HS", "BS", "HP", "DT", "AS", "CAP"] {
         assert!(
-            support::present(cx, s.win, ids::logstf_col(shown)),
+            support::present(cx, s.win, ids::logstf_sort(shown)),
             "{shown}"
         );
     }
@@ -753,6 +953,138 @@ fn a_highlander_log_shows_every_column_and_closing_drops_the_detail(cx: &mut Tes
     );
     support::click_id(cx, s.win, ids::logstf_log(2));
     assert!(cx.update(|cx| page.read(cx).detail().is_none()));
+}
+
+#[gpui_kit::test]
+fn the_map_sits_under_the_title_in_the_smallest_window(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_log_map(3)).as_deref(),
+        Some("cp_process_f12")
+    );
+    let title = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
+    let map = support::bounds_of(cx, s.win, ids::logstf_log_map(3)).unwrap();
+    let list = support::bounds_of(cx, s.win, ids::LOGSTF_LIST).unwrap();
+    assert!(
+        map.top() >= title.bottom() - px(1.),
+        "map {map:?} under title {title:?}"
+    );
+    assert!(
+        map.left() >= title.left() - px(1.),
+        "map {map:?} in the title cell"
+    );
+    assert!(map.right() <= list.right(), "map {map:?} inside {list:?}");
+}
+
+#[gpui_kit::test]
+fn the_date_sits_under_the_title_in_the_smallest_window(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    let date = support::label_of(cx, s.win, ids::logstf_log_date(3)).expect("the date line");
+    assert!(
+        date.len() == 10 && date.chars().filter(|&c| c == '-').count() == 2,
+        "{date:?} reads as a date"
+    );
+    let title = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
+    let date = support::bounds_of(cx, s.win, ids::logstf_log_date(3)).unwrap();
+    assert!(
+        date.top() >= title.bottom() - px(1.),
+        "date {date:?} under title {title:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn a_wide_window_gives_the_map_its_own_column(cx: &mut TestAppContext) {
+    use gpui_kit::px;
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    let title = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
+    let map = support::bounds_of(cx, s.win, ids::logstf_log_map(3)).unwrap();
+    assert!(
+        map.left() >= title.right(),
+        "map {map:?} right of title {title:?}"
+    );
+    assert!(
+        map.size.width <= px(161.),
+        "map {map:?} is one 160 px column"
+    );
+}
+
+#[gpui_kit::test]
+fn shrinking_across_the_breakpoint_makes_room_for_the_map_line(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    let wide = support::bounds_of(cx, s.win, ids::logstf_log(3)).unwrap();
+
+    // The rows were measured one line high; the narrow window must remeasure them.
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    to_end(cx, &page);
+    let row = support::bounds_of(cx, s.win, ids::logstf_log(3)).unwrap();
+    let title = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
+    let map = support::bounds_of(cx, s.win, ids::logstf_log_map(3)).unwrap();
+    assert!(
+        row.size.height >= wide.size.height + map.size.height - px(1.),
+        "row {row:?} was {wide:?}"
+    );
+    assert!(
+        row.size.height >= title.size.height + map.size.height,
+        "row {row:?} holds title {title:?} and map {map:?}"
+    );
+    assert!(map.bottom() <= row.bottom(), "map {map:?} inside {row:?}");
+}
+
+#[gpui_kit::test]
+fn a_long_title_and_map_stay_inside_their_row_in_the_smallest_window(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let title = "Grand Finals ".repeat(12);
+    let map = format!("cp_{}", "very_long_map_name_".repeat(8));
+    let body = format!(
+        r#"{{"success": true, "results": 1, "total": 1, "parameters": {{}}, "logs": [
+            {{"id": 3, "title": "{title}", "map": "{map}", "date": {}, "views": 0, "players": 12}}]}}"#,
+        day_ago(1)
+    );
+    server.mount_bytes("/api/v1/log", body.into_bytes());
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    let row = support::bounds_of(cx, s.win, ids::logstf_log(3)).unwrap();
+    let list = support::bounds_of(cx, s.win, ids::LOGSTF_LIST).unwrap();
+    let dpm = support::bounds_of(cx, s.win, ids::logstf_log_dpm(3)).unwrap();
+    for cell in [ids::logstf_log_title(3), ids::logstf_log_map(3)] {
+        let b = support::bounds_of(cx, s.win, cell.clone()).unwrap();
+        assert!(
+            b.right() <= dpm.left(),
+            "{cell:?} {b:?} runs into DPM {dpm:?}"
+        );
+        assert!(b.bottom() <= row.bottom(), "{cell:?} {b:?} below {row:?}");
+    }
+    assert!(dpm.right() <= list.right(), "DPM {dpm:?} past {list:?}");
 }
 
 #[gpui_kit::test]
@@ -780,7 +1112,7 @@ fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
 
     // The players table keeps every column, so its name column never collapses.
     let first = cx.update(|cx| page.read(cx).detail().unwrap().players()[0].steam_id());
-    let header = support::bounds_of(cx, s.win, ids::logstf_col("Name")).unwrap();
+    let header = support::bounds_of(cx, s.win, ids::logstf_sort("Name")).unwrap();
     let name = support::bounds_of(cx, s.win, ids::logstf_player_name(first)).unwrap();
     assert!(header.size.width >= px(100.), "header {header:?}");
     assert!(name.size.width >= px(100.), "name {name:?}");
@@ -795,7 +1127,7 @@ fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
     });
     support::settle(cx, s.win);
     let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
-    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     assert!(cap.right() > table.right(), "the table overflows at 800 px");
     let wheel = ScrollEvent {
         position: point(table.center().x, table.top() + px(10.)),
@@ -808,7 +1140,7 @@ fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
     .unwrap();
     support::settle(cx, s.win);
     let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
-    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     assert!(
         cap.right() <= table.right() + px(1.) && cap.left() >= table.left(),
         "CAP {cap:?} outside {table:?}"
@@ -837,41 +1169,12 @@ fn a_player_waiting_for_their_first_sync_is_not_shown_as_without_logs(cx: &mut T
         cx.update(|cx| page.read(cx).active()) == Some(sid(1))
     });
     assert!(
-        cx.update(|cx| page.read(cx).is_syncing()),
+        cx.update(|cx| page.read(cx).is_syncing(cx)),
         "Arie's sync is open"
     );
     assert!(!support::present(cx, s.win, ids::LOGSTF_NO_LOGS));
     support::wait_real(cx, "both syncs", |cx| {
-        cx.update(|cx| !page.read(cx).is_syncing())
-    });
-}
-
-#[gpui_kit::test]
-fn a_row_still_downloading_does_not_open(cx: &mut TestAppContext) {
-    let env = support::env();
-    let server = support::StoreServer::start();
-    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
-    server.mount_bytes_after("/json/3", SIXES.as_bytes().to_vec(), Duration::from_secs(1));
-    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
-    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
-    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
-    support::wait_real(cx, "the pending row", |cx| {
-        cx.update(|cx| {
-            page.read(cx)
-                .rows()
-                .iter()
-                .any(|r| r.id() == 3 && r.state() == tf2tools_core::LogState::Pending)
-        })
-    });
-    to_end(cx, &page);
-    support::click_id(cx, s.win, ids::logstf_log(3));
-    assert_eq!(expanded(cx, &page), None);
-    assert_eq!(
-        support::label_of(cx, s.win, ids::logstf_log_note(3)).as_deref(),
-        Some("Downloading...")
-    );
-    support::wait_real(cx, "the sync", |cx| {
-        cx.update(|cx| !page.read(cx).is_syncing())
+        cx.update(|cx| !page.read(cx).is_syncing(cx))
     });
 }
 
@@ -934,12 +1237,12 @@ fn a_mouse_wheel_over_a_wide_table_scrolls_the_page(cx: &mut TestAppContext) {
     players_table_in_view(cx, &s, &page);
 
     let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
-    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     let before = page_offset(cx, &page);
     let at = point(table.center().x, table.top() + px(10.));
     wheel(cx, &s, at, ScrollDelta::Lines(point(0., -3.)));
     let after = page_offset(cx, &page);
-    let moved = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let moved = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     assert!(
         after > before,
         "the page scrolls down: {before:?} then {after:?}"
@@ -950,9 +1253,9 @@ fn a_mouse_wheel_over_a_wide_table_scrolls_the_page(cx: &mut TestAppContext) {
     let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
     let at = point(table.center().x, table.top() + px(10.));
     let before = page_offset(cx, &page);
-    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     wheel(cx, &s, at, ScrollDelta::Lines(point(-3., 0.)));
-    let moved = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let moved = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     assert!(moved.left() < cap.left(), "{cap:?} then {moved:?}");
     assert_eq!(page_offset(cx, &page), before, "the page stays put");
 }
@@ -1001,7 +1304,7 @@ fn the_page_keeps_its_scroll_while_a_sync_lands(cx: &mut TestAppContext) {
         assert_eq!(page_offset(cx, &page), expected, "after progress {step}");
     }
     support::wait_real(cx, "the sync", |cx| {
-        cx.update(|cx| !page.read(cx).is_syncing())
+        cx.update(|cx| !page.read(cx).is_syncing(cx))
     });
 }
 
@@ -1024,7 +1327,7 @@ fn a_new_log_keeps_the_open_log_where_it_was(cx: &mut TestAppContext) {
     server.mount_bytes("/json/4", SIXES.as_bytes().to_vec());
     cx.update(|cx| page.update(cx, |page, cx| page.refresh(cx)));
     support::wait_real(cx, "the refresh", |cx| {
-        cx.update(|cx| !page.read(cx).is_syncing() && page.read(cx).rows().len() == 3)
+        cx.update(|cx| !page.read(cx).is_syncing(cx) && page.read(cx).rows().len() == 3)
     });
     support::settle(cx, s.win);
     let after = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL);
@@ -1057,4 +1360,221 @@ fn the_add_button_says_it_is_looking_up(cx: &mut TestAppContext) {
     support::wait_real(cx, "the new chip", |cx| {
         cx.update(|cx| page.read(cx).players().len()) == 1
     });
+}
+
+#[gpui_kit::test]
+fn the_banner_halves_are_solid_with_blu_on_the_left(cx: &mut TestAppContext) {
+    use tf2tools_core::Team;
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    let half = |cx: &mut TestAppContext, team| {
+        support::bounds_of(cx, s.win, ids::logstf_banner_team(3, team)).expect("a banner half")
+    };
+    let (blu, red) = (half(cx, Team::Blue), half(cx, Team::Red));
+    assert!(blu.origin.x < red.origin.x, "BLU sits left of RED");
+    for team in [Team::Red, Team::Blue] {
+        let fill = tf2tools_app::theme::team_fill(team);
+        let ratio = contrast_with_white(fill);
+        assert!(ratio >= 4.5, "white on {fill:?} is {ratio:.2}:1");
+        // logs.tf's muted teal-blue and brick-red, not the theme's saturated text colours.
+        assert!(fill.s <= 0.4, "{team:?} fill {fill:?} is too saturated");
+    }
+}
+
+// WCAG's contrast ratio of white text on `fill`.
+fn contrast_with_white(fill: gpui_kit::Hsla) -> f32 {
+    let rgb = fill.to_rgb();
+    let linear = |c: f32| {
+        if c <= 0.039_28 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    let lum = 0.2126 * linear(rgb.r) + 0.7152 * linear(rgb.g) + 0.0722 * linear(rgb.b);
+    1.05 / (lum + 0.05)
+}
+
+// Serves one 6v6 log for a player who plays seven classes in it, and opens the page on them.
+fn seven_class_page(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    server: &support::StoreServer,
+) -> (support::ShellWindow, Entity<LogsTfPage>) {
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, env, &server.uri(), &[(SEVEN_CLASSES, "Seven")]);
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    (s, page)
+}
+
+const SEVEN_CLASSES: u64 = 170_965_550;
+
+// Every class icon of row 3 stays inside the class column, clear of K/D/A and in the row.
+fn assert_icons_clear_of_kda(cx: &mut TestAppContext, s: &support::ShellWindow) {
+    use gpui_kit::px;
+    let row = support::bounds_of(cx, s.win, ids::logstf_log(3)).unwrap();
+    let kda = support::bounds_of(cx, s.win, ids::logstf_log_kda(3)).unwrap();
+    let mut shown = 0;
+    for class in TfClass::ALL {
+        let Some(icon) = support::bounds_of(cx, s.win, ids::logstf_log_class(3, class)) else {
+            continue;
+        };
+        shown += 1;
+        assert!(
+            icon.right() + px(8.) <= kda.left(),
+            "{class:?} {icon:?} touches K/D/A {kda:?}"
+        );
+        assert!(
+            icon.bottom() <= row.bottom(),
+            "{class:?} {icon:?} below {row:?}"
+        );
+    }
+    assert_eq!(shown, 7, "every class the player played has an icon");
+}
+
+#[gpui_kit::test]
+fn many_class_icons_stay_clear_of_kda(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (s, _page) = seven_class_page(cx, &env, &server);
+    assert_icons_clear_of_kda(cx, &s);
+}
+
+#[gpui_kit::test]
+fn many_class_icons_stay_clear_of_kda_in_the_smallest_window(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (s, page) = seven_class_page(cx, &env, &server);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    to_end(cx, &page);
+    assert_icons_clear_of_kda(cx, &s);
+}
+
+#[gpui_kit::test]
+fn four_class_icons_share_one_line_at_1280(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (s, page) = seven_class_page(cx, &env, &server);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(800.)));
+    to_end(cx, &page);
+    let classes = cx.update(|cx| {
+        let rows = page.read(cx).rows();
+        rows.iter()
+            .find(|r| r.id() == 3)
+            .unwrap()
+            .classes()
+            .to_vec()
+    });
+    let tops: Vec<_> = classes[..4]
+        .iter()
+        .map(|c| support::bounds_of(cx, s.win, ids::logstf_log_class(3, *c)).unwrap())
+        .map(|b| b.top())
+        .collect();
+    assert!(tops.iter().all(|t| *t == tops[0]), "{tops:?}");
+}
+
+// `text` shaped in the theme font at `rems` times the root size.
+fn shaped(cx: &mut TestAppContext, win: gpui_kit::AnyWindowHandle, text: &str, rems: f32) -> f32 {
+    use gpui_kit::component::ActiveTheme as _;
+    cx.update_window(win, |_, w, cx| {
+        let run = gpui_kit::TextRun {
+            len: text.len(),
+            font: gpui_kit::font(cx.theme().font_family.clone()),
+            ..Default::default()
+        };
+        let size = gpui_kit::rems(rems).to_pixels(w.rem_size());
+        f32::from(
+            w.text_system()
+                .shape_line(text.to_owned().into(), size, &[run], None)
+                .width,
+        )
+    })
+    .unwrap()
+}
+
+#[gpui_kit::test]
+fn a_typical_title_and_map_read_whole_in_the_smallest_window(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (title, map) = ("serveme.tf #1234567", "cp_process_final");
+    let body = format!(
+        r#"{{"success": true, "results": 1, "total": 1, "parameters": {{}}, "logs": [
+            {{"id": 3, "title": "{title}", "map": "{map}", "date": {}, "views": 0, "players": 12}}]}}"#,
+        day_ago(1)
+    );
+    server.mount_bytes("/api/v1/log", body.into_bytes());
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    let cell = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
+    let need = shaped(cx, s.win, title, 0.875);
+    assert!(
+        f32::from(cell.size.width) >= need,
+        "title {cell:?} under {need} px"
+    );
+    let cell = support::bounds_of(cx, s.win, ids::logstf_log_map(3)).unwrap();
+    let need = shaped(cx, s.win, map, 0.75);
+    assert!(
+        f32::from(cell.size.width) >= need,
+        "map {cell:?} under {need} px"
+    );
+}
+
+#[gpui_kit::test]
+fn a_long_time_played_never_meets_its_label(cx: &mut TestAppContext) {
+    use gpui_kit::px;
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // One log in which Arie played Scout for 100h 59m.
+    let mut log: serde_json::Value = serde_json::from_str(SIXES).unwrap();
+    let scout = &mut log["players"]["[U:1:231702]"]["class_stats"][0];
+    assert_eq!(scout["type"], "scout");
+    scout["total_time"] = serde_json::json!(363_540);
+    // And Pyro for 68h 43m, which still fits beside its label.
+    let pyro = &mut log["players"]["[U:1:231702]"]["class_stats"][1];
+    assert_eq!(pyro["type"], "pyro");
+    pyro["total_time"] = serde_json::json!(247_380);
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_bytes("/json/3", log.to_string().into_bytes());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let _page = open_page(cx, &s);
+    support::wait_real(cx, "the scout card's time", |cx| {
+        support::label_of(cx, s.win, ids::logstf_class_value(TfClass::Scout, "Played")).as_deref()
+            == Some("100h 59m")
+    });
+    let card = support::bounds_of(cx, s.win, ids::logstf_class(TfClass::Scout)).unwrap();
+    let label =
+        support::bounds_of(cx, s.win, ids::logstf_class_label(TfClass::Scout, "Played")).unwrap();
+    let value =
+        support::bounds_of(cx, s.win, ids::logstf_class_value(TfClass::Scout, "Played")).unwrap();
+    let apart = value.left() - label.right() >= px(8.) || value.top() >= label.bottom();
+    assert!(apart, "value {value:?} meets label {label:?}");
+    assert!(
+        value.right() <= card.right() - px(12.),
+        "value {value:?} past {card:?}"
+    );
+    let label =
+        support::bounds_of(cx, s.win, ids::logstf_class_label(TfClass::Pyro, "Played")).unwrap();
+    let value =
+        support::bounds_of(cx, s.win, ids::logstf_class_value(TfClass::Pyro, "Played")).unwrap();
+    assert_eq!(
+        value.top(),
+        label.top(),
+        "68h 43m {value:?} wrapped off {label:?}"
+    );
+    assert!(
+        value.left() - label.right() >= px(8.),
+        "value {value:?} meets label {label:?}"
+    );
 }

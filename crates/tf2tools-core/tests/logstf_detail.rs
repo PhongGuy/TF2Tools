@@ -1,8 +1,10 @@
 //! Reading a logs.tf log body into the expanded view's shape.
 
-use tf2tools_core::{LogParseError, STEAM_ID64_BASE, SteamId, Team, TfClass, parse_log};
+use tf2tools_core::{
+    LogParseError, MatrixKind, Medigun, STEAM_ID64_BASE, SteamId, Team, TfClass, parse_log,
+};
 
-use crate::common::logstf::{PlayerSpec, log_body, logstf_fixture};
+use crate::common::logstf::{PlayerSpec, log_body, logstf_fixture, solo};
 
 fn sid(account: u64) -> SteamId {
     SteamId::from_id64(STEAM_ID64_BASE + account).unwrap()
@@ -92,7 +94,7 @@ fn a_highlander_medic_has_charges_spread_and_class_kills() {
         "{}",
         medic.heal_per_min()
     );
-    assert_eq!(medic.charges(), [("medigun".to_owned(), 17)]);
+    assert_eq!(medic.charges(), [(Medigun::MediGun, 17)]);
     assert_eq!(medic.drops(), 2);
     assert!(close(medic.avg_time_to_build(), 56.74));
     assert!(close(medic.avg_uber_length(), 6.56));
@@ -101,11 +103,14 @@ fn a_highlander_medic_has_charges_spread_and_class_kills() {
     assert_eq!(medic.heal_spread()[0].steam_id(), sid(866_286_911));
     assert_eq!(medic.heal_spread()[0].healing(), 13_725);
     let kills = log
-        .class_kills()
+        .class_matrix(MatrixKind::Kills)
         .iter()
         .find(|k| k.steam_id() == sid(302_123_669))
         .unwrap();
-    assert_eq!(kills.kills(), [(TfClass::Spy, 1)]);
+    assert_eq!(
+        (kills.counts(), kills.total()),
+        ([0, 0, 0, 0, 0, 0, 0, 0, 1], 1)
+    );
 }
 
 #[test]
@@ -241,4 +246,19 @@ fn classes_with_equal_time_list_by_class_name_like_the_log_row() {
         .map(|c| c.class())
         .collect();
     assert_eq!(classes, [TfClass::Scout, TfClass::Medic, TfClass::Soldier]);
+}
+
+#[test]
+fn per_minute_rates_with_a_whole_answer_come_out_exactly_whole() {
+    // 62 over a 62 s log is exactly 60 a minute; dividing by the length in minutes lands
+    // a hair under, which a floored readout shows as 59.
+    let mut spec = solo(1, ("medic", 62, 0, 0, 0, 0));
+    spec.heal = 62;
+    let mut body: serde_json::Value = serde_json::from_str(&log_body(62, &[spec])).unwrap();
+    let player = &mut body["players"]["[U:1:1]"];
+    player["dt"] = 62.into();
+    player["medicstats"] = serde_json::json!({});
+    let log = parse_log(&body.to_string()).unwrap();
+    assert_eq!(log.players()[0].dt_per_min(), 60.0);
+    assert_eq!(log.medics()[0].heal_per_min(), 60.0);
 }

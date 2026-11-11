@@ -2,7 +2,9 @@
 //! spacing, 429 backoff, timeouts, a redirect policy and size-capped bodies.
 
 use std::cell::Cell;
+use std::pin::pin;
 use std::sync::Arc;
+use std::task::Poll;
 use std::time::Duration;
 
 use crate::error::{
@@ -20,6 +22,44 @@ pub(crate) const USER_AGENT: &str = concat!(
 
 /// How many times a 429 is retried before the request fails as rate limited.
 const RATE_LIMIT_RETRIES: u32 = 3;
+
+/// The response as a Body when its status is a success, otherwise Status.
+fn accept(url: &str, response: reqwest::Response) -> Result<Body, NetFailure> {
+    let status = response.status();
+    if !status.is_success() {
+        return Err(NetFailure::Status {
+            url: url.to_owned(),
+            status: status.as_u16(),
+        });
+    }
+    Ok(Body {
+        url: url.to_owned(),
+        response,
+    })
+}
+
+/// The longest Retry-After honoured, so a server cannot park a request for hours.
+const RETRY_AFTER_CAP: Duration = Duration::from_secs(60);
+
+/// The most one request spends waiting out 429s, across all its retries.
+const RATE_LIMIT_BUDGET: Duration = Duration::from_secs(60);
+
+/// The wait after a 429: the longer of `backoff` and Retry-After in whole seconds (capped at
+/// `RETRY_AFTER_CAP`), or `backoff` alone when the header is missing or in its date form.
+fn rate_limit_wait(retry_after: Option<&str>, backoff: Duration) -> Duration {
+    retry_after
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map_or(backoff, |secs| {
+            Duration::from_secs(secs).min(RETRY_AFTER_CAP).max(backoff)
+        })
+}
+
+/// The wait before the next retry, cut to what `waited` left of `RATE_LIMIT_BUDGET`;
+/// None once the budget is spent.
+fn next_wait(retry_after: Option<&str>, backoff: Duration, waited: Duration) -> Option<Duration> {
+    let left = RATE_LIMIT_BUDGET.saturating_sub(waited);
+    (!left.is_zero()).then(|| rate_limit_wait(retry_after, backoff).min(left))
+}
 
 tokio::task_local! {
     /// The 429s seen by the sync this task is running; unset outside `StoreClient::sync`.
@@ -256,56 +296,89 @@ impl Http {
         }
     }
 
-    /// Waits `spacing`, then opens `url` as `open_retrying` does.
-    pub(crate) async fn open_api(&self, url: &str) -> Result<Body, NetFailure> {
+    /// Waits `spacing`, then opens `url` as `open_retrying_until` does.
+    async fn open_api_until(
+        &self,
+        url: &str,
+        stop: impl Future<Output = ()>,
+    ) -> Result<Body, NetFailure> {
         tokio::time::sleep(self.spacing).await;
-        self.open_retrying(url).await
+        self.open_retrying_until(url, stop).await
+    }
+
+    /// `open_retrying` with no way to stop its 429 waits.
+    pub(crate) async fn open_retrying(&self, url: &str) -> Result<Body, NetFailure> {
+        self.open_retrying_until(url, std::future::pending()).await
     }
 
     /// Sends with the User-Agent and no spacing, retries a 429 after backoff, 2x and 4x
-    /// backoff, then fails RateLimited; any other non-success status is Status. Every 429
-    /// is counted in RATE_LIMITS when a sync is running on this task.
-    pub(crate) async fn open_retrying(&self, url: &str) -> Result<Body, NetFailure> {
+    /// backoff (or a longer Retry-After), waiting a minute at most in all, then fails
+    /// RateLimited; any other non-success status is Status. Every 429 is logged and counted
+    /// in RATE_LIMITS when a scope is set on this task. A 429 wait that `stop` outlasts ends
+    /// at once as RateLimited.
+    pub(crate) async fn open_retrying_until(
+        &self,
+        url: &str,
+        stop: impl Future<Output = ()>,
+    ) -> Result<Body, NetFailure> {
+        let mut stop = pin!(stop);
         let mut retries = 0;
+        let mut waited = Duration::ZERO;
         loop {
-            let result = self.open(url).await;
-            if let Err(NetFailure::Status { status: 429, .. }) = result {
-                let _ = RATE_LIMITS.try_with(|count| count.set(count.get() + 1));
+            let response = self.send(url).await?;
+            if response.status() != reqwest::StatusCode::TOO_MANY_REQUESTS {
+                return accept(url, response);
             }
-            match result {
-                Err(NetFailure::Status { status: 429, .. }) if retries < RATE_LIMIT_RETRIES => {
-                    tokio::time::sleep(self.backoff * 2u32.pow(retries)).await;
-                    retries += 1;
-                }
-                Err(NetFailure::Status { status: 429, .. }) => {
-                    return Err(NetFailure::RateLimited {
-                        url: url.to_owned(),
-                    });
-                }
-                other => return other,
+            let _ = RATE_LIMITS.try_with(|count| count.set(count.get() + 1));
+            let host = reqwest::Url::parse(url)
+                .ok()
+                .and_then(|u| u.host_str().map(str::to_owned))
+                .unwrap_or_default();
+            let retry_after = response
+                .headers()
+                .get(reqwest::header::RETRY_AFTER)
+                .and_then(|value| value.to_str().ok());
+            let wait = next_wait(retry_after, self.backoff * 2u32.pow(retries), waited);
+            let Some(wait) = wait.filter(|_| retries < RATE_LIMIT_RETRIES) else {
+                tracing::warn!(host, "rate limited (429); giving up");
+                return Err(NetFailure::RateLimited {
+                    url: url.to_owned(),
+                });
+            };
+            waited += wait;
+            tracing::warn!(host, ?wait, "rate limited (429); retrying after a wait");
+            if !waited_out(tokio::time::sleep(wait), stop.as_mut()).await {
+                tracing::warn!(host, "rate limit wait stopped");
+                return Err(NetFailure::RateLimited {
+                    url: url.to_owned(),
+                });
             }
+            retries += 1;
         }
     }
 
     /// A plain GET with the User-Agent: no spacing and no retry; non-success is Status.
     pub(crate) async fn open(&self, url: &str) -> Result<Body, NetFailure> {
         let response = self.send(url).await?;
-        let status = response.status();
-        if !status.is_success() {
-            return Err(NetFailure::Status {
-                url: url.to_owned(),
-                status: status.as_u16(),
-            });
-        }
-        Ok(Body {
-            url: url.to_owned(),
-            response,
-        })
+        accept(url, response)
     }
 
     /// The whole body of an API response, capped at `limit` bytes.
     pub(crate) async fn get_api(&self, url: &str, limit: u64) -> Result<Vec<u8>, NetFailure> {
-        self.open_api(url).await?.read_to_end(limit).await
+        self.get_api_until(url, limit, std::future::pending()).await
+    }
+
+    /// `get_api` whose 429 waits end as RateLimited once `stop` resolves.
+    pub(crate) async fn get_api_until(
+        &self,
+        url: &str,
+        limit: u64,
+        stop: impl Future<Output = ()>,
+    ) -> Result<Vec<u8>, NetFailure> {
+        self.open_api_until(url, stop)
+            .await?
+            .read_to_end(limit)
+            .await
     }
 
     async fn send(&self, url: &str) -> Result<reqwest::Response, NetFailure> {
@@ -353,6 +426,19 @@ impl Body {
     }
 }
 
+/// Whether `wait` finished before `stop` resolved.
+async fn waited_out(wait: impl Future<Output = ()>, stop: impl Future<Output = ()>) -> bool {
+    let mut wait = pin!(wait);
+    let mut stop = pin!(stop);
+    std::future::poll_fn(|cx| {
+        if stop.as_mut().poll(cx).is_ready() {
+            return Poll::Ready(false);
+        }
+        wait.as_mut().poll(cx).map(|()| true)
+    })
+    .await
+}
+
 /// A failed send: a refused redirect names its target, a hop off loopback reads as offline,
 /// anything else is a network failure.
 fn failure(url: &str, error: &reqwest::Error) -> NetFailure {
@@ -378,10 +464,18 @@ fn offline(url: &str) -> NetFailure {
     }
 }
 
+// The message leads with the failure's kind, since reqwest's own text names only the URL.
 fn network(url: &str, error: &reqwest::Error) -> NetFailure {
+    let kind = if error.is_timeout() {
+        "timeout"
+    } else if error.is_connect() {
+        "connect"
+    } else {
+        "other"
+    };
     NetFailure::Network {
         url: url.to_owned(),
-        message: error.to_string(),
+        message: format!("{kind}: {error}"),
     }
 }
 
@@ -534,6 +628,108 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, NetFailure::Network { .. }), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn a_network_failure_names_its_kind() {
+        let refused = fast().get_api("http://127.0.0.1:1/x", 1024).await;
+        let NetFailure::Network { message, .. } = refused.unwrap_err() else {
+            panic!("a refused connection is a network failure");
+        };
+        assert!(message.starts_with("connect: "), "{message}");
+
+        let server = MockServer::start().await;
+        Mock::given(path("/x"))
+            .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(5)))
+            .mount(&server)
+            .await;
+        let timeouts = Timeouts {
+            connect: Duration::from_secs(10),
+            read: Duration::from_millis(100),
+        };
+        let http = Http::with(
+            Duration::ZERO,
+            Duration::from_millis(1),
+            USER_AGENT,
+            timeouts,
+            &Redirects::Any,
+            false,
+        );
+        let stalled = http.get_api(&format!("{}/x", server.uri()), 1024).await;
+        let NetFailure::Network { message, .. } = stalled.unwrap_err() else {
+            panic!("a stalled reply is a network failure");
+        };
+        assert!(message.starts_with("timeout: "), "{message}");
+    }
+
+    /// A server answering 429 with `retry_after` once, then "ok".
+    async fn limited_once(retry_after: &str) -> (MockServer, String) {
+        let server = MockServer::start().await;
+        Mock::given(path("/x"))
+            .respond_with(ResponseTemplate::new(429).insert_header("retry-after", retry_after))
+            .up_to_n_times(1)
+            .mount(&server)
+            .await;
+        Mock::given(path("/x"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("ok"))
+            .mount(&server)
+            .await;
+        let url = format!("{}/x", server.uri());
+        (server, url)
+    }
+
+    #[tokio::test]
+    async fn a_retry_after_longer_than_the_backoff_is_waited_in_its_place() {
+        let (_server, url) = limited_once("1").await;
+        let http = Http::new(Duration::ZERO, Duration::from_millis(1), USER_AGENT);
+        let start = Instant::now();
+        assert_eq!(http.get_api(&url, 1024).await.unwrap(), b"ok");
+        assert!(start.elapsed() >= Duration::from_secs(1));
+    }
+
+    #[tokio::test]
+    async fn a_zero_retry_after_still_waits_the_backoff() {
+        let (_server, url) = limited_once("0").await;
+        let http = Http::new(Duration::ZERO, Duration::from_millis(300), USER_AGENT);
+        let start = Instant::now();
+        assert_eq!(http.get_api(&url, 1024).await.unwrap(), b"ok");
+        assert!(start.elapsed() >= Duration::from_millis(300));
+    }
+
+    #[test]
+    fn the_429_waits_of_one_request_stop_at_a_minute_in_all() {
+        let backoff = Duration::from_secs(4);
+        let secs = Duration::from_secs;
+        assert_eq!(
+            next_wait(Some("60"), backoff, Duration::ZERO),
+            Some(secs(60))
+        );
+        assert_eq!(next_wait(Some("60"), backoff, secs(60)), None);
+        assert_eq!(next_wait(Some("50"), backoff, secs(50)), Some(secs(10)));
+        assert_eq!(next_wait(None, backoff, secs(58)), Some(secs(2)));
+        assert_eq!(next_wait(None, backoff, Duration::ZERO), Some(backoff));
+    }
+
+    #[test]
+    fn a_retry_after_in_seconds_is_capped_at_a_minute() {
+        let backoff = Duration::from_secs(4);
+        assert_eq!(rate_limit_wait(Some("7"), backoff), Duration::from_secs(7));
+        assert_eq!(
+            rate_limit_wait(Some("0"), backoff),
+            backoff,
+            "never under the backoff"
+        );
+        assert_eq!(rate_limit_wait(Some(" 3600 "), backoff), RETRY_AFTER_CAP);
+        assert_eq!(RETRY_AFTER_CAP, Duration::from_secs(60));
+    }
+
+    #[test]
+    fn a_missing_or_dated_retry_after_keeps_the_backoff() {
+        let backoff = Duration::from_secs(4);
+        assert_eq!(rate_limit_wait(None, backoff), backoff);
+        let date = "Wed, 21 Oct 2026 07:28:00 GMT";
+        assert_eq!(rate_limit_wait(Some(date), backoff), backoff);
+        assert_eq!(rate_limit_wait(Some("-1"), backoff), backoff);
     }
 
     #[tokio::test]

@@ -28,7 +28,7 @@ use tf2tools_core::{
 use super::canvas::{colour, scene_note};
 use super::editor::{Align, HudEditor, Spread};
 use super::parts::row_label;
-use super::tip::{Spot, record, tip, tip_beside_row, tipped};
+use super::tip::{Spot, record, tip_beside_row, tipped};
 use super::view::{Panel, PanelMode, PanelPlace};
 use super::{Field, FontList, HudMakerPage};
 use crate::ids;
@@ -36,6 +36,7 @@ use crate::pages::crosshair_maker::model::hsla_of_rgba;
 use crate::widgets::Named as _;
 use crate::widgets::labelled;
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
+use crate::widgets::tip::tip;
 
 // The prompt with nothing selected, naming the scene whose tab is open.
 fn empty_hint(scene: Option<Scene>) -> &'static str {

@@ -26,6 +26,7 @@ use tf2tools_core::{CrosshairId, CrosshairRef, HudEntry, HudId};
 use crate::audio::player::show_idle;
 use crate::keymap::ToggleSidebar;
 use crate::local_messages::describe_settings;
+use crate::logs_sync::logs_sync;
 use crate::pages::addon_store::AddonStorePage;
 use crate::pages::addons::AddonsPage;
 use crate::pages::crosshair_maker::CrosshairMakerPage;
@@ -67,6 +68,8 @@ pub struct Shell {
     preloaded_huds: Option<Vec<HudEntry>>,
     /// The hub observation and failure-toast subscription, while a hub is installed.
     _hub_subscriptions: Option<[Subscription; 2]>,
+    /// The logs.tf sync observation, which redraws the header's logs.tf ring.
+    _logs_subscription: Subscription,
     /// The updater observation and failure-toast subscription, while an updater is installed.
     _update_subscriptions: Option<[Subscription; 2]>,
     /// The crash notice observation, while a notice is installed.
@@ -145,6 +148,9 @@ impl Shell {
                 }),
             ]
         });
+        // The header's logs.tf ring reads the app-wide sync, created here so the ring always has one.
+        let logs = logs_sync(cx);
+        let logs_subscription = cx.observe(&logs, |_, _, cx| cx.notify());
         // The banner reads the updater, and a download or install the player asked for toasts when it fails.
         let update_subscriptions = updater(cx).map(|u| {
             [
@@ -177,6 +183,7 @@ impl Shell {
             huds_search: String::new(),
             preloaded_huds: huds,
             _hub_subscriptions: hub_subscriptions,
+            _logs_subscription: logs_subscription,
             _update_subscriptions: update_subscriptions,
             _crash_subscription: crash_subscription,
             _old_v4_subscription: old_v4_subscription,

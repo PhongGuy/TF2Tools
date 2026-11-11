@@ -18,6 +18,7 @@ thiserror.workspace = true
 dirs.workspace = true
 steamlocate.workspace = true
 zip.workspace = true
+flate2.workspace = true
 sevenz-rust2.workspace = true
 vpk.workspace = true
 rars.workspace = true

@@ -3,9 +3,9 @@
 
 use gpui_kit::ElementId;
 use tf2tools_core::{
-    AddonName, BoardMode, GbId, HudId, MeterKind, ModuleChoice, NewPart, PartKey, PinCorner,
-    Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, SteamId, StoreItemId,
-    StoreKind, TfClass, WeaponKind, WeaponSlot,
+    AddonName, BoardMode, GbId, HudId, LogsRange, MatrixKind, MeterKind, ModuleChoice, NewPart,
+    PartKey, PinCorner, Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind,
+    SteamId, StoreItemId, StoreKind, Team, TfClass, WeaponKind, WeaponSlot,
 };
 
 use crate::shell::route::Page;
@@ -1258,6 +1258,11 @@ pub fn sync_ring(kind: StoreKind) -> ElementId {
     keyed(SYNC_RING, store_slug(kind))
 }
 
+/// The header's logs.tf sync ring: "sync-ring:logs-tf".
+pub fn logstf_sync_ring() -> ElementId {
+    keyed(SYNC_RING, "logs-tf")
+}
+
 /// A Settings sync card's status line, keyed by the store's slug: "settings-sync:<slug>".
 pub fn settings_sync(kind: StoreKind) -> ElementId {
     keyed(SETTINGS_SYNC, store_slug(kind))
@@ -2474,13 +2479,37 @@ pub const LOGSTF_ERROR: &str = "logstf-error";
 /// Retries a failed logs.tf sync.
 pub const LOGSTF_RETRY: &str = "logstf-retry";
 
-/// Labelled "<first> to <last date>: <n> logs" (or "...: last 400 logs" at the cap) under the
-/// class grid, once the player has logs.
+/// Labelled "Last <range>, <n> logs" (or "All logs, <n>") under the class grid, once the
+/// player has logs.
 pub const LOGSTF_SUMMARY: &str = "logstf-summary";
+/// The history range slider beside the summary, six stops from 1 month to All.
+pub const LOGSTF_RANGE: &str = "logstf-range";
+
+/// One stop's label under the history range slider, a click picks it:
+/// "logstf-range-stop:<key>".
+pub fn logstf_range_stop(range: LogsRange) -> ElementId {
+    keyed("logstf-range-stop", range.key())
+}
 
 /// One class's card in the logs.tf averages grid: "logstf-class:<class>".
 pub fn logstf_class(class: TfClass) -> ElementId {
     keyed("logstf-class", &class.name().to_lowercase())
+}
+
+/// A class card's stat name, by its label: "logstf-class-label:<class>:<label>".
+pub fn logstf_class_label(class: TfClass, label: &str) -> ElementId {
+    keyed(
+        "logstf-class-label",
+        &format!("{}:{label}", class.name().to_lowercase()),
+    )
+}
+
+/// A class card's stat value, labelled with its text: "logstf-class-value:<class>:<label>".
+pub fn logstf_class_value(class: TfClass, label: &str) -> ElementId {
+    keyed(
+        "logstf-class-value",
+        &format!("{}:{label}", class.name().to_lowercase()),
+    )
 }
 
 /// The dimmed "Not played" on a class card with no time: "logstf-class-unplayed:<class>".
@@ -2507,6 +2536,16 @@ pub fn logstf_log_panel(id: u64) -> ElementId {
     keyed("logstf-log-panel", &id.to_string())
 }
 
+/// The open log's loading or failure line in its panel: "logstf-log-status:<id>".
+pub fn logstf_log_status(id: u64) -> ElementId {
+    keyed("logstf-log-status", &id.to_string())
+}
+
+/// "Try again" on the open log's failure line, which fetches it again: "logstf-log-retry:<id>".
+pub fn logstf_log_retry(id: u64) -> ElementId {
+    keyed("logstf-log-retry", &id.to_string())
+}
+
 /// A row's note in place of its stats, labelled with why it has none: "logstf-log-note:<id>".
 pub fn logstf_log_note(id: u64) -> ElementId {
     keyed("logstf-log-note", &id.to_string())
@@ -2525,28 +2564,86 @@ pub fn logstf_log_dpm(id: u64) -> ElementId {
     keyed("logstf-log-dpm", &id.to_string())
 }
 
+/// A log row's K/D/A cell: "logstf-log-kda:<id>".
+pub fn logstf_log_kda(id: u64) -> ElementId {
+    keyed("logstf-log-kda", &id.to_string())
+}
+
+/// A log row's icon for a class the player played: "logstf-log-class:<id>:<class>".
+pub fn logstf_log_class(id: u64, class: TfClass) -> ElementId {
+    keyed(
+        "logstf-log-class",
+        &format!("{id}:{}", class.name().to_lowercase()),
+    )
+}
+
 /// A log row's title cell: "logstf-log-title:<id>".
 pub fn logstf_log_title(id: u64) -> ElementId {
     keyed("logstf-log-title", &id.to_string())
 }
 
-/// The open log's team totals, which scroll sideways in a narrow window.
+/// A log row's map, its own column or a line under the title, labelled with the map name:
+/// "logstf-log-map:<id>".
+pub fn logstf_log_map(id: u64) -> ElementId {
+    keyed("logstf-log-map", &id.to_string())
+}
+
+/// A log row's date as a line under the title, in a window too narrow for its own column,
+/// labelled "2026-10-30": "logstf-log-date:<id>".
+pub fn logstf_log_date(id: u64) -> ElementId {
+    keyed("logstf-log-date", &id.to_string())
+}
+
+/// The open log's team table, which scrolls sideways in a narrow window.
 pub const LOGSTF_TEAMS_SCROLL: &str = "logstf-teams-scroll";
 
 /// The open log's players table, which scrolls sideways in a narrow window.
 pub const LOGSTF_PLAYERS_SCROLL: &str = "logstf-players-scroll";
+
+/// The tooltip that shows a player's whole name over a cut name in the open log.
+pub const LOGSTF_NAME_TIP: &str = "logstf-name-tip";
 
 /// One player's name cell in the open log's players table: "logstf-player-name:<id64>".
 pub fn logstf_player_name(id: SteamId) -> ElementId {
     keyed("logstf-player-name", &id.id64().to_string())
 }
 
-/// The open log's score, RED first, labelled "3 : 2".
-pub const LOGSTF_TEAM_SCORE: &str = "logstf-team-score";
+/// The open log's score banner, labelled "BLU 2, RED 3": "logstf-banner:<id>".
+pub fn logstf_banner(id: u64) -> ElementId {
+    keyed("logstf-banner", &id.to_string())
+}
 
-/// A players table column header in the open log, keyed by its title: "logstf-col:K/D".
-pub fn logstf_col(name: &str) -> ElementId {
-    keyed("logstf-col", name)
+/// One cell of the open log's team table, labelled with its value:
+/// "logstf-team-cell:blu:Midfights".
+pub fn logstf_team_cell(team: Team, column: &str) -> ElementId {
+    keyed("logstf-team-cell", &format!("{}:{column}", team_slug(team)))
+}
+
+/// One team's half of open log `id`'s score banner: "logstf-banner-team:<id>:red".
+pub fn logstf_banner_team(id: u64, team: Team) -> ElementId {
+    keyed("logstf-banner-team", &format!("{id}:{}", team_slug(team)))
+}
+
+fn team_slug(team: Team) -> &'static str {
+    match team {
+        Team::Red => "red",
+        Team::Blue | _ => "blu",
+    }
+}
+
+/// A players table header in the open log, which sorts by its column, keyed by its title:
+/// "logstf-sort:K/D".
+pub fn logstf_sort(title: &str) -> ElementId {
+    keyed("logstf-sort", title)
+}
+
+/// The players table's header line in the open log: "logstf-players-head".
+pub const LOGSTF_PLAYERS_HEAD: &str = "logstf-players-head";
+
+/// The arrow on the sorted players header, labelled "high to low" or "low to high":
+/// "logstf-sort-arrow:K/D".
+pub fn logstf_sort_arrow(title: &str) -> ElementId {
+    keyed("logstf-sort-arrow", title)
 }
 
 /// One player's line in the open log's players table: "logstf-player:<id64>".
@@ -2554,14 +2651,241 @@ pub fn logstf_player_row(id: SteamId) -> ElementId {
     keyed("logstf-player", &id.id64().to_string())
 }
 
+/// A player's class icon in the open log's players table, which opens its class card on hover:
+/// "logstf-class-card:<id64>:<class>".
+pub fn logstf_class_card(id: SteamId, class: TfClass) -> ElementId {
+    keyed("logstf-class-card", &player_class(id, class))
+}
+
+/// The hover card around a class icon, keying its open state: "logstf-class-hover:<id64>:<class>".
+pub fn logstf_class_hover(id: SteamId, class: TfClass) -> ElementId {
+    keyed("logstf-class-hover", &player_class(id, class))
+}
+
+/// The open class card's content: "logstf-class-popover:<id64>:<class>".
+pub fn logstf_class_popover(id: SteamId, class: TfClass) -> ElementId {
+    keyed("logstf-class-popover", &player_class(id, class))
+}
+
+/// One weapon's row in a class card, labelled "scattergun 7 (100%) 3334 (86%) 56%":
+/// "logstf-weapon:<id64>:<class>:<weapon>".
+pub fn logstf_weapon(id: SteamId, class: TfClass, weapon: &str) -> ElementId {
+    keyed(
+        "logstf-weapon",
+        &format!("{}:{weapon}", player_class(id, class)),
+    )
+}
+
+/// A column's header in a class card, by its title ("K", "DA"):
+/// "logstf-card-column:<id64>:<class>:<title>".
+pub fn logstf_card_column(id: SteamId, class: TfClass, title: &str) -> ElementId {
+    keyed(
+        "logstf-card-column",
+        &format!("{}:{title}", player_class(id, class)),
+    )
+}
+
+fn player_class(id: SteamId, class: TfClass) -> String {
+    format!("{}:{}", id.id64(), class.name().to_lowercase())
+}
+
+/// The open log's rounds section: "logstf-rounds".
+pub const LOGSTF_ROUNDS: &str = "logstf-rounds";
+
+/// The sideways scroll around the open log's rounds table.
+pub const LOGSTF_ROUNDS_SCROLL: &str = "logstf-rounds-scroll";
+
+/// The sideways scroll around the rounds after open round `n`, which sits between them:
+/// "logstf-rounds-scroll-after:<n>".
+pub fn logstf_rounds_scroll_after(n: usize) -> ElementId {
+    keyed("logstf-rounds-scroll-after", &n.to_string())
+}
+
+/// The rounds table's header line: "logstf-rounds-head".
+pub const LOGSTF_ROUNDS_HEAD: &str = "logstf-rounds-head";
+
+/// One column's title in the rounds table's header, keyed by it: "logstf-rounds-column:RED DA".
+pub fn logstf_rounds_column(title: &str) -> ElementId {
+    keyed("logstf-rounds-column", title)
+}
+
+/// One team number in a round's row, keyed by its column's title:
+/// "logstf-round-cell:<log>:<n>:RED DA".
+pub fn logstf_round_cell(log: u64, round: usize, title: &str) -> ElementId {
+    keyed("logstf-round-cell", &format!("{log}:{round}:{title}"))
+}
+
+/// The header line over an open round's players: "logstf-round-players-head:<log>:<n>".
+pub fn logstf_round_players_head(log: u64, round: usize) -> ElementId {
+    keyed("logstf-round-players-head", &format!("{log}:{round}"))
+}
+
+/// One round's row in the open log, which opens or closes it: "logstf-round:<log>:<n>".
+pub fn logstf_round(log: u64, round: usize) -> ElementId {
+    keyed("logstf-round", &format!("{log}:{round}"))
+}
+
+/// An open round's players and events under its row: "logstf-round-panel:<log>:<n>".
+pub fn logstf_round_panel(log: u64, round: usize) -> ElementId {
+    keyed("logstf-round-panel", &format!("{log}:{round}"))
+}
+
+/// A round's running score, labelled "0 - 1" (BLU - RED): "logstf-round-score:<log>:<n>".
+pub fn logstf_round_score(log: u64, round: usize) -> ElementId {
+    keyed("logstf-round-score", &format!("{log}:{round}"))
+}
+
+/// A round's midfight winner, labelled "BLU", "RED" or "-": "logstf-round-midfight:<log>:<n>".
+pub fn logstf_round_midfight(log: u64, round: usize) -> ElementId {
+    keyed("logstf-round-midfight", &format!("{log}:{round}"))
+}
+
+/// One player's line in an open round: "logstf-round-player:<log>:<n>:<id64>".
+pub fn logstf_round_player(log: u64, round: usize, id: SteamId) -> ElementId {
+    keyed(
+        "logstf-round-player",
+        &format!("{log}:{round}:{}", id.id64()),
+    )
+}
+
+/// One event in an open round, labelled with its time, type and description:
+/// "logstf-event:<log>:<n>:<ix>".
+pub fn logstf_event(log: u64, round: usize, ix: usize) -> ElementId {
+    keyed("logstf-event", &format!("{log}:{round}:{ix}"))
+}
+
 /// One Medic's block in the open log: "logstf-medic:<id64>".
 pub fn logstf_medic(id: SteamId) -> ElementId {
     keyed("logstf-medic", &id.id64().to_string())
 }
 
-/// A tracked player's kills by victim class in the open log: "logstf-class-kills:<id64>".
-pub fn logstf_class_kills(id: SteamId) -> ElementId {
-    keyed("logstf-class-kills", &id.id64().to_string())
+/// The open log's Medics section: "logstf-medics".
+pub const LOGSTF_MEDICS: &str = "logstf-medics";
+
+/// One row of a Medic's block, labelled with its value: "logstf-medic-fact:<id64>:<label>".
+/// Charges rows use "Charges:<medigun key>" as their label.
+pub fn logstf_medic_fact(id: SteamId, label: &str) -> ElementId {
+    keyed("logstf-medic-fact", &format!("{}:{label}", id.id64()))
+}
+
+/// One heal target's share in a Medic's block, labelled with it:
+/// "logstf-heal-target:<medic id64>:<target id64>".
+pub fn logstf_heal_target(medic: SteamId, target: SteamId) -> ElementId {
+    keyed(
+        "logstf-heal-target",
+        &format!("{}:{}", medic.id64(), target.id64()),
+    )
+}
+
+/// One heal target's name in a Medic's block: "logstf-heal-name:<medic id64>:<target id64>".
+pub fn logstf_heal_name(medic: SteamId, target: SteamId) -> ElementId {
+    keyed(
+        "logstf-heal-name",
+        &format!("{}:{}", medic.id64(), target.id64()),
+    )
+}
+
+/// One heal target's class icon cell in a Medic's block:
+/// "logstf-heal-class:<medic id64>:<target id64>".
+pub fn logstf_heal_class(medic: SteamId, target: SteamId) -> ElementId {
+    keyed(
+        "logstf-heal-class",
+        &format!("{}:{}", medic.id64(), target.id64()),
+    )
+}
+
+/// One heal target's row in a Medic's block: "logstf-heal-row:<medic id64>:<target id64>".
+pub fn logstf_heal_row(medic: SteamId, target: SteamId) -> ElementId {
+    keyed(
+        "logstf-heal-row",
+        &format!("{}:{}", medic.id64(), target.id64()),
+    )
+}
+
+/// The open log's kill matrix section: "logstf-matrix".
+pub const LOGSTF_MATRIX: &str = "logstf-matrix";
+/// The kill matrix's total header, labelled K, KA or D by tab: "logstf-matrix-total".
+pub const LOGSTF_MATRIX_TOTAL: &str = "logstf-matrix-total";
+/// The kill matrix's tab group: "logstf-matrix-tabs".
+pub const LOGSTF_MATRIX_TABS: &str = "logstf-matrix-tabs";
+/// The kill matrix's sideways scroll: "logstf-matrix-scroll".
+pub const LOGSTF_MATRIX_SCROLL: &str = "logstf-matrix-scroll";
+
+/// One kill matrix tab, selected while shown: "logstf-matrix-tab:kills" | "kills-assists" |
+/// "deaths".
+pub fn logstf_matrix_tab(kind: MatrixKind) -> ElementId {
+    keyed("logstf-matrix-tab", matrix_key(kind))
+}
+
+fn matrix_key(kind: MatrixKind) -> &'static str {
+    match kind {
+        MatrixKind::KillsAssists => "kills-assists",
+        MatrixKind::Deaths => "deaths",
+        MatrixKind::Kills | _ => "kills",
+    }
+}
+
+/// The button inside a kill matrix tab: "logstf-matrix-tab-button:<kind>", keyed as the tab.
+pub fn logstf_matrix_tab_button(kind: MatrixKind) -> ElementId {
+    keyed("logstf-matrix-tab-button", matrix_key(kind))
+}
+
+/// One class's icon in the kill matrix's header: "logstf-matrix-head:<class>".
+pub fn logstf_matrix_head(class: TfClass) -> ElementId {
+    keyed("logstf-matrix-head", &class.name().to_lowercase())
+}
+
+/// One player's row of the kill matrix: "logstf-matrix-row:<id64>".
+pub fn logstf_matrix_row(id: SteamId) -> ElementId {
+    keyed("logstf-matrix-row", &id.id64().to_string())
+}
+
+/// One player's name cell in the kill matrix: "logstf-matrix-name:<id64>".
+pub fn logstf_matrix_name(id: SteamId) -> ElementId {
+    keyed("logstf-matrix-name", &id.id64().to_string())
+}
+
+/// One count in a player's kill matrix row: "logstf-matrix-cell:<id64>:<class>", or
+/// "logstf-matrix-cell:<id64>:k" for the total.
+pub fn logstf_matrix_cell(id: SteamId, class: Option<TfClass>) -> ElementId {
+    match class {
+        Some(class) => keyed("logstf-matrix-cell", &player_class(id, class)),
+        None => keyed("logstf-matrix-cell", &format!("{}:k", id.id64())),
+    }
+}
+
+/// The open log's Show Chat button: "logstf-chat-toggle".
+pub const LOGSTF_CHAT_TOGGLE: &str = "logstf-chat-toggle";
+/// The open log's Show Killstreaks button, disabled without streaks: "logstf-streaks-toggle".
+pub const LOGSTF_STREAKS_TOGGLE: &str = "logstf-streaks-toggle";
+/// The chat dialog's scrolling list: "logstf-chat".
+pub const LOGSTF_CHAT: &str = "logstf-chat";
+/// The killstreaks dialog's scrolling list: "logstf-streaks".
+pub const LOGSTF_STREAKS: &str = "logstf-streaks";
+
+/// One line of the chat dialog, labelled "<name>: <msg>": "logstf-chat-line:<ix>".
+pub fn logstf_chat_line(ix: usize) -> ElementId {
+    keyed("logstf-chat-line", &ix.to_string())
+}
+
+/// The sender's name in one chat line: "logstf-chat-name:<ix>".
+pub fn logstf_chat_name(ix: usize) -> ElementId {
+    keyed("logstf-chat-name", &ix.to_string())
+}
+
+/// One row of the killstreaks dialog, labelled "0:39 ORANGEjuice 3": "logstf-streak:<ix>".
+pub fn logstf_streak(ix: usize) -> ElementId {
+    keyed("logstf-streak", &ix.to_string())
+}
+
+/// The player's name in one killstreaks row, labelled with it: "logstf-streak-name:<ix>".
+pub fn logstf_streak_name(ix: usize) -> ElementId {
+    keyed("logstf-streak-name", &ix.to_string())
+}
+
+/// The open log's Download log button: "logstf-download:<log id>".
+pub fn logstf_download(id: u64) -> ElementId {
+    keyed("logstf-download", &id.to_string())
 }
 
 /// One tracked player's chip, selected while active: "logstf-chip:<id64>".

@@ -42,6 +42,7 @@ pub mod fonts;
 pub mod graphics;
 pub mod hud_copies;
 pub mod hud_switches;
+pub mod logstf;
 pub mod maker_page;
 pub mod scroll;
 pub mod update_fake;
@@ -1000,6 +1001,21 @@ impl StoreServer {
     /// Forgets every mounted answer, so later mounts take over.
     pub fn reset(&self) {
         self.rt.block_on(self.server.reset());
+    }
+
+    /// Mounts a mock the helpers here do not cover.
+    pub fn mount(&self, mock: Mock) {
+        self.rt.block_on(mock.mount(&self.server));
+    }
+
+    /// Answers every GET of `route` with `status` only after `delay`.
+    pub fn mount_status_after(&self, route: &str, status: u16, delay: Duration) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(route))
+                .respond_with(ResponseTemplate::new(status).set_delay(delay))
+                .mount(&self.server),
+        );
     }
 
     /// Answers every GET of `route` with `status` and an empty body.

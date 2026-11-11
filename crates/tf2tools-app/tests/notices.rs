@@ -131,6 +131,7 @@ fn known_notices_get_plain_titles() {
     );
     assert_eq!(notices::title_for("GameBanana-notice.txt"), "GameBanana");
     assert_eq!(notices::title_for("serveme-notice.txt"), "serveme.tf");
+    assert_eq!(notices::title_for("logstf-notice.txt"), "logs.tf");
     assert_eq!(
         notices::title_for("Valve-notice.txt"),
         "Valve and Team Fortress 2"
@@ -158,6 +159,7 @@ const SOURCES: &[(&str, &str, &str)] = &[
     ),
     ("GameBanana stores", "GameBanana-notice.txt", "GameBanana"),
     ("Maps page list", "serveme-notice.txt", "serveme.tf"),
+    ("logs.tf page", "logstf-notice.txt", "logs.tf"),
     ("game artwork", "Valve-notice.txt", "Valve Corporation"),
 ];
 

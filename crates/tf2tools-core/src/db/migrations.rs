@@ -449,8 +449,9 @@ const STEP_14_SQL: &str = "
     );
 ";
 
-/// v6 step 15: the logs.tf cache. Bodies stay as received so the expanded view needs no
-/// download; class rows hold every player of a downloaded log.
+/// v6 step 15: the logs.tf cache. Bodies are kept, zlib-compressed, so the expanded view needs
+/// no download; databases from before the BLOB declaration hold some plain TEXT bodies, which
+/// still read. Class rows hold every player of a downloaded log.
 const STEP_15_SQL: &str = "
     CREATE TABLE IF NOT EXISTS logstf_players (
         steam_id INTEGER PRIMARY KEY,
@@ -464,7 +465,7 @@ const STEP_15_SQL: &str = "
         map TEXT NOT NULL,
         date INTEGER NOT NULL,
         length INTEGER,
-        body TEXT,
+        body BLOB,
         fetched_at INTEGER,
         state INTEGER NOT NULL DEFAULT 0
     );

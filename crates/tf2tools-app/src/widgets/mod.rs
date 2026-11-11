@@ -10,6 +10,7 @@ pub mod scroll;
 pub mod store_error;
 pub mod sync_banner;
 pub mod sync_ring;
+pub mod tip;
 pub mod weapon_assigner;
 
 use gpui_kit::component::button::Button;

@@ -9,8 +9,8 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, TitleBar, h_flex,
 };
 use gpui_kit::{
-    App, Context, FontWeight, InteractiveElement as _, IntoElement, MouseButton,
-    ParentElement as _, Pixels, Role, StatefulInteractiveElement as _, Styled as _,
+    App, Context, Div, ElementId, FontWeight, InteractiveElement as _, IntoElement, MouseButton,
+    ParentElement as _, Pixels, Role, Stateful, StatefulInteractiveElement as _, Styled as _,
     TestSupportExt as _, div, px, transparent_black,
 };
 
@@ -21,6 +21,8 @@ use super::route::Page;
 use super::sidebar::icon as nav_icon;
 use super::{HEADER_HEIGHT, Shell};
 use crate::ids;
+use crate::logs_sync::{ring_fill, try_logs_sync};
+use crate::pages::logs_tf::text::ring_label;
 use crate::services::{Tf2State, tf2_state};
 use crate::sync::{store_name, store_slug, sync_hub};
 use crate::widgets::Named as _;
@@ -67,7 +69,11 @@ fn content(
 ) -> impl IntoElement + use<> {
     let title = page.title();
     // No wrapper while nothing syncs, so an empty row adds no gap before the badge.
-    let rings = sync_rings(cx);
+    let mut rings: Vec<_> = sync_rings(cx)
+        .into_iter()
+        .map(|r| r.into_any_element())
+        .collect();
+    rings.extend(logs_ring(cx).map(|r| r.into_any_element()));
     let rings = (!rings.is_empty()).then(|| h_flex().gap_1p5().children(rings));
     h_flex()
         .id(ids::HEADER_ROW)
@@ -232,7 +238,6 @@ fn sync_rings(cx: &App) -> Vec<impl IntoElement + use<>> {
         return Vec::new();
     };
     let hub = hub.read(cx);
-    let (colors, muted) = (RingColors::of(cx.theme()), cx.theme().muted_foreground);
     RINGS
         .into_iter()
         .filter_map(|kind| {
@@ -253,32 +258,89 @@ fn sync_rings(cx: &App) -> Vec<impl IntoElement + use<>> {
             } else {
                 tick.fetched as f32 / tick.total as f32 * 100.
             };
-            let tip = label.clone();
             Some(
-                div()
-                    .id(ids::sync_ring(kind))
-                    .aria_label(label)
-                    .test_support()
-                    .flex_none()
-                    .size(px(24.))
-                    .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
-                    .child(
-                        SyncRing::new(ids::keyed("sync-ring-arc", store_slug(kind)), colors)
-                            .value(value)
-                            .spinning(curated)
-                            .child(
-                                div()
-                                    .id(ids::keyed("sync-ring-icon", store_slug(kind)))
-                                    .test_support()
-                                    .flex_none()
-                                    .child(
-                                        Icon::new(ring_icon(kind))
-                                            .with_size(Size::Size(RING_ICON))
-                                            .text_color(muted),
-                                    ),
-                            ),
-                    ),
+                ring(
+                    Ring {
+                        id: ids::sync_ring(kind),
+                        slug: store_slug(kind),
+                        label,
+                        value,
+                        spinning: curated,
+                        icon: ring_icon(kind),
+                    },
+                    cx,
+                )
+                .test_support(),
             )
         })
         .collect()
+}
+
+// The logs.tf sync's ring after the store rings: counts while logs download, spinning while
+// the list is read. Unlike the store rings it opens its page, through the shell's leave guard.
+fn logs_ring(cx: &mut Context<Shell>) -> Option<impl IntoElement + use<>> {
+    let sync = try_logs_sync(cx)?;
+    let sync = sync.read(cx);
+    sync.running()?;
+    let progress = sync.progress();
+    let fill = ring_fill(progress);
+    let ring = ring(
+        Ring {
+            id: ids::logstf_sync_ring(),
+            slug: "logs-tf",
+            label: ring_label(progress),
+            value: fill.unwrap_or_default(),
+            spinning: fill.is_none(),
+            icon: nav_icon(Page::LogsTf),
+        },
+        cx,
+    );
+    // Like the sidebar toggle, a press on the ring must not start a window move.
+    Some(
+        ring.cursor_pointer()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_click(cx.listener(|shell, _, window, cx| {
+                shell.request_navigate(Page::LogsTf, window, cx);
+            }))
+            .test_support(),
+    )
+}
+
+// What one header ring shows; `slug` keys its arc and icon ids.
+struct Ring {
+    id: ElementId,
+    slug: &'static str,
+    label: String,
+    value: f32,
+    spinning: bool,
+    icon: IconName,
+}
+
+// v5's 24 px ring with its tooltip and the page's icon centred in the arc. Callers add
+// `test_support` last, since the observed wrapper takes no more listeners.
+fn ring(ring: Ring, cx: &App) -> Stateful<Div> {
+    let (colors, muted) = (RingColors::of(cx.theme()), cx.theme().muted_foreground);
+    let tip = ring.label.clone();
+    div()
+        .id(ring.id)
+        .aria_label(ring.label)
+        .flex_none()
+        .size(px(24.))
+        .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+        .child(
+            SyncRing::new(ids::keyed("sync-ring-arc", ring.slug), colors)
+                .value(ring.value)
+                .spinning(ring.spinning)
+                .child(
+                    div()
+                        .id(ids::keyed("sync-ring-icon", ring.slug))
+                        .test_support()
+                        .flex_none()
+                        .child(
+                            Icon::new(ring.icon)
+                                .with_size(Size::Size(RING_ICON))
+                                .text_color(muted),
+                        ),
+                ),
+        )
 }

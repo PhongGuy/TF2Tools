@@ -64,6 +64,10 @@ The HUD Maker shows your HUD the way the game draws it: in a fight, on the score
 
 The Maps page lists the community maps from serveme.tf. Search them by name, sort them by name, by most played or by recently played, and download a map straight into your game. Remove a map you downloaded when you no longer need it.
 
+### logs.tf stats
+
+The logs.tf page shows your competitive stats from logs.tf. Paste your Steam profile link or Steam ID to track yourself, and add teammates the same way. Each player gets a card per class with their averages, and below it a list of their logs. Drag the range slider to look at only your most recent logs. Open a log to see it the way logs.tf shows it: the players, the kills between classes, the rounds and the events. TF2Tools downloads your logs once and keeps them, so the page works offline, and a download that stopped picks up where it left off.
+
 ### Profiles
 
 Save your HUD, sounds and crosshairs together as a profile, for example one for competitive and one for casual, and switch your whole setup at once.
@@ -122,7 +126,7 @@ TF2 reads its HUD, sounds and crosshairs when it starts, so restart the game to 
 
 ## Privacy
 
-No accounts, no ads, no tracking. TF2Tools goes online for the stores (GameBanana, GitHub and mastercomfig.com), for the Maps page (serveme.tf) and to check GitHub for a new version of TF2Tools. Your library stays on your computer. The weapon icons in the crosshair list come from your own TF2 install.
+No accounts, no ads, no tracking. TF2Tools goes online for the stores (GameBanana, GitHub and mastercomfig.com), for the Maps page (serveme.tf), for the logs.tf page (logs.tf, and Steam to look up a profile link) and to check GitHub for a new version of TF2Tools. Your library stays on your computer. The weapon icons in the crosshair list come from your own TF2 install.
 
 ## License
 
@@ -134,6 +138,7 @@ MIT, see [LICENSE](LICENSE). The bundled Inter font is under the SIL Open Font L
 - **hud-db:** the hand-picked HUD list in the HUD Store comes from [hud-db](https://github.com/mastercomfig/hud-db), Copyright (c) 2024-2026 mastercomfig, under the MIT License, in `licenses/hud-db-MIT.txt`. Each HUD belongs to its authors.
 - **GameBanana:** the HUDs, sounds, crosshairs and other items in the GameBanana stores come from [GameBanana](https://gamebanana.com), owned and run by GameBanana Co LLC. Each item belongs to the creators credited on its GameBanana page, and TF2Tools claims no rights to it. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with GameBanana or GameBanana Co LLC.
 - **serveme.tf:** the community map list on the Maps page, and its map files, come from [serveme.tf](https://serveme.tf). Each map belongs to its makers. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with serveme.tf.
+- **logs.tf:** the stats and logs on the logs.tf page come from [logs.tf](https://logs.tf). TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with logs.tf.
 
 ### Valve
 
