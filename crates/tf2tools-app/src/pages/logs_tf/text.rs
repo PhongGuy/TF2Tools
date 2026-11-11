@@ -143,7 +143,8 @@ pub fn download_reason(error: &LogsFetchError) -> &'static str {
         LogsFetchError::Network { .. } => "Check your internet connection.",
         LogsFetchError::RateLimited { .. } => LOGS_TF_BUSY,
         LogsFetchError::TooLarge { .. } => "This log is too big to download.",
-        // The workspace lint wants every known variant named before the wildcard.
+        // The lint only wants every known variant named; a wildcard that shares a known arm's
+        // text joins that arm, one with its own text stands alone.
         LogsFetchError::Unreadable
         | LogsFetchError::Http { .. }
         | LogsFetchError::Cache { .. }
@@ -163,10 +164,9 @@ pub fn fetch_message(error: &LogsFetchError) -> Option<&'static str> {
     match error {
         LogsFetchError::Network { .. } => Some(LOG_OFFLINE),
         LogsFetchError::RateLimited { .. } => Some(LOGS_TF_BUSY),
-        LogsFetchError::Http { .. } => Some(LOGS_TF_DOWN),
         LogsFetchError::Cache { .. } => Some(SAVE_FAILED),
         LogsFetchError::Gone | LogsFetchError::Unreadable | LogsFetchError::TooLarge { .. } => None,
-        _ => Some(LOGS_TF_DOWN),
+        LogsFetchError::Http { .. } | _ => Some(LOGS_TF_DOWN),
     }
 }
 
