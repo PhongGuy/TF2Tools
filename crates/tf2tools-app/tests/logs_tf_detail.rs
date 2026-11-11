@@ -254,3 +254,71 @@ fn the_matrix_tabs_switch_and_list_every_player(cx: &mut TestAppContext) {
         Some(false)
     );
 }
+
+#[gpui_kit::test]
+fn chat_and_killstreaks_open_in_dialogs(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_CHAT_TOGGLE);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_STREAKS_TOGGLE).as_deref(),
+        Some("Show Killstreaks (13)")
+    );
+    support::click_id(cx, s.win, ids::LOGSTF_CHAT_TOGGLE);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_chat_line(0)).as_deref(),
+        Some("line between insane and genius: DRHAPPYWIPE")
+    );
+    // All 69 lines fit an 800x600 window only by scrolling inside the dialog.
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(800.), gpui_kit::px(600.)),
+    );
+    let list = support::bounds_of(cx, s.win, ids::LOGSTF_CHAT).expect("the chat list");
+    let last = support::bounds_of(cx, s.win, ids::logstf_chat_line(68)).expect("the last line");
+    assert!(list.bottom() <= gpui_kit::px(600.), "{list:?}");
+    assert!(
+        last.bottom() > list.bottom(),
+        "the chat scrolls: {last:?} {list:?}"
+    );
+    support::click_dialog_x(cx, s.win);
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_CHAT_TOGGLE);
+    support::click_id(cx, s.win, ids::LOGSTF_STREAKS_TOGGLE);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_streak(0)).as_deref(),
+        Some("0:39 ORANGEjuice 3")
+    );
+}
+
+#[gpui_kit::test]
+fn a_log_with_only_the_required_keys_opens_with_its_sections_left_out(cx: &mut TestAppContext) {
+    const MINIMAL: &str = r#"{"length": 60, "teams": {"Red": {}, "Blue": {}},
+        "players": {"[U:1:231702]": {"team": "Red",
+            "class_stats": [{"type": "scout", "total_time": 60}]}}}"#;
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[(9, day_ago(1))]));
+    server.mount_bytes("/json/9", MINIMAL.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 9);
+    assert!(
+        support::present(cx, s.win, ids::logstf_banner(9)),
+        "the log opens"
+    );
+    assert!(
+        !support::present(cx, s.win, ids::LOGSTF_ROUNDS),
+        "no rounds section"
+    );
+    assert!(
+        !support::present(cx, s.win, ids::LOGSTF_MEDICS),
+        "no medic section"
+    );
+    assert!(
+        support::present(cx, s.win, ids::logstf_matrix_row(sid(ARIE))),
+        "matrix rows read as zeros"
+    );
+    assert!(
+        support::disabled_of(cx, s.win, ids::LOGSTF_STREAKS_TOGGLE),
+        "nothing to show"
+    );
+}

@@ -37,7 +37,7 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::toast_error;
 use crate::tokio_bridge;
-use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
+use crate::widgets::dialog_frame::{DETAIL_WIDTH, DIALOG_WIDTH, DialogFrame};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 use sort::{PlayerColumn, PlayerSort};
@@ -593,6 +593,27 @@ impl LogsTfPage {
         });
     }
 
+    // Opens the open log's chat over the page. The rows are shaped once, since the log they
+    // come from never changes while the dialog is up.
+    fn open_chat(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(rows) = self.detail().map(tables::chat_rows) else {
+            return;
+        };
+        open_detail_dialog(window, cx, move |window, cx| {
+            detail::footer::chat_dialog(&rows, window, cx)
+        });
+    }
+
+    // Opens the open log's killstreaks over the page, shaped once as the chat is.
+    fn open_streaks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(rows) = self.detail().map(detail::footer::streak_rows) else {
+            return;
+        };
+        open_detail_dialog(window, cx, move |window, cx| {
+            detail::footer::streaks_dialog(&rows, window, cx)
+        });
+    }
+
     // Reads the field, looks the player up on Steam, then tracks and activates them. A bad
     // input or a failed lookup or write stays in the dialog with its text kept.
     fn submit_add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1003,6 +1024,23 @@ impl Render for LogsTfPage {
 }
 
 // A range's place on the slider, narrow to wide.
+// A read-only dialog of the log's detail width, deferred as the add dialog is so the click
+// that opened it cannot pull focus back out.
+fn open_detail_dialog<E: IntoElement>(
+    window: &mut Window,
+    cx: &mut Context<LogsTfPage>,
+    content: impl Fn(&Window, &App) -> E + 'static,
+) {
+    window.defer(cx, move |window, cx| {
+        let frame = DialogFrame::new(DETAIL_WIDTH);
+        window.open_dialog(cx, move |dialog, window, cx| {
+            frame
+                .apply(dialog, &*window, &*cx)
+                .child(frame.measure(content(&*window, &*cx)))
+        });
+    });
+}
+
 fn stop_index(range: LogsRange) -> usize {
     LogsRange::STOPS
         .iter()

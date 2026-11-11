@@ -7,7 +7,7 @@ use tf2tools_app::pages::logs_tf::text::{
     EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, charge_text, count_text, duration_text, event_text,
     fetch_message, finding_text, healing_text, medigun_name, one_decimal, progress_line,
     progress_text, range_label, reads_zero, resolve_message, ring_label, seconds_text, share_text,
-    summary_text, sync_message, tenths_text, time_played_text, whole,
+    streaks_label, summary_text, sync_message, tenths_text, time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
@@ -466,4 +466,22 @@ fn matrix_rows_run_k_high_to_low_and_count_every_player() {
         ([0; 9], 0),
         "a medic with no kills reads as zeros"
     );
+}
+
+#[test]
+fn chat_lines_carry_their_team_and_console_has_none() {
+    use tf2tools_app::pages::logs_tf::tables::chat_rows;
+    let body = r#"{"length": 60, "teams": {"Red": {}, "Blue": {}},
+        "players": {"[U:1:5]": {"team": "Red", "class_stats": [{"type": "scout", "total_time": 60}]}},
+        "chat": [{"steamid": "[U:1:5]", "name": "Five", "msg": "gl"},
+                 {"steamid": "Console", "name": "Console", "msg": "hi"}]}"#;
+    let log = tf2tools_core::parse_log(body).unwrap();
+    let rows = chat_rows(&log);
+    assert_eq!(rows[0].team, Some(tf2tools_core::Team::Red));
+    assert_eq!(
+        (rows[1].team, rows[1].name.as_str(), rows[1].msg.as_str()),
+        (None, "Console", "hi")
+    );
+    assert_eq!(streaks_label(13), "Show Killstreaks (13)");
+    assert_eq!(streaks_label(0), "Show Killstreaks (0)");
 }

@@ -2736,6 +2736,25 @@ pub fn logstf_matrix_cell(id: SteamId, class: Option<TfClass>) -> ElementId {
     }
 }
 
+/// The open log's Show Chat button: "logstf-chat-toggle".
+pub const LOGSTF_CHAT_TOGGLE: &str = "logstf-chat-toggle";
+/// The open log's Show Killstreaks button, disabled without streaks: "logstf-streaks-toggle".
+pub const LOGSTF_STREAKS_TOGGLE: &str = "logstf-streaks-toggle";
+/// The chat dialog's scrolling list: "logstf-chat".
+pub const LOGSTF_CHAT: &str = "logstf-chat";
+/// The killstreaks dialog's scrolling list: "logstf-streaks".
+pub const LOGSTF_STREAKS: &str = "logstf-streaks";
+
+/// One line of the chat dialog, labelled "<name>: <msg>": "logstf-chat-line:<ix>".
+pub fn logstf_chat_line(ix: usize) -> ElementId {
+    keyed("logstf-chat-line", &ix.to_string())
+}
+
+/// One row of the killstreaks dialog, labelled "0:39 ORANGEjuice 3": "logstf-streak:<ix>".
+pub fn logstf_streak(ix: usize) -> ElementId {
+    keyed("logstf-streak", &ix.to_string())
+}
+
 /// One tracked player's chip, selected while active: "logstf-chip:<id64>".
 pub fn logstf_chip(id: SteamId) -> ElementId {
     keyed("logstf-chip", &id.id64().to_string())

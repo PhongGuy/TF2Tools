@@ -247,6 +247,11 @@ pub fn reads_zero(cell: &str) -> bool {
     matches!(cell, "0" | "0.0")
 }
 
+/// The Show Killstreaks button's words with the log's count: "Show Killstreaks (13)".
+pub fn streaks_label(n: usize) -> String {
+    format!("Show Killstreaks ({n})")
+}
+
 /// A team's name as the app writes it: "BLU" or "RED".
 pub fn team_name(team: Team) -> &'static str {
     match team {

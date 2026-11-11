@@ -1,7 +1,9 @@
 //! An open log's panel, laid out like its page on logs.tf: the score banner, the title, the
-//! team table, the players table, the rounds, one block per Medic and the kill matrix.
+//! team table, the players table, the rounds, one block per Medic, the kill matrix and the
+//! buttons that open the chat and the killstreaks.
 
 mod banner;
+pub(super) mod footer;
 mod matrix;
 mod medics;
 mod players;
@@ -127,12 +129,13 @@ fn log_body(
         .child(
             section(
                 "Kill matrix",
-                matrix::matrix(log, matrix, &is_tracked, page, cx),
+                matrix::matrix(log, matrix, &is_tracked, page.clone(), cx),
                 cx,
             )
             .id(ids::LOGSTF_MATRIX)
             .test_support(),
         )
+        .child(footer::footer(log, page))
 }
 
 // A titled part of the body.
