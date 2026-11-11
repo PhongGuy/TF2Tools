@@ -562,3 +562,99 @@ fn the_grid_shows_nine_classes_and_dims_the_unplayed(cx: &mut TestAppContext) {
     let scout = cx.update(|cx| page.read(cx).averages().unwrap()[0].clone());
     assert_eq!(scout.seconds(), 1559);
 }
+
+fn expanded(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) -> Option<u64> {
+    cx.update(|cx| page.read(cx).expanded())
+}
+
+/// Scrolls the page to its last log, since the grid fills most of the window above the list.
+fn to_end(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) {
+    let state = cx.update(|cx| page.read(cx).list_state().clone());
+    state.scroll_to_end();
+}
+
+#[gpui_kit::test]
+fn one_row_opens_at_a_time(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+
+    support::click_id(cx, s.win, ids::logstf_log(3));
+    assert_eq!(expanded(cx, &page), Some(3));
+    assert!(support::present(cx, s.win, ids::logstf_log_panel(3)));
+    assert!(support::present(cx, s.win, ids::logstf_log_open(3)));
+
+    to_end(cx, &page);
+    support::click_id(cx, s.win, ids::logstf_log(2));
+    assert_eq!(expanded(cx, &page), Some(2));
+    assert!(!support::present(cx, s.win, ids::logstf_log_panel(3)));
+    assert!(support::present(cx, s.win, ids::logstf_log_panel(2)));
+
+    support::click_id(cx, s.win, ids::logstf_log(2));
+    assert_eq!(expanded(cx, &page), None);
+}
+
+#[gpui_kit::test]
+fn gone_and_unreadable_rows_explain_and_do_not_open(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes(
+        "/api/v1/log",
+        list_body(&[(5, day_ago(1)), (6, day_ago(2))]),
+    );
+    server.mount_status("/json/5", 404);
+    server.mount_bytes("/json/6", b"{}".to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+
+    support::click_id(cx, s.win, ids::logstf_log(5));
+    assert_eq!(expanded(cx, &page), None);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_log_note(5)).as_deref(),
+        Some("This log was removed from logs.tf")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_log_note(6)).as_deref(),
+        Some("This log couldn't be read")
+    );
+    assert!(support::present(cx, s.win, ids::logstf_log_open(6)));
+}
+
+#[gpui_kit::test]
+fn a_player_without_logs_gets_a_profile_link(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[]));
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let _page = open_page(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_NO_LOGS).as_deref(),
+        Some("No logs in the last 90 days.")
+    );
+    assert!(support::present(cx, s.win, ids::LOGSTF_NO_LOGS_PROFILE));
+    for class in TfClass::ALL {
+        assert!(support::present(
+            cx,
+            s.win,
+            ids::logstf_class_unplayed(class)
+        ));
+    }
+}
+
+#[gpui_kit::test]
+fn the_grid_scrolls_away_with_the_logs(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    let scout = ids::logstf_class(TfClass::Scout);
+    let before = support::bounds_of(cx, s.win, scout.clone()).unwrap();
+    to_end(cx, &page);
+    let after = support::bounds_of(cx, s.win, scout).unwrap();
+    assert!(after.top() < before.top(), "{before:?} then {after:?}");
+}

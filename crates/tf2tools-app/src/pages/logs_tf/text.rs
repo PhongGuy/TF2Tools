@@ -85,3 +85,31 @@ pub fn summary_text(logs: usize, capped: bool) -> String {
         (false, _) => format!("Last 90 days, {logs} logs"),
     }
 }
+
+/// The log list's line when the active player has no logs in the window.
+pub const NO_LOGS_TEXT: &str = "No logs in the last 90 days.";
+
+/// A row's note in place of its stats while its log downloads.
+pub const LOG_PENDING: &str = "Downloading...";
+
+/// A row's note when logs.tf no longer has its log.
+pub const LOG_GONE: &str = "This log was removed from logs.tf";
+
+/// A row's note when its log's body could not be read.
+pub const LOG_UNREADABLE: &str = "This log couldn't be read";
+
+/// A match length as minutes and seconds, as logs.tf writes it: "28:34", "60:00".
+pub fn duration_text(seconds: u32) -> String {
+    format!("{}:{:02}", seconds / 60, seconds % 60)
+}
+
+/// An upload time as a date on this computer's clock: "2026-10-17".
+pub fn date_text(unix: i64) -> String {
+    chrono::DateTime::from_timestamp(unix, 0)
+        .map(|t| {
+            t.with_timezone(&chrono::Local)
+                .format("%Y-%m-%d")
+                .to_string()
+        })
+        .unwrap_or_default()
+}

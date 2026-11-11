@@ -1,8 +1,8 @@
 //! The logs.tf page's wording and number formats.
 
 use tf2tools_app::pages::logs_tf::text::{
-    one_decimal, progress_text, resolve_message, summary_text, sync_message, time_played_text,
-    whole,
+    duration_text, one_decimal, progress_text, resolve_message, summary_text, sync_message,
+    time_played_text, whole,
 };
 use tf2tools_core::{LogsSyncError, ResolveError};
 
@@ -91,4 +91,11 @@ fn grid_numbers_format_like_the_spec() {
     assert_eq!(summary_text(87, false), "Last 90 days, 87 logs");
     assert_eq!(summary_text(1, false), "Last 90 days, 1 log");
     assert_eq!(summary_text(400, true), "Last 400 logs");
+}
+
+#[test]
+fn durations_read_as_minutes_and_seconds() {
+    assert_eq!(duration_text(1714), "28:34");
+    assert_eq!(duration_text(59), "0:59");
+    assert_eq!(duration_text(3600), "60:00");
 }

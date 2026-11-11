@@ -1,6 +1,7 @@
 //! The logs.tf page: tracked players as chips, their 90-day class averages and their logs.
 
 mod grid;
+mod list;
 pub mod text;
 
 use gpui_kit::assets::IconName;
@@ -10,12 +11,13 @@ use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Disableable as _, Sizable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::{
     App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
-    Subscription, Task, TestSupportExt as _, Window, div,
+    ListAlignment, ListState, ParentElement as _, Render, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _, Window,
+    div, px,
 };
 use tf2tools_core::{
-    ClassAverage, LogRow, LogsProgress, LogsSyncError, LogsSyncSummary, SteamId, TrackedPlayer,
-    parse_player_input, window_start,
+    ClassAverage, LogRow, LogState, LogsProgress, LogsSyncError, LogsSyncSummary, SteamId,
+    TrackedPlayer, parse_player_input, window_start,
 };
 
 use crate::ids;
@@ -42,6 +44,9 @@ pub struct LogsTfPage {
     loaded: bool,
     rows: Vec<LogRow>,
     averages: Option<[ClassAverage; 9]>,
+    // The open log's id; the list's item 0 is the page top, so row `i` is item `i + 1`.
+    expanded: Option<u64>,
+    list: ListState,
     // One sync runs at a time and is never cancelled; a player chosen meanwhile waits in
     // `queued`, so `syncing` stays true until the queue is empty.
     syncing: bool,
@@ -82,6 +87,8 @@ impl LogsTfPage {
             loaded: false,
             rows: Vec::new(),
             averages: None,
+            expanded: None,
+            list: ListState::new(1, ListAlignment::Top, px(200.)),
             syncing: false,
             running: None,
             queued: None,
@@ -142,6 +149,31 @@ impl LogsTfPage {
         if let (false, Some(id)) = (self.syncing, self.active) {
             self.sync(id, true, cx);
         }
+    }
+
+    /// The page's one scrolling list: the top, then a row per log.
+    pub fn list_state(&self) -> &ListState {
+        &self.list
+    }
+
+    /// The log whose row is open, if any.
+    pub fn expanded(&self) -> Option<u64> {
+        self.expanded
+    }
+
+    /// Opens log `id`'s row, closing any other; on the open row it closes it.
+    pub fn toggle(&mut self, id: u64, cx: &mut Context<Self>) {
+        let closing = self.expanded.take();
+        if closing != Some(id) {
+            self.expanded = Some(id);
+        }
+        // Both rows change height, so both remeasure and the rows below move with them.
+        for changed in closing.into_iter().chain([id]) {
+            if let Some(ix) = self.rows.iter().position(|r| r.id() == changed) {
+                self.list.remeasure_items(ix + 1..ix + 2);
+            }
+        }
+        cx.notify();
     }
 
     /// The player whose chip is selected, if any is tracked.
@@ -396,6 +428,7 @@ impl LogsTfPage {
                         let (rows, averages) = logs.unzip();
                         page.rows = rows.unwrap_or_default();
                         page.averages = averages;
+                        page.fit_list();
                     }
                     Err(error) => tracing::warn!(%error, "reading the logs.tf cache failed"),
                 }
@@ -408,6 +441,22 @@ impl LogsTfPage {
                 cx.notify();
             });
         })
+    }
+
+    // Matches the list to fresh rows: added or dropped rows splice in after the top, and
+    // every item remeasures since a row's state or the top's height may have changed. An open
+    // row that is gone or no longer downloaded closes.
+    fn fit_list(&mut self) {
+        let items = self.rows.len() + 1;
+        let old = self.list.item_count();
+        if old != items {
+            self.list.splice(1..old, self.rows.len());
+        }
+        self.list.remeasure_items(0..items);
+        let open = |r: &LogRow| Some(r.id()) == self.expanded && r.state() == LogState::Ready;
+        if !self.rows.iter().any(open) {
+            self.expanded = None;
+        }
     }
 
     // Syncs `id` on the tokio runtime, rereading the cache after each progress event so logs
@@ -560,36 +609,18 @@ impl LogsTfPage {
         )
     }
 
-    // The no-player explanation and its way to track someone.
-    fn empty_state(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        v_flex()
-            .items_center()
-            .gap_4()
-            .py_12()
-            .child(labelled(
-                div().text_sm().text_color(cx.theme().muted_foreground),
-                ids::LOGSTF_EMPTY,
-                EMPTY_TEXT,
-            ))
-            .child(
-                Button::new(ids::LOGSTF_EMPTY_ADD)
-                    .primary()
-                    .icon(IconName::Plus)
-                    .label("Add player")
-                    .on_click(cx.listener(|page, _, window, cx| page.open_add(window, cx))),
-            )
-    }
-}
-
-impl Render for LogsTfPage {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    // Everything above the logs, the list's first item: the credit, chips and their buttons,
+    // the status line, the grid, then the column titles or the no-logs line.
+    fn top(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let empty = self.loaded && self.players.is_empty();
+        let fetching = self.syncing && self.running == self.active;
+        let no_logs = self
+            .active
+            .filter(|_| self.loaded && !fetching && self.rows.is_empty());
         v_flex()
-            .id(ids::page(Page::LogsTf))
-            .test_support()
-            .size_full()
-            .p(CONTENT_PADDING)
+            .w_full()
             .gap_4()
+            .pb_4()
             .child(
                 h_flex().justify_end().child(
                     Button::new(ids::LOGSTF_CREDIT)
@@ -614,5 +645,39 @@ impl Render for LogsTfPage {
                     .map(|averages| grid::class_grid(averages, self.rows.len(), cx)),
             )
             .children(empty.then(|| self.empty_state(cx)))
+            .children(no_logs.map(|id| list::no_logs(id, cx)))
+            .children((!self.rows.is_empty()).then(|| list::column_header(cx)))
+    }
+
+    // The no-player explanation and its way to track someone.
+    fn empty_state(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        v_flex()
+            .items_center()
+            .gap_4()
+            .py_12()
+            .child(labelled(
+                div().text_sm().text_color(cx.theme().muted_foreground),
+                ids::LOGSTF_EMPTY,
+                EMPTY_TEXT,
+            ))
+            .child(
+                Button::new(ids::LOGSTF_EMPTY_ADD)
+                    .primary()
+                    .icon(IconName::Plus)
+                    .label("Add player")
+                    .on_click(cx.listener(|page, _, window, cx| page.open_add(window, cx))),
+            )
+    }
+}
+
+impl Render for LogsTfPage {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // The page scrolls as one list, so the grid and the logs move together.
+        v_flex()
+            .id(ids::page(Page::LogsTf))
+            .test_support()
+            .size_full()
+            .p(CONTENT_PADDING)
+            .child(list::page_list(self, cx).flex_1().min_h_0())
     }
 }

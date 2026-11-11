@@ -2487,6 +2487,35 @@ pub fn logstf_class_unplayed(class: TfClass) -> ElementId {
     keyed("logstf-class-unplayed", &class.name().to_lowercase())
 }
 
+/// The logs.tf page's scrolling list: the chips and grid as its first item, then the logs.
+pub const LOGSTF_LIST: &str = "logstf-list";
+/// The scrollbar beside the logs.tf page's list.
+pub const LOGSTF_LIST_SCROLLBAR: &str = "logstf-list-scrollbar";
+/// Labelled "No logs in the last 90 days." when the active player has no logs.
+pub const LOGSTF_NO_LOGS: &str = "logstf-no-logs";
+/// The link to the active player's logs.tf profile beside the no-logs line.
+pub const LOGSTF_NO_LOGS_PROFILE: &str = "logstf-no-logs-profile";
+
+/// One log's row in the logs.tf list, which opens or closes it: "logstf-log:<id>".
+pub fn logstf_log(id: u64) -> ElementId {
+    keyed("logstf-log", &id.to_string())
+}
+
+/// The open log's panel under its row: "logstf-log-panel:<id>".
+pub fn logstf_log_panel(id: u64) -> ElementId {
+    keyed("logstf-log-panel", &id.to_string())
+}
+
+/// A row's note in place of its stats, labelled with why it has none: "logstf-log-note:<id>".
+pub fn logstf_log_note(id: u64) -> ElementId {
+    keyed("logstf-log-note", &id.to_string())
+}
+
+/// "Open on logs.tf" for one log, in its panel or on an unreadable row: "logstf-log-open:<id>".
+pub fn logstf_log_open(id: u64) -> ElementId {
+    keyed("logstf-log-open", &id.to_string())
+}
+
 /// One tracked player's chip, selected while active: "logstf-chip:<id64>".
 pub fn logstf_chip(id: SteamId) -> ElementId {
     keyed("logstf-chip", &id.id64().to_string())
