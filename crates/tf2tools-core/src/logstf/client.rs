@@ -313,7 +313,7 @@ impl LogsClient {
         }
 
         self.cache.mark_synced(id, now)?;
-        self.cache.prune(now)?;
+        self.cache.prune()?;
         Ok(summary)
     }
 

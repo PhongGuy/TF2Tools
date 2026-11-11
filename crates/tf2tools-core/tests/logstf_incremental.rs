@@ -200,14 +200,16 @@ async fn a_real_name_is_kept() {
 }
 
 #[tokio::test]
-async fn a_finished_sync_prunes_logs_past_120_days() {
+async fn a_finished_sync_keeps_old_listed_logs_and_drops_unlisted_ones() {
     let env = env_with("Arie").await;
     let steam = i64::try_from(ARIE).unwrap();
     common::sql(&env.dir)
         .execute_batch(&format!(
-            "INSERT INTO logstf_logs (id, title, map, date) VALUES (99, 'old', 'm', {});
-             INSERT INTO logstf_player_logs (steam_id, log_id) VALUES ({steam}, 99);",
-            days_ago(130)
+            "INSERT INTO logstf_logs (id, title, map, date) VALUES (99, 'old', 'm', {old});
+             INSERT INTO logstf_player_logs (steam_id, log_id) VALUES ({steam}, 99);
+             INSERT INTO logstf_logs (id, title, map, date) VALUES (98, 'orphan', 'm', {recent});",
+            old = days_ago(2_000),
+            recent = days_ago(1),
         ))
         .unwrap();
     mount_list(&env.server, ARIE, list_body(&[(2, days_ago(1))])).await;
@@ -216,8 +218,12 @@ async fn a_finished_sync_prunes_logs_past_120_days() {
         .sync_player(arie(), false, &|_| {})
         .await
         .unwrap();
-    assert_eq!(common::count(&env.dir, "logstf_logs"), 1);
-    assert_eq!(common::count(&env.dir, "logstf_player_logs"), 1);
+    assert_eq!(
+        common::count(&env.dir, "logstf_logs"),
+        2,
+        "2 and 99 stay, 98 goes"
+    );
+    assert_eq!(common::count(&env.dir, "logstf_player_logs"), 2);
 }
 
 #[tokio::test]

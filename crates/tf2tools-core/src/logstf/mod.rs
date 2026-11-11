@@ -32,9 +32,6 @@ pub const LOGS_SPACING: Duration = Duration::from_secs(1);
 /// The largest log or profile body accepted.
 pub const LOG_BODY_LIMIT: u64 = 2 * 1024 * 1024;
 
-/// Logs uploaded this much before every listing player's newest log are deleted after a sync.
-pub const PRUNE_SECS: i64 = 120 * 86_400;
-
 /// A player synced more recently than this is not synced again unless forced.
 pub const STALE_SECS: i64 = 30 * 60;
 

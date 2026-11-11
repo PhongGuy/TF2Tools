@@ -247,7 +247,7 @@ impl LogsTfPage {
         self.after_write(saving, window, cx);
     }
 
-    // Asks before forgetting a player; their logs stay cached until pruned.
+    // Asks before forgetting a player; their logs no other tracked player shares go with them.
     fn remove(&mut self, id: SteamId, name: &str, window: &mut Window, cx: &mut Context<Self>) {
         let answer = confirm(
             Confirm {

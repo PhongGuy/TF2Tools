@@ -8,7 +8,7 @@ use rusqlite::{OptionalExtension, params};
 
 use super::averages::{CLASS_SUMS, ClassAverage, ClassSums, WINDOW_LOGS};
 use super::{
-    LOG_BODY_LIMIT, LogDetail, LogsRange, PROVISIONAL_SECS, PRUNE_SECS, SteamId, logstf_class,
+    LOG_BODY_LIMIT, LogDetail, LogsRange, PROVISIONAL_SECS, SteamId, logstf_class,
     logstf_class_name,
 };
 use crate::db::Database;
@@ -20,6 +20,14 @@ const ACTIVE_KEY: &str = "logstf_active_player";
 
 /// The `settings` key holding the chosen history range's key.
 const RANGE_KEY: &str = "logstf_range";
+
+/// The `settings` key prefix, followed by a SteamID64, for the range a player was last listed in.
+const LISTED_RANGE_PREFIX: &str = "logstf_listed_range:";
+
+/// Deletes every log no tracked player is a member of; memberships and class rows cascade.
+const PRUNE_SQL: &str = "DELETE FROM logstf_logs WHERE id NOT IN (
+        SELECT m.log_id FROM logstf_player_logs m
+        JOIN logstf_players p ON p.steam_id = m.steam_id)";
 
 /// `logstf_logs.state` for a log logs.tf answered 404 for.
 pub(super) const STATE_GONE: i64 = 1;
@@ -249,14 +257,18 @@ impl LogsCache {
             .map_err(db_error)
     }
 
-    /// Deletes the player row and their memberships; their logs stay until pruned.
+    /// Deletes the player, their memberships, their listed-range setting and then every log
+    /// no remaining tracked player is a member of, in one transaction.
     pub fn remove_player(&self, id: SteamId) -> Result<(), LogsCacheError> {
         self.db
             .write(|conn| {
+                let listed_key = format!("{LISTED_RANGE_PREFIX}{}", id.id64());
                 let id = sql_id(id)?;
                 let tx = conn.transaction()?;
                 tx.execute("DELETE FROM logstf_player_logs WHERE steam_id = ?1", [id])?;
                 tx.execute("DELETE FROM logstf_players WHERE steam_id = ?1", [id])?;
+                tx.execute("DELETE FROM settings WHERE key = ?1", [listed_key])?;
+                tx.execute(PRUNE_SQL, [])?;
                 tx.commit()
             })
             .map_err(db_error)
@@ -467,28 +479,11 @@ impl LogsCache {
         }))
     }
 
-    /// Deletes logs no tracked player's window still needs; returns how many. A tracked
-    /// player keeps their logs up to `PRUNE_SECS` before their newest one; a log no tracked
-    /// player lists goes once it is `PRUNE_SECS` older than `now`. Memberships and class rows
-    /// go with them through the foreign-key cascade.
-    pub fn prune(&self, now: i64) -> Result<usize, LogsCacheError> {
-        // `listed` pairs each tracked membership with whether that player's own reach covers
-        // the log; a log survives while any pair covers it.
-        let sql = "WITH anchors AS (
-                SELECT m.steam_id, MAX(l.date) AS anchor FROM logstf_player_logs m
-                JOIN logstf_players p ON p.steam_id = m.steam_id
-                JOIN logstf_logs l ON l.id = m.log_id
-                GROUP BY m.steam_id
-            ), listed AS (
-                SELECT m.log_id, l.date >= a.anchor - ?2 AS covered FROM logstf_player_logs m
-                JOIN anchors a ON a.steam_id = m.steam_id
-                JOIN logstf_logs l ON l.id = m.log_id
-            )
-            DELETE FROM logstf_logs
-            WHERE id NOT IN (SELECT log_id FROM listed WHERE covered)
-              AND (id IN (SELECT log_id FROM listed) OR date < ?1 - ?2)";
+    /// Deletes every log no tracked player is a member of, whatever its age; returns how
+    /// many. Memberships and class rows go with them through the foreign-key cascade.
+    pub fn prune(&self) -> Result<usize, LogsCacheError> {
         self.db
-            .write(|conn| conn.execute(sql, params![now, PRUNE_SECS]))
+            .write(|conn| conn.execute(PRUNE_SQL, []))
             .map_err(db_error)
     }
 }

@@ -108,8 +108,8 @@ pub use logstf::{
     ClassAverage, ClassLine, EventKind, HealTarget, Killstreak, LOG_BODY_LIMIT, LOGS_SPACING,
     LogChatLine, LogColumns, LogDetail, LogRow, LogState, LogsCache, LogsClient, LogsEndpoints,
     LogsProgress, LogsRange, LogsSyncSummary, MatrixKind, MatrixRow, MedicLine, Medigun,
-    PROVISIONAL_SECS, PRUNE_SECS, PlayerInput, PlayerLine, RoundEvent, RoundLine, RoundPlayer,
-    RoundTeam, STALE_SECS, STEAM_ID64_BASE, SteamId, TeamTotals, TrackedPlayer, WeaponLine,
+    PROVISIONAL_SECS, PlayerInput, PlayerLine, RoundEvent, RoundLine, RoundPlayer, RoundTeam,
+    STALE_SECS, STEAM_ID64_BASE, SteamId, TeamTotals, TrackedPlayer, WeaponLine,
     leaderboard_icon_stem, logstf_class, parse_log, parse_player_input, window_start,
 };
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
