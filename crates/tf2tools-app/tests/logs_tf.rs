@@ -1407,6 +1407,30 @@ fn many_class_icons_stay_clear_of_kda_in_the_smallest_window(cx: &mut TestAppCon
     assert_icons_clear_of_kda(cx, &s);
 }
 
+#[gpui_kit::test]
+fn four_class_icons_share_one_line_at_1280(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (s, page) = seven_class_page(cx, &env, &server);
+    cx.simulate_window_resize(s.win, size(px(1280.), px(800.)));
+    to_end(cx, &page);
+    let classes = cx.update(|cx| {
+        let rows = page.read(cx).rows();
+        rows.iter()
+            .find(|r| r.id() == 3)
+            .unwrap()
+            .classes()
+            .to_vec()
+    });
+    let tops: Vec<_> = classes[..4]
+        .iter()
+        .map(|c| support::bounds_of(cx, s.win, ids::logstf_log_class(3, *c)).unwrap())
+        .map(|b| b.top())
+        .collect();
+    assert!(tops.iter().all(|t| *t == tops[0]), "{tops:?}");
+}
+
 // `text` shaped in the theme font at `rems` times the root size.
 fn shaped(cx: &mut TestAppContext, win: gpui_kit::AnyWindowHandle, text: &str, rems: f32) -> f32 {
     use gpui_kit::component::ActiveTheme as _;

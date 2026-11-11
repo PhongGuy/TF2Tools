@@ -29,7 +29,9 @@ const CHEVRON: Pixels = px(16.);
 const DATE: Pixels = px(88.);
 const MAP: Pixels = px(160.);
 const LENGTH: Pixels = px(56.);
-const CLASSES: Pixels = px(72.);
+// Four icons on one line, or three in a narrow window.
+const CLASSES: Pixels = px(84.);
+const CLASSES_NARROW: Pixels = px(72.);
 const KDA: Pixels = px(80.);
 const DPM: Pixels = px(48.);
 const GAP: Pixels = px(16.);
@@ -52,6 +54,7 @@ pub(super) struct Fit {
     date_column: bool,
     gap: Pixels,
     title_min: Pixels,
+    classes: Pixels,
 }
 
 impl Fit {
@@ -61,6 +64,7 @@ impl Fit {
         date_column: true,
         gap: GAP,
         title_min: TITLE_MIN,
+        classes: CLASSES,
     };
 }
 
@@ -75,6 +79,7 @@ pub(super) fn fit(list: &ListState) -> Fit {
         date_column: roomy,
         gap: if roomy { GAP } else { GAP_NARROW },
         title_min: if roomy { TITLE_MIN } else { TITLE_MIN_NARROW },
+        classes: if roomy { CLASSES } else { CLASSES_NARROW },
     }
 }
 
@@ -121,7 +126,7 @@ pub(super) fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
         .when(fit.length, |el| {
             el.child(cell(LENGTH, "Length").text_right())
         })
-        .child(cell(CLASSES, "Class"))
+        .child(cell(fit.classes, "Class"))
         .child(cell(KDA, "K/D/A").text_right())
         .child(
             cell(DPM, "DPM")
@@ -267,9 +272,9 @@ fn map_cell(base: Div, id: u64, map: &str) -> impl IntoElement {
 fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
     let id = row.id();
     let assets = &cx.global::<Services>().assets;
-    // Three icons fill the class column; more wrap onto further lines and the row grows.
+    // Icons past the class column's line wrap onto further lines and the row grows.
     let icons = h_flex()
-        .w(CLASSES)
+        .w(fit.classes)
         .flex_none()
         .flex_wrap()
         .gap_1()
@@ -321,7 +326,7 @@ fn note(id: u64, state: LogState, fit: Fit, cx: &App) -> impl IntoElement {
     };
     let length = if fit.length { LENGTH + fit.gap } else { px(0.) };
     h_flex()
-        .w(length + CLASSES + KDA + DPM + fit.gap * 2.)
+        .w(length + fit.classes + KDA + DPM + fit.gap * 2.)
         .flex_none()
         .gap_2()
         .child(labelled(
