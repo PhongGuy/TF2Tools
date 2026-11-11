@@ -3,6 +3,7 @@
 //! kills by class.
 
 mod banner;
+mod medics;
 mod players;
 mod popover;
 mod rounds;
@@ -16,11 +17,11 @@ use gpui_kit::{
     ParentElement as _, Pixels, Styled as _, TestSupportExt as _, WeakEntity, Window, div, px,
 };
 use tf2tools_core::{
-    LogDetail, LogRow, LogState, MatrixKind, MedicLine, SteamId, Team, TfClass, TrackedPlayer,
+    LogDetail, LogRow, LogState, MatrixKind, SteamId, Team, TfClass, TrackedPlayer,
 };
 
 use super::sort::PlayerSort;
-use super::text::{LOG_LOADING, one_decimal, team_name, whole};
+use super::text::{LOG_LOADING, team_name};
 use super::{LogsTfPage, OpenLog, OpenState};
 use crate::ids;
 use crate::services::Services;
@@ -32,7 +33,6 @@ use crate::widgets::store_error::error_line;
 // A number column's width and a class icon's size, shared with the players table.
 const NUMBER: Pixels = px(44.);
 const ICON: Pixels = px(16.);
-const MEDIC_WIDTH: Pixels = px(280.);
 
 /// The panel under open log `row`. The score banner heads it once `open` is ready; the
 /// title comes from the row at once; under it the parsed log, or a line saying it is loading
@@ -127,15 +127,7 @@ fn log_body(
             )
         })
         .when(!log.medics().is_empty(), |el| {
-            el.child(section(
-                "Medics",
-                h_flex()
-                    .flex_wrap()
-                    .items_start()
-                    .gap_4()
-                    .children(log.medics().iter().map(|m| medic_block(m, cx))),
-                cx,
-            ))
+            el.child(section("Medics", medics::medics(log, cx), cx))
         })
         .when(!kills.is_empty(), |el| {
             let mut table = v_flex().child(
@@ -179,80 +171,6 @@ pub(super) fn section(title: &'static str, content: impl IntoElement, cx: &App) 
                 .child(title),
         )
         .child(content)
-}
-
-// One Medic's healing and uber numbers, then who they healed, most first.
-fn medic_block(medic: &MedicLine, cx: &App) -> impl IntoElement {
-    let fact = |label: String, value: String| {
-        h_flex()
-            .justify_between()
-            .gap_2()
-            .child(div().text_color(cx.theme().muted_foreground).child(label))
-            .child(value)
-    };
-    let mut facts = vec![
-        ("Healing".to_owned(), medic.heal().to_string()),
-        ("Heals/min".to_owned(), whole(medic.heal_per_min())),
-    ];
-    facts.extend(medic.charges().iter().map(|(kind, n)| {
-        (
-            format!("Charges ({})", charge_name(kind.key())),
-            n.to_string(),
-        )
-    }));
-    facts.extend([
-        ("Drops".to_owned(), medic.drops().to_string()),
-        (
-            "Avg time to build".to_owned(),
-            format!("{}s", whole(medic.avg_time_to_build())),
-        ),
-        (
-            "Avg uber length".to_owned(),
-            format!("{}s", one_decimal(medic.avg_uber_length())),
-        ),
-        (
-            "Deaths within 20s after uber".to_owned(),
-            medic.deaths_after_uber().to_string(),
-        ),
-    ]);
-    v_flex()
-        .id(ids::logstf_medic(medic.steam_id()))
-        .test_support()
-        .w(MEDIC_WIDTH)
-        .gap_1()
-        .p_2()
-        .rounded_md()
-        .border_1()
-        .border_color(cx.theme().border)
-        .child(
-            h_flex()
-                .gap_2()
-                .font_weight(FontWeight::SEMIBOLD)
-                .child(team_cell(medic.team(), cx))
-                .child(div().truncate().child(medic.name().to_owned())),
-        )
-        .children(facts.into_iter().map(|(label, value)| fact(label, value)))
-        .child(
-            div()
-                .pt_1()
-                .font_weight(FontWeight::MEDIUM)
-                .child("Heal spread"),
-        )
-        .children(
-            medic
-                .heal_spread()
-                .iter()
-                .map(|t| fact(t.name().to_owned(), t.healing().to_string())),
-        )
-}
-
-// logs.tf's medigun keys read as names: "kritzkrieg" becomes "Kritzkrieg".
-fn charge_name(kind: &str) -> String {
-    let mut chars = kind.chars();
-    chars
-        .next()
-        .map(|first| first.to_uppercase().chain(chars).collect())
-        .unwrap_or_default()
 }
 
 // A team's name in its colour.

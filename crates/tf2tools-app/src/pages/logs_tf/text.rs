@@ -266,6 +266,26 @@ pub fn medigun_name(medigun: &Medigun) -> &str {
     }
 }
 
+/// A Medic's healing with its rate per minute: "28170 (986/m)".
+pub fn healing_text(heal: u32, per_min: f64) -> String {
+    format!("{heal} ({}/m)", whole(per_min))
+}
+
+/// One medigun's charges and their share of all `total`: "Medigun: 12 (100%)".
+pub fn charge_text(medigun: &Medigun, n: u32, total: u32) -> String {
+    format!("{}: {n} ({})", medigun_name(medigun), share_text(n, total))
+}
+
+/// A time in whole seconds: "63 s".
+pub fn seconds_text(secs: f64) -> String {
+    format!("{} s", whole(secs))
+}
+
+/// A time to a tenth of a second: "6.5 s".
+pub fn tenths_text(secs: f64) -> String {
+    format!("{} s", one_decimal(secs))
+}
+
 /// (Type, Description) for one round event, players named through `name_of`. A charge names
 /// its medigun only when it is not the stock one; an unknown type shows its raw name alone.
 pub fn event_text(kind: &EventKind, name_of: &dyn Fn(SteamId) -> String) -> (String, String) {

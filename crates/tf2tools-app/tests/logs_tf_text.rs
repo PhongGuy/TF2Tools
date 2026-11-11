@@ -4,9 +4,10 @@ use std::time::Duration;
 
 use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
-    EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, count_text, duration_text, event_text, fetch_message,
-    finding_text, medigun_name, one_decimal, progress_line, progress_text, range_label, reads_zero,
-    resolve_message, ring_label, share_text, summary_text, sync_message, time_played_text, whole,
+    EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, charge_text, count_text, duration_text, event_text,
+    fetch_message, finding_text, healing_text, medigun_name, one_decimal, progress_line,
+    progress_text, range_label, reads_zero, resolve_message, ring_label, seconds_text, share_text,
+    summary_text, sync_message, tenths_text, time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
@@ -388,4 +389,45 @@ fn events_read_in_player_words() {
     }
     assert_eq!(medigun_name(&Medigun::QuickFix), "Quick-Fix");
     assert_eq!(medigun_name(&Medigun::Other("mystery".into())), "mystery");
+}
+
+#[test]
+fn medic_numbers_read_like_logs_tf() {
+    use tf2tools_core::Medigun;
+    assert_eq!(healing_text(28_170, 986.11), "28170 (986/m)");
+    assert_eq!(charge_text(&Medigun::MediGun, 12, 12), "Medigun: 12 (100%)");
+    assert_eq!(
+        charge_text(&Medigun::Kritzkrieg, 1, 4),
+        "Kritzkrieg: 1 (25%)"
+    );
+    assert_eq!(
+        charge_text(&Medigun::Other("mystery".into()), 2, 2),
+        "mystery: 2 (100%)"
+    );
+    assert_eq!(seconds_text(63.166), "63 s");
+    assert_eq!(tenths_text(6.5), "6.5 s");
+}
+
+#[test]
+fn heal_targets_run_high_to_low_with_class_and_share() {
+    use tf2tools_app::pages::logs_tf::tables::heal_rows;
+    use tf2tools_core::TfClass;
+    let log = tf2tools_core::parse_log(crate::support::logstf::SIXES).unwrap();
+    let rahmed = log.medics().iter().find(|m| m.name() == "Rahmed").unwrap();
+    let rows = heal_rows(rahmed);
+    let top: Vec<(&str, Option<TfClass>, u32, &str)> = rows[..2]
+        .iter()
+        .map(|r| (r.name.as_str(), r.class, r.heals, r.share.as_str()))
+        .collect();
+    assert_eq!(
+        top,
+        [
+            ("deshio", Some(TfClass::Scout), 8_495, "30%"),
+            ("DrHappiness", Some(TfClass::Soldier), 6_127, "22%"),
+        ]
+    );
+    assert!(
+        rows.windows(2).all(|w| w[0].heals >= w[1].heals),
+        "Heals high to low"
+    );
 }

@@ -65,7 +65,7 @@ impl LogDetail {
     pub fn columns(&self) -> &LogColumns {
         &self.columns
     }
-    /// Every player who played Medic, in the players' order.
+    /// Every player logs.tf kept Medic stats for, in the players' order.
     pub fn medics(&self) -> &[MedicLine] {
         &self.medics
     }
@@ -822,30 +822,27 @@ fn build(wire: WireLog) -> LogDetail {
 
     let medics = players
         .iter()
-        .filter(|(_, line, _)| line.classes.iter().any(|c| c.class == TfClass::Medic))
-        .map(|(key, line, p)| {
-            let stats = p.medicstats.clone().unwrap_or_default();
-            MedicLine {
-                steam_id: line.steam_id,
-                name: line.name.clone(),
-                team: line.team,
-                heal: p.heal,
-                heal_per_min: per_min(p.heal),
-                charges: p
-                    .ubertypes
-                    .iter()
-                    .map(|(k, v)| (Medigun::from_key(k), *v))
-                    .collect(),
-                drops: p.drops,
-                avg_time_to_build: stats.avg_time_to_build,
-                avg_uber_length: stats.avg_uber_length,
-                deaths_after_uber: stats.deaths_within_20s_after_uber,
-                avg_time_before_using: stats.avg_time_before_using,
-                near_full_deaths: stats.deaths_with_95_99_uber,
-                advantages_lost: stats.advantages_lost,
-                biggest_advantage_lost: stats.biggest_advantage_lost,
-                heal_spread: heal_spread(wire.healspread.get(key), &name_of, &class_of),
-            }
+        .filter_map(|(key, line, p)| Some((key, line, p, p.medicstats.clone()?)))
+        .map(|(key, line, p, stats)| MedicLine {
+            steam_id: line.steam_id,
+            name: line.name.clone(),
+            team: line.team,
+            heal: p.heal,
+            heal_per_min: per_min(p.heal),
+            charges: p
+                .ubertypes
+                .iter()
+                .map(|(k, v)| (Medigun::from_key(k), *v))
+                .collect(),
+            drops: p.drops,
+            avg_time_to_build: stats.avg_time_to_build,
+            avg_uber_length: stats.avg_uber_length,
+            deaths_after_uber: stats.deaths_within_20s_after_uber,
+            avg_time_before_using: stats.avg_time_before_using,
+            near_full_deaths: stats.deaths_with_95_99_uber,
+            advantages_lost: stats.advantages_lost,
+            biggest_advantage_lost: stats.biggest_advantage_lost,
+            heal_spread: heal_spread(wire.healspread.get(key), &name_of, &class_of),
         })
         .collect();
 

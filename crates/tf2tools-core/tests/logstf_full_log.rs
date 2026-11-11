@@ -415,7 +415,7 @@ fn heal_targets_carry_their_longest_class_and_charges_name_their_medigun() {
     );
     let body = r#"{"length": 60, "teams": {"Red": {}, "Blue": {}},
         "players": {"[U:1:5]": {"team": "Red", "heal": 10,
-            "ubertypes": {"medigun": 3, "kritzkrieg": 2},
+            "ubertypes": {"medigun": 3, "kritzkrieg": 2}, "medicstats": {},
             "class_stats": [{"type": "medic", "total_time": 60}]}},
         "healspread": {"[U:1:5]": {"[U:1:6]": 10}}}"#;
     let log = parse_log(body).unwrap();
@@ -429,7 +429,11 @@ fn heal_targets_carry_their_longest_class_and_charges_name_their_medigun() {
         medic.charges(),
         [(Medigun::Kritzkrieg, 2), (Medigun::MediGun, 3)]
     );
-    assert_eq!(medic.near_full_deaths(), 0, "no medicstats reads as zeros");
+    assert_eq!(
+        medic.near_full_deaths(),
+        0,
+        "empty medicstats read as zeros"
+    );
 }
 
 #[test]
@@ -568,5 +572,22 @@ fn a_log_with_only_the_required_keys_opens_with_empty_sections() {
     assert_eq!(
         (streak.steam_id(), streak.streak(), streak.at()),
         (sid(5), 4, 2)
+    );
+}
+
+#[test]
+fn only_players_with_medic_stats_get_a_medic_block() {
+    let body = r#"{"length": 60, "teams": {"Red": {}, "Blue": {}},
+        "players": {
+          "[U:1:5]": {"team": "Red", "class_stats": [{"type": "medic", "total_time": 60}]},
+          "[U:1:6]": {"team": "Blue", "class_stats": [{"type": "medic", "total_time": 60}],
+                      "medicstats": {"avg_time_to_build": 50}}}}"#;
+    let log = parse_log(body).unwrap();
+    let medics: Vec<SteamId> = log.medics().iter().map(|m| m.steam_id()).collect();
+    assert_eq!(medics, [sid(6)]);
+    assert_eq!(
+        six().medics().len(),
+        2,
+        "both fixture medics carry medicstats"
     );
 }

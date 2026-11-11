@@ -186,3 +186,37 @@ fn rounds_open_any_number_and_show_players_and_events(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|cx| page.read(cx).open_rounds()), [1]);
     assert!(!support::present(cx, s.win, ids::logstf_round_panel(3, 0)));
 }
+
+#[gpui_kit::test]
+fn a_medic_block_reads_like_logs_tf(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened(cx, 3);
+    let rahmed = sid(175_790_976);
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_medic(rahmed));
+    let facts = [
+        ("Healing", "28170 (986/m)"),
+        ("Charges:medigun", "Medigun: 12 (100%)"),
+        ("Drops", "0"),
+        ("Avg time to build", "63 s"),
+        ("Avg time before using", "37 s"),
+        ("Near full charge deaths", "0"),
+        ("Avg uber length", "6.5 s"),
+        ("Deaths after charge", "4"),
+        ("Major advantages lost", "1"),
+        ("Biggest advantage lost", "21 s"),
+    ];
+    for (label, value) in facts {
+        assert_eq!(
+            support::label_of(cx, s.win, ids::logstf_medic_fact(rahmed, label)).as_deref(),
+            Some(value),
+            "{label}"
+        );
+    }
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_heal_target(rahmed, sid(251_597_547))).as_deref(),
+        Some("30%")
+    );
+    assert!(
+        support::present(cx, s.win, ids::logstf_medic(sid(98_265_577))),
+        "both medics"
+    );
+}

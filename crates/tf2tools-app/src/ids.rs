@@ -2678,6 +2678,24 @@ pub fn logstf_medic(id: SteamId) -> ElementId {
     keyed("logstf-medic", &id.id64().to_string())
 }
 
+/// The open log's Medics section: "logstf-medics".
+pub const LOGSTF_MEDICS: &str = "logstf-medics";
+
+/// One row of a Medic's block, labelled with its value: "logstf-medic-fact:<id64>:<label>".
+/// Charges rows use "Charges:<medigun key>" as their label.
+pub fn logstf_medic_fact(id: SteamId, label: &str) -> ElementId {
+    keyed("logstf-medic-fact", &format!("{}:{label}", id.id64()))
+}
+
+/// One heal target's row in a Medic's block, labelled with its share:
+/// "logstf-heal-target:<medic id64>:<target id64>".
+pub fn logstf_heal_target(medic: SteamId, target: SteamId) -> ElementId {
+    keyed(
+        "logstf-heal-target",
+        &format!("{}:{}", medic.id64(), target.id64()),
+    )
+}
+
 /// A tracked player's kills by victim class in the open log: "logstf-class-kills:<id64>".
 pub fn logstf_class_kills(id: SteamId) -> ElementId {
     keyed("logstf-class-kills", &id.id64().to_string())
