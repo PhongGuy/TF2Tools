@@ -487,7 +487,15 @@ fn switching_chips_mid_sync_finishes_the_first_and_shows_the_second(cx: &mut Tes
             .iter()
             .all(|p| p.last_synced().is_some())
     });
-    assert_eq!(s.services.logs.cache().logs(sid(ARIE)).unwrap().len(), 2);
+    assert_eq!(
+        s.services
+            .logs
+            .cache()
+            .logs(sid(ARIE), tf2tools_core::LogsRange::Months3)
+            .unwrap()
+            .len(),
+        2
+    );
     // "other" shares the same served list, so it shows the same two logs, from its own load.
     assert_eq!(row_ids(cx, &page), [3, 2]);
 }
@@ -558,7 +566,7 @@ fn the_grid_shows_nine_classes_and_dims_the_unplayed(cx: &mut TestAppContext) {
     assert_eq!(
         support::label_of(cx, s.win, ids::LOGSTF_SUMMARY),
         Some(summary_text(
-            local(tf2tools_core::window_start(newest)),
+            local(tf2tools_core::window_start(newest, tf2tools_core::LogsRange::Months3).unwrap()),
             local(newest),
             2,
             false

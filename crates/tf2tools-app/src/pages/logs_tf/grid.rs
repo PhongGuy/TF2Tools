@@ -5,7 +5,7 @@ use gpui_kit::{
     App, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
-use tf2tools_core::{ClassAverage, LOG_CAP, LogRow, window_start};
+use tf2tools_core::{ClassAverage, LogRow, LogsRange, window_start};
 
 use super::text::{local_date, one_decimal, summary_text, time_played_text, whole};
 use crate::ids;
@@ -40,21 +40,16 @@ pub(super) fn class_grid(
         }))
 }
 
-// The window ends at the newest row. Uncapped it reaches the full span back; at the cap it
-// only reaches the oldest row kept. No rows means no window to name.
+// The window ends at the newest row and reaches the range's full span back. No rows means no
+// window to name.
 fn summary(rows: &[LogRow]) -> Option<String> {
     let newest = rows.first()?.date();
-    let capped = rows.len() >= LOG_CAP;
-    let oldest = if capped {
-        rows.last()?.date()
-    } else {
-        window_start(newest)
-    };
+    let oldest = window_start(newest, LogsRange::default()).unwrap_or(newest);
     Some(summary_text(
         local_date(oldest)?,
         local_date(newest)?,
         rows.len(),
-        capped,
+        false,
     ))
 }
 

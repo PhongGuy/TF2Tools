@@ -1,6 +1,6 @@
 //! The window is the 90 days ending at the player's newest log, however old that log is.
 
-use tf2tools_core::{PRUNE_SECS, SteamId, TrackedPlayer, WINDOW_SECS};
+use tf2tools_core::{LogsRange, PRUNE_SECS, SteamId, TrackedPlayer};
 
 use crate::common;
 use crate::common::logstf::{
@@ -25,7 +25,7 @@ async fn sync_from(anchor_days: i64) -> (Vec<u64>, u32, usize, usize) {
     cache
         .add_player(&TrackedPlayer::new(arie(), "Arie"))
         .unwrap();
-    let window_days = WINDOW_SECS / DAY;
+    let window_days = LogsRange::Months3.reach_secs().unwrap() / DAY;
     mount_list(
         &env.server,
         ARIE,
@@ -43,8 +43,8 @@ async fn sync_from(anchor_days: i64) -> (Vec<u64>, u32, usize, usize) {
         .sync_player(arie(), false, &|_| {})
         .await
         .unwrap();
-    let rows = cache.logs(arie()).unwrap();
-    let averages = cache.class_averages(arie()).unwrap();
+    let rows = cache.logs(arie(), LogsRange::Months3).unwrap();
+    let averages = cache.class_averages(arie(), LogsRange::Months3).unwrap();
     let fetched = paths(&env.server)
         .await
         .iter()
@@ -95,8 +95,11 @@ async fn the_list_averages_and_pending_check_share_one_window() {
     let env = logs_env().await;
     seed(&env.dir, &[(3, 150, true), (2, 200, true), (1, 260, false)]);
     let cache = env.client.cache();
-    assert_eq!(ids(&cache.logs(arie()).unwrap()), [3, 2]);
-    let averages = cache.class_averages(arie()).unwrap();
+    assert_eq!(
+        ids(&cache.logs(arie(), LogsRange::Months3).unwrap()),
+        [3, 2]
+    );
+    let averages = cache.class_averages(arie(), LogsRange::Months3).unwrap();
     assert_eq!((averages[0].logs(), averages[0].seconds()), (2, 120));
     let summary = env
         .client
@@ -110,7 +113,10 @@ async fn the_list_averages_and_pending_check_share_one_window() {
     seed(&env.dir, &[(3, 150, true), (2, 220, false)]);
     mount_list(&env.server, ARIE, list_body(&[])).await;
     let cache = env.client.cache();
-    assert_eq!(ids(&cache.logs(arie()).unwrap()), [3, 2]);
+    assert_eq!(
+        ids(&cache.logs(arie(), LogsRange::Months3).unwrap()),
+        [3, 2]
+    );
     let summary = env
         .client
         .sync_player(arie(), false, &|_| {})
@@ -160,5 +166,8 @@ async fn pruning_follows_each_players_own_window() {
         .unwrap();
     // 4 is past Arie's slack and 6 past Bea's; 2 stays for Arie although Bea's window is long past it.
     assert_eq!(left, [1, 2, 3, 5]);
-    assert_eq!(ids(&cache.logs(arie()).unwrap()), [1, 2]);
+    assert_eq!(
+        ids(&cache.logs(arie(), LogsRange::Months3).unwrap()),
+        [1, 2]
+    );
 }

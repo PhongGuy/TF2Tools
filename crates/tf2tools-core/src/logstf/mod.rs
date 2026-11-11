@@ -4,6 +4,7 @@ mod averages;
 mod cache;
 mod client;
 mod detail;
+mod range;
 mod steam_id;
 mod steam_xml;
 
@@ -19,6 +20,7 @@ pub use detail::{
     MatrixRow, MedicLine, Medigun, PlayerLine, RoundEvent, RoundLine, RoundPlayer, RoundTeam,
     TeamTotals, WeaponLine, parse_log,
 };
+pub use range::{LogsRange, window_start};
 pub use steam_id::{PlayerInput, SteamId, parse_player_input};
 
 /// The SteamID64 of account number 0 in the public universe.
@@ -30,25 +32,14 @@ pub const LOGS_SPACING: Duration = Duration::from_secs(1);
 /// The largest log or profile body accepted.
 pub const LOG_BODY_LIMIT: u64 = 2 * 1024 * 1024;
 
-/// How far back the log list and the class averages reach from the player's newest log.
-pub const WINDOW_SECS: i64 = 90 * 86_400;
-
 /// Logs uploaded this much before every listing player's newest log are deleted after a sync.
 pub const PRUNE_SECS: i64 = 120 * 86_400;
-
-/// The most logs a player's window holds; older ones past it are left out.
-pub const LOG_CAP: usize = 400;
 
 /// A player synced more recently than this is not synced again unless forced.
 pub const STALE_SECS: i64 = 30 * 60;
 
 /// A log fetched within this long of its upload may still change and is fetched once more.
 pub const PROVISIONAL_SECS: i64 = 60 * 60;
-
-/// The start of the window that ends at `anchor`, the player's newest log (unix seconds).
-pub fn window_start(anchor: i64) -> i64 {
-    anchor - WINDOW_SECS
-}
 
 /// logs.tf's class name ("heavyweapons", "demoman", ...) as a `TfClass`; `None` for anything else.
 pub fn logstf_class(name: &str) -> Option<TfClass> {

@@ -49,7 +49,7 @@ async fn the_list_is_cut_at_the_window_with_one_list_request() {
 }
 
 #[tokio::test]
-async fn the_list_is_cut_at_the_cap() {
+async fn every_log_in_the_window_is_listed() {
     let env = tracked_env().await;
     let logs: Vec<(u64, i64)> = (0..405u64)
         .map(|i| (10_000 - i, days_ago(1) - i as i64))
@@ -61,15 +61,8 @@ async fn the_list_is_cut_at_the_cap() {
         .sync_player(arie(), false, &|_| {})
         .await
         .unwrap();
-    assert_eq!(
-        (summary.listed(), summary.downloaded(), summary.capped()),
-        (400, 400, true)
-    );
-    assert_eq!(common::count(&env.dir, "logstf_player_logs"), 400);
-    assert!(
-        !paths(&env.server).await.contains(&"/json/9600".to_owned()),
-        "the 401st is never fetched"
-    );
+    assert_eq!((summary.listed(), summary.downloaded()), (405, 405));
+    assert_eq!(common::count(&env.dir, "logstf_logs"), 405);
 }
 
 #[tokio::test]

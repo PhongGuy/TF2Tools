@@ -196,6 +196,7 @@ mod logstf_full_log;
 mod logstf_ids;
 mod logstf_incremental;
 mod logstf_ingest;
+mod logstf_range;
 mod logstf_resolve;
 mod logstf_sync;
 mod logstf_sync_failures;

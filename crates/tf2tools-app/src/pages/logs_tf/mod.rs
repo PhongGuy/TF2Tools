@@ -17,8 +17,8 @@ use gpui_kit::{
     div, px,
 };
 use tf2tools_core::{
-    ClassAverage, LogDetail, LogRow, LogState, LogsProgress, LogsSyncError, LogsSyncSummary,
-    SteamId, TrackedPlayer, parse_log, parse_player_input,
+    ClassAverage, LogDetail, LogRow, LogState, LogsProgress, LogsRange, LogsSyncError,
+    LogsSyncSummary, SteamId, TrackedPlayer, parse_log, parse_player_input,
 };
 
 use crate::ids;
@@ -458,8 +458,10 @@ impl LogsTfPage {
             let active = cache.active_player().map_err(read)?;
             let logs = match active {
                 Some(id) => Some((
-                    cache.logs(id).map_err(read)?,
-                    cache.class_averages(id).map_err(read)?,
+                    cache.logs(id, LogsRange::default()).map_err(read)?,
+                    cache
+                        .class_averages(id, LogsRange::default())
+                        .map_err(read)?,
                 )),
                 None => None,
             };

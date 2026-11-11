@@ -6,8 +6,7 @@ use rusqlite::{OptionalExtension, params};
 
 use super::averages::{CLASS_SUMS, ClassAverage, ClassSums, WINDOW_LOGS};
 use super::{
-    LOG_CAP, LogDetail, PROVISIONAL_SECS, PRUNE_SECS, SteamId, WINDOW_SECS, logstf_class,
-    logstf_class_name,
+    LogDetail, LogsRange, PROVISIONAL_SECS, PRUNE_SECS, SteamId, logstf_class, logstf_class_name,
 };
 use crate::db::Database;
 use crate::error::LogsCacheError;
@@ -15,6 +14,9 @@ use crate::weapons::TfClass;
 
 /// The `settings` key naming the player whose chip is selected.
 const ACTIVE_KEY: &str = "logstf_active_player";
+
+/// The `settings` key holding the chosen history range's key.
+const RANGE_KEY: &str = "logstf_range";
 
 /// `logstf_logs.state` for a log logs.tf answered 404 for.
 pub(super) const STATE_GONE: i64 = 1;
@@ -291,9 +293,40 @@ impl LogsCache {
             .map_err(db_error)
     }
 
-    /// The player's logs in their window (the `WINDOW_SECS` ending at their newest log),
-    /// newest first, at most LOG_CAP.
-    pub fn logs(&self, id: SteamId) -> Result<Vec<LogRow>, LogsCacheError> {
+    /// The chosen history range; a missing or unknown setting reads as the default, three months.
+    pub fn range(&self) -> Result<LogsRange, LogsCacheError> {
+        let key = self
+            .db
+            .read(|conn| {
+                conn.query_row(
+                    "SELECT value FROM settings WHERE key = ?1",
+                    [RANGE_KEY],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+            })
+            .map_err(db_error)?;
+        Ok(key
+            .as_deref()
+            .and_then(LogsRange::from_key)
+            .unwrap_or_default())
+    }
+
+    /// Stores `range` as the chosen history range.
+    pub fn set_range(&self, range: LogsRange) -> Result<(), LogsCacheError> {
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+                    params![RANGE_KEY, range.key()],
+                )
+            })
+            .map(drop)
+            .map_err(db_error)
+    }
+
+    /// The player's logs in `range`'s window ending at their newest log, newest first.
+    pub fn logs(&self, id: SteamId, range: LogsRange) -> Result<Vec<LogRow>, LogsCacheError> {
         // One row per (log, class played), longest class first and ties by class name; a log with no class rows
         // comes once with NULL stats. Consecutive rows of one log fold into its LogRow.
         let sql = format!(
@@ -308,7 +341,7 @@ impl LogsCache {
         self.db
             .read(|conn| {
                 let mut stmt = conn.prepare(&sql)?;
-                let mut rows = stmt.query(params![sql_id(id)?, WINDOW_SECS, LOG_CAP as i64])?;
+                let mut rows = stmt.query(params![sql_id(id)?, range.reach_secs()])?;
                 let mut out: Vec<LogRow> = Vec::new();
                 while let Some(row) = rows.next()? {
                     let log_id = u64::try_from(row.get::<_, i64>(0)?).unwrap_or(0);
@@ -374,13 +407,17 @@ impl LogsCache {
     }
 
     /// The nine classes in TfClass::ALL order, over exactly the logs `logs` returns.
-    pub fn class_averages(&self, id: SteamId) -> Result<[ClassAverage; 9], LogsCacheError> {
+    pub fn class_averages(
+        &self,
+        id: SteamId,
+        range: LogsRange,
+    ) -> Result<[ClassAverage; 9], LogsCacheError> {
         let sql = format!("{WINDOW_LOGS} {CLASS_SUMS}");
         let sums = self
             .db
             .read(|conn| {
                 let mut stmt = conn.prepare(&sql)?;
-                stmt.query_map(params![sql_id(id)?, WINDOW_SECS, LOG_CAP as i64], |row| {
+                stmt.query_map(params![sql_id(id)?, range.reach_secs()], |row| {
                     Ok((
                         row.get::<_, String>(0)?,
                         ClassSums {
@@ -589,7 +626,11 @@ impl LogsCache {
     }
 
     /// Whether any of `player`'s logs `logs` would return is still pending.
-    pub(crate) fn has_pending(&self, player: SteamId) -> Result<bool, LogsCacheError> {
+    pub(crate) fn has_pending(
+        &self,
+        player: SteamId,
+        range: LogsRange,
+    ) -> Result<bool, LogsCacheError> {
         let sql = format!(
             "{WINDOW_LOGS}
              SELECT 1 FROM logstf_logs
@@ -598,7 +639,7 @@ impl LogsCache {
         self.db
             .read(|conn| {
                 conn.prepare(&sql)?
-                    .exists(params![sql_id(player)?, WINDOW_SECS, LOG_CAP as i64])
+                    .exists(params![sql_id(player)?, range.reach_secs()])
             })
             .map_err(db_error)
     }

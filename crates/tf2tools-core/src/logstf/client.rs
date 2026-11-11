@@ -11,7 +11,7 @@ use crate::store::http::{Http, NetFailure, Redirects};
 use super::cache::{ListedLog, STATE_GONE};
 use super::steam_xml::xml_text;
 use super::{
-    LOG_BODY_LIMIT, LOG_CAP, LOGS_SPACING, LogsCache, PlayerInput, STALE_SECS, SteamId,
+    LOG_BODY_LIMIT, LOGS_SPACING, LogsCache, LogsRange, PlayerInput, STALE_SECS, SteamId,
     TrackedPlayer, parse_log, window_start,
 };
 
@@ -44,7 +44,6 @@ pub struct LogsSyncSummary {
     downloaded: usize,
     gone: usize,
     unreadable: usize,
-    capped: bool,
 }
 
 impl LogsSyncSummary {
@@ -53,7 +52,7 @@ impl LogsSyncSummary {
         self.skipped
     }
 
-    /// Logs in the window, after the cap.
+    /// Logs in the window.
     pub fn listed(&self) -> usize {
         self.listed
     }
@@ -71,11 +70,6 @@ impl LogsSyncSummary {
     /// Logs whose body could not be read.
     pub fn unreadable(&self) -> usize {
         self.unreadable
-    }
-
-    /// More logs were in the window than `LOG_CAP`; the oldest were left out.
-    pub fn capped(&self) -> bool {
-        self.capped
     }
 }
 
@@ -256,7 +250,8 @@ impl LogsClient {
             })?;
         // A sync that stopped partway leaves pending logs, so the next open finishes it.
         let fresh = last_synced.is_some_and(|at| now - at < STALE_SECS);
-        if !force && fresh && !self.cache.has_pending(id)? {
+        let range = LogsRange::default();
+        if !force && fresh && !self.cache.has_pending(id, range)? {
             return Ok(LogsSyncSummary {
                 skipped: true,
                 ..LogsSyncSummary::default()
@@ -264,18 +259,17 @@ impl LogsClient {
         }
 
         // The window ends at the player's newest log, which tops the list, so the first page
-        // (1000 entries, more than the cap) always reaches it however long ago they played.
+        // always reaches it however long ago they played.
         let mut logs = self.list(id).await?;
         let anchor = logs.iter().map(|log| log.date).max().unwrap_or(0);
-        logs.retain(|log| log.date >= window_start(anchor));
+        if let Some(start) = window_start(anchor, range) {
+            logs.retain(|log| log.date >= start);
+        }
         logs.sort_by(|a, b| b.date.cmp(&a.date).then(b.id.cmp(&a.id)));
-        let capped = logs.len() > LOG_CAP;
-        logs.truncate(LOG_CAP);
         let wanted = self.cache.record_list(id, &logs, now)?;
 
         let mut summary = LogsSyncSummary {
             listed: logs.len(),
-            capped,
             ..LogsSyncSummary::default()
         };
         let total = wanted.len();
