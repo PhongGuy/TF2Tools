@@ -2599,6 +2599,12 @@ pub fn logstf_sort(title: &str) -> ElementId {
     keyed("logstf-sort", title)
 }
 
+/// The arrow on the sorted players header, labelled "high to low" or "low to high":
+/// "logstf-sort-arrow:K/D".
+pub fn logstf_sort_arrow(title: &str) -> ElementId {
+    keyed("logstf-sort-arrow", title)
+}
+
 /// One player's line in the open log's players table: "logstf-player:<id64>".
 pub fn logstf_player_row(id: SteamId) -> ElementId {
     keyed("logstf-player", &id.id64().to_string())

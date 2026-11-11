@@ -1,11 +1,12 @@
 //! The open log's players table, sortable by any header as on logs.tf.
 
+use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{ActiveTheme as _, Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Icon, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, Div, FontWeight, InteractiveElement as _, ParentElement as _, Pixels, Styled as _,
-    TestSupportExt as _, WeakEntity, div, px,
+    App, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
+    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, div, px,
 };
 use tf2tools_core::{LogColumns, LogDetail, PlayerLine, SteamId};
 
@@ -39,20 +40,31 @@ pub(super) fn players_table(
     let columns = player_columns(log.columns());
     // A kept sort by a column this log hides lists in the default order, but stays saved.
     let shown = sort.shown_in(log.columns());
+    // The sorted header carries an arrow under its title, since the columns are too narrow
+    // to fit one beside it.
     let header = |column: PlayerColumn| {
         let page = page.clone();
-        Button::new(ids::logstf_sort(column.title()))
+        let sorted = shown.filter(|s| s.column == column);
+        let button = Button::new(ids::logstf_sort(column.title()))
             .ghost()
             .xsmall()
             .label(column.title())
-            .selected(shown.is_some_and(|s| s.column == column))
-            .flex_none()
+            .selected(sorted.is_some())
+            .w_full()
             .on_click(move |_, _, cx| {
                 let _ = page.update(cx, |page, cx| page.sort_players_by(column, cx));
+            });
+        v_flex()
+            .flex_none()
+            .items_center()
+            .child(button)
+            .when_some(sorted, |el, sort| {
+                el.child(sort_arrow(column, sort.descending))
             })
     };
     let mut table = v_flex().w_full().child(
         h_flex()
+            .items_start()
             .gap_1()
             .px_1()
             .py_1()
@@ -117,6 +129,20 @@ pub(super) fn players_table(
         );
     }
     table
+}
+
+// The sorted column's direction as a small chevron, said in words for readers.
+fn sort_arrow(column: PlayerColumn, descending: bool) -> impl IntoElement {
+    let (icon, words) = if descending {
+        (IconName::ChevronDown, "high to low")
+    } else {
+        (IconName::ChevronUp, "low to high")
+    };
+    div()
+        .id(ids::logstf_sort_arrow(column.title()))
+        .aria_label(words)
+        .test_support()
+        .child(Icon::new(icon).xsmall())
 }
 
 // logs.tf's number columns in its order, without the ones the log did not record.

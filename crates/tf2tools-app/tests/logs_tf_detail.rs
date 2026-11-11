@@ -708,3 +708,19 @@ fn a_wide_table_keeps_its_sideways_bar_under_its_last_row(cx: &mut TestAppContex
         "row ends {last:?}, matrix {matrix:?}"
     );
 }
+
+#[gpui_kit::test]
+fn the_sorted_header_shows_its_direction(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_sort("DA"));
+    let arrow = |cx: &mut TestAppContext, title: &str| {
+        support::label_of(cx, s.win, ids::logstf_sort_arrow(title))
+    };
+    // logs.tf's default order lights no header.
+    assert!(!support::present(cx, s.win, ids::logstf_sort_arrow("Team")));
+    support::click_id(cx, s.win, ids::logstf_sort("DA"));
+    assert_eq!(arrow(cx, "DA").as_deref(), Some("high to low"));
+    assert!(!support::present(cx, s.win, ids::logstf_sort_arrow("K")));
+    support::click_id(cx, s.win, ids::logstf_sort("DA"));
+    assert_eq!(arrow(cx, "DA").as_deref(), Some("low to high"));
+}
