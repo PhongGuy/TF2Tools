@@ -1,5 +1,7 @@
-//! The local Addons page: the mastercomfig addons in the library, installed or not.
+//! The local Addons page: the mastercomfig addons in the library, installed or not, then the
+//! GameBanana add-ons.
 
+mod gamebanana;
 pub mod model;
 
 use std::rc::Rc;
@@ -11,10 +13,10 @@ use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
 };
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AsyncApp, Context, Entity, EventEmitter, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled, Subscription, TestSupportExt as _, WeakEntity, Window,
-    div, px,
+    AnyElement, AnyWindowHandle, App, AsyncApp, Context, ElementId, Entity, EventEmitter,
+    FontWeight, InteractiveElement as _, IntoElement, ParentElement, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement as _, Styled, Subscription, TestSupportExt as _,
+    WeakEntity, Window, div, px,
 };
 use tf2tools_core::{
     AddonEntry, AddonName, LogLevel, NewLogEntry, StoreItemId, StoreKind, Tf2Install,
@@ -22,6 +24,7 @@ use tf2tools_core::{
 
 use crate::activity;
 use crate::addon_updates::AddonUpdates;
+use crate::gb_addon_installs::GbAddonInstalls;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_library, describe_tf2_install};
@@ -49,6 +52,7 @@ pub struct AddonsPage {
     /// Bumped by each reload, so a slower, older load never overwrites a newer one.
     load_generation: u64,
     updates: Entity<AddonUpdates>,
+    gb: Entity<GbAddonInstalls>,
     /// The addon this page works on now and what it does to it.
     busy: Option<(AddonName, AddonAction)>,
     scroll: ScrollHandle,
@@ -69,6 +73,8 @@ impl AddonsPage {
         let updating = cx.observe(&updates, |_, _, cx| cx.notify());
         let downloads = StoreDownloads::install(cx);
         let downloading = cx.observe(&downloads, |_, _, cx| cx.notify());
+        let gb = GbAddonInstalls::global(cx);
+        let gb_changed = cx.observe(&gb, |_, _, cx| cx.notify());
         let mut page = Self {
             win: window.window_handle(),
             addons: Rc::from(Vec::new()),
@@ -76,11 +82,13 @@ impl AddonsPage {
             adopted: false,
             load_generation: 0,
             updates,
+            gb,
             busy: None,
             scroll: ScrollHandle::new(),
-            _subscriptions: vec![tf2, library, updating, downloading],
+            _subscriptions: vec![tf2, library, updating, downloading, gb_changed],
         };
         page.reload(cx);
+        page.gb.update(cx, |gb, cx| gb.check_updates(cx));
         page
     }
 
@@ -94,11 +102,12 @@ impl AddonsPage {
         &self.addons
     }
 
-    /// v5's `isAnyBusy`: an operation of this page, a pending or running reinstall, or any
-    /// store download.
+    /// v5's `isAnyBusy`: an operation of this page, a pending or running reinstall, any
+    /// store download, or a GameBanana add-on operation.
     pub fn is_any_busy(&self, cx: &App) -> bool {
         self.busy.is_some()
             || self.updates.read(cx).is_busy()
+            || self.gb.read(cx).is_busy()
             || StoreDownloads::global(cx).is_some_and(|d| d.read(cx).is_busy())
     }
 
@@ -253,7 +262,9 @@ impl AddonsPage {
 
     // Lists the library in the background, adopting tf/custom's addons first on the first load
     // that knows TF2. A failed adoption only warns; a failed list toasts through the window.
+    // The GameBanana add-ons are listed again too, which catches files deleted by hand.
     fn reload(&mut self, cx: &mut Context<Self>) {
+        self.gb.update(cx, |gb, cx| gb.reload(cx));
         self.load_generation += 1;
         let generation = self.load_generation;
         let tf2 = tf2_state(cx).read(cx).install().cloned();
@@ -295,7 +306,10 @@ impl AddonsPage {
 
     // The count line on the left; v5's outline "Browse Addon Store" on the right.
     fn header(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let installed = self.addons.iter().filter(|a| a.is_installed()).count();
+        let gb = self.gb.read(cx).entries();
+        let library = self.addons.len() + gamebanana::shown(gb).count();
+        let installed = self.addons.iter().filter(|a| a.is_installed()).count()
+            + gamebanana::shown(gb).filter(|e| e.is_installed()).count();
         h_flex()
             .flex_wrap()
             .items_center()
@@ -304,7 +318,7 @@ impl AddonsPage {
             .child(labelled(
                 div().text_sm().text_color(cx.theme().muted_foreground),
                 ids::ADDONS_COUNT,
-                count_line(self.addons.len(), installed),
+                count_line(library, installed),
             ))
             .child(
                 Button::new(ids::ADDONS_BROWSE)
@@ -315,8 +329,22 @@ impl AddonsPage {
             )
     }
 
-    // "Installed Addons" (or its empty card), then "Your Library" when anything is left over.
+    // The mastercomfig addons when there are any: "Installed Addons" (or its empty card), then
+    // "Your Library" when anything is left over. Then the GameBanana add-ons, when any.
     fn sections(&self, columns: usize, cx: &mut Context<Self>) -> AnyElement {
+        let rest = self.is_any_busy(cx);
+        let gb = self.gb.clone();
+        let any_gb = gamebanana::shown(gb.read(cx).entries()).next().is_some();
+        let gb_section = any_gb.then(|| gamebanana::gb_section(&gb, columns, rest, cx));
+        let mastercomfig = (!self.addons.is_empty()).then(|| self.mastercomfig(columns, cx));
+        v_flex()
+            .gap_6()
+            .children(mastercomfig)
+            .children(gb_section)
+            .into_any_element()
+    }
+
+    fn mastercomfig(&self, columns: usize, cx: &mut Context<Self>) -> AnyElement {
         let state = CardState {
             rest: self.is_any_busy(cx),
             has_tf2: tf2_state(cx).read(cx).install().is_some(),
@@ -448,7 +476,11 @@ impl Render for AddonsPage {
             )
         });
         let body = self.loaded.then(|| {
-            if self.addons.is_empty() {
+            if self.addons.is_empty()
+                && gamebanana::shown(self.gb.read(cx).entries())
+                    .next()
+                    .is_none()
+            {
                 self.empty_library(cx)
             } else {
                 let columns = columns_for(window.viewport_size().width - SHELL_CHROME_WIDTH);
@@ -471,7 +503,7 @@ impl Render for AddonsPage {
 }
 
 // A titled section, its heading labelled for the tests and the pilot.
-fn section(id: &'static str, title: &'static str, body: AnyElement) -> impl IntoElement {
+fn section(id: impl Into<ElementId>, title: &'static str, body: AnyElement) -> impl IntoElement {
     v_flex()
         .gap_3()
         .child(labelled(

@@ -111,13 +111,6 @@ pub struct StoreDetail {
     _subscriptions: Vec<Subscription>,
 }
 
-const UNSUPPORTED_NOTE: &str = "RAR archive: extract it manually, then import it locally";
-
-/// Whether the app cannot import `file_name`: RAR archives, in any case.
-pub fn is_unsupported(file_name: &str) -> bool {
-    file_name.to_ascii_lowercase().ends_with(".rar")
-}
-
 /// Whether `kind`'s items have screenshots; the detail shows its carousel only for these.
 pub fn has_screenshots(kind: StoreKind) -> bool {
     matches!(
@@ -219,7 +212,7 @@ impl StoreDetail {
         self.load_files(cx);
     }
 
-    /// Starts file `index` through `StoreDownloads`; false when busy, unsupported or absent.
+    /// Starts file `index` through `StoreDownloads`; false when busy or absent.
     pub fn download(&mut self, index: usize, cx: &mut Context<Self>) -> bool {
         let FilesState::Ready(files) = &self.files else {
             return false;
@@ -227,9 +220,6 @@ impl StoreDetail {
         let Some(file) = files.get(index) else {
             return false;
         };
-        if is_unsupported(file.file_name()) {
-            return false;
-        }
         let Some(downloads) = StoreDownloads::global(cx) else {
             return false;
         };
@@ -279,7 +269,7 @@ impl StoreDetail {
         cx.notify();
     }
 
-    // One file row: its name and size, an unsupported note, and its own Download button.
+    // One file row: its name and size, and its own Download button.
     fn file_row(
         &self,
         index: usize,
@@ -288,7 +278,6 @@ impl StoreDetail {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let muted = cx.theme().muted_foreground;
-        let unsupported = is_unsupported(file.file_name());
         let curated = self.item.kind == StoreKind::CuratedHuds;
         // Curated re-downloads replace the HUD in place; a GameBanana item is owned once.
         let (label, owned_gb) = match (self.item.in_library, curated) {
@@ -298,7 +287,7 @@ impl StoreDetail {
         };
         let button = Button::new(ids::store_file(index))
             .label(label)
-            .disabled(busy || unsupported || owned_gb)
+            .disabled(busy || owned_gb)
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.download(index, cx);
             }));
@@ -319,14 +308,7 @@ impl StoreDetail {
                         file.size().map(|size| {
                             div().text_xs().text_color(muted).child(format_bytes(size))
                         }),
-                    )
-                    .children(unsupported.then(|| {
-                        labelled(
-                            div().text_xs().text_color(muted),
-                            ids::store_file_note(index),
-                            UNSUPPORTED_NOTE,
-                        )
-                    })),
+                    ),
             )
             .child(button)
             .into_any_element()

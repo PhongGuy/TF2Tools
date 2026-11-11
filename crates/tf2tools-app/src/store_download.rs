@@ -403,6 +403,7 @@ fn failure_description(kind: StoreKind, err: &DownloadError) -> String {
         | DownloadError::Network { .. }
         | DownloadError::TooLarge { .. }
         | DownloadError::ChecksumMismatch { .. }
+        | DownloadError::EmptyBody { .. }
         | DownloadError::NoUsableFiles { .. }
         | DownloadError::Interrupted { .. }
         | DownloadError::Io { .. }

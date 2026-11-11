@@ -7,10 +7,11 @@ use md5::{Digest, Md5};
 use rusqlite::OptionalExtension;
 use tokio::io::AsyncWriteExt;
 
+use super::http::NetFailure;
 use super::unpack::{crosshair_files, entry_name, sound_files};
 use super::{StoreClient, StoreFile, StoreItemId, StoreKind};
 use crate::db::Database;
-use crate::error::{DownloadError, LibraryError};
+use crate::error::{DownloadError, GbAddonFetchError, LibraryError};
 use crate::library::{AddonName, GbId, Library, LibraryEntry, Provenance, is_plain_name};
 
 /// What a running download is doing.
@@ -141,8 +142,7 @@ impl StoreClient {
         Ok(())
     }
 
-    /// Streams the file to `dest`, failing as soon as it passes the cap, then checks the
-    /// md5. Returns the bytes received and the announced size.
+    /// Streams the file to `dest` under the kind's size cap and checks its md5.
     async fn fetch(
         &self,
         kind: StoreKind,
@@ -150,21 +150,47 @@ impl StoreClient {
         dest: &Path,
         progress: &(dyn Fn(DownloadProgress) + Send + Sync),
     ) -> Result<(u64, Option<u64>), DownloadError> {
-        let limit = self.config.size_cap(kind);
-        let mut body = self.http.open(file.url()).await?;
+        self.stream_to(
+            file.url(),
+            file.md5(),
+            file.file_name(),
+            self.config.size_cap(kind),
+            dest,
+            progress,
+        )
+        .await
+        .map_err(DownloadError::from)
+    }
+
+    /// Streams `url` to `dest`, failing as soon as it passes `limit`, then checks `md5`
+    /// when given (case-insensitive). Returns the bytes received and the announced size.
+    pub(super) async fn stream_to(
+        &self,
+        url: &str,
+        md5: Option<&str>,
+        file_name: &str,
+        limit: u64,
+        dest: &Path,
+        progress: &(dyn Fn(DownloadProgress) + Send + Sync),
+    ) -> Result<(u64, Option<u64>), StreamFailure> {
+        let io = |source| StreamFailure::Io {
+            path: dest.to_path_buf(),
+            source,
+        };
+        let mut body = self.http.open(url).await.map_err(StreamFailure::Net)?;
         let total = body.total();
-        let mut out = tokio::fs::File::create(dest).await.map_err(io_at(dest))?;
+        let mut out = tokio::fs::File::create(dest).await.map_err(io)?;
         let mut hasher = Md5::new();
         let mut downloaded = 0u64;
-        while let Some(chunk) = body.chunk().await? {
+        while let Some(chunk) = body.chunk().await.map_err(StreamFailure::Net)? {
             downloaded += chunk.len() as u64;
             if downloaded > limit {
-                return Err(DownloadError::TooLarge {
-                    url: file.url().to_owned(),
+                return Err(StreamFailure::TooLarge {
+                    url: url.to_owned(),
                     limit,
                 });
             }
-            out.write_all(&chunk).await.map_err(io_at(dest))?;
+            out.write_all(&chunk).await.map_err(io)?;
             hasher.update(&chunk);
             progress(DownloadProgress {
                 phase: DownloadPhase::Downloading,
@@ -173,18 +199,25 @@ impl StoreClient {
             });
         }
         // Tokio finishes file writes in the background; flush before the importer reads it.
-        out.flush().await.map_err(io_at(dest))?;
+        out.flush().await.map_err(io)?;
         drop(out);
 
-        if let Some(expected) = file.md5() {
+        // A busy GameBanana can answer 200 with no bytes; a checksum other than the empty
+        // file's says the file has content, so this is the server, not a damaged file.
+        if downloaded == 0 && md5.is_some_and(|m| !m.eq_ignore_ascii_case(EMPTY_MD5)) {
+            return Err(StreamFailure::EmptyBody {
+                url: url.to_owned(),
+            });
+        }
+        if let Some(expected) = md5 {
             let found: String = hasher
                 .finalize()
                 .iter()
                 .map(|b| format!("{b:02x}"))
                 .collect();
             if found != expected.to_lowercase() {
-                return Err(DownloadError::ChecksumMismatch {
-                    file_name: file.file_name().to_owned(),
+                return Err(StreamFailure::ChecksumMismatch {
+                    file_name: file_name.to_owned(),
                     expected: expected.to_owned(),
                     found,
                 });
@@ -193,6 +226,58 @@ impl StoreClient {
         Ok((downloaded, total))
     }
 }
+
+/// The MD5 of zero bytes.
+const EMPTY_MD5: &str = "d41d8cd98f00b204e9800998ecf8427e";
+
+/// Why streaming a file to disk stopped. Each public download error takes these over
+/// through its own From impl.
+pub(super) enum StreamFailure {
+    Net(NetFailure),
+    Io {
+        path: PathBuf,
+        source: std::io::Error,
+    },
+    TooLarge {
+        url: String,
+        limit: u64,
+    },
+    EmptyBody {
+        url: String,
+    },
+    ChecksumMismatch {
+        file_name: String,
+        expected: String,
+        found: String,
+    },
+}
+
+/// Both public download errors carry the same four stream failures under the same names.
+macro_rules! from_stream_failure {
+    ($($target:ident),*) => {$(
+        impl From<StreamFailure> for $target {
+            fn from(failure: StreamFailure) -> Self {
+                match failure {
+                    StreamFailure::Net(net) => net.into(),
+                    StreamFailure::Io { path, source } => Self::Io { path, source },
+                    StreamFailure::TooLarge { url, limit } => Self::TooLarge { url, limit },
+                    StreamFailure::EmptyBody { url } => Self::EmptyBody { url },
+                    StreamFailure::ChecksumMismatch {
+                        file_name,
+                        expected,
+                        found,
+                    } => Self::ChecksumMismatch {
+                        file_name,
+                        expected,
+                        found,
+                    },
+                }
+            }
+        }
+    )*};
+}
+
+from_stream_failure!(DownloadError, GbAddonFetchError);
 
 /// How `file` imports for `kind`, or None when the file belongs to another store.
 fn target(kind: StoreKind, file: &StoreFile) -> Option<Target> {
@@ -219,7 +304,7 @@ fn target(kind: StoreKind, file: &StoreFile) -> Option<Target> {
 /// The scratch file name: the store name's last path component when it is a single plain
 /// component, else `download` plus its extension when that is alphanumeric, since the
 /// importers key off the extension.
-fn save_name(store_name: &str) -> String {
+pub(super) fn save_name(store_name: &str) -> String {
     let last = store_name.rsplit(['/', '\\']).next().unwrap_or_default();
     let mut components = Path::new(last).components();
     let single =

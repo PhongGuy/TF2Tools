@@ -24,6 +24,7 @@ use tf2tools_core::{
 use super::card::{OpenAddon, card_height, gb_addon_card};
 use crate::addon_detail::open_addon_detail;
 use crate::addon_feed::{AddonFeed, Keyed, StepAfter};
+use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer};
 use crate::ids;
 use crate::mature::MatureAddons;
 use crate::pages::common::{SkeletonTop, empty_state_card, skeleton_cards};
@@ -186,7 +187,10 @@ impl AddonTab {
             cx.new(|cx| SelectState::new(rows, Some(IndexPath::default()), window, cx));
         let rows = CategoryOption::rows(ids::ADDON_WEAPON, "All weapons", &[]);
         let weapon_select = cx.new(|cx| SelectState::new(rows, None, window, cx));
+        // A finished install changes the cards' badges.
+        let installs = GbAddonInstalls::global(cx);
         subscriptions.extend([
+            cx.observe(&installs, |_, _, cx| cx.notify()),
             cx.observe(&mature, Self::mature_changed),
             cx.subscribe(&search_input, |tab, input, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -745,7 +749,9 @@ impl AddonTab {
     // the drawn cards.
     fn cards_grid(&self, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity().downgrade();
-        let section = self.section.key();
+        let gb_section = self.section;
+        let section = gb_section.key();
+        let installs = GbAddonInstalls::global(cx).downgrade();
         self.grid
             .render_sized(self.feed.items().len(), card_height, move |ix, _, cx| {
                 let card = this.upgrade().and_then(|tab| {
@@ -765,9 +771,12 @@ impl AddonTab {
                     RemoteImages::global(cx).map(|images| images.read(cx).image(&key))
                 });
                 let id = card.id;
+                let badge = installs
+                    .upgrade()
+                    .and_then(|i| GbAddonOffer::of(i.read(cx).entry(id)).badge());
                 let opened = card.clone();
                 let open: OpenAddon = Rc::new(move |window, cx: &mut App| {
-                    open_addon_detail(&opened, window, cx);
+                    open_addon_detail(gb_section, &opened, window, cx);
                 });
                 let tab = this.clone();
                 let reveal = blurred.then(|| -> OpenAddon {
@@ -775,7 +784,7 @@ impl AddonTab {
                         let _ = tab.update(cx, |tab, cx| tab.reveal(id, cx));
                     })
                 });
-                gb_addon_card(section, &card, image, open, reveal, cx)
+                gb_addon_card(section, &card, image, badge, open, reveal, cx)
             })
     }
 }

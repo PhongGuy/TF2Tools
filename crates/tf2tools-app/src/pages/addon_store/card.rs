@@ -13,6 +13,7 @@ use gpui_kit::{
 use tf2tools_core::AddonCard;
 
 use crate::counts::count_stat;
+use crate::gb_addon_installs::GbAddonOffer;
 use crate::ids;
 use crate::pages::common::{badge_of, card_frame};
 use crate::remote_images::RemoteImage;
@@ -30,13 +31,15 @@ pub fn card_height(width: Pixels) -> Pixels {
 /// What a click on the card does.
 pub type OpenAddon = Rc<dyn Fn(&mut Window, &mut App)>;
 
-/// A GameBanana add-on card: thumbnail, name (tagged "Outdated" when obsolete), author and
-/// likes. A click calls `open`; with `reveal`, a "Mature" cover hides the thumbnail and a
-/// click on the cover calls `reveal` instead.
+/// A GameBanana add-on card: thumbnail, name (tagged with `badge`, "Installed" or "Update",
+/// when given, else "Outdated" when obsolete), author and likes. A click calls `open`;
+/// with `reveal`, a "Mature" cover hides the thumbnail and a click on the cover calls
+/// `reveal` instead.
 pub fn gb_addon_card(
     section: &str,
     card: &AddonCard,
     image: Option<RemoteImage>,
+    badge: Option<&'static str>,
     open: OpenAddon,
     reveal: Option<OpenAddon>,
     cx: &App,
@@ -88,12 +91,28 @@ pub fn gb_addon_card(
             .child("Mature")
     });
     let shot = shot.children(cover);
-    let outdated = card.obsolete.then(|| {
+    // One status badge at most, so the name keeps its room on a narrow card; the install
+    // badge wins over "Outdated".
+    let outdated = (card.obsolete && badge.is_none()).then(|| {
         div().flex_none().child(badge_of(
             ids::addon_gb_card_outdated(section, card.id),
             Tag::secondary(),
             transparent_black(),
             "Outdated",
+        ))
+    });
+    // An update waiting is the one state worth the accent colour; installed stays quiet.
+    let installed = badge.map(|text| {
+        let tag = if text == GbAddonOffer::Update.label() {
+            Tag::primary()
+        } else {
+            Tag::secondary()
+        };
+        div().flex_none().child(badge_of(
+            ids::addon_gb_card_badge(section, card.id),
+            tag,
+            transparent_black(),
+            text,
         ))
     });
     card_frame(cx)
@@ -135,7 +154,8 @@ pub fn gb_addon_card(
                                     ids::addon_gb_card_name(section, card.id),
                                     card.name.clone(),
                                 ))
-                                .children(outdated),
+                                .children(outdated)
+                                .children(installed),
                         )
                         .child(
                             div()

@@ -72,6 +72,11 @@ impl DataDir {
         self.root.join("mastercomfig")
     }
 
+    /// GameBanana add-on copies, `<root>/library/gb-addons`. Touches no files.
+    pub fn gb_addon_dir(&self) -> PathBuf {
+        self.root.join("library").join("gb-addons")
+    }
+
     /// Scratch space for downloads and extraction, `<root>/tmp`.
     pub fn tmp_dir(&self) -> PathBuf {
         self.root.join("tmp")

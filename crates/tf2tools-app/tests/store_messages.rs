@@ -21,7 +21,7 @@ const DL_DISK: &str = "Couldn't save the download. Make sure your disk has free 
 const DL_LIBRARY: &str = "TF2Tools couldn't update your library. Restart TF2Tools and try again.";
 const DL_STOPPED: &str = "The download stopped before it finished. Try again.";
 const DL_UNUSABLE: &str = "This download has nothing TF2Tools can use. Pick another file.";
-const DL_RAR: &str = "This file is a RAR archive, which TF2Tools can't open. Pick another file.";
+const DL_LOCKED: &str = "This download is locked with a password, so TF2Tools can't open it.";
 const DL_UNPACK: &str = "The download couldn't be unpacked. Try again, or pick another file.";
 
 fn io(text: &str) -> std::io::Error {
@@ -100,6 +100,11 @@ fn download_cases() -> Vec<(StoreKind, DownloadError, &'static str)> {
         ),
         (
             GB,
+            DownloadError::EmptyBody { url: GB_URL.into() },
+            "GameBanana is busy and sent an empty file. Try again in a moment.",
+        ),
+        (
+            GB,
             DownloadError::ChecksumMismatch {
                 file_name: "flawhud.zip".into(),
                 expected: "abc123".into(),
@@ -131,10 +136,10 @@ fn download_cases() -> Vec<(StoreKind, DownloadError, &'static str)> {
         ),
         (
             GB,
-            DownloadError::Archive(ArchiveError::Rar {
+            DownloadError::Archive(ArchiveError::Encrypted {
                 path: PathBuf::from("/tmp/hud.rar"),
             }),
-            DL_RAR,
+            DL_LOCKED,
         ),
         (
             GB,
@@ -146,10 +151,10 @@ fn download_cases() -> Vec<(StoreKind, DownloadError, &'static str)> {
         ),
         (
             GB,
-            DownloadError::Import(ImportError::Archive(ArchiveError::Rar {
+            DownloadError::Import(ImportError::Archive(ArchiveError::Encrypted {
                 path: PathBuf::from("/tmp/hud.rar"),
             })),
-            DL_RAR,
+            DL_LOCKED,
         ),
         (
             GB,
@@ -584,4 +589,140 @@ fn a_stopped_add_on_task_names_add_ons_not_files() {
     );
     support::assert_plain(&addons_stopped("join error".to_owned()).message);
     support::assert_plain(&addon_stopped("join error".to_owned()).message);
+}
+
+#[test]
+fn addon_fetch_failures_read_as_plain_words() {
+    use tf2tools_app::store_messages::describe_gb_fetch;
+    use tf2tools_core::{ArchiveError, GbAddonFetchError, GbId};
+    let p = || PathBuf::from("/tmp/x.rar");
+    let cases: Vec<(GbAddonFetchError, &str)> = vec![
+        (
+            GbAddonFetchError::NoFiles {
+                gb_id: GbId::new(1),
+            },
+            "This add-on has no files to install. Pick another add-on.",
+        ),
+        (
+            GbAddonFetchError::VirusScan {
+                file_name: "a.zip".into(),
+                result: "infected".into(),
+            },
+            "GameBanana's virus scan didn't pass this file, so it wasn't installed.",
+        ),
+        (
+            GbAddonFetchError::TooLarge {
+                url: GB_URL.into(),
+                limit: 1,
+            },
+            "This download is too big for TF2Tools to install.",
+        ),
+        (
+            GbAddonFetchError::OnlyExe {
+                file_name: "a.zip".into(),
+            },
+            "This download only holds a program, which TF2Tools won't run. It wasn't installed.",
+        ),
+        (
+            GbAddonFetchError::UnknownLayout {
+                file_name: "a.zip".into(),
+                payloads: 0,
+            },
+            "TF2Tools found nothing in this download it knows how to install, so it wasn't installed.",
+        ),
+        (
+            GbAddonFetchError::UnknownLayout {
+                file_name: "a.zip".into(),
+                payloads: 40,
+            },
+            "This download holds too many parts for TF2Tools to tell which to install, so it wasn't installed.",
+        ),
+        (
+            GbAddonFetchError::Archive(ArchiveError::UnsafePath {
+                path: p(),
+                entry: "../x".into(),
+            }),
+            "This download looks unsafe and was not installed.",
+        ),
+        (
+            GbAddonFetchError::Archive(ArchiveError::Encrypted { path: p() }),
+            DL_LOCKED,
+        ),
+        (
+            GbAddonFetchError::Archive(ArchiveError::Malformed {
+                path: p(),
+                message: "bad".into(),
+            }),
+            "This download can't be opened. Pick another add-on.",
+        ),
+        (
+            GbAddonFetchError::EmptyBody { url: GB_URL.into() },
+            "GameBanana is busy and sent an empty file. Try again in a moment.",
+        ),
+        (
+            GbAddonFetchError::ChecksumMismatch {
+                file_name: "a.zip".into(),
+                expected: "a".into(),
+                found: "b".into(),
+            },
+            "The download was damaged on the way. Try again.",
+        ),
+        (
+            GbAddonFetchError::Network {
+                url: GB_URL.into(),
+                message: "reset".into(),
+            },
+            "Couldn't reach GameBanana. Check your internet connection and try again.",
+        ),
+        (
+            GbAddonFetchError::RateLimited { url: GB_URL.into() },
+            "GameBanana is busy right now. Wait a few minutes, then try again.",
+        ),
+        (
+            GbAddonFetchError::Http {
+                url: GB_URL.into(),
+                status: 503,
+            },
+            "GameBanana is having problems right now. Try again later.",
+        ),
+        (
+            GbAddonFetchError::Http {
+                url: GB_URL.into(),
+                status: 404,
+            },
+            "GameBanana couldn't find this file. Try again later.",
+        ),
+        (
+            GbAddonFetchError::Io {
+                path: p(),
+                source: io("No space left on device (os error 28)"),
+            },
+            DL_DISK,
+        ),
+        (
+            GbAddonFetchError::Archive(ArchiveError::Io {
+                path: p(),
+                source: io("No space left on device (os error 28)"),
+            }),
+            DL_DISK,
+        ),
+        (
+            GbAddonFetchError::Interrupted {
+                message: "cancelled".into(),
+            },
+            "The download stopped before it finished. Try again.",
+        ),
+    ];
+    for (err, want) in cases {
+        let failure = describe_gb_fetch(&err);
+        assert_eq!(failure.message, want, "{err:?}");
+        assert_eq!(failure.detail, err.to_string());
+        support::assert_plain(&failure.message);
+    }
+    // The log names the entry that made an archive unsafe.
+    let unsafe_path = GbAddonFetchError::Archive(ArchiveError::UnsafePath {
+        path: p(),
+        entry: "../x".into(),
+    });
+    assert!(describe_gb_fetch(&unsafe_path).detail.contains("../x"));
 }

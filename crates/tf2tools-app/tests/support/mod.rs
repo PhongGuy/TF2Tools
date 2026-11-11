@@ -1096,6 +1096,17 @@ pub fn seed_curated(
     .unwrap();
 }
 
+/// A zip in memory holding `entries`.
+pub fn zip_of(entries: &[(&str, &[u8])]) -> Vec<u8> {
+    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let options = zip::write::SimpleFileOptions::default();
+    for &(name, bytes) in entries {
+        zip.start_file(name, options).unwrap();
+        zip.write_all(bytes).unwrap();
+    }
+    zip.finish().unwrap().into_inner()
+}
+
 /// A minimal HUD archive in memory: `<name>/info.vdf` plus a layout file.
 pub fn hud_zip_bytes(name: &str) -> Vec<u8> {
     let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
@@ -1326,6 +1337,52 @@ impl StoreServer {
                 .and(path(format!("/apiv11/Mod/{gb_id}/ProfilePage")))
                 .respond_with(ResponseTemplate::new(200).set_body_json(body))
                 .mount(&self.server),
+        );
+    }
+
+    /// Mod `gb_id` named `name`: its ProfilePage lists `files` (file name, body, date added),
+    /// each served at `/dl/addon/<gb_id>/<i>`, scanned "clean", sized and checksum-free.
+    pub fn mount_gb_addon(&self, gb_id: u64, name: &str, files: &[(&str, Vec<u8>, i64)]) {
+        self.mount_gb_addon_after(gb_id, name, files, Duration::ZERO);
+    }
+
+    /// `mount_gb_addon` with each file answered only after `delay`.
+    pub fn mount_gb_addon_after(
+        &self,
+        gb_id: u64,
+        name: &str,
+        files: &[(&str, Vec<u8>, i64)],
+        delay: Duration,
+    ) {
+        let uri = self.uri();
+        let listed: Vec<serde_json::Value> = files
+            .iter()
+            .enumerate()
+            .map(|(i, (file, body, date))| {
+                let route = format!("/dl/addon/{gb_id}/{i}");
+                self.rt.block_on(
+                    Mock::given(method("GET"))
+                        .and(path(route.as_str()))
+                        .respond_with(
+                            ResponseTemplate::new(200)
+                                .set_body_bytes(body.clone())
+                                .set_delay(delay),
+                        )
+                        .mount(&self.server),
+                );
+                serde_json::json!({
+                    "_idRow": 100 + i, "_sFile": file, "_nFilesize": body.len(),
+                    "_tsDateAdded": date, "_sMd5Checksum": "", "_sAvResult": "clean",
+                    "_sDownloadUrl": format!("{uri}{route}"),
+                })
+            })
+            .collect();
+        self.mount_gb_profile(
+            gb_id,
+            serde_json::json!({
+                "_idRow": gb_id, "_sName": name, "_aSubmitter": {"_sName": "vex"},
+                "_sProfileUrl": format!("https://gamebanana.com/mods/{gb_id}"), "_aFiles": listed,
+            }),
         );
     }
 
@@ -1830,4 +1887,9 @@ pub fn icon_png(env: &Env) -> PathBuf {
         .save(&path)
         .unwrap();
     path
+}
+
+/// Opens the env's database, for tests that set up a state no flow reaches.
+pub fn sql(env: &Env) -> rusqlite::Connection {
+    rusqlite::Connection::open(env.data.db_path()).unwrap()
 }

@@ -780,6 +780,14 @@ pub const ADDON_DETAIL_OUTDATED: &str = "addon-detail-outdated";
 pub const ADDON_DETAIL_BODY: &str = "addon-detail-body";
 /// The scrollbar beside `ADDON_DETAIL_BODY`.
 pub const ADDON_DETAIL_SCROLLBAR: &str = "addon-detail-scrollbar";
+/// The add-on detail's Install, Update, "Install again" or "Installed" button.
+pub const ADDON_DETAIL_INSTALL: &str = "addon-detail-install";
+/// The add-on detail's download progress, labelled with its text.
+pub const ADDON_DETAIL_PROGRESS: &str = "addon-detail-progress";
+/// The add-on detail's download progress bar.
+pub const ADDON_DETAIL_BAR: &str = "addon-detail-bar";
+/// Why the add-on detail offers no install, in its place.
+pub const ADDON_DETAIL_BLOCKED: &str = "addon-detail-blocked";
 /// The Settings "Show mature add-ons" switch.
 pub const SETTINGS_MATURE_ADDONS: &str = "settings-mature-addons";
 /// Wraps the Activity Log's category select.
@@ -816,6 +824,8 @@ pub const ADDONS_INSTALLED: &str = "addons-installed";
 pub const ADDONS_INSTALLED_EMPTY: &str = "addons-installed-empty";
 /// The "Your Library" section title.
 pub const ADDONS_LIBRARY: &str = "addons-library";
+/// The Addons page's "GameBanana add-ons" section title.
+pub const ADDONS_GB: &str = "addons-gb";
 /// The Graphics page's line under the title.
 pub const GRAPHICS_SUBTITLE: &str = "graphics-subtitle";
 /// The Graphics page's "TF2 not found" warning, present only without a TF2 install.
@@ -1588,11 +1598,6 @@ fn store_key(kind: StoreKind, id: &StoreItemId) -> String {
 /// A detail dialog file row's Download button: "store-file:<i>".
 pub fn store_file(index: usize) -> ElementId {
     keyed("store-file", &index.to_string())
-}
-
-/// A detail dialog file row's note, present only for an unsupported archive: "store-file-note:<i>".
-pub fn store_file_note(index: usize) -> ElementId {
-    keyed("store-file-note", &index.to_string())
 }
 
 /// A detail body's link button, keyed by what it opens ("repo", "gamebanana", a social key).
@@ -2492,9 +2497,55 @@ pub fn addon_gb_card_outdated(section: &str, id: GbId) -> ElementId {
     keyed("addon-gb-card-outdated", &format!("{section}:{id}"))
 }
 
+/// A GameBanana add-on card's "Installed" or "Update" badge: "addon-gb-card-badge:<section>:<id>".
+pub fn addon_gb_card_badge(section: &str, id: GbId) -> ElementId {
+    keyed("addon-gb-card-badge", &format!("{section}:{id}"))
+}
+
 /// A GameBanana add-on card's like count: "addon-gb-card-likes:<section>:<id>".
 pub fn addon_gb_card_likes(section: &str, id: GbId) -> ElementId {
     keyed("addon-gb-card-likes", &format!("{section}:{id}"))
+}
+
+/// One section's GameBanana add-ons on the Addons page, titled: "addons-gb-group:<key>".
+pub fn addons_gb_group(key: &str) -> ElementId {
+    keyed("addons-gb-group", key)
+}
+
+/// An installed GameBanana add-on's card on the Addons page: "addons-gb-card:<id>".
+pub fn addons_gb_card(id: GbId) -> ElementId {
+    keyed("addons-gb-card", &id.to_string())
+}
+
+/// The card's "Remove" button: "addons-gb-remove:<id>".
+pub fn addons_gb_remove(id: GbId) -> ElementId {
+    keyed("addons-gb-remove", &id.to_string())
+}
+
+/// The card's "Update" button, present only with a newer file: "addons-gb-update:<id>".
+pub fn addons_gb_update(id: GbId) -> ElementId {
+    keyed("addons-gb-update", &id.to_string())
+}
+
+/// The card's "Install again" button, present only when not installed: "addons-gb-reinstall:<id>".
+pub fn addons_gb_reinstall(id: GbId) -> ElementId {
+    keyed("addons-gb-reinstall", &id.to_string())
+}
+
+/// The card's one loading button while an operation works on it: "addons-gb-busy:<id>".
+pub fn addons_gb_busy(id: GbId) -> ElementId {
+    keyed("addons-gb-busy", &id.to_string())
+}
+
+/// The card's "Open on GameBanana" button: "addons-gb-open:<id>".
+pub fn addons_gb_open(id: GbId) -> ElementId {
+    keyed("addons-gb-open", &id.to_string())
+}
+
+/// The card's state tag ("No longer on GameBanana", "Update available" or "Not installed"),
+/// absent when installed and current: "addons-gb-tag:<id>".
+pub fn addons_gb_tag(id: GbId) -> ElementId {
+    keyed("addons-gb-tag", &id.to_string())
 }
 
 /// One credit in the add-on detail, by group and position: "addon-detail-credit:<g>:<i>".
@@ -2505,4 +2556,24 @@ pub fn addon_detail_credit(group: usize, index: usize) -> ElementId {
 /// One file row in the add-on detail, by position: "addon-detail-file:<i>".
 pub fn addon_detail_file(index: usize) -> ElementId {
     keyed("addon-detail-file", &index.to_string())
+}
+
+/// The "Choose what to install" dialog for an add-on with several parts.
+pub const PAYLOAD_CHECKLIST: &str = "payload-checklist";
+/// The checklist's title, "Choose what to install".
+pub const PAYLOAD_CHECKLIST_TITLE: &str = "payload-checklist-title";
+/// The checklist's description, naming the add-on.
+pub const PAYLOAD_CHECKLIST_DESCRIPTION: &str = "payload-checklist-description";
+/// The checklist's rows, which scroll when there are many.
+pub const PAYLOAD_CHECKLIST_ROWS: &str = "payload-checklist-rows";
+/// The scrollbar beside the checklist's rows.
+pub const PAYLOAD_CHECKLIST_SCROLLBAR: &str = "payload-checklist-scrollbar";
+/// The checklist's Install button, disabled while nothing is checked.
+pub const PAYLOAD_INSTALL: &str = "payload-install";
+/// The checklist's Cancel button.
+pub const PAYLOAD_CANCEL: &str = "payload-cancel";
+
+/// One part's checkbox in the checklist, by row: "payload-check:<i>".
+pub fn payload_check(index: usize) -> ElementId {
+    keyed("payload-check", &index.to_string())
 }

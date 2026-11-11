@@ -22,6 +22,7 @@ mod old_v4;
 mod pak;
 pub mod panic_mark;
 mod paths;
+mod payloads;
 mod settings;
 mod store;
 mod templates;
@@ -40,14 +41,14 @@ pub use db::Database;
 pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
     BrowseError, CatalogError, CopyHudError, DataDirError, DetectError, DownloadError, FilesError,
-    FontCheckError, FontInstallError, HistoryError, HudFilesError, HudLoadError, ImageError,
-    ImportError, InstallError, InstallMastercomfigError, KeepHudError, KvParseError, LibraryError,
-    LogError, MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError,
-    ModuleCatalogError, OpenError, PaintError, PngReadError, PngWriteError, PresetError,
-    PreviewError, ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError,
-    RestoreMastercomfigError, SchemaError, SettingsError, SyncError, TakeOverError,
-    UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
-    WavError, WeaponIconsError,
+    FontCheckError, FontInstallError, GbAddonCheckError, GbAddonFetchError, GbAddonInstallError,
+    HistoryError, HudFilesError, HudLoadError, ImageError, ImportError, InstallError,
+    InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError, MakeHudError,
+    MapDownloadError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError, OpenError,
+    PaintError, PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError,
+    RecipeError, ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError, SchemaError,
+    SettingsError, SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
+    UpdateDownloadError, VpkError, VtfError, WavError, WeaponIconsError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
@@ -89,13 +90,14 @@ pub use hud_maker::{background_corners, corner_radius, paints_background};
 pub use hud_maker::{wrap_lines, wrapped_text_left};
 pub use library::{
     AddonEntry, AddonName, ApplyProfileReport, ApplyReport, ApplyStep, Assignment, CrosshairEntry,
-    CrosshairFormat, CrosshairId, CrosshairRef, DraftCrosshair, DraftSlot, ExternalHud, GbId,
-    HudAssets, HudEntry, HudId, HudInstall, HudStatus, InstalledCrosshairs, InstalledSound,
-    InstalledSounds, Library, LibraryEntry, MadeHud, MakeTarget, MastercomfigStatus, MissingItem,
-    MissingKind, PaintTarget, PaintedSource, Preset, PresetEntry, Profile, ProfileCrosshair,
-    ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate, Provenance, Recovery,
-    Reinstall, SavedHud, SkipReason, SkippedAssignment, SoundConflict, SoundEntry, SoundFormat,
-    SoundId, SoundKind, crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
+    CrosshairFormat, CrosshairId, CrosshairRef, DraftCrosshair, DraftSlot, ExternalHud,
+    GbAddonCheck, GbAddonEntry, GbId, HudAssets, HudEntry, HudId, HudInstall, HudStatus,
+    InstalledCrosshairs, InstalledSound, InstalledSounds, Library, LibraryEntry, MadeHud,
+    MakeTarget, MastercomfigStatus, MissingItem, MissingKind, PaintTarget, PaintedSource, Preset,
+    PresetEntry, Profile, ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId,
+    ProfileItem, ProfileUpdate, Provenance, Recovery, Reinstall, SavedHud, SkipReason,
+    SkippedAssignment, SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind,
+    crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
 };
 pub use library::{
     Choices, ComfigModule, ModuleCatalog, ModuleCategory, ModuleChoice, ModuleValue, readable_name,
@@ -105,13 +107,14 @@ pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
+pub use payloads::{MAX_PAYLOADS, Payload, PayloadKind, find_payloads};
 pub use settings::{Settings, Volume};
 pub use store::{
     AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
     AddonProfile, AddonQuery, AddonSection, AddonSort, AddonStep, DownloadPhase, DownloadProgress,
-    Endpoints, INDEX_STEP_CALLS, MastercomfigRelease, SEARCH_STEP_CALLS, STEP_CARDS, StoreCard,
-    StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem, StoreItemId, StoreKind,
-    StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
+    Endpoints, GbAddonDownload, INDEX_STEP_CALLS, MastercomfigRelease, SEARCH_STEP_CALLS,
+    STEP_CARDS, StoreCard, StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem,
+    StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
 };
 pub use store::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 pub use texture::{

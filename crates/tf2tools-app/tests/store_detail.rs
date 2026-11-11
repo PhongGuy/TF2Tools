@@ -10,9 +10,7 @@ use support::scroll::{assert_bar_beside, assert_clear_of_bar, assert_track_scrol
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_store::bodies::{curated_body, gamebanana_body, social_icon};
 use tf2tools_app::store_detail::detail_width;
-use tf2tools_app::store_detail::{
-    DetailItem, FilesState, StoreDetail, is_unsupported, open_detail,
-};
+use tf2tools_app::store_detail::{DetailItem, FilesState, StoreDetail, open_detail};
 use tf2tools_app::store_download::StoreDownloads;
 use tf2tools_core::{GbId, StoreItemId, StoreKind};
 
@@ -56,14 +54,6 @@ fn downloads(cx: &mut TestAppContext) -> Entity<StoreDownloads> {
     cx.update(|cx| StoreDownloads::global(cx)).unwrap()
 }
 
-#[test]
-fn rar_files_are_unsupported() {
-    assert!(is_unsupported("hud.rar"));
-    assert!(is_unsupported("HUD.RAR"));
-    assert!(!is_unsupported("hud.zip"));
-    assert!(!is_unsupported("rar.7z"));
-}
-
 #[gpui_kit::test]
 fn a_gamebanana_item_lists_its_files_and_downloads_one(cx: &mut TestAppContext) {
     let env = support::env();
@@ -89,17 +79,7 @@ fn a_gamebanana_item_lists_its_files_and_downloads_one(cx: &mut TestAppContext) 
         2,
         "the item's gallery"
     );
-    assert!(
-        support::present(cx, win, ids::store_file_note(1)),
-        "the RAR is marked"
-    );
-    assert!(!support::present(cx, win, ids::store_file_note(0)));
-    support::click_id(cx, win, ids::store_file(1));
     let dl = downloads(cx);
-    assert!(
-        !cx.update(|cx| dl.read(cx).is_busy()),
-        "an unsupported file never starts"
-    );
     support::click_id(cx, win, ids::store_file(0));
     support::wait_real(cx, "the download", |cx| {
         cx.update(|cx| !dl.read(cx).is_busy())
