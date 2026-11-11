@@ -548,6 +548,52 @@ fn removing_a_player_mid_download_waits_for_the_download(cx: &mut TestAppContext
 }
 
 #[gpui_kit::test]
+fn confirming_a_removal_closes_the_dialog_while_the_sync_stops(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Arie's one download waits on the gate, so their sync's stop cannot end yet.
+    mount_list_for(&server, ARIE, &[(3, day_ago(1))], Duration::ZERO);
+    mount_list_for(&server, 1, &[], Duration::ZERO);
+    let downloads = Gate::default();
+    mount_held(
+        &server,
+        &downloads,
+        "/json/3",
+        None,
+        SIXES.as_bytes().to_vec(),
+    );
+    let (s, page) = removal_page(cx, &env, &server);
+    support::wait_real(cx, "Arie's download", |_| downloads.arrived() == 1);
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    // The app plays the dialog's exit, so this test does too.
+    cx.update(|cx| cx.set_reduce_motion(false));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    // Frames come only as the app's own would: next-frame callbacks fire, and a window
+    // draws only once something invalidated it. No forced redraw stands in for the page.
+    for _ in 0..60 {
+        cx.executor().advance_clock(Duration::from_millis(16));
+        cx.update_window(s.win, |_, w, cx| w.simulate_next_frame(cx))
+            .unwrap();
+        cx.run_until_parked();
+    }
+    let shown = cx
+        .update_window(s.win, |_, w, _| {
+            use gpui_kit::test::TestWindowExt as _;
+            w.try_find(ids::CONFIRM_DIALOG).is_some()
+        })
+        .unwrap();
+    assert!(!shown, "the dialog leaves before the sync has stopped");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_chip(sid(ARIE))).as_deref(),
+        Some("Removing...")
+    );
+    downloads.open();
+    support::wait_real(cx, "the removal", |cx| {
+        cx.update(|cx| page.read(cx).players().len() == 1)
+    });
+}
+
+#[gpui_kit::test]
 fn choosing_a_player_being_removed_starts_no_sync_for_them(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
