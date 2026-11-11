@@ -14,6 +14,7 @@ mod db;
 mod disk;
 mod error;
 mod fonts;
+mod game_icons;
 mod hud_maker;
 mod ice;
 mod library;
@@ -46,13 +47,14 @@ pub use error::{
     PreviewError, ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError,
     RestoreMastercomfigError, SchemaError, SettingsError, SyncError, TakeOverError,
     UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
-    WavError,
+    WavError, WeaponIconsError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
     HudFonts, PROTECTED_FONT_NAMES, Platform, check_hud_fonts, install_hud_fonts, scan_hud_fonts,
     system_font_host,
 };
+pub use game_icons::GameWeaponIcons;
 pub use hud_maker::MeterKind;
 pub use hud_maker::{
     ALIGNMENTS, AddBlock, Align, AnimationAppend, AnimationChange, AssetFile, AxisSize, Backdrop,

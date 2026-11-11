@@ -2,8 +2,13 @@
 //! image through prefabs, and the cached PNGs built from tf2_textures_dir.vpk.
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
-use tf2tools_core::{Weapon, weapon_inventory_images, weapons};
+use crate::common;
+use tf2tools_core::{
+    GameWeaponIcons, RgbaImage, Weapon, WeaponIconsError, read_png, rgba_to_vtf,
+    weapon_inventory_images, weapons,
+};
 
 // Checked against the live items_game.txt on 2026-11-11: each name occurs once and its
 // backpack `_large` VTF is in tf2_textures_dir.vpk.
@@ -164,4 +169,175 @@ fn a_prefab_cycle_or_a_missing_image_leaves_the_weapon_out() {
 fn text_that_is_no_items_game_gives_no_images() {
     assert!(weapon_inventory_images("").is_empty());
     assert!(weapon_inventory_images(r#""items_game" { "items" "oops" }"#).is_empty());
+}
+
+const SCATTERGUN_LARGE: &str = "materials/backpack/weapons/c_models/c_scattergun_large.vtf";
+// Stored in mixed case: the lookup ignores case.
+const SHOTGUN_LARGE: &str = "materials/Backpack/weapons/w_models/W_Shotgun_large.vtf";
+// The sapper has only its plain texture, the fallback when `_large` is missing.
+const SAPPER_PLAIN: &str = "materials/backpack/weapons/w_models/w_sapper.vtf";
+
+fn vtf(w: u32, h: u32, rgba: [u8; 4]) -> Vec<u8> {
+    let pixels = rgba.repeat((w * h) as usize);
+    rgba_to_vtf(&RgbaImage::from_pixels(w, h, pixels).unwrap()).unwrap()
+}
+
+/// A temp folder holding `tf/scripts/items/items_game.txt` (ITEMS_GAME) and
+/// `tf/tf2_textures_dir.vpk` holding `entries`, plus an empty `cache` path; returns (tmp, tf, cache).
+fn game(entries: &[(&str, &[u8])]) -> (tempfile::TempDir, PathBuf, PathBuf) {
+    let dir = tempfile::tempdir().unwrap();
+    let tf = dir.path().join("tf");
+    common::write_file(
+        &tf.join("scripts/items/items_game.txt"),
+        ITEMS_GAME.as_bytes(),
+    );
+    common::write_file(
+        &tf.join("tf2_textures_dir.vpk"),
+        &common::vpk_bytes(entries),
+    );
+    let cache = dir.path().join("cache");
+    (dir, tf, cache)
+}
+
+fn standard_entries() -> Vec<(&'static str, Vec<u8>)> {
+    vec![
+        (SCATTERGUN_LARGE, vtf(256, 256, [200, 30, 30, 255])),
+        (SHOTGUN_LARGE, vtf(64, 32, [30, 30, 200, 255])),
+        (SAPPER_PLAIN, vtf(16, 16, [30, 200, 30, 255])),
+    ]
+}
+
+fn borrowed<'a>(entries: &'a [(&'static str, Vec<u8>)]) -> Vec<(&'static str, &'a [u8])> {
+    entries.iter().map(|(p, b)| (*p, b.as_slice())).collect()
+}
+
+fn png_size(path: &std::path::Path) -> (u32, u32) {
+    let png = read_png(path).unwrap();
+    (png.width(), png.height())
+}
+
+// The resize filter may round a flat colour by a step, so compare the first pixel loosely.
+fn assert_first_pixel_near(path: &std::path::Path, want: [u8; 4]) {
+    let png = read_png(path).unwrap();
+    let got = &png.pixels()[..4];
+    for (g, w) in got.iter().zip(want) {
+        assert!(g.abs_diff(w) <= 2, "{got:?} is not near {want:?}");
+    }
+}
+
+#[test]
+fn each_pictured_weapon_gets_a_png_no_larger_than_128() {
+    let entries = standard_entries();
+    let (_tmp, tf, cache) = game(&borrowed(&entries));
+    let icons = GameWeaponIcons::build(&tf, &cache).unwrap();
+
+    let scattergun = icons.get("tf_weapon_scattergun").unwrap();
+    assert!(scattergun.starts_with(&cache));
+    assert_eq!(png_size(scattergun), (128, 128));
+    assert_first_pixel_near(scattergun, [200, 30, 30, 255]);
+    // Smaller pictures keep their size and shape.
+    assert_eq!(
+        png_size(icons.get("tf_weapon_shotgun_primary").unwrap()),
+        (64, 32)
+    );
+    assert_eq!(png_size(icons.get("tf_weapon_builder").unwrap()), (16, 16));
+    // The soldier shotgun's own image is not in the pak; the bat's prefabs loop.
+    assert_eq!(icons.get("tf_weapon_shotgun_soldier"), None);
+    assert_eq!(icons.get("tf_weapon_bat"), None);
+    assert_eq!((icons.len(), icons.decoded()), (3, 3));
+}
+
+#[test]
+fn a_second_build_reuses_the_cached_pngs() {
+    let entries = standard_entries();
+    let (_tmp, tf, cache) = game(&borrowed(&entries));
+    let first = GameWeaponIcons::build(&tf, &cache).unwrap();
+    let second = GameWeaponIcons::build(&tf, &cache).unwrap();
+    assert_eq!(second.decoded(), 0);
+    assert_eq!(second.len(), 3);
+    for script in [
+        "tf_weapon_scattergun",
+        "tf_weapon_shotgun_primary",
+        "tf_weapon_builder",
+    ] {
+        assert_eq!(first.get(script), second.get(script), "{script}");
+    }
+}
+
+#[test]
+fn a_changed_texture_is_rebuilt_and_stale_pngs_are_removed() {
+    let entries = standard_entries();
+    let (_tmp, tf, cache) = game(&borrowed(&entries));
+    let first = GameWeaponIcons::build(&tf, &cache).unwrap();
+    let old = first.get("tf_weapon_scattergun").unwrap().to_path_buf();
+    common::write_file(&cache.join("junk.png"), b"not ours");
+    common::write_file(&cache.join("notes.txt"), b"left alone");
+
+    // A game update redraws the scattergun at another size.
+    let mut updated = standard_entries();
+    updated[0].1 = vtf(128, 128, [255, 255, 255, 255]);
+    common::write_file(
+        &tf.join("tf2_textures_dir.vpk"),
+        &common::vpk_bytes(&borrowed(&updated)),
+    );
+    let second = GameWeaponIcons::build(&tf, &cache).unwrap();
+
+    let new = second.get("tf_weapon_scattergun").unwrap();
+    assert_ne!(new, old.as_path());
+    assert_first_pixel_near(new, [255, 255, 255, 255]);
+    assert_eq!(second.decoded(), 1);
+    assert!(!old.exists(), "the old scattergun png is pruned");
+    assert!(!cache.join("junk.png").exists());
+    assert!(cache.join("notes.txt").exists());
+    assert_eq!(
+        second.get("tf_weapon_builder"),
+        first.get("tf_weapon_builder")
+    );
+}
+
+#[test]
+fn an_undecodable_texture_leaves_out_only_its_weapon() {
+    let mut entries = standard_entries();
+    entries[0].1 = b"VTF\0 but nothing after".to_vec();
+    let (_tmp, tf, cache) = game(&borrowed(&entries));
+    let icons = GameWeaponIcons::build(&tf, &cache).unwrap();
+    assert_eq!(icons.get("tf_weapon_scattergun"), None);
+    assert!(icons.get("tf_weapon_shotgun_primary").is_some());
+    assert_eq!(icons.len(), 2);
+}
+
+#[test]
+fn a_missing_items_game_or_texture_pak_fails_the_build() {
+    let entries = standard_entries();
+    let (_tmp, tf, cache) = game(&borrowed(&entries));
+    std::fs::remove_file(tf.join("tf2_textures_dir.vpk")).unwrap();
+    let err = GameWeaponIcons::build(&tf, &cache).unwrap_err();
+    assert!(matches!(err, WeaponIconsError::Textures { .. }), "{err:?}");
+
+    std::fs::remove_file(tf.join("scripts/items/items_game.txt")).unwrap();
+    let err = GameWeaponIcons::build(&tf, &cache).unwrap_err();
+    assert!(matches!(err, WeaponIconsError::ItemsGame { .. }), "{err:?}");
+}
+
+#[test]
+fn an_unwritable_cache_fails_the_build() {
+    let entries = standard_entries();
+    let (_tmp, tf, cache) = game(&borrowed(&entries));
+    common::write_file(&cache, b"a file where the folder should be");
+    let err = GameWeaponIcons::build(&tf, &cache).unwrap_err();
+    assert!(matches!(err, WeaponIconsError::Cache { .. }), "{err:?}");
+}
+
+#[test]
+#[ignore = "needs a TF2 game folder in TF2TOOLS_TF2_GAME"]
+fn the_real_game_pictures_all_64_weapons() {
+    let game = PathBuf::from(std::env::var("TF2TOOLS_TF2_GAME").expect("TF2TOOLS_TF2_GAME"));
+    let cache = tempfile::tempdir().unwrap();
+    let icons = GameWeaponIcons::build(&game.join("tf"), cache.path()).unwrap();
+    for w in weapons() {
+        let path = icons
+            .get(w.script_name())
+            .unwrap_or_else(|| panic!("{} has no icon", w.script_name()));
+        assert_eq!(png_size(path), (128, 128), "{}", w.script_name());
+    }
 }

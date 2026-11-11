@@ -2037,3 +2037,31 @@ pub enum ModuleCatalogError {
         limit: u64,
     },
 }
+
+/// Why the game's weapon icons could not be built.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum WeaponIconsError {
+    /// items_game.txt is missing, unreadable or over 64 MiB.
+    #[error("cannot read {path}: {source}")]
+    ItemsGame {
+        /// The items_game.txt path.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// tf2_textures_dir.vpk is missing or not a readable VPK.
+    #[error("cannot read the game's textures: {source}")]
+    Textures {
+        /// Why the texture pak could not be read.
+        source: VpkError,
+    },
+    /// The cache folder or a PNG in it cannot be written.
+    #[error("cannot write the weapon icon cache at {path}: {message}")]
+    Cache {
+        /// The folder or file that failed.
+        path: PathBuf,
+        /// What went wrong.
+        message: String,
+    },
+}

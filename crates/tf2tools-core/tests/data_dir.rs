@@ -87,3 +87,17 @@ fn with_cache_home_puts_images_where_platform_default_does() {
         Path::new("/run/cache/tf2tools/images")
     );
 }
+
+#[test]
+fn weapon_icons_cache_beside_the_store_images() {
+    assert_eq!(
+        DataDir::at("/data/com.tf2tools.app").weapon_icon_dir(),
+        Path::new("/data/com.tf2tools.app/cache/weapon-icons")
+    );
+    assert_eq!(
+        DataDir::at("/run/data/com.tf2tools.app")
+            .with_cache_home("/run/cache")
+            .weapon_icon_dir(),
+        Path::new("/run/cache/tf2tools/weapon-icons")
+    );
+}

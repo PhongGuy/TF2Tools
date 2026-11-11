@@ -488,14 +488,14 @@ pub(crate) fn thumbnail_jpeg(image: &RgbaImage, w: u32, h: u32) -> Option<Vec<u8
     Some(out)
 }
 
-fn as_buffer(image: &RgbaImage) -> image::RgbaImage {
+pub(crate) fn as_buffer(image: &RgbaImage) -> image::RgbaImage {
     // `RgbaImage` always holds width * height * 4 bytes, so the copy fills the buffer exactly.
     let mut buffer = image::RgbaImage::new(image.width, image.height);
     buffer.copy_from_slice(&image.pixels);
     buffer
 }
 
-fn stretch(source: &image::RgbaImage, w: u32, h: u32) -> RgbaImage {
+pub(crate) fn stretch(source: &image::RgbaImage, w: u32, h: u32) -> RgbaImage {
     let resized = imageops::resize(source, w, h, imageops::FilterType::CatmullRom);
     RgbaImage {
         width: w,
