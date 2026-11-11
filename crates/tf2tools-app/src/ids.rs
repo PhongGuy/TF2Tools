@@ -2820,6 +2820,11 @@ pub fn logstf_matrix_row(id: SteamId) -> ElementId {
     keyed("logstf-matrix-row", &id.id64().to_string())
 }
 
+/// One player's name cell in the kill matrix: "logstf-matrix-name:<id64>".
+pub fn logstf_matrix_name(id: SteamId) -> ElementId {
+    keyed("logstf-matrix-name", &id.id64().to_string())
+}
+
 /// One count in a player's kill matrix row: "logstf-matrix-cell:<id64>:<class>", or
 /// "logstf-matrix-cell:<id64>:k" for the total.
 pub fn logstf_matrix_cell(id: SteamId, class: Option<TfClass>) -> ElementId {

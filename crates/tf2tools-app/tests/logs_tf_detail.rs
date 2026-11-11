@@ -750,6 +750,31 @@ fn a_long_name_gives_way_to_the_numbers_at_800(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn a_long_name_shows_in_full_while_the_kill_matrix_fits_1280(cx: &mut TestAppContext) {
+    let (_env, _server, s, id, _) = opened_long_name(cx, 1280., 800.);
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    scroll_to_in_log(cx, &s, &page, 2, ids::LOGSTF_MATRIX_SCROLL);
+    let matrix = support::bounds_of(cx, s.win, ids::LOGSTF_MATRIX_SCROLL).unwrap();
+    let total = support::bounds_of(cx, s.win, ids::LOGSTF_MATRIX_TOTAL).unwrap();
+    assert!(total.right() <= matrix.right(), "{total:?} past {matrix:?}");
+    // The matrix is narrower than the players table, so the name grows into the room left.
+    let name = support::bounds_of(cx, s.win, ids::logstf_matrix_name(id)).unwrap();
+    assert!(
+        f32::from(name.size.width) >= text_width(cx, s.win, LONG_NAME),
+        "the name is cut short: {name:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn a_long_name_gives_way_to_the_kill_counts_at_800(cx: &mut TestAppContext) {
+    let (_env, _server, s, id, _) = opened_long_name(cx, 800., 600.);
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    scroll_to_in_log(cx, &s, &page, 2, ids::LOGSTF_MATRIX_SCROLL);
+    let name = support::bounds_of(cx, s.win, ids::logstf_matrix_name(id)).unwrap();
+    assert!(name.size.width <= gpui_kit::px(100.), "{name:?}");
+}
+
+#[gpui_kit::test]
 fn class_icons_in_the_players_table_read_like_logs_tf(cx: &mut TestAppContext) {
     let (_env, _server, s, page) = opened(cx, 3);
     scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_PLAYERS_SCROLL);

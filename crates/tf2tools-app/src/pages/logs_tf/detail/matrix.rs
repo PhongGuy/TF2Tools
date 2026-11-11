@@ -19,9 +19,10 @@ use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
 
-// The fixed columns before the nine classes; the name takes what is left.
+// The fixed columns before the nine classes. The name is sized at its minimum so a long one
+// never widens the table, and grows into any room the window leaves, truncating the rest.
 const TEAM: Pixels = px(40.);
-const NAME_MIN: Pixels = px(120.);
+const NAME_MIN: Pixels = px(100.);
 const MAIN: Pixels = px(24.);
 
 // Each tab's title and its total column's header, as logs.tf names them.
@@ -84,7 +85,7 @@ fn table(log: &LogDetail, kind: MatrixKind, is_tracked: &dyn Fn(SteamId) -> bool
             .text_color(muted)
             .font_weight(FontWeight::MEDIUM)
             .child(heading("Team").w(TEAM))
-            .child(heading("Player").flex_1().min_w(NAME_MIN))
+            .child(heading("Player").w(NAME_MIN).flex_grow(1.))
             .child(heading("C").w(MAIN))
             .children(TfClass::ALL.map(|class| {
                 class_cell(class, cx)
@@ -124,8 +125,10 @@ fn table(log: &LogDetail, kind: MatrixKind, is_tracked: &dyn Fn(SteamId) -> bool
                 .child(team_cell(player.team(), cx).w(TEAM))
                 .child(
                     div()
-                        .flex_1()
-                        .min_w(NAME_MIN)
+                        .id(ids::logstf_matrix_name(id))
+                        .test_support()
+                        .w(NAME_MIN)
+                        .flex_grow(1.)
                         .truncate()
                         .child(player.name().to_owned()),
                 )
