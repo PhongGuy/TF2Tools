@@ -225,17 +225,33 @@ fn assert_first_pixel_near(path: &std::path::Path, want: [u8; 4]) {
     }
 }
 
-/// Dates `path` `secs` seconds from now (negative is the past).
+/// Dates the file or folder `path` `secs` seconds from now (negative is the past).
 fn touch(path: &std::path::Path, secs: i64) {
     let now = std::time::SystemTime::now();
     let delta = std::time::Duration::from_secs(secs.unsigned_abs());
     let when = if secs < 0 { now - delta } else { now + delta };
+    open_for_dating(path).unwrap().set_modified(when).unwrap();
+}
+
+// Unix sets a folder's times through a read-only handle; Windows opens folders only with
+// backup semantics.
+#[cfg(unix)]
+fn open_for_dating(path: &std::path::Path) -> std::io::Result<std::fs::File> {
+    if path.is_dir() {
+        std::fs::File::open(path)
+    } else {
+        std::fs::File::options().write(true).open(path)
+    }
+}
+
+#[cfg(windows)]
+fn open_for_dating(path: &std::path::Path) -> std::io::Result<std::fs::File> {
+    use std::os::windows::fs::OpenOptionsExt as _;
+    const FILE_FLAG_BACKUP_SEMANTICS: u32 = 0x0200_0000;
     std::fs::File::options()
         .write(true)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
         .open(path)
-        .unwrap()
-        .set_modified(when)
-        .unwrap();
 }
 
 /// Ages every file in `cache` by an hour, so pruning sees it as left from an earlier build.
@@ -393,6 +409,7 @@ fn a_stale_png_that_cannot_be_removed_does_not_fail_the_build() {
     let (_tmp, tf, cache) = game(&borrowed(&entries));
     // A folder named like a PNG cannot be removed as a file.
     common::write_file(&cache.join("stuck.png/inside"), b"x");
+    touch(&cache.join("stuck.png"), -3600);
     let icons = GameWeaponIcons::build(&tf, &cache).unwrap();
     assert_eq!(icons.len(), 3);
 }
