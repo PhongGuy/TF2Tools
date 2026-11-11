@@ -161,9 +161,8 @@ fn a_reread_that_starts_after_a_pick_does_not_put_the_old_range_back(cx: &mut Te
             seen.borrow_mut().push(page.read(cx).range())
         })
     });
-    // The pick's write and a reread started after it both wait off the UI thread, run in a
-    // random order. A try whose first step leaves the old range saved ran the reread first.
-    let mut raced = 0;
+    // The pick's write and a reread started after it both wait off the UI thread and run in a
+    // random order; the page counts each reread it dropped for seeing the old range.
     for pick in [LogsRange::Year1, LogsRange::Months3].repeat(12) {
         let old = cx.update(|cx| page.read(cx).range());
         seen.borrow_mut().clear();
@@ -174,10 +173,6 @@ fn a_reread_that_starts_after_a_pick_does_not_put_the_old_range_back(cx: &mut Te
             })
         })
         .unwrap();
-        cx.dispatcher.scheduler().tick_background_only();
-        if s.services.logs.cache().range().unwrap() == old {
-            raced += 1;
-        }
         let rows: &[u64] = if pick == LogsRange::Year1 {
             &[3, 2]
         } else {
@@ -190,7 +185,8 @@ fn a_reread_that_starts_after_a_pick_does_not_put_the_old_range_back(cx: &mut Te
             seen.borrow()
         );
     }
-    assert!(raced > 0, "no try ran the reread before the write");
+    let dropped = cx.update(|cx| page.read(cx).stale_reads_dropped());
+    assert!(dropped > 0, "no try ran the reread before the write");
 }
 
 #[gpui_kit::test]

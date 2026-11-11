@@ -76,8 +76,10 @@ pub struct LogsTfPage {
     range: LogsRange,
     range_slider: Entity<SliderState>,
     slider_range: LogsRange,
-    // Range picks not yet saved; a cache read meanwhile may still hold the old range.
+    // Range picks not yet saved; a cache read meanwhile may still hold the old range. Reads
+    // dropped for that are counted, so a test can see the guard fire.
     range_writes: u32,
+    stale_reads: u32,
     // The open log and how far its body got; the list's item 0 is the page top, so row `i`
     // is item `i + 1`. A read or fetch that lands after its row closed is dropped.
     open: Option<OpenLog>,
@@ -159,6 +161,7 @@ impl LogsTfPage {
             range_slider,
             slider_range: LogsRange::default(),
             range_writes: 0,
+            stale_reads: 0,
             open: None,
             player_sort: PlayerSort::default(),
             matrix: MatrixKind::Kills,
@@ -228,6 +231,11 @@ impl LogsTfPage {
     /// How far back the list, averages and sync reach, as the settings keep it.
     pub fn range(&self) -> LogsRange {
         self.range
+    }
+
+    /// How many cache reads were dropped for seeing a range a pick had not yet replaced.
+    pub fn stale_reads_dropped(&self) -> u32 {
+        self.stale_reads
     }
 
     /// The history range slider: stops 0 to 5 in `LogsRange::STOPS` order, step 1.
@@ -823,7 +831,8 @@ impl LogsTfPage {
                 // A read that ran before a range pick was saved saw the old range; the pick's
                 // own reread follows, so this one is dropped like a superseded one.
                 let before_pick = matches!(&loaded, Ok((_, _, range, _))
-                    if page.range_writes > 0 && *range != page.range);
+                    if stale_read(page.range_writes, page.range, *range));
+                page.stale_reads += u32::from(before_pick);
                 if page.load_generation != generation || before_pick {
                     return;
                 }
@@ -1126,6 +1135,12 @@ fn open_detail_dialog<E: IntoElement>(
     });
 }
 
+// A cache read that saw `read_range` while `pending_picks` range picks wait to be saved ran
+// before the newest pick, `picked`, landed; the pick's own reread follows it.
+fn stale_read(pending_picks: u32, picked: LogsRange, read_range: LogsRange) -> bool {
+    pending_picks > 0 && read_range != picked
+}
+
 // A range's place on the slider, narrow to wide.
 fn stop_index(range: LogsRange) -> usize {
     LogsRange::STOPS
@@ -1154,4 +1169,19 @@ fn write_replacing(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> 
     part.as_file().sync_all()?;
     part.persist(path).map_err(|e| e.error)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_read_is_stale_only_while_a_pick_is_unsaved_and_it_saw_another_range() {
+        use LogsRange::{Months3, Year1};
+        assert!(stale_read(1, Year1, Months3), "it saw the range the pick replaced");
+        assert!(stale_read(2, Year1, Months3), "two picks out");
+        assert!(!stale_read(1, Year1, Year1), "it already saw the pick");
+        assert!(!stale_read(0, Year1, Months3), "no pick out: the cache is the truth");
+        assert!(!stale_read(0, Year1, Year1));
+    }
 }
