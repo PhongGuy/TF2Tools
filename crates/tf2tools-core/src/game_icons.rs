@@ -4,6 +4,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime};
 
 use crate::error::WeaponIconsError;
@@ -148,6 +149,10 @@ fn fit(icon: RgbaImage) -> RgbaImage {
     stretch(&as_buffer(&icon), scale(w), scale(h))
 }
 
+/// Numbers each tmp file, so a dropped build still running in this process never shares a
+/// tmp name with a newer one.
+static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
+
 /// Writes under a process-unique temporary name and renames, so a crash or a second app
 /// never leaves half a PNG under the final name.
 fn write_atomically(png: &Path, icon: &RgbaImage) -> Result<(), WeaponIconsError> {
@@ -159,7 +164,8 @@ fn write_atomically_with(
     write: impl FnOnce(&Path) -> Result<(), String>,
 ) -> Result<(), WeaponIconsError> {
     let mut tmp = png.as_os_str().to_owned();
-    tmp.push(format!(".{}.tmp", std::process::id()));
+    let n = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+    tmp.push(format!(".{}.{n}.tmp", std::process::id()));
     let tmp = PathBuf::from(tmp);
     write(&tmp).map_err(|message| {
         let _ = std::fs::remove_file(&tmp);
@@ -183,7 +189,6 @@ fn prune(
     started: SystemTime,
 ) -> Result<(), WeaponIconsError> {
     let keep: HashSet<&Path> = icons.values().map(PathBuf::as_path).collect();
-    let own_tmp = format!(".{}.tmp", std::process::id());
     let entries = std::fs::read_dir(cache_dir).map_err(|e| cache_error(cache_dir, &e))?;
     for entry in entries {
         let path = entry.map_err(|e| cache_error(cache_dir, &e))?.path();
@@ -192,7 +197,7 @@ fn prune(
                 .is_some_and(|ext| ext.eq_ignore_ascii_case(want))
         };
         let stale_png = has_ext("png") && !keep.contains(path.as_path());
-        let stale_tmp = has_ext("tmp") && !path.to_string_lossy().ends_with(own_tmp.as_str());
+        let stale_tmp = has_ext("tmp") && tmp_owner(&path) != Some(std::process::id());
         let fresh = || {
             std::fs::metadata(&path)
                 .and_then(|m| m.modified())
@@ -210,6 +215,14 @@ fn prune(
         }
     }
     Ok(())
+}
+
+/// The pid in a `<png>.<pid>.<n>.tmp` name, None for any other shape.
+fn tmp_owner(path: &Path) -> Option<u32> {
+    let name = path.file_name()?.to_str()?.strip_suffix(".tmp")?;
+    let (rest, n) = name.rsplit_once('.')?;
+    n.parse::<u64>().ok()?;
+    rest.rsplit_once('.')?.1.parse().ok()
 }
 
 fn cache_error(path: &Path, error: &std::io::Error) -> WeaponIconsError {
@@ -234,5 +247,28 @@ mod tests {
         });
         assert!(matches!(result, Err(WeaponIconsError::Cache { .. })));
         assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn each_write_gets_its_own_tmp_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let png = dir.path().join("icon.png");
+        let mut seen = Vec::new();
+        for _ in 0..2 {
+            write_atomically_with(&png, |tmp| {
+                seen.push(tmp.to_path_buf());
+                std::fs::write(tmp, b"png").map_err(|e| e.to_string())
+            })
+            .unwrap();
+        }
+        assert_ne!(seen[0], seen[1]);
+        let prefix = format!("icon.png.{}.", std::process::id());
+        for tmp in &seen {
+            let name = tmp.file_name().unwrap().to_string_lossy();
+            assert!(
+                name.starts_with(&prefix) && name.ends_with(".tmp"),
+                "{name}"
+            );
+        }
     }
 }

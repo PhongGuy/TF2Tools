@@ -390,9 +390,9 @@ fn pruning_removes_another_processes_leftover_tmp_files() {
     let entries = standard_entries();
     let (_tmp, tf, cache) = game(&borrowed(&entries));
     // Pid 1 is the init process, never this test.
-    let theirs = cache.join("tf_weapon_bat-v1-0-0.png.1.tmp");
+    let theirs = cache.join("tf_weapon_bat-v1-0-0.png.1.7.tmp");
     let ours = cache.join(format!(
-        "tf_weapon_bat-v1-0-0.png.{}.tmp",
+        "tf_weapon_bat-v1-0-0.png.{}.7.tmp",
         std::process::id()
     ));
     common::write_file(&theirs, b"half a png");
