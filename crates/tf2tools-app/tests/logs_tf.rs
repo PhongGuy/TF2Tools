@@ -1297,3 +1297,39 @@ fn the_add_button_says_it_is_looking_up(cx: &mut TestAppContext) {
         cx.update(|cx| page.read(cx).players().len()) == 1
     });
 }
+
+#[gpui_kit::test]
+fn the_banner_halves_are_solid_with_blu_on_the_left(cx: &mut TestAppContext) {
+    use gpui_kit::component::ActiveTheme as _;
+    use tf2tools_core::Team;
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    let half = |cx: &mut TestAppContext, team| {
+        support::bounds_of(cx, s.win, ids::logstf_banner_team(3, team)).expect("a banner half")
+    };
+    let (blu, red) = (half(cx, Team::Blue), half(cx, Team::Red));
+    assert!(blu.origin.x < red.origin.x, "BLU sits left of RED");
+    let (theme_red, theme_blue) = cx.update(|cx| (cx.theme().red, cx.theme().blue));
+    for color in [theme_red, theme_blue] {
+        let ratio = contrast_with_white(tf2tools_app::theme::team_fill(color));
+        assert!(ratio >= 4.5, "white on {color:?} is {ratio:.2}:1");
+    }
+}
+
+// WCAG's contrast ratio of white text on `fill`.
+fn contrast_with_white(fill: gpui_kit::Hsla) -> f32 {
+    let rgb = fill.to_rgb();
+    let linear = |c: f32| {
+        if c <= 0.039_28 {
+            c / 12.92
+        } else {
+            ((c + 0.055) / 1.055).powf(2.4)
+        }
+    };
+    let lum = 0.2126 * linear(rgb.r) + 0.7152 * linear(rgb.g) + 0.0722 * linear(rgb.b);
+    1.05 / (lum + 0.05)
+}

@@ -58,3 +58,10 @@ pub fn install(cx: &mut App) {
 pub fn card_hover(theme: &Theme) -> Hsla {
     theme.accent
 }
+
+/// A team's solid fill under white text, as logs.tf heads a log with its score banner.
+/// The dark theme's red and blue are 400 shades; a third darker they sit near 600, where
+/// white text clears 4.5:1.
+pub fn team_fill(color: Hsla) -> Hsla {
+    color.darken(0.35)
+}

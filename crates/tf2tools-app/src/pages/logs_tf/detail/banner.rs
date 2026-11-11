@@ -12,6 +12,7 @@ use super::super::list::open_link;
 use super::super::text::{date_text, duration_text};
 use super::team_cell;
 use crate::ids;
+use crate::theme::team_fill;
 use crate::widgets::labelled;
 
 // One team table column: its logs.tf title and how a team's cell reads.
@@ -30,16 +31,18 @@ const COLUMNS: [Column; 6] = [
 /// beside the centre line, labelled "BLU 2, RED 3".
 pub(super) fn banner(id: u64, log: &LogDetail, cx: &App) -> impl IntoElement {
     let (blue, red) = (log.blue().score(), log.red().score());
-    let half = |color: Hsla| {
+    let half = |team: Team, color: Hsla| {
         h_flex()
+            .id(ids::logstf_banner_team(id, team))
+            .test_support()
             .flex_1()
             .min_w_0()
             .justify_between()
             .items_center()
             .px_4()
             .py_2()
-            .bg(color.opacity(0.18))
-            .text_color(color)
+            .bg(team_fill(color))
+            .text_color(gpui_kit::white())
             .font_weight(FontWeight::BOLD)
     };
     let name = |text: &'static str| div().text_xl().child(text);
@@ -52,8 +55,16 @@ pub(super) fn banner(id: u64, log: &LogDetail, cx: &App) -> impl IntoElement {
         .w_full()
         .rounded_md()
         .overflow_hidden()
-        .child(half(cx.theme().blue).child(name("BLU")).child(score(blue)))
-        .child(half(cx.theme().red).child(score(red)).child(name("RED")))
+        .child(
+            half(Team::Blue, cx.theme().blue)
+                .child(name("BLU"))
+                .child(score(blue)),
+        )
+        .child(
+            half(Team::Red, cx.theme().red)
+                .child(score(red))
+                .child(name("RED")),
+        )
 }
 
 /// The row's title over its map, date and length, with the way to the same log on logs.tf.

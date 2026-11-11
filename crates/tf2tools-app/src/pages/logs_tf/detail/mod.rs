@@ -35,9 +35,9 @@ const MEDIC_WIDTH: Pixels = px(280.);
 type Column = (&'static str, fn(&PlayerLine) -> String);
 
 /// The panel under open log `row`. The score banner heads it once `opened` is ready; the
-/// title comes from the row at once; under it the parsed log, or a line saying it is
-/// loading or why it failed. A
-/// failed fetch of a pending log offers Retry, which asks `page` to fetch it again.
+/// title comes from the row at once; under it the parsed log, or a line saying it is loading
+/// or why it failed. A failed fetch of a pending log offers Retry, which asks `page` to fetch
+/// it again.
 pub(super) fn panel(
     row: &LogRow,
     opened: &OpenState,

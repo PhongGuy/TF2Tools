@@ -2578,11 +2578,19 @@ pub fn logstf_banner(id: u64) -> ElementId {
 /// One cell of the open log's team table, labelled with its value:
 /// "logstf-team-cell:blu:Midfights".
 pub fn logstf_team_cell(team: Team, column: &str) -> ElementId {
-    let slug = match team {
+    keyed("logstf-team-cell", &format!("{}:{column}", team_slug(team)))
+}
+
+/// One team's half of open log `id`'s score banner: "logstf-banner-team:<id>:red".
+pub fn logstf_banner_team(id: u64, team: Team) -> ElementId {
+    keyed("logstf-banner-team", &format!("{id}:{}", team_slug(team)))
+}
+
+fn team_slug(team: Team) -> &'static str {
+    match team {
         Team::Red => "red",
         Team::Blue | _ => "blu",
-    };
-    keyed("logstf-team-cell", &format!("{slug}:{column}"))
+    }
 }
 
 /// A players table column header in the open log, keyed by its title: "logstf-col:K/D".
