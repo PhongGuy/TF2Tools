@@ -1382,3 +1382,53 @@ fn many_class_icons_stay_clear_of_kda_in_the_smallest_window(cx: &mut TestAppCon
     to_end(cx, &page);
     assert_icons_clear_of_kda(cx, &s);
 }
+
+// `text` shaped in the theme font at `rems` times the root size.
+fn shaped(cx: &mut TestAppContext, win: gpui_kit::AnyWindowHandle, text: &str, rems: f32) -> f32 {
+    use gpui_kit::component::ActiveTheme as _;
+    cx.update_window(win, |_, w, cx| {
+        let run = gpui_kit::TextRun {
+            len: text.len(),
+            font: gpui_kit::font(cx.theme().font_family.clone()),
+            ..Default::default()
+        };
+        let size = gpui_kit::rems(rems).to_pixels(w.rem_size());
+        f32::from(
+            w.text_system()
+                .shape_line(text.to_owned().into(), size, &[run], None)
+                .width,
+        )
+    })
+    .unwrap()
+}
+
+#[gpui_kit::test]
+fn a_typical_title_and_map_read_whole_in_the_smallest_window(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (title, map) = ("serveme.tf #1234567", "cp_process_final");
+    let body = format!(
+        r#"{{"success": true, "results": 1, "total": 1, "parameters": {{}}, "logs": [
+            {{"id": 3, "title": "{title}", "map": "{map}", "date": {}, "views": 0, "players": 12}}]}}"#,
+        day_ago(1)
+    );
+    server.mount_bytes("/api/v1/log", body.into_bytes());
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    let cell = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
+    let need = shaped(cx, s.win, title, 0.875);
+    assert!(
+        f32::from(cell.size.width) >= need,
+        "title {cell:?} under {need} px"
+    );
+    let cell = support::bounds_of(cx, s.win, ids::logstf_log_map(3)).unwrap();
+    let need = shaped(cx, s.win, map, 0.75);
+    assert!(
+        f32::from(cell.size.width) >= need,
+        "map {cell:?} under {need} px"
+    );
+}

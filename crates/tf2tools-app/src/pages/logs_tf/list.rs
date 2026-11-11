@@ -35,20 +35,21 @@ const DPM: Pixels = px(48.);
 const GAP: Pixels = px(16.);
 const ICON: Pixels = px(18.);
 const TITLE_MIN: Pixels = px(100.);
-// Below the core columns' width the rows tighten their gaps and title, so DPM, the last
-// column, still ends inside the smallest window's 448 px list.
+// Below the core columns' width the rows tighten their gaps and title, and the date moves
+// under the title, so DPM, the last column, still ends inside the smallest window's 448 px list.
 const GAP_NARROW: Pixels = px(8.);
 const TITLE_MIN_NARROW: Pixels = px(72.);
 // The row's horizontal padding, both sides.
 const PADDING: Pixels = px(24.);
 
 /// How the rows fit the list's width. A narrow window gives up Length first, then moves Map
-/// under the title, then tightens the gaps and the title's minimum; before the first frame the
-/// list has no width yet.
+/// under the title, then moves Date under Map and tightens the gaps and the title's minimum;
+/// before the first frame the list has no width yet.
 #[derive(Clone, Copy)]
 pub(super) struct Fit {
     map_column: bool,
     length: bool,
+    date_column: bool,
     gap: Pixels,
     title_min: Pixels,
 }
@@ -57,6 +58,7 @@ impl Fit {
     pub(super) const ALL: Self = Self {
         map_column: true,
         length: true,
+        date_column: true,
         gap: GAP,
         title_min: TITLE_MIN,
     };
@@ -70,6 +72,7 @@ pub(super) fn fit(list: &ListState) -> Fit {
     Fit {
         map_column: unknown || width >= core + MAP + GAP,
         length: unknown || width >= core + MAP + LENGTH + GAP * 2.,
+        date_column: roomy,
         gap: if roomy { GAP } else { GAP_NARROW },
         title_min: if roomy { TITLE_MIN } else { TITLE_MIN_NARROW },
     }
@@ -112,7 +115,7 @@ pub(super) fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
         .font_weight(FontWeight::MEDIUM)
         .text_color(cx.theme().muted_foreground)
         .child(div().w(CHEVRON).flex_none())
-        .child(cell(DATE, "Date"))
+        .when(fit.date_column, |el| el.child(cell(DATE, "Date")))
         .child(div().flex_1().min_w(fit.title_min).child("Title"))
         .when(fit.map_column, |el| el.child(cell(MAP, "Map")))
         .when(fit.length, |el| {
@@ -180,7 +183,9 @@ fn log_item(
         .text_sm()
         .when(open, |el| el.bg(theme.muted))
         .child(chevron)
-        .child(div().w(DATE).flex_none().child(date_text(row.date())))
+        .when(fit.date_column, |el| {
+            el.child(div().w(DATE).flex_none().child(date_text(row.date())))
+        })
         .child(
             v_flex()
                 .flex_1()
@@ -195,6 +200,14 @@ fn log_item(
                 .when(!fit.map_column, |el| {
                     let line = div().text_xs().text_color(theme.muted_foreground);
                     el.child(map_cell(line, id, row.map()))
+                })
+                .when(!fit.date_column, |el| {
+                    el.child(
+                        div()
+                            .text_xs()
+                            .text_color(theme.muted_foreground)
+                            .child(date_text(row.date())),
+                    )
                 }),
         )
         .when(fit.map_column, |el| {
