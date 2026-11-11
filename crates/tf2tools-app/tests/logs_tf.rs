@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, HIGHLANDER, SIXES, day_ago, expanded, list_body, list_requests, list_requests_for,
-    mount_list_for, open_log, open_page, players_of, requests_to, row_ids, serve_two_logs, shell,
-    sid, to_end, unix_now,
+    ARIE, Gate, HIGHLANDER, SIXES, day_ago, expanded, list_body, list_requests, list_requests_for,
+    mount_held, mount_list_for, open_log, open_page, players_of, requests_to, row_ids,
+    serve_two_logs, shell, sid, to_end, unix_now,
 };
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
@@ -478,7 +478,8 @@ fn stored_rows(env: &support::Env) -> (i64, i64) {
 fn removing_a_player_mid_download_waits_for_the_download(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    // Arie's list answers at once and both bodies slowly, so the removal meets a download.
+    // Arie's list answers at once and both bodies wait on the gate, so the removal meets a
+    // download on the wire.
     mount_list_for(
         &server,
         ARIE,
@@ -486,42 +487,51 @@ fn removing_a_player_mid_download_waits_for_the_download(cx: &mut TestAppContext
         Duration::ZERO,
     );
     mount_list_for(&server, 1, &[], Duration::ZERO);
-    server.mount_bytes_after(
+    let downloads = Gate::default();
+    mount_held(
+        &server,
+        &downloads,
         "/json/3",
+        None,
         SIXES.as_bytes().to_vec(),
-        Duration::from_millis(500),
     );
-    server.mount_bytes_after(
+    mount_held(
+        &server,
+        &downloads,
         "/json/2",
+        None,
         HIGHLANDER.as_bytes().to_vec(),
-        Duration::from_millis(500),
     );
     let (s, page) = removal_page(cx, &env, &server);
-    let downloads = || requests_to(&server, "/json/3") + requests_to(&server, "/json/2");
-    support::wait_real(cx, "Arie's first download", |_| downloads() == 1);
+    support::wait_real(cx, "Arie's first download", |_| downloads.arrived() == 1);
     support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
     support::click_id(cx, s.win, ids::CONFIRM_OK);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_chip(sid(ARIE))).as_deref(),
+        Some("Removing...")
+    );
     let tracked = s.services.logs.cache().players().unwrap();
     assert!(
         tracked.iter().any(|p| p.steam_id() == sid(ARIE)),
         "Arie stays tracked until their download ends"
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::logstf_chip(sid(ARIE))).as_deref(),
-        Some("Removing...")
     );
     support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
     assert!(
         !support::present(cx, s.win, ids::CONFIRM_OK),
         "a player being removed cannot be asked about again"
     );
+    downloads.open();
     support::wait_real(cx, "the removal and the next sync", |cx| {
         cx.update(|cx| {
             let p = page.read(cx);
             p.players().len() == 1 && !p.is_syncing(cx)
         })
     });
-    assert_eq!(downloads(), 1, "no download started after the removal");
+    assert_eq!(
+        downloads.arrived(),
+        1,
+        "no download started after the removal"
+    );
     assert_eq!(
         stored_rows(&env),
         (0, 0),
@@ -537,22 +547,23 @@ fn removing_a_player_mid_download_waits_for_the_download(cx: &mut TestAppContext
 fn choosing_a_player_being_removed_starts_no_sync_for_them(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    // Arie's list answers slowly, so the chip click lands while the removal waits on it.
-    mount_list_for(
+    // Arie's list waits on the gate, so the chip click lands while the removal waits on it.
+    let list = Gate::default();
+    mount_held(
         &server,
-        ARIE,
-        &[(3, day_ago(1))],
-        Duration::from_millis(500),
+        &list,
+        "/api/v1/log",
+        Some(ARIE),
+        list_body(&[(3, day_ago(1))]),
     );
     mount_list_for(&server, 1, &[], Duration::ZERO);
     server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
     let (s, page) = removal_page(cx, &env, &server);
-    support::wait_real(cx, "Arie's list request", |_| {
-        list_requests_for(&server, ARIE) == 1
-    });
+    support::wait_real(cx, "Arie's list request", |_| list.arrived() == 1);
     support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
     support::click_id(cx, s.win, ids::CONFIRM_OK);
     support::click_id(cx, s.win, ids::logstf_chip(sid(ARIE)));
+    list.open();
     support::wait_real(cx, "the removal and the next sync", |cx| {
         cx.update(|cx| {
             let p = page.read(cx);
@@ -568,6 +579,69 @@ fn choosing_a_player_being_removed_starts_no_sync_for_them(cx: &mut TestAppConte
         stored_rows(&env),
         (0, 0),
         "nothing of Arie's outlives the removal"
+    );
+}
+
+#[gpui_kit::test]
+fn removing_two_players_back_to_back_syncs_neither(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Arie's list waits on the gate, so the other player's removal starts and ends while
+    // Arie's removal still waits for Arie's sync.
+    let list = Gate::default();
+    mount_held(
+        &server,
+        &list,
+        "/api/v1/log",
+        Some(ARIE),
+        list_body(&[(3, day_ago(1))]),
+    );
+    mount_list_for(&server, 1, &[], Duration::ZERO);
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let (s, page) = removal_page(cx, &env, &server);
+    support::wait_real(cx, "Arie's list request", |_| list.arrived() == 1);
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(1)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    // The other player has no sync to wait for, so their chip may already be gone.
+    let other = support::label_of(cx, s.win, ids::logstf_chip(sid(1)));
+    assert!(
+        matches!(other.as_deref(), None | Some("Removing...")),
+        "{other:?}"
+    );
+    support::wait_real(cx, "the other player's removal", |cx| {
+        cx.update(|cx| page.read(cx).players().len() == 1)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_chip(sid(ARIE))).as_deref(),
+        Some("Removing..."),
+        "Arie is still being removed after the other removal ended"
+    );
+    support::click_id(cx, s.win, ids::logstf_chip(sid(ARIE)));
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    assert!(!support::present(cx, s.win, ids::CONFIRM_OK));
+    list.open();
+    support::wait_real(cx, "both removals", |cx| {
+        cx.update(|cx| {
+            let p = page.read(cx);
+            p.players().is_empty() && !p.is_syncing(cx)
+        })
+    });
+    assert_eq!(
+        list_requests_for(&server, ARIE),
+        1,
+        "no second sync for Arie"
+    );
+    assert_eq!(
+        list_requests_for(&server, 1),
+        0,
+        "no sync for the other player"
+    );
+    assert_eq!(
+        stored_rows(&env),
+        (0, 0),
+        "nothing of either player is left"
     );
 }
 

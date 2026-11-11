@@ -6,6 +6,8 @@ mod grid;
 mod list;
 pub mod text;
 
+use std::collections::HashSet;
+
 use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -68,8 +70,8 @@ pub struct LogsTfPage {
     // At most one reread follows the sync at a time; events meanwhile ask for one more.
     rereading: bool,
     reread_wanted: bool,
-    // The player whose removal waits on their sync; nothing syncs them again meanwhile.
-    removing: Option<SteamId>,
+    // Players whose removal waits on their sync; nothing syncs them again meanwhile.
+    removing: HashSet<SteamId>,
     // Cache reads can land out of order; only the newest applies, and it starts the sync a
     // superseded read asked for.
     load_generation: u64,
@@ -139,7 +141,7 @@ impl LogsTfPage {
             sync,
             rereading: false,
             reread_wanted: false,
-            removing: None,
+            removing: HashSet::new(),
             load_generation: 0,
             sync_wanted: false,
             add_input,
@@ -342,7 +344,7 @@ impl LogsTfPage {
             }
             // Their sync ends first, so a list page it was recording cannot outlive the removal.
             let Ok(stopped) = page.update(cx, |page, cx| {
-                page.removing = Some(id);
+                page.removing.insert(id);
                 cx.notify();
                 page.sync.update(cx, |sync, cx| sync.stop(id, cx))
             }) else {
@@ -361,7 +363,7 @@ impl LogsTfPage {
             };
             let removed = removing.await;
             let _ = page.update_in(cx, |page, window, cx| {
-                page.removing = None;
+                page.removing.remove(&id);
                 page.written(removed, window, cx);
             });
         })
@@ -623,7 +625,7 @@ impl LogsTfPage {
 
     // Asks the app-wide sync for `id`; a run for anyone else is cancelled in its favour.
     fn sync(&mut self, id: SteamId, force: bool, cx: &mut Context<Self>) {
-        if self.removing == Some(id) {
+        if self.removing.contains(&id) {
             return;
         }
         self.sync
@@ -711,7 +713,7 @@ impl LogsTfPage {
             let id = player.steam_id();
             let name = player.name().to_owned();
             // A chip being removed says so and takes no clicks until it goes.
-            let removing = self.removing == Some(id);
+            let removing = self.removing.contains(&id);
             let chip = filter_badge(
                 ids::logstf_chip(id),
                 self.active == Some(id),

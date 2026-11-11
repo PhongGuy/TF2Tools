@@ -1,5 +1,7 @@
 //! Shared logs.tf helpers: a shell over a mock logs.tf, its fixtures and page lookups.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
 
 use gpui_kit::{Entity, TestAppContext};
@@ -175,6 +177,65 @@ pub fn mount_list_for(
             .respond_with(reply)
             .mount(&server.server),
     );
+}
+
+/// Holds replies until the test opens it, so a request stays in flight exactly as long as
+/// the test needs. Wiremock answers under its own lock, so while a reply is held the server
+/// takes no other request and `requests_to` would block; `arrived` counts instead.
+#[derive(Clone, Default)]
+pub struct Gate(Arc<(Mutex<bool>, Condvar, AtomicUsize)>);
+
+impl Gate {
+    /// How many held requests have reached the server.
+    pub fn arrived(&self) -> usize {
+        self.0.2.load(Ordering::SeqCst)
+    }
+
+    /// Lets every held reply, and every later one, through.
+    pub fn open(&self) {
+        *self.0.0.lock().unwrap() = true;
+        self.0.1.notify_all();
+    }
+}
+
+struct Held {
+    gate: Gate,
+    reply: wiremock::ResponseTemplate,
+}
+
+impl wiremock::Respond for Held {
+    // A gate the test never opens gives way after ten seconds, so a failure cannot hang.
+    fn respond(&self, _: &wiremock::Request) -> wiremock::ResponseTemplate {
+        let (open, wake, arrived) = &*self.gate.0;
+        arrived.fetch_add(1, Ordering::SeqCst);
+        let shut = open.lock().unwrap();
+        let _ = wake
+            .wait_timeout_while(shut, Duration::from_secs(10), |open| !*open)
+            .unwrap();
+        self.reply.clone()
+    }
+}
+
+/// Serves `body` at `route` behind `gate`, only for `account`'s requests when one is given.
+pub fn mount_held(
+    server: &super::StoreServer,
+    gate: &Gate,
+    route: &str,
+    account: Option<u64>,
+    body: Vec<u8>,
+) {
+    use wiremock::matchers::{method, path, query_param};
+    let mut mock = wiremock::Mock::given(method("GET")).and(path(route));
+    if let Some(account) = account {
+        mock = mock.and(query_param("player", sid(account).id64().to_string()));
+    }
+    let held = Held {
+        gate: gate.clone(),
+        reply: wiremock::ResponseTemplate::new(200).set_body_bytes(body),
+    };
+    server
+        .rt
+        .block_on(mock.respond_with(held).mount(&server.server));
 }
 
 /// How many requests for `route` the server has had.
