@@ -311,3 +311,17 @@ fn a_class_without_a_readable_weapon_map_has_no_weapons() {
         ("rocket", 2, 90, 0)
     );
 }
+
+#[test]
+fn a_round_whose_team_stats_do_not_read_keeps_zero_team_stats() {
+    let body = r#"{"length": 9, "teams": {"Red": {}, "Blue": {}}, "players": {},
+        "rounds": [{"winner": "Red", "team": null},
+                   {"winner": "Blue", "team": {"Blue": null, "Red": {"score": 2}}}]}"#;
+    let log = parse_log(body).unwrap();
+    let rows: Vec<(Option<Team>, u32, u32)> = log
+        .rounds()
+        .iter()
+        .map(|r| (r.winner(), r.blue().score(), r.red().score()))
+        .collect();
+    assert_eq!(rows, [(Some(Team::Red), 0, 0), (Some(Team::Blue), 0, 2)]);
+}

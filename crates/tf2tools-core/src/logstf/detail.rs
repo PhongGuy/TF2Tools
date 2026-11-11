@@ -977,6 +977,7 @@ struct WireRound {
     winner: String,
     #[serde(deserialize_with = "text")]
     firstcap: String,
+    #[serde(deserialize_with = "lenient")]
     team: WireRoundTeams,
     #[serde(deserialize_with = "lenient_map")]
     players: BTreeMap<String, WireRoundPlayer>,
@@ -987,9 +988,9 @@ struct WireRound {
 #[derive(Deserialize, Default)]
 #[serde(default)]
 struct WireRoundTeams {
-    #[serde(rename = "Red")]
+    #[serde(rename = "Red", deserialize_with = "lenient")]
     red: WireRoundTeam,
-    #[serde(rename = "Blue")]
+    #[serde(rename = "Blue", deserialize_with = "lenient")]
     blue: WireRoundTeam,
 }
 
@@ -1225,6 +1226,11 @@ fn object_counts(value: Value) -> BTreeMap<String, u32> {
 
 fn count_map<'de, D: Deserializer<'de>>(d: D) -> Result<BTreeMap<String, u32>, D::Error> {
     Ok(object_counts(Value::deserialize(d)?))
+}
+
+/// A value that reads as its default when it does not have the expected shape.
+fn lenient<'de, D: Deserializer<'de>, T: DeserializeOwned + Default>(d: D) -> Result<T, D::Error> {
+    Ok(serde_json::from_value(Value::deserialize(d)?).unwrap_or_default())
 }
 
 /// A list whose unreadable entries are skipped; anything but an array reads as empty.
