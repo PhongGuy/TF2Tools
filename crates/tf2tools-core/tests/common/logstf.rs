@@ -231,3 +231,39 @@ pub fn class_rows(dir: &tf2tools_core::DataDir, log_id: i64) -> i64 {
         )
         .unwrap()
 }
+
+/// Answers with `template` after running `before`, so a test can change the database while
+/// a request is in flight.
+pub struct Before<F> {
+    before: F,
+    template: ResponseTemplate,
+}
+
+pub fn before<F: Fn() + Send + Sync + 'static>(before: F, template: ResponseTemplate) -> Before<F> {
+    Before { before, template }
+}
+
+impl<F: Fn() + Send + Sync + 'static> wiremock::Respond for Before<F> {
+    fn respond(&self, _: &wiremock::Request) -> ResponseTemplate {
+        (self.before)();
+        self.template.clone()
+    }
+}
+
+/// Answers `/json/<id>` with `body`, removing `player` from the cache just before it replies.
+pub async fn remove_on_download(
+    server: &wiremock::MockServer,
+    cache: &tf2tools_core::LogsCache,
+    player: tf2tools_core::SteamId,
+    id: u64,
+    body: String,
+) {
+    let cache = cache.clone();
+    let reply = ResponseTemplate::new(200).set_body_string(body);
+    Mock::given(method("GET"))
+        .and(path(format!("/json/{id}")))
+        .respond_with(before(move || cache.remove_player(player).unwrap(), reply))
+        .with_priority(1)
+        .mount(server)
+        .await;
+}

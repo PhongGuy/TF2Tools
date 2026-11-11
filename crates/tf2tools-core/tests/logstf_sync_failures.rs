@@ -2,9 +2,10 @@
 
 use tf2tools_core::{LogsCancel, LogsRange, LogsSyncError, SteamId, TrackedPlayer};
 
+use crate::common;
 use crate::common::logstf::{
     ARIE, LogsEnv, class_rows, days_ago, list_body, log_body, log_state, logs_env, mount_any_log,
-    mount_list, mount_log, paths, solo,
+    mount_list, mount_log, paths, remove_on_download, solo,
 };
 
 fn arie() -> SteamId {
@@ -263,4 +264,28 @@ async fn gone_and_unreadable_logs_do_not_keep_a_fresh_cache_syncing() {
         .unwrap();
     assert!(next.skipped(), "gone and unreadable logs are settled");
     assert!(paths(&env.server).await.is_empty());
+}
+
+#[tokio::test]
+async fn a_player_removed_mid_sync_ends_it_cleanly_without_storing_their_logs() {
+    let env = tracked_env().await;
+    let list = list_body(&[(3, days_ago(1)), (2, days_ago(2)), (1, days_ago(3))]);
+    mount_list(&env.server, ARIE, list).await;
+    mount_any_log(&env.server).await;
+    let body = log_body(600, &[solo(231_702, ("scout", 600, 1, 1, 1, 100))]);
+    remove_on_download(&env.server, env.client.cache(), arie(), 2, body).await;
+    let summary = env
+        .client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
+    assert_eq!(summary.downloaded(), 1, "only log 3 was stored");
+    assert_eq!(common::count(&env.dir, "logstf_logs"), 0);
+    assert_eq!(common::count(&env.dir, "logstf_class_rows"), 0);
 }

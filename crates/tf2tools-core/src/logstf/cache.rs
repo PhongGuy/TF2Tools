@@ -550,22 +550,28 @@ impl LogsCache {
     /// Stores a downloaded log: its body and length, a class row per player per class played
     /// (Medic heals, ubers and drops on the medic row only), and real names for any player
     /// still named by the offline placeholder. Old class rows go first, so a refetch replaces them.
+    /// Returns false, storing nothing, when the log's row is gone (pruned or its player removed).
     pub(crate) fn ingest(
         &self,
         log_id: i64,
         body: &str,
         detail: &LogDetail,
         now: i64,
-    ) -> Result<(), LogsCacheError> {
+    ) -> Result<bool, LogsCacheError> {
         let stored = deflate(body)?;
         self.db
             .write(|conn| {
                 let tx = conn.transaction()?;
-                tx.execute(
+                let updated = tx.execute(
                     "UPDATE logstf_logs SET body = ?2, fetched_at = ?3, length = ?4, state = 0
                      WHERE id = ?1",
                     params![log_id, stored, now, detail.length()],
                 )?;
+                // The row vanished between listing and download; its class rows have no log
+                // to point at, so there is nothing to store.
+                if updated == 0 {
+                    return Ok(false);
+                }
                 tx.execute("DELETE FROM logstf_class_rows WHERE log_id = ?1", [log_id])?;
                 {
                     let mut row = tx.prepare(
@@ -597,7 +603,8 @@ impl LogsCache {
                         rename.execute(params![sql_id(p.steam_id())?, p.name()])?;
                     }
                 }
-                tx.commit()
+                tx.commit()?;
+                Ok(true)
             })
             .map_err(db_error)
     }

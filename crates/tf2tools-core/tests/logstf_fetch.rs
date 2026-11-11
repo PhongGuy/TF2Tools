@@ -6,6 +6,7 @@ use tf2tools_core::{LogState, LogsFetchError, LogsRange, SteamId, TrackedPlayer}
 use crate::common;
 use crate::common::logstf::{
     ARIE, LogsEnv, class_rows, days_ago, log_state, logs_env, logstf_fixture, mount_log,
+    remove_on_download,
 };
 
 fn arie() -> SteamId {
@@ -92,4 +93,15 @@ async fn an_offline_fetch_is_a_network_error_and_sends_nothing() {
         Err(LogsFetchError::Network { .. })
     ));
     assert_eq!(log_state(&env.dir, 3), (0, false));
+}
+
+#[tokio::test]
+async fn a_log_removed_while_it_downloads_is_still_returned() {
+    let env = pending_env(&[3]).await;
+    let body = logstf_fixture("log-4137103-6v6.json");
+    remove_on_download(&env.server, env.client.cache(), arie(), 3, body).await;
+    let detail = env.client.fetch_log(3).await.unwrap();
+    assert_eq!(detail.players().len(), 12);
+    assert_eq!(common::count(&env.dir, "logstf_logs"), 0);
+    assert_eq!(common::count(&env.dir, "logstf_class_rows"), 0);
 }

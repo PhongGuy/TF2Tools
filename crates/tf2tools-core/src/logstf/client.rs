@@ -374,6 +374,7 @@ impl LogsClient {
                 .await?
             {
                 Downloaded::Ready(_) => summary.downloaded += 1,
+                Downloaded::Vanished(_) => {}
                 Downloaded::Gone => summary.gone += 1,
                 Downloaded::Unreadable { marked: true, .. } => summary.unreadable += 1,
                 Downloaded::Unreadable { marked: false, .. } => {}
@@ -400,7 +401,7 @@ impl LogsClient {
             .download::<LogsFetchError>(log_id, Priority::Interactive, now)
             .await?
         {
-            Downloaded::Ready(detail) => Ok(*detail),
+            Downloaded::Ready(detail) | Downloaded::Vanished(detail) => Ok(*detail),
             Downloaded::Gone => Err(LogsFetchError::Gone),
             Downloaded::Unreadable {
                 too_large: Some((url, limit)),
@@ -436,8 +437,11 @@ impl LogsClient {
         };
         Ok(match readable {
             Some((body, detail)) => {
-                self.cache.ingest(log_id, &body, &detail, now)?;
-                Downloaded::Ready(Box::new(detail))
+                if self.cache.ingest(log_id, &body, &detail, now)? {
+                    Downloaded::Ready(Box::new(detail))
+                } else {
+                    Downloaded::Vanished(Box::new(detail))
+                }
             }
             None => Downloaded::Unreadable {
                 marked: self.cache.mark_unreadable(log_id, now)?,
@@ -566,6 +570,8 @@ impl Drop for GapGuard<'_> {
 /// What became of one log body download; every outcome is already recorded in the cache.
 enum Downloaded {
     Ready(Box<LogDetail>),
+    /// Downloaded fine, but the log's row was removed meanwhile, so nothing was stored.
+    Vanished(Box<LogDetail>),
     Gone,
     /// `marked` is false when a good copy was already stored; `too_large` names the cap hit.
     Unreadable {
