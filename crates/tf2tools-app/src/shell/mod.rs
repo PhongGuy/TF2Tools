@@ -650,7 +650,12 @@ impl Render for Shell {
                     .flex_1()
                     .min_w_0()
                     .h_full()
-                    .child(header::render(self.page, self.tf2_running, cx))
+                    .child(header::render(
+                        self.page,
+                        self.tf2_running,
+                        window.viewport_size().width,
+                        cx,
+                    ))
                     .children(update_view::banner(cx))
                     .children(crate::crash::notice::banner(cx))
                     .children(crate::old_v4::banner(cx))

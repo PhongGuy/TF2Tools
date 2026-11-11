@@ -56,13 +56,14 @@ pub fn sync_banner(kind: StoreKind, has_rows: bool, cx: &App) -> Option<AnyEleme
                 .justify_between()
                 .gap_4()
                 .text_sm()
+                // The text takes the row's slack and wraps; the count keeps its width.
                 .child(labelled(
-                    div(),
+                    div().flex_1().min_w_0(),
                     ids::SYNC_BANNER,
                     banner_text(kind, has_rows),
                 ))
                 .child(labelled(
-                    div().text_color(theme.muted_foreground),
+                    div().flex_none().text_color(theme.muted_foreground),
                     ids::SYNC_BANNER_COUNT,
                     banner_count(tick),
                 )),
