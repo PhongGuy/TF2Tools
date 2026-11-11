@@ -930,6 +930,66 @@ fn a_wide_window_gives_the_map_its_own_column(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn shrinking_across_the_breakpoint_makes_room_for_the_map_line(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    let wide = support::bounds_of(cx, s.win, ids::logstf_log(3)).unwrap();
+
+    // The rows were measured one line high; the narrow window must remeasure them.
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    to_end(cx, &page);
+    let row = support::bounds_of(cx, s.win, ids::logstf_log(3)).unwrap();
+    let title = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
+    let map = support::bounds_of(cx, s.win, ids::logstf_log_map(3)).unwrap();
+    assert!(
+        row.size.height >= wide.size.height + map.size.height - px(1.),
+        "row {row:?} was {wide:?}"
+    );
+    assert!(
+        row.size.height >= title.size.height + map.size.height,
+        "row {row:?} holds title {title:?} and map {map:?}"
+    );
+    assert!(map.bottom() <= row.bottom(), "map {map:?} inside {row:?}");
+}
+
+#[gpui_kit::test]
+fn a_long_title_and_map_stay_inside_their_row_in_the_smallest_window(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let title = "Grand Finals ".repeat(12);
+    let map = format!("cp_{}", "very_long_map_name_".repeat(8));
+    let body = format!(
+        r#"{{"success": true, "results": 1, "total": 1, "parameters": {{}}, "logs": [
+            {{"id": 3, "title": "{title}", "map": "{map}", "date": {}, "views": 0, "players": 12}}]}}"#,
+        day_ago(1)
+    );
+    server.mount_bytes("/api/v1/log", body.into_bytes());
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    let row = support::bounds_of(cx, s.win, ids::logstf_log(3)).unwrap();
+    let list = support::bounds_of(cx, s.win, ids::LOGSTF_LIST).unwrap();
+    let dpm = support::bounds_of(cx, s.win, ids::logstf_log_dpm(3)).unwrap();
+    for cell in [ids::logstf_log_title(3), ids::logstf_log_map(3)] {
+        let b = support::bounds_of(cx, s.win, cell.clone()).unwrap();
+        assert!(
+            b.right() <= dpm.left(),
+            "{cell:?} {b:?} runs into DPM {dpm:?}"
+        );
+        assert!(b.bottom() <= row.bottom(), "{cell:?} {b:?} below {row:?}");
+    }
+    assert!(dpm.right() <= list.right(), "DPM {dpm:?} past {list:?}");
+}
+
+#[gpui_kit::test]
 fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
     use gpui_kit::{InputEvent as _, ListOffset, ScrollDelta, ScrollEvent, point, px, size};
 
