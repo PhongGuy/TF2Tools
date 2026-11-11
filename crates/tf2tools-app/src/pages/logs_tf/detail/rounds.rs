@@ -15,7 +15,9 @@ use tf2tools_core::{LogDetail, RoundLine, SteamId, Team};
 use super::{NUMBER, team_cell, team_colour};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
-use crate::pages::logs_tf::text::{EventPart, duration_text, event_parts, team_name};
+use crate::pages::logs_tf::text::{
+    EventPart, duration_text, event_parts, round_length_text, team_name,
+};
 use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
 
@@ -166,7 +168,7 @@ fn round_row(
             let _ = page.update(cx, |page, cx| page.toggle_round(n, cx));
         })
         .child(spread(ROUND).child((n + 1).to_string()))
-        .child(spread(LENGTH).child(duration_text(round.length())))
+        .child(spread(LENGTH).child(round_length_text(round.length())))
         .child(score)
         .children(COLUMNS.map(|(title, read)| {
             spread(TEAM_NUMBER)

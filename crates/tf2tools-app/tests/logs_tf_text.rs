@@ -5,10 +5,10 @@ use std::time::Duration;
 use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
     DOWNLOAD_FAILED, EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, charge_text, count_text,
-    download_reason, duration_text, event_parts, event_text, fetch_message, finding_text,
-    healing_text, medigun_name, one_decimal, progress_line, progress_text, range_label, reads_zero,
-    resolve_message, ring_label, seconds_text, share_text, streaks_label, summary_text,
-    sync_message, tenths_text, time_played_text, whole,
+    download_reason, duration_text, event_parts, event_text, fetch_message, finding_text, floored,
+    floored_share_text, healing_text, medigun_name, one_decimal, progress_line, progress_text,
+    range_label, reads_zero, resolve_message, ring_label, round_length_text, seconds_text,
+    share_text, streaks_label, summary_text, sync_message, tenths_text, time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
@@ -474,6 +474,45 @@ fn an_events_names_take_their_own_teams_colour() {
     );
 }
 
+// Worked examples from logs.tf 3319519, 1769 s long, where logs.tf floors whole numbers.
+fn per_min_3319519(n: f64) -> f64 {
+    n * 60.0 / 1769.0
+}
+
+#[test]
+fn open_log_whole_numbers_floor_like_logs_tf() {
+    assert_eq!(floored(per_min_3319519(4567.0)), "154");
+    assert_eq!(floored(per_min_3319519(4540.0)), "153");
+    assert_eq!(
+        healing_text(32_039, per_min_3319519(32_039.0)),
+        "32039 (1086/m)"
+    );
+    assert_eq!(seconds_text(58.9167), "58 s");
+    assert_eq!(seconds_text(35.7), "35 s");
+}
+
+#[test]
+fn one_decimal_numbers_round_half_up_like_logs_tf() {
+    assert_eq!(tenths_text(6.66), "6.7 s");
+    assert_eq!(one_decimal(0.25), "0.3");
+    assert_eq!(one_decimal(2.45), "2.5");
+}
+
+#[test]
+fn heal_and_charge_shares_floor_like_logs_tf() {
+    use tf2tools_core::Medigun;
+    assert_eq!(floored_share_text(7_026, 32_039), "21%");
+    assert_eq!(floored_share_text(7_051, 28_298), "24%");
+    assert_eq!(floored_share_text(0, 0), "0%");
+    assert_eq!(charge_text(&Medigun::MediGun, 2, 3), "Medigun: 2 (66%)");
+}
+
+#[test]
+fn round_lengths_pad_their_minutes_like_logs_tf() {
+    assert_eq!(round_length_text(330), "05:30");
+    assert_eq!(round_length_text(1006), "16:46");
+}
+
 #[test]
 fn medic_numbers_read_like_logs_tf() {
     use tf2tools_core::Medigun;
@@ -506,7 +545,7 @@ fn heal_targets_run_high_to_low_with_class_and_share() {
         top,
         [
             ("deshio", Some(TfClass::Scout), 8_495, "30%"),
-            ("DrHappiness", Some(TfClass::Soldier), 6_127, "22%"),
+            ("DrHappiness", Some(TfClass::Soldier), 6_127, "21%"),
         ]
     );
     assert!(

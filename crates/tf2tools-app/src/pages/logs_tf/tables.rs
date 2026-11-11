@@ -5,7 +5,7 @@ use tf2tools_core::{
     ClassLine, LogDetail, MatrixKind, MatrixRow, MedicLine, PlayerLine, SteamId, Team, TfClass,
 };
 
-use super::text::{accuracy_text, share_text};
+use super::text::{accuracy_text, floored_share_text, share_text};
 
 /// One weapon's line in a class card, its shares already worded.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,7 +57,7 @@ pub fn heal_rows(medic: &MedicLine) -> Vec<HealRow> {
             name: t.name().to_owned(),
             class: t.class(),
             heals: t.healing(),
-            share: share_text(t.healing(), medic.heal()),
+            share: floored_share_text(t.healing(), medic.heal()),
         })
         .collect()
 }

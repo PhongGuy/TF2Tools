@@ -179,14 +179,19 @@ pub fn time_played_text(seconds: u64) -> String {
     }
 }
 
-/// A rate with one decimal: "0.6".
+/// A rate with one decimal, half rounding up as on logs.tf: "0.6", 0.25 reads "0.3".
 pub fn one_decimal(value: f64) -> String {
-    format!("{value:.1}")
+    format!("{:.1}", (value * 10.).round() / 10.)
 }
 
-/// A rate as a whole number: "136".
+/// A rate as a whole number, rounded to nearest, for the app's own numbers: "136".
 pub fn whole(value: f64) -> String {
     format!("{value:.0}")
+}
+
+/// A number logs.tf shows whole, cut down as logs.tf does: 154.9 reads "154".
+pub fn floored(value: f64) -> String {
+    format!("{}", value.floor())
 }
 
 /// A history range's stop label under the slider: "1 month" up to "All".
@@ -255,6 +260,11 @@ pub const LOG_GONE: &str = "This log was removed from logs.tf";
 /// A row's note when its log's body could not be read.
 pub const LOG_UNREADABLE: &str = "This log couldn't be read";
 
+/// A round's length with minutes padded to two digits, as logs.tf's rounds table: "05:30".
+pub fn round_length_text(seconds: u32) -> String {
+    format!("{:02}:{:02}", seconds / 60, seconds % 60)
+}
+
 /// A match length as minutes and seconds, as logs.tf writes it: "28:34", "60:00".
 pub fn duration_text(seconds: u32) -> String {
     format!("{}:{:02}", seconds / 60, seconds % 60)
@@ -276,6 +286,15 @@ pub fn share_text(part: u32, whole: u32) -> String {
     format!("{}%", percent(part, whole))
 }
 
+/// `part` as a whole percent of `whole` cut down, as logs.tf shows heal and charge shares:
+/// 21.9% reads "21%"; a whole of 0 reads "0%".
+pub fn floored_share_text(part: u32, whole: u32) -> String {
+    let share = (u64::from(part) * 100)
+        .checked_div(u64::from(whole))
+        .unwrap_or(0);
+    format!("{share}%")
+}
+
 /// Hits as a whole percent of shots: "43%"; with no shots there is no accuracy, "-".
 pub fn accuracy_text(hits: u32, shots: u32) -> String {
     if shots == 0 {
@@ -284,7 +303,7 @@ pub fn accuracy_text(hits: u32, shots: u32) -> String {
     format!("{}%", percent(hits, shots))
 }
 
-// Integer half-up rounding, so 4.5% reads "5%" as on logs.tf.
+// Integer half-up rounding, so 4.5% reads "5%".
 fn percent(part: u32, whole: u32) -> u64 {
     if whole == 0 {
         return 0;
@@ -323,17 +342,21 @@ pub fn medigun_name(medigun: &Medigun) -> &str {
 
 /// A Medic's healing with its rate per minute: "28170 (986/m)".
 pub fn healing_text(heal: u32, per_min: f64) -> String {
-    format!("{heal} ({}/m)", whole(per_min))
+    format!("{heal} ({}/m)", floored(per_min))
 }
 
 /// One medigun's charges and their share of all `total`: "Medigun: 12 (100%)".
 pub fn charge_text(medigun: &Medigun, n: u32, total: u32) -> String {
-    format!("{}: {n} ({})", medigun_name(medigun), share_text(n, total))
+    format!(
+        "{}: {n} ({})",
+        medigun_name(medigun),
+        floored_share_text(n, total)
+    )
 }
 
-/// A time in whole seconds: "63 s".
+/// A time in whole seconds, cut down as logs.tf shows it: 58.9 reads "58 s".
 pub fn seconds_text(secs: f64) -> String {
-    format!("{} s", whole(secs))
+    format!("{} s", floored(secs))
 }
 
 /// A time to a tenth of a second: "6.5 s".

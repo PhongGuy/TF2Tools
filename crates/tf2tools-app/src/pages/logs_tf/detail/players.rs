@@ -15,7 +15,7 @@ use super::{NUMBER, team_cell};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players};
-use crate::pages::logs_tf::text::{one_decimal, reads_zero, whole};
+use crate::pages::logs_tf::text::{floored, one_decimal, reads_zero};
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 use crate::widgets::tip::tip;
@@ -171,7 +171,7 @@ fn player_columns(c: &LogColumns) -> Vec<Column> {
         (P::KaPerD, |p| one_decimal(p.kapd())),
         (P::KPerD, |p| one_decimal(p.kpd())),
         (P::DamageTaken, |p| p.dt().to_string()),
-        (P::DamageTakenPerMin, |p| whole(p.dt_per_min())),
+        (P::DamageTakenPerMin, |p| floored(p.dt_per_min())),
         (P::Medkits, |p| p.medkits().to_string()),
         (P::Backstabs, |p| p.backstabs().to_string()),
         (P::Headshots, |p| p.headshots().to_string()),
