@@ -867,3 +867,46 @@ fn killstreak_names_show_whole(cx: &mut TestAppContext) {
         );
     }
 }
+
+// `text` shaped at text-xs in the theme font at `weight`, as the open log's tables set it.
+fn xs_width(
+    cx: &mut TestAppContext,
+    win: gpui_kit::AnyWindowHandle,
+    text: &str,
+    weight: gpui_kit::FontWeight,
+) -> f32 {
+    use gpui_kit::component::ActiveTheme as _;
+    cx.update_window(win, |_, w, cx| {
+        let mut font = gpui_kit::font(cx.theme().font_family.clone());
+        font.weight = weight;
+        let run = gpui_kit::TextRun {
+            len: text.len(),
+            font,
+            ..Default::default()
+        };
+        let size = gpui_kit::rems(0.75).to_pixels(w.rem_size());
+        f32::from(
+            w.text_system()
+                .shape_line(text.to_owned().into(), size, &[run], None)
+                .width,
+        )
+    })
+    .unwrap()
+}
+
+#[gpui_kit::test]
+fn the_team_table_fits_the_smallest_window(cx: &mut TestAppContext) {
+    use tf2tools_core::Team;
+    let (_env, _server, s, _page) = opened_at(cx, 3, 800., 600., ids::LOGSTF_TEAMS_SCROLL);
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_TEAMS_SCROLL).unwrap();
+    let cell = support::bounds_of(cx, s.win, ids::logstf_team_cell(Team::Blue, "Midfights"));
+    let cell = cell.unwrap();
+    assert!(cell.right() <= table.right(), "{cell:?} past {table:?}");
+    // Every title fits its column, so none spills into the one before.
+    for title in ["Kills", "Damage", "Charges", "Drops", "Caps", "Midfights"] {
+        let cell = support::bounds_of(cx, s.win, ids::logstf_team_cell(Team::Blue, title));
+        let width = f32::from(cell.unwrap().size.width);
+        let text = xs_width(cx, s.win, title, gpui_kit::FontWeight::MEDIUM);
+        assert!(width >= text, "{title}: {width} under {text}");
+    }
+}

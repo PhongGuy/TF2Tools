@@ -15,16 +15,17 @@ use crate::ids;
 use crate::theme::team_fill;
 use crate::widgets::labelled;
 
-// One team table column: its logs.tf title and how a team's cell reads.
-type Column = (&'static str, fn(&TeamTotals) -> u32);
+// One team table column: its logs.tf title, its width and how a team's cell reads. Each is
+// just wide enough for its title, so all seven fit the smallest window's 424 px panel.
+type Column = (&'static str, f32, fn(&TeamTotals) -> u32);
 
 const COLUMNS: [Column; 6] = [
-    ("Kills", TeamTotals::kills),
-    ("Damage", TeamTotals::dmg),
-    ("Charges", TeamTotals::charges),
-    ("Drops", TeamTotals::drops),
-    ("Caps", TeamTotals::caps),
-    ("Midfights", TeamTotals::midfights),
+    ("Kills", 48., TeamTotals::kills),
+    ("Damage", 56., TeamTotals::dmg),
+    ("Charges", 56., TeamTotals::charges),
+    ("Drops", 48., TeamTotals::drops),
+    ("Caps", 48., TeamTotals::caps),
+    ("Midfights", 72., TeamTotals::midfights),
 ];
 
 /// The score banner of log `id`: BLU's half on the left, RED's on the right, each score
@@ -89,14 +90,14 @@ pub(super) fn title(row: &LogRow, cx: &App) -> impl IntoElement {
 
 /// The team table in logs.tf's columns and order, RED's row first.
 pub(super) fn team_table(log: &LogDetail, cx: &App) -> Div {
-    let cell = || div().w(px(64.)).flex_none().text_right();
+    let cell = |width: f32| div().w(px(width)).flex_none().text_right();
     let head = h_flex()
         .gap_1()
         .py_1()
         .text_color(cx.theme().muted_foreground)
         .font_weight(FontWeight::MEDIUM)
         .child(div().w(px(40.)).flex_none().child("Team"))
-        .children(COLUMNS.map(|(title, _)| cell().child(title)));
+        .children(COLUMNS.map(|(title, width, _)| cell(width).child(title)));
     let line = |team: Team, totals: &TeamTotals| {
         h_flex()
             .gap_1()
@@ -104,9 +105,9 @@ pub(super) fn team_table(log: &LogDetail, cx: &App) -> Div {
             .border_t_1()
             .border_color(cx.theme().border)
             .child(team_cell(team, cx).w(px(40.)))
-            .children(COLUMNS.map(|(title, read)| {
+            .children(COLUMNS.map(|(title, width, read)| {
                 let value = read(totals).to_string();
-                labelled(cell(), ids::logstf_team_cell(team, title), value)
+                labelled(cell(width), ids::logstf_team_cell(team, title), value)
             }))
     };
     v_flex()
