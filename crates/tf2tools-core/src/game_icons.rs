@@ -12,6 +12,8 @@ use crate::weapon_inventory_images;
 
 const ITEMS_GAME_MAX_BYTES: u64 = 64 * 1024 * 1024;
 const ICON_MAX_SIDE: u32 = 128;
+/// Part of every cache name; bump it when the size or filter changes so old icons are redrawn.
+const FORMAT: &str = "v1";
 
 /// The game's backpack icons for the crosshair weapons, as PNGs in a cache folder.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,7 +27,7 @@ impl GameWeaponIcons {
     /// Reads `<tf_dir>/scripts/items/items_game.txt` and `<tf_dir>/tf2_textures_dir.vpk` and
     /// makes sure `cache_dir` holds a PNG, at most 128 px a side, for every weapon the game
     /// pictures; a PNG already there for the same texture is reused. Removes every other
-    /// `.png` in `cache_dir`. Blocking.
+    /// `.png` in `cache_dir`, and `.tmp` files another process left. Blocking.
     ///
     /// Fails with `ItemsGame` or `Textures` when either game file cannot be read, and with
     /// `Cache` when the folder or a PNG cannot be written. A weapon whose item or texture is
@@ -48,7 +50,10 @@ impl GameWeaponIcons {
             // texture is reused without reading it from the pak.
             let dir = &entry.dir_entry;
             let length = u64::from(dir.preload_length) + u64::from(dir.file_length);
-            let png = cache_dir.join(format!("{script}-{:08x}-{length:x}.png", dir.crc32));
+            let png = cache_dir.join(format!(
+                "{script}-{FORMAT}-{:08x}-{length:x}.png",
+                dir.crc32
+            ));
             if !png.is_file() {
                 let Some(icon) = read_entry(&pak_path, name, entry)
                     .ok()
@@ -138,12 +143,22 @@ fn fit(icon: RgbaImage) -> RgbaImage {
 /// Writes under a process-unique temporary name and renames, so a crash or a second app
 /// never leaves half a PNG under the final name.
 fn write_atomically(png: &Path, icon: &RgbaImage) -> Result<(), WeaponIconsError> {
+    write_atomically_with(png, |tmp| write_png(tmp, icon).map_err(|e| e.to_string()))
+}
+
+fn write_atomically_with(
+    png: &Path,
+    write: impl FnOnce(&Path) -> Result<(), String>,
+) -> Result<(), WeaponIconsError> {
     let mut tmp = png.as_os_str().to_owned();
     tmp.push(format!(".{}.tmp", std::process::id()));
     let tmp = PathBuf::from(tmp);
-    write_png(&tmp, icon).map_err(|e| WeaponIconsError::Cache {
-        path: tmp.clone(),
-        message: e.to_string(),
+    write(&tmp).map_err(|message| {
+        let _ = std::fs::remove_file(&tmp);
+        WeaponIconsError::Cache {
+            path: tmp.clone(),
+            message,
+        }
     })?;
     std::fs::rename(&tmp, png).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
@@ -151,25 +166,30 @@ fn write_atomically(png: &Path, icon: &RgbaImage) -> Result<(), WeaponIconsError
     })
 }
 
-/// Removes every `.png` in `cache_dir` that this build did not keep.
+/// Removes every `.png` in `cache_dir` that this build did not keep, and every `.tmp` not
+/// written by this process. A file that will not go is logged and left.
 fn prune(
     cache_dir: &Path,
     icons: &BTreeMap<&'static str, PathBuf>,
 ) -> Result<(), WeaponIconsError> {
     let keep: HashSet<&Path> = icons.values().map(PathBuf::as_path).collect();
+    let own_tmp = format!(".{}.tmp", std::process::id());
     let entries = std::fs::read_dir(cache_dir).map_err(|e| cache_error(cache_dir, &e))?;
     for entry in entries {
         let path = entry.map_err(|e| cache_error(cache_dir, &e))?.path();
-        let is_png = path
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("png"));
-        if !is_png || keep.contains(path.as_path()) {
+        let has_ext = |want: &str| {
+            path.extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case(want))
+        };
+        let stale_png = has_ext("png") && !keep.contains(path.as_path());
+        let stale_tmp = has_ext("tmp") && !path.to_string_lossy().ends_with(own_tmp.as_str());
+        if !stale_png && !stale_tmp {
             continue;
         }
         // Another app pruning the same folder may have removed it first.
         match std::fs::remove_file(&path) {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
-                return Err(cache_error(&path, &e));
+                tracing::warn!(%e, path = %path.display(), "could not remove a stale weapon icon");
             }
             _ => {}
         }
@@ -181,5 +201,23 @@ fn cache_error(path: &Path, error: &std::io::Error) -> WeaponIconsError {
     WeaponIconsError::Cache {
         path: path.to_path_buf(),
         message: error.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_failed_write_leaves_no_tmp_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let png = dir.path().join("icon.png");
+        // Half a file lands, then the disk fills.
+        let result = write_atomically_with(&png, |tmp| {
+            std::fs::write(tmp, b"half").unwrap();
+            Err("no space left".into())
+        });
+        assert!(matches!(result, Err(WeaponIconsError::Cache { .. })));
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), 0);
     }
 }

@@ -329,6 +329,50 @@ fn an_unwritable_cache_fails_the_build() {
 }
 
 #[test]
+fn cache_names_carry_the_icon_format_version() {
+    let entries = standard_entries();
+    let (_tmp, tf, cache) = game(&borrowed(&entries));
+    let icons = GameWeaponIcons::build(&tf, &cache).unwrap();
+    let name = icons
+        .get("tf_weapon_scattergun")
+        .unwrap()
+        .file_name()
+        .unwrap();
+    assert!(
+        name.to_string_lossy()
+            .starts_with("tf_weapon_scattergun-v1-"),
+        "{name:?}"
+    );
+}
+
+#[test]
+fn pruning_removes_another_processes_leftover_tmp_files() {
+    let entries = standard_entries();
+    let (_tmp, tf, cache) = game(&borrowed(&entries));
+    // Pid 1 is the init process, never this test.
+    let theirs = cache.join("tf_weapon_bat-v1-0-0.png.1.tmp");
+    let ours = cache.join(format!(
+        "tf_weapon_bat-v1-0-0.png.{}.tmp",
+        std::process::id()
+    ));
+    common::write_file(&theirs, b"half a png");
+    common::write_file(&ours, b"being written");
+    GameWeaponIcons::build(&tf, &cache).unwrap();
+    assert!(!theirs.exists());
+    assert!(ours.exists());
+}
+
+#[test]
+fn a_stale_png_that_cannot_be_removed_does_not_fail_the_build() {
+    let entries = standard_entries();
+    let (_tmp, tf, cache) = game(&borrowed(&entries));
+    // A folder named like a PNG cannot be removed as a file.
+    common::write_file(&cache.join("stuck.png/inside"), b"x");
+    let icons = GameWeaponIcons::build(&tf, &cache).unwrap();
+    assert_eq!(icons.len(), 3);
+}
+
+#[test]
 #[ignore = "needs a TF2 game folder in TF2TOOLS_TF2_GAME"]
 fn the_real_game_pictures_all_64_weapons() {
     let game = PathBuf::from(std::env::var("TF2TOOLS_TF2_GAME").expect("TF2TOOLS_TF2_GAME"));
