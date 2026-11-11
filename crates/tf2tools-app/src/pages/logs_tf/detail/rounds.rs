@@ -6,15 +6,16 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, div, px,
+    App, Div, FontWeight, HighlightStyle, InteractiveElement as _, IntoElement, ParentElement as _,
+    Pixels, StatefulInteractiveElement as _, Styled as _, StyledText, TestSupportExt as _,
+    WeakEntity, div, px,
 };
-use tf2tools_core::{EventKind, LogDetail, RoundLine, SteamId, Team};
+use tf2tools_core::{LogDetail, RoundLine, SteamId, Team};
 
 use super::{NUMBER, number, team_cell, team_colour};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
-use crate::pages::logs_tf::text::{duration_text, event_text, team_name};
+use crate::pages::logs_tf::text::{EventPart, duration_text, event_parts, team_name};
 use crate::widgets::labelled;
 
 // The rounds table's fixed columns, and the open round's name and description columns.
@@ -49,6 +50,13 @@ pub(super) fn rounds_table(
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> Div {
+    let team_of = |id: SteamId| {
+        detail
+            .players()
+            .iter()
+            .find(|p| p.steam_id() == id)
+            .map(|p| p.team())
+    };
     let fixed = |width: Pixels, text: &'static str| div().w(width).flex_none().child(text);
     let mut table = v_flex().child(
         h_flex()
@@ -68,7 +76,7 @@ pub(super) fn rounds_table(
         let is_open = open.contains(&n);
         table = table.child(round_row(log, n, round, is_open, page.clone(), cx));
         if is_open {
-            table = table.child(round_panel(log, n, round, name_of, cx));
+            table = table.child(round_panel(log, n, round, name_of, &team_of, cx));
         }
     }
     table
@@ -86,15 +94,19 @@ fn round_row(
 ) -> impl IntoElement {
     let colour = |team: Option<Team>| team.map(|t| team_colour(t, cx));
     let score = format!("{} - {}", round.blue().score(), round.red().score());
-    let score = labelled(
-        div()
-            .w(SCORE)
-            .flex_none()
-            .font_weight(FontWeight::SEMIBOLD)
-            .when_some(colour(round.winner()), |el, c| el.text_color(c)),
-        ids::logstf_round_score(log, n),
-        score,
-    );
+    // The winner's colour is said in words too, for readers that cannot see it.
+    let score = div()
+        .id(ids::logstf_round_score(log, n))
+        .aria_label(score.clone())
+        .when_some(round.winner(), |el, team| {
+            el.text_color(team_colour(team, cx))
+                .aria_description(format!("{} won", team_name(team)))
+        })
+        .test_support()
+        .w(SCORE)
+        .flex_none()
+        .font_weight(FontWeight::SEMIBOLD)
+        .child(score);
     let midfight = round.midfight().map_or("-", team_name);
     let midfight = labelled(
         div()
@@ -138,12 +150,13 @@ fn round_row(
 }
 
 // An open round: its players by kills then damage, then its events on the log's clock with
-// each description in its team's colour.
+// each name in a description in its own team's colour, as logs.tf shows them.
 fn round_panel(
     log: u64,
     n: usize,
     round: &RoundLine,
     name_of: &dyn Fn(SteamId) -> String,
+    team_of: &dyn Fn(SteamId) -> Option<Team>,
     cx: &App,
 ) -> impl IntoElement {
     let head = || {
@@ -169,17 +182,13 @@ fn round_panel(
                 .child(number("Damage".to_owned())),
         )
         .children(round.players().iter().map(|p| {
+            let name = name_of(p.steam_id());
             line()
                 .id(ids::logstf_round_player(log, n, p.steam_id()))
+                .aria_label(format!("{name} {} {}", p.kills(), p.dmg()))
                 .test_support()
                 .child(team_cell(p.team(), cx).w(TEAM))
-                .child(
-                    div()
-                        .w(NAME)
-                        .flex_none()
-                        .truncate()
-                        .child(name_of(p.steam_id())),
-                )
+                .child(div().w(NAME).flex_none().truncate().child(name))
                 .child(number(p.kills().to_string()))
                 .child(number(p.dmg().to_string()))
         }));
@@ -192,7 +201,8 @@ fn round_panel(
         )
         .children(round.events().iter().enumerate().map(|(ix, event)| {
             let time = duration_text(event.at());
-            let (ty, description) = event_text(event.kind(), name_of);
+            let (ty, parts) = event_parts(event.kind(), name_of, team_of);
+            let (description, colours) = coloured(&parts, cx);
             let label = [time.as_str(), &ty, &description]
                 .into_iter()
                 .filter(|part| !part.is_empty())
@@ -208,10 +218,7 @@ fn round_panel(
                     div()
                         .w(DESCRIPTION)
                         .flex_none()
-                        .when_some(event_team(event.kind()), |el, team| {
-                            el.text_color(team_colour(team, cx))
-                        })
-                        .child(description),
+                        .child(StyledText::new(description).with_highlights(colours)),
                 )
         }));
     v_flex()
@@ -226,14 +233,24 @@ fn round_panel(
         .child(events)
 }
 
-// The team an event belongs to, which colours its description; an unknown one has none.
-fn event_team(kind: &EventKind) -> Option<Team> {
-    match kind {
-        EventKind::PointCap { team, .. }
-        | EventKind::Charge { team, .. }
-        | EventKind::MedicDeath { team, .. }
-        | EventKind::Drop { team, .. }
-        | EventKind::RoundWin { team } => Some(*team),
-        EventKind::Other { .. } | _ => None,
+// An event's description as one string, with each stretch that names a team or one of its
+// players highlighted in that team's colour.
+fn coloured(
+    parts: &[EventPart],
+    cx: &App,
+) -> (String, Vec<(std::ops::Range<usize>, HighlightStyle)>) {
+    let mut text = String::new();
+    let mut colours = Vec::new();
+    for (part, team) in parts {
+        let start = text.len();
+        text.push_str(part);
+        if let Some(team) = team {
+            let style = HighlightStyle {
+                color: Some(team_colour(*team, cx)),
+                ..HighlightStyle::default()
+            };
+            colours.push((start..text.len(), style));
+        }
     }
+    (text, colours)
 }

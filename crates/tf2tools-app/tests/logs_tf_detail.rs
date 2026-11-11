@@ -295,6 +295,49 @@ fn rounds_open_any_number_and_show_players_and_events(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn a_round_names_its_players_and_says_who_won(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_ROUNDS);
+    support::click_id(cx, s.win, ids::logstf_round(3, 0));
+    let (name, kills, dmg, winner) = cx.update(|cx| {
+        let log = page.read(cx).detail().unwrap();
+        let round = &log.rounds()[0];
+        let arie = |id: &tf2tools_core::SteamId| *id == sid(ARIE);
+        let line = round
+            .players()
+            .iter()
+            .find(|p| arie(&p.steam_id()))
+            .unwrap();
+        let player = log.players().iter().find(|p| arie(&p.steam_id())).unwrap();
+        (
+            player.name().to_owned(),
+            line.kills(),
+            line.dmg(),
+            round.winner(),
+        )
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_round_player(3, 0, sid(ARIE))),
+        Some(format!("{name} {kills} {dmg}")),
+        "the row shows the log's name for the player"
+    );
+    assert_eq!(winner, Some(tf2tools_core::Team::Red), "RED took round 1");
+    let score = ids::logstf_round_score(3, 0);
+    support::settle(cx, s.win);
+    let said = cx
+        .update_window(s.win, |_, w, _| {
+            w.try_find(score)
+                .and_then(|e| e.description().map(str::to_owned))
+        })
+        .unwrap();
+    assert_eq!(
+        said.as_deref(),
+        Some("RED won"),
+        "the score is in RED's colour"
+    );
+}
+
+#[gpui_kit::test]
 fn a_medic_block_reads_like_logs_tf(cx: &mut TestAppContext) {
     let (_env, _server, s, page) = opened(cx, 3);
     let rahmed = sid(175_790_976);

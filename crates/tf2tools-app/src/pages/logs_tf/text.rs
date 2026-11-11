@@ -143,6 +143,7 @@ pub fn download_reason(error: &LogsFetchError) -> &'static str {
         LogsFetchError::Network { .. } => "Check your internet connection.",
         LogsFetchError::RateLimited { .. } => LOGS_TF_BUSY,
         LogsFetchError::TooLarge { .. } => "This log is too big to download.",
+        // The workspace lint wants every known variant named before the wildcard.
         LogsFetchError::Unreadable
         | LogsFetchError::Http { .. }
         | LogsFetchError::Cache { .. }
@@ -317,39 +318,72 @@ pub fn tenths_text(secs: f64) -> String {
 /// (Type, Description) for one round event, players named through `name_of`. A charge names
 /// its medigun only when it is not the stock one; an unknown type shows its raw name alone.
 pub fn event_text(kind: &EventKind, name_of: &dyn Fn(SteamId) -> String) -> (String, String) {
-    let (ty, description) = match kind {
+    let (ty, parts) = event_parts(kind, name_of, &|_| None);
+    (ty, parts.into_iter().map(|(text, _)| text).collect())
+}
+
+/// One stretch of an event's description and the team whose colour it takes, if any.
+pub type EventPart = (String, Option<Team>);
+
+/// An event's type and its description in stretches. Each player's name carries their own
+/// team, `team_of` for one the event does not place, and a team's name carries that team.
+pub fn event_parts(
+    kind: &EventKind,
+    name_of: &dyn Fn(SteamId) -> String,
+    team_of: &dyn Fn(SteamId) -> Option<Team>,
+) -> (String, Vec<EventPart>) {
+    let plain = |text: &str| (text.to_owned(), None);
+    let (ty, parts) = match kind {
         EventKind::PointCap { team, point } => (
             "Point Capture",
-            format!("{} captured point {point}", team_name(*team)),
+            vec![
+                (team_name(*team).to_owned(), Some(*team)),
+                plain(&format!(" captured point {point}")),
+            ],
         ),
-        EventKind::Charge { medic, medigun, .. } => {
-            let medic = name_of(*medic);
-            let description = match medigun {
-                Medigun::MediGun => medic,
-                other @ (Medigun::Kritzkrieg
-                | Medigun::QuickFix
-                | Medigun::Vaccinator
-                | Medigun::Other(_)
-                | _) => format!("{medic} ({})", medigun_name(other)),
-            };
-            ("Übercharge", description)
+        EventKind::Charge {
+            team,
+            medic,
+            medigun,
+        } => {
+            let mut parts = vec![(name_of(*medic), Some(*team))];
+            if *medigun != Medigun::MediGun {
+                parts.push(plain(&format!(" ({})", medigun_name(medigun))));
+            }
+            ("Übercharge", parts)
         }
-        EventKind::MedicDeath { medic, killer, .. } => {
-            let medic = name_of(*medic);
-            let description = match killer {
-                Some(killer) => format!("{medic} killed by {}", name_of(*killer)),
-                None => format!("{medic} died"),
-            };
-            ("Medic Death", description)
+        EventKind::MedicDeath {
+            team,
+            medic,
+            killer,
+        } => {
+            let mut parts = vec![(name_of(*medic), Some(*team))];
+            match killer {
+                Some(killer) => {
+                    parts.push(plain(" killed by "));
+                    parts.push((name_of(*killer), team_of(*killer)));
+                }
+                None => parts.push(plain(" died")),
+            }
+            ("Medic Death", parts)
         }
-        EventKind::Drop { medic, .. } => {
-            ("Drop", format!("{} dropped a full charge", name_of(*medic)))
-        }
-        EventKind::RoundWin { team } => {
-            ("Round end", format!("Round win for {}", team_name(*team)))
-        }
-        EventKind::Other { name } => return (name.clone(), String::new()),
-        _ => return (format!("{kind:?}"), String::new()),
+        EventKind::Drop { team, medic } => (
+            "Drop",
+            vec![
+                (name_of(*medic), Some(*team)),
+                plain(" dropped a full charge"),
+            ],
+        ),
+        EventKind::RoundWin { team } => (
+            "Round end",
+            vec![
+                plain("Round win for "),
+                (team_name(*team).to_owned(), Some(*team)),
+            ],
+        ),
+        EventKind::Other { name } => return (name.clone(), Vec::new()),
+        // A kind added to core later still reads as an event, never as debug text.
+        _ => return ("Event".to_owned(), Vec::new()),
     };
-    (ty.to_owned(), description)
+    (ty.to_owned(), parts)
 }

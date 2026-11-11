@@ -5,8 +5,8 @@ use std::time::Duration;
 use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
     DOWNLOAD_FAILED, EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, charge_text, count_text,
-    download_reason, duration_text, event_text, fetch_message, finding_text, healing_text,
-    medigun_name, one_decimal, progress_line, progress_text, range_label, reads_zero,
+    download_reason, duration_text, event_parts, event_text, fetch_message, finding_text,
+    healing_text, medigun_name, one_decimal, progress_line, progress_text, range_label, reads_zero,
     resolve_message, ring_label, seconds_text, share_text, streaks_label, summary_text,
     sync_message, tenths_text, time_played_text, whole,
 };
@@ -393,6 +393,51 @@ fn events_read_in_player_words() {
 }
 
 #[test]
+fn an_events_names_take_their_own_teams_colour() {
+    use tf2tools_core::{EventKind, Medigun, STEAM_ID64_BASE, SteamId, Team};
+    let p = |n: u64| SteamId::from_id64(STEAM_ID64_BASE + n).unwrap();
+    let name_of = |id: SteamId| format!("p{}", id.id64() - STEAM_ID64_BASE);
+    // p6 plays for BLU; anyone else is unknown to the log.
+    let team_of = |id: SteamId| (id == p(6)).then_some(Team::Blue);
+    let parts = |kind: EventKind| event_parts(&kind, &name_of, &team_of).1;
+    let piece = |text: &str, team: Option<Team>| (text.to_owned(), team);
+    assert_eq!(
+        parts(EventKind::MedicDeath {
+            team: Team::Red,
+            medic: p(5),
+            killer: Some(p(6)),
+        }),
+        [
+            piece("p5", Some(Team::Red)),
+            piece(" killed by ", None),
+            piece("p6", Some(Team::Blue)),
+        ]
+    );
+    assert_eq!(
+        parts(EventKind::Charge {
+            team: Team::Blue,
+            medic: p(5),
+            medigun: Medigun::Kritzkrieg,
+        }),
+        [piece("p5", Some(Team::Blue)), piece(" (Kritzkrieg)", None)]
+    );
+    assert_eq!(
+        parts(EventKind::Drop {
+            team: Team::Red,
+            medic: p(5),
+        }),
+        [
+            piece("p5", Some(Team::Red)),
+            piece(" dropped a full charge", None)
+        ]
+    );
+    assert_eq!(
+        parts(EventKind::RoundWin { team: Team::Red }),
+        [piece("Round win for ", None), piece("RED", Some(Team::Red))]
+    );
+}
+
+#[test]
 fn medic_numbers_read_like_logs_tf() {
     use tf2tools_core::Medigun;
     assert_eq!(healing_text(28_170, 986.11), "28170 (986/m)");
@@ -504,5 +549,22 @@ fn download_failures_say_why() {
         limit: 1,
     };
     assert_eq!(download_reason(&big), "This log is too big to download.");
+    let busy = LogsFetchError::RateLimited { url: "u".into() };
+    assert_eq!(
+        download_reason(&busy),
+        "logs.tf is busy. Try again in a few minutes."
+    );
+    let down = LogsFetchError::Http {
+        url: "u".into(),
+        status: 500,
+    };
+    assert_eq!(
+        download_reason(&down),
+        "logs.tf isn't responding right now. Try again later."
+    );
+    assert_eq!(
+        download_reason(&LogsFetchError::Unreadable),
+        "logs.tf isn't responding right now. Try again later."
+    );
     assert_eq!(DOWNLOAD_FAILED, "Couldn't download this log.");
 }
