@@ -2548,6 +2548,19 @@ pub fn logstf_log_dpm(id: u64) -> ElementId {
     keyed("logstf-log-dpm", &id.to_string())
 }
 
+/// A log row's K/D/A cell: "logstf-log-kda:<id>".
+pub fn logstf_log_kda(id: u64) -> ElementId {
+    keyed("logstf-log-kda", &id.to_string())
+}
+
+/// A log row's icon for a class the player played: "logstf-log-class:<id>:<class>".
+pub fn logstf_log_class(id: u64, class: TfClass) -> ElementId {
+    keyed(
+        "logstf-log-class",
+        &format!("{id}:{}", class.name().to_lowercase()),
+    )
+}
+
 /// A log row's title cell: "logstf-log-title:<id>".
 pub fn logstf_log_title(id: u64) -> ElementId {
     keyed("logstf-log-title", &id.to_string())

@@ -250,11 +250,19 @@ fn map_cell(base: Div, id: u64, map: &str) -> impl IntoElement {
 fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
     let id = row.id();
     let assets = &cx.global::<Services>().assets;
-    let icons = h_flex().w(CLASSES).flex_none().gap_1().children(
-        row.classes()
-            .iter()
-            .map(|&class| class_icon(class, assets.class_icon(class).as_deref(), ICON)),
-    );
+    // Three icons fill the class column; more wrap onto further lines and the row grows.
+    let icons = h_flex()
+        .w(CLASSES)
+        .flex_none()
+        .flex_wrap()
+        .gap_1()
+        .children(row.classes().iter().map(|&class| {
+            div()
+                .id(ids::logstf_log_class(id, class))
+                .test_support()
+                .flex_none()
+                .child(class_icon(class, assets.class_icon(class).as_deref(), ICON))
+        }));
     let length = row.length().map(duration_text).unwrap_or_default();
     let kda = format!("{}/{}/{}", row.kills(), row.deaths(), row.assists());
     let dpm = row.dmg_per_min().map(whole).unwrap_or_else(|| "-".into());
@@ -269,6 +277,8 @@ fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
     length.into_iter().chain([
         icons.into_any_element(),
         div()
+            .id(ids::logstf_log_kda(id))
+            .test_support()
             .w(KDA)
             .flex_none()
             .text_right()

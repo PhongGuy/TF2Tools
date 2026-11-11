@@ -1324,3 +1324,61 @@ fn contrast_with_white(fill: gpui_kit::Hsla) -> f32 {
     let lum = 0.2126 * linear(rgb.r) + 0.7152 * linear(rgb.g) + 0.0722 * linear(rgb.b);
     1.05 / (lum + 0.05)
 }
+
+// Serves one 6v6 log for a player who plays seven classes in it, and opens the page on them.
+fn seven_class_page(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    server: &support::StoreServer,
+) -> (support::ShellWindow, Entity<LogsTfPage>) {
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, env, &server.uri(), &[(SEVEN_CLASSES, "Seven")]);
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    (s, page)
+}
+
+const SEVEN_CLASSES: u64 = 170_965_550;
+
+// Every class icon of row 3 stays inside the class column, clear of K/D/A and in the row.
+fn assert_icons_clear_of_kda(cx: &mut TestAppContext, s: &support::ShellWindow) {
+    use gpui_kit::px;
+    let row = support::bounds_of(cx, s.win, ids::logstf_log(3)).unwrap();
+    let kda = support::bounds_of(cx, s.win, ids::logstf_log_kda(3)).unwrap();
+    let mut shown = 0;
+    for class in TfClass::ALL {
+        let Some(icon) = support::bounds_of(cx, s.win, ids::logstf_log_class(3, class)) else {
+            continue;
+        };
+        shown += 1;
+        assert!(
+            icon.right() + px(8.) <= kda.left(),
+            "{class:?} {icon:?} touches K/D/A {kda:?}"
+        );
+        assert!(
+            icon.bottom() <= row.bottom(),
+            "{class:?} {icon:?} below {row:?}"
+        );
+    }
+    assert_eq!(shown, 7, "every class the player played has an icon");
+}
+
+#[gpui_kit::test]
+fn many_class_icons_stay_clear_of_kda(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (s, _page) = seven_class_page(cx, &env, &server);
+    assert_icons_clear_of_kda(cx, &s);
+}
+
+#[gpui_kit::test]
+fn many_class_icons_stay_clear_of_kda_in_the_smallest_window(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (s, page) = seven_class_page(cx, &env, &server);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    to_end(cx, &page);
+    assert_icons_clear_of_kda(cx, &s);
+}
