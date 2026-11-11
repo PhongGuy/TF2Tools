@@ -493,3 +493,37 @@ fn switching_chips_mid_sync_finishes_the_first_and_shows_the_second(cx: &mut Tes
     // "other" shares the same served list, so it shows the same two logs, from its own load.
     assert_eq!(row_ids(cx, &page), [3, 2]);
 }
+
+#[gpui_kit::test]
+fn the_progress_line_belongs_to_the_active_player(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes(
+        "/api/v1/log",
+        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
+    );
+    // The first download answers slowly, so Arie's sync is mid-download at the switch.
+    server.mount_bytes_after("/json/3", SIXES.as_bytes().to_vec(), Duration::from_secs(1));
+    server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
+    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    support::wait_real(cx, "Arie's progress", |cx| {
+        support::label_of(cx, s.win, ids::LOGSTF_PROGRESS).as_deref()
+            == Some("Downloading logs: 0 of 2")
+    });
+
+    support::click_id(cx, s.win, ids::logstf_chip(sid(1)));
+    support::wait_real(cx, "the switch", |cx| {
+        cx.update(|cx| page.read(cx).active()) == Some(sid(1))
+    });
+    support::settle(cx, s.win);
+    assert!(
+        cx.update(|cx| page.read(cx).is_syncing()),
+        "Arie's sync is open"
+    );
+    assert!(!support::present(cx, s.win, ids::LOGSTF_PROGRESS));
+    support::wait_real(cx, "both syncs", |cx| {
+        cx.update(|cx| !page.read(cx).is_syncing())
+    });
+}

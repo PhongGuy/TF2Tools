@@ -10,7 +10,7 @@ use gpui_kit::component::{Disableable as _, Sizable as _, WindowExt as _, h_flex
 use gpui_kit::{
     App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
     ParentElement as _, Render, SharedString, StatefulInteractiveElement as _, Styled as _,
-    Subscription, TestSupportExt as _, Window, div,
+    Subscription, Task, TestSupportExt as _, Window, div,
 };
 use tf2tools_core::{
     ClassAverage, LogRow, LogsProgress, LogsSyncError, LogsSyncSummary, SteamId, TrackedPlayer,
@@ -94,7 +94,7 @@ impl LogsTfPage {
             add_open: false,
             _subscriptions: vec![enter],
         };
-        page.load(true, cx);
+        page.load(true, cx).detach();
         page
     }
 
@@ -102,7 +102,7 @@ impl LogsTfPage {
     /// the active player if their logs are stale.
     pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
         if !hidden {
-            self.load(true, cx);
+            self.load(true, cx).detach();
         }
     }
 
@@ -330,7 +330,7 @@ impl LogsTfPage {
                             page.add_open = false;
                             window.close_dialog(cx);
                         }
-                        page.load(true, cx);
+                        page.load(true, cx).detach();
                     }
                     Err(message) => page.add_error = Some(message.into()),
                 }
@@ -354,7 +354,7 @@ impl LogsTfPage {
                 if let Err(err) = written {
                     toast_error(window, cx, &err);
                 }
-                page.load(true, cx);
+                page.load(true, cx).detach();
             });
         })
         .detach();
@@ -363,7 +363,7 @@ impl LogsTfPage {
     // Reads the players, the active chip and that player's logs and averages off the UI
     // thread. With `sync`, the landing also syncs the active player, in the same update that
     // sets `loaded`. A failed read leaves the page as it was; the warning keeps the cause.
-    fn load(&mut self, sync: bool, cx: &mut Context<Self>) {
+    fn load(&mut self, sync: bool, cx: &mut Context<Self>) -> Task<()> {
         self.sync_wanted |= sync;
         self.load_generation += 1;
         let generation = self.load_generation;
@@ -407,7 +407,6 @@ impl LogsTfPage {
                 cx.notify();
             });
         })
-        .detach();
     }
 
     // Syncs `id` on the tokio runtime, rereading the cache after each progress event so logs
@@ -433,15 +432,19 @@ impl LogsTfPage {
             };
             client.sync_player(id, force, &report).await
         });
+        // Each reread lands before the next event is taken, so events that arrive meanwhile
+        // collapse into one reread of the newest count.
         cx.spawn(async move |page, cx| {
             while rx.changed().await.is_ok() {
                 let progress = *rx.borrow_and_update();
-                let shown = page.update(cx, |page, cx| {
+                let reread = page.update(cx, |page, cx| {
                     page.progress = progress;
-                    page.load(false, cx);
+                    cx.notify();
+                    page.load(false, cx)
                 });
-                if shown.is_err() {
-                    return;
+                match reread {
+                    Ok(reread) => reread.await,
+                    Err(_) => return,
                 }
             }
             let joined = job.await;
@@ -475,7 +478,7 @@ impl LogsTfPage {
         if let Some(next) = self.queued.take() {
             self.sync(next, false, cx);
         }
-        self.load(false, cx);
+        self.load(false, cx).detach();
         cx.notify();
     }
 
@@ -504,16 +507,18 @@ impl LogsTfPage {
             }))
     }
 
-    // The progress line while logs download, then the last failure with its Retry.
+    // The active player's progress line while their logs download, then the last failure
+    // with its Retry, hidden while a sync runs since Retry could not start another.
     fn status(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let progress = self.progress.filter(|_| self.syncing).map(|p| {
+        let ours = self.syncing && self.running == self.active;
+        let progress = self.progress.filter(|_| ours).map(|p| {
             labelled(
                 div().text_sm().text_color(cx.theme().muted_foreground),
                 ids::LOGSTF_PROGRESS,
                 progress_text(p.done(), p.total()),
             )
         });
-        let error = self.error.map(|error| {
+        let error = self.error.filter(|_| !self.syncing).map(|error| {
             let page = cx.entity().downgrade();
             let on_retry = move |_: &mut Window, cx: &mut App| {
                 let _ = page.update(cx, |page, cx| page.refresh(cx));
