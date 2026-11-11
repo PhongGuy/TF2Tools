@@ -2543,6 +2543,12 @@ pub fn logstf_log_title(id: u64) -> ElementId {
     keyed("logstf-log-title", &id.to_string())
 }
 
+/// A log row's map, its own column or a line under the title, labelled with the map name:
+/// "logstf-log-map:<id>".
+pub fn logstf_log_map(id: u64) -> ElementId {
+    keyed("logstf-log-map", &id.to_string())
+}
+
 /// The open log's team totals, which scroll sideways in a narrow window.
 pub const LOGSTF_TEAMS_SCROLL: &str = "logstf-teams-scroll";
 

@@ -3,12 +3,13 @@
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Context, Div, FontWeight, InteractiveElement as _, IntoElement, ListState,
-    ParentElement as _, Pixels, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _,
-    WeakEntity, div, list, px,
+    ParentElement as _, Pixels, SharedString, StatefulInteractiveElement as _, Styled as _,
+    TestSupportExt as _, WeakEntity, div, list, px,
 };
 use tf2tools_core::{LogRow, LogState, SteamId};
 
@@ -41,11 +42,12 @@ const TITLE_MIN_NARROW: Pixels = px(72.);
 // The row's horizontal padding, both sides.
 const PADDING: Pixels = px(24.);
 
-/// How the rows fit the list's width. A narrow window gives up Length first, then Map, then
-/// tightens the gaps and the title's minimum; before the first frame the list has no width yet.
+/// How the rows fit the list's width. A narrow window gives up Length first, then moves Map
+/// under the title, then tightens the gaps and the title's minimum; before the first frame the
+/// list has no width yet.
 #[derive(Clone, Copy)]
 pub(super) struct Fit {
-    map: bool,
+    map_column: bool,
     length: bool,
     gap: Pixels,
     title_min: Pixels,
@@ -53,7 +55,7 @@ pub(super) struct Fit {
 
 impl Fit {
     pub(super) const ALL: Self = Self {
-        map: true,
+        map_column: true,
         length: true,
         gap: GAP,
         title_min: TITLE_MIN,
@@ -66,7 +68,7 @@ pub(super) fn fit(list: &ListState) -> Fit {
     let unknown = width <= px(0.);
     let roomy = unknown || width >= core;
     Fit {
-        map: unknown || width >= core + MAP + GAP,
+        map_column: unknown || width >= core + MAP + GAP,
         length: unknown || width >= core + MAP + LENGTH + GAP * 2.,
         gap: if roomy { GAP } else { GAP_NARROW },
         title_min: if roomy { TITLE_MIN } else { TITLE_MIN_NARROW },
@@ -112,7 +114,7 @@ pub(super) fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
         .child(div().w(CHEVRON).flex_none())
         .child(cell(DATE, "Date"))
         .child(div().flex_1().min_w(fit.title_min).child("Title"))
-        .when(fit.map, |el| el.child(cell(MAP, "Map")))
+        .when(fit.map_column, |el| el.child(cell(MAP, "Map")))
         .when(fit.length, |el| {
             el.child(cell(LENGTH, "Length").text_right())
         })
@@ -180,22 +182,23 @@ fn log_item(
         .child(chevron)
         .child(div().w(DATE).flex_none().child(date_text(row.date())))
         .child(
-            div()
-                .id(ids::logstf_log_title(id))
-                .test_support()
+            v_flex()
                 .flex_1()
                 .min_w(fit.title_min)
-                .truncate()
-                .child(row.title().to_owned()),
+                .child(
+                    div()
+                        .id(ids::logstf_log_title(id))
+                        .test_support()
+                        .truncate()
+                        .child(row.title().to_owned()),
+                )
+                .when(!fit.map_column, |el| {
+                    let line = div().text_xs().text_color(theme.muted_foreground);
+                    el.child(map_cell(line, id, row.map()))
+                }),
         )
-        .when(fit.map, |el| {
-            el.child(
-                div()
-                    .w(MAP)
-                    .flex_none()
-                    .truncate()
-                    .child(row.map().to_owned()),
-            )
+        .when(fit.map_column, |el| {
+            el.child(map_cell(div().w(MAP).flex_none(), id, row.map()))
         });
     line = match row.state() {
         LogState::Ready => line
@@ -223,6 +226,19 @@ fn log_item(
             detail::panel(row, opened, &state.players, cx)
         }))
         .into_any_element()
+}
+
+// The log's map in `base`, truncated with the full name in a tooltip; `base` sizes it as its
+// own column or styles it as a muted line under the title.
+fn map_cell(base: Div, id: u64, map: &str) -> impl IntoElement {
+    let map = SharedString::from(map.to_owned());
+    let tip = map.clone();
+    base.id(ids::logstf_log_map(id))
+        .aria_label(map.clone())
+        .truncate()
+        .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+        .test_support()
+        .child(map)
 }
 
 // A downloaded log's numbers for the player: length, classes, K/D/A and damage per minute.

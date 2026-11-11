@@ -881,6 +881,55 @@ fn a_highlander_log_shows_every_column_and_closing_drops_the_detail(cx: &mut Tes
 }
 
 #[gpui_kit::test]
+fn the_map_sits_under_the_title_in_the_smallest_window(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_log_map(3)).as_deref(),
+        Some("cp_process_f12")
+    );
+    let title = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
+    let map = support::bounds_of(cx, s.win, ids::logstf_log_map(3)).unwrap();
+    let list = support::bounds_of(cx, s.win, ids::LOGSTF_LIST).unwrap();
+    assert!(
+        map.top() >= title.bottom() - px(1.),
+        "map {map:?} under title {title:?}"
+    );
+    assert!(
+        map.left() >= title.left() - px(1.),
+        "map {map:?} in the title cell"
+    );
+    assert!(map.right() <= list.right(), "map {map:?} inside {list:?}");
+}
+
+#[gpui_kit::test]
+fn a_wide_window_gives_the_map_its_own_column(cx: &mut TestAppContext) {
+    use gpui_kit::px;
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    let title = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
+    let map = support::bounds_of(cx, s.win, ids::logstf_log_map(3)).unwrap();
+    assert!(
+        map.left() >= title.right(),
+        "map {map:?} right of title {title:?}"
+    );
+    assert!(
+        map.size.width <= px(161.),
+        "map {map:?} is one 160 px column"
+    );
+}
+
+#[gpui_kit::test]
 fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
     use gpui_kit::{InputEvent as _, ListOffset, ScrollDelta, ScrollEvent, point, px, size};
 
