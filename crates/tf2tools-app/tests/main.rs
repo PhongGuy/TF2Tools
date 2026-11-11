@@ -150,6 +150,7 @@ mod logs_tf_range;
 mod logs_tf_sort;
 mod logs_tf_sync;
 mod logs_tf_text;
+mod logs_tf_weapons;
 mod maps;
 mod maps_model;
 mod mastercomfig_restore;

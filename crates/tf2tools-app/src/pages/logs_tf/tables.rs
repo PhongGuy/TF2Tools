@@ -2,7 +2,8 @@
 //! window.
 
 use tf2tools_core::{
-    ClassLine, LogDetail, MatrixKind, MatrixRow, MedicLine, PlayerLine, SteamId, Team, TfClass,
+    ClassLine, ClassWeapons, LogDetail, MatrixKind, MatrixRow, MedicLine, PlayerLine, SteamId,
+    Team, TfClass, WeaponSum,
 };
 
 use super::text::{accuracy_text, floored_share_text, share_text};
@@ -32,6 +33,26 @@ pub fn weapon_rows(player: &PlayerLine, class: &ClassLine) -> Vec<WeaponRow> {
             dmg: w.dmg(),
             dmg_share: share_text(w.dmg(), player.dmg()),
             accuracy: accuracy_text(w.hits(), w.shots()),
+        })
+        .collect()
+}
+
+/// The class weapons panel's rows in core's order (damage high to low); shares are of the
+/// class's summed weapon kills and damage, so they add to about 100%.
+pub fn class_weapon_rows(weapons: &ClassWeapons) -> Vec<WeaponRow> {
+    let narrow = |n: i64| u32::try_from(n).unwrap_or(u32::MAX);
+    let kills = narrow(weapons.weapons().iter().map(WeaponSum::kills).sum());
+    let dmg = narrow(weapons.weapons().iter().map(WeaponSum::dmg).sum());
+    weapons
+        .weapons()
+        .iter()
+        .map(|w| WeaponRow {
+            name: w.name().to_owned(),
+            kills: narrow(w.kills()),
+            kill_share: share_text(narrow(w.kills()), kills),
+            dmg: narrow(w.dmg()),
+            dmg_share: share_text(narrow(w.dmg()), dmg),
+            accuracy: accuracy_text(narrow(w.hits()), narrow(w.shots())),
         })
         .collect()
 }

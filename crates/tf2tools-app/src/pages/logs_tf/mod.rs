@@ -1,6 +1,7 @@
 //! The logs.tf page: tracked players as chips, their class averages and their logs over the
 //! history range the player picks.
 
+mod class_weapons;
 mod detail;
 mod grid;
 mod list;
@@ -24,8 +25,8 @@ use gpui_kit::{
     div, px,
 };
 use tf2tools_core::{
-    ClassAverage, LogDetail, LogRow, LogState, LogsRange, MatrixKind, SteamId, TrackedPlayer,
-    parse_log, parse_player_input,
+    ClassAverage, ClassWeapons, LogDetail, LogRow, LogState, LogsRange, MatrixKind, SteamId,
+    TfClass, TrackedPlayer, parse_log, parse_player_input,
 };
 
 use crate::ids;
@@ -71,6 +72,11 @@ pub struct LogsTfPage {
     loaded: bool,
     rows: Vec<LogRow>,
     averages: Option<[ClassAverage; 9]>,
+    // The class whose card is ringed, and the weapons the panel shows with the class they were
+    // read for; a pick moves the ring at once but the panel keeps its pair until the read lands.
+    selected_class: Option<TfClass>,
+    weapons: Option<(TfClass, ClassWeapons)>,
+    weapons_generation: u64,
     // The history range as the settings keep it, and the slider that picks it. `slider_range`
     // is the stop last pushed into the slider, so a drag is never snapped back mid-way.
     range: LogsRange,
@@ -157,6 +163,9 @@ impl LogsTfPage {
             loaded: false,
             rows: Vec::new(),
             averages: None,
+            selected_class: None,
+            weapons: None,
+            weapons_generation: 0,
             range: LogsRange::default(),
             range_slider,
             slider_range: LogsRange::default(),
@@ -214,6 +223,88 @@ impl LogsTfPage {
     /// The active player's class averages; None before the first load.
     pub fn averages(&self) -> Option<&[ClassAverage; 9]> {
         self.averages.as_ref()
+    }
+
+    /// The class whose card is selected, if any.
+    pub fn selected_class(&self) -> Option<TfClass> {
+        self.selected_class
+    }
+
+    /// The weapons the panel holds and the class they were read for.
+    pub fn class_weapons(&self) -> Option<(TfClass, &ClassWeapons)> {
+        self.weapons
+            .as_ref()
+            .map(|(class, weapons)| (*class, weapons))
+    }
+
+    /// Selects `class` and reads its weapons, keeping the held ones shown until then; on the
+    /// selected class it closes. An unplayed class does nothing.
+    pub fn pick_class(&mut self, class: TfClass, cx: &mut Context<Self>) {
+        if self.selected_class == Some(class) {
+            self.close_class(cx);
+            return;
+        }
+        let played = self
+            .averages
+            .as_ref()
+            .is_some_and(|a| a.iter().any(|a| a.class() == class && a.played()));
+        if !played {
+            return;
+        }
+        self.selected_class = Some(class);
+        self.read_weapons(cx);
+        self.list.remeasure_items(0..1);
+        cx.notify();
+    }
+
+    /// Closes the class weapons panel and clears the selection.
+    pub fn close_class(&mut self, cx: &mut Context<Self>) {
+        self.selected_class = None;
+        self.weapons = None;
+        // A read still out must not reopen the panel.
+        self.weapons_generation += 1;
+        self.list.remeasure_items(0..1);
+        cx.notify();
+    }
+
+    // Reads the selected class's weapons off the UI thread. The landing applies only while the
+    // page still shows the player, range and class it read for and no newer read went out; a
+    // failed read keeps the panel as it was.
+    fn read_weapons(&mut self, cx: &mut Context<Self>) {
+        let (Some(active), Some(class)) = (self.active, self.selected_class) else {
+            return;
+        };
+        let range = self.range;
+        self.weapons_generation += 1;
+        let generation = self.weapons_generation;
+        let reading = run_blocking(cx, move |s| {
+            s.logs
+                .cache()
+                .class_weapons(active, range, class)
+                .map_err(|e| OpError::core("Failed to read class weapons", e))
+        });
+        cx.spawn(async move |page, cx| {
+            let read = reading.await;
+            let _ = page.update(cx, |page, cx| {
+                let current = page.weapons_generation == generation
+                    && !stale_read(page.range_writes, page.range, range)
+                    && page.active == Some(active)
+                    && page.range == range
+                    && page.selected_class == Some(class);
+                if !current {
+                    return;
+                }
+                match read {
+                    Ok(weapons) => {
+                        page.weapons = Some((class, weapons));
+                        page.list.remeasure_items(0..1);
+                        cx.notify();
+                    }
+                    Err(error) => tracing::warn!(%error, "reading logs.tf class weapons failed"),
+                }
+            });
+        })
+        .detach();
     }
 
     /// Why the active player's last sync failed, shown under the chips.
@@ -1074,13 +1165,28 @@ impl LogsTfPage {
                             self.range,
                             &self.range_slider,
                             cx.entity().downgrade(),
+                            self.selected_class,
                             cx,
                         )
                     }),
             )
+            .children(self.weapons_panel(cx))
             .children(empty.then(|| self.empty_state(cx)))
             .children(no_logs.map(|id| list::no_logs(id, cx)))
             .children((!self.rows.is_empty()).then(|| list::column_header(self.fit, cx)))
+    }
+
+    // The panel for the held weapons, while a class is selected.
+    fn weapons_panel(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+        self.selected_class?;
+        let (class, weapons) = self.weapons.as_ref()?;
+        Some(class_weapons::class_weapons_panel(
+            *class,
+            weapons,
+            self.range,
+            cx.entity().downgrade(),
+            cx,
+        ))
     }
 
     // The no-player explanation and its way to track someone.

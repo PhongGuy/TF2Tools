@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use tf2tools_core::{
     EventKind, LogsFetchError, LogsRange, LogsSyncError, Medigun, ResolveError, SteamId, Team,
+    TfClass,
 };
 
 use crate::logs_sync::SyncProgress;
@@ -264,6 +265,25 @@ fn day_text(unix: i64) -> String {
                 .to_string()
         })
         .unwrap_or_default()
+}
+
+/// The class weapons panel's line when the class's logs carry no weapon stats at all.
+pub const NO_WEAPONS_TEXT: &str = "No weapon stats in these logs";
+
+/// The class weapons panel's title: "Scout weapons · 3 months · 1 log", "All" for every log.
+pub fn weapons_title(class: TfClass, range: LogsRange, logs: u32) -> String {
+    let noun = if logs == 1 { "log" } else { "logs" };
+    let count = count_text(usize::try_from(logs).unwrap_or(usize::MAX));
+    format!(
+        "{} weapons · {} · {count} {noun}",
+        class.name(),
+        range_label(range)
+    )
+}
+
+/// The class weapons panel's note while older logs still wait for their weapons counted.
+pub fn counting_text(left: u32) -> String {
+    format!("Counting older logs, {left} left")
 }
 
 /// The log list's line when logs.tf has no logs for the active player.
