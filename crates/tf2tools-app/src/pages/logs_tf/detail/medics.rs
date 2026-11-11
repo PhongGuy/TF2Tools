@@ -16,7 +16,7 @@ use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
 
-// Two blocks side by side still fit the 800 px window's content column.
+// A block's width; in the 800 px window's content column they wrap one to a line.
 const MEDIC_WIDTH: Pixels = px(300.);
 const CLASS: Pixels = px(40.);
 

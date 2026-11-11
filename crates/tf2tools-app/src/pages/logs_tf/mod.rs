@@ -1109,7 +1109,6 @@ impl Render for LogsTfPage {
     }
 }
 
-// A range's place on the slider, narrow to wide.
 // A read-only dialog of the log's detail width, deferred as the add dialog is so the click
 // that opened it cannot pull focus back out.
 fn open_detail_dialog<E: IntoElement>(
@@ -1127,6 +1126,7 @@ fn open_detail_dialog<E: IntoElement>(
     });
 }
 
+// A range's place on the slider, narrow to wide.
 fn stop_index(range: LogsRange) -> usize {
     LogsRange::STOPS
         .iter()

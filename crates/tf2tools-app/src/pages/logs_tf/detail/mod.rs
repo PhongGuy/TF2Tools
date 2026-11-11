@@ -1,6 +1,6 @@
 //! An open log's panel, laid out like its page on logs.tf: the score banner, the title, the
 //! team table, the players table, the rounds, one block per Medic, the kill matrix and the
-//! buttons that open the chat and the killstreaks.
+//! buttons that open the chat and the killstreaks and download the log.
 
 mod banner;
 pub(super) mod footer;
@@ -161,6 +161,7 @@ pub(super) fn team_cell(team: Team, cx: &App) -> Div {
         .child(team_name(team))
 }
 
+// A team's colour from the theme; a team core adds later reads as BLU's rather than none.
 pub(super) fn team_colour(team: Team, cx: &App) -> Hsla {
     match team {
         Team::Red => cx.theme().red,

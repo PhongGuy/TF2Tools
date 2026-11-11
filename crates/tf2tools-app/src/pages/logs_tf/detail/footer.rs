@@ -1,4 +1,5 @@
-//! The open log's footer buttons, Show Chat and Show Killstreaks, and the dialogs they open.
+//! The open log's footer buttons, Show Chat, Show Killstreaks and Download log, and the
+//! dialogs the first two open.
 
 use gpui_kit::component::button::Button;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
