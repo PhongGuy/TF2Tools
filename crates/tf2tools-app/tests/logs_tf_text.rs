@@ -1,8 +1,9 @@
 //! The logs.tf page's wording and number formats.
 
+use chrono::NaiveDate;
 use tf2tools_app::pages::logs_tf::text::{
-    duration_text, one_decimal, progress_text, resolve_message, summary_text, sync_message,
-    time_played_text, whole,
+    EMPTY_TEXT, NO_LOGS_TEXT, duration_text, one_decimal, progress_text, resolve_message,
+    summary_text, sync_message, time_played_text, whole,
 };
 use tf2tools_core::{LogsSyncError, ResolveError};
 
@@ -84,9 +85,48 @@ fn grid_numbers_format_like_the_spec() {
     assert_eq!(one_decimal(0.6), "0.6");
     assert_eq!(one_decimal(2.666_666), "2.7");
     assert_eq!(whole(136.38), "136");
-    assert_eq!(summary_text(87, false), "Last 90 days, 87 logs");
-    assert_eq!(summary_text(1, false), "Last 90 days, 1 log");
-    assert_eq!(summary_text(400, true), "Last 400 logs");
+}
+
+fn day(y: i32, m: u32, d: u32) -> NaiveDate {
+    NaiveDate::from_ymd_opt(y, m, d).unwrap()
+}
+
+#[test]
+fn the_summary_names_the_window_it_covers() {
+    let (aug, nov) = (day(2026, 8, 12), day(2026, 11, 10));
+    assert_eq!(
+        summary_text(aug, nov, 247, false),
+        "Aug 12 to Nov 10, 2026: 247 logs"
+    );
+    assert_eq!(
+        summary_text(aug, nov, 1, false),
+        "Aug 12 to Nov 10, 2026: 1 log"
+    );
+    assert_eq!(
+        summary_text(day(2022, 6, 3), day(2022, 9, 1), 31, false),
+        "Jun 3 to Sep 1, 2022: 31 logs"
+    );
+    assert_eq!(
+        summary_text(day(2021, 11, 20), day(2022, 2, 18), 64, false),
+        "Nov 20, 2021 to Feb 18, 2022: 64 logs"
+    );
+    assert_eq!(
+        summary_text(aug, nov, 400, true),
+        "Aug 12 to Nov 10, 2026: last 400 logs"
+    );
+    assert_eq!(
+        summary_text(nov, nov, 400, true),
+        "Nov 10, 2026: last 400 logs"
+    );
+}
+
+#[test]
+fn no_wording_promises_the_last_90_days_from_today() {
+    assert_eq!(NO_LOGS_TEXT, "No logs on logs.tf for this player yet.");
+    assert_eq!(
+        EMPTY_TEXT,
+        "Track a player to see their class averages and logs from their last 90 days of play."
+    );
 }
 
 #[test]

@@ -8,7 +8,9 @@ use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use serde_json::json;
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
-use tf2tools_app::pages::logs_tf::text::{LOOKING_UP, log_url, profile_url};
+use tf2tools_app::pages::logs_tf::text::{
+    LOOKING_UP, local_date, log_url, profile_url, summary_text,
+};
 use tf2tools_app::services::{Services, Tf2State};
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
@@ -550,9 +552,17 @@ fn the_grid_shows_nine_classes_and_dims_the_unplayed(cx: &mut TestAppContext) {
             "{class:?}"
         );
     }
+    // The window runs 90 days back from the newest log, in this computer's dates.
+    let newest = cx.update(|cx| page.read(cx).rows()[0].date());
+    let local = |unix| local_date(unix).unwrap();
     assert_eq!(
-        support::label_of(cx, s.win, ids::LOGSTF_SUMMARY).as_deref(),
-        Some("Last 90 days, 2 logs")
+        support::label_of(cx, s.win, ids::LOGSTF_SUMMARY),
+        Some(summary_text(
+            local(tf2tools_core::window_start(newest)),
+            local(newest),
+            2,
+            false
+        ))
     );
     let scout = cx.update(|cx| page.read(cx).averages().unwrap()[0].clone());
     assert_eq!(scout.seconds(), 1559);
@@ -628,7 +638,7 @@ fn a_player_without_logs_gets_a_profile_link(cx: &mut TestAppContext) {
     let _page = open_page(cx, &s);
     assert_eq!(
         support::label_of(cx, s.win, ids::LOGSTF_NO_LOGS).as_deref(),
-        Some("No logs in the last 90 days.")
+        Some("No logs on logs.tf for this player yet.")
     );
     assert!(support::present(cx, s.win, ids::LOGSTF_NO_LOGS_PROFILE));
     for class in TfClass::ALL {

@@ -5,9 +5,9 @@ use gpui_kit::{
     App, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
-use tf2tools_core::{ClassAverage, LOG_CAP};
+use tf2tools_core::{ClassAverage, LOG_CAP, LogRow, window_start};
 
-use super::text::{one_decimal, summary_text, time_played_text, whole};
+use super::text::{local_date, one_decimal, summary_text, time_played_text, whole};
 use crate::ids;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
@@ -16,8 +16,12 @@ use crate::widgets::labelled;
 const CARD_WIDTH: f32 = 168.;
 const ICON_SIZE: f32 = 28.;
 
-/// The nine cards, wrapping, with the summary line for `logs` rows under them.
-pub(super) fn class_grid(averages: &[ClassAverage; 9], logs: usize, cx: &App) -> impl IntoElement {
+/// The nine cards, wrapping, with the summary line for the window's `rows` under them.
+pub(super) fn class_grid(
+    averages: &[ClassAverage; 9],
+    rows: &[LogRow],
+    cx: &App,
+) -> impl IntoElement {
     v_flex()
         .gap_2()
         .child(
@@ -27,11 +31,31 @@ pub(super) fn class_grid(averages: &[ClassAverage; 9], logs: usize, cx: &App) ->
                 .gap_3()
                 .children(averages.iter().map(|average| class_card(average, cx))),
         )
-        .child(labelled(
-            div().text_sm().text_color(cx.theme().muted_foreground),
-            ids::LOGSTF_SUMMARY,
-            summary_text(logs, logs >= LOG_CAP),
-        ))
+        .children(summary(rows).map(|text| {
+            labelled(
+                div().text_sm().text_color(cx.theme().muted_foreground),
+                ids::LOGSTF_SUMMARY,
+                text,
+            )
+        }))
+}
+
+// The window ends at the newest row. Uncapped it reaches the full span back; at the cap it
+// only reaches the oldest row kept. No rows means no window to name.
+fn summary(rows: &[LogRow]) -> Option<String> {
+    let newest = rows.first()?.date();
+    let capped = rows.len() >= LOG_CAP;
+    let oldest = if capped {
+        rows.last()?.date()
+    } else {
+        window_start(newest)
+    };
+    Some(summary_text(
+        local_date(oldest)?,
+        local_date(newest)?,
+        rows.len(),
+        capped,
+    ))
 }
 
 // The icon and name, then the rates as label and value rows; Medic's two extra rates only

@@ -138,7 +138,7 @@ impl LogsTfPage {
         &self.players
     }
 
-    /// The active player's logs in the 90-day window, newest first, from the cache.
+    /// The active player's logs in their window, newest first, from the cache.
     pub fn rows(&self) -> &[LogRow] {
         &self.rows
     }
@@ -709,7 +709,7 @@ impl LogsTfPage {
                 self.averages
                     .as_ref()
                     .filter(|_| !self.players.is_empty())
-                    .map(|averages| grid::class_grid(averages, self.rows.len(), cx)),
+                    .map(|averages| grid::class_grid(averages, &self.rows, cx)),
             )
             .children(empty.then(|| self.empty_state(cx)))
             .children(no_logs.map(|id| list::no_logs(id, cx)))

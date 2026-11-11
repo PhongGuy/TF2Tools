@@ -1,5 +1,6 @@
 //! The logs.tf page's wording and links, kept free of UI so tests read them without a window.
 
+use chrono::{Datelike as _, NaiveDate};
 use tf2tools_core::{LogsSyncError, ResolveError, SteamId};
 
 /// logs.tf's front page, which the page's credit opens.
@@ -7,7 +8,7 @@ pub const LOGS_TF_URL: &str = "https://logs.tf";
 
 /// The empty page's explanation, shown until a player is tracked.
 pub const EMPTY_TEXT: &str =
-    "Track a player to see their class averages and logs from the last 90 days.";
+    "Track a player to see their class averages and logs from their last 90 days of play.";
 
 /// Why a logs.tf change could not be kept, in player words.
 pub const SAVE_FAILED: &str = "Couldn't save logs.tf data on this computer.";
@@ -80,17 +81,37 @@ pub fn whole(value: f64) -> String {
     format!("{value:.0}")
 }
 
-/// The line under the class grid. At the log cap the window is no longer the full 90 days.
-pub fn summary_text(logs: usize, capped: bool) -> String {
-    match (capped, logs) {
-        (true, _) => format!("Last {logs} logs"),
-        (false, 1) => "Last 90 days, 1 log".to_owned(),
-        (false, _) => format!("Last 90 days, {logs} logs"),
+/// The line under the class grid: the dates the logs span, then how many there are:
+/// "Aug 12 to Nov 10, 2026: 247 logs"; at the log cap, "...: last 400 logs".
+pub fn summary_text(first: NaiveDate, last: NaiveDate, logs: usize, capped: bool) -> String {
+    let count = match (capped, logs) {
+        (true, _) => format!("last {logs} logs"),
+        (false, 1) => "1 log".to_owned(),
+        (false, _) => format!("{logs} logs"),
+    };
+    format!("{}: {count}", range_text(first, last))
+}
+
+// The year is written once when both ends share it, and on each end when they don't.
+fn range_text(first: NaiveDate, last: NaiveDate) -> String {
+    const DAY: &str = "%b %-d";
+    const FULL: &str = "%b %-d, %Y";
+    if first == last {
+        last.format(FULL).to_string()
+    } else if first.year() == last.year() {
+        format!("{} to {}", first.format(DAY), last.format(FULL))
+    } else {
+        format!("{} to {}", first.format(FULL), last.format(FULL))
     }
 }
 
-/// The log list's line when the active player has no logs in the window.
-pub const NO_LOGS_TEXT: &str = "No logs in the last 90 days.";
+/// The calendar date of an upload time on this computer's clock.
+pub fn local_date(unix: i64) -> Option<NaiveDate> {
+    chrono::DateTime::from_timestamp(unix, 0).map(|t| t.with_timezone(&chrono::Local).date_naive())
+}
+
+/// The log list's line when logs.tf has no logs for the active player.
+pub const NO_LOGS_TEXT: &str = "No logs on logs.tf for this player yet.";
 
 /// A row's note in place of its stats while its log downloads.
 pub const LOG_PENDING: &str = "Downloading...";
