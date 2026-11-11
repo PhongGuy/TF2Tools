@@ -14,10 +14,10 @@ publish = false
 tf2tools-app = { path = "../../crates/tf2tools-app" }
 tf2tools-core = { path = "../../crates/tf2tools-core" }
 # This crate keeps its own lock, so the kit trio's exact pins are repeated here.
-gpui-kit = "=0.9.0"
-gpui-component = "=0.9.0"
-gpui-base = "=0.9.0"
-gpui-pilot-host = { git = "https://github.com/PhongGuy/gpui-pilot", tag = "v0.3.0" }
+gpui-kit = "=0.9.1"
+gpui-component = "=0.9.1"
+gpui-base = "=0.9.1"
+gpui-pilot-host = { git = "https://github.com/PhongGuy/gpui-pilot", tag = "v0.3.2" }
 anyhow = "1"
 zip = "9"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
@@ -34,7 +34,7 @@ update-test-key = ["tf2tools-app/update-test-key"]
 [dev-dependencies]
 tempfile = "3"
 # The test platform records file dialogs, so a test can see a pick reach one.
-gpui-kit = { version = "=0.9.0", features = ["test-support"] }
+gpui-kit = { version = "=0.9.1", features = ["test-support"] }
 
 # Headless frame numbers need an optimised host and app.
 [profile.dev.package."*"]

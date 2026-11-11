@@ -1,6 +1,6 @@
-# Vendored gpui-pre-scheduler 0.3.11
+# Vendored gpui-pre-scheduler 0.3.12
 
-A copy of `gpui-pre-scheduler` 0.3.11 from crates.io (a snapshot of Zed's
+A copy of `gpui-pre-scheduler` 0.3.12 from crates.io (a snapshot of Zed's
 `scheduler` crate, Apache-2.0, see `LICENSE-APACHE`), used through
 `[patch.crates-io]` in the workspace `Cargo.toml`.
 
