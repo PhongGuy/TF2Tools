@@ -378,10 +378,18 @@ fn offline(url: &str) -> NetFailure {
     }
 }
 
+// The message leads with the failure's kind, since reqwest's own text names only the URL.
 fn network(url: &str, error: &reqwest::Error) -> NetFailure {
+    let kind = if error.is_timeout() {
+        "timeout"
+    } else if error.is_connect() {
+        "connect"
+    } else {
+        "other"
+    };
     NetFailure::Network {
         url: url.to_owned(),
-        message: error.to_string(),
+        message: format!("{kind}: {error}"),
     }
 }
 
@@ -534,6 +542,38 @@ mod tests {
             .await
             .unwrap_err();
         assert!(matches!(err, NetFailure::Network { .. }), "{err:?}");
+    }
+
+    #[tokio::test]
+    async fn a_network_failure_names_its_kind() {
+        let refused = fast().get_api("http://127.0.0.1:1/x", 1024).await;
+        let NetFailure::Network { message, .. } = refused.unwrap_err() else {
+            panic!("a refused connection is a network failure");
+        };
+        assert!(message.starts_with("connect: "), "{message}");
+
+        let server = MockServer::start().await;
+        Mock::given(path("/x"))
+            .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(5)))
+            .mount(&server)
+            .await;
+        let timeouts = Timeouts {
+            connect: Duration::from_secs(10),
+            read: Duration::from_millis(100),
+        };
+        let http = Http::with(
+            Duration::ZERO,
+            Duration::from_millis(1),
+            USER_AGENT,
+            timeouts,
+            &Redirects::Any,
+            false,
+        );
+        let stalled = http.get_api(&format!("{}/x", server.uri()), 1024).await;
+        let NetFailure::Network { message, .. } = stalled.unwrap_err() else {
+            panic!("a stalled reply is a network failure");
+        };
+        assert!(message.starts_with("timeout: "), "{message}");
     }
 
     #[tokio::test]
