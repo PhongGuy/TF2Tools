@@ -4,7 +4,8 @@ use std::collections::HashMap;
 
 use rusqlite::{OptionalExtension, params};
 
-use super::{LogDetail, PROVISIONAL_SECS, SteamId, logstf_class_name};
+use super::averages::{CLASS_SUMS, ClassAverage, ClassSums, WINDOW_LOGS};
+use super::{LOG_CAP, LogDetail, PROVISIONAL_SECS, SteamId, logstf_class, logstf_class_name};
 use crate::db::Database;
 use crate::error::LogsCacheError;
 use crate::weapons::TfClass;
@@ -44,6 +45,105 @@ impl TrackedPlayer {
     /// When the player's logs last finished syncing, in unix seconds.
     pub fn last_synced(&self) -> Option<i64> {
         self.last_synced
+    }
+}
+
+/// Where a cached log stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum LogState {
+    /// Listed but not downloaded yet.
+    Pending,
+    /// Downloaded and readable.
+    Ready,
+    /// logs.tf no longer has it.
+    Gone,
+    /// Its body could not be read as a log.
+    Unreadable,
+}
+
+/// One log in a player's list, with that player's line from it.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct LogRow {
+    id: u64,
+    title: String,
+    map: String,
+    date: i64,
+    length: Option<u32>,
+    state: LogState,
+    classes: Vec<TfClass>,
+    seconds: u32,
+    kills: u32,
+    deaths: u32,
+    assists: u32,
+    dmg: u32,
+}
+
+impl LogRow {
+    /// The logs.tf log id.
+    pub fn id(&self) -> u64 {
+        self.id
+    }
+
+    /// The log's title.
+    pub fn title(&self) -> &str {
+        &self.title
+    }
+
+    /// The map played.
+    pub fn map(&self) -> &str {
+        &self.map
+    }
+
+    /// When the log was uploaded, in unix seconds.
+    pub fn date(&self) -> i64 {
+        self.date
+    }
+
+    /// The match length in seconds, once downloaded.
+    pub fn length(&self) -> Option<u32> {
+        self.length
+    }
+
+    /// Whether the log is downloaded, gone or unreadable.
+    pub fn state(&self) -> LogState {
+        self.state
+    }
+
+    /// The classes the player played, longest first; empty unless `Ready`.
+    pub fn classes(&self) -> &[TfClass] {
+        &self.classes
+    }
+
+    /// The player's time across all classes.
+    pub fn seconds(&self) -> u32 {
+        self.seconds
+    }
+
+    /// The player's kills.
+    pub fn kills(&self) -> u32 {
+        self.kills
+    }
+
+    /// The player's deaths.
+    pub fn deaths(&self) -> u32 {
+        self.deaths
+    }
+
+    /// The player's assists.
+    pub fn assists(&self) -> u32 {
+        self.assists
+    }
+
+    /// The player's damage.
+    pub fn dmg(&self) -> u32 {
+        self.dmg
+    }
+
+    /// Damage per minute over the player's time; `None` when they have no time.
+    pub fn dmg_per_min(&self) -> Option<f64> {
+        (self.seconds > 0).then(|| f64::from(self.dmg) / f64::from(self.seconds) * 60.0)
     }
 }
 
@@ -181,6 +281,126 @@ impl LogsCache {
             })
             .map(drop)
             .map_err(db_error)
+    }
+
+    /// The player's logs in the window, newest first, at most LOG_CAP.
+    pub fn logs(&self, id: SteamId, since: i64) -> Result<Vec<LogRow>, LogsCacheError> {
+        // One row per (log, class played), longest class first; a log with no class rows
+        // comes once with NULL stats. Consecutive rows of one log fold into its LogRow.
+        let sql = format!(
+            "{WINDOW_LOGS}
+             SELECT l.id, l.title, l.map, l.date, l.length, l.state, l.body IS NOT NULL,
+                    r.class, r.seconds, r.kills, r.deaths, r.assists, r.dmg
+             FROM logstf_logs l
+             LEFT JOIN logstf_class_rows r ON r.log_id = l.id AND r.steam_id = ?1
+             WHERE l.id IN (SELECT id FROM window_logs)
+             ORDER BY l.date DESC, l.id DESC, r.seconds DESC"
+        );
+        self.db
+            .read(|conn| {
+                let mut stmt = conn.prepare(&sql)?;
+                let mut rows = stmt.query(params![sql_id(id)?, since, LOG_CAP as i64])?;
+                let mut out: Vec<LogRow> = Vec::new();
+                while let Some(row) = rows.next()? {
+                    let log_id = u64::try_from(row.get::<_, i64>(0)?).unwrap_or(0);
+                    if out.last().is_none_or(|last| last.id != log_id) {
+                        let state = match (row.get::<_, i64>(5)?, row.get::<_, bool>(6)?) {
+                            (1, _) => LogState::Gone,
+                            (2, _) => LogState::Unreadable,
+                            (_, true) => LogState::Ready,
+                            (_, false) => LogState::Pending,
+                        };
+                        out.push(LogRow {
+                            id: log_id,
+                            title: row.get(1)?,
+                            map: row.get(2)?,
+                            date: row.get(3)?,
+                            length: row.get::<_, Option<i64>>(4)?.map(clamp_u32),
+                            state,
+                            classes: Vec::new(),
+                            seconds: 0,
+                            kills: 0,
+                            deaths: 0,
+                            assists: 0,
+                            dmg: 0,
+                        });
+                    }
+                    let Some(log) = out.last_mut() else { continue };
+                    let class = row.get::<_, Option<String>>(7)?;
+                    let Some(class) = class.as_deref().and_then(logstf_class) else {
+                        continue;
+                    };
+                    if log.state != LogState::Ready {
+                        continue;
+                    }
+                    let stat = |i| row.get::<_, i64>(i).map(clamp_u32);
+                    log.classes.push(class);
+                    log.seconds = log.seconds.saturating_add(stat(8)?);
+                    log.kills = log.kills.saturating_add(stat(9)?);
+                    log.deaths = log.deaths.saturating_add(stat(10)?);
+                    log.assists = log.assists.saturating_add(stat(11)?);
+                    log.dmg = log.dmg.saturating_add(stat(12)?);
+                }
+                Ok(out)
+            })
+            .map_err(db_error)
+    }
+
+    /// The stored `/json/<id>` body of a downloaded log; `None` for any other.
+    pub fn log_body(&self, log_id: u64) -> Result<Option<String>, LogsCacheError> {
+        let Ok(log_id) = i64::try_from(log_id) else {
+            return Ok(None);
+        };
+        self.db
+            .read(|conn| {
+                conn.query_row(
+                    "SELECT body FROM logstf_logs WHERE id = ?1",
+                    [log_id],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .optional()
+            })
+            .map(Option::flatten)
+            .map_err(db_error)
+    }
+
+    /// The nine classes in TfClass::ALL order, over exactly the logs `logs` returns.
+    pub fn class_averages(
+        &self,
+        id: SteamId,
+        since: i64,
+    ) -> Result<[ClassAverage; 9], LogsCacheError> {
+        let sql = format!("{WINDOW_LOGS} {CLASS_SUMS}");
+        let sums = self
+            .db
+            .read(|conn| {
+                let mut stmt = conn.prepare(&sql)?;
+                stmt.query_map(params![sql_id(id)?, since, LOG_CAP as i64], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        ClassSums {
+                            seconds: row.get(1)?,
+                            logs: row.get(2)?,
+                            kills: row.get(3)?,
+                            deaths: row.get(4)?,
+                            assists: row.get(5)?,
+                            dmg: row.get(6)?,
+                            heal: row.get(7)?,
+                            ubers: row.get(8)?,
+                        },
+                    ))
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()
+            })
+            .map_err(db_error)?;
+        // A stored name logstf_class rejects is skipped rather than failing the page.
+        let by_class: HashMap<TfClass, ClassSums> = sums
+            .into_iter()
+            .filter_map(|(name, s)| Some((logstf_class(&name)?, s)))
+            .collect();
+        Ok(TfClass::ALL.map(|class| {
+            ClassAverage::from_sums(class, by_class.get(&class).copied().unwrap_or_default())
+        }))
     }
 
     /// Deletes logs uploaded before `before` (unix seconds); returns how many.
@@ -395,6 +615,11 @@ fn fold_class_rows(detail: &LogDetail) -> HashMap<(SteamId, TfClass), ClassStats
 /// `id` as SQLite stores it; every public-universe SteamID64 fits in an i64.
 fn sql_id(id: SteamId) -> rusqlite::Result<i64> {
     i64::try_from(id.id64()).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+}
+
+/// A stored count as u32, clamped into range.
+fn clamp_u32(n: i64) -> u32 {
+    u32::try_from(n.max(0)).unwrap_or(u32::MAX)
 }
 
 fn from_sql_id(id: i64) -> Option<SteamId> {

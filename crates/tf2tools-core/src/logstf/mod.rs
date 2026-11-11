@@ -1,5 +1,6 @@
 //! logs.tf: Steam IDs, the player cache and the log client.
 
+mod averages;
 mod cache;
 mod client;
 mod detail;
@@ -10,7 +11,8 @@ use std::time::Duration;
 
 use crate::weapons::TfClass;
 
-pub use cache::{LogsCache, TrackedPlayer};
+pub use averages::ClassAverage;
+pub use cache::{LogRow, LogState, LogsCache, TrackedPlayer};
 pub use client::{LogsClient, LogsEndpoints, LogsProgress, LogsSyncSummary};
 pub use detail::{
     ClassKills, ClassLine, HealTarget, LogColumns, LogDetail, MedicLine, PlayerLine, TeamTotals,
