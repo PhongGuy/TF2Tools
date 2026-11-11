@@ -2459,6 +2459,8 @@ pub const LOGSTF_ADD: &str = "logstf-add";
 pub const LOGSTF_ADD_INPUT: &str = "logstf-add-input";
 /// The add-player dialog's Add button, disabled while the field is blank.
 pub const LOGSTF_ADD_CONFIRM: &str = "logstf-add-confirm";
+/// The add-player dialog's Cancel button.
+pub const LOGSTF_ADD_CANCEL: &str = "logstf-add-cancel";
 /// Labelled with why the add-player dialog could not add the player.
 pub const LOGSTF_ADD_ERROR: &str = "logstf-add-error";
 

@@ -967,6 +967,20 @@ impl StoreServer {
         );
     }
 
+    /// Serves `body` at `route` only after `delay`, for work that must still be running.
+    pub fn mount_bytes_after(&self, route: &str, body: Vec<u8>, delay: Duration) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(route))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_bytes(body)
+                        .set_delay(delay),
+                )
+                .mount(&self.server),
+        );
+    }
+
     /// GitHub's latest mastercomfig release `tag`, listing only the base VPK at this server's
     /// `/gh/mastercomfig/mastercomfig-base.vpk`.
     pub fn mount_mastercomfig_release(&self, tag: &str) {

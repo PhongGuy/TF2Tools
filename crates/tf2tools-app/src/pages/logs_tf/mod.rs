@@ -32,11 +32,12 @@ pub struct LogsTfPage {
     players: Vec<TrackedPlayer>,
     active: Option<SteamId>,
     loaded: bool,
-    // The add dialog's field, its last failure and whether a lookup is running. They live
-    // here because the dialog builder runs every frame.
+    // The add dialog's field, its last failure, whether a lookup is running and whether the
+    // dialog is still up. They live here because the dialog builder runs every frame.
     add_input: Entity<InputState>,
     add_error: Option<SharedString>,
     adding: bool,
+    add_open: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -61,6 +62,7 @@ impl LogsTfPage {
             add_input,
             add_error: None,
             adding: false,
+            add_open: false,
             _subscriptions: vec![enter],
         };
         page.load(cx);
@@ -140,11 +142,11 @@ impl LogsTfPage {
     // page on every frame, so a failure shows in place and the typed text stays.
     fn open_add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.add_error = None;
+        self.add_open = true;
         let page = cx.entity().downgrade();
         let input = self.add_input.clone();
         // Deferred so the click that opened it cannot pull focus back out of the field.
         window.defer(cx, move |window, cx| {
-            input.update(cx, |state, cx| state.focus(window, cx));
             let frame = DialogFrame::new(DIALOG_WIDTH);
             window.open_dialog(cx, move |dialog, window, cx| {
                 let Some(entity) = page.upgrade() else {
@@ -174,22 +176,40 @@ impl LogsTfPage {
                         )
                     }))
                     .child(
-                        h_flex().justify_end().child(
-                            Button::new(ids::LOGSTF_ADD_CONFIRM)
-                                .primary()
-                                .label("Add")
-                                .disabled(blank || this.adding)
-                                .on_click(move |_, window, cx| {
-                                    entity.update(cx, |page, cx| page.submit_add(window, cx));
-                                }),
-                        ),
+                        h_flex()
+                            .justify_end()
+                            .gap_2()
+                            .child(
+                                Button::new(ids::LOGSTF_ADD_CANCEL)
+                                    .outline()
+                                    .label("Cancel")
+                                    .on_click(|_, window, cx| window.close_dialog(cx)),
+                            )
+                            .child(
+                                Button::new(ids::LOGSTF_ADD_CONFIRM)
+                                    .primary()
+                                    .label("Add")
+                                    .disabled(blank || this.adding)
+                                    .on_click({
+                                        let entity = entity.clone();
+                                        move |_, window, cx| {
+                                            entity.update(cx, |page, cx| {
+                                                page.submit_add(window, cx);
+                                            });
+                                        }
+                                    }),
+                            ),
                     );
                 // Enter belongs to the field, which adds; the kit's Confirm never closes it.
+                // Every way out clears `add_open`, so a late lookup closes no other dialog.
                 frame
                     .apply(dialog, &*window, &*cx)
                     .on_ok(|_, _, _| false)
+                    .on_close(move |_, _, cx| entity.update(cx, |page, _| page.add_open = false))
                     .child(frame.measure(content))
             });
+            // The dialog takes focus as it opens, so the field asks for it back afterwards.
+            input.update(cx, |state, cx| state.focus(window, cx));
         });
     }
 
@@ -250,7 +270,10 @@ impl LogsTfPage {
                     Ok(()) => {
                         page.add_input
                             .update(cx, |state, cx| state.set_value("", window, cx));
-                        window.close_dialog(cx);
+                        if page.add_open {
+                            page.add_open = false;
+                            window.close_dialog(cx);
+                        }
                         page.load(cx);
                     }
                     Err(message) => page.add_error = Some(message.into()),

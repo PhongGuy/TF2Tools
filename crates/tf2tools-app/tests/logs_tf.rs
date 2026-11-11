@@ -315,3 +315,48 @@ fn adding_a_tracked_player_just_activates_them(cx: &mut TestAppContext) {
     });
     assert_eq!(players_of(cx, &page), ["a", "b"]);
 }
+
+#[gpui_kit::test]
+fn a_lookup_landing_after_the_dialog_closed_leaves_other_dialogs_alone(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes_after(
+        "/steam/id/gabelogannewell/",
+        FOUND_XML.as_bytes().to_vec(),
+        Duration::from_millis(500),
+    );
+    server.mount_bytes("/api/v1/log", list_body(&[]));
+    let s = shell(cx, &env, &server.uri(), &[(1, "a")]);
+    let page = open_page(cx, &s);
+
+    support::click_id(cx, s.win, ids::LOGSTF_ADD);
+    type_into_add(cx, &s, &page, "gabelogannewell");
+    support::press(cx, s.win, "enter");
+    assert!(
+        support::disabled_of(cx, s.win, ids::LOGSTF_ADD_CONFIRM),
+        "Enter started the lookup, which holds Add"
+    );
+    support::click_dialog_x(cx, s.win);
+    assert!(!support::present(cx, s.win, ids::LOGSTF_ADD_INPUT));
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(1)));
+    support::wait_real(cx, "the late add", |cx| {
+        cx.update(|cx| page.read(cx).players().len()) == 2
+    });
+    assert!(
+        support::present(cx, s.win, ids::CONFIRM_TITLE),
+        "the stop-tracking confirm is still open"
+    );
+}
+
+#[gpui_kit::test]
+fn the_add_dialog_cancels_without_adding(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let s = shell(cx, &env, &server.uri(), &[]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::LOGSTF_EMPTY_ADD);
+    type_into_add(cx, &s, &page, "gabelogannewell");
+    support::click_id(cx, s.win, ids::LOGSTF_ADD_CANCEL);
+    assert!(!support::present(cx, s.win, ids::LOGSTF_ADD_INPUT));
+    assert!(players_of(cx, &page).is_empty());
+}
