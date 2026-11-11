@@ -2593,9 +2593,10 @@ fn team_slug(team: Team) -> &'static str {
     }
 }
 
-/// A players table column header in the open log, keyed by its title: "logstf-col:K/D".
-pub fn logstf_col(name: &str) -> ElementId {
-    keyed("logstf-col", name)
+/// A players table header in the open log, which sorts by its column, keyed by its title:
+/// "logstf-sort:K/D".
+pub fn logstf_sort(title: &str) -> ElementId {
+    keyed("logstf-sort", title)
 }
 
 /// One player's line in the open log's players table: "logstf-player:<id64>".

@@ -294,3 +294,32 @@ pub fn download_beside(cx: &mut TestAppContext, beside: &support::StoreServer, i
         .block_on(client.fetch_log(id))
         .expect("the log downloads");
 }
+
+/// Scrolls the page so `target`, inside open log `log`'s panel, sits just under the list's top.
+pub fn scroll_to_in_log(
+    cx: &mut gpui_kit::TestAppContext,
+    s: &super::ShellWindow,
+    page: &gpui_kit::Entity<tf2tools_app::pages::logs_tf::LogsTfPage>,
+    log: u64,
+    target: impl Into<gpui_kit::ElementId>,
+) {
+    use gpui_kit::{ListOffset, px};
+    let target = target.into();
+    let item_ix = cx
+        .update(|cx| page.read(cx).rows().iter().position(|r| r.id() == log))
+        .expect("the log is listed")
+        + 1;
+    let state = cx.update(|cx| page.read(cx).list_state().clone());
+    state.scroll_to(ListOffset {
+        item_ix,
+        offset_in_item: px(0.),
+    });
+    super::settle(cx, s.win);
+    let row = super::bounds_of(cx, s.win, tf2tools_app::ids::logstf_log(log)).expect("the row");
+    let at = super::bounds_of(cx, s.win, target).expect("the target is laid out");
+    state.scroll_to(ListOffset {
+        item_ix,
+        offset_in_item: at.top() - row.top() - px(8.),
+    });
+    super::settle(cx, s.win);
+}

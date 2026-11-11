@@ -812,13 +812,13 @@ fn an_open_6v6_log_hides_columns_logs_tf_hides(cx: &mut TestAppContext) {
         "K", "A", "D", "DA", "DA/M", "KA/D", "K/D", "DT", "DT/M", "HP", "AS", "CAP",
     ] {
         assert!(
-            support::present(cx, s.win, ids::logstf_col(shown)),
+            support::present(cx, s.win, ids::logstf_sort(shown)),
             "{shown}"
         );
     }
     for hidden in ["HS", "BS"] {
         assert!(
-            !support::present(cx, s.win, ids::logstf_col(hidden)),
+            !support::present(cx, s.win, ids::logstf_sort(hidden)),
             "{hidden}"
         );
     }
@@ -902,7 +902,7 @@ fn a_highlander_log_shows_every_column_and_closing_drops_the_detail(cx: &mut Tes
     open_log(cx, &s, &page, 2);
     for shown in ["HS", "BS", "HP", "DT", "AS", "CAP"] {
         assert!(
-            support::present(cx, s.win, ids::logstf_col(shown)),
+            support::present(cx, s.win, ids::logstf_sort(shown)),
             "{shown}"
         );
     }
@@ -1048,7 +1048,7 @@ fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
 
     // The players table keeps every column, so its name column never collapses.
     let first = cx.update(|cx| page.read(cx).detail().unwrap().players()[0].steam_id());
-    let header = support::bounds_of(cx, s.win, ids::logstf_col("Name")).unwrap();
+    let header = support::bounds_of(cx, s.win, ids::logstf_sort("Name")).unwrap();
     let name = support::bounds_of(cx, s.win, ids::logstf_player_name(first)).unwrap();
     assert!(header.size.width >= px(100.), "header {header:?}");
     assert!(name.size.width >= px(100.), "name {name:?}");
@@ -1063,7 +1063,7 @@ fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
     });
     support::settle(cx, s.win);
     let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
-    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     assert!(cap.right() > table.right(), "the table overflows at 800 px");
     let wheel = ScrollEvent {
         position: point(table.center().x, table.top() + px(10.)),
@@ -1076,7 +1076,7 @@ fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
     .unwrap();
     support::settle(cx, s.win);
     let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
-    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     assert!(
         cap.right() <= table.right() + px(1.) && cap.left() >= table.left(),
         "CAP {cap:?} outside {table:?}"
@@ -1173,12 +1173,12 @@ fn a_mouse_wheel_over_a_wide_table_scrolls_the_page(cx: &mut TestAppContext) {
     players_table_in_view(cx, &s, &page);
 
     let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
-    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     let before = page_offset(cx, &page);
     let at = point(table.center().x, table.top() + px(10.));
     wheel(cx, &s, at, ScrollDelta::Lines(point(0., -3.)));
     let after = page_offset(cx, &page);
-    let moved = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let moved = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     assert!(
         after > before,
         "the page scrolls down: {before:?} then {after:?}"
@@ -1189,9 +1189,9 @@ fn a_mouse_wheel_over_a_wide_table_scrolls_the_page(cx: &mut TestAppContext) {
     let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
     let at = point(table.center().x, table.top() + px(10.));
     let before = page_offset(cx, &page);
-    let cap = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     wheel(cx, &s, at, ScrollDelta::Lines(point(-3., 0.)));
-    let moved = support::bounds_of(cx, s.win, ids::logstf_col("CAP")).unwrap();
+    let moved = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
     assert!(moved.left() < cap.left(), "{cap:?} then {moved:?}");
     assert_eq!(page_offset(cx, &page), before, "the page stays put");
 }

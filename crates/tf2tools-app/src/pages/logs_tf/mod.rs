@@ -4,6 +4,7 @@
 mod detail;
 mod grid;
 mod list;
+pub mod sort;
 pub mod text;
 
 use std::collections::HashSet;
@@ -38,6 +39,7 @@ use crate::tokio_bridge;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
+use sort::{PlayerColumn, PlayerSort};
 use text::{
     EMPTY_TEXT, LOG_UNREADABLE, LOGS_TF_DOWN, LOGS_TF_URL, LOOKING_UP, REMOVING, SAVE_FAILED,
     STEAM_UNREACHABLE, fetch_message, profile_url, progress_line, resolve_message,
@@ -73,6 +75,8 @@ pub struct LogsTfPage {
     // The open log and how far its body got; the list's item 0 is the page top, so row `i`
     // is item `i + 1`. A read or fetch that lands after its row closed is dropped.
     open: Option<OpenLog>,
+    // The players table's order, kept across logs while the page lives.
+    player_sort: PlayerSort,
     list: ListState,
     // Which optional row columns fit, from the list's width at the last frame; the list's
     // state cannot be asked while it lays its own items out.
@@ -147,6 +151,7 @@ impl LogsTfPage {
             range_slider,
             slider_range: LogsRange::default(),
             open: None,
+            player_sort: PlayerSort::default(),
             list: ListState::new(1, ListAlignment::Top, px(200.)),
             fit: list::Fit::ALL,
             sync,
@@ -253,6 +258,17 @@ impl LogsTfPage {
     /// The page's one scrolling list: the top, then a row per log.
     pub fn list_state(&self) -> &ListState {
         &self.list
+    }
+
+    /// The open log's players table order.
+    pub fn player_sort(&self) -> PlayerSort {
+        self.player_sort
+    }
+
+    /// A click on the players table's `column` header: sorts by it, or flips it if it leads.
+    pub fn sort_players_by(&mut self, column: PlayerColumn, cx: &mut Context<Self>) {
+        self.player_sort = self.player_sort.clicked(column);
+        cx.notify();
     }
 
     /// The log whose row is open, if any.

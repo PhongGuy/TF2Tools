@@ -2,6 +2,7 @@
 //! team table, the players table, one block per Medic and the tracked players' kills by class.
 
 mod banner;
+mod players;
 
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -10,10 +11,10 @@ use gpui_kit::{
     ParentElement as _, Pixels, Styled as _, TestSupportExt as _, WeakEntity, Window, div, px,
 };
 use tf2tools_core::{
-    LogColumns, LogDetail, LogRow, LogState, MatrixKind, MedicLine, PlayerLine, SteamId, Team,
-    TfClass, TrackedPlayer,
+    LogDetail, LogRow, LogState, MatrixKind, MedicLine, SteamId, Team, TfClass, TrackedPlayer,
 };
 
+use super::sort::PlayerSort;
 use super::text::{LOG_LOADING, one_decimal, whole};
 use super::{LogsTfPage, OpenState};
 use crate::ids;
@@ -23,16 +24,10 @@ use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
 use crate::widgets::store_error::error_line;
 
-// The players table's fixed columns; the name takes what is left.
-const TEAM: Pixels = px(40.);
-const NAME_MIN: Pixels = px(120.);
-const CLASSES: Pixels = px(76.);
+// A number column's width and a class icon's size, shared with the players table.
 const NUMBER: Pixels = px(44.);
 const ICON: Pixels = px(16.);
 const MEDIC_WIDTH: Pixels = px(280.);
-
-// One players table column: its logs.tf title and how a player's cell reads.
-type Column = (&'static str, fn(&PlayerLine) -> String);
 
 /// The panel under open log `row`. The score banner heads it once `opened` is ready; the
 /// title comes from the row at once; under it the parsed log, or a line saying it is loading
@@ -42,6 +37,7 @@ pub(super) fn panel(
     row: &LogRow,
     opened: &OpenState,
     tracked: &[TrackedPlayer],
+    sort: PlayerSort,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> AnyElement {
@@ -55,7 +51,7 @@ pub(super) fn panel(
         OpenState::Loading | OpenState::Failed(_) => None,
     };
     let body = match opened {
-        OpenState::Ready(log) => log_body(log, tracked, cx).into_any_element(),
+        OpenState::Ready(log) => log_body(log, tracked, sort, page, cx).into_any_element(),
         OpenState::Loading => status(LOG_LOADING),
         OpenState::Failed(why) if row.state() == LogState::Pending => {
             let on_retry = move |_: &mut Window, cx: &mut App| {
@@ -81,7 +77,13 @@ pub(super) fn panel(
 }
 
 // Everything the parsed body adds, in logs.tf's order.
-fn log_body(log: &LogDetail, tracked: &[TrackedPlayer], cx: &App) -> impl IntoElement {
+fn log_body(
+    log: &LogDetail,
+    tracked: &[TrackedPlayer],
+    sort: PlayerSort,
+    page: WeakEntity<LogsTfPage>,
+    cx: &App,
+) -> impl IntoElement {
     let is_tracked = |id: SteamId| tracked.iter().any(|p| p.steam_id() == id);
     let kills: Vec<_> = log
         .class_matrix(MatrixKind::Kills)
@@ -104,7 +106,7 @@ fn log_body(log: &LogDetail, tracked: &[TrackedPlayer], cx: &App) -> impl IntoEl
         ))
         .child(sideways(
             ids::LOGSTF_PLAYERS_SCROLL,
-            players_table(log, &is_tracked, cx),
+            players::players_table(log, sort, &is_tracked, page, cx),
         ))
         .when(!log.medics().is_empty(), |el| {
             el.child(section(
@@ -159,92 +161,6 @@ pub(super) fn section(title: &'static str, content: impl IntoElement, cx: &App) 
                 .child(title),
         )
         .child(content)
-}
-
-// The players table: RED then BLU as core orders them, with the columns this log recorded.
-fn players_table(log: &LogDetail, is_tracked: &dyn Fn(SteamId) -> bool, cx: &App) -> Div {
-    let columns = player_columns(log.columns());
-    let title = |text: &'static str| div().id(ids::logstf_col(text)).test_support().child(text);
-    let mut table = v_flex().w_full().child(
-        h_flex()
-            .gap_1()
-            .px_1()
-            .py_1()
-            .text_color(cx.theme().muted_foreground)
-            .font_weight(FontWeight::MEDIUM)
-            .child(title("Team").w(TEAM).flex_none())
-            .child(title("Name").flex_1().min_w(NAME_MIN))
-            .child(title("Classes").w(CLASSES).flex_none())
-            .children(
-                columns
-                    .iter()
-                    .map(|(t, _)| title(t).w(NUMBER).flex_none().text_right()),
-            ),
-    );
-    let assets = &cx.global::<Services>().assets;
-    for player in log.players() {
-        let icons = player
-            .classes()
-            .iter()
-            .map(|c| class_icon(c.class(), assets.class_icon(c.class()).as_deref(), ICON));
-        table = table.child(
-            h_flex()
-                .id(ids::logstf_player_row(player.steam_id()))
-                .test_support()
-                .gap_1()
-                .px_1()
-                .py_1()
-                .border_t_1()
-                .border_color(cx.theme().border)
-                .when(is_tracked(player.steam_id()), |el| {
-                    el.bg(cx.theme().primary.opacity(0.12))
-                        .font_weight(FontWeight::SEMIBOLD)
-                })
-                .child(team_cell(player.team(), cx).w(TEAM))
-                .child(
-                    div()
-                        .id(ids::logstf_player_name(player.steam_id()))
-                        .test_support()
-                        .flex_1()
-                        .min_w(NAME_MIN)
-                        .truncate()
-                        .child(player.name().to_owned()),
-                )
-                .child(
-                    h_flex()
-                        .w(CLASSES)
-                        .flex_none()
-                        .gap_0p5()
-                        .overflow_hidden()
-                        .children(icons),
-                )
-                .children(columns.iter().map(|(_, cell)| number(cell(player)))),
-        );
-    }
-    table
-}
-
-// logs.tf's columns in its order, without the ones the log did not record.
-fn player_columns(c: &LogColumns) -> Vec<Column> {
-    let all: [(bool, Column); 14] = [
-        (true, ("K", |p| p.kills().to_string())),
-        (true, ("A", |p| p.assists().to_string())),
-        (true, ("D", |p| p.deaths().to_string())),
-        (true, ("DA", |p| p.dmg().to_string())),
-        (true, ("DA/M", |p| p.da_per_min().to_string())),
-        (true, ("KA/D", |p| one_decimal(p.kapd()))),
-        (true, ("K/D", |p| one_decimal(p.kpd()))),
-        (c.dt(), ("DT", |p| p.dt().to_string())),
-        (c.dt(), ("DT/M", |p| whole(p.dt_per_min()))),
-        (c.hp(), ("HP", |p| p.medkits().to_string())),
-        (c.bs(), ("BS", |p| p.backstabs().to_string())),
-        (c.hs(), ("HS", |p| p.headshots().to_string())),
-        (c.airshots(), ("AS", |p| p.airshots().to_string())),
-        (c.caps(), ("CAP", |p| p.caps().to_string())),
-    ];
-    all.into_iter()
-        .filter_map(|(shown, column)| shown.then_some(column))
-        .collect()
 }
 
 // One Medic's healing and uber numbers, then who they healed, most first.
