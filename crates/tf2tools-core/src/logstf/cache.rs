@@ -531,10 +531,7 @@ impl LogsCache {
                     let mut member = tx.prepare(
                         "INSERT OR IGNORE INTO logstf_player_logs (steam_id, log_id) VALUES (?1, ?2)",
                     )?;
-                    let mut needs = tx.prepare(
-                        "SELECT 1 FROM logstf_logs WHERE id = ?1 AND state = 0 AND (body IS NULL
-                             OR (fetched_at - date < ?2 AND ?3 - date >= ?2))",
-                    )?;
+                    let mut needs = tx.prepare(NEEDS_DOWNLOAD_SQL)?;
                     for log in logs {
                         upsert.execute(params![log.id, log.title, log.map, log.date])?;
                         member.execute(params![player, log.id])?;
@@ -545,6 +542,17 @@ impl LogsCache {
                 }
                 tx.commit()?;
                 Ok(wanted)
+            })
+            .map_err(db_error)
+    }
+
+    /// Whether `log_id` still needs a download by `record_list`'s rule; false once a body was
+    /// stored meanwhile or the row is gone.
+    pub(crate) fn needs_download(&self, log_id: i64, now: i64) -> Result<bool, LogsCacheError> {
+        self.db
+            .read(|conn| {
+                conn.prepare(NEEDS_DOWNLOAD_SQL)?
+                    .exists(params![log_id, PROVISIONAL_SECS, now])
             })
             .map_err(db_error)
     }
@@ -724,6 +732,11 @@ impl LogsCache {
             .map_err(db_error)
     }
 }
+
+/// Matches log ?1 while it needs a download: not gone or unreadable, and without a body or
+/// fetched while provisional (within ?2 seconds of upload) and settled by ?3.
+const NEEDS_DOWNLOAD_SQL: &str = "SELECT 1 FROM logstf_logs WHERE id = ?1 AND state = 0
+    AND (body IS NULL OR (fetched_at - date < ?2 AND ?3 - date >= ?2))";
 
 /// One row's stats: seconds, kills, deaths, assists, dmg, heal, ubers, drops.
 type ClassStats = [i64; 8];

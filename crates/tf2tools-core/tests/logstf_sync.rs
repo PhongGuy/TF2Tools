@@ -1,10 +1,16 @@
-//! A player's log list: the window, the cap, and refusing an untracked player.
+//! A player's log list: the window, every log in it, each body downloaded once, and refusing
+//! an untracked player.
 
 use tf2tools_core::{LogsCancel, LogsRange, LogsSyncError, SteamId, TrackedPlayer};
 
+use std::time::Duration;
+
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, ResponseTemplate};
+
 use crate::common;
 use crate::common::logstf::{
-    ARIE, LogsEnv, days_ago, list_body, logs_env, mount_any_log, mount_list, paths,
+    ARIE, LogsEnv, days_ago, list_body, log_body, logs_env, mount_any_log, mount_list, paths, solo,
 };
 
 fn arie() -> SteamId {
@@ -93,4 +99,40 @@ async fn an_untracked_player_is_refused_without_a_request() {
         .unwrap_err();
     assert!(matches!(err, LogsSyncError::NotTracked { .. }), "{err:?}");
     assert!(paths(&env.server).await.is_empty());
+}
+
+#[tokio::test]
+async fn a_log_fetched_while_the_sync_runs_is_not_downloaded_again() {
+    let env = tracked_env().await;
+    let list = list_body(&[(3, days_ago(1)), (2, days_ago(2)), (1, days_ago(3))]);
+    mount_list(&env.server, ARIE, list).await;
+    mount_any_log(&env.server).await;
+    // Log 3 answers slowly, so the player opens log 1 while the sync still waits on it.
+    let body = log_body(600, &[solo(231_702, ("scout", 600, 1, 1, 1, 100))]);
+    Mock::given(method("GET"))
+        .and(path("/json/3"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_string(body)
+                .set_delay(Duration::from_millis(300)),
+        )
+        .with_priority(1)
+        .mount(&env.server)
+        .await;
+    let (cancel, client) = (LogsCancel::new(), &env.client);
+    let (synced, fetched) = tokio::join!(
+        client.sync_player(arie(), LogsRange::Months3, false, &cancel, &|_| {}),
+        async {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            client.fetch_log(1).await
+        },
+    );
+    fetched.unwrap();
+    assert_eq!(synced.unwrap().downloaded(), 2, "logs 3 and 2");
+    let downloads: Vec<_> = paths(&env.server)
+        .await
+        .into_iter()
+        .filter(|p| p == "/json/1")
+        .collect();
+    assert_eq!(downloads.len(), 1, "only the fetch asked for log 1");
 }

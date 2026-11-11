@@ -303,6 +303,7 @@ impl LogsClient {
     ///
     /// `cancel` is checked before every request; a cancelled sync returns `Ok` with what it
     /// saved, leaving last_synced unstamped and nothing pruned so the next sync resumes.
+    /// A log stored meanwhile is not downloaded again.
     /// One sync runs at a time per client (clones share the lock).
     pub async fn sync_player(
         &self,
@@ -369,6 +370,11 @@ impl LogsClient {
             if cancel.is_cancelled() {
                 summary.cancelled = true;
                 return Ok(summary);
+            }
+            // A log opened during the sync may already be stored; it is never downloaded twice.
+            if !self.cache.needs_download(log_id, now)? {
+                on_progress(progress(done + 1));
+                continue;
             }
             // Gone and unreadable logs are marked and never asked again; any other failure
             // stops the sync.
