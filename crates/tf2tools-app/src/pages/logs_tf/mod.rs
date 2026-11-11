@@ -901,7 +901,8 @@ impl LogsTfPage {
         self.sync_wanted |= sync;
         self.load_generation += 1;
         let generation = self.load_generation;
-        let loading = run_blocking(cx, |s| {
+        let selected = self.selected_class;
+        let loading = run_blocking(cx, move |s| {
             let cache = s.logs.cache();
             let read = |e| OpError::core("Failed to load logs.tf players", e);
             let players = cache.players().map_err(read)?;
@@ -914,27 +915,34 @@ impl LogsTfPage {
                 )),
                 None => None,
             };
-            Ok((players, active, range, logs))
+            let weapons = match (active, selected) {
+                (Some(id), Some(class)) => {
+                    Some((class, cache.class_weapons(id, range, class).map_err(read)?))
+                }
+                _ => None,
+            };
+            Ok((players, active, range, logs, weapons))
         });
         cx.spawn(async move |page, cx| {
             let loaded = loading.await;
             let _ = page.update(cx, |page, cx| {
                 // A read that ran before a range pick was saved saw the old range; the pick's
                 // own reread follows, so this one is dropped like a superseded one.
-                let before_pick = matches!(&loaded, Ok((_, _, range, _))
+                let before_pick = matches!(&loaded, Ok((_, _, range, _, _))
                     if stale_read(page.range_writes, page.range, *range));
                 page.stale_reads += u32::from(before_pick);
                 if page.load_generation != generation || before_pick {
                     return;
                 }
                 match loaded {
-                    Ok((players, active, range, logs)) => {
+                    Ok((players, active, range, logs, weapons)) => {
                         page.players = players;
                         page.active = active;
                         page.range = range;
                         let (rows, averages) = logs.unzip();
                         let old = std::mem::replace(&mut page.rows, rows.unwrap_or_default());
                         page.averages = averages;
+                        page.carry_class(weapons);
                         page.fit_list(&old);
                         page.read_downloaded(&old, cx);
                     }
@@ -949,6 +957,31 @@ impl LogsTfPage {
                 cx.notify();
             });
         })
+    }
+
+    // Keeps the panel in step with fresh averages: it closes when the active player never
+    // played the selected class, else takes the load's weapons if they were read for the
+    // class still selected. The bump drops a click read that went out before this one.
+    fn carry_class(&mut self, weapons: Option<(TfClass, ClassWeapons)>) {
+        let Some(class) = self.selected_class else {
+            return;
+        };
+        let played = self
+            .averages
+            .as_ref()
+            .is_some_and(|a| a.iter().any(|a| a.class() == class && a.played()));
+        if !played {
+            self.selected_class = None;
+            self.weapons = None;
+            self.weapons_generation += 1;
+            return;
+        }
+        if let Some((read, weapons)) = weapons
+            && read == class
+        {
+            self.weapons = Some((read, weapons));
+            self.weapons_generation += 1;
+        }
     }
 
     // Matches the list to fresh rows that replaced `old`: added or dropped rows splice in

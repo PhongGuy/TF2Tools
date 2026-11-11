@@ -2,6 +2,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Duration;
 
 use gpui_kit::{ElementId, Entity, TestAppContext};
 use tf2tools_app::ids;
@@ -10,7 +11,9 @@ use tf2tools_app::pages::logs_tf::text::{NO_WEAPONS_TEXT, counting_text, weapons
 use tf2tools_core::{LogsRange, TfClass};
 
 use crate::support;
-use crate::support::logstf::{ARIE, SIXES, day_ago, list_body, open_page, shell, to_end};
+use crate::support::logstf::{
+    ARIE, HIGHLANDER, SIXES, day_ago, list_body, mount_list_for, open_page, shell, sid, to_end,
+};
 
 /// Serves Arie's one log, the 6v6 fixture, a day old.
 fn serve_sixes(server: &support::StoreServer) {
@@ -198,6 +201,150 @@ fn a_weapon_read_for_a_class_no_longer_picked_is_dropped(cx: &mut TestAppContext
     assert!(
         !seen.borrow().contains(&Some(TfClass::Scout)),
         "Scout's read landed: {:?}",
+        seen.borrow()
+    );
+}
+
+const CABO: u64 = 187_445_387;
+
+fn shown_logs(cx: &mut TestAppContext, page: &Entity<LogsTfPage>, class: TfClass) -> Option<u32> {
+    cx.update(|cx| {
+        let p = page.read(cx);
+        p.class_weapons()
+            .filter(|(c, _)| *c == class)
+            .map(|(_, w)| w.logs())
+    })
+}
+
+#[gpui_kit::test]
+fn the_panel_follows_a_range_pick(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Log 2 is the same 6v6 log 200 days back: outside 3 months, inside a year.
+    server.mount_bytes(
+        "/api/v1/log",
+        list_body(&[(3, day_ago(1)), (2, day_ago(200))]),
+    );
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    server.mount_bytes("/json/2", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    wait_for(cx, &page, TfClass::Scout);
+    assert_eq!(
+        title(cx, &s).as_deref(),
+        Some("Scout weapons · 3 months · 1 log")
+    );
+
+    support::click_id(cx, s.win, ids::logstf_range_stop(LogsRange::Year1));
+    support::wait_real(cx, "a year of weapons", |cx| {
+        let quiet = cx.update(|cx| !page.read(cx).is_syncing(cx));
+        quiet && shown_logs(cx, &page, TfClass::Scout) == Some(2)
+    });
+    assert_eq!(
+        title(cx, &s).as_deref(),
+        Some("Scout weapons · 1 year · 2 logs")
+    );
+    assert_eq!(
+        row(cx, &s, TfClass::Scout, "scattergun").as_deref(),
+        Some("scattergun 14 (100%) 6668 (95%) 56%")
+    );
+}
+
+#[gpui_kit::test]
+fn the_panel_follows_the_chip_and_closes_for_a_player_without_the_class(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    mount_list_for(&server, ARIE, &[(3, day_ago(1))], Duration::ZERO);
+    mount_list_for(&server, CABO, &[(2, day_ago(1))], Duration::ZERO);
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
+    // Cabo is added last, so his chip is active and synced first; then Arie's.
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie"), (CABO, "cabo")]);
+    let page = open_page(cx, &s);
+    let switch = |cx: &mut TestAppContext, account: u64| {
+        support::click_id(cx, s.win, ids::logstf_chip(sid(account)));
+        support::wait_real(cx, "the switch", |cx| {
+            cx.update(|cx| {
+                let p = page.read(cx);
+                p.active() == Some(sid(account)) && !p.is_syncing(cx)
+            })
+        });
+    };
+    switch(cx, ARIE);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    wait_for(cx, &page, TfClass::Scout);
+
+    switch(cx, CABO);
+    support::wait_real(cx, "cabo's scout weapons", |cx| {
+        let first = cx.update(|cx| {
+            page.read(cx)
+                .class_weapons()
+                .and_then(|(_, w)| w.weapons().first().map(|x| x.kills()))
+        });
+        first == Some(17)
+    });
+    assert_eq!(
+        row(cx, &s, TfClass::Scout, "scattergun").as_deref(),
+        Some("scattergun 17 (85%) 10006 (87%) 63%")
+    );
+
+    // Arie played Pyro; Cabo never did, so his chip closes the panel.
+    switch(cx, ARIE);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Pyro));
+    wait_for(cx, &page, TfClass::Pyro);
+    switch(cx, CABO);
+    support::wait_real(cx, "the panel to close", |cx| picked(cx, &page).is_none());
+    assert!(!support::present(cx, s.win, ids::LOGSTF_CLASS_WEAPONS));
+}
+
+#[gpui_kit::test]
+fn removing_the_last_player_closes_the_panel(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    wait_for(cx, &page, TfClass::Scout);
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::wait_real(cx, "the removal", |cx| {
+        cx.update(|cx| page.read(cx).players().is_empty())
+    });
+    assert_eq!((picked(cx, &page), shown(cx, &page)), (None, None));
+    assert!(!support::present(cx, s.win, ids::LOGSTF_CLASS_WEAPONS));
+}
+
+#[gpui_kit::test]
+fn a_reread_that_saw_the_old_class_does_not_bring_it_back(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    // A pick and a reread both read Scout off the UI thread and wait to land; then Pyro is picked.
+    cx.update(|cx| {
+        page.update(cx, |p, cx| {
+            p.pick_class(TfClass::Scout, cx);
+            p.set_hidden(false, cx);
+        })
+    });
+    while cx.dispatcher.scheduler().tick_background_only() {}
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let _watch = cx.update(|cx| {
+        let seen = Rc::clone(&seen);
+        cx.observe(&page, move |page, cx| {
+            seen.borrow_mut()
+                .push(page.read(cx).class_weapons().map(|(c, _)| c))
+        })
+    });
+    cx.update(|cx| page.update(cx, |p, cx| p.pick_class(TfClass::Pyro, cx)));
+    wait_for(cx, &page, TfClass::Pyro);
+    support::settle(cx, s.win);
+    assert!(
+        !seen.borrow().contains(&Some(TfClass::Scout)),
+        "a Scout read landed: {:?}",
         seen.borrow()
     );
 }
