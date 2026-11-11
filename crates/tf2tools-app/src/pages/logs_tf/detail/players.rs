@@ -13,6 +13,7 @@ use tf2tools_core::{LogColumns, LogDetail, PlayerLine, SteamId};
 use super::popover::class_hover;
 use super::{NUMBER, team_cell};
 use crate::ids;
+use crate::pages::hud_maker::tip::tip;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players};
 use crate::pages::logs_tf::text::{one_decimal, reads_zero, whole};
@@ -118,6 +119,7 @@ pub(super) fn players_table(
                 div()
                     .id(ids::logstf_player_name(player.steam_id()))
                     .test_support()
+                    .tooltip(tip(ids::LOGSTF_NAME_TIP, player.name().to_owned()))
                     .w(NAME_MIN)
                     .flex_grow(1.)
                     .truncate()

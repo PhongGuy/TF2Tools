@@ -26,7 +26,7 @@ mod start_card;
 mod step_name;
 pub mod timeline;
 mod tint;
-mod tip;
+pub(crate) mod tip;
 pub mod view;
 mod zoom;
 

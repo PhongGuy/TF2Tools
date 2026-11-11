@@ -2600,6 +2600,9 @@ pub const LOGSTF_TEAMS_SCROLL: &str = "logstf-teams-scroll";
 /// The open log's players table, which scrolls sideways in a narrow window.
 pub const LOGSTF_PLAYERS_SCROLL: &str = "logstf-players-scroll";
 
+/// The tooltip that shows a player's whole name over a players table or kill matrix name.
+pub const LOGSTF_NAME_TIP: &str = "logstf-name-tip";
+
 /// One player's name cell in the open log's players table: "logstf-player-name:<id64>".
 pub fn logstf_player_name(id: SteamId) -> ElementId {
     keyed("logstf-player-name", &id.id64().to_string())

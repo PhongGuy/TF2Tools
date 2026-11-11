@@ -12,6 +12,7 @@ use tf2tools_core::{LogDetail, MatrixKind, SteamId, TfClass};
 
 use super::{ICON, class_cell, team_cell};
 use crate::ids;
+use crate::pages::hud_maker::tip::tip;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::tables::matrix_rows;
 use crate::services::Services;
@@ -127,6 +128,7 @@ fn table(log: &LogDetail, kind: MatrixKind, is_tracked: &dyn Fn(SteamId) -> bool
                     div()
                         .id(ids::logstf_matrix_name(id))
                         .test_support()
+                        .tooltip(tip(ids::LOGSTF_NAME_TIP, player.name().to_owned()))
                         .w(NAME_MIN)
                         .flex_grow(1.)
                         .truncate()

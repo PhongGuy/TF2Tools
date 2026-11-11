@@ -1,6 +1,6 @@
-//! Tooltips for the HUD Maker's panels on GPUI's own tooltip, not the kit's window-wide one:
-//! it drops on any press or scroll and whenever its control leaves the pointer, so it never
-//! stays behind when a panel scrolls or redraws under a still pointer.
+//! Tooltips for the HUD Maker's panels and the logs.tf tables' names, on GPUI's own tooltip,
+//! not the kit's window-wide one: it drops on any press or scroll and whenever its control
+//! leaves the pointer, so it never stays behind when a panel scrolls or redraws under it.
 
 use std::cell::Cell;
 use std::rc::Rc;
@@ -42,7 +42,7 @@ impl Render for Tip {
 }
 
 /// A builder for `.tooltip(...)` showing `text`, its content readable under `id`.
-pub(super) fn tip(
+pub(crate) fn tip(
     id: &'static str,
     text: impl Into<SharedString>,
 ) -> impl Fn(&mut Window, &mut App) -> AnyView + 'static {

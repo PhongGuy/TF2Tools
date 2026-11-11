@@ -774,6 +774,36 @@ fn a_long_name_gives_way_to_the_kill_counts_at_800(cx: &mut TestAppContext) {
     assert!(name.size.width <= gpui_kit::px(100.), "{name:?}");
 }
 
+/// Hovers `name` until its tooltip would show, and returns the tooltip's text.
+fn name_tip(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    name: gpui_kit::ElementId,
+) -> Option<String> {
+    cx.update_window(s.win, |_, w, cx| w.hover(name, cx))
+        .unwrap();
+    support::settle(cx, s.win);
+    cx.executor().advance_clock(Duration::from_millis(800));
+    support::settle(cx, s.win);
+    support::label_of(cx, s.win, ids::LOGSTF_NAME_TIP)
+}
+
+#[gpui_kit::test]
+fn a_cut_players_table_name_shows_whole_in_its_tooltip(cx: &mut TestAppContext) {
+    let (_env, _server, s, id, _) = opened_long_name(cx, 800., 600.);
+    let tip = name_tip(cx, &s, ids::logstf_player_name(id));
+    assert_eq!(tip.as_deref(), Some(LONG_NAME));
+}
+
+#[gpui_kit::test]
+fn a_cut_kill_matrix_name_shows_whole_in_its_tooltip(cx: &mut TestAppContext) {
+    let (_env, _server, s, id, _) = opened_long_name(cx, 800., 600.);
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    scroll_to_in_log(cx, &s, &page, 2, ids::LOGSTF_MATRIX_SCROLL);
+    let tip = name_tip(cx, &s, ids::logstf_matrix_name(id));
+    assert_eq!(tip.as_deref(), Some(LONG_NAME));
+}
+
 #[gpui_kit::test]
 fn class_icons_in_the_players_table_read_like_logs_tf(cx: &mut TestAppContext) {
     let (_env, _server, s, page) = opened(cx, 3);
