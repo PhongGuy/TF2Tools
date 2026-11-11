@@ -148,21 +148,3 @@ fn moving_tf2_mid_load_shows_only_the_new_folders_icons(cx: &mut TestAppContext)
     );
     assert_eq!(cx.update(|cx| icons.read(cx).loads()), 2);
 }
-
-// The landing guard on its own: a result for a folder no longer shown is dropped even if
-// its task was not.
-#[gpui_kit::test]
-fn a_late_result_for_an_old_folder_is_dropped(cx: &mut TestAppContext) {
-    let env = support::env();
-    let (_tf2, icons, _) = setup(cx, &env, Tf2State::Detecting, &[]);
-    let old = env.game.join("tf");
-    let late = HashMap::from([("tf_weapon_scattergun", env.tmp.path().join("old.png"))]);
-    let shown = cx.update(|cx| {
-        icons.update(cx, |icons, cx| {
-            icons.show_game(Some(env.tmp.path().join("Other TF2/tf")), cx);
-            icons.land(&old, late, cx);
-            icons.icon("tf_weapon_scattergun").map(Path::to_path_buf)
-        })
-    });
-    assert_eq!(shown, None);
-}

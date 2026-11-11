@@ -103,23 +103,14 @@ impl WeaponIcons {
         self.task = Some(cx.spawn(async move |this, cx| {
             // A panicking loader leaves slot squares, like a failed build.
             let icons = loading.await.unwrap_or_default();
-            let _ = this.update(cx, |this, cx| this.land(&dir, icons, cx));
+            let _ = this.update(cx, |this, cx| {
+                // Backstop: a newer show_game drops this task, but never apply another folder's icons.
+                if this.shown_for.as_deref() == Some(dir.as_path()) {
+                    this.icons = icons;
+                    cx.notify();
+                }
+            });
         }));
-    }
-
-    /// Applies a finished load for `tf_dir`; ignored unless `tf_dir` is still the folder shown,
-    /// so a load for a folder TF2 has since left never overwrites the newer one.
-    pub fn land(
-        &mut self,
-        tf_dir: &Path,
-        icons: HashMap<&'static str, PathBuf>,
-        cx: &mut Context<Self>,
-    ) {
-        if self.shown_for.as_deref() != Some(tf_dir) {
-            return;
-        }
-        self.icons = icons;
-        cx.notify();
     }
 }
 
