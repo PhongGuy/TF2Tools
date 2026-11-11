@@ -225,6 +225,29 @@ fn assert_first_pixel_near(path: &std::path::Path, want: [u8; 4]) {
     }
 }
 
+/// Dates `path` `secs` seconds from now (negative is the past).
+fn touch(path: &std::path::Path, secs: i64) {
+    let now = std::time::SystemTime::now();
+    let delta = std::time::Duration::from_secs(secs.unsigned_abs());
+    let when = if secs < 0 { now - delta } else { now + delta };
+    std::fs::File::options()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(when)
+        .unwrap();
+}
+
+/// Ages every file in `cache` by an hour, so pruning sees it as left from an earlier build.
+fn age(cache: &std::path::Path) {
+    for entry in std::fs::read_dir(cache).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_file() {
+            touch(&path, -3600);
+        }
+    }
+}
+
 #[test]
 fn each_pictured_weapon_gets_a_png_no_larger_than_128() {
     let entries = standard_entries();
@@ -280,6 +303,7 @@ fn a_changed_texture_is_rebuilt_and_stale_pngs_are_removed() {
         &tf.join("tf2_textures_dir.vpk"),
         &common::vpk_bytes(&borrowed(&updated)),
     );
+    age(&cache);
     let second = GameWeaponIcons::build(&tf, &cache).unwrap();
 
     let new = second.get("tf_weapon_scattergun").unwrap();
@@ -357,6 +381,7 @@ fn pruning_removes_another_processes_leftover_tmp_files() {
     ));
     common::write_file(&theirs, b"half a png");
     common::write_file(&ours, b"being written");
+    age(&cache);
     GameWeaponIcons::build(&tf, &cache).unwrap();
     assert!(!theirs.exists());
     assert!(ours.exists());
@@ -370,6 +395,20 @@ fn a_stale_png_that_cannot_be_removed_does_not_fail_the_build() {
     common::write_file(&cache.join("stuck.png/inside"), b"x");
     let icons = GameWeaponIcons::build(&tf, &cache).unwrap();
     assert_eq!(icons.len(), 3);
+}
+
+#[test]
+fn pruning_spares_files_written_while_the_build_ran() {
+    let entries = standard_entries();
+    let (_tmp, tf, cache) = game(&borrowed(&entries));
+    // Another build (TF2 moved, or a second app) writes these while this one runs.
+    let png = common::write_file(&cache.join("tf_weapon_bat-v1-1-2.png"), b"theirs");
+    let tmp = common::write_file(&cache.join("tf_weapon_bat-v1-1-2.png.1.tmp"), b"theirs");
+    touch(&png, 60);
+    touch(&tmp, 60);
+    GameWeaponIcons::build(&tf, &cache).unwrap();
+    assert!(png.exists());
+    assert!(tmp.exists());
 }
 
 #[test]

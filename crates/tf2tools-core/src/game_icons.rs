@@ -4,6 +4,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 
 use crate::error::WeaponIconsError;
 use crate::pak::{open_vpk, read_entry};
@@ -14,6 +15,9 @@ const ITEMS_GAME_MAX_BYTES: u64 = 64 * 1024 * 1024;
 const ICON_MAX_SIDE: u32 = 128;
 /// Part of every cache name; bump it when the size or filter changes so old icons are redrawn.
 const FORMAT: &str = "v1";
+/// Files this close to the build's start may come from another build running now; the slack
+/// covers file systems whose timestamps lag the clock.
+const FRESH_SLACK: Duration = Duration::from_secs(2);
 
 /// The game's backpack icons for the crosshair weapons, as PNGs in a cache folder.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,12 +31,16 @@ impl GameWeaponIcons {
     /// Reads `<tf_dir>/scripts/items/items_game.txt` and `<tf_dir>/tf2_textures_dir.vpk` and
     /// makes sure `cache_dir` holds a PNG, at most 128 px a side, for every weapon the game
     /// pictures; a PNG already there for the same texture is reused. Removes every other
-    /// `.png` in `cache_dir`, and `.tmp` files another process left. Blocking.
+    /// `.png` in `cache_dir`, and `.tmp` files another process left, unless written since the
+    /// build started. Blocking.
     ///
     /// Fails with `ItemsGame` or `Textures` when either game file cannot be read, and with
     /// `Cache` when the folder or a PNG cannot be written. A weapon whose item or texture is
     /// missing or undecodable is left out instead.
     pub fn build(tf_dir: &Path, cache_dir: &Path) -> Result<GameWeaponIcons, WeaponIconsError> {
+        let started = SystemTime::now()
+            .checked_sub(FRESH_SLACK)
+            .unwrap_or(SystemTime::UNIX_EPOCH);
         let images = weapon_inventory_images(&read_items_game(
             &tf_dir.join("scripts/items/items_game.txt"),
         )?);
@@ -66,7 +74,7 @@ impl GameWeaponIcons {
             }
             icons.insert(script, png);
         }
-        prune(cache_dir, &icons)?;
+        prune(cache_dir, &icons, started)?;
         Ok(GameWeaponIcons { icons, decoded })
     }
 
@@ -167,10 +175,12 @@ fn write_atomically_with(
 }
 
 /// Removes every `.png` in `cache_dir` that this build did not keep, and every `.tmp` not
-/// written by this process. A file that will not go is logged and left.
+/// written by this process, if last modified before `started`; newer files may belong to
+/// another build running now. A file that will not go is logged and left.
 fn prune(
     cache_dir: &Path,
     icons: &BTreeMap<&'static str, PathBuf>,
+    started: SystemTime,
 ) -> Result<(), WeaponIconsError> {
     let keep: HashSet<&Path> = icons.values().map(PathBuf::as_path).collect();
     let own_tmp = format!(".{}.tmp", std::process::id());
@@ -183,7 +193,12 @@ fn prune(
         };
         let stale_png = has_ext("png") && !keep.contains(path.as_path());
         let stale_tmp = has_ext("tmp") && !path.to_string_lossy().ends_with(own_tmp.as_str());
-        if !stale_png && !stale_tmp {
+        let fresh = || {
+            std::fs::metadata(&path)
+                .and_then(|m| m.modified())
+                .is_ok_and(|modified| modified >= started)
+        };
+        if (!stale_png && !stale_tmp) || fresh() {
             continue;
         }
         // Another app pruning the same folder may have removed it first.
