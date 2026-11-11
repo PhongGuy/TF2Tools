@@ -79,3 +79,18 @@ pub(crate) fn logstf_class_name(class: TfClass) -> &'static str {
         TfClass::Spy => "spy",
     }
 }
+
+/// The stem of the class's HUD leaderboard icon, `materials/hud/leaderboard_class_<stem>.vtf`.
+pub fn leaderboard_icon_stem(class: TfClass) -> &'static str {
+    match class {
+        TfClass::Scout => "scout",
+        TfClass::Soldier => "soldier",
+        TfClass::Pyro => "pyro",
+        TfClass::Demoman => "demo",
+        TfClass::Heavy => "heavy",
+        TfClass::Engineer => "engineer",
+        TfClass::Medic => "medic",
+        TfClass::Sniper => "sniper",
+        TfClass::Spy => "spy",
+    }
+}

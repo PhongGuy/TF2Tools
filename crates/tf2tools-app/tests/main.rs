@@ -25,6 +25,7 @@ mod button_names;
 mod button_state;
 mod card_grid;
 mod carousel;
+mod class_icons;
 mod confirm;
 mod counts;
 mod crash;

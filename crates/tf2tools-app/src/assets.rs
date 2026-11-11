@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use gpui_kit::assets::Assets;
 use gpui_kit::{AssetSource, SharedString};
-use tf2tools_core::WeaponSlot;
+use tf2tools_core::{TfClass, WeaponSlot, leaderboard_icon_stem};
 
 /// The composite preview's backgrounds, v5's order; files are `<root>/backgrounds/<name>.png`.
 pub const BACKGROUNDS: [&str; 3] = ["2fort", "badlands", "process"];
@@ -93,6 +93,15 @@ impl AssetRoot {
             _ => "default.png",
         };
         self.0.join("weapon-icons").join(file)
+    }
+
+    /// `<root>/classes/<stem>.png` when that file exists.
+    pub fn class_icon(&self, class: TfClass) -> Option<PathBuf> {
+        let path = self
+            .0
+            .join("classes")
+            .join(format!("{}.png", leaderboard_icon_stem(class)));
+        path.is_file().then_some(path)
     }
 }
 
