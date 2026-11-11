@@ -226,8 +226,8 @@ fn log_item(
                 .as_ref()
                 .filter(|open| open.id == id)
                 .map(|open| {
-                    let sort = state.player_sort;
-                    detail::panel(row, open, &state.players, sort, page, cx)
+                    let (sort, matrix) = (state.player_sort, state.matrix);
+                    detail::panel(row, open, &state.players, sort, matrix, page, cx)
                 }),
         )
         .into_any_element()

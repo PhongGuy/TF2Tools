@@ -431,3 +431,39 @@ fn heal_targets_run_high_to_low_with_class_and_share() {
         "Heals high to low"
     );
 }
+
+#[test]
+fn matrix_rows_run_k_high_to_low_and_count_every_player() {
+    use tf2tools_app::pages::logs_tf::tables::matrix_rows;
+    use tf2tools_core::MatrixKind;
+    let log = tf2tools_core::parse_log(crate::support::logstf::SIXES).unwrap();
+    let sid = crate::support::logstf::sid;
+    for kind in [
+        MatrixKind::Kills,
+        MatrixKind::KillsAssists,
+        MatrixKind::Deaths,
+    ] {
+        let rows = matrix_rows(&log, kind);
+        assert_eq!(rows.len(), 12, "{kind:?} has every player");
+        let totals: Vec<u32> = rows.iter().map(|r| r.total()).collect();
+        assert!(
+            totals.windows(2).all(|w| w[0] >= w[1]),
+            "{kind:?} {totals:?}"
+        );
+    }
+    let kills = matrix_rows(&log, MatrixKind::Kills);
+    assert_eq!(
+        kills[0].steam_id(),
+        sid(285_837_700),
+        "39 kills tops the table"
+    );
+    let meta = kills
+        .iter()
+        .find(|r| r.steam_id() == sid(98_265_577))
+        .unwrap();
+    assert_eq!(
+        (meta.counts(), meta.total()),
+        ([0; 9], 0),
+        "a medic with no kills reads as zeros"
+    );
+}

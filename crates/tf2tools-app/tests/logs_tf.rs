@@ -842,15 +842,6 @@ fn an_open_6v6_log_hides_columns_logs_tf_hides(cx: &mut TestAppContext) {
         s.win,
         ids::logstf_medic(sid(98_265_577))
     ));
-    assert!(support::present(
-        cx,
-        s.win,
-        ids::logstf_class_kills(sid(ARIE))
-    ));
-    assert!(
-        !support::present(cx, s.win, ids::logstf_class_kills(sid(103_548_491))),
-        "class kills only for tracked players"
-    );
     assert!(support::present(cx, s.win, ids::logstf_log_open(3)));
 }
 

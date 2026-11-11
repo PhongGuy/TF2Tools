@@ -1,7 +1,9 @@
 //! The open log's table rows shaped from core's lines, free of UI so tests read them without a
 //! window.
 
-use tf2tools_core::{ClassLine, MedicLine, PlayerLine, SteamId, TfClass};
+use tf2tools_core::{
+    ClassLine, LogDetail, MatrixKind, MatrixRow, MedicLine, PlayerLine, SteamId, TfClass,
+};
 
 use super::text::{accuracy_text, share_text};
 
@@ -58,4 +60,12 @@ pub fn heal_rows(medic: &MedicLine) -> Vec<HealRow> {
             share: share_text(t.healing(), medic.heal()),
         })
         .collect()
+}
+
+/// Every player's row of `kind`, K high to low, ties in the players' order.
+pub fn matrix_rows(log: &LogDetail, kind: MatrixKind) -> Vec<MatrixRow> {
+    // Core lists every player in the players' order, so a stable sort keeps that under ties.
+    let mut rows = log.class_matrix(kind);
+    rows.sort_by_key(|r| std::cmp::Reverse(r.total()));
+    rows
 }

@@ -24,8 +24,8 @@ use gpui_kit::{
     div, px,
 };
 use tf2tools_core::{
-    ClassAverage, LogDetail, LogRow, LogState, LogsRange, SteamId, TrackedPlayer, parse_log,
-    parse_player_input,
+    ClassAverage, LogDetail, LogRow, LogState, LogsRange, MatrixKind, SteamId, TrackedPlayer,
+    parse_log, parse_player_input,
 };
 
 use crate::ids;
@@ -79,6 +79,8 @@ pub struct LogsTfPage {
     open: Option<OpenLog>,
     // The players table's order, kept across logs while the page lives.
     player_sort: PlayerSort,
+    // The kill matrix tab, kept the same way.
+    matrix: MatrixKind,
     list: ListState,
     // Which optional row columns fit, from the list's width at the last frame; the list's
     // state cannot be asked while it lays its own items out.
@@ -154,6 +156,7 @@ impl LogsTfPage {
             slider_range: LogsRange::default(),
             open: None,
             player_sort: PlayerSort::default(),
+            matrix: MatrixKind::Kills,
             list: ListState::new(1, ListAlignment::Top, px(200.)),
             fit: list::Fit::ALL,
             sync,
@@ -270,6 +273,17 @@ impl LogsTfPage {
     /// A click on the players table's `column` header: sorts by it, or flips it if it leads.
     pub fn sort_players_by(&mut self, column: PlayerColumn, cx: &mut Context<Self>) {
         self.player_sort = self.player_sort.clicked(column);
+        cx.notify();
+    }
+
+    /// The open log's kill matrix tab.
+    pub fn matrix_kind(&self) -> MatrixKind {
+        self.matrix
+    }
+
+    /// A click on the kill matrix's `kind` tab.
+    pub fn show_matrix(&mut self, kind: MatrixKind, cx: &mut Context<Self>) {
+        self.matrix = kind;
         cx.notify();
     }
 

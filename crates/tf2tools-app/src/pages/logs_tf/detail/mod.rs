@@ -1,16 +1,14 @@
 //! An open log's panel, laid out like its page on logs.tf: the score banner, the title, the
-//! team table, the players table, the rounds, one block per Medic and the tracked players'
-//! kills by class.
+//! team table, the players table, the rounds, one block per Medic and the kill matrix.
 
 mod banner;
+mod matrix;
 mod medics;
 mod players;
 mod popover;
 mod rounds;
 
-use std::collections::BTreeSet;
-
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Div, FontWeight, Hsla, InteractiveElement as _, IntoElement,
@@ -43,6 +41,7 @@ pub(super) fn panel(
     open: &OpenLog,
     tracked: &[TrackedPlayer],
     sort: PlayerSort,
+    matrix: MatrixKind,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> AnyElement {
@@ -58,7 +57,7 @@ pub(super) fn panel(
     };
     let body = match opened {
         OpenState::Ready(log) => {
-            log_body(id, log, &open.rounds, tracked, sort, page, cx).into_any_element()
+            log_body(open, log, tracked, sort, matrix, page, cx).into_any_element()
         }
         OpenState::Loading => status(LOG_LOADING),
         OpenState::Failed(why) if row.state() == LogState::Pending => {
@@ -86,20 +85,15 @@ pub(super) fn panel(
 
 // Everything the parsed body adds, in logs.tf's order.
 fn log_body(
-    id: u64,
+    open: &OpenLog,
     log: &LogDetail,
-    open_rounds: &BTreeSet<usize>,
     tracked: &[TrackedPlayer],
     sort: PlayerSort,
+    matrix: MatrixKind,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> impl IntoElement {
     let is_tracked = |id: SteamId| tracked.iter().any(|p| p.steam_id() == id);
-    let kills: Vec<_> = log
-        .class_matrix(MatrixKind::Kills)
-        .into_iter()
-        .filter(|k| is_tracked(k.steam_id()) && k.total() > 0)
-        .collect();
     let name_of = |id: SteamId| {
         log.players()
             .iter()
@@ -119,7 +113,8 @@ fn log_body(
             players::players_table(log, sort, &is_tracked, page.clone(), cx),
         ))
         .when(!log.rounds().is_empty(), |el| {
-            let table = rounds::rounds_table(id, log, open_rounds, &name_of, page, cx);
+            let table =
+                rounds::rounds_table(open.id, log, &open.rounds, &name_of, page.clone(), cx);
             el.child(
                 section("Rounds", sideways(ids::LOGSTF_ROUNDS_SCROLL, table), cx)
                     .id(ids::LOGSTF_ROUNDS)
@@ -129,34 +124,15 @@ fn log_body(
         .when(!log.medics().is_empty(), |el| {
             el.child(section("Medics", medics::medics(log, cx), cx))
         })
-        .when(!kills.is_empty(), |el| {
-            let mut table = v_flex().child(
-                h_flex()
-                    .gap_1()
-                    .py_1()
-                    .child(div().flex_1().min_w_0())
-                    .children(TfClass::ALL.map(|class| class_cell(class, cx))),
-            );
-            for line in kills {
-                let id = line.steam_id();
-                let counts = line.counts();
-                table =
-                    table.child(
-                        h_flex()
-                            .id(ids::logstf_class_kills(id))
-                            .test_support()
-                            .gap_1()
-                            .py_1()
-                            .border_t_1()
-                            .border_color(cx.theme().border)
-                            .child(div().flex_1().min_w_0().truncate().child(name_of(id)))
-                            .children(counts.map(|n| {
-                                number(if n == 0 { String::new() } else { n.to_string() })
-                            })),
-                    );
-            }
-            el.child(section("Class kills", table.max_w(px(560.)), cx))
-        })
+        .child(
+            section(
+                "Kill matrix",
+                matrix::matrix(log, matrix, &is_tracked, page, cx),
+                cx,
+            )
+            .id(ids::LOGSTF_MATRIX)
+            .test_support(),
+        )
 }
 
 // A titled part of the body.

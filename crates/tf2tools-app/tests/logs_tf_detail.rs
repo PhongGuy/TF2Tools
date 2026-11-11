@@ -220,3 +220,37 @@ fn a_medic_block_reads_like_logs_tf(cx: &mut TestAppContext) {
         "both medics"
     );
 }
+
+#[gpui_kit::test]
+fn the_matrix_tabs_switch_and_list_every_player(cx: &mut TestAppContext) {
+    use tf2tools_core::MatrixKind;
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_MATRIX);
+    assert_eq!(
+        cx.update(|cx| page.read(cx).matrix_kind()),
+        MatrixKind::Kills
+    );
+    assert_eq!(
+        support::selected_of(cx, s.win, ids::logstf_matrix_tab(MatrixKind::Kills)),
+        Some(true)
+    );
+    for account in [ARIE, 98_265_577, 285_837_700] {
+        assert!(
+            support::present(cx, s.win, ids::logstf_matrix_row(sid(account))),
+            "{account}"
+        );
+    }
+    support::click_id(cx, s.win, ids::logstf_matrix_tab(MatrixKind::Deaths));
+    assert_eq!(
+        cx.update(|cx| page.read(cx).matrix_kind()),
+        MatrixKind::Deaths
+    );
+    assert_eq!(
+        support::selected_of(cx, s.win, ids::logstf_matrix_tab(MatrixKind::Deaths)),
+        Some(true)
+    );
+    assert_eq!(
+        support::selected_of(cx, s.win, ids::logstf_matrix_tab(MatrixKind::Kills)),
+        Some(false)
+    );
+}

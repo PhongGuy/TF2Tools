@@ -3,9 +3,9 @@
 
 use gpui_kit::ElementId;
 use tf2tools_core::{
-    AddonName, BoardMode, GbId, HudId, LogsRange, MeterKind, ModuleChoice, NewPart, PartKey,
-    PinCorner, Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, SteamId,
-    StoreItemId, StoreKind, Team, TfClass, WeaponKind, WeaponSlot,
+    AddonName, BoardMode, GbId, HudId, LogsRange, MatrixKind, MeterKind, ModuleChoice, NewPart,
+    PartKey, PinCorner, Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind,
+    SteamId, StoreItemId, StoreKind, Team, TfClass, WeaponKind, WeaponSlot,
 };
 
 use crate::shell::route::Page;
@@ -2696,9 +2696,44 @@ pub fn logstf_heal_target(medic: SteamId, target: SteamId) -> ElementId {
     )
 }
 
-/// A tracked player's kills by victim class in the open log: "logstf-class-kills:<id64>".
-pub fn logstf_class_kills(id: SteamId) -> ElementId {
-    keyed("logstf-class-kills", &id.id64().to_string())
+/// The open log's kill matrix section: "logstf-matrix".
+pub const LOGSTF_MATRIX: &str = "logstf-matrix";
+/// The kill matrix's tab group: "logstf-matrix-tabs".
+pub const LOGSTF_MATRIX_TABS: &str = "logstf-matrix-tabs";
+/// The kill matrix's sideways scroll: "logstf-matrix-scroll".
+pub const LOGSTF_MATRIX_SCROLL: &str = "logstf-matrix-scroll";
+
+/// One kill matrix tab, selected while shown: "logstf-matrix-tab:kills" | "kills-assists" |
+/// "deaths".
+pub fn logstf_matrix_tab(kind: MatrixKind) -> ElementId {
+    keyed("logstf-matrix-tab", matrix_key(kind))
+}
+
+fn matrix_key(kind: MatrixKind) -> &'static str {
+    match kind {
+        MatrixKind::KillsAssists => "kills-assists",
+        MatrixKind::Deaths => "deaths",
+        MatrixKind::Kills | _ => "kills",
+    }
+}
+
+/// The button inside a kill matrix tab: "logstf-matrix-tab-button:<kind>", keyed as the tab.
+pub fn logstf_matrix_tab_button(kind: MatrixKind) -> ElementId {
+    keyed("logstf-matrix-tab-button", matrix_key(kind))
+}
+
+/// One player's row of the kill matrix: "logstf-matrix-row:<id64>".
+pub fn logstf_matrix_row(id: SteamId) -> ElementId {
+    keyed("logstf-matrix-row", &id.id64().to_string())
+}
+
+/// One count in a player's kill matrix row: "logstf-matrix-cell:<id64>:<class>", or
+/// "logstf-matrix-cell:<id64>:k" for the total.
+pub fn logstf_matrix_cell(id: SteamId, class: Option<TfClass>) -> ElementId {
+    match class {
+        Some(class) => keyed("logstf-matrix-cell", &player_class(id, class)),
+        None => keyed("logstf-matrix-cell", &format!("{}:k", id.id64())),
+    }
 }
 
 /// One tracked player's chip, selected while active: "logstf-chip:<id64>".
