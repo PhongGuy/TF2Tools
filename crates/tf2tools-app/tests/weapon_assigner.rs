@@ -406,8 +406,9 @@ fn compact_rows_show_neither_icon(cx: &mut TestAppContext) {
     assert!(!support::present(cx, win, ids::weapon_icon(script)));
 }
 
-// A compact list over a found TF2 starts no icon load. TF2 goes missing before the session's
-// icons are fetched, so only an entity the compact list made would already count a load.
+// A compact list over a found TF2 starts no icon load. Had the compact list made the icons
+// entity while TF2 was found, the entity's first look at TF2 would have started a load, so
+// `loads` would be 1; made here after TF2 goes missing, it starts none.
 #[gpui_kit::test]
 fn a_compact_list_never_loads_icons(cx: &mut TestAppContext) {
     let env = support::env();

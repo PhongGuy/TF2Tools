@@ -319,6 +319,30 @@ pub(crate) fn write_pairs(pairs: &[KvPair]) -> String {
     out
 }
 
+/// The children of a block value.
+pub(crate) fn block(pair: &KvPair) -> Option<&[KvPair]> {
+    match &pair.value {
+        KvValue::Block(children) => Some(children),
+        KvValue::Text(_) => None,
+    }
+}
+
+/// The first block named `name`, ignoring case.
+pub(crate) fn block_named<'a>(pairs: &'a [KvPair], name: &str) -> Option<&'a [KvPair]> {
+    pairs
+        .iter()
+        .find(|pair| pair.key.eq_ignore_ascii_case(name))
+        .and_then(block)
+}
+
+/// The first text value named `name`, ignoring case.
+pub(crate) fn text<'a>(pairs: &'a [KvPair], name: &str) -> Option<&'a str> {
+    pairs.iter().find_map(|pair| match &pair.value {
+        KvValue::Text(t) if pair.key.eq_ignore_ascii_case(name) => Some(t.as_str()),
+        KvValue::Text(_) | KvValue::Block(_) => None,
+    })
+}
+
 /// `start` combined with its `#base`/`#include` files, at most 16 levels below `start`: each
 /// `#base` file's first block merges into the file's first block (own keys win, earlier bases
 /// beat later ones), and each `#include` file's pairs follow the file's own. A `start` that is
