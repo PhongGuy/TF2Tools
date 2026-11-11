@@ -3,40 +3,20 @@
 use std::time::Duration;
 
 use crate::support;
+use crate::support::logstf::{
+    ARIE, HIGHLANDER, SIXES, day_ago, expanded, list_body, open_log, open_page, players_of,
+    row_ids, serve_two_logs, shell, sid, to_end, unix_now,
+};
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
-use serde_json::json;
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
 use tf2tools_app::pages::logs_tf::text::{
     LOOKING_UP, local_date, log_url, profile_url, summary_text,
 };
-use tf2tools_app::services::{Services, Tf2State};
+use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::{
-    LogsCache, LogsClient, LogsEndpoints, STEAM_ID64_BASE, SteamId, StoreConfig, TfClass,
-    TrackedPlayer,
-};
-
-fn sid(account: u64) -> SteamId {
-    SteamId::from_id64(STEAM_ID64_BASE + account).unwrap()
-}
-
-/// Opens logs.tf through the sidebar and waits for its first load and any sync to finish.
-fn open_page(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<LogsTfPage> {
-    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
-    let page = cx
-        .update(|cx| s.shell.read(cx).logs_tf_page())
-        .expect("a logs.tf page");
-    support::wait_real(cx, "the logs.tf page", |cx| {
-        cx.update(|cx| {
-            let p = page.read(cx);
-            p.is_loaded() && !p.is_syncing()
-        })
-    });
-    support::settle(cx, s.win);
-    page
-}
+use tf2tools_core::{SteamId, TfClass};
 
 #[gpui_kit::test]
 fn logs_tf_sits_under_maps_and_starts_empty(cx: &mut TestAppContext) {
@@ -70,69 +50,6 @@ fn links_point_at_logs_tf() {
         profile_url(sid(231_702)),
         "https://logs.tf/profile/76561197960497430"
     );
-}
-
-/// A logs client on `base` with no request spacing, over the services' own database.
-fn logs_client(services: &Services, base: &str) -> LogsClient {
-    LogsClient::new(
-        LogsCache::new(services.db.clone()),
-        LogsEndpoints::loopback(base),
-    )
-    .with_config(
-        StoreConfig::default()
-            .with_request_spacing(Duration::ZERO)
-            .with_retry_backoff(Duration::from_millis(1)),
-    )
-}
-
-/// A shell whose logs client talks to `base`, with `players` (account, name) tracked in order.
-fn shell(
-    cx: &mut TestAppContext,
-    env: &support::Env,
-    base: &str,
-    players: &[(u64, &'static str)],
-) -> support::ShellWindow {
-    cx.executor().allow_parking();
-    let base = base.to_owned();
-    let players = players.to_vec();
-    support::shell_window_tweaked(
-        cx,
-        env,
-        Tf2State::Missing { saved: None },
-        move |services| {
-            let logs = logs_client(services, &base);
-            for (account, name) in &players {
-                logs.cache()
-                    .add_player(&TrackedPlayer::new(sid(*account), *name))
-                    .unwrap();
-            }
-            *services = services.clone().with_logs(logs);
-        },
-    )
-}
-
-/// A logs.tf list response holding (id, upload date) pairs.
-fn list_body(logs: &[(u64, i64)]) -> Vec<u8> {
-    let logs: Vec<_> = logs
-        .iter()
-        .map(|&(id, date)| {
-            json!({"id": id, "title": format!("Log {id}"), "map": "cp_process_f12",
-                   "date": date, "views": 0, "players": 12})
-        })
-        .collect();
-    json!({"success": true, "results": logs.len(), "total": logs.len(), "parameters": {}, "logs": logs})
-        .to_string()
-        .into_bytes()
-}
-
-fn players_of(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) -> Vec<String> {
-    cx.update(|cx| {
-        page.read(cx)
-            .players()
-            .iter()
-            .map(|p| p.name().to_owned())
-            .collect()
-    })
 }
 
 #[gpui_kit::test]
@@ -364,39 +281,6 @@ fn the_add_dialog_cancels_without_adding(cx: &mut TestAppContext) {
     assert!(players_of(cx, &page).is_empty());
 }
 
-const SIXES: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../tf2tools-core/tests/fixtures/logstf/log-4137103-6v6.json"
-));
-const HIGHLANDER: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/../tf2tools-core/tests/fixtures/logstf/log-4150405-hl.json"
-));
-
-const ARIE: u64 = 231_702;
-
-fn unix_now() -> i64 {
-    chrono::Utc::now().timestamp()
-}
-
-fn day_ago(days: i64) -> i64 {
-    unix_now() - days * 86_400
-}
-
-/// Serves Arie's list of logs 3 (the 6v6 fixture) and 2 (the highlander fixture).
-fn serve_two_logs(server: &support::StoreServer) {
-    server.mount_bytes(
-        "/api/v1/log",
-        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
-    );
-    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
-    server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
-}
-
-fn row_ids(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) -> Vec<u64> {
-    cx.update(|cx| page.read(cx).rows().iter().map(|r| r.id()).collect())
-}
-
 #[gpui_kit::test]
 fn opening_the_page_syncs_the_active_player(cx: &mut TestAppContext) {
     let env = support::env();
@@ -576,16 +460,6 @@ fn the_grid_shows_nine_classes_and_dims_the_unplayed(cx: &mut TestAppContext) {
     assert_eq!(scout.seconds(), 1559);
 }
 
-fn expanded(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) -> Option<u64> {
-    cx.update(|cx| page.read(cx).expanded())
-}
-
-/// Scrolls the page to its last log, since the grid fills most of the window above the list.
-fn to_end(cx: &mut TestAppContext, page: &Entity<LogsTfPage>) {
-    let state = cx.update(|cx| page.read(cx).list_state().clone());
-    state.scroll_to_end();
-}
-
 #[gpui_kit::test]
 fn one_row_opens_at_a_time(cx: &mut TestAppContext) {
     let env = support::env();
@@ -670,16 +544,6 @@ fn the_grid_scrolls_away_with_the_logs(cx: &mut TestAppContext) {
     to_end(cx, &page);
     let after = support::bounds_of(cx, s.win, scout).unwrap();
     assert!(after.top() < before.top(), "{before:?} then {after:?}");
-}
-
-/// Opens log `id`'s row and waits for its body to be parsed and drawn.
-fn open_log(cx: &mut TestAppContext, s: &support::ShellWindow, page: &Entity<LogsTfPage>, id: u64) {
-    to_end(cx, page);
-    support::click_id(cx, s.win, ids::logstf_log(id));
-    support::wait_real(cx, "the parsed log", |cx| {
-        cx.update(|cx| page.read(cx).detail().is_some())
-    });
-    support::settle(cx, s.win);
 }
 
 #[gpui_kit::test]
