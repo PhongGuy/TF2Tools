@@ -148,6 +148,52 @@ fn a_read_in_flight_does_not_put_the_old_range_back(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn a_reread_that_starts_after_a_pick_does_not_put_the_old_range_back(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let _watch = cx.update(|cx| {
+        let seen = Rc::clone(&seen);
+        cx.observe(&page, move |page, cx| {
+            seen.borrow_mut().push(page.read(cx).range())
+        })
+    });
+    // The pick's write and a reread started after it both wait off the UI thread, run in a
+    // random order. A try whose first step leaves the old range saved ran the reread first.
+    let mut raced = 0;
+    for pick in [LogsRange::Year1, LogsRange::Months3].repeat(12) {
+        let old = cx.update(|cx| page.read(cx).range());
+        seen.borrow_mut().clear();
+        cx.update_window(s.win, |_, window, cx| {
+            page.update(cx, |p, cx| {
+                p.set_range(pick, window, cx);
+                p.set_hidden(false, cx);
+            })
+        })
+        .unwrap();
+        cx.dispatcher.scheduler().tick_background_only();
+        if s.services.logs.cache().range().unwrap() == old {
+            raced += 1;
+        }
+        let rows: &[u64] = if pick == LogsRange::Year1 {
+            &[3, 2]
+        } else {
+            &[3]
+        };
+        settled(cx, &page, rows);
+        assert!(
+            !seen.borrow().contains(&old),
+            "the range went back to {old:?}: {:?}",
+            seen.borrow()
+        );
+    }
+    assert!(raced > 0, "no try ran the reread before the write");
+}
+
+#[gpui_kit::test]
 fn the_stop_labels_take_keyboard_focus(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();

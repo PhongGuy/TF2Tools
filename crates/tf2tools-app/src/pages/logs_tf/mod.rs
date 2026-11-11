@@ -76,6 +76,8 @@ pub struct LogsTfPage {
     range: LogsRange,
     range_slider: Entity<SliderState>,
     slider_range: LogsRange,
+    // Range picks not yet saved; a cache read meanwhile may still hold the old range.
+    range_writes: u32,
     // The open log and how far its body got; the list's item 0 is the page top, so row `i`
     // is item `i + 1`. A read or fetch that lands after its row closed is dropped.
     open: Option<OpenLog>,
@@ -156,6 +158,7 @@ impl LogsTfPage {
             range: LogsRange::default(),
             range_slider,
             slider_range: LogsRange::default(),
+            range_writes: 0,
             open: None,
             player_sort: PlayerSort::default(),
             matrix: MatrixKind::Kills,
@@ -242,13 +245,21 @@ impl LogsTfPage {
         // A cache read already out holds the old range; it must not land and put it back.
         self.load_generation += 1;
         self.move_slider(window, cx);
+        self.range_writes += 1;
         let saving = run_blocking(cx, move |s| {
             s.logs.cache().set_range(range).map_err(|error| {
                 tracing::warn!(%error, "saving the logs.tf history range failed");
                 OpError::core("Failed to change the history range", SAVE_FAILED)
             })
         });
-        self.after_write(saving, window, cx);
+        cx.spawn_in(window, async move |page, cx| {
+            let written = saving.await;
+            let _ = page.update_in(cx, |page, window, cx| {
+                page.range_writes -= 1;
+                page.written(written, window, cx);
+            });
+        })
+        .detach();
     }
 
     // Puts the slider's thumb on `self.range`'s stop when it was last put elsewhere.
@@ -809,7 +820,11 @@ impl LogsTfPage {
         cx.spawn(async move |page, cx| {
             let loaded = loading.await;
             let _ = page.update(cx, |page, cx| {
-                if page.load_generation != generation {
+                // A read that ran before a range pick was saved saw the old range; the pick's
+                // own reread follows, so this one is dropped like a superseded one.
+                let before_pick = matches!(&loaded, Ok((_, _, range, _))
+                    if page.range_writes > 0 && *range != page.range);
+                if page.load_generation != generation || before_pick {
                     return;
                 }
                 match loaded {
