@@ -611,16 +611,12 @@ enum Downloaded {
     },
 }
 
-/// A fetch-on-open has no HTTP-status variant: only a 404 means something to the player, so
-/// every other status and a refused redirect read as a network failure.
+/// A refused redirect reads as a network failure; a 404 never gets here, it marks the log gone.
 impl From<NetFailure> for LogsFetchError {
     fn from(failure: NetFailure) -> Self {
         match failure {
             NetFailure::RateLimited { url } => LogsFetchError::RateLimited { url },
-            NetFailure::Status { url, status } => LogsFetchError::Network {
-                url,
-                message: format!("HTTP {status}"),
-            },
+            NetFailure::Status { url, status } => LogsFetchError::Http { url, status },
             NetFailure::Network { url, message } => LogsFetchError::Network { url, message },
             NetFailure::TooLarge { url, limit } => LogsFetchError::TooLarge { url, limit },
             NetFailure::Untrusted { url } => LogsFetchError::Network {

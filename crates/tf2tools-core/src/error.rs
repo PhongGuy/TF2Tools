@@ -2349,13 +2349,21 @@ pub enum LogsFetchError {
     /// The body was not UTF-8 or not a log; it is marked unreadable.
     #[error("logs.tf sent a log that could not be read")]
     Unreadable,
-    /// logs.tf could not be reached, answered an error status or redirected off the allowlist.
+    /// logs.tf could not be reached or redirected off the allowlist.
     #[error("cannot reach {url}: {message}")]
     Network {
         /// The address that was asked.
         url: String,
         /// What went wrong.
         message: String,
+    },
+    /// logs.tf answered an error status other than 404 and 429.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
     },
     /// logs.tf kept answering HTTP 429 after every retry.
     #[error("{url} is rate limiting requests; try again later")]

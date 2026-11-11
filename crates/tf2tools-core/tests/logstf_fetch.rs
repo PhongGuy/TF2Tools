@@ -62,10 +62,13 @@ async fn a_missing_or_unreadable_log_is_marked_as_the_sync_would() {
         Err(LogsFetchError::Unreadable)
     ));
     assert_eq!(log_state(&env.dir, 2), (2, false));
-    assert!(matches!(
-        env.client.fetch_log(1).await,
-        Err(LogsFetchError::Network { .. })
-    ));
+    assert!(
+        matches!(
+            env.client.fetch_log(1).await,
+            Err(LogsFetchError::Http { status: 500, .. })
+        ),
+        "an error status is the server's fault, not the connection's"
+    );
     assert_eq!(
         log_state(&env.dir, 1),
         (0, false),
