@@ -223,7 +223,9 @@ pub fn summary_text(range: LogsRange, logs: usize, newest: Option<i64>, now: i64
             let span = match range {
                 LogsRange::Month1 => "month",
                 LogsRange::Year1 => "year",
-                other => range_label(other),
+                other @ (LogsRange::Months3 | LogsRange::Months6 | LogsRange::Years2 | _) => {
+                    range_label(other)
+                }
             };
             format!("Last {span}, {count} {noun}")
         }
