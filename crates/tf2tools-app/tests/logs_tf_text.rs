@@ -70,10 +70,6 @@ fn sync_failures_and_progress_read_as_the_spec_words_them() {
             },
             "Couldn't save logs.tf data on this computer.",
         ),
-        (
-            LogsSyncError::NotTracked { steam_id: 1 },
-            "Couldn't save logs.tf data on this computer.",
-        ),
     ];
     for (error, text) in cases {
         assert_eq!(sync_message(&error), text, "{error:?}");

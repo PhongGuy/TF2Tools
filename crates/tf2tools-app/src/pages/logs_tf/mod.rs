@@ -239,10 +239,10 @@ impl LogsTfPage {
     /// Makes `id`'s chip the active one, saves that choice and reloads the page from the cache.
     pub fn select(&mut self, id: SteamId, window: &mut Window, cx: &mut Context<Self>) {
         let saving = run_blocking(cx, move |s| {
-            s.logs
-                .cache()
-                .set_active_player(id)
-                .map_err(|_| OpError::core("Failed to switch player", SAVE_FAILED))
+            s.logs.cache().set_active_player(id).map_err(|error| {
+                tracing::warn!(%error, "saving the active logs.tf player failed");
+                OpError::core("Failed to switch player", SAVE_FAILED)
+            })
         });
         self.after_write(saving, window, cx);
     }
@@ -266,10 +266,10 @@ impl LogsTfPage {
             }
             let _ = page.update_in(cx, |page, window, cx| {
                 let removing = run_blocking(cx, move |s| {
-                    s.logs
-                        .cache()
-                        .remove_player(id)
-                        .map_err(|_| OpError::core("Failed to stop tracking", SAVE_FAILED))
+                    s.logs.cache().remove_player(id).map_err(|error| {
+                        tracing::warn!(%error, "removing a logs.tf player failed");
+                        OpError::core("Failed to stop tracking", SAVE_FAILED)
+                    })
                 });
                 page.after_write(removing, window, cx);
             });
@@ -562,8 +562,7 @@ impl LogsTfPage {
         cx: &mut Context<Self>,
     ) {
         match joined {
-            Ok(Ok(_)) => self.error = None,
-            Ok(Err(LogsSyncError::NotTracked { .. })) => {}
+            Ok(Ok(_) | Err(LogsSyncError::NotTracked { .. })) => self.error = None,
             Ok(Err(error)) => {
                 tracing::warn!(%error, "syncing logs.tf logs failed");
                 self.error = Some(sync_message(&error));
@@ -664,10 +663,17 @@ impl LogsTfPage {
     // the status line, the grid, then the column titles or the no-logs line.
     fn top(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let empty = self.loaded && self.players.is_empty();
-        let fetching = self.syncing && self.running == self.active;
+        // Only a finished sync can say a player has no logs: one still running or waiting
+        // its turn may bring some, and a player never synced shows the error line instead.
+        let fetching = self.syncing && (self.running == self.active || self.queued == self.active);
+        let synced = |id: &SteamId| {
+            self.players
+                .iter()
+                .any(|p| p.steam_id() == *id && p.last_synced().is_some())
+        };
         let no_logs = self
             .active
-            .filter(|_| self.loaded && !fetching && self.rows.is_empty());
+            .filter(|id| self.loaded && !fetching && self.rows.is_empty() && synced(id));
         v_flex()
             .w_full()
             .gap_4()

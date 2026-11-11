@@ -46,14 +46,14 @@ pub fn progress_text(done: usize, total: usize) -> String {
     format!("Downloading logs: {done} of {total}")
 }
 
-/// The line under the chips for a failed sync. A cache failure and a player removed while
-/// their sync waited both mean the logs could not be kept.
+/// The line under the chips for a failed sync. A player removed while their sync waited is
+/// no failure, so the page never asks for it.
 pub fn sync_message(error: &LogsSyncError) -> &'static str {
     match error {
         LogsSyncError::Network { .. } => "You're offline. Showing saved logs.",
         LogsSyncError::RateLimited { .. } => "logs.tf is busy. Try again in a few minutes.",
         LogsSyncError::Malformed { .. } => "logs.tf sent something we didn't understand.",
-        LogsSyncError::Database { .. } | LogsSyncError::NotTracked { .. } => SAVE_FAILED,
+        LogsSyncError::Database { .. } => SAVE_FAILED,
         LogsSyncError::Http { .. } | LogsSyncError::TooLarge { .. } | _ => LOGS_TF_DOWN,
     }
 }
