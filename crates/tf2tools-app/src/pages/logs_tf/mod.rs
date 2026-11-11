@@ -10,6 +10,7 @@ use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::{Disableable as _, Sizable as _, WindowExt as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
     ListAlignment, ListOffset, ListState, ParentElement as _, Render, SharedString,
@@ -34,7 +35,7 @@ use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 use text::{
-    EMPTY_TEXT, LOGS_TF_URL, LOOKING_UP, SAVE_FAILED, STEAM_UNREACHABLE, profile_url,
+    EMPTY_TEXT, LOGS_TF_URL, LOOKING_UP, REMOVING, SAVE_FAILED, STEAM_UNREACHABLE, profile_url,
     progress_line, resolve_message,
 };
 
@@ -60,6 +61,8 @@ pub struct LogsTfPage {
     // At most one reread follows the sync at a time; events meanwhile ask for one more.
     rereading: bool,
     reread_wanted: bool,
+    // The player whose removal waits on their sync; nothing syncs them again meanwhile.
+    removing: Option<SteamId>,
     // Cache reads can land out of order; only the newest applies, and it starts the sync a
     // superseded read asked for.
     load_generation: u64,
@@ -109,6 +112,7 @@ impl LogsTfPage {
             sync,
             rereading: false,
             reread_wanted: false,
+            removing: None,
             load_generation: 0,
             sync_wanted: false,
             add_input,
@@ -273,19 +277,27 @@ impl LogsTfPage {
             }
             // Their sync ends first, so a list page it was recording cannot outlive the removal.
             let Ok(stopped) = page.update(cx, |page, cx| {
+                page.removing = Some(id);
+                cx.notify();
                 page.sync.update(cx, |sync, cx| sync.stop(id, cx))
             }) else {
                 return;
             };
             stopped.await;
-            let _ = page.update_in(cx, |page, window, cx| {
-                let removing = run_blocking(cx, move |s| {
+            let Ok(removing) = page.update(cx, |_, cx| {
+                run_blocking(cx, move |s| {
                     s.logs.cache().remove_player(id).map_err(|error| {
                         tracing::warn!(%error, "removing a logs.tf player failed");
                         OpError::core("Failed to stop tracking", SAVE_FAILED)
                     })
-                });
-                page.after_write(removing, window, cx);
+                })
+            }) else {
+                return;
+            };
+            let removed = removing.await;
+            let _ = page.update_in(cx, |page, window, cx| {
+                page.removing = None;
+                page.written(removed, window, cx);
             });
         })
         .detach();
@@ -438,8 +450,7 @@ impl LogsTfPage {
         .detach();
     }
 
-    // Every chip write ends the same way: a failure toasts, then the page rereads the cache,
-    // which is the truth either way.
+    // Awaits a chip write, then ends it with `written`.
     fn after_write(
         &mut self,
         write: impl Future<Output = Result<(), OpError>> + 'static,
@@ -448,14 +459,23 @@ impl LogsTfPage {
     ) {
         cx.spawn_in(window, async move |page, cx| {
             let written = write.await;
-            let _ = page.update_in(cx, |page, window, cx| {
-                if let Err(err) = written {
-                    toast_error(window, cx, &err);
-                }
-                page.load(true, cx).detach();
-            });
+            let _ = page.update_in(cx, |page, window, cx| page.written(written, window, cx));
         })
         .detach();
+    }
+
+    // Every chip write ends the same way: a failure toasts, then the page rereads the cache,
+    // which is the truth either way.
+    fn written(
+        &mut self,
+        written: Result<(), OpError>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Err(err) = written {
+            toast_error(window, cx, &err);
+        }
+        self.load(true, cx).detach();
     }
 
     // Reads the players, the active chip and that player's logs and averages off the UI
@@ -538,6 +558,9 @@ impl LogsTfPage {
 
     // Asks the app-wide sync for `id`; a run for anyone else is cancelled in its favour.
     fn sync(&mut self, id: SteamId, force: bool, cx: &mut Context<Self>) {
+        if self.removing == Some(id) {
+            return;
+        }
         self.sync.update(cx, |sync, cx| {
             sync.start(id, LogsRange::default(), force, cx)
         });
@@ -623,19 +646,24 @@ impl LogsTfPage {
         for player in &self.players {
             let id = player.steam_id();
             let name = player.name().to_owned();
+            // A chip being removed says so and takes no clicks until it goes.
+            let removing = self.removing == Some(id);
             let chip = filter_badge(
                 ids::logstf_chip(id),
                 self.active == Some(id),
-                name.clone(),
+                if removing { REMOVING } else { name.as_str() }.to_owned(),
                 window,
                 cx,
             )
-            .on_click(cx.listener(move |page, _, window, cx| page.select(id, window, cx)));
+            .when(!removing, |chip| {
+                chip.on_click(cx.listener(move |page, _, window, cx| page.select(id, window, cx)))
+            });
             let remove = Button::new(ids::logstf_chip_remove(id))
                 .ghost()
                 .xsmall()
                 .icon(IconName::X)
                 .named(format!("Stop tracking {name}"))
+                .disabled(removing)
                 .on_click(cx.listener(move |page, _, window, cx| {
                     page.remove(id, &name, window, cx);
                 }));

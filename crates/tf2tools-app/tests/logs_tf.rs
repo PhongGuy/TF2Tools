@@ -4,8 +4,9 @@ use std::time::Duration;
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, HIGHLANDER, SIXES, day_ago, expanded, list_body, list_requests, mount_list_for, open_log,
-    open_page, players_of, requests_to, row_ids, serve_two_logs, shell, sid, to_end, unix_now,
+    ARIE, HIGHLANDER, SIXES, day_ago, expanded, list_body, list_requests, list_requests_for,
+    mount_list_for, open_log, open_page, players_of, requests_to, row_ids, serve_two_logs, shell,
+    sid, to_end, unix_now,
 };
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
@@ -443,6 +444,132 @@ fn removing_a_player_mid_sync_stops_their_sync_before_their_logs_go(cx: &mut Tes
     assert!(
         support::toast_labels(cx, s.win).is_empty(),
         "nothing failed"
+    );
+}
+
+/// Opens logs.tf with "other" (stamped as synced) and Arie tracked, Arie active.
+fn removal_page(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    server: &support::StoreServer,
+) -> (support::ShellWindow, Entity<LogsTfPage>) {
+    let s = shell(cx, env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
+    let other = i64::try_from(sid(1).id64()).unwrap();
+    support::sql(env)
+        .execute(
+            "UPDATE logstf_players SET last_synced = ?1 WHERE steam_id = ?2",
+            [unix_now() - 60, other],
+        )
+        .unwrap();
+    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    (s, page)
+}
+
+/// Memberships and stored logs left in the database.
+fn stored_rows(env: &support::Env) -> (i64, i64) {
+    let conn = support::sql(env);
+    let count = |sql: &str| conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap();
+    (
+        count("SELECT COUNT(*) FROM logstf_player_logs"),
+        count("SELECT COUNT(*) FROM logstf_logs"),
+    )
+}
+
+#[gpui_kit::test]
+fn removing_a_player_mid_download_waits_for_the_download(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Arie's list answers at once and both bodies slowly, so the removal meets a download.
+    mount_list_for(
+        &server,
+        ARIE,
+        &[(3, day_ago(1)), (2, day_ago(2))],
+        Duration::ZERO,
+    );
+    mount_list_for(&server, 1, &[], Duration::ZERO);
+    server.mount_bytes_after(
+        "/json/3",
+        SIXES.as_bytes().to_vec(),
+        Duration::from_millis(500),
+    );
+    server.mount_bytes_after(
+        "/json/2",
+        HIGHLANDER.as_bytes().to_vec(),
+        Duration::from_millis(500),
+    );
+    let (s, page) = removal_page(cx, &env, &server);
+    let downloads = || requests_to(&server, "/json/3") + requests_to(&server, "/json/2");
+    support::wait_real(cx, "Arie's first download", |_| downloads() == 1);
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    let tracked = s.services.logs.cache().players().unwrap();
+    assert!(
+        tracked.iter().any(|p| p.steam_id() == sid(ARIE)),
+        "Arie stays tracked until their download ends"
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_chip(sid(ARIE))).as_deref(),
+        Some("Removing...")
+    );
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    assert!(
+        !support::present(cx, s.win, ids::CONFIRM_OK),
+        "a player being removed cannot be asked about again"
+    );
+    support::wait_real(cx, "the removal and the next sync", |cx| {
+        cx.update(|cx| {
+            let p = page.read(cx);
+            p.players().len() == 1 && !p.is_syncing(cx)
+        })
+    });
+    assert_eq!(downloads(), 1, "no download started after the removal");
+    assert_eq!(
+        stored_rows(&env),
+        (0, 0),
+        "nothing of Arie's outlives the removal"
+    );
+    assert!(
+        support::toast_labels(cx, s.win).is_empty(),
+        "nothing failed"
+    );
+}
+
+#[gpui_kit::test]
+fn choosing_a_player_being_removed_starts_no_sync_for_them(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Arie's list answers slowly, so the chip click lands while the removal waits on it.
+    mount_list_for(
+        &server,
+        ARIE,
+        &[(3, day_ago(1))],
+        Duration::from_millis(500),
+    );
+    mount_list_for(&server, 1, &[], Duration::ZERO);
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let (s, page) = removal_page(cx, &env, &server);
+    support::wait_real(cx, "Arie's list request", |_| {
+        list_requests_for(&server, ARIE) == 1
+    });
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::click_id(cx, s.win, ids::logstf_chip(sid(ARIE)));
+    support::wait_real(cx, "the removal and the next sync", |cx| {
+        cx.update(|cx| {
+            let p = page.read(cx);
+            p.players().len() == 1 && !p.is_syncing(cx)
+        })
+    });
+    assert_eq!(
+        list_requests_for(&server, ARIE),
+        1,
+        "no second sync for Arie started"
+    );
+    assert_eq!(
+        stored_rows(&env),
+        (0, 0),
+        "nothing of Arie's outlives the removal"
     );
 }
 

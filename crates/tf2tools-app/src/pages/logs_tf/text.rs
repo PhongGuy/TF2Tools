@@ -20,6 +20,9 @@ pub const SAVE_FAILED: &str = "Couldn't save logs.tf data on this computer.";
 /// Why a Steam lookup failed when Steam could not answer, in player words.
 pub const STEAM_UNREACHABLE: &str = "Can't reach Steam. Check your internet connection.";
 
+/// A player's chip while their removal waits for their sync to end.
+pub const REMOVING: &str = "Removing...";
+
 /// The add dialog's Add button while Steam looks the player up.
 pub const LOOKING_UP: &str = "Looking up...";
 

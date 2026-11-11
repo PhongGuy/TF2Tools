@@ -188,6 +188,23 @@ pub fn requests_to(server: &super::StoreServer, route: &str) -> usize {
         .count()
 }
 
+/// How many list requests (`/api/v1/log`) the server has had for `account`.
+pub fn list_requests_for(server: &super::StoreServer, account: u64) -> usize {
+    let player = sid(account).id64().to_string();
+    server
+        .rt
+        .block_on(server.server.received_requests())
+        .unwrap_or_default()
+        .iter()
+        .filter(|r| r.url.path() == "/api/v1/log")
+        .filter(|r| {
+            r.url
+                .query_pairs()
+                .any(|(k, v)| k == "player" && v == player)
+        })
+        .count()
+}
+
 /// How many list requests (`/api/v1/log`) the server has had.
 pub fn list_requests(server: &super::StoreServer) -> usize {
     requests_to(server, "/api/v1/log")
