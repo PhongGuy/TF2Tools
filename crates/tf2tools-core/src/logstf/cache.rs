@@ -7,7 +7,9 @@ use rusqlite::types::ValueRef;
 use rusqlite::{OptionalExtension, params};
 
 use super::averages::{CLASS_SUMS, ClassAverage, ClassSums, WINDOW_LOGS};
-use super::weapons::write_weapon_rows;
+use super::weapons::{
+    ClassWeapons, WEAPON_LOGS, WEAPON_PENDING, WEAPON_SUMS, WeaponSum, write_weapon_rows,
+};
 use super::{
     LOG_BODY_LIMIT, LogDetail, LogsRange, PROVISIONAL_SECS, SteamId, logstf_class,
     logstf_class_name,
@@ -475,6 +477,35 @@ impl LogsCache {
         Ok(TfClass::ALL.map(|class| {
             ClassAverage::from_sums(class, by_class.get(&class).copied().unwrap_or_default())
         }))
+    }
+
+    /// The player's weapon sums on `class` over exactly the logs `logs` returns.
+    pub fn class_weapons(
+        &self,
+        id: SteamId,
+        range: LogsRange,
+        class: TfClass,
+    ) -> Result<ClassWeapons, LogsCacheError> {
+        let sums_sql = format!("{WINDOW_LOGS} {WEAPON_SUMS}");
+        let logs_sql = format!("{WINDOW_LOGS} {WEAPON_LOGS}");
+        let pending_sql = format!("{WINDOW_LOGS} {WEAPON_PENDING}");
+        self.db
+            .read(|conn| {
+                let args = params![sql_id(id)?, range.reach_secs(), logstf_class_name(class)];
+                let weapons = conn
+                    .prepare(&sums_sql)?
+                    .query_map(args, |row| {
+                        Ok(WeaponSum::new(
+                            row.get(0)?,
+                            [row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?],
+                        ))
+                    })?
+                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                let logs: i64 = conn.query_row(&logs_sql, args, |row| row.get(0))?;
+                let pending: i64 = conn.query_row(&pending_sql, args, |row| row.get(0))?;
+                Ok(ClassWeapons::new(logs, pending, weapons))
+            })
+            .map_err(db_error)
     }
 
     /// Deletes every log no tracked player is a member of, whatever its age; returns how

@@ -61,6 +61,110 @@ fn fold_weapon_rows(detail: &LogDetail) -> HashMap<(SteamId, TfClass, String), W
     rows
 }
 
+/// Player ?1's summed weapon rows for class ?3 over `WINDOW_LOGS`, in display order.
+pub(super) const WEAPON_SUMS: &str = "SELECT weapon, SUM(kills), SUM(dmg), SUM(shots), SUM(hits)
+    FROM logstf_weapon_rows
+    WHERE steam_id = ?1 AND class = ?3 AND log_id IN (SELECT id FROM window_logs)
+    GROUP BY weapon
+    ORDER BY SUM(dmg) DESC, SUM(kills) DESC, weapon";
+
+/// How many window logs hold weapon rows for player ?1 on class ?3.
+pub(super) const WEAPON_LOGS: &str = "SELECT COUNT(DISTINCT log_id) FROM logstf_weapon_rows
+    WHERE steam_id = ?1 AND class = ?3 AND log_id IN (SELECT id FROM window_logs)";
+
+/// Window logs where player ?1 played class ?3 but the weapon rows are not yet counted.
+pub(super) const WEAPON_PENDING: &str = "SELECT COUNT(*) FROM logstf_logs l
+    WHERE l.weapons_counted = 0 AND l.id IN (SELECT id FROM window_logs)
+      AND EXISTS (SELECT 1 FROM logstf_class_rows r
+                  WHERE r.log_id = l.id AND r.steam_id = ?1 AND r.class = ?3)";
+
+/// One weapon's stats summed over a player's window on one class.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct WeaponSum {
+    name: String,
+    kills: i64,
+    dmg: i64,
+    shots: i64,
+    hits: i64,
+}
+
+impl WeaponSum {
+    pub(super) fn new(name: String, [kills, dmg, shots, hits]: WeaponStats) -> Self {
+        WeaponSum {
+            name,
+            kills,
+            dmg,
+            shots,
+            hits,
+        }
+    }
+
+    /// The logs.tf weapon name, such as `scattergun`.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Kills with the weapon.
+    pub fn kills(&self) -> i64 {
+        self.kills
+    }
+
+    /// Damage dealt with the weapon.
+    pub fn dmg(&self) -> i64 {
+        self.dmg
+    }
+
+    /// Shots fired; 0 for weapons logs.tf does not count shots for.
+    pub fn shots(&self) -> i64 {
+        self.shots
+    }
+
+    /// Shots that hit.
+    pub fn hits(&self) -> i64 {
+        self.hits
+    }
+
+    /// hits / shots; `None` when shots is 0.
+    pub fn accuracy(&self) -> Option<f64> {
+        (self.shots > 0).then(|| self.hits as f64 / self.shots as f64)
+    }
+}
+
+/// A player's weapons on one class over the window, with how many logs back them.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct ClassWeapons {
+    logs: u32,
+    pending: u32,
+    weapons: Vec<WeaponSum>,
+}
+
+impl ClassWeapons {
+    pub(super) fn new(logs: i64, pending: i64, weapons: Vec<WeaponSum>) -> Self {
+        ClassWeapons {
+            logs: u32::try_from(logs).unwrap_or(0),
+            pending: u32::try_from(pending).unwrap_or(0),
+            weapons,
+        }
+    }
+
+    /// Distinct logs in the window with weapon rows for the class.
+    pub fn logs(&self) -> u32 {
+        self.logs
+    }
+
+    /// Logs in the window with class rows for the class whose weapons are not yet counted.
+    pub fn pending(&self) -> u32 {
+        self.pending
+    }
+
+    /// Damage high to low, then kills high to low, then name.
+    pub fn weapons(&self) -> &[WeaponSum] {
+        &self.weapons
+    }
+}
+
 #[cfg(test)]
 #[path = "weapons_tests.rs"]
 mod tests;
