@@ -70,3 +70,6 @@ test = true
 [[example]]
 name = "make_manifest"
 test = true
+
+[[example]]
+name = "extract_class_icons"

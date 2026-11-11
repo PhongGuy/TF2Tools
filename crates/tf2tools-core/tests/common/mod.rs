@@ -10,6 +10,7 @@ pub mod hud_pictures;
 pub mod hud_schema;
 pub mod hud_stock;
 pub mod hud_switches;
+pub mod logstf;
 pub mod sfnt;
 pub mod update;
 
@@ -152,13 +153,56 @@ const M14_TABLES: &str = "
     );
 ";
 
+/// The tables migration 15 adds, as the schema should hold them.
+const M15_TABLES: &str = "
+    CREATE TABLE logstf_players (
+        steam_id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        last_synced INTEGER
+    );
+    CREATE TABLE logstf_logs (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        map TEXT NOT NULL,
+        date INTEGER NOT NULL,
+        length INTEGER,
+        body TEXT,
+        fetched_at INTEGER,
+        state INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE logstf_player_logs (
+        steam_id INTEGER NOT NULL,
+        log_id INTEGER NOT NULL REFERENCES logstf_logs(id) ON DELETE CASCADE,
+        PRIMARY KEY (steam_id, log_id)
+    );
+    CREATE TABLE logstf_class_rows (
+        log_id INTEGER NOT NULL REFERENCES logstf_logs(id) ON DELETE CASCADE,
+        steam_id INTEGER NOT NULL,
+        class TEXT NOT NULL,
+        seconds INTEGER NOT NULL,
+        kills INTEGER NOT NULL,
+        deaths INTEGER NOT NULL,
+        assists INTEGER NOT NULL,
+        dmg INTEGER NOT NULL,
+        heal INTEGER NOT NULL DEFAULT 0,
+        ubers INTEGER NOT NULL DEFAULT 0,
+        drops INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (log_id, steam_id, class)
+    );
+    CREATE INDEX logstf_class_rows_player ON logstf_class_rows(steam_id);
+    CREATE INDEX logstf_player_logs_log ON logstf_player_logs(log_id);
+";
+
 /// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables,
-/// migration 13's mastercomfig tables and migration 14's add-on table: the schema v6 opens to.
+/// migration 13's mastercomfig tables, migration 14's add-on table and migration 15's logs.tf
+/// tables: the schema v6 opens to.
 pub fn current_shape() -> SchemaShape {
     let conn = v5_fixture_connection();
     conn.execute_batch(M12_TABLES).unwrap();
     conn.execute_batch(M13_TABLES).unwrap();
     conn.execute_batch(M14_TABLES).unwrap();
+    conn.execute_batch(M15_TABLES).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape

@@ -550,6 +550,12 @@ fn open_shell(
     )
     .unwrap()
     .with_font_host(font_host);
+    // No shell test may reach logs.tf or Steam; tests that need them swap in their own client.
+    let dead = tf2tools_core::LogsClient::new(
+        tf2tools_core::LogsCache::new(services.db.clone()),
+        tf2tools_core::LogsEndpoints::loopback("http://127.0.0.1:9"),
+    );
+    services = services.with_logs(dead);
     tweak(&mut services);
     install_services(cx, services.clone());
     // A test that pins no probe reads an empty proc tree, never the machine's processes.
@@ -957,6 +963,20 @@ impl StoreServer {
             Mock::given(method("GET"))
                 .and(path(route))
                 .respond_with(ResponseTemplate::new(200).set_body_bytes(body))
+                .mount(&self.server),
+        );
+    }
+
+    /// Serves `body` at `route` only after `delay`, for work that must still be running.
+    pub fn mount_bytes_after(&self, route: &str, body: Vec<u8>, delay: Duration) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(route))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_bytes(body)
+                        .set_delay(delay),
+                )
                 .mount(&self.server),
         );
     }
