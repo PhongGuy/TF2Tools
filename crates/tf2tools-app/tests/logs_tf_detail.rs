@@ -1,9 +1,13 @@
 //! The open log's sections, compared with the fixtures' logs.tf pages.
 
-use gpui_kit::{Entity, TestAppContext};
+use std::time::Duration;
+
+use gpui_kit::test::TestWindowExt as _;
+use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
 use tf2tools_app::pages::logs_tf::sort::{PlayerColumn, PlayerSort};
+use tf2tools_core::TfClass;
 
 use crate::support;
 use crate::support::logstf::{
@@ -60,5 +64,42 @@ fn clicking_a_header_sorts_the_players_and_again_flips_it(cx: &mut TestAppContex
             descending: false
         },
         "the sort is kept while the page lives"
+    );
+}
+
+#[gpui_kit::test]
+fn hovering_a_class_icon_opens_its_card(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened(cx, 3);
+    let icon = ids::logstf_class_card(sid(ARIE), TfClass::Scout);
+    scroll_to_in_log(cx, &s, &page, 3, icon.clone());
+    assert!(
+        !support::present(
+            cx,
+            s.win,
+            ids::logstf_class_popover(sid(ARIE), TfClass::Scout)
+        ),
+        "closed until hovered"
+    );
+    cx.update_window(s.win, |_, w, cx| w.hover(icon.clone(), cx))
+        .unwrap();
+    support::settle(cx, s.win);
+    cx.executor().advance_clock(Duration::from_millis(300));
+    support::settle(cx, s.win);
+    assert!(
+        support::present(
+            cx,
+            s.win,
+            ids::logstf_class_popover(sid(ARIE), TfClass::Scout)
+        ),
+        "the card opens on hover"
+    );
+    assert_eq!(
+        support::label_of(
+            cx,
+            s.win,
+            ids::logstf_weapon(sid(ARIE), TfClass::Scout, "scattergun")
+        )
+        .as_deref(),
+        Some("scattergun 7 (100%) 3334 (86%) 56%")
     );
 }

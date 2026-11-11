@@ -3,6 +3,7 @@
 
 mod banner;
 mod players;
+mod popover;
 
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;

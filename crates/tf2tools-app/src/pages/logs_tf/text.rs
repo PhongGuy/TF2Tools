@@ -218,3 +218,24 @@ pub fn date_text(unix: i64) -> String {
         })
         .unwrap_or_default()
 }
+
+/// `part` as a whole percent of `whole`, rounded to nearest: "47%"; a whole of 0 reads "0%".
+pub fn share_text(part: u32, whole: u32) -> String {
+    format!("{}%", percent(part, whole))
+}
+
+/// Hits as a whole percent of shots: "43%"; with no shots there is no accuracy, "-".
+pub fn accuracy_text(hits: u32, shots: u32) -> String {
+    if shots == 0 {
+        return "-".to_owned();
+    }
+    format!("{}%", percent(hits, shots))
+}
+
+// Integer half-up rounding, so 4.5% reads "5%" as on logs.tf.
+fn percent(part: u32, whole: u32) -> u64 {
+    if whole == 0 {
+        return 0;
+    }
+    (u64::from(part) * 100 + u64::from(whole) / 2) / u64::from(whole)
+}

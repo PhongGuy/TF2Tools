@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
-    EMPTY_TEXT, NO_LOGS_TEXT, count_text, duration_text, fetch_message, finding_text, one_decimal,
-    progress_line, progress_text, range_label, resolve_message, ring_label, summary_text,
-    sync_message, time_played_text, whole,
+    EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, count_text, duration_text, fetch_message,
+    finding_text, one_decimal, progress_line, progress_text, range_label, resolve_message,
+    ring_label, share_text, summary_text, sync_message, time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
@@ -246,4 +246,68 @@ fn the_ring_fills_only_once_there_is_a_count() {
     });
     assert_eq!(ring_fill(finding), None);
     assert_eq!(ring_fill(None), None);
+}
+
+#[test]
+fn shares_and_accuracy_round_like_logs_tf() {
+    assert_eq!(share_text(9, 19), "47%");
+    assert_eq!(share_text(3_334, 3_896), "86%");
+    assert_eq!(share_text(0, 0), "0%");
+    assert_eq!(accuracy_text(133, 309), "43%");
+    assert_eq!(accuracy_text(161, 290), "56%");
+    assert_eq!(accuracy_text(0, 0), "-");
+    assert_eq!(accuracy_text(5, 0), "-");
+}
+
+#[test]
+fn arie_scout_weapons_read_like_logs_tf() {
+    use tf2tools_app::pages::logs_tf::tables::weapon_rows;
+    let log = tf2tools_core::parse_log(crate::support::logstf::SIXES).unwrap();
+    let arie = log
+        .players()
+        .iter()
+        .find(|p| p.steam_id() == crate::support::logstf::sid(crate::support::logstf::ARIE))
+        .unwrap();
+    let scout = &arie.classes()[0];
+    assert_eq!(scout.class(), tf2tools_core::TfClass::Scout);
+    let shown: Vec<(String, u32, String, u32, String, String)> = weapon_rows(arie, scout)
+        .into_iter()
+        .map(|r| {
+            (
+                r.name,
+                r.kills,
+                r.kill_share,
+                r.dmg,
+                r.dmg_share,
+                r.accuracy,
+            )
+        })
+        .collect();
+    let row = |n: &str, k, ks: &str, d, ds: &str, a: &str| {
+        (
+            n.to_owned(),
+            k,
+            ks.to_owned(),
+            d,
+            ds.to_owned(),
+            a.to_owned(),
+        )
+    };
+    assert_eq!(
+        shown,
+        [
+            row("scattergun", 7, "100%", 3_334, "86%", "56%"),
+            row("pistol_scout", 0, "0%", 177, "5%", "10%"),
+        ]
+    );
+    let pyro = arie
+        .classes()
+        .iter()
+        .find(|c| c.class() == tf2tools_core::TfClass::Pyro)
+        .unwrap();
+    let flames = weapon_rows(arie, pyro)
+        .into_iter()
+        .find(|r| r.name == "flamethrower")
+        .unwrap();
+    assert_eq!(flames.accuracy, "-", "no shots, no accuracy");
 }

@@ -5,6 +5,7 @@ mod detail;
 mod grid;
 mod list;
 pub mod sort;
+pub mod tables;
 pub mod text;
 
 use std::collections::HashSet;

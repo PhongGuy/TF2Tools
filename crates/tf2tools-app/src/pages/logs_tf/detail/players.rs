@@ -9,6 +9,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{LogColumns, LogDetail, PlayerLine, SteamId};
 
+use super::popover::class_hover;
 use super::{ICON, NUMBER, team_cell};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
@@ -64,12 +65,16 @@ pub(super) fn players_table(
     for i in sort_players(players, sort) {
         let player = &players[i];
         // Classes come longest first; the main one is solid, the rest fade.
+        // Hovering one opens its class card.
         let icons = player.classes().iter().enumerate().map(|(n, c)| {
             let icon = class_icon(c.class(), assets.class_icon(c.class()).as_deref(), ICON);
-            div()
+            let icon = div()
+                .id(ids::logstf_class_card(player.steam_id(), c.class()))
+                .test_support()
                 .flex_none()
                 .when(n > 0, |el| el.opacity(0.5))
-                .child(icon)
+                .child(icon);
+            class_hover(player, c, icon)
         });
         table = table.child(
             h_flex()

@@ -2604,6 +2604,35 @@ pub fn logstf_player_row(id: SteamId) -> ElementId {
     keyed("logstf-player", &id.id64().to_string())
 }
 
+/// A player's class icon in the open log's players table, which opens its class card on hover:
+/// "logstf-class-card:<id64>:<class>".
+pub fn logstf_class_card(id: SteamId, class: TfClass) -> ElementId {
+    keyed("logstf-class-card", &player_class(id, class))
+}
+
+/// The hover card around a class icon, keying its open state: "logstf-class-hover:<id64>:<class>".
+pub fn logstf_class_hover(id: SteamId, class: TfClass) -> ElementId {
+    keyed("logstf-class-hover", &player_class(id, class))
+}
+
+/// The open class card's content: "logstf-class-popover:<id64>:<class>".
+pub fn logstf_class_popover(id: SteamId, class: TfClass) -> ElementId {
+    keyed("logstf-class-popover", &player_class(id, class))
+}
+
+/// One weapon's row in a class card, labelled "scattergun 7 (100%) 3334 (86%) 56%":
+/// "logstf-weapon:<id64>:<class>:<weapon>".
+pub fn logstf_weapon(id: SteamId, class: TfClass, weapon: &str) -> ElementId {
+    keyed(
+        "logstf-weapon",
+        &format!("{}:{weapon}", player_class(id, class)),
+    )
+}
+
+fn player_class(id: SteamId, class: TfClass) -> String {
+    format!("{}:{}", id.id64(), class.name().to_lowercase())
+}
+
 /// One Medic's block in the open log: "logstf-medic:<id64>".
 pub fn logstf_medic(id: SteamId) -> ElementId {
     keyed("logstf-medic", &id.id64().to_string())
