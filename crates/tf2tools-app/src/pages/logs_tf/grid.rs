@@ -20,10 +20,11 @@ use crate::widgets::labelled;
 const CARD_WIDTH: f32 = 168.;
 const ICON_SIZE: f32 = 28.;
 
-// Wide enough that the six stop labels sit apart under the track.
-const RANGE_WIDTH: f32 = 320.;
-// How far the slider's handle reaches past the track's end, so the labels line up with it.
-const THUMB_REACH: f32 = 11.;
+// The stop labels sit one cell apart, each centred on its thumb stop. The slider's track is
+// inset half a cell on both sides, so the end labels fit inside the picker too.
+const STOP_CELL: f32 = 68.;
+const RANGE_WIDTH: f32 = STOP_CELL * LogsRange::STOPS.len() as f32;
+const LABEL_HEIGHT: f32 = 24.;
 
 /// The nine cards, wrapping, with the summary line for `logs` in `range` back from `newest`
 /// and the range slider under them.
@@ -77,6 +78,18 @@ fn range_picker(slider: &Entity<SliderState>, page: WeakEntity<LogsTfPage>) -> i
                 let _ = page.update(cx, |page, cx| page.set_range(range, window, cx));
             })
     });
+    // The kit's thumb centres on its share of the track's width, which spans the picker less
+    // half a cell each side, so stop `i` lies `i` cells in from the first label's centre.
+    let cells = labels.into_iter().enumerate().map(|(i, label)| {
+        h_flex()
+            .absolute()
+            .top_0()
+            .left(px(STOP_CELL * i as f32))
+            .w(px(STOP_CELL))
+            .h_full()
+            .justify_center()
+            .child(label)
+    });
     v_flex()
         .ml_auto()
         .w(px(RANGE_WIDTH))
@@ -86,10 +99,17 @@ fn range_picker(slider: &Entity<SliderState>, page: WeakEntity<LogsTfPage>) -> i
                 .id(ids::LOGSTF_RANGE)
                 .aria_label("History range")
                 .test_support()
-                .px(px(THUMB_REACH))
+                .px(px(STOP_CELL / 2.))
                 .child(Slider::new(slider)),
         )
-        .child(h_flex().justify_between().text_xs().children(labels))
+        .child(
+            div()
+                .relative()
+                .w_full()
+                .h(px(LABEL_HEIGHT))
+                .text_xs()
+                .children(cells),
+        )
 }
 
 // The icon and name, then the rates as label and value rows; Medic's two extra rates only

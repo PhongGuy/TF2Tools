@@ -221,3 +221,32 @@ fn a_player_whose_last_game_is_old_still_sees_it_in_a_short_range(cx: &mut TestA
         "{summary}"
     );
 }
+
+#[gpui_kit::test]
+fn each_stop_label_sits_centred_under_its_thumb_stop(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    // The thumb's centre for stop `i` of five steps lies that share along the slider's track.
+    let track = cx.update(|cx| page.read(cx).range_slider().read(cx).bounds());
+    let steps = (LogsRange::STOPS.len() - 1) as f32;
+    let mut last_right = None;
+    for (i, range) in LogsRange::STOPS.into_iter().enumerate() {
+        let stop = track.left() + track.size.width * (i as f32 / steps);
+        let label = support::bounds_of(cx, s.win, ids::logstf_range_stop(range)).unwrap();
+        let centre = label.center().x;
+        assert!(
+            (centre - stop).abs() <= gpui_kit::px(1.),
+            "{range:?} label centre {centre:?}, stop {stop:?}"
+        );
+        if let Some(right) = last_right {
+            assert!(
+                label.left() >= right,
+                "{range:?} {label:?} overlaps its neighbour"
+            );
+        }
+        last_right = Some(label.right());
+    }
+}
