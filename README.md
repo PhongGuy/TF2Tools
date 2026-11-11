@@ -126,7 +126,7 @@ TF2 reads its HUD, sounds and crosshairs when it starts, so restart the game to 
 
 ## Privacy
 
-No accounts, no ads, no tracking. TF2Tools goes online for the stores (GameBanana, GitHub and mastercomfig.com), for the Maps page (serveme.tf), for the logs.tf page (logs.tf, and Steam to look up a profile link) and to check GitHub for a new version of TF2Tools. Your library stays on your computer.
+No accounts, no ads, no tracking. TF2Tools goes online for the stores (GameBanana, GitHub and mastercomfig.com), for the Maps page (serveme.tf), for the logs.tf page (logs.tf, and Steam to look up a profile link) and to check GitHub for a new version of TF2Tools. Your library stays on your computer. The weapon icons in the crosshair list come from your own TF2 install.
 
 ## License
 
@@ -142,7 +142,7 @@ MIT, see [LICENSE](LICENSE). The bundled Inter font is under the SIL Open Font L
 
 ### Valve
 
-Team Fortress 2, its weapon icons, crosshairs and other game artwork are the property of Valve Corporation. TF2Tools uses them with credit, in a free fan tool for players of the game. Some weapon icons are loaded from the [Official TF2 Wiki](https://wiki.teamfortress.com).
+Team Fortress 2, its weapon icons, crosshairs and other game artwork are the property of Valve Corporation. TF2Tools uses them with credit, in a free fan tool for players of the game. The weapon icons in the crosshair list are read from your own TF2 install.
 
 Valve, the Valve logo, Steam, the Steam logo, Team Fortress and the Team Fortress logo are trademarks and/or registered trademarks of Valve Corporation in the U.S. and/or other countries. All other trademarks are property of their respective owners.
 

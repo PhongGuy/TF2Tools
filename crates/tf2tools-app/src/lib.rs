@@ -46,6 +46,7 @@ pub mod theme;
 pub mod timing;
 pub mod tokio_bridge;
 pub mod updater;
+pub mod weapon_icons;
 pub mod widgets;
 
 /// Kit init, the theme and the app's key bindings. Tests and the pilot call it.

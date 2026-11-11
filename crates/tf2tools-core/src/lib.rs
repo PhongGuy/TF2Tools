@@ -14,6 +14,7 @@ mod db;
 mod disk;
 mod error;
 mod fonts;
+mod game_icons;
 mod hud_maker;
 mod ice;
 mod library;
@@ -49,13 +50,14 @@ pub use error::{
     PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
     ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
     SettingsError, SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
-    UpdateDownloadError, VpkError, VtfError, WavError,
+    UpdateDownloadError, VpkError, VtfError, WavError, WeaponIconsError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
     HudFonts, PROTECTED_FONT_NAMES, Platform, check_hud_fonts, install_hud_fonts, scan_hud_fonts,
     system_font_host,
 };
+pub use game_icons::GameWeaponIcons;
 pub use hud_maker::MeterKind;
 pub use hud_maker::{
     ALIGNMENTS, AddBlock, Align, AnimationAppend, AnimationChange, AssetFile, AxisSize, Backdrop,
@@ -137,4 +139,5 @@ pub use update::{
     UpdateOffer, apply,
 };
 pub use wav::{WavInfo, inspect_wav};
+pub use weapon_icons::weapon_inventory_images;
 pub use weapons::{TfClass, Weapon, WeaponSlot, weapons};
