@@ -123,4 +123,5 @@ pub use update::{
     UpdateOffer, apply,
 };
 pub use wav::{WavInfo, inspect_wav};
+pub use weapon_icons::weapon_inventory_images;
 pub use weapons::{TfClass, Weapon, WeaponSlot, weapons};
