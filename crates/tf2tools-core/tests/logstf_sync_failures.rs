@@ -166,3 +166,32 @@ async fn a_forced_refresh_that_fails_partway_lets_the_next_open_finish_it() {
         .unwrap();
     assert!(after.skipped(), "nothing pending and freshly synced");
 }
+
+#[tokio::test]
+async fn gone_and_unreadable_logs_do_not_keep_a_fresh_cache_syncing() {
+    let env = tracked_env().await;
+    mount_list(
+        &env.server,
+        ARIE,
+        list_body(&[(31, days_ago(1)), (30, days_ago(2))]),
+    )
+    .await;
+    mount_log(&env.server, 31, 404, r#"{"success": false}"#.into()).await;
+    mount_log(&env.server, 30, 200, r#"{"success": true}"#.into()).await;
+    env.client
+        .sync_player(arie(), false, &|_| {})
+        .await
+        .unwrap();
+    assert_eq!(log_state(&env.dir, 31), (1, false));
+    assert_eq!(log_state(&env.dir, 30), (2, false));
+
+    // Neither log has a body, but neither is pending, so a normal open skips the list.
+    env.server.reset().await;
+    let next = env
+        .client
+        .sync_player(arie(), false, &|_| {})
+        .await
+        .unwrap();
+    assert!(next.skipped(), "gone and unreadable logs are settled");
+    assert!(paths(&env.server).await.is_empty());
+}
