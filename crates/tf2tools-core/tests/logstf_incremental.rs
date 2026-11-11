@@ -1,6 +1,6 @@
 //! Repeat syncs: staleness, incremental downloads, provisional logs, pruning, the lock.
 
-use tf2tools_core::{SteamId, TrackedPlayer};
+use tf2tools_core::{LogsCancel, LogsRange, SteamId, TrackedPlayer};
 
 use crate::common;
 use crate::common::logstf::{
@@ -36,14 +36,26 @@ async fn a_fresh_cache_is_skipped_and_a_forced_refresh_fetches_only_the_list() {
     .await;
     mount_any_log(&env.server).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!(paths(&env.server).await.len(), 3);
 
     let again = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert!(again.skipped());
@@ -53,7 +65,17 @@ async fn a_fresh_cache_is_skipped_and_a_forced_refresh_fetches_only_the_list() {
         "no request inside 30 minutes"
     );
 
-    let forced = env.client.sync_player(arie(), true, &|_| {}).await.unwrap();
+    let forced = env
+        .client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            true,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
     assert!(!forced.skipped());
     let all = paths(&env.server).await;
     assert_eq!(all.len(), 4, "one list request, no log request");
@@ -66,7 +88,13 @@ async fn a_stale_cache_syncs_without_force() {
     mount_list(&env.server, ARIE, list_body(&[(2, days_ago(1))])).await;
     mount_any_log(&env.server).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     common::sql(&env.dir)
@@ -77,7 +105,13 @@ async fn a_stale_cache_syncs_without_force() {
         .unwrap();
     let summary = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert!(!summary.skipped());
@@ -90,7 +124,13 @@ async fn a_provisional_log_is_fetched_again_once() {
     mount_list(&env.server, ARIE, list_body(&[(20, uploaded)])).await;
     mount_any_log(&env.server).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     // As if it was downloaded ten minutes after upload, while the game may still have been going.
@@ -100,8 +140,26 @@ async fn a_provisional_log_is_fetched_again_once() {
             [uploaded + 600],
         )
         .unwrap();
-    env.client.sync_player(arie(), true, &|_| {}).await.unwrap();
-    env.client.sync_player(arie(), true, &|_| {}).await.unwrap();
+    env.client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            true,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
+    env.client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            true,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
     assert_eq!(json_requests(&paths(&env.server).await), 2);
     assert_eq!(
         common::count(&env.dir, "logstf_class_rows"),
@@ -118,7 +176,13 @@ async fn provisional_env(status: u16, body: String) -> LogsEnv {
     mount_list(&env.server, ARIE, list_body(&[(20, uploaded)])).await;
     mount_any_log(&env.server).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     common::sql(&env.dir)
@@ -134,7 +198,17 @@ async fn provisional_env(status: u16, body: String) -> LogsEnv {
 /// A refetch that cannot be read keeps the earlier good copy and settles it, so it is not
 /// counted as unreadable and is not asked for again.
 async fn assert_kept_after_unreadable_refetch(env: &LogsEnv) {
-    let summary = env.client.sync_player(arie(), true, &|_| {}).await.unwrap();
+    let summary = env
+        .client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            true,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
     assert_eq!(summary.unreadable(), 0, "a kept log is not unreadable");
     assert_eq!(log_state(&env.dir, 20), (0, true), "the good body stays");
     assert_eq!(
@@ -142,7 +216,16 @@ async fn assert_kept_after_unreadable_refetch(env: &LogsEnv) {
         1,
         "the class rows stay"
     );
-    env.client.sync_player(arie(), true, &|_| {}).await.unwrap();
+    env.client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            true,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
     assert_eq!(
         json_requests(&paths(&env.server).await),
         2,
@@ -166,7 +249,17 @@ async fn a_provisional_log_keeps_its_body_when_the_refetch_is_too_large() {
 #[tokio::test]
 async fn a_provisional_log_that_is_now_404_is_gone() {
     let env = provisional_env(404, String::new()).await;
-    let summary = env.client.sync_player(arie(), true, &|_| {}).await.unwrap();
+    let summary = env
+        .client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            true,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
     assert_eq!(summary.gone(), 1);
     assert_eq!(log_state(&env.dir, 20), (1, false));
     assert_eq!(common::count(&env.dir, "logstf_class_rows"), 0);
@@ -178,7 +271,13 @@ async fn a_placeholder_name_is_replaced_from_the_log() {
     mount_list(&env.server, ARIE, list_body(&[(3, days_ago(1))])).await;
     mount_log(&env.server, 3, 200, logstf_fixture("log-4137103-6v6.json")).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -193,7 +292,13 @@ async fn a_real_name_is_kept() {
     mount_list(&env.server, ARIE, list_body(&[(3, days_ago(1))])).await;
     mount_log(&env.server, 3, 200, logstf_fixture("log-4137103-6v6.json")).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!(env.client.cache().players().unwrap()[0].name(), "Arie");
@@ -215,7 +320,13 @@ async fn a_finished_sync_keeps_old_listed_logs_and_drops_unlisted_ones() {
     mount_list(&env.server, ARIE, list_body(&[(2, days_ago(1))])).await;
     mount_any_log(&env.server).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -237,9 +348,11 @@ async fn concurrent_syncs_run_one_at_a_time() {
     .await;
     mount_any_log(&env.server).await;
     let other = env.client.clone();
+    let cancel = LogsCancel::new();
     let (a, b) = tokio::join!(
-        env.client.sync_player(arie(), true, &|_| {}),
-        other.sync_player(arie(), true, &|_| {}),
+        env.client
+            .sync_player(arie(), LogsRange::Months3, true, &cancel, &|_| {}),
+        other.sync_player(arie(), LogsRange::Months3, true, &cancel, &|_| {}),
     );
     a.unwrap();
     b.unwrap();
@@ -256,7 +369,13 @@ async fn a_teammates_cached_log_costs_no_request() {
     mount_list(&env.server, ARIE, list_body(&[(3, days_ago(1))])).await;
     mount_log(&env.server, 3, 200, logstf_fixture("log-4137103-6v6.json")).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     // A Red teammate in the same log.
@@ -266,6 +385,9 @@ async fn a_teammates_cached_log_costs_no_request() {
         .add_player(&TrackedPlayer::new(mate, "Emiel"))
         .unwrap();
     mount_list(&env.server, mate.id64(), list_body(&[(3, days_ago(1))])).await;
-    env.client.sync_player(mate, false, &|_| {}).await.unwrap();
+    env.client
+        .sync_player(mate, LogsRange::Months3, false, &LogsCancel::new(), &|_| {})
+        .await
+        .unwrap();
     assert_eq!(json_requests(&paths(&env.server).await), 1);
 }

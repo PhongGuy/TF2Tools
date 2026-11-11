@@ -1,6 +1,6 @@
 //! Logs that are gone or unreadable, and failures that stop a sync.
 
-use tf2tools_core::{LogsSyncError, SteamId, TrackedPlayer};
+use tf2tools_core::{LogsCancel, LogsRange, LogsSyncError, SteamId, TrackedPlayer};
 
 use crate::common::logstf::{
     ARIE, LogsEnv, class_rows, days_ago, list_body, log_body, log_state, logs_env, mount_any_log,
@@ -33,12 +33,27 @@ async fn a_404_is_gone_and_never_retried() {
     .await;
     let summary = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!(summary.gone(), 1);
     assert_eq!(log_state(&env.dir, 7), (1, false));
-    env.client.sync_player(arie(), true, &|_| {}).await.unwrap();
+    env.client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            true,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
     let asked = paths(&env.server)
         .await
         .iter()
@@ -73,7 +88,13 @@ async fn unreadable_and_oversized_bodies_are_marked_and_the_rest_continue() {
     .await;
     let summary = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!((summary.unreadable(), summary.downloaded()), (2, 1));
@@ -96,7 +117,13 @@ async fn a_server_error_stops_the_sync_and_keeps_what_was_saved() {
     mount_log(&env.server, 11, 503, String::new()).await;
     let err = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap_err();
     assert!(
@@ -114,7 +141,13 @@ async fn a_list_that_will_not_parse_is_malformed() {
     mount_list(&env.server, ARIE, "not json".into()).await;
     let err = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap_err();
     assert!(matches!(err, LogsSyncError::Malformed { .. }), "{err:?}");
@@ -126,7 +159,13 @@ async fn a_forced_refresh_that_fails_partway_lets_the_next_open_finish_it() {
     mount_list(&env.server, ARIE, list_body(&[(20, days_ago(2))])).await;
     mount_any_log(&env.server).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
 
@@ -145,14 +184,26 @@ async fn a_forced_refresh_that_fails_partway_lets_the_next_open_finish_it() {
         .await;
     mount_any_log(&env.server).await;
     env.client
-        .sync_player(arie(), true, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            true,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap_err();
     assert_eq!(log_state(&env.dir, 21), (0, false));
 
     let next = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert!(!next.skipped(), "a pending log is not a fresh cache");
@@ -161,7 +212,13 @@ async fn a_forced_refresh_that_fails_partway_lets_the_next_open_finish_it() {
 
     let after = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert!(after.skipped(), "nothing pending and freshly synced");
@@ -179,7 +236,13 @@ async fn gone_and_unreadable_logs_do_not_keep_a_fresh_cache_syncing() {
     mount_log(&env.server, 31, 404, r#"{"success": false}"#.into()).await;
     mount_log(&env.server, 30, 200, r#"{"success": true}"#.into()).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!(log_state(&env.dir, 31), (1, false));
@@ -189,7 +252,13 @@ async fn gone_and_unreadable_logs_do_not_keep_a_fresh_cache_syncing() {
     env.server.reset().await;
     let next = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert!(next.skipped(), "gone and unreadable logs are settled");

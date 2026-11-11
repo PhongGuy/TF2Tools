@@ -1,6 +1,6 @@
 //! Log rows and 90-day class averages over the cache.
 
-use tf2tools_core::{LogState, LogsRange, SteamId, TfClass, TrackedPlayer};
+use tf2tools_core::{LogState, LogsCancel, LogsRange, SteamId, TfClass, TrackedPlayer};
 
 use crate::common;
 use crate::common::logstf::{
@@ -56,7 +56,13 @@ async fn averages_are_time_weighted_over_the_window() {
     mount_log(&env.server, 1, 200, log_body(720, &[log1])).await;
     mount_log(&env.server, 2, 200, log_body(1500, &[log2, other])).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
 
@@ -134,7 +140,13 @@ async fn a_log_row_carries_the_players_line_and_state() {
     mount_log(&env.server, 2, 404, String::new()).await;
     mount_log(&env.server, 1, 200, "{}".into()).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     // A listed log whose download has not happened yet.
@@ -239,7 +251,13 @@ async fn classes_with_equal_time_list_by_class_name_in_every_row() {
         .await;
     }
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     let rows = env.client.cache().logs(arie(), LogsRange::Months3).unwrap();

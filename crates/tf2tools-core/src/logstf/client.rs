@@ -1,6 +1,8 @@
 //! The logs.tf client: Steam profile lookups and log syncs, all through one paced `Http`.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use serde::Deserialize;
 
@@ -15,24 +17,47 @@ use super::{
     TrackedPlayer, parse_log, window_start,
 };
 
-/// How far a sync has got through the logs it needs to download.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct LogsProgress {
-    done: usize,
-    total: usize,
+/// Asks a running sync to stop before its next request; clones share one flag.
+#[derive(Debug, Clone, Default)]
+pub struct LogsCancel(Arc<AtomicBool>);
+
+impl LogsCancel {
+    /// A flag nobody has raised yet.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Stops every sync holding this flag or a clone of it.
+    pub fn cancel(&self) {
+        self.0.store(true, Ordering::Relaxed);
+    }
+
+    /// Whether `cancel` was called on this flag or a clone.
+    pub fn is_cancelled(&self) -> bool {
+        self.0.load(Ordering::Relaxed)
+    }
 }
 
-impl LogsProgress {
-    /// Logs handled so far, downloaded or marked.
-    pub fn done(&self) -> usize {
-        self.done
-    }
-
-    /// Logs this sync needs to download.
-    pub fn total(&self) -> usize {
-        self.total
-    }
+/// How far a sync has got: first through the player's list, then through the downloads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum LogsProgress {
+    /// The player's list is being read, page by page.
+    Listing {
+        /// Logs listed so far.
+        listed: usize,
+        /// The logs logs.tf reports for the player.
+        total: usize,
+    },
+    /// Logs without a body are being downloaded.
+    Downloading {
+        /// Logs handled so far, downloaded or marked.
+        done: usize,
+        /// Logs this sync needs to download.
+        total: usize,
+        /// The gap kept between requests.
+        spacing: Duration,
+    },
 }
 
 /// What one `sync_player` call did.
@@ -40,6 +65,7 @@ impl LogsProgress {
 #[non_exhaustive]
 pub struct LogsSyncSummary {
     skipped: bool,
+    cancelled: bool,
     listed: usize,
     downloaded: usize,
     gone: usize,
@@ -50,6 +76,11 @@ impl LogsSyncSummary {
     /// The cache was fresh, so nothing was asked of logs.tf.
     pub fn skipped(&self) -> bool {
         self.skipped
+    }
+
+    /// The sync stopped early on a `LogsCancel`; what it saved stays saved.
+    pub fn cancelled(&self) -> bool {
+        self.cancelled
     }
 
     /// Logs in the window.
@@ -143,6 +174,8 @@ pub struct LogsClient {
     cache: LogsCache,
     http: Http,
     endpoints: LogsEndpoints,
+    /// The configured gap between requests, reported with the download progress.
+    spacing: Duration,
     /// Held for a whole sync, so two syncs never interleave their writes.
     sync_lock: Arc<tokio::sync::Mutex<()>>,
 }
@@ -150,10 +183,12 @@ pub struct LogsClient {
 impl LogsClient {
     /// A client over `cache` that asks `endpoints`, paced by `default_config`.
     pub fn new(cache: LogsCache, endpoints: LogsEndpoints) -> Self {
+        let config = Self::default_config();
         LogsClient {
             cache,
-            http: crate::store::http_for(&Self::default_config(), &endpoints.redirects()),
+            http: crate::store::http_for(&config, &endpoints.redirects()),
             endpoints,
+            spacing: config.request_spacing(),
             sync_lock: Arc::default(),
         }
     }
@@ -166,6 +201,7 @@ impl LogsClient {
     /// This client with `config`'s pacing, timeouts, User-Agent and offline switch.
     pub fn with_config(mut self, config: StoreConfig) -> Self {
         self.http = crate::store::http_for(&config, &self.endpoints.redirects());
+        self.spacing = config.request_spacing();
         self
     }
 
@@ -230,14 +266,19 @@ impl LogsClient {
         Ok(TrackedPlayer::new(id, name))
     }
 
-    /// Lists the player's logs, downloads every listed log without a body, 1 s apart, and
-    /// prunes. Skips everything when last_synced is under 30 minutes old and no log in the
-    /// window is still pending, unless `force`.
+    /// Lists the player's logs in `range`, downloads every listed log without a body, 1 s
+    /// apart, and prunes. Skips everything when last_synced is under 30 minutes old and no log
+    /// in the window is still pending, unless `force`.
+    ///
+    /// `cancel` is checked before every request; a cancelled sync returns `Ok` with what it
+    /// saved, leaving last_synced unstamped and nothing pruned so the next sync resumes.
     /// One sync runs at a time per client (clones share the lock).
     pub async fn sync_player(
         &self,
         id: SteamId,
+        range: LogsRange,
         force: bool,
+        cancel: &LogsCancel,
         on_progress: &(dyn Fn(LogsProgress) + Send + Sync),
     ) -> Result<LogsSyncSummary, LogsSyncError> {
         let _held = self.sync_lock.lock().await;
@@ -250,10 +291,16 @@ impl LogsClient {
             })?;
         // A sync that stopped partway leaves pending logs, so the next open finishes it.
         let fresh = last_synced.is_some_and(|at| now - at < STALE_SECS);
-        let range = LogsRange::default();
         if !force && fresh && !self.cache.has_pending(id, range)? {
             return Ok(LogsSyncSummary {
                 skipped: true,
+                ..LogsSyncSummary::default()
+            });
+        }
+
+        if cancel.is_cancelled() {
+            return Ok(LogsSyncSummary {
+                cancelled: true,
                 ..LogsSyncSummary::default()
             });
         }
@@ -273,8 +320,19 @@ impl LogsClient {
             ..LogsSyncSummary::default()
         };
         let total = wanted.len();
-        on_progress(LogsProgress { done: 0, total });
+        let spacing = self.spacing;
+        let progress = |done| LogsProgress::Downloading {
+            done,
+            total,
+            spacing,
+        };
+        on_progress(progress(0));
         for (done, log_id) in wanted.into_iter().enumerate() {
+            // The list is already recorded, so a stop here leaves only bodiless logs to fetch.
+            if cancel.is_cancelled() {
+                summary.cancelled = true;
+                return Ok(summary);
+            }
             let url = format!("{}/json/{log_id}", self.endpoints.logs_tf());
             // A 404 means logs.tf dropped the log; an oversize, non-UTF-8 or non-log body is
             // unreadable, unless a provisional refetch already holds a good copy. Marked logs are
@@ -287,10 +345,7 @@ impl LogsClient {
                 Err(NetFailure::Status { status: 404, .. }) => {
                     self.cache.mark_failed(log_id, STATE_GONE, now)?;
                     summary.gone += 1;
-                    on_progress(LogsProgress {
-                        done: done + 1,
-                        total,
-                    });
+                    on_progress(progress(done + 1));
                     continue;
                 }
                 Err(failure) => return Err(failure.into()),
@@ -306,10 +361,7 @@ impl LogsClient {
                     }
                 }
             }
-            on_progress(LogsProgress {
-                done: done + 1,
-                total,
-            });
+            on_progress(progress(done + 1));
         }
 
         self.cache.mark_synced(id, now)?;

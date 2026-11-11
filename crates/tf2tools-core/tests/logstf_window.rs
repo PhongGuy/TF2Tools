@@ -1,6 +1,6 @@
 //! The window is the 90 days ending at the player's newest log, however old that log is.
 
-use tf2tools_core::{LogsRange, SteamId, TrackedPlayer};
+use tf2tools_core::{LogsCancel, LogsRange, SteamId, TrackedPlayer};
 
 use crate::common;
 use crate::common::logstf::{
@@ -40,7 +40,13 @@ async fn sync_from(anchor_days: i64) -> (Vec<u64>, u32, usize, usize) {
     mount_any_log(&env.server).await;
     let summary = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     let rows = cache.logs(arie(), LogsRange::Months3).unwrap();
@@ -103,7 +109,13 @@ async fn the_list_averages_and_pending_check_share_one_window() {
     assert_eq!((averages[0].logs(), averages[0].seconds()), (2, 120));
     let summary = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert!(summary.skipped());
@@ -119,7 +131,13 @@ async fn the_list_averages_and_pending_check_share_one_window() {
     );
     let summary = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert!(!summary.skipped());

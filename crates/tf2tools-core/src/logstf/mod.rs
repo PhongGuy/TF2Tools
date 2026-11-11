@@ -14,7 +14,7 @@ use crate::weapons::TfClass;
 
 pub use averages::ClassAverage;
 pub use cache::{LogRow, LogState, LogsCache, TrackedPlayer};
-pub use client::{LogsClient, LogsEndpoints, LogsProgress, LogsSyncSummary};
+pub use client::{LogsCancel, LogsClient, LogsEndpoints, LogsProgress, LogsSyncSummary};
 pub use detail::{
     ClassLine, EventKind, HealTarget, Killstreak, LogChatLine, LogColumns, LogDetail, MatrixKind,
     MatrixRow, MedicLine, Medigun, PlayerLine, RoundEvent, RoundLine, RoundPlayer, RoundTeam,

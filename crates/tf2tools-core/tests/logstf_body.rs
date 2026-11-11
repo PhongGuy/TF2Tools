@@ -1,6 +1,8 @@
 //! Log bodies are stored compressed, and plain-text bodies from earlier builds still open.
 
-use tf2tools_core::{Database, LogsCache, SteamId, TrackedPlayer, parse_log};
+use tf2tools_core::{
+    Database, LogsCache, LogsCancel, LogsRange, SteamId, TrackedPlayer, parse_log,
+};
 
 use crate::common;
 use crate::common::logstf::{
@@ -52,7 +54,13 @@ async fn a_downloaded_body_is_stored_compressed_and_reads_back_whole() {
     mount_list(&env.server, ARIE, list_body(&[(3, days_ago(1))])).await;
     mount_log(&env.server, 3, 200, body.clone()).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     let (kind, bytes) = storage(&env.dir, 3);
@@ -106,7 +114,16 @@ async fn plain_text_bodies_from_an_earlier_build_keep_opening_beside_new_ones() 
     .await;
     let new = logstf_fixture("log-4137103-6v6.json");
     mount_log(&env.server, 8, 200, new.clone()).await;
-    env.client.sync_player(arie(), true, &|_| {}).await.unwrap();
+    env.client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            true,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
     assert_eq!(paths(&env.server).await, ["/api/v1/log", "/json/8"]);
     assert_eq!(storage(&env.dir, 7).0, "text");
     assert_eq!(storage(&env.dir, 8).0, "blob");

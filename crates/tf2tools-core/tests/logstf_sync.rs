@@ -1,6 +1,6 @@
 //! A player's log list: the window, the cap, and refusing an untracked player.
 
-use tf2tools_core::{LogsSyncError, SteamId, TrackedPlayer};
+use tf2tools_core::{LogsCancel, LogsRange, LogsSyncError, SteamId, TrackedPlayer};
 
 use crate::common;
 use crate::common::logstf::{
@@ -37,7 +37,13 @@ async fn the_list_is_cut_at_the_window_with_one_list_request() {
     mount_any_log(&env.server).await;
     let summary = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -58,7 +64,13 @@ async fn every_log_in_the_window_is_listed() {
     mount_any_log(&env.server).await;
     let summary = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!((summary.listed(), summary.downloaded()), (405, 405));
@@ -70,7 +82,13 @@ async fn an_untracked_player_is_refused_without_a_request() {
     let env = logs_env().await;
     let err = env
         .client
-        .sync_player(arie(), true, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            true,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap_err();
     assert!(matches!(err, LogsSyncError::NotTracked { .. }), "{err:?}");

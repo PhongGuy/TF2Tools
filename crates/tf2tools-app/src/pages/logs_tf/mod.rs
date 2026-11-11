@@ -17,7 +17,7 @@ use gpui_kit::{
     div, px,
 };
 use tf2tools_core::{
-    ClassAverage, LogDetail, LogRow, LogState, LogsProgress, LogsRange, LogsSyncError,
+    ClassAverage, LogDetail, LogRow, LogState, LogsCancel, LogsProgress, LogsRange, LogsSyncError,
     LogsSyncSummary, SteamId, TrackedPlayer, parse_log, parse_player_input,
 };
 
@@ -543,7 +543,9 @@ impl LogsTfPage {
             let report = move |progress| {
                 tx.send_replace(Some(progress));
             };
-            client.sync_player(id, force, &report).await
+            client
+                .sync_player(id, LogsRange::default(), force, &LogsCancel::new(), &report)
+                .await
         });
         // Each reread lands before the next event is taken, so events that arrive meanwhile
         // collapse into one reread of the newest count.
@@ -624,13 +626,16 @@ impl LogsTfPage {
     fn status(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let ours = self.syncing && self.running == self.active;
         // A count of 0 of 0 says nothing, so the line waits for the list to arrive.
-        let progress = self.progress.filter(|p| ours && p.total() > 0).map(|p| {
-            labelled(
-                div().text_sm().text_color(cx.theme().muted_foreground),
-                ids::LOGSTF_PROGRESS,
-                progress_text(p.done(), p.total()),
-            )
-        });
+        let progress = match self.progress {
+            Some(LogsProgress::Downloading { done, total, .. }) if ours && total > 0 => {
+                Some(labelled(
+                    div().text_sm().text_color(cx.theme().muted_foreground),
+                    ids::LOGSTF_PROGRESS,
+                    progress_text(done, total),
+                ))
+            }
+            _ => None,
+        };
         let error = self.error.filter(|_| !self.syncing).map(|error| {
             let page = cx.entity().downgrade();
             let on_retry = move |_: &mut Window, cx: &mut App| {

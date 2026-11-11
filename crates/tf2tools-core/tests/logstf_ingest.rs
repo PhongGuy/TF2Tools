@@ -2,7 +2,7 @@
 
 use std::sync::Mutex;
 
-use tf2tools_core::{SteamId, TrackedPlayer};
+use tf2tools_core::{LogsCancel, LogsProgress, LogsRange, SteamId, TrackedPlayer};
 
 use crate::common;
 use crate::common::logstf::{
@@ -40,9 +40,17 @@ async fn first_sync_downloads_newest_first_with_progress_and_every_players_rows(
     let seen = Mutex::new(Vec::new());
     let summary = env
         .client
-        .sync_player(arie(), false, &|p| {
-            seen.lock().unwrap().push((p.done(), p.total()))
-        })
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|p| {
+                if let LogsProgress::Downloading { done, total, .. } = p {
+                    seen.lock().unwrap().push((done, total));
+                }
+            },
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -83,7 +91,13 @@ async fn medic_heals_go_on_the_medic_row_only_and_unknown_classes_are_dropped() 
     };
     mount_log(&env.server, 30, 200, log_body(620, &[medic])).await;
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     let rows: Vec<(String, i64, i64, i64)> = common::sql(&env.dir)
@@ -127,7 +141,13 @@ async fn a_class_listed_twice_for_one_player_folds_into_one_row() {
     mount_log(&env.server, 40, 200, log_body(500, &[twice])).await;
 
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!(log_state(&env.dir, 40), (0, true));
@@ -153,7 +173,13 @@ async fn two_keys_for_one_steam_id_fold_into_one_row_per_class() {
     mount_log(&env.server, 41, 200, body).await;
 
     env.client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!(log_state(&env.dir, 41), (0, true));
@@ -178,7 +204,13 @@ async fn a_body_that_is_not_utf8_is_unreadable_and_not_stored() {
 
     let summary = env
         .client
-        .sync_player(arie(), false, &|_| {})
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
         .await
         .unwrap();
     assert_eq!(summary.unreadable(), 1);
