@@ -1464,13 +1464,13 @@ pub fn weapon_row(script: &str) -> ElementId {
     keyed("weapon-row", script)
 }
 
-/// A weapon row's wiki icon in its slot-coloured frame, present once the icon has loaded:
+/// A weapon row's game icon in its slot-coloured frame, present once the icon has loaded:
 /// "weapon-icon:<script>".
 pub fn weapon_icon(script: &str) -> ElementId {
     keyed("weapon-icon", script)
 }
 
-/// A weapon row's 16 px slot square, shown while its icon is missing, loading or failed:
+/// A weapon row's 16 px slot square, shown while its icon is missing or TF2 is not found:
 /// "weapon-slot-icon:<script>".
 pub fn weapon_slot_icon(script: &str) -> ElementId {
     keyed("weapon-slot-icon", script)

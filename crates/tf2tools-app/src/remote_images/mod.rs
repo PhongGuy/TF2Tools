@@ -26,8 +26,6 @@ pub enum ImageTarget {
     CardBlurred,
     /// The detail carousel, 1280x720.
     Carousel,
-    /// A weapon row icon, 100x75, the wiki thumbnail's size.
-    WeaponIcon,
 }
 
 impl ImageTarget {
@@ -36,7 +34,6 @@ impl ImageTarget {
         match self {
             ImageTarget::Card | ImageTarget::CardBlurred => (480, 270),
             ImageTarget::Carousel => (1280, 720),
-            ImageTarget::WeaponIcon => (100, 75),
         }
     }
 }
@@ -70,14 +67,6 @@ impl ImageKey {
         Self {
             url: url.to_owned(),
             target: ImageTarget::Carousel,
-        }
-    }
-
-    /// The URL decoded for a weapon row.
-    pub fn weapon_icon(url: &str) -> Self {
-        Self {
-            url: url.to_owned(),
-            target: ImageTarget::WeaponIcon,
         }
     }
 }

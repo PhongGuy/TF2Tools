@@ -215,5 +215,4 @@ mod updater_startup;
 mod vendor_patch;
 mod version;
 mod weapon_assigner;
-mod weapon_icon_decode;
 mod weapon_icons;
