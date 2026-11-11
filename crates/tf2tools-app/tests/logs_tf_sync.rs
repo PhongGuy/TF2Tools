@@ -9,7 +9,7 @@ use tf2tools_core::{LogState, LogsRange, SteamId};
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, HIGHLANDER, SIXES, day_ago, list_body, serve_two_logs, shell, sid,
+    ARIE, HIGHLANDER, SIXES, day_ago, list_body, list_requests, serve_two_logs, shell, sid,
 };
 
 fn hub(cx: &mut TestAppContext) -> Entity<LogsSync> {
@@ -127,4 +127,122 @@ fn a_resumed_sync_counts_the_logs_already_saved(cx: &mut TestAppContext) {
             })
     });
     idle(cx, &sync);
+}
+
+/// Serves logs 3 and 2 with log 3's body answering after `delay`.
+fn serve_slow_download(server: &support::StoreServer, delay: Duration) {
+    server.mount_bytes(
+        "/api/v1/log",
+        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
+    );
+    server.mount_bytes_after("/json/3", SIXES.as_bytes().to_vec(), delay);
+    server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
+}
+
+#[gpui_kit::test]
+fn a_request_for_another_player_cancels_the_run_and_follows_it(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_slow_download(&server, Duration::from_millis(500));
+    let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
+    let sync = hub(cx);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    support::wait_real(cx, "Arie's downloads", |cx| {
+        matches!(
+            cx.update(|cx| sync.read(cx).progress()),
+            Some(SyncProgress::Downloading { .. })
+        )
+    });
+    start(cx, &sync, 1, LogsRange::Months3);
+    assert_eq!(
+        cx.update(|cx| (sync.read(cx).running(), sync.read(cx).queued())),
+        (Some(sid(ARIE)), Some(sid(1))),
+        "the cancelled run ends before the next starts"
+    );
+    idle(cx, &sync);
+    assert_eq!(
+        last_synced(&s, sid(ARIE)),
+        None,
+        "a cancelled sync is not stamped"
+    );
+    assert!(
+        last_synced(&s, sid(1)).is_some(),
+        "the queued player synced"
+    );
+    assert_eq!(cx.update(|cx| sync.read(cx).error(sid(ARIE))), None);
+}
+
+#[gpui_kit::test]
+fn the_same_request_again_is_ignored(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_slow_download(&server, Duration::from_millis(300));
+    let _s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let sync = hub(cx);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    assert_eq!(cx.update(|cx| sync.read(cx).queued()), None);
+    idle(cx, &sync);
+    assert_eq!(list_requests(&server), 1, "one listing for one request");
+}
+
+#[gpui_kit::test]
+fn a_request_with_another_range_restarts_the_run(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_slow_download(&server, Duration::from_millis(500));
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let sync = hub(cx);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    support::wait_real(cx, "Arie's downloads", |cx| {
+        cx.update(|cx| sync.read(cx).progress()).is_some()
+    });
+    start(cx, &sync, ARIE, LogsRange::Year1);
+    assert_eq!(cx.update(|cx| sync.read(cx).queued()), Some(sid(ARIE)));
+    idle(cx, &sync);
+    assert_eq!(list_requests(&server), 2, "the wider range lists again");
+    assert!(
+        last_synced(&s, sid(ARIE)).is_some(),
+        "the restarted run finished"
+    );
+}
+
+#[gpui_kit::test]
+fn asking_again_for_a_cancelled_player_queues_a_fresh_run(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_slow_download(&server, Duration::from_millis(500));
+    let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
+    let sync = hub(cx);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    support::wait_real(cx, "Arie's downloads", |cx| {
+        cx.update(|cx| sync.read(cx).progress()).is_some()
+    });
+    start(cx, &sync, 1, LogsRange::Months3);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    assert_eq!(cx.update(|cx| sync.read(cx).queued()), Some(sid(ARIE)));
+    idle(cx, &sync);
+    assert!(
+        last_synced(&s, sid(ARIE)).is_some(),
+        "Arie's fresh run finished"
+    );
+}
+
+#[gpui_kit::test]
+fn stopping_a_queued_player_drops_them(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_slow_download(&server, Duration::from_millis(300));
+    let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
+    let sync = hub(cx);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    start(cx, &sync, 1, LogsRange::Months3);
+    let _stopped = cx.update(|cx| sync.update(cx, |s, cx| s.stop(sid(1), cx)));
+    assert_eq!(cx.update(|cx| sync.read(cx).queued()), None);
+    idle(cx, &sync);
+    assert_eq!(
+        last_synced(&s, sid(1)),
+        None,
+        "the dropped player never synced"
+    );
 }

@@ -53,17 +53,22 @@ struct Request {
     force: bool,
 }
 
-/// The running sync; dropping `_task` aborts the tokio job with it.
+/// The running sync; dropping `_task` aborts the tokio job with it. `ended` closes when the
+/// sync future is gone, which is what `stop` waits for.
 struct Run {
     request: Request,
     progress: Option<SyncProgress>,
+    cancel: LogsCancel,
+    ended: async_channel::Receiver<()>,
     _task: Task<()>,
 }
 
-/// The one logs.tf sync the app runs, with the last failure kept for the page's error line.
+/// The one logs.tf sync the app runs, the one request waiting behind it, and the last failure
+/// kept for the page's error line.
 #[derive(Default)]
 pub struct LogsSync {
     run: Option<Run>,
+    queued: Option<Request>,
     error: Option<(SteamId, &'static str)>,
 }
 
@@ -88,12 +93,45 @@ pub fn try_logs_sync(cx: &App) -> Option<Entity<LogsSync>> {
 impl EventEmitter<LogsSyncEvent> for LogsSync {}
 
 impl LogsSync {
-    /// Starts syncing `id` over `range` unless a sync is already running.
+    /// Starts syncing `id` over `range`. A run of this same request carries on; any other
+    /// request cancels the run and waits in the queue, replacing whatever waited there.
     pub fn start(&mut self, id: SteamId, range: LogsRange, force: bool, cx: &mut Context<Self>) {
-        if self.run.is_none() {
-            self.spawn(Request { id, range, force }, cx);
+        let request = Request { id, range, force };
+        match &self.run {
+            None => self.spawn(request, cx),
+            Some(run) if run.request == request && !force && !run.cancel.is_cancelled() => {
+                self.queued = None;
+            }
+            // Cancel rather than abort, so a list page already in flight is still recorded.
+            Some(run) => {
+                run.cancel.cancel();
+                self.queued = Some(request);
+            }
+        }
+        cx.notify();
+    }
+
+    /// Drops `id` from the queue and cancels their run; the task resolves once it has ended.
+    pub fn stop(&mut self, id: SteamId, cx: &mut Context<Self>) -> Task<()> {
+        if self.queued.is_some_and(|queued| queued.id == id) {
+            self.queued = None;
             cx.notify();
         }
+        match self.run.as_ref().filter(|run| run.request.id == id) {
+            Some(run) => {
+                run.cancel.cancel();
+                let ended = run.ended.clone();
+                cx.background_spawn(async move {
+                    let _ = ended.recv().await;
+                })
+            }
+            None => Task::ready(()),
+        }
+    }
+
+    /// The player waiting for the running sync to end.
+    pub fn queued(&self) -> Option<SteamId> {
+        self.queued.map(|request| request.id)
     }
 
     /// The player whose sync is running.
@@ -101,9 +139,9 @@ impl LogsSync {
         self.run.as_ref().map(|run| run.request.id)
     }
 
-    /// Whether a sync is running.
+    /// Whether a sync is running or waiting to.
     pub fn busy(&self) -> bool {
-        self.run.is_some()
+        self.run.is_some() || self.queued.is_some()
     }
 
     /// The running player's progress, once core has reported any.
@@ -126,9 +164,12 @@ impl LogsSync {
         }
         let client = cx.global::<Services>().logs.clone();
         let cancel = LogsCancel::new();
+        let run_cancel = cancel.clone();
+        let (ended_tx, ended) = async_channel::bounded::<()>(1);
         // Only the newest progress is kept, so a slow frame skips counts rather than queueing them.
         let (tx, mut rx) = tokio::sync::watch::channel(None::<SyncProgress>);
         let job = tokio_bridge::spawn(cx, async move {
+            let _ended = ended_tx;
             let Request { id, range, force } = request;
             let cache = client.cache();
             // Read once when downloads start: logs in the window an earlier run already handled.
@@ -169,6 +210,8 @@ impl LogsSync {
         self.run = Some(Run {
             request,
             progress: None,
+            cancel: run_cancel,
+            ended,
             _task: task,
         });
     }
@@ -211,6 +254,9 @@ impl LogsSync {
         }
         self.run = None;
         cx.emit(LogsSyncEvent::Finished(id));
+        if let Some(next) = self.queued.take() {
+            self.spawn(next, cx);
+        }
         cx.notify();
     }
 }
