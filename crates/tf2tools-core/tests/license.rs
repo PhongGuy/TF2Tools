@@ -96,6 +96,7 @@ fn the_readme_credits_every_outside_source() {
         "licenses/hud-db-MIT.txt",
         "GameBanana Co LLC",
         "serveme.tf",
+        "logs.tf",
         "Valve Corporation",
     ] {
         assert!(section.contains(needed), "missing: {needed}");
@@ -105,6 +106,7 @@ fn the_readme_credits_every_outside_source() {
         "mastercomfig",
         "GameBanana",
         "serveme.tf",
+        "logs.tf",
     ] {
         let disclaimer = format!(
             "TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with {source}"
