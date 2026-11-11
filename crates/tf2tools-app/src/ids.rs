@@ -2654,6 +2654,14 @@ pub const LOGSTF_ROUNDS: &str = "logstf-rounds";
 /// The sideways scroll around the open log's rounds table.
 pub const LOGSTF_ROUNDS_SCROLL: &str = "logstf-rounds-scroll";
 
+/// The rounds table's header line: "logstf-rounds-head".
+pub const LOGSTF_ROUNDS_HEAD: &str = "logstf-rounds-head";
+
+/// The header line over an open round's players: "logstf-round-players-head:<log>:<n>".
+pub fn logstf_round_players_head(log: u64, round: usize) -> ElementId {
+    keyed("logstf-round-players-head", &format!("{log}:{round}"))
+}
+
 /// One round's row in the open log, which opens or closes it: "logstf-round:<log>:<n>".
 pub fn logstf_round(log: u64, round: usize) -> ElementId {
     keyed("logstf-round", &format!("{log}:{round}"))

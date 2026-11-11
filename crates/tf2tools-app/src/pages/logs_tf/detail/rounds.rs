@@ -12,19 +12,22 @@ use gpui_kit::{
 };
 use tf2tools_core::{LogDetail, RoundLine, SteamId, Team};
 
-use super::{NUMBER, number, team_cell, team_colour};
+use super::{NUMBER, team_cell, team_colour};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::text::{EventPart, duration_text, event_parts, team_name};
 use crate::widgets::labelled;
 
-// The rounds table's fixed columns, and the open round's name and description columns.
+// The rounds table's least column widths, which share out the table's width as on logs.tf,
+// and the open round's fixed columns.
 const ROUND: Pixels = px(48.);
 const LENGTH: Pixels = px(52.);
 const SCORE: Pixels = px(56.);
+const TEAM_NUMBER: Pixels = px(52.);
 const MIDFIGHTS: Pixels = px(64.);
 const TEAM: Pixels = px(40.);
 const NAME: Pixels = px(200.);
+const ROUND_NUMBER: Pixels = px(56.);
 const TYPE: Pixels = px(96.);
 const DESCRIPTION: Pixels = px(280.);
 
@@ -58,19 +61,20 @@ pub(super) fn rounds_table(
             .find(|p| p.steam_id() == id)
             .map(|p| p.team())
     };
-    let fixed = |width: Pixels, text: &'static str| div().w(width).flex_none().child(text);
     let mut table = v_flex().child(
         h_flex()
+            .id(ids::LOGSTF_ROUNDS_HEAD)
+            .test_support()
             .gap_1()
             .px_1()
             .py_1()
             .text_color(cx.theme().muted_foreground)
             .font_weight(FontWeight::MEDIUM)
-            .child(fixed(ROUND, "Round"))
-            .child(fixed(LENGTH, "Length"))
-            .child(fixed(SCORE, "Score"))
-            .children(COLUMNS.map(|(title, _)| number(title.to_owned())))
-            .child(fixed(MIDFIGHTS, "Midfights"))
+            .child(spread(ROUND).child("Round"))
+            .child(spread(LENGTH).child("Length"))
+            .child(spread(SCORE).child("Score"))
+            .children(COLUMNS.map(|(title, _)| spread(TEAM_NUMBER).text_right().child(title)))
+            .child(spread(MIDFIGHTS).child("Midfights"))
             .child(div().w(px(16.)).flex_none()),
     );
     for (n, round) in detail.rounds().iter().enumerate() {
@@ -106,18 +110,15 @@ fn round_row(
                 .aria_description(format!("{} won", team_name(team)))
         })
         .test_support()
-        .w(SCORE)
-        .flex_none()
+        .flex_1()
+        .min_w(SCORE)
         .font_weight(FontWeight::SEMIBOLD)
         .child(score);
     let midfight = round.midfight().map_or("-", team_name);
     let midfight = labelled(
-        div()
-            .w(MIDFIGHTS)
-            .flex_none()
-            .when_some(colour(round.midfight()), |el, c| {
-                el.text_color(c).font_weight(FontWeight::BOLD)
-            }),
+        spread(MIDFIGHTS).when_some(colour(round.midfight()), |el, c| {
+            el.text_color(c).font_weight(FontWeight::BOLD)
+        }),
         ids::logstf_round_midfight(log, n),
         midfight,
     );
@@ -139,15 +140,14 @@ fn round_row(
         .on_click(move |_, _, cx| {
             let _ = page.update(cx, |page, cx| page.toggle_round(n, cx));
         })
-        .child(div().w(ROUND).flex_none().child((n + 1).to_string()))
-        .child(
-            div()
-                .w(LENGTH)
-                .flex_none()
-                .child(duration_text(round.length())),
-        )
+        .child(spread(ROUND).child((n + 1).to_string()))
+        .child(spread(LENGTH).child(duration_text(round.length())))
         .child(score)
-        .children(COLUMNS.map(|(_, read)| number(read(round).to_string())))
+        .children(COLUMNS.map(|(_, read)| {
+            spread(TEAM_NUMBER)
+                .text_right()
+                .child(read(round).to_string())
+        }))
         .child(midfight)
         .child(Icon::new(chevron).xsmall().flex_none())
 }
@@ -180,10 +180,12 @@ fn round_panel(
     let players = v_flex()
         .child(
             head()
+                .id(ids::logstf_round_players_head(log, n))
+                .test_support()
                 .child(div().w(TEAM).flex_none().child("Team"))
                 .child(div().w(NAME).flex_none().child("Name"))
-                .child(number("Kills".to_owned()))
-                .child(number("Damage".to_owned())),
+                .child(round_number("Kills".to_owned()))
+                .child(round_number("Damage".to_owned())),
         )
         .children(round.players().iter().map(|p| {
             let name = name_of(p.steam_id());
@@ -193,8 +195,8 @@ fn round_panel(
                 .test_support()
                 .child(team_cell(p.team(), cx).w(TEAM))
                 .child(div().w(NAME).flex_none().truncate().child(name))
-                .child(number(p.kills().to_string()))
-                .child(number(p.dmg().to_string()))
+                .child(round_number(p.kills().to_string()))
+                .child(round_number(p.dmg().to_string()))
         }));
     let events = v_flex()
         .child(
@@ -235,6 +237,22 @@ fn round_panel(
         .border_color(cx.theme().border)
         .child(players)
         .child(events)
+}
+
+// A rounds table column at least `width` wide that takes its share of the spare width and
+// keeps its text on one line.
+fn spread(width: Pixels) -> Div {
+    div().flex_1().min_w(width).whitespace_nowrap()
+}
+
+// A number in an open round's players, wide enough for "Damage" on one line.
+fn round_number(text: String) -> Div {
+    div()
+        .w(ROUND_NUMBER)
+        .flex_none()
+        .text_right()
+        .whitespace_nowrap()
+        .child(text)
 }
 
 // An event's description as one string, with each stretch that names a team or one of its

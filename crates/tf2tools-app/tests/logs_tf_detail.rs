@@ -724,3 +724,23 @@ fn the_sorted_header_shows_its_direction(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::logstf_sort("DA"));
     assert_eq!(arrow(cx, "DA").as_deref(), Some("low to high"));
 }
+
+#[gpui_kit::test]
+fn round_headers_stay_on_one_line_and_spread_across_the_table(cx: &mut TestAppContext) {
+    let (_env, _server, s, _page) = opened_at(cx, 3, 1280., 800., ids::LOGSTF_ROUNDS);
+    let head = support::bounds_of(cx, s.win, ids::LOGSTF_ROUNDS_HEAD).unwrap();
+    let row = support::bounds_of(cx, s.win, ids::logstf_round(3, 0)).unwrap();
+    assert!(head.size.height <= row.size.height, "{head:?} {row:?}");
+    // The last column ends near the table's right edge, as on logs.tf, rather than mid-way.
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_ROUNDS_SCROLL).unwrap();
+    let midfight = support::bounds_of(cx, s.win, ids::logstf_round_midfight(3, 0)).unwrap();
+    assert!(
+        midfight.right() >= table.right() - gpui_kit::px(40.),
+        "{midfight:?} in {table:?}"
+    );
+
+    support::click_id(cx, s.win, ids::logstf_round(3, 0));
+    let head = support::bounds_of(cx, s.win, ids::logstf_round_players_head(3, 0)).unwrap();
+    let row = support::bounds_of(cx, s.win, ids::logstf_round_player(3, 0, sid(ARIE))).unwrap();
+    assert!(head.size.height < row.size.height * 1.5, "{head:?} {row:?}");
+}
