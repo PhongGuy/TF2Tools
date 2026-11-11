@@ -215,4 +215,9 @@ fn a_player_whose_last_game_is_old_still_sees_it_in_a_short_range(cx: &mut TestA
     let page = open_page(cx, &s);
     assert_eq!(row_ids(cx, &page), [3]);
     assert!(!support::present(cx, s.win, ids::LOGSTF_NO_LOGS));
+    let summary = support::label_of(cx, s.win, ids::LOGSTF_SUMMARY).unwrap();
+    assert!(
+        summary.starts_with("3 months up to ") && summary.ends_with(", 1 log"),
+        "{summary}"
+    );
 }

@@ -201,20 +201,44 @@ pub fn range_label(range: LogsRange) -> &'static str {
     }
 }
 
-/// The line under the class grid: the range, then how many logs it holds:
-/// "Last 3 months, 87 logs", "Last month, 1 log", "All logs, 4,812".
-pub fn summary_text(range: LogsRange, logs: usize) -> String {
-    // "Last month" and "Last year" drop the stop label's "1".
-    let span = match range {
-        LogsRange::Month1 => "month",
-        LogsRange::Year1 => "year",
-        LogsRange::All => return format!("All logs, {}", count_text(logs)),
-        other @ (LogsRange::Months3 | LogsRange::Months6 | LogsRange::Years2 | _) => {
-            range_label(other)
-        }
-    };
+/// The line under the class grid: the range, then how many logs it holds. The range counts
+/// back from `newest`, the newest log's upload time, so it reads as "Last 3 months, 87 logs"
+/// only while that log is at most a week before `now`; an older one names the day the range
+/// ends: "1 year up to 13 Dec 2022, 274 logs". `All` reads "All logs, 4,812".
+pub fn summary_text(range: LogsRange, logs: usize, newest: Option<i64>, now: i64) -> String {
+    const RECENT: i64 = 7 * 86_400;
+    let count = count_text(logs);
+    if range == LogsRange::All {
+        return format!("All logs, {count}");
+    }
     let noun = if logs == 1 { "log" } else { "logs" };
-    format!("Last {span}, {} {noun}", count_text(logs))
+    match newest.filter(|&newest| now - newest > RECENT) {
+        Some(newest) => format!(
+            "{} up to {}, {count} {noun}",
+            range_label(range),
+            day_text(newest)
+        ),
+        None => {
+            // "Last month" and "Last year" drop the stop label's "1".
+            let span = match range {
+                LogsRange::Month1 => "month",
+                LogsRange::Year1 => "year",
+                other => range_label(other),
+            };
+            format!("Last {span}, {count} {noun}")
+        }
+    }
+}
+
+// A day on this computer's clock as a player writes it: "13 Dec 2022".
+fn day_text(unix: i64) -> String {
+    chrono::DateTime::from_timestamp(unix, 0)
+        .map(|t| {
+            t.with_timezone(&chrono::Local)
+                .format("%-d %b %Y")
+                .to_string()
+        })
+        .unwrap_or_default()
 }
 
 /// The log list's line when logs.tf has no logs for the active player.

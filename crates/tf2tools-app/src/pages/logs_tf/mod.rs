@@ -1070,6 +1070,7 @@ impl LogsTfPage {
                         grid::class_grid(
                             averages,
                             self.rows.len(),
+                            self.rows.first().map(LogRow::date),
                             self.range,
                             &self.range_slider,
                             cx.entity().downgrade(),

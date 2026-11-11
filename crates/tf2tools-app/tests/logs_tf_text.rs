@@ -97,18 +97,16 @@ fn grid_numbers_format_like_the_spec() {
 
 #[test]
 fn the_summary_names_the_range_and_counts_its_logs() {
-    assert_eq!(summary_text(LogsRange::Month1, 1), "Last month, 1 log");
-    assert_eq!(
-        summary_text(LogsRange::Months3, 87),
-        "Last 3 months, 87 logs"
-    );
-    assert_eq!(summary_text(LogsRange::Months6, 2), "Last 6 months, 2 logs");
-    assert_eq!(
-        summary_text(LogsRange::Year1, 1_400),
-        "Last year, 1,400 logs"
-    );
-    assert_eq!(summary_text(LogsRange::Years2, 12), "Last 2 years, 12 logs");
-    assert_eq!(summary_text(LogsRange::All, 4_812), "All logs, 4,812");
+    // A newest log from yesterday reads as the last span counted from today.
+    let now = noon(2026, 11, 11);
+    let recent = Some(now - 86_400);
+    let summary = |range, logs| summary_text(range, logs, recent, now);
+    assert_eq!(summary(LogsRange::Month1, 1), "Last month, 1 log");
+    assert_eq!(summary(LogsRange::Months3, 87), "Last 3 months, 87 logs");
+    assert_eq!(summary(LogsRange::Months6, 2), "Last 6 months, 2 logs");
+    assert_eq!(summary(LogsRange::Year1, 1_400), "Last year, 1,400 logs");
+    assert_eq!(summary(LogsRange::Years2, 12), "Last 2 years, 12 logs");
+    assert_eq!(summary(LogsRange::All, 4_812), "All logs, 4,812");
     let labels: Vec<&str> = LogsRange::STOPS.into_iter().map(range_label).collect();
     assert_eq!(
         labels,
@@ -117,6 +115,45 @@ fn the_summary_names_the_range_and_counts_its_logs() {
         ]
     );
     assert!(!EMPTY_TEXT.contains("90 days"), "{EMPTY_TEXT}");
+}
+
+// Noon on a day on this computer's clock, as unix seconds.
+fn noon(year: i32, month: u32, day: u32) -> i64 {
+    use chrono::TimeZone as _;
+    chrono::Local
+        .with_ymd_and_hms(year, month, day, 12, 0, 0)
+        .unwrap()
+        .timestamp()
+}
+
+#[test]
+fn an_old_newest_log_names_the_day_the_range_ends() {
+    // The window counts back from the newest log, so an old one is named, not "last".
+    let now = noon(2026, 11, 11);
+    let old = Some(noon(2022, 12, 13));
+    assert_eq!(
+        summary_text(LogsRange::Year1, 274, old, now),
+        "1 year up to 13 Dec 2022, 274 logs"
+    );
+    assert_eq!(
+        summary_text(LogsRange::Month1, 1, old, now),
+        "1 month up to 13 Dec 2022, 1 log"
+    );
+    assert_eq!(summary_text(LogsRange::All, 274, old, now), "All logs, 274");
+    // Up to a week old still reads as recent; a day past that names the date.
+    let week = 7 * 86_400;
+    assert_eq!(
+        summary_text(LogsRange::Months3, 5, Some(now - week), now),
+        "Last 3 months, 5 logs"
+    );
+    assert!(
+        summary_text(LogsRange::Months3, 5, Some(now - week - 86_400), now)
+            .starts_with("3 months up to "),
+    );
+    assert_eq!(
+        summary_text(LogsRange::Months3, 0, None, now),
+        "Last 3 months, 0 logs"
+    );
 }
 
 #[test]

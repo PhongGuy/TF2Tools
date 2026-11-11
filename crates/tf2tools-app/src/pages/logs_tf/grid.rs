@@ -25,11 +25,12 @@ const RANGE_WIDTH: f32 = 320.;
 // How far the slider's handle reaches past the track's end, so the labels line up with it.
 const THUMB_REACH: f32 = 11.;
 
-/// The nine cards, wrapping, with the summary line for `logs` in `range` and the range
-/// slider under them.
+/// The nine cards, wrapping, with the summary line for `logs` in `range` back from `newest`
+/// and the range slider under them.
 pub(super) fn class_grid(
     averages: &[ClassAverage; 9],
     logs: usize,
+    newest: Option<i64>,
     range: LogsRange,
     slider: &Entity<SliderState>,
     page: WeakEntity<LogsTfPage>,
@@ -55,7 +56,7 @@ pub(super) fn class_grid(
                     labelled(
                         div().text_sm().text_color(muted),
                         ids::LOGSTF_SUMMARY,
-                        summary_text(range, logs),
+                        summary_text(range, logs, newest, chrono::Utc::now().timestamp()),
                     )
                 }))
                 .child(range_picker(slider, page)),
