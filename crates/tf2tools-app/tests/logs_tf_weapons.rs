@@ -549,3 +549,45 @@ fn a_pick_while_a_load_reads_gets_its_weapons_once_the_load_lands(cx: &mut TestA
     assert_eq!(cx.update(|cx| page.read(cx).active()), Some(sid(CABO)));
     assert_eq!(first, Some((TfClass::Scout, Some(17))));
 }
+
+#[gpui_kit::test]
+fn a_read_from_before_a_close_never_lands_after_a_reopen(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    // Scout's first read finishes off the UI thread with one log and waits to land.
+    cx.update(|cx| page.update(cx, |p, cx| p.pick_class(TfClass::Scout, cx)));
+    while cx.dispatcher.scheduler().tick_background_only() {}
+    // Scout's weapon rows go, so a read from here on sees no logs and tells the two apart.
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute("DELETE FROM logstf_weapon_rows WHERE class = 'scout'", [])
+        .unwrap();
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let _watch = cx.update(|cx| {
+        let seen = Rc::clone(&seen);
+        cx.observe(&page, move |page, cx| {
+            seen.borrow_mut()
+                .push(page.read(cx).class_weapons().map(|(c, w)| (c, w.logs())))
+        })
+    });
+    cx.update(|cx| {
+        page.update(cx, |p, cx| {
+            p.close_class(cx);
+            p.pick_class(TfClass::Scout, cx);
+        })
+    });
+    support::wait_real(cx, "the reopened read", |cx| {
+        cx.update(|cx| page.read(cx).class_weapons().map(|(c, w)| (c, w.logs())))
+            == Some((TfClass::Scout, 0))
+    });
+    support::settle(cx, s.win);
+    assert!(
+        !seen.borrow().contains(&Some((TfClass::Scout, 1))),
+        "the read from before the close landed: {:?}",
+        seen.borrow()
+    );
+    assert_eq!(picked(cx, &page), Some(TfClass::Scout));
+}
