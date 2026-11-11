@@ -65,8 +65,10 @@ fn bar<H: ScrollbarHandle + Clone>(
 /// scrolls the page around it. While the content overflows, the bar stays drawn as a hint in a
 /// strip of its own under the content. The box carries `id` and keeps its offset under that id.
 pub fn sideways(id: impl Into<ElementId>, content: impl IntoElement) -> Sideways {
+    let id = id.into();
     Sideways {
-        id: id.into(),
+        offset_key: id.clone(),
+        id,
         content: content.into_any_element(),
     }
 }
@@ -75,7 +77,17 @@ pub fn sideways(id: impl Into<ElementId>, content: impl IntoElement) -> Sideways
 #[derive(IntoElement)]
 pub struct Sideways {
     id: ElementId,
+    offset_key: ElementId,
     content: AnyElement,
+}
+
+impl Sideways {
+    /// Keeps the offset under `key` instead of the box's id, so every box given the same key
+    /// scrolls as one: a table split into parts keeps its columns lined up.
+    pub fn shared(mut self, key: impl Into<ElementId>) -> Self {
+        self.offset_key = key.into();
+        self
+    }
 }
 
 // A sideways box's offset, and whether its content overflowed when last laid out.
@@ -86,7 +98,7 @@ struct SidewaysState {
 
 impl RenderOnce for Sideways {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let state = window.use_keyed_state(self.id.clone(), cx, |_, _| SidewaysState {
+        let state = window.use_keyed_state(self.offset_key.clone(), cx, |_, _| SidewaysState {
             handle: ScrollHandle::default(),
             overflows: false,
         });

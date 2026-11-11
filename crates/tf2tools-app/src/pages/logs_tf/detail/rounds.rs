@@ -25,7 +25,8 @@ const ROUND: Pixels = px(48.);
 const LENGTH: Pixels = px(52.);
 const SCORE: Pixels = px(56.);
 const TEAM_NUMBER: Pixels = px(52.);
-const MIDFIGHTS: Pixels = px(64.);
+// Wide enough for the "Midfights" header, so the header lays out like the rows under it.
+const MIDFIGHTS: Pixels = px(68.);
 const TEAM: Pixels = px(40.);
 const NAME: Pixels = px(200.);
 const ROUND_NUMBER: Pixels = px(56.);
@@ -53,7 +54,8 @@ const COLUMNS: [Column; 6] = [
 /// Log `log`'s rounds in logs.tf's columns, one row each. A click on a row asks `page` to open
 /// or close it; each round in `open` shows its players and events under its row. The rows
 /// scroll sideways in boxes that break at each open round, so a box's bar sits under its rows
-/// and the round's panel, sized to the window, never scrolls with them.
+/// and the round's panel, sized to the window, never scrolls with them. The boxes share one
+/// offset, so every part stays under the header.
 pub(super) fn rounds_table(
     log: u64,
     detail: &LogDetail,
@@ -98,7 +100,8 @@ pub(super) fn rounds_table(
         let is_open = open.contains(&n);
         rows = rows.child(round_row(log, n, round, is_open, page.clone(), cx));
         if is_open || n == last {
-            table = table.child(sideways(scroll_id, std::mem::replace(&mut rows, v_flex())));
+            let part = sideways(scroll_id, std::mem::replace(&mut rows, v_flex()));
+            table = table.child(part.shared(ids::LOGSTF_ROUNDS_SCROLL));
             scroll_id = ids::logstf_rounds_scroll_after(n);
         }
         if is_open {

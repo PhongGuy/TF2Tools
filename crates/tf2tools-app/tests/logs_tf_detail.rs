@@ -974,6 +974,46 @@ fn an_open_round_sits_below_the_rounds_sideways_bar_at_800(cx: &mut TestAppConte
 }
 
 #[gpui_kit::test]
+fn the_rounds_parts_scroll_sideways_together_at_800(cx: &mut TestAppContext) {
+    use gpui_kit::{InputEvent as _, ScrollDelta, ScrollEvent, point, px};
+    let (_env, _server, s, page) = opened_at(cx, 3, 800., 600., ids::LOGSTF_ROUNDS);
+    support::click_id(cx, s.win, ids::logstf_round(3, 0));
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_round(3, 1));
+    let left = |cx: &mut TestAppContext, id: gpui_kit::ElementId| {
+        support::bounds_of(cx, s.win, id).unwrap().left()
+    };
+    let head = left(cx, ids::logstf_rounds_column("RED DA"));
+    for n in [0, 1] {
+        let cell = left(cx, ids::logstf_round_cell(3, n, "RED DA"));
+        assert_eq!(cell, head, "round {n}'s cell starts off its header");
+    }
+    // A sideways wheel over the part after the open round, as a trackpad sends it.
+    let lower = support::bounds_of(cx, s.win, ids::logstf_round(3, 1)).unwrap();
+    let event = ScrollEvent {
+        position: point(lower.center().x, lower.center().y),
+        delta: ScrollDelta::Lines(point(-3., 0.)),
+        ..Default::default()
+    };
+    cx.update_window(s.win, |_, w, cx| {
+        let _ = w.dispatch_event(event.to_platform_input(), cx);
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    let moved = left(cx, ids::logstf_rounds_column("RED DA"));
+    let below = left(cx, ids::logstf_round_cell(3, 1, "RED DA"));
+    assert!(below < head - px(1.), "the wheel moved nothing: {below:?}");
+    assert!(
+        moved < head - px(1.),
+        "the header stayed at {head:?}: {moved:?}"
+    );
+    // Every row's cell stays under its header.
+    for n in [0, 1] {
+        let cell = left(cx, ids::logstf_round_cell(3, n, "RED DA"));
+        assert_eq!(cell, moved, "round {n}'s cell left its header");
+    }
+}
+
+#[gpui_kit::test]
 fn the_team_table_fits_the_smallest_window(cx: &mut TestAppContext) {
     use tf2tools_core::Team;
     let (_env, _server, s, _page) = opened_at(cx, 3, 800., 600., ids::LOGSTF_TEAMS_SCROLL);
