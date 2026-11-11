@@ -83,29 +83,24 @@ pub struct Sideways {
 
 impl Sideways {
     /// Keeps the offset under `key` instead of the box's id, so every box given the same key
-    /// scrolls as one: a table split into parts keeps its columns lined up.
+    /// scrolls as one: a table split into parts keeps its columns lined up. Each box still
+    /// shows its own bar strip, and the shared offset is clamped to the smallest part's maximum.
     pub fn shared(mut self, key: impl Into<ElementId>) -> Self {
         self.offset_key = key.into();
         self
     }
 }
 
-// A sideways box's offset, and whether its content overflowed when last laid out.
-struct SidewaysState {
-    handle: ScrollHandle,
-    overflows: bool,
-}
-
 impl RenderOnce for Sideways {
     fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
-        let state = window.use_keyed_state(self.offset_key.clone(), cx, |_, _| SidewaysState {
-            handle: ScrollHandle::default(),
-            overflows: false,
-        });
-        let (handle, overflows) = {
-            let s = state.read(cx);
-            (s.handle.clone(), s.overflows)
-        };
+        // The offset lives under the shared key; whether the content overflows is each box's
+        // own, since parts of a split table can differ in width.
+        let handle = window
+            .use_keyed_state(self.offset_key.clone(), cx, |_, _| ScrollHandle::default())
+            .read(cx)
+            .clone();
+        let state = window.use_keyed_state((self.id.clone(), "overflows"), cx, |_, _| false);
+        let overflows = *state.read(cx);
         // Overflow is known only once the area is laid out, so a probe after it records any
         // change and redraws, opening or closing the bar's strip a frame later.
         let probe = {
@@ -114,7 +109,7 @@ impl RenderOnce for Sideways {
                 move |_, window, cx| {
                     let now = handle.max_offset().x > px(0.);
                     if now != overflows {
-                        state.update(cx, |s, _| s.overflows = now);
+                        state.update(cx, |s, _| *s = now);
                         window.refresh();
                     }
                 },
