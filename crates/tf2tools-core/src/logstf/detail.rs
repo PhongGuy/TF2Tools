@@ -24,7 +24,9 @@ pub struct LogDetail {
     players: Vec<PlayerLine>,
     columns: LogColumns,
     medics: Vec<MedicLine>,
-    class_kills: Vec<ClassKills>,
+    class_kills: Vec<MatrixRow>,
+    class_kill_assists: Vec<MatrixRow>,
+    class_deaths: Vec<MatrixRow>,
     rounds: Vec<RoundLine>,
 }
 
@@ -65,9 +67,15 @@ impl LogDetail {
     pub fn medics(&self) -> &[MedicLine] {
         &self.medics
     }
-    /// Kills by victim class, one entry per player with any, in the players' order.
-    pub fn class_kills(&self) -> &[ClassKills] {
-        &self.class_kills
+    /// One row per player in the players' order, counting `kind` by the other player's
+    /// class; a player logs.tf has no entry for reads as zeros.
+    pub fn class_matrix(&self, kind: MatrixKind) -> Vec<MatrixRow> {
+        match kind {
+            MatrixKind::Kills => &self.class_kills,
+            MatrixKind::KillsAssists => &self.class_kill_assists,
+            MatrixKind::Deaths => &self.class_deaths,
+        }
+        .clone()
     }
     /// The rounds in play order; empty when the log has none or they do not read.
     pub fn rounds(&self) -> &[RoundLine] {
@@ -673,22 +681,39 @@ impl HealTarget {
     }
 }
 
-/// One player's kills by victim class.
-#[derive(Debug, Clone, PartialEq)]
+/// Which of logs.tf's three class matrices to read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub struct ClassKills {
-    steam_id: SteamId,
-    kills: Vec<(TfClass, u32)>,
+pub enum MatrixKind {
+    /// Kills by victim class (`classkills`).
+    Kills,
+    /// Kills plus assists by victim class (`classkillassists`).
+    KillsAssists,
+    /// Deaths by killer class (`classdeaths`).
+    Deaths,
 }
 
-impl ClassKills {
-    /// The killer's Steam ID.
+/// One player's row of a class matrix.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MatrixRow {
+    steam_id: SteamId,
+    counts: [u32; 9],
+    total: u32,
+}
+
+impl MatrixRow {
+    /// The player's Steam ID.
     pub fn steam_id(&self) -> SteamId {
         self.steam_id
     }
-    /// Kills per victim class in TF2 order, classes with none left out.
-    pub fn kills(&self) -> &[(TfClass, u32)] {
-        &self.kills
+    /// The count against each class, in `TfClass::ALL` order.
+    pub fn counts(&self) -> [u32; 9] {
+        self.counts
+    }
+    /// The sum of `counts`.
+    pub fn total(&self) -> u32 {
+        self.total
     }
 }
 
@@ -766,27 +791,31 @@ fn build(wire: WireLog) -> LogDetail {
         })
         .collect();
 
-    let class_kills = players
-        .iter()
-        .filter_map(|(key, line, _)| {
-            let by_class = wire.classkills.get(key)?;
-            let kills: Vec<(TfClass, u32)> = TfClass::ALL
-                .iter()
-                .filter_map(|&class| {
-                    let n = by_class
-                        .iter()
-                        .filter(|(name, _)| logstf_class(name) == Some(class))
-                        .map(|(_, n)| *n)
-                        .sum::<u32>();
-                    (n > 0).then_some((class, n))
-                })
-                .collect();
-            (!kills.is_empty()).then_some(ClassKills {
-                steam_id: line.steam_id,
-                kills,
+    // Every player gets a row: a missing entry or class reads as 0, and names fold
+    // through logstf_class so `heavyweapons` lands on Heavy.
+    let matrix = |wire_map: &BTreeMap<String, BTreeMap<String, u32>>| -> Vec<MatrixRow> {
+        players
+            .iter()
+            .map(|(key, line, _)| {
+                let by_class = wire_map.get(key);
+                let counts = TfClass::ALL.map(|class| {
+                    by_class.map_or(0, |m| {
+                        m.iter()
+                            .filter(|(name, _)| logstf_class(name) == Some(class))
+                            .fold(0u32, |sum, (_, n)| sum.saturating_add(*n))
+                    })
+                });
+                MatrixRow {
+                    steam_id: line.steam_id,
+                    counts,
+                    total: counts.iter().fold(0u32, |sum, n| sum.saturating_add(*n)),
+                }
             })
-        })
-        .collect();
+            .collect()
+    };
+    let class_kills = matrix(&wire.classkills);
+    let class_kill_assists = matrix(&wire.classkillassists);
+    let class_deaths = matrix(&wire.classdeaths);
 
     LogDetail {
         length: wire.length,
@@ -806,6 +835,8 @@ fn build(wire: WireLog) -> LogDetail {
         },
         medics,
         class_kills,
+        class_kill_assists,
+        class_deaths,
         rounds: wire.rounds.into_iter().map(round_line).collect(),
     }
 }
@@ -1004,6 +1035,10 @@ struct WireLog {
     healspread: BTreeMap<String, BTreeMap<String, u32>>,
     #[serde(default, deserialize_with = "count_maps")]
     classkills: BTreeMap<String, BTreeMap<String, u32>>,
+    #[serde(default, deserialize_with = "count_maps")]
+    classkillassists: BTreeMap<String, BTreeMap<String, u32>>,
+    #[serde(default, deserialize_with = "count_maps")]
+    classdeaths: BTreeMap<String, BTreeMap<String, u32>>,
     #[serde(default, deserialize_with = "lenient_list")]
     rounds: Vec<WireRound>,
 }

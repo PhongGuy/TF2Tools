@@ -1,6 +1,8 @@
 //! The full log: rounds and events, weapons, medic details, class matrices, streaks and chat.
 
-use tf2tools_core::{EventKind, LogDetail, Medigun, STEAM_ID64_BASE, SteamId, Team, parse_log};
+use tf2tools_core::{
+    EventKind, LogDetail, MatrixKind, Medigun, STEAM_ID64_BASE, SteamId, Team, parse_log,
+};
 
 use tf2tools_core::TfClass;
 
@@ -428,4 +430,55 @@ fn heal_targets_carry_their_longest_class_and_charges_name_their_medigun() {
         [(Medigun::Kritzkrieg, 2), (Medigun::MediGun, 3)]
     );
     assert_eq!(medic.near_full_deaths(), 0, "no medicstats reads as zeros");
+}
+
+#[test]
+fn class_matrices_have_a_row_for_every_player() {
+    for log in [six(), hl()] {
+        let players: Vec<SteamId> = log.players().iter().map(|p| p.steam_id()).collect();
+        for kind in [
+            MatrixKind::Kills,
+            MatrixKind::KillsAssists,
+            MatrixKind::Deaths,
+        ] {
+            let ids: Vec<SteamId> = log
+                .class_matrix(kind)
+                .iter()
+                .map(|r| r.steam_id())
+                .collect();
+            assert_eq!(ids, players, "{kind:?}");
+        }
+    }
+    let log = six();
+    let row = |kind: MatrixKind, account: u64| {
+        log.class_matrix(kind)
+            .into_iter()
+            .find(|r| r.steam_id() == sid(account))
+            .unwrap()
+    };
+    let arie = row(MatrixKind::Kills, 231_702);
+    assert_eq!(
+        (arie.counts(), arie.total()),
+        ([3, 2, 1, 1, 0, 0, 0, 0, 0], 7)
+    );
+    let arie = row(MatrixKind::KillsAssists, 231_702);
+    assert_eq!(
+        (arie.counts(), arie.total()),
+        ([4, 5, 2, 2, 0, 0, 0, 0, 0], 13)
+    );
+    // The Blue medic has no classkills entry: the row reads as zeros.
+    let meta = row(MatrixKind::Kills, 98_265_577);
+    assert_eq!((meta.counts(), meta.total()), ([0; 9], 0));
+    let meta = row(MatrixKind::Deaths, 98_265_577);
+    assert_eq!(
+        (meta.counts(), meta.total()),
+        ([1, 3, 0, 2, 0, 0, 1, 1, 0], 8)
+    );
+    let hl = hl();
+    let manchester = hl
+        .class_matrix(MatrixKind::Kills)
+        .into_iter()
+        .find(|r| r.steam_id() == sid(306_968_798))
+        .unwrap();
+    assert_eq!(manchester.total(), 0);
 }

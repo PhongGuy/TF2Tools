@@ -8,7 +8,8 @@ use gpui_kit::{
     ParentElement as _, Pixels, Styled as _, TestSupportExt as _, div, px,
 };
 use tf2tools_core::{
-    LogColumns, LogDetail, LogRow, MedicLine, PlayerLine, SteamId, Team, TfClass, TrackedPlayer,
+    LogColumns, LogDetail, LogRow, MatrixKind, MedicLine, PlayerLine, SteamId, Team, TfClass,
+    TrackedPlayer,
 };
 
 use super::list::open_link;
@@ -94,9 +95,9 @@ fn header(row: &LogRow, cx: &App) -> impl IntoElement {
 fn log_body(log: &LogDetail, tracked: &[TrackedPlayer], cx: &App) -> impl IntoElement {
     let is_tracked = |id: SteamId| tracked.iter().any(|p| p.steam_id() == id);
     let kills: Vec<_> = log
-        .class_kills()
-        .iter()
-        .filter(|k| is_tracked(k.steam_id()))
+        .class_matrix(MatrixKind::Kills)
+        .into_iter()
+        .filter(|k| is_tracked(k.steam_id()) && k.total() > 0)
         .collect();
     let name_of = |id: SteamId| {
         log.players()
@@ -134,24 +135,21 @@ fn log_body(log: &LogDetail, tracked: &[TrackedPlayer], cx: &App) -> impl IntoEl
             );
             for line in kills {
                 let id = line.steam_id();
-                let count = |class| {
-                    line.kills()
-                        .iter()
-                        .find(|(c, _)| *c == class)
-                        .map(|(_, n)| n.to_string())
-                        .unwrap_or_default()
-                };
-                table = table.child(
-                    h_flex()
-                        .id(ids::logstf_class_kills(id))
-                        .test_support()
-                        .gap_1()
-                        .py_1()
-                        .border_t_1()
-                        .border_color(cx.theme().border)
-                        .child(div().flex_1().min_w_0().truncate().child(name_of(id)))
-                        .children(TfClass::ALL.map(|class| number(count(class)))),
-                );
+                let counts = line.counts();
+                table =
+                    table.child(
+                        h_flex()
+                            .id(ids::logstf_class_kills(id))
+                            .test_support()
+                            .gap_1()
+                            .py_1()
+                            .border_t_1()
+                            .border_color(cx.theme().border)
+                            .child(div().flex_1().min_w_0().truncate().child(name_of(id)))
+                            .children(counts.map(|n| {
+                                number(if n == 0 { String::new() } else { n.to_string() })
+                            })),
+                    );
             }
             el.child(section("Class kills", table.max_w(px(560.)), cx))
         })

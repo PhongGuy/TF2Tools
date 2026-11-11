@@ -1,6 +1,8 @@
 //! Reading a logs.tf log body into the expanded view's shape.
 
-use tf2tools_core::{LogParseError, Medigun, STEAM_ID64_BASE, SteamId, Team, TfClass, parse_log};
+use tf2tools_core::{
+    LogParseError, MatrixKind, Medigun, STEAM_ID64_BASE, SteamId, Team, TfClass, parse_log,
+};
 
 use crate::common::logstf::{PlayerSpec, log_body, logstf_fixture};
 
@@ -101,11 +103,14 @@ fn a_highlander_medic_has_charges_spread_and_class_kills() {
     assert_eq!(medic.heal_spread()[0].steam_id(), sid(866_286_911));
     assert_eq!(medic.heal_spread()[0].healing(), 13_725);
     let kills = log
-        .class_kills()
-        .iter()
+        .class_matrix(MatrixKind::Kills)
+        .into_iter()
         .find(|k| k.steam_id() == sid(302_123_669))
         .unwrap();
-    assert_eq!(kills.kills(), [(TfClass::Spy, 1)]);
+    assert_eq!(
+        (kills.counts(), kills.total()),
+        ([0, 0, 0, 0, 0, 0, 0, 0, 1], 1)
+    );
 }
 
 #[test]
