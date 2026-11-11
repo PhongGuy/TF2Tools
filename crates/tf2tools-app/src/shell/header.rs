@@ -21,7 +21,7 @@ use super::route::Page;
 use super::sidebar::icon as nav_icon;
 use super::{HEADER_HEIGHT, Shell};
 use crate::ids;
-use crate::logs_sync::{SyncProgress, try_logs_sync};
+use crate::logs_sync::{ring_fill, try_logs_sync};
 use crate::pages::logs_tf::text::ring_label;
 use crate::services::{Tf2State, tf2_state};
 use crate::sync::{store_name, store_slug, sync_hub};
@@ -262,20 +262,14 @@ fn logs_ring(cx: &mut Context<Shell>) -> Option<impl IntoElement + use<>> {
     let sync = sync.read(cx);
     sync.running()?;
     let progress = sync.progress();
-    let value = match progress {
-        Some(SyncProgress::Downloading { done, total, .. }) if total > 0 => {
-            done as f32 / total as f32 * 100.
-        }
-        _ => 0.,
-    };
-    let downloading = matches!(progress, Some(SyncProgress::Downloading { .. }));
+    let fill = ring_fill(progress);
     let ring = ring(
         Ring {
             id: ids::logstf_sync_ring(),
             slug: "logs-tf",
             label: ring_label(progress),
-            value,
-            spinning: !downloading,
+            value: fill.unwrap_or_default(),
+            spinning: fill.is_none(),
             icon: nav_icon(Page::LogsTf),
         },
         cx,

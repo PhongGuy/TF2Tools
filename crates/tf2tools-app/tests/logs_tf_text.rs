@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use tf2tools_app::logs_sync::SyncProgress;
+use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
     EMPTY_TEXT, NO_LOGS_TEXT, count_text, duration_text, fetch_message, finding_text, one_decimal,
     progress_line, progress_text, range_label, resolve_message, ring_label, summary_text,
@@ -227,4 +227,23 @@ fn fetch_failures_read_in_player_words_or_leave_it_to_the_row() {
     ] {
         assert_eq!(fetch_message(&row_says_it), None, "{row_says_it:?}");
     }
+}
+
+#[test]
+fn the_ring_fills_only_once_there_is_a_count() {
+    let downloading = |done, total| {
+        Some(SyncProgress::Downloading {
+            done,
+            total,
+            left: Duration::ZERO,
+        })
+    };
+    assert_eq!(ring_fill(downloading(1, 4)), Some(25.));
+    assert_eq!(ring_fill(downloading(0, 0)), None, "nothing to count spins");
+    let finding = Some(SyncProgress::Finding {
+        listed: 0,
+        total: 9,
+    });
+    assert_eq!(ring_fill(finding), None);
+    assert_eq!(ring_fill(None), None);
 }

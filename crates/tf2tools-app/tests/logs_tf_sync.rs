@@ -295,3 +295,27 @@ fn the_ring_spins_while_the_list_is_read(cx: &mut TestAppContext) {
     );
     idle(cx, &sync);
 }
+
+#[gpui_kit::test]
+fn a_stopped_run_keeps_no_error_for_the_player(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // The download in flight when the run stops fails, as it would for a removed player.
+    server.mount_bytes(
+        "/api/v1/log",
+        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
+    );
+    server.mount_status_after("/json/3", 503, Duration::from_millis(500));
+    let _s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let sync = hub(cx);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    support::wait_real(cx, "Arie's downloads", |cx| {
+        matches!(
+            cx.update(|cx| sync.read(cx).progress()),
+            Some(SyncProgress::Downloading { .. })
+        )
+    });
+    let _stopped = cx.update(|cx| sync.update(cx, |s, cx| s.stop(sid(ARIE), cx)));
+    idle(cx, &sync);
+    assert_eq!(cx.update(|cx| sync.read(cx).error(sid(ARIE))), None);
+}

@@ -36,6 +36,16 @@ pub fn downloading(done: usize, total: usize, spacing: Duration, base: usize) ->
     }
 }
 
+/// How full the header ring is, 0 to 100, while logs download; None while it spins.
+pub fn ring_fill(progress: Option<SyncProgress>) -> Option<f32> {
+    match progress {
+        Some(SyncProgress::Downloading { done, total, .. }) if total > 0 => {
+            Some(done as f32 / total as f32 * 100.)
+        }
+        _ => None,
+    }
+}
+
 /// What observers hear from the sync.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogsSyncEvent {
@@ -159,9 +169,7 @@ impl LogsSync {
         if !tokio_bridge::is_running(cx) {
             tokio_bridge::init(cx);
         }
-        if self.error.is_some_and(|(id, _)| id == request.id) {
-            self.error = None;
-        }
+        self.clear_error(request.id);
         let client = cx.global::<Services>().logs.clone();
         let cancel = LogsCancel::new();
         let run_cancel = cancel.clone();
@@ -229,20 +237,28 @@ impl LogsSync {
         }
     }
 
-    // Keeps or clears id's error line as the page did; a player removed while their sync
-    // waited is no failure. Dropping the run here also drops this very task, as SyncHub does.
+    fn clear_error(&mut self, id: SteamId) {
+        if self.error.is_some_and(|(failed, _)| failed == id) {
+            self.error = None;
+        }
+    }
+
+    // Keeps or clears id's error line as the page did. A stopped run, or a player removed
+    // while their sync waited, is no failure: whatever broke in flight was asked to end.
+    // Dropping the run here also drops this very task, as SyncHub does.
     fn finished(
         &mut self,
         id: SteamId,
         joined: Result<Result<LogsSyncSummary, LogsSyncError>, tokio_bridge::JoinError>,
         cx: &mut Context<Self>,
     ) {
+        let stopped = self
+            .run
+            .as_ref()
+            .is_some_and(|run| run.cancel.is_cancelled());
         match joined {
-            Ok(Ok(_) | Err(LogsSyncError::NotTracked { .. })) => {
-                if self.error.is_some_and(|(failed, _)| failed == id) {
-                    self.error = None;
-                }
-            }
+            Ok(Ok(_) | Err(LogsSyncError::NotTracked { .. })) => self.clear_error(id),
+            _ if stopped => self.clear_error(id),
             Ok(Err(error)) => {
                 tracing::warn!(%error, "syncing logs.tf logs failed");
                 self.error = Some((id, sync_message(&error)));

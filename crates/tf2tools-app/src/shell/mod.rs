@@ -68,6 +68,8 @@ pub struct Shell {
     preloaded_huds: Option<Vec<HudEntry>>,
     /// The hub observation and failure-toast subscription, while a hub is installed.
     _hub_subscriptions: Option<[Subscription; 2]>,
+    /// The logs.tf sync observation, which redraws the header's logs.tf ring.
+    _logs_subscription: Subscription,
     /// The updater observation and failure-toast subscription, while an updater is installed.
     _update_subscriptions: Option<[Subscription; 2]>,
     /// The crash notice observation, while a notice is installed.
@@ -148,7 +150,7 @@ impl Shell {
         });
         // The header's logs.tf ring reads the app-wide sync, created here so the ring always has one.
         let logs = logs_sync(cx);
-        cx.observe(&logs, |_, _, cx| cx.notify()).detach();
+        let logs_subscription = cx.observe(&logs, |_, _, cx| cx.notify());
         // The banner reads the updater, and a download or install the player asked for toasts when it fails.
         let update_subscriptions = updater(cx).map(|u| {
             [
@@ -181,6 +183,7 @@ impl Shell {
             huds_search: String::new(),
             preloaded_huds: huds,
             _hub_subscriptions: hub_subscriptions,
+            _logs_subscription: logs_subscription,
             _update_subscriptions: update_subscriptions,
             _crash_subscription: crash_subscription,
             _old_v4_subscription: old_v4_subscription,

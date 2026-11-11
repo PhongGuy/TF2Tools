@@ -1003,6 +1003,16 @@ impl StoreServer {
         self.rt.block_on(self.server.reset());
     }
 
+    /// Answers every GET of `route` with `status` only after `delay`.
+    pub fn mount_status_after(&self, route: &str, status: u16, delay: Duration) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(route))
+                .respond_with(ResponseTemplate::new(status).set_delay(delay))
+                .mount(&self.server),
+        );
+    }
+
     /// Answers every GET of `route` with `status` and an empty body.
     pub fn mount_status(&self, route: &str, status: u16) {
         self.rt.block_on(
