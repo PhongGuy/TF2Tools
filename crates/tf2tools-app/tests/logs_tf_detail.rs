@@ -257,6 +257,23 @@ fn the_widest_card_cells_in_the_fixtures_fit_their_columns(cx: &mut TestAppConte
 }
 
 #[gpui_kit::test]
+fn the_players_table_comes_before_the_team_table_and_the_rounds(cx: &mut TestAppContext) {
+    // logs.tf's order under the title: Players, then Team, then Rounds.
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_PLAYERS_SCROLL);
+    let top = |cx: &mut TestAppContext, id| {
+        support::bounds_of(cx, s.win, id)
+            .expect("the section is laid out")
+            .top()
+    };
+    let players = top(cx, ids::LOGSTF_PLAYERS_SCROLL);
+    let team = top(cx, ids::LOGSTF_TEAMS_SCROLL);
+    let rounds = top(cx, ids::LOGSTF_ROUNDS);
+    assert!(players < team, "players at {players:?}, team at {team:?}");
+    assert!(team < rounds, "team at {team:?}, rounds at {rounds:?}");
+}
+
+#[gpui_kit::test]
 fn rounds_open_any_number_and_show_players_and_events(cx: &mut TestAppContext) {
     let (_env, _server, s, page) = opened(cx, 3);
     scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_ROUNDS);

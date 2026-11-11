@@ -1,5 +1,5 @@
 //! An open log's panel, laid out like its page on logs.tf: the score banner, the title, the
-//! team table, the players table, the rounds, one block per Medic, the kill matrix and the
+//! players table, the team table, the rounds, one block per Medic, the kill matrix and the
 //! buttons that open the chat and the killstreaks and download the log.
 
 mod banner;
@@ -107,12 +107,12 @@ fn log_body(
         .gap_6()
         .text_xs()
         .child(sideways(
-            ids::LOGSTF_TEAMS_SCROLL,
-            banner::team_table(log, cx),
-        ))
-        .child(sideways(
             ids::LOGSTF_PLAYERS_SCROLL,
             players::players_table(log, sort, &is_tracked, page.clone(), cx),
+        ))
+        .child(sideways(
+            ids::LOGSTF_TEAMS_SCROLL,
+            banner::team_table(log, cx),
         ))
         .when(!log.rounds().is_empty(), |el| {
             let table =
