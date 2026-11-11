@@ -4,7 +4,7 @@
 use gpui_kit::ElementId;
 use tf2tools_core::{
     AddonName, BoardMode, GbId, HudId, MeterKind, ModuleChoice, NewPart, PartKey, PinCorner,
-    Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, StoreItemId,
+    Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, SteamId, StoreItemId,
     StoreKind, TfClass, WeaponKind, WeaponSlot,
 };
 
@@ -2446,6 +2446,133 @@ pub const MAPS_ERROR: &str = "maps-error";
 pub const MAPS_RETRY: &str = "maps-retry";
 /// The Maps page's "TF2 not found" warning, present only without a TF2 install.
 pub const MAPS_NO_TF2: &str = "maps-no-tf2";
+
+/// The logs.tf page's "Stats from logs.tf" credit, which opens logs.tf.
+pub const LOGSTF_CREDIT: &str = "logstf-credit";
+/// Labelled with the logs.tf page's explanation while no player is tracked.
+pub const LOGSTF_EMPTY: &str = "logstf-empty";
+/// The empty logs.tf page's "Add player" button.
+pub const LOGSTF_EMPTY_ADD: &str = "logstf-empty-add";
+/// The "+ Add player" chip after the tracked players.
+pub const LOGSTF_ADD: &str = "logstf-add";
+/// The add-player dialog's Steam link or ID field.
+pub const LOGSTF_ADD_INPUT: &str = "logstf-add-input";
+/// The add-player dialog's Add button, disabled while the field is blank.
+pub const LOGSTF_ADD_CONFIRM: &str = "logstf-add-confirm";
+/// The add-player dialog's Cancel button.
+pub const LOGSTF_ADD_CANCEL: &str = "logstf-add-cancel";
+/// Labelled with why the add-player dialog could not add the player.
+pub const LOGSTF_ADD_ERROR: &str = "logstf-add-error";
+/// Forces a fresh logs.tf sync of the active player.
+pub const LOGSTF_REFRESH: &str = "logstf-refresh";
+/// "Open profile on logs.tf" for the active player.
+pub const LOGSTF_PROFILE: &str = "logstf-profile";
+/// Labelled "Downloading logs: <done> of <total>" while a sync downloads logs.
+pub const LOGSTF_PROGRESS: &str = "logstf-progress";
+/// Labelled with why the last logs.tf sync failed.
+pub const LOGSTF_ERROR: &str = "logstf-error";
+/// Retries a failed logs.tf sync.
+pub const LOGSTF_RETRY: &str = "logstf-retry";
+
+/// Labelled "<first> to <last date>: <n> logs" (or "...: last 400 logs" at the cap) under the
+/// class grid, once the player has logs.
+pub const LOGSTF_SUMMARY: &str = "logstf-summary";
+
+/// One class's card in the logs.tf averages grid: "logstf-class:<class>".
+pub fn logstf_class(class: TfClass) -> ElementId {
+    keyed("logstf-class", &class.name().to_lowercase())
+}
+
+/// The dimmed "Not played" on a class card with no time: "logstf-class-unplayed:<class>".
+pub fn logstf_class_unplayed(class: TfClass) -> ElementId {
+    keyed("logstf-class-unplayed", &class.name().to_lowercase())
+}
+
+/// The logs.tf page's scrolling list: the chips and grid as its first item, then the logs.
+pub const LOGSTF_LIST: &str = "logstf-list";
+/// The scrollbar beside the logs.tf page's list.
+pub const LOGSTF_LIST_SCROLLBAR: &str = "logstf-list-scrollbar";
+/// Labelled "No logs on logs.tf for this player yet." when the active player has no logs.
+pub const LOGSTF_NO_LOGS: &str = "logstf-no-logs";
+/// The link to the active player's logs.tf profile beside the no-logs line.
+pub const LOGSTF_NO_LOGS_PROFILE: &str = "logstf-no-logs-profile";
+
+/// One log's row in the logs.tf list, which opens or closes it: "logstf-log:<id>".
+pub fn logstf_log(id: u64) -> ElementId {
+    keyed("logstf-log", &id.to_string())
+}
+
+/// The open log's panel under its row: "logstf-log-panel:<id>".
+pub fn logstf_log_panel(id: u64) -> ElementId {
+    keyed("logstf-log-panel", &id.to_string())
+}
+
+/// A row's note in place of its stats, labelled with why it has none: "logstf-log-note:<id>".
+pub fn logstf_log_note(id: u64) -> ElementId {
+    keyed("logstf-log-note", &id.to_string())
+}
+
+/// "Open on logs.tf" for one log, in its panel or on an unreadable row: "logstf-log-open:<id>".
+pub fn logstf_log_open(id: u64) -> ElementId {
+    keyed("logstf-log-open", &id.to_string())
+}
+
+/// The DPM column title over the logs.tf rows.
+pub const LOGSTF_HEAD_DPM: &str = "logstf-head-dpm";
+
+/// A log row's damage-per-minute cell: "logstf-log-dpm:<id>".
+pub fn logstf_log_dpm(id: u64) -> ElementId {
+    keyed("logstf-log-dpm", &id.to_string())
+}
+
+/// A log row's title cell: "logstf-log-title:<id>".
+pub fn logstf_log_title(id: u64) -> ElementId {
+    keyed("logstf-log-title", &id.to_string())
+}
+
+/// The open log's team totals, which scroll sideways in a narrow window.
+pub const LOGSTF_TEAMS_SCROLL: &str = "logstf-teams-scroll";
+
+/// The open log's players table, which scrolls sideways in a narrow window.
+pub const LOGSTF_PLAYERS_SCROLL: &str = "logstf-players-scroll";
+
+/// One player's name cell in the open log's players table: "logstf-player-name:<id64>".
+pub fn logstf_player_name(id: SteamId) -> ElementId {
+    keyed("logstf-player-name", &id.id64().to_string())
+}
+
+/// The open log's score, RED first, labelled "3 : 2".
+pub const LOGSTF_TEAM_SCORE: &str = "logstf-team-score";
+
+/// A players table column header in the open log, keyed by its title: "logstf-col:K/D".
+pub fn logstf_col(name: &str) -> ElementId {
+    keyed("logstf-col", name)
+}
+
+/// One player's line in the open log's players table: "logstf-player:<id64>".
+pub fn logstf_player_row(id: SteamId) -> ElementId {
+    keyed("logstf-player", &id.id64().to_string())
+}
+
+/// One Medic's block in the open log: "logstf-medic:<id64>".
+pub fn logstf_medic(id: SteamId) -> ElementId {
+    keyed("logstf-medic", &id.id64().to_string())
+}
+
+/// A tracked player's kills by victim class in the open log: "logstf-class-kills:<id64>".
+pub fn logstf_class_kills(id: SteamId) -> ElementId {
+    keyed("logstf-class-kills", &id.id64().to_string())
+}
+
+/// One tracked player's chip, selected while active: "logstf-chip:<id64>".
+pub fn logstf_chip(id: SteamId) -> ElementId {
+    keyed("logstf-chip", &id.id64().to_string())
+}
+
+/// The x beside a player's chip that asks to stop tracking them: "logstf-chip-remove:<id64>".
+pub fn logstf_chip_remove(id: SteamId) -> ElementId {
+    keyed("logstf-chip-remove", &id.id64().to_string())
+}
 
 /// One map's row: "map-row:<name>".
 pub fn map_row(name: &str) -> ElementId {

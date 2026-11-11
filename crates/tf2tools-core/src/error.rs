@@ -2206,3 +2206,147 @@ pub enum ModuleCatalogError {
         limit: u64,
     },
 }
+
+/// Why the player box text could not be read.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum PlayerInputError {
+    /// The text is no Steam link, ID or vanity name.
+    #[error("That doesn't look like a Steam profile link or Steam ID.")]
+    NotSteam,
+}
+
+/// Why the logs.tf cache could not be read or written.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum LogsCacheError {
+    /// SQLite failed on one of the `logstf_` tables or the active-player setting.
+    #[error("the logs.tf cache could not be read or written: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+}
+
+/// Why a Steam profile could not be looked up.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ResolveError {
+    /// Steam answered that no such profile exists.
+    #[error("We couldn't find that Steam profile.")]
+    NotFound,
+    /// Steam kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// Steam answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// Steam could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The profile body grew past its size cap.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// The profile body named neither a Steam ID nor an error.
+    #[error("unexpected response from {url}: {message}")]
+    Malformed {
+        /// The address that was asked.
+        url: String,
+        /// What was wrong with the body.
+        message: String,
+    },
+}
+
+/// Why a player's logs.tf sync stopped.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum LogsSyncError {
+    /// logs.tf kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// logs.tf answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// logs.tf could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The log list grew past its size cap.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// The log list or a log body was not the JSON logs.tf sends.
+    #[error("unexpected response from {url}: {message}")]
+    Malformed {
+        /// The address that was asked.
+        url: String,
+        /// What was wrong with the body.
+        message: String,
+    },
+    /// SQLite failed while writing the cache.
+    #[error("the logs.tf cache could not be read or written: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+    /// The player has no row in the tracked-player list.
+    #[error("{steam_id} is not a tracked player")]
+    NotTracked {
+        /// The player's SteamID64.
+        steam_id: u64,
+    },
+}
+
+impl From<LogsCacheError> for LogsSyncError {
+    fn from(e: LogsCacheError) -> Self {
+        match e {
+            LogsCacheError::Database { message } => LogsSyncError::Database { message },
+        }
+    }
+}
+
+/// Why a stored logs.tf body could not be read as a log.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum LogParseError {
+    /// The body is not JSON or lacks `length`, `teams` or `players`.
+    #[error("the log could not be read: {message}")]
+    Format {
+        /// What the JSON reader objected to.
+        message: String,
+    },
+}

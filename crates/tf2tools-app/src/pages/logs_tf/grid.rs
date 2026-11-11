@@ -1,0 +1,117 @@
+//! The class averages grid: one card per class in TF2 order, then how many logs it covers.
+
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::{
+    App, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
+    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
+};
+use tf2tools_core::{ClassAverage, LOG_CAP, LogRow, window_start};
+
+use super::text::{local_date, one_decimal, summary_text, time_played_text, whole};
+use crate::ids;
+use crate::services::Services;
+use crate::widgets::class_icon::class_icon;
+use crate::widgets::labelled;
+
+const CARD_WIDTH: f32 = 168.;
+const ICON_SIZE: f32 = 28.;
+
+/// The nine cards, wrapping, with the summary line for the window's `rows` under them.
+pub(super) fn class_grid(
+    averages: &[ClassAverage; 9],
+    rows: &[LogRow],
+    cx: &App,
+) -> impl IntoElement {
+    v_flex()
+        .gap_2()
+        .child(
+            h_flex()
+                .flex_wrap()
+                .items_start()
+                .gap_3()
+                .children(averages.iter().map(|average| class_card(average, cx))),
+        )
+        .children(summary(rows).map(|text| {
+            labelled(
+                div().text_sm().text_color(cx.theme().muted_foreground),
+                ids::LOGSTF_SUMMARY,
+                text,
+            )
+        }))
+}
+
+// The window ends at the newest row. Uncapped it reaches the full span back; at the cap it
+// only reaches the oldest row kept. No rows means no window to name.
+fn summary(rows: &[LogRow]) -> Option<String> {
+    let newest = rows.first()?.date();
+    let capped = rows.len() >= LOG_CAP;
+    let oldest = if capped {
+        rows.last()?.date()
+    } else {
+        window_start(newest)
+    };
+    Some(summary_text(
+        local_date(oldest)?,
+        local_date(newest)?,
+        rows.len(),
+        capped,
+    ))
+}
+
+// The icon and name, then the rates as label and value rows; Medic's two extra rates only
+// exist when there is time on Medic. A class with no time says so in the muted colour.
+fn class_card(average: &ClassAverage, cx: &App) -> impl IntoElement {
+    let class = average.class();
+    let muted = cx.theme().muted_foreground;
+    let icon = cx.global::<Services>().assets.class_icon(class);
+    let header = h_flex()
+        .gap_2()
+        .child(class_icon(class, icon.as_deref(), px(ICON_SIZE)))
+        .child(div().font_weight(FontWeight::SEMIBOLD).child(class.name()));
+    let body = if average.played() {
+        let mut stats = vec![
+            ("Time played", time_played_text(average.seconds())),
+            ("Logs", average.logs().to_string()),
+            ("Kills/min", one_decimal(average.kills_per_min())),
+            ("Deaths/min", one_decimal(average.deaths_per_min())),
+            ("Dmg/min", whole(average.dmg_per_min())),
+            ("KA/D", one_decimal(average.kad())),
+        ];
+        stats.extend(average.heal_per_min().map(|h| ("Heals/min", whole(h))));
+        stats.extend(
+            average
+                .ubers_per_10min()
+                .map(|u| ("Ubers/10 min", one_decimal(u))),
+        );
+        v_flex()
+            .gap_0p5()
+            .text_sm()
+            .children(stats.into_iter().map(|(label, value)| {
+                h_flex()
+                    .justify_between()
+                    .gap_2()
+                    .child(div().text_color(muted).child(label))
+                    .child(div().child(value))
+            }))
+            .into_any_element()
+    } else {
+        labelled(
+            div().text_sm().text_color(muted),
+            ids::logstf_class_unplayed(class),
+            "Not played",
+        )
+        .into_any_element()
+    };
+    v_flex()
+        .id(ids::logstf_class(class))
+        .aria_label(class.name())
+        .test_support()
+        .w(px(CARD_WIDTH))
+        .gap_2()
+        .p_3()
+        .rounded(cx.theme().radius_lg)
+        .border_1()
+        .border_color(cx.theme().border)
+        .child(header)
+        .child(body)
+}

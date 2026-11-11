@@ -21,6 +21,7 @@ enum Owner {
 /// the binary from the app crate's `assets/` and the core crate's `data/`. A new folder fails the check until it is listed.
 const BUNDLED: &[(&str, Owner)] = &[
     ("assets/backgrounds", Owner::ValveDerived),
+    ("assets/classes", Owner::ValveDerived),
     ("assets/crosshairs", Owner::ValveDerived),
     ("assets/weapon-icons", Owner::ValveDerived),
     (

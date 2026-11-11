@@ -2,11 +2,12 @@
 //! laid over its right edge, always drawn while the content overflows so the player sees there
 //! is more below.
 
-use gpui_kit::component::scroll::{Scrollbar, ScrollbarHandle, ScrollbarMode};
-use gpui_kit::component::v_flex;
+use gpui_kit::component::scroll::{ScrollableMask, Scrollbar, ScrollbarHandle, ScrollbarMode};
+use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::{
-    Div, ElementId, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Styled as _,
-    TestSupportExt as _, div, px,
+    AnyElement, App, Axis, Div, ElementId, InteractiveElement as _, IntoElement,
+    ParentElement as _, Pixels, RenderOnce, ScrollHandle, StatefulInteractiveElement as _,
+    Styled as _, TestSupportExt as _, Window, div, px,
 };
 
 /// The width of the bar's track, drawn at the right edge of its holder.
@@ -56,4 +57,53 @@ fn bar<H: ScrollbarHandle + Clone>(
             .mode(ScrollbarMode::Always)
             .viewport_from_layout(),
     )
+}
+
+/// A full-width box that scrolls `content` sideways, for a table wider than the window. It
+/// takes only horizontal wheel input (a trackpad swipe, shift+wheel), so a plain wheel over it
+/// scrolls the page around it. The box carries `id` and keeps its offset under that id.
+pub fn sideways(id: impl Into<ElementId>, content: impl IntoElement) -> Sideways {
+    Sideways {
+        id: id.into(),
+        content: content.into_any_element(),
+    }
+}
+
+/// The element `sideways` builds.
+#[derive(IntoElement)]
+pub struct Sideways {
+    id: ElementId,
+    content: AnyElement,
+}
+
+impl RenderOnce for Sideways {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let handle = window
+            .use_keyed_state(self.id.clone(), cx, |_, _| ScrollHandle::default())
+            .read(cx)
+            .clone();
+        // The kit's `overflow_x_scrollbar` turns a plain wheel into sideways scrolling, which
+        // traps the page. A horizontal mask beside a clipped area, as the kit's own markdown
+        // tables use, consumes only horizontal-dominant deltas and lets the rest bubble.
+        div()
+            .id(self.id.clone())
+            .test_support()
+            .relative()
+            .w_full()
+            .child(
+                h_flex()
+                    .id((self.id.clone(), "area"))
+                    .w_full()
+                    .overflow_hidden()
+                    .track_scroll(&handle)
+                    .child(div().flex_none().min_w_full().child(self.content)),
+            )
+            .child(ScrollableMask::new(Axis::Horizontal, &handle).id(self.id))
+            .child(
+                div()
+                    .absolute()
+                    .inset_0()
+                    .child(Scrollbar::horizontal(&handle).viewport_from_layout()),
+            )
+    }
 }
