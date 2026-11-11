@@ -808,10 +808,6 @@ fn an_open_6v6_log_hides_columns_logs_tf_hides(cx: &mut TestAppContext) {
     let page = open_page(cx, &s);
     open_log(cx, &s, &page, 3);
 
-    assert_eq!(
-        support::label_of(cx, s.win, ids::LOGSTF_TEAM_SCORE).as_deref(),
-        Some("3 : 2")
-    );
     for shown in [
         "K", "A", "D", "DA", "DA/M", "KA/D", "K/D", "DT", "DT/M", "HP", "AS", "CAP",
     ] {
@@ -854,6 +850,44 @@ fn an_open_6v6_log_hides_columns_logs_tf_hides(cx: &mut TestAppContext) {
     assert!(
         !support::present(cx, s.win, ids::logstf_class_kills(sid(103_548_491))),
         "class kills only for tracked players"
+    );
+    assert!(support::present(cx, s.win, ids::logstf_log_open(3)));
+}
+
+#[gpui_kit::test]
+fn the_banner_and_team_table_read_like_logs_tf(cx: &mut TestAppContext) {
+    use tf2tools_core::Team;
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_banner(3)).as_deref(),
+        Some("BLU 2, RED 3")
+    );
+    let cells = [
+        (Team::Blue, "Kills", "117"),
+        (Team::Red, "Damage", "37145"),
+        (Team::Blue, "Charges", "14"),
+        (Team::Red, "Drops", "0"),
+        (Team::Red, "Caps", "17"),
+        (Team::Blue, "Midfights", "4"),
+        (Team::Red, "Midfights", "1"),
+    ];
+    for (team, column, value) in cells {
+        assert_eq!(
+            support::label_of(cx, s.win, ids::logstf_team_cell(team, column)).as_deref(),
+            Some(value),
+            "{team:?} {column}"
+        );
+    }
+    let red = support::bounds_of(cx, s.win, ids::logstf_team_cell(Team::Red, "Kills")).unwrap();
+    let blu = support::bounds_of(cx, s.win, ids::logstf_team_cell(Team::Blue, "Kills")).unwrap();
+    assert!(
+        red.top() < blu.top(),
+        "RED's row comes first, as on logs.tf"
     );
     assert!(support::present(cx, s.win, ids::logstf_log_open(3)));
 }

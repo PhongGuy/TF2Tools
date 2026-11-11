@@ -5,7 +5,7 @@ use gpui_kit::ElementId;
 use tf2tools_core::{
     AddonName, BoardMode, GbId, HudId, LogsRange, MeterKind, ModuleChoice, NewPart, PartKey,
     PinCorner, Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, SteamId,
-    StoreItemId, StoreKind, TfClass, WeaponKind, WeaponSlot,
+    StoreItemId, StoreKind, Team, TfClass, WeaponKind, WeaponSlot,
 };
 
 use crate::shell::route::Page;
@@ -2559,7 +2559,7 @@ pub fn logstf_log_map(id: u64) -> ElementId {
     keyed("logstf-log-map", &id.to_string())
 }
 
-/// The open log's team totals, which scroll sideways in a narrow window.
+/// The open log's team table, which scrolls sideways in a narrow window.
 pub const LOGSTF_TEAMS_SCROLL: &str = "logstf-teams-scroll";
 
 /// The open log's players table, which scrolls sideways in a narrow window.
@@ -2570,8 +2570,20 @@ pub fn logstf_player_name(id: SteamId) -> ElementId {
     keyed("logstf-player-name", &id.id64().to_string())
 }
 
-/// The open log's score, RED first, labelled "3 : 2".
-pub const LOGSTF_TEAM_SCORE: &str = "logstf-team-score";
+/// The open log's score banner, labelled "BLU 2, RED 3": "logstf-banner:<id>".
+pub fn logstf_banner(id: u64) -> ElementId {
+    keyed("logstf-banner", &id.to_string())
+}
+
+/// One cell of the open log's team table, labelled with its value:
+/// "logstf-team-cell:blu:Midfights".
+pub fn logstf_team_cell(team: Team, column: &str) -> ElementId {
+    let slug = match team {
+        Team::Red => "red",
+        Team::Blue | _ => "blu",
+    };
+    keyed("logstf-team-cell", &format!("{slug}:{column}"))
+}
 
 /// A players table column header in the open log, keyed by its title: "logstf-col:K/D".
 pub fn logstf_col(name: &str) -> ElementId {

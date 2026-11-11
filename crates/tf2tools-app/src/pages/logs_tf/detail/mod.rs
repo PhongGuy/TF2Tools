@@ -1,5 +1,7 @@
-//! An open log's panel, laid out like its page on logs.tf: the header, team totals, the
-//! players table, one block per Medic and the tracked players' kills by class.
+//! An open log's panel, laid out like its page on logs.tf: the score banner, the title, the
+//! team table, the players table, one block per Medic and the tracked players' kills by class.
+
+mod banner;
 
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -12,8 +14,7 @@ use tf2tools_core::{
     TfClass, TrackedPlayer,
 };
 
-use super::list::open_link;
-use super::text::{LOG_LOADING, date_text, duration_text, one_decimal, whole};
+use super::text::{LOG_LOADING, one_decimal, whole};
 use super::{LogsTfPage, OpenState};
 use crate::ids;
 use crate::services::Services;
@@ -33,8 +34,9 @@ const MEDIC_WIDTH: Pixels = px(280.);
 // One players table column: its logs.tf title and how a player's cell reads.
 type Column = (&'static str, fn(&PlayerLine) -> String);
 
-/// The panel under open log `row`. The header comes from the row at once; under it the
-/// parsed log once `opened` is ready, or a line saying it is loading or why it failed. A
+/// The panel under open log `row`. The score banner heads it once `opened` is ready; the
+/// title comes from the row at once; under it the parsed log, or a line saying it is
+/// loading or why it failed. A
 /// failed fetch of a pending log offers Retry, which asks `page` to fetch it again.
 pub(super) fn panel(
     row: &LogRow,
@@ -47,6 +49,10 @@ pub(super) fn panel(
     let status = |text: &'static str| {
         let line = div().text_sm().text_color(cx.theme().muted_foreground);
         labelled(line, ids::logstf_log_status(id), text).into_any_element()
+    };
+    let ready = match opened {
+        OpenState::Ready(log) => Some(log.as_ref()),
+        OpenState::Loading | OpenState::Failed(_) => None,
     };
     let body = match opened {
         OpenState::Ready(log) => log_body(log, tracked, cx).into_any_element(),
@@ -68,37 +74,10 @@ pub(super) fn panel(
         .px_3()
         .py_3()
         .bg(cx.theme().muted)
-        .child(header(row, cx))
+        .when_some(ready, |el, log| el.child(banner::banner(id, log, cx)))
+        .child(banner::title(row, cx))
         .child(body)
         .into_any_element()
-}
-
-// Title over map, date and length, with the way to the same log on logs.tf.
-fn header(row: &LogRow, cx: &App) -> impl IntoElement {
-    let mut facts = vec![row.map().to_owned(), date_text(row.date())];
-    facts.extend(row.length().map(duration_text));
-    h_flex()
-        .w_full()
-        .items_start()
-        .gap_4()
-        .child(
-            v_flex()
-                .flex_1()
-                .min_w_0()
-                .child(
-                    div()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .truncate()
-                        .child(row.title().to_owned()),
-                )
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(cx.theme().muted_foreground)
-                        .child(facts.join("  ·  ")),
-                ),
-        )
-        .child(open_link(row.id()))
 }
 
 // Everything the parsed body adds, in logs.tf's order.
@@ -119,7 +98,10 @@ fn log_body(log: &LogDetail, tracked: &[TrackedPlayer], cx: &App) -> impl IntoEl
         .w_full()
         .gap_6()
         .text_xs()
-        .child(sideways(ids::LOGSTF_TEAMS_SCROLL, team_totals(log, cx)))
+        .child(sideways(
+            ids::LOGSTF_TEAMS_SCROLL,
+            banner::team_table(log, cx),
+        ))
         .child(sideways(
             ids::LOGSTF_PLAYERS_SCROLL,
             players_table(log, &is_tracked, cx),
@@ -166,7 +148,7 @@ fn log_body(log: &LogDetail, tracked: &[TrackedPlayer], cx: &App) -> impl IntoEl
 }
 
 // A titled part of the body.
-fn section(title: &'static str, content: impl IntoElement, cx: &App) -> Div {
+pub(super) fn section(title: &'static str, content: impl IntoElement, cx: &App) -> Div {
     v_flex()
         .gap_2()
         .child(
@@ -177,57 +159,6 @@ fn section(title: &'static str, content: impl IntoElement, cx: &App) -> Div {
                 .child(title),
         )
         .child(content)
-}
-
-// The score with RED first, then each team's kills, damage, charges, drops and caps.
-fn team_totals(log: &LogDetail, cx: &App) -> impl IntoElement {
-    let (red, blue) = (log.red(), log.blue());
-    let titles = ["Team", "Kills", "Damage", "Charges", "Drops", "Caps"];
-    let header = h_flex()
-        .gap_1()
-        .py_1()
-        .text_color(cx.theme().muted_foreground)
-        .font_weight(FontWeight::MEDIUM)
-        .children(titles.map(|t| div().w(px(64.)).flex_none().text_right().child(t)));
-    let line = |team: Team, t: &tf2tools_core::TeamTotals| {
-        h_flex()
-            .gap_1()
-            .py_1()
-            .border_t_1()
-            .border_color(cx.theme().border)
-            .child(team_cell(team, cx).w(px(64.)).text_right())
-            .children(
-                [t.kills(), t.dmg(), t.charges(), t.drops(), t.caps()].map(|n| {
-                    div()
-                        .w(px(64.))
-                        .flex_none()
-                        .text_right()
-                        .child(n.to_string())
-                }),
-            )
-    };
-    h_flex()
-        .gap_8()
-        .items_center()
-        .child(
-            h_flex()
-                .gap_3()
-                .text_xl()
-                .font_weight(FontWeight::BOLD)
-                .child(team_cell(Team::Red, cx))
-                .child(labelled(
-                    div(),
-                    ids::LOGSTF_TEAM_SCORE,
-                    format!("{} : {}", red.score(), blue.score()),
-                ))
-                .child(team_cell(Team::Blue, cx)),
-        )
-        .child(
-            v_flex()
-                .child(header)
-                .child(line(Team::Red, red))
-                .child(line(Team::Blue, blue)),
-        )
 }
 
 // The players table: RED then BLU as core orders them, with the columns this log recorded.
@@ -391,7 +322,7 @@ fn charge_name(kind: &str) -> String {
 }
 
 // A team's name in its colour.
-fn team_cell(team: Team, cx: &App) -> Div {
+pub(super) fn team_cell(team: Team, cx: &App) -> Div {
     let (text, color): (&str, Hsla) = match team {
         Team::Red => ("RED", cx.theme().red),
         Team::Blue | _ => ("BLU", cx.theme().blue),
@@ -414,6 +345,6 @@ fn class_cell(class: TfClass, cx: &App) -> AnyElement {
         .into_any_element()
 }
 
-fn number(text: String) -> Div {
+pub(super) fn number(text: String) -> Div {
     div().w(NUMBER).flex_none().text_right().child(text)
 }
