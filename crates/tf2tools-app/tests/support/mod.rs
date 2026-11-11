@@ -1003,6 +1003,11 @@ impl StoreServer {
         self.rt.block_on(self.server.reset());
     }
 
+    /// Mounts a mock the helpers here do not cover.
+    pub fn mount(&self, mock: Mock) {
+        self.rt.block_on(mock.mount(&self.server));
+    }
+
     /// Answers every GET of `route` with `status` only after `delay`.
     pub fn mount_status_after(&self, route: &str, status: u16, delay: Duration) {
         self.rt.block_on(

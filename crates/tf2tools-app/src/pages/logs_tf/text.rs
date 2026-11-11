@@ -115,11 +115,15 @@ pub fn progress_line(progress: SyncProgress) -> String {
     }
 }
 
-/// The line under the chips for a failed sync. A player removed while their sync waited is
-/// no failure, so the page never asks for it.
-pub fn sync_message(error: &LogsSyncError) -> &'static str {
+/// The line under the chips for a failed sync, `has_saved` when the player has logs saved
+/// to fall back on. A player removed while their sync waited is no failure, so the page never
+/// asks for it.
+pub fn sync_message(error: &LogsSyncError, has_saved: bool) -> &'static str {
     match error {
-        LogsSyncError::Network { .. } => "You're offline. Showing saved logs.",
+        LogsSyncError::Network { .. } if has_saved => "You're offline. Showing saved logs.",
+        LogsSyncError::Network { .. } => {
+            "Couldn't reach logs.tf. Check your connection and try again."
+        }
         LogsSyncError::RateLimited { .. } => LOGS_TF_BUSY,
         LogsSyncError::Malformed { .. } => "logs.tf sent something we didn't understand.",
         LogsSyncError::Database { .. } => SAVE_FAILED,

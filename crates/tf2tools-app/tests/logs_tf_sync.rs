@@ -333,3 +333,77 @@ fn a_stopped_run_keeps_no_error_for_the_player(cx: &mut TestAppContext) {
     idle(cx, &sync);
     assert_eq!(cx.update(|cx| sync.read(cx).error(sid(ARIE))), None);
 }
+
+// Points the app's logs client at `base` with reads that give up after a second, so a reply
+// the server holds back fails as a network error.
+fn impatient_client(cx: &mut TestAppContext, base: &str) {
+    use tf2tools_app::services::Services;
+    use tf2tools_core::{LogsCache, LogsClient, LogsEndpoints, StoreConfig};
+    cx.update(|cx| {
+        let db = cx.global::<Services>().db.clone();
+        let logs = LogsClient::new(LogsCache::new(db), LogsEndpoints::loopback(base)).with_config(
+            StoreConfig::default()
+                .with_request_spacing(Duration::ZERO)
+                .with_retry_backoff(Duration::from_millis(1))
+                .with_timeouts(Duration::from_secs(10), Duration::from_secs(1)),
+        );
+        cx.global_mut::<Services>().logs = logs;
+    });
+}
+
+// Holds back Arie's list replies, all of them or only the first `times`.
+fn hold_lists(server: &support::StoreServer, times: Option<u64>) {
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, ResponseTemplate};
+    let reply = ResponseTemplate::new(200)
+        .set_body_bytes(list_body(&[(3, day_ago(1)), (2, day_ago(2))]))
+        .set_delay(Duration::from_secs(30));
+    let mut mock = Mock::given(method("GET"))
+        .and(path("/api/v1/log"))
+        .respond_with(reply);
+    if let Some(times) = times {
+        mock = mock.up_to_n_times(times);
+    }
+    server.mount(mock);
+}
+
+// The sync with its pause before a retry taken out, so tests wait on no clock.
+fn hub_without_retry_pause(cx: &mut TestAppContext) -> Entity<LogsSync> {
+    let sync = hub(cx);
+    cx.update(|cx| sync.update(cx, |s, _| s.set_retry_delay(Duration::ZERO)));
+    sync
+}
+
+#[gpui_kit::test]
+fn one_unreachable_try_is_retried_and_the_logs_arrive(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    hold_lists(&server, Some(1));
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    impatient_client(cx, &server.uri());
+    let sync = hub_without_retry_pause(cx);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    idle(cx, &sync);
+    assert_eq!(cx.update(|cx| sync.read(cx).error(sid(ARIE))), None);
+    let saved = s.services.logs.cache().logs(sid(ARIE), LogsRange::All);
+    assert_eq!(saved.unwrap().len(), 2);
+    assert_eq!(list_requests(&server), 2);
+}
+
+#[gpui_kit::test]
+fn two_unreachable_tries_with_nothing_saved_say_logs_tf_was_not_reached(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    hold_lists(&server, None);
+    let _s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    impatient_client(cx, &server.uri());
+    let sync = hub_without_retry_pause(cx);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    idle(cx, &sync);
+    assert_eq!(
+        cx.update(|cx| sync.read(cx).error(sid(ARIE))),
+        Some("Couldn't reach logs.tf. Check your connection and try again.")
+    );
+    assert_eq!(list_requests(&server), 2, "one retry, no more");
+}

@@ -81,8 +81,22 @@ fn sync_failures_and_progress_read_as_the_spec_words_them() {
         ),
     ];
     for (error, text) in cases {
-        assert_eq!(sync_message(&error), text, "{error:?}");
+        assert_eq!(sync_message(&error, true), text, "{error:?}");
     }
+}
+
+#[test]
+fn an_unreachable_logs_tf_with_nothing_saved_asks_to_try_again() {
+    let unreachable = LogsSyncError::Network {
+        url: "u".into(),
+        message: "m".into(),
+    };
+    assert_eq!(
+        sync_message(&unreachable, false),
+        "Couldn't reach logs.tf. Check your connection and try again."
+    );
+    let busy = LogsSyncError::RateLimited { url: "u".into() };
+    assert_eq!(sync_message(&busy, false), sync_message(&busy, true));
 }
 
 #[test]

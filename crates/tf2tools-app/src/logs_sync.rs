@@ -46,6 +46,9 @@ pub fn ring_fill(progress: Option<SyncProgress>) -> Option<f32> {
     }
 }
 
+/// How long a sync that could not reach logs.tf waits before its one retry.
+const RETRY_DELAY: Duration = Duration::from_secs(2);
+
 /// What observers hear from the sync.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogsSyncEvent {
@@ -80,6 +83,8 @@ pub struct LogsSync {
     run: Option<Run>,
     queued: Option<Request>,
     error: Option<(SteamId, &'static str)>,
+    // Tests take the pause out; None is RETRY_DELAY.
+    retry_delay: Option<Duration>,
 }
 
 struct LogsSyncGlobal(Entity<LogsSync>);
@@ -159,6 +164,11 @@ impl LogsSync {
         self.run.as_ref().and_then(|run| run.progress)
     }
 
+    /// Sets the pause before retrying a sync that could not reach logs.tf.
+    pub fn set_retry_delay(&mut self, delay: Duration) {
+        self.retry_delay = Some(delay);
+    }
+
     /// Why `id`'s last sync failed, in player words.
     pub fn error(&self, id: SteamId) -> Option<&'static str> {
         self.error
@@ -171,6 +181,7 @@ impl LogsSync {
         }
         self.clear_error(request.id);
         let client = cx.global::<Services>().logs.clone();
+        let retry_delay = self.retry_delay.unwrap_or(RETRY_DELAY);
         let cancel = LogsCancel::new();
         let run_cancel = cancel.clone();
         let (ended_tx, ended) = async_channel::bounded::<()>(1);
@@ -200,7 +211,20 @@ impl LogsSync {
                 };
                 tx.send_replace(Some(shown));
             };
-            client.sync_player(id, range, force, &cancel, &report).await
+            let mut result = client.sync_player(id, range, force, &cancel, &report).await;
+            // logs.tf can be out of reach for a moment, so an unreachable run tries once more.
+            if let Err(error @ LogsSyncError::Network { .. }) = &result {
+                tracing::info!(%error, "retrying the logs.tf sync once");
+                pause(retry_delay, &cancel).await;
+                if !cancel.is_cancelled() {
+                    result = client.sync_player(id, range, force, &cancel, &report).await;
+                }
+            }
+            let has_saved = result.is_err()
+                && cache
+                    .logs(id, LogsRange::All)
+                    .is_ok_and(|rows| !rows.is_empty());
+            (result, has_saved)
         });
         let task = cx.spawn(async move |this, cx| {
             while rx.changed().await.is_ok() {
@@ -249,7 +273,7 @@ impl LogsSync {
     fn finished(
         &mut self,
         id: SteamId,
-        joined: Result<Result<LogsSyncSummary, LogsSyncError>, tokio_bridge::JoinError>,
+        joined: Result<(Result<LogsSyncSummary, LogsSyncError>, bool), tokio_bridge::JoinError>,
         cx: &mut Context<Self>,
     ) {
         let stopped = self
@@ -257,11 +281,11 @@ impl LogsSync {
             .as_ref()
             .is_some_and(|run| run.cancel.is_cancelled());
         match joined {
-            Ok(Ok(_) | Err(LogsSyncError::NotTracked { .. })) => self.clear_error(id),
+            Ok((Ok(_) | Err(LogsSyncError::NotTracked { .. }), _)) => self.clear_error(id),
             _ if stopped => self.clear_error(id),
-            Ok(Err(error)) => {
+            Ok((Err(error), has_saved)) => {
                 tracing::warn!(%error, "syncing logs.tf logs failed");
-                self.error = Some((id, sync_message(&error)));
+                self.error = Some((id, sync_message(&error, has_saved)));
             }
             Err(error) => {
                 tracing::warn!(%error, "the logs.tf sync task stopped");
@@ -274,6 +298,17 @@ impl LogsSync {
             self.spawn(next, cx);
         }
         cx.notify();
+    }
+}
+
+// Waits `delay` in short steps, ending early once the run is cancelled.
+async fn pause(delay: Duration, cancel: &LogsCancel) {
+    const STEP: Duration = Duration::from_millis(50);
+    let mut left = delay;
+    while !left.is_zero() && !cancel.is_cancelled() {
+        let step = left.min(STEP);
+        tokio::time::sleep(step).await;
+        left -= step;
     }
 }
 

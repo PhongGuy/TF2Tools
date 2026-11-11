@@ -319,14 +319,18 @@ fn a_failed_refresh_keeps_the_saved_logs_and_says_why(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn offline_the_page_says_so(cx: &mut TestAppContext) {
+fn offline_with_nothing_saved_the_page_says_logs_tf_was_not_reached(cx: &mut TestAppContext) {
     let env = support::env();
     let s = shell(cx, &env, "http://127.0.0.1:9", &[(ARIE, "Arie")]);
+    // The retry after an unreachable run comes at once, so the test waits on no clock.
+    let sync = cx.update(tf2tools_app::logs_sync::logs_sync);
+    cx.update(|cx| sync.update(cx, |s, _| s.set_retry_delay(Duration::ZERO)));
     let _page = open_page(cx, &s);
     assert_eq!(
         support::label_of(cx, s.win, ids::LOGSTF_ERROR).as_deref(),
-        Some("You're offline. Showing saved logs.")
+        Some("Couldn't reach logs.tf. Check your connection and try again.")
     );
+    assert!(support::present(cx, s.win, ids::LOGSTF_RETRY));
     assert!(
         !support::present(cx, s.win, ids::LOGSTF_NO_LOGS),
         "a player never synced is not a player without logs"
