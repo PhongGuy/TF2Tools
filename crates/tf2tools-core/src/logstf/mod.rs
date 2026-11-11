@@ -26,8 +26,14 @@ pub use steam_id::{PlayerInput, SteamId, parse_player_input};
 /// The SteamID64 of account number 0 in the public universe.
 pub const STEAM_ID64_BASE: u64 = 76_561_197_960_265_728;
 
-/// The pause before each logs.tf or Steam request, so a sync stays polite.
+/// The least gap between two logs.tf or Steam request starts, so a sync stays polite.
 pub const LOGS_SPACING: Duration = Duration::from_secs(1);
+
+/// The gap between logs.tf requests while a sync downloads more than `LONG_PULL` logs.
+pub const LOGS_LONG_SPACING: Duration = Duration::from_secs(2);
+
+/// A sync with more logs than this to download spaces them `LOGS_LONG_SPACING` apart.
+pub const LONG_PULL: usize = 400;
 
 /// The largest log or profile body accepted.
 pub const LOG_BODY_LIMIT: u64 = 2 * 1024 * 1024;

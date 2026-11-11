@@ -1,6 +1,8 @@
 //! A logs.tf client against wiremock, and the recorded logs.tf bodies.
 
 use std::path::Path;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use serde_json::json;
 use tempfile::TempDir;
@@ -228,4 +230,43 @@ pub fn class_rows(dir: &tf2tools_core::DataDir, log_id: i64) -> i64 {
             |r| r.get(0),
         )
         .unwrap()
+}
+
+/// Arrival times of the requests answered through `answer`; clones share them.
+#[derive(Clone, Default)]
+pub struct Stamps(Arc<Mutex<Vec<Instant>>>);
+
+struct Stamped {
+    stamps: Stamps,
+    template: ResponseTemplate,
+}
+
+impl wiremock::Respond for Stamped {
+    fn respond(&self, _: &wiremock::Request) -> ResponseTemplate {
+        self.stamps.0.lock().unwrap().push(Instant::now());
+        self.template.clone()
+    }
+}
+
+impl Stamps {
+    pub fn answer(&self, template: ResponseTemplate) -> impl wiremock::Respond + use<> {
+        Stamped {
+            stamps: self.clone(),
+            template,
+        }
+    }
+
+    pub fn arrivals(&self) -> usize {
+        self.0.lock().unwrap().len()
+    }
+
+    /// The smallest gap between two consecutive arrivals.
+    pub fn min_gap(&self) -> Duration {
+        let mut at = self.0.lock().unwrap().clone();
+        at.sort();
+        at.windows(2)
+            .map(|w| w[1] - w[0])
+            .min()
+            .unwrap_or(Duration::MAX)
+    }
 }

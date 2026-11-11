@@ -1,4 +1,4 @@
-//! The logs.tf client: Steam profile lookups and log syncs, all through one paced `Http`.
+//! The logs.tf client: Steam profile lookups and log syncs, every request through one gate.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -10,12 +10,13 @@ use serde::Deserialize;
 use crate::error::{LogsSyncError, ResolveError};
 use crate::store::StoreConfig;
 use crate::store::http::{Http, NetFailure, Redirects};
+use crate::store::pacer::{Pacer, Priority};
 
 use super::cache::{ListedLog, STATE_GONE};
 use super::steam_xml::xml_text;
 use super::{
-    LOG_BODY_LIMIT, LOGS_SPACING, LogsCache, LogsRange, PlayerInput, STALE_SECS, SteamId,
-    TrackedPlayer, parse_log, window_start,
+    LOG_BODY_LIMIT, LOGS_LONG_SPACING, LOGS_SPACING, LONG_PULL, LogsCache, LogsRange, PlayerInput,
+    STALE_SECS, SteamId, TrackedPlayer, parse_log, window_start,
 };
 
 /// Asks a running sync to stop before its next request; clones share one flag.
@@ -180,8 +181,12 @@ pub struct LogsClient {
     cache: LogsCache,
     http: Http,
     endpoints: LogsEndpoints,
+    /// The gate every request waits on; clones share it, so they never overlap their gaps.
+    pacer: Pacer,
     /// The configured gap between requests, reported with the download progress.
     spacing: Duration,
+    /// The gap a sync downloading more than `LONG_PULL` logs widens the gate to.
+    long_spacing: Duration,
     /// Held for a whole sync, so two syncs never interleave their writes.
     sync_lock: Arc<tokio::sync::Mutex<()>>,
 }
@@ -192,9 +197,11 @@ impl LogsClient {
         let config = Self::default_config();
         LogsClient {
             cache,
-            http: crate::store::http_for(&config, &endpoints.redirects()),
+            http: unpaced_http(&config, &endpoints),
             endpoints,
+            pacer: Pacer::new(config.request_spacing()),
             spacing: config.request_spacing(),
+            long_spacing: LOGS_LONG_SPACING,
             sync_lock: Arc::default(),
         }
     }
@@ -204,11 +211,25 @@ impl LogsClient {
         StoreConfig::default().with_request_spacing(LOGS_SPACING)
     }
 
-    /// This client with `config`'s pacing, timeouts, User-Agent and offline switch.
+    /// This client with `config`'s pacing, timeouts, User-Agent and offline switch, on a new
+    /// gate that earlier clones do not share.
     pub fn with_config(mut self, config: StoreConfig) -> Self {
-        self.http = crate::store::http_for(&config, &self.endpoints.redirects());
+        self.http = unpaced_http(&config, &self.endpoints);
+        self.pacer = Pacer::new(config.request_spacing());
         self.spacing = config.request_spacing();
         self
+    }
+
+    /// This client with `spacing` as the long-pull gap in place of `LOGS_LONG_SPACING`.
+    pub fn with_long_spacing(mut self, spacing: Duration) -> Self {
+        self.long_spacing = spacing;
+        self
+    }
+
+    /// One GET through the gate: it starts at least one gap after this client's last request.
+    async fn get(&self, url: &str, priority: Priority) -> Result<Vec<u8>, NetFailure> {
+        self.pacer.slot(priority).await;
+        self.http.get_api(url, LOG_BODY_LIMIT).await
     }
 
     /// The cache this client syncs into.
@@ -251,7 +272,7 @@ impl LogsClient {
     /// Reads one profile XML body: an `<error>` means no such profile, otherwise
     /// `<steamID64>` must be a valid id and `<steamID>` names it.
     async fn lookup(&self, url: &str) -> Result<TrackedPlayer, ResolveError> {
-        let bytes = self.http.get_api(url, LOG_BODY_LIMIT).await?;
+        let bytes = self.get(url, Priority::Interactive).await?;
         let body = String::from_utf8_lossy(&bytes);
         if xml_text(&body, "error").is_some() {
             return Err(ResolveError::NotFound);
@@ -273,7 +294,7 @@ impl LogsClient {
     }
 
     /// Lists the player's logs in `range` page by page, downloads every listed log without a
-    /// body, 1 s apart, and prunes. Skips everything when last_synced is under 30 minutes old,
+    /// body, one configured gap apart (`LOGS_LONG_SPACING` when more than `LONG_PULL`), and prunes. Skips everything when last_synced is under 30 minutes old,
     /// `range` is no wider than the last full listing and no log in the window is still
     /// pending, unless `force`.
     ///
@@ -326,7 +347,14 @@ impl LogsClient {
             ..LogsSyncSummary::default()
         };
         let total = wanted.len();
-        let spacing = self.spacing;
+        // A long pull goes slower so it does not lean on logs.tf; the guard puts the configured
+        // gap back however the sync ends, a dropped future included.
+        let spacing = if total > LONG_PULL {
+            self.spacing.max(self.long_spacing)
+        } else {
+            self.spacing
+        };
+        let _gap = GapGuard::widen(&self.pacer, spacing, self.spacing);
         let progress = |done| LogsProgress::Downloading {
             done,
             total,
@@ -343,7 +371,7 @@ impl LogsClient {
             // A 404 means logs.tf dropped the log; an oversize, non-UTF-8 or non-log body is
             // unreadable, unless a provisional refetch already holds a good copy. Marked logs are
             // never asked again; any other failure stops the sync.
-            let readable = match self.http.get_api(&url, LOG_BODY_LIMIT).await {
+            let readable = match self.get(&url, Priority::Background).await {
                 Ok(bytes) => String::from_utf8(bytes)
                     .ok()
                     .and_then(|body| parse_log(&body).ok().map(|detail| (body, detail))),
@@ -447,7 +475,7 @@ impl LogsClient {
             self.endpoints.logs_tf(),
             id.id64()
         );
-        let bytes = self.http.get_api(&url, LOG_BODY_LIMIT).await?;
+        let bytes = self.get(&url, Priority::Background).await?;
         let list: WireList =
             serde_json::from_slice(&bytes).map_err(|e| LogsSyncError::Malformed {
                 url: url.clone(),
@@ -464,5 +492,30 @@ impl LogsClient {
             })
             .collect();
         Ok((logs, list.total))
+    }
+}
+
+/// An `Http` with no spacing of its own, so the client's gate is the only pacing.
+fn unpaced_http(config: &StoreConfig, endpoints: &LogsEndpoints) -> Http {
+    let config = config.clone().with_request_spacing(Duration::ZERO);
+    crate::store::http_for(&config, &endpoints.redirects())
+}
+
+/// Holds the gate at a sync's gap and restores the configured gap when dropped.
+struct GapGuard<'a> {
+    pacer: &'a Pacer,
+    configured: Duration,
+}
+
+impl<'a> GapGuard<'a> {
+    fn widen(pacer: &'a Pacer, gap: Duration, configured: Duration) -> Self {
+        pacer.set_base(gap);
+        GapGuard { pacer, configured }
+    }
+}
+
+impl Drop for GapGuard<'_> {
+    fn drop(&mut self) {
+        self.pacer.set_base(self.configured);
     }
 }

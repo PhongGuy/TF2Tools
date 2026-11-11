@@ -1,5 +1,5 @@
-//! The one pacer every GameBanana API call goes through: calls start at least a gap apart,
-//! calls the player waits on go first, and empty replies back the gap off.
+//! The pacer GameBanana API calls and logs.tf requests go through, one instance each: calls
+//! start at least a gap apart, calls the player waits on go first, and empty replies back off.
 
 use std::future::Future;
 use std::pin::pin;
@@ -150,8 +150,17 @@ impl Pacer {
             .unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// Sets the base gap and the current gap to `base` from the next start on; a start
+    /// already promised keeps its time, so a shorter gap never pulls it forward.
+    pub(crate) fn set_base(&self, base: Duration) {
+        let mut s = self.lock();
+        s.base = base;
+        s.gap = base;
+        s.clean = 0;
+    }
+
     /// Waits for this caller's start; a background caller also waits while any interactive one does.
-    async fn slot(&self, priority: Priority) {
+    pub(crate) async fn slot(&self, priority: Priority) {
         let _ticket = Ticket::new(self, priority);
         loop {
             // Made before the state is read, so a notify between the read and the await is kept.
@@ -505,6 +514,20 @@ mod tests {
                 throttled: 0
             }
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_new_base_spaces_the_next_starts_and_keeps_the_pending_one() {
+        let (pacer, log, t0) = (Pacer::new(BASE), Log::default(), Instant::now());
+        scripted(&pacer, Background, &[], &log, t0).await.unwrap();
+        pacer.set_base(ms(500));
+        for _ in 0..2 {
+            scripted(&pacer, Background, &[], &log, t0).await.unwrap();
+        }
+        assert_eq!(pacer.gap(), ms(500));
+        pacer.set_base(BASE);
+        scripted(&pacer, Background, &[], &log, t0).await.unwrap();
+        assert_eq!(starts(&log), [ms(0), ms(200), ms(700), ms(1200)]);
     }
 
     #[tokio::test(start_paused = true)]
