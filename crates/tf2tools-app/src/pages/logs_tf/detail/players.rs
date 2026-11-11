@@ -21,7 +21,8 @@ use crate::widgets::class_icon::class_icon;
 // The table's fixed columns; the name takes what is left.
 const TEAM: Pixels = px(40.);
 const NAME_MIN: Pixels = px(120.);
-const CLASSES: Pixels = px(76.);
+// Room for four class icons, as many as a player shows before the rest clip.
+const CLASSES: Pixels = px(88.);
 
 // One number column: which sort it is and how a player's cell reads.
 type Column = (PlayerColumn, fn(&PlayerLine) -> String);

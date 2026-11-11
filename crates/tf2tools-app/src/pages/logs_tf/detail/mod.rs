@@ -32,8 +32,9 @@ use crate::widgets::scroll::sideways;
 use crate::widgets::store_error::error_line;
 
 // A number column's width and a class icon's size, shared with the players table.
-const NUMBER: Pixels = px(44.);
-const ICON: Pixels = px(16.);
+// Both are sized so every players column of a full log fits a 1280 px window, as on logs.tf.
+const NUMBER: Pixels = px(40.);
+const ICON: Pixels = px(20.);
 
 /// The panel under open log `row`. The score banner heads it once `open` is ready; the
 /// title comes from the row at once; under it the parsed log, or a line saying it is loading

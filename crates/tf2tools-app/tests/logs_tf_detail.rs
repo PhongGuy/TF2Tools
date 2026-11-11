@@ -627,3 +627,54 @@ fn a_cancelled_save_does_nothing(cx: &mut TestAppContext) {
         "nothing downloaded"
     );
 }
+
+/// Log `log` open in a `width` by `height` window, the page scrolled to `target`.
+fn opened_at(
+    cx: &mut TestAppContext,
+    log: u64,
+    width: f32,
+    height: f32,
+    target: impl Into<gpui_kit::ElementId>,
+) -> (
+    support::Env,
+    support::StoreServer,
+    support::ShellWindow,
+    Entity<LogsTfPage>,
+) {
+    let (env, server, s, page) = opened(cx, log);
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(width), gpui_kit::px(height)),
+    );
+    support::settle(cx, s.win);
+    scroll_to_in_log(cx, &s, &page, log, target);
+    (env, server, s, page)
+}
+
+#[gpui_kit::test]
+fn every_players_column_fits_a_1280_window(cx: &mut TestAppContext) {
+    // The highlander fixture records every column logs.tf can show.
+    let (_env, _server, s, page) = opened_at(cx, 2, 1280., 800., ids::LOGSTF_PLAYERS_SCROLL);
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL).unwrap();
+    let cap = support::bounds_of(cx, s.win, ids::logstf_sort("CAP")).unwrap();
+    assert!(cap.right() <= table.right(), "CAP {cap:?} past {table:?}");
+    // A table that fits keeps no strip for a sideways bar under its last row.
+    let players = cx.update(|cx| page.read(cx).detail().unwrap().players().to_vec());
+    let last = players
+        .iter()
+        .map(|p| {
+            let row = ids::logstf_player_row(p.steam_id());
+            support::bounds_of(cx, s.win, row).unwrap().bottom()
+        })
+        .fold(gpui_kit::px(0.), gpui_kit::Pixels::max);
+    assert_eq!(last, table.bottom(), "{last:?} {table:?}");
+}
+
+#[gpui_kit::test]
+fn class_icons_in_the_players_table_read_like_logs_tf(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_PLAYERS_SCROLL);
+    let icon =
+        support::bounds_of(cx, s.win, ids::logstf_class_card(sid(ARIE), TfClass::Scout)).unwrap();
+    assert!(icon.size.width >= gpui_kit::px(20.), "{icon:?}");
+}
