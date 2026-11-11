@@ -1,80 +1,76 @@
-//! Which TF2 wiki item pictures each weapon script; each name was checked against the wiki.
+//! Which item pictures each weapon script: the items_game.txt item whose backpack image
+//! the game ships, read from the player's own TF2 install.
 
-use crate::Weapon;
+use std::collections::{BTreeMap, HashMap};
 
-impl Weapon {
-    /// The TF2 wiki item this weapon script is pictured by, such as `"Scattergun"`; its icon
-    /// is the wiki file `Item_icon_<name>.png` with spaces as underscores. None for a script
-    /// with no picture.
-    pub fn icon_name(&self) -> Option<&'static str> {
-        // A row covering several items (class shotguns, "Most Melee") shows its stock item,
-        // and names drop a leading "The" as the wiki's file names do.
-        Some(match self.script_name() {
-            "tf_weapon_pep_brawler_blaster" => "Baby Face's Blaster",
-            "tf_weapon_lunchbox_drink" => "Bonk! Atomic Punch",
-            "tf_weapon_bat_fish" => "Holy Mackerel",
-            "tf_weapon_jar_milk" => "Mad Milk",
-            "tf_weapon_bat" => "Bat",
-            "tf_weapon_bat_wood" => "Sandman",
-            "tf_weapon_scattergun" => "Scattergun",
-            "tf_weapon_handgun_scout_primary" => "Shortstop",
-            "tf_weapon_soda_popper" => "Soda Popper",
-            "tf_weapon_pistol_scout" => "Pistol",
-            "tf_weapon_handgun_scout_secondary" => "Winger",
-            "tf_weapon_bat_giftwrap" => "Wrap Assassin",
-            "tf_weapon_cleaver" => "Flying Guillotine",
-            "tf_weapon_rocketlauncher_airstrike" => "Air Strike",
-            "tf_weapon_buff_item" => "Buff Banner",
-            "tf_weapon_particle_cannon" => "Cow Mangler 5000",
-            "tf_weapon_rocketlauncher_directhit" => "Direct Hit",
-            "tf_weapon_shovel" => "Shovel",
-            "tf_weapon_raygun" => "Righteous Bison",
-            "tf_weapon_rocketlauncher" => "Rocket Launcher",
-            "tf_weapon_shotgun_soldier" => "Shotgun",
-            "tf_weapon_rocketlauncher_fireball" => "Dragon's Fury",
-            "tf_weapon_flamethrower" => "Flame Thrower",
-            "tf_weapon_flaregun" => "Flare Gun",
-            "tf_weapon_slap" => "Hot Hand",
-            "tf_weapon_flaregun_revenge" => "Manmelter",
-            "tf_weapon_fireaxe" => "Fire Axe",
-            "tf_weapon_shotgun_pyro" => "Shotgun",
-            "tf_weapon_rocketpack" => "Thermal Thruster",
-            "tf_weapon_grenadelauncher" => "Grenade Launcher",
-            "tf_weapon_cannon" => "Loose Cannon",
-            "tf_weapon_bottle" => "Bottle",
-            "tf_weapon_katana" => "Half-Zatoichi",
-            "tf_weapon_pipebomblauncher" => "Stickybomb Launcher",
-            "tf_weapon_sword" => "Eyelander",
-            "tf_weapon_stickbomb" => "Ullapool Caber",
-            "tf_weapon_fists" => "Fists",
-            "tf_weapon_minigun" => "Minigun",
-            "tf_weapon_lunchbox" => "Sandvich",
-            "tf_weapon_shotgun_hwg" => "Shotgun",
-            "tf_weapon_robot_arm" => "Gunslinger",
-            "tf_weapon_wrench" => "Wrench",
-            "tf_weapon_pistol" => "Pistol",
-            "tf_weapon_shotgun_building_rescue" => "Rescue Ranger",
-            "tf_weapon_mechanical_arm" => "Short Circuit",
-            "tf_weapon_shotgun_primary" => "Shotgun",
-            "tf_weapon_sentry_revenge" => "Frontier Justice",
-            "tf_weapon_laser_pointer" => "Wrangler",
-            "tf_weapon_crossbow" => "Crusader's Crossbow",
-            "tf_weapon_medigun" => "Medi Gun",
-            "tf_weapon_bonesaw" => "Bonesaw",
-            "tf_weapon_syringegun_medic" => "Syringe Gun",
-            "tf_weapon_compound_bow" => "Huntsman",
-            "tf_weapon_sniperrifle_classic" => "Classic",
-            "tf_weapon_charged_smg" => "Cleaner's Carbine",
-            "tf_weapon_jar" => "Jarate",
-            "tf_weapon_club" => "Kukri",
-            "tf_weapon_sniperrifle" => "Sniper Rifle",
-            "tf_weapon_smg" => "SMG",
-            "tf_weapon_sniperrifle_decap" => "Bazaar Bargain",
-            "tf_weapon_sapper" => "Red-Tape Recorder",
-            "tf_weapon_knife" => "Knife",
-            "tf_weapon_revolver" => "Revolver",
-            "tf_weapon_builder" => "Sapper",
-            _ => return None,
-        })
+use crate::fonts::Platform;
+use crate::fonts::keyvalues::{self, KvPair, block, block_named, text};
+use crate::weapons;
+
+/// How many prefab hops an image lookup follows before giving up, which also ends cycles.
+const PREFAB_DEPTH: usize = 8;
+
+/// Each weapon script's `image_inventory` path (as items_game spells it, no extension) from
+/// items_game.txt text, through the item's prefabs. Scripts whose item or image is absent are
+/// left out.
+pub fn weapon_inventory_images(items_game: &str) -> BTreeMap<&'static str, String> {
+    // Parse without `keyvalues::load`: its file size cap sits just above the live file.
+    let file = keyvalues::parse(items_game, Platform::current().unwrap_or(Platform::Windows));
+    let Some(root) = block_named(&file.pairs, "items_game") else {
+        return BTreeMap::new();
+    };
+
+    // Every `prefabs` block feeds one case-blind lookup; the first definition of a name wins.
+    let mut prefabs: HashMap<String, &[KvPair]> = HashMap::new();
+    for pair in root
+        .iter()
+        .filter(|p| p.key.eq_ignore_ascii_case("prefabs"))
+    {
+        for prefab in block(pair).unwrap_or_default() {
+            if let Some(children) = block(prefab) {
+                prefabs
+                    .entry(prefab.key.to_ascii_lowercase())
+                    .or_insert(children);
+            }
+        }
     }
+
+    let wanted: HashMap<&str, &'static str> = weapons()
+        .iter()
+        .filter_map(|w| Some((w.icon_item()?, w.script_name())))
+        .collect();
+    let mut images = BTreeMap::new();
+    for pair in root.iter().filter(|p| p.key.eq_ignore_ascii_case("items")) {
+        for item in block(pair).unwrap_or_default().iter().filter_map(block) {
+            let Some(&script) = text(item, "name").and_then(|name| wanted.get(name)) else {
+                continue;
+            };
+            if images.contains_key(script) {
+                continue;
+            }
+            if let Some(image) = inventory_image(item, &prefabs, 0) {
+                images.insert(script, image.to_owned());
+            }
+        }
+    }
+    images
+}
+
+/// An item's (or prefab's) own `image_inventory`, else the first found through its `prefab`
+/// list, left to right and depth-first.
+fn inventory_image<'a>(
+    pairs: &'a [KvPair],
+    prefabs: &HashMap<String, &'a [KvPair]>,
+    depth: usize,
+) -> Option<&'a str> {
+    if let Some(image) = text(pairs, "image_inventory") {
+        return Some(image);
+    }
+    if depth >= PREFAB_DEPTH {
+        return None;
+    }
+    text(pairs, "prefab")?
+        .split_whitespace()
+        .filter_map(|name| prefabs.get(&name.to_ascii_lowercase()))
+        .find_map(|prefab| inventory_image(prefab, prefabs, depth + 1))
 }

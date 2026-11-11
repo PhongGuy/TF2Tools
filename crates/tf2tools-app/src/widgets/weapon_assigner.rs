@@ -2,7 +2,7 @@
 //! rows. It never writes; a click emits `AssignRequested` and the host decides what assigning
 //! means (the Crosshairs page writes the table, the profile editor saves its crosshairs).
 
-use std::collections::HashMap;
+use std::path::Path;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -22,8 +22,8 @@ use tf2tools_core::{CrosshairRef, TfClass, Weapon, WeaponSlot, weapons};
 use crate::ids;
 use crate::pages::common::ORANGE_500;
 use crate::previews::CrosshairPreviews;
-use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
 use crate::services::Services;
+use crate::weapon_icons::WeaponIcons;
 use crate::widgets::Named as _;
 use crate::widgets::crosshair_picker::preview_image;
 use crate::widgets::labelled;
@@ -40,11 +40,6 @@ pub fn slot_colour(slot: WeaponSlot, primary: Hsla) -> Hsla {
         WeaponSlot::Secondary => rgb(BLUE_500).into(),
         WeaponSlot::Melee | _ => rgb(ORANGE_500).into(),
     }
-}
-
-/// The `RemoteImages` viewer name of one assigner's icon wants.
-fn icon_viewer(id: impl std::fmt::Display) -> String {
-    format!("weapon-icons:{id}")
 }
 
 /// What an assign click targets.
@@ -112,11 +107,9 @@ pub struct WeaponAssigner {
     clearable: bool,
     previews: Entity<CrosshairPreviews>,
     _previews: Subscription,
-    /// The session image cache; None in compact mode or when none is installed.
-    images: Option<Entity<RemoteImages>>,
-    /// Weapon script to its wiki icon URL.
-    icon_urls: HashMap<&'static str, String>,
-    _images: Vec<Subscription>,
+    /// The session's game icons; None in compact mode.
+    icons: Option<Entity<WeaponIcons>>,
+    _icons: Option<Subscription>,
     /// The compact list's scroll.
     list_scroll: ScrollHandle,
 }
@@ -134,23 +127,13 @@ impl WeaponAssigner {
         let previews = CrosshairPreviews::global(cx);
         let observe_previews = cx.observe(&previews, |_, _, cx| cx.notify());
 
-        // Full rows draw wiki icons as they land; on release the viewer hands its wants back.
-        let images = RemoteImages::global(cx).filter(|_| !compact);
-        let mut subscriptions = Vec::new();
-        if let Some(images) = images.clone() {
-            subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
-            let viewer = icon_viewer(cx.entity_id());
-            subscriptions.push(cx.on_release(move |_, cx| {
-                images.update(cx, |images, cx| images.want(&viewer, Vec::new(), cx));
-            }));
-        }
-        let store = &cx.global::<Services>().store;
-        let icon_urls = weapons()
-            .iter()
-            .filter_map(|w| Some((w.script_name(), store.weapon_icon_url(w)?)))
-            .collect();
+        // Full rows draw the game's icons once they land; the first full list starts the load.
+        let icons = (!compact).then(|| WeaponIcons::global(cx));
+        let observe_icons = icons
+            .as_ref()
+            .map(|icons| cx.observe(icons, |_, _, cx| cx.notify()));
 
-        let assigner = Self {
+        Self {
             class: TfClass::Scout,
             slot: None,
             bar: true,
@@ -162,28 +145,9 @@ impl WeaponAssigner {
             list_scroll: ScrollHandle::new(),
             previews,
             _previews: observe_previews,
-            images,
-            icon_urls,
-            _images: subscriptions,
-        };
-        assigner.want_icons(cx);
-        assigner
-    }
-
-    // Ask the cache for the shown class's icons in row order. Called on construction and on
-    // a real class change, never from render.
-    fn want_icons(&self, cx: &mut Context<Self>) {
-        let Some(images) = &self.images else {
-            return;
-        };
-        let keys = weapons()
-            .iter()
-            .filter(|w| w.class() == self.class)
-            .filter_map(|w| self.icon_urls.get(w.script_name()))
-            .map(|url| ImageKey::weapon_icon(url))
-            .collect();
-        let viewer = icon_viewer(cx.entity_id());
-        images.update(cx, |images, cx| images.want(&viewer, keys, cx));
+            icons,
+            _icons: observe_icons,
+        }
     }
 
     /// The class whose weapons the list shows.
@@ -197,7 +161,6 @@ impl WeaponAssigner {
             return;
         }
         self.class = class;
-        self.want_icons(cx);
         cx.emit(ClassChanged { class });
         cx.notify();
     }
@@ -393,7 +356,7 @@ impl WeaponAssigner {
         }
     }
 
-    // One weapon: its wiki icon in a slot-coloured frame, or the slot square, and dot,
+    // One weapon: its game icon in a slot-coloured frame, or the slot square, and dot,
     // name, the assigned crosshair's preview and name, and a check mark when assigned, or a
     // spinner in its slot while this weapon is being assigned. Inert, and its content dimmed,
     // without a selection or while the host is busy.
@@ -449,23 +412,22 @@ impl WeaponAssigner {
         });
         let active = self.state.has_selection && !self.state.busy;
         let icon = (!self.compact).then(|| {
-            let ready = self
-                .images
+            let path = self
+                .icons
                 .as_ref()
-                .zip(self.icon_urls.get(script))
-                .map(|(i, u)| i.read(cx).image(&ImageKey::weapon_icon(u)));
+                .and_then(|i| i.read(cx).icon(script).map(Path::to_path_buf));
             // One fixed box either way, so a row keeps its height as its icon lands.
             let slot = div().flex_none().w(px(36.)).h(px(28.));
-            match ready {
-                Some(RemoteImage::Ready(image)) => slot
+            match path {
+                Some(path) => slot
                     .id(ids::weapon_icon(script))
                     .test_support()
                     .border_2()
                     .border_color(dot)
                     .rounded(px(4.))
-                    .child(img(image).size_full().object_fit(ObjectFit::Contain))
+                    .child(img(path).size_full().object_fit(ObjectFit::Contain))
                     .into_any_element(),
-                _ => {
+                None => {
                     let square = cx.global::<Services>().assets.slot_icon(weapon.slot());
                     slot.flex()
                         .items_center()

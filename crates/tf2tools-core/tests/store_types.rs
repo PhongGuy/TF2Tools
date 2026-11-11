@@ -157,8 +157,7 @@ fn endpoints_default_to_production_and_can_be_redirected() {
         prod.image_prefixes(),
         [
             "https://images.gamebanana.com/",
-            "https://raw.githubusercontent.com/",
-            "https://wiki.teamfortress.com/w/images/"
+            "https://raw.githubusercontent.com/"
         ]
     );
     let mock = prod
@@ -228,4 +227,11 @@ fn sync_status_reports_every_store_in_order() {
             (StoreKind::Addons, None, 1),
         ]
     );
+}
+
+#[test]
+fn no_endpoint_reaches_the_tf2_wiki() {
+    for prefix in Endpoints::default().image_prefixes() {
+        assert!(!prefix.contains("wiki.teamfortress.com"), "{prefix}");
+    }
 }

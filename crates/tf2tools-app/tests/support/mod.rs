@@ -1894,6 +1894,37 @@ pub fn seed_mastercomfig_overrides(env: &Env, uri: &str) {
         .unwrap();
 }
 
+pub type IconLoads = Arc<std::sync::Mutex<Vec<PathBuf>>>;
+
+/// A loader that pictures every weapon but `skip` with `png`, logging each tf folder it loads.
+pub fn fake_icon_loader(
+    png: PathBuf,
+    skip: &'static [&'static str],
+) -> (tf2tools_app::weapon_icons::IconLoader, IconLoads) {
+    let loads: IconLoads = Arc::default();
+    let log = Arc::clone(&loads);
+    let loader: tf2tools_app::weapon_icons::IconLoader =
+        Arc::new(move |_: &Services, tf_dir: &std::path::Path| {
+            log.lock().unwrap().push(tf_dir.to_path_buf());
+            tf2tools_core::weapons()
+                .iter()
+                .map(|w| w.script_name())
+                .filter(|s| !skip.contains(s))
+                .map(|s| (s, png.clone()))
+                .collect::<std::collections::HashMap<_, _>>()
+        });
+    (loader, loads)
+}
+
+/// A 128x128 clear PNG at `<tmp>/icon.png`, standing in for a cached game icon.
+pub fn icon_png(env: &Env) -> PathBuf {
+    let path = env.tmp.path().join("icon.png");
+    image::RgbaImage::from_pixel(128, 128, image::Rgba([0, 0, 0, 0]))
+        .save(&path)
+        .unwrap();
+    path
+}
+
 /// Opens the env's database, for tests that set up a state no flow reaches.
 pub fn sql(env: &Env) -> rusqlite::Connection {
     rusqlite::Connection::open(env.data.db_path()).unwrap()

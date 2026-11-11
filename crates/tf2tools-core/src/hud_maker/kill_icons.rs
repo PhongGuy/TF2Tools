@@ -2,7 +2,7 @@
 
 use crate::error::HudFilesError;
 use crate::fonts::Platform;
-use crate::fonts::keyvalues::{KvPair, KvValue};
+use crate::fonts::keyvalues::{KvPair, block, block_named, text};
 
 use super::files::HudFiles;
 
@@ -130,28 +130,5 @@ fn icon_in(pairs: &[KvPair], name: &str) -> Option<KillIcon> {
         };
         let glyph = text(keys, "font").is_some() || text(keys, "character").is_some();
         (!glyph && icon.wide > 0 && icon.tall > 0).then_some(icon)
-    })
-}
-
-fn block(pair: &KvPair) -> Option<&[KvPair]> {
-    match &pair.value {
-        KvValue::Block(children) => Some(children),
-        KvValue::Text(_) => None,
-    }
-}
-
-/// The first block named `name`, ignoring case.
-fn block_named<'a>(pairs: &'a [KvPair], name: &str) -> Option<&'a [KvPair]> {
-    pairs
-        .iter()
-        .find(|pair| pair.key.eq_ignore_ascii_case(name))
-        .and_then(block)
-}
-
-/// The first text value named `name`, ignoring case.
-fn text<'a>(pairs: &'a [KvPair], name: &str) -> Option<&'a str> {
-    pairs.iter().find_map(|pair| match &pair.value {
-        KvValue::Text(t) if pair.key.eq_ignore_ascii_case(name) => Some(t.as_str()),
-        KvValue::Text(_) | KvValue::Block(_) => None,
     })
 }

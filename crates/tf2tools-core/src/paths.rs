@@ -87,6 +87,12 @@ impl DataDir {
     pub fn image_cache_dir(&self) -> PathBuf {
         self.image_cache.clone()
     }
+
+    /// The game weapon icon cache: `<cache home>/tf2tools/weapon-icons` beside the store's
+    /// image cache, `<root>/cache/weapon-icons` from `at`.
+    pub fn weapon_icon_dir(&self) -> PathBuf {
+        self.image_cache.with_file_name("weapon-icons")
+    }
 }
 
 /// A kind of installable item with its own library directory.

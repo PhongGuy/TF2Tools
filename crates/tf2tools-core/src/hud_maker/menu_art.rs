@@ -3,7 +3,7 @@
 
 use crate::error::HudFilesError;
 use crate::fonts::Platform;
-use crate::fonts::keyvalues::{KvPair, KvValue};
+use crate::fonts::keyvalues::{KvValue, block, text};
 
 use super::files::HudFiles;
 use super::layout::Screen;
@@ -69,19 +69,4 @@ impl Screen {
     pub fn is_wider(self) -> bool {
         u64::from(self.wide()) * 10 >= u64::from(self.tall()) * 16
     }
-}
-
-fn block(pair: &KvPair) -> Option<&[KvPair]> {
-    match &pair.value {
-        KvValue::Block(children) => Some(children),
-        KvValue::Text(_) => None,
-    }
-}
-
-/// The first text value named `name`, ignoring case.
-fn text<'a>(pairs: &'a [KvPair], name: &str) -> Option<&'a str> {
-    pairs.iter().find_map(|pair| match &pair.value {
-        KvValue::Text(t) if pair.key.eq_ignore_ascii_case(name) => Some(t.as_str()),
-        KvValue::Text(_) | KvValue::Block(_) => None,
-    })
 }

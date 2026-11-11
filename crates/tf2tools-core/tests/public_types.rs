@@ -3,11 +3,11 @@
 use tf2tools_core::{
     AddonEntry, AddonName, ApplyReport, ArchiveError, Assignment, BuiltinCrosshair,
     BuiltinCrosshairs, CatalogError, CrosshairEntry, CrosshairFormat, CrosshairId, CrosshairRef,
-    FitChange, GbId, HudEntry, HudId, HudStatus, ImportError, InstallError, InstalledCrosshairs,
-    InstalledSound, InstalledSounds, Library, LibraryEntry, LibraryError, PaintError, PaintTarget,
-    PaintedSource, PngReadError, PngWriteError, Provenance, RgbaImage, SkipReason,
-    SkippedAssignment, SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind, TfClass,
-    VpkError, VtfError, WavError, WavInfo, Weapon, WeaponSlot,
+    FitChange, GameWeaponIcons, GbId, HudEntry, HudId, HudStatus, ImportError, InstallError,
+    InstalledCrosshairs, InstalledSound, InstalledSounds, Library, LibraryEntry, LibraryError,
+    PaintError, PaintTarget, PaintedSource, PngReadError, PngWriteError, Provenance, RgbaImage,
+    SkipReason, SkippedAssignment, SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind,
+    TfClass, VpkError, VtfError, WavError, WavInfo, Weapon, WeaponIconsError, WeaponSlot,
 };
 
 fn assert_send_sync<T: Send + Sync + std::fmt::Debug + 'static>() {}
@@ -15,6 +15,8 @@ fn assert_send_sync<T: Send + Sync + std::fmt::Debug + 'static>() {}
 #[test]
 fn format_types_are_send_sync_debug() {
     assert_send_sync::<RgbaImage>();
+    assert_send_sync::<GameWeaponIcons>();
+    assert_send_sync::<WeaponIconsError>();
     assert_send_sync::<WavInfo>();
     assert_send_sync::<Weapon>();
     assert_send_sync::<TfClass>();
