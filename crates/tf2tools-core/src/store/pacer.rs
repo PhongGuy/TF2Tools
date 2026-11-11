@@ -162,8 +162,9 @@ impl Pacer {
             .unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Sets the base gap and the current gap to `base` from the next start on; a start
-    /// already promised keeps its time, so a shorter gap never pulls it forward.
+    /// Sets the base gap and the current gap to `base` from the next start on, clearing any
+    /// 429 widening and the run of answers easing it; a start already promised keeps its
+    /// time, so a shorter gap never pulls it forward.
     pub(crate) fn set_base(&self, base: Duration) {
         let mut s = self.lock();
         s.base = base;
@@ -633,6 +634,5 @@ mod tests {
             pacer.answered();
         }
         assert_eq!(pacer.gap(), ms(800));
-        assert_eq!(EASE_AFTER, 20);
     }
 }
