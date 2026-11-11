@@ -227,7 +227,7 @@ fn log_item(
                 .filter(|open| open.id == id)
                 .map(|open| {
                     let sort = state.player_sort;
-                    detail::panel(row, &open.state, &state.players, sort, page, cx)
+                    detail::panel(row, open, &state.players, sort, page, cx)
                 }),
         )
         .into_any_element()

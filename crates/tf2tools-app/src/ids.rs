@@ -2633,6 +2633,46 @@ fn player_class(id: SteamId, class: TfClass) -> String {
     format!("{}:{}", id.id64(), class.name().to_lowercase())
 }
 
+/// The open log's rounds section: "logstf-rounds".
+pub const LOGSTF_ROUNDS: &str = "logstf-rounds";
+
+/// The sideways scroll around the open log's rounds table.
+pub const LOGSTF_ROUNDS_SCROLL: &str = "logstf-rounds-scroll";
+
+/// One round's row in the open log, which opens or closes it: "logstf-round:<log>:<n>".
+pub fn logstf_round(log: u64, round: usize) -> ElementId {
+    keyed("logstf-round", &format!("{log}:{round}"))
+}
+
+/// An open round's players and events under its row: "logstf-round-panel:<log>:<n>".
+pub fn logstf_round_panel(log: u64, round: usize) -> ElementId {
+    keyed("logstf-round-panel", &format!("{log}:{round}"))
+}
+
+/// A round's running score, labelled "0 - 1" (BLU - RED): "logstf-round-score:<log>:<n>".
+pub fn logstf_round_score(log: u64, round: usize) -> ElementId {
+    keyed("logstf-round-score", &format!("{log}:{round}"))
+}
+
+/// A round's midfight winner, labelled "BLU", "RED" or "-": "logstf-round-midfight:<log>:<n>".
+pub fn logstf_round_midfight(log: u64, round: usize) -> ElementId {
+    keyed("logstf-round-midfight", &format!("{log}:{round}"))
+}
+
+/// One player's line in an open round: "logstf-round-player:<log>:<n>:<id64>".
+pub fn logstf_round_player(log: u64, round: usize, id: SteamId) -> ElementId {
+    keyed(
+        "logstf-round-player",
+        &format!("{log}:{round}:{}", id.id64()),
+    )
+}
+
+/// One event in an open round, labelled with its time, type and description:
+/// "logstf-event:<log>:<n>:<ix>".
+pub fn logstf_event(log: u64, round: usize, ix: usize) -> ElementId {
+    keyed("logstf-event", &format!("{log}:{round}:{ix}"))
+}
+
 /// One Medic's block in the open log: "logstf-medic:<id64>".
 pub fn logstf_medic(id: SteamId) -> ElementId {
     keyed("logstf-medic", &id.id64().to_string())

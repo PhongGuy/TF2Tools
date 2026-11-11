@@ -148,3 +148,41 @@ fn hovering_a_class_icon_opens_its_card(cx: &mut TestAppContext) {
         Some("scattergun 7 (100%) 3334 (86%) 56%")
     );
 }
+
+#[gpui_kit::test]
+fn rounds_open_any_number_and_show_players_and_events(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_ROUNDS);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_round_score(3, 0)).as_deref(),
+        Some("0 - 1")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_round_midfight(3, 0)).as_deref(),
+        Some("BLU")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_round_midfight(3, 5)).as_deref(),
+        Some("-")
+    );
+    support::click_id(cx, s.win, ids::logstf_round(3, 0));
+    // Round 0's panel pushes round 1's header down, possibly out of view.
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_round(3, 1));
+    support::click_id(cx, s.win, ids::logstf_round(3, 1));
+    assert_eq!(cx.update(|cx| page.read(cx).open_rounds()), [0, 1]);
+    assert!(support::present(cx, s.win, ids::logstf_round_panel(3, 0)));
+    assert!(support::present(cx, s.win, ids::logstf_round_panel(3, 1)));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::logstf_round_player(3, 0, sid(ARIE))
+    ));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_event(3, 0, 0)).as_deref(),
+        Some("0:23 Medic Death Meta Knightynski killed by DrHappiness")
+    );
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_round(3, 0));
+    support::click_id(cx, s.win, ids::logstf_round(3, 0));
+    assert_eq!(cx.update(|cx| page.read(cx).open_rounds()), [1]);
+    assert!(!support::present(cx, s.win, ids::logstf_round_panel(3, 0)));
+}

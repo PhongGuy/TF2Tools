@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
-    EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, count_text, duration_text, fetch_message,
-    finding_text, one_decimal, progress_line, progress_text, range_label, reads_zero,
+    EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, count_text, duration_text, event_text, fetch_message,
+    finding_text, medigun_name, one_decimal, progress_line, progress_text, range_label, reads_zero,
     resolve_message, ring_label, share_text, summary_text, sync_message, time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
@@ -319,4 +319,73 @@ fn zero_cells_read_as_zero_whole_or_with_a_decimal() {
     assert!(!reads_zero("0.4"));
     assert!(!reads_zero("10"));
     assert!(!reads_zero("-"));
+}
+
+#[test]
+fn events_read_in_player_words() {
+    use tf2tools_core::{EventKind, Medigun, STEAM_ID64_BASE, SteamId, Team};
+    let p = |n: u64| SteamId::from_id64(STEAM_ID64_BASE + n).unwrap();
+    let name_of = |id: SteamId| format!("p{}", id.id64() - STEAM_ID64_BASE);
+    let cases = [
+        (
+            EventKind::PointCap {
+                team: Team::Blue,
+                point: 3,
+            },
+            ("Point Capture", "BLU captured point 3"),
+        ),
+        (
+            EventKind::Charge {
+                team: Team::Red,
+                medic: p(5),
+                medigun: Medigun::MediGun,
+            },
+            ("Übercharge", "p5"),
+        ),
+        (
+            EventKind::Charge {
+                team: Team::Red,
+                medic: p(5),
+                medigun: Medigun::Kritzkrieg,
+            },
+            ("Übercharge", "p5 (Kritzkrieg)"),
+        ),
+        (
+            EventKind::MedicDeath {
+                team: Team::Blue,
+                medic: p(5),
+                killer: Some(p(6)),
+            },
+            ("Medic Death", "p5 killed by p6"),
+        ),
+        (
+            EventKind::MedicDeath {
+                team: Team::Blue,
+                medic: p(5),
+                killer: None,
+            },
+            ("Medic Death", "p5 died"),
+        ),
+        (
+            EventKind::Drop {
+                team: Team::Red,
+                medic: p(5),
+            },
+            ("Drop", "p5 dropped a full charge"),
+        ),
+        (
+            EventKind::RoundWin { team: Team::Red },
+            ("Round end", "Round win for RED"),
+        ),
+        (EventKind::Other { name: "mvp".into() }, ("mvp", "")),
+    ];
+    for (kind, (ty, description)) in cases {
+        assert_eq!(
+            event_text(&kind, &name_of),
+            (ty.to_owned(), description.to_owned()),
+            "{kind:?}"
+        );
+    }
+    assert_eq!(medigun_name(&Medigun::QuickFix), "Quick-Fix");
+    assert_eq!(medigun_name(&Medigun::Other("mystery".into())), "mystery");
 }

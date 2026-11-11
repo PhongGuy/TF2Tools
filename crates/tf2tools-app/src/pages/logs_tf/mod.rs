@@ -8,7 +8,7 @@ pub mod sort;
 pub mod tables;
 pub mod text;
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme as _;
@@ -46,10 +46,11 @@ use text::{
     STEAM_UNREACHABLE, fetch_message, profile_url, progress_line, resolve_message,
 };
 
-// The open log: its id and how far its body got.
+// The open log: its id, how far its body got and which of its rounds are open.
 pub(super) struct OpenLog {
     pub(super) id: u64,
     pub(super) state: OpenState,
+    pub(super) rounds: BTreeSet<usize>,
 }
 
 // A downloaded log reads its stored body and a pending one is fetched; either lands Ready,
@@ -293,6 +294,7 @@ impl LogsTfPage {
             self.open = Some(OpenLog {
                 id,
                 state: OpenState::Loading,
+                rounds: BTreeSet::new(),
             });
             match self.rows.iter().find(|r| r.id() == id).map(LogRow::state) {
                 Some(LogState::Pending) => self.fetch_detail(id, cx),
@@ -303,6 +305,26 @@ impl LogsTfPage {
         for changed in closing.into_iter().chain([id]) {
             self.remeasure_log(changed);
         }
+        cx.notify();
+    }
+
+    /// The open log's open rounds, ascending.
+    pub fn open_rounds(&self) -> Vec<usize> {
+        self.open
+            .as_ref()
+            .map_or_else(Vec::new, |open| open.rounds.iter().copied().collect())
+    }
+
+    /// Opens round `round` of the open log, or closes it if open; any number stay open.
+    pub fn toggle_round(&mut self, round: usize, cx: &mut Context<Self>) {
+        let Some(open) = &mut self.open else {
+            return;
+        };
+        if !open.rounds.remove(&round) {
+            open.rounds.insert(round);
+        }
+        let id = open.id;
+        self.remeasure_log(id);
         cx.notify();
     }
 
@@ -742,6 +764,7 @@ impl LogsTfPage {
         let Some(OpenLog {
             id,
             state: OpenState::Failed(_),
+            ..
         }) = self.open
         else {
             return;

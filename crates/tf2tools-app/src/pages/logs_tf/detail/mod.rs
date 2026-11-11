@@ -1,9 +1,13 @@
 //! An open log's panel, laid out like its page on logs.tf: the score banner, the title, the
-//! team table, the players table, one block per Medic and the tracked players' kills by class.
+//! team table, the players table, the rounds, one block per Medic and the tracked players'
+//! kills by class.
 
 mod banner;
 mod players;
 mod popover;
+mod rounds;
+
+use std::collections::BTreeSet;
 
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -16,8 +20,8 @@ use tf2tools_core::{
 };
 
 use super::sort::PlayerSort;
-use super::text::{LOG_LOADING, one_decimal, whole};
-use super::{LogsTfPage, OpenState};
+use super::text::{LOG_LOADING, one_decimal, team_name, whole};
+use super::{LogsTfPage, OpenLog, OpenState};
 use crate::ids;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
@@ -30,13 +34,13 @@ const NUMBER: Pixels = px(44.);
 const ICON: Pixels = px(16.);
 const MEDIC_WIDTH: Pixels = px(280.);
 
-/// The panel under open log `row`. The score banner heads it once `opened` is ready; the
+/// The panel under open log `row`. The score banner heads it once `open` is ready; the
 /// title comes from the row at once; under it the parsed log, or a line saying it is loading
 /// or why it failed. A failed fetch of a pending log offers Retry, which asks `page` to fetch
 /// it again.
 pub(super) fn panel(
     row: &LogRow,
-    opened: &OpenState,
+    open: &OpenLog,
     tracked: &[TrackedPlayer],
     sort: PlayerSort,
     page: WeakEntity<LogsTfPage>,
@@ -47,12 +51,15 @@ pub(super) fn panel(
         let line = div().text_sm().text_color(cx.theme().muted_foreground);
         labelled(line, ids::logstf_log_status(id), text).into_any_element()
     };
+    let opened = &open.state;
     let ready = match opened {
         OpenState::Ready(log) => Some(log.as_ref()),
         OpenState::Loading | OpenState::Failed(_) => None,
     };
     let body = match opened {
-        OpenState::Ready(log) => log_body(log, tracked, sort, page, cx).into_any_element(),
+        OpenState::Ready(log) => {
+            log_body(id, log, &open.rounds, tracked, sort, page, cx).into_any_element()
+        }
         OpenState::Loading => status(LOG_LOADING),
         OpenState::Failed(why) if row.state() == LogState::Pending => {
             let on_retry = move |_: &mut Window, cx: &mut App| {
@@ -79,7 +86,9 @@ pub(super) fn panel(
 
 // Everything the parsed body adds, in logs.tf's order.
 fn log_body(
+    id: u64,
     log: &LogDetail,
+    open_rounds: &BTreeSet<usize>,
     tracked: &[TrackedPlayer],
     sort: PlayerSort,
     page: WeakEntity<LogsTfPage>,
@@ -107,8 +116,16 @@ fn log_body(
         ))
         .child(sideways(
             ids::LOGSTF_PLAYERS_SCROLL,
-            players::players_table(log, sort, &is_tracked, page, cx),
+            players::players_table(log, sort, &is_tracked, page.clone(), cx),
         ))
+        .when(!log.rounds().is_empty(), |el| {
+            let table = rounds::rounds_table(id, log, open_rounds, &name_of, page, cx);
+            el.child(
+                section("Rounds", sideways(ids::LOGSTF_ROUNDS_SCROLL, table), cx)
+                    .id(ids::LOGSTF_ROUNDS)
+                    .test_support(),
+            )
+        })
         .when(!log.medics().is_empty(), |el| {
             el.child(section(
                 "Medics",
@@ -240,15 +257,18 @@ fn charge_name(kind: &str) -> String {
 
 // A team's name in its colour.
 pub(super) fn team_cell(team: Team, cx: &App) -> Div {
-    let (text, color): (&str, Hsla) = match team {
-        Team::Red => ("RED", cx.theme().red),
-        Team::Blue | _ => ("BLU", cx.theme().blue),
-    };
     div()
         .flex_none()
         .font_weight(FontWeight::BOLD)
-        .text_color(color)
-        .child(text)
+        .text_color(team_colour(team, cx))
+        .child(team_name(team))
+}
+
+pub(super) fn team_colour(team: Team, cx: &App) -> Hsla {
+    match team {
+        Team::Red => cx.theme().red,
+        Team::Blue | _ => cx.theme().blue,
+    }
 }
 
 fn class_cell(class: TfClass, cx: &App) -> AnyElement {

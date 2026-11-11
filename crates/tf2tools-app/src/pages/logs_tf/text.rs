@@ -2,7 +2,9 @@
 
 use std::time::Duration;
 
-use tf2tools_core::{LogsFetchError, LogsRange, LogsSyncError, ResolveError, SteamId};
+use tf2tools_core::{
+    EventKind, LogsFetchError, LogsRange, LogsSyncError, Medigun, ResolveError, SteamId, Team,
+};
 
 use crate::logs_sync::SyncProgress;
 
@@ -243,4 +245,63 @@ fn percent(part: u32, whole: u32) -> u64 {
 /// Whether a players table cell reads zero, whole or to one decimal, so it can be muted.
 pub fn reads_zero(cell: &str) -> bool {
     matches!(cell, "0" | "0.0")
+}
+
+/// A team's name as the app writes it: "BLU" or "RED".
+pub fn team_name(team: Team) -> &'static str {
+    match team {
+        Team::Red => "RED",
+        Team::Blue | _ => "BLU",
+    }
+}
+
+/// A medigun's name as the game writes it; one logs.tf names otherwise keeps that name.
+pub fn medigun_name(medigun: &Medigun) -> &str {
+    match medigun {
+        Medigun::Kritzkrieg => "Kritzkrieg",
+        Medigun::QuickFix => "Quick-Fix",
+        Medigun::Vaccinator => "Vaccinator",
+        Medigun::Other(name) => name,
+        Medigun::MediGun | _ => "Medigun",
+    }
+}
+
+/// (Type, Description) for one round event, players named through `name_of`. A charge names
+/// its medigun only when it is not the stock one; an unknown type shows its raw name alone.
+pub fn event_text(kind: &EventKind, name_of: &dyn Fn(SteamId) -> String) -> (String, String) {
+    let (ty, description) = match kind {
+        EventKind::PointCap { team, point } => (
+            "Point Capture",
+            format!("{} captured point {point}", team_name(*team)),
+        ),
+        EventKind::Charge { medic, medigun, .. } => {
+            let medic = name_of(*medic);
+            let description = match medigun {
+                Medigun::MediGun => medic,
+                other @ (Medigun::Kritzkrieg
+                | Medigun::QuickFix
+                | Medigun::Vaccinator
+                | Medigun::Other(_)
+                | _) => format!("{medic} ({})", medigun_name(other)),
+            };
+            ("Übercharge", description)
+        }
+        EventKind::MedicDeath { medic, killer, .. } => {
+            let medic = name_of(*medic);
+            let description = match killer {
+                Some(killer) => format!("{medic} killed by {}", name_of(*killer)),
+                None => format!("{medic} died"),
+            };
+            ("Medic Death", description)
+        }
+        EventKind::Drop { medic, .. } => {
+            ("Drop", format!("{} dropped a full charge", name_of(*medic)))
+        }
+        EventKind::RoundWin { team } => {
+            ("Round end", format!("Round win for {}", team_name(*team)))
+        }
+        EventKind::Other { name } => return (name.clone(), String::new()),
+        _ => return (format!("{kind:?}"), String::new()),
+    };
+    (ty.to_owned(), description)
 }
