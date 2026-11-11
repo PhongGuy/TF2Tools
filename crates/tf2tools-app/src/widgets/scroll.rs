@@ -90,12 +90,9 @@ impl RenderOnce for Sideways {
             handle: ScrollHandle::default(),
             overflows: false,
         });
-        let SidewaysState { handle, overflows } = {
+        let (handle, overflows) = {
             let s = state.read(cx);
-            SidewaysState {
-                handle: s.handle.clone(),
-                overflows: s.overflows,
-            }
+            (s.handle.clone(), s.overflows)
         };
         // Overflow is known only once the area is laid out, so a probe after it records any
         // change and redraws, opening or closing the bar's strip a frame later.
