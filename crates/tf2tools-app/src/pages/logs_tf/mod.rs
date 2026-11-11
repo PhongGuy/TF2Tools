@@ -33,7 +33,7 @@ use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 use text::{
-    EMPTY_TEXT, LOGS_TF_DOWN, LOGS_TF_URL, SAVE_FAILED, STEAM_UNREACHABLE, profile_url,
+    EMPTY_TEXT, LOGS_TF_DOWN, LOGS_TF_URL, LOOKING_UP, SAVE_FAILED, STEAM_UNREACHABLE, profile_url,
     progress_text, resolve_message, sync_message,
 };
 
@@ -327,7 +327,8 @@ impl LogsTfPage {
                             .child(
                                 Button::new(ids::LOGSTF_ADD_CONFIRM)
                                     .primary()
-                                    .label("Add")
+                                    .label(if this.adding { LOOKING_UP } else { "Add" })
+                                    .loading(this.adding)
                                     .disabled(blank || this.adding)
                                     .on_click({
                                         let entity = entity.clone();

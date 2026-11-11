@@ -8,7 +8,7 @@ use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use serde_json::json;
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
-use tf2tools_app::pages::logs_tf::text::{log_url, profile_url};
+use tf2tools_app::pages::logs_tf::text::{LOOKING_UP, log_url, profile_url};
 use tf2tools_app::services::{Services, Tf2State};
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
@@ -1021,4 +1021,32 @@ fn a_new_log_keeps_the_open_log_where_it_was(cx: &mut TestAppContext) {
     support::settle(cx, s.win);
     let after = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL);
     assert_eq!(after, Some(before), "the open log stays put");
+}
+
+#[gpui_kit::test]
+fn the_add_button_says_it_is_looking_up(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes_after(
+        "/steam/id/gabelogannewell/",
+        FOUND_XML.as_bytes().to_vec(),
+        Duration::from_millis(500),
+    );
+    server.mount_bytes("/api/v1/log", list_body(&[]));
+    let s = shell(cx, &env, &server.uri(), &[]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::LOGSTF_EMPTY_ADD);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_ADD_CONFIRM).as_deref(),
+        Some("Add")
+    );
+    type_into_add(cx, &s, &page, "gabelogannewell");
+    support::click_id(cx, s.win, ids::LOGSTF_ADD_CONFIRM);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_ADD_CONFIRM).as_deref(),
+        Some(LOOKING_UP)
+    );
+    support::wait_real(cx, "the new chip", |cx| {
+        cx.update(|cx| page.read(cx).players().len()) == 1
+    });
 }
