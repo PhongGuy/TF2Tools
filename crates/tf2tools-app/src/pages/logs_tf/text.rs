@@ -268,7 +268,8 @@ pub const LOG_GONE: &str = "This log was removed from logs.tf";
 /// A row's note when its log's body could not be read.
 pub const LOG_UNREADABLE: &str = "This log couldn't be read";
 
-/// A round's length with minutes padded to two digits, as logs.tf's rounds table: "05:30".
+/// A round's length or an event's time, minutes padded to two digits as logs.tf's rounds
+/// table writes them: "05:30", "00:50".
 pub fn round_length_text(seconds: u32) -> String {
     format!("{:02}:{:02}", seconds / 60, seconds % 60)
 }

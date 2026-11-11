@@ -15,9 +15,7 @@ use tf2tools_core::{LogDetail, RoundLine, SteamId, Team};
 use super::{NUMBER, team_cell, team_colour};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
-use crate::pages::logs_tf::text::{
-    EventPart, duration_text, event_parts, round_length_text, team_name,
-};
+use crate::pages::logs_tf::text::{EventPart, event_parts, round_length_text, team_name};
 use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
 
@@ -241,7 +239,7 @@ fn round_panel(
                 .child(div().flex_1().min_w(DESCRIPTION_MIN).child("Description")),
         )
         .children(round.events().iter().enumerate().map(|(ix, event)| {
-            let time = duration_text(event.at());
+            let time = round_length_text(event.at());
             let (ty, parts) = event_parts(event.kind(), name_of, team_of);
             let (description, colours) = coloured(&parts, cx);
             let label = [time.as_str(), &ty, &description]

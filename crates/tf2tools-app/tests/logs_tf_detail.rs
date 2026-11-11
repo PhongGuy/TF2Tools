@@ -315,7 +315,7 @@ fn rounds_open_any_number_and_show_players_and_events(cx: &mut TestAppContext) {
     ));
     assert_eq!(
         support::label_of(cx, s.win, ids::logstf_event(3, 0, 0)).as_deref(),
-        Some("0:23 Medic Death Meta Knightynski killed by DrHappiness")
+        Some("00:23 Medic Death Meta Knightynski killed by DrHappiness")
     );
     scroll_to_in_log(cx, &s, &page, 3, ids::logstf_round(3, 0));
     support::click_id(cx, s.win, ids::logstf_round(3, 0));
