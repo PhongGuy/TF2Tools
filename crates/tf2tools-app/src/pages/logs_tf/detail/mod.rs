@@ -81,7 +81,7 @@ pub(super) fn panel(
         .px_3()
         .py_3()
         .bg(cx.theme().muted)
-        .when_some(ready, |el, log| el.child(banner::banner(id, log, cx)))
+        .when_some(ready, |el, log| el.child(banner::banner(id, log)))
         .child(banner::title(row, cx))
         .child(body)
         .into_any_element()

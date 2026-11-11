@@ -1314,7 +1314,6 @@ fn the_add_button_says_it_is_looking_up(cx: &mut TestAppContext) {
 
 #[gpui_kit::test]
 fn the_banner_halves_are_solid_with_blu_on_the_left(cx: &mut TestAppContext) {
-    use gpui_kit::component::ActiveTheme as _;
     use tf2tools_core::Team;
     let env = support::env();
     let server = support::StoreServer::start();
@@ -1327,10 +1326,12 @@ fn the_banner_halves_are_solid_with_blu_on_the_left(cx: &mut TestAppContext) {
     };
     let (blu, red) = (half(cx, Team::Blue), half(cx, Team::Red));
     assert!(blu.origin.x < red.origin.x, "BLU sits left of RED");
-    let (theme_red, theme_blue) = cx.update(|cx| (cx.theme().red, cx.theme().blue));
-    for color in [theme_red, theme_blue] {
-        let ratio = contrast_with_white(tf2tools_app::theme::team_fill(color));
-        assert!(ratio >= 4.5, "white on {color:?} is {ratio:.2}:1");
+    for team in [Team::Red, Team::Blue] {
+        let fill = tf2tools_app::theme::team_fill(team);
+        let ratio = contrast_with_white(fill);
+        assert!(ratio >= 4.5, "white on {fill:?} is {ratio:.2}:1");
+        // logs.tf's muted teal-blue and brick-red, not the theme's saturated text colours.
+        assert!(fill.s <= 0.4, "{team:?} fill {fill:?} is too saturated");
     }
 }
 

@@ -3,7 +3,7 @@
 
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
-    App, Div, FontWeight, Hsla, InteractiveElement as _, IntoElement, ParentElement as _,
+    App, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
 use tf2tools_core::{LogDetail, LogRow, Team, TeamTotals};
@@ -29,9 +29,9 @@ const COLUMNS: [Column; 6] = [
 
 /// The score banner of log `id`: BLU's half on the left, RED's on the right, each score
 /// beside the centre line, labelled "BLU 2, RED 3".
-pub(super) fn banner(id: u64, log: &LogDetail, cx: &App) -> impl IntoElement {
+pub(super) fn banner(id: u64, log: &LogDetail) -> impl IntoElement {
     let (blue, red) = (log.blue().score(), log.red().score());
-    let half = |team: Team, color: Hsla| {
+    let half = |team: Team| {
         h_flex()
             .id(ids::logstf_banner_team(id, team))
             .test_support()
@@ -41,7 +41,7 @@ pub(super) fn banner(id: u64, log: &LogDetail, cx: &App) -> impl IntoElement {
             .items_center()
             .px_4()
             .py_2()
-            .bg(team_fill(color))
+            .bg(team_fill(team))
             .text_color(gpui_kit::white())
             .font_weight(FontWeight::BOLD)
     };
@@ -55,16 +55,8 @@ pub(super) fn banner(id: u64, log: &LogDetail, cx: &App) -> impl IntoElement {
         .w_full()
         .rounded_md()
         .overflow_hidden()
-        .child(
-            half(Team::Blue, cx.theme().blue)
-                .child(name("BLU"))
-                .child(score(blue)),
-        )
-        .child(
-            half(Team::Red, cx.theme().red)
-                .child(score(red))
-                .child(name("RED")),
-        )
+        .child(half(Team::Blue).child(name("BLU")).child(score(blue)))
+        .child(half(Team::Red).child(score(red)).child(name("RED")))
 }
 
 /// The row's title over its map, date and length, with the way to the same log on logs.tf.
