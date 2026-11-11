@@ -2600,7 +2600,7 @@ pub const LOGSTF_TEAMS_SCROLL: &str = "logstf-teams-scroll";
 /// The open log's players table, which scrolls sideways in a narrow window.
 pub const LOGSTF_PLAYERS_SCROLL: &str = "logstf-players-scroll";
 
-/// The tooltip that shows a player's whole name over a players table or kill matrix name.
+/// The tooltip that shows a player's whole name over a cut name in the open log.
 pub const LOGSTF_NAME_TIP: &str = "logstf-name-tip";
 
 /// One player's name cell in the open log's players table: "logstf-player-name:<id64>".
@@ -2777,6 +2777,23 @@ pub fn logstf_heal_target(medic: SteamId, target: SteamId) -> ElementId {
     )
 }
 
+/// One heal target's name in a Medic's block: "logstf-heal-name:<medic id64>:<target id64>".
+pub fn logstf_heal_name(medic: SteamId, target: SteamId) -> ElementId {
+    keyed(
+        "logstf-heal-name",
+        &format!("{}:{}", medic.id64(), target.id64()),
+    )
+}
+
+/// One heal target's class icon cell in a Medic's block:
+/// "logstf-heal-class:<medic id64>:<target id64>".
+pub fn logstf_heal_class(medic: SteamId, target: SteamId) -> ElementId {
+    keyed(
+        "logstf-heal-class",
+        &format!("{}:{}", medic.id64(), target.id64()),
+    )
+}
+
 /// One heal target's row in a Medic's block: "logstf-heal-row:<medic id64>:<target id64>".
 pub fn logstf_heal_row(medic: SteamId, target: SteamId) -> ElementId {
     keyed(
@@ -2849,6 +2866,11 @@ pub const LOGSTF_STREAKS: &str = "logstf-streaks";
 /// One line of the chat dialog, labelled "<name>: <msg>": "logstf-chat-line:<ix>".
 pub fn logstf_chat_line(ix: usize) -> ElementId {
     keyed("logstf-chat-line", &ix.to_string())
+}
+
+/// The sender's name in one chat line: "logstf-chat-name:<ix>".
+pub fn logstf_chat_name(ix: usize) -> ElementId {
+    keyed("logstf-chat-name", &ix.to_string())
 }
 
 /// One row of the killstreaks dialog, labelled "0:39 ORANGEjuice 3": "logstf-streak:<ix>".

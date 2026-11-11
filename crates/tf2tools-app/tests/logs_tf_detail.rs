@@ -685,6 +685,35 @@ fn every_players_column_fits_a_1280_window(cx: &mut TestAppContext) {
 // The longest name seen in a real log, which pushed CAP out of a 1280 window.
 const LONG_NAME: &str = "cheveuxbrillantenneigé39800";
 
+/// The highlander log with the player named `from` renamed `LONG_NAME`, open in a `width` by
+/// `height` window with the default sidebar.
+fn opened_renamed(
+    cx: &mut TestAppContext,
+    from: &str,
+    width: f32,
+    height: f32,
+) -> (
+    support::Env,
+    support::StoreServer,
+    support::ShellWindow,
+    Entity<LogsTfPage>,
+) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[(2, day_ago(1))]));
+    let log = HIGHLANDER.replace(&format!("\"{from}\""), &format!("\"{LONG_NAME}\""));
+    server.mount_bytes("/json/2", log.into_bytes());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 2);
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(width), gpui_kit::px(height)),
+    );
+    support::settle(cx, s.win);
+    (env, server, s, page)
+}
+
 /// The highlander log, one player renamed `LONG_NAME`, open in a `width` by `height` window
 /// with the default sidebar; returns the long-named player's id and main class with it.
 fn opened_long_name(
@@ -698,19 +727,7 @@ fn opened_long_name(
     tf2tools_core::SteamId,
     TfClass,
 ) {
-    let env = support::env();
-    let server = support::StoreServer::start();
-    server.mount_bytes("/api/v1/log", list_body(&[(2, day_ago(1))]));
-    let log = HIGHLANDER.replace("\"cabo marola\"", &format!("\"{LONG_NAME}\""));
-    server.mount_bytes("/json/2", log.into_bytes());
-    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
-    let page = open_page(cx, &s);
-    open_log(cx, &s, &page, 2);
-    cx.simulate_window_resize(
-        s.win,
-        gpui_kit::size(gpui_kit::px(width), gpui_kit::px(height)),
-    );
-    support::settle(cx, s.win);
+    let (env, server, s, page) = opened_renamed(cx, "cabo marola", width, height);
     scroll_to_in_log(cx, &s, &page, 2, ids::LOGSTF_PLAYERS_SCROLL);
     let id = cx.update(|cx| {
         let log = page.read(cx).detail().unwrap();
@@ -1037,4 +1054,73 @@ fn the_matrix_total_header_lines_up_with_the_class_icons(cx: &mut TestAppContext
     let scout = support::bounds_of(cx, s.win, ids::logstf_matrix_head(TfClass::Scout)).unwrap();
     let mid = |b: gpui_kit::Bounds<gpui_kit::Pixels>| f32::from(b.top() + b.size.height / 2.);
     assert!((mid(total) - mid(scout)).abs() < 1., "{total:?} {scout:?}");
+}
+
+// The Medic who healed the long-named player in the highlander log.
+fn manchester(cx: &mut TestAppContext, s: &support::ShellWindow) -> tf2tools_core::SteamId {
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    cx.update(|cx| {
+        let log = page.read(cx).detail().unwrap();
+        let medic = log.medics().iter().find(|m| m.name() == "manchester");
+        medic.expect("manchester's block").steam_id()
+    })
+}
+
+#[gpui_kit::test]
+fn a_cut_heal_target_keeps_clear_of_its_class_icon(cx: &mut TestAppContext) {
+    let (_env, _server, s, id, _) = opened_long_name(cx, 1280., 800.);
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    let medic = manchester(cx, &s);
+    scroll_to_in_log(cx, &s, &page, 2, ids::logstf_heal_row(medic, id));
+    let name = support::bounds_of(cx, s.win, ids::logstf_heal_name(medic, id)).unwrap();
+    let icon = support::bounds_of(cx, s.win, ids::logstf_heal_class(medic, id)).unwrap();
+    assert!(
+        f32::from(name.size.width) < text_width(cx, s.win, LONG_NAME),
+        "the name is cut short: {name:?}"
+    );
+    assert!(
+        name.right() + gpui_kit::px(8.) <= icon.left(),
+        "{name:?} {icon:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn a_cut_heal_target_shows_whole_in_its_tooltip(cx: &mut TestAppContext) {
+    let (_env, _server, s, id, _) = opened_long_name(cx, 1280., 800.);
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    let medic = manchester(cx, &s);
+    scroll_to_in_log(cx, &s, &page, 2, ids::logstf_heal_row(medic, id));
+    let tip = name_tip(cx, &s, ids::logstf_heal_name(medic, id));
+    assert_eq!(tip.as_deref(), Some(LONG_NAME));
+}
+
+// The highlander log with its first chatter renamed `LONG_NAME`, its chat open.
+fn long_chatter_chat(
+    cx: &mut TestAppContext,
+    width: f32,
+    height: f32,
+) -> (support::Env, support::StoreServer, support::ShellWindow) {
+    let (env, server, s, page) = opened_renamed(cx, "dor1tos", width, height);
+    scroll_to_in_log(cx, &s, &page, 2, ids::LOGSTF_CHAT_TOGGLE);
+    support::click_id(cx, s.win, ids::LOGSTF_CHAT_TOGGLE);
+    support::settle(cx, s.win);
+    (env, server, s)
+}
+
+#[gpui_kit::test]
+fn a_long_chat_name_takes_the_room_it_has_at_1280(cx: &mut TestAppContext) {
+    let (_env, _server, s) = long_chatter_chat(cx, 1280., 800.);
+    let name = support::bounds_of(cx, s.win, ids::logstf_chat_name(0)).unwrap();
+    let full = shaped_width(cx, s.win, LONG_NAME, gpui_kit::FontWeight::SEMIBOLD);
+    assert!(
+        f32::from(name.size.width) >= full,
+        "the name is cut short: {name:?} < {full}"
+    );
+}
+
+#[gpui_kit::test]
+fn a_chat_name_shows_whole_in_its_tooltip(cx: &mut TestAppContext) {
+    let (_env, _server, s) = long_chatter_chat(cx, 800., 600.);
+    let tip = name_tip(cx, &s, ids::logstf_chat_name(0));
+    assert_eq!(tip.as_deref(), Some(LONG_NAME));
 }

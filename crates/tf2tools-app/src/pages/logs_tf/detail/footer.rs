@@ -16,11 +16,14 @@ use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::tables::ChatRow;
 use crate::pages::logs_tf::text::{duration_text, streaks_label};
 use crate::widgets::dialog_frame::content_max_height;
+use crate::widgets::tip::tip;
 
 // The team badge's column, kept empty for a sender who is not a player so names line up.
 const BADGE: Pixels = px(32.);
 const TIME: Pixels = px(48.);
 const NAME: Pixels = px(200.);
+// The room a chat message keeps however long its sender's name.
+const MESSAGE_MIN: Pixels = px(160.);
 
 /// One killstreak as the dialog lists it, its time already worded.
 #[derive(Clone)]
@@ -101,8 +104,17 @@ pub(in crate::pages::logs_tf) fn chat_dialog(
             .items_start()
             .gap_2()
             .child(badge(row.team, cx))
-            .child(name(&row.name, row.team, cx))
-            .child(div().flex_1().min_w_0().child(row.msg.clone()))
+            .child(
+                // The name takes the line's spare room and is cut only past it.
+                name(&row.name, row.team, cx)
+                    .flex_initial()
+                    .min_w_0()
+                    .max_w_full()
+                    .id(ids::logstf_chat_name(ix))
+                    .test_support()
+                    .tooltip(tip(ids::LOGSTF_NAME_TIP, row.name.clone())),
+            )
+            .child(div().flex_1().min_w(MESSAGE_MIN).child(row.msg.clone()))
     });
     let body = if rows.is_empty() {
         vec![muted("Nobody chatted in this log.", cx).into_any_element()]

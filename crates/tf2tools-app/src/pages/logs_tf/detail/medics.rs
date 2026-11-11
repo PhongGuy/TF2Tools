@@ -4,7 +4,7 @@
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
     App, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
-    Styled as _, TestSupportExt as _, div, px,
+    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
 use tf2tools_core::{LogDetail, MedicLine, SteamId};
 
@@ -15,6 +15,7 @@ use crate::pages::logs_tf::text::{charge_text, healing_text, seconds_text, tenth
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
+use crate::widgets::tip::tip;
 
 // A block's width; in the 800 px window's content column they wrap one to a line.
 const MEDIC_WIDTH: Pixels = px(300.);
@@ -146,8 +147,26 @@ fn heal_table(medic: &MedicLine, is_tracked: &dyn Fn(SteamId) -> bool, cx: &App)
             .py_0p5()
             .border_t_1()
             .border_color(cx.theme().border)
-            .child(div().flex_1().min_w_0().truncate().child(row.name))
-            .child(div().w(CLASS).flex_none().children(icon))
+            .child(
+                div()
+                    .id(ids::logstf_heal_name(medic.steam_id(), row.steam_id))
+                    .test_support()
+                    .tooltip(tip(ids::LOGSTF_NAME_TIP, row.name.clone()))
+                    .flex_1()
+                    .min_w_0()
+                    // Kept clear of the class icon after a cut-off name.
+                    .mr_1()
+                    .truncate()
+                    .child(row.name),
+            )
+            .child(
+                div()
+                    .id(ids::logstf_heal_class(medic.steam_id(), row.steam_id))
+                    .test_support()
+                    .w(CLASS)
+                    .flex_none()
+                    .children(icon),
+            )
             .child(number(row.heals.to_string()))
             .child(share)
     });
