@@ -209,3 +209,55 @@ fn rows_and_averages_share_the_cap() {
     assert_eq!(avg[0].logs() as usize, LOG_CAP);
     assert_eq!(avg[0].seconds(), 60 * LOG_CAP as u64);
 }
+
+#[tokio::test]
+async fn classes_with_equal_time_list_by_class_name_in_every_row() {
+    let env = logs_env().await;
+    env.client
+        .cache()
+        .add_player(&TrackedPlayer::new(arie(), "Arie"))
+        .unwrap();
+    // Three classes tied at 300 s in five logs: row order would only match by chance.
+    let tied = PlayerSpec {
+        account: 231_702,
+        name: "Arie",
+        team: "Red",
+        heal: 0,
+        ubers: 0,
+        drops: 0,
+        classes: vec![
+            ("soldier", 300, 1, 1, 1, 100),
+            ("medic", 300, 1, 1, 1, 100),
+            ("scout", 300, 1, 1, 1, 100),
+        ],
+    };
+    let ids: Vec<(u64, i64)> = (1..=5).map(|i| (i, days_ago(i as i64))).collect();
+    mount_list(&env.server, ARIE, list_body(&ids)).await;
+    for (id, _) in &ids {
+        mount_log(
+            &env.server,
+            *id,
+            200,
+            log_body(900, std::slice::from_ref(&tied)),
+        )
+        .await;
+    }
+    env.client
+        .sync_player(arie(), false, &|_| {})
+        .await
+        .unwrap();
+    let rows = env
+        .client
+        .cache()
+        .logs(arie(), window_start(now()))
+        .unwrap();
+    assert_eq!(rows.len(), 5);
+    for row in rows {
+        assert_eq!(
+            row.classes(),
+            [TfClass::Medic, TfClass::Scout, TfClass::Soldier],
+            "log {}",
+            row.id()
+        );
+    }
+}

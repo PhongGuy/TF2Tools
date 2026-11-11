@@ -145,3 +145,14 @@ async fn a_redirect_off_the_logs_and_steam_hosts_is_refused() {
     );
     assert!(elsewhere.received_requests().await.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn an_oversized_profile_adds_an_id_under_its_id64() {
+    let env = logs_env().await;
+    let huge = format!("<profile>{}</profile>", "x".repeat(2 * 1024 * 1024));
+    serve_xml(&env.server, "/steam/profiles/76561197960287930/", &huge).await;
+    let input = PlayerInput::Id(SteamId::from_id64(GABE).unwrap());
+    let player = env.client.resolve_player(&input).await.unwrap();
+    assert_eq!(player.steam_id().id64(), GABE);
+    assert_eq!(player.name(), "76561197960287930");
+}

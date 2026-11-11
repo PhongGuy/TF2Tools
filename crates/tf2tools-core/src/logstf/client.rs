@@ -8,17 +8,12 @@ use crate::error::{LogsSyncError, ResolveError};
 use crate::store::StoreConfig;
 use crate::store::http::{Http, NetFailure, Redirects};
 
-use super::cache::ListedLog;
+use super::cache::{ListedLog, STATE_GONE};
 use super::steam_xml::xml_text;
 use super::{
     LOG_BODY_LIMIT, LOG_CAP, LOGS_SPACING, LogsCache, PRUNE_SECS, PlayerInput, STALE_SECS, SteamId,
     TrackedPlayer, parse_log, window_start,
 };
-
-/// `logstf_logs.state` for a log logs.tf answered 404 for.
-const STATE_GONE: i64 = 1;
-/// `logstf_logs.state` for a log whose body could not be read.
-const STATE_UNREADABLE: i64 = 2;
 
 /// How far a sync has got through the logs it needs to download.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -193,7 +188,7 @@ impl LogsClient {
     /// The player behind `input`, named by their Steam persona, without touching the cache.
     ///
     /// A known Steam ID still resolves when Steam cannot be reached or answers with something
-    /// other than profile XML (a maintenance page), named by its id64, so a player can be
+    /// other than profile XML (a maintenance page, an oversized body), named by its id64, so a player can be
     /// added offline. A vanity name needs Steam and fails as Steam did.
     pub async fn resolve_player(&self, input: &PlayerInput) -> Result<TrackedPlayer, ResolveError> {
         let steam = self.endpoints.steam_community();
@@ -209,6 +204,7 @@ impl LogsClient {
                     ResolveError::Network { .. }
                     | ResolveError::Http { .. }
                     | ResolveError::RateLimited { .. }
+                    | ResolveError::TooLarge { .. }
                     | ResolveError::Malformed { .. },
                 ),
             ) => Ok(TrackedPlayer::new(*id, id.to_string())),
@@ -241,7 +237,8 @@ impl LogsClient {
     }
 
     /// Lists the player's logs, downloads every listed log without a body, 1 s apart, and
-    /// prunes. Skips everything when last_synced is under 30 minutes old, unless `force`.
+    /// prunes. Skips everything when last_synced is under 30 minutes old and no log in the
+    /// window is still pending, unless `force`.
     /// One sync runs at a time per client (clones share the lock).
     pub async fn sync_player(
         &self,
@@ -257,7 +254,9 @@ impl LogsClient {
             .ok_or(LogsSyncError::NotTracked {
                 steam_id: id.id64(),
             })?;
-        if !force && last_synced.is_some_and(|at| now - at < STALE_SECS) {
+        // A sync that stopped partway leaves pending logs, so the next open finishes it.
+        let fresh = last_synced.is_some_and(|at| now - at < STALE_SECS);
+        if !force && fresh && !self.cache.has_pending(id, window_start(now))? {
             return Ok(LogsSyncSummary {
                 skipped: true,
                 ..LogsSyncSummary::default()
@@ -278,6 +277,7 @@ impl LogsClient {
             ..LogsSyncSummary::default()
         };
         let total = wanted.len();
+        on_progress(LogsProgress { done: 0, total });
         for (done, log_id) in wanted.into_iter().enumerate() {
             let url = format!("{}/json/{log_id}", self.endpoints.logs_tf());
             // A 404 means logs.tf dropped the log; an oversize, non-UTF-8 or non-log body is
@@ -305,7 +305,7 @@ impl LogsClient {
                     summary.downloaded += 1;
                 }
                 None => {
-                    if self.cache.mark_unreadable(log_id, STATE_UNREADABLE, now)? {
+                    if self.cache.mark_unreadable(log_id, now)? {
                         summary.unreadable += 1;
                     }
                 }

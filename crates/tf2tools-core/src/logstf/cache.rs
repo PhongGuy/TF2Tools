@@ -13,6 +13,11 @@ use crate::weapons::TfClass;
 /// The `settings` key naming the player whose chip is selected.
 const ACTIVE_KEY: &str = "logstf_active_player";
 
+/// `logstf_logs.state` for a log logs.tf answered 404 for.
+pub(super) const STATE_GONE: i64 = 1;
+/// `logstf_logs.state` for a log whose body could not be read.
+pub(super) const STATE_UNREADABLE: i64 = 2;
+
 /// A player on the logs page's chip row.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -285,7 +290,7 @@ impl LogsCache {
 
     /// The player's logs in the window, newest first, at most LOG_CAP.
     pub fn logs(&self, id: SteamId, since: i64) -> Result<Vec<LogRow>, LogsCacheError> {
-        // One row per (log, class played), longest class first; a log with no class rows
+        // One row per (log, class played), longest class first and ties by class name; a log with no class rows
         // comes once with NULL stats. Consecutive rows of one log fold into its LogRow.
         let sql = format!(
             "{WINDOW_LOGS}
@@ -294,7 +299,7 @@ impl LogsCache {
              FROM logstf_logs l
              LEFT JOIN logstf_class_rows r ON r.log_id = l.id AND r.steam_id = ?1
              WHERE l.id IN (SELECT id FROM window_logs)
-             ORDER BY l.date DESC, l.id DESC, r.seconds DESC"
+             ORDER BY l.date DESC, l.id DESC, r.seconds DESC, r.class"
         );
         self.db
             .read(|conn| {
@@ -305,8 +310,8 @@ impl LogsCache {
                     let log_id = u64::try_from(row.get::<_, i64>(0)?).unwrap_or(0);
                     if out.last().is_none_or(|last| last.id != log_id) {
                         let state = match (row.get::<_, i64>(5)?, row.get::<_, bool>(6)?) {
-                            (1, _) => LogState::Gone,
-                            (2, _) => LogState::Unreadable,
+                            (STATE_GONE, _) => LogState::Gone,
+                            (STATE_UNREADABLE, _) => LogState::Unreadable,
                             (_, true) => LogState::Ready,
                             (_, false) => LogState::Pending,
                         };
@@ -525,7 +530,7 @@ impl LogsCache {
             .map_err(db_error)
     }
 
-    /// Marks a log gone (state 1) or unreadable (state 2) as of `now`. Any earlier body and
+    /// Marks a log `STATE_GONE` or `STATE_UNREADABLE` as of `now`. Any earlier body and
     /// class rows go too, so a marked log never counts and the needs-download rule skips it.
     pub(crate) fn mark_failed(
         &self,
@@ -549,12 +554,7 @@ impl LogsCache {
     /// Handles a log whose download could not be read. A log that already holds a good body
     /// (a provisional refetch) keeps it and is stamped settled as of `now`; any other is marked
     /// unreadable. Returns true when the log was marked.
-    pub(crate) fn mark_unreadable(
-        &self,
-        log_id: i64,
-        state: i64,
-        now: i64,
-    ) -> Result<bool, LogsCacheError> {
+    pub(crate) fn mark_unreadable(&self, log_id: i64, now: i64) -> Result<bool, LogsCacheError> {
         let kept = self
             .db
             .write(|conn| {
@@ -567,8 +567,23 @@ impl LogsCache {
         if kept > 0 {
             return Ok(false);
         }
-        self.mark_failed(log_id, state, now)?;
+        self.mark_failed(log_id, STATE_UNREADABLE, now)?;
         Ok(true)
+    }
+
+    /// Whether any of `player`'s logs `logs` would return since `since` is still pending.
+    pub(crate) fn has_pending(&self, player: SteamId, since: i64) -> Result<bool, LogsCacheError> {
+        let sql = format!(
+            "{WINDOW_LOGS}
+             SELECT 1 FROM logstf_logs
+             WHERE id IN (SELECT id FROM window_logs) AND state = 0 AND body IS NULL"
+        );
+        self.db
+            .read(|conn| {
+                conn.prepare(&sql)?
+                    .exists(params![sql_id(player)?, since, LOG_CAP as i64])
+            })
+            .map_err(db_error)
     }
 
     /// Stamps `player` as synced at `now`.

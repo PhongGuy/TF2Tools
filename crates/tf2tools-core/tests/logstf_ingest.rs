@@ -49,7 +49,7 @@ async fn first_sync_downloads_newest_first_with_progress_and_every_players_rows(
         paths(&env.server).await,
         ["/api/v1/log", "/json/3", "/json/2", "/json/1"]
     );
-    assert_eq!(*seen.lock().unwrap(), [(1, 3), (2, 3), (3, 3)]);
+    assert_eq!(*seen.lock().unwrap(), [(0, 3), (1, 3), (2, 3), (3, 3)]);
     assert_eq!(
         (summary.listed(), summary.downloaded(), summary.capped()),
         (3, 3, false)

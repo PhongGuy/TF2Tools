@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 
-use super::{SteamId, logstf_class};
+use super::{SteamId, logstf_class, logstf_class_name};
 use crate::Team;
 use crate::error::LogParseError;
 use crate::weapons::TfClass;
@@ -551,7 +551,12 @@ fn player_line(
             })
         })
         .collect();
-    classes.sort_by_key(|c| std::cmp::Reverse(c.seconds));
+    // Ties break by logs.tf class name, as the cached log row orders them.
+    classes.sort_by(|a, b| {
+        b.seconds
+            .cmp(&a.seconds)
+            .then_with(|| logstf_class_name(a.class).cmp(logstf_class_name(b.class)))
+    });
     // logs.tf sends the ratios as text; recompute them when that text is missing or garbled.
     let deaths = f64::from(p.deaths.max(1));
     PlayerLine {

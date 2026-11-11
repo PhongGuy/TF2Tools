@@ -119,3 +119,50 @@ async fn a_list_that_will_not_parse_is_malformed() {
         .unwrap_err();
     assert!(matches!(err, LogsSyncError::Malformed { .. }), "{err:?}");
 }
+
+#[tokio::test]
+async fn a_forced_refresh_that_fails_partway_lets_the_next_open_finish_it() {
+    let env = tracked_env().await;
+    mount_list(&env.server, ARIE, list_body(&[(20, days_ago(2))])).await;
+    mount_any_log(&env.server).await;
+    env.client
+        .sync_player(arie(), false, &|_| {})
+        .await
+        .unwrap();
+
+    // A new log appears and the forced refresh stops on a server error before reaching it.
+    env.server.reset().await;
+    mount_list(
+        &env.server,
+        ARIE,
+        list_body(&[(21, days_ago(1)), (20, days_ago(2))]),
+    )
+    .await;
+    wiremock::Mock::given(wiremock::matchers::path("/json/21"))
+        .respond_with(wiremock::ResponseTemplate::new(503))
+        .up_to_n_times(1)
+        .mount(&env.server)
+        .await;
+    mount_any_log(&env.server).await;
+    env.client
+        .sync_player(arie(), true, &|_| {})
+        .await
+        .unwrap_err();
+    assert_eq!(log_state(&env.dir, 21), (0, false));
+
+    let next = env
+        .client
+        .sync_player(arie(), false, &|_| {})
+        .await
+        .unwrap();
+    assert!(!next.skipped(), "a pending log is not a fresh cache");
+    assert_eq!(next.downloaded(), 1);
+    assert_eq!(log_state(&env.dir, 21), (0, true));
+
+    let after = env
+        .client
+        .sync_player(arie(), false, &|_| {})
+        .await
+        .unwrap();
+    assert!(after.skipped(), "nothing pending and freshly synced");
+}

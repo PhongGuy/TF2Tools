@@ -218,3 +218,27 @@ fn computing_kapd_from_huge_kills_and_assists_does_not_overflow() {
     let p = &log.players()[0];
     assert!(close(p.kapd(), 2.0 * f64::from(u32::MAX)));
 }
+
+#[test]
+fn classes_with_equal_time_list_by_class_name_like_the_log_row() {
+    let tied = PlayerSpec {
+        account: 5,
+        name: "five",
+        team: "Red",
+        heal: 0,
+        ubers: 0,
+        drops: 0,
+        classes: vec![
+            ("soldier", 300, 1, 1, 1, 100),
+            ("medic", 300, 1, 1, 1, 100),
+            ("scout", 600, 1, 1, 1, 100),
+        ],
+    };
+    let log = parse_log(&log_body(1200, &[tied])).unwrap();
+    let classes: Vec<TfClass> = log.players()[0]
+        .classes()
+        .iter()
+        .map(|c| c.class())
+        .collect();
+    assert_eq!(classes, [TfClass::Scout, TfClass::Medic, TfClass::Soldier]);
+}
