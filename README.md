@@ -1,6 +1,6 @@
 # TF2Tools
 
-Set up your Team Fortress 2 HUD, hitsounds, killsounds and crosshairs in a few clicks, and find new ones from the community without leaving the app.
+Set up your Team Fortress 2 HUD, hitsounds, killsounds, crosshairs and graphics in a few clicks, and find new ones from the community without leaving the app.
 
 **[Download for Windows](https://github.com/PhongGuy/TF2Tools/releases/latest/download/TF2Tools.exe)** · **[Download for Linux](https://github.com/PhongGuy/TF2Tools/releases/latest/download/tf2tools-linux-x86_64.AppImage)**
 
@@ -36,9 +36,13 @@ Install mastercomfig's addons from the Addon Store. The Addons page shows what y
 
 ![The Addon Store](.github/readme/addon-store.webp)
 
+### Graphics
+
+The Graphics page sets TF2's graphics with mastercomfig. Install mastercomfig in one click, update it when a new version is out, or let TF2Tools take over the copy you already have. Pick a graphics preset, from Ultra down to Low, then change any of its settings one by one, or reset them to the preset. Changes apply the next time TF2 starts.
+
 ### The stores
 
-Browse sounds and crosshairs from GameBanana, preview sounds before you download them, search and sort the GameBanana stores, and filter the hand-picked HUDs.
+Browse sounds and crosshairs from GameBanana, preview sounds before you download them, search and sort the GameBanana stores, and filter the hand-picked HUDs. Next to its mastercomfig tab, the Addon Store has GameBanana tabs for skins, effects, GUIs, textures and game files: open one to see its pictures, details and files, and go to its GameBanana page to get it.
 
 ![The Sound Store](.github/readme/sound-store.webp)
 
@@ -56,6 +60,10 @@ The HUD Maker shows your HUD the way the game draws it: in a fight, on the score
 
 ![The HUD Maker: the main menu with the Items button picked and its settings open beside it](.github/readme/hud-maker.webp)
 
+### Maps
+
+The Maps page lists the community maps from serveme.tf. Search them by name, sort them by name, by most played or by recently played, and download a map straight into your game. Remove a map you downloaded when you no longer need it.
+
 ### Profiles
 
 Save your HUD, sounds and crosshairs together as a profile, for example one for competitive and one for casual, and switch your whole setup at once.
@@ -64,7 +72,7 @@ Save your HUD, sounds and crosshairs together as a profile, for example one for 
 
 ### Settings
 
-Point TF2Tools at your game if it didn't find it, set the preview volume and refresh the stores. The Logs page lists what TF2Tools did, and TF2Tools checks for new versions of itself (see [Updates](#updates)).
+Point TF2Tools at your game if it didn't find it, set the preview volume and refresh the stores. The Activity Log (**Logs** in the sidebar) lists what TF2Tools did, and TF2Tools checks for new versions of itself (see [Updates](#updates)).
 
 ![The Settings page: the preview volume, how often the stores refresh, and each store's last sync](.github/readme/settings.webp)
 
