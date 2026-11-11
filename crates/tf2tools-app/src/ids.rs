@@ -2588,6 +2588,12 @@ pub fn logstf_log_map(id: u64) -> ElementId {
     keyed("logstf-log-map", &id.to_string())
 }
 
+/// A log row's date as a line under the title, in a window too narrow for its own column,
+/// labelled "2026-10-30": "logstf-log-date:<id>".
+pub fn logstf_log_date(id: u64) -> ElementId {
+    keyed("logstf-log-date", &id.to_string())
+}
+
 /// The open log's team table, which scrolls sideways in a narrow window.
 pub const LOGSTF_TEAMS_SCROLL: &str = "logstf-teams-scroll";
 

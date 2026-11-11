@@ -934,6 +934,29 @@ fn the_map_sits_under_the_title_in_the_smallest_window(cx: &mut TestAppContext) 
 }
 
 #[gpui_kit::test]
+fn the_date_sits_under_the_title_in_the_smallest_window(cx: &mut TestAppContext) {
+    use gpui_kit::{px, size};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    let date = support::label_of(cx, s.win, ids::logstf_log_date(3)).expect("the date line");
+    assert!(
+        date.len() == 10 && date.chars().filter(|&c| c == '-').count() == 2,
+        "{date:?} reads as a date"
+    );
+    let title = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
+    let date = support::bounds_of(cx, s.win, ids::logstf_log_date(3)).unwrap();
+    assert!(
+        date.top() >= title.bottom() - px(1.),
+        "date {date:?} under title {title:?}"
+    );
+}
+
+#[gpui_kit::test]
 fn a_wide_window_gives_the_map_its_own_column(cx: &mut TestAppContext) {
     use gpui_kit::px;
     let env = support::env();

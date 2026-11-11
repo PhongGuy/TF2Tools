@@ -202,11 +202,15 @@ fn log_item(
                     el.child(map_cell(line, id, row.map()))
                 })
                 .when(!fit.date_column, |el| {
+                    let date = date_text(row.date());
                     el.child(
                         div()
+                            .id(ids::logstf_log_date(id))
+                            .aria_label(date.clone())
+                            .test_support()
                             .text_xs()
                             .text_color(theme.muted_foreground)
-                            .child(date_text(row.date())),
+                            .child(date),
                     )
                 }),
         )
