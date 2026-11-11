@@ -482,3 +482,91 @@ fn class_matrices_have_a_row_for_every_player() {
         .unwrap();
     assert_eq!(manchester.total(), 0);
 }
+
+#[test]
+fn killstreaks_sort_by_time() {
+    let log = hl();
+    assert_eq!(log.killstreaks().len(), 19);
+    let first: Vec<(u32, SteamId, u32)> = log.killstreaks()[..3]
+        .iter()
+        .map(|k| (k.at(), k.steam_id(), k.streak()))
+        .collect();
+    assert_eq!(
+        first,
+        [
+            (147, sid(489_813_215), 3),
+            (438, sid(301_213_564), 3),
+            (441, sid(866_286_911), 3),
+        ]
+    );
+    assert!(log.killstreaks().windows(2).all(|w| w[0].at() <= w[1].at()));
+    assert_eq!(six().killstreaks().len(), 13);
+}
+
+#[test]
+fn chat_keeps_order_text_and_non_player_senders() {
+    let log = six();
+    let chat = log.chat();
+    assert_eq!(chat.len(), 69);
+    assert_eq!(
+        (chat[0].steam_id(), chat[0].name(), chat[0].msg()),
+        (
+            Some(sid(285_837_700)),
+            "line between insane and genius",
+            "DRHAPPYWIPE"
+        )
+    );
+    assert_eq!(chat[1].msg(), "✦⋆⭒˚｡⋆你好!⋆⭒˚｡⋆✦");
+    let last = &chat[68];
+    assert_eq!(
+        (last.steam_id(), last.name(), last.msg()),
+        (Some(sid(231_702)), "Arie - serveme.tf", "GG EZ")
+    );
+    let body = r#"{"length": 60, "teams": {"Red": {}, "Blue": {}}, "players": {},
+        "chat": [{"steamid": "Console", "name": "Console", "msg": "hi"}]}"#;
+    let log = parse_log(body).unwrap();
+    assert_eq!(
+        (
+            log.chat()[0].steam_id(),
+            log.chat()[0].name(),
+            log.chat()[0].msg()
+        ),
+        (None, "Console", "hi")
+    );
+}
+
+#[test]
+fn a_log_with_only_the_required_keys_opens_with_empty_sections() {
+    let body = r#"{"length": 60, "teams": {"Red": {}, "Blue": {}},
+        "players": {"[U:1:5]": {"team": "Red",
+            "class_stats": [{"type": "scout", "total_time": 60}]}}}"#;
+    let log = parse_log(body).unwrap();
+    assert!(log.rounds().is_empty() && log.chat().is_empty() && log.killstreaks().is_empty());
+    assert!(log.medics().is_empty());
+    assert_eq!(log.red().midfights(), 0);
+    for kind in [
+        MatrixKind::Kills,
+        MatrixKind::KillsAssists,
+        MatrixKind::Deaths,
+    ] {
+        let rows = log.class_matrix(kind);
+        assert_eq!(rows.len(), 1);
+        assert_eq!((rows[0].counts(), rows[0].total()), ([0; 9], 0));
+    }
+    let malformed = r#"{"length": 60, "teams": {"Red": {}, "Blue": {}}, "players": {},
+        "chat": 5, "classkills": [1], "classdeaths": null,
+        "killstreaks": [{"steamid": "BOT", "streak": 3, "time": 1},
+                        {"steamid": "[U:1:5]", "streak": "4", "time": 2}]}"#;
+    let log = parse_log(malformed).unwrap();
+    assert!(log.chat().is_empty());
+    assert_eq!(
+        log.killstreaks().len(),
+        1,
+        "an unreadable steamid is skipped"
+    );
+    let streak = &log.killstreaks()[0];
+    assert_eq!(
+        (streak.steam_id(), streak.streak(), streak.at()),
+        (sid(5), 4, 2)
+    );
+}

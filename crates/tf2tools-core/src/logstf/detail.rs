@@ -28,6 +28,8 @@ pub struct LogDetail {
     class_kill_assists: Vec<MatrixRow>,
     class_deaths: Vec<MatrixRow>,
     rounds: Vec<RoundLine>,
+    killstreaks: Vec<Killstreak>,
+    chat: Vec<LogChatLine>,
 }
 
 impl LogDetail {
@@ -80,6 +82,62 @@ impl LogDetail {
     /// The rounds in play order; empty when the log has none or they do not read.
     pub fn rounds(&self) -> &[RoundLine] {
         &self.rounds
+    }
+    /// Killstreaks by the time they happened; tied times keep logs.tf's order.
+    pub fn killstreaks(&self) -> &[Killstreak] {
+        &self.killstreaks
+    }
+    /// The chat in the order it was said.
+    pub fn chat(&self) -> &[LogChatLine] {
+        &self.chat
+    }
+}
+
+/// One player's killstreak.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct Killstreak {
+    steam_id: SteamId,
+    streak: u32,
+    at: u32,
+}
+
+impl Killstreak {
+    /// The player on the streak.
+    pub fn steam_id(&self) -> SteamId {
+        self.steam_id
+    }
+    /// Kills in the streak.
+    pub fn streak(&self) -> u32 {
+        self.streak
+    }
+    /// Seconds since the first round's start.
+    pub fn at(&self) -> u32 {
+        self.at
+    }
+}
+
+/// One chat message.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct LogChatLine {
+    steam_id: Option<SteamId>,
+    name: String,
+    msg: String,
+}
+
+impl LogChatLine {
+    /// The sender, `None` for a non-player such as the console.
+    pub fn steam_id(&self) -> Option<SteamId> {
+        self.steam_id
+    }
+    /// The sender's name as logs.tf shows it.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    /// The message text.
+    pub fn msg(&self) -> &str {
+        &self.msg
     }
 }
 
@@ -838,7 +896,33 @@ fn build(wire: WireLog) -> LogDetail {
         class_kill_assists,
         class_deaths,
         rounds: wire.rounds.into_iter().map(round_line).collect(),
+        killstreaks: killstreaks(wire.killstreaks),
+        chat: wire
+            .chat
+            .into_iter()
+            .map(|c| LogChatLine {
+                steam_id: SteamId::from_steam3(&c.steamid),
+                name: c.name,
+                msg: c.msg,
+            })
+            .collect(),
     }
+}
+
+/// Streaks whose player reads, by time; the stable sort keeps tied times in JSON order.
+fn killstreaks(wire: Vec<WireKillstreak>) -> Vec<Killstreak> {
+    let mut streaks: Vec<Killstreak> = wire
+        .into_iter()
+        .filter_map(|k| {
+            Some(Killstreak {
+                steam_id: SteamId::from_steam3(&k.steamid)?,
+                streak: k.streak,
+                at: k.time,
+            })
+        })
+        .collect();
+    streaks.sort_by_key(Killstreak::at);
+    streaks
 }
 
 fn round_line(round: WireRound) -> RoundLine {
@@ -1041,6 +1125,32 @@ struct WireLog {
     classdeaths: BTreeMap<String, BTreeMap<String, u32>>,
     #[serde(default, deserialize_with = "lenient_list")]
     rounds: Vec<WireRound>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    killstreaks: Vec<WireKillstreak>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    chat: Vec<WireChat>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireKillstreak {
+    #[serde(deserialize_with = "text")]
+    steamid: String,
+    #[serde(deserialize_with = "count")]
+    streak: u32,
+    #[serde(deserialize_with = "count")]
+    time: u32,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireChat {
+    #[serde(deserialize_with = "text")]
+    steamid: String,
+    #[serde(deserialize_with = "text")]
+    name: String,
+    #[serde(deserialize_with = "text")]
+    msg: String,
 }
 
 #[derive(Deserialize, Default)]
