@@ -2,7 +2,9 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::Duration;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
 
 use gpui_kit::{ElementId, Entity, TestAppContext};
 use tf2tools_app::ids;
@@ -12,8 +14,8 @@ use tf2tools_core::{LogsRange, TfClass};
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, HIGHLANDER, SIXES, day_ago, list_body, mount_list_for, open_page, requests_to, shell,
-    sid, to_end,
+    ARIE, HIGHLANDER, SIXES, day_ago, list_body, mount_list_for, mount_list_with, open_page,
+    requests_to, shell, sid, to_end,
 };
 
 /// Serves Arie's one log, the 6v6 fixture, a day old.
@@ -481,4 +483,69 @@ fn a_backfill_batch_refills_the_open_panel(cx: &mut TestAppContext) {
         row(cx, &s, TfClass::Scout, "scattergun").as_deref(),
         Some("scattergun 14 (100%) 6668 (95%) 56%")
     );
+}
+
+// Answers a player's list at once until told to hold, then waits up to ten seconds for
+// the release, so a sync can be kept running without a gate on its first request.
+#[derive(Clone, Default)]
+struct HoldLater {
+    hold: Arc<AtomicBool>,
+    release: Arc<AtomicBool>,
+}
+
+impl wiremock::Respond for HoldLater {
+    fn respond(&self, _: &wiremock::Request) -> wiremock::ResponseTemplate {
+        if self.hold.load(Ordering::SeqCst) {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            while !self.release.load(Ordering::SeqCst) && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+        wiremock::ResponseTemplate::new(200).set_body_bytes(list_body(&[(3, day_ago(1))]))
+    }
+}
+
+#[gpui_kit::test]
+fn a_pick_while_a_load_reads_gets_its_weapons_once_the_load_lands(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let arie = HoldLater::default();
+    mount_list_with(&server, ARIE, arie.clone());
+    mount_list_for(&server, CABO, &[(2, day_ago(1))], Duration::ZERO);
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie"), (CABO, "cabo")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_chip(sid(ARIE)));
+    support::wait_real(cx, "arie", |cx| {
+        cx.update(|cx| {
+            let p = page.read(cx);
+            p.active() == Some(sid(ARIE)) && !p.is_syncing(cx)
+        })
+    });
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Pyro));
+    wait_for(cx, &page, TfClass::Pyro);
+
+    // Arie's held refresh keeps Cabo's sync queued, so no sync reread follows the load. The
+    // load reads Cabo with Pyro selected; Scout is picked while it waits to land, and the
+    // click read sees Arie, so only the landing can fetch Cabo's Scout weapons.
+    arie.hold.store(true, Ordering::SeqCst);
+    cx.update(|cx| page.update(cx, |p, cx| p.refresh(cx)));
+    s.services
+        .logs
+        .cache()
+        .set_active_player(sid(CABO))
+        .unwrap();
+    cx.update(|cx| page.update(cx, |p, cx| p.set_hidden(false, cx)));
+    while cx.dispatcher.scheduler().tick_background_only() {}
+    cx.update(|cx| page.update(cx, |p, cx| p.pick_class(TfClass::Scout, cx)));
+    support::settle(cx, s.win);
+    let first = cx.update(|cx| {
+        let p = page.read(cx);
+        p.class_weapons()
+            .map(|(c, w)| (c, w.weapons().first().map(|x| x.kills())))
+    });
+    arie.release.store(true, Ordering::SeqCst);
+    assert_eq!(cx.update(|cx| page.read(cx).active()), Some(sid(CABO)));
+    assert_eq!(first, Some((TfClass::Scout, Some(17))));
 }

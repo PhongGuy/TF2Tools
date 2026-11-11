@@ -194,6 +194,22 @@ pub fn mount_list_for(
     );
 }
 
+/// Answers `account`'s list requests with `responder`, for a test that decides each reply.
+pub fn mount_list_with(
+    server: &super::StoreServer,
+    account: u64,
+    responder: impl wiremock::Respond + 'static,
+) {
+    use wiremock::matchers::{method, path, query_param};
+    server.rt.block_on(
+        wiremock::Mock::given(method("GET"))
+            .and(path("/api/v1/log"))
+            .and(query_param("player", sid(account).id64().to_string()))
+            .respond_with(responder)
+            .mount(&server.server),
+    );
+}
+
 /// Holds replies until the test opens it, so a request stays in flight exactly as long as
 /// the test needs. Wiremock answers under its own lock, so while a reply is held the server
 /// takes no other request and `requests_to` would block; `arrived` counts instead.

@@ -988,7 +988,7 @@ impl LogsTfPage {
                         let (rows, averages) = logs.unzip();
                         let old = std::mem::replace(&mut page.rows, rows.unwrap_or_default());
                         page.averages = averages;
-                        page.carry_class(weapons);
+                        page.carry_class(weapons, cx);
                         page.fit_list(&old);
                         page.read_downloaded(&old, cx);
                     }
@@ -1010,8 +1010,10 @@ impl LogsTfPage {
 
     // Keeps the panel in step with fresh averages: it closes when the active player never
     // played the selected class, else takes the load's weapons if they were read for the
-    // class still selected. The bump drops a click read that went out before this one.
-    fn carry_class(&mut self, weapons: Option<(TfClass, ClassWeapons)>) {
+    // class still selected. The bump drops a click read that went out before this one. A
+    // class picked while the load read gets its own read, since its click read saw the old
+    // player or range and is dropped.
+    fn carry_class(&mut self, weapons: Option<(TfClass, ClassWeapons)>, cx: &mut Context<Self>) {
         let Some(class) = self.selected_class else {
             return;
         };
@@ -1030,6 +1032,8 @@ impl LogsTfPage {
         {
             self.weapons = Some((read, weapons));
             self.weapons_generation += 1;
+        } else {
+            self.read_weapons(cx);
         }
     }
 
