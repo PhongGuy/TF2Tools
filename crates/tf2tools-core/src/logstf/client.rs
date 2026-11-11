@@ -15,8 +15,8 @@ use crate::store::pacer::{Pacer, Priority};
 use super::cache::{ListedLog, STATE_GONE};
 use super::steam_xml::xml_text;
 use super::{
-    LOG_BODY_LIMIT, LOGS_LONG_SPACING, LOGS_SPACING, LONG_PULL, LogDetail, LogsCache, LogsRange,
-    PlayerInput, STALE_SECS, SteamId, TrackedPlayer, parse_log, window_start,
+    LOG_BODY_LIMIT, LOG_ZIP_LIMIT, LOGS_LONG_SPACING, LOGS_SPACING, LONG_PULL, LogDetail,
+    LogsCache, LogsRange, PlayerInput, STALE_SECS, SteamId, TrackedPlayer, parse_log, window_start,
 };
 
 /// Asks a running sync to stop before its next request; clones share one flag.
@@ -229,9 +229,9 @@ impl LogsClient {
     }
 
     /// One GET through the gate: it starts at least one gap after this client's last request.
-    async fn get(&self, url: &str, priority: Priority) -> Result<Vec<u8>, NetFailure> {
+    async fn get(&self, url: &str, priority: Priority, limit: u64) -> Result<Vec<u8>, NetFailure> {
         self.pacer.slot(priority).await;
-        self.http.get_api(url, LOG_BODY_LIMIT).await
+        self.http.get_api(url, limit).await
     }
 
     /// The cache this client syncs into.
@@ -274,7 +274,7 @@ impl LogsClient {
     /// Reads one profile XML body: an `<error>` means no such profile, otherwise
     /// `<steamID64>` must be a valid id and `<steamID>` names it.
     async fn lookup(&self, url: &str) -> Result<TrackedPlayer, ResolveError> {
-        let bytes = self.get(url, Priority::Interactive).await?;
+        let bytes = self.get(url, Priority::Interactive, LOG_BODY_LIMIT).await?;
         let body = String::from_utf8_lossy(&bytes);
         if xml_text(&body, "error").is_some() {
             return Err(ResolveError::NotFound);
@@ -436,6 +436,17 @@ impl LogsClient {
         }
     }
 
+    /// logs.tf's raw log zip for `log_id` (GET /logs/log_<id>.log.zip) through the gate at
+    /// interactive priority; 404 is Gone, past `LOG_ZIP_LIMIT` is TooLarge; the cache is untouched.
+    pub async fn download_zip(&self, log_id: u64) -> Result<Vec<u8>, LogsFetchError> {
+        let url = format!("{}/logs/log_{log_id}.log.zip", self.endpoints.logs_tf());
+        match self.get(&url, Priority::Interactive, LOG_ZIP_LIMIT).await {
+            Ok(bytes) => Ok(bytes),
+            Err(NetFailure::Status { status: 404, .. }) => Err(LogsFetchError::Gone),
+            Err(failure) => Err(failure.into()),
+        }
+    }
+
     /// The detail of `log_id`'s stored body, when one is stored and still parses.
     fn stored_detail(&self, log_id: i64) -> Option<LogDetail> {
         let body = self.cache.log_body(u64::try_from(log_id).ok()?).ok()??;
@@ -450,7 +461,7 @@ impl LogsClient {
         E: From<NetFailure> + From<LogsCacheError>,
     {
         let url = format!("{}/json/{log_id}", self.endpoints.logs_tf());
-        let (readable, too_large) = match self.get(&url, priority).await {
+        let (readable, too_large) = match self.get(&url, priority, LOG_BODY_LIMIT).await {
             Ok(bytes) => (
                 String::from_utf8(bytes)
                     .ok()
@@ -553,7 +564,7 @@ impl LogsClient {
             self.endpoints.logs_tf(),
             id.id64()
         );
-        let bytes = self.get(&url, Priority::Background).await?;
+        let bytes = self.get(&url, Priority::Background, LOG_BODY_LIMIT).await?;
         let list: WireList =
             serde_json::from_slice(&bytes).map_err(|e| LogsSyncError::Malformed {
                 url: url.clone(),

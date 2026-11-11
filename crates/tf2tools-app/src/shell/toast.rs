@@ -130,10 +130,13 @@ pub fn error_label(err: &OpError) -> SharedString {
     label(err.title(), err.description())
 }
 
-// "{title}. {description}", or the title alone when the description is empty.
+// "{title}. {description}", or the title alone when the description is empty. A title
+// that already ends a sentence gets no second full stop.
 fn label(title: &str, description: &str) -> SharedString {
     if description.is_empty() {
         SharedString::from(title.to_owned())
+    } else if title.ends_with(['.', '!', '?']) {
+        SharedString::from(format!("{title} {description}"))
     } else {
         SharedString::from(format!("{title}. {description}"))
     }

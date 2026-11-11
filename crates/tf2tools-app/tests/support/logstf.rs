@@ -8,6 +8,7 @@ use gpui_kit::{Entity, TestAppContext};
 use serde_json::json;
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
+use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::{Services, Tf2State};
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
@@ -56,13 +57,27 @@ pub fn shell(
     base: &str,
     players: &[(u64, &'static str)],
 ) -> support::ShellWindow {
+    shell_with_picker(cx, env, base, players, Arc::new(ScriptedPicker::empty()))
+}
+
+/// Like `shell`, with the save and file picks `picker` scripts.
+pub fn shell_with_picker(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    base: &str,
+    players: &[(u64, &'static str)],
+    picker: Arc<ScriptedPicker>,
+) -> support::ShellWindow {
     cx.executor().allow_parking();
     let base = base.to_owned();
     let players = players.to_vec();
-    support::shell_window_tweaked(
+    super::open_shell(
         cx,
         env,
         Tf2State::Missing { saved: None },
+        picker,
+        super::no_steam(),
+        None,
         move |services| {
             let logs = logs_client(services, &base);
             for (account, name) in &players {

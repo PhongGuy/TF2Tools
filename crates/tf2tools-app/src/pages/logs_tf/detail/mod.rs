@@ -135,7 +135,7 @@ fn log_body(
             .id(ids::LOGSTF_MATRIX)
             .test_support(),
         )
-        .child(footer::footer(log, page))
+        .child(footer::footer(open.id, log, page))
 }
 
 // A titled part of the body.

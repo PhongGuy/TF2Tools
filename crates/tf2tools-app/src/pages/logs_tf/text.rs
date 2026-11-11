@@ -127,6 +127,29 @@ pub fn sync_message(error: &LogsSyncError) -> &'static str {
     }
 }
 
+/// The toast title once a log's zip is saved; its description names the file.
+pub const DOWNLOADED: &str = "Log downloaded";
+
+/// The toast title when Download log fails; its description says why.
+pub const DOWNLOAD_FAILED: &str = "Couldn't download this log.";
+
+/// Why Download log failed, when the save itself could not be written.
+pub const WRITE_FAILED: &str = "Couldn't write the file.";
+
+/// Why Download log failed, in the player's words.
+pub fn download_reason(error: &LogsFetchError) -> &'static str {
+    match error {
+        LogsFetchError::Gone => "logs.tf no longer has this log.",
+        LogsFetchError::Network { .. } => "Check your internet connection.",
+        LogsFetchError::RateLimited { .. } => LOGS_TF_BUSY,
+        LogsFetchError::TooLarge { .. } => "This log is too big to download.",
+        LogsFetchError::Unreadable
+        | LogsFetchError::Http { .. }
+        | LogsFetchError::Cache { .. }
+        | _ => LOGS_TF_DOWN,
+    }
+}
+
 /// The open panel's line while a log not yet downloaded is fetched.
 pub const LOG_LOADING: &str = "Loading log...";
 

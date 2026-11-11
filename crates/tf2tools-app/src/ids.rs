@@ -2757,6 +2757,11 @@ pub fn logstf_streak(ix: usize) -> ElementId {
     keyed("logstf-streak", &ix.to_string())
 }
 
+/// The open log's Download log button: "logstf-download:<log id>".
+pub fn logstf_download(id: u64) -> ElementId {
+    keyed("logstf-download", &id.to_string())
+}
+
 /// One tracked player's chip, selected while active: "logstf-chip:<id64>".
 pub fn logstf_chip(id: SteamId) -> ElementId {
     keyed("logstf-chip", &id.id64().to_string())

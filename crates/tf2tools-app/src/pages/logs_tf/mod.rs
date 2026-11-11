@@ -31,19 +31,21 @@ use tf2tools_core::{
 use crate::ids;
 use crate::logs_sync::{LogsSync, LogsSyncEvent, SyncProgress, logs_sync};
 use crate::pages::common::filter_badge;
+use crate::picker::PickKind;
 use crate::services::{OpError, Services, run_blocking};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
-use crate::shell::toast::toast_error;
+use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::tokio_bridge;
 use crate::widgets::dialog_frame::{DETAIL_WIDTH, DIALOG_WIDTH, DialogFrame};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 use sort::{PlayerColumn, PlayerSort};
 use text::{
-    EMPTY_TEXT, LOG_UNREADABLE, LOGS_TF_DOWN, LOGS_TF_URL, LOOKING_UP, REMOVING, SAVE_FAILED,
-    STEAM_UNREACHABLE, fetch_message, profile_url, progress_line, resolve_message,
+    DOWNLOAD_FAILED, DOWNLOADED, EMPTY_TEXT, LOG_UNREADABLE, LOGS_TF_DOWN, LOGS_TF_URL, LOOKING_UP,
+    REMOVING, SAVE_FAILED, STEAM_UNREACHABLE, WRITE_FAILED, download_reason, fetch_message,
+    profile_url, progress_line, resolve_message,
 };
 
 // The open log: its id, how far its body got and which of its rounds are open.
@@ -614,6 +616,75 @@ impl LogsTfPage {
         });
     }
 
+    // Asks where to save log `id`'s raw zip, downloads it from logs.tf, then writes it off the
+    // UI thread. A cancelled dialog ends it; any failure toasts why and leaves no file.
+    fn download_log(&mut self, id: u64, window: &mut Window, cx: &mut Context<Self>) {
+        let picking = cx.global::<Services>().picker.save_to(
+            PickKind::LogZip,
+            &format!("log_{id}.log.zip"),
+            cx,
+        );
+        cx.spawn_in(window, async move |page, cx| {
+            let Some(path) = picking.await else {
+                return;
+            };
+            let downloading = page.update(cx, |_, cx| {
+                if !tokio_bridge::is_running(cx) {
+                    tokio_bridge::init(cx);
+                }
+                let client = cx.global::<Services>().logs.clone();
+                tokio_bridge::spawn(cx, async move { client.download_zip(id).await })
+            });
+            let Ok(downloading) = downloading else {
+                return;
+            };
+            let saved = match downloading.await {
+                Ok(Ok(bytes)) => {
+                    let target = path.clone();
+                    let writing = page.update(cx, |_, cx| {
+                        run_blocking(cx, move |_| Ok(write_replacing(&target, &bytes)))
+                    });
+                    let Ok(writing) = writing else {
+                        return;
+                    };
+                    match writing.await {
+                        Ok(Ok(())) => Ok(()),
+                        Ok(Err(error)) => {
+                            tracing::warn!(%error, id, "writing a logs.tf zip failed");
+                            Err(WRITE_FAILED)
+                        }
+                        Err(error) => {
+                            tracing::warn!(%error, id, "the logs.tf zip write stopped");
+                            Err(WRITE_FAILED)
+                        }
+                    }
+                }
+                Ok(Err(error)) => {
+                    tracing::warn!(%error, id, "downloading a logs.tf zip failed");
+                    Err(download_reason(&error))
+                }
+                Err(error) => {
+                    tracing::warn!(%error, id, "the logs.tf zip download stopped");
+                    Err(LOGS_TF_DOWN)
+                }
+            };
+            let _ = page.update_in(cx, |_, window, cx| match saved {
+                Ok(()) => {
+                    let name = path.file_name().unwrap_or_default().to_string_lossy();
+                    toast(
+                        window,
+                        cx,
+                        ToastKind::Success,
+                        DOWNLOADED,
+                        name.into_owned(),
+                    );
+                }
+                Err(why) => toast(window, cx, ToastKind::Error, DOWNLOAD_FAILED, why),
+            });
+        })
+        .detach();
+    }
+
     // Reads the field, looks the player up on Steam, then tracks and activates them. A bad
     // input or a failed lookup or write stays in the dialog with its text kept.
     fn submit_add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1056,4 +1127,16 @@ fn stop_at(value: f32) -> LogsRange {
         value.round().clamp(0., (LogsRange::STOPS.len() - 1) as f32) as usize
     };
     LogsRange::STOPS[ix]
+}
+
+// Writes `bytes` to a temporary file beside `path`, then renames it over `path`, so a failed
+// write never leaves a partial file where the player asked for one.
+fn write_replacing(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let dir = path.parent().filter(|d| !d.as_os_str().is_empty());
+    let mut part = tempfile::NamedTempFile::new_in(dir.unwrap_or(std::path::Path::new(".")))?;
+    part.write_all(bytes)?;
+    part.as_file().sync_all()?;
+    part.persist(path).map_err(|e| e.error)?;
+    Ok(())
 }

@@ -38,6 +38,9 @@ pub const LONG_PULL: usize = 400;
 /// The largest log or profile body accepted.
 pub const LOG_BODY_LIMIT: u64 = 2 * 1024 * 1024;
 
+/// The largest raw log zip `LogsClient::download_zip` accepts.
+pub const LOG_ZIP_LIMIT: u64 = 32 * 1024 * 1024;
+
 /// A player synced more recently than this is not synced again unless forced.
 pub const STALE_SECS: i64 = 30 * 60;
 

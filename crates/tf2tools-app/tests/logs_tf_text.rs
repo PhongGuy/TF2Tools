@@ -4,10 +4,11 @@ use std::time::Duration;
 
 use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
-    EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, charge_text, count_text, duration_text, event_text,
-    fetch_message, finding_text, healing_text, medigun_name, one_decimal, progress_line,
-    progress_text, range_label, reads_zero, resolve_message, ring_label, seconds_text, share_text,
-    streaks_label, summary_text, sync_message, tenths_text, time_played_text, whole,
+    DOWNLOAD_FAILED, EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, charge_text, count_text,
+    download_reason, duration_text, event_text, fetch_message, finding_text, healing_text,
+    medigun_name, one_decimal, progress_line, progress_text, range_label, reads_zero,
+    resolve_message, ring_label, seconds_text, share_text, streaks_label, summary_text,
+    sync_message, tenths_text, time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
@@ -484,4 +485,24 @@ fn chat_lines_carry_their_team_and_console_has_none() {
     );
     assert_eq!(streaks_label(13), "Show Killstreaks (13)");
     assert_eq!(streaks_label(0), "Show Killstreaks (0)");
+}
+
+#[test]
+fn download_failures_say_why() {
+    use tf2tools_core::LogsFetchError;
+    assert_eq!(
+        download_reason(&LogsFetchError::Gone),
+        "logs.tf no longer has this log."
+    );
+    let offline = LogsFetchError::Network {
+        url: "u".into(),
+        message: "m".into(),
+    };
+    assert_eq!(download_reason(&offline), "Check your internet connection.");
+    let big = LogsFetchError::TooLarge {
+        url: "u".into(),
+        limit: 1,
+    };
+    assert_eq!(download_reason(&big), "This log is too big to download.");
+    assert_eq!(DOWNLOAD_FAILED, "Couldn't download this log.");
 }

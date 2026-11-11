@@ -46,10 +46,11 @@ pub(in crate::pages::logs_tf) fn streak_rows(log: &LogDetail) -> Vec<StreakRow> 
         .collect()
 }
 
-/// The two buttons under the kill matrix; each asks `page` to open its dialog, and Show
-/// Killstreaks is disabled when the log has none.
-pub(super) fn footer(log: &LogDetail, page: WeakEntity<LogsTfPage>) -> Div {
+/// The buttons under the kill matrix: Show Chat and Show Killstreaks ask `page` to open
+/// their dialogs (Killstreaks disabled when the log has none); Download log saves log `id`.
+pub(super) fn footer(id: u64, log: &LogDetail, page: WeakEntity<LogsTfPage>) -> Div {
     let chat_page = page.clone();
+    let download_page = page.clone();
     let streaks = log.killstreaks().len();
     h_flex()
         .gap_2()
@@ -70,6 +71,15 @@ pub(super) fn footer(log: &LogDetail, page: WeakEntity<LogsTfPage>) -> Div {
                 .disabled(streaks == 0)
                 .on_click(move |_, window, cx| {
                     let _ = page.update(cx, |page, cx| page.open_streaks(window, cx));
+                }),
+        )
+        .child(
+            Button::new(ids::logstf_download(id))
+                .outline()
+                .small()
+                .label("Download log")
+                .on_click(move |_, window, cx| {
+                    let _ = download_page.update(cx, |page, cx| page.download_log(id, window, cx));
                 }),
         )
 }

@@ -1,5 +1,6 @@
 //! The open log's sections, compared with the fixtures' logs.tf pages.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use gpui_kit::test::TestWindowExt as _;
@@ -7,12 +8,13 @@ use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
 use tf2tools_app::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players};
+use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_core::TfClass;
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, HIGHLANDER, SIXES, day_ago, list_body, open_log, open_page, scroll_to_in_log,
-    serve_two_logs, shell, sid,
+    ARIE, HIGHLANDER, SIXES, day_ago, list_body, open_log, open_page, requests_to,
+    scroll_to_in_log, serve_two_logs, shell, shell_with_picker, sid,
 };
 
 /// Arie's two logs synced, log `log` open; the env and server live as long as the test.
@@ -334,4 +336,102 @@ fn the_matrix_total_column_is_named_for_its_tab(cx: &mut TestAppContext) {
     assert_eq!(total(cx).as_deref(), Some("KA"));
     support::click_id(cx, s.win, ids::logstf_matrix_tab(MatrixKind::Deaths));
     assert_eq!(total(cx).as_deref(), Some("D"));
+}
+
+fn download_shell(
+    cx: &mut TestAppContext,
+    picks: Vec<std::path::PathBuf>,
+    zip: Option<Vec<u8>>,
+) -> (
+    support::Env,
+    support::StoreServer,
+    support::ShellWindow,
+    Entity<LogsTfPage>,
+    Arc<ScriptedPicker>,
+) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    match zip {
+        Some(bytes) => server.mount_bytes("/logs/log_3.log.zip", bytes),
+        None => server.mount_status("/logs/log_3.log.zip", 404),
+    }
+    let picker = Arc::new(ScriptedPicker::new(picks));
+    let s = shell_with_picker(
+        cx,
+        &env,
+        &server.uri(),
+        &[(ARIE, "Arie")],
+        Arc::clone(&picker),
+    );
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_download(3));
+    (env, server, s, page, picker)
+}
+
+#[gpui_kit::test]
+fn download_log_saves_the_zip_where_the_player_chose(cx: &mut TestAppContext) {
+    let target = tempfile::tempdir().unwrap();
+    let path = target.path().join("my log.zip");
+    let (_env, _server, s, _page, picker) =
+        download_shell(cx, vec![path.clone()], Some(b"PK\x03\x04raw".to_vec()));
+    support::click_id(cx, s.win, ids::logstf_download(3));
+    support::wait_real(cx, "the toast", |cx| {
+        support::present(cx, s.win, ids::TOAST)
+    });
+    let toast = support::label_of(cx, s.win, ids::TOAST).unwrap();
+    assert!(toast.starts_with("Log downloaded"), "{toast}");
+    assert_eq!(std::fs::read(&path).unwrap(), b"PK\x03\x04raw");
+    assert_eq!(picker.suggested(), ["log_3.log.zip"]);
+}
+
+#[gpui_kit::test]
+fn a_log_logs_tf_lost_is_not_saved_and_says_why(cx: &mut TestAppContext) {
+    let target = tempfile::tempdir().unwrap();
+    let path = target.path().join("log.zip");
+    let (_env, _server, s, _page, _picker) = download_shell(cx, vec![path.clone()], None);
+    support::click_id(cx, s.win, ids::logstf_download(3));
+    support::wait_real(cx, "the toast", |cx| {
+        support::present(cx, s.win, ids::TOAST)
+    });
+    let toast = support::label_of(cx, s.win, ids::TOAST).unwrap();
+    assert!(toast.starts_with("Couldn't download this log."), "{toast}");
+    assert!(toast.contains("logs.tf no longer has this log"), "{toast}");
+    support::assert_plain(&toast);
+    assert!(!path.exists(), "nothing is written");
+}
+
+#[gpui_kit::test]
+fn a_file_that_cannot_be_written_says_so(cx: &mut TestAppContext) {
+    let target = tempfile::tempdir().unwrap();
+    let path = target.path().join("no such folder").join("log.zip");
+    let (_env, _server, s, _page, _picker) =
+        download_shell(cx, vec![path.clone()], Some(b"PK\x03\x04raw".to_vec()));
+    support::click_id(cx, s.win, ids::logstf_download(3));
+    support::wait_real(cx, "the toast", |cx| {
+        support::present(cx, s.win, ids::TOAST)
+    });
+    let toast = support::label_of(cx, s.win, ids::TOAST).unwrap();
+    assert!(toast.starts_with("Couldn't download this log."), "{toast}");
+    assert!(toast.contains("Couldn't write the file"), "{toast}");
+    assert!(!path.exists(), "nothing is written");
+}
+
+#[gpui_kit::test]
+fn a_cancelled_save_does_nothing(cx: &mut TestAppContext) {
+    let (_env, server, s, _page, picker) = download_shell(cx, Vec::new(), Some(b"zip".to_vec()));
+    support::click_id(cx, s.win, ids::logstf_download(3));
+    // Wait until the picker was asked, then let the cancelled answer run out before
+    // asserting, so an ignored cancel would have time to download and toast.
+    support::wait_real(cx, "the save picker is asked", |_| {
+        !picker.suggested().is_empty()
+    });
+    support::settle(cx, s.win);
+    assert!(!support::present(cx, s.win, ids::TOAST), "no toast");
+    assert_eq!(
+        requests_to(&server, "/logs/log_3.log.zip"),
+        0,
+        "nothing downloaded"
+    );
 }
