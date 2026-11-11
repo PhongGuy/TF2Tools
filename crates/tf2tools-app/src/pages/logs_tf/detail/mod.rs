@@ -192,7 +192,7 @@ pub(super) fn team_colour(team: Team, cx: &App) -> Hsla {
     }
 }
 
-fn class_cell(class: TfClass, cx: &App) -> AnyElement {
+fn class_cell(class: TfClass, cx: &App) -> Div {
     let assets = &cx.global::<Services>().assets;
     div()
         .w(NUMBER)
@@ -200,7 +200,6 @@ fn class_cell(class: TfClass, cx: &App) -> AnyElement {
         .flex()
         .justify_end()
         .child(class_icon(class, assets.class_icon(class).as_deref(), ICON))
-        .into_any_element()
 }
 
 pub(super) fn number(text: String) -> Div {

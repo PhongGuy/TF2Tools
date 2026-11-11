@@ -86,7 +86,11 @@ fn table(log: &LogDetail, kind: MatrixKind, is_tracked: &dyn Fn(SteamId) -> bool
             .child(heading("Team").w(TEAM))
             .child(heading("Player").flex_1().min_w(NAME_MIN))
             .child(heading("C").w(MAIN))
-            .children(TfClass::ALL.map(|class| class_cell(class, cx)))
+            .children(TfClass::ALL.map(|class| {
+                class_cell(class, cx)
+                    .id(ids::logstf_matrix_head(class))
+                    .test_support()
+            }))
             .child(labelled(
                 super::number(String::new()),
                 ids::LOGSTF_MATRIX_TOTAL,

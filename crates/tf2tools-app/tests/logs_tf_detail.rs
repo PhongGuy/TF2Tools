@@ -934,3 +934,12 @@ fn the_team_table_fits_the_smallest_window(cx: &mut TestAppContext) {
         assert!(width >= text, "{title}: {width} under {text}");
     }
 }
+
+#[gpui_kit::test]
+fn the_matrix_total_header_lines_up_with_the_class_icons(cx: &mut TestAppContext) {
+    let (_env, _server, s, _page) = opened_at(cx, 3, 1280., 800., ids::LOGSTF_MATRIX_SCROLL);
+    let total = support::bounds_of(cx, s.win, ids::LOGSTF_MATRIX_TOTAL).unwrap();
+    let scout = support::bounds_of(cx, s.win, ids::logstf_matrix_head(TfClass::Scout)).unwrap();
+    let mid = |b: gpui_kit::Bounds<gpui_kit::Pixels>| f32::from(b.top() + b.size.height / 2.);
+    assert!((mid(total) - mid(scout)).abs() < 1., "{total:?} {scout:?}");
+}

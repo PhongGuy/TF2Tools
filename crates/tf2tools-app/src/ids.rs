@@ -2810,6 +2810,11 @@ pub fn logstf_matrix_tab_button(kind: MatrixKind) -> ElementId {
     keyed("logstf-matrix-tab-button", matrix_key(kind))
 }
 
+/// One class's icon in the kill matrix's header: "logstf-matrix-head:<class>".
+pub fn logstf_matrix_head(class: TfClass) -> ElementId {
+    keyed("logstf-matrix-head", &class.name().to_lowercase())
+}
+
 /// One player's row of the kill matrix: "logstf-matrix-row:<id64>".
 pub fn logstf_matrix_row(id: SteamId) -> ElementId {
     keyed("logstf-matrix-row", &id.id64().to_string())
