@@ -1,6 +1,9 @@
 //! The logs.tf page's wording and number formats.
 
-use tf2tools_app::pages::logs_tf::text::{progress_text, resolve_message, sync_message};
+use tf2tools_app::pages::logs_tf::text::{
+    one_decimal, progress_text, resolve_message, summary_text, sync_message, time_played_text,
+    whole,
+};
 use tf2tools_core::{LogsSyncError, ResolveError};
 
 #[test]
@@ -75,4 +78,17 @@ fn sync_failures_and_progress_read_as_the_spec_words_them() {
     for (error, text) in cases {
         assert_eq!(sync_message(&error), text, "{error:?}");
     }
+}
+
+#[test]
+fn grid_numbers_format_like_the_spec() {
+    assert_eq!(time_played_text(0), "0m");
+    assert_eq!(time_played_text(1559), "25m");
+    assert_eq!(time_played_text(5400), "1h 30m");
+    assert_eq!(one_decimal(0.6), "0.6");
+    assert_eq!(one_decimal(2.666_666), "2.7");
+    assert_eq!(whole(136.38), "136");
+    assert_eq!(summary_text(87, false), "Last 90 days, 87 logs");
+    assert_eq!(summary_text(1, false), "Last 90 days, 1 log");
+    assert_eq!(summary_text(400, true), "Last 400 logs");
 }

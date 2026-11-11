@@ -2474,6 +2474,19 @@ pub const LOGSTF_ERROR: &str = "logstf-error";
 /// Retries a failed logs.tf sync.
 pub const LOGSTF_RETRY: &str = "logstf-retry";
 
+/// Labelled "Last 90 days, <n> logs" (or "Last 400 logs" at the cap) under the class grid.
+pub const LOGSTF_SUMMARY: &str = "logstf-summary";
+
+/// One class's card in the logs.tf averages grid: "logstf-class:<class>".
+pub fn logstf_class(class: TfClass) -> ElementId {
+    keyed("logstf-class", &class.name().to_lowercase())
+}
+
+/// The dimmed "Not played" on a class card with no time: "logstf-class-unplayed:<class>".
+pub fn logstf_class_unplayed(class: TfClass) -> ElementId {
+    keyed("logstf-class-unplayed", &class.name().to_lowercase())
+}
+
 /// One tracked player's chip, selected while active: "logstf-chip:<id64>".
 pub fn logstf_chip(id: SteamId) -> ElementId {
     keyed("logstf-chip", &id.id64().to_string())

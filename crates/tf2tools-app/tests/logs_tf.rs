@@ -12,7 +12,8 @@ use tf2tools_app::pages::logs_tf::text::{log_url, profile_url};
 use tf2tools_app::services::{Services, Tf2State};
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    LogsCache, LogsClient, LogsEndpoints, STEAM_ID64_BASE, SteamId, StoreConfig, TrackedPlayer,
+    LogsCache, LogsClient, LogsEndpoints, STEAM_ID64_BASE, SteamId, StoreConfig, TfClass,
+    TrackedPlayer,
 };
 
 fn sid(account: u64) -> SteamId {
@@ -526,4 +527,38 @@ fn the_progress_line_belongs_to_the_active_player(cx: &mut TestAppContext) {
     support::wait_real(cx, "both syncs", |cx| {
         cx.update(|cx| !page.read(cx).is_syncing())
     });
+}
+
+#[gpui_kit::test]
+fn the_grid_shows_nine_classes_and_dims_the_unplayed(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    for class in TfClass::ALL {
+        assert!(
+            support::present(cx, s.win, ids::logstf_class(class)),
+            "{class:?}"
+        );
+    }
+    // Arie played Scout, Pyro and Heavy in the 6v6 log and is absent from the highlander one.
+    for class in [TfClass::Scout, TfClass::Pyro, TfClass::Heavy] {
+        assert!(
+            !support::present(cx, s.win, ids::logstf_class_unplayed(class)),
+            "{class:?}"
+        );
+    }
+    for class in [TfClass::Soldier, TfClass::Medic, TfClass::Spy] {
+        assert!(
+            support::present(cx, s.win, ids::logstf_class_unplayed(class)),
+            "{class:?}"
+        );
+    }
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_SUMMARY).as_deref(),
+        Some("Last 90 days, 2 logs")
+    );
+    let scout = cx.update(|cx| page.read(cx).averages().unwrap()[0].clone());
+    assert_eq!(scout.seconds(), 1559);
 }

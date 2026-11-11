@@ -57,3 +57,31 @@ pub fn sync_message(error: &LogsSyncError) -> &'static str {
         LogsSyncError::Http { .. } | LogsSyncError::TooLarge { .. } | _ => LOGS_TF_DOWN,
     }
 }
+
+/// Time on a class, rounded down to whole minutes: "45m", "1h 30m", "0m".
+pub fn time_played_text(seconds: u64) -> String {
+    let minutes = seconds / 60;
+    match minutes / 60 {
+        0 => format!("{minutes}m"),
+        hours => format!("{hours}h {}m", minutes % 60),
+    }
+}
+
+/// A rate with one decimal: "0.6".
+pub fn one_decimal(value: f64) -> String {
+    format!("{value:.1}")
+}
+
+/// A rate as a whole number: "136".
+pub fn whole(value: f64) -> String {
+    format!("{value:.0}")
+}
+
+/// The line under the class grid. At the log cap the window is no longer the full 90 days.
+pub fn summary_text(logs: usize, capped: bool) -> String {
+    match (capped, logs) {
+        (true, _) => format!("Last {logs} logs"),
+        (false, 1) => "Last 90 days, 1 log".to_owned(),
+        (false, _) => format!("Last 90 days, {logs} logs"),
+    }
+}

@@ -1,5 +1,6 @@
 //! The logs.tf page: tracked players as chips, their 90-day class averages and their logs.
 
+mod grid;
 pub mod text;
 
 use gpui_kit::assets::IconName;
@@ -511,7 +512,8 @@ impl LogsTfPage {
     // with its Retry, hidden while a sync runs since Retry could not start another.
     fn status(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let ours = self.syncing && self.running == self.active;
-        let progress = self.progress.filter(|_| ours).map(|p| {
+        // A count of 0 of 0 says nothing, so the line waits for the list to arrive.
+        let progress = self.progress.filter(|p| ours && p.total() > 0).map(|p| {
             labelled(
                 div().text_sm().text_color(cx.theme().muted_foreground),
                 ids::LOGSTF_PROGRESS,
@@ -605,6 +607,12 @@ impl Render for LogsTfPage {
                     .child(self.actions(cx))
             }))
             .child(self.status(cx))
+            .children(
+                self.averages
+                    .as_ref()
+                    .filter(|_| !self.players.is_empty())
+                    .map(|averages| grid::class_grid(averages, self.rows.len(), cx)),
+            )
             .children(empty.then(|| self.empty_state(cx)))
     }
 }
