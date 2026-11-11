@@ -506,3 +506,136 @@ fn a_new_run_keeps_the_last_download_count_until_it_downloads(cx: &mut TestAppCo
     gate.open();
     idle(cx, &sync);
 }
+
+// Arie's first listing answers at once and log 3's body waits at `download`; every later
+// listing waits at `listing`, where a new run's progress shows. Player 1 lists nothing.
+fn serve_held_download_then_listing(server: &support::StoreServer) -> (Gate, Gate) {
+    let (download, listing) = (Gate::default(), Gate::default());
+    support::logstf::mount_list_for(server, 1, &[], Duration::ZERO);
+    server.mount(
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/api/v1/log"))
+            .respond_with(
+                wiremock::ResponseTemplate::new(200)
+                    .set_body_bytes(list_body(&[(3, day_ago(1)), (2, day_ago(2))])),
+            )
+            .up_to_n_times(1),
+    );
+    mount_held(
+        server,
+        &listing,
+        "/api/v1/log",
+        None,
+        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
+    );
+    mount_held(
+        server,
+        &download,
+        "/json/3",
+        None,
+        SIXES.as_bytes().to_vec(),
+    );
+    server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
+    (download, listing)
+}
+
+// Starts Arie's Months3 run and returns its download count once it shows.
+fn downloading_count(cx: &mut TestAppContext, sync: &Entity<LogsSync>) -> SyncProgress {
+    start(cx, sync, ARIE, LogsRange::Months3);
+    support::wait_real(cx, "the download count", |cx| {
+        matches!(
+            cx.update(|cx| sync.read(cx).progress()),
+            Some(SyncProgress::Downloading { .. })
+        )
+    });
+    cx.update(|cx| sync.read(cx).progress()).unwrap()
+}
+
+// Starts Arie over `range`, past the freshness check, and reads the progress while the
+// listing is held.
+fn progress_while_listing(
+    cx: &mut TestAppContext,
+    sync: &Entity<LogsSync>,
+    listing: &Gate,
+    range: LogsRange,
+) -> Option<SyncProgress> {
+    let before = listing.arrived();
+    cx.update(|cx| sync.update(cx, |s, cx| s.start(sid(ARIE), range, true, cx)));
+    support::wait_real(cx, "the held listing", |_| listing.arrived() > before);
+    let shown = cx.update(|cx| sync.read(cx).progress());
+    listing.open();
+    idle(cx, sync);
+    shown
+}
+
+#[gpui_kit::test]
+fn a_finished_run_leaves_no_download_count(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (download, listing) = serve_held_download_then_listing(&server);
+    let _s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let sync = hub(cx);
+    downloading_count(cx, &sync);
+    download.open();
+    idle(cx, &sync);
+    assert_eq!(cx.update(|cx| sync.read(cx).error(sid(ARIE))), None);
+    assert_eq!(
+        progress_while_listing(cx, &sync, &listing, LogsRange::Months3),
+        None
+    );
+}
+
+#[gpui_kit::test]
+fn a_stopped_run_leaves_no_download_count(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (download, listing) = serve_held_download_then_listing(&server);
+    let _s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let sync = hub(cx);
+    downloading_count(cx, &sync);
+    let _stopped = cx.update(|cx| sync.update(cx, |s, cx| s.stop(sid(ARIE), cx)));
+    download.open();
+    idle(cx, &sync);
+    assert_eq!(
+        progress_while_listing(cx, &sync, &listing, LogsRange::Months3),
+        None
+    );
+}
+
+#[gpui_kit::test]
+fn a_run_over_another_range_leaves_out_the_old_count(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (download, listing) = serve_held_download_then_listing(&server);
+    let _s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let sync = hub(cx);
+    downloading_count(cx, &sync);
+    start(cx, &sync, ARIE, LogsRange::Year1);
+    download.open();
+    support::wait_real(cx, "the held listing", |_| listing.arrived() >= 1);
+    assert_eq!(
+        cx.update(|cx| sync.read(cx).progress()),
+        None,
+        "the wider range's listing shows no count"
+    );
+    listing.open();
+    idle(cx, &sync);
+}
+
+#[gpui_kit::test]
+fn switching_players_keeps_each_players_download_count(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (download, listing) = serve_held_download_then_listing(&server);
+    let _s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
+    let sync = hub(cx);
+    let arie = downloading_count(cx, &sync);
+    start(cx, &sync, 1, LogsRange::Months3);
+    download.open();
+    idle(cx, &sync);
+    assert_eq!(
+        progress_while_listing(cx, &sync, &listing, LogsRange::Months3),
+        Some(arie),
+        "Arie's count is back while Arie lists again"
+    );
+}

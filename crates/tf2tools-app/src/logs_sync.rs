@@ -1,6 +1,7 @@
 //! The app-wide logs.tf sync: one `LogsClient::sync_player` run on the tokio bridge, observed
 //! by the logs.tf page and the shell header, so a sync keeps going while the page is hidden.
 
+use std::collections::HashMap;
 use std::time::Duration;
 
 use gpui_kit::{App, AppContext as _, Context, Entity, EventEmitter, Global, Task};
@@ -83,9 +84,10 @@ pub struct LogsSync {
     run: Option<Run>,
     queued: Option<Request>,
     error: Option<(SteamId, &'static str)>,
-    // The player's last download count and estimate, kept through a retry's or a new run's
-    // listing until a fresh count replaces it, so the time left does not blink out.
-    last_download: Option<(SteamId, SyncProgress)>,
+    // Each player's last download count and estimate over its range, kept through a retry's
+    // or a new run's listing so the time left does not blink out. Success, a stop or a run
+    // over another range drops it.
+    last_download: HashMap<SteamId, (LogsRange, SyncProgress)>,
     // Tests take the pause out; None is RETRY_DELAY.
     retry_delay: Option<Duration>,
 }
@@ -135,6 +137,7 @@ impl LogsSync {
             self.queued = None;
             cx.notify();
         }
+        self.last_download.remove(&id);
         match self.run.as_ref().filter(|run| run.request.id == id) {
             Some(run) => {
                 run.cancel.cancel();
@@ -166,9 +169,9 @@ impl LogsSync {
     /// player's last download count stands in until this run downloads.
     pub fn progress(&self) -> Option<SyncProgress> {
         let run = self.run.as_ref()?;
-        match (run.progress, self.last_download) {
+        match (run.progress, self.last_download.get(&run.request.id)) {
             (Some(now @ SyncProgress::Downloading { .. }), _) => Some(now),
-            (_, Some((id, last))) if id == run.request.id => Some(last),
+            (_, Some(&(range, last))) if range == run.request.range => Some(last),
             (listing, _) => listing,
         }
     }
@@ -189,6 +192,13 @@ impl LogsSync {
             tokio_bridge::init(cx);
         }
         self.clear_error(request.id);
+        if self
+            .last_download
+            .get(&request.id)
+            .is_some_and(|&(range, _)| range != request.range)
+        {
+            self.last_download.remove(&request.id);
+        }
         let client = cx.global::<Services>().logs.clone();
         let retry_delay = self.retry_delay.unwrap_or(RETRY_DELAY);
         let cancel = LogsCancel::new();
@@ -273,8 +283,12 @@ impl LogsSync {
     ) {
         if let Some(run) = self.run.as_mut().filter(|run| run.request.id == id) {
             run.progress = progress;
-            if let Some(downloading @ SyncProgress::Downloading { .. }) = progress {
-                self.last_download = Some((id, downloading));
+            // A stopped run's late counts must not bring back the count `stop` dropped.
+            if let Some(downloading @ SyncProgress::Downloading { .. }) = progress
+                && !run.cancel.is_cancelled()
+            {
+                self.last_download
+                    .insert(id, (run.request.range, downloading));
             }
             cx.emit(LogsSyncEvent::Progress(id));
             cx.notify();
@@ -300,12 +314,13 @@ impl LogsSync {
             .run
             .as_ref()
             .is_some_and(|run| run.cancel.is_cancelled());
+        // A cancelled run also ends Ok, but only a finished one leaves nothing to count.
         match joined {
+            _ if stopped => self.clear_error(id),
             Ok((Ok(_) | Err(LogsSyncError::NotTracked { .. }), _)) => {
                 self.clear_error(id);
-                self.last_download = None;
+                self.last_download.remove(&id);
             }
-            _ if stopped => self.clear_error(id),
             Ok((Err(error), has_saved)) => {
                 tracing::warn!(%error, "syncing logs.tf logs failed");
                 self.error = Some((id, sync_message(&error, has_saved)));
