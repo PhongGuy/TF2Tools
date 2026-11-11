@@ -1,9 +1,12 @@
 //! The logs.tf page's wording and number formats.
 
+use std::time::Duration;
+
 use chrono::NaiveDate;
+use tf2tools_app::logs_sync::SyncProgress;
 use tf2tools_app::pages::logs_tf::text::{
-    EMPTY_TEXT, NO_LOGS_TEXT, duration_text, one_decimal, progress_text, resolve_message,
-    summary_text, sync_message, time_played_text, whole,
+    EMPTY_TEXT, NO_LOGS_TEXT, count_text, duration_text, finding_text, one_decimal, progress_line,
+    progress_text, resolve_message, summary_text, sync_message, time_played_text, whole,
 };
 use tf2tools_core::{LogsSyncError, ResolveError};
 
@@ -30,7 +33,10 @@ fn resolve_failures_read_as_the_spec_words_them() {
 
 #[test]
 fn sync_failures_and_progress_read_as_the_spec_words_them() {
-    assert_eq!(progress_text(12, 87), "Downloading logs: 12 of 87");
+    assert_eq!(
+        progress_text(12, 87, Duration::ZERO),
+        "Downloading logs: 12 of 87"
+    );
     let url = || "u".to_owned();
     let cases = [
         (
@@ -134,4 +140,37 @@ fn durations_read_as_minutes_and_seconds() {
     assert_eq!(duration_text(1714), "28:34");
     assert_eq!(duration_text(59), "0:59");
     assert_eq!(duration_text(3600), "60:00");
+}
+
+#[test]
+fn progress_reads_in_two_phases_with_an_estimate() {
+    assert_eq!(count_text(0), "0");
+    assert_eq!(count_text(999), "999");
+    assert_eq!(count_text(4_812), "4,812");
+    assert_eq!(count_text(1_234_567), "1,234,567");
+    assert_eq!(finding_text(2_000, 4_812), "Finding logs: 2,000 of 4,812");
+    let at = |secs| progress_text(120, 4_812, Duration::from_secs(secs));
+    assert_eq!(
+        at(9_600),
+        "Downloading logs: 120 of 4,812, about 2 h 40 min left"
+    );
+    assert_eq!(at(3_600), "Downloading logs: 120 of 4,812, about 1 h left");
+    assert_eq!(at(720), "Downloading logs: 120 of 4,812, about 12 min left");
+    assert_eq!(at(60), "Downloading logs: 120 of 4,812, about 1 min left");
+    assert_eq!(at(59), "Downloading logs: 120 of 4,812");
+    assert_eq!(
+        progress_line(SyncProgress::Finding {
+            listed: 1_000,
+            total: 4_812
+        }),
+        "Finding logs: 1,000 of 4,812"
+    );
+    assert_eq!(
+        progress_line(SyncProgress::Downloading {
+            done: 1,
+            total: 2,
+            left: Duration::ZERO
+        }),
+        "Downloading logs: 1 of 2"
+    );
 }

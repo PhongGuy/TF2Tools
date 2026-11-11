@@ -17,11 +17,12 @@ use gpui_kit::{
     div, px,
 };
 use tf2tools_core::{
-    ClassAverage, LogDetail, LogRow, LogState, LogsCancel, LogsProgress, LogsRange, LogsSyncError,
-    LogsSyncSummary, SteamId, TrackedPlayer, parse_log, parse_player_input,
+    ClassAverage, LogDetail, LogRow, LogState, LogsRange, SteamId, TrackedPlayer, parse_log,
+    parse_player_input,
 };
 
 use crate::ids;
+use crate::logs_sync::{LogsSync, LogsSyncEvent, SyncProgress, logs_sync};
 use crate::pages::common::filter_badge;
 use crate::services::{OpError, Services, run_blocking};
 use crate::shell::CONTENT_PADDING;
@@ -33,8 +34,8 @@ use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 use text::{
-    EMPTY_TEXT, LOGS_TF_DOWN, LOGS_TF_URL, LOOKING_UP, SAVE_FAILED, STEAM_UNREACHABLE, profile_url,
-    progress_text, resolve_message, sync_message,
+    EMPTY_TEXT, LOGS_TF_URL, LOOKING_UP, SAVE_FAILED, STEAM_UNREACHABLE, profile_url,
+    progress_line, resolve_message,
 };
 
 /// The logs.tf page. It reads the tracked players from the cache on creation and is kept
@@ -54,13 +55,11 @@ pub struct LogsTfPage {
     // Which optional row columns fit, from the list's width at the last frame; the list's
     // state cannot be asked while it lays its own items out.
     fit: list::Fit,
-    // One sync runs at a time and is never cancelled; a player chosen meanwhile waits in
-    // `queued`, so `syncing` stays true until the queue is empty.
-    syncing: bool,
-    running: Option<SteamId>,
-    queued: Option<SteamId>,
-    progress: Option<LogsProgress>,
-    error: Option<&'static str>,
+    // The app-wide sync the page starts and watches; it keeps running while the page hides.
+    sync: Entity<LogsSync>,
+    // At most one reread follows the sync at a time; events meanwhile ask for one more.
+    rereading: bool,
+    reread_wanted: bool,
     // Cache reads can land out of order; only the newest applies, and it starts the sync a
     // superseded read asked for.
     load_generation: u64,
@@ -88,6 +87,15 @@ impl LogsTfPage {
                 }
             },
         );
+        // The active player's sync moving rereads the cache, so logs appear as they land.
+        let sync = logs_sync(cx);
+        let heard = cx.subscribe(&sync, |page, _, event: &LogsSyncEvent, cx| {
+            let (LogsSyncEvent::Progress(id) | LogsSyncEvent::Finished(id)) = *event;
+            if page.active == Some(id) {
+                page.reread(cx);
+            }
+        });
+        let redraw = cx.observe(&sync, |_, _, cx| cx.notify());
         let mut page = Self {
             players: Vec::new(),
             active: None,
@@ -98,18 +106,16 @@ impl LogsTfPage {
             detail: None,
             list: ListState::new(1, ListAlignment::Top, px(200.)),
             fit: list::Fit::ALL,
-            syncing: false,
-            running: None,
-            queued: None,
-            progress: None,
-            error: None,
+            sync,
+            rereading: false,
+            reread_wanted: false,
             load_generation: 0,
             sync_wanted: false,
             add_input,
             add_error: None,
             adding: false,
             add_open: false,
-            _subscriptions: vec![enter],
+            _subscriptions: vec![enter, heard, redraw],
         };
         page.load(true, cx).detach();
         page
@@ -129,8 +135,8 @@ impl LogsTfPage {
     }
 
     /// True while a player's logs sync or another player's sync waits its turn.
-    pub fn is_syncing(&self) -> bool {
-        self.syncing
+    pub fn is_syncing(&self, cx: &App) -> bool {
+        self.sync.read(cx).busy()
     }
 
     /// The tracked players, in the order they were added.
@@ -148,14 +154,14 @@ impl LogsTfPage {
         self.averages.as_ref()
     }
 
-    /// Why the last sync failed, shown under the chips.
-    pub fn error(&self) -> Option<&str> {
-        self.error
+    /// Why the active player's last sync failed, shown under the chips.
+    pub fn error(&self, cx: &App) -> Option<&'static str> {
+        self.active.and_then(|id| self.sync.read(cx).error(id))
     }
 
     /// Forces a sync of the active player; a no-op while a sync runs.
     pub fn refresh(&mut self, cx: &mut Context<Self>) {
-        if let (false, Some(id)) = (self.syncing, self.active) {
+        if let (false, Some(id)) = (self.is_syncing(cx), self.active) {
             self.sync(id, true, cx);
         }
     }
@@ -247,7 +253,8 @@ impl LogsTfPage {
         self.after_write(saving, window, cx);
     }
 
-    // Asks before forgetting a player; their logs no other tracked player shares go with them.
+    // Asks before forgetting a player, stops their sync, then drops them with every log no
+    // other tracked player shares.
     fn remove(&mut self, id: SteamId, name: &str, window: &mut Window, cx: &mut Context<Self>) {
         let answer = confirm(
             Confirm {
@@ -264,6 +271,13 @@ impl LogsTfPage {
             if answer.recv().await != Ok(true) {
                 return;
             }
+            // Their sync ends first, so a list page it was recording cannot outlive the removal.
+            let Ok(stopped) = page.update(cx, |page, cx| {
+                page.sync.update(cx, |sync, cx| sync.stop(id, cx))
+            }) else {
+                return;
+            };
+            stopped.await;
             let _ = page.update_in(cx, |page, window, cx| {
                 let removing = run_blocking(cx, move |s| {
                     s.logs.cache().remove_player(id).map_err(|error| {
@@ -522,83 +536,36 @@ impl LogsTfPage {
         }
     }
 
-    // Syncs `id` on the tokio runtime, rereading the cache after each progress event so logs
-    // appear as they land. While another sync runs, `id` replaces whoever waits next.
+    // Asks the app-wide sync for `id`; a run for anyone else is cancelled in its favour.
     fn sync(&mut self, id: SteamId, force: bool, cx: &mut Context<Self>) {
-        if self.syncing {
-            self.queued = (self.running != Some(id)).then_some(id);
+        self.sync.update(cx, |sync, cx| {
+            sync.start(id, LogsRange::default(), force, cx)
+        });
+    }
+
+    // Each reread lands before the next starts, so a burst of events costs one more read.
+    fn reread(&mut self, cx: &mut Context<Self>) {
+        if self.rereading {
+            self.reread_wanted = true;
             return;
         }
-        self.syncing = true;
-        self.running = Some(id);
-        self.progress = None;
-        cx.notify();
-        if !tokio_bridge::is_running(cx) {
-            tokio_bridge::init(cx);
-        }
-        let client = cx.global::<Services>().logs.clone();
-        // Only the newest count is kept, so a slow frame skips counts rather than queueing them.
-        let (tx, mut rx) = tokio::sync::watch::channel(None::<LogsProgress>);
-        let job = tokio_bridge::spawn(cx, async move {
-            let report = move |progress| {
-                tx.send_replace(Some(progress));
-            };
-            client
-                .sync_player(id, LogsRange::default(), force, &LogsCancel::new(), &report)
-                .await
-        });
-        // Each reread lands before the next event is taken, so events that arrive meanwhile
-        // collapse into one reread of the newest count.
+        self.rereading = true;
+        let reading = self.load(false, cx);
         cx.spawn(async move |page, cx| {
-            while rx.changed().await.is_ok() {
-                let progress = *rx.borrow_and_update();
-                let reread = page.update(cx, |page, cx| {
-                    page.progress = progress;
-                    cx.notify();
-                    page.load(false, cx)
-                });
-                match reread {
-                    Ok(reread) => reread.await,
-                    Err(_) => return,
+            reading.await;
+            let _ = page.update(cx, |page, cx| {
+                page.rereading = false;
+                if std::mem::take(&mut page.reread_wanted) {
+                    page.reread(cx);
                 }
-            }
-            let joined = job.await;
-            let _ = page.update(cx, |page, cx| page.synced(joined, cx));
+            });
         })
         .detach();
     }
 
-    // Ends a sync: keeps or clears the error line, starts the queued player's sync if any and
-    // rereads the cache. A queued player removed before their turn is no failure.
-    fn synced(
-        &mut self,
-        joined: Result<Result<LogsSyncSummary, LogsSyncError>, tokio_bridge::JoinError>,
-        cx: &mut Context<Self>,
-    ) {
-        match joined {
-            Ok(Ok(_) | Err(LogsSyncError::NotTracked { .. })) => self.error = None,
-            Ok(Err(error)) => {
-                tracing::warn!(%error, "syncing logs.tf logs failed");
-                self.error = Some(sync_message(&error));
-            }
-            Err(error) => {
-                tracing::warn!(%error, "the logs.tf sync task stopped");
-                self.error = Some(LOGS_TF_DOWN);
-            }
-        }
-        self.syncing = false;
-        self.running = None;
-        self.progress = None;
-        if let Some(next) = self.queued.take() {
-            self.sync(next, false, cx);
-        }
-        self.load(false, cx).detach();
-        cx.notify();
-    }
-
     // Refresh and the active player's logs.tf profile, beside the chips.
     fn actions(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let syncing = self.syncing;
+        let syncing = self.is_syncing(cx);
         h_flex()
             .flex_none()
             .gap_2()
@@ -624,19 +591,23 @@ impl LogsTfPage {
     // The active player's progress line while their logs download, then the last failure
     // with its Retry, hidden while a sync runs since Retry could not start another.
     fn status(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let ours = self.syncing && self.running == self.active;
+        let sync = self.sync.read(cx);
+        let ours = self.active.is_some() && sync.running() == self.active;
         // A count of 0 of 0 says nothing, so the line waits for the list to arrive.
-        let progress = match self.progress {
-            Some(LogsProgress::Downloading { done, total, .. }) if ours && total > 0 => {
-                Some(labelled(
-                    div().text_sm().text_color(cx.theme().muted_foreground),
-                    ids::LOGSTF_PROGRESS,
-                    progress_text(done, total),
-                ))
-            }
-            _ => None,
-        };
-        let error = self.error.filter(|_| !self.syncing).map(|error| {
+        let progress = sync.progress().filter(|progress| {
+            let (SyncProgress::Finding { total, .. } | SyncProgress::Downloading { total, .. }) =
+                *progress;
+            ours && total > 0
+        });
+        let busy = sync.busy();
+        let progress = progress.map(|progress| {
+            labelled(
+                div().text_sm().text_color(cx.theme().muted_foreground),
+                ids::LOGSTF_PROGRESS,
+                progress_line(progress),
+            )
+        });
+        let error = self.error(cx).filter(|_| !busy).map(|error| {
             let page = cx.entity().downgrade();
             let on_retry = move |_: &mut Window, cx: &mut App| {
                 let _ = page.update(cx, |page, cx| page.refresh(cx));
@@ -682,7 +653,9 @@ impl LogsTfPage {
         let empty = self.loaded && self.players.is_empty();
         // Only a finished sync can say a player has no logs: one still running or waiting
         // its turn may bring some, and a player never synced shows the error line instead.
-        let fetching = self.syncing && (self.running == self.active || self.queued == self.active);
+        let sync = self.sync.read(cx);
+        let fetching = self.active.is_some()
+            && (sync.running() == self.active || sync.queued() == self.active);
         let synced = |id: &SteamId| {
             self.players
                 .iter()

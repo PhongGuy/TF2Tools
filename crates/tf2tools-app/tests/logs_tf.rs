@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, HIGHLANDER, SIXES, day_ago, expanded, list_body, open_log, open_page, players_of,
-    row_ids, serve_two_logs, shell, sid, to_end, unix_now,
+    ARIE, HIGHLANDER, SIXES, day_ago, expanded, list_body, list_requests, mount_list_for, open_log,
+    open_page, players_of, requests_to, row_ids, serve_two_logs, shell, sid, to_end, unix_now,
 };
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
@@ -291,7 +291,7 @@ fn opening_the_page_syncs_the_active_player(cx: &mut TestAppContext) {
     assert_eq!(row_ids(cx, &page), [3, 2]);
     assert!(cx.update(|cx| page.read(cx).averages().is_some()));
     assert_eq!(
-        cx.update(|cx| page.read(cx).error().map(str::to_owned)),
+        cx.update(|cx| page.read(cx).error(cx).map(str::to_owned)),
         None
     );
     assert!(!support::present(cx, s.win, ids::LOGSTF_PROGRESS));
@@ -310,7 +310,7 @@ fn a_failed_refresh_keeps_the_saved_logs_and_says_why(cx: &mut TestAppContext) {
     server.mount_status("/api/v1/log", 503);
     support::click_id(cx, s.win, ids::LOGSTF_REFRESH);
     support::wait_real(cx, "the failed refresh", |cx| {
-        cx.update(|cx| page.read(cx).error().is_some() && !page.read(cx).is_syncing())
+        cx.update(|cx| page.read(cx).error(cx).is_some() && !page.read(cx).is_syncing(cx))
     });
     assert_eq!(
         support::label_of(cx, s.win, ids::LOGSTF_ERROR).as_deref(),
@@ -335,10 +335,10 @@ fn offline_the_page_says_so(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn switching_chips_mid_sync_finishes_the_first_and_shows_the_second(cx: &mut TestAppContext) {
+fn switching_chips_mid_sync_cancels_the_first_and_syncs_the_second(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    // The list answers slowly, so Arie's sync is still open when the chip is clicked.
+    // The list answers slowly, so Arie's sync is still listing when the chip is clicked.
     server.mount_bytes_after(
         "/api/v1/log",
         list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
@@ -349,39 +349,101 @@ fn switching_chips_mid_sync_finishes_the_first_and_shows_the_second(cx: &mut Tes
     let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
     support::click_id(cx, s.win, ids::nav(Page::LogsTf));
     let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
-    support::wait_real(cx, "the chips", |cx| {
-        cx.update(|cx| page.read(cx).is_loaded())
+    support::wait_real(cx, "Arie's sync", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded() && page.read(cx).is_syncing(cx))
     });
-    assert!(
-        cx.update(|cx| page.read(cx).is_syncing()),
-        "Arie's sync is open"
-    );
-    assert_eq!(cx.update(|cx| page.read(cx).active()), Some(sid(ARIE)));
     support::click_id(cx, s.win, ids::logstf_chip(sid(1)));
-    support::wait_real(cx, "both syncs", |cx| {
+    support::wait_real(cx, "the switch", |cx| {
         cx.update(|cx| {
             let p = page.read(cx);
-            p.active() == Some(sid(1)) && !p.is_syncing()
-        }) && s
-            .services
+            p.active() == Some(sid(1)) && !p.is_syncing(cx)
+        })
+    });
+    let synced = |id: SteamId| {
+        s.services
             .logs
             .cache()
             .players()
             .unwrap()
-            .iter()
-            .all(|p| p.last_synced().is_some())
-    });
+            .into_iter()
+            .find(|p| p.steam_id() == id)
+            .and_then(|p| p.last_synced())
+    };
     assert_eq!(
-        s.services
-            .logs
-            .cache()
-            .logs(sid(ARIE), tf2tools_core::LogsRange::Months3)
-            .unwrap()
-            .len(),
-        2
+        synced(sid(ARIE)),
+        None,
+        "Arie's sync was cancelled, so it is not stamped"
     );
-    // "other" shares the same served list, so it shows the same two logs, from its own load.
+    assert!(synced(sid(1)).is_some(), "the chosen player synced");
     assert_eq!(row_ids(cx, &page), [3, 2]);
+
+    // Choosing Arie again resumes their sync.
+    support::click_id(cx, s.win, ids::logstf_chip(sid(ARIE)));
+    support::wait_real(cx, "Arie's resumed sync", |cx| {
+        cx.update(|cx| !page.read(cx).is_syncing(cx)) && synced(sid(ARIE)).is_some()
+    });
+}
+
+#[gpui_kit::test]
+fn removing_a_player_mid_sync_stops_their_sync_before_their_logs_go(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // Arie's list answers slowly, so the removal lands while it is in flight. The other
+    // player's list is empty; their sync still lists (no listed range is stamped, so it is
+    // not skipped), finds nothing and downloads nothing.
+    mount_list_for(
+        &server,
+        ARIE,
+        &[(3, day_ago(1))],
+        Duration::from_millis(500),
+    );
+    mount_list_for(&server, 1, &[], Duration::ZERO);
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
+    let other = i64::try_from(sid(1).id64()).unwrap();
+    support::sql(&env)
+        .execute(
+            "UPDATE logstf_players SET last_synced = ?1 WHERE steam_id = ?2",
+            [unix_now() - 60, other],
+        )
+        .unwrap();
+    support::click_id(cx, s.win, ids::nav(Page::LogsTf));
+    let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
+    // Waiting for the request itself means the removal meets a list that is on the wire.
+    support::wait_real(cx, "Arie's list request", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded() && page.read(cx).is_syncing(cx))
+            && list_requests(&server) == 1
+    });
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::wait_real(cx, "the removal and the next sync", |cx| {
+        cx.update(|cx| {
+            let p = page.read(cx);
+            p.players().len() == 1 && !p.is_syncing(cx)
+        })
+    });
+    let conn = support::sql(&env);
+    let count = |sql: &str| conn.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap();
+    assert_eq!(
+        count("SELECT COUNT(*) FROM logstf_player_logs"),
+        0,
+        "no membership outlives Arie's removal"
+    );
+    assert_eq!(
+        count("SELECT COUNT(*) FROM logstf_logs"),
+        0,
+        "Arie's unshared log went with them"
+    );
+    assert_eq!(
+        requests_to(&server, "/json/3"),
+        0,
+        "Arie's stopped sync downloaded nothing"
+    );
+    assert_eq!(cx.update(|cx| page.read(cx).error(cx)), None);
+    assert!(
+        support::toast_labels(cx, s.win).is_empty(),
+        "nothing failed"
+    );
 }
 
 #[gpui_kit::test]
@@ -409,12 +471,12 @@ fn the_progress_line_belongs_to_the_active_player(cx: &mut TestAppContext) {
     });
     support::settle(cx, s.win);
     assert!(
-        cx.update(|cx| page.read(cx).is_syncing()),
+        cx.update(|cx| page.read(cx).is_syncing(cx)),
         "Arie's sync is open"
     );
     assert!(!support::present(cx, s.win, ids::LOGSTF_PROGRESS));
     support::wait_real(cx, "both syncs", |cx| {
-        cx.update(|cx| !page.read(cx).is_syncing())
+        cx.update(|cx| !page.read(cx).is_syncing(cx))
     });
 }
 
@@ -709,12 +771,12 @@ fn a_player_waiting_for_their_first_sync_is_not_shown_as_without_logs(cx: &mut T
         cx.update(|cx| page.read(cx).active()) == Some(sid(1))
     });
     assert!(
-        cx.update(|cx| page.read(cx).is_syncing()),
+        cx.update(|cx| page.read(cx).is_syncing(cx)),
         "Arie's sync is open"
     );
     assert!(!support::present(cx, s.win, ids::LOGSTF_NO_LOGS));
     support::wait_real(cx, "both syncs", |cx| {
-        cx.update(|cx| !page.read(cx).is_syncing())
+        cx.update(|cx| !page.read(cx).is_syncing(cx))
     });
 }
 
@@ -743,7 +805,7 @@ fn a_row_still_downloading_does_not_open(cx: &mut TestAppContext) {
         Some("Downloading...")
     );
     support::wait_real(cx, "the sync", |cx| {
-        cx.update(|cx| !page.read(cx).is_syncing())
+        cx.update(|cx| !page.read(cx).is_syncing(cx))
     });
 }
 
@@ -873,7 +935,7 @@ fn the_page_keeps_its_scroll_while_a_sync_lands(cx: &mut TestAppContext) {
         assert_eq!(page_offset(cx, &page), expected, "after progress {step}");
     }
     support::wait_real(cx, "the sync", |cx| {
-        cx.update(|cx| !page.read(cx).is_syncing())
+        cx.update(|cx| !page.read(cx).is_syncing(cx))
     });
 }
 
@@ -896,7 +958,7 @@ fn a_new_log_keeps_the_open_log_where_it_was(cx: &mut TestAppContext) {
     server.mount_bytes("/json/4", SIXES.as_bytes().to_vec());
     cx.update(|cx| page.update(cx, |page, cx| page.refresh(cx)));
     support::wait_real(cx, "the refresh", |cx| {
-        cx.update(|cx| !page.read(cx).is_syncing() && page.read(cx).rows().len() == 3)
+        cx.update(|cx| !page.read(cx).is_syncing(cx) && page.read(cx).rows().len() == 3)
     });
     support::settle(cx, s.win);
     let after = support::bounds_of(cx, s.win, ids::LOGSTF_PLAYERS_SCROLL);

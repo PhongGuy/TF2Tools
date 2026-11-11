@@ -1,7 +1,11 @@
 //! The logs.tf page's wording and links, kept free of UI so tests read them without a window.
 
+use std::time::Duration;
+
 use chrono::{Datelike as _, NaiveDate};
 use tf2tools_core::{LogsSyncError, ResolveError, SteamId};
+
+use crate::logs_sync::SyncProgress;
 
 /// logs.tf's front page, which the page's credit opens.
 pub const LOGS_TF_URL: &str = "https://logs.tf";
@@ -45,9 +49,53 @@ pub fn resolve_message(error: &ResolveError) -> &'static str {
 /// Why a sync could not reach logs.tf or got an error page back, in player words.
 pub const LOGS_TF_DOWN: &str = "logs.tf isn't responding right now. Try again later.";
 
-/// The progress line while a sync downloads logs: "Downloading logs: 12 of 87".
-pub fn progress_text(done: usize, total: usize) -> String {
-    format!("Downloading logs: {done} of {total}")
+/// A count with thousands separators: "4,812".
+pub fn count_text(n: usize) -> String {
+    let digits = n.to_string();
+    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i).is_multiple_of(3) {
+            out.push(',');
+        }
+        out.push(c);
+    }
+    out
+}
+
+/// The progress line while a sync reads the player's list: "Finding logs: 2,000 of 4,812".
+pub fn finding_text(listed: usize, total: usize) -> String {
+    format!(
+        "Finding logs: {} of {}",
+        count_text(listed),
+        count_text(total)
+    )
+}
+
+/// The progress line while a sync downloads logs, with the time left once it is a minute
+/// or more: "Downloading logs: 120 of 4,812, about 2 h 40 min left".
+pub fn progress_text(done: usize, total: usize, left: Duration) -> String {
+    let line = format!(
+        "Downloading logs: {} of {}",
+        count_text(done),
+        count_text(total)
+    );
+    // Minutes round to the nearest, so 89 s reads "1 min" and 90 s "2 min".
+    let minutes = (left.as_secs() + 30) / 60;
+    let estimate = match (left.as_secs() < 60, minutes / 60, minutes % 60) {
+        (true, ..) => return line,
+        (false, 0, m) => format!("{m} min"),
+        (false, h, 0) => format!("{h} h"),
+        (false, h, m) => format!("{h} h {m} min"),
+    };
+    format!("{line}, about {estimate} left")
+}
+
+/// The line for a running sync in whichever phase it is.
+pub fn progress_line(progress: SyncProgress) -> String {
+    match progress {
+        SyncProgress::Finding { listed, total } => finding_text(listed, total),
+        SyncProgress::Downloading { done, total, left } => progress_text(done, total, left),
+    }
 }
 
 /// The line under the chips for a failed sync. A player removed while their sync waited is

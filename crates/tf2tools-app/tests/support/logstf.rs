@@ -27,7 +27,7 @@ pub fn open_page(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<Lo
     support::wait_real(cx, "the logs.tf page", |cx| {
         cx.update(|cx| {
             let p = page.read(cx);
-            p.is_loaded() && !p.is_syncing()
+            p.is_loaded() && !p.is_syncing(cx)
         })
     });
     support::settle(cx, s.win);
@@ -153,6 +153,28 @@ pub fn open_log(
         cx.update(|cx| page.read(cx).detail().is_some())
     });
     support::settle(cx, s.win);
+}
+
+/// Serves `account`'s list only, holding (id, upload date) pairs, after `delay`.
+pub fn mount_list_for(
+    server: &super::StoreServer,
+    account: u64,
+    logs: &[(u64, i64)],
+    delay: std::time::Duration,
+) {
+    use wiremock::matchers::{method, path, query_param};
+    use wiremock::{Mock, ResponseTemplate};
+    let player = sid(account).id64().to_string();
+    let reply = ResponseTemplate::new(200)
+        .set_body_bytes(list_body(logs))
+        .set_delay(delay);
+    server.rt.block_on(
+        Mock::given(method("GET"))
+            .and(path("/api/v1/log"))
+            .and(query_param("player", player.as_str()))
+            .respond_with(reply)
+            .mount(&server.server),
+    );
 }
 
 /// How many requests for `route` the server has had.
