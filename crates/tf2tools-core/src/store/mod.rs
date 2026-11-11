@@ -25,13 +25,11 @@ use std::cell::Cell;
 use std::sync::Arc;
 use std::time::Duration;
 
-use md5::{Digest, Md5};
 use rusqlite::OptionalExtension;
 
 use crate::db::Database;
 use crate::error::{BrowseError, FilesError, QueryError, SyncError};
 use crate::paths::DataDir;
-use crate::weapons::Weapon;
 pub use addon_catalog::{
     AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
     AddonProfile, AddonQuery, AddonSort, AddonStep, INDEX_STEP_CALLS, SEARCH_STEP_CALLS,
@@ -113,7 +111,6 @@ pub struct Endpoints {
     preview_prefixes: Vec<String>,
     image_prefixes: Vec<String>,
     hud_resources: String,
-    wiki_images: String,
     serveme: String,
     map_downloads: String,
     mastercomfig_data: String,
@@ -132,12 +129,10 @@ impl Default for Endpoints {
             image_prefixes: vec![
                 "https://images.gamebanana.com/".to_owned(),
                 "https://raw.githubusercontent.com/".to_owned(),
-                "https://wiki.teamfortress.com/w/images/".to_owned(),
             ],
             hud_resources:
                 "https://raw.githubusercontent.com/mastercomfig/hud-db/main/hud-resources"
                     .to_owned(),
-            wiki_images: "https://wiki.teamfortress.com/w/images".to_owned(),
             serveme: "https://serveme.tf".to_owned(),
             map_downloads: "https://fastdl.serveme.tf/maps".to_owned(),
             mastercomfig_data: "https://raw.githubusercontent.com/mastercomfig/mastercomfig"
@@ -149,8 +144,8 @@ impl Default for Endpoints {
 impl Endpoints {
     /// Every base under `base` (no trailing slash): GameBanana `{base}/apiv11`, GitHub API
     /// `{base}/gh-api`, github.com `{base}/gh`, previews `[{base}/preview/]`, images
-    /// `[{base}/img/]`, hud-db screenshots `{base}/img/hud-resources`, wiki images
-    /// `{base}/img/wiki`, serveme.tf `{base}/serveme`, map files `{base}/fastdl/maps` and
+    /// `[{base}/img/]`, hud-db screenshots `{base}/img/hud-resources`, serveme.tf
+    /// `{base}/serveme`, map files `{base}/fastdl/maps` and
     /// mastercomfig's repository files `{base}/gh-raw/mastercomfig`.
     pub fn loopback(base: &str) -> Self {
         Self {
@@ -160,7 +155,6 @@ impl Endpoints {
             preview_prefixes: vec![format!("{base}/preview/")],
             image_prefixes: vec![format!("{base}/img/")],
             hud_resources: format!("{base}/img/hud-resources"),
-            wiki_images: format!("{base}/img/wiki"),
             serveme: format!("{base}/serveme"),
             map_downloads: format!("{base}/fastdl/maps"),
             mastercomfig_data: format!("{base}/gh-raw/mastercomfig"),
@@ -196,41 +190,6 @@ impl Endpoints {
     /// `{base}/{hud_id}/{resource}.webp`.
     pub fn hud_resources(&self) -> &str {
         &self.hud_resources
-    }
-
-    /// The wiki's image root, without a trailing slash; production is
-    /// `https://wiki.teamfortress.com/w/images`, loopback `{base}/img/wiki`.
-    pub fn wiki_images(&self) -> &str {
-        &self.wiki_images
-    }
-
-    /// The 100 px thumbnail of the wiki item `name`'s icon: MediaWiki's hashed path
-    /// `{root}/thumb/{h[0]}/{h[0..2]}/{file}/100px-{file}` for `file` = `Item_icon_<name>.png`
-    /// with spaces as `_`, `h` the hex md5 of that file name, percent-encoded outside
-    /// `A-Za-z0-9_.-`.
-    pub fn weapon_icon_url(&self, name: &str) -> String {
-        // MediaWiki shards uploads by the md5 of the raw file name, so the path is computable
-        // without asking the wiki (its redirect page sits behind a bot check).
-        let file = format!("Item_icon_{}.png", name.replace(' ', "_"));
-        let hash: String = Md5::digest(file.as_bytes())
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect();
-        let encoded: String = file
-            .bytes()
-            .map(|b| match b {
-                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'_' | b'.' | b'-' => {
-                    char::from(b).to_string()
-                }
-                _ => format!("%{b:02X}"),
-            })
-            .collect();
-        format!(
-            "{}/thumb/{}/{}/{encoded}/100px-{encoded}",
-            self.wiki_images,
-            &hash[..1],
-            &hash[..2]
-        )
     }
 
     /// The serveme.tf base whose `/maps` page lists the community maps.
@@ -291,12 +250,6 @@ impl Endpoints {
         prefixes: impl IntoIterator<Item = impl Into<String>>,
     ) -> Self {
         self.preview_prefixes = prefixes.into_iter().map(Into::into).collect();
-        self
-    }
-
-    /// These endpoints with another wiki image root.
-    pub fn with_wiki_images(mut self, base: impl Into<String>) -> Self {
-        self.wiki_images = base.into();
         self
     }
 
@@ -557,13 +510,6 @@ pub struct StoreClient {
 }
 
 impl StoreClient {
-    /// The icon URL for `weapon` under this client's endpoints; None when it has no wiki name.
-    pub fn weapon_icon_url(&self, weapon: &Weapon) -> Option<String> {
-        weapon
-            .icon_name()
-            .map(|name| self.endpoints.weapon_icon_url(name))
-    }
-
     /// A client over `db` and `dir` talking to `endpoints`, with `StoreConfig::default()`.
     pub fn new(db: Database, dir: DataDir, endpoints: Endpoints) -> Self {
         let config = StoreConfig::default();

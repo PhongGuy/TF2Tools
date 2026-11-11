@@ -227,5 +227,4 @@ mod update_download;
 mod vpk;
 mod vtf;
 mod wav;
-mod weapon_icons;
 mod weapons;
