@@ -5,18 +5,20 @@ pub mod text;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{h_flex, v_flex};
+use gpui_kit::component::{Sizable as _, h_flex, v_flex};
 use gpui_kit::{
-    App, Context, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _,
-    TestSupportExt as _, Window, div,
+    App, Context, InteractiveElement as _, IntoElement, ParentElement as _, Render,
+    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window, div,
 };
 use tf2tools_core::{SteamId, TrackedPlayer};
 
 use crate::ids;
+use crate::pages::common::filter_badge;
 use crate::services::{OpError, run_blocking};
 use crate::shell::CONTENT_PADDING;
+use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
-use crate::widgets::labelled;
+use crate::widgets::{Named as _, labelled};
 use text::{EMPTY_TEXT, LOGS_TF_URL};
 
 /// The logs.tf page. It reads the tracked players from the cache on creation and is kept
@@ -61,6 +63,63 @@ impl LogsTfPage {
         self.active
     }
 
+    /// Makes `id`'s chip the active one, saves that choice and reloads the page from the cache.
+    pub fn select(&mut self, id: SteamId, cx: &mut Context<Self>) {
+        let saving = run_blocking(cx, move |s| {
+            s.logs
+                .cache()
+                .set_active_player(id)
+                .map_err(|e| OpError::core("Failed to save the logs.tf player", e))
+        });
+        self.after_write(saving, cx);
+    }
+
+    // Asks before forgetting a player; their logs stay cached until pruned.
+    fn remove(&mut self, id: SteamId, name: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let answer = confirm(
+            Confirm {
+                title: format!("Stop tracking {name}?").into(),
+                description: format!("{name}'s chip goes away. You can add them again later.")
+                    .into(),
+                confirm_label: "Stop tracking".into(),
+                cancel_label: "Cancel".into(),
+            },
+            window,
+            cx,
+        );
+        cx.spawn_in(window, async move |page, cx| {
+            if answer.recv().await != Ok(true) {
+                return;
+            }
+            let _ = page.update(cx, |page, cx| {
+                let removing = run_blocking(cx, move |s| {
+                    s.logs
+                        .cache()
+                        .remove_player(id)
+                        .map_err(|e| OpError::core("Failed to stop tracking the player", e))
+                });
+                page.after_write(removing, cx);
+            });
+        })
+        .detach();
+    }
+
+    // Every chip write ends the same way: the cache is the truth, so reread it, and a failed
+    // write is worth a warning in the log but leaves the page as the cache has it.
+    fn after_write(
+        &mut self,
+        write: impl Future<Output = Result<(), OpError>> + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        cx.spawn(async move |page, cx| {
+            if let Err(error) = write.await {
+                tracing::warn!(%error, "a logs.tf player change failed");
+            }
+            let _ = page.update(cx, |page, cx| page.load(cx));
+        })
+        .detach();
+    }
+
     // Reads the players and the active chip off the UI thread. A failed read leaves the page
     // empty rather than stuck loading; the warning keeps the cause for the log.
     fn load(&mut self, cx: &mut Context<Self>) {
@@ -89,6 +148,40 @@ impl LogsTfPage {
         .detach();
     }
 
+    // One chip per tracked player in order, each with its x, then "+ Add player", wrapping.
+    fn chips(&self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let mut row = h_flex().flex_wrap().gap_2();
+        for player in &self.players {
+            let id = player.steam_id();
+            let name = player.name().to_owned();
+            let chip = filter_badge(
+                ids::logstf_chip(id),
+                self.active == Some(id),
+                name.clone(),
+                window,
+                cx,
+            )
+            .on_click(cx.listener(move |page, _, _, cx| page.select(id, cx)));
+            let remove = Button::new(ids::logstf_chip_remove(id))
+                .ghost()
+                .xsmall()
+                .icon(IconName::X)
+                .named(format!("Stop tracking {name}"))
+                .on_click(cx.listener(move |page, _, window, cx| {
+                    cx.stop_propagation();
+                    page.remove(id, &name, window, cx);
+                }));
+            row = row.child(h_flex().gap_0p5().child(chip).child(remove));
+        }
+        row.child(filter_badge(
+            ids::LOGSTF_ADD,
+            false,
+            "+ Add player",
+            window,
+            cx,
+        ))
+    }
+
     // The no-player explanation and its way to track someone.
     fn empty_state(&self, cx: &App) -> impl IntoElement {
         v_flex()
@@ -110,7 +203,7 @@ impl LogsTfPage {
 }
 
 impl Render for LogsTfPage {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let empty = self.loaded && self.players.is_empty();
         v_flex()
             .id(ids::page(Page::LogsTf))
@@ -127,6 +220,7 @@ impl Render for LogsTfPage {
                         .on_click(|_, _, cx| cx.open_url(LOGS_TF_URL)),
                 ),
             )
+            .children((!self.players.is_empty()).then(|| self.chips(window, cx)))
             .children(empty.then(|| self.empty_state(cx)))
     }
 }

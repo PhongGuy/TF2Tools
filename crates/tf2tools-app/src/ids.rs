@@ -4,7 +4,7 @@
 use gpui_kit::ElementId;
 use tf2tools_core::{
     AddonName, BoardMode, GbId, HudId, MeterKind, ModuleChoice, NewPart, PartKey, PinCorner,
-    Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, StoreItemId,
+    Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind, SteamId, StoreItemId,
     StoreKind, TfClass, WeaponKind, WeaponSlot,
 };
 
@@ -2453,6 +2453,18 @@ pub const LOGSTF_CREDIT: &str = "logstf-credit";
 pub const LOGSTF_EMPTY: &str = "logstf-empty";
 /// The empty logs.tf page's "Add player" button.
 pub const LOGSTF_EMPTY_ADD: &str = "logstf-empty-add";
+/// The "+ Add player" chip after the tracked players.
+pub const LOGSTF_ADD: &str = "logstf-add";
+
+/// One tracked player's chip, selected while active: "logstf-chip:<id64>".
+pub fn logstf_chip(id: SteamId) -> ElementId {
+    keyed("logstf-chip", &id.id64().to_string())
+}
+
+/// The x beside a player's chip that asks to stop tracking them: "logstf-chip-remove:<id64>".
+pub fn logstf_chip_remove(id: SteamId) -> ElementId {
+    keyed("logstf-chip-remove", &id.id64().to_string())
+}
 
 /// One map's row: "map-row:<name>".
 pub fn map_row(name: &str) -> ElementId {
