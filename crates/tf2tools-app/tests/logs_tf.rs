@@ -1432,3 +1432,51 @@ fn a_typical_title_and_map_read_whole_in_the_smallest_window(cx: &mut TestAppCon
         "map {cell:?} under {need} px"
     );
 }
+
+#[gpui_kit::test]
+fn a_long_time_played_never_meets_its_label(cx: &mut TestAppContext) {
+    use gpui_kit::px;
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // One log in which Arie played Scout for 100h 59m.
+    let mut log: serde_json::Value = serde_json::from_str(SIXES).unwrap();
+    let scout = &mut log["players"]["[U:1:231702]"]["class_stats"][0];
+    assert_eq!(scout["type"], "scout");
+    scout["total_time"] = serde_json::json!(363_540);
+    // And Pyro for 68h 43m, which still fits beside its label.
+    let pyro = &mut log["players"]["[U:1:231702]"]["class_stats"][1];
+    assert_eq!(pyro["type"], "pyro");
+    pyro["total_time"] = serde_json::json!(247_380);
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_bytes("/json/3", log.to_string().into_bytes());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let _page = open_page(cx, &s);
+    support::wait_real(cx, "the scout card's time", |cx| {
+        support::label_of(cx, s.win, ids::logstf_class_value(TfClass::Scout, "Played")).as_deref()
+            == Some("100h 59m")
+    });
+    let card = support::bounds_of(cx, s.win, ids::logstf_class(TfClass::Scout)).unwrap();
+    let label =
+        support::bounds_of(cx, s.win, ids::logstf_class_label(TfClass::Scout, "Played")).unwrap();
+    let value =
+        support::bounds_of(cx, s.win, ids::logstf_class_value(TfClass::Scout, "Played")).unwrap();
+    let apart = value.left() - label.right() >= px(8.) || value.top() >= label.bottom();
+    assert!(apart, "value {value:?} meets label {label:?}");
+    assert!(
+        value.right() <= card.right() - px(12.),
+        "value {value:?} past {card:?}"
+    );
+    let label =
+        support::bounds_of(cx, s.win, ids::logstf_class_label(TfClass::Pyro, "Played")).unwrap();
+    let value =
+        support::bounds_of(cx, s.win, ids::logstf_class_value(TfClass::Pyro, "Played")).unwrap();
+    assert_eq!(
+        value.top(),
+        label.top(),
+        "68h 43m {value:?} wrapped off {label:?}"
+    );
+    assert!(
+        value.left() - label.right() >= px(8.),
+        "value {value:?} meets label {label:?}"
+    );
+}

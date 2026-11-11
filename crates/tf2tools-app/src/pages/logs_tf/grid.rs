@@ -124,7 +124,7 @@ fn class_card(average: &ClassAverage, cx: &App) -> impl IntoElement {
         .child(div().font_weight(FontWeight::SEMIBOLD).child(class.name()));
     let body = if average.played() {
         let mut stats = vec![
-            ("Time played", time_played_text(average.seconds())),
+            ("Played", time_played_text(average.seconds())),
             ("Logs", average.logs().to_string()),
             ("Kills/min", one_decimal(average.kills_per_min())),
             ("Deaths/min", one_decimal(average.deaths_per_min())),
@@ -141,11 +141,22 @@ fn class_card(average: &ClassAverage, cx: &App) -> impl IntoElement {
             .gap_0p5()
             .text_sm()
             .children(stats.into_iter().map(|(label, value)| {
+                // A value too long to sit beside its label wraps under it, still right-aligned.
                 h_flex()
-                    .justify_between()
-                    .gap_2()
-                    .child(div().text_color(muted).child(label))
-                    .child(div().child(value))
+                    .flex_wrap()
+                    .gap_x_2()
+                    .child(
+                        div()
+                            .id(ids::logstf_class_label(class, label))
+                            .test_support()
+                            .text_color(muted)
+                            .child(label),
+                    )
+                    .child(labelled(
+                        div().ml_auto(),
+                        ids::logstf_class_value(class, label),
+                        value,
+                    ))
             }))
             .into_any_element()
     } else {

@@ -2496,6 +2496,22 @@ pub fn logstf_class(class: TfClass) -> ElementId {
     keyed("logstf-class", &class.name().to_lowercase())
 }
 
+/// A class card's rate name, by its label: "logstf-class-label:<class>:<label>".
+pub fn logstf_class_label(class: TfClass, label: &str) -> ElementId {
+    keyed(
+        "logstf-class-label",
+        &format!("{}:{label}", class.name().to_lowercase()),
+    )
+}
+
+/// A class card's rate value, labelled with its text: "logstf-class-value:<class>:<label>".
+pub fn logstf_class_value(class: TfClass, label: &str) -> ElementId {
+    keyed(
+        "logstf-class-value",
+        &format!("{}:{label}", class.name().to_lowercase()),
+    )
+}
+
 /// The dimmed "Not played" on a class card with no time: "logstf-class-unplayed:<class>".
 pub fn logstf_class_unplayed(class: TfClass) -> ElementId {
     keyed("logstf-class-unplayed", &class.name().to_lowercase())
