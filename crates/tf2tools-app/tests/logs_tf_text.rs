@@ -491,7 +491,11 @@ fn matrix_rows_run_k_high_to_low_and_count_every_player() {
     ] {
         let rows = matrix_rows(&log, kind);
         assert_eq!(rows.len(), 12, "{kind:?} has every player");
-        let totals: Vec<u32> = rows.iter().map(|r| r.total()).collect();
+        assert!(
+            rows.iter().all(|(p, r)| p.steam_id() == r.steam_id()),
+            "{kind:?} pairs each row with its own player"
+        );
+        let totals: Vec<u32> = rows.iter().map(|(_, r)| r.total()).collect();
         assert!(
             totals.windows(2).all(|w| w[0] >= w[1]),
             "{kind:?} {totals:?}"
@@ -499,13 +503,13 @@ fn matrix_rows_run_k_high_to_low_and_count_every_player() {
     }
     let kills = matrix_rows(&log, MatrixKind::Kills);
     assert_eq!(
-        kills[0].steam_id(),
+        kills[0].1.steam_id(),
         sid(285_837_700),
         "39 kills tops the table"
     );
-    let meta = kills
+    let (_, meta) = kills
         .iter()
-        .find(|r| r.steam_id() == sid(98_265_577))
+        .find(|(_, r)| r.steam_id() == sid(98_265_577))
         .unwrap();
     assert_eq!(
         (meta.counts(), meta.total()),

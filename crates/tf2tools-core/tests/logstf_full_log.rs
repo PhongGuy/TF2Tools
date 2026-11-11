@@ -456,7 +456,7 @@ fn class_matrices_have_a_row_for_every_player() {
     let log = six();
     let row = |kind: MatrixKind, account: u64| {
         log.class_matrix(kind)
-            .into_iter()
+            .iter()
             .find(|r| r.steam_id() == sid(account))
             .unwrap()
     };
@@ -481,7 +481,7 @@ fn class_matrices_have_a_row_for_every_player() {
     let hl = hl();
     let manchester = hl
         .class_matrix(MatrixKind::Kills)
-        .into_iter()
+        .iter()
         .find(|r| r.steam_id() == sid(306_968_798))
         .unwrap();
     assert_eq!(manchester.total(), 0);

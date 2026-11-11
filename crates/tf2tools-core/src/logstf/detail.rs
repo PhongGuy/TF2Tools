@@ -71,13 +71,12 @@ impl LogDetail {
     }
     /// One row per player in the players' order, counting `kind` by the other player's
     /// class; a player logs.tf has no entry for reads as zeros.
-    pub fn class_matrix(&self, kind: MatrixKind) -> Vec<MatrixRow> {
+    pub fn class_matrix(&self, kind: MatrixKind) -> &[MatrixRow] {
         match kind {
             MatrixKind::Kills => &self.class_kills,
             MatrixKind::KillsAssists => &self.class_kill_assists,
             MatrixKind::Deaths => &self.class_deaths,
         }
-        .clone()
     }
     /// The rounds in play order; empty when the log has none or they do not read.
     pub fn rounds(&self) -> &[RoundLine] {

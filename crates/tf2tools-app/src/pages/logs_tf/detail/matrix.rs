@@ -1,8 +1,6 @@
 //! The open log's kill matrix: every player's kills, kills plus assists or deaths against each
 //! class, one tab per kind as on logs.tf.
 
-use std::collections::HashMap;
-
 use gpui_kit::component::button::Button;
 use gpui_kit::component::{ActiveTheme as _, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -10,7 +8,7 @@ use gpui_kit::{
     App, Div, FontWeight, InteractiveElement as _, ParentElement as _, Pixels, Role,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, div, px,
 };
-use tf2tools_core::{LogDetail, MatrixKind, PlayerLine, SteamId, TfClass};
+use tf2tools_core::{LogDetail, MatrixKind, SteamId, TfClass};
 
 use super::{ICON, class_cell, team_cell};
 use crate::ids;
@@ -95,14 +93,9 @@ fn table(log: &LogDetail, kind: MatrixKind, is_tracked: &dyn Fn(SteamId) -> bool
                 total,
             )),
     );
-    let players: HashMap<SteamId, &PlayerLine> =
-        log.players().iter().map(|p| (p.steam_id(), p)).collect();
     let assets = &cx.global::<Services>().assets;
-    for row in matrix_rows(log, kind) {
+    for (player, row) in matrix_rows(log, kind) {
         let id = row.steam_id();
-        let Some(player) = players.get(&id) else {
-            continue;
-        };
         let main = player.classes().first().map(|c| {
             let class = c.class();
             class_icon(class, assets.class_icon(class).as_deref(), ICON)

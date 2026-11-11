@@ -62,11 +62,12 @@ pub fn heal_rows(medic: &MedicLine) -> Vec<HealRow> {
         .collect()
 }
 
-/// Every player's row of `kind`, K high to low, ties in the players' order.
-pub fn matrix_rows(log: &LogDetail, kind: MatrixKind) -> Vec<MatrixRow> {
-    // Core lists every player in the players' order, so a stable sort keeps that under ties.
-    let mut rows = log.class_matrix(kind);
-    rows.sort_by_key(|r| std::cmp::Reverse(r.total()));
+/// Every player with their row of `kind`, K high to low, ties in the players' order.
+pub fn matrix_rows(log: &LogDetail, kind: MatrixKind) -> Vec<(&PlayerLine, &MatrixRow)> {
+    // Core lists one row per player in the players' order, so a row pairs with its player by
+    // position and a stable sort keeps that order under ties.
+    let mut rows: Vec<_> = log.players().iter().zip(log.class_matrix(kind)).collect();
+    rows.sort_by_key(|(_, r)| std::cmp::Reverse(r.total()));
     rows
 }
 

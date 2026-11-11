@@ -104,7 +104,7 @@ fn a_highlander_medic_has_charges_spread_and_class_kills() {
     assert_eq!(medic.heal_spread()[0].healing(), 13_725);
     let kills = log
         .class_matrix(MatrixKind::Kills)
-        .into_iter()
+        .iter()
         .find(|k| k.steam_id() == sid(302_123_669))
         .unwrap();
     assert_eq!(
