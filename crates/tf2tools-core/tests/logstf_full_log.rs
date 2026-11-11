@@ -248,3 +248,66 @@ fn a_malformed_rounds_section_reads_as_empty_and_a_bad_round_is_skipped() {
     assert_eq!(log.rounds()[0].blue().score(), 0);
     assert!(log.rounds()[0].events().is_empty() && log.rounds()[0].players().is_empty());
 }
+
+#[test]
+fn team_totals_read_midfights_from_firstcaps() {
+    let (six, hl) = (six(), hl());
+    assert_eq!((six.blue().midfights(), six.red().midfights()), (4, 1));
+    assert_eq!((hl.blue().midfights(), hl.red().midfights()), (1, 4));
+}
+
+#[test]
+fn class_lines_list_weapons_by_kills_then_damage() {
+    let log = six();
+    let arie = log
+        .players()
+        .iter()
+        .find(|p| p.steam_id() == sid(231_702))
+        .unwrap();
+    let scout: Vec<(&str, u32, u32, u32, u32)> = arie.classes()[0]
+        .weapons()
+        .iter()
+        .map(|w| (w.name(), w.kills(), w.dmg(), w.shots(), w.hits()))
+        .collect();
+    assert_eq!(
+        scout,
+        [
+            ("scattergun", 7, 3334, 290, 161),
+            ("pistol_scout", 0, 177, 201, 21)
+        ]
+    );
+    let pyro: Vec<&str> = arie.classes()[1]
+        .weapons()
+        .iter()
+        .map(|w| w.name())
+        .collect();
+    assert_eq!(pyro, ["shotgun_pyro", "flamethrower"]);
+    let heavy = &arie.classes()[2].weapons()[0];
+    assert_eq!(
+        (heavy.name(), heavy.shots(), heavy.hits()),
+        ("long_heatmaker", 0, 0)
+    );
+}
+
+#[test]
+fn a_class_without_a_readable_weapon_map_has_no_weapons() {
+    let body = r#"{"length": 60, "teams": {"Red": {}, "Blue": {}}, "players": {
+        "[U:1:5]": {"team": "Red", "class_stats": [
+            {"type": "scout", "total_time": 30, "weapon": null},
+            {"type": "soldier", "total_time": 20,
+             "weapon": {"rocket": {"kills": "2", "dmg": 90.4}, "bad": 5}}
+        ]}}}"#;
+    let log = parse_log(body).unwrap();
+    let classes = log.players()[0].classes();
+    assert!(classes[0].weapons().is_empty());
+    assert_eq!(
+        classes[1].weapons().len(),
+        1,
+        "a non-object entry is skipped"
+    );
+    let rocket = &classes[1].weapons()[0];
+    assert_eq!(
+        (rocket.name(), rocket.kills(), rocket.dmg(), rocket.shots()),
+        ("rocket", 2, 90, 0)
+    );
+}

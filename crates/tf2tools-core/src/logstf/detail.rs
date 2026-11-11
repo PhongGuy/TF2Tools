@@ -294,6 +294,7 @@ pub struct TeamTotals {
     charges: u32,
     drops: u32,
     caps: u32,
+    midfights: u32,
 }
 
 impl TeamTotals {
@@ -320,6 +321,10 @@ impl TeamTotals {
     /// Points captured.
     pub fn caps(&self) -> u32 {
         self.caps
+    }
+    /// Midfights won (first captures of a round).
+    pub fn midfights(&self) -> u32 {
+        self.midfights
     }
 }
 
@@ -447,6 +452,7 @@ pub struct ClassLine {
     deaths: u32,
     assists: u32,
     dmg: u32,
+    weapons: Vec<WeaponLine>,
 }
 
 impl ClassLine {
@@ -473,6 +479,44 @@ impl ClassLine {
     /// Damage dealt on it.
     pub fn dmg(&self) -> u32 {
         self.dmg
+    }
+    /// The weapons used on it, most kills first, then most damage, then by name.
+    pub fn weapons(&self) -> &[WeaponLine] {
+        &self.weapons
+    }
+}
+
+/// One weapon a player used on one class.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct WeaponLine {
+    name: String,
+    kills: u32,
+    dmg: u32,
+    shots: u32,
+    hits: u32,
+}
+
+impl WeaponLine {
+    /// The logs.tf weapon name.
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    /// Kills with it.
+    pub fn kills(&self) -> u32 {
+        self.kills
+    }
+    /// Damage dealt with it.
+    pub fn dmg(&self) -> u32 {
+        self.dmg
+    }
+    /// Shots fired.
+    pub fn shots(&self) -> u32 {
+        self.shots
+    }
+    /// Shots that hit.
+    pub fn hits(&self) -> u32 {
+        self.hits
     }
 }
 
@@ -826,6 +870,13 @@ fn player_line(
         .class_stats
         .iter()
         .filter_map(|c| {
+            let mut weapons = c.weapon.clone();
+            weapons.sort_by(|a, b| {
+                b.kills
+                    .cmp(&a.kills)
+                    .then_with(|| b.dmg.cmp(&a.dmg))
+                    .then_with(|| a.name.cmp(&b.name))
+            });
             Some(ClassLine {
                 class: logstf_class(&c.kind)?,
                 seconds: c.total_time,
@@ -833,6 +884,7 @@ fn player_line(
                 deaths: c.deaths,
                 assists: c.assists,
                 dmg: c.dmg,
+                weapons,
             })
         })
         .collect();
@@ -1007,6 +1059,8 @@ struct WireTeam {
     drops: u32,
     #[serde(deserialize_with = "count")]
     caps: u32,
+    #[serde(deserialize_with = "count")]
+    firstcaps: u32,
 }
 
 impl WireTeam {
@@ -1018,6 +1072,7 @@ impl WireTeam {
             charges: self.charges,
             drops: self.drops,
             caps: self.caps,
+            midfights: self.firstcaps,
         }
     }
 }
@@ -1118,6 +1173,8 @@ struct WireClass {
     assists: u32,
     #[serde(deserialize_with = "count")]
     dmg: u32,
+    #[serde(deserialize_with = "weapon_lines")]
+    weapon: Vec<WeaponLine>,
 }
 
 /// A number, or numeric text, as an `f64`; anything else is `None`.
@@ -1203,5 +1260,25 @@ fn count_maps<'de, D: Deserializer<'de>>(
     Ok(map
         .into_iter()
         .map(|(k, v)| (k, object_counts(v)))
+        .collect())
+}
+
+/// A class's weapon map as lines; entries that are not objects are skipped, and a
+/// `weapon` that is not an object reads as none.
+fn weapon_lines<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<WeaponLine>, D::Error> {
+    let Value::Object(map) = Value::deserialize(d)? else {
+        return Ok(Vec::new());
+    };
+    let field = |v: &Value, key: &str| v.get(key).map_or(0, to_count);
+    Ok(map
+        .into_iter()
+        .filter(|(_, v)| v.is_object())
+        .map(|(name, v)| WeaponLine {
+            kills: field(&v, "kills"),
+            dmg: field(&v, "dmg"),
+            shots: field(&v, "shots"),
+            hits: field(&v, "hits"),
+            name,
+        })
         .collect())
 }

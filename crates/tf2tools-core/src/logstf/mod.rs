@@ -16,7 +16,7 @@ pub use cache::{LogRow, LogState, LogsCache, TrackedPlayer};
 pub use client::{LogsClient, LogsEndpoints, LogsProgress, LogsSyncSummary};
 pub use detail::{
     ClassKills, ClassLine, EventKind, HealTarget, LogColumns, LogDetail, MedicLine, Medigun,
-    PlayerLine, RoundEvent, RoundLine, RoundPlayer, RoundTeam, TeamTotals, parse_log,
+    PlayerLine, RoundEvent, RoundLine, RoundPlayer, RoundTeam, TeamTotals, WeaponLine, parse_log,
 };
 pub use steam_id::{PlayerInput, SteamId, parse_player_input};
 
