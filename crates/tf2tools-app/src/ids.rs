@@ -2788,6 +2788,11 @@ pub fn logstf_streak(ix: usize) -> ElementId {
     keyed("logstf-streak", &ix.to_string())
 }
 
+/// The player's name in one killstreaks row, labelled with it: "logstf-streak-name:<ix>".
+pub fn logstf_streak_name(ix: usize) -> ElementId {
+    keyed("logstf-streak-name", &ix.to_string())
+}
+
 /// The open log's Download log button: "logstf-download:<log id>".
 pub fn logstf_download(id: u64) -> ElementId {
     keyed("logstf-download", &id.to_string())

@@ -194,11 +194,23 @@ fn the_card_opens_after_a_tenth_of_a_second_and_closes_when_left(cx: &mut TestAp
 
 // `text` shaped at text-sm in the theme font, as a card cell lays it out.
 fn text_width(cx: &mut TestAppContext, win: gpui_kit::AnyWindowHandle, text: &str) -> f32 {
+    shaped_width(cx, win, text, gpui_kit::FontWeight::NORMAL)
+}
+
+// `text` shaped at text-sm in the theme font at `weight`.
+fn shaped_width(
+    cx: &mut TestAppContext,
+    win: gpui_kit::AnyWindowHandle,
+    text: &str,
+    weight: gpui_kit::FontWeight,
+) -> f32 {
     use gpui_kit::component::ActiveTheme as _;
     cx.update_window(win, |_, w, cx| {
+        let mut font = gpui_kit::font(cx.theme().font_family.clone());
+        font.weight = weight;
         let run = gpui_kit::TextRun {
             len: text.len(),
-            font: gpui_kit::font(cx.theme().font_family.clone()),
+            font,
             ..Default::default()
         };
         let size = gpui_kit::rems(0.875).to_pixels(w.rem_size());
@@ -743,4 +755,21 @@ fn round_headers_stay_on_one_line_and_spread_across_the_table(cx: &mut TestAppCo
     let head = support::bounds_of(cx, s.win, ids::logstf_round_players_head(3, 0)).unwrap();
     let row = support::bounds_of(cx, s.win, ids::logstf_round_player(3, 0, sid(ARIE))).unwrap();
     assert!(head.size.height < row.size.height * 1.5, "{head:?} {row:?}");
+}
+
+#[gpui_kit::test]
+fn killstreak_names_show_whole(cx: &mut TestAppContext) {
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_CHAT_TOGGLE);
+    support::click_id(cx, s.win, ids::LOGSTF_STREAKS_TOGGLE);
+    for ix in 0..13 {
+        let id = ids::logstf_streak_name(ix);
+        let name = support::label_of(cx, s.win, id.clone()).expect("a streak's name");
+        let cell = support::bounds_of(cx, s.win, id).unwrap();
+        let width = shaped_width(cx, s.win, &name, gpui_kit::FontWeight::SEMIBOLD);
+        assert!(
+            f32::from(cell.size.width) + 0.5 >= width,
+            "{name:?} needs {width} px, has {cell:?}"
+        );
+    }
 }

@@ -133,10 +133,14 @@ pub(in crate::pages::logs_tf) fn streaks_dialog(
             .gap_2()
             .child(div().w(TIME).flex_none().child(row.time.clone()))
             .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .child(name(&row.name, row.team, cx)),
+                // The streak's name has the row to itself, so it is cut only at the row's end.
+                div().flex_1().min_w_0().child(
+                    name(&row.name, row.team, cx)
+                        .id(ids::logstf_streak_name(ix))
+                        .aria_label(row.name.clone())
+                        .test_support()
+                        .max_w_full(),
+                ),
             )
             .child(
                 div()
