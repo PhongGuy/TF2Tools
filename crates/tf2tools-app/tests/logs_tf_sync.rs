@@ -407,3 +407,50 @@ fn two_unreachable_tries_with_nothing_saved_say_logs_tf_was_not_reached(cx: &mut
     );
     assert_eq!(list_requests(&server), 2, "one retry, no more");
 }
+
+#[gpui_kit::test]
+fn a_retried_sync_counts_the_logs_its_first_try_saved(cx: &mut TestAppContext) {
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, ResponseTemplate};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // The first try saves log 3, then log 2 never answers in time; the retry's log 2 is held
+    // at the gate, where its progress shows.
+    server.mount_bytes(
+        "/api/v1/log",
+        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
+    );
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let slow = ResponseTemplate::new(200)
+        .set_body_bytes(HIGHLANDER.as_bytes().to_vec())
+        .set_delay(Duration::from_secs(30));
+    server.mount(
+        Mock::given(method("GET"))
+            .and(path("/json/2"))
+            .respond_with(slow)
+            .up_to_n_times(1),
+    );
+    let gate = Gate::default();
+    mount_held(
+        &server,
+        &gate,
+        "/json/2",
+        None,
+        HIGHLANDER.as_bytes().to_vec(),
+    );
+    let _s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    impatient_client(cx, &server.uri());
+    let sync = hub_without_retry_pause(cx);
+    start(cx, &sync, ARIE, LogsRange::Months3);
+    held(cx, &gate);
+    support::wait_real(cx, "the retry's progress", |cx| {
+        cx.update(|cx| sync.read(cx).progress())
+            == Some(SyncProgress::Downloading {
+                done: 1,
+                total: 2,
+                left: Duration::ZERO,
+            })
+    });
+    gate.open();
+    idle(cx, &sync);
+}

@@ -191,33 +191,41 @@ impl LogsSync {
             let _ended = ended_tx;
             let Request { id, range, force } = request;
             let cache = client.cache();
-            // Read once when downloads start: logs in the window an earlier run already handled.
-            let base = std::sync::OnceLock::new();
-            let report = move |progress: LogsProgress| {
-                let shown = match progress {
-                    LogsProgress::Listing { listed, total, .. } => {
-                        SyncProgress::Finding { listed, total }
-                    }
-                    LogsProgress::Downloading {
-                        done,
-                        total,
-                        spacing,
-                        ..
-                    } => {
-                        let base = *base.get_or_init(|| saved(cache, id, range));
-                        downloading(done, total, spacing, base)
-                    }
-                    _ => return,
-                };
-                tx.send_replace(Some(shown));
+            // Each try reads its own baseline when downloads start: logs in the window already
+            // handled, which after a failed try includes the ones that try saved.
+            let report = || {
+                let base = std::sync::OnceLock::new();
+                let tx = &tx;
+                move |progress: LogsProgress| {
+                    let shown = match progress {
+                        LogsProgress::Listing { listed, total, .. } => {
+                            SyncProgress::Finding { listed, total }
+                        }
+                        LogsProgress::Downloading {
+                            done,
+                            total,
+                            spacing,
+                            ..
+                        } => {
+                            let base = *base.get_or_init(|| saved(cache, id, range));
+                            downloading(done, total, spacing, base)
+                        }
+                        _ => return,
+                    };
+                    tx.send_replace(Some(shown));
+                }
             };
-            let mut result = client.sync_player(id, range, force, &cancel, &report).await;
+            let mut result = client
+                .sync_player(id, range, force, &cancel, &report())
+                .await;
             // logs.tf can be out of reach for a moment, so an unreachable run tries once more.
             if let Err(error @ LogsSyncError::Network { .. }) = &result {
                 tracing::info!(%error, "retrying the logs.tf sync once");
                 pause(retry_delay, &cancel).await;
                 if !cancel.is_cancelled() {
-                    result = client.sync_player(id, range, force, &cancel, &report).await;
+                    result = client
+                        .sync_player(id, range, force, &cancel, &report())
+                        .await;
                 }
             }
             let has_saved = result.is_err()
