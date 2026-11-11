@@ -49,6 +49,9 @@ use text::{
     profile_url, progress_line, resolve_message,
 };
 
+// Logs counted per backfill batch: small enough that one batch's transaction stays short.
+const WEAPON_BATCH: usize = 50;
+
 // The open log: its id, how far its body got and which of its rounds are open.
 pub(super) struct OpenLog {
     pub(super) id: u64,
@@ -77,6 +80,8 @@ pub struct LogsTfPage {
     selected_class: Option<TfClass>,
     weapons: Option<(TfClass, ClassWeapons)>,
     weapons_generation: u64,
+    // Set while the weapon backfill runs, so a second start is a no-op.
+    weapons_counting: bool,
     // The history range as the settings keep it, and the slider that picks it. `slider_range`
     // is the stop last pushed into the slider, so a drag is never snapped back mid-way.
     range: LogsRange,
@@ -166,6 +171,7 @@ impl LogsTfPage {
             selected_class: None,
             weapons: None,
             weapons_generation: 0,
+            weapons_counting: false,
             range: LogsRange::default(),
             range_slider,
             slider_range: LogsRange::default(),
@@ -303,6 +309,46 @@ impl LogsTfPage {
                     Err(error) => tracing::warn!(%error, "reading logs.tf class weapons failed"),
                 }
             });
+        })
+        .detach();
+    }
+
+    /// Counts weapon stats for logs stored before weapon rows existed, one batch at a time off
+    /// the UI thread, rereading the open panel after each batch that counted a log. A no-op
+    /// while a backfill runs; it stops when none are left, on an error, or when a batch counts
+    /// nothing, and the next run resumes.
+    pub fn count_older_weapons(&mut self, cx: &mut Context<Self>) {
+        if std::mem::replace(&mut self.weapons_counting, true) {
+            return;
+        }
+        cx.spawn(async move |page, cx| {
+            loop {
+                let Ok(batch) = page.update(cx, |_, cx| {
+                    run_blocking(cx, |s| {
+                        s.logs
+                            .cache()
+                            .count_weapons(WEAPON_BATCH)
+                            .map_err(|e| OpError::core("Failed to count logs.tf weapon stats", e))
+                    })
+                }) else {
+                    break;
+                };
+                match batch.await {
+                    Ok(done) => {
+                        if done.counted() > 0 {
+                            let _ = page.update(cx, |page, cx| page.read_weapons(cx));
+                        }
+                        if done.left() == 0 || done.counted() == 0 {
+                            break;
+                        }
+                    }
+                    Err(error) => {
+                        tracing::warn!(%error, "counting logs.tf weapon stats failed");
+                        break;
+                    }
+                }
+            }
+            let _ = page.update(cx, |page, _| page.weapons_counting = false);
         })
         .detach();
     }
@@ -948,7 +994,10 @@ impl LogsTfPage {
                     }
                     Err(error) => tracing::warn!(%error, "reading the logs.tf cache failed"),
                 }
-                page.loaded = true;
+                // The first landing starts counting logs an earlier build stored.
+                if !std::mem::replace(&mut page.loaded, true) {
+                    page.count_older_weapons(cx);
+                }
                 if std::mem::take(&mut page.sync_wanted)
                     && let Some(id) = page.active
                 {

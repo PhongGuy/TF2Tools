@@ -12,7 +12,8 @@ use tf2tools_core::{LogsRange, TfClass};
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, HIGHLANDER, SIXES, day_ago, list_body, mount_list_for, open_page, shell, sid, to_end,
+    ARIE, HIGHLANDER, SIXES, day_ago, list_body, mount_list_for, open_page, requests_to, shell,
+    sid, to_end,
 };
 
 /// Serves Arie's one log, the 6v6 fixture, a day old.
@@ -346,5 +347,138 @@ fn a_reread_that_saw_the_old_class_does_not_bring_it_back(cx: &mut TestAppContex
         !seen.borrow().contains(&Some(TfClass::Scout)),
         "a Scout read landed: {:?}",
         seen.borrow()
+    );
+}
+
+#[gpui_kit::test]
+fn logs_stored_before_weapon_rows_are_counted_after_the_first_load(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    // No /json/3: a download would 404 and mark the log gone, failing the test.
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    // Log 3 as an earlier build left it: body and class row stored, no weapon rows, uncounted.
+    let steam = i64::try_from(sid(ARIE).id64()).unwrap();
+    let conn = rusqlite::Connection::open(env.data.db_path()).unwrap();
+    conn.execute(
+        "INSERT INTO logstf_logs (id, title, map, date, length, body, state)
+         VALUES (3, 'Log 3', 'cp_process_f12', ?1, 1714, ?2, 0)",
+        rusqlite::params![day_ago(1), SIXES],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO logstf_player_logs (steam_id, log_id) VALUES (?1, 3)",
+        [steam],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO logstf_class_rows (log_id, steam_id, class, seconds, kills, deaths, assists, dmg)
+         VALUES (3, ?1, 'scout', 1559, 7, 0, 0, 3511)",
+        [steam],
+    )
+    .unwrap();
+    drop(conn);
+
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    support::wait_real(cx, "the counted log", |cx| {
+        cx.update(|cx| {
+            page.read(cx)
+                .class_weapons()
+                .is_some_and(|(c, w)| c == TfClass::Scout && w.logs() == 1 && w.pending() == 0)
+        })
+    });
+    assert_eq!(
+        row(cx, &s, TfClass::Scout, "scattergun").as_deref(),
+        Some("scattergun 7 (100%) 3334 (95%) 56%")
+    );
+    assert!(!support::present(cx, s.win, ids::LOGSTF_CLASS_WEAPONS_NOTE));
+    assert_eq!(
+        requests_to(&server, "/json/3"),
+        0,
+        "counted from the stored body, not downloaded"
+    );
+}
+
+#[gpui_kit::test]
+fn the_note_says_when_logs_wait_or_hold_no_weapons(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    let conn = rusqlite::Connection::open(env.data.db_path()).unwrap();
+    // Heavy keeps its counted marker but loses its rows; Scout's log waits to be counted.
+    conn.execute_batch(
+        "DELETE FROM logstf_weapon_rows WHERE class IN ('heavyweapons', 'scout');
+         UPDATE logstf_logs SET weapons_counted = 0 WHERE id = 3;",
+    )
+    .unwrap();
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    wait_for(cx, &page, TfClass::Scout);
+    assert_eq!(
+        title(cx, &s).as_deref(),
+        Some("Scout weapons · 3 months · 0 logs")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_CLASS_WEAPONS_NOTE).as_deref(),
+        Some("Counting older logs, 1 left")
+    );
+
+    conn.execute_batch("UPDATE logstf_logs SET weapons_counted = 1 WHERE id = 3;")
+        .unwrap();
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Heavy));
+    wait_for(cx, &page, TfClass::Heavy);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_CLASS_WEAPONS_NOTE).as_deref(),
+        Some(NO_WEAPONS_TEXT)
+    );
+}
+
+#[gpui_kit::test]
+fn a_backfill_batch_refills_the_open_panel(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    wait_for(cx, &page, TfClass::Scout);
+    // The click read has landed with log 3. Log 4, the same body stored uncounted, joins the
+    // window; only a batch's rerun can bring it into the panel.
+    let steam = i64::try_from(sid(ARIE).id64()).unwrap();
+    let conn = rusqlite::Connection::open(env.data.db_path()).unwrap();
+    conn.execute(
+        "INSERT INTO logstf_logs (id, title, map, date, length, body, state)
+         VALUES (4, 'Log 4', 'cp_process_f12', ?1, 1714, ?2, 0)",
+        rusqlite::params![day_ago(2), SIXES],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO logstf_player_logs (steam_id, log_id) VALUES (?1, 4)",
+        [steam],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO logstf_class_rows (log_id, steam_id, class, seconds, kills, deaths, assists, dmg)
+         VALUES (4, ?1, 'scout', 1559, 7, 0, 0, 3511)",
+        [steam],
+    )
+    .unwrap();
+    drop(conn);
+    assert_eq!(shown_logs(cx, &page, TfClass::Scout), Some(1));
+
+    cx.update(|cx| page.update(cx, |p, cx| p.count_older_weapons(cx)));
+    while cx.dispatcher.scheduler().tick_background_only() {}
+    support::wait_real(cx, "the refilled panel", |cx| {
+        shown_logs(cx, &page, TfClass::Scout) == Some(2)
+    });
+    assert_eq!(
+        title(cx, &s).as_deref(),
+        Some("Scout weapons · 3 months · 2 logs")
+    );
+    assert_eq!(
+        row(cx, &s, TfClass::Scout, "scattergun").as_deref(),
+        Some("scattergun 14 (100%) 6668 (95%) 56%")
     );
 }
