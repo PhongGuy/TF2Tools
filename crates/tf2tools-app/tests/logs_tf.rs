@@ -485,16 +485,7 @@ fn switching_chips_mid_sync_finishes_the_first_and_shows_the_second(cx: &mut Tes
             .iter()
             .all(|p| p.last_synced().is_some())
     });
-    let since = tf2tools_core::window_start(unix_now());
-    assert_eq!(
-        s.services
-            .logs
-            .cache()
-            .logs(sid(ARIE), since)
-            .unwrap()
-            .len(),
-        2
-    );
+    assert_eq!(s.services.logs.cache().logs(sid(ARIE)).unwrap().len(), 2);
     // "other" shares the same served list, so it shows the same two logs, from its own load.
     assert_eq!(row_ids(cx, &page), [3, 2]);
 }

@@ -1,6 +1,8 @@
 //! The tracked-player list, the active player and pruning.
 
-use tf2tools_core::{DataDir, Database, LogsCache, STEAM_ID64_BASE, SteamId, TrackedPlayer};
+use tf2tools_core::{
+    DataDir, Database, LogsCache, PRUNE_SECS, STEAM_ID64_BASE, SteamId, TrackedPlayer,
+};
 
 use crate::common;
 
@@ -112,11 +114,11 @@ fn removing_a_player_drops_memberships_but_keeps_their_logs() {
 }
 
 #[test]
-fn pruning_deletes_old_logs_and_cascades_to_their_rows() {
+fn pruning_deletes_old_untracked_logs_and_cascades_to_their_rows() {
     let (_tmp, dir, cache) = open();
     seed_log(&dir, 1, 1_000, 1);
     seed_log(&dir, 2, 5_000, 1);
-    assert_eq!(cache.prune(2_000).unwrap(), 1);
+    assert_eq!(cache.prune(2_000 + PRUNE_SECS).unwrap(), 1);
     assert_eq!(common::count(&dir, "logstf_logs"), 1);
     assert_eq!(common::count(&dir, "logstf_player_logs"), 1);
     assert_eq!(common::count(&dir, "logstf_class_rows"), 1);

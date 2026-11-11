@@ -18,7 +18,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{
     ClassAverage, LogDetail, LogRow, LogState, LogsProgress, LogsSyncError, LogsSyncSummary,
-    SteamId, TrackedPlayer, parse_log, parse_player_input, window_start,
+    SteamId, TrackedPlayer, parse_log, parse_player_input,
 };
 
 use crate::ids;
@@ -456,11 +456,10 @@ impl LogsTfPage {
             let read = |e| OpError::core("Failed to load logs.tf players", e);
             let players = cache.players().map_err(read)?;
             let active = cache.active_player().map_err(read)?;
-            let since = window_start(chrono::Utc::now().timestamp());
             let logs = match active {
                 Some(id) => Some((
-                    cache.logs(id, since).map_err(read)?,
-                    cache.class_averages(id, since).map_err(read)?,
+                    cache.logs(id).map_err(read)?,
+                    cache.class_averages(id).map_err(read)?,
                 )),
                 None => None,
             };

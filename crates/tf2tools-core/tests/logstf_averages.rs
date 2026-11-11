@@ -1,6 +1,6 @@
 //! Log rows and 90-day class averages over the cache.
 
-use tf2tools_core::{LOG_CAP, LogState, SteamId, TfClass, TrackedPlayer, window_start};
+use tf2tools_core::{LOG_CAP, LogState, SteamId, TfClass, TrackedPlayer};
 
 use crate::common;
 use crate::common::logstf::{
@@ -72,11 +72,7 @@ async fn averages_are_time_weighted_over_the_window() {
         ))
         .unwrap();
 
-    let avg = env
-        .client
-        .cache()
-        .class_averages(arie(), window_start(now()))
-        .unwrap();
+    let avg = env.client.cache().class_averages(arie()).unwrap();
     let classes: Vec<TfClass> = avg.iter().map(|a| a.class()).collect();
     assert_eq!(classes, TfClass::ALL);
 
@@ -107,14 +103,7 @@ async fn averages_are_time_weighted_over_the_window() {
     assert_eq!(avg[6].class(), TfClass::Medic);
     assert_eq!(avg[1].ubers_per_10min(), None);
 
-    assert_eq!(
-        env.client
-            .cache()
-            .logs(arie(), window_start(now()))
-            .unwrap()
-            .len(),
-        2
-    );
+    assert_eq!(env.client.cache().logs(arie()).unwrap().len(), 2);
 }
 
 #[tokio::test]
@@ -147,11 +136,7 @@ async fn a_log_row_carries_the_players_line_and_state() {
         ))
         .unwrap();
 
-    let rows = env
-        .client
-        .cache()
-        .logs(arie(), window_start(now()))
-        .unwrap();
+    let rows = env.client.cache().logs(arie()).unwrap();
     let ids: Vec<u64> = rows.iter().map(|r| r.id()).collect();
     assert_eq!(ids, [4, 3, 2, 1]);
     let states: Vec<LogState> = rows.iter().map(|r| r.state()).collect();
@@ -203,9 +188,8 @@ fn rows_and_averages_share_the_cap() {
         ));
     }
     common::sql(&dir).execute_batch(&sql).unwrap();
-    let since = window_start(now());
-    assert_eq!(cache.logs(arie(), since).unwrap().len(), LOG_CAP);
-    let avg = cache.class_averages(arie(), since).unwrap();
+    assert_eq!(cache.logs(arie()).unwrap().len(), LOG_CAP);
+    let avg = cache.class_averages(arie()).unwrap();
     assert_eq!(avg[0].logs() as usize, LOG_CAP);
     assert_eq!(avg[0].seconds(), 60 * LOG_CAP as u64);
 }
@@ -246,11 +230,7 @@ async fn classes_with_equal_time_list_by_class_name_in_every_row() {
         .sync_player(arie(), false, &|_| {})
         .await
         .unwrap();
-    let rows = env
-        .client
-        .cache()
-        .logs(arie(), window_start(now()))
-        .unwrap();
+    let rows = env.client.cache().logs(arie()).unwrap();
     assert_eq!(rows.len(), 5);
     for row in rows {
         assert_eq!(

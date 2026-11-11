@@ -11,7 +11,7 @@ use crate::store::http::{Http, NetFailure, Redirects};
 use super::cache::{ListedLog, STATE_GONE};
 use super::steam_xml::xml_text;
 use super::{
-    LOG_BODY_LIMIT, LOG_CAP, LOGS_SPACING, LogsCache, PRUNE_SECS, PlayerInput, STALE_SECS, SteamId,
+    LOG_BODY_LIMIT, LOG_CAP, LOGS_SPACING, LogsCache, PlayerInput, STALE_SECS, SteamId,
     TrackedPlayer, parse_log, window_start,
 };
 
@@ -256,16 +256,18 @@ impl LogsClient {
             })?;
         // A sync that stopped partway leaves pending logs, so the next open finishes it.
         let fresh = last_synced.is_some_and(|at| now - at < STALE_SECS);
-        if !force && fresh && !self.cache.has_pending(id, window_start(now))? {
+        if !force && fresh && !self.cache.has_pending(id)? {
             return Ok(LogsSyncSummary {
                 skipped: true,
                 ..LogsSyncSummary::default()
             });
         }
 
-        // One list request covers the window: the page holds more entries than the cap.
+        // The window ends at the player's newest log, which tops the list, so the first page
+        // (1000 entries, more than the cap) always reaches it however long ago they played.
         let mut logs = self.list(id).await?;
-        logs.retain(|log| log.date >= window_start(now));
+        let anchor = logs.iter().map(|log| log.date).max().unwrap_or(0);
+        logs.retain(|log| log.date >= window_start(anchor));
         logs.sort_by(|a, b| b.date.cmp(&a.date).then(b.id.cmp(&a.id)));
         let capped = logs.len() > LOG_CAP;
         logs.truncate(LOG_CAP);
@@ -317,7 +319,7 @@ impl LogsClient {
         }
 
         self.cache.mark_synced(id, now)?;
-        self.cache.prune(now - PRUNE_SECS)?;
+        self.cache.prune(now)?;
         Ok(summary)
     }
 

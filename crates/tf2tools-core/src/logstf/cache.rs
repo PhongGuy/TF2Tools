@@ -5,7 +5,10 @@ use std::collections::HashMap;
 use rusqlite::{OptionalExtension, params};
 
 use super::averages::{CLASS_SUMS, ClassAverage, ClassSums, WINDOW_LOGS};
-use super::{LOG_CAP, LogDetail, PROVISIONAL_SECS, SteamId, logstf_class, logstf_class_name};
+use super::{
+    LOG_CAP, LogDetail, PROVISIONAL_SECS, PRUNE_SECS, SteamId, WINDOW_SECS, logstf_class,
+    logstf_class_name,
+};
 use crate::db::Database;
 use crate::error::LogsCacheError;
 use crate::weapons::TfClass;
@@ -288,8 +291,9 @@ impl LogsCache {
             .map_err(db_error)
     }
 
-    /// The player's logs in the window, newest first, at most LOG_CAP.
-    pub fn logs(&self, id: SteamId, since: i64) -> Result<Vec<LogRow>, LogsCacheError> {
+    /// The player's logs in their window (the `WINDOW_SECS` ending at their newest log),
+    /// newest first, at most LOG_CAP.
+    pub fn logs(&self, id: SteamId) -> Result<Vec<LogRow>, LogsCacheError> {
         // One row per (log, class played), longest class first and ties by class name; a log with no class rows
         // comes once with NULL stats. Consecutive rows of one log fold into its LogRow.
         let sql = format!(
@@ -304,7 +308,7 @@ impl LogsCache {
         self.db
             .read(|conn| {
                 let mut stmt = conn.prepare(&sql)?;
-                let mut rows = stmt.query(params![sql_id(id)?, since, LOG_CAP as i64])?;
+                let mut rows = stmt.query(params![sql_id(id)?, WINDOW_SECS, LOG_CAP as i64])?;
                 let mut out: Vec<LogRow> = Vec::new();
                 while let Some(row) = rows.next()? {
                     let log_id = u64::try_from(row.get::<_, i64>(0)?).unwrap_or(0);
@@ -370,17 +374,13 @@ impl LogsCache {
     }
 
     /// The nine classes in TfClass::ALL order, over exactly the logs `logs` returns.
-    pub fn class_averages(
-        &self,
-        id: SteamId,
-        since: i64,
-    ) -> Result<[ClassAverage; 9], LogsCacheError> {
+    pub fn class_averages(&self, id: SteamId) -> Result<[ClassAverage; 9], LogsCacheError> {
         let sql = format!("{WINDOW_LOGS} {CLASS_SUMS}");
         let sums = self
             .db
             .read(|conn| {
                 let mut stmt = conn.prepare(&sql)?;
-                stmt.query_map(params![sql_id(id)?, since, LOG_CAP as i64], |row| {
+                stmt.query_map(params![sql_id(id)?, WINDOW_SECS, LOG_CAP as i64], |row| {
                     Ok((
                         row.get::<_, String>(0)?,
                         ClassSums {
@@ -408,11 +408,28 @@ impl LogsCache {
         }))
     }
 
-    /// Deletes logs uploaded before `before` (unix seconds); returns how many.
-    /// Memberships and class rows go with them through the foreign-key cascade.
-    pub fn prune(&self, before: i64) -> Result<usize, LogsCacheError> {
+    /// Deletes logs no tracked player's window still needs; returns how many. A tracked
+    /// player keeps their logs up to `PRUNE_SECS` before their newest one; a log no tracked
+    /// player lists goes once it is `PRUNE_SECS` older than `now`. Memberships and class rows
+    /// go with them through the foreign-key cascade.
+    pub fn prune(&self, now: i64) -> Result<usize, LogsCacheError> {
+        // `listed` pairs each tracked membership with whether that player's own reach covers
+        // the log; a log survives while any pair covers it.
+        let sql = "WITH anchors AS (
+                SELECT m.steam_id, MAX(l.date) AS anchor FROM logstf_player_logs m
+                JOIN logstf_players p ON p.steam_id = m.steam_id
+                JOIN logstf_logs l ON l.id = m.log_id
+                GROUP BY m.steam_id
+            ), listed AS (
+                SELECT m.log_id, l.date >= a.anchor - ?2 AS covered FROM logstf_player_logs m
+                JOIN anchors a ON a.steam_id = m.steam_id
+                JOIN logstf_logs l ON l.id = m.log_id
+            )
+            DELETE FROM logstf_logs
+            WHERE id NOT IN (SELECT log_id FROM listed WHERE covered)
+              AND (id IN (SELECT log_id FROM listed) OR date < ?1 - ?2)";
         self.db
-            .write(|conn| conn.execute("DELETE FROM logstf_logs WHERE date < ?1", [before]))
+            .write(|conn| conn.execute(sql, params![now, PRUNE_SECS]))
             .map_err(db_error)
     }
 }
@@ -571,8 +588,8 @@ impl LogsCache {
         Ok(true)
     }
 
-    /// Whether any of `player`'s logs `logs` would return since `since` is still pending.
-    pub(crate) fn has_pending(&self, player: SteamId, since: i64) -> Result<bool, LogsCacheError> {
+    /// Whether any of `player`'s logs `logs` would return is still pending.
+    pub(crate) fn has_pending(&self, player: SteamId) -> Result<bool, LogsCacheError> {
         let sql = format!(
             "{WINDOW_LOGS}
              SELECT 1 FROM logstf_logs
@@ -581,7 +598,7 @@ impl LogsCache {
         self.db
             .read(|conn| {
                 conn.prepare(&sql)?
-                    .exists(params![sql_id(player)?, since, LOG_CAP as i64])
+                    .exists(params![sql_id(player)?, WINDOW_SECS, LOG_CAP as i64])
             })
             .map_err(db_error)
     }

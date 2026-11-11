@@ -29,7 +29,7 @@ async fn the_list_is_cut_at_the_window_with_one_list_request() {
         list_body(&[
             (5, days_ago(1)),
             (4, days_ago(89)),
-            (3, days_ago(91)),
+            (3, days_ago(92)),
             (2, days_ago(100)),
         ]),
     )

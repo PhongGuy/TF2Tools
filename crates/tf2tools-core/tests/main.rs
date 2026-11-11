@@ -198,6 +198,7 @@ mod logstf_ingest;
 mod logstf_resolve;
 mod logstf_sync;
 mod logstf_sync_failures;
+mod logstf_window;
 mod maps;
 mod mastercomfig;
 mod mastercomfig_catalog;
