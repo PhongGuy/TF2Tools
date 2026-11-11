@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 
@@ -24,6 +25,7 @@ pub struct LogDetail {
     columns: LogColumns,
     medics: Vec<MedicLine>,
     class_kills: Vec<ClassKills>,
+    rounds: Vec<RoundLine>,
 }
 
 impl LogDetail {
@@ -66,6 +68,219 @@ impl LogDetail {
     /// Kills by victim class, one entry per player with any, in the players' order.
     pub fn class_kills(&self) -> &[ClassKills] {
         &self.class_kills
+    }
+    /// The rounds in play order; empty when the log has none or they do not read.
+    pub fn rounds(&self) -> &[RoundLine] {
+        &self.rounds
+    }
+}
+
+/// One round: its result, each team's share and the events on the log's clock.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct RoundLine {
+    length: u32,
+    winner: Option<Team>,
+    midfight: Option<Team>,
+    blue: RoundTeam,
+    red: RoundTeam,
+    players: Vec<RoundPlayer>,
+    events: Vec<RoundEvent>,
+}
+
+impl RoundLine {
+    /// The round's length in seconds.
+    pub fn length(&self) -> u32 {
+        self.length
+    }
+    /// The team that won the round, `None` for a stalemate or an unfinished round.
+    pub fn winner(&self) -> Option<Team> {
+        self.winner
+    }
+    /// The team that took the first point, `None` when no point was taken.
+    pub fn midfight(&self) -> Option<Team> {
+        self.midfight
+    }
+    /// Blue's share of the round.
+    pub fn blue(&self) -> &RoundTeam {
+        &self.blue
+    }
+    /// Red's share of the round.
+    pub fn red(&self) -> &RoundTeam {
+        &self.red
+    }
+    /// Players by kills, then damage (both high to low), then SteamID64.
+    pub fn players(&self) -> &[RoundPlayer] {
+        &self.players
+    }
+    /// The round's events in the log's order.
+    pub fn events(&self) -> &[RoundEvent] {
+        &self.events
+    }
+}
+
+/// One team's share of one round; `score` is the running score after it.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct RoundTeam {
+    score: u32,
+    kills: u32,
+    dmg: u32,
+    ubers: u32,
+}
+
+impl RoundTeam {
+    /// Rounds won so far, this one included.
+    pub fn score(&self) -> u32 {
+        self.score
+    }
+    /// Kills in the round.
+    pub fn kills(&self) -> u32 {
+        self.kills
+    }
+    /// Damage dealt in the round.
+    pub fn dmg(&self) -> u32 {
+        self.dmg
+    }
+    /// Ubercharges used in the round.
+    pub fn ubers(&self) -> u32 {
+        self.ubers
+    }
+}
+
+/// One player's line in one round.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct RoundPlayer {
+    steam_id: SteamId,
+    team: Team,
+    kills: u32,
+    dmg: u32,
+}
+
+impl RoundPlayer {
+    /// The player's Steam ID.
+    pub fn steam_id(&self) -> SteamId {
+        self.steam_id
+    }
+    /// The player's team.
+    pub fn team(&self) -> Team {
+        self.team
+    }
+    /// Kills in the round.
+    pub fn kills(&self) -> u32 {
+        self.kills
+    }
+    /// Damage dealt in the round.
+    pub fn dmg(&self) -> u32 {
+        self.dmg
+    }
+}
+
+/// One event in a round.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct RoundEvent {
+    at: u32,
+    kind: EventKind,
+}
+
+impl RoundEvent {
+    /// Seconds since the first round's start.
+    pub fn at(&self) -> u32 {
+        self.at
+    }
+    /// What happened.
+    pub fn kind(&self) -> &EventKind {
+        &self.kind
+    }
+}
+
+/// What a round event records; a type this app does not know, or a known one missing its
+/// team or medic, keeps its raw name in `Other`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum EventKind {
+    /// A team captured a control point.
+    PointCap {
+        /// The capturing team.
+        team: Team,
+        /// The point's number.
+        point: u32,
+    },
+    /// A Medic used a charge.
+    Charge {
+        /// The Medic's team.
+        team: Team,
+        /// The Medic.
+        medic: SteamId,
+        /// The medigun charged.
+        medigun: Medigun,
+    },
+    /// A Medic died.
+    MedicDeath {
+        /// The Medic's team.
+        team: Team,
+        /// The Medic.
+        medic: SteamId,
+        /// The killer, `None` when the log does not name one.
+        killer: Option<SteamId>,
+    },
+    /// A Medic died holding a full charge.
+    Drop {
+        /// The Medic's team.
+        team: Team,
+        /// The Medic.
+        medic: SteamId,
+    },
+    /// A team won the round.
+    RoundWin {
+        /// The winning team.
+        team: Team,
+    },
+    /// Any other event, by its logs.tf type.
+    Other {
+        /// The raw type.
+        name: String,
+    },
+}
+
+/// The medigun behind a charge.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Medigun {
+    /// The stock Medi Gun.
+    MediGun,
+    /// The Kritzkrieg.
+    Kritzkrieg,
+    /// The Quick-Fix.
+    QuickFix,
+    /// The Vaccinator.
+    Vaccinator,
+    /// A medigun logs.tf names otherwise, by that name.
+    Other(String),
+}
+
+impl Medigun {
+    /// The medigun logs.tf names `key`; an unknown name is kept in `Other`.
+    pub fn from_key(key: &str) -> Medigun {
+        match key {
+            "medigun" => Medigun::MediGun,
+            "kritzkrieg" => Medigun::Kritzkrieg,
+            "quickfix" => Medigun::QuickFix,
+            "vaccinator" => Medigun::Vaccinator,
+            other => Medigun::Other(other.to_owned()),
+        }
+    }
+    /// The name logs.tf uses for this medigun.
+    pub fn key(&self) -> &str {
+        match self {
+            Medigun::MediGun => "medigun",
+            Medigun::Kritzkrieg => "kritzkrieg",
+            Medigun::QuickFix => "quickfix",
+            Medigun::Vaccinator => "vaccinator",
+            Medigun::Other(name) => name,
+        }
     }
 }
 
@@ -509,7 +724,77 @@ fn build(wire: WireLog) -> LogDetail {
         },
         medics,
         class_kills,
+        rounds: wire.rounds.into_iter().map(round_line).collect(),
     }
+}
+
+fn round_line(round: WireRound) -> RoundLine {
+    let side = |t: &WireRoundTeam| RoundTeam {
+        score: t.score,
+        kills: t.kills,
+        dmg: t.dmg,
+        ubers: t.ubers,
+    };
+    let mut players: Vec<RoundPlayer> = round
+        .players
+        .iter()
+        .filter_map(|(key, p)| {
+            Some(RoundPlayer {
+                steam_id: SteamId::from_steam3(key)?,
+                team: team(&p.team)?,
+                kills: p.kills,
+                dmg: p.dmg,
+            })
+        })
+        .collect();
+    players.sort_by(|a, b| {
+        b.kills
+            .cmp(&a.kills)
+            .then(b.dmg.cmp(&a.dmg))
+            .then(a.steam_id.id64().cmp(&b.steam_id.id64()))
+    });
+    RoundLine {
+        length: round.length,
+        winner: team(&round.winner),
+        midfight: team(&round.firstcap),
+        blue: side(&round.team.blue),
+        red: side(&round.team.red),
+        players,
+        events: round
+            .events
+            .into_iter()
+            .map(|e| RoundEvent {
+                at: e.time,
+                kind: event_kind(e),
+            })
+            .collect(),
+    }
+}
+
+/// The event's kind; a known type whose team or medic does not read falls back to `Other`.
+fn event_kind(e: WireEvent) -> EventKind {
+    let team = team(&e.team);
+    let medic = SteamId::from_steam3(&e.steamid);
+    let known = match (e.kind.as_str(), team, medic) {
+        ("pointcap", Some(team), _) => Some(EventKind::PointCap {
+            team,
+            point: e.point,
+        }),
+        ("charge", Some(team), Some(medic)) => Some(EventKind::Charge {
+            team,
+            medic,
+            medigun: Medigun::from_key(&e.medigun),
+        }),
+        ("medic_death", Some(team), Some(medic)) => Some(EventKind::MedicDeath {
+            team,
+            medic,
+            killer: SteamId::from_steam3(&e.killer),
+        }),
+        ("drop", Some(team), Some(medic)) => Some(EventKind::Drop { team, medic }),
+        ("round_win", Some(team), _) => Some(EventKind::RoundWin { team }),
+        _ => None,
+    };
+    known.unwrap_or(EventKind::Other { name: e.kind })
 }
 
 fn team(name: &str) -> Option<Team> {
@@ -627,6 +912,76 @@ struct WireLog {
     healspread: BTreeMap<String, BTreeMap<String, u32>>,
     #[serde(default, deserialize_with = "count_maps")]
     classkills: BTreeMap<String, BTreeMap<String, u32>>,
+    #[serde(default, deserialize_with = "lenient_list")]
+    rounds: Vec<WireRound>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireRound {
+    #[serde(deserialize_with = "count")]
+    length: u32,
+    #[serde(deserialize_with = "text")]
+    winner: String,
+    #[serde(deserialize_with = "text")]
+    firstcap: String,
+    team: WireRoundTeams,
+    #[serde(deserialize_with = "lenient_map")]
+    players: BTreeMap<String, WireRoundPlayer>,
+    #[serde(deserialize_with = "lenient_list")]
+    events: Vec<WireEvent>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireRoundTeams {
+    #[serde(rename = "Red")]
+    red: WireRoundTeam,
+    #[serde(rename = "Blue")]
+    blue: WireRoundTeam,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireRoundTeam {
+    #[serde(deserialize_with = "count")]
+    score: u32,
+    #[serde(deserialize_with = "count")]
+    kills: u32,
+    #[serde(deserialize_with = "count")]
+    dmg: u32,
+    #[serde(deserialize_with = "count")]
+    ubers: u32,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireRoundPlayer {
+    #[serde(deserialize_with = "text")]
+    team: String,
+    #[serde(deserialize_with = "count")]
+    kills: u32,
+    #[serde(deserialize_with = "count")]
+    dmg: u32,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct WireEvent {
+    #[serde(rename = "type", deserialize_with = "text")]
+    kind: String,
+    #[serde(deserialize_with = "count")]
+    time: u32,
+    #[serde(deserialize_with = "text")]
+    team: String,
+    #[serde(deserialize_with = "count")]
+    point: u32,
+    #[serde(deserialize_with = "text")]
+    steamid: String,
+    #[serde(deserialize_with = "text")]
+    killer: String,
+    #[serde(deserialize_with = "text")]
+    medigun: String,
 }
 
 #[derive(Deserialize)]
@@ -813,6 +1168,30 @@ fn object_counts(value: Value) -> BTreeMap<String, u32> {
 
 fn count_map<'de, D: Deserializer<'de>>(d: D) -> Result<BTreeMap<String, u32>, D::Error> {
     Ok(object_counts(Value::deserialize(d)?))
+}
+
+/// A list whose unreadable entries are skipped; anything but an array reads as empty.
+fn lenient_list<'de, D: Deserializer<'de>, T: DeserializeOwned>(d: D) -> Result<Vec<T>, D::Error> {
+    let Value::Array(items) = Value::deserialize(d)? else {
+        return Ok(Vec::new());
+    };
+    Ok(items
+        .into_iter()
+        .filter_map(|v| serde_json::from_value(v).ok())
+        .collect())
+}
+
+/// A map whose unreadable entries are skipped; anything but an object reads as empty.
+fn lenient_map<'de, D: Deserializer<'de>, T: DeserializeOwned>(
+    d: D,
+) -> Result<BTreeMap<String, T>, D::Error> {
+    let Value::Object(map) = Value::deserialize(d)? else {
+        return Ok(BTreeMap::new());
+    };
+    Ok(map
+        .into_iter()
+        .filter_map(|(k, v)| Some((k, serde_json::from_value(v).ok()?)))
+        .collect())
 }
 
 fn count_maps<'de, D: Deserializer<'de>>(

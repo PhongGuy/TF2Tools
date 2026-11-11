@@ -105,11 +105,12 @@ pub use library::{
 pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
 pub use logstf::{
-    ClassAverage, ClassKills, ClassLine, HealTarget, LOG_BODY_LIMIT, LOG_CAP, LOGS_SPACING,
-    LogColumns, LogDetail, LogRow, LogState, LogsCache, LogsClient, LogsEndpoints, LogsProgress,
-    LogsSyncSummary, MedicLine, PROVISIONAL_SECS, PRUNE_SECS, PlayerInput, PlayerLine, STALE_SECS,
-    STEAM_ID64_BASE, SteamId, TeamTotals, TrackedPlayer, WINDOW_SECS, leaderboard_icon_stem,
-    logstf_class, parse_log, parse_player_input, window_start,
+    ClassAverage, ClassKills, ClassLine, EventKind, HealTarget, LOG_BODY_LIMIT, LOG_CAP,
+    LOGS_SPACING, LogColumns, LogDetail, LogRow, LogState, LogsCache, LogsClient, LogsEndpoints,
+    LogsProgress, LogsSyncSummary, MedicLine, Medigun, PROVISIONAL_SECS, PRUNE_SECS, PlayerInput,
+    PlayerLine, RoundEvent, RoundLine, RoundPlayer, RoundTeam, STALE_SECS, STEAM_ID64_BASE,
+    SteamId, TeamTotals, TrackedPlayer, WINDOW_SECS, leaderboard_icon_stem, logstf_class,
+    parse_log, parse_player_input, window_start,
 };
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;

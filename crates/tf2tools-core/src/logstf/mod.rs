@@ -15,8 +15,8 @@ pub use averages::ClassAverage;
 pub use cache::{LogRow, LogState, LogsCache, TrackedPlayer};
 pub use client::{LogsClient, LogsEndpoints, LogsProgress, LogsSyncSummary};
 pub use detail::{
-    ClassKills, ClassLine, HealTarget, LogColumns, LogDetail, MedicLine, PlayerLine, TeamTotals,
-    parse_log,
+    ClassKills, ClassLine, EventKind, HealTarget, LogColumns, LogDetail, MedicLine, Medigun,
+    PlayerLine, RoundEvent, RoundLine, RoundPlayer, RoundTeam, TeamTotals, parse_log,
 };
 pub use steam_id::{PlayerInput, SteamId, parse_player_input};
 

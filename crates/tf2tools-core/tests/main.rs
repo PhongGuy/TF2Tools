@@ -192,6 +192,7 @@ mod license;
 mod logstf_averages;
 mod logstf_cache;
 mod logstf_detail;
+mod logstf_full_log;
 mod logstf_ids;
 mod logstf_incremental;
 mod logstf_ingest;
