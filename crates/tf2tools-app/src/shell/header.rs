@@ -34,6 +34,7 @@ pub const PLAY_TF2_URL: &str = "steam://run/440";
 pub(super) fn render(
     page: Page,
     tf2_running: bool,
+    window_width: Pixels,
     cx: &mut Context<Shell>,
 ) -> impl IntoElement + use<> {
     let (border, bg) = (cx.theme().border, cx.theme().background);
@@ -53,12 +54,17 @@ pub(super) fn render(
                     window.remove_window();
                 }
             })
-            .child(content(page, tf2_running, cx)),
+            .child(content(page, tf2_running, window_width, cx)),
     )
 }
 
 // v5's header row: the sidebar toggle, the page title and the status slot.
-fn content(page: Page, tf2_running: bool, cx: &mut Context<Shell>) -> impl IntoElement + use<> {
+fn content(
+    page: Page,
+    tf2_running: bool,
+    window_width: Pixels,
+    cx: &mut Context<Shell>,
+) -> impl IntoElement + use<> {
     let title = page.title();
     // No wrapper while nothing syncs, so an empty row adds no gap before the badge.
     let rings = sync_rings(cx);
@@ -66,7 +72,11 @@ fn content(page: Page, tf2_running: bool, cx: &mut Context<Shell>) -> impl IntoE
     h_flex()
         .id(ids::HEADER_ROW)
         .test_support()
+        // The row only grows into the room the window buttons leave, so its content never
+        // widens the kit bar past them; the title shrinks first.
         .flex_1()
+        .w_0()
+        .min_w_0()
         .h_full()
         .px(px(24.))
         .gap_4()
@@ -91,6 +101,8 @@ fn content(page: Page, tf2_running: bool, cx: &mut Context<Shell>) -> impl IntoE
                 .id(ids::HEADER_TITLE)
                 .aria_label(title)
                 .test_support()
+                .min_w_0()
+                .truncate()
                 .text_lg()
                 .font_weight(FontWeight::SEMIBOLD)
                 .child(title),
@@ -99,10 +111,11 @@ fn content(page: Page, tf2_running: bool, cx: &mut Context<Shell>) -> impl IntoE
         // v5's status slot: the rings in their own `gap-1.5` row, then the TF2 badge.
         .child(
             h_flex()
+                .flex_none()
                 .ml_auto()
                 .gap_2()
                 .children(rings)
-                .children(play_button(tf2_running, cx))
+                .children(play_button(tf2_running, window_width < COMPACT_BELOW, cx))
                 .children(tf2_badge(cx)),
         )
 }
@@ -128,21 +141,29 @@ fn shortcuts_button(cx: &mut Context<Shell>) -> impl IntoElement + use<> {
         )
 }
 
+// Below this window width a full header (four sync rings, a long title) would push the window
+// buttons off the edge, so "Play TF2" keeps only its icon.
+const COMPACT_BELOW: Pixels = px(1024.);
+
 // Starts TF2 through Steam; only while TF2 is found, and waiting while it already runs.
-fn play_button(tf2_running: bool, cx: &App) -> Option<impl IntoElement + use<>> {
+fn play_button(tf2_running: bool, compact: bool, cx: &App) -> Option<impl IntoElement + use<>> {
     tf2_state(cx).read(cx).install()?;
     let button = Button::new(ids::PLAY_TF2)
         .primary()
         .small()
         .icon(IconName::Play)
-        .label("Play TF2")
         .accessibility_label("Play TF2")
         .disabled(tf2_running)
         .on_click(|_, _, cx| cx.open_url(PLAY_TF2_URL));
-    let button = if tf2_running {
-        button.tooltip("TF2 is already running")
-    } else {
+    let button = match (tf2_running, compact) {
+        (true, _) => button.tooltip("TF2 is already running"),
+        (false, true) => button.tooltip("Play TF2"),
+        (false, false) => button,
+    };
+    let button = if compact {
         button
+    } else {
+        button.label("Play TF2")
     };
     // Like the sidebar toggle, a press on the button must not start a window move.
     Some(
