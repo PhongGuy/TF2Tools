@@ -13,6 +13,8 @@ use tokio::time::{Instant, sleep_until};
 pub(crate) const MAX_GAP: Duration = Duration::from_secs(8);
 /// Clean replies in a row, while backed off, that bring the gap back to its base.
 pub(crate) const CLEAN_TO_RESET: u32 = 10;
+/// Answers in a row, after a 429 widened the gap, that halve it back toward the base.
+pub(crate) const EASE_AFTER: u32 = 20;
 /// Empty replies in a row within one call before it fails as throttled.
 pub(crate) const EMPTY_LIMIT: u32 = 3;
 
@@ -61,6 +63,8 @@ struct State {
     /// When the latest call started.
     last: Option<Instant>,
     clean: u32,
+    /// Answers in a row since the last 429, while the gap is widened.
+    answers: u32,
     interactive_waiting: usize,
     stats: PacerStats,
     /// Every start with the gap it reserved after itself, so tests check spacing exactly.
@@ -88,6 +92,7 @@ impl Pacer {
             next: None,
             last: None,
             clean: 0,
+            answers: 0,
             interactive_waiting: 0,
             stats: PacerStats::default(),
             #[cfg(test)]
@@ -101,10 +106,6 @@ impl Pacer {
         }
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "read by the tests and the live probe")
-    )]
     pub(crate) fn gap(&self) -> Duration {
         self.lock().gap
     }
@@ -168,6 +169,7 @@ impl Pacer {
         s.base = base;
         s.gap = base;
         s.clean = 0;
+        s.answers = 0;
     }
 
     /// Waits for this caller's start; a background caller also waits while any interactive one does.
@@ -203,6 +205,27 @@ impl Pacer {
         }
     }
 
+    /// A 429 came back: doubles the gap up to `MAX_GAP`, pushes the next start back to
+    /// match and restarts the run of answers that eases it.
+    pub(crate) fn rate_limited(&self) {
+        let mut s = self.lock();
+        s.answers = 0;
+        widen(&mut s);
+    }
+
+    /// A request was answered without a 429: every `EASE_AFTER` in a row halve a widened
+    /// gap, never below the base.
+    pub(crate) fn answered(&self) {
+        let mut s = self.lock();
+        if s.gap > s.base {
+            s.answers += 1;
+            if s.answers >= EASE_AFTER {
+                s.gap = (s.gap / 2).max(s.base);
+                s.answers = 0;
+            }
+        }
+    }
+
     fn empty(&self, throttled: bool) {
         let mut s = self.lock();
         s.stats.empty += 1;
@@ -210,12 +233,7 @@ impl Pacer {
             s.stats.throttled += 1;
         }
         s.clean = 0;
-        s.gap = s.gap.saturating_mul(2).min(MAX_GAP);
-        // Never pull a pending start forward: a reset gap must not shorten a longer wait.
-        let gap = s.gap;
-        s.next = s
-            .last
-            .map(|last| s.next.map_or(last + gap, |next| next.max(last + gap)));
+        widen(&mut s);
     }
 
     fn clean(&self) {
@@ -228,6 +246,16 @@ impl Pacer {
             }
         }
     }
+}
+
+/// Doubles the gap up to `MAX_GAP` and moves the next start to one new gap after the last.
+fn widen(s: &mut State) {
+    s.gap = s.gap.saturating_mul(2).min(MAX_GAP);
+    // Never pull a pending start forward: a reset gap must not shorten a longer wait.
+    let gap = s.gap;
+    s.next = s
+        .last
+        .map(|last| s.next.map_or(last + gap, |next| next.max(last + gap)));
 }
 
 /// Counts an interactive caller as waiting until its slot starts or its future is dropped.
@@ -550,5 +578,61 @@ mod tests {
         assert_eq!(result, Err(Paced::Throttled));
         scripted(&pacer, Background, &[], &log, t0).await.unwrap();
         assert_eq!(starts(&log), [ms(0); 4]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_rate_limit_doubles_the_gap_up_to_eight_seconds() {
+        let pacer = Pacer::new(Duration::from_secs(1));
+        pacer.rate_limited();
+        assert_eq!(pacer.gap(), Duration::from_secs(2));
+        for _ in 0..3 {
+            pacer.rate_limited();
+        }
+        assert_eq!(pacer.gap(), MAX_GAP);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_rate_limit_pushes_the_next_start_back_by_the_wider_gap() {
+        let (pacer, log, t0) = (Pacer::new(BASE), Log::default(), Instant::now());
+        scripted(&pacer, Background, &[], &log, t0).await.unwrap();
+        pacer.rate_limited();
+        scripted(&pacer, Background, &[], &log, t0).await.unwrap();
+        assert_eq!(starts(&log), [ms(0), ms(400)]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn twenty_answers_in_a_row_halve_a_widened_gap_down_to_its_base() {
+        let pacer = Pacer::new(BASE);
+        pacer.rate_limited();
+        pacer.rate_limited();
+        for _ in 0..EASE_AFTER - 1 {
+            pacer.answered();
+        }
+        assert_eq!(
+            pacer.gap(),
+            ms(800),
+            "nineteen answers keep the widened gap"
+        );
+        pacer.answered();
+        assert_eq!(pacer.gap(), ms(400));
+        for _ in 0..2 * EASE_AFTER {
+            pacer.answered();
+        }
+        assert_eq!(pacer.gap(), BASE, "easing never drops below the base");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_rate_limit_restarts_the_run_of_answers() {
+        let pacer = Pacer::new(BASE);
+        pacer.rate_limited();
+        for _ in 0..EASE_AFTER - 1 {
+            pacer.answered();
+        }
+        pacer.rate_limited();
+        for _ in 0..EASE_AFTER - 1 {
+            pacer.answered();
+        }
+        assert_eq!(pacer.gap(), ms(800));
+        assert_eq!(EASE_AFTER, 20);
     }
 }

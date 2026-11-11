@@ -253,3 +253,58 @@ async fn a_client_from_new_slows_a_long_pull_to_the_long_spacing() {
         LOGS_LONG_SPACING
     );
 }
+
+/// Syncs 22 hourly logs `spacing` apart whose first download is answered 429 once, and
+/// returns the gap each start reserved with the spacing every Downloading tick reported.
+async fn sync_through_one_rate_limit(spacing: Duration) -> (Vec<Duration>, Vec<Duration>) {
+    let env = env(spacing).await;
+    let logs: Vec<_> = (0..22)
+        .map(|i| (1_000 - i, now() - DAY - 3_600 * i))
+        .collect();
+    mount(&env.server, r"^/api/v1/log$", list_body(&logs)).await;
+    Mock::given(method("GET"))
+        .and(path_regex(r"^/json/\d+$"))
+        .respond_with(ResponseTemplate::new(429))
+        .up_to_n_times(1)
+        .mount(&env.server)
+        .await;
+    mount(&env.server, r"^/json/\d+$", log_body()).await;
+    let reported = Mutex::new(Vec::new());
+    env.client
+        .sync_player(arie(), LogsRange::Months3, true, &LogsCancel::new(), &|p| {
+            if let LogsProgress::Downloading { spacing, .. } = p {
+                reported.lock().unwrap().push(spacing);
+            }
+        })
+        .await
+        .unwrap();
+    let reserved = env
+        .client
+        .pacer
+        .starts()
+        .iter()
+        .map(|(_, gap)| *gap)
+        .collect();
+    (reserved, reported.into_inner().unwrap())
+}
+
+#[tokio::test]
+async fn a_429_widens_the_sync_gap_until_twenty_answers_ease_it_back() {
+    let base = Duration::from_millis(2);
+    let (reserved, _) = sync_through_one_rate_limit(base).await;
+    // The list and the rate-limited download start at the base; the next twenty answered
+    // downloads run at double it, and the last one is back at the base.
+    let mut expected = vec![base, base];
+    expected.extend([base * 2; 20]);
+    expected.push(base);
+    assert_eq!(reserved, expected);
+}
+
+#[tokio::test]
+async fn sync_progress_reports_the_widened_gap() {
+    let base = Duration::from_millis(2);
+    let (_, reported) = sync_through_one_rate_limit(base).await;
+    assert_eq!(reported.len(), 23, "the start and one tick per log");
+    assert_eq!((reported[0], reported[1]), (base, base * 2));
+    assert_eq!(reported[22], base);
+}

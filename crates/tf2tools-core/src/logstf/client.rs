@@ -1,5 +1,6 @@
 //! The logs.tf client: Steam profile lookups and log syncs, every request through one gate.
 
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -9,7 +10,7 @@ use serde::Deserialize;
 
 use crate::error::{LogsCacheError, LogsFetchError, LogsSyncError, ResolveError};
 use crate::store::StoreConfig;
-use crate::store::http::{Http, NetFailure, Redirects};
+use crate::store::http::{Http, NetFailure, RATE_LIMITS, Redirects};
 use crate::store::pacer::{Pacer, Priority};
 
 use super::cache::{ListedLog, STATE_GONE};
@@ -59,7 +60,7 @@ pub enum LogsProgress {
         done: usize,
         /// Logs this sync needs to download.
         total: usize,
-        /// The gap kept between requests.
+        /// The gap the gate keeps now, wider while logs.tf answers 429.
         spacing: Duration,
     },
 }
@@ -229,9 +230,23 @@ impl LogsClient {
     }
 
     /// One GET through the gate: it starts at least one gap after this client's last request.
+    /// Each 429 it met widens the gate and an answer without one helps ease it back, so
+    /// logs.tf is asked less often while it is pushing back.
     async fn get(&self, url: &str, priority: Priority, limit: u64) -> Result<Vec<u8>, NetFailure> {
         self.pacer.slot(priority).await;
-        self.http.get_api(url, limit).await
+        let (result, rate_limits) = RATE_LIMITS
+            .scope(Cell::new(0), async {
+                let result = self.http.get_api(url, limit).await;
+                (result, RATE_LIMITS.with(Cell::get))
+            })
+            .await;
+        for _ in 0..rate_limits {
+            self.pacer.rate_limited();
+        }
+        if rate_limits == 0 && result.is_ok() {
+            self.pacer.answered();
+        }
+        result
     }
 
     /// The cache this client syncs into.
@@ -359,10 +374,11 @@ impl LogsClient {
             self.spacing
         };
         let _gap = GapGuard::widen(&self.pacer, spacing, self.spacing);
+        // The live gap, so a 429 that widened the gate shows in the time left.
         let progress = |done| LogsProgress::Downloading {
             done,
             total,
-            spacing,
+            spacing: self.pacer.gap(),
         };
         on_progress(progress(0));
         for (done, log_id) in wanted.into_iter().enumerate() {
