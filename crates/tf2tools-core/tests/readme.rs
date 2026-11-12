@@ -370,3 +370,16 @@ fn the_logs_section_says_where_weapon_names_come_from() {
         "logs.tf section: {logs}"
     );
 }
+
+#[test]
+fn the_logs_section_mentions_kill_feed_icons() {
+    let readme = repo_file("README.md");
+    let (_, logs) = readme
+        .split_once("### logs.tf stats")
+        .expect("a logs.tf section");
+    let (logs, _) = logs.split_once("\n### ").expect("a section after it");
+    assert!(
+        logs.contains("kill feed icon, also read from your TF2 install"),
+        "logs.tf section: {logs}"
+    );
+}
