@@ -62,7 +62,7 @@ use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::carousel::open_lightbox;
 use crate::widgets::labelled;
-use crate::widgets::profile_menu::{added_title, profile_menu};
+use crate::widgets::profile_menu::{Section, added_title, profile_menu};
 use crate::widgets::scroll::scroll_area;
 
 /// The card's text and buttons below a store HUD's 16:9 screenshot, and a local card's height.
@@ -1798,7 +1798,11 @@ fn add_to_profile_button(
         .named("Add to profile")
         .loading(busy == Some(&Busy::AddToProfile(hud.folder_name().to_owned())))
         .disabled(busy.is_some())
-        .dropdown_menu(profile_menu(ids::hud_profile_pick, on_pick))
+        .dropdown_menu(profile_menu(vec![Section {
+            heading: None,
+            item_id: ids::hud_profile_pick,
+            on_pick,
+        }]))
 }
 
 // v5's library EmptyState: an empty library, or a search that matched nothing.

@@ -6,6 +6,7 @@ use std::rc::Rc;
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
@@ -18,8 +19,8 @@ use gpui_kit::{
 };
 
 use tf2tools_core::{
-    InstalledSounds, LibraryError, LogLevel, NewLogEntry, Provenance, SoundEntry, SoundFormat,
-    SoundKind,
+    DraftSlot, InstalledSounds, LibraryError, LogLevel, NewLogEntry, ProfileDraft, ProfileError,
+    ProfileId, Provenance, SoundEntry, SoundFormat, SoundKind,
 };
 
 use super::common::{SM_ICON_PX, YELLOW_500, badge_of, card_frame, needs_tf2, no_tf2_notice};
@@ -27,7 +28,10 @@ use crate::activity;
 use crate::audio::player::{NowPlaying, Player, sound_player};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
-use crate::local_messages::{describe_import, describe_library, describe_tf2_install};
+use crate::local_messages::{
+    describe_import, describe_library, describe_profile, describe_tf2_install,
+};
+use crate::pages::profiles::model::NOT_APPLIED;
 use crate::picker::PickKind;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
@@ -37,6 +41,7 @@ use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::labelled;
+use crate::widgets::profile_menu::{OnPick, Section, added_title, profile_menu};
 use crate::widgets::scroll::scroll_area;
 
 /// A library card's height; a short window scrolls the page rather than cut the grid below a row.
@@ -54,6 +59,8 @@ enum Busy {
     /// Deleting the sound in this folder.
     Delete(String),
     Uninstall(SoundKind),
+    /// Putting the sound in this folder in a profile.
+    AddToProfile(String),
 }
 
 // Its TF2 notice asks the shell for the Settings page.
@@ -320,6 +327,50 @@ impl SoundsPage {
                     &NewLogEntry::new(LogLevel::Info, "sound", "install", message),
                 );
                 Ok((done.into(), SharedString::default()))
+            },
+            cx,
+        );
+    }
+
+    // Puts `sound` in profile `id` as its `kind`, keeping the other slots. The profile is read
+    // again here, so one deleted while the menu was open fails with an error toast.
+    fn add_to_profile(
+        &mut self,
+        sound: &SoundEntry,
+        kind: SoundKind,
+        id: ProfileId,
+        cx: &mut Context<Self>,
+    ) {
+        let (sound_id, name) = (sound.id().clone(), sound.name().to_owned());
+        let busy = Busy::AddToProfile(sound.folder_name().to_owned());
+        self.run(
+            busy,
+            move |s| {
+                let failed =
+                    |e: ProfileError| describe_profile(&e).into_op("Couldn't add to profile");
+                let before = s.library.profile(&id).map_err(failed)?;
+                let draft = ProfileDraft::from_profile(&before);
+                let slot = DraftSlot::Item(sound_id);
+                let (draft, old) = match kind {
+                    SoundKind::Hitsound => (draft.with_hitsound(slot), before.hitsound()),
+                    SoundKind::Killsound | _ => (draft.with_killsound(slot), before.killsound()),
+                };
+                let update = s.library.update_profile(&id, &draft).map_err(failed)?;
+                let after = match kind {
+                    SoundKind::Hitsound => update.profile().hitsound(),
+                    SoundKind::Killsound | _ => update.profile().killsound(),
+                };
+                let replaced = old
+                    .filter(|old| Some(old.folder_name()) != after.map(|a| a.folder_name()))
+                    .map(|old| old.name());
+                let role = Some(kind.name());
+                let title = added_title(&name, update.profile().name(), role, replaced);
+                let note = if update.deactivated() {
+                    NOT_APPLIED
+                } else {
+                    ""
+                };
+                Ok((title.into(), note.into()))
             },
             cx,
         );
@@ -738,7 +789,16 @@ fn sound_card(
         .flex()
         .flex_col()
         .overflow_hidden()
-        .child(sound_title(sound).px_6().pt_6())
+        // "Add to profile" sits by the title, since the action row is full on a narrow card.
+        .child(
+            h_flex()
+                .px_6()
+                .pt_6()
+                .gap_2()
+                .justify_between()
+                .child(sound_title(sound).min_w_0())
+                .child(add_to_profile_button(sound, busy, page)),
+        )
         .child(
             h_flex()
                 .mt_auto()
@@ -784,6 +844,41 @@ fn sound_card(
                 ),
         )
         .into_any_element()
+}
+
+// The card's "Add to profile" menu: every profile under "Hitsound in", then again under
+// "Killsound in". A pick saves through the page, behind any other sound action.
+fn add_to_profile_button(
+    sound: &SoundEntry,
+    busy: Option<&Busy>,
+    page: &WeakEntity<SoundsPage>,
+) -> impl IntoElement {
+    let pick = |kind: SoundKind| -> OnPick {
+        let (page, entry) = (page.clone(), sound.clone());
+        Rc::new(move |id: ProfileId, _: &mut Window, cx: &mut App| {
+            let _ = page.update(cx, |page, cx| page.add_to_profile(&entry, kind, id, cx));
+        })
+    };
+    let adding = busy == Some(&Busy::AddToProfile(sound.folder_name().to_owned()));
+    Button::new(ids::sound_add_to_profile(sound.folder_name()))
+        .ghost()
+        .px(SM_ICON_PX)
+        .icon(IconName::LayersPlus)
+        .named("Add to profile")
+        .loading(adding)
+        .disabled(busy.is_some())
+        .dropdown_menu(profile_menu(vec![
+            Section {
+                heading: Some("Hitsound in"),
+                item_id: ids::sound_hit_pick,
+                on_pick: pick(SoundKind::Hitsound),
+            },
+            Section {
+                heading: Some("Killsound in"),
+                item_id: ids::sound_kill_pick,
+                on_pick: pick(SoundKind::Killsound),
+            },
+        ]))
 }
 
 // v5's library empty state: a faint speaker and a muted line, plus a hint when nothing is

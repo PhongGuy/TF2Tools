@@ -34,41 +34,59 @@ pub fn read_profiles(cx: &App) -> Result<Vec<Profile>, ProfileError> {
     cx.global::<Services>().library.profiles()
 }
 
-/// Adds one item per profile to `menu`, each with id `item_id(profile)`. No profiles gives one
-/// disabled "No profiles yet" item, and a failed read a disabled line saying so.
-pub fn profile_items(
+/// One run of profiles in the menu: an optional heading over them, each item's id, and what a
+/// pick does.
+pub struct Section {
+    pub heading: Option<&'static str>,
+    pub item_id: fn(&ProfileId) -> ElementId,
+    pub on_pick: OnPick,
+}
+
+/// Adds every section to `menu`, each listing all `profiles`. No profiles, or a failed read,
+/// gives a single disabled line in place of all the sections.
+fn profile_items(
     menu: PopupMenu,
     profiles: &Result<Vec<Profile>, ProfileError>,
-    item_id: fn(&ProfileId) -> ElementId,
-    on_pick: &OnPick,
+    sections: &[Section],
 ) -> PopupMenu {
-    let note = |text: &'static str| {
-        PopupMenuItem::element(move |_, _| labelled(div(), ids::PROFILE_MENU_EMPTY, text))
-            .disabled(true)
+    let note = |id: &'static str, text: &'static str| {
+        PopupMenuItem::element(move |_, _| labelled(div(), id, text)).disabled(true)
     };
     let profiles = match profiles {
-        Ok(profiles) if profiles.is_empty() => return menu.item(note("No profiles yet")),
+        Ok(profiles) if profiles.is_empty() => {
+            return menu.item(note(ids::PROFILE_MENU_EMPTY, "No profiles yet"));
+        }
         Ok(profiles) => profiles,
         Err(e) => {
             tracing::warn!(error = %e, "could not read profiles for the menu");
-            return menu.item(note("Couldn't read your profiles"));
+            return menu.item(note(
+                ids::PROFILE_MENU_UNREADABLE,
+                "Couldn't read your profiles",
+            ));
         }
     };
-    profiles.iter().fold(menu, |menu, profile| {
-        let (id, name) = (profile.id().clone(), profile.name().to_owned());
-        let element_id = item_id(&id);
-        let on_pick = Rc::clone(on_pick);
-        menu.item(
-            PopupMenuItem::element(move |_, _| labelled(div(), element_id.clone(), name.clone()))
+    sections.iter().fold(menu, |menu, section| {
+        let menu = match section.heading {
+            Some(heading) => menu.label(heading),
+            None => menu,
+        };
+        profiles.iter().fold(menu, |menu, profile| {
+            let (id, name) = (profile.id().clone(), profile.name().to_owned());
+            let element_id = (section.item_id)(&id);
+            let on_pick = Rc::clone(&section.on_pick);
+            menu.item(
+                PopupMenuItem::element(move |_, _| {
+                    labelled(div(), element_id.clone(), name.clone())
+                })
                 .on_click(move |_, window, cx| on_pick(id.clone(), window, cx)),
-        )
+            )
+        })
     })
 }
 
-/// A one-section menu builder for `dropdown_menu`: every profile, read as the menu opens.
+/// A menu builder for `dropdown_menu` that reads the profiles once each time the menu opens.
 pub fn profile_menu(
-    item_id: fn(&ProfileId) -> ElementId,
-    on_pick: OnPick,
+    sections: Vec<Section>,
 ) -> impl Fn(PopupMenu, &mut Window, &mut Context<PopupMenu>) -> PopupMenu + 'static {
-    move |menu, _, cx| profile_items(menu, &read_profiles(cx), item_id, &on_pick)
+    move |menu, _, cx| profile_items(menu, &read_profiles(cx), &sections)
 }

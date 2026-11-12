@@ -1353,6 +1353,9 @@ pub fn hud_profile_pick(profile: &ProfileId) -> ElementId {
 /// The disabled "No profiles yet" item an "Add to profile" menu shows when there are none.
 pub const PROFILE_MENU_EMPTY: &str = "profile-menu-empty";
 
+/// The disabled line an "Add to profile" menu shows when the profiles can't be read.
+pub const PROFILE_MENU_UNREADABLE: &str = "profile-menu-unreadable";
+
 /// A store HUD card's "Visit page" button, opening the HUD's own page in the browser.
 pub fn hud_visit(folder: &str) -> ElementId {
     keyed("hud-visit", folder)
@@ -1406,6 +1409,21 @@ pub fn sound_hit(folder: &str) -> ElementId {
 /// A library sound card's outline "Kill" button; installs it as the killsound.
 pub fn sound_kill(folder: &str) -> ElementId {
     keyed("sound-kill", folder)
+}
+
+/// A library sound card's "Add to profile" button, opening the hitsound and killsound menu.
+pub fn sound_add_to_profile(folder: &str) -> ElementId {
+    keyed("sound-add-to-profile", folder)
+}
+
+/// One profile under "Hitsound in" in a sound card's "Add to profile" menu.
+pub fn sound_hit_pick(profile: &ProfileId) -> ElementId {
+    keyed("sound-hit-pick", profile.as_str())
+}
+
+/// One profile under "Killsound in" in a sound card's "Add to profile" menu.
+pub fn sound_kill_pick(profile: &ProfileId) -> ElementId {
+    keyed("sound-kill-pick", profile.as_str())
 }
 
 /// A hitsound or killsound slot card, keyed by the kind's name.

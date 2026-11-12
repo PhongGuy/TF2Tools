@@ -1173,6 +1173,26 @@ pub fn zip_of(entries: &[(&str, &[u8])]) -> Vec<u8> {
     zip.finish().unwrap().into_inner()
 }
 
+/// 441 frames of 44.1 kHz stereo 16-bit silence, a file `import_sound` accepts.
+pub fn wav_bytes() -> Vec<u8> {
+    let data_len: u32 = 441 * 4;
+    let mut out = Vec::new();
+    out.extend_from_slice(b"RIFF");
+    out.extend_from_slice(&(36 + data_len).to_le_bytes());
+    out.extend_from_slice(b"WAVEfmt ");
+    out.extend_from_slice(&16u32.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&2u16.to_le_bytes());
+    out.extend_from_slice(&44_100u32.to_le_bytes());
+    out.extend_from_slice(&(44_100u32 * 4).to_le_bytes());
+    out.extend_from_slice(&4u16.to_le_bytes());
+    out.extend_from_slice(&16u16.to_le_bytes());
+    out.extend_from_slice(b"data");
+    out.extend_from_slice(&data_len.to_le_bytes());
+    out.resize(out.len() + data_len as usize, 0);
+    out
+}
+
 /// A minimal HUD archive in memory: `<name>/info.vdf` plus a layout file.
 pub fn hud_zip_bytes(name: &str) -> Vec<u8> {
     let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
