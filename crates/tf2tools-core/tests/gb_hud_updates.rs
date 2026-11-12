@@ -465,6 +465,7 @@ fn a_copy_of_a_removed_item_is_offered_nothing() {
     set_mark(&env, &base, Some(100));
     let copy = env.lib.copy_hud(base.id()).unwrap();
     env.lib.delete_hud(base.id()).unwrap();
+    checked(&env, 38, latest(200));
     checked(&env, 38, GbAddonCheck::Gone);
     assert_eq!(
         env.lib.copy_update(copy.id()).unwrap(),

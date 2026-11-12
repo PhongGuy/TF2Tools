@@ -385,12 +385,12 @@ fn the_logs_section_mentions_kill_feed_icons() {
 }
 
 #[test]
-fn the_huds_section_says_gamebanana_huds_show_update_too() {
+fn the_huds_section_says_store_huds_show_update() {
     let readme = repo_file("README.md");
     let (_, huds) = readme.split_once("### HUDs\n").expect("a HUDs section");
     let (huds, _) = huds.split_once("\n### ").expect("a section after it");
     assert!(
-        huds.contains("GameBanana HUDs show **Update** too"),
+        huds.contains("a HUD you got from the HUD Store is out, its card shows **Update**. If it has several files on GameBanana, you pick which one."),
         "HUDs section: {huds}"
     );
 }

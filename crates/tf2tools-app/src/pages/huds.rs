@@ -916,7 +916,7 @@ impl HudsPage {
     }
 
     // Opens the plain store detail of the GameBanana item copy `hud` was made from. With no
-    // library HUD of that item, its download is no duplicate; once it lands the copy updates.
+    // library HUD of that item, its download is no duplicate; once it lands the copy offers it.
     fn open_copy_store(&mut self, hud: &HudEntry, window: &mut Window, cx: &mut Context<Self>) {
         let folder = hud.folder_name();
         let (Some(gb_id), Some(base)) = (self.copy_items.get(folder), self.copies.get(folder))
