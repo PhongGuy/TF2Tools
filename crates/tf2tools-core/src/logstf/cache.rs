@@ -441,11 +441,29 @@ impl LogsCache {
         limit: usize,
         hook: &dyn Fn(BackfillStep, i64),
     ) -> Result<WeaponBackfill, LogsCacheError> {
+        self.backfill(&WEAPON_PASS, limit, hook)
+    }
+
+    /// Fills the damage taken on class rows of up to `limit` logs stored before the cache
+    /// kept it, oldest id first, from each log's stored body. A row whose player the body
+    /// lacks stays unknown; errors behave as in `count_weapons`.
+    pub fn fill_damage_taken(&self, limit: usize) -> Result<WeaponBackfill, LogsCacheError> {
+        self.backfill(&DAMAGE_TAKEN_PASS, limit, &|_, _| {})
+    }
+
+    // One batch of `pass`: each pending log's body is read and parsed outside the write lock,
+    // then written and marked done in one transaction guarded by the pass's own selection.
+    fn backfill(
+        &self,
+        pass: &BodyPass,
+        limit: usize,
+        hook: &dyn Fn(BackfillStep, i64),
+    ) -> Result<WeaponBackfill, LogsCacheError> {
         let limit = i64::try_from(limit).unwrap_or(i64::MAX);
         let ids = self
             .db
             .read(|conn| {
-                conn.prepare(UNCOUNTED_SQL)?
+                conn.prepare(pass.pending)?
                     .query_map([limit], |row| row.get::<_, i64>(0))?
                     .collect::<rusqlite::Result<Vec<_>>>()
             })
@@ -459,7 +477,8 @@ impl LogsCache {
                 BodyRead::Damaged => {
                     tracing::warn!(
                         id,
-                        "stored logs.tf body is damaged; counting it without weapons"
+                        pass = pass.name,
+                        "stored logs.tf body is damaged; marking it done without rows"
                     );
                     None
                 }
@@ -469,7 +488,8 @@ impl LogsCache {
                         tracing::warn!(
                             %error,
                             id,
-                            "stored logs.tf body does not parse; counting it without weapons"
+                            pass = pass.name,
+                            "stored logs.tf body does not parse; marking it done without rows"
                         );
                         None
                     }
@@ -482,11 +502,11 @@ impl LogsCache {
                     let tx = conn.transaction()?;
                     // The guard first: if the log changed since the read, dropping `tx`
                     // unwritten keeps whatever that change left.
-                    if tx.execute(MARK_COUNTED_SQL, [id])? == 0 {
+                    if tx.execute(pass.mark, [id])? == 0 {
                         return Ok(false);
                     }
                     if let Some(detail) = &detail {
-                        write_weapon_rows(&tx, id, detail)?;
+                        (pass.write)(&tx, id, detail)?;
                     }
                     tx.commit()?;
                     Ok(true)
@@ -496,7 +516,7 @@ impl LogsCache {
         }
         let left: i64 = self
             .db
-            .read(|conn| conn.query_row(UNCOUNTED_LEFT_SQL, [], |row| row.get(0)))
+            .read(|conn| conn.query_row(pass.left, [], |row| row.get(0)))
             .map_err(db_error)?;
         Ok(WeaponBackfill::new(
             counted,
@@ -760,7 +780,7 @@ impl LogsCache {
                 }
                 write_weapon_rows(&tx, log_id, detail)?;
                 tx.execute(
-                    "UPDATE logstf_logs SET weapons_counted = 1 WHERE id = ?1",
+                    "UPDATE logstf_logs SET weapons_counted = 1, dt_counted = 1 WHERE id = ?1",
                     [log_id],
                 )?;
                 tx.commit()?;
@@ -914,6 +934,61 @@ fn fold_class_rows(detail: &LogDetail) -> HashMap<(SteamId, TfClass), ClassStats
         }
     }
     rows
+}
+
+/// A backfill over stored bodies: the logs it waits on (oldest ?1 of them), how many are
+/// left, the guarded mark of log ?1 as done, and what it writes from a parsed body.
+struct BodyPass {
+    name: &'static str,
+    pending: &'static str,
+    left: &'static str,
+    mark: &'static str,
+    write: fn(&rusqlite::Transaction<'_>, i64, &LogDetail) -> rusqlite::Result<()>,
+}
+
+const WEAPON_PASS: BodyPass = BodyPass {
+    name: "weapons",
+    pending: UNCOUNTED_SQL,
+    left: UNCOUNTED_LEFT_SQL,
+    mark: MARK_COUNTED_SQL,
+    write: write_weapon_rows,
+};
+
+/// The selection the damage-taken pass works through, shared with its guard.
+macro_rules! dt_pending {
+    () => {
+        "body IS NOT NULL AND state = 0 AND dt_counted = 0"
+    };
+}
+
+const DAMAGE_TAKEN_PASS: BodyPass = BodyPass {
+    name: "damage taken",
+    pending: concat!(
+        "SELECT id FROM logstf_logs WHERE ",
+        dt_pending!(),
+        " ORDER BY id LIMIT ?1"
+    ),
+    left: concat!("SELECT COUNT(*) FROM logstf_logs WHERE ", dt_pending!()),
+    mark: concat!(
+        "UPDATE logstf_logs SET dt_counted = 1 WHERE id = ?1 AND ",
+        dt_pending!()
+    ),
+    write: write_damage_taken,
+};
+
+// Sets each player's damage taken on their class rows of log `log_id` that have none yet.
+fn write_damage_taken(
+    tx: &rusqlite::Transaction<'_>,
+    log_id: i64,
+    detail: &LogDetail,
+) -> rusqlite::Result<()> {
+    let mut set = tx.prepare(
+        "UPDATE logstf_class_rows SET dt = ?3 WHERE log_id = ?1 AND steam_id = ?2 AND dt IS NULL",
+    )?;
+    for (id, dt) in damage_taken(detail) {
+        set.execute(params![log_id, sql_id(id)?, dt])?;
+    }
+    Ok(())
 }
 
 /// Each player's damage taken over the log, summing a player named under two keys.

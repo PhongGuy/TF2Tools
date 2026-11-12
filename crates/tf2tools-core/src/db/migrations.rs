@@ -118,11 +118,15 @@ const STEPS: &[Step] = &[
         add_columns: &[("library_huds", "gb_file_date", "INTEGER")],
     },
     // v6 step 18: the player's damage taken, the same on each of their class rows of a log.
-    // Rows stored before it stay NULL, so the list can tell unknown from zero.
+    // Rows stored before it stay NULL, so the list can tell unknown from zero, until the
+    // backfill reads them from the body; `dt_counted` is that backfill's progress marker.
     Step {
         version: 18,
         sql: "",
-        add_columns: &[("logstf_class_rows", "dt", "INTEGER")],
+        add_columns: &[
+            ("logstf_class_rows", "dt", "INTEGER"),
+            ("logstf_logs", "dt_counted", "INTEGER NOT NULL DEFAULT 0"),
+        ],
     },
 ];
 

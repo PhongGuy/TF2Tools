@@ -486,6 +486,7 @@ fn v17_database_keeps_its_class_rows_with_no_damage_taken() {
     let conn = Connection::open(dir.db_path()).unwrap();
     conn.execute_batch(
         "ALTER TABLE logstf_class_rows DROP COLUMN dt;
+         ALTER TABLE logstf_logs DROP COLUMN dt_counted;
          INSERT INTO logstf_logs (id, title, map, date, body, state)
              VALUES (7, 'Log 7', 'm', 1, x'00', 0);
          INSERT INTO logstf_class_rows (log_id, steam_id, class, seconds, kills, deaths, assists, dmg)
@@ -509,6 +510,15 @@ fn v17_database_keeps_its_class_rows_with_no_damage_taken() {
         row,
         (1, None),
         "a row stored before step 18 has no damage taken"
+    );
+    let counted: i64 = conn
+        .query_row("SELECT dt_counted FROM logstf_logs WHERE id = 7", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(
+        counted, 0,
+        "a log stored before step 18 waits for the backfill"
     );
     assert_eq!(common::schema_shape(&conn), common::current_shape());
 }

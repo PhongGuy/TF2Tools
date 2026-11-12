@@ -217,6 +217,51 @@ async fn a_row_cached_before_damage_taken_was_kept_has_none() {
     assert_eq!((rows[0].kills(), rows[0].dt()), (7, None));
 }
 
+#[tokio::test]
+async fn the_damage_taken_backfill_fills_rows_from_the_stored_body() {
+    let env = logs_env().await;
+    env.client
+        .cache()
+        .add_player(&TrackedPlayer::new(arie(), "Arie"))
+        .unwrap();
+    mount_list(&env.server, ARIE, list_body(&[(3, days_ago(1))])).await;
+    mount_log(&env.server, 3, 200, logstf_fixture("log-4137103-6v6.json")).await;
+    env.client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
+    // As an earlier build left it: no damage taken, and a row for someone the body lacks.
+    common::sql(&env.dir)
+        .execute_batch(
+            "UPDATE logstf_class_rows SET dt = NULL;
+             UPDATE logstf_logs SET dt_counted = 0;
+             INSERT INTO logstf_class_rows (log_id, steam_id, class, seconds, kills, deaths, assists, dmg)
+                 VALUES (3, 1, 'scout', 60, 0, 0, 0, 0);",
+        )
+        .unwrap();
+    let cache = env.client.cache();
+    let done = cache.fill_damage_taken(50).unwrap();
+    assert_eq!((done.counted(), done.left()), (1, 0));
+    let rows = cache.logs(arie(), LogsRange::Months3).unwrap();
+    assert_eq!(rows[0].dt(), Some(5964));
+    let stranger: Option<i64> = common::sql(&env.dir)
+        .query_row(
+            "SELECT dt FROM logstf_class_rows WHERE log_id = 3 AND steam_id = 1",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(stranger, None, "a player the body lacks stays unknown");
+    let again = cache.fill_damage_taken(50).unwrap();
+    assert_eq!((again.counted(), again.left()), (0, 0));
+}
+
 #[test]
 fn rows_and_averages_have_no_cap() {
     let (_tmp, dir) = common::temp_data_dir();

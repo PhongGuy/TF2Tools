@@ -222,7 +222,10 @@ const M17_TABLES: &str = "
     ALTER TABLE library_huds ADD COLUMN gb_file_date INTEGER;
 ";
 
-const M18_COLUMNS: &str = "ALTER TABLE logstf_class_rows ADD COLUMN dt INTEGER;";
+const M18_COLUMNS: &str = "
+    ALTER TABLE logstf_class_rows ADD COLUMN dt INTEGER;
+    ALTER TABLE logstf_logs ADD COLUMN dt_counted INTEGER NOT NULL DEFAULT 0;
+";
 
 /// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables,
 /// migration 13's mastercomfig tables, migration 14's add-on table, migration 15's logs.tf
