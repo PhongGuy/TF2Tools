@@ -363,7 +363,9 @@ fn shown_text(part: &super::Part, text: &GameText, sample: super::SampleSet) -> 
     {
         return None;
     }
-    Some(sample.fill(&text.show(label.text())).replace("\\n", "\n"))
+    // A KOTH clock's text comes from the game's code, as the preview draws it.
+    let label = super::SampleSet::koth_clock(part.key().as_str()).unwrap_or(label.text());
+    Some(sample.fill(&text.show(label)).replace("\\n", "\n"))
 }
 
 /// Whether shown text draws nothing at all.

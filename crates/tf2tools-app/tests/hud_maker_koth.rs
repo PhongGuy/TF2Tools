@@ -64,3 +64,20 @@ fn show_it_on_the_koth_timer_turns_koth_on_and_back(cx: &mut TestAppContext) {
         "Show it on the round timer leaves KOTH"
     );
 }
+
+#[gpui_kit::test]
+fn the_koth_clocks_show_a_round_in_progress(cx: &mut TestAppContext) {
+    let (_env, s, _page) = open_maker(cx);
+    support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
+    support::click_id(
+        cx,
+        s.win,
+        ids::hud_maker_situation_switch(SituationSwitch::Koth),
+    );
+    let text = |cx: &mut TestAppContext, timer: &str| {
+        let key = PartKey::new(format!("HudKothTimeStatus/{timer}/TimePanelValue"));
+        support::label_of(cx, s.win, ids::hud_maker_text(&key))
+    };
+    assert_eq!(text(cx, "RedTimer").as_deref(), Some("3:00"));
+    assert_eq!(text(cx, "BlueTimer").as_deref(), Some("2:14"));
+}
