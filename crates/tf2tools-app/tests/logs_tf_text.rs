@@ -731,3 +731,77 @@ fn a_known_log_name_reads_as_the_games_name_and_keeps_its_raw_id() {
         [("quake_rl".to_owned(), "quake_rl".to_owned())]
     );
 }
+
+// Class lists for the opened log's weapon rows: the Original is Soldier's, the Pyro's stock
+// flamethrower and shotgun are Pyro's.
+const CLASS_ITEMS: &str = r##""items_game" { "items" {
+    "21" { "name" "TF_WEAPON_FLAMETHROWER" "item_class" "tf_weapon_flamethrower" "used_by_classes" { "pyro" "1" } }
+    "12" { "name" "TF_WEAPON_SHOTGUN_PYRO" "item_class" "tf_weapon_shotgun" "used_by_classes" { "pyro" "1" } }
+    "513" { "item_class" "tf_weapon_rocketlauncher" "item_logname" "quake_rl" "used_by_classes" { "soldier" "1" } }
+} }"##;
+
+fn weapon(kills: u32, dmg: u32, shots: u32, hits: u32) -> serde_json::Value {
+    serde_json::json!({"kills": kills, "dmg": dmg, "avg_dmg": 0, "shots": shots, "hits": hits})
+}
+
+/// Arie's Pyro rows in the 6v6 log after adding `extra` to the Pyro's weapons.
+fn arie_pyro_rows(
+    extra: &[(&str, serde_json::Value)],
+) -> Vec<tf2tools_app::pages::logs_tf::tables::WeaponRow> {
+    use tf2tools_app::pages::logs_tf::tables::weapon_rows;
+    let mut json: serde_json::Value = serde_json::from_str(crate::support::logstf::SIXES).unwrap();
+    for (key, value) in extra {
+        json["players"]["[U:1:231702]"]["class_stats"][1]["weapon"][*key] = value.clone();
+    }
+    let log = tf2tools_core::parse_log(&json.to_string()).unwrap();
+    let arie = log
+        .players()
+        .iter()
+        .find(|p| p.steam_id() == crate::support::logstf::sid(crate::support::logstf::ARIE))
+        .unwrap();
+    let pyro = arie
+        .classes()
+        .iter()
+        .find(|c| c.class() == tf2tools_core::TfClass::Pyro)
+        .unwrap();
+    let names = tf2tools_core::WeaponNames::from_files(CLASS_ITEMS, b"");
+    weapon_rows(arie, pyro, &names)
+}
+
+#[test]
+fn a_match_class_card_lists_only_weapons_the_class_can_equip() {
+    let rows = arie_pyro_rows(&[
+        ("quake_rl", weapon(2, 400, 10, 5)),
+        ("tf_projectile_rocket", weapon(1, 150, 4, 2)),
+        ("mystery_gun", weapon(0, 10, 0, 0)),
+        ("world", weapon(0, 0, 0, 0)),
+    ]);
+    let raw: Vec<&str> = rows.iter().map(|r| r.raw.as_str()).collect();
+    assert!(!raw.contains(&"quake_rl"), "{raw:?}");
+    for key in ["shotgun_pyro", "flamethrower", "mystery_gun", "world"] {
+        assert!(raw.contains(&key), "{key} in {raw:?}");
+    }
+    let rocket = rows
+        .iter()
+        .find(|r| r.raw == "tf_projectile_rocket")
+        .unwrap();
+    assert_eq!(rocket.name, "Reflected rocket");
+    assert_eq!(rocket.accuracy, "50%");
+}
+
+#[test]
+fn rows_with_one_shown_name_merge_into_the_first() {
+    let rows = arie_pyro_rows(&[
+        ("tf_projectile_rocket", weapon(1, 150, 4, 2)),
+        ("deflect_rocket", weapon(2, 30, 2, 2)),
+    ]);
+    let rockets: Vec<_> = rows
+        .iter()
+        .filter(|r| r.name == "Reflected rocket")
+        .collect();
+    assert_eq!(rockets.len(), 1, "{rows:?}");
+    let rocket = rockets[0];
+    assert_eq!((rocket.kills, rocket.dmg), (3, 180));
+    assert_eq!(rocket.raw, "deflect_rocket", "the first by kills");
+    assert_eq!(rocket.accuracy, "67%", "4 of 6 shots over both sides");
+}
