@@ -773,6 +773,25 @@ fn remove_asks_then_deletes_the_files(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn remove_while_tf2_runs_says_close_tf2_first_without_asking(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(40, "Kept", &[("a.vpk", gb_vpk(), 100)]);
+    let s = store_shell(cx, &env, &server);
+    install_gb(cx, &s, 40, "skins");
+    let _page = open_addons(cx, &s);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    let id = tf2tools_core::GbId::new(40);
+    support::click_id(cx, s.win, ids::addons_gb_remove(id));
+    crate::gb_addon_installs::toast_is(
+        cx,
+        s.win,
+        "Close TF2 first. TF2 is running. Close the game, then try again.",
+    );
+    assert!(!support::present(cx, s.win, ids::CONFIRM_DESCRIPTION));
+    assert!(env.game.join("tf/custom/tf2tools-gb-40-kept.vpk").is_file());
+}
+
+#[gpui_kit::test]
 fn a_hand_deleted_addon_offers_install_again(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
     server.mount_gb_addon(5, "Back", &[("a.vpk", gb_vpk(), 100)]);

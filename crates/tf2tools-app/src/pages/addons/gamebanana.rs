@@ -16,8 +16,11 @@ use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer, GbAddonStage};
 use crate::ids;
 use crate::links::gamebanana_page;
 use crate::pages::common::{badge_of, card_frame};
-use crate::services::tf2_state;
+use crate::pages::graphics::jobs::refuse_while_running;
+use crate::pages::profiles::probe::Tf2Probe;
+use crate::services::{run_blocking, tf2_state};
 use crate::shell::confirm::{Confirm, confirm};
+use crate::shell::toast::toast_error;
 use crate::widgets::Named as _;
 use crate::widgets::card_grid::stretch_rows;
 
@@ -113,18 +116,44 @@ fn labelled_group(kind: AddonSection, cx: &App) -> impl IntoElement {
 }
 
 // Asks first, as Remove also deletes the library copy; a yes hands the work to the installs.
+// A VPK add-on can't go while TF2 runs, so that refusal comes before the question; the
+// installs probe again, as TF2 may start while the dialog is open.
 fn remove(id: GbId, name: String, window: &mut Window, cx: &mut Context<AddonsPage>) {
-    let answer = confirm(Confirm::remove_gb_addon(&name), window, cx);
+    let installs = GbAddonInstalls::global(cx);
+    let has_vpk = installs.read(cx).entry(id).is_some_and(has_vpk);
+    let probe = Tf2Probe::get(cx);
+    let refusing = run_blocking(cx, move |_| {
+        if has_vpk {
+            refuse_while_running(&*probe)
+        } else {
+            Ok(())
+        }
+    });
     let win = window.window_handle();
     cx.spawn(async move |_, cx| {
+        if let Err(err) = refusing.await {
+            let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
+            return;
+        }
+        let Ok(answer) = win.update(cx, |_, window, cx| {
+            confirm(Confirm::remove_gb_addon(&name), window, cx)
+        }) else {
+            return;
+        };
         if answer.recv().await.unwrap_or(false) {
-            cx.update(|cx| {
-                let installs = GbAddonInstalls::global(cx);
-                installs.update(cx, |i, cx| i.remove(id, win, cx));
-            });
+            cx.update(|cx| installs.update(cx, |i, cx| i.remove(id, win, cx)));
         }
     })
     .detach();
+}
+
+/// Whether any of the add-on's recorded files is a VPK, which TF2 holds open while it runs.
+fn has_vpk(entry: &GbAddonEntry) -> bool {
+    entry.files().iter().any(|f| {
+        std::path::Path::new(f)
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("vpk"))
+    })
 }
 
 // The words on a running operation's footer.
