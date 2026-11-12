@@ -33,6 +33,7 @@ mod timestamp;
 mod update;
 mod wav;
 mod weapon_icons;
+mod weapon_names;
 mod weapons;
 
 pub use activity::{ActivityLog, LOG_KEEP, LogEntry, LogLevel, LogQuery, NewLogEntry};
@@ -140,4 +141,5 @@ pub use update::{
 };
 pub use wav::{WavInfo, inspect_wav};
 pub use weapon_icons::weapon_inventory_images;
+pub use weapon_names::WeaponNames;
 pub use weapons::{TfClass, Weapon, WeaponSlot, weapons};

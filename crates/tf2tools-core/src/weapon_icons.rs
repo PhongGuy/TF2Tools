@@ -7,7 +7,7 @@ use crate::fonts::Platform;
 use crate::fonts::keyvalues::{self, KvPair, block, block_named, text};
 use crate::weapons;
 
-/// How many prefab hops an image lookup follows before giving up, which also ends cycles.
+/// How many prefab hops a lookup follows before giving up, which also ends cycles.
 const PREFAB_DEPTH: usize = 8;
 
 /// Each weapon script's `image_inventory` path (as items_game spells it, no extension) from
@@ -20,20 +20,7 @@ pub fn weapon_inventory_images(items_game: &str) -> BTreeMap<&'static str, Strin
         return BTreeMap::new();
     };
 
-    // Every `prefabs` block feeds one case-blind lookup; the first definition of a name wins.
-    let mut prefabs: HashMap<String, &[KvPair]> = HashMap::new();
-    for pair in root
-        .iter()
-        .filter(|p| p.key.eq_ignore_ascii_case("prefabs"))
-    {
-        for prefab in block(pair).unwrap_or_default() {
-            if let Some(children) = block(prefab) {
-                prefabs
-                    .entry(prefab.key.to_ascii_lowercase())
-                    .or_insert(children);
-            }
-        }
-    }
+    let prefabs = prefab_map(root);
 
     let wanted: HashMap<&str, &'static str> = weapons()
         .iter()
@@ -48,7 +35,7 @@ pub fn weapon_inventory_images(items_game: &str) -> BTreeMap<&'static str, Strin
             if images.contains_key(script) {
                 continue;
             }
-            if let Some(image) = inventory_image(item, &prefabs, 0) {
+            if let Some(image) = inherited(item, &prefabs, "image_inventory") {
                 images.insert(script, image.to_owned());
             }
         }
@@ -56,15 +43,43 @@ pub fn weapon_inventory_images(items_game: &str) -> BTreeMap<&'static str, Strin
     images
 }
 
-/// An item's (or prefab's) own `image_inventory`, else the first found through its `prefab`
+/// Every `prefabs` block of items_game's root as one case-blind lookup; the first definition
+/// of a name wins.
+pub(crate) fn prefab_map(root: &[KvPair]) -> HashMap<String, &[KvPair]> {
+    let mut prefabs: HashMap<String, &[KvPair]> = HashMap::new();
+    for pair in root
+        .iter()
+        .filter(|p| p.key.eq_ignore_ascii_case("prefabs"))
+    {
+        for prefab in block(pair).unwrap_or_default() {
+            if let Some(children) = block(prefab) {
+                prefabs
+                    .entry(prefab.key.to_ascii_lowercase())
+                    .or_insert(children);
+            }
+        }
+    }
+    prefabs
+}
+
+/// An item's (or prefab's) own text value `key`, else the first found through its `prefab`
 /// list, left to right and depth-first.
-fn inventory_image<'a>(
+pub(crate) fn inherited<'a>(
     pairs: &'a [KvPair],
     prefabs: &HashMap<String, &'a [KvPair]>,
+    key: &str,
+) -> Option<&'a str> {
+    inherited_at(pairs, prefabs, key, 0)
+}
+
+fn inherited_at<'a>(
+    pairs: &'a [KvPair],
+    prefabs: &HashMap<String, &'a [KvPair]>,
+    key: &str,
     depth: usize,
 ) -> Option<&'a str> {
-    if let Some(image) = text(pairs, "image_inventory") {
-        return Some(image);
+    if let Some(value) = text(pairs, key) {
+        return Some(value);
     }
     if depth >= PREFAB_DEPTH {
         return None;
@@ -72,5 +87,5 @@ fn inventory_image<'a>(
     text(pairs, "prefab")?
         .split_whitespace()
         .filter_map(|name| prefabs.get(&name.to_ascii_lowercase()))
-        .find_map(|prefab| inventory_image(prefab, prefabs, depth + 1))
+        .find_map(|prefab| inherited_at(prefab, prefabs, key, depth + 1))
 }
