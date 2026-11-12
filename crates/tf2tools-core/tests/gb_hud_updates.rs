@@ -1,8 +1,11 @@
 //! GameBanana HUDs: file dates, the daily check, version marks and replacing downloads.
 
+use crate::common::hud_copy::{game_for, import_stock_hud};
 use crate::common::{self, StoreEnv, sql, store_env, zip_bytes};
+use crate::common::{LibraryEnv, library_env};
 
 use serde_json::json;
+use tf2tools_core::{CopyUpdate, DownloadUpdate, LibraryKind, Platform};
 use tf2tools_core::{
     DataDir, GbId, HudEntry, HudId, LibraryEntry, StoreFile, StoreItemId, StoreKind,
 };
@@ -203,4 +206,221 @@ async fn an_unreachable_gamebanana_stops_the_check_and_records_nothing() {
         "{result:?}"
     );
     assert_eq!(check_row(&env.dir, 20), (None, None, false));
+}
+
+const SAME_INFO: (&str, &str) = ("info.vdf", "\"darhud\" { ui_version 3 }");
+const JAN_2026: i64 = 1_767_225_600; // 2026-01-01T00:00:00Z
+
+fn now_secs() -> i64 {
+    chrono::Utc::now().timestamp()
+}
+
+fn set_mark(env: &LibraryEnv, hud: &HudEntry, date: Option<i64>) {
+    sql(&env.dir)
+        .execute(
+            "UPDATE library_huds SET gb_file_date = ?1 WHERE id = ?2",
+            rusqlite::params![date, hud.id().as_str()],
+        )
+        .unwrap();
+}
+
+fn checked(env: &LibraryEnv, id: u64, check: GbAddonCheck) {
+    env.lib.ensure_gb_hud_checks(&[GbId::new(id)]).unwrap();
+    env.lib
+        .record_gb_hud_check(GbId::new(id), check, NOW)
+        .unwrap();
+}
+
+fn latest(file_date: i64) -> GbAddonCheck {
+    GbAddonCheck::Latest { file_date }
+}
+
+fn rewrite_record(env: &LibraryEnv, copy: &HudEntry, hash: &str, base_updated_at: &str) {
+    let file = env
+        .dir
+        .library_dir(LibraryKind::Huds)
+        .join(copy.folder_name())
+        .join(".tf2tools/maker.json");
+    let mut maker: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+    maker["base"]["hash"] = hash.into();
+    maker["base"]["base_updated_at"] = base_updated_at.into();
+    std::fs::write(&file, maker.to_string()).unwrap();
+}
+
+#[test]
+fn a_download_s_mark_is_its_file_date() {
+    let env = library_env();
+    let hud = import_stock_hud(&env, "darhud-202517", &[], common::gb(30));
+    set_mark(&env, &hud, Some(100));
+    assert_eq!(
+        env.lib.download_update(hud.id()).unwrap(),
+        DownloadUpdate::Unknown,
+        "never checked"
+    );
+    checked(&env, 30, latest(100));
+    assert_eq!(
+        env.lib.download_update(hud.id()).unwrap(),
+        DownloadUpdate::Current
+    );
+    checked(&env, 30, latest(300));
+    assert_eq!(
+        env.lib.download_update(hud.id()).unwrap(),
+        DownloadUpdate::Newer
+    );
+    checked(&env, 30, GbAddonCheck::Gone);
+    assert_eq!(
+        env.lib.download_update(hud.id()).unwrap(),
+        DownloadUpdate::Current,
+        "a removed item offers nothing"
+    );
+}
+
+#[test]
+fn an_older_download_s_mark_is_when_it_was_added() {
+    let env = library_env();
+    let hud = import_stock_hud(&env, "budhud", &[], common::gb(31));
+    checked(&env, 31, latest(now_secs() - 3600));
+    assert_eq!(
+        env.lib.download_update(hud.id()).unwrap(),
+        DownloadUpdate::Current
+    );
+    checked(&env, 31, latest(now_secs() + 3600));
+    assert_eq!(
+        env.lib.download_update(hud.id()).unwrap(),
+        DownloadUpdate::Newer
+    );
+    sql(&env.dir)
+        .execute(
+            "UPDATE library_huds SET created_at = 'not a time' WHERE id = ?1",
+            [hud.id().as_str()],
+        )
+        .unwrap();
+    assert_eq!(
+        env.lib.download_update(hud.id()).unwrap(),
+        DownloadUpdate::Unknown
+    );
+}
+
+#[test]
+fn a_copy_takes_a_newer_download_of_its_item_from_another_folder() {
+    let env = library_env();
+    let tf = game_for(&env, &[]);
+    let base = import_stock_hud(&env, "darhud-202517", &[], common::gb(32));
+    set_mark(&env, &base, Some(100));
+    let copy = env.lib.copy_hud(base.id()).unwrap();
+    let record = env.lib.copy_base(copy.id()).unwrap().unwrap();
+    assert_eq!((record.store_id(), record.hash()), ("gb:32", "100"));
+    let older = import_stock_hud(&env, "darhud-202401", &[("OLD.txt", "old")], common::gb(32));
+    set_mark(&env, &older, Some(50));
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::UpToDate
+    );
+    let newer = import_stock_hud(&env, "darhud-202618", &[("NEW.txt", "new")], common::gb(32));
+    set_mark(&env, &newer, Some(300));
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::InLibrary {
+            from: newer.id().clone(),
+            name: newer.name().to_owned()
+        }
+    );
+    env.lib
+        .update_copy(copy.id(), newer.id(), &tf, Platform::Linux)
+        .unwrap();
+    assert_eq!(env.lib.copy_base(copy.id()).unwrap().unwrap().hash(), "300");
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::UpToDate
+    );
+}
+
+#[test]
+fn a_newer_mark_with_the_same_bytes_is_not_offered() {
+    let env = library_env();
+    let base = import_stock_hud(&env, "darhud-202517", &[SAME_INFO], common::gb(33));
+    set_mark(&env, &base, Some(100));
+    let copy = env.lib.copy_hud(base.id()).unwrap();
+    let again = import_stock_hud(&env, "darhud-202618", &[SAME_INFO], common::gb(33));
+    set_mark(&env, &again, Some(300));
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::UpToDate
+    );
+}
+
+#[test]
+fn a_same_mark_reinstall_into_the_base_folder_is_still_offered() {
+    let env = library_env();
+    let base = import_stock_hud(&env, "darhud", &[], common::gb(36));
+    let copy = env.lib.copy_hud(base.id()).unwrap();
+    let mark: i64 = env
+        .lib
+        .copy_base(copy.id())
+        .unwrap()
+        .unwrap()
+        .hash()
+        .parse()
+        .unwrap();
+    let again = import_stock_hud(&env, "darhud", &[("NEW.txt", "new")], common::gb(36));
+    set_mark(&env, &again, Some(mark));
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::InLibrary {
+            from: again.id().clone(),
+            name: again.name().to_owned()
+        },
+        "no newer mark, so the folder-reinstall rule decides"
+    );
+}
+
+#[test]
+fn a_copy_whose_base_left_the_library_is_offered_the_store_s_newer_file() {
+    let env = library_env();
+    let base = import_stock_hud(&env, "darhud-202517", &[], common::gb(34));
+    set_mark(&env, &base, Some(100));
+    let copy = env.lib.copy_hud(base.id()).unwrap();
+    checked(&env, 34, latest(300));
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::UpToDate,
+        "its library HUD updates first"
+    );
+    env.lib.delete_hud(base.id()).unwrap();
+    assert_eq!(env.lib.copy_update(copy.id()).unwrap(), CopyUpdate::InStore);
+    checked(&env, 34, latest(100));
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::UpToDate
+    );
+}
+
+#[test]
+fn an_older_copy_s_mark_is_its_base_s_download_time_else_its_own() {
+    let env = library_env();
+    let base = import_stock_hud(&env, "toonhud", &[], common::gb(35));
+    let copy = env.lib.copy_hud(base.id()).unwrap();
+    env.lib.delete_hud(base.id()).unwrap();
+    rewrite_record(&env, &copy, "", "2026-01-01T00:00:00Z");
+    checked(&env, 35, latest(JAN_2026 + 60));
+    assert_eq!(env.lib.copy_update(copy.id()).unwrap(), CopyUpdate::InStore);
+    checked(&env, 35, latest(JAN_2026 - 60));
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::UpToDate
+    );
+    rewrite_record(&env, &copy, "", "");
+    checked(&env, 35, latest(now_secs() + 3600));
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::InStore,
+        "the copy's own created_at"
+    );
+    rewrite_record(&env, &copy, "", "garbage");
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::UpToDate,
+        "no mark, no offer"
+    );
 }

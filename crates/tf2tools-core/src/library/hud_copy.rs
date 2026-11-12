@@ -14,8 +14,8 @@ use super::made_huds::{
     replay_with_kept_copies, roll_back, write_build, write_copy_in_place,
 };
 use super::{
-    HudEntry, HudId, IoFailure, Library, METADATA_DIR, Provenance, create_dir_all, folder_name,
-    io_at, is_plain_name, library_db, new_id, now, tree_copy,
+    GbId, HudEntry, HudId, IoFailure, Library, METADATA_DIR, Provenance, create_dir_all,
+    folder_name, io_at, is_plain_name, library_db, new_id, now, tree_copy,
 };
 use crate::error::{
     CopyHudError, HudLoadError, InstallError, LibraryError, MakeHudError, UpdateCopyError,
@@ -26,6 +26,7 @@ use crate::hud_maker::{
     OWN_SCRIPT, both_changed, left_out,
 };
 use crate::paths::LibraryKind;
+use crate::timestamp::unix_seconds;
 
 /// The name a left-out HUD option is listed under when no version of the HUD labels it.
 const UNNAMED_OPTION: &str = "A HUD option";
@@ -228,7 +229,9 @@ impl Library {
                 format!("gb:{gb_id}"),
                 format!("GameBanana item {gb_id}"),
                 String::new(),
-                String::new(),
+                (self.hud_gb_mark(entry).map_err(copy_library)?)
+                    .map(|mark| mark.to_string())
+                    .unwrap_or_default(),
             ),
             Provenance::Local => (
                 String::new(),
@@ -430,8 +433,9 @@ pub enum DownloadUpdate {
     Newer,
     /// The download is the store's current commit.
     Current,
-    /// No versions to compare: not a curated download, no commit in its folder name, no
-    /// store row, or an edited HUD, which `copy_update` covers.
+    /// No versions to compare: a local HUD, a curated download without a commit in its
+    /// folder name or a store row, an unchecked or unmarked GameBanana download, or an
+    /// edited HUD, which `copy_update` covers.
     Unknown,
 }
 
@@ -562,8 +566,9 @@ impl TreeCache {
 
 impl Library {
     /// Whether the copy `id` has a newer base from its own source: a curated copy only from
-    /// the store's current commit, any copy from a reinstall of its base's library folder
-    /// with other bytes. A HUD that is no copy is `UpToDate`.
+    /// the store's current commit, a GameBanana copy from a later file of its item, any copy
+    /// from a reinstall of its base's library folder with other bytes. A HUD that is no copy
+    /// is `UpToDate`.
     ///
     /// # Errors
     /// `NotFound` for no such row; `Io` or `Database` when reading fails.
@@ -575,7 +580,7 @@ impl Library {
         candidates.retain(|c| c.id() != id);
         candidates.sort_by(|a, b| b.updated_at().cmp(a.updated_at()));
         for candidate in &candidates {
-            if self.same_source(&base, candidate)? {
+            if self.same_source(id, &base, candidate)? {
                 return Ok(CopyUpdate::InLibrary {
                     from: candidate.id().clone(),
                     name: candidate.name().to_owned(),
@@ -594,7 +599,7 @@ impl Library {
                 }
             }
             Some(current) => !commits_match(&current, base.hash()),
-            None => false,
+            None => self.newer_gb_file(id, &base, &candidates)?,
         };
         Ok(if newer_in_store {
             CopyUpdate::InStore
@@ -603,8 +608,9 @@ impl Library {
         })
     }
 
-    /// Whether the store has a newer version of library HUD `id`, a curated download whose
-    /// folder name ends in the commit it was downloaded at.
+    /// Whether the store has a newer version of library HUD `id`: a curated download whose
+    /// folder name ends in the commit it was downloaded at, or a GameBanana download whose
+    /// item's daily check found a later file.
     ///
     /// # Errors
     /// `NotFound` for no such row; `Io` or `Database` when reading fails.
@@ -614,12 +620,14 @@ impl Library {
             .ok_or_else(|| LibraryError::NotFound {
                 what: format!("HUD {id}"),
             })?;
-        let Provenance::Curated { hud_id } = hud.provenance() else {
-            return Ok(DownloadUpdate::Unknown);
-        };
         if self.is_made_hud(id)? {
             return Ok(DownloadUpdate::Unknown);
         }
+        let hud_id = match hud.provenance() {
+            Provenance::Curated { hud_id } => hud_id,
+            Provenance::GameBanana { gb_id, .. } => return self.gb_download_update(&hud, *gb_id),
+            Provenance::Local => return Ok(DownloadUpdate::Unknown),
+        };
         let (Some(downloaded), Some(current)) =
             (commit_suffix(hud.folder_name()), self.store_hash(hud_id)?)
         else {
@@ -697,15 +705,28 @@ impl Library {
     }
 
     /// True when `candidate` is a newer version of `copy`'s base from the same source: the
-    /// store's current commit of a curated base, or a reinstall of the base's library folder
-    /// with a later time and other bytes. A made HUD never is.
+    /// store's current commit of a curated base, a later file of a GameBanana base's item, or
+    /// a reinstall of the base's library folder with a later time and other bytes. A made HUD
+    /// never is.
     pub(crate) fn same_source(
         &self,
+        id: &HudId,
         copy: &CopyBase,
         candidate: &HudEntry,
     ) -> Result<bool, LibraryError> {
         if self.is_made_hud(candidate.id())? {
             return Ok(false);
+        }
+        // A download of the copy's GameBanana item with a later mark and other bytes. When
+        // it does not hold, the folder-reinstall rule below still decides.
+        if let Provenance::GameBanana { gb_id, .. } = candidate.provenance()
+            && copy.store_id() == format!("gb:{gb_id}")
+            && let (Some(theirs), Some(ours)) =
+                (self.hud_gb_mark(candidate)?, self.copy_mark(id, copy)?)
+            && theirs > ours
+            && self.hud_tree_hash(candidate.id())?.hash() != copy.tree()
+        {
+            return Ok(true);
         }
         if let (Some(store_hud), Provenance::Curated { hud_id }) = (
             copy.store_id().strip_prefix("hud-db:"),
@@ -725,6 +746,71 @@ impl Library {
         let reinstall = candidate.folder_name() == copy.base_folder()
             && candidate.updated_at() > copy.base_updated_at();
         Ok(reinstall && self.hud_tree_hash(candidate.id())?.hash() != copy.tree())
+    }
+
+    /// The version mark of copy `id`'s GameBanana base: the number its record holds, or for
+    /// an older record without one, its base's download time, else the copy's own.
+    fn copy_mark(&self, id: &HudId, copy: &CopyBase) -> Result<Option<i64>, LibraryError> {
+        if !copy.hash().is_empty() {
+            return Ok(copy.hash().parse().ok());
+        }
+        if !copy.base_updated_at().is_empty() {
+            return Ok(unix_seconds(copy.base_updated_at()));
+        }
+        let created: Option<String> = self
+            .db
+            .read(|conn| {
+                conn.query_row(
+                    "SELECT created_at FROM library_huds WHERE id = ?1",
+                    [id.as_str()],
+                    |r| r.get(0),
+                )
+                .optional()
+            })
+            .map_err(library_db)?;
+        Ok(created.as_deref().and_then(unix_seconds))
+    }
+
+    /// Whether GameBanana has a newer file for copy `id`'s item than its base, once no
+    /// library HUD of that item is left to update from first.
+    fn newer_gb_file(
+        &self,
+        id: &HudId,
+        copy: &CopyBase,
+        candidates: &[HudEntry],
+    ) -> Result<bool, LibraryError> {
+        let Some(gb_id) = (copy.store_id().strip_prefix("gb:")).and_then(|n| n.parse().ok()) else {
+            return Ok(false);
+        };
+        let gb_id = GbId::new(gb_id);
+        let in_library = candidates.iter().any(
+            |c| matches!(c.provenance(), Provenance::GameBanana { gb_id: other, .. } if *other == gb_id),
+        );
+        if in_library {
+            return Ok(false);
+        }
+        let Some((Some(latest), Some(_), false)) = self.gb_hud_check(gb_id)? else {
+            return Ok(false);
+        };
+        Ok(self.copy_mark(id, copy)?.is_some_and(|mark| latest > mark))
+    }
+
+    /// Whether GameBanana has a newer file than the download `hud` of item `gb_id`, by the
+    /// daily check; `Unknown` until the item is checked or when `hud` has no mark.
+    fn gb_download_update(
+        &self,
+        hud: &HudEntry,
+        gb_id: GbId,
+    ) -> Result<DownloadUpdate, LibraryError> {
+        let (Some(mark), Some((latest, Some(_), gone))) =
+            (self.hud_gb_mark(hud)?, self.gb_hud_check(gb_id)?)
+        else {
+            return Ok(DownloadUpdate::Unknown);
+        };
+        Ok(match latest {
+            Some(latest) if !gone && latest > mark => DownloadUpdate::Newer,
+            _ => DownloadUpdate::Current,
+        })
     }
 
     /// Whether a library row of the copy's store HUD at commit `current` holds exactly the
@@ -905,7 +991,7 @@ impl Library {
             return Err(UpdateCopyError::MadeHud { id: text(from) });
         }
         if !self
-            .same_source(&copy, &row.entry)
+            .same_source(id, &copy, &row.entry)
             .map_err(|e| save_library(e, gone))?
         {
             return Err(UpdateCopyError::NotSameSource { id: text(from) });

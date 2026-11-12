@@ -13,6 +13,13 @@ pub(crate) fn now() -> String {
     format(Utc::now())
 }
 
+/// `text` as unix seconds, for any RFC 3339 time v5 or v6 wrote; `None` when it is not one.
+pub(crate) fn unix_seconds(text: &str) -> Option<i64> {
+    DateTime::parse_from_rfc3339(text)
+        .ok()
+        .map(|t| t.timestamp())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -48,5 +55,15 @@ mod tests {
         // v5 wrote chrono's variable-width default; a later v6 value still sorts after it.
         assert!(format(base + TimeDelta::seconds(1)).as_str() > "2026-10-16T05:27:00.5+00:00");
         assert!(format(base).as_str() > "2026-10-16T05:26:59.123456789+00:00");
+    }
+
+    #[test]
+    fn unix_seconds_reads_v5_and_v6_text_and_rejects_junk() {
+        assert_eq!(unix_seconds("2026-01-01T00:00:00Z"), Some(1_767_225_600));
+        assert_eq!(
+            unix_seconds("2026-01-01T00:00:00.000000+00:00"),
+            Some(1_767_225_600)
+        );
+        assert_eq!(unix_seconds("garbage"), None);
     }
 }

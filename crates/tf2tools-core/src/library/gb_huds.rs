@@ -2,8 +2,13 @@
 //! library HUDs of one item share a single request.
 
 use super::gb_addons::{CHECK_INTERVAL, gb_id_column};
-use super::{GbAddonCheck, GbId, Library, library_db};
+use super::{GbAddonCheck, GbId, HudEntry, Library, library_db};
 use crate::error::LibraryError;
+use crate::timestamp::unix_seconds;
+use rusqlite::OptionalExtension;
+
+/// A HUD item's check row: (latest file date, checked at, gone).
+pub(super) type HudCheckRow = (Option<i64>, Option<i64>, bool);
 
 fn column(gb_id: GbId) -> Result<i64, LibraryError> {
     gb_id_column(gb_id, |message| LibraryError::Database { message })
@@ -79,6 +84,39 @@ impl Library {
                 ),
             })
             .map(drop)
+            .map_err(library_db)
+    }
+
+    /// A GameBanana HUD's version mark in unix seconds: its file's date when the download
+    /// recorded one, else when it was added; `None` when neither reads as a time.
+    pub(super) fn hud_gb_mark(&self, hud: &HudEntry) -> Result<Option<i64>, LibraryError> {
+        let date: Option<i64> = self
+            .db
+            .read(|conn| {
+                conn.query_row(
+                    "SELECT gb_file_date FROM library_huds WHERE id = ?1",
+                    [hud.id().as_str()],
+                    |r| r.get(0),
+                )
+                .optional()
+            })
+            .map_err(library_db)?
+            .flatten();
+        Ok(date.or_else(|| unix_seconds(hud.created_at())))
+    }
+
+    /// The check row of HUD item `gb_id`, when it is tracked.
+    pub(super) fn gb_hud_check(&self, gb_id: GbId) -> Result<Option<HudCheckRow>, LibraryError> {
+        let id = column(gb_id)?;
+        self.db
+            .read(|conn| {
+                conn.query_row(
+                    "SELECT latest_file_date, checked_at, gone FROM gb_hud_checks WHERE gb_id = ?1",
+                    [id],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get::<_, i64>(2)? != 0)),
+                )
+                .optional()
+            })
             .map_err(library_db)
     }
 }
