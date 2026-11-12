@@ -11,7 +11,7 @@ use gpui_kit::{
     App, Div, ElementId, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
     RenderImage, Styled as _, TestSupportExt as _, img, px,
 };
-use tf2tools_core::{HudFiles, Platform, RgbaImage};
+use tf2tools_core::{HudFiles, Platform, RgbaImage, WeaponNames};
 
 use crate::folder_load::FolderLoad;
 use crate::hud_textures::{crop, texture_pixels};
@@ -35,6 +35,15 @@ impl KillIconImages {
     /// The icon for a logs.tf weapon name, ignoring case.
     pub fn get(&self, log_name: &str) -> Option<&Arc<RenderImage>> {
         self.0.get(&log_name.to_lowercase())
+    }
+
+    /// The icon the killfeed draws for a logs.tf weapon name: the first of `names`' candidates
+    /// the game has, so unlocks logged apart from their icon still get one.
+    pub fn for_weapon(&self, log_name: &str, names: &WeaponNames) -> Option<&Arc<RenderImage>> {
+        names
+            .kill_icons(log_name)
+            .into_iter()
+            .find_map(|name| self.get(name))
     }
 
     /// How many icons there are.

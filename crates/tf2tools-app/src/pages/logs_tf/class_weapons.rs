@@ -82,7 +82,9 @@ fn weapon_table(
     let rows = class_weapon_rows(weapons, names);
     // Once any row has an icon, every row keeps a slot for one so the names line up; the name
     // column grows by the slot so long names keep their room.
-    let slotted = rows.iter().any(|w| icons.get(&w.raw).is_some());
+    let slotted = rows
+        .iter()
+        .any(|w| icons.for_weapon(&w.raw, names).is_some());
     let name_min = if slotted {
         NAME + ICON_SLOT + SLOT_GAP
     } else {
@@ -104,7 +106,7 @@ fn weapon_table(
         let dmg = format!("{} ({})", w.dmg, w.dmg_share);
         let label: SharedString = format!("{} {kills} {dmg} {}", w.name, w.accuracy).into();
         let icon = icons
-            .get(&w.raw)
+            .for_weapon(&w.raw, names)
             .map(|image| weapon_icon(ids::logstf_class_weapon_icon(class, &w.raw), image));
         let name = h_flex()
             .flex_1()
