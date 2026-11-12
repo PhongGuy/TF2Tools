@@ -1,13 +1,16 @@
 //! The Maps page: serveme.tf's community maps in a searchable, sortable list, each one
-//! downloadable into `tf/maps`, and removable when TF2Tools put it there.
+//! downloadable into `tf/maps`, and removable when TF2Tools put it there. A source strip
+//! switches to GameBanana's maps, browsed with the Addon Store's GameBanana tab.
 
 pub mod model;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, Icon, IndexPath, Sizable as _};
+use gpui_kit::component::{
+    ActiveTheme as _, Disableable as _, Icon, IndexPath, Selectable as _, Sizable as _,
+};
 use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -16,12 +19,13 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
     Window, div, list, px,
 };
-use tf2tools_core::{MapState, StoreClient};
+use tf2tools_core::{AddonSection, MapState, StoreClient};
 
 use crate::ids;
 use crate::map_messages::{
     describe_map_download, describe_map_remove, describe_map_sync, map_stopped,
 };
+use crate::pages::addon_store::gamebanana_tab::AddonTab;
 use crate::pages::common::no_tf2_warning;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
@@ -68,6 +72,33 @@ struct Running {
 
 type Labels = Entity<SelectState<Vec<LabelOption>>>;
 
+/// Where the Maps page lists maps from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MapsSource {
+    Serveme,
+    GameBanana,
+}
+
+impl MapsSource {
+    pub const ALL: [MapsSource; 2] = [MapsSource::Serveme, MapsSource::GameBanana];
+
+    /// The key in the source button's id.
+    pub fn key(self) -> &'static str {
+        match self {
+            MapsSource::Serveme => "serveme",
+            MapsSource::GameBanana => "gamebanana",
+        }
+    }
+
+    /// The source button's label.
+    pub fn title(self) -> &'static str {
+        match self {
+            MapsSource::Serveme => "serveme.tf",
+            MapsSource::GameBanana => "GameBanana",
+        }
+    }
+}
+
 /// The Maps page. It reads the cached list on creation and asks for a fresh one once; it
 /// is kept while hidden, so search, sort and scroll survive a trip to another page.
 pub struct MapsPage {
@@ -90,6 +121,10 @@ pub struct MapsPage {
     list: ListState,
     search: Entity<InputState>,
     sort_select: Labels,
+    source: MapsSource,
+    /// GameBanana's map tab, built the first time that source shows.
+    gamebanana: Option<Entity<AddonTab>>,
+    hidden: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -133,6 +168,9 @@ impl MapsPage {
             list: ListState::new(0, ListAlignment::Top, px(400.)),
             search,
             sort_select,
+            source: MapsSource::Serveme,
+            gamebanana: None,
+            hidden: false,
             _subscriptions: subscriptions,
         };
         page.reload(cx);
@@ -192,10 +230,65 @@ impl MapsPage {
     }
 
     /// Re-reads the states on return, since the player may have changed `tf/maps` meanwhile.
+    /// The GameBanana tab hides with the page.
     pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        self.hidden = hidden;
         if !hidden {
             self.reload(cx);
         }
+        self.sync_tab_hidden(cx);
+    }
+
+    /// The source showing; serveme.tf when the page is made.
+    pub fn source(&self) -> MapsSource {
+        self.source
+    }
+
+    /// Shows `source`, building the GameBanana tab the first time, which starts its first step.
+    pub fn select_source(
+        &mut self,
+        source: MapsSource,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.source = source;
+        if source == MapsSource::GameBanana && self.gamebanana.is_none() {
+            self.gamebanana = Some(cx.new(|cx| AddonTab::new(AddonSection::MAPS, window, cx)));
+        }
+        self.sync_tab_hidden(cx);
+        cx.notify();
+    }
+
+    /// GameBanana's map tab, once built.
+    pub fn gamebanana(&self) -> Option<Entity<AddonTab>> {
+        self.gamebanana.clone()
+    }
+
+    // Only a drawn tab holds image wants and steps, so it shows only on a shown page under
+    // the GameBanana source.
+    fn sync_tab_hidden(&self, cx: &mut Context<Self>) {
+        let hidden = self.hidden || self.source != MapsSource::GameBanana;
+        if let Some(tab) = &self.gamebanana {
+            tab.update(cx, |tab, cx| tab.set_hidden(hidden, cx));
+        }
+    }
+
+    // As on the Addon Store, a joined group of h-9 buttons.
+    fn source_strip(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let buttons = MapsSource::ALL.map(|source| {
+            Button::new(ids::maps_source(source.key()))
+                .label(source.title())
+                .h(px(36.))
+                .selected(self.source == source)
+                .on_click(
+                    cx.listener(move |page, _, window, cx| page.select_source(source, window, cx)),
+                )
+        });
+        h_flex().id(ids::MAPS_SOURCE_TABS).test_support().child(
+            ButtonGroup::new(ids::MAPS_SOURCE_GROUP)
+                .outline()
+                .children(buttons),
+        )
     }
 
     // Recomputes the shown rows from the search and sort, back at the top of the list.
@@ -665,6 +758,26 @@ fn map_row(
 
 impl Render for MapsPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let page = v_flex()
+            .id(ids::page(Page::Maps))
+            .test_support()
+            .size_full()
+            .p(CONTENT_PADDING)
+            .gap_4()
+            .child(self.source_strip(cx));
+        // Only one source renders, so the tab's ids never meet the list's.
+        if self.source == MapsSource::GameBanana {
+            return page
+                .child(
+                    div()
+                        .id(ids::MAPS_GB_INFO)
+                        .test_support()
+                        .text_sm()
+                        .text_color(cx.theme().muted_foreground)
+                        .child("Community maps from GameBanana. Open a map to see it there."),
+                )
+                .child(div().flex_1().min_h_0().children(self.gamebanana.clone()));
+        }
         self.compact = window.viewport_size().width < WIDE_WINDOW;
         // The box can change without an event (a value set by code), so it is compared here.
         if self.search.read(cx).value().as_ref() != self.query {
@@ -676,13 +789,7 @@ impl Render for MapsPage {
         } else {
             self.rows(cx).into_any_element()
         };
-        v_flex()
-            .id(ids::page(Page::Maps))
-            .test_support()
-            .size_full()
-            .p(CONTENT_PADDING)
-            .gap_4()
-            .child(self.toolbar(cx))
+        page.child(self.toolbar(cx))
             .when(missing, |page| {
                 page.child(no_tf2_warning(
                     ids::MAPS_NO_TF2,

@@ -64,6 +64,8 @@ The HUD Maker shows your HUD the way the game draws it: in a fight, on the score
 
 The Maps page lists the community maps from serveme.tf. Search them by name, sort them by name, by most played or by recently played, and download a map straight into your game. Remove a map you downloaded when you no longer need it.
 
+Switch the page to GameBanana to browse the TF2 maps there. Search them, sort them and pick a gamemode such as King of the Hill, Payload or Mann vs. Machine. Open a map to see its pictures and downloads, with a link to its GameBanana page. Installing GameBanana maps from the app is not there yet.
+
 ### logs.tf stats
 
 The logs.tf page shows your competitive stats from logs.tf. Paste your Steam profile link or Steam ID to track yourself, and add teammates the same way. Each player gets a card per class with their averages, and below it a list of their logs. Click a class someone played to see their weapons for it: kills, damage and accuracy for each one. Weapons go by their in-game names, read from your TF2 install when TF2Tools finds it. Each weapon shows its kill feed icon, also read from your TF2 install. Drag the range slider to look at only your most recent logs. Open a log to see it the way logs.tf shows it: the players, the kills between classes, the rounds and the events. TF2Tools downloads your logs once and keeps them, so the page works offline, and a download that stopped picks up where it left off.
@@ -126,7 +128,7 @@ TF2 reads its HUD, sounds and crosshairs when it starts, so restart the game to 
 
 ## Privacy
 
-No accounts, no ads, no tracking. TF2Tools goes online for the stores (GameBanana, GitHub and mastercomfig.com), for the Maps page (serveme.tf), for the logs.tf page (logs.tf, and Steam to look up a profile link) and to check GitHub for a new version of TF2Tools. Your library stays on your computer. The weapon icons in the crosshair list come from your own TF2 install.
+No accounts, no ads, no tracking. TF2Tools goes online for the stores (GameBanana, GitHub and mastercomfig.com), for the Maps page (serveme.tf and GameBanana), for the logs.tf page (logs.tf, and Steam to look up a profile link) and to check GitHub for a new version of TF2Tools. Your library stays on your computer. The weapon icons in the crosshair list come from your own TF2 install.
 
 ## License
 

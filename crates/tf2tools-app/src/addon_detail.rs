@@ -150,6 +150,10 @@ impl AddonDetail {
     // what the library holds; or, once the profile is read, why a download can't happen.
     // A first install waits for the profile, which it downloads from.
     fn install_control(&self, cx: &mut Context<Self>) -> (Option<Button>, Option<AnyElement>) {
+        // Maps are browse-only until map installing exists, so their detail has no control.
+        if self.section == AddonSection::MAPS {
+            return (None, None);
+        }
         let ready = self.ready();
         let installs = self.installs.read(cx);
         let offer = Offer::of(installs.entry(self.card.id));

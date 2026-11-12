@@ -154,6 +154,7 @@ mod logs_tf_sync;
 mod logs_tf_text;
 mod logs_tf_weapons;
 mod maps;
+mod maps_gamebanana;
 mod maps_model;
 mod mastercomfig_restore;
 mod notices;

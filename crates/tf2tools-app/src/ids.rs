@@ -2451,6 +2451,17 @@ pub const MAPS_ERROR: &str = "maps-error";
 pub const MAPS_RETRY: &str = "maps-retry";
 /// The Maps page's "TF2 not found" warning, present only without a TF2 install.
 pub const MAPS_NO_TF2: &str = "maps-no-tf2";
+/// The Maps page's source strip, serveme.tf or GameBanana.
+pub const MAPS_SOURCE_TABS: &str = "maps-source-tabs";
+/// The joined button group inside the source strip.
+pub const MAPS_SOURCE_GROUP: &str = "maps-source-group";
+/// The GameBanana source's info line.
+pub const MAPS_GB_INFO: &str = "maps-gb-info";
+
+/// One source's button in the strip, labelled with its title: "maps-source:<key>".
+pub fn maps_source(key: &str) -> ElementId {
+    keyed("maps-source", key)
+}
 
 /// The logs.tf page's "Stats from logs.tf" credit, which opens logs.tf.
 pub const LOGSTF_CREDIT: &str = "logstf-credit";
