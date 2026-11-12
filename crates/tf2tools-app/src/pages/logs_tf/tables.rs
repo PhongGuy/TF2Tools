@@ -21,61 +21,116 @@ pub struct WeaponRow {
     pub accuracy: String,
 }
 
-/// `class`'s weapons by kills high to low (ties keep core's order); shares are of the player's
-/// whole-log kills and damage.
+/// `class`'s weapons it can equip by kills high to low (ties keep core's order), rows of one
+/// shown name merged; shares are of the player's whole-log kills and damage.
 pub fn weapon_rows(player: &PlayerLine, class: &ClassLine, names: &WeaponNames) -> Vec<WeaponRow> {
     let mut weapons: Vec<_> = class.weapons().iter().collect();
     weapons.sort_by_key(|w| std::cmp::Reverse(w.kills()));
-    weapons
+    let mut tallies = class_tallies(
+        class.class(),
+        names,
+        weapons
+            .into_iter()
+            .map(|w| (w.name(), w.kills(), w.dmg(), w.hits(), w.shots())),
+    );
+    // Merged rows can outgrow the ones above them, so they take their place by kills again.
+    tallies.sort_by_key(|t| std::cmp::Reverse(t.kills));
+    tallies
         .into_iter()
-        .map(|w| WeaponRow {
-            raw: w.name().to_owned(),
-            name: shown_name(w.name(), names),
-            kills: w.kills(),
-            kill_share: share_text(w.kills(), player.kills()),
-            dmg: w.dmg(),
-            dmg_share: share_text(w.dmg(), player.dmg()),
-            accuracy: accuracy_text(w.hits(), w.shots()),
-        })
+        .map(|t| t.row(player.kills(), player.dmg()))
         .collect()
 }
 
 /// The class weapons block's rows for `class` in core's order (damage high to low), leaving out
-/// weapons the game says `class` cannot equip, which logs.tf files there after a class switch.
+/// weapons the game says `class` cannot equip, which logs.tf files there after a class switch,
+/// and merging rows of one shown name.
 pub fn class_weapon_rows(
     class: TfClass,
     weapons: &ClassWeapons,
     names: &WeaponNames,
 ) -> Vec<WeaponRow> {
     let narrow = |n: i64| u32::try_from(n).unwrap_or(u32::MAX);
-    let shown: Vec<&WeaponSum> = weapons
-        .weapons()
-        .iter()
-        .filter(|w| names.usable_by(w.name(), class))
-        .collect();
+    let mut tallies = class_tallies(
+        class,
+        names,
+        weapons.weapons().iter().map(|w: &WeaponSum| {
+            let (kills, dmg) = (narrow(w.kills()), narrow(w.dmg()));
+            (w.name(), kills, dmg, narrow(w.hits()), narrow(w.shots()))
+        }),
+    );
+    tallies.sort_by_key(|t| std::cmp::Reverse(t.dmg));
     // Shares are of the shown rows' summed kills and damage, so they still add to about 100%.
-    let kills = narrow(shown.iter().map(|w| w.kills()).sum());
-    let dmg = narrow(shown.iter().map(|w| w.dmg()).sum());
-    shown
-        .into_iter()
-        .map(|w| WeaponRow {
-            raw: w.name().to_owned(),
-            name: names
-                .class_name(w.name(), class)
-                .unwrap_or(w.name())
-                .to_owned(),
-            kills: narrow(w.kills()),
-            kill_share: share_text(narrow(w.kills()), kills),
-            dmg: narrow(w.dmg()),
-            dmg_share: share_text(narrow(w.dmg()), dmg),
-            accuracy: accuracy_text(narrow(w.hits()), narrow(w.shots())),
-        })
-        .collect()
+    let kills = tallies
+        .iter()
+        .fold(0u32, |sum, t| sum.saturating_add(t.kills));
+    let dmg = tallies
+        .iter()
+        .fold(0u32, |sum, t| sum.saturating_add(t.dmg));
+    tallies.into_iter().map(|t| t.row(kills, dmg)).collect()
 }
 
-// The game's name for a logs.tf weapon, or the log name when the game has none.
-fn shown_name(raw: &str, names: &WeaponNames) -> String {
-    names.get(raw).unwrap_or(raw).to_owned()
+// One shown weapon line before wording: the first log name's id, the summed counts, and the
+// hits and shots of the one side that measured them, if exactly one did.
+struct Tally {
+    raw: String,
+    name: String,
+    kills: u32,
+    dmg: u32,
+    hits: u32,
+    shots: u32,
+    measured: u32,
+}
+
+impl Tally {
+    fn row(self, all_kills: u32, all_dmg: u32) -> WeaponRow {
+        let (hits, shots) = if self.measured == 1 {
+            (self.hits, self.shots)
+        } else {
+            (0, 0)
+        };
+        WeaponRow {
+            raw: self.raw,
+            name: self.name,
+            kills: self.kills,
+            kill_share: share_text(self.kills, all_kills),
+            dmg: self.dmg,
+            dmg_share: share_text(self.dmg, all_dmg),
+            accuracy: accuracy_text(hits, shots),
+        }
+    }
+}
+
+// `weapons` (log name, kills, damage, hits, shots) that `class` can equip, named for `class`,
+// in order with each later row of an already shown name folded into the first.
+fn class_tallies<'a>(
+    class: TfClass,
+    names: &WeaponNames,
+    weapons: impl Iterator<Item = (&'a str, u32, u32, u32, u32)>,
+) -> Vec<Tally> {
+    let mut tallies: Vec<Tally> = Vec::new();
+    for (raw, kills, dmg, hits, shots) in weapons.filter(|w| names.usable_by(w.0, class)) {
+        let name = names.class_name(raw, class).unwrap_or(raw);
+        let measured = u32::from(shots > 0);
+        if let Some(t) = tallies.iter_mut().find(|t| t.name == name) {
+            t.kills = t.kills.saturating_add(kills);
+            t.dmg = t.dmg.saturating_add(dmg);
+            t.measured += measured;
+            if measured == 1 {
+                (t.hits, t.shots) = (hits, shots);
+            }
+        } else {
+            tallies.push(Tally {
+                raw: raw.to_owned(),
+                name: name.to_owned(),
+                kills,
+                dmg,
+                hits,
+                shots,
+                measured,
+            });
+        }
+    }
+    tallies
 }
 
 /// One player a Medic healed, with their share of the Medic's healing worded.

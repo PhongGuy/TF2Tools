@@ -814,7 +814,8 @@ fn switched_classes_log() -> Vec<u8> {
     let arie = &mut log["players"]["[U:1:231702]"]["class_stats"];
     let pyro = &mut arie[1]["weapon"];
     pyro["quake_rl"] = weapon(2, 400, 10, 5);
-    pyro["tf_projectile_rocket"] = weapon(1, 150, 0, 0);
+    pyro["tf_projectile_rocket"] = weapon(1, 150, 4, 2);
+    pyro["deflect_rocket"] = weapon(1, 0, 0, 0);
     pyro["mystery_gun"] = weapon(1, 48, 0, 0);
     let medic = serde_json::json!({"type": "medic", "kills": 3, "assists": 0, "deaths": 0,
         "dmg": 500, "total_time": 60, "weapon": {
@@ -849,14 +850,16 @@ fn a_class_lists_only_weapons_it_can_equip(cx: &mut TestAppContext) {
         None,
         "a Soldier weapon"
     );
-    // Shares are of the shown rows alone: 2 kills and 56 + 46 + 150 + 48 = 300 damage.
+    // Shares are of the shown rows alone: 3 kills and 56 + 46 + 150 + 48 = 300 damage. Both
+    // rocket keys read "Reflected rocket", so they share the first one's row and its accuracy.
     assert_eq!(
         row(cx, &s, TfClass::Pyro, "tf_projectile_rocket").as_deref(),
-        Some(format!("Reflected rocket 1 (50%) 150 (50%) {}", accuracy_text(0, 0)).as_str())
+        Some("Reflected rocket 2 (67%) 150 (50%) 50%")
     );
+    assert_eq!(row(cx, &s, TfClass::Pyro, "deflect_rocket"), None, "merged");
     assert_eq!(
         row(cx, &s, TfClass::Pyro, "mystery_gun").as_deref(),
-        Some(format!("mystery_gun 1 (50%) 48 (16%) {}", accuracy_text(0, 0)).as_str()),
+        Some(format!("mystery_gun 1 (33%) 48 (16%) {}", accuracy_text(0, 0)).as_str()),
         "an unknown weapon stays"
     );
 
