@@ -1023,3 +1023,18 @@ fn while_another_addon_works_gamebanana_buttons_rest_but_the_link(cx: &mut TestA
     });
     assert_eq!(support::disabled_ids(cx, s.win, &all), vec![update, remove]);
 }
+
+#[gpui_kit::test]
+fn a_recorded_gamebanana_map_is_neither_counted_nor_listed(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(4, "koth_x", &[("a.vpk", gb_vpk(), 100)]);
+    let s = store_shell(cx, &env, &server);
+    install_gb(cx, &s, 4, "maps");
+    let _page = open_addons(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::ADDONS_COUNT).as_deref(),
+        Some("No addons in library")
+    );
+    assert!(support::present(cx, s.win, ids::ADDONS_EMPTY));
+    assert!(!support::present(cx, s.win, ids::ADDONS_GB));
+}

@@ -50,12 +50,12 @@ fn main_action(entry: &GbAddonEntry) -> Option<Main> {
     }
 }
 
-/// The entries the page draws: a row naming a section this build does not know has no group,
-/// so it is left out of the count as well.
+/// The entries the page draws: only Addon Store sections have a group, so a map or a section
+/// this build does not know is left out of the count as well.
 pub(super) fn shown(entries: &[GbAddonEntry]) -> impl Iterator<Item = &GbAddonEntry> {
     entries
         .iter()
-        .filter(|e| AddonSection::by_key(e.section()).is_some())
+        .filter(|e| AddonSection::ALL.iter().any(|s| s.key() == e.section()))
 }
 
 /// "GameBanana add-ons" with one titled group per section that has an entry, in tab order.
