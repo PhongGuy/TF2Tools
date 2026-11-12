@@ -1,5 +1,7 @@
 //! Killfeed weapon icons from the game's HUD icon tables.
 
+use std::collections::HashSet;
+
 use crate::error::HudFilesError;
 use crate::fonts::Platform;
 use crate::fonts::keyvalues::{KvPair, block, block_named, text};
@@ -77,6 +79,36 @@ impl KillIcons {
         };
         find(name).or_else(fallback)
     }
+
+    /// Every name [`KillIcons::get`] answers with a region, written with its prefix (`d_x`,
+    /// `dneg_x` or a bare `file` name), in table then entry order and once regardless of case.
+    /// `dneg_` names an entry does not declare are left out.
+    pub fn names(&self) -> Vec<String> {
+        let mut seen = HashSet::new();
+        let mut names = Vec::new();
+        for root in self
+            .tables
+            .iter()
+            .filter_map(|pairs| pairs.iter().find_map(block))
+        {
+            let prefixes = prefixes(root);
+            for entry in block_named(root, "TextureData").unwrap_or_default() {
+                let Some(keys) = block(entry) else {
+                    continue;
+                };
+                for &(file_key, prefix) in &prefixes {
+                    let name = format!("{prefix}{}", entry.key);
+                    if text(keys, file_key).is_some()
+                        && seen.insert(name.to_lowercase())
+                        && self.get(&name).is_some()
+                    {
+                        names.push(name);
+                    }
+                }
+            }
+        }
+        names
+    }
 }
 
 impl HudFiles {
@@ -104,13 +136,7 @@ impl HudFiles {
 /// `name` in one table: the first entry whose prefixed name matches and that draws a region.
 fn icon_in(pairs: &[KvPair], name: &str) -> Option<KillIcon> {
     let root = pairs.iter().find_map(block)?;
-    // A file key's prefix: plain `file` has none, the rest are declared in TextureFileRefs.
-    let mut prefixes = vec![("file", "")];
-    for file_ref in block_named(root, "TextureFileRefs").unwrap_or_default() {
-        if let Some(prefix) = block(file_ref).and_then(|b| text(b, "prefix")) {
-            prefixes.push((file_ref.key.as_str(), prefix));
-        }
-    }
+    let prefixes = prefixes(root);
     let entries = block_named(root, "TextureData").unwrap_or_default();
     entries.iter().find_map(|entry| {
         let keys = block(entry)?;
@@ -131,4 +157,15 @@ fn icon_in(pairs: &[KvPair], name: &str) -> Option<KillIcon> {
         let glyph = text(keys, "font").is_some() || text(keys, "character").is_some();
         (!glyph && icon.wide > 0 && icon.tall > 0).then_some(icon)
     })
+}
+
+/// Each file key with its prefix: plain `file` has none, the rest are declared in TextureFileRefs.
+fn prefixes(root: &[KvPair]) -> Vec<(&str, &str)> {
+    let mut prefixes = vec![("file", "")];
+    for file_ref in block_named(root, "TextureFileRefs").unwrap_or_default() {
+        if let Some(prefix) = block(file_ref).and_then(|b| text(b, "prefix")) {
+            prefixes.push((file_ref.key.as_str(), prefix));
+        }
+    }
+    prefixes
 }
