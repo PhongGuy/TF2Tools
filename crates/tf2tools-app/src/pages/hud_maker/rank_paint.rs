@@ -36,11 +36,12 @@ impl RankText {
     }
 }
 
-/// The rank name's paint and the track's colour.
+/// The rank name's paint and the track's and fill's colours.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RankPaint {
     name: RankText,
     track: Rgba,
+    fill: Rgba,
 }
 
 impl RankPaint {
@@ -72,6 +73,11 @@ impl RankPaint {
     /// The track segments' colour; unset is the stock `20 20 20 180`.
     pub fn track(&self) -> Rgba {
         self.track
+    }
+
+    /// The filled segments' colour; unset is the scheme's `CreditsGreen`.
+    pub fn fill(&self) -> Rgba {
+        self.fill
     }
 }
 
@@ -112,6 +118,7 @@ pub fn rank_paint(pieces: &RankPieces, scheme: &Scheme, screen_tall: u32) -> Ran
             screen_tall,
         ),
         track: (pieces.track_colour()).map_or(Rgba::new(20, 20, 20, 180), |c| scheme.colour(c)),
+        fill: scheme.colour(pieces.fill_colour().unwrap_or("CreditsGreen")),
     }
 }
 

@@ -61,6 +61,26 @@ fn stock_places_the_name_and_the_track() {
 }
 
 #[test]
+fn three_of_the_ten_segments_are_filled_in_the_fill_colour() {
+    // The fill control sits a unit inside the track; its own ten segments, three of them shown.
+    for (screen, wide, tall, gap) in [(SD, 320, 100, 1), (X2, 640, 200, 2)] {
+        let p = pieces(Some(RANK_PANEL), wide, tall, screen);
+        let f = p.fill_segments();
+        assert_eq!(f.len(), 3, "{f:?}");
+        let bar = p.bar().unwrap();
+        assert!(f[0].x > bar.x && f[0].y > bar.y && f[0].tall < bar.tall);
+        for (a, b) in f.iter().zip(&f[1..]) {
+            assert_eq!(b.x - (a.x + a.wide), gap, "{f:?}");
+        }
+        assert_eq!(p.fill_colour(), Some("CreditsGreen"));
+    }
+    assert_eq!(
+        pieces(Some(RANK_PANEL), 320, 100, SD).fill_segments()[0],
+        Rect::new(127, 61, 17, 5)
+    );
+}
+
+#[test]
 fn the_sample_is_a_level_one_casual_rank_with_its_xp() {
     // As the game shows a new player: the type and level under the name, and the xp so far
     // and needed under the bar's two ends.
@@ -71,7 +91,7 @@ fn the_sample_is_a_level_one_casual_rank_with_its_xp() {
             [
                 ("DescLine1", "Casual", Rect::new(125, 39, 195, 20)),
                 ("DescLine2", "Level: 1", Rect::new(125, 49, 195, 20)),
-                ("CurrentXPLabel", "0 xp", Rect::new(126, 57, 100, 20)),
+                ("CurrentXPLabel", "225 xp", Rect::new(126, 57, 100, 20)),
                 ("NextLevelXPLabel", "750 xp", Rect::new(215, 57, 100, 20)),
             ]
         );
@@ -162,6 +182,7 @@ fn a_hidden_track_draws_no_segments_but_keeps_the_xp_text() {
     let p = pieces(Some(&own), 320, 100, SD);
     assert_eq!(p.bar(), None);
     assert!(p.segments().is_empty());
+    assert_eq!(p.fill_segments().len(), 3, "the fill stays");
     assert_eq!(p.labels().len(), 4);
 }
 

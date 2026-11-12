@@ -1911,6 +1911,11 @@ pub fn hud_maker_rank_segment(key: &PartKey, n: usize) -> ElementId {
     keyed("hud-maker-rank-segment", &format!("{}#{n}", key.as_str()))
 }
 
+/// One filled segment of a rank panel's level bar: "hud-maker-rank-fill:<key>#<n>".
+pub fn hud_maker_rank_fill(key: &PartKey, n: usize) -> ElementId {
+    keyed("hud-maker-rank-fill", &format!("{}#{n}", key.as_str()))
+}
+
 /// A rank panel's rank line or xp label, by its block name in the file:
 /// "hud-maker-rank-label:<key>#<field>".
 pub fn hud_maker_rank_label(key: &PartKey, field: &str) -> ElementId {

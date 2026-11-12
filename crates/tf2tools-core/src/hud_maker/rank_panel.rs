@@ -24,6 +24,8 @@ pub struct RankPieces {
     bar: Option<Rect>,
     track_colour: Option<String>,
     segments: Vec<Rect>,
+    fill_segments: Vec<Rect>,
+    fill_colour: Option<String>,
     labels: Vec<RankLabel>,
 }
 
@@ -78,9 +80,19 @@ impl RankPieces {
     }
 
     /// The track's ten segments, each clipped to the track; empty when the track is hidden.
-    /// The sample has no xp yet, so the green progress bar over them is empty.
     pub fn segments(&self) -> &[Rect] {
         &self.segments
+    }
+
+    /// The progress bar's filled segments, three of its own ten for the sample's 225 of 750 xp,
+    /// each clipped to the fill control. A hidden track leaves them alone.
+    pub fn fill_segments(&self) -> &[Rect] {
+        &self.fill_segments
+    }
+
+    /// The fill's colour from the file, if it sets one.
+    pub fn fill_colour(&self) -> Option<&str> {
+        self.fill_colour.as_deref()
     }
 
     /// The rank lines and xp labels that show: `DescLine1`, `DescLine2`, `CurrentXPLabel`, then
@@ -149,18 +161,22 @@ impl RankLabel {
 
 const NAME_PATH: &str = "BGPanel/NameLabel";
 const TRACK_PATH: &str = "BGPanel/StatsContainer/XPBar/ProgressBarsContainer/ProgressBar";
+const FILL_PATH: &str = "BGPanel/StatsContainer/XPBar/ProgressBarsContainer/ContinuousProgressBar";
 
-/// The labels the game fills for a new casual player: the rank type and level under the name,
+/// The labels the game fills for a casual player part-way through level 1: the rank type and level under the name,
 /// and the xp so far and needed for the next level under the bar's ends.
 const SAMPLE_LABELS: [(&str, &str); 4] = [
     ("BGPanel/DescLine1", "Casual"),
     ("BGPanel/DescLine2", "Level: 1"),
-    ("BGPanel/StatsContainer/XPBar/CurrentXPLabel", "0 xp"),
+    ("BGPanel/StatsContainer/XPBar/CurrentXPLabel", "225 xp"),
     ("BGPanel/StatsContainer/XPBar/NextLevelXPLabel", "750 xp"),
 ];
 
 /// The casual level bar is split into this many segments.
 const SEGMENTS: i32 = 10;
+
+/// How many segments the sample's 225 of 750 xp fills.
+const FILLED: i32 = 3;
 
 /// Edges (left, top, right, bottom) of the area a control may draw in.
 type Edges = (i32, i32, i32, i32);
@@ -277,7 +293,7 @@ pub fn rank_pieces(
             .then(|| place(layout, path, wide, tall, scale))
             .flatten()
     };
-    let (name, track) = (find(NAME_PATH), find(TRACK_PATH));
+    let (name, track, fill) = (find(NAME_PATH), find(TRACK_PATH), find(FILL_PATH));
     let text =
         |p: Option<&Placed>, key: &str| p.and_then(|p| p.control.value(key)).map(str::to_owned);
     // The label shows as a whole box or not at all: hidden or clipped away leaves neither.
@@ -309,7 +325,9 @@ pub fn rank_pieces(
         name_all_caps: name.as_ref().is_some_and(all_caps),
         bar: track.as_ref().and_then(|p| p.shown),
         track_colour: text(track.as_ref(), "fgcolor_override"),
-        segments: track.as_ref().map_or_else(Vec::new, |p| segments(p, scale)),
+        segments: (track.as_ref()).map_or_else(Vec::new, |p| segments(p, SEGMENTS, scale)),
+        fill_segments: (fill.as_ref()).map_or_else(Vec::new, |p| segments(p, FILLED, scale)),
+        fill_colour: text(fill.as_ref(), "fgcolor_override"),
         labels,
     }
 }
@@ -330,9 +348,9 @@ fn all_caps(p: &Placed) -> bool {
         .is_some_and(|v| v > 0)
 }
 
-/// The track's own box cut into equal segments with a one-unit gap between neighbours, each
-/// clipped to what shows of the track; none when the track is hidden or clipped away.
-fn segments(track: &Placed, scale: ScreenScale) -> Vec<Rect> {
+/// The first `count` of a bar's ten equal segments, cut from its own box with a one-unit gap
+/// between neighbours and clipped to what shows of it; none when the bar is hidden.
+fn segments(track: &Placed, count: i32, scale: ScreenScale) -> Vec<Rect> {
     let Some(shown) = track.shown.map(edges) else {
         return Vec::new();
     };
@@ -340,7 +358,7 @@ fn segments(track: &Placed, scale: ScreenScale) -> Vec<Rect> {
     let (x, wide) = (i64::from(track.own.x), i64::from(track.own.wide));
     let (top, bottom) = (i64::from(track.own.y), i64::from(edges(track.own).3));
     let n = i64::from(SEGMENTS);
-    (0..n)
+    (0..i64::from(count.min(SEGMENTS)))
         .filter_map(|i| {
             let left = x + i * wide / n;
             let right = x + (i + 1) * wide / n - if i + 1 < n { gap } else { 0 };

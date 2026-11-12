@@ -2182,7 +2182,7 @@ fn the_main_menu_draws_a_sample_rank_where_the_game_draws_yours(cx: &mut TestApp
     for (field, text) in [
         ("DescLine1", "Casual"),
         ("DescLine2", "Level: 1"),
-        ("CurrentXPLabel", "0 xp"),
+        ("CurrentXPLabel", "225 xp"),
         ("NextLevelXPLabel", "750 xp"),
     ] {
         assert_eq!(
@@ -2200,6 +2200,17 @@ fn the_main_menu_draws_a_sample_rank_where_the_game_draws_yours(cx: &mut TestApp
         cx,
         s.win,
         ids::hud_maker_rank_segment(&level, 10)
+    ));
+    // Three tenths of the way through the level: three segments filled.
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::hud_maker_rank_fill(&level, 2)
+    ));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::hud_maker_rank_fill(&level, 3)
     ));
     // Its medal is off; the medal panel draws the medal as the plain stand-in, beside the name
     // and nothing else.

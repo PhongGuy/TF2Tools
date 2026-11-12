@@ -86,6 +86,11 @@ fn a_hud_that_hides_the_track_keeps_the_xp_text(cx: &mut TestAppContext) {
         s.win,
         ids::hud_maker_rank_segment(&key, 0)
     ));
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::hud_maker_rank_fill(&key, 0)
+    ));
     let xp = ids::hud_maker_rank_label(&key, "NextLevelXPLabel");
     assert_eq!(
         support::label_of(cx, s.win, xp.clone()).as_deref(),
@@ -155,15 +160,22 @@ fn an_unset_name_draws_the_canvas_defaults() {
 }
 
 #[test]
-fn the_track_takes_the_files_colour_else_the_stock_one() {
-    let rank = rank_file("visible 1", "wide f0 tall f-2").replace(
-        "fgcolor_override \"20 20 20 180\"",
-        "fgcolor_override \"1 2 3 4\"",
-    );
+fn the_track_and_fill_take_the_files_colours_else_the_stock_ones() {
+    let rank = rank_file("visible 1", "wide f0 tall f-2")
+        .replace(
+            "fgcolor_override \"20 20 20 180\"",
+            "fgcolor_override \"1 2 3 4\"",
+        )
+        .replace(
+            "fgcolor_override CreditsGreen",
+            "fgcolor_override \"5 6 7 8\"",
+        );
     let p = paint_of(&rank);
     assert_eq!(p.track(), tf2tools_core::Rgba::new(1, 2, 3, 4));
-    let bare =
-        rank_file("visible 1", "wide f0 tall f-2").replace("fgcolor_override \"20 20 20 180\"", "");
+    assert_eq!(p.fill(), tf2tools_core::Rgba::new(5, 6, 7, 8));
+    let bare = rank_file("visible 1", "wide f0 tall f-2")
+        .replace("fgcolor_override \"20 20 20 180\"", "")
+        .replace("fgcolor_override CreditsGreen", "");
     let p = paint_of(&bare);
     assert_eq!(p.track(), tf2tools_core::Rgba::new(20, 20, 20, 180));
 }

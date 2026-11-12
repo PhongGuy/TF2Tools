@@ -2400,7 +2400,7 @@ fn model_block_value(part: &Part, model: &HudModel, key: &str) -> Option<f32> {
 
 // The sample rank where the game draws the player's: the medal, a 3D model whose flat picture
 // the game does not ship, as the plain stand-in; the name, rank lines and xp in the game's fonts
-// and colours; and the level bar's ten segments, empty as a new player's.
+// and colours; and the level bar's ten segments, three of them filled.
 fn rank(part: &Part, b: &PartBox, look: &Look) -> Vec<AnyElement> {
     let pieces = rank_pieces(look.model, part, b.wide(), b.tall(), look.screen);
     // The game draws its medal left of the name, so the stand-in keeps off the text.
@@ -2484,11 +2484,19 @@ fn rank(part: &Part, b: &PartBox, look: &Look) -> Vec<AnyElement> {
             .bg(track)
             .into_any_element()
     });
+    // The filled segments come after the track's so they paint over it.
+    let fill = look.shade(paint.fill());
+    let filled = pieces.fill_segments().iter().enumerate().map(|(n, &r)| {
+        piece(ids::hud_maker_rank_fill(part.key(), n), r)
+            .bg(fill)
+            .into_any_element()
+    });
     [medal, name, bar]
         .into_iter()
         .flatten()
         .chain(lines)
         .chain(segments)
+        .chain(filled)
         .collect()
 }
 
