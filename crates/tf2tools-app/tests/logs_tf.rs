@@ -1504,13 +1504,16 @@ fn shaped(cx: &mut TestAppContext, win: gpui_kit::AnyWindowHandle, text: &str, r
 }
 
 #[gpui_kit::test]
-fn a_typical_map_reads_whole_and_the_title_gives_way_in_the_smallest_window(
+fn a_typical_map_reads_whole_and_a_long_title_gives_way_in_the_smallest_window(
     cx: &mut TestAppContext,
 ) {
     use gpui_kit::{px, size};
     let env = support::env();
     let server = support::StoreServer::start();
-    let (title, map) = ("serveme.tf #1234567", "cp_process_final");
+    let (title, map) = (
+        "serveme.tf #1234567 RGL Invite Grand Finals",
+        "cp_process_final",
+    );
     let body = format!(
         r#"{{"success": true, "results": 1, "total": 1, "parameters": {{}}, "logs": [
             {{"id": 3, "title": "{title}", "map": "{map}", "date": {}, "views": 0, "players": 12}}]}}"#,
@@ -1522,8 +1525,13 @@ fn a_typical_map_reads_whole_and_the_title_gives_way_in_the_smallest_window(
     cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
     let page = open_page(cx, &s);
     to_end(cx, &page);
-    // The eight stats keep their room, so the title may be cut short but stays readable.
+    // The eight stats keep their room, so a long title is cut short but stays readable.
     let cell = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
+    let need = shaped(cx, s.win, title, 0.875);
+    assert!(
+        f32::from(cell.size.width) < need,
+        "title {cell:?} whole at {need} px"
+    );
     assert!(cell.size.width >= px(96.), "title {cell:?} still readable");
     let cell = support::bounds_of(cx, s.win, ids::logstf_log_map(3)).unwrap();
     let need = shaped(cx, s.win, map, 0.75);
