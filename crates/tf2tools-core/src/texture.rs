@@ -224,6 +224,35 @@ pub(crate) fn vtf_size(bytes: &[u8]) -> Option<(u32, u32)> {
     Some((side(16)?, side(18)?))
 }
 
+/// A crosshair VTF as the game should load it. Every weapon script samples a 64x64 rect, so
+/// a smaller texture whose sides both divide 64 is scaled up by nearest neighbour and encoded
+/// as `rgba_to_vtf` does; anything else, or a file that does not decode, comes back unchanged.
+pub(crate) fn crosshair_for_game(bytes: Vec<u8>) -> Vec<u8> {
+    let fits = |side: u32| side > 0 && side < CANVAS && CANVAS.is_multiple_of(side);
+    match vtf_size(&bytes) {
+        Some((w, h)) if fits(w) && fits(h) => {}
+        _ => return bytes,
+    }
+    let Ok(small) = decode_vtf(&bytes) else {
+        return bytes;
+    };
+    // Each target pixel reads the source pixel it falls in, so a 32x32 dot becomes a 2x2 block.
+    let (fx, fy) = (CANVAS / small.width, CANVAS / small.height);
+    let pixels = (0..CANVAS)
+        .flat_map(|y| (0..CANVAS).map(move |x| (x / fx, y / fy)))
+        .flat_map(|(x, y)| {
+            let at = ((y * small.width + x) * 4) as usize;
+            small.pixels[at..at + 4].to_vec()
+        })
+        .collect();
+    let big = RgbaImage {
+        width: CANVAS,
+        height: CANVAS,
+        pixels,
+    };
+    rgba_to_vtf(&big).unwrap_or(bytes)
+}
+
 /// Converts a PNG to an RGBA8888 crosshair VTF. The image is scaled with Lanczos3
 /// to fit 64x64 keeping its aspect ratio and centred on a transparent canvas.
 ///

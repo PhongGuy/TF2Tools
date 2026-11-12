@@ -16,7 +16,7 @@ use crate::crosshair_catalog::BuiltinCrosshairs;
 use crate::error::{ImportError, InstallError, LibraryError, PaintError, VtfError};
 use crate::paths::LibraryKind;
 use crate::templates;
-use crate::texture::{RgbaImage, decode_vtf, png_to_vtf, rgba_to_vtf};
+use crate::texture::{RgbaImage, crosshair_for_game, decode_vtf, png_to_vtf, rgba_to_vtf};
 use crate::tf2::Tf2Install;
 use crate::{ice, pak};
 
@@ -1042,7 +1042,8 @@ impl Library {
                 // the template instead.
                 let name = templates::texture_name(reference);
                 let vtf = materials.join(format!("{name}.vtf"));
-                std::fs::copy(&found.vtf, &vtf).map_err(io_at(&vtf))?;
+                let bytes = std::fs::read(&found.vtf).map_err(io_at(&found.vtf))?;
+                std::fs::write(&vtf, crosshair_for_game(bytes)).map_err(io_at(&vtf))?;
                 let vmt = materials.join(format!("{name}.vmt"));
                 match &found.vmt {
                     Some(src) if name == reference.as_str() => std::fs::copy(src, &vmt).map(drop),
