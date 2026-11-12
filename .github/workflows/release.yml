@@ -50,24 +50,29 @@ jobs:
 
   linux:
     needs: gate
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
+    # Built against 22.04's glibc, so the binary needs at most GLIBC_2.35 and runs on 22.04 LTS and newer.
+    container:
+      image: ubuntu:22.04@sha256:74b12b11ffa550fba1929ad4d8d16533c34f6612728469671afba1b03b66881c
     timeout-minutes: 60
     env:
       # The update-test-key feature refuses to compile with this set (updater/keys.rs).
       TF2TOOLS_RELEASE_BUILD: "1"
-      # linuxdeploy runs its own AppImages, and the runner has no FUSE for them.
+      # linuxdeploy runs its own AppImages, and the container has no FUSE for them.
       APPIMAGE_EXTRACT_AND_RUN: "1"
+      DEBIAN_FRONTEND: noninteractive
     steps:
+      # First, since checkout needs git to clone rather than fetch a tarball. The container runs as root.
+      - name: Install build tools and system libraries
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends build-essential cmake ca-certificates curl git file pkg-config libfontconfig-dev libfreetype-dev libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev libvulkan1 libegl1 libasound2-dev
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
-      - name: Install system libraries
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends file pkg-config libfontconfig-dev libfreetype-dev libwayland-dev libx11-xcb-dev libxkbcommon-x11-dev libvulkan1 libegl1 libasound2-dev
       - name: Install cargo-packager
         run: cargo install cargo-packager --version 0.11.8 --locked
       - name: Package
