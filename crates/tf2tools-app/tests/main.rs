@@ -228,3 +228,4 @@ mod vendor_patch;
 mod version;
 mod weapon_assigner;
 mod weapon_icons;
+mod weapon_names;
