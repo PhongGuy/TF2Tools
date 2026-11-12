@@ -17,15 +17,16 @@ use gpui_kit::component::{
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, AsyncApp, ClickEvent, Context, Div,
-    ElementId, Entity, EventEmitter, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    ObjectFit, ParentElement as _, Pixels, Render, Role, ScrollHandle, SharedString, Stateful,
-    StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription, Task,
+    ElementId, Entity, EventEmitter, FontWeight, Global, Hsla, InteractiveElement as _,
+    IntoElement, ObjectFit, ParentElement as _, Pixels, Render, Role, ScrollHandle, SharedString,
+    Stateful, StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription, Task,
     TestSupportExt as _, WeakEntity, Window, div, img, px, relative, rgb, transparent_black,
 };
 
 use tf2tools_core::{
-    CopyUpdate, DownloadUpdate, HudEntry, HudId, HudInstall, HudStatus, LibraryEntry, LibraryError,
-    LogLevel, NewLogEntry, Platform, Provenance, StoreItem, StoreItemId, StoreKind, Tf2Install,
+    CopyUpdate, DownloadUpdate, GbId, HudEntry, HudId, HudInstall, HudStatus, LibraryEntry,
+    LibraryError, LogLevel, NewLogEntry, Platform, Provenance, StoreFile, StoreItem, StoreItemId,
+    StoreKind, Tf2Install,
 };
 
 use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, needs_tf2, no_tf2_notice};
@@ -37,7 +38,10 @@ use crate::local_messages::{
     copy_in_store_text, copy_made_text, copy_updated_notice, describe_copy_hud, describe_import,
     describe_library, describe_tf2_install, describe_update_copy, editing_copy_text,
 };
+use crate::pages::graphics::jobs::refuse_while_running;
 use crate::pages::hud_maker::live::{Live, live_job};
+use crate::pages::hud_store::bodies::gamebanana_body;
+use crate::pages::profiles::probe::Tf2Probe;
 use crate::picker::PickKind;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages, local_image_url};
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
@@ -47,6 +51,7 @@ use crate::shell::external_huds::{ExternalPlan, HudAction, check_external};
 use crate::shell::font_check::ask_about_fonts;
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, error_label, toast, toast_error};
+use crate::store_detail::{DetailItem, open_detail};
 use crate::store_messages::{describe_download, describe_files, download_stopped};
 use crate::timing;
 use crate::tokio_bridge;
@@ -91,6 +96,14 @@ enum Busy {
     Update(String),
 }
 
+/// Whether this session's GameBanana HUD check has started.
+#[derive(Default)]
+struct GbHudCheckSession {
+    claimed: bool,
+}
+
+impl Global for GbHudCheckSession {}
+
 /// Asks the shell to open made HUD `0` in the HUD Maker.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EditInHudMaker(pub HudId);
@@ -103,6 +116,8 @@ pub struct HudsPage {
     made: Rc<HashSet<String>>,
     /// Copies' folders and the name of the HUD each was copied from.
     copies: Rc<HashMap<String, String>>,
+    /// Copies' folders and the GameBanana item each one's base came from.
+    copy_items: Rc<HashMap<String, GbId>>,
     /// Copies' folders and whether a newer version of their HUD is out, checked after a load.
     updates: Rc<HashMap<String, CopyUpdate>>,
     /// Folders of unedited store HUDs whose store version is newer, checked after a load.
@@ -204,6 +219,7 @@ impl HudsPage {
             huds: huds.into(),
             made: Rc::default(),
             copies: Rc::default(),
+            copy_items: Rc::default(),
             updates: Rc::default(),
             behind_store: Rc::default(),
             status: None,
@@ -279,15 +295,32 @@ impl HudsPage {
                 .filter(|h| s.library.is_made_hud(h.id()).unwrap_or(false))
                 .map(|h| h.folder_name().to_owned())
                 .collect();
+            // GameBanana items to check: library downloads and the items copies were made from.
+            let mut gb_ids: Vec<GbId> = (huds.iter())
+                .filter_map(|h| match h.provenance() {
+                    Provenance::GameBanana { gb_id, .. } => Some(*gb_id),
+                    Provenance::Local | Provenance::Curated { .. } | _ => None,
+                })
+                .collect();
             // A copy record that cannot be read leaves a plain made HUD card, never a failure.
+            let mut copy_items: HashMap<String, GbId> = HashMap::new();
             let copies: HashMap<String, String> = (huds.iter())
                 .filter(|h| made.contains(h.folder_name()))
                 .filter_map(|h| {
                     let base = s.library.copy_base(h.id()).ok().flatten()?;
+                    let gb = (base.store_id().strip_prefix("gb:"))
+                        .and_then(|n| n.parse().ok())
+                        .map(GbId::new);
+                    if let Some(gb) = gb {
+                        gb_ids.push(gb);
+                        copy_items.insert(h.folder_name().to_owned(), gb);
+                    }
                     Some((h.folder_name().to_owned(), base.name().to_owned()))
                 })
                 .collect();
-            Ok((huds, status, urls, made, copies))
+            gb_ids.sort_unstable();
+            gb_ids.dedup();
+            Ok((huds, status, urls, made, copies, copy_items, gb_ids))
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {
@@ -301,12 +334,14 @@ impl HudsPage {
                     }
                     // A current failure toasts only when it differs from the last one shown.
                     let fresh = match &loaded {
-                        Ok((huds, status, urls, made, copies)) => {
+                        Ok((huds, status, urls, made, copies, copy_items, gb_ids)) => {
                             page.lowered = huds.iter().map(|h| h.name().to_lowercase()).collect();
                             page.huds = huds.as_slice().into();
                             page.made = Rc::new(made.clone());
                             page.copies = Rc::new(copies.clone());
+                            page.copy_items = Rc::new(copy_items.clone());
                             page.check_updates(generation, cx);
+                            page.check_gamebanana(gb_ids.clone(), cx);
                             page.status = status.clone();
                             page.set_store_links(urls.clone(), cx);
                             page.last_failure = None;
@@ -358,8 +393,10 @@ impl HudsPage {
         let (copies, downloads): (Vec<_>, Vec<_>) = (self.huds.iter())
             .filter(|h| {
                 self.copies.contains_key(h.folder_name())
-                    || matches!(h.provenance(), Provenance::Curated { .. })
-                        && !self.made.contains(h.folder_name())
+                    || matches!(
+                        h.provenance(),
+                        Provenance::Curated { .. } | Provenance::GameBanana { .. }
+                    ) && !self.made.contains(h.folder_name())
             })
             .map(|h| (h.folder_name().to_owned(), h.id().clone()))
             .partition(|(folder, _)| self.copies.contains_key(folder));
@@ -391,6 +428,53 @@ impl HudsPage {
                     cx.notify();
                 }
             });
+        })
+        .detach();
+    }
+
+    // Asks GameBanana about `ids` once a session, after making sure each has a check row. The
+    // session is claimed only when a row is due, so a visit with nothing to ask keeps it. The
+    // app starts the runtime on its first frame; a load before that leaves the check to the next.
+    fn check_gamebanana(&mut self, ids: Vec<GbId>, cx: &mut Context<Self>) {
+        let claimed = cx
+            .try_global::<GbHudCheckSession>()
+            .is_some_and(|s| s.claimed);
+        if ids.is_empty() || claimed || !tokio_bridge::is_running(cx) {
+            return;
+        }
+        let due = run_blocking(cx, move |s| {
+            let now = chrono::Utc::now().timestamp();
+            let failed = |e: LibraryError| describe_library(&e).into_op("Couldn't list HUDs");
+            s.library.ensure_gb_hud_checks(&ids).map_err(failed)?;
+            s.library.gb_huds_due_for_check(now).map_err(failed)
+        });
+        cx.spawn(async move |page, cx| {
+            match due.await {
+                Ok(due) if !due.is_empty() => {}
+                Ok(_) => return,
+                Err(err) => {
+                    tracing::warn!("listing GameBanana HUDs due for a check failed: {err}");
+                    return;
+                }
+            }
+            let job = cx.update(|cx| {
+                let session = cx.default_global::<GbHudCheckSession>();
+                if std::mem::replace(&mut session.claimed, true) {
+                    return None;
+                }
+                let store = cx.global::<Services>().store.clone();
+                let now = chrono::Utc::now().timestamp();
+                Some(tokio_bridge::spawn(cx, async move {
+                    store.check_gb_hud_updates(now).await
+                }))
+            });
+            let Some(job) = job else { return };
+            match job.await {
+                Ok(Ok(_)) => {}
+                Ok(Err(err)) => tracing::warn!("GameBanana HUD update check failed: {err}"),
+                Err(join) => tracing::warn!("GameBanana HUD update check stopped: {join}"),
+            }
+            let _ = page.update(cx, |page, cx| page.reload(cx));
         })
         .detach();
     }
@@ -740,32 +824,170 @@ impl HudsPage {
 }
 
 impl HudsPage {
-    // Downloads the store's current version of unedited store HUD `hud`, then swaps it in:
-    // the new version is installed when the old one was, and the old one leaves the library.
-    // A failed install keeps the old one, so the player is never left without their HUD.
+    // Updates unedited store HUD `hud` to its item's current file. TF2 must be closed, since
+    // the installed copy is replaced. The file listing runs first; a failure leaves the HUD.
+    // A GameBanana item with several files may hold variants, so the player picks one.
     fn update_download(&mut self, hud: &HudEntry, window: &mut Window, cx: &mut Context<Self>) {
-        let Provenance::Curated { hud_id } = hud.provenance().clone() else {
+        let (kind, item) = match hud.provenance().clone() {
+            Provenance::Curated { hud_id } => {
+                (StoreKind::CuratedHuds, StoreItemId::Curated(hud_id))
+            }
+            Provenance::GameBanana { gb_id, .. } => {
+                (StoreKind::GameBananaHuds, StoreItemId::GameBanana(gb_id))
+            }
+            Provenance::Local | _ => return,
+        };
+        self.busy = Some(Busy::Update(hud.folder_name().to_owned()));
+        cx.notify();
+        // Read before the download, which may already remove the old row.
+        let was_installed = matches!(
+            &self.status,
+            Some((_, HudStatus::Managed { id, .. })) if id == hud.id()
+        );
+        let probe = Tf2Probe::get(cx);
+        let refusing = run_blocking(cx, move |_| refuse_while_running(&*probe));
+        let store = cx.global::<Services>().store.clone();
+        let (old, item_id) = (hud.clone(), item.clone());
+        let win = window.window_handle();
+        cx.spawn(async move |page, cx| {
+            let listed = match refusing.await {
+                Err(err) => Err(err),
+                Ok(()) => {
+                    let listing = cx.update(|cx| {
+                        if !tokio_bridge::is_running(cx) {
+                            tokio_bridge::init(cx);
+                        }
+                        tokio_bridge::spawn(cx, async move {
+                            let files = (store.item_files(kind, &item).await)
+                                .map_err(|e| describe_files(kind, &e).message)?;
+                            match files.is_empty() {
+                                true => Err(DOWNLOAD_GONE.to_owned()),
+                                false => Ok(files),
+                            }
+                        })
+                    });
+                    let file = listing.await.unwrap_or_else(|_| {
+                        let failure = download_stopped("the HUD update task stopped unexpectedly");
+                        failure.log("HUD update");
+                        Err(failure.message)
+                    });
+                    file.map_err(|message| OpError::Core {
+                        action: UPDATE_FAILED,
+                        message,
+                    })
+                }
+            };
+            let _ = page.update(cx, |page, cx| match listed {
+                Ok(files) if kind == StoreKind::GameBananaHuds && files.len() > 1 => {
+                    page.busy = None;
+                    cx.notify();
+                    let weak = cx.entity().downgrade();
+                    let detail = DetailItem {
+                        kind,
+                        id: item_id,
+                        name: old.name().to_owned(),
+                        in_library: true,
+                    };
+                    let pick = move |file: &StoreFile, _: &mut Window, cx: &mut App| {
+                        let (old, file) = (old.clone(), file.clone());
+                        let _ = weak.update(cx, |page, cx| {
+                            page.replace_unless_running(old, kind, file, was_installed, cx)
+                        });
+                    };
+                    let body = gamebanana_body().with_update(pick);
+                    let _ = win.update(cx, |_, window, cx| {
+                        open_detail(detail, body, window, cx);
+                    });
+                }
+                // The listing above already turned an empty item into an error.
+                Ok(files) => {
+                    if let Some(file) = files.into_iter().next() {
+                        page.replace_with(old, kind, file, was_installed, cx)
+                    }
+                }
+                Err(err) => {
+                    page.busy = None;
+                    cx.notify();
+                    let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
+                }
+            });
+        })
+        .detach();
+    }
+
+    // Opens the plain store detail of the GameBanana item copy `hud` was made from. With no
+    // library HUD of that item, its download is no duplicate; once it lands the copy offers it.
+    fn open_copy_store(&mut self, hud: &HudEntry, window: &mut Window, cx: &mut Context<Self>) {
+        let folder = hud.folder_name();
+        let (Some(gb_id), Some(base)) = (self.copy_items.get(folder), self.copies.get(folder))
+        else {
             return;
         };
-        let busy = Busy::Update(hud.folder_name().to_owned());
+        let item = DetailItem {
+            kind: StoreKind::GameBananaHuds,
+            id: StoreItemId::GameBanana(*gb_id),
+            name: base.clone(),
+            in_library: false,
+        };
+        open_detail(item, gamebanana_body(), window, cx);
+    }
+
+    // The store detail's file pick: TF2 may have started since Update was clicked, so probe
+    // again before anything is downloaded.
+    fn replace_unless_running(
+        &mut self,
+        old: HudEntry,
+        kind: StoreKind,
+        file: StoreFile,
+        was_installed: bool,
+        cx: &mut Context<Self>,
+    ) {
+        self.busy = Some(Busy::Update(old.folder_name().to_owned()));
+        cx.notify();
+        let probe = Tf2Probe::get(cx);
+        let refusing = run_blocking(cx, move |_| refuse_while_running(&*probe));
+        let win = self.win;
+        cx.spawn(async move |page, cx| {
+            let refused = refusing.await;
+            let _ = page.update(cx, |page, cx| match refused {
+                Ok(()) => page.replace_with(old, kind, file, was_installed, cx),
+                Err(err) => {
+                    page.busy = None;
+                    cx.notify();
+                    let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
+                }
+            });
+        })
+        .detach();
+    }
+
+    // Downloads `file` beside or over `old`, then swaps it in through `swap_download`. It needs
+    // no window, so the store detail's file pick can call it too.
+    fn replace_with(
+        &mut self,
+        old: HudEntry,
+        kind: StoreKind,
+        file: StoreFile,
+        was_installed: bool,
+        cx: &mut Context<Self>,
+    ) {
+        let busy = Busy::Update(old.folder_name().to_owned());
         self.busy = Some(busy.clone());
         cx.notify();
         if !tokio_bridge::is_running(cx) {
             tokio_bridge::init(cx);
         }
         let store = cx.global::<Services>().store.clone();
-        let kind = StoreKind::CuratedHuds;
+        let (old_id, name) = (old.id().clone(), old.name().to_owned());
+        let replaces = old_id.clone();
         let fetching = tokio_bridge::spawn(cx, async move {
-            let item = StoreItemId::Curated(hud_id);
-            let files = (store.item_files(kind, &item).await)
-                .map_err(|e| describe_files(kind, &e).message)?;
-            let file = files.into_iter().next().ok_or(DOWNLOAD_GONE.to_owned())?;
-            (store.download(kind, &file, &|_| {}).await)
+            (store
+                .download_replacing(kind, &file, &replaces, &|_| {})
+                .await)
                 .map_err(|e| describe_download(kind, &e).message)
         });
-        let (old, name) = (hud.id().clone(), hud.name().to_owned());
         let tf2 = tf2_state(cx).read(cx).install().cloned();
-        let win = window.window_handle();
+        let win = self.win;
         cx.spawn(async move |page, cx| {
             let fetched = fetching.await.unwrap_or_else(|_| {
                 let failure = download_stopped("the HUD update task stopped unexpectedly");
@@ -784,7 +1006,7 @@ impl HudsPage {
             let _ = page.update(cx, |page, cx| match new {
                 Ok(Some(new)) => page.run(
                     busy,
-                    move |s| swap_download(s, &old, &new, &name, tf2.as_ref()),
+                    move |s| swap_download(s, &old_id, &new, &name, tf2.as_ref(), was_installed),
                     cx,
                     None,
                 ),
@@ -804,32 +1026,33 @@ impl HudsPage {
     }
 }
 
-// Puts downloaded HUD `new` in place of `old`: installed in its place when `old` was the
-// installed HUD, then `old` deleted. A download into `old`'s own folder only refreshes the
-// installed copy.
+// Puts downloaded HUD `new` in place of `old`: installed when `old` was, then `old` deleted.
+// While `old` still exists a failed install keeps it; a download over `old`'s folder has
+// already replaced its row, so a failed install there only warns.
 fn swap_download(
     s: &Services,
     old: &HudId,
     new: &HudId,
     name: &str,
     tf2: Option<&Tf2Install>,
+    was_installed: bool,
 ) -> Result<Done, OpError> {
-    let installed = tf2.filter(
-        |tf2| matches!(s.library.hud_status(tf2), Ok(HudStatus::Managed { id, .. }) if &id == old),
-    );
+    let listed =
+        (s.library.list_huds()).map_err(|e| describe_library(&e).into_op(UPDATE_FAILED))?;
+    let old_exists = listed.iter().any(|h| h.id() == old);
     let updated = format!("{name} is now up to date");
     let mut done: Done = (ToastKind::Success, "HUD updated".into(), updated.into());
-    if new == old {
-        if let Some(tf2) = installed
-            && let Live::Failed(_) = live_job(s, new, name, tf2)
-        {
-            done.0 = ToastKind::Warning;
-            done.2 = format!("{} {NOT_REINSTALLED}", done.2).into();
+    if let (true, Some(tf2)) = (was_installed, tf2) {
+        match install_job(s, new, tf2, &ExternalPlan::default()) {
+            Ok(_) => {}
+            Err(err) if old_exists => return Err(err),
+            Err(_) => {
+                done.0 = ToastKind::Warning;
+                done.2 = format!("{} {NOT_REINSTALLED}", done.2).into();
+            }
         }
-    } else {
-        if let Some(tf2) = installed {
-            install_job(s, new, tf2, &ExternalPlan::default())?;
-        }
+    }
+    if old_exists && old != new {
         s.library
             .delete_hud(old)
             .map_err(|e| describe_library(&e).into_op(UPDATE_FAILED))?;
@@ -1294,6 +1517,8 @@ struct CardState<'a> {
     made: bool,
     /// A copy's base name and its update check.
     copy: Option<(&'a str, Option<&'a CopyUpdate>)>,
+    /// The GameBanana item a copy's base came from, which its store offer opens.
+    copy_item: Option<GbId>,
     /// An unedited store HUD whose store version is newer.
     behind_store: bool,
     /// The HUD's own web page, where its author posts help and updates.
@@ -1313,6 +1538,7 @@ fn hud_card(
         url,
         made,
         copy,
+        copy_item,
         behind_store,
         page_url,
     } = state;
@@ -1369,6 +1595,16 @@ fn hud_card(
                     }),
             )
         }
+        Some(CopyUpdate::InStore) if copy_item.is_some() => Some(
+            Button::new(ids::hud_update(folder))
+                .ghost()
+                .icon(IconName::RefreshCw)
+                .tooltip("Update")
+                .accessibility_label("Update")
+                .loading(updating)
+                .disabled(busy.is_some() && !updating)
+                .on_click(on_page(HudsPage::open_copy_store)),
+        ),
         _ if behind_store => Some(
             Button::new(ids::hud_update(folder))
                 .ghost()
@@ -1587,12 +1823,13 @@ impl HudsPage {
                 image + CARD_TEXT_HEIGHT + note
             };
             let (busy, page) = (self.busy.clone(), cx.entity().downgrade());
-            let (huds, urls, pages, made, copies, updates, behind) = (
+            let (huds, urls, pages, made, copies, copy_items, updates, behind) = (
                 Rc::clone(&self.huds),
                 Rc::clone(&self.image_urls),
                 Rc::clone(&self.page_urls),
                 Rc::clone(&self.made),
                 Rc::clone(&self.copies),
+                Rc::clone(&self.copy_items),
                 Rc::clone(&self.updates),
                 Rc::clone(&self.behind_store),
             );
@@ -1606,6 +1843,7 @@ impl HudsPage {
                             made: made.contains(folder),
                             copy: (copies.get(folder))
                                 .map(|base| (base.as_str(), updates.get(folder))),
+                            copy_item: copy_items.get(folder).copied(),
                             behind_store: behind.contains(folder),
                             page_url: pages.get(folder).map(String::as_str),
                         };

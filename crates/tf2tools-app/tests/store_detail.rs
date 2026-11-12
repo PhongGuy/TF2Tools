@@ -882,3 +882,49 @@ fn a_short_window_shows_a_bar_beside_the_detail_body(cx: &mut TestAppContext) {
         "the header stays"
     );
 }
+
+#[gpui_kit::test]
+fn update_mode_offers_every_file_even_for_an_owned_item(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let files = [
+        ("flawhud.zip", support::hud_zip_bytes("flawhud")),
+        ("flawhud-4k.zip", support::hud_zip_bytes("flawhud-4k")),
+    ];
+    server.mount_gb_files(7, &files, Duration::ZERO);
+    let (win, _) = support::store_window(
+        cx,
+        &env,
+        &server,
+        |env| support::seed_gb_huds(env, &[(7, "FlawHUD")]),
+        |_, _| support::Blank,
+    );
+    let picked = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
+    let seen = std::rc::Rc::clone(&picked);
+    let body = gamebanana_body()
+        .with_update(move |file, _, _| seen.borrow_mut().push(file.file_name().to_owned()));
+    cx.update_window(win, |_, window, cx| {
+        open_detail(item(GB, gb(7), "FlawHUD", true), body, window, cx)
+    })
+    .unwrap();
+    support::wait_real(cx, "the files", |cx| {
+        support::present(cx, win, ids::store_file(1))
+    });
+    for i in 0..2 {
+        assert_eq!(
+            support::label_of(cx, win, ids::store_file(i)).as_deref(),
+            Some("Update with this file")
+        );
+        assert!(!support::disabled_of(cx, win, ids::store_file(i)));
+    }
+    assert!(
+        !support::present(cx, win, ids::STORE_DETAIL_BADGE),
+        "update mode shows no In Library badge"
+    );
+    support::click_id(cx, win, ids::store_file(1));
+    assert_eq!(*picked.borrow(), ["flawhud-4k.zip"]);
+    assert!(
+        !support::present(cx, win, ids::STORE_DETAIL),
+        "picking closes the detail"
+    );
+}

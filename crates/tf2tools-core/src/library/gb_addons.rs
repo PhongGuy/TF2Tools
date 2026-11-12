@@ -484,7 +484,7 @@ pub enum GbAddonCheck {
 }
 
 /// How long a check stays fresh, so GameBanana is asked about each add-on once a day.
-const CHECK_INTERVAL: i64 = 86_400;
+pub(super) const CHECK_INTERVAL: i64 = 86_400;
 
 impl Library {
     /// Add-ons whose `checked_at` is more than a day before `now`, or after it (the clock
@@ -725,7 +725,7 @@ fn unix_now() -> i64 {
 }
 
 /// `gb_id` as its INTEGER column; an id past `i64` fails through `database` with a message.
-fn gb_id_column<E>(gb_id: GbId, database: impl FnOnce(String) -> E) -> Result<i64, E> {
+pub(super) fn gb_id_column<E>(gb_id: GbId, database: impl FnOnce(String) -> E) -> Result<i64, E> {
     i64::try_from(gb_id.get()).map_err(|e| {
         database(format!(
             "GameBanana id {gb_id} does not fit the database: {e}"

@@ -12,7 +12,7 @@ use super::unpack::{crosshair_files, entry_name, sound_files};
 use super::{StoreClient, StoreFile, StoreItemId, StoreKind};
 use crate::db::Database;
 use crate::error::{DownloadError, GbAddonFetchError, LibraryError};
-use crate::library::{AddonName, GbId, Library, LibraryEntry, Provenance, is_plain_name};
+use crate::library::{AddonName, GbId, HudId, Library, LibraryEntry, Provenance, is_plain_name};
 
 /// What a running download is doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,7 +52,8 @@ impl DownloadProgress {
 
 /// The item a download imports as, settled before any request is made.
 enum Target {
-    GameBananaHud(GbId),
+    /// The item and the listed file's upload date, recorded on the imported HUD.
+    GameBananaHud(GbId, Option<i64>),
     CuratedHud(String),
     Addon(AddonName, String),
     Sound(GbId),
@@ -71,12 +72,37 @@ impl StoreClient {
         file: &StoreFile,
         progress: &(dyn Fn(DownloadProgress) + Send + Sync),
     ) -> Result<Vec<LibraryEntry>, DownloadError> {
+        self.download_inner(kind, file, None, progress).await
+    }
+
+    /// `download`, for updating library HUD `replaces` to another file of its GameBanana
+    /// item: that row does not count as a duplicate, so the new file imports beside it, or
+    /// over it when both land in one folder. Removing the old row is the caller's step.
+    /// Any other row of the item still refuses with `AlreadyInLibrary`.
+    pub async fn download_replacing(
+        &self,
+        kind: StoreKind,
+        file: &StoreFile,
+        replaces: &HudId,
+        progress: &(dyn Fn(DownloadProgress) + Send + Sync),
+    ) -> Result<Vec<LibraryEntry>, DownloadError> {
+        self.download_inner(kind, file, Some(replaces), progress)
+            .await
+    }
+
+    async fn download_inner(
+        &self,
+        kind: StoreKind,
+        file: &StoreFile,
+        replaces: Option<&HudId>,
+        progress: &(dyn Fn(DownloadProgress) + Send + Sync),
+    ) -> Result<Vec<LibraryEntry>, DownloadError> {
         let target = target(kind, file).ok_or_else(|| DownloadError::WrongKind {
             file_name: file.file_name().to_owned(),
         })?;
         let _turn = self.download_lock.lock().await;
         if let StoreItemId::GameBanana(id) = file.item() {
-            self.refuse_duplicate(kind, *id)?;
+            self.refuse_duplicate(kind, *id, replaces)?;
         }
 
         let tmp = self.dir.tmp_dir();
@@ -111,8 +137,14 @@ impl StoreClient {
         })?
     }
 
-    /// AlreadyInLibrary when the kind's library table already holds this GameBanana id.
-    fn refuse_duplicate(&self, kind: StoreKind, id: GbId) -> Result<(), DownloadError> {
+    /// AlreadyInLibrary when the kind's library table already holds this GameBanana id,
+    /// unless `replaces` names a library HUD of that same item.
+    fn refuse_duplicate(
+        &self,
+        kind: StoreKind,
+        id: GbId,
+        replaces: Option<&HudId>,
+    ) -> Result<(), DownloadError> {
         let table = match kind {
             StoreKind::GameBananaHuds => "library_huds",
             StoreKind::Sounds => "library_sounds",
@@ -123,6 +155,21 @@ impl StoreClient {
         let Ok(column) = i64::try_from(id.get()) else {
             return Ok(());
         };
+        if let Some(old) = replaces.filter(|_| table == "library_huds") {
+            let replacing: bool = self
+                .db
+                .read(|conn| {
+                    conn.query_row(
+                        "SELECT COUNT(*) > 0 FROM library_huds WHERE id = ?1 AND store_gb_id = ?2",
+                        rusqlite::params![old.as_str(), column],
+                        |r| r.get(0),
+                    )
+                })
+                .map_err(database)?;
+            if replacing {
+                return Ok(());
+            }
+        }
         // The table name is one of the constants above, never caller text.
         let exists: bool = self
             .db
@@ -286,7 +333,7 @@ fn target(kind: StoreKind, file: &StoreFile) -> Option<Target> {
     }
     match (kind, file.item()) {
         (StoreKind::GameBananaHuds, StoreItemId::GameBanana(id)) => {
-            Some(Target::GameBananaHud(*id))
+            Some(Target::GameBananaHud(*id, file.date_added()))
         }
         (StoreKind::Sounds, StoreItemId::GameBanana(id)) => Some(Target::Sound(*id)),
         (StoreKind::Crosshairs, StoreItemId::GameBanana(id)) => Some(Target::Crosshair(*id)),
@@ -330,9 +377,17 @@ fn import(
     scratch: &Path,
 ) -> Result<Vec<LibraryEntry>, DownloadError> {
     let entry = match target {
-        Target::GameBananaHud(gb_id) => {
+        Target::GameBananaHud(gb_id, date) => {
             let author = media_row(db, StoreKind::GameBananaHuds, gb_id)?.1;
-            LibraryEntry::Hud(library.import_hud(saved, Provenance::GameBanana { gb_id, author })?)
+            let hud = library.import_hud(saved, Provenance::GameBanana { gb_id, author })?;
+            // Recorded after the import, whose row insert starts the column empty. A failed
+            // write keeps the HUD: an unrecorded date only falls back to the row's age.
+            if let Some(date) = date
+                && let Err(e) = library.set_gb_file_date(hud.id(), date)
+            {
+                tracing::warn!(error = %e, "could not record a GameBanana HUD's file date");
+            }
+            LibraryEntry::Hud(hud)
         }
         Target::CuratedHud(hud_id) => {
             LibraryEntry::Hud(library.import_hud(saved, Provenance::Curated { hud_id })?)

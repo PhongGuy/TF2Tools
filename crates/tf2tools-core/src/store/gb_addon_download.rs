@@ -11,7 +11,7 @@ use super::{AddonFile, AddonProfile, AddonSection, DownloadProgress, StoreClient
 use walkdir::WalkDir;
 
 use crate::archive::{VPK_MAGIC, extract_archive, sniff};
-use crate::error::{BrowseError, GbAddonCheckError, GbAddonFetchError};
+use crate::error::{BrowseError, GbAddonCheckError, GbAddonFetchError, LibraryError};
 use crate::library::{GbAddonCheck, GbId, Library, io_at};
 use crate::payloads::{MAX_PAYLOADS, Payload, find_payloads};
 
@@ -94,9 +94,30 @@ impl StoreClient {
     /// any other failure records `Unchanged` for that item and goes on.
     pub async fn check_gb_addon_updates(&self, now: i64) -> Result<usize, GbAddonCheckError> {
         let library = Library::new(self.db.clone(), self.dir.clone());
+        self.check_gb_items(library.gb_addons_due_for_check(now)?, |id, check| {
+            library.record_gb_addon_check(id, check, now)
+        })
+        .await
+    }
+
+    /// Checks every due GameBanana HUD item once, exactly as add-ons are checked.
+    pub async fn check_gb_hud_updates(&self, now: i64) -> Result<usize, GbAddonCheckError> {
+        let library = Library::new(self.db.clone(), self.dir.clone());
+        self.check_gb_items(library.gb_huds_due_for_check(now)?, |id, check| {
+            library.record_gb_hud_check(id, check, now)
+        })
+        .await
+    }
+
+    /// Asks GameBanana for each of `ids` in turn and hands what it learned to `record`.
+    async fn check_gb_items(
+        &self,
+        ids: Vec<GbId>,
+        record: impl Fn(GbId, GbAddonCheck) -> Result<(), LibraryError>,
+    ) -> Result<usize, GbAddonCheckError> {
         let catalog = self.addon_catalog();
         let mut checked = 0;
-        for gb_id in library.gb_addons_due_for_check(now)? {
+        for gb_id in ids {
             // Only an unreachable GameBanana ends the run, so the rest stay due for later;
             // one item's bad page waits a day like a clean check.
             let check = match catalog.profile_at(gb_id, Priority::Background).await {
@@ -118,7 +139,7 @@ impl StoreClient {
                 ) => return Err(e.into()),
                 Err(_) => GbAddonCheck::Unchanged,
             };
-            library.record_gb_addon_check(gb_id, check, now)?;
+            record(gb_id, check)?;
             checked += 1;
         }
         Ok(checked)

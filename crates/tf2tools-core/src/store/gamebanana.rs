@@ -121,6 +121,7 @@ pub(crate) struct ItemFile {
     pub(crate) size: Option<u64>,
     pub(crate) md5: Option<String>,
     pub(crate) url: String,
+    pub(crate) date_added: Option<i64>,
 }
 
 /// Parses an item's file listing, skipping files without a download address; an error
@@ -144,6 +145,7 @@ pub(crate) fn parse_files(body: &[u8]) -> Result<Vec<ItemFile>, serde_json::Erro
                 size: file["_nFilesize"].as_u64(),
                 md5: (!md5.is_empty()).then_some(md5),
                 url,
+                date_added: file["_tsDateAdded"].as_i64(),
             })
         })
         .collect())

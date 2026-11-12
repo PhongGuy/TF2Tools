@@ -44,6 +44,7 @@ pub struct DetailItem {
 
 type BodyFn = Rc<dyn Fn(&StoreItem, &mut Window, &mut App) -> AnyElement>;
 type ActionFn = Rc<dyn Fn(&StoreItem, &mut Window, &mut App) -> Option<AnyElement>>;
+type PickFn = Rc<dyn Fn(&StoreFile, &mut Window, &mut App)>;
 
 /// What a store kind adds to the dialog: the body under the files (and the carousel, if any),
 /// and an optional action right of the name block, as v5's Repository and GameBanana buttons.
@@ -51,6 +52,8 @@ type ActionFn = Rc<dyn Fn(&StoreItem, &mut Window, &mut App) -> Option<AnyElemen
 pub struct DetailBody {
     body: BodyFn,
     action: Option<ActionFn>,
+    /// Set in update mode: every file row hands its file here instead of downloading it.
+    update: Option<PickFn>,
 }
 
 impl DetailBody {
@@ -59,6 +62,7 @@ impl DetailBody {
         Self {
             body: Rc::new(body),
             action: None,
+            update: None,
         }
     }
 
@@ -69,6 +73,15 @@ impl DetailBody {
     ) -> Self {
         Self {
             action: Some(Rc::new(action)),
+            ..self
+        }
+    }
+
+    /// Turns the dialog into the picker for updating a library HUD: each file row reads
+    /// "Update with this file", and a click calls `pick` with that file and closes the dialog.
+    pub fn with_update(self, pick: impl Fn(&StoreFile, &mut Window, &mut App) + 'static) -> Self {
+        Self {
+            update: Some(Rc::new(pick)),
             ..self
         }
     }
@@ -278,23 +291,39 @@ impl StoreDetail {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let muted = cx.theme().muted_foreground;
-        let curated = self.item.kind == StoreKind::CuratedHuds;
-        // Curated re-downloads replace the HUD in place; a GameBanana item is owned once.
-        let (label, owned_gb) = match (self.item.in_library, curated) {
-            (true, true) => ("Re-download", false),
-            (true, false) => ("In Library", true),
-            _ => ("Download", false),
-        };
-        let button = Button::new(ids::store_file(index))
-            .label(label)
-            .disabled(busy || owned_gb)
-            .on_click(cx.listener(move |this, _, _, cx| {
-                this.download(index, cx);
-            }));
-        let button = if self.item.in_library {
-            button.secondary()
+        let button = if let Some(pick) = self.body.update.clone() {
+            // Update mode picks the file that replaces the library HUD, owned or not.
+            let label = "Update with this file";
+            let file = file.clone();
+            Button::new(ids::store_file(index))
+                .label(label)
+                .accessibility_label(label)
+                .primary()
+                .disabled(busy)
+                .on_click(cx.listener(move |_, _, window, cx| {
+                    pick(&file, window, cx);
+                    window.close_dialog(cx);
+                }))
         } else {
-            button.primary()
+            let curated = self.item.kind == StoreKind::CuratedHuds;
+            // Curated re-downloads replace the HUD in place; a GameBanana item is owned once.
+            let (label, owned_gb) = match (self.item.in_library, curated) {
+                (true, true) => ("Re-download", false),
+                (true, false) => ("In Library", true),
+                _ => ("Download", false),
+            };
+            let button = Button::new(ids::store_file(index))
+                .label(label)
+                .accessibility_label(label)
+                .disabled(busy || owned_gb)
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.download(index, cx);
+                }));
+            if self.item.in_library {
+                button.secondary()
+            } else {
+                button.primary()
+            }
         };
         h_flex()
             .w_full()
@@ -375,7 +404,9 @@ impl Render for StoreDetail {
         } else {
             "In Library"
         };
-        let badge = self.item.in_library.then(|| {
+        // Update mode is about replacing the library copy, so it shows no ownership badge.
+        let owned = self.item.in_library && self.body.update.is_none();
+        let badge = owned.then(|| {
             badge_of(
                 ids::STORE_DETAIL_BADGE,
                 Tag::secondary(),

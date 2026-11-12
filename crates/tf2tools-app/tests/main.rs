@@ -70,6 +70,7 @@ mod help_links;
 mod hud_copy_card;
 mod hud_copy_update;
 mod hud_download_update;
+mod hud_gb_update;
 mod hud_installed_edit;
 mod hud_maker;
 mod hud_maker_align;
