@@ -30,6 +30,7 @@ use tf2tools_core::{
 };
 
 use crate::ids;
+use crate::kill_icons::{KillIconImages, LoadedKillIcons};
 use crate::logs_sync::{LogsSync, LogsSyncEvent, SyncProgress, logs_sync};
 use crate::pages::common::filter_badge;
 use crate::picker::PickKind;
@@ -121,6 +122,7 @@ pub struct LogsTfPage {
     adding: bool,
     add_open: bool,
     names: Entity<LoadedWeaponNames>,
+    icons: Entity<LoadedKillIcons>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -167,8 +169,12 @@ impl LogsTfPage {
         // The game's weapon names landing re-renders the panel and any open class card.
         let names = LoadedWeaponNames::global(cx);
         let named = cx.observe(&names, |_, _, cx| cx.notify());
+        // So do the game's kill icons.
+        let icons = LoadedKillIcons::global(cx);
+        let iconed = cx.observe(&icons, |_, _, cx| cx.notify());
         let mut page = Self {
             names,
+            icons,
             players: Vec::new(),
             active: None,
             loaded: false,
@@ -198,7 +204,7 @@ impl LogsTfPage {
             add_error: None,
             adding: false,
             add_open: false,
-            _subscriptions: vec![enter, heard, redraw, released, named],
+            _subscriptions: vec![enter, heard, redraw, released, named, iconed],
         };
         page.load(true, cx).detach();
         page
@@ -459,6 +465,11 @@ impl LogsTfPage {
     /// The game's names for logs.tf weapons, empty until the found TF2's load lands.
     pub fn weapon_names<'a>(&self, cx: &'a App) -> &'a WeaponNames {
         self.names.read(cx).names()
+    }
+
+    /// The game's kill icons for logs.tf weapons, empty until the found TF2's load lands.
+    pub fn kill_icons<'a>(&self, cx: &'a App) -> &'a KillIconImages {
+        self.icons.read(cx).icons()
     }
 
     /// The open row's log, once its body is read and parsed.
@@ -1288,6 +1299,7 @@ impl LogsTfPage {
             *class,
             weapons,
             self.weapon_names(cx),
+            self.kill_icons(cx),
             self.range,
             page,
             cx,

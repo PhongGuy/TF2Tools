@@ -116,3 +116,24 @@ fn the_tables_are_read_once_and_answer_every_name_after() {
     assert_eq!(region("arrow"), Some(("../sprites/arrow".to_owned(), 0, 0)));
     assert_eq!(region("d_nothing"), None);
 }
+
+#[test]
+fn names_lists_every_drawn_icon_once_with_its_prefix() {
+    let icons = files().kill_icons(Platform::Linux).unwrap();
+    assert_eq!(
+        icons.names(),
+        [
+            "d_tf_projectile_rocket",
+            "dneg_tf_projectile_rocket",
+            "d_obj_sentrygun",
+            "shared",
+            "arrow",
+        ],
+        "glyphs and empty regions are left out; hud_textures' shared is shadowed"
+    );
+    for name in icons.names() {
+        assert!(icons.get(&name).is_some(), "{name} answers get");
+    }
+    let none = HudFiles::from_memory(vec![vec![]]);
+    assert!(none.kill_icons(Platform::Linux).unwrap().names().is_empty());
+}
