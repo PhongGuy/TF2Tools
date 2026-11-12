@@ -14,7 +14,7 @@ This is TF2Tools 6, a native desktop app rebuilt from the ground up. It replaces
 
 ### HUDs
 
-Keep all your HUDs in one place and switch between them with one click. TF2 can only use one HUD at a time, so TF2Tools takes the old one out when you install another. If a HUD needs fonts you don't have, TF2Tools offers to install them. Get new HUDs from the HUD Store: the hand-picked list from hud-db, or everything on GameBanana.
+Keep all your HUDs in one place and switch between them with one click. TF2 can only use one HUD at a time, so TF2Tools takes the old one out when you install another. If a HUD needs fonts you don't have, TF2Tools offers to install them. Get new HUDs from the HUD Store: the hand-picked list from hud-db, or everything on GameBanana. When a newer version of a HUD from the HUD Store is out, its card shows **Update**, and GameBanana HUDs show **Update** too; if a GameBanana item has several files, you pick which one.
 
 ![The HUDs page: the HUD in your game at the top, your library below](.github/readme/huds.webp)
 

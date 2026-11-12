@@ -383,3 +383,14 @@ fn the_logs_section_mentions_kill_feed_icons() {
         "logs.tf section: {logs}"
     );
 }
+
+#[test]
+fn the_huds_section_says_gamebanana_huds_show_update_too() {
+    let readme = repo_file("README.md");
+    let (_, huds) = readme.split_once("### HUDs\n").expect("a HUDs section");
+    let (huds, _) = huds.split_once("\n### ").expect("a section after it");
+    assert!(
+        huds.contains("GameBanana HUDs show **Update** too"),
+        "HUDs section: {huds}"
+    );
+}
