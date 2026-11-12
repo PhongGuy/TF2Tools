@@ -1793,7 +1793,6 @@ fn add_to_profile_button(
     });
     Button::new(ids::hud_add_to_profile(hud.folder_name()))
         .ghost()
-        .xsmall()
         .icon(IconName::LayersPlus)
         .named("Add to profile")
         .loading(busy == Some(&Busy::AddToProfile(hud.folder_name().to_owned())))

@@ -598,7 +598,7 @@ pub const CROSSHAIRS_DELETE: &str = "crosshairs-delete";
 pub const CROSSHAIRS_COPY_TO_MAKER: &str = "crosshairs-copy-to-maker";
 /// The Crosshairs page's "Add to profile" button, opening the profile menu; present while a
 /// crosshair is selected.
-pub const CROSSHAIRS_ADD_TO_PROFILE: &str = "crosshair-add-to-profile";
+pub const CROSSHAIRS_ADD_TO_PROFILE: &str = "crosshairs-add-to-profile";
 /// The Crosshairs page's Export PNG button; present while a crosshair is selected.
 pub const CROSSHAIRS_EXPORT_PNG: &str = "crosshairs-export-png";
 /// The installed HUD card, or the empty card when none is installed.

@@ -331,6 +331,11 @@ fn pick_opens_editor(
     let page = cx
         .update(|cx| s.shell.read(cx).profiles_page())
         .expect("a Profiles page");
+    // The page's first load ends after the editor opened; it must leave the editor as it is.
+    support::wait_real(cx, "Profiles to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
     let editor = cx.update(|cx| page.read(cx).editor()).expect("the editor");
     let (id, slot, picked) = cx.update(|cx| {
         let e = editor.read(cx);
@@ -343,7 +348,6 @@ fn pick_opens_editor(
     assert_eq!(&id, p.id(), "the picked profile's editor");
     assert_eq!(slot, Slot::Crosshairs, "on the Crosshairs slot");
     assert_eq!(picked, Some(crosshair), "with the crosshair picked");
-    support::settle(cx, s.win);
     assert_eq!(
         reload(s, p).crosshairs(),
         p.crosshairs(),
