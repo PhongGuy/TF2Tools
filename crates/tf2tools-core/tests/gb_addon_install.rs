@@ -565,6 +565,53 @@ async fn remove_deletes_a_multi_chunk_vpks_sound_cache_and_keeps_others() {
 }
 
 #[tokio::test]
+async fn a_renamed_update_deletes_the_old_vpks_sound_cache() {
+    let s = setup().await;
+    let d = download(&s, 26, "Old", "old.vpk", vpk(b"o"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["old.vpk"]), &s.tf2, &no)
+        .unwrap();
+    let dir = s.tf2.custom_dir();
+    common::write_file(&dir.join("tf2tools-gb-26-old.vpk.sound.cache"), b"c");
+    let d = download(&s, 26, "New", "new.vpk", vpk(b"n"), 200).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["new.vpk"]), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(custom(&s), ["tf2tools-gb-26-new.vpk"]);
+}
+
+#[tokio::test]
+async fn install_again_deletes_a_leftover_vpks_sound_cache() {
+    let s = setup().await;
+    let d = download(&s, 28, "New", "new.vpk", vpk(b"n"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["new.vpk"]), &s.tf2, &no)
+        .unwrap();
+    // An old VPK an update could not delete stays on the row as a leftover.
+    let dir = s.tf2.custom_dir();
+    common::write_file(&dir.join("tf2tools-gb-28-old.vpk"), b"o");
+    common::write_file(&dir.join("tf2tools-gb-28-old.vpk.sound.cache"), b"c");
+    let files = serde_json::json!([
+        "custom/tf2tools-gb-28-new.vpk",
+        "custom/tf2tools-gb-28-old.vpk",
+    ]);
+    common::sql(&s.env.dir)
+        .execute(
+            "UPDATE library_gb_addons SET files = ?1 WHERE gb_id = 28",
+            [files.to_string()],
+        )
+        .unwrap();
+    s.env
+        .lib
+        .reinstall_gb_addon(GbId::new(28), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(custom(&s), ["tf2tools-gb-28-new.vpk"]);
+}
+
+#[tokio::test]
 async fn remove_without_a_sound_cache_is_not_an_error() {
     let s = setup().await;
     let d = download(&s, 25, "Crit", "crit.vpk", vpk(b"v"), 100).await;
