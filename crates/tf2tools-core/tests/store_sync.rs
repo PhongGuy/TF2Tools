@@ -672,19 +672,16 @@ async fn a_full_page_claiming_completeness_is_not_an_end() {
     let env = store_env().await;
     seed_stale_sound(&env);
     mount_page(&env.server, "Sound", 1, full_page(true)).await;
+    // The walk goes on to page 2, whose empty reply ends it without confirming the end.
     mount_page(&env.server, "Sound", 2, empty_page(19718)).await;
     let (result, _) = sync_sounds(&env, false).await;
-    assert!(
-        matches!(result, Err(SyncError::Throttled { .. })),
-        "{result:?}"
-    );
+    result.unwrap();
     assert!(requested_pages(&env.server).await.contains(&"2".to_owned()));
     assert_eq!(
         count(&env.dir, "store_sounds"),
         16,
         "the stale row survives"
     );
-    assert_eq!(meta(&env.dir, "sounds_last_synced"), None);
 }
 
 #[tokio::test]
@@ -828,4 +825,32 @@ async fn a_fresh_v5_sound_cache_without_the_order_key_walks_again() {
     let (result, _) = sync_sounds(&env, false).await;
     assert!(!result.unwrap().is_fresh());
     assert_eq!(requested_pages(&env.server).await, ["1", "2"]);
+}
+
+#[tokio::test]
+async fn a_listing_shorter_than_its_count_ends_at_the_empty_page_past_it() {
+    let env = store_env().await;
+    seed_stale_sound(&env);
+    mount_page(&env.server, "Sound", 1, full_page(false)).await;
+    mount_page(&env.server, "Sound", 2, empty_page(19718)).await;
+    let (result, _) = sync_sounds(&env, false).await;
+    let outcome = result.unwrap();
+    assert_eq!((outcome.fetched(), outcome.rows()), (15, 16));
+    assert!(names(&env, "store_sounds").contains(&"stale".to_owned()));
+    assert_store_timestamp(&meta(&env.dir, "sounds_last_synced").unwrap());
+    assert_eq!(meta(&env.dir, "sounds_sync_page"), None);
+}
+
+#[tokio::test]
+async fn an_empty_first_page_still_fails_as_throttled() {
+    let env = store_env().await;
+    seed_stale_sound(&env);
+    mount_every_page(&env.server, "Sound", empty_page(19718)).await;
+    let (result, _) = sync_sounds(&env, false).await;
+    assert!(
+        matches!(result, Err(SyncError::Throttled { .. })),
+        "{result:?}"
+    );
+    assert_eq!(requested_pages(&env.server).await, ["1", "1", "1"]);
+    assert_eq!(meta(&env.dir, "sounds_last_synced"), None);
 }

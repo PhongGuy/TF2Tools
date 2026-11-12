@@ -68,9 +68,16 @@ pub(crate) async fn gamebanana(
     });
 
     let mut total = 0;
+    // GameBanana's count can exceed its listing, and the page past the end looks like a
+    // throttled reply. Once a full page is in, that reply ends the walk as unconfirmed.
+    let mut full_seen = fetched >= gamebanana::PAGE_SIZE;
     let confirmed = loop {
-        let index = fetch_page(client, kind, page).await?;
+        let index = match fetch_page(client, kind, page).await {
+            Err(SyncError::Throttled { .. }) if full_seen => break false,
+            other => other?,
+        };
         let count = u32::try_from(index.records.len()).unwrap_or(u32::MAX);
+        full_seen |= count >= gamebanana::PAGE_SIZE;
         if total == 0 {
             total = index.total;
         }
@@ -109,7 +116,7 @@ pub(crate) async fn gamebanana(
         tracing::warn!(
             ?kind,
             page,
-            "store sync hit its page limit before a confirmed end; unseen rows kept"
+            "store sync stopped at its page limit or an empty page before a confirmed end; unseen rows kept"
         );
     }
 
