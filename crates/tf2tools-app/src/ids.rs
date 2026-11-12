@@ -1340,6 +1340,19 @@ pub fn hud_update(folder: &str) -> ElementId {
     keyed("hud-update", folder)
 }
 
+/// A library HUD card's "Add to profile" button, opening the profile menu.
+pub fn hud_add_to_profile(folder: &str) -> ElementId {
+    keyed("hud-add-to-profile", folder)
+}
+
+/// One profile in a HUD card's "Add to profile" menu.
+pub fn hud_profile_pick(profile: &ProfileId) -> ElementId {
+    keyed("hud-profile-pick", profile.as_str())
+}
+
+/// The disabled "No profiles yet" item an "Add to profile" menu shows when there are none.
+pub const PROFILE_MENU_EMPTY: &str = "profile-menu-empty";
+
 /// A store HUD card's "Visit page" button, opening the HUD's own page in the browser.
 pub fn hud_visit(folder: &str) -> ElementId {
     keyed("hud-visit", folder)

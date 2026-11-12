@@ -6,6 +6,7 @@ pub mod class_icon;
 pub mod crosshair_picker;
 pub mod dialog_frame;
 pub mod label_option;
+pub mod profile_menu;
 pub mod scroll;
 pub mod store_error;
 pub mod sync_banner;

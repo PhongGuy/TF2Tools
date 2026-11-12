@@ -6,6 +6,9 @@ use tf2tools_core::{
     StoreKind,
 };
 
+/// Shown when a save ends the profile's active state, so the game no longer matches it.
+pub const NOT_APPLIED: &str = "Changes not applied yet";
+
 /// The crosshair badge: "1 crosshair", "N crosshairs".
 pub fn crosshair_count(n: usize) -> String {
     if n == 1 {
