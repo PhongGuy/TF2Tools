@@ -26,6 +26,7 @@ use tf2tools_core::{CrosshairId, CrosshairRef, HudEntry, HudId};
 use crate::audio::player::show_idle;
 use crate::keymap::ToggleSidebar;
 use crate::local_messages::describe_settings;
+use crate::logs_sync::logs_sync;
 use crate::pages::addon_store::AddonStorePage;
 use crate::pages::addons::AddonsPage;
 use crate::pages::crosshair_maker::CrosshairMakerPage;
@@ -36,6 +37,7 @@ use crate::pages::hud_maker::HudMakerPage;
 use crate::pages::hud_store::HudStorePage;
 use crate::pages::huds::{EditInHudMaker, HudsPage};
 use crate::pages::logs::LogsPage;
+use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::maps::MapsPage;
 use crate::pages::profiles::ProfilesPage;
 use crate::pages::profiles::probe::Tf2Probe;
@@ -66,6 +68,8 @@ pub struct Shell {
     preloaded_huds: Option<Vec<HudEntry>>,
     /// The hub observation and failure-toast subscription, while a hub is installed.
     _hub_subscriptions: Option<[Subscription; 2]>,
+    /// The logs.tf sync observation, which redraws the header's logs.tf ring.
+    _logs_subscription: Subscription,
     /// The updater observation and failure-toast subscription, while an updater is installed.
     _update_subscriptions: Option<[Subscription; 2]>,
     /// The crash notice observation, while a notice is installed.
@@ -89,6 +93,7 @@ pub struct Shell {
     crosshair_store: Option<Entity<CrosshairStorePage>>,
     logs: Option<Entity<LogsPage>>,
     maps: Option<Entity<MapsPage>>,
+    logs_tf: Option<Entity<LogsTfPage>>,
     addons: Option<Entity<AddonsPage>>,
     graphics: Option<Entity<GraphicsPage>>,
     profiles: Option<Entity<ProfilesPage>>,
@@ -143,6 +148,9 @@ impl Shell {
                 }),
             ]
         });
+        // The header's logs.tf ring reads the app-wide sync, created here so the ring always has one.
+        let logs = logs_sync(cx);
+        let logs_subscription = cx.observe(&logs, |_, _, cx| cx.notify());
         // The banner reads the updater, and a download or install the player asked for toasts when it fails.
         let update_subscriptions = updater(cx).map(|u| {
             [
@@ -175,6 +183,7 @@ impl Shell {
             huds_search: String::new(),
             preloaded_huds: huds,
             _hub_subscriptions: hub_subscriptions,
+            _logs_subscription: logs_subscription,
             _update_subscriptions: update_subscriptions,
             _crash_subscription: crash_subscription,
             _old_v4_subscription: old_v4_subscription,
@@ -192,6 +201,7 @@ impl Shell {
             crosshair_store: None,
             logs: None,
             maps: None,
+            logs_tf: None,
             addons: None,
             graphics: None,
             profiles: None,
@@ -223,7 +233,7 @@ impl Shell {
     }
 
     // Leaving a library page or a maker drops it, so the next visit builds it fresh from the
-    // saved state; only the HUDs search text is carried over. The stores, Maps, the Activity Log and Settings are kept, hidden, so a return finds
+    // saved state; only the HUDs search text is carried over. The stores, Maps, logs.tf, the Activity Log and Settings are kept, hidden, so a return finds
     // their tab, search, filters, sort, scroll and unsaved edits as left. Re-selecting the
     // current page keeps it as it is. A playing sound plays on; the idle player shows only on
     // the sound pages, and toasts rise above it while it shows.
@@ -270,6 +280,9 @@ impl Shell {
                 p.update(cx, |p, cx| p.set_hidden(hidden, cx));
             }),
             Page::Maps => self.maps.as_ref().map(|p| {
+                p.update(cx, |p, cx| p.set_hidden(hidden, cx));
+            }),
+            Page::LogsTf => self.logs_tf.as_ref().map(|p| {
                 p.update(cx, |p, cx| p.set_hidden(hidden, cx));
             }),
             Page::Settings => self.settings.as_ref().map(|p| {
@@ -386,6 +399,11 @@ impl Shell {
     /// The Maps page while it shows.
     pub fn maps_page(&self) -> Option<Entity<MapsPage>> {
         self.shown(Page::Maps, self.maps.as_ref())
+    }
+
+    /// The logs.tf page while it shows.
+    pub fn logs_tf_page(&self) -> Option<Entity<LogsTfPage>> {
+        self.shown(Page::LogsTf, self.logs_tf.as_ref())
     }
 
     /// The Addons page while it shows.
@@ -580,6 +598,11 @@ impl Render for Shell {
                 .get_or_insert_with(|| cx.new(|cx| MapsPage::new(window, cx)))
                 .clone()
                 .into_any_element(),
+            Page::LogsTf => self
+                .logs_tf
+                .get_or_insert_with(|| cx.new(|cx| LogsTfPage::new(window, cx)))
+                .clone()
+                .into_any_element(),
             // The page asks to show another page by event; the subscription dies with the page.
             Page::Addons => self
                 .addons
@@ -634,7 +657,12 @@ impl Render for Shell {
                     .flex_1()
                     .min_w_0()
                     .h_full()
-                    .child(header::render(self.page, self.tf2_running, cx))
+                    .child(header::render(
+                        self.page,
+                        self.tf2_running,
+                        window.viewport_size().width,
+                        cx,
+                    ))
                     .children(update_view::banner(cx))
                     .children(crate::crash::notice::banner(cx))
                     .children(crate::old_v4::banner(cx))

@@ -17,7 +17,7 @@ use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::widgets::card_grid::CardGrid;
-use tf2tools_app::widgets::scroll::scroll_area;
+use tf2tools_app::widgets::scroll::{BAR_WIDTH, scroll_area, sideways};
 use tf2tools_core::{
     GbId, LogLevel, NewLogEntry, ProfileDraft, Provenance, StoreItemId, StoreKind, Tf2Install,
 };
@@ -654,4 +654,53 @@ fn at_1280x800_only_the_sound_store_grid_scrolls(cx: &mut TestAppContext) {
     let bar = ids::grid_scrollbar(ids::STORE_GRID);
     assert_bar_beside(cx, s.win, ids::STORE_GRID, bar.clone());
     assert_track_scrolls_virtual(cx, s.win, bar, card);
+}
+
+/// Two sideways parts of one table sharing an offset: one 300 px wide, one 600 px wide.
+struct Parts;
+
+impl Render for Parts {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let part = |id: &'static str, width: f32| {
+            sideways(id, div().w(px(width)).h(px(20.))).shared("probe-parts")
+        };
+        v_flex()
+            .size_full()
+            .child(part("probe-narrow", 300.))
+            .child(part("probe-wide", 600.))
+    }
+}
+
+#[gpui_kit::test]
+fn parts_sharing_an_offset_each_keep_their_own_bar_strip(cx: &mut TestAppContext) {
+    support::init(cx);
+    let win = cx
+        .update(|cx| {
+            let options = WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(Bounds {
+                    origin: point(px(0.), px(0.)),
+                    size: size(px(400.), px(300.)),
+                })),
+                ..WindowOptions::default()
+            };
+            gpui_kit::open_window(options, cx, |_, cx| cx.new(|_| Parts))
+        })
+        .unwrap()
+        .0;
+    // Only the wider part overflows the 400 px window, so only it opens a strip under its
+    // content, and neither flips frame to frame.
+    for frame in 0..4 {
+        let narrow = bounds(cx, win, "probe-narrow").size.height;
+        let wide = bounds(cx, win, "probe-wide").size.height;
+        assert_eq!(
+            narrow,
+            px(20.),
+            "frame {frame}: the narrow part has no strip"
+        );
+        assert_eq!(
+            wide,
+            px(20.) + BAR_WIDTH,
+            "frame {frame}: the wide part has a strip"
+        );
+    }
 }

@@ -18,8 +18,10 @@ thiserror.workspace = true
 dirs.workspace = true
 steamlocate.workspace = true
 zip.workspace = true
+flate2.workspace = true
 sevenz-rust2.workspace = true
 vpk.workspace = true
+rars.workspace = true
 vtf.workspace = true
 image = { workspace = true, features = ["jpeg"] }
 serde.workspace = true
@@ -50,6 +52,7 @@ windows-sys.workspace = true
 tempfile.workspace = true
 wiremock.workspace = true
 minisign.workspace = true
+rars = { workspace = true, features = ["write", "encryption"] }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
 
 # A single test executable keeps the link count (and the target dir) small.
@@ -68,3 +71,6 @@ test = true
 [[example]]
 name = "make_manifest"
 test = true
+
+[[example]]
+name = "extract_class_icons"

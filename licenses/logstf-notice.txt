@@ -1,0 +1,5 @@
+logs.tf
+
+The stats and logs on the logs.tf page come from logs.tf (https://logs.tf).
+
+TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with logs.tf.

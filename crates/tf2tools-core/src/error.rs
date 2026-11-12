@@ -144,9 +144,9 @@ pub enum ArchiveError {
         /// The underlying I/O error.
         source: std::io::Error,
     },
-    /// The file is a RAR archive, which is not supported.
-    #[error("{path} is a RAR archive, which is not supported; pick a zip or 7z file")]
-    Rar {
+    /// The archive is password-protected.
+    #[error("{path} is password-protected")]
+    Encrypted {
         /// The archive.
         path: PathBuf,
     },
@@ -1010,6 +1010,12 @@ pub enum DownloadError {
         /// The cap in bytes.
         limit: u64,
     },
+    /// The server sent no bytes for a file listed with content, as GameBanana does when busy.
+    #[error("{url} sent an empty body")]
+    EmptyBody {
+        /// The address of the file.
+        url: String,
+    },
     /// The downloaded bytes do not match the store's MD5 checksum.
     #[error("{file_name} failed its checksum: expected {expected}, got {found}")]
     ChecksumMismatch {
@@ -1062,6 +1068,169 @@ pub enum DownloadError {
         /// SQLite's description of the failure.
         message: String,
     },
+}
+
+/// Why an add-on's newest file could not be made ready to install.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GbAddonFetchError {
+    /// The item lists no files.
+    #[error("GameBanana item {gb_id} has no files to install")]
+    NoFiles {
+        /// The item that was asked for.
+        gb_id: GbId,
+    },
+    /// GameBanana's virus scan did not pass the file.
+    #[error("{file_name} did not pass GameBanana's virus scan ({result:?})")]
+    VirusScan {
+        /// The store's name for the file.
+        file_name: String,
+        /// The scan result GameBanana reported.
+        result: String,
+    },
+    /// The server kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// The server answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// The server could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The file is listed as, or grew past, the add-on size cap.
+    #[error("{url} is more than {limit} bytes")]
+    TooLarge {
+        /// The address of the file.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// The server sent no bytes for a file listed with content, as GameBanana does when busy.
+    #[error("{url} sent an empty body")]
+    EmptyBody {
+        /// The address of the file.
+        url: String,
+    },
+    /// The downloaded bytes do not match the store's MD5 checksum.
+    #[error("{file_name} failed its checksum: expected {expected}, got {found}")]
+    ChecksumMismatch {
+        /// The store's name for the file.
+        file_name: String,
+        /// The checksum the store published.
+        expected: String,
+        /// The checksum of the bytes received.
+        found: String,
+    },
+    /// The downloaded archive could not be extracted or walked.
+    #[error(transparent)]
+    Archive(#[from] ArchiveError),
+    /// The download holds only programs, which TF2Tools never runs.
+    #[error("{file_name} holds only programs, nothing to install")]
+    OnlyExe {
+        /// The store's name for the file.
+        file_name: String,
+    },
+    /// The download's layout matches no known add-on shape: nothing installable, or
+    /// more than `MAX_PAYLOADS` parts.
+    #[error("{}", unknown_layout_message(.file_name, *.payloads))]
+    UnknownLayout {
+        /// The store's name for the file.
+        file_name: String,
+        /// How many payloads were found.
+        payloads: usize,
+    },
+    /// A file or directory could not be read or written.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// The extraction stopped before it finished, for example on a cancelled task.
+    #[error("the download was interrupted: {message}")]
+    Interrupted {
+        /// What stopped it.
+        message: String,
+    },
+}
+
+/// Words an unknown layout by whether it found nothing or too much to choose from.
+fn unknown_layout_message(file_name: &str, payloads: usize) -> String {
+    if payloads == 0 {
+        format!("{file_name} holds nothing TF2Tools knows how to install")
+    } else {
+        format!("{file_name} has {payloads} possible parts, too many to tell which to install")
+    }
+}
+
+/// Why a GameBanana add-on update check stopped before every due add-on was asked.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GbAddonCheckError {
+    /// GameBanana could not be reached, was rate limiting or kept sending empty replies.
+    #[error(transparent)]
+    Browse(#[from] BrowseError),
+    /// The library's rows could not be read or written.
+    #[error(transparent)]
+    Library(#[from] LibraryError),
+}
+
+/// Why a GameBanana add-on could not be installed, installed again or removed.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GbAddonInstallError {
+    /// A file or directory could not be read or written.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// SQLite failed to read or record the add-on.
+    #[error("library database error: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+    /// The game folder (`tf/`) is gone, so nothing was written.
+    #[error("Team Fortress 2 is no longer at {path}")]
+    GameMissing {
+        /// The `tf` folder that is missing.
+        path: PathBuf,
+    },
+    /// TF2 holds VPKs open; nothing changed.
+    #[error("TF2 is running and a VPK would change")]
+    Tf2Running,
+    /// No row, or no library copy, for the add-on.
+    #[error("GameBanana add-on {gb_id} is not in the library")]
+    NotInLibrary {
+        /// The add-on that was asked for.
+        gb_id: GbId,
+    },
+    /// A chosen name is not one of the download's payloads.
+    #[error("{name} is not a payload of this download")]
+    UnknownPayload {
+        /// The chosen name.
+        name: String,
+    },
+    /// No payload was chosen.
+    #[error("no payload was chosen")]
+    NothingChosen,
 }
 
 /// Why an item's audio preview could not be fetched.
@@ -2035,5 +2204,255 @@ pub enum ModuleCatalogError {
         url: String,
         /// The cap in bytes.
         limit: u64,
+    },
+}
+
+/// Why the game's weapon icons could not be built.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum WeaponIconsError {
+    /// items_game.txt is missing, unreadable or over 64 MiB.
+    #[error("cannot read {path}: {source}")]
+    ItemsGame {
+        /// The items_game.txt path.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// tf2_textures_dir.vpk is missing or not a readable VPK.
+    #[error("cannot read the game's textures: {source}")]
+    Textures {
+        /// Why the texture pak could not be read.
+        source: VpkError,
+    },
+    /// The cache folder or a PNG in it cannot be written.
+    #[error("cannot write the weapon icon cache at {path}: {message}")]
+    Cache {
+        /// The folder or file that failed.
+        path: PathBuf,
+        /// What went wrong.
+        message: String,
+    },
+}
+
+/// Why the game's weapon names could not be read.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum WeaponNamesError {
+    /// items_game.txt is missing, unreadable, not a file or over 64 MiB.
+    #[error("cannot read {path}: {source}")]
+    ItemsGame {
+        /// The items_game.txt path.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// tf_english.txt is missing, unreadable, not a file or over 16 MiB.
+    #[error("cannot read {path}: {source}")]
+    English {
+        /// The tf_english.txt path.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+}
+
+/// Why the player box text could not be read.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum PlayerInputError {
+    /// The text is no Steam link, ID or vanity name.
+    #[error("That doesn't look like a Steam profile link or Steam ID.")]
+    NotSteam,
+}
+
+/// Why the logs.tf cache could not be read or written.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum LogsCacheError {
+    /// SQLite failed on one of the `logstf_` tables or the active-player setting.
+    #[error("the logs.tf cache could not be read or written: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+}
+
+/// Why a Steam profile could not be looked up.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ResolveError {
+    /// Steam answered that no such profile exists.
+    #[error("We couldn't find that Steam profile.")]
+    NotFound,
+    /// Steam kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// Steam answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// Steam could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The profile body grew past its size cap.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// The profile body named neither a Steam ID nor an error.
+    #[error("unexpected response from {url}: {message}")]
+    Malformed {
+        /// The address that was asked.
+        url: String,
+        /// What was wrong with the body.
+        message: String,
+    },
+}
+
+/// Why a player's logs.tf sync stopped.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum LogsSyncError {
+    /// logs.tf kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// logs.tf answered with a non-success status.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// logs.tf could not be reached or the connection broke.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP client's description of the failure.
+        message: String,
+    },
+    /// The log list grew past its size cap.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// The log list or a log body was not the JSON logs.tf sends.
+    #[error("unexpected response from {url}: {message}")]
+    Malformed {
+        /// The address that was asked.
+        url: String,
+        /// What was wrong with the body.
+        message: String,
+    },
+    /// SQLite failed while writing the cache.
+    #[error("the logs.tf cache could not be read or written: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+    /// The player has no row in the tracked-player list.
+    #[error("{steam_id} is not a tracked player")]
+    NotTracked {
+        /// The player's SteamID64.
+        steam_id: u64,
+    },
+}
+
+impl From<LogsCacheError> for LogsSyncError {
+    fn from(e: LogsCacheError) -> Self {
+        match e {
+            LogsCacheError::Database { message } => LogsSyncError::Database { message },
+        }
+    }
+}
+
+/// Why a log opened before the sync reached it could not be fetched.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum LogsFetchError {
+    /// logs.tf no longer has the log; it is marked gone.
+    #[error("logs.tf no longer has this log")]
+    Gone,
+    /// The body was not UTF-8 or not a log; it is marked unreadable.
+    #[error("logs.tf sent a log that could not be read")]
+    Unreadable,
+    /// logs.tf could not be reached or redirected off the allowlist.
+    #[error("cannot reach {url}: {message}")]
+    Network {
+        /// The address that was asked.
+        url: String,
+        /// What went wrong.
+        message: String,
+    },
+    /// logs.tf answered an error status other than 404 and 429.
+    #[error("{url} answered HTTP {status}")]
+    Http {
+        /// The address that was asked.
+        url: String,
+        /// The HTTP status code.
+        status: u16,
+    },
+    /// logs.tf kept answering HTTP 429 after every retry.
+    #[error("{url} is rate limiting requests; try again later")]
+    RateLimited {
+        /// The address that was asked.
+        url: String,
+    },
+    /// The body grew past its size cap; it is marked unreadable.
+    #[error("{url} sent more than {limit} bytes")]
+    TooLarge {
+        /// The address that was asked.
+        url: String,
+        /// The cap in bytes.
+        limit: u64,
+    },
+    /// SQLite failed while writing the cache.
+    #[error("the logs.tf cache could not be read or written: {message}")]
+    Cache {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+}
+
+impl From<LogsCacheError> for LogsFetchError {
+    fn from(e: LogsCacheError) -> Self {
+        match e {
+            LogsCacheError::Database { message } => LogsFetchError::Cache { message },
+        }
+    }
+}
+
+/// Why a stored logs.tf body could not be read as a log.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum LogParseError {
+    /// The body is not JSON or lacks `length`, `teams` or `players`.
+    #[error("the log could not be read: {message}")]
+    Format {
+        /// What the JSON reader objected to.
+        message: String,
     },
 }

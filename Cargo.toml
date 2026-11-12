@@ -32,8 +32,10 @@ dirs = "7"
 steamlocate = "2.1"
 tempfile = "3"
 zip = "9"
+flate2 = "1.1.10"
 sevenz-rust2 = "0.24"
 vpk = "0.3"
+rars = { version = "=0.12.4", default-features = false }
 vtf = "0.4.1"
 image = { version = "0.25", default-features = false, features = ["png", "webp"] }
 serde = { version = "1", features = ["derive"] }
@@ -61,10 +63,10 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 wiremock = "0.6.5"
 # Windows resources for the exe icon; the version gpui-pre already resolves.
 embed-resource = "=3.0.12"
-# UI: the kit trio is pinned exactly at 0.9.0, so a kit bump is a deliberate change.
-gpui-kit = "=0.9.0"
-gpui-component = "=0.9.0"
-gpui-base = "=0.9.0"
+# UI: the kit trio is pinned exactly at 0.9.1, so a kit bump is a deliberate change.
+gpui-kit = "=0.9.1"
+gpui-component = "=0.9.1"
+gpui-base = "=0.9.1"
 rust-embed = { version = "=8.13.0", features = ["debug-embed"] }
 anyhow = "1"
 async-channel = "2.5"

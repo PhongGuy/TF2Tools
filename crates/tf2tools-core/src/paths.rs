@@ -72,6 +72,11 @@ impl DataDir {
         self.root.join("mastercomfig")
     }
 
+    /// GameBanana add-on copies, `<root>/library/gb-addons`. Touches no files.
+    pub fn gb_addon_dir(&self) -> PathBuf {
+        self.root.join("library").join("gb-addons")
+    }
+
     /// Scratch space for downloads and extraction, `<root>/tmp`.
     pub fn tmp_dir(&self) -> PathBuf {
         self.root.join("tmp")
@@ -81,6 +86,12 @@ impl DataDir {
     /// `<root>/cache/images` from `at`.
     pub fn image_cache_dir(&self) -> PathBuf {
         self.image_cache.clone()
+    }
+
+    /// The game weapon icon cache: `<cache home>/tf2tools/weapon-icons` beside the store's
+    /// image cache, `<root>/cache/weapon-icons` from `at`.
+    pub fn weapon_icon_dir(&self) -> PathBuf {
+        self.image_cache.with_file_name("weapon-icons")
     }
 }
 

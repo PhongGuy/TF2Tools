@@ -59,13 +59,14 @@ use gpui_kit::{
 };
 use tf2tools_core::{
     BoardMode, Change, ChangeTarget, ClassSchema, EditRefused, FontEdit, GameText, HudAssets,
-    HudFiles, HudFilesError, HudId, HudImage, HudLoadError, HudModel, HudOptions, KillIcon,
-    LogLevel, MakeHudError, MakeTarget, MakerBase, MeterKind, NewLogEntry, OptionKind, OptionValue,
-    PartKey, Platform, RgbaImage, SampleSet, Scene, SceneRule, Screen, Team, drawn_image,
-    font_families, picture_material, scene_image,
+    HudFiles, HudFilesError, HudId, HudImage, HudLoadError, HudModel, HudOptions, LogLevel,
+    MakeHudError, MakeTarget, MakerBase, MeterKind, NewLogEntry, OptionKind, OptionValue, PartKey,
+    Platform, SampleSet, Scene, SceneRule, Screen, Team, drawn_image, font_families,
+    picture_material, scene_image,
 };
 
 use crate::activity;
+use crate::hud_textures::{Decoded, crop, decode_texture};
 use crate::ids;
 use crate::keymap::{
     CancelHudDrag, HUD_MAKER_CONTEXT, HideHudPart, NUDGE_FAR, NudgeDown, NudgeDownFar, NudgeLeft,
@@ -4605,38 +4606,9 @@ fn decode_layered(
         .collect()
 }
 
-// A texture decoded, with the pixels kept for cutting icons out of a sheet.
-type Decoded = Option<(Arc<RgbaImage>, Arc<RenderImage>)>;
-
-// `name`'s texture as pixels and as a render image; `None` when it is missing or unreadable.
-fn decode_texture(files: &HudFiles, name: &str, platform: Platform) -> Decoded {
-    let Ok(HudImage::Found(texture)) = files.image(name, platform) else {
-        return None;
-    };
-    let image = texture.image();
-    let render = to_render_image(image.width(), image.height(), image.pixels().to_vec())?;
-    Some((Arc::new(image.clone()), render))
-}
-
 // The main menu's background names for a narrow and a wide screen; an unreadable list is none.
 fn menu_backgrounds(files: &HudFiles, platform: Platform) -> MenuBackgrounds {
     [false, true].map(|wide| files.menu_background(wide, platform).ok().flatten())
-}
-
-// The icon's texel rectangle out of its sheet; `None` when the rectangle leaves the sheet.
-fn crop(sheet: &RgbaImage, icon: &KillIcon) -> Option<RgbaImage> {
-    let right = icon.x().checked_add(icon.wide())?;
-    let bottom = icon.y().checked_add(icon.tall())?;
-    if right > sheet.width() || bottom > sheet.height() {
-        return None;
-    }
-    let (stride, row_bytes) = (sheet.width() as usize * 4, icon.wide() as usize * 4);
-    let mut pixels = Vec::with_capacity(row_bytes * icon.tall() as usize);
-    for row in icon.y()..bottom {
-        let start = row as usize * stride + icon.x() as usize * 4;
-        pixels.extend_from_slice(sheet.pixels().get(start..start + row_bytes)?);
-    }
-    RgbaImage::from_pixels(icon.wide(), icon.tall(), pixels)
 }
 
 impl Render for HudMakerPage {

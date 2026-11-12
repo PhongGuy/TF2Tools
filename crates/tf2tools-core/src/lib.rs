@@ -14,13 +14,16 @@ mod db;
 mod disk;
 mod error;
 mod fonts;
+mod game_icons;
 mod hud_maker;
 mod ice;
 mod library;
+mod logstf;
 mod old_v4;
 mod pak;
 pub mod panic_mark;
 mod paths;
+mod payloads;
 mod settings;
 mod store;
 mod templates;
@@ -30,6 +33,7 @@ mod timestamp;
 mod update;
 mod wav;
 mod weapon_icons;
+mod weapon_names;
 mod weapons;
 
 pub use activity::{ActivityLog, LOG_KEEP, LogEntry, LogLevel, LogQuery, NewLogEntry};
@@ -39,20 +43,22 @@ pub use db::Database;
 pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
     BrowseError, CatalogError, CopyHudError, DataDirError, DetectError, DownloadError, FilesError,
-    FontCheckError, FontInstallError, HistoryError, HudFilesError, HudLoadError, ImageError,
-    ImportError, InstallError, InstallMastercomfigError, KeepHudError, KvParseError, LibraryError,
-    LogError, MakeHudError, MapDownloadError, MapRemoveError, MastercomfigStatusError,
-    ModuleCatalogError, OpenError, PaintError, PngReadError, PngWriteError, PresetError,
-    PreviewError, ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError,
-    RestoreMastercomfigError, SchemaError, SettingsError, SyncError, TakeOverError,
-    UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
-    WavError,
+    FontCheckError, FontInstallError, GbAddonCheckError, GbAddonFetchError, GbAddonInstallError,
+    HistoryError, HudFilesError, HudLoadError, ImageError, ImportError, InstallError,
+    InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError, LogParseError,
+    LogsCacheError, LogsFetchError, LogsSyncError, MakeHudError, MapDownloadError, MapRemoveError,
+    MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError, PlayerInputError,
+    PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
+    ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
+    SettingsError, SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
+    UpdateDownloadError, VpkError, VtfError, WavError, WeaponIconsError, WeaponNamesError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
     HudFonts, PROTECTED_FONT_NAMES, Platform, check_hud_fonts, install_hud_fonts, scan_hud_fonts,
     system_font_host,
 };
+pub use game_icons::GameWeaponIcons;
 pub use hud_maker::MeterKind;
 pub use hud_maker::{
     ALIGNMENTS, AddBlock, Align, AnimationAppend, AnimationChange, AssetFile, AxisSize, Backdrop,
@@ -87,29 +93,40 @@ pub use hud_maker::{background_corners, corner_radius, paints_background};
 pub use hud_maker::{wrap_lines, wrapped_text_left};
 pub use library::{
     AddonEntry, AddonName, ApplyProfileReport, ApplyReport, ApplyStep, Assignment, CrosshairEntry,
-    CrosshairFormat, CrosshairId, CrosshairRef, DraftCrosshair, DraftSlot, ExternalHud, GbId,
-    HudAssets, HudEntry, HudId, HudInstall, HudStatus, InstalledCrosshairs, InstalledSound,
-    InstalledSounds, Library, LibraryEntry, MadeHud, MakeTarget, MastercomfigStatus, MissingItem,
-    MissingKind, PaintTarget, PaintedSource, Preset, PresetEntry, Profile, ProfileCrosshair,
-    ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate, Provenance, Recovery,
-    Reinstall, SavedHud, SkipReason, SkippedAssignment, SoundConflict, SoundEntry, SoundFormat,
-    SoundId, SoundKind, crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
+    CrosshairFormat, CrosshairId, CrosshairRef, DraftCrosshair, DraftSlot, ExternalHud,
+    GbAddonCheck, GbAddonEntry, GbId, HudAssets, HudEntry, HudId, HudInstall, HudStatus,
+    InstalledCrosshairs, InstalledSound, InstalledSounds, Library, LibraryEntry, MadeHud,
+    MakeTarget, MastercomfigStatus, MissingItem, MissingKind, PaintTarget, PaintedSource, Preset,
+    PresetEntry, Profile, ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId,
+    ProfileItem, ProfileUpdate, Provenance, Recovery, Reinstall, SavedHud, SkipReason,
+    SkippedAssignment, SoundConflict, SoundEntry, SoundFormat, SoundId, SoundKind,
+    crosshair_scripts_need_repair, pictures_fit, read_recipe_file,
 };
 pub use library::{
     Choices, ComfigModule, ModuleCatalog, ModuleCategory, ModuleChoice, ModuleValue, readable_name,
 };
 pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
+pub use logstf::{
+    ClassAverage, ClassLine, ClassWeapons, EventKind, HealTarget, Killstreak, LOG_BODY_LIMIT,
+    LOG_ZIP_LIMIT, LOGS_LONG_SPACING, LOGS_SPACING, LONG_PULL, LogChatLine, LogColumns, LogDetail,
+    LogRow, LogState, LogsCache, LogsCancel, LogsClient, LogsEndpoints, LogsProgress, LogsRange,
+    LogsSyncSummary, MatrixKind, MatrixRow, MedicLine, Medigun, PROVISIONAL_SECS, PlayerInput,
+    PlayerLine, RoundEvent, RoundLine, RoundPlayer, RoundTeam, STALE_SECS, STEAM_ID64_BASE,
+    SteamId, TeamTotals, TrackedPlayer, WeaponBackfill, WeaponLine, WeaponSum,
+    leaderboard_icon_stem, logstf_class, parse_log, parse_player_input, window_start,
+};
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
+pub use payloads::{MAX_PAYLOADS, Payload, PayloadKind, find_payloads};
 pub use settings::{Settings, Volume};
 pub use store::{
     AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
     AddonProfile, AddonQuery, AddonSection, AddonSort, AddonStep, DownloadPhase, DownloadProgress,
-    Endpoints, INDEX_STEP_CALLS, MastercomfigRelease, SEARCH_STEP_CALLS, STEP_CARDS, StoreCard,
-    StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem, StoreItemId, StoreKind,
-    StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
+    Endpoints, GbAddonDownload, INDEX_STEP_CALLS, MastercomfigRelease, SEARCH_STEP_CALLS,
+    STEP_CARDS, StoreCard, StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem,
+    StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
 };
 pub use store::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 pub use texture::{
@@ -123,4 +140,6 @@ pub use update::{
     UpdateOffer, apply,
 };
 pub use wav::{WavInfo, inspect_wav};
+pub use weapon_icons::weapon_inventory_images;
+pub use weapon_names::WeaponNames;
 pub use weapons::{TfClass, Weapon, WeaponSlot, weapons};

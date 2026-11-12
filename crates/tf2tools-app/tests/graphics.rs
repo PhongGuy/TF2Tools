@@ -35,7 +35,7 @@ fn open_graphics(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<Gr
 #[test]
 fn graphics_follows_addons_in_the_tools_group_with_the_gauge_icon() {
     let at = Page::ALL.iter().position(|p| *p == Page::Graphics).unwrap();
-    assert_eq!(Page::ALL.len(), 15);
+    assert_eq!(Page::ALL.len(), 16);
     assert_eq!(Page::ALL[at - 1], Page::Addons);
     assert_eq!(Page::ALL[at + 1], Page::HudStore);
     let page = Page::Graphics;

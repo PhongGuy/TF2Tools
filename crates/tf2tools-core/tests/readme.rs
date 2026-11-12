@@ -98,9 +98,11 @@ fn the_readme_has_the_player_sections_in_order() {
         "### Hitsounds and killsounds",
         "### A crosshair for every weapon",
         "### mastercomfig addons",
+        "### Graphics",
         "### The stores",
         "### Make your own crosshair",
         "### Make your own HUD",
+        "### Maps",
         "### Profiles",
         "### Settings",
         "## Download and install",
@@ -325,4 +327,59 @@ fn the_readme_credits_valve() {
             "the License section lacks {needle:?}"
         );
     }
+}
+
+#[test]
+fn weapon_icons_come_from_the_game_not_the_wiki() {
+    let readme = repo_file("README.md");
+    let notice = repo_file("licenses/Valve-notice.txt");
+    for (name, text) in [("README.md", &readme), ("Valve-notice.txt", &notice)] {
+        let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert!(
+            !flat.contains("wiki.teamfortress.com"),
+            "{name} still names the wiki"
+        );
+        assert!(!flat.contains("TF2 Wiki"), "{name} still names the wiki");
+        assert!(
+            flat.contains("weapon icons in the crosshair list are read from your own TF2 install"),
+            "{name} lacks where the icons come from"
+        );
+    }
+    let privacy = readme
+        .split_once("\n## Privacy\n")
+        .expect("a Privacy section")
+        .1
+        .split_once("\n## ")
+        .expect("a section after Privacy")
+        .0;
+    assert!(
+        privacy.contains("The weapon icons in the crosshair list come from your own TF2 install."),
+        "the Privacy section lacks the icon sentence"
+    );
+}
+
+#[test]
+fn the_logs_section_says_where_weapon_names_come_from() {
+    let readme = repo_file("README.md");
+    let (_, logs) = readme
+        .split_once("### logs.tf stats")
+        .expect("a logs.tf section");
+    let (logs, _) = logs.split_once("\n### ").expect("a section after it");
+    assert!(
+        logs.contains("in-game names, read from your TF2 install"),
+        "logs.tf section: {logs}"
+    );
+}
+
+#[test]
+fn the_logs_section_mentions_kill_feed_icons() {
+    let readme = repo_file("README.md");
+    let (_, logs) = readme
+        .split_once("### logs.tf stats")
+        .expect("a logs.tf section");
+    let (logs, _) = logs.split_once("\n### ").expect("a section after it");
+    assert!(
+        logs.contains("kill feed icon, also read from your TF2 install"),
+        "logs.tf section: {logs}"
+    );
 }

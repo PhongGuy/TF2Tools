@@ -16,13 +16,14 @@ pub enum Page {
     CrosshairStore,
     AddonStore,
     Maps,
+    LogsTf,
     Settings,
     Logs,
 }
 
 impl Page {
-    /// Every page in sidebar order: tools, stores, makers and Maps, footer.
-    pub const ALL: [Page; 15] = [
+    /// Every page in sidebar order: tools, stores, makers, Maps and logs.tf, footer.
+    pub const ALL: [Page; 16] = [
         Page::Huds,
         Page::Sounds,
         Page::Crosshairs,
@@ -36,6 +37,7 @@ impl Page {
         Page::CrosshairMaker,
         Page::HudMaker,
         Page::Maps,
+        Page::LogsTf,
         Page::Settings,
         Page::Logs,
     ];
@@ -56,6 +58,7 @@ impl Page {
             Page::CrosshairStore => "crosshair-store",
             Page::AddonStore => "addon-store",
             Page::Maps => "maps",
+            Page::LogsTf => "logs-tf",
             Page::Settings => "settings",
             Page::Logs => "logs",
         }
@@ -77,6 +80,7 @@ impl Page {
             Page::CrosshairStore => "Crosshair Store",
             Page::AddonStore => "Addon Store",
             Page::Maps => "Maps",
+            Page::LogsTf => "logs.tf",
             Page::Settings => "Settings",
             Page::Logs => "Logs",
         }
@@ -99,6 +103,7 @@ impl Page {
             | other @ Page::CrosshairStore
             | other @ Page::AddonStore
             | other @ Page::Maps
+            | other @ Page::LogsTf
             | other @ Page::Settings => other.label(),
         }
     }
@@ -122,6 +127,7 @@ impl Page {
                 | Page::Logs
                 | Page::Profiles
                 | Page::Maps
+                | Page::LogsTf
         )
     }
 

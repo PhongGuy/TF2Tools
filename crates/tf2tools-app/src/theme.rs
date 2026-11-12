@@ -58,3 +58,12 @@ pub fn install(cx: &mut App) {
 pub fn card_hover(theme: &Theme) -> Hsla {
     theme.accent
 }
+
+/// A team's solid fill under white text, as logs.tf heads a log with its score banner: its
+/// muted teal-blue and brick-red, the blue a shade darker so white text clears 4.5:1.
+pub fn team_fill(team: tf2tools_core::Team) -> Hsla {
+    match team {
+        tf2tools_core::Team::Red => gpui_kit::rgb(0xa75d50).into(),
+        tf2tools_core::Team::Blue | _ => gpui_kit::rgb(0x567b88).into(),
+    }
+}

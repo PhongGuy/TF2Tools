@@ -10,6 +10,7 @@ pub mod hud_pictures;
 pub mod hud_schema;
 pub mod hud_stock;
 pub mod hud_switches;
+pub mod logstf;
 pub mod sfnt;
 pub mod update;
 
@@ -19,9 +20,10 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
 use tf2tools_core::{
-    BuiltinCrosshairs, CrosshairEntry, DataDir, Database, DownloadError, DownloadProgress,
-    Endpoints, GbId, HudEntry, Library, LibraryEntry, ModuleCatalog, Provenance, SoundEntry,
-    StoreClient, StoreConfig, StoreFile, StoreItemId, StoreKind, Tf2Install,
+    AddonProfile, AddonSection, BuiltinCrosshairs, CrosshairEntry, DataDir, Database,
+    DownloadError, DownloadProgress, Endpoints, GbAddonDownload, GbAddonFetchError, GbId, HudEntry,
+    Library, LibraryEntry, ModuleCatalog, Provenance, SoundEntry, StoreClient, StoreConfig,
+    StoreFile, StoreItemId, StoreKind, Tf2Install,
 };
 use wiremock::MockServer;
 use wiremock::matchers::{method, path};
@@ -140,12 +142,85 @@ const M13_TABLES: &str = "
     );
 ";
 
-/// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables and
-/// migration 13's mastercomfig tables: the schema v6 opens to.
+/// The table migration 14 adds, as the schema should hold it.
+const M14_TABLES: &str = "
+    CREATE TABLE library_gb_addons (
+        gb_id INTEGER PRIMARY KEY, section TEXT NOT NULL, name TEXT NOT NULL,
+        author TEXT NOT NULL, file_id INTEGER NOT NULL, file_date INTEGER NOT NULL,
+        latest_file_date INTEGER NOT NULL, checked_at INTEGER NOT NULL,
+        payloads TEXT NOT NULL, files TEXT NOT NULL, installed INTEGER NOT NULL,
+        gone INTEGER NOT NULL DEFAULT 0
+    );
+";
+
+/// The tables migration 15 adds, as the schema should hold them.
+const M15_TABLES: &str = "
+    CREATE TABLE logstf_players (
+        steam_id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        last_synced INTEGER
+    );
+    CREATE TABLE logstf_logs (
+        id INTEGER PRIMARY KEY,
+        title TEXT NOT NULL,
+        map TEXT NOT NULL,
+        date INTEGER NOT NULL,
+        length INTEGER,
+        body BLOB,
+        fetched_at INTEGER,
+        state INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE logstf_player_logs (
+        steam_id INTEGER NOT NULL,
+        log_id INTEGER NOT NULL REFERENCES logstf_logs(id) ON DELETE CASCADE,
+        PRIMARY KEY (steam_id, log_id)
+    );
+    CREATE TABLE logstf_class_rows (
+        log_id INTEGER NOT NULL REFERENCES logstf_logs(id) ON DELETE CASCADE,
+        steam_id INTEGER NOT NULL,
+        class TEXT NOT NULL,
+        seconds INTEGER NOT NULL,
+        kills INTEGER NOT NULL,
+        deaths INTEGER NOT NULL,
+        assists INTEGER NOT NULL,
+        dmg INTEGER NOT NULL,
+        heal INTEGER NOT NULL DEFAULT 0,
+        ubers INTEGER NOT NULL DEFAULT 0,
+        drops INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (log_id, steam_id, class)
+    );
+    CREATE INDEX logstf_class_rows_player ON logstf_class_rows(steam_id);
+    CREATE INDEX logstf_player_logs_log ON logstf_player_logs(log_id);
+";
+
+/// The tables and column migration 16 adds, as the schema should hold them.
+const M16_TABLES: &str = "
+    CREATE TABLE logstf_weapon_rows (
+        log_id INTEGER NOT NULL REFERENCES logstf_logs(id) ON DELETE CASCADE,
+        steam_id INTEGER NOT NULL,
+        class TEXT NOT NULL,
+        weapon TEXT NOT NULL,
+        kills INTEGER NOT NULL,
+        dmg INTEGER NOT NULL,
+        shots INTEGER NOT NULL,
+        hits INTEGER NOT NULL,
+        PRIMARY KEY (log_id, steam_id, class, weapon)
+    );
+    CREATE INDEX logstf_weapon_rows_player ON logstf_weapon_rows(steam_id);
+    ALTER TABLE logstf_logs ADD COLUMN weapons_counted INTEGER NOT NULL DEFAULT 0;
+";
+
+/// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables,
+/// migration 13's mastercomfig tables, migration 14's add-on table, migration 15's logs.tf
+/// tables and migration 16's weapon rows: the schema v6 opens to.
 pub fn current_shape() -> SchemaShape {
     let conn = v5_fixture_connection();
     conn.execute_batch(M12_TABLES).unwrap();
     conn.execute_batch(M13_TABLES).unwrap();
+    conn.execute_batch(M14_TABLES).unwrap();
+    conn.execute_batch(M15_TABLES).unwrap();
+    conn.execute_batch(M16_TABLES).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape
@@ -319,6 +394,133 @@ pub fn game_with_vpk(vpk: &[u8]) -> (tempfile::TempDir, std::path::PathBuf) {
     write_file(&tf.join("gameinfo.txt"), GAMEINFO_ONE_VPK.as_bytes());
     write_file(&tf.join("tf2_misc_dir.vpk"), vpk);
     (dir, tf)
+}
+
+/// Bytes of a RAR archive of `version` holding `entries`, built by `rars` itself, so names
+/// must be safe; `password` encrypts every entry.
+pub fn rar_bytes(
+    version: rars::ArchiveVersion,
+    entries: &[(&str, &[u8])],
+    password: Option<&[u8]>,
+) -> Vec<u8> {
+    let mut builder = rars::Builder::new(version).password(password.map(<[u8]>::to_vec));
+    for &(name, bytes) in entries {
+        builder
+            .add_bytes(name.as_bytes().to_vec(), bytes.to_vec(), None, None)
+            .unwrap();
+    }
+    let mut out = Vec::new();
+    builder
+        .write_to(&mut out, &rars::WriterResources::default(), None)
+        .unwrap();
+    out
+}
+
+/// CRC-32 (IEEE), bitwise; fixtures are tiny.
+fn crc32(bytes: &[u8]) -> u32 {
+    let mut crc = !0u32;
+    for &b in bytes {
+        crc ^= u32::from(b);
+        for _ in 0..8 {
+            crc = if crc & 1 == 1 {
+                (crc >> 1) ^ 0xEDB8_8320
+            } else {
+                crc >> 1
+            };
+        }
+    }
+    !crc
+}
+
+/// What every entry of `rar4_stored` and `rar5_stored` holds.
+pub const STORED_DATA: &[u8] = b"escaped\n";
+
+/// A stored RAR4 archive with `names` written verbatim; `host` 2 is Windows, 3 Unix.
+pub fn rar4_stored(names: &[&str], host: u8) -> Vec<u8> {
+    let crc = crc32(STORED_DATA);
+    let len = STORED_DATA.len() as u32;
+    let mut out = b"Rar!\x1a\x07\x00".to_vec();
+    let mut main = vec![0x73u8];
+    main.extend(0u16.to_le_bytes());
+    main.extend(13u16.to_le_bytes());
+    main.extend(0u16.to_le_bytes());
+    main.extend(0u32.to_le_bytes());
+    out.extend(((crc32(&main) & 0xffff) as u16).to_le_bytes());
+    out.extend(&main);
+    for name in names {
+        let n = name.as_bytes();
+        let attr: u32 = if host == 3 { 0o100644 } else { 0x20 };
+        let mut body = vec![0x74u8];
+        body.extend(0x8000u16.to_le_bytes());
+        body.extend((32 + n.len() as u16).to_le_bytes());
+        body.extend(len.to_le_bytes());
+        body.extend(len.to_le_bytes());
+        body.push(host);
+        body.extend(crc.to_le_bytes());
+        body.extend(0x2100_0000u32.to_le_bytes());
+        body.push(20);
+        body.push(0x30);
+        body.extend((n.len() as u16).to_le_bytes());
+        body.extend(attr.to_le_bytes());
+        body.extend(n);
+        out.extend(((crc32(&body) & 0xffff) as u16).to_le_bytes());
+        out.extend(&body);
+        out.extend(STORED_DATA);
+    }
+    let end = [0x7bu8, 0x00, 0x40, 0x07, 0x00];
+    out.extend(((crc32(&end) & 0xffff) as u16).to_le_bytes());
+    out.extend(end);
+    out
+}
+
+fn vint(mut v: u64) -> Vec<u8> {
+    let mut out = Vec::new();
+    loop {
+        let c = (v & 0x7f) as u8;
+        v >>= 7;
+        out.push(c | if v != 0 { 0x80 } else { 0 });
+        if v == 0 {
+            return out;
+        }
+    }
+}
+
+fn rar5_header(body: &[u8]) -> Vec<u8> {
+    let mut h = vint(body.len() as u64);
+    h.extend(body);
+    let mut out = crc32(&h).to_le_bytes().to_vec();
+    out.extend(h);
+    out
+}
+
+/// A stored RAR5 archive with `names` written verbatim; `host` 0 is Windows, 1 Unix.
+pub fn rar5_stored(names: &[&str], host: u64) -> Vec<u8> {
+    let crc = crc32(STORED_DATA);
+    let len = STORED_DATA.len() as u64;
+    let mut out = b"Rar!\x1a\x07\x01\x00".to_vec();
+    out.extend(rar5_header(&[vint(1), vint(0), vint(0)].concat()));
+    for name in names {
+        let n = name.as_bytes();
+        let attr = if host == 1 { 0o100644 } else { 0x20 };
+        let body = [
+            vint(2),
+            vint(0x0002),
+            vint(len),
+            vint(0x0004),
+            vint(len),
+            vint(attr),
+            crc.to_le_bytes().to_vec(),
+            vint(0),
+            vint(host),
+            vint(n.len() as u64),
+            n.to_vec(),
+        ]
+        .concat();
+        out.extend(rar5_header(&body));
+        out.extend(STORED_DATA);
+    }
+    out.extend(rar5_header(&[vint(5), vint(0), vint(0)].concat()));
+    out
 }
 
 /// Bytes of a zip holding `entries`; a name ending in `/` becomes a directory entry.
@@ -622,6 +824,70 @@ pub async fn download_collecting(
     let result = env
         .client
         .download(kind, file, &|p: DownloadProgress| {
+            seen.lock().unwrap().push(p)
+        })
+        .await;
+    (result, seen.into_inner().unwrap())
+}
+
+/// Serves `body` at `/dl/addon/<gb_id>/<i>` and returns its ProfilePage `_aFiles` record:
+/// dated `date`, scanned "clean", sized and checksummed from the body.
+pub async fn gb_addon_file(
+    env: &StoreEnv,
+    gb_id: u64,
+    i: usize,
+    name: &str,
+    body: &[u8],
+    date: i64,
+) -> serde_json::Value {
+    let route = format!("/dl/addon/{gb_id}/{i}");
+    Mock::given(method("GET"))
+        .and(path(route.as_str()))
+        .respond_with(ResponseTemplate::new(200).set_body_bytes(body.to_vec()))
+        .mount(&env.server)
+        .await;
+    serde_json::json!({
+        "_idRow": 100 + i, "_sFile": name, "_nFilesize": body.len(), "_tsDateAdded": date,
+        "_sMd5Checksum": md5_hex(body), "_sAvResult": "clean",
+        "_sDownloadUrl": format!("{}{route}", env.server.uri()),
+    })
+}
+
+/// Mounts Mod `gb_id`'s ProfilePage named `name` with `files` and reads it back.
+pub async fn gb_addon_profile(
+    env: &StoreEnv,
+    gb_id: u64,
+    name: &str,
+    files: Vec<serde_json::Value>,
+) -> AddonProfile {
+    Mock::given(method("GET"))
+        .and(path(format!("/apiv11/Mod/{gb_id}/ProfilePage")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "_idRow": gb_id, "_sName": name, "_aSubmitter": {"_sName": "vex"},
+            "_sProfileUrl": format!("https://gamebanana.com/mods/{gb_id}"), "_aFiles": files,
+        })))
+        .mount(&env.server)
+        .await;
+    env.client
+        .addon_catalog()
+        .profile(GbId::new(gb_id))
+        .await
+        .expect("profile")
+}
+
+/// Downloads `profile` as a `section` add-on through `client`, collecting its progress.
+pub async fn gb_addon_download(
+    client: &StoreClient,
+    section: &str,
+    profile: &AddonProfile,
+) -> (
+    Result<GbAddonDownload, GbAddonFetchError>,
+    Vec<DownloadProgress>,
+) {
+    let seen = std::sync::Mutex::new(Vec::new());
+    let section = AddonSection::by_key(section).expect("section");
+    let result = client
+        .download_gb_addon(section, profile, &|p: DownloadProgress| {
             seen.lock().unwrap().push(p)
         })
         .await;

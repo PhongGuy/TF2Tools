@@ -42,6 +42,7 @@ pub mod fonts;
 pub mod graphics;
 pub mod hud_copies;
 pub mod hud_switches;
+pub mod logstf;
 pub mod maker_page;
 pub mod scroll;
 pub mod update_fake;
@@ -550,6 +551,12 @@ fn open_shell(
     )
     .unwrap()
     .with_font_host(font_host);
+    // No shell test may reach logs.tf or Steam; tests that need them swap in their own client.
+    let dead = tf2tools_core::LogsClient::new(
+        tf2tools_core::LogsCache::new(services.db.clone()),
+        tf2tools_core::LogsEndpoints::loopback("http://127.0.0.1:9"),
+    );
+    services = services.with_logs(dead);
     tweak(&mut services);
     install_services(cx, services.clone());
     // A test that pins no probe reads an empty proc tree, never the machine's processes.
@@ -961,6 +968,20 @@ impl StoreServer {
         );
     }
 
+    /// Serves `body` at `route` only after `delay`, for work that must still be running.
+    pub fn mount_bytes_after(&self, route: &str, body: Vec<u8>, delay: Duration) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(route))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_bytes(body)
+                        .set_delay(delay),
+                )
+                .mount(&self.server),
+        );
+    }
+
     /// GitHub's latest mastercomfig release `tag`, listing only the base VPK at this server's
     /// `/gh/mastercomfig/mastercomfig-base.vpk`.
     pub fn mount_mastercomfig_release(&self, tag: &str) {
@@ -980,6 +1001,21 @@ impl StoreServer {
     /// Forgets every mounted answer, so later mounts take over.
     pub fn reset(&self) {
         self.rt.block_on(self.server.reset());
+    }
+
+    /// Mounts a mock the helpers here do not cover.
+    pub fn mount(&self, mock: Mock) {
+        self.rt.block_on(mock.mount(&self.server));
+    }
+
+    /// Answers every GET of `route` with `status` only after `delay`.
+    pub fn mount_status_after(&self, route: &str, status: u16, delay: Duration) {
+        self.rt.block_on(
+            Mock::given(method("GET"))
+                .and(path(route))
+                .respond_with(ResponseTemplate::new(status).set_delay(delay))
+                .mount(&self.server),
+        );
     }
 
     /// Answers every GET of `route` with `status` and an empty body.
@@ -1094,6 +1130,17 @@ pub fn seed_curated(
         (hud_id, name, author, repo, CURATED_HASH, data_json),
     )
     .unwrap();
+}
+
+/// A zip in memory holding `entries`.
+pub fn zip_of(entries: &[(&str, &[u8])]) -> Vec<u8> {
+    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let options = zip::write::SimpleFileOptions::default();
+    for &(name, bytes) in entries {
+        zip.start_file(name, options).unwrap();
+        zip.write_all(bytes).unwrap();
+    }
+    zip.finish().unwrap().into_inner()
 }
 
 /// A minimal HUD archive in memory: `<name>/info.vdf` plus a layout file.
@@ -1326,6 +1373,52 @@ impl StoreServer {
                 .and(path(format!("/apiv11/Mod/{gb_id}/ProfilePage")))
                 .respond_with(ResponseTemplate::new(200).set_body_json(body))
                 .mount(&self.server),
+        );
+    }
+
+    /// Mod `gb_id` named `name`: its ProfilePage lists `files` (file name, body, date added),
+    /// each served at `/dl/addon/<gb_id>/<i>`, scanned "clean", sized and checksum-free.
+    pub fn mount_gb_addon(&self, gb_id: u64, name: &str, files: &[(&str, Vec<u8>, i64)]) {
+        self.mount_gb_addon_after(gb_id, name, files, Duration::ZERO);
+    }
+
+    /// `mount_gb_addon` with each file answered only after `delay`.
+    pub fn mount_gb_addon_after(
+        &self,
+        gb_id: u64,
+        name: &str,
+        files: &[(&str, Vec<u8>, i64)],
+        delay: Duration,
+    ) {
+        let uri = self.uri();
+        let listed: Vec<serde_json::Value> = files
+            .iter()
+            .enumerate()
+            .map(|(i, (file, body, date))| {
+                let route = format!("/dl/addon/{gb_id}/{i}");
+                self.rt.block_on(
+                    Mock::given(method("GET"))
+                        .and(path(route.as_str()))
+                        .respond_with(
+                            ResponseTemplate::new(200)
+                                .set_body_bytes(body.clone())
+                                .set_delay(delay),
+                        )
+                        .mount(&self.server),
+                );
+                serde_json::json!({
+                    "_idRow": 100 + i, "_sFile": file, "_nFilesize": body.len(),
+                    "_tsDateAdded": date, "_sMd5Checksum": "", "_sAvResult": "clean",
+                    "_sDownloadUrl": format!("{uri}{route}"),
+                })
+            })
+            .collect();
+        self.mount_gb_profile(
+            gb_id,
+            serde_json::json!({
+                "_idRow": gb_id, "_sName": name, "_aSubmitter": {"_sName": "vex"},
+                "_sProfileUrl": format!("https://gamebanana.com/mods/{gb_id}"), "_aFiles": listed,
+            }),
         );
     }
 
@@ -1799,4 +1892,40 @@ pub fn seed_mastercomfig_overrides(env: &Env, uri: &str) {
             [serde_json::to_string(&urls).unwrap()],
         )
         .unwrap();
+}
+
+pub type IconLoads = Arc<std::sync::Mutex<Vec<PathBuf>>>;
+
+/// A loader that pictures every weapon but `skip` with `png`, logging each tf folder it loads.
+pub fn fake_icon_loader(
+    png: PathBuf,
+    skip: &'static [&'static str],
+) -> (tf2tools_app::weapon_icons::IconLoader, IconLoads) {
+    let loads: IconLoads = Arc::default();
+    let log = Arc::clone(&loads);
+    let loader: tf2tools_app::weapon_icons::IconLoader =
+        Arc::new(move |_: &Services, tf_dir: &std::path::Path| {
+            log.lock().unwrap().push(tf_dir.to_path_buf());
+            tf2tools_core::weapons()
+                .iter()
+                .map(|w| w.script_name())
+                .filter(|s| !skip.contains(s))
+                .map(|s| (s, png.clone()))
+                .collect::<std::collections::HashMap<_, _>>()
+        });
+    (loader, loads)
+}
+
+/// A 128x128 clear PNG at `<tmp>/icon.png`, standing in for a cached game icon.
+pub fn icon_png(env: &Env) -> PathBuf {
+    let path = env.tmp.path().join("icon.png");
+    image::RgbaImage::from_pixel(128, 128, image::Rgba([0, 0, 0, 0]))
+        .save(&path)
+        .unwrap();
+    path
+}
+
+/// Opens the env's database, for tests that set up a state no flow reaches.
+pub fn sql(env: &Env) -> rusqlite::Connection {
+    rusqlite::Connection::open(env.data.db_path()).unwrap()
 }

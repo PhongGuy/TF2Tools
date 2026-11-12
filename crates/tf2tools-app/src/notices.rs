@@ -17,7 +17,9 @@ const TITLES: &[(&str, &str)] = &[
     ("hud-db-MIT.txt", "hud-db HUD list (MIT)"),
     ("GameBanana-notice.txt", "GameBanana"),
     ("serveme-notice.txt", "serveme.tf"),
+    ("logstf-notice.txt", "logs.tf"),
     ("Valve-notice.txt", "Valve and Team Fortress 2"),
+    ("rars-Apache-2.0.txt", "rars RAR reader (Apache-2.0)"),
 ];
 
 /// One licence notice: its file under `licenses/`, a plain title and the full text.

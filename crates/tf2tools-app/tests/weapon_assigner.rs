@@ -2,20 +2,17 @@ use crate::support;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 
 use gpui_kit::prelude::*;
 use gpui_kit::{AnyWindowHandle, Bounds, Context, Entity, Pixels, TestAppContext, Window, div, px};
 use tf2tools_app::ids;
-use tf2tools_app::remote_images::decode::decode_image;
-use tf2tools_app::remote_images::queue::IMAGE_BUDGET;
-use tf2tools_app::remote_images::{FetchFailure, ImageFetch, ImageKey, RemoteImage, RemoteImages};
-use tf2tools_app::services::Services;
+use tf2tools_app::services::{Tf2State, install_tf2_state};
+use tf2tools_app::weapon_icons::WeaponIcons;
 use tf2tools_app::widgets::weapon_assigner::{
     AssignRequested, AssignTarget, AssignedCell, AssignerState, ClassChanged, ClearRequested,
     WeaponAssigner, slot_colour,
 };
-use tf2tools_core::{TfClass, Weapon, WeaponSlot, weapons};
+use tf2tools_core::{Tf2Install, TfClass, Weapon, WeaponSlot, weapons};
 
 struct Host {
     assigner: Entity<WeaponAssigner>,
@@ -271,34 +268,7 @@ fn the_assigning_row_spins_in_place_of_its_check(cx: &mut TestAppContext) {
     assert!(support::present(cx, win, ids::weapon_check(scattergun)));
 }
 
-type Asked = Arc<Mutex<Vec<String>>>;
-
-/// A fetcher that serves a 100x75 clear PNG for every URL (or fails each one), logging URLs.
-fn icon_fetch(serve: bool) -> (ImageFetch, Asked) {
-    let mut out = std::io::Cursor::new(Vec::new());
-    image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(
-        100,
-        75,
-        image::Rgba([0, 0, 0, 0]),
-    ))
-    .write_to(&mut out, image::ImageFormat::Png)
-    .unwrap();
-    let png = Arc::new(out.into_inner());
-    let asked: Asked = Arc::default();
-    let log = Arc::clone(&asked);
-    let fetch: ImageFetch = Arc::new(move |url: String| {
-        log.lock().unwrap().push(url);
-        let result = if serve {
-            Ok(png.to_vec())
-        } else {
-            Err(FetchFailure::Permanent)
-        };
-        Box::pin(async move { result })
-    });
-    (fetch, asked)
-}
-
-/// A window hosting a new assigner over the services and image cache already installed.
+/// A window hosting a new assigner over the services and icons already installed.
 fn assigner_window(
     cx: &mut TestAppContext,
     compact: bool,
@@ -316,124 +286,106 @@ fn assigner_window(
     (win, assigner)
 }
 
-/// Services plus an image cache on `fetch`; fetches cross tokio, so the executor may park.
+fn found(env: &support::Env) -> Tf2State {
+    Tf2State::Found(Tf2Install::from_path(&env.game).unwrap())
+}
+
+/// Services, TF2 in `state`, and the game icons on a fake loader that skips `skip`.
 fn install_icons(
     cx: &mut TestAppContext,
     env: &support::Env,
-    fetch: ImageFetch,
-) -> Entity<RemoteImages> {
+    state: Tf2State,
+    skip: &'static [&'static str],
+) -> (Entity<Tf2State>, Entity<WeaponIcons>, support::IconLoads) {
     support::init(cx);
-    cx.executor().allow_parking();
     support::install_services(cx, support::services(env, support::no_steam()));
-    cx.update(|cx| RemoteImages::install_with(cx, fetch, IMAGE_BUDGET, decode_image))
+    let tf2 = cx.update(|cx| install_tf2_state(cx, state));
+    let (loader, loads) = support::fake_icon_loader(support::icon_png(env), skip);
+    let icons = cx.update(|cx| WeaponIcons::install_with(cx, loader));
+    (tf2, icons, loads)
 }
 
-fn icon_urls(cx: &mut TestAppContext, class: TfClass) -> Vec<String> {
-    cx.update(|cx| {
-        let store = &cx.global::<Services>().store;
-        let mut urls: Vec<String> = weapons()
-            .iter()
-            .filter(|w| w.class() == class)
-            .map(|w| store.weapon_icon_url(w).expect("every weapon is mapped"))
-            .collect();
-        urls.sort();
-        urls
-    })
+fn loaded(cx: &mut TestAppContext, icons: &Entity<WeaponIcons>) -> bool {
+    cx.update(|cx| icons.read(cx).icon("tf_weapon_scattergun").is_some())
 }
 
-fn asked_sorted(asked: &Asked) -> Vec<String> {
-    let mut urls = asked.lock().unwrap().clone();
-    urls.sort();
-    urls
+fn assert_framed(cx: &mut TestAppContext, win: AnyWindowHandle, script: &str) {
+    let frame = support::bounds_of(cx, win, ids::weapon_icon(script))
+        .unwrap_or_else(|| panic!("{script}: the framed icon"));
+    assert_eq!(size_of(frame), (px(36.), px(28.)), "{script}");
+    assert!(
+        !support::present(cx, win, ids::weapon_slot_icon(script)),
+        "{script}"
+    );
+    let row = support::bounds_of(cx, win, ids::weapon_row(script)).unwrap();
+    assert!(row.contains(&frame.center()), "{script}");
 }
 
-fn all_ready(cx: &mut TestAppContext, images: &Entity<RemoteImages>, urls: &[String]) -> bool {
-    cx.update(|cx| {
-        urls.iter().all(|u| {
-            matches!(
-                images.read(cx).image(&ImageKey::weapon_icon(u)),
-                RemoteImage::Ready(_)
-            )
-        })
-    })
-}
-
-#[gpui_kit::test]
-fn the_list_fetches_each_of_its_class_icons_once(cx: &mut TestAppContext) {
-    let env = support::env();
-    let (fetch, asked) = icon_fetch(true);
-    let images = install_icons(cx, &env, fetch);
-    let (_win, _assigner) = assigner_window(cx, false);
-    let scout = icon_urls(cx, TfClass::Scout);
-    support::wait_real(cx, "the scout icons", |cx| all_ready(cx, &images, &scout));
-    assert_eq!(asked_sorted(&asked), scout);
-    assert_eq!(
-        cx.update(|cx| images.read(cx).stats().foreground_decodes),
-        0
+fn assert_square(cx: &mut TestAppContext, win: AnyWindowHandle, script: &str) {
+    let square = support::bounds_of(cx, win, ids::weapon_slot_icon(script))
+        .unwrap_or_else(|| panic!("{script}: the slot square"));
+    assert_eq!(size_of(square), (px(16.), px(16.)), "{script}");
+    assert!(
+        !support::present(cx, win, ids::weapon_icon(script)),
+        "{script}"
     );
 }
 
-// Switching classes asks once per switch, never from render, and a class seen before is
-// drawn from the session cache without fetching again.
 #[gpui_kit::test]
-fn switching_classes_wants_once_and_refetches_nothing(cx: &mut TestAppContext) {
+fn a_game_icon_is_framed_in_place_of_the_slot_square(cx: &mut TestAppContext) {
     let env = support::env();
-    let (fetch, asked) = icon_fetch(true);
-    let images = install_icons(cx, &env, fetch);
-    let (win, assigner) = assigner_window(cx, false);
-    let (scout, soldier) = (
-        icon_urls(cx, TfClass::Scout),
-        icon_urls(cx, TfClass::Soldier),
-    );
-    support::wait_real(cx, "the scout icons", |cx| all_ready(cx, &images, &scout));
-    let wants = cx.update(|cx| images.read(cx).stats().wants);
-
-    cx.update(|cx| assigner.update(cx, |a, cx| a.set_class(TfClass::Soldier, cx)));
-    support::wait_real(cx, "the soldier icons", |cx| {
-        all_ready(cx, &images, &soldier)
-    });
-    cx.update(|cx| assigner.update(cx, |a, cx| a.set_class(TfClass::Scout, cx)));
-    cx.update(|cx| assigner.update(cx, |a, cx| a.set_assigned(Vec::new(), cx)));
+    let (_tf2, icons, _) = install_icons(cx, &env, found(&env), &[]);
+    let (win, _assigner) = assigner_window(cx, false);
+    support::wait_real(cx, "the game icons", |cx| loaded(cx, &icons));
     support::settle(cx, win);
-
-    assert_eq!(cx.update(|cx| images.read(cx).stats().wants), wants + 2);
-    let mut both = [scout.clone(), soldier].concat();
-    both.sort();
-    assert_eq!(asked_sorted(&asked), both);
-    assert!(all_ready(cx, &images, &scout));
-    assert_eq!(
-        cx.update(|cx| images.read(cx).stats().foreground_decodes),
-        0
-    );
-}
-
-// Dropping the list hands its wants back with one empty want, so the cache stops holding
-// its icons as wanted; the drop runs inside an update so the release fires before the read.
-#[gpui_kit::test]
-fn dropping_the_list_releases_its_icon_wants(cx: &mut TestAppContext) {
-    let env = support::env();
-    let (fetch, _asked) = icon_fetch(true);
-    let images = install_icons(cx, &env, fetch);
-    let assigner = cx.update(|cx| cx.new(|cx| WeaponAssigner::new(false, cx)));
-    cx.run_until_parked();
-    let wants = cx.update(|cx| images.read(cx).stats().wants);
-    assert!(wants > 0, "the list wants its class icons");
-
-    cx.update(|_| drop(assigner));
-    cx.run_until_parked();
-    assert_eq!(cx.update(|cx| images.read(cx).stats().wants), wants + 1);
+    for script in scout_scripts() {
+        assert_framed(cx, win, script);
+    }
 }
 
 #[gpui_kit::test]
-fn compact_rows_want_no_icons(cx: &mut TestAppContext) {
+fn a_weapon_the_game_lacks_keeps_its_slot_square(cx: &mut TestAppContext) {
     let env = support::env();
-    let (fetch, asked) = icon_fetch(true);
-    let images = install_icons(cx, &env, fetch);
-    let (win, assigner) = assigner_window(cx, true);
-    cx.update(|cx| assigner.update(cx, |a, cx| a.set_class(TfClass::Spy, cx)));
+    let (_tf2, icons, _) = install_icons(cx, &env, found(&env), &["tf_weapon_bat"]);
+    let (win, _assigner) = assigner_window(cx, false);
+    support::wait_real(cx, "the game icons", |cx| loaded(cx, &icons));
     support::settle(cx, win);
-    assert!(asked.lock().unwrap().is_empty());
-    assert_eq!(cx.update(|cx| images.read(cx).stats().wants), 0);
+    assert_square(cx, win, "tf_weapon_bat");
+    assert_framed(cx, win, "tf_weapon_scattergun");
+}
+
+#[gpui_kit::test]
+fn before_tf2_is_found_rows_show_the_slot_square(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (_tf2, _icons, loads) = install_icons(cx, &env, Tf2State::Missing { saved: None }, &[]);
+    let (win, _assigner) = assigner_window(cx, false);
+    for script in scout_scripts() {
+        assert_square(cx, win, script);
+    }
+    assert!(loads.lock().unwrap().is_empty());
+}
+
+#[gpui_kit::test]
+fn without_a_tf2_state_rows_show_the_slot_square(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (win, _assigner, _) = open(cx, &env, false);
+    for script in scout_scripts() {
+        assert_square(cx, win, script);
+    }
+}
+
+#[gpui_kit::test]
+fn two_lists_share_one_load(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (_tf2, icons, loads) = install_icons(cx, &env, found(&env), &[]);
+    let (first, _a) = assigner_window(cx, false);
+    let (second, _b) = assigner_window(cx, false);
+    support::wait_real(cx, "the game icons", |cx| loaded(cx, &icons));
+    support::settle(cx, first);
+    support::settle(cx, second);
+    assert_framed(cx, first, "tf_weapon_scattergun");
+    assert_framed(cx, second, "tf_weapon_scattergun");
+    assert_eq!(loads.lock().unwrap().len(), 1);
 }
 
 fn scout_scripts() -> Vec<&'static str> {
@@ -442,72 +394,6 @@ fn scout_scripts() -> Vec<&'static str> {
 
 fn size_of(b: Bounds<Pixels>) -> (Pixels, Pixels) {
     (b.size.width, b.size.height)
-}
-
-#[gpui_kit::test]
-fn a_loaded_icon_is_framed_in_place_of_the_slot_square(cx: &mut TestAppContext) {
-    let env = support::env();
-    let (fetch, _asked) = icon_fetch(true);
-    let images = install_icons(cx, &env, fetch);
-    let (win, _assigner) = assigner_window(cx, false);
-    let scout = icon_urls(cx, TfClass::Scout);
-    support::wait_real(cx, "the scout icons", |cx| all_ready(cx, &images, &scout));
-    for script in scout_scripts() {
-        let frame = support::bounds_of(cx, win, ids::weapon_icon(script))
-            .unwrap_or_else(|| panic!("{script}: the framed icon"));
-        assert_eq!(size_of(frame), (px(36.), px(28.)), "{script}");
-        assert!(
-            !support::present(cx, win, ids::weapon_slot_icon(script)),
-            "{script}"
-        );
-        let row = support::bounds_of(cx, win, ids::weapon_row(script)).unwrap();
-        assert!(row.contains(&frame.center()), "{script}");
-    }
-}
-
-#[gpui_kit::test]
-fn a_failed_icon_falls_back_to_the_slot_square(cx: &mut TestAppContext) {
-    let env = support::env();
-    let (fetch, asked) = icon_fetch(false);
-    let images = install_icons(cx, &env, fetch);
-    let (win, _assigner) = assigner_window(cx, false);
-    let scout = icon_urls(cx, TfClass::Scout);
-    support::wait_real(cx, "every scout icon to fail", |cx| {
-        asked_sorted(&asked) == scout
-            && cx.update(|cx| {
-                scout.iter().all(|u| {
-                    matches!(
-                        images.read(cx).image(&ImageKey::weapon_icon(u)),
-                        RemoteImage::Failed
-                    )
-                })
-            })
-    });
-    for script in scout_scripts() {
-        let square = support::bounds_of(cx, win, ids::weapon_slot_icon(script))
-            .unwrap_or_else(|| panic!("{script}: the slot square"));
-        assert_eq!(size_of(square), (px(16.), px(16.)), "{script}");
-        assert!(
-            !support::present(cx, win, ids::weapon_icon(script)),
-            "{script}"
-        );
-    }
-}
-
-#[gpui_kit::test]
-fn without_an_image_cache_rows_show_the_slot_square(cx: &mut TestAppContext) {
-    let env = support::env();
-    let (win, _assigner, _) = open(cx, &env, false);
-    for script in scout_scripts() {
-        assert!(
-            support::present(cx, win, ids::weapon_slot_icon(script)),
-            "{script}"
-        );
-        assert!(
-            !support::present(cx, win, ids::weapon_icon(script)),
-            "{script}"
-        );
-    }
 }
 
 #[gpui_kit::test]
@@ -520,20 +406,47 @@ fn compact_rows_show_neither_icon(cx: &mut TestAppContext) {
     assert!(!support::present(cx, win, ids::weapon_icon(script)));
 }
 
-// A row is as tall with its slot square as with its framed icon, so nothing jumps as icons land.
+// A compact list over a found TF2 starts no icon load. Had the compact list made the icons
+// entity while TF2 was found, the entity's first look at TF2 would have started a load, so
+// `loads` would be 1; made here after TF2 goes missing, it starts none.
 #[gpui_kit::test]
-fn rows_keep_their_height_when_icons_land(cx: &mut TestAppContext) {
+fn a_compact_list_never_loads_icons(cx: &mut TestAppContext) {
+    let env = support::env();
+    support::init(cx);
+    support::install_services(cx, support::services(&env, support::no_steam()));
+    let tf2 = cx.update(|cx| install_tf2_state(cx, found(&env)));
+    let (_win, _assigner) = assigner_window(cx, true);
+    cx.update(|cx| {
+        tf2.update(cx, |t, cx| {
+            *t = Tf2State::Missing { saved: None };
+            cx.notify();
+        })
+    });
+    let loads = cx.update(|cx| WeaponIcons::global(cx).read(cx).loads());
+    assert_eq!(loads, 0);
+}
+
+// Icons that land after the list opens replace the squares, and a row is as tall with its
+// framed icon as with its slot square, so nothing jumps.
+#[gpui_kit::test]
+fn icons_landing_later_replace_the_squares_without_a_jump(cx: &mut TestAppContext) {
     let env = support::env();
     let script = "tf_weapon_scattergun";
-    let (fallback_win, _a, _) = open(cx, &env, false);
-    let before = support::bounds_of(cx, fallback_win, ids::weapon_row(script)).unwrap();
-    let (fetch, _asked) = icon_fetch(true);
-    cx.executor().allow_parking();
-    let images = cx.update(|cx| RemoteImages::install_with(cx, fetch, IMAGE_BUDGET, decode_image));
+    let (tf2, icons, _) = install_icons(cx, &env, Tf2State::Detecting, &[]);
     let (win, _assigner) = assigner_window(cx, false);
-    let scout = icon_urls(cx, TfClass::Scout);
-    support::wait_real(cx, "the scout icons", |cx| all_ready(cx, &images, &scout));
-    assert!(support::present(cx, win, ids::weapon_icon(script)));
+    assert_square(cx, win, script);
+    let before = support::bounds_of(cx, win, ids::weapon_row(script)).unwrap();
+
+    let state = found(&env);
+    cx.update(|cx| {
+        tf2.update(cx, |t, cx| {
+            *t = state;
+            cx.notify();
+        })
+    });
+    support::wait_real(cx, "the game icons", |cx| loaded(cx, &icons));
+    support::settle(cx, win);
+    assert_framed(cx, win, script);
     let after = support::bounds_of(cx, win, ids::weapon_row(script)).unwrap();
     assert_eq!(after.size.height, before.size.height);
 }

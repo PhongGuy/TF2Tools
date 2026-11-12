@@ -21,6 +21,7 @@ enum Owner {
 /// the binary from the app crate's `assets/` and the core crate's `data/`. A new folder fails the check until it is listed.
 const BUNDLED: &[(&str, Owner)] = &[
     ("assets/backgrounds", Owner::ValveDerived),
+    ("assets/classes", Owner::ValveDerived),
     ("assets/crosshairs", Owner::ValveDerived),
     ("assets/weapon-icons", Owner::ValveDerived),
     (
@@ -130,9 +131,14 @@ fn known_notices_get_plain_titles() {
     );
     assert_eq!(notices::title_for("GameBanana-notice.txt"), "GameBanana");
     assert_eq!(notices::title_for("serveme-notice.txt"), "serveme.tf");
+    assert_eq!(notices::title_for("logstf-notice.txt"), "logs.tf");
     assert_eq!(
         notices::title_for("Valve-notice.txt"),
         "Valve and Team Fortress 2"
+    );
+    assert_eq!(
+        notices::title_for("rars-Apache-2.0.txt"),
+        "rars RAR reader (Apache-2.0)"
     );
     // A notice nobody titled still shows, named after its file.
     assert_eq!(notices::title_for("Some-Thing-MIT.txt"), "Some Thing MIT");
@@ -153,6 +159,7 @@ const SOURCES: &[(&str, &str, &str)] = &[
     ),
     ("GameBanana stores", "GameBanana-notice.txt", "GameBanana"),
     ("Maps page list", "serveme-notice.txt", "serveme.tf"),
+    ("logs.tf page", "logstf-notice.txt", "logs.tf"),
     ("game artwork", "Valve-notice.txt", "Valve Corporation"),
 ];
 
