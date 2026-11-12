@@ -74,6 +74,8 @@ The logs.tf page shows your competitive stats from logs.tf. Paste your Steam pro
 
 Save your HUD, sounds and crosshairs together as a profile, for example one for competitive and one for casual, and switch your whole setup at once.
 
+You can also add a HUD or a sound to a profile from its card with **Add to profile**, or send the selected crosshair to a profile from the Crosshairs page and pick its weapons there.
+
 ![The Profiles page](.github/readme/profiles.webp)
 
 ### Settings

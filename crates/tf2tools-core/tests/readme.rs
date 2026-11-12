@@ -394,3 +394,16 @@ fn the_huds_section_says_store_huds_show_update() {
         "HUDs section: {huds}"
     );
 }
+
+#[test]
+fn the_profiles_section_mentions_add_to_profile() {
+    let readme = repo_file("README.md");
+    let (_, profiles) = readme
+        .split_once("### Profiles\n")
+        .expect("a Profiles section");
+    let (profiles, _) = profiles.split_once("\n### ").expect("a section after it");
+    assert!(
+        profiles.contains("**Add to profile**"),
+        "Profiles section: {profiles}"
+    );
+}
