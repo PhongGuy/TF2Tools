@@ -1,6 +1,6 @@
 //! Readable weapon names for logs.tf's log names, from items_game.txt and tf_english.txt.
 
-use tf2tools_core::{WeaponNames, WeaponNamesError};
+use tf2tools_core::{TfClass, WeaponNames, WeaponNamesError};
 
 fn utf16le(text: &str) -> Vec<u8> {
     let mut out = vec![0xFF, 0xFE];
@@ -371,4 +371,196 @@ fn every_real_weapon_key_has_a_kill_icon() {
     }
     assert_eq!(drawn("unique_pickaxe_escape").as_deref(), Some("pickaxe"));
     assert_eq!(names.get("shotgun_soldier"), Some("Shotgun"));
+}
+
+// Class shapes from the live items_game.txt: a class list on a prefab (18), on an unlock (513),
+// shared by two classes (154), the four stock shotguns on one item_class, and an icon name (141).
+const CLASS_ITEMS: &str = r##""items_game" {
+    "prefabs" {
+        "weapon_rocketlauncher" { "item_class" "tf_weapon_rocketlauncher" "used_by_classes" { "soldier" "1" } }
+        "weapon_shotgun" { "item_class" "tf_weapon_shotgun" }
+    }
+    "items" {
+        "18" { "name" "TF_WEAPON_ROCKETLAUNCHER" "prefab" "weapon_rocketlauncher" }
+        "513" { "item_class" "tf_weapon_rocketlauncher" "item_logname" "quake_rl" "used_by_classes" { "soldier" "1" } }
+        "154" { "item_class" "tf_weapon_shovel" "item_logname" "paintrain" "used_by_classes" { "Soldier" "1" "demoman" "1" } }
+        "9" { "name" "TF_WEAPON_SHOTGUN_PRIMARY" "prefab" "weapon_shotgun" "used_by_classes" { "engineer" "1" } }
+        "10" { "name" "TF_WEAPON_SHOTGUN_SOLDIER" "prefab" "weapon_shotgun" "used_by_classes" { "soldier" "1" } }
+        "11" { "name" "TF_WEAPON_SHOTGUN_HWG" "prefab" "weapon_shotgun" "used_by_classes" { "heavy" "1" } }
+        "12" { "name" "TF_WEAPON_SHOTGUN_PYRO" "prefab" "weapon_shotgun" "used_by_classes" { "pyro" "1" } }
+        "141" { "item_class" "tf_weapon_sentry_revenge" "item_logname" "frontier_justice" "item_iconname" "frontier_kill" "used_by_classes" { "engineer" "1" } }
+        "1000" { "item_logname" "classless" }
+    }
+}"##;
+
+fn class_names() -> WeaponNames {
+    // No lang file: ownership does not depend on a weapon's name localising.
+    WeaponNames::from_files(CLASS_ITEMS, b"")
+}
+
+#[test]
+fn used_by_classes_give_an_items_classes() {
+    let n = class_names();
+    assert_eq!(n.classes("quake_rl"), [TfClass::Soldier]);
+    assert_eq!(n.classes("QUAKE_RL"), [TfClass::Soldier]);
+    assert_eq!(n.classes("paintrain"), [TfClass::Soldier, TfClass::Demoman]);
+    assert_eq!(n.classes("frontier_kill"), [TfClass::Engineer]);
+    assert_eq!(
+        n.classes("rocketlauncher"),
+        [TfClass::Soldier],
+        "through the prefab"
+    );
+}
+
+#[test]
+fn each_stock_shotgun_belongs_to_its_entity_class() {
+    let n = class_names();
+    assert_eq!(n.classes("shotgun_soldier"), [TfClass::Soldier]);
+    assert_eq!(n.classes("shotgun_pyro"), [TfClass::Pyro]);
+    assert_eq!(n.classes("shotgun_hwg"), [TfClass::Heavy]);
+    assert_eq!(n.classes("shotgun_primary"), [TfClass::Engineer]);
+}
+
+#[test]
+fn reflects_belong_to_pyro_and_stock_projectiles_to_their_launcher_and_pyro() {
+    let n = class_names();
+    for key in [
+        "deflect_rocket",
+        "deflect_promode",
+        "deflect_sticky",
+        "deflect_flare",
+    ] {
+        assert_eq!(n.classes(key), [TfClass::Pyro], "{key}");
+    }
+    assert_eq!(
+        n.classes("tf_projectile_rocket"),
+        [TfClass::Soldier, TfClass::Pyro]
+    );
+    assert_eq!(
+        n.classes("tf_projectile_pipe"),
+        [TfClass::Pyro, TfClass::Demoman]
+    );
+    assert_eq!(
+        n.classes("tf_projectile_pipe_remote"),
+        [TfClass::Pyro, TfClass::Demoman]
+    );
+    assert_eq!(
+        n.classes("tf_projectile_arrow"),
+        [TfClass::Pyro, TfClass::Sniper]
+    );
+    assert_eq!(n.classes("obj_sentrygun3"), [TfClass::Engineer]);
+    assert_eq!(n.classes("taunt_medic"), [TfClass::Medic]);
+}
+
+#[test]
+fn a_class_uses_only_its_own_weapons_and_anything_unknown() {
+    let n = class_names();
+    assert!(n.usable_by("quake_rl", TfClass::Soldier));
+    assert!(!n.usable_by("quake_rl", TfClass::Pyro));
+    assert!(!n.usable_by("quake_rl", TfClass::Medic));
+    assert!(n.usable_by("paintrain", TfClass::Demoman));
+    assert!(n.usable_by("tf_projectile_rocket", TfClass::Pyro));
+    assert!(!n.usable_by("tf_projectile_rocket", TfClass::Medic));
+    for key in [
+        "mystery_gun",
+        "classless",
+        "world",
+        "player",
+        "tf_pumpkin_bomb",
+    ] {
+        assert!(n.classes(key).is_empty(), "{key}");
+        for class in TfClass::ALL {
+            assert!(n.usable_by(key, class), "{key} on {class:?}");
+        }
+    }
+}
+
+#[test]
+fn without_class_lists_every_class_uses_everything() {
+    for n in [WeaponNames::default(), names()] {
+        for key in ["quake_rl", "deflect_rocket", "tf_projectile_pipe"] {
+            assert!(n.classes(key).is_empty(), "{key}");
+            assert!(n.usable_by(key, TfClass::Medic), "{key}");
+        }
+    }
+}
+
+#[test]
+fn projectiles_read_as_their_launcher_or_a_reflect_on_pyro() {
+    let n = WeaponNames::default();
+    for (key, class, shown) in [
+        ("tf_projectile_rocket", TfClass::Soldier, "Rocket Launcher"),
+        ("tf_projectile_rocket", TfClass::Pyro, "Reflected rocket"),
+        ("tf_projectile_pipe", TfClass::Demoman, "Grenade Launcher"),
+        ("tf_projectile_pipe", TfClass::Pyro, "Reflected pipe"),
+        (
+            "tf_projectile_pipe_remote",
+            TfClass::Demoman,
+            "Stickybomb Launcher",
+        ),
+        (
+            "tf_projectile_pipe_remote",
+            TfClass::Pyro,
+            "Reflected sticky",
+        ),
+        ("tf_projectile_arrow", TfClass::Sniper, "Huntsman"),
+        ("tf_projectile_arrow", TfClass::Pyro, "Reflected arrow"),
+        ("deflect_rocket", TfClass::Pyro, "Reflected rocket"),
+        ("deflect_promode", TfClass::Pyro, "Reflected pipe"),
+        ("deflect_sticky", TfClass::Pyro, "Reflected sticky"),
+        ("deflect_arrow", TfClass::Pyro, "Reflected arrow"),
+        ("deflect_flare", TfClass::Pyro, "Reflected flare"),
+        ("deflect_ball", TfClass::Pyro, "Reflected ball"),
+    ] {
+        assert_eq!(n.class_name(key, class), Some(shown), "{key} on {class:?}");
+    }
+    let n = names();
+    assert_eq!(
+        n.class_name("quake_rl", TfClass::Soldier),
+        Some("The Original")
+    );
+    assert_eq!(n.class_name("mystery_gun", TfClass::Pyro), None);
+}
+
+// Every item key the game can log, and each stock and non-item kill name, belongs to a class.
+#[test]
+#[ignore = "needs a TF2 game folder in TF2TOOLS_TF2_GAME"]
+fn every_real_weapon_key_has_a_class() {
+    let game =
+        std::path::PathBuf::from(std::env::var("TF2TOOLS_TF2_GAME").expect("TF2TOOLS_TF2_GAME"));
+    let names = WeaponNames::load(&game.join("tf")).unwrap();
+    let stock = [
+        "scattergun",
+        "pistol_scout",
+        "shotgun_soldier",
+        "shotgun_pyro",
+        "shotgun_hwg",
+        "shotgun_primary",
+        "pistol",
+        "flamethrower",
+        "minigun",
+        "sniperrifle",
+        "smg",
+        "knife",
+    ];
+    let owned = NON_ITEM_KEYS
+        .into_iter()
+        .filter(|k| *k != "tf_pumpkin_bomb");
+    let mut missing: Vec<&str> = names
+        .log_names()
+        .chain(stock)
+        .chain(owned)
+        .filter(|k| names.classes(k).is_empty())
+        .collect();
+    missing.sort_unstable();
+    assert!(missing.is_empty(), "no class for {missing:?}");
+    assert_eq!(names.classes("quake_rl"), [TfClass::Soldier]);
+    assert_eq!(
+        names.classes("paintrain"),
+        [TfClass::Soldier, TfClass::Demoman]
+    );
+    assert!(!names.usable_by("quake_rl", TfClass::Pyro));
+    for key in BLANK_KEYS.into_iter().chain(["tf_pumpkin_bomb"]) {
+        assert!(names.classes(key).is_empty(), "{key}");
+    }
 }

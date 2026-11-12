@@ -8,7 +8,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{ClassWeapons, LogsRange, TfClass, WeaponNames};
 
-use super::tables::class_weapon_rows;
+use super::tables::{WeaponRow, class_weapon_rows};
 use super::text::{NO_WEAPONS_TEXT, counting_text, weapons_title};
 use crate::ids;
 use crate::kill_icons::{ICON_SLOT, KillIconImages, SLOT_GAP, icon_slot, weapon_icon};
@@ -23,8 +23,8 @@ const ACCURACY: Pixels = px(80.);
 // The block starts under the class name, past the row's padding and icon.
 const INDENT: Pixels = px(40.);
 
-/// The block for `weapons`, read for `class` over `range` and named by `names`; a second click
-/// on its class row closes it.
+/// The block for `weapons`, read for `class` over `range` and named by `names`, showing only the
+/// weapons `class` can equip; a second click on its class row closes it.
 pub(super) fn class_weapons_block(
     class: TfClass,
     weapons: &ClassWeapons,
@@ -34,9 +34,10 @@ pub(super) fn class_weapons_block(
     cx: &App,
 ) -> impl IntoElement + use<> {
     let muted = cx.theme().muted_foreground;
+    let rows = class_weapon_rows(class, weapons, names);
     let note = if weapons.pending() > 0 {
         Some(counting_text(weapons.pending()))
-    } else if weapons.weapons().is_empty() {
+    } else if rows.is_empty() {
         Some(NO_WEAPONS_TEXT.to_owned())
     } else {
         None
@@ -64,22 +65,20 @@ pub(super) fn class_weapons_block(
                 note,
             )
         }))
-        .children(
-            (!weapons.weapons().is_empty()).then(|| weapon_table(class, weapons, names, icons, cx)),
-        )
+        .children((!rows.is_empty()).then(|| weapon_table(class, rows, names, icons, cx)))
 }
 
 // The column titles, then one line per weapon labelled as the class card's rows are.
 fn weapon_table(
     class: TfClass,
-    weapons: &ClassWeapons,
+    rows: Vec<WeaponRow>,
     names: &WeaponNames,
     icons: &KillIconImages,
     cx: &App,
 ) -> impl IntoElement + use<> {
     let border = cx.theme().border;
     let cell = |width: Pixels| div().w(width).flex_none().text_right();
-    let rows: Vec<_> = class_weapon_rows(weapons, names)
+    let rows: Vec<_> = rows
         .into_iter()
         .map(|w| {
             let image = icons.for_weapon(&w.raw, names).cloned();

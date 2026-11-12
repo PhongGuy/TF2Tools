@@ -9,8 +9,12 @@ use std::time::{Duration, Instant};
 use gpui_kit::{AppContext, ElementId, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
-use tf2tools_app::pages::logs_tf::text::{NO_WEAPONS_TEXT, counting_text, weapons_title};
-use tf2tools_core::{LogsRange, TfClass};
+use tf2tools_app::pages::logs_tf::text::{
+    NO_WEAPONS_TEXT, accuracy_text, counting_text, weapons_title,
+};
+use tf2tools_app::services::Services;
+use tf2tools_app::weapon_names::LoadedWeaponNames;
+use tf2tools_core::{LogsRange, TfClass, WeaponNames};
 
 use crate::support;
 use crate::support::logstf::{
@@ -786,4 +790,86 @@ fn weapon_names_line_up_behind_an_icon_slot_only_when_icons_show(cx: &mut TestAp
         "names line up: {iconed} {plain}"
     );
     assert!(iconed - row >= 64., "a 64 px slot first: {row} {iconed}");
+}
+
+// Game names with class lists: the Original is Soldier's, the crossbow Medic's, and the Pyro's
+// stock flamethrower and shotgun are Pyro's.
+const CLASS_ITEMS: &str = r##""items_game" { "items" {
+    "13" { "name" "TF_WEAPON_SCATTERGUN" "item_class" "tf_weapon_scattergun" "item_name" "#TF_Weapon_Scattergun" "used_by_classes" { "scout" "1" } }
+    "21" { "name" "TF_WEAPON_FLAMETHROWER" "item_class" "tf_weapon_flamethrower" "used_by_classes" { "pyro" "1" } }
+    "12" { "name" "TF_WEAPON_SHOTGUN_PYRO" "item_class" "tf_weapon_shotgun" "used_by_classes" { "pyro" "1" } }
+    "305" { "item_class" "tf_weapon_crossbow" "item_logname" "crusaders_crossbow" "item_name" "#TF_Crossbow" "propername" "1" "used_by_classes" { "medic" "1" } }
+    "513" { "item_class" "tf_weapon_rocketlauncher" "item_logname" "quake_rl" "item_name" "#TF_TheOriginal" "propername" "1" "used_by_classes" { "soldier" "1" } }
+} }"##;
+const CLASS_LANG: &str = r#""lang" { "Tokens" { "TF_Weapon_Scattergun" "Scattergun" "TF_TheOriginal" "Original" "TF_Crossbow" "Crusader's Crossbow" } }"#;
+
+fn weapon(kills: u32, dmg: u32, shots: u32, hits: u32) -> serde_json::Value {
+    serde_json::json!({"kills": kills, "dmg": dmg, "avg_dmg": 0, "shots": shots, "hits": hits})
+}
+
+/// The 6v6 log with Arie's Pyro carrying a Soldier's Original, a rocket and an unknown weapon,
+/// and a Medic life that also logged the Original.
+fn switched_classes_log() -> Vec<u8> {
+    let mut log: serde_json::Value = serde_json::from_str(SIXES).unwrap();
+    let arie = &mut log["players"]["[U:1:231702]"]["class_stats"];
+    let pyro = &mut arie[1]["weapon"];
+    pyro["quake_rl"] = weapon(2, 400, 10, 5);
+    pyro["tf_projectile_rocket"] = weapon(1, 150, 0, 0);
+    pyro["mystery_gun"] = weapon(1, 48, 0, 0);
+    let medic = serde_json::json!({"type": "medic", "kills": 3, "assists": 0, "deaths": 0,
+        "dmg": 500, "total_time": 60, "weapon": {
+            "crusaders_crossbow": weapon(1, 200, 4, 2), "quake_rl": weapon(2, 300, 6, 3)}});
+    arie.as_array_mut().unwrap().push(medic);
+    serde_json::to_vec(&log).unwrap()
+}
+
+#[gpui_kit::test]
+fn a_class_lists_only_weapons_it_can_equip(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_bytes("/json/3", switched_classes_log());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let names = cx.update(|cx| {
+        LoadedWeaponNames::install_with(
+            cx,
+            Arc::new(|_: &Services, _: &std::path::Path| {
+                WeaponNames::from_files(CLASS_ITEMS, CLASS_LANG.as_bytes())
+            }),
+        )
+    });
+    load_names(cx, &env, &names);
+    let page = open_page(cx, &s);
+
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Pyro));
+    wait_for(cx, &page, TfClass::Pyro);
+    support::settle(cx, s.win);
+    assert_eq!(
+        row(cx, &s, TfClass::Pyro, "quake_rl"),
+        None,
+        "a Soldier weapon"
+    );
+    // Shares are of the shown rows alone: 2 kills and 56 + 46 + 150 + 48 = 300 damage.
+    assert_eq!(
+        row(cx, &s, TfClass::Pyro, "tf_projectile_rocket").as_deref(),
+        Some(format!("Reflected rocket 1 (50%) 150 (50%) {}", accuracy_text(0, 0)).as_str())
+    );
+    assert_eq!(
+        row(cx, &s, TfClass::Pyro, "mystery_gun").as_deref(),
+        Some(format!("mystery_gun 1 (50%) 48 (16%) {}", accuracy_text(0, 0)).as_str()),
+        "an unknown weapon stays"
+    );
+
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Medic));
+    wait_for(cx, &page, TfClass::Medic);
+    support::settle(cx, s.win);
+    assert_eq!(
+        row(cx, &s, TfClass::Medic, "quake_rl"),
+        None,
+        "a Soldier weapon"
+    );
+    assert_eq!(
+        row(cx, &s, TfClass::Medic, "crusaders_crossbow").as_deref(),
+        Some("The Crusader's Crossbow 1 (100%) 200 (100%) 50%")
+    );
 }

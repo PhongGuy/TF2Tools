@@ -40,18 +40,30 @@ pub fn weapon_rows(player: &PlayerLine, class: &ClassLine, names: &WeaponNames) 
         .collect()
 }
 
-/// The class weapons block's rows in core's order (damage high to low); shares are of the
-/// class's summed weapon kills and damage, so they add to about 100%.
-pub fn class_weapon_rows(weapons: &ClassWeapons, names: &WeaponNames) -> Vec<WeaponRow> {
+/// The class weapons block's rows for `class` in core's order (damage high to low), leaving out
+/// weapons the game says `class` cannot equip, which logs.tf files there after a class switch.
+pub fn class_weapon_rows(
+    class: TfClass,
+    weapons: &ClassWeapons,
+    names: &WeaponNames,
+) -> Vec<WeaponRow> {
     let narrow = |n: i64| u32::try_from(n).unwrap_or(u32::MAX);
-    let kills = narrow(weapons.weapons().iter().map(WeaponSum::kills).sum());
-    let dmg = narrow(weapons.weapons().iter().map(WeaponSum::dmg).sum());
-    weapons
+    let shown: Vec<&WeaponSum> = weapons
         .weapons()
         .iter()
+        .filter(|w| names.usable_by(w.name(), class))
+        .collect();
+    // Shares are of the shown rows' summed kills and damage, so they still add to about 100%.
+    let kills = narrow(shown.iter().map(|w| w.kills()).sum());
+    let dmg = narrow(shown.iter().map(|w| w.dmg()).sum());
+    shown
+        .into_iter()
         .map(|w| WeaponRow {
             raw: w.name().to_owned(),
-            name: shown_name(w.name(), names),
+            name: names
+                .class_name(w.name(), class)
+                .unwrap_or(w.name())
+                .to_owned(),
             kills: narrow(w.kills()),
             kill_share: share_text(narrow(w.kills()), kills),
             dmg: narrow(w.dmg()),

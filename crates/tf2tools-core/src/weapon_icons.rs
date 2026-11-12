@@ -8,7 +8,7 @@ use crate::fonts::keyvalues::{self, KvPair, block, block_named, text};
 use crate::weapons;
 
 /// How many prefab hops a lookup follows before giving up, which also ends cycles.
-const PREFAB_DEPTH: usize = 8;
+pub(crate) const PREFAB_DEPTH: usize = 8;
 
 /// Each weapon script's `image_inventory` path (as items_game spells it, no extension) from
 /// items_game.txt text, through the item's prefabs. Scripts whose item or image is absent are
