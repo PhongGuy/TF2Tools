@@ -14,8 +14,8 @@ use gpui_kit::{
 use tf2tools_core::{LogRow, LogState, SteamId};
 
 use super::text::{
-    LOG_GONE, LOG_PENDING, LOG_UNREADABLE, NO_LOGS_TEXT, date_text, duration_text, list_dpm_text,
-    log_url, profile_url,
+    LOG_GONE, LOG_PENDING, LOG_UNREADABLE, NO_LOGS_TEXT, date_time_text, duration_text, kapd_text,
+    known_text, log_url, per_min_text, profile_url,
 };
 use super::{LogsTfPage, detail};
 use crate::ids;
@@ -24,28 +24,40 @@ use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_beside;
 
+/// The tracked player's own columns on each row, in logs.tf's order.
+pub const STAT_COLUMNS: [&str; 8] = ["K", "A", "D", "DA", "DA/M", "KA/D", "DT", "DT/M"];
+
+// The page's content stops growing here and centres, so a wide window keeps names, classes
+// and stats together instead of stretching the title across the screen.
+const MAX_WIDTH: Pixels = px(1400.);
+
 // Column widths shared by the header and every row, so the columns line up like a table.
 const CHEVRON: Pixels = px(16.);
-const DATE: Pixels = px(88.);
+const DATE: Pixels = px(124.);
 const MAP: Pixels = px(160.);
 const LENGTH: Pixels = px(56.);
-// Four icons on one line, or three in a narrow window.
+// Four icons on one line, or two in a narrow window, where the stats need the room.
 const CLASSES: Pixels = px(84.);
-const CLASSES_NARROW: Pixels = px(72.);
-const KDA: Pixels = px(80.);
-const DPM: Pixels = px(48.);
+const CLASSES_NARROW: Pixels = px(40.);
+// The stat columns' widths in STAT_COLUMNS order, and tighter ones in smaller text for a
+// narrow window, so all eight stay on screen while the title gives way.
+const STATS: [f32; 8] = [28., 28., 28., 48., 40., 40., 48., 40.];
+const STATS_NARROW: [f32; 8] = [18., 18., 18., 36., 30., 28., 36., 30.];
+const STAT_GAP: Pixels = px(8.);
+const STAT_GAP_NARROW: Pixels = px(2.);
 const GAP: Pixels = px(16.);
 const ICON: Pixels = px(18.);
 const TITLE_MIN: Pixels = px(100.);
-// Below the core columns' width the rows tighten their gaps and title, and the date moves
-// under the title, so DPM, the last column, still ends inside the smallest window's 448 px list.
+// Below the core columns' width the rows tighten their gaps, title and stats, and the date
+// moves under the title, so DT/M, the last column, still ends inside the smallest window's
+// 448 px list.
 const GAP_NARROW: Pixels = px(8.);
 const TITLE_MIN_NARROW: Pixels = px(72.);
 // The row's horizontal padding, both sides.
 const PADDING: Pixels = px(24.);
 
-/// How the rows fit the list's width. A narrow window gives up Length first, then moves Map
-/// under the title, then moves Date under Map and tightens the gaps and the title's minimum;
+/// How the rows fit the list's width. A narrow window moves Map under the title first, then
+/// gives up Length, then moves Date under Map and tightens the gaps, title and stats;
 /// before the first frame the list has no width yet.
 #[derive(Clone, Copy)]
 pub(super) struct Fit {
@@ -55,6 +67,7 @@ pub(super) struct Fit {
     gap: Pixels,
     title_min: Pixels,
     classes: Pixels,
+    narrow_stats: bool,
 }
 
 impl Fit {
@@ -65,21 +78,44 @@ impl Fit {
         gap: GAP,
         title_min: TITLE_MIN,
         classes: CLASSES,
+        narrow_stats: false,
     };
+
+    fn stat_widths(self) -> [f32; 8] {
+        if self.narrow_stats {
+            STATS_NARROW
+        } else {
+            STATS
+        }
+    }
+
+    fn stat_gap(self) -> Pixels {
+        if self.narrow_stats {
+            STAT_GAP_NARROW
+        } else {
+            STAT_GAP
+        }
+    }
+
+    // The eight stat columns and the gaps between them.
+    fn stats_width(self) -> Pixels {
+        px(self.stat_widths().iter().sum()) + self.stat_gap() * 7.
+    }
 }
 
 pub(super) fn fit(list: &ListState) -> Fit {
-    let width = list.viewport_bounds().size.width;
-    let core = CHEVRON + DATE + CLASSES + KDA + DPM + TITLE_MIN + GAP * 5. + PADDING;
+    let width = list.viewport_bounds().size.width.min(MAX_WIDTH);
+    let core = CHEVRON + DATE + CLASSES + Fit::ALL.stats_width() + TITLE_MIN + GAP * 4. + PADDING;
     let unknown = width <= px(0.);
     let roomy = unknown || width >= core;
     Fit {
-        map_column: unknown || width >= core + MAP + GAP,
-        length: unknown || width >= core + MAP + LENGTH + GAP * 2.,
+        map_column: unknown || width >= core + MAP + LENGTH + GAP * 2.,
+        length: unknown || width >= core + LENGTH + GAP,
         date_column: roomy,
         gap: if roomy { GAP } else { GAP_NARROW },
         title_min: if roomy { TITLE_MIN } else { TITLE_MIN_NARROW },
         classes: if roomy { CLASSES } else { CLASSES_NARROW },
+        narrow_stats: !roomy,
     }
 }
 
@@ -92,19 +128,49 @@ pub(super) fn page_list(page: &LogsTfPage, cx: &mut Context<LogsTfPage>) -> Div 
             let Some(page) = this.upgrade() else {
                 return div().into_any_element();
             };
-            if ix == 0 {
+            let item = if ix == 0 {
                 // The chips and buttons take listeners, so the top builds inside the page.
-                return page.update(cx, |page, cx| page.top(window, cx).into_any_element());
-            }
-            let page = page.read(cx);
-            match page.rows.get(ix - 1) {
-                Some(row) => log_item(row, page, page.fit, this.clone(), cx),
-                None => div().into_any_element(),
-            }
+                page.update(cx, |page, cx| page.top(window, cx).into_any_element())
+            } else {
+                let page = page.read(cx);
+                match page.rows.get(ix - 1) {
+                    Some(row) => log_item(row, page, page.fit, this.clone(), cx),
+                    None => div().into_any_element(),
+                }
+            };
+            centred(item)
         })
         .size_full(),
     );
     scroll_beside(ids::LOGSTF_LIST_SCROLLBAR, &page.list, rows)
+}
+
+// One list item at the page's width, up to MAX_WIDTH and centred beyond it.
+fn centred(item: AnyElement) -> AnyElement {
+    h_flex()
+        .w_full()
+        .justify_center()
+        .child(div().w_full().max_w(MAX_WIDTH).child(item))
+        .into_any_element()
+}
+
+// The eight stat cells as one block, so they keep their own tighter spacing; `cell` fills
+// column `i`'s base, already sized and right-aligned.
+fn stat_block(fit: Fit, cell: impl Fn(usize, &'static str, Div) -> AnyElement) -> impl IntoElement {
+    let widths = fit.stat_widths();
+    h_flex()
+        .w(fit.stats_width())
+        .flex_none()
+        .gap(fit.stat_gap())
+        .when(fit.narrow_stats, |el| el.text_xs())
+        .children(STAT_COLUMNS.iter().enumerate().map(|(i, &title)| {
+            let base = div()
+                .w(px(widths[i]))
+                .flex_none()
+                .text_right()
+                .whitespace_nowrap();
+            cell(i, title, base)
+        }))
 }
 
 /// The column titles over the rows, in the rows' widths.
@@ -127,13 +193,12 @@ pub(super) fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
             el.child(cell(LENGTH, "Length").text_right())
         })
         .child(cell(fit.classes, "Class"))
-        .child(cell(KDA, "K/D/A").text_right())
-        .child(
-            cell(DPM, "DPM")
-                .id(ids::LOGSTF_HEAD_DPM)
+        .child(stat_block(fit, |_, title, base| {
+            base.id(ids::logstf_head(title))
                 .test_support()
-                .text_right(),
-        )
+                .child(title)
+                .into_any_element()
+        }))
 }
 
 /// The line for a player with no logs in the window, with a way to their logs.tf profile.
@@ -189,7 +254,7 @@ fn log_item(
         .when(open, |el| el.bg(theme.muted))
         .child(chevron)
         .when(fit.date_column, |el| {
-            el.child(div().w(DATE).flex_none().child(date_text(row.date())))
+            el.child(date_cell(div().w(DATE).flex_none(), id, row.date()))
         })
         .child(
             v_flex()
@@ -207,16 +272,8 @@ fn log_item(
                     el.child(map_cell(line, id, row.map()))
                 })
                 .when(!fit.date_column, |el| {
-                    let date = date_text(row.date());
-                    el.child(
-                        div()
-                            .id(ids::logstf_log_date(id))
-                            .aria_label(date.clone())
-                            .test_support()
-                            .text_xs()
-                            .text_color(theme.muted_foreground)
-                            .child(date),
-                    )
+                    let line = div().text_xs().text_color(theme.muted_foreground);
+                    el.child(date_cell(line, id, row.date()))
                 }),
         )
         .when(fit.map_column, |el| {
@@ -255,6 +312,15 @@ fn log_item(
         .into_any_element()
 }
 
+// The log's start date and minute in `base`, its own column or a muted line under the title.
+fn date_cell(base: Div, id: u64, date: i64) -> impl IntoElement {
+    labelled(
+        base.whitespace_nowrap(),
+        ids::logstf_log_date(id),
+        date_time_text(date),
+    )
+}
+
 // The log's map in `base`, truncated with the full name in a tooltip; `base` sizes it as its
 // own column or styles it as a muted line under the title.
 fn map_cell(base: Div, id: u64, map: &str) -> impl IntoElement {
@@ -268,7 +334,7 @@ fn map_cell(base: Div, id: u64, map: &str) -> impl IntoElement {
         .child(map)
 }
 
-// A downloaded log's numbers for the player: length, classes, K/D/A and damage per minute.
+// A downloaded log's numbers for the player: length, classes, then the eight stat columns.
 fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
     let id = row.id();
     let assets = &cx.global::<Services>().assets;
@@ -286,8 +352,20 @@ fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
                 .child(class_icon(class, assets.class_icon(class).as_deref(), ICON))
         }));
     let length = row.length().map(duration_text).unwrap_or_default();
-    let kda = format!("{}/{}/{}", row.kills(), row.deaths(), row.assists());
-    let dpm = list_dpm_text(row.dmg(), row.length());
+    let (kills, assists, deaths) = (row.kills(), row.assists(), row.deaths());
+    let values: [String; 8] = [
+        kills.to_string(),
+        assists.to_string(),
+        deaths.to_string(),
+        row.dmg().to_string(),
+        per_min_text(Some(row.dmg()), row.length()),
+        kapd_text(kills, assists, deaths),
+        known_text(row.dt()),
+        per_min_text(row.dt(), row.length()),
+    ];
+    let cells = stat_block(fit, |i, title, base| {
+        labelled(base, ids::logstf_log_stat(id, title), values[i].clone()).into_any_element()
+    });
     let length = fit.length.then(|| {
         div()
             .w(LENGTH)
@@ -296,25 +374,9 @@ fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
             .child(length)
             .into_any_element()
     });
-    length.into_iter().chain([
-        icons.into_any_element(),
-        div()
-            .id(ids::logstf_log_kda(id))
-            .test_support()
-            .w(KDA)
-            .flex_none()
-            .text_right()
-            .child(kda)
-            .into_any_element(),
-        div()
-            .id(ids::logstf_log_dpm(id))
-            .test_support()
-            .w(DPM)
-            .flex_none()
-            .text_right()
-            .child(dpm)
-            .into_any_element(),
-    ])
+    length
+        .into_iter()
+        .chain([icons.into_any_element(), cells.into_any_element()])
 }
 
 // Why a row has no stats, muted and spanning the stats columns.
@@ -326,7 +388,7 @@ fn note(id: u64, state: LogState, fit: Fit, cx: &App) -> impl IntoElement {
     };
     let length = if fit.length { LENGTH + fit.gap } else { px(0.) };
     h_flex()
-        .w(length + fit.classes + KDA + DPM + fit.gap * 2.)
+        .w(length + fit.classes + fit.stats_width() + fit.gap)
         .flex_none()
         .gap_2()
         .child(labelled(

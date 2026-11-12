@@ -5,11 +5,11 @@ use std::time::Duration;
 use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
     DOWNLOAD_FAILED, EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, charge_text, count_text,
-    download_reason, duration_text, event_parts, event_text, fetch_message, finding_text, floored,
-    floored_share_text, healing_text, list_dpm_text, medigun_name, one_decimal, progress_line,
-    progress_text, range_label, reads_zero, resolve_message, ring_label, round_length_text,
-    seconds_text, share_text, streaks_label, summary_text, sync_message, tenths_text,
-    time_played_text, whole,
+    date_time_text, download_reason, duration_text, event_parts, event_text, fetch_message,
+    finding_text, floored, floored_share_text, healing_text, kapd_text, known_text, medigun_name,
+    one_decimal, per_min_text, progress_line, progress_text, range_label, reads_zero,
+    resolve_message, ring_label, round_length_text, seconds_text, share_text, streaks_label,
+    summary_text, sync_message, tenths_text, time_played_text, whole,
 };
 use tf2tools_core::{LogsRange, LogsSyncError, ResolveError};
 
@@ -508,12 +508,36 @@ fn open_log_whole_numbers_floor_like_logs_tf() {
 }
 
 #[test]
-fn the_list_dpm_is_the_open_logs_da_per_minute() {
+fn the_list_per_minute_rates_floor_like_the_open_log() {
     // phong in 3319519: 6011 damage over 1769 s is 203.9, which logs.tf shows as 203.
-    assert_eq!(list_dpm_text(6011, Some(1769)), "203");
-    assert_eq!(list_dpm_text(300, Some(60)), "300");
-    assert_eq!(list_dpm_text(6011, Some(0)), "-");
-    assert_eq!(list_dpm_text(6011, None), "-");
+    assert_eq!(per_min_text(Some(6011), Some(1769)), "203");
+    assert_eq!(per_min_text(Some(300), Some(60)), "300");
+    assert_eq!(per_min_text(Some(6011), Some(0)), "\u{2013}");
+    assert_eq!(per_min_text(Some(6011), None), "\u{2013}");
+    assert_eq!(per_min_text(None, Some(1769)), "\u{2013}");
+}
+
+#[test]
+fn the_list_ka_per_d_matches_the_players_table() {
+    // Arie in 4137103: 7 kills and 6 assists over 21 deaths reads 0.6, as logs.tf shows.
+    assert_eq!(kapd_text(7, 6, 21), "0.6");
+    assert_eq!(kapd_text(5, 2, 0), "7.0", "no deaths counts as one");
+}
+
+#[test]
+fn an_unknown_list_value_reads_as_a_dash() {
+    assert_eq!(known_text(Some(5964)), "5964");
+    assert_eq!(known_text(None), "\u{2013}");
+}
+
+#[test]
+fn a_row_date_carries_the_start_time() {
+    use chrono::TimeZone as _;
+    let unix = chrono::Local
+        .with_ymd_and_hms(2026, 11, 12, 20, 56, 30)
+        .unwrap()
+        .timestamp();
+    assert_eq!(date_time_text(unix), "2026-11-12 20:56");
 }
 
 #[test]

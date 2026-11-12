@@ -995,8 +995,8 @@ fn the_date_sits_under_the_title_in_the_smallest_window(cx: &mut TestAppContext)
     to_end(cx, &page);
     let date = support::label_of(cx, s.win, ids::logstf_log_date(3)).expect("the date line");
     assert!(
-        date.len() == 10 && date.chars().filter(|&c| c == '-').count() == 2,
-        "{date:?} reads as a date"
+        date.len() == 16 && date.chars().filter(|&c| c == '-').count() == 2,
+        "{date:?} reads as a date and time"
     );
     let title = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
     let date = support::bounds_of(cx, s.win, ids::logstf_log_date(3)).unwrap();
@@ -1008,11 +1008,13 @@ fn the_date_sits_under_the_title_in_the_smallest_window(cx: &mut TestAppContext)
 
 #[gpui_kit::test]
 fn a_wide_window_gives_the_map_its_own_column(cx: &mut TestAppContext) {
-    use gpui_kit::px;
+    use gpui_kit::{px, size};
     let env = support::env();
     let server = support::StoreServer::start();
     serve_two_logs(&server);
     let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    // The eight stat columns leave room for Map's own column from about 1400 px.
+    cx.simulate_window_resize(s.win, size(px(1600.), px(900.)));
     let page = open_page(cx, &s);
     to_end(cx, &page);
     let title = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
@@ -1075,16 +1077,17 @@ fn a_long_title_and_map_stay_inside_their_row_in_the_smallest_window(cx: &mut Te
     to_end(cx, &page);
     let row = support::bounds_of(cx, s.win, ids::logstf_log(3)).unwrap();
     let list = support::bounds_of(cx, s.win, ids::LOGSTF_LIST).unwrap();
-    let dpm = support::bounds_of(cx, s.win, ids::logstf_log_dpm(3)).unwrap();
+    let first = support::bounds_of(cx, s.win, ids::logstf_log_stat(3, "K")).unwrap();
+    let last = support::bounds_of(cx, s.win, ids::logstf_log_stat(3, "DT/M")).unwrap();
     for cell in [ids::logstf_log_title(3), ids::logstf_log_map(3)] {
         let b = support::bounds_of(cx, s.win, cell.clone()).unwrap();
         assert!(
-            b.right() <= dpm.left(),
-            "{cell:?} {b:?} runs into DPM {dpm:?}"
+            b.right() <= first.left(),
+            "{cell:?} {b:?} runs into the stats {first:?}"
         );
         assert!(b.bottom() <= row.bottom(), "{cell:?} {b:?} below {row:?}");
     }
-    assert!(dpm.right() <= list.right(), "DPM {dpm:?} past {list:?}");
+    assert!(last.right() <= list.right(), "DT/M {last:?} past {list:?}");
 }
 
 #[gpui_kit::test]
@@ -1103,11 +1106,11 @@ fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
     let title = support::bounds_of(cx, s.win, ids::logstf_log_title(2)).unwrap();
     assert!(title.size.width >= px(72.), "title {title:?}");
 
-    // Every core column stays whole: DPM, the last, ends inside the list.
+    // Every core column stays whole: DT/M, the last, ends inside the list.
     let list = support::bounds_of(cx, s.win, ids::LOGSTF_LIST).unwrap();
-    for dpm in [ids::LOGSTF_HEAD_DPM.into(), ids::logstf_log_dpm(2)] {
-        let cell = support::bounds_of(cx, s.win, dpm).unwrap();
-        assert!(cell.right() <= list.right(), "DPM {cell:?} past {list:?}");
+    for last in [ids::logstf_head("DT/M"), ids::logstf_log_stat(2, "DT/M")] {
+        let cell = support::bounds_of(cx, s.win, last).unwrap();
+        assert!(cell.right() <= list.right(), "DT/M {cell:?} past {list:?}");
     }
 
     // The players table keeps every column, so its name column never collapses.
@@ -1415,11 +1418,11 @@ fn seven_class_page(
 
 const SEVEN_CLASSES: u64 = 170_965_550;
 
-// Every class icon of row 3 stays inside the class column, clear of K/D/A and in the row.
+// Every class icon of row 3 stays inside the class column, clear of the stats and in the row.
 fn assert_icons_clear_of_kda(cx: &mut TestAppContext, s: &support::ShellWindow) {
     use gpui_kit::px;
     let row = support::bounds_of(cx, s.win, ids::logstf_log(3)).unwrap();
-    let kda = support::bounds_of(cx, s.win, ids::logstf_log_kda(3)).unwrap();
+    let kda = support::bounds_of(cx, s.win, ids::logstf_log_stat(3, "K")).unwrap();
     let mut shown = 0;
     for class in TfClass::ALL {
         let Some(icon) = support::bounds_of(cx, s.win, ids::logstf_log_class(3, class)) else {
@@ -1428,7 +1431,7 @@ fn assert_icons_clear_of_kda(cx: &mut TestAppContext, s: &support::ShellWindow) 
         shown += 1;
         assert!(
             icon.right() + px(8.) <= kda.left(),
-            "{class:?} {icon:?} touches K/D/A {kda:?}"
+            "{class:?} {icon:?} touches the stats {kda:?}"
         );
         assert!(
             icon.bottom() <= row.bottom(),
@@ -1501,7 +1504,9 @@ fn shaped(cx: &mut TestAppContext, win: gpui_kit::AnyWindowHandle, text: &str, r
 }
 
 #[gpui_kit::test]
-fn a_typical_title_and_map_read_whole_in_the_smallest_window(cx: &mut TestAppContext) {
+fn a_typical_map_reads_whole_and_the_title_gives_way_in_the_smallest_window(
+    cx: &mut TestAppContext,
+) {
     use gpui_kit::{px, size};
     let env = support::env();
     let server = support::StoreServer::start();
@@ -1517,12 +1522,14 @@ fn a_typical_title_and_map_read_whole_in_the_smallest_window(cx: &mut TestAppCon
     cx.simulate_window_resize(s.win, size(px(800.), px(600.)));
     let page = open_page(cx, &s);
     to_end(cx, &page);
+    // The eight stats keep their room, so the title is the cell that is cut short.
     let cell = support::bounds_of(cx, s.win, ids::logstf_log_title(3)).unwrap();
     let need = shaped(cx, s.win, title, 0.875);
     assert!(
-        f32::from(cell.size.width) >= need,
-        "title {cell:?} under {need} px"
+        f32::from(cell.size.width) < need,
+        "title {cell:?} whole at {need} px"
     );
+    assert!(cell.size.width >= px(96.), "title {cell:?} still readable");
     let cell = support::bounds_of(cx, s.win, ids::logstf_log_map(3)).unwrap();
     let need = shaped(cx, s.win, map, 0.75);
     assert!(

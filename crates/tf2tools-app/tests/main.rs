@@ -151,6 +151,7 @@ mod logs_tf;
 mod logs_tf_detail;
 mod logs_tf_open;
 mod logs_tf_range;
+mod logs_tf_rows;
 mod logs_tf_sort;
 mod logs_tf_sync;
 mod logs_tf_text;

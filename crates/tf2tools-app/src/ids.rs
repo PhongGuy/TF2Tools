@@ -2529,7 +2529,7 @@ pub const LOGSTF_ERROR: &str = "logstf-error";
 /// Retries a failed logs.tf sync.
 pub const LOGSTF_RETRY: &str = "logstf-retry";
 
-/// Labelled "Last <range>, <n> logs" (or "All logs, <n>") under the class grid, once the
+/// Labelled "Last <range>, <n> logs" (or "All logs, <n>") above the class grid, once the
 /// player has logs.
 pub const LOGSTF_SUMMARY: &str = "logstf-summary";
 /// The history range slider beside the summary, six stops from 1 month to All.
@@ -2645,17 +2645,15 @@ pub fn logstf_log_open(id: u64) -> ElementId {
     keyed("logstf-log-open", &id.to_string())
 }
 
-/// The DPM column title over the logs.tf rows.
-pub const LOGSTF_HEAD_DPM: &str = "logstf-head-dpm";
-
-/// A log row's damage-per-minute cell: "logstf-log-dpm:<id>".
-pub fn logstf_log_dpm(id: u64) -> ElementId {
-    keyed("logstf-log-dpm", &id.to_string())
+/// A column title over the logs.tf rows, by its text ("K", "DA/M"): "logstf-head:<title>".
+pub fn logstf_head(title: &str) -> ElementId {
+    keyed("logstf-head", title)
 }
 
-/// A log row's K/D/A cell: "logstf-log-kda:<id>".
-pub fn logstf_log_kda(id: u64) -> ElementId {
-    keyed("logstf-log-kda", &id.to_string())
+/// One of a log row's eight stat cells, by its column title and labelled with its value:
+/// "logstf-log-stat:<id>:<title>".
+pub fn logstf_log_stat(id: u64, title: &str) -> ElementId {
+    keyed("logstf-log-stat", &format!("{id}:{title}"))
 }
 
 /// A log row's icon for a class the player played: "logstf-log-class:<id>:<class>".
@@ -2677,8 +2675,8 @@ pub fn logstf_log_map(id: u64) -> ElementId {
     keyed("logstf-log-map", &id.to_string())
 }
 
-/// A log row's date as a line under the title, in a window too narrow for its own column,
-/// labelled "2026-10-30": "logstf-log-date:<id>".
+/// A log row's start date and time, its own column or a line under the title in a narrow
+/// window, labelled "2026-10-30 20:56": "logstf-log-date:<id>".
 pub fn logstf_log_date(id: u64) -> ElementId {
     keyed("logstf-log-date", &id.to_string())
 }

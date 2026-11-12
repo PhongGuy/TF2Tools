@@ -9,6 +9,8 @@ pub mod sort;
 pub mod tables;
 pub mod text;
 
+pub use list::STAT_COLUMNS;
+
 use std::collections::{BTreeSet, HashSet};
 
 use gpui_kit::assets::IconName;
