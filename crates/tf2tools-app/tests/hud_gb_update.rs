@@ -4,9 +4,10 @@ use crate::support;
 
 use gpui_kit::TestAppContext;
 use tf2tools_app::ids;
+use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::{GbId, HudEntry, Provenance, Tf2Install};
+use tf2tools_core::{GbId, HudEntry, HudStatus, Provenance, Tf2Install};
 
 fn gb(id: u64) -> Provenance {
     Provenance::GameBanana {
@@ -127,4 +128,151 @@ fn the_check_runs_once_a_session_when_the_huds_page_opens(cx: &mut TestAppContex
         assert_eq!(profiles(&server), 1, "one check a session");
         std::thread::sleep(std::time::Duration::from_millis(10));
     }
+}
+
+fn ready(cx: &mut TestAppContext) -> (support::Env, support::ShellWindow, support::StoreServer) {
+    let env = support::env();
+    let s = shell(cx, &env);
+    let server = support::StoreServer::start();
+    support::store_ready(cx, &server);
+    (env, s, server)
+}
+
+fn click_update(cx: &mut TestAppContext, s: &support::ShellWindow, hud: &HudEntry) {
+    revisit_huds(cx, s);
+    support::wait_real(cx, "the Update button", |cx| {
+        support::present(cx, s.win, ids::hud_update(hud.folder_name()))
+    });
+    support::click_id(cx, s.win, ids::hud_update(hud.folder_name()));
+}
+
+fn installed_is(s: &support::ShellWindow, env: &support::Env, hud: &HudEntry) -> bool {
+    let tf2 = Tf2Install::from_path(&env.game).unwrap();
+    matches!(s.services.library.hud_status(&tf2), Ok(HudStatus::Managed { id, .. }) if &id == hud.id())
+}
+
+#[gpui_kit::test]
+fn a_one_file_item_replaces_the_installed_hud_from_a_new_folder(cx: &mut TestAppContext) {
+    let (env, s, server) = ready(cx);
+    let old = import(&s, &env, "darhud-202517", 45, 100);
+    checked(&env, 45, 300, false);
+    server.mount_gb_files_dated(
+        45,
+        &[(
+            "darhud-202618.zip",
+            support::hud_zip_bytes("darhud-202618"),
+            300,
+        )],
+    );
+    s.services
+        .library
+        .install_hud(old.id(), &Tf2Install::from_path(&env.game).unwrap())
+        .unwrap();
+    click_update(cx, &s, &old);
+    support::wait_real(cx, "the update", |_| {
+        let huds = s.services.library.list_huds().unwrap();
+        huds.len() == 1 && huds[0].folder_name() == "darhud-202618"
+    });
+    let new = s.services.library.list_huds().unwrap().remove(0);
+    assert!(
+        matches!(new.provenance(), Provenance::GameBanana { gb_id, .. } if *gb_id == GbId::new(45))
+    );
+    support::wait_real(cx, "the new version installed", |_| {
+        installed_is(&s, &env, &new)
+    });
+    assert!(
+        !env.data
+            .library_dir(tf2tools_core::LibraryKind::Huds)
+            .join("darhud-202517")
+            .exists()
+    );
+    support::wait_real(cx, "the toast", |cx| {
+        support::toast_labels(cx, s.win)
+            .iter()
+            .any(|t| t.contains("is now up to date"))
+    });
+}
+
+#[gpui_kit::test]
+fn a_download_into_the_same_folder_swaps_the_row_and_stays_installed(cx: &mut TestAppContext) {
+    let (env, s, server) = ready(cx);
+    let old = import(&s, &env, "darhud", 46, 100);
+    checked(&env, 46, 300, false);
+    server.mount_gb_files_dated(46, &[("darhud.zip", support::hud_zip_bytes("darhud"), 300)]);
+    s.services
+        .library
+        .install_hud(old.id(), &Tf2Install::from_path(&env.game).unwrap())
+        .unwrap();
+    click_update(cx, &s, &old);
+    support::wait_real(cx, "the toast", |cx| {
+        support::toast_labels(cx, s.win)
+            .iter()
+            .any(|t| t.contains("is now up to date"))
+    });
+    let huds = s.services.library.list_huds().unwrap();
+    assert_eq!(huds.len(), 1);
+    assert_eq!(huds[0].folder_name(), "darhud");
+    assert_ne!(huds[0].id(), old.id());
+    assert!(installed_is(&s, &env, &huds[0]));
+    assert!(
+        !support::toast_labels(cx, s.win)
+            .iter()
+            .any(|t| t.starts_with("Failed"))
+    );
+}
+
+#[gpui_kit::test]
+fn update_refuses_while_tf2_runs_before_any_request(cx: &mut TestAppContext) {
+    let (env, s, server) = ready(cx);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    let old = import(&s, &env, "darhud-202517", 47, 100);
+    checked(&env, 47, 300, false);
+    server.mount_gb_files_dated(
+        47,
+        &[(
+            "darhud-202618.zip",
+            support::hud_zip_bytes("darhud-202618"),
+            300,
+        )],
+    );
+    click_update(cx, &s, &old);
+    support::wait_real(cx, "the refusal", |cx| {
+        support::toast_labels(cx, s.win)
+            .iter()
+            .any(|t| t == "Close TF2 first. TF2 is running. Close the game, then try again.")
+    });
+    assert_eq!(
+        server.requests_where(|p| p.starts_with("/dl/") || p == "/apiv11/Mod/47"),
+        0
+    );
+    let ids: Vec<_> = s
+        .services
+        .library
+        .list_huds()
+        .unwrap()
+        .iter()
+        .map(|h| h.id().clone())
+        .collect();
+    assert_eq!(ids, [old.id().clone()]);
+}
+
+#[gpui_kit::test]
+fn a_failed_file_listing_toasts_and_keeps_the_hud(cx: &mut TestAppContext) {
+    let (env, s, server) = ready(cx);
+    let old = import(&s, &env, "darhud-202517", 51, 100);
+    checked(&env, 51, 300, false);
+    server.mount_gb_missing(51, std::time::Duration::ZERO);
+    click_update(cx, &s, &old);
+    support::wait_real(cx, "the failure toast", |cx| {
+        support::toast_labels(cx, s.win)
+            .iter()
+            .any(|t| t.starts_with("Failed to update HUD"))
+    });
+    let huds = s.services.library.list_huds().unwrap();
+    assert_eq!(huds.len(), 1);
+    assert_eq!(huds[0].id(), old.id());
+    assert!(
+        !support::disabled_of(cx, s.win, ids::hud_update(old.folder_name())),
+        "busy is cleared"
+    );
 }

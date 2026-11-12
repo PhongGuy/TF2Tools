@@ -1010,6 +1010,25 @@ impl StoreServer {
         self.rt.block_on(mock.mount(&self.server));
     }
 
+    /// GameBanana Mod `gb_id` listing `files` (name, body, date added); file i served at `/dl/{gb_id}/{i}`.
+    pub fn mount_gb_files_dated(&self, gb_id: u64, files: &[(&str, Vec<u8>, i64)]) {
+        let uri = self.uri();
+        let listed: Vec<serde_json::Value> = files.iter().enumerate().map(|(i, (name, body, date))| {
+            serde_json::json!({"_idRow": i + 1, "_sFile": name, "_nFilesize": body.len(), "_tsDateAdded": date,
+                "_sDownloadUrl": format!("{uri}/dl/{gb_id}/{i}"), "_sMd5Checksum": ""})
+        }).collect();
+        self.mount(
+            Mock::given(method("GET"))
+                .and(path(format!("/apiv11/Mod/{gb_id}")))
+                .respond_with(ResponseTemplate::new(200).set_body_json(
+                    serde_json::json!({"_idRow": gb_id, "_sName": "item", "_aFiles": listed}),
+                )),
+        );
+        for (i, (_, body, _)) in files.iter().enumerate() {
+            self.mount_bytes(&format!("/dl/{gb_id}/{i}"), body.clone());
+        }
+    }
+
     /// How many requests whose path `keep` accepts have arrived.
     pub fn requests_where(&self, keep: impl Fn(&str) -> bool) -> usize {
         let asked = self

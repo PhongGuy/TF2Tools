@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use gpui_kit::TestAppContext;
 use tf2tools_app::ids;
+use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{HudEntry, HudStatus, Provenance, Tf2Install};
@@ -146,4 +147,41 @@ fn updating_a_download_that_is_not_installed_leaves_tf2_alone(cx: &mut TestAppCo
         s.services.library.hud_status(&tf2).unwrap(),
         HudStatus::NotInstalled
     );
+}
+
+#[gpui_kit::test]
+fn a_curated_update_refuses_while_tf2_runs(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = shell(cx, &env);
+    let server = support::StoreServer::start();
+    support::store_ready(cx, &server);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    let repo = server.mount_curated_at(
+        "rayshud",
+        B,
+        support::hud_zip_bytes(&format!("rayshud-{B}")),
+        Duration::ZERO,
+    );
+    store_at(&env, &repo, B);
+    let old = download(&s, &env, &format!("rayshud-{A}"));
+    revisit_huds(cx, &s);
+    support::wait_real(cx, "the update check", |cx| {
+        support::present(cx, s.win, ids::hud_update(old.folder_name()))
+    });
+    support::click_id(cx, s.win, ids::hud_update(old.folder_name()));
+    support::wait_real(cx, "the refusal", |cx| {
+        support::toast_labels(cx, s.win)
+            .iter()
+            .any(|t| t == "Close TF2 first. TF2 is running. Close the game, then try again.")
+    });
+    assert_eq!(server.requests_where(|p| p.starts_with("/repo/")), 0);
+    let ids: Vec<_> = s
+        .services
+        .library
+        .list_huds()
+        .unwrap()
+        .iter()
+        .map(|h| h.id().clone())
+        .collect();
+    assert_eq!(ids, [old.id().clone()]);
 }

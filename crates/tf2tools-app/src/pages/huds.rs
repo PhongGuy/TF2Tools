@@ -25,8 +25,8 @@ use gpui_kit::{
 
 use tf2tools_core::{
     CopyUpdate, DownloadUpdate, GbId, HudEntry, HudId, HudInstall, HudStatus, LibraryEntry,
-    LibraryError, LogLevel, NewLogEntry, Platform, Provenance, StoreItem, StoreItemId, StoreKind,
-    Tf2Install,
+    LibraryError, LogLevel, NewLogEntry, Platform, Provenance, StoreFile, StoreItem, StoreItemId,
+    StoreKind, Tf2Install,
 };
 
 use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, needs_tf2, no_tf2_notice};
@@ -38,7 +38,9 @@ use crate::local_messages::{
     copy_in_store_text, copy_made_text, copy_updated_notice, describe_copy_hud, describe_import,
     describe_library, describe_tf2_install, describe_update_copy, editing_copy_text,
 };
+use crate::pages::graphics::jobs::refuse_while_running;
 use crate::pages::hud_maker::live::{Live, live_job};
+use crate::pages::profiles::probe::Tf2Probe;
 use crate::picker::PickKind;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages, local_image_url};
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
@@ -808,32 +810,94 @@ impl HudsPage {
 }
 
 impl HudsPage {
-    // Downloads the store's current version of unedited store HUD `hud`, then swaps it in:
-    // the new version is installed when the old one was, and the old one leaves the library.
-    // A failed install keeps the old one, so the player is never left without their HUD.
+    // Updates unedited store HUD `hud` to its item's current file. TF2 must be closed, since
+    // the installed copy is replaced. The file listing runs first; a failure leaves the HUD.
     fn update_download(&mut self, hud: &HudEntry, window: &mut Window, cx: &mut Context<Self>) {
-        let Provenance::Curated { hud_id } = hud.provenance().clone() else {
-            return;
+        let (kind, item) = match hud.provenance().clone() {
+            Provenance::Curated { hud_id } => {
+                (StoreKind::CuratedHuds, StoreItemId::Curated(hud_id))
+            }
+            Provenance::GameBanana { gb_id, .. } => {
+                (StoreKind::GameBananaHuds, StoreItemId::GameBanana(gb_id))
+            }
+            Provenance::Local | _ => return,
         };
-        let busy = Busy::Update(hud.folder_name().to_owned());
+        self.busy = Some(Busy::Update(hud.folder_name().to_owned()));
+        cx.notify();
+        // Read before the download, which may already remove the old row.
+        let was_installed = matches!(
+            &self.status,
+            Some((_, HudStatus::Managed { id, .. })) if id == hud.id()
+        );
+        let probe = Tf2Probe::get(cx);
+        let refusing = run_blocking(cx, move |_| refuse_while_running(&*probe));
+        let store = cx.global::<Services>().store.clone();
+        let old = hud.clone();
+        let win = window.window_handle();
+        cx.spawn(async move |page, cx| {
+            let listed = match refusing.await {
+                Err(err) => Err(err),
+                Ok(()) => {
+                    let listing = cx.update(|cx| {
+                        if !tokio_bridge::is_running(cx) {
+                            tokio_bridge::init(cx);
+                        }
+                        tokio_bridge::spawn(cx, async move {
+                            let files = (store.item_files(kind, &item).await)
+                                .map_err(|e| describe_files(kind, &e).message)?;
+                            files.into_iter().next().ok_or(DOWNLOAD_GONE.to_owned())
+                        })
+                    });
+                    let file = listing.await.unwrap_or_else(|_| {
+                        let failure = download_stopped("the HUD update task stopped unexpectedly");
+                        failure.log("HUD update");
+                        Err(failure.message)
+                    });
+                    file.map_err(|message| OpError::Core {
+                        action: UPDATE_FAILED,
+                        message,
+                    })
+                }
+            };
+            let _ = page.update(cx, |page, cx| match listed {
+                Ok(file) => page.replace_with(old, kind, file, was_installed, cx),
+                Err(err) => {
+                    page.busy = None;
+                    cx.notify();
+                    let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
+                }
+            });
+        })
+        .detach();
+    }
+
+    // Downloads `file` beside or over `old`, then swaps it in through `swap_download`. It needs
+    // no window, so the store detail's file pick can call it too.
+    fn replace_with(
+        &mut self,
+        old: HudEntry,
+        kind: StoreKind,
+        file: StoreFile,
+        was_installed: bool,
+        cx: &mut Context<Self>,
+    ) {
+        let busy = Busy::Update(old.folder_name().to_owned());
         self.busy = Some(busy.clone());
         cx.notify();
         if !tokio_bridge::is_running(cx) {
             tokio_bridge::init(cx);
         }
         let store = cx.global::<Services>().store.clone();
-        let kind = StoreKind::CuratedHuds;
+        let (old_id, name) = (old.id().clone(), old.name().to_owned());
+        let replaces = old_id.clone();
         let fetching = tokio_bridge::spawn(cx, async move {
-            let item = StoreItemId::Curated(hud_id);
-            let files = (store.item_files(kind, &item).await)
-                .map_err(|e| describe_files(kind, &e).message)?;
-            let file = files.into_iter().next().ok_or(DOWNLOAD_GONE.to_owned())?;
-            (store.download(kind, &file, &|_| {}).await)
+            (store
+                .download_replacing(kind, &file, &replaces, &|_| {})
+                .await)
                 .map_err(|e| describe_download(kind, &e).message)
         });
-        let (old, name) = (hud.id().clone(), hud.name().to_owned());
         let tf2 = tf2_state(cx).read(cx).install().cloned();
-        let win = window.window_handle();
+        let win = self.win;
         cx.spawn(async move |page, cx| {
             let fetched = fetching.await.unwrap_or_else(|_| {
                 let failure = download_stopped("the HUD update task stopped unexpectedly");
@@ -852,7 +916,7 @@ impl HudsPage {
             let _ = page.update(cx, |page, cx| match new {
                 Ok(Some(new)) => page.run(
                     busy,
-                    move |s| swap_download(s, &old, &new, &name, tf2.as_ref()),
+                    move |s| swap_download(s, &old_id, &new, &name, tf2.as_ref(), was_installed),
                     cx,
                     None,
                 ),
@@ -872,32 +936,33 @@ impl HudsPage {
     }
 }
 
-// Puts downloaded HUD `new` in place of `old`: installed in its place when `old` was the
-// installed HUD, then `old` deleted. A download into `old`'s own folder only refreshes the
-// installed copy.
+// Puts downloaded HUD `new` in place of `old`: installed when `old` was, then `old` deleted.
+// While `old` still exists a failed install keeps it; a download over `old`'s folder has
+// already replaced its row, so a failed install there only warns.
 fn swap_download(
     s: &Services,
     old: &HudId,
     new: &HudId,
     name: &str,
     tf2: Option<&Tf2Install>,
+    was_installed: bool,
 ) -> Result<Done, OpError> {
-    let installed = tf2.filter(
-        |tf2| matches!(s.library.hud_status(tf2), Ok(HudStatus::Managed { id, .. }) if &id == old),
-    );
+    let listed =
+        (s.library.list_huds()).map_err(|e| describe_library(&e).into_op(UPDATE_FAILED))?;
+    let old_exists = listed.iter().any(|h| h.id() == old);
     let updated = format!("{name} is now up to date");
     let mut done: Done = (ToastKind::Success, "HUD updated".into(), updated.into());
-    if new == old {
-        if let Some(tf2) = installed
-            && let Live::Failed(_) = live_job(s, new, name, tf2)
-        {
-            done.0 = ToastKind::Warning;
-            done.2 = format!("{} {NOT_REINSTALLED}", done.2).into();
+    if let (true, Some(tf2)) = (was_installed, tf2) {
+        match install_job(s, new, tf2, &ExternalPlan::default()) {
+            Ok(_) => {}
+            Err(err) if old_exists => return Err(err),
+            Err(_) => {
+                done.0 = ToastKind::Warning;
+                done.2 = format!("{} {NOT_REINSTALLED}", done.2).into();
+            }
         }
-    } else {
-        if let Some(tf2) = installed {
-            install_job(s, new, tf2, &ExternalPlan::default())?;
-        }
+    }
+    if old_exists && old != new {
         s.library
             .delete_hud(old)
             .map_err(|e| describe_library(&e).into_op(UPDATE_FAILED))?;
