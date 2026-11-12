@@ -330,58 +330,64 @@ pub(super) static RULES: [PanelRule; 12] = [
         clickable: true,
         fills_screen: false,
     },
-    // HudDeathNotice draws its notices in code, so its block's ControlName siblings in
-    // hudlayout.res are not its children; its box spans most of the screen, so the canvas
-    // selects it through its drawn lines instead of a click on the box.
-    PanelRule {
-        id: PartId::Killfeed,
-        label: "Killfeed",
-        shows_when: "Shows when someone is killed",
-        panel: "HudDeathNotice",
-        parent: None,
-        geometry: &[(HUDLAYOUT, "HudDeathNotice")],
-        children_file: HUDLAYOUT,
-        ignores: &["visible"],
-        centres_x: false,
-        centres_y: false,
-        children: false,
-        clickable: false,
-        fills_screen: false,
-    },
-    // basechat.res's own HudChat block applies after hudlayout's, and its top-level siblings
-    // (input line, filters button, history) are the chat's children.
-    PanelRule {
-        id: PartId::Chat,
-        label: "Chat",
-        shows_when: "Shows when someone sends a chat message",
-        panel: "HudChat",
-        parent: None,
-        geometry: &[(HUDLAYOUT, "HudChat")],
-        children_file: "resource/ui/basechat.res",
-        ignores: &["visible"],
-        centres_x: false,
-        centres_y: false,
-        children: true,
-        clickable: true,
-        fills_screen: false,
-    },
-    // On a King of the Hill map the game draws these two team timers in the round timer's place.
-    PanelRule {
-        id: PartId::KothTimer,
-        label: "KOTH timer",
-        shows_when: "Shows on King of the Hill maps",
-        panel: "HudKothTimeStatus",
-        parent: None,
-        geometry: &[(HUDLAYOUT, "HudKothTimeStatus")],
-        children_file: "resource/ui/hudobjectivekothtimepanel.res",
-        ignores: &["visible"],
-        centres_x: false,
-        centres_y: false,
-        children: true,
-        clickable: true,
-        fills_screen: false,
-    },
+    KILLFEED,
+    CHAT,
+    KOTH_TIMER,
 ];
+
+// HudDeathNotice draws its notices in code, so its block's ControlName siblings in
+// hudlayout.res are not its children; its box spans most of the screen, so the canvas
+// selects it through its drawn lines instead of a click on the box.
+const KILLFEED: PanelRule = PanelRule {
+    id: PartId::Killfeed,
+    label: "Killfeed",
+    shows_when: "Shows when someone is killed",
+    panel: "HudDeathNotice",
+    parent: None,
+    geometry: &[(HUDLAYOUT, "HudDeathNotice")],
+    children_file: HUDLAYOUT,
+    ignores: &["visible"],
+    centres_x: false,
+    centres_y: false,
+    children: false,
+    clickable: false,
+    fills_screen: false,
+};
+
+// basechat.res's own HudChat block applies after hudlayout's, and its top-level siblings
+// (input line, filters button, history) are the chat's children.
+const CHAT: PanelRule = PanelRule {
+    id: PartId::Chat,
+    label: "Chat",
+    shows_when: "Shows when someone sends a chat message",
+    panel: "HudChat",
+    parent: None,
+    geometry: &[(HUDLAYOUT, "HudChat")],
+    children_file: "resource/ui/basechat.res",
+    ignores: &["visible"],
+    centres_x: false,
+    centres_y: false,
+    children: true,
+    clickable: true,
+    fills_screen: false,
+};
+
+// On a King of the Hill map the game draws these two team timers in the round timer's place.
+const KOTH_TIMER: PanelRule = PanelRule {
+    id: PartId::KothTimer,
+    label: "KOTH timer",
+    shows_when: "Shows on King of the Hill maps",
+    panel: "HudKothTimeStatus",
+    parent: None,
+    geometry: &[(HUDLAYOUT, "HudKothTimeStatus")],
+    children_file: "resource/ui/hudobjectivekothtimepanel.res",
+    ignores: &["visible"],
+    centres_x: false,
+    centres_y: false,
+    children: true,
+    clickable: true,
+    fills_screen: false,
+};
 
 /// When the scoreboard shows, shared by its part rule and its code-toggled root.
 pub(super) const HOLD_SCORES: &str = "Shows while you hold the scoreboard key";
@@ -424,21 +430,27 @@ pub(super) static MAIN_MENU: PanelRule = PanelRule {
 
 // The freeze cam panel fills the screen by hudlayout's box and everything hangs off it, so it
 // is neither clickable nor hideable.
-pub(super) static FREEZE_PANEL: PanelRule = PanelRule {
-    id: PartId::FreezeCam,
-    label: "Freeze cam",
-    shows_when: "Shows while you watch your killer",
-    panel: "FreezePanel",
-    parent: None,
-    geometry: &[(HUDLAYOUT, "FreezePanel")],
-    children_file: "resource/ui/freezepanel_basic.res",
-    ignores: &[],
-    centres_x: false,
-    centres_y: false,
-    children: true,
-    clickable: false,
-    fills_screen: false,
-};
+// The game keeps the killfeed, chat and KOTH panel over it; the rest of the HUD goes.
+pub(super) static FREEZE_PANELS: [PanelRule; 4] = [
+    PanelRule {
+        id: PartId::FreezeCam,
+        label: "Freeze cam",
+        shows_when: "Shows while you watch your killer",
+        panel: "FreezePanel",
+        parent: None,
+        geometry: &[(HUDLAYOUT, "FreezePanel")],
+        children_file: "resource/ui/freezepanel_basic.res",
+        ignores: &[],
+        centres_x: false,
+        centres_y: false,
+        children: true,
+        clickable: false,
+        fills_screen: false,
+    },
+    KILLFEED,
+    CHAT,
+    KOTH_TIMER,
+];
 
 // The win panel's box comes from hudlayout and everything hangs off it, so it is neither
 // clickable nor hideable.
@@ -522,7 +534,7 @@ impl PanelRule {
         match id {
             PartId::Scoreboard => &SCOREBOARD,
             PartId::MainMenu => &MAIN_MENU,
-            PartId::FreezeCam => &FREEZE_PANEL,
+            PartId::FreezeCam => &FREEZE_PANELS[0],
             PartId::WinPanel => &WIN_PANEL,
             PartId::ClassSelect => &CLASS_SELECT,
             PartId::Spectator => &SPECTATOR_PANELS[0],

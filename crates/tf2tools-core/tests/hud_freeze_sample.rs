@@ -29,7 +29,7 @@ fn the_labels_fill_from_the_killer_not_the_live_defaults() {
     assert_eq!(fill("%KillerName%"), "Captain Crumpet");
     // The killer's health, not the HUD's default 150.
     assert_eq!(fill("%Health%"), "187");
-    assert_eq!(fill("%text%"), "[F5] Save this moment!");
+    assert_eq!(fill("%text%"), "[F5] Save this moment");
     assert_eq!(fill("%nemesisname%%nemesisadvice%"), "");
     assert_eq!(fill("Health left: %Health%"), "Health left: 187");
     // The other samples are untouched.

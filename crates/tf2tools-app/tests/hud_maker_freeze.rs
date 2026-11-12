@@ -64,6 +64,21 @@ fn the_tab_is_last_and_switches_to_the_freeze_cam(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn the_freeze_cam_darkens_the_world_and_keeps_the_chat(cx: &mut TestAppContext) {
+    let env = support::env();
+    support::seed_stock_game_with(&env.game, &[]);
+    let s = support::shell_window(cx, &env, found(&env));
+    let _page = open_maker(cx, &s);
+    assert!(!support::present(cx, s.win, ids::HUD_MAKER_FREEZE_SHADE));
+    support::click_scene(cx, s.win, Scene::FreezeCam);
+    // The game dims the world behind the freeze cam and keeps the chat over it.
+    assert!(support::present(cx, s.win, ids::HUD_MAKER_FREEZE_SHADE));
+    assert!(present(cx, &s, "HudChat"));
+    support::click_scene(cx, s.win, Scene::Hud);
+    assert!(!support::present(cx, s.win, ids::HUD_MAKER_FREEZE_SHADE));
+}
+
+#[gpui_kit::test]
 fn a_hud_with_a_stub_freeze_file_says_it_cannot_show_the_scene(cx: &mut TestAppContext) {
     let env = support::env();
     let stub = "#base \"freezepanel_basic_base.res\"";
@@ -149,7 +164,7 @@ fn the_killed_by_panel_draws_the_killer_and_the_game_text(cx: &mut TestAppContex
     );
     assert_eq!(
         label(cx, &s, "FreezePanel/ScreenshotPanel/ScreenshotLabel").as_deref(),
-        Some("[F5] Save this moment!")
+        Some("[F5] Save this moment")
     );
     // The panel's background decodes under its part (the team image the code sets, not the file's), and the avatar is the plain stand-in.
     let bg = PartKey::new("FreezePanel/FreezePanelBase/FreezePanelBG");

@@ -653,6 +653,17 @@ impl HudMakerPage {
                 .size_full()
                 .child(img(image).size_full().object_fit(ObjectFit::Fill))
         });
+        // The game dims the world to about 0.62 of its brightness behind the freeze cam, so a
+        // black shade at the rest of that covers the backdrop and stays under every part.
+        let freeze_shade = (model.scene() == Scene::FreezeCam).then(|| {
+            div()
+                .id(ids::HUD_MAKER_FREEZE_SHADE)
+                .test_support()
+                .absolute()
+                .inset_0()
+                .size_full()
+                .bg(gpui_kit::hsla(0., 0., 0., 0.38))
+        });
         // While the menu picture is being read, a plain line stands in for the blank screen.
         let loading = self.menu_art_loading().then(|| {
             div()
@@ -679,6 +690,7 @@ impl HudMakerPage {
             .overflow_hidden()
             .bg(rgb(0x101010))
             .children(backdrop)
+            .children(freeze_shade)
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|page, ev: &MouseDownEvent, window, cx| {

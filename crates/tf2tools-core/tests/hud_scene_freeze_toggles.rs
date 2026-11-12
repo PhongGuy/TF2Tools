@@ -33,6 +33,9 @@ fn the_game_shows_the_screenshot_hint_and_hides_the_rest() {
             ("NemesisSubPanel", false),
             ("PlayerStatusHealthBonusImage", false),
             ("BuildingStatusHealthImageBG", false),
+            ("ChatInputLine", false),
+            ("ChatFiltersButton", false),
+            ("TimePanelValue", false),
         ]
     );
     for t in rule.code_toggled() {

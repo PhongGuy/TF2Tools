@@ -125,7 +125,7 @@ static KILLER: SampleKiller = SampleKiller {
 static KILLED_VARIABLES: [(&str, &str); 5] = [
     ("killername", "Captain Crumpet"),
     ("health", "187"),
-    ("text", "[F5] Save this moment!"),
+    ("text", "[F5] Save this moment"),
     ("nemesisname", ""),
     ("nemesisadvice", ""),
 ];
