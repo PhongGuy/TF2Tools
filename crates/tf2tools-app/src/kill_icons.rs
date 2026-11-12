@@ -6,7 +6,10 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
-use gpui_kit::{App, Entity, RenderImage};
+use gpui_kit::{
+    App, ElementId, Entity, InteractiveElement as _, IntoElement, RenderImage, Styled as _,
+    TestSupportExt as _, img, px,
+};
 use tf2tools_core::{HudFiles, Platform, RgbaImage};
 
 use crate::folder_load::{FolderLoad, FolderLoader};
@@ -59,6 +62,18 @@ impl FolderLoad<KillIconImages> {
     pub fn icons(&self) -> &KillIconImages {
         self.value()
     }
+}
+
+/// `image` as a 16 px tall icon keeping its aspect, under `id`.
+pub(crate) fn weapon_icon(id: ElementId, image: &Arc<RenderImage>) -> impl IntoElement + use<> {
+    let size = image.size(0);
+    let width = 16. * size.width.0.max(1) as f32 / size.height.0.max(1) as f32;
+    img(Arc::clone(image))
+        .h(px(16.))
+        .w(px(width))
+        .flex_none()
+        .id(id)
+        .test_support()
 }
 
 // The production loader. Each sheet decodes once and serves every icon on it; an unreadable

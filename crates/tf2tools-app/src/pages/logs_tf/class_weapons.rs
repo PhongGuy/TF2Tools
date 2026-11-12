@@ -15,6 +15,7 @@ use super::LogsTfPage;
 use super::tables::class_weapon_rows;
 use super::text::{NO_WEAPONS_TEXT, counting_text, weapons_title};
 use crate::ids;
+use crate::kill_icons::{KillIconImages, weapon_icon};
 use crate::widgets::scroll::sideways;
 use crate::widgets::{Named as _, labelled};
 
@@ -31,6 +32,7 @@ pub(super) fn class_weapons_panel(
     class: TfClass,
     weapons: &ClassWeapons,
     names: &WeaponNames,
+    icons: &KillIconImages,
     range: LogsRange,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
@@ -80,7 +82,7 @@ pub(super) fn class_weapons_panel(
         .children((!weapons.weapons().is_empty()).then(|| {
             sideways(
                 ids::LOGSTF_CLASS_WEAPONS_TABLE,
-                weapon_table(class, weapons, names, cx),
+                weapon_table(class, weapons, names, icons, cx),
             )
         }))
 }
@@ -90,6 +92,7 @@ fn weapon_table(
     class: TfClass,
     weapons: &ClassWeapons,
     names: &WeaponNames,
+    icons: &KillIconImages,
     cx: &App,
 ) -> impl IntoElement + use<> {
     let border = cx.theme().border;
@@ -109,6 +112,16 @@ fn weapon_table(
         let kills = format!("{} ({})", w.kills, w.kill_share);
         let dmg = format!("{} ({})", w.dmg, w.dmg_share);
         let label: SharedString = format!("{} {kills} {dmg} {}", w.name, w.accuracy).into();
+        let icon = icons
+            .get(&w.raw)
+            .map(|image| weapon_icon(ids::logstf_class_weapon_icon(class, &w.raw), image));
+        let name = h_flex()
+            .flex_1()
+            .min_w(NAME)
+            .gap_1()
+            .items_center()
+            .children(icon)
+            .child(div().flex_1().min_w_0().truncate().child(w.name));
         h_flex()
             .id(ids::logstf_class_weapon(class, &w.raw))
             .aria_label(label)
@@ -117,7 +130,7 @@ fn weapon_table(
             .py_0p5()
             .border_t_1()
             .border_color(border)
-            .child(div().flex_1().min_w(NAME).child(w.name))
+            .child(name)
             .child(cell(KILLS).child(kills))
             .child(cell(DAMAGE).child(dmg))
             .child(cell(ACCURACY).child(w.accuracy))

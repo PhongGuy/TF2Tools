@@ -1,5 +1,6 @@
 //! Shared logs.tf helpers: a shell over a mock logs.tf, its fixtures and page lookups.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
@@ -7,6 +8,7 @@ use std::time::Duration;
 use gpui_kit::{Entity, TestAppContext};
 use serde_json::json;
 use tf2tools_app::ids;
+use tf2tools_app::kill_icons::{KillIconImages, LoadedKillIcons};
 use tf2tools_app::pages::logs_tf::LogsTfPage;
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::{Services, Tf2State};
@@ -387,5 +389,27 @@ pub fn load_names(cx: &mut TestAppContext, env: &support::Env, names: &Entity<Lo
     cx.update(|cx| names.update(cx, |n, cx| n.show_game(Some(tf), cx)));
     support::wait_real(cx, "the weapon names", |cx| {
         cx.update(|cx| names.read(cx).names().get("scattergun").is_some())
+    });
+}
+
+/// A 2x1 icon for scattergun alone, on a loader that gives it for any folder.
+pub fn install_icons(cx: &mut TestAppContext) -> Entity<LoadedKillIcons> {
+    cx.update(|cx| {
+        LoadedKillIcons::install_with(
+            cx,
+            Arc::new(|_: &Services, _: &std::path::Path| {
+                let image = tf2tools_app::previews::to_render_image(2, 1, vec![255; 8]).unwrap();
+                KillIconImages::from_map(HashMap::from([("scattergun".to_owned(), image)]))
+            }),
+        )
+    })
+}
+
+/// Loads `env`'s game into `icons` and waits until the load lands.
+pub fn load_icons(cx: &mut TestAppContext, env: &support::Env, icons: &Entity<LoadedKillIcons>) {
+    let tf = env.game.join("tf");
+    cx.update(|cx| icons.update(cx, |i, cx| i.show_game(Some(tf), cx)));
+    support::wait_real(cx, "the kill icons", |cx| {
+        cx.update(|cx| icons.read(cx).icons().get("scattergun").is_some())
     });
 }

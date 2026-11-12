@@ -2539,6 +2539,14 @@ pub fn logstf_class_weapon(class: TfClass, weapon: &str) -> ElementId {
     )
 }
 
+/// A weapon's kill icon in the class weapons panel: "logstf-class-weapon-icon:<class>:<weapon>".
+pub fn logstf_class_weapon_icon(class: TfClass, weapon: &str) -> ElementId {
+    keyed(
+        "logstf-class-weapon-icon",
+        &format!("{}:{weapon}", class.name().to_lowercase()),
+    )
+}
+
 /// The logs.tf page's scrolling list: the chips and grid as its first item, then the logs.
 pub const LOGSTF_LIST: &str = "logstf-list";
 /// The scrollbar beside the logs.tf page's list.
@@ -2694,6 +2702,14 @@ pub fn logstf_class_popover(id: SteamId, class: TfClass) -> ElementId {
 pub fn logstf_weapon(id: SteamId, class: TfClass, weapon: &str) -> ElementId {
     keyed(
         "logstf-weapon",
+        &format!("{}:{weapon}", player_class(id, class)),
+    )
+}
+
+/// A weapon's kill icon in a class card: "logstf-weapon-icon:<id64>:<class>:<weapon>".
+pub fn logstf_weapon_icon(id: SteamId, class: TfClass, weapon: &str) -> ElementId {
+    keyed(
+        "logstf-weapon-icon",
         &format!("{}:{weapon}", player_class(id, class)),
     )
 }

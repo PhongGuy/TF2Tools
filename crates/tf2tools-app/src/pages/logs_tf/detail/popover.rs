@@ -1,17 +1,19 @@
 //! The class card that opens over a class icon in the players table, as logs.tf's does.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use gpui_kit::component::hover_card::HoverCard;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
-    App, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
+    App, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels, RenderImage,
     SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity,
     div, px,
 };
 use tf2tools_core::{PlayerLine, SteamId, TfClass, WeaponNames};
 
 use crate::ids;
+use crate::kill_icons::{KillIconImages, weapon_icon};
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::tables::{WeaponRow, weapon_rows};
 use crate::pages::logs_tf::text::duration_text;
@@ -25,12 +27,12 @@ const KILLS: Pixels = px(80.);
 const DAMAGE: Pixels = px(104.);
 const ACCURACY: Pixels = px(40.);
 
-// What one card shows, worded once the card opens.
+// What one card shows, worded once the card opens; each weapon carries its kill icon if any.
 struct Card {
     id: SteamId,
     class: TfClass,
     facts: [(&'static str, String); 5],
-    weapons: Vec<WeaponRow>,
+    weapons: Vec<(WeaponRow, Option<Arc<RenderImage>>)>,
 }
 
 /// `icon` wrapped in a hover card showing `player`'s time, kills and weapons on `class`. The
@@ -50,6 +52,7 @@ pub(super) fn class_hover(
                 card_for(
                     page.detail()?.players(),
                     page.weapon_names(cx),
+                    page.kill_icons(cx),
                     player,
                     class,
                 )
@@ -62,6 +65,7 @@ pub(super) fn class_hover(
 fn card_for(
     players: &[PlayerLine],
     names: &WeaponNames,
+    icons: &KillIconImages,
     player: SteamId,
     class: TfClass,
 ) -> Option<Card> {
@@ -77,7 +81,13 @@ fn card_for(
             ("D", on.deaths().to_string()),
             ("DA", on.dmg().to_string()),
         ],
-        weapons: weapon_rows(line, on, names),
+        weapons: weapon_rows(line, on, names)
+            .into_iter()
+            .map(|row| {
+                let icon = icons.get(&row.raw).cloned();
+                (row, icon)
+            })
+            .collect(),
     })
 }
 
@@ -107,7 +117,17 @@ fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
         .child(column("K", KILLS))
         .child(column("DA", DAMAGE))
         .child(cell(ACCURACY).child("Acc"));
-    let rows = card.weapons.iter().map(|w| {
+    let rows = card.weapons.iter().map(|(w, icon)| {
+        let icon = icon
+            .as_ref()
+            .map(|image| weapon_icon(ids::logstf_weapon_icon(card.id, card.class, &w.raw), image));
+        let name = h_flex()
+            .flex_1()
+            .min_w_0()
+            .gap_1()
+            .items_center()
+            .children(icon)
+            .child(div().flex_1().min_w_0().truncate().child(w.name.clone()));
         let kills = format!("{} ({})", w.kills, w.kill_share);
         let dmg = format!("{} ({})", w.dmg, w.dmg_share);
         let label: SharedString = format!("{} {kills} {dmg} {}", w.name, w.accuracy).into();
@@ -119,7 +139,7 @@ fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
             .py_0p5()
             .border_t_1()
             .border_color(cx.theme().border)
-            .child(div().flex_1().min_w_0().truncate().child(w.name.clone()))
+            .child(name)
             .child(cell(KILLS).child(kills))
             .child(cell(DAMAGE).child(dmg))
             .child(cell(ACCURACY).child(w.accuracy.clone()))
