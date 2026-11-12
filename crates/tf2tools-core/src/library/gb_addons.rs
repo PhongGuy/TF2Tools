@@ -258,7 +258,7 @@ impl Library {
         let swapped = (|| {
             for file in previous.iter().flat_map(|e| &e.files) {
                 if let Some(path) = recorded_path(&tf, gb_id, file) {
-                    remove_entry(&path)?;
+                    remove_installed(&path)?;
                 }
             }
             remove_dir_if_present(&library_copy)?;
@@ -311,7 +311,7 @@ impl Library {
         let tf = tf2.tf_dir();
         for file in &entry.files {
             if let Some(path) = recorded_path(&tf, gb_id, file) {
-                remove_entry(&path)?;
+                remove_installed(&path)?;
             }
         }
         // A staging dir an interrupted install left behind belongs to the add-on too.
@@ -379,7 +379,7 @@ impl Library {
 
         for file in &leftovers {
             if let Some(path) = recorded_path(&tf, gb_id, file) {
-                remove_entry(&path)?;
+                remove_installed(&path)?;
             }
         }
         let mut copied = Vec::new();
@@ -709,6 +709,22 @@ fn remove_entry(path: &Path) -> Result<(), IoFailure> {
         Ok(_) => remove_file_if_present(path),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(io_at(path)(e)),
+    }
+}
+
+/// Removes an installed file or folder and, for a VPK, the `.sound.cache` TF2 wrote beside
+/// it. A multi-chunk VPK's cache may be named after `_dir.vpk` or the bare `.vpk`, so both go.
+fn remove_installed(path: &Path) -> Result<(), IoFailure> {
+    remove_entry(path)?;
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
+    let Some(name) = name.filter(|n| is_vpk(n)) else {
+        return Ok(());
+    };
+    let custom = path.parent().unwrap_or(path);
+    remove_file_if_present(&custom.join(format!("{name}.sound.cache")))?;
+    match name.strip_suffix("_dir.vpk") {
+        Some(base) => remove_file_if_present(&custom.join(format!("{base}.vpk.sound.cache"))),
+        None => Ok(()),
     }
 }
 
