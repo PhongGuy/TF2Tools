@@ -246,3 +246,63 @@ fn deleting_a_sound_not_installed_keeps_the_active_profile() {
         Some("p1")
     );
 }
+
+#[test]
+fn uninstalling_a_vpk_sound_removes_its_sound_cache() {
+    let env = library_env();
+    let sound = import_vpk(&env, "Pack");
+    env.lib
+        .install_sound(sound.id(), SoundKind::Hitsound, &env.tf2)
+        .unwrap();
+    let custom = env.tf2.custom_dir();
+    write_file(&custom.join("tf2tools-hitsound.vpk.sound.cache"), b"cache");
+    env.lib
+        .uninstall_sound(SoundKind::Hitsound, &env.tf2)
+        .unwrap();
+    assert!(tree(&custom).is_empty(), "{:?}", tree(&custom));
+}
+
+#[test]
+fn installing_a_wav_over_a_vpk_removes_the_vpk_sound_cache() {
+    let env = library_env();
+    let sound = import_wav(&env, "Ding");
+    let custom = env.tf2.custom_dir();
+    write_file(&custom.join("tf2tools-hitsound.vpk"), b"old");
+    write_file(&custom.join("tf2tools-hitsound.vpk.sound.cache"), b"cache");
+    env.lib
+        .install_sound(sound.id(), SoundKind::Hitsound, &env.tf2)
+        .unwrap();
+    assert_eq!(tree(&custom), [format!("{UI}/hitsound.wav")]);
+}
+
+#[test]
+fn uninstalling_without_a_cache_keeps_the_other_kinds_cache() {
+    let env = library_env();
+    let custom = env.tf2.custom_dir();
+    write_file(&custom.join("tf2tools-hitsound.vpk"), b"v");
+    write_file(&custom.join("tf2tools-killsound.vpk"), b"k");
+    write_file(&custom.join("tf2tools-killsound.vpk.sound.cache"), b"c");
+    env.lib
+        .uninstall_sound(SoundKind::Hitsound, &env.tf2)
+        .unwrap();
+    assert_eq!(
+        tree(&custom),
+        [
+            "tf2tools-killsound.vpk",
+            "tf2tools-killsound.vpk.sound.cache"
+        ]
+    );
+}
+
+#[test]
+fn installing_a_vpk_over_a_vpk_removes_the_stale_sound_cache() {
+    let env = library_env();
+    let sound = import_vpk(&env, "Pack");
+    let custom = env.tf2.custom_dir();
+    write_file(&custom.join("tf2tools-hitsound.vpk"), b"old");
+    write_file(&custom.join("tf2tools-hitsound.vpk.sound.cache"), b"cache");
+    env.lib
+        .install_sound(sound.id(), SoundKind::Hitsound, &env.tf2)
+        .unwrap();
+    assert_eq!(tree(&custom), ["tf2tools-hitsound.vpk"]);
+}
