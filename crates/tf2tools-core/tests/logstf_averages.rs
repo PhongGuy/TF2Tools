@@ -262,6 +262,84 @@ async fn the_damage_taken_backfill_fills_rows_from_the_stored_body() {
     assert_eq!((again.counted(), again.left()), (0, 0));
 }
 
+// Tracks Arie and syncs one log `id` served with `body`.
+async fn synced(id: u64, body: String) -> common::logstf::LogsEnv {
+    let env = logs_env().await;
+    env.client
+        .cache()
+        .add_player(&TrackedPlayer::new(arie(), "Arie"))
+        .unwrap();
+    mount_list(&env.server, ARIE, list_body(&[(id, days_ago(1))])).await;
+    mount_log(&env.server, id, 200, body).await;
+    env.client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
+    env
+}
+
+#[tokio::test]
+async fn a_freshly_ingested_log_leaves_the_damage_taken_pass_nothing() {
+    let env = synced(3, logstf_fixture("log-4137103-6v6.json")).await;
+    let cache = env.client.cache();
+    let done = cache.fill_damage_taken(50).unwrap();
+    assert_eq!((done.counted(), done.left()), (0, 0));
+    let rows = cache.logs(arie(), LogsRange::Months3).unwrap();
+    assert_eq!(rows[0].dt(), Some(5964));
+}
+
+#[tokio::test]
+async fn a_log_without_damage_taken_stores_none_at_ingest_and_in_the_pass() {
+    // The built body sets no hasDT, as logs.tf logs from before it tracked damage taken.
+    let body = log_body(600, &[solo(231_702, ("scout", 600, 1, 1, 1, 100))]);
+    let env = synced(30, body).await;
+    let cache = env.client.cache();
+    assert_eq!(
+        cache.logs(arie(), LogsRange::Months3).unwrap()[0].dt(),
+        None
+    );
+    common::sql(&env.dir)
+        .execute_batch("UPDATE logstf_logs SET dt_counted = 0")
+        .unwrap();
+    let done = cache.fill_damage_taken(50).unwrap();
+    assert_eq!((done.counted(), done.left()), (1, 0));
+    assert_eq!(
+        cache.logs(arie(), LogsRange::Months3).unwrap()[0].dt(),
+        None
+    );
+}
+
+#[tokio::test]
+async fn a_damaged_body_is_marked_done_by_the_damage_taken_pass_with_none() {
+    let env = logs_env().await;
+    let steam = i64::try_from(ARIE).unwrap();
+    common::sql(&env.dir)
+        .execute_batch(&format!(
+            "INSERT INTO logstf_logs (id, title, map, date, body, state) VALUES
+                 (11, 'not zlib', 'm', 1, x'00010203', 0);
+             INSERT INTO logstf_class_rows (log_id, steam_id, class, seconds, kills, deaths, assists, dmg)
+                 VALUES (11, {steam}, 'scout', 60, 0, 0, 0, 0);"
+        ))
+        .unwrap();
+    let done = env.client.cache().fill_damage_taken(50).unwrap();
+    assert_eq!((done.counted(), done.left()), (1, 0));
+    let (counted, dt): (i64, Option<i64>) = common::sql(&env.dir)
+        .query_row(
+            "SELECT l.dt_counted, r.dt FROM logstf_logs l JOIN logstf_class_rows r ON r.log_id = l.id
+             WHERE l.id = 11",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((counted, dt), (1, None));
+}
+
 #[test]
 fn rows_and_averages_have_no_cap() {
     let (_tmp, dir) = common::temp_data_dir();

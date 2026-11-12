@@ -771,7 +771,7 @@ impl LogsCache {
                             heal,
                             ubers,
                             drops,
-                            taken.get(&id).copied().unwrap_or(0)
+                            taken.get(&id).copied()
                         ])?;
                     }
                     for p in detail.players() {
@@ -991,9 +991,13 @@ fn write_damage_taken(
     Ok(())
 }
 
-/// Each player's damage taken over the log, summing a player named under two keys.
+/// Each player's damage taken over the log, summing a player named under two keys; empty
+/// for a log that does not record it, so its rows stay unknown rather than zero.
 fn damage_taken(detail: &LogDetail) -> HashMap<SteamId, i64> {
     let mut taken: HashMap<SteamId, i64> = HashMap::new();
+    if !detail.columns().dt() {
+        return taken;
+    }
     for p in detail.players() {
         *taken.entry(p.steam_id()).or_default() += i64::from(p.dt());
     }
