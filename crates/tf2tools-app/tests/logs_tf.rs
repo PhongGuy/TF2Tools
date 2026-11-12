@@ -841,6 +841,11 @@ fn the_grid_scrolls_away_with_the_logs(cx: &mut TestAppContext) {
     let server = support::StoreServer::start();
     serve_two_logs(&server);
     let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    // A short window, so the compact table and two logs overflow it.
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(1200.), gpui_kit::px(600.)),
+    );
     let page = open_page(cx, &s);
     let scout = ids::logstf_class(TfClass::Scout);
     let before = support::bounds_of(cx, s.win, scout.clone()).unwrap();
@@ -1542,8 +1547,7 @@ fn a_typical_map_reads_whole_and_a_long_title_gives_way_in_the_smallest_window(
 }
 
 #[gpui_kit::test]
-fn a_long_time_played_never_meets_its_label(cx: &mut TestAppContext) {
-    use gpui_kit::px;
+fn a_long_time_played_stays_in_its_column(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     // One log in which Arie played Scout for 100h 59m.
@@ -1551,40 +1555,26 @@ fn a_long_time_played_never_meets_its_label(cx: &mut TestAppContext) {
     let scout = &mut log["players"]["[U:1:231702]"]["class_stats"][0];
     assert_eq!(scout["type"], "scout");
     scout["total_time"] = serde_json::json!(363_540);
-    // And Pyro for 68h 43m, which still fits beside its label.
-    let pyro = &mut log["players"]["[U:1:231702]"]["class_stats"][1];
-    assert_eq!(pyro["type"], "pyro");
-    pyro["total_time"] = serde_json::json!(247_380);
     server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
     server.mount_bytes("/json/3", log.to_string().into_bytes());
     let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
     let _page = open_page(cx, &s);
-    support::wait_real(cx, "the scout card's time", |cx| {
+    support::wait_real(cx, "the scout row's time", |cx| {
         support::label_of(cx, s.win, ids::logstf_class_value(TfClass::Scout, "Played")).as_deref()
             == Some("100h 59m")
     });
-    let card = support::bounds_of(cx, s.win, ids::logstf_class(TfClass::Scout)).unwrap();
-    let label =
-        support::bounds_of(cx, s.win, ids::logstf_class_label(TfClass::Scout, "Played")).unwrap();
+    let played = support::bounds_of(cx, s.win, ids::logstf_class_head("Played")).unwrap();
+    let logs = support::bounds_of(cx, s.win, ids::logstf_class_head("Logs")).unwrap();
     let value =
         support::bounds_of(cx, s.win, ids::logstf_class_value(TfClass::Scout, "Played")).unwrap();
-    let apart = value.left() - label.right() >= px(8.) || value.top() >= label.bottom();
-    assert!(apart, "value {value:?} meets label {label:?}");
     assert!(
-        value.right() <= card.right() - px(12.),
-        "value {value:?} past {card:?}"
+        value.left() >= played.left() && value.right() <= played.right(),
+        "value {value:?} spills out of {played:?}"
     );
-    let label =
-        support::bounds_of(cx, s.win, ids::logstf_class_label(TfClass::Pyro, "Played")).unwrap();
-    let value =
-        support::bounds_of(cx, s.win, ids::logstf_class_value(TfClass::Pyro, "Played")).unwrap();
-    assert_eq!(
-        value.top(),
-        label.top(),
-        "68h 43m {value:?} wrapped off {label:?}"
-    );
+    assert!(logs.left() >= played.right(), "{logs:?} meets {played:?}");
+    let row = support::bounds_of(cx, s.win, ids::logstf_class(TfClass::Scout)).unwrap();
     assert!(
-        value.left() - label.right() >= px(8.),
-        "value {value:?} meets label {label:?}"
+        value.size.height <= row.size.height,
+        "{value:?} wrapped in {row:?}"
     );
 }

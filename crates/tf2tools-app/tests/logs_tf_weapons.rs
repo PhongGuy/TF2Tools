@@ -1,4 +1,4 @@
-//! The class weapons panel: a played class card opens its weapon sums over the range.
+//! The class weapons block: a played class row opens its weapon sums over the range.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -50,7 +50,7 @@ fn title(cx: &mut TestAppContext, s: &support::ShellWindow) -> Option<String> {
 }
 
 #[test]
-fn the_panel_wording() {
+fn the_weapons_wording() {
     assert_eq!(
         weapons_title(TfClass::Scout, LogsRange::Months3, 1),
         "Scout weapons · 3 months · 1 log"
@@ -72,7 +72,7 @@ fn the_panel_wording() {
 }
 
 #[gpui_kit::test]
-fn a_played_card_opens_its_weapons_and_a_second_click_closes_them(cx: &mut TestAppContext) {
+fn a_played_row_opens_its_weapons_and_a_second_click_closes_them(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     serve_sixes(&server);
@@ -116,16 +116,16 @@ fn a_played_card_opens_its_weapons_and_a_second_click_closes_them(cx: &mut TestA
     assert_eq!(picked(cx, &page), None);
     assert!(!support::present(cx, s.win, ids::LOGSTF_CLASS_WEAPONS));
 
-    // Reopened, the top item grows, so the log row sits under the panel.
+    // Reopened, the top item grows, so the log row sits under the block.
     support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
     wait_for(cx, &page, TfClass::Scout);
     to_end(cx, &page);
-    let panel =
-        support::bounds_of(cx, s.win, ids::LOGSTF_CLASS_WEAPONS).expect("the panel is drawn");
+    let block =
+        support::bounds_of(cx, s.win, ids::LOGSTF_CLASS_WEAPONS).expect("the block is drawn");
     let log = support::bounds_of(cx, s.win, ids::logstf_log(3)).expect("the row is drawn");
     assert!(
-        log.top() >= panel.bottom(),
-        "row {log:?} overlaps panel {panel:?}"
+        log.top() >= block.bottom(),
+        "row {log:?} overlaps block {block:?}"
     );
 }
 
@@ -161,7 +161,7 @@ fn close_switch_unplayed_and_no_shots(cx: &mut TestAppContext) {
     let page = open_page(cx, &s);
 
     support::click_id(cx, s.win, ids::logstf_class(TfClass::Soldier));
-    assert_eq!(picked(cx, &page), None, "an unplayed card opens nothing");
+    assert_eq!(picked(cx, &page), None, "an unplayed row opens nothing");
     assert_eq!(
         support::selected_of(cx, s.win, ids::logstf_class(TfClass::Soldier)),
         None
@@ -169,7 +169,7 @@ fn close_switch_unplayed_and_no_shots(cx: &mut TestAppContext) {
 
     support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
     wait_for(cx, &page, TfClass::Scout);
-    // The ring moves at once; Scout's title and rows stay until Pyro's read lands.
+    // The highlight moves at once; Scout's weapons stay held, unshown, until Pyro's read lands.
     cx.update(|cx| page.update(cx, |p, cx| p.pick_class(TfClass::Pyro, cx)));
     assert_eq!(
         (picked(cx, &page), shown(cx, &page)),
@@ -198,7 +198,8 @@ fn close_switch_unplayed_and_no_shots(cx: &mut TestAppContext) {
         ids::logstf_class_weapon(TfClass::Scout, "scattergun")
     ));
 
-    support::click_id(cx, s.win, ids::LOGSTF_CLASS_WEAPONS_CLOSE);
+    // A second click on the open row closes it.
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Pyro));
     assert_eq!(picked(cx, &page), None);
     assert!(!support::present(cx, s.win, ids::LOGSTF_CLASS_WEAPONS));
 }
@@ -243,7 +244,7 @@ fn shown_logs(cx: &mut TestAppContext, page: &Entity<LogsTfPage>, class: TfClass
 }
 
 #[gpui_kit::test]
-fn the_panel_follows_a_range_pick(cx: &mut TestAppContext) {
+fn the_weapons_follow_a_range_pick(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     // Log 2 is the same 6v6 log 200 days back: outside 3 months, inside a year.
@@ -278,7 +279,7 @@ fn the_panel_follows_a_range_pick(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn the_panel_follows_the_chip_and_closes_for_a_player_without_the_class(cx: &mut TestAppContext) {
+fn the_weapons_follow_the_chip_and_close_for_a_player_without_the_class(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     mount_list_for(&server, ARIE, &[(3, day_ago(1))], Duration::ZERO);
@@ -315,17 +316,17 @@ fn the_panel_follows_the_chip_and_closes_for_a_player_without_the_class(cx: &mut
         Some("scattergun 17 (85%) 10006 (87%) 63%")
     );
 
-    // Arie played Pyro; Cabo never did, so his chip closes the panel.
+    // Arie played Pyro; Cabo never did, so his chip closes the weapons.
     switch(cx, ARIE);
     support::click_id(cx, s.win, ids::logstf_class(TfClass::Pyro));
     wait_for(cx, &page, TfClass::Pyro);
     switch(cx, CABO);
-    support::wait_real(cx, "the panel to close", |cx| picked(cx, &page).is_none());
+    support::wait_real(cx, "the weapons to close", |cx| picked(cx, &page).is_none());
     assert!(!support::present(cx, s.win, ids::LOGSTF_CLASS_WEAPONS));
 }
 
 #[gpui_kit::test]
-fn removing_the_last_player_closes_the_panel(cx: &mut TestAppContext) {
+fn removing_the_last_player_closes_the_weapons(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     serve_sixes(&server);
@@ -461,7 +462,7 @@ fn the_note_says_when_logs_wait_or_hold_no_weapons(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn a_backfill_batch_refills_the_open_panel(cx: &mut TestAppContext) {
+fn a_backfill_batch_refills_the_open_weapons(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     serve_sixes(&server);
@@ -470,7 +471,7 @@ fn a_backfill_batch_refills_the_open_panel(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
     wait_for(cx, &page, TfClass::Scout);
     // The click read has landed with log 3. Log 4, the same body stored uncounted, joins the
-    // window; only a batch's rerun can bring it into the panel.
+    // window; only a batch's rerun can bring it into the weapons.
     let steam = i64::try_from(sid(ARIE).id64()).unwrap();
     let conn = rusqlite::Connection::open(env.data.db_path()).unwrap();
     conn.execute(
@@ -495,7 +496,7 @@ fn a_backfill_batch_refills_the_open_panel(cx: &mut TestAppContext) {
 
     cx.update(|cx| page.update(cx, |p, cx| p.count_older_weapons(cx)));
     while cx.dispatcher.scheduler().tick_background_only() {}
-    support::wait_real(cx, "the refilled panel", |cx| {
+    support::wait_real(cx, "the refilled weapons", |cx| {
         shown_logs(cx, &page, TfClass::Scout) == Some(2)
     });
     assert_eq!(
@@ -615,7 +616,7 @@ fn a_read_from_before_a_close_never_lands_after_a_reopen(cx: &mut TestAppContext
     assert_eq!(picked(cx, &page), Some(TfClass::Scout));
 }
 
-// A weapon read that fails inside a page load costs only the panel: the averages still land.
+// A weapon read that fails inside a page load costs only the weapons block: the averages still land.
 #[gpui_kit::test]
 fn a_failed_weapon_read_does_not_stop_the_page_load(cx: &mut TestAppContext) {
     let env = support::env();
@@ -647,7 +648,7 @@ fn a_failed_weapon_read_does_not_stop_the_page_load(cx: &mut TestAppContext) {
     assert_eq!(
         shown(cx, &page),
         Some(TfClass::Scout),
-        "the panel keeps its rows"
+        "the block keeps its rows"
     );
     conn.execute(
         "ALTER TABLE logstf_weapon_rows_away RENAME TO logstf_weapon_rows",
@@ -657,7 +658,7 @@ fn a_failed_weapon_read_does_not_stop_the_page_load(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn the_panel_switches_to_game_names_when_they_load(cx: &mut TestAppContext) {
+fn the_weapons_switch_to_game_names_when_they_load(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     serve_sixes(&server);
@@ -705,7 +706,7 @@ fn the_icon_ids() {
 }
 
 #[gpui_kit::test]
-fn the_panel_shows_a_kill_icon_where_the_game_has_one(cx: &mut TestAppContext) {
+fn the_weapons_show_a_kill_icon_where_the_game_has_one(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     serve_sixes(&server);
@@ -729,7 +730,7 @@ fn the_panel_shows_a_kill_icon_where_the_game_has_one(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn an_open_panel_gains_icons_when_they_load(cx: &mut TestAppContext) {
+fn open_weapons_gain_icons_when_they_load(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     serve_sixes(&server);
@@ -751,7 +752,7 @@ fn an_open_panel_gains_icons_when_they_load(cx: &mut TestAppContext) {
     );
 }
 
-// The left edges of a panel row and of its name text.
+// The left edges of a weapon row and of its name text.
 fn name_edges(cx: &mut TestAppContext, s: &support::ShellWindow, weapon: &str) -> (f32, f32) {
     let row = support::bounds_of(cx, s.win, ids::logstf_class_weapon(TfClass::Scout, weapon));
     let name = support::bounds_of(
@@ -764,7 +765,7 @@ fn name_edges(cx: &mut TestAppContext, s: &support::ShellWindow, weapon: &str) -
 }
 
 #[gpui_kit::test]
-fn panel_names_line_up_behind_an_icon_slot_only_when_icons_show(cx: &mut TestAppContext) {
+fn weapon_names_line_up_behind_an_icon_slot_only_when_icons_show(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     serve_sixes(&server);

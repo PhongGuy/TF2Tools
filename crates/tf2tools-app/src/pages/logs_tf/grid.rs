@@ -1,13 +1,14 @@
-//! The class averages grid: how many logs it covers beside the history range slider, then
-//! one card per class in TF2 order.
+//! The class averages: how many logs they cover beside the history range slider, then one
+//! compact table row per class in TF2 order, the open class's weapons right under its row.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::{Slider, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, Entity, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, div, px,
+    AnyElement, App, Entity, FontWeight, InteractiveElement as _, IntoElement, MouseButton,
+    ParentElement as _, Pixels, Role, StatefulInteractiveElement as _, Styled as _,
+    TestSupportExt as _, WeakEntity, Window, div, px, transparent_black,
 };
 use tf2tools_core::{ClassAverage, LogsRange, TfClass};
 
@@ -17,9 +18,25 @@ use crate::ids;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
+use crate::widgets::scroll::sideways;
 
-const CARD_WIDTH: f32 = 168.;
-const ICON_SIZE: f32 = 28.;
+const ICON_SIZE: f32 = 20.;
+const ROW_PAD: Pixels = px(12.);
+const GAP: Pixels = px(10.);
+// The class column grows to fill the box but keeps room for "Demoman" beside its icon; each
+// number column fits its title and widest value on one line, so the table fits a 1200 px window.
+const CLASS_MIN: Pixels = px(120.);
+const COLUMNS: [(&str, Pixels); 9] = [
+    ("Played", px(72.)),
+    ("Logs", px(44.)),
+    ("Kills/min", px(64.)),
+    ("Assists/min", px(76.)),
+    ("Deaths/min", px(76.)),
+    ("Dmg/min", px(60.)),
+    ("KA/D", px(44.)),
+    ("Heals/min", px(68.)),
+    ("Ubers/10 min", px(84.)),
+];
 
 // The stop labels sit one cell apart, each centred on its thumb stop. The slider's track is
 // inset half a cell on both sides, so the end labels fit inside the picker too.
@@ -28,8 +45,8 @@ const RANGE_WIDTH: f32 = STOP_CELL * LogsRange::STOPS.len() as f32;
 const LABEL_HEIGHT: f32 = 24.;
 
 /// The summary line for `logs` in `range` back from `newest` and the range slider, so the
-/// range is picked before the stats are read, then the nine cards, wrapping. A played card
-/// opens its weapons; `selected` is ringed.
+/// range is picked before the stats are read, then the class table. A played row opens its
+/// weapons; `selected` is highlighted with `weapons`, the open block, drawn under it.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn class_grid(
     averages: &[ClassAverage; 9],
@@ -39,15 +56,13 @@ pub(super) fn class_grid(
     slider: &Entity<SliderState>,
     page: WeakEntity<LogsTfPage>,
     selected: Option<TfClass>,
-    cx: &App,
+    weapons: Option<AnyElement>,
+    window: &mut Window,
+    cx: &mut App,
 ) -> impl IntoElement {
     let muted = cx.theme().muted_foreground;
-    let cards = averages.iter().map(|average| {
-        let class = average.class();
-        class_card(average, selected == Some(class), page.clone(), cx)
-    });
-    // The cards come after the picker, which takes `page`, so they are built first.
-    let cards: Vec<_> = cards.collect();
+    // The table comes after the picker, which takes `page`, so it is built first.
+    let table = class_table(averages, page.clone(), selected, weapons, window, cx);
     v_flex()
         .gap_2()
         .child(
@@ -65,7 +80,7 @@ pub(super) fn class_grid(
                 }))
                 .child(range_picker(slider, page)),
         )
-        .child(h_flex().flex_wrap().items_start().gap_3().children(cards))
+        .child(table)
 }
 
 // The slider over its six stop labels; a label click picks its stop like a release there.
@@ -116,85 +131,154 @@ fn range_picker(slider: &Entity<SliderState>, page: WeakEntity<LogsTfPage>) -> i
         )
 }
 
-// The icon and name, then the rates as label and value rows; Medic's two extra rates only
-// exist when there is time on Medic. A class with no time says so in the muted colour and,
-// having no weapons to show, takes no click and exposes no selected state.
-fn class_card(
-    average: &ClassAverage,
-    selected: bool,
+// The column titles over one row per class in a bordered box. Below its natural width the
+// table keeps every column and scrolls sideways inside the box instead of squashing.
+fn class_table(
+    averages: &[ClassAverage; 9],
     page: WeakEntity<LogsTfPage>,
-    cx: &App,
+    selected: Option<TfClass>,
+    mut weapons: Option<AnyElement>,
+    window: &mut Window,
+    cx: &mut App,
+) -> impl IntoElement {
+    let numbers: Pixels = COLUMNS.iter().map(|(_, width)| *width).sum();
+    let min_width = CLASS_MIN + numbers + GAP * COLUMNS.len() as f32 + ROW_PAD * 2. + px(2.);
+    let theme = cx.theme();
+    let (border, radius) = (theme.border, theme.radius_lg);
+    let head = line()
+        .text_xs()
+        .text_color(theme.muted_foreground)
+        .font_weight(FontWeight::MEDIUM)
+        .child(
+            div()
+                .id(ids::logstf_class_head("Class"))
+                .test_support()
+                .flex_1()
+                .min_w(CLASS_MIN)
+                .child("Class"),
+        )
+        .children(COLUMNS.map(|(label, width)| {
+            div()
+                .id(ids::logstf_class_head(label))
+                .test_support()
+                .w(width)
+                .flex_none()
+                .text_right()
+                .child(label)
+        }));
+    let mut rows = v_flex()
+        .w_full()
+        .min_w(min_width)
+        .text_sm()
+        .child(head)
+        .child(div().h(px(1.)).bg(border));
+    for average in averages {
+        let class = average.class();
+        let open = selected == Some(class);
+        rows = rows
+            .child(class_row(average, open, page.clone(), window, cx))
+            .children(open.then(|| weapons.take()).flatten());
+    }
+    div()
+        .rounded(radius)
+        .border_1()
+        .border_color(border)
+        .overflow_hidden()
+        .child(sideways(ids::LOGSTF_CLASS_TABLE, rows))
+}
+
+// The shared shape of the title line and every class row, so their columns line up; the
+// clear border is where a focused row draws its ring.
+fn line() -> gpui_kit::Div {
+    h_flex()
+        .w_full()
+        .gap(GAP)
+        .px(ROW_PAD)
+        .py_1p5()
+        .border_1()
+        .border_color(transparent_black())
+        .whitespace_nowrap()
+}
+
+// The icon and name, then each rate right-aligned in its column; Medic's two extra rates only
+// exist when there is time on Medic. A class with no time is dimmed, says so under Played and,
+// having no weapons to show, takes no click, focus or selected state.
+fn class_row(
+    average: &ClassAverage,
+    open: bool,
+    page: WeakEntity<LogsTfPage>,
+    window: &mut Window,
+    cx: &mut App,
 ) -> impl IntoElement {
     let class = average.class();
-    let muted = cx.theme().muted_foreground;
+    let id = ids::logstf_class(class);
     let icon = cx.global::<Services>().assets.class_icon(class);
-    let header = h_flex()
+    let values: [Option<String>; 9] = if average.played() {
+        [
+            Some(time_played_text(average.seconds())),
+            Some(average.logs().to_string()),
+            Some(one_decimal(average.kills_per_min())),
+            Some(one_decimal(average.assists_per_min())),
+            Some(one_decimal(average.deaths_per_min())),
+            Some(whole(average.dmg_per_min())),
+            Some(one_decimal(average.kad())),
+            average.heal_per_min().map(whole),
+            average.ubers_per_10min().map(one_decimal),
+        ]
+    } else {
+        Default::default()
+    };
+    let cells = COLUMNS
+        .into_iter()
+        .zip(values)
+        .map(|((label, width), value)| {
+            let cell = h_flex().w(width).flex_none().justify_end();
+            match value {
+                Some(value) => cell.child(labelled(
+                    div(),
+                    ids::logstf_class_value(class, label),
+                    value,
+                )),
+                None if label == "Played" && !average.played() => cell.child(labelled(
+                    div(),
+                    ids::logstf_class_unplayed(class),
+                    "Not played",
+                )),
+                None => cell,
+            }
+        });
+    let name = h_flex()
+        .flex_1()
+        .min_w(CLASS_MIN)
         .gap_2()
         .child(class_icon(class, icon.as_deref(), px(ICON_SIZE)))
         .child(div().font_weight(FontWeight::SEMIBOLD).child(class.name()));
-    let body = if average.played() {
-        let mut stats = vec![
-            ("Played", time_played_text(average.seconds())),
-            ("Logs", average.logs().to_string()),
-            ("Kills/min", one_decimal(average.kills_per_min())),
-            ("Deaths/min", one_decimal(average.deaths_per_min())),
-            ("Dmg/min", whole(average.dmg_per_min())),
-            ("KA/D", one_decimal(average.kad())),
-        ];
-        stats.extend(average.heal_per_min().map(|h| ("Heals/min", whole(h))));
-        stats.extend(
-            average
-                .ubers_per_10min()
-                .map(|u| ("Ubers/10 min", one_decimal(u))),
-        );
-        v_flex()
-            .gap_0p5()
-            .text_sm()
-            .children(stats.into_iter().map(|(label, value)| {
-                // A value too long to sit beside its label wraps under it, still right-aligned.
-                h_flex()
-                    .flex_wrap()
-                    .gap_x_2()
-                    .child(
-                        div()
-                            .id(ids::logstf_class_label(class, label))
-                            .test_support()
-                            .text_color(muted)
-                            .child(label),
-                    )
-                    .child(labelled(
-                        div().ml_auto(),
-                        ids::logstf_class_value(class, label),
-                        value,
-                    ))
-            }))
-            .into_any_element()
-    } else {
-        labelled(
-            div().text_sm().text_color(muted),
-            ids::logstf_class_unplayed(class),
-            "Not played",
-        )
-        .into_any_element()
-    };
-    v_flex()
-        .id(ids::logstf_class(class))
+    let row = line()
+        .id(id.clone())
         .aria_label(class.name())
         .test_support()
-        .w(px(CARD_WIDTH))
-        .gap_2()
-        .p_3()
-        .rounded(cx.theme().radius_lg)
-        .border_1()
-        .border_color(cx.theme().border)
-        .when(average.played(), |card| {
-            card.aria_selected(selected)
-                .cursor_pointer()
-                .when(selected, |card| card.border_color(cx.theme().primary))
-                .on_click(move |_, _, cx| {
-                    let _ = page.update(cx, |page, cx| page.pick_class(class, cx));
-                })
+        .child(name)
+        .children(cells);
+    if !average.played() {
+        return row.opacity(0.5).into_any_element();
+    }
+    // A played row is a button on the tab order, Enter or Space opening it as a click does.
+    let focus = window
+        .use_keyed_state(id, cx, |_, cx| cx.focus_handle().tab_stop(true))
+        .read(cx)
+        .clone();
+    let theme = cx.theme();
+    let hover = theme.muted.opacity(0.5);
+    row.role(Role::Button)
+        .aria_selected(open)
+        .track_focus(&focus)
+        .cursor_pointer()
+        .when(open, |row| row.bg(theme.muted))
+        .when(!open, |row| row.hover(move |style| style.bg(hover)))
+        .when(focus.is_focused(window), |row| row.border_color(theme.ring))
+        .on_mouse_down(MouseButton::Left, |_, window, _| window.prevent_default())
+        .on_click(move |_, _, cx| {
+            let _ = page.update(cx, |page, cx| page.pick_class(class, cx));
         })
-        .child(header)
-        .child(body)
+        .into_any_element()
 }
