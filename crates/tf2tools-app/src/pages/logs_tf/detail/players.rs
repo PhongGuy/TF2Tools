@@ -1,12 +1,11 @@
 //! The open log's players table, sortable by any header as on logs.tf.
 
-use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{ActiveTheme as _, Icon, Selectable as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, div, px,
+    App, Div, FontWeight, InteractiveElement as _, ParentElement as _, Pixels, Styled as _,
+    TestSupportExt as _, WeakEntity, div, px,
 };
 use tf2tools_core::{LogColumns, LogDetail, PlayerLine};
 
@@ -14,6 +13,7 @@ use super::popover::class_hover;
 use super::{NUMBER, team_cell};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
+use crate::pages::logs_tf::head::sortable;
 use crate::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players_shown};
 use crate::pages::logs_tf::text::{floored, one_decimal, reads_zero};
 use crate::services::Services;
@@ -27,9 +27,6 @@ const NAME_MIN: Pixels = px(100.);
 // room for four of them, as many as a player shows before the rest clip: 4 x 24 plus 3 x 2 gaps.
 const CLASS_ICON: Pixels = px(24.);
 const CLASSES: Pixels = px(102.);
-// The sort arrow's row under every header, kept empty when unsorted so sorting never moves
-// the table; an xsmall icon's height.
-const ARROW: Pixels = px(12.);
 
 // One number column: which sort it is and how a player's cell reads.
 type Column = (PlayerColumn, fn(&PlayerLine) -> String);
@@ -60,14 +57,8 @@ pub(super) fn players_table(
             .on_click(move |_, _, cx| {
                 let _ = page.update(cx, |page, cx| page.sort_players_by(column, cx));
             });
-        let arrow = div().h(ARROW).flex_none().when_some(sorted, |el, sort| {
-            el.child(sort_arrow(column, sort.descending))
-        });
-        v_flex()
-            .flex_none()
-            .items_center()
-            .child(button)
-            .child(arrow)
+        let arrow = ids::logstf_sort_arrow(column.title());
+        sortable(button, arrow, sorted.map(|s| s.descending))
     };
     let mut table = v_flex().w_full().child(
         h_flex()
@@ -143,20 +134,6 @@ pub(super) fn players_table(
         );
     }
     table
-}
-
-// The sorted column's direction as a small chevron, said in words for readers.
-fn sort_arrow(column: PlayerColumn, descending: bool) -> impl IntoElement {
-    let (icon, words) = if descending {
-        (IconName::ChevronDown, "high to low")
-    } else {
-        (IconName::ChevronUp, "low to high")
-    };
-    div()
-        .id(ids::logstf_sort_arrow(column.title()))
-        .aria_label(words)
-        .test_support()
-        .child(Icon::new(icon).xsmall())
 }
 
 // logs.tf's number columns in its order, without the ones the log did not record.

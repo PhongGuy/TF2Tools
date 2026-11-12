@@ -232,3 +232,244 @@ fn the_table_scrolls_sideways_in_the_smallest_window(cx: &mut TestAppContext) {
         "Ubers {ubers:?} outside {table:?}"
     );
 }
+
+// The class rows' tops, in TF2 class order.
+fn class_tops(cx: &mut TestAppContext, s: &support::ShellWindow) -> Vec<gpui_kit::Pixels> {
+    TfClass::ALL
+        .into_iter()
+        .map(|class| {
+            support::bounds_of(cx, s.win, ids::logstf_class(class))
+                .unwrap()
+                .top()
+        })
+        .collect()
+}
+
+// The classes in the order their rows are drawn.
+fn drawn_order(cx: &mut TestAppContext, s: &support::ShellWindow) -> Vec<TfClass> {
+    let tops = class_tops(cx, s);
+    let mut order: Vec<usize> = (0..9).collect();
+    order.sort_by_key(|&i| tops[i]);
+    order.into_iter().map(|i| TfClass::ALL[i]).collect()
+}
+
+#[gpui_kit::test]
+fn a_title_sorts_the_played_classes_by_its_value_and_unplayed_stay_last(cx: &mut TestAppContext) {
+    use tf2tools_app::pages::logs_tf::sort::{ClassSort, ClassStat};
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    let averages = cx.update(|cx| page.read(cx).averages().unwrap().clone());
+    let played: Vec<_> = averages.iter().filter(|a| a.played()).collect();
+    let unplayed: Vec<TfClass> = averages
+        .iter()
+        .filter(|a| !a.played())
+        .map(|a| a.class())
+        .collect();
+    assert!(played.len() >= 3 && !unplayed.is_empty(), "the fixture");
+    let expect = |descending: bool| {
+        let mut rows = played.clone();
+        rows.sort_by(|a, b| {
+            let ord = a.kills_per_min().total_cmp(&b.kills_per_min());
+            if descending { ord.reverse() } else { ord }
+        });
+        let mut classes: Vec<TfClass> = rows.iter().map(|a| a.class()).collect();
+        classes.extend(&unplayed);
+        classes
+    };
+    let class_order: Vec<TfClass> = played.iter().map(|a| a.class()).collect();
+    assert_ne!(
+        expect(false)[..played.len()],
+        class_order[..],
+        "low to high is not class order"
+    );
+
+    support::click_id(cx, s.win, ids::logstf_class_head("Kills/min"));
+    assert_eq!(
+        cx.update(|cx| page.read(cx).class_sort()),
+        Some(ClassSort {
+            column: ClassStat::KillsPerMin,
+            descending: true
+        })
+    );
+    assert_eq!(drawn_order(cx, &s), expect(true), "high to low");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_class_arrow("Kills/min")).as_deref(),
+        Some("high to low")
+    );
+    support::click_id(cx, s.win, ids::logstf_class_head("Kills/min"));
+    assert_eq!(
+        drawn_order(cx, &s),
+        expect(false),
+        "flipped, unplayed still last"
+    );
+
+    // Played sorts by the seconds behind its text.
+    support::click_id(cx, s.win, ids::logstf_class_head("Played"));
+    let mut by_time = played.clone();
+    by_time.sort_by_key(|a| std::cmp::Reverse(a.seconds()));
+    let mut want: Vec<TfClass> = by_time.iter().map(|a| a.class()).collect();
+    want.extend(&unplayed);
+    assert_eq!(drawn_order(cx, &s), want);
+
+    // Class sorts by class order, played rows first, and its title is a button the keyboard
+    // reaches; a second press reverses it.
+    support::tab_to(cx, s.win, ids::logstf_class_head("Class"), 64);
+    support::press(cx, s.win, "enter");
+    assert_eq!(
+        cx.update(|cx| page.read(cx).class_sort()),
+        Some(ClassSort {
+            column: ClassStat::Class,
+            descending: false
+        })
+    );
+    let mut want = class_order.clone();
+    want.extend(&unplayed);
+    assert_eq!(drawn_order(cx, &s), want, "Scout to Spy");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_class_arrow("Class")).as_deref(),
+        Some("low to high")
+    );
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::logstf_class_arrow("Played")
+    ));
+    support::press(cx, s.win, "enter");
+    let mut want: Vec<TfClass> = class_order.iter().rev().copied().collect();
+    want.extend(&unplayed);
+    assert_eq!(drawn_order(cx, &s), want, "Spy to Scout, unplayed last");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_class_arrow("Class")).as_deref(),
+        Some("high to low")
+    );
+}
+
+#[gpui_kit::test]
+fn empty_medic_cells_sort_lowest_and_the_sort_survives_a_range_change(cx: &mut TestAppContext) {
+    use tf2tools_core::LogsRange;
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_class_head("Heals/min"));
+    let sort = cx.update(|cx| page.read(cx).class_sort());
+    assert!(sort.is_some());
+    // Descending, an empty Heals cell is lowest, so every played class keeps class order.
+    let averages = cx.update(|cx| page.read(cx).averages().unwrap().clone());
+    let mut want: Vec<TfClass> = averages
+        .iter()
+        .filter(|a| a.played())
+        .map(|a| a.class())
+        .collect();
+    if let Some(i) = want.iter().position(|c| {
+        averages
+            .iter()
+            .any(|a| a.class() == *c && a.heal_per_min().is_some())
+    }) {
+        let medic = want.remove(i);
+        want.insert(0, medic);
+    }
+    want.extend(averages.iter().filter(|a| !a.played()).map(|a| a.class()));
+    assert_eq!(drawn_order(cx, &s), want);
+
+    let other = LogsRange::STOPS
+        .into_iter()
+        .find(|r| *r != cx.update(|cx| page.read(cx).range()))
+        .unwrap();
+    support::click_id(cx, s.win, ids::logstf_range_stop(other));
+    assert_eq!(cx.update(|cx| page.read(cx).class_sort()), sort, "kept");
+}
+
+#[gpui_kit::test]
+fn an_open_class_keeps_its_weapons_under_its_row_after_a_sort(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    support::wait_real(cx, "the weapons", |cx| {
+        cx.update(|cx| page.read(cx).class_weapons().map(|(c, _)| c)) == Some(TfClass::Scout)
+    });
+    let mut moved = false;
+    for label in ["Kills/min", "Kills/min", "Played"] {
+        support::click_id(cx, s.win, ids::logstf_class_head(label));
+        let order = drawn_order(cx, &s);
+        let at = order.iter().position(|c| *c == TfClass::Scout).unwrap();
+        moved |= at != 0;
+        let row = support::bounds_of(cx, s.win, ids::logstf_class(TfClass::Scout)).unwrap();
+        let block = support::bounds_of(cx, s.win, ids::LOGSTF_CLASS_WEAPONS).expect("the block");
+        assert!(
+            block.top() >= row.bottom(),
+            "{label}: {block:?} not under {row:?}"
+        );
+        if let Some(next) = order.get(at + 1) {
+            let after = support::bounds_of(cx, s.win, ids::logstf_class(*next)).unwrap();
+            assert!(
+                block.bottom() <= after.top(),
+                "{label}: {block:?} not over {next:?}"
+            );
+        }
+    }
+    assert!(moved, "some sort moved Scout off the top");
+}
+
+#[gpui_kit::test]
+fn low_to_high_puts_empty_medic_cells_first_among_played_rows(cx: &mut TestAppContext) {
+    // A 6v6 Medic given short Scout and Soldier stints, so empty Heals cells sit beside his.
+    const MEDIC: u64 = 175_790_976;
+    let mut sixes: serde_json::Value = serde_json::from_str(SIXES).unwrap();
+    let stints = sixes["players"]["[U:1:175790976]"]["class_stats"]
+        .as_array_mut()
+        .unwrap();
+    for class in ["scout", "soldier"] {
+        stints.push(serde_json::json!({"type": class, "kills": 1, "assists": 0,
+            "deaths": 1, "dmg": 100, "total_time": 120, "weapon": {}}));
+    }
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_bytes("/json/3", serde_json::to_vec(&sixes).unwrap());
+    let s = shell(cx, &env, &server.uri(), &[(MEDIC, "Medic")]);
+    let page = open_page(cx, &s);
+    let averages = cx.update(|cx| page.read(cx).averages().unwrap().clone());
+    let played = |c: TfClass| averages.iter().any(|a| a.class() == c && a.played());
+    assert!(played(TfClass::Scout) && played(TfClass::Soldier) && played(TfClass::Medic));
+    support::click_id(cx, s.win, ids::logstf_class_head("Heals/min"));
+    support::click_id(cx, s.win, ids::logstf_class_head("Heals/min"));
+    let mut want = vec![TfClass::Scout, TfClass::Soldier, TfClass::Medic];
+    want.extend(TfClass::ALL.into_iter().filter(|c| !played(*c)));
+    assert_eq!(drawn_order(cx, &s), want);
+}
+
+#[gpui_kit::test]
+fn the_class_title_reads_from_the_left_and_the_numbers_from_the_right(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let _page = open_page(cx, &s);
+    let title = |cx: &mut TestAppContext, label| {
+        support::bounds_of(cx, s.win, ids::logstf_class_title(label)).expect(label)
+    };
+    // The first row's icon starts past the row's 12 px padding and 1 px border.
+    let row = support::bounds_of(cx, s.win, ids::logstf_class(TfClass::Scout)).unwrap();
+    let class = title(cx, "Class");
+    let icon_left = f32::from(row.left()) + 13.;
+    assert!(
+        (f32::from(class.left()) - icon_left).abs() <= 2.,
+        "{class:?} not over the icon at {icon_left}"
+    );
+    for label in COLUMNS {
+        let text = title(cx, label);
+        let head = support::bounds_of(cx, s.win, ids::logstf_class_head(label)).unwrap();
+        assert!(
+            (f32::from(text.right()) - f32::from(head.right())).abs() <= 1.,
+            "{label}: {text:?} not flush right in {head:?}"
+        );
+    }
+}

@@ -2562,9 +2562,22 @@ pub fn logstf_range_stop(range: LogsRange) -> ElementId {
 /// The bordered box holding the class averages table, scrolling it sideways when narrow.
 pub const LOGSTF_CLASS_TABLE: &str = "logstf-class-table";
 
-/// One column title atop the class averages table, by its text: "logstf-class-head:<label>".
+/// One column title atop the class averages table, a button that sorts by it, by its text:
+/// "logstf-class-head:<label>".
 pub fn logstf_class_head(label: &str) -> ElementId {
     keyed("logstf-class-head", label)
+}
+
+/// The text inside a class table title's button, sitting where the title reads:
+/// "logstf-class-title:<label>".
+pub fn logstf_class_title(label: &str) -> ElementId {
+    keyed("logstf-class-title", label)
+}
+
+/// The arrow on the sorted class table title, labelled "high to low" or "low to high":
+/// "logstf-class-arrow:<label>".
+pub fn logstf_class_arrow(label: &str) -> ElementId {
+    keyed("logstf-class-arrow", label)
 }
 
 /// One class's row in the logs.tf averages table, a played one opens its weapons:
@@ -2922,7 +2935,8 @@ pub fn logstf_heal_row(medic: SteamId, target: SteamId) -> ElementId {
 
 /// The open log's kill matrix section: "logstf-matrix".
 pub const LOGSTF_MATRIX: &str = "logstf-matrix";
-/// The kill matrix's total header, labelled K, KA or D by tab: "logstf-matrix-total".
+/// The kill matrix's total header, a button labelled K, KA or D by tab that sorts by the
+/// total: "logstf-matrix-total".
 pub const LOGSTF_MATRIX_TOTAL: &str = "logstf-matrix-total";
 /// The kill matrix's tab group: "logstf-matrix-tabs".
 pub const LOGSTF_MATRIX_TABS: &str = "logstf-matrix-tabs";
@@ -2948,9 +2962,17 @@ pub fn logstf_matrix_tab_button(kind: MatrixKind) -> ElementId {
     keyed("logstf-matrix-tab-button", matrix_key(kind))
 }
 
-/// One class's icon in the kill matrix's header: "logstf-matrix-head:<class>".
+/// One class's icon in the kill matrix's header, which sorts by its column:
+/// "logstf-matrix-head:<class>".
 pub fn logstf_matrix_head(class: TfClass) -> ElementId {
     keyed("logstf-matrix-head", &class.name().to_lowercase())
+}
+
+/// The arrow on the sorted kill matrix header, labelled "high to low" or "low to high":
+/// "logstf-matrix-arrow:<class>", or "logstf-matrix-arrow:total".
+pub fn logstf_matrix_arrow(class: Option<TfClass>) -> ElementId {
+    let key = class.map_or_else(|| "total".to_owned(), |c| c.name().to_lowercase());
+    keyed("logstf-matrix-arrow", &key)
 }
 
 /// One player's row of the kill matrix: "logstf-matrix-row:<id64>".

@@ -20,16 +20,12 @@ use gpui_kit::{
     ParentElement as _, Pixels, Stateful, StatefulInteractiveElement, Styled, TestSupportExt as _,
     WeakEntity, Window, div, px,
 };
-use tf2tools_core::{
-    LogDetail, LogRow, LogState, MatrixKind, SteamId, Team, TfClass, TrackedPlayer,
-};
+use tf2tools_core::{LogDetail, LogRow, LogState, MatrixKind, SteamId, Team, TrackedPlayer};
 
-use super::sort::PlayerSort;
+use super::sort::{MatrixSort, PlayerSort};
 use super::text::{LOG_LOADING, nickname_note, team_name};
 use super::{LogsTfPage, OpenLog, OpenState};
 use crate::ids;
-use crate::services::Services;
-use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
 use crate::widgets::store_error::error_line;
@@ -133,7 +129,7 @@ pub(super) fn panel(
     open: &OpenLog,
     tracked: &Tracked,
     sort: PlayerSort,
-    matrix: MatrixKind,
+    matrix: (MatrixKind, Option<MatrixSort>),
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> AnyElement {
@@ -181,7 +177,7 @@ fn log_body(
     log: &LogDetail,
     tracked: &Tracked,
     sort: PlayerSort,
-    matrix: MatrixKind,
+    matrix: (MatrixKind, Option<MatrixSort>),
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> impl IntoElement {
@@ -263,16 +259,6 @@ pub(super) fn team_colour(team: Team, cx: &App) -> Hsla {
         Team::Red => cx.theme().red,
         Team::Blue | _ => cx.theme().blue,
     }
-}
-
-fn class_cell(class: TfClass, cx: &App) -> Div {
-    let assets = &cx.global::<Services>().assets;
-    div()
-        .w(NUMBER)
-        .flex_none()
-        .flex()
-        .justify_end()
-        .child(class_icon(class, assets.class_icon(class).as_deref(), ICON))
 }
 
 pub(super) fn number(text: String) -> Div {
