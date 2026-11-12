@@ -8,17 +8,16 @@ use gpui_kit::{
     App, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, div, px,
 };
-use tf2tools_core::{LogColumns, LogDetail, PlayerLine, SteamId};
+use tf2tools_core::{LogColumns, LogDetail, PlayerLine};
 
 use super::popover::class_hover;
 use super::{NUMBER, team_cell};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
-use crate::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players};
+use crate::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players_shown};
 use crate::pages::logs_tf::text::{floored, one_decimal, reads_zero};
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
-use crate::widgets::tip::tip;
 
 // The table's fixed columns. The name is sized at its minimum so a long one never widens the
 // table, and grows into any room the window leaves, truncating what still does not fit.
@@ -40,7 +39,7 @@ type Column = (PlayerColumn, fn(&PlayerLine) -> String);
 pub(super) fn players_table(
     log: &LogDetail,
     sort: PlayerSort,
-    is_tracked: &dyn Fn(SteamId) -> bool,
+    tracked: &super::Tracked,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> Div {
@@ -87,7 +86,8 @@ pub(super) fn players_table(
     );
     let assets = &cx.global::<Services>().assets;
     let players = log.players();
-    for i in sort_players(players, shown.unwrap_or_default()) {
+    let shown_name = |p: &PlayerLine| tracked.shown(p.steam_id(), p.name());
+    for i in sort_players_shown(players, shown.unwrap_or_default(), &shown_name) {
         let player = &players[i];
         // Classes come longest first; the main one is solid, the rest fade.
         // Hovering one opens its class card.
@@ -105,7 +105,7 @@ pub(super) fn players_table(
         table = table.child(
             super::player_row(
                 h_flex().id(ids::logstf_player_row(player.steam_id())),
-                is_tracked(player.steam_id()),
+                tracked.is(player.steam_id()),
                 cx,
             )
             .test_support()
@@ -115,16 +115,16 @@ pub(super) fn players_table(
             .border_t_1()
             .border_color(cx.theme().border)
             .child(team_cell(player.team(), cx).w(TEAM))
-            .child(
+            .child(super::name_cell(
                 div()
                     .id(ids::logstf_player_name(player.steam_id()))
-                    .test_support()
-                    .tooltip(tip(ids::LOGSTF_NAME_TIP, player.name().to_owned()))
                     .w(NAME_MIN)
-                    .flex_grow(1.)
-                    .truncate()
-                    .child(player.name().to_owned()),
-            )
+                    .flex_grow(1.),
+                player.steam_id(),
+                player.name(),
+                tracked,
+                "player",
+            ))
             .child(
                 // Kept clear of a cut-off name before it.
                 h_flex()

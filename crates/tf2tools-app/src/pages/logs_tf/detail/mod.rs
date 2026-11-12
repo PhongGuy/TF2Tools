@@ -10,11 +10,14 @@ mod players;
 mod popover;
 mod rounds;
 
-use gpui_kit::component::{ActiveTheme as _, v_flex};
+use std::collections::{HashMap, HashSet};
+
+use gpui_kit::assets::IconName;
+use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    AnyElement, App, Div, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    ParentElement as _, Pixels, StatefulInteractiveElement, Styled, TestSupportExt as _,
+    AnyElement, App, Div, ElementId, FontWeight, Hsla, InteractiveElement as _, IntoElement,
+    ParentElement as _, Pixels, Stateful, StatefulInteractiveElement, Styled, TestSupportExt as _,
     WeakEntity, Window, div, px,
 };
 use tf2tools_core::{
@@ -22,7 +25,7 @@ use tf2tools_core::{
 };
 
 use super::sort::PlayerSort;
-use super::text::{LOG_LOADING, team_name};
+use super::text::{LOG_LOADING, nickname_note, team_name};
 use super::{LogsTfPage, OpenLog, OpenState};
 use crate::ids;
 use crate::services::Services;
@@ -30,11 +33,96 @@ use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
 use crate::widgets::store_error::error_line;
+use crate::widgets::tip::tip;
 
 // A number column's width and a class icon's size, shared with the players table.
 // Both are sized so every players column of a full log fits a 1280 px window, as on logs.tf.
 const NUMBER: Pixels = px(40.);
 const ICON: Pixels = px(20.);
+
+/// The tracked players an open log marks, and the nicknames it names them by; there are no
+/// nicknames while Settings turns them off.
+#[derive(Clone, Default)]
+pub(in crate::pages::logs_tf) struct Tracked {
+    ids: HashSet<SteamId>,
+    nicknames: HashMap<SteamId, String>,
+}
+
+impl Tracked {
+    pub(in crate::pages::logs_tf) fn new(players: &[TrackedPlayer], nicknames: bool) -> Self {
+        Tracked {
+            ids: players.iter().map(TrackedPlayer::steam_id).collect(),
+            nicknames: players
+                .iter()
+                .filter(|_| nicknames)
+                .filter_map(|p| Some((p.steam_id(), p.nickname()?.to_owned())))
+                .collect(),
+        }
+    }
+
+    pub(super) fn is(&self, id: SteamId) -> bool {
+        self.ids.contains(&id)
+    }
+
+    pub(super) fn nickname(&self, id: SteamId) -> Option<&str> {
+        self.nicknames.get(&id).map(String::as_str)
+    }
+
+    /// The name the tables show for `id`: their nickname, else `log_name`.
+    pub(super) fn shown(&self, id: SteamId, log_name: &str) -> String {
+        self.nickname(id).unwrap_or(log_name).to_owned()
+    }
+}
+
+// A table's name in `cell`, which the caller ids and sizes, labelled and cut to fit with the
+// tooltip giving it whole. A nickname other than the log's name shows instead, followed by a
+// marker whose tooltip names the player as the log does.
+pub(super) fn name_cell(
+    cell: Stateful<Div>,
+    player: SteamId,
+    log_name: &str,
+    tracked: &Tracked,
+    place: &str,
+) -> AnyElement {
+    let nickname = tracked.nickname(player).filter(|n| *n != log_name.trim());
+    let Some(nickname) = nickname else {
+        return cell
+            .aria_label(log_name.to_owned())
+            .test_support()
+            .tooltip(tip(ids::LOGSTF_NAME_TIP, log_name.to_owned()))
+            .truncate()
+            .child(log_name.to_owned())
+            .into_any_element();
+    };
+    cell.test_support()
+        .flex()
+        .items_center()
+        .gap_1()
+        .overflow_hidden()
+        .aria_label(nickname.to_owned())
+        .child(
+            div()
+                .id(ids::LOGSTF_NICK_NAME)
+                .tooltip(tip(ids::LOGSTF_NAME_TIP, nickname.to_owned()))
+                .min_w_0()
+                .truncate()
+                .child(nickname.to_owned()),
+        )
+        .child(nick_marker(ids::logstf_nick(place, player), log_name))
+        .into_any_element()
+}
+
+// The small mark after a nickname; hovering it says whose name the log really shows.
+pub(super) fn nick_marker(id: ElementId, log_name: &str) -> impl IntoElement {
+    h_flex()
+        .id(id)
+        .aria_label("Nickname")
+        .test_support()
+        .flex_none()
+        .opacity(0.6)
+        .tooltip(tip(ids::LOGSTF_NICK_TIP, nickname_note(log_name)))
+        .child(Icon::new(IconName::Info).xsmall())
+}
 
 /// The panel under open log `row`. The score banner heads it once `open` is ready; the
 /// title comes from the row at once; under it the parsed log, or a line saying it is loading
@@ -43,7 +131,7 @@ const ICON: Pixels = px(20.);
 pub(super) fn panel(
     row: &LogRow,
     open: &OpenLog,
-    tracked: &[TrackedPlayer],
+    tracked: &Tracked,
     sort: PlayerSort,
     matrix: MatrixKind,
     page: WeakEntity<LogsTfPage>,
@@ -91,41 +179,26 @@ pub(super) fn panel(
 fn log_body(
     open: &OpenLog,
     log: &LogDetail,
-    tracked: &[TrackedPlayer],
+    tracked: &Tracked,
     sort: PlayerSort,
     matrix: MatrixKind,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> impl IntoElement {
-    let is_tracked = |id: SteamId| tracked.iter().any(|p| p.steam_id() == id);
-    let name_of = |id: SteamId| {
-        log.players()
-            .iter()
-            .find(|p| p.steam_id() == id)
-            .map_or_else(|| id.id64().to_string(), |p| p.name().to_owned())
-    };
     v_flex()
         .w_full()
         .gap_6()
         .text_xs()
         .child(sideways(
             ids::LOGSTF_PLAYERS_SCROLL,
-            players::players_table(log, sort, &is_tracked, page.clone(), cx),
+            players::players_table(log, sort, tracked, page.clone(), cx),
         ))
         .child(sideways(
             ids::LOGSTF_TEAMS_SCROLL,
             banner::team_table(log, cx),
         ))
         .when(!log.rounds().is_empty(), |el| {
-            let table = rounds::rounds_table(
-                open.id,
-                log,
-                &open.rounds,
-                &name_of,
-                &is_tracked,
-                page.clone(),
-                cx,
-            );
+            let table = rounds::rounds_table(open.id, log, &open.rounds, tracked, page.clone(), cx);
             el.child(
                 section("Rounds", table, cx)
                     .id(ids::LOGSTF_ROUNDS)
@@ -133,12 +206,12 @@ fn log_body(
             )
         })
         .when(!log.medics().is_empty(), |el| {
-            el.child(section("Medics", medics::medics(log, &is_tracked, cx), cx))
+            el.child(section("Medics", medics::medics(log, tracked, cx), cx))
         })
         .child(
             section(
                 "Kill matrix",
-                matrix::matrix(log, matrix, &is_tracked, page.clone(), cx),
+                matrix::matrix(log, matrix, tracked, page.clone(), cx),
                 cx,
             )
             .id(ids::LOGSTF_MATRIX)

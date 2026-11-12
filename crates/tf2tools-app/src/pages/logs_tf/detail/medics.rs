@@ -4,9 +4,9 @@
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
     App, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
+    Styled as _, TestSupportExt as _, div, px,
 };
-use tf2tools_core::{LogDetail, MedicLine, SteamId};
+use tf2tools_core::{LogDetail, MedicLine};
 
 use super::{ICON, NUMBER, number, team_cell};
 use crate::ids;
@@ -15,33 +15,24 @@ use crate::pages::logs_tf::text::{charge_text, healing_text, seconds_text, tenth
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
-use crate::widgets::tip::tip;
 
 // A block's width; in the 800 px window's content column they wrap one to a line.
 const MEDIC_WIDTH: Pixels = px(300.);
 const CLASS: Pixels = px(40.);
 
 /// One block per Medic in `log`, wrapping onto new lines as the width runs out.
-pub(super) fn medics(
-    log: &LogDetail,
-    is_tracked: &dyn Fn(SteamId) -> bool,
-    cx: &App,
-) -> impl IntoElement {
+pub(super) fn medics(log: &LogDetail, tracked: &super::Tracked, cx: &App) -> impl IntoElement {
     h_flex()
         .id(ids::LOGSTF_MEDICS)
         .test_support()
         .flex_wrap()
         .items_start()
         .gap_4()
-        .children(log.medics().iter().map(|m| medic_block(m, is_tracked, cx)))
+        .children(log.medics().iter().map(|m| medic_block(m, tracked, cx)))
 }
 
 // The Medic's name in team colour, the ten rows logs.tf shows, then the heal-target table.
-fn medic_block(
-    medic: &MedicLine,
-    is_tracked: &dyn Fn(SteamId) -> bool,
-    cx: &App,
-) -> impl IntoElement {
+fn medic_block(medic: &MedicLine, tracked: &super::Tracked, cx: &App) -> impl IntoElement {
     let id = medic.steam_id();
     let fact = |label: &str, key: &str, value: String| {
         h_flex()
@@ -84,7 +75,13 @@ fn medic_block(
                 .gap_2()
                 .font_weight(FontWeight::SEMIBOLD)
                 .child(team_cell(medic.team(), cx))
-                .child(div().truncate().child(medic.name().to_owned())),
+                .child(super::name_cell(
+                    div().id(ids::LOGSTF_MEDIC_NAME).min_w_0(),
+                    id,
+                    medic.name(),
+                    tracked,
+                    "medic",
+                )),
         )
         .child(fact(
             "Healing",
@@ -111,11 +108,11 @@ fn medic_block(
             ]
             .map(|(label, value)| fact(label, label, value)),
         )
-        .child(heal_table(medic, is_tracked, cx))
+        .child(heal_table(medic, tracked, cx))
 }
 
 // Heal Target, Class, Heals and a bold share, most healed first.
-fn heal_table(medic: &MedicLine, is_tracked: &dyn Fn(SteamId) -> bool, cx: &App) -> Div {
+fn heal_table(medic: &MedicLine, tracked: &super::Tracked, cx: &App) -> Div {
     let assets = &cx.global::<Services>().assets;
     let header = h_flex()
         .gap_1()
@@ -141,24 +138,24 @@ fn heal_table(medic: &MedicLine, is_tracked: &dyn Fn(SteamId) -> bool, cx: &App)
             row.share,
         );
         let line = h_flex().id(ids::logstf_heal_row(medic.steam_id(), row.steam_id));
-        super::player_row(line, is_tracked(row.steam_id), cx)
+        super::player_row(line, tracked.is(row.steam_id), cx)
             .test_support()
             .gap_1()
             .py_0p5()
             .border_t_1()
             .border_color(cx.theme().border)
-            .child(
+            .child(super::name_cell(
                 div()
                     .id(ids::logstf_heal_name(medic.steam_id(), row.steam_id))
-                    .test_support()
-                    .tooltip(tip(ids::LOGSTF_NAME_TIP, row.name.clone()))
                     .flex_1()
                     .min_w_0()
                     // Kept clear of the class icon after a cut-off name.
-                    .mr_1()
-                    .truncate()
-                    .child(row.name),
-            )
+                    .mr_1(),
+                row.steam_id,
+                &row.name,
+                tracked,
+                &format!("heal:{}", medic.steam_id().id64()),
+            ))
             .child(
                 div()
                     .id(ids::logstf_heal_class(medic.steam_id(), row.steam_id))

@@ -33,6 +33,7 @@ use tf2tools_core::{
 
 use crate::ids;
 use crate::kill_icons::{KillIconImages, LoadedKillIcons};
+use crate::log_nicknames::LogNicknames;
 use crate::logs_sync::{LogsSync, LogsSyncEvent, SyncProgress, logs_sync};
 use crate::pages::common::filter_badge;
 use crate::picker::PickKind;
@@ -120,9 +121,15 @@ pub struct LogsTfPage {
     // The add dialog's field, its last failure, whether a lookup is running and whether the
     // dialog is still up. They live here because the dialog builder runs every frame.
     add_input: Entity<InputState>,
+    add_nickname: Entity<InputState>,
     add_error: Option<SharedString>,
     adding: bool,
     add_open: bool,
+    // The rename dialog's field and the player it renames while it is up.
+    rename_input: Entity<InputState>,
+    renaming: Option<SteamId>,
+    // Whether an open log names tracked players by their nicknames, as Settings says.
+    nicknames: Entity<LogNicknames>,
     names: Entity<LoadedWeaponNames>,
     icons: Entity<LoadedKillIcons>,
     _subscriptions: Vec<Subscription>,
@@ -132,16 +139,32 @@ impl LogsTfPage {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let add_input =
             cx.new(|cx| InputState::new(window, cx).placeholder("Steam profile link or Steam ID"));
-        // gpui-kit owns InputEvent; Enter in the field adds like the Add button.
-        let enter = cx.subscribe_in(
-            &add_input,
+        let add_nickname =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Nickname (optional)"));
+        let rename_input = cx.new(|cx| InputState::new(window, cx).placeholder("Nickname"));
+        // gpui-kit owns InputEvent; Enter in either add field adds like the Add button, and
+        // in the rename field saves like Save.
+        let mut entered = Vec::new();
+        for field in [&add_input, &add_nickname] {
+            entered.push(cx.subscribe_in(
+                field,
+                window,
+                |page, _, event: &InputEvent, window, cx| {
+                    if matches!(event, InputEvent::PressEnter { .. }) {
+                        page.submit_add(window, cx);
+                    }
+                },
+            ));
+        }
+        entered.push(cx.subscribe_in(
+            &rename_input,
             window,
             |page, _, event: &InputEvent, window, cx| {
                 if matches!(event, InputEvent::PressEnter { .. }) {
-                    page.submit_add(window, cx);
+                    page.submit_rename(window, cx);
                 }
             },
-        );
+        ));
         // The active player's sync moving rereads the cache, so logs appear as they land.
         let sync = logs_sync(cx);
         let heard = cx.subscribe(&sync, |page, _, event: &LogsSyncEvent, cx| {
@@ -174,6 +197,9 @@ impl LogsTfPage {
         // So do the game's kill icons.
         let icons = LoadedKillIcons::global(cx);
         let iconed = cx.observe(&icons, |_, _, cx| cx.notify());
+        // Settings turning nicknames on or off redraws the open log.
+        let nicknames = LogNicknames::global(cx);
+        let nicknamed = cx.observe(&nicknames, |_, _, cx| cx.notify());
         let mut page = Self {
             names,
             icons,
@@ -203,10 +229,17 @@ impl LogsTfPage {
             load_generation: 0,
             sync_wanted: false,
             add_input,
+            add_nickname,
             add_error: None,
             adding: false,
             add_open: false,
-            _subscriptions: vec![enter, heard, redraw, released, named, iconed],
+            rename_input,
+            renaming: None,
+            nicknames,
+            _subscriptions: entered
+                .into_iter()
+                .chain([heard, redraw, released, named, iconed, nicknamed])
+                .collect(),
         };
         page.load(true, cx).detach();
         page
@@ -668,6 +701,22 @@ impl LogsTfPage {
         &self.add_input
     }
 
+    /// The add dialog's optional nickname field, emptied after a successful add.
+    pub fn add_nickname_input(&self) -> &Entity<InputState> {
+        &self.add_nickname
+    }
+
+    /// The rename dialog's nickname field.
+    pub fn rename_input(&self) -> &Entity<InputState> {
+        &self.rename_input
+    }
+
+    // The tracked players an open log marks, with the nicknames it shows while Settings
+    // keeps them on.
+    fn tracked(&self, cx: &App) -> detail::Tracked {
+        detail::Tracked::new(&self.players, self.nicknames.read(cx).show())
+    }
+
     /// Makes `id`'s chip the active one, saves that choice and reloads the page from the cache.
     pub fn select(&mut self, id: SteamId, window: &mut Window, cx: &mut Context<Self>) {
         let saving = run_blocking(cx, move |s| {
@@ -750,10 +799,24 @@ impl LogsTfPage {
                             .child("Add player"),
                     )
                     .child(
-                        div()
-                            .id(ids::LOGSTF_ADD_INPUT)
-                            .test_support()
-                            .child(Input::new(&this.add_input)),
+                        h_flex()
+                            .gap_2()
+                            .child(
+                                div()
+                                    .id(ids::LOGSTF_ADD_INPUT)
+                                    .test_support()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .child(Input::new(&this.add_input)),
+                            )
+                            .child(
+                                div()
+                                    .id(ids::LOGSTF_ADD_NICKNAME)
+                                    .test_support()
+                                    .w(px(160.))
+                                    .flex_none()
+                                    .child(Input::new(&this.add_nickname)),
+                            ),
                     )
                     .children(this.add_error.clone().map(|error| {
                         labelled(
@@ -801,14 +864,109 @@ impl LogsTfPage {
         });
     }
 
+    // Opens the nickname dialog for `id`, its field holding their current nickname. Save
+    // stores what is typed; a blank field clears the nickname, back to the Steam name.
+    fn open_rename(&mut self, id: SteamId, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(player) = self.players.iter().find(|p| p.steam_id() == id) else {
+            return;
+        };
+        let title = format!("Nickname for {}", player.name());
+        let current = player.nickname().unwrap_or_default().to_owned();
+        self.rename_input
+            .update(cx, |state, cx| state.set_value(current, window, cx));
+        self.renaming = Some(id);
+        let page = cx.entity().downgrade();
+        let input = self.rename_input.clone();
+        // Deferred, as the add dialog is, so the opening click keeps focus in the field.
+        window.defer(cx, move |window, cx| {
+            let frame = DialogFrame::new(DIALOG_WIDTH);
+            window.open_dialog(cx, move |dialog, window, cx| {
+                let Some(entity) = page.upgrade() else {
+                    return dialog;
+                };
+                let this = entity.read(cx);
+                let content = v_flex()
+                    .gap_4()
+                    .child(
+                        div()
+                            .text_lg()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(title.clone()),
+                    )
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(cx.theme().muted_foreground)
+                            .child("Leave it empty to use their Steam name."),
+                    )
+                    .child(
+                        div()
+                            .id(ids::LOGSTF_RENAME_INPUT)
+                            .test_support()
+                            .child(Input::new(&this.rename_input)),
+                    )
+                    .child(
+                        h_flex()
+                            .justify_end()
+                            .gap_2()
+                            .child(
+                                Button::new(ids::LOGSTF_RENAME_CANCEL)
+                                    .outline()
+                                    .label("Cancel")
+                                    .on_click(|_, window, cx| window.close_dialog(cx)),
+                            )
+                            .child(
+                                Button::new(ids::LOGSTF_RENAME_SAVE)
+                                    .primary()
+                                    .label("Save")
+                                    .on_click({
+                                        let entity = entity.clone();
+                                        move |_, window, cx| {
+                                            entity.update(cx, |page, cx| {
+                                                page.submit_rename(window, cx)
+                                            });
+                                        }
+                                    }),
+                            ),
+                    );
+                frame
+                    .apply(dialog, &*window, &*cx)
+                    .on_ok(|_, _, _| false)
+                    .on_close(move |_, _, cx| entity.update(cx, |page, _| page.renaming = None))
+                    .child(frame.measure(content))
+            });
+            input.update(cx, |state, cx| state.focus(window, cx));
+        });
+    }
+
+    // Saves the rename dialog's field as the player's nickname, closes it and rereads.
+    fn submit_rename(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(id) = self.renaming.take() else {
+            return;
+        };
+        let nickname = self.rename_input.read(cx).value().to_string();
+        window.close_dialog(cx);
+        let saving = run_blocking(cx, move |s| {
+            s.logs
+                .cache()
+                .set_nickname(id, Some(&nickname))
+                .map_err(|error| {
+                    tracing::warn!(%error, "saving a logs.tf nickname failed");
+                    OpError::core("Failed to save the nickname", SAVE_FAILED)
+                })
+        });
+        self.after_write(saving, window, cx);
+    }
+
     // Opens the open log's chat over the page. The rows are shaped once, since the log they
     // come from never changes while the dialog is up.
     fn open_chat(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(rows) = self.detail().map(tables::chat_rows) else {
             return;
         };
+        let tracked = self.tracked(cx);
         open_detail_dialog(window, cx, move |window, cx| {
-            detail::footer::chat_dialog(&rows, window, cx)
+            detail::footer::chat_dialog(&rows, &tracked, window, cx)
         });
     }
 
@@ -817,8 +975,9 @@ impl LogsTfPage {
         let Some(rows) = self.detail().map(detail::footer::streak_rows) else {
             return;
         };
+        let tracked = self.tracked(cx);
         open_detail_dialog(window, cx, move |window, cx| {
-            detail::footer::streaks_dialog(&rows, window, cx)
+            detail::footer::streaks_dialog(&rows, &tracked, window, cx)
         });
     }
 
@@ -906,6 +1065,7 @@ impl LogsTfPage {
                 return;
             }
         };
+        let nickname = self.add_nickname.read(cx).value().to_string();
         self.add_error = None;
         self.adding = true;
         cx.notify();
@@ -917,6 +1077,7 @@ impl LogsTfPage {
         cx.spawn_in(window, async move |page, cx| {
             let added = match resolving.await {
                 Ok(Ok(player)) => {
+                    let player = player.with_nickname(Some(&nickname));
                     let saving = page.update(cx, |_, cx| {
                         run_blocking(cx, move |s| {
                             s.logs
@@ -946,8 +1107,9 @@ impl LogsTfPage {
                 page.adding = false;
                 match added {
                     Ok(()) => {
-                        page.add_input
-                            .update(cx, |state, cx| state.set_value("", window, cx));
+                        for field in [&page.add_input, &page.add_nickname] {
+                            field.update(cx, |state, cx| state.set_value("", window, cx));
+                        }
                         if page.add_open {
                             page.add_open = false;
                             window.close_dialog(cx);
@@ -1227,7 +1389,7 @@ impl LogsTfPage {
         let mut row = h_flex().flex_wrap().gap_2();
         for player in &self.players {
             let id = player.steam_id();
-            let name = player.name().to_owned();
+            let name = player.display_name().to_owned();
             // A chip being removed says so and takes no clicks until it goes.
             let removing = self.removing.contains(&id);
             let chip = filter_badge(
@@ -1249,7 +1411,16 @@ impl LogsTfPage {
                 .on_click(cx.listener(move |page, _, window, cx| {
                     page.remove(id, &name, window, cx);
                 }));
-            row = row.child(h_flex().gap_0p5().child(chip).child(remove));
+            let rename = Button::new(ids::logstf_chip_rename(id))
+                .ghost()
+                .xsmall()
+                .icon(IconName::Pencil)
+                .named(format!("Nickname for {}", player.name()))
+                .disabled(removing)
+                .on_click(cx.listener(move |page, _, window, cx| {
+                    page.open_rename(id, window, cx);
+                }));
+            row = row.child(h_flex().gap_0p5().child(chip).child(rename).child(remove));
         }
         row.child(
             filter_badge(ids::LOGSTF_ADD, false, "+ Add player", window, cx)

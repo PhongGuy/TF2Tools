@@ -2,7 +2,9 @@
 
 use std::cmp::Ordering;
 
-use tf2tools_app::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players};
+use tf2tools_app::pages::logs_tf::sort::{
+    PlayerColumn, PlayerSort, sort_players, sort_players_shown,
+};
 use tf2tools_core::{LogDetail, PlayerLine, Team, TfClass, parse_log};
 
 use crate::support::logstf::{HIGHLANDER, SIXES};
@@ -157,4 +159,25 @@ fn a_sort_by_a_column_the_log_hides_falls_back_to_the_default_unhighlighted() {
         None,
         "logs.tf highlights no header until one is clicked"
     );
+}
+
+#[test]
+fn sorting_by_name_goes_by_the_name_the_table_shows() {
+    let log = six();
+    let players = log.players();
+    let by_name = PlayerSort {
+        column: PlayerColumn::Name,
+        descending: false,
+    };
+    let last = *sort_players(players, by_name).last().unwrap();
+    let renamed = players[last].steam_id();
+    // "!" sorts ahead of every name in the fixture, "[☁]Emiel" included.
+    let shown = |p: &PlayerLine| {
+        if p.steam_id() == renamed {
+            "!".to_owned()
+        } else {
+            p.name().to_owned()
+        }
+    };
+    assert_eq!(sort_players_shown(players, by_name, &shown)[0], last);
 }

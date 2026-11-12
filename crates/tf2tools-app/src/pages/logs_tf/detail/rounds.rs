@@ -60,8 +60,7 @@ pub(super) fn rounds_table(
     log: u64,
     detail: &LogDetail,
     open: &BTreeSet<usize>,
-    name_of: &dyn Fn(SteamId) -> String,
-    is_tracked: &dyn Fn(SteamId) -> bool,
+    tracked: &super::Tracked,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> Div {
@@ -71,6 +70,14 @@ pub(super) fn rounds_table(
             .iter()
             .find(|p| p.steam_id() == id)
             .map(|p| p.team())
+    };
+    // Players go by their names in the log; the round panel puts nicknames over them.
+    let log_name = |id: SteamId| {
+        detail
+            .players()
+            .iter()
+            .find(|p| p.steam_id() == id)
+            .map_or_else(|| id.id64().to_string(), |p| p.name().to_owned())
     };
     let head = h_flex()
         .id(ids::LOGSTF_ROUNDS_HEAD)
@@ -106,9 +113,7 @@ pub(super) fn rounds_table(
             scroll_id = ids::logstf_rounds_scroll_after(n);
         }
         if is_open {
-            table = table.child(round_panel(
-                log, n, round, name_of, is_tracked, &team_of, cx,
-            ));
+            table = table.child(round_panel(log, n, round, &log_name, tracked, &team_of, cx));
         }
     }
     table
@@ -191,11 +196,12 @@ fn round_panel(
     log: u64,
     n: usize,
     round: &RoundLine,
-    name_of: &dyn Fn(SteamId) -> String,
-    is_tracked: &dyn Fn(SteamId) -> bool,
+    log_name: &dyn Fn(SteamId) -> String,
+    tracked: &super::Tracked,
     team_of: &dyn Fn(SteamId) -> Option<Team>,
     cx: &App,
 ) -> impl IntoElement {
+    let name_of = |id: SteamId| tracked.shown(id, &log_name(id));
     let head = || {
         h_flex()
             .gap_1()
@@ -222,12 +228,19 @@ fn round_panel(
         )
         .children(round.players().iter().map(|p| {
             let name = name_of(p.steam_id());
+            let in_log = log_name(p.steam_id());
             let row = line().id(ids::logstf_round_player(log, n, p.steam_id()));
-            super::player_row(row, is_tracked(p.steam_id()), cx)
+            super::player_row(row, tracked.is(p.steam_id()), cx)
                 .aria_label(format!("{name} {} {}", p.kills(), p.dmg()))
                 .test_support()
                 .child(team_cell(p.team(), cx).w(TEAM))
-                .child(div().w(NAME).flex_none().truncate().child(name))
+                .child(super::name_cell(
+                    div().id(ids::LOGSTF_ROUND_NAME).w(NAME).flex_none(),
+                    p.steam_id(),
+                    &in_log,
+                    tracked,
+                    &format!("round:{log}:{n}"),
+                ))
                 .child(round_number(p.kills().to_string()))
                 .child(round_number(p.dmg().to_string()))
         }));
@@ -240,7 +253,7 @@ fn round_panel(
         )
         .children(round.events().iter().enumerate().map(|(ix, event)| {
             let time = round_length_text(event.at());
-            let (ty, parts) = event_parts(event.kind(), name_of, team_of);
+            let (ty, parts) = event_parts(event.kind(), &name_of, team_of);
             let (description, colours) = coloured(&parts, cx);
             let label = [time.as_str(), &ty, &description]
                 .into_iter()

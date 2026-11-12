@@ -99,12 +99,17 @@ impl PlayerColumn {
         }
     }
 
-    // This column's ascending order of two players.
-    fn compare(self, a: &PlayerLine, b: &PlayerLine) -> Ordering {
+    // This column's ascending order of two players, names read through `name`.
+    fn compare(
+        self,
+        a: &PlayerLine,
+        b: &PlayerLine,
+        name: &dyn Fn(&PlayerLine) -> String,
+    ) -> Ordering {
         let num = |f: fn(&PlayerLine) -> f64| f(a).total_cmp(&f(b));
         match self {
             Self::Team => blu_first(a).cmp(&blu_first(b)),
-            Self::Name => a.name().to_lowercase().cmp(&b.name().to_lowercase()),
+            Self::Name => name(a).to_lowercase().cmp(&name(b).to_lowercase()),
             Self::Class => main_class(a).cmp(&main_class(b)),
             Self::Kills => a.kills().cmp(&b.kills()),
             Self::Assists => a.assists().cmp(&b.assists()),
@@ -160,13 +165,23 @@ impl PlayerSort {
     }
 }
 
-/// Indexes into `players` in display order; ties keep the default order.
+/// Indexes into `players` in display order by their names in the log; ties keep the default
+/// order.
 pub fn sort_players(players: &[PlayerLine], sort: PlayerSort) -> Vec<usize> {
+    sort_players_shown(players, sort, &|p| p.name().to_owned())
+}
+
+/// Like `sort_players`, with the Name column going by `shown`, the name the table shows.
+pub fn sort_players_shown(
+    players: &[PlayerLine],
+    sort: PlayerSort,
+    shown: &dyn Fn(&PlayerLine) -> String,
+) -> Vec<usize> {
     // Both sorts are stable, so the default order breaks every column's ties.
     let mut order: Vec<usize> = (0..players.len()).collect();
     order.sort_by_key(|&i| (blu_first(&players[i]), main_class(&players[i])));
     order.sort_by(|&a, &b| {
-        let ord = sort.column.compare(&players[a], &players[b]);
+        let ord = sort.column.compare(&players[a], &players[b], shown);
         if sort.descending { ord.reverse() } else { ord }
     });
     order

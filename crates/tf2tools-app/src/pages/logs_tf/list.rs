@@ -306,7 +306,7 @@ fn log_item(
                 .filter(|open| open.id == id)
                 .map(|open| {
                     let (sort, matrix) = (state.player_sort, state.matrix);
-                    detail::panel(row, open, &state.players, sort, matrix, page, cx)
+                    detail::panel(row, open, &state.tracked(cx), sort, matrix, page, cx)
                 }),
         )
         .into_any_element()

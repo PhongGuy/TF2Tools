@@ -329,3 +329,18 @@ fn mature_add_ons_default_off_and_round_trip() {
     db.set_show_mature_addons(false).unwrap();
     assert!(!db.settings().unwrap().show_mature_addons());
 }
+
+#[test]
+fn log_nicknames_default_on_and_round_trip() {
+    let (_tmp, dir) = common::temp_data_dir();
+    let db = Database::open(&dir).unwrap();
+    assert!(db.settings().unwrap().show_log_nicknames());
+    db.set_show_log_nicknames(false).unwrap();
+    assert_eq!(
+        raw_setting(&dir, "show_log_nicknames").as_deref(),
+        Some("false")
+    );
+    assert!(!db.settings().unwrap().show_log_nicknames());
+    db.set_show_log_nicknames(true).unwrap();
+    assert!(db.settings().unwrap().show_log_nicknames());
+}

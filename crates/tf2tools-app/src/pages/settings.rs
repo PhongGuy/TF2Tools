@@ -31,6 +31,7 @@ use crate::links;
 use crate::local_messages::{
     describe_detect, describe_settings, describe_store_status, describe_tf2_folder,
 };
+use crate::log_nicknames::LogNicknames;
 use crate::mature::MatureAddons;
 use crate::notices::{self, Notice};
 use crate::picker::PickKind;
@@ -176,6 +177,8 @@ impl SettingsPage {
         cx.observe(&path, |_, _, cx| cx.notify()).detach();
         let mature = MatureAddons::global(cx);
         cx.observe(&mature, |_, _, cx| cx.notify()).detach();
+        let nicknames = LogNicknames::global(cx);
+        cx.observe(&nicknames, |_, _, cx| cx.notify()).detach();
         // The Resync buttons follow the hub's running kinds and failures, so only a change
         // there redraws; every ended run may have written a new stamp, so the statuses are
         // read again. With no hub, Resync stays off.
@@ -585,6 +588,16 @@ pub fn format_hours(hours: u32) -> String {
     }
 }
 
+// Saves the moment it flips, outside "Save Settings", as an open log redraws on it.
+fn nicknames_switch(cx: &mut App) -> AnyElement {
+    let nicknames = LogNicknames::global(cx);
+    Switch::new(ids::SETTINGS_LOG_NICKNAMES)
+        .checked(nicknames.read(cx).show())
+        .label("Show nicknames in match logs")
+        .on_click(move |&on, _, cx| nicknames.update(cx, |n, cx| n.set(on, cx)))
+        .into_any_element()
+}
+
 // Saves the moment it flips, outside "Save Settings", as the add-on tabs relist on it.
 fn mature_switch(cx: &mut App) -> AnyElement {
     let mature = MatureAddons::global(cx);
@@ -855,6 +868,12 @@ impl Render for SettingsPage {
                         "Add-ons",
                         "GameBanana skins, effects, GUIs, textures and game files",
                         Some(mature_switch(cx)),
+                        cx,
+                    ))
+                    .child(card(
+                        "logs.tf",
+                        "How opened match logs name the players you track",
+                        Some(nicknames_switch(cx)),
                         cx,
                     ))
                     // v5 shows the store cards only once their status has been read.

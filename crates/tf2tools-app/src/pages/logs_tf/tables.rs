@@ -110,6 +110,7 @@ pub fn matrix_rows(log: &LogDetail, kind: MatrixKind) -> Vec<(&PlayerLine, &Matr
 /// One chat message with its sender's team; `None` for a sender who is not a player.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChatRow {
+    pub steam_id: Option<SteamId>,
     pub team: Option<Team>,
     pub name: String,
     pub msg: String,
@@ -127,6 +128,7 @@ pub fn chat_rows(log: &LogDetail) -> Vec<ChatRow> {
     log.chat()
         .iter()
         .map(|line| ChatRow {
+            steam_id: line.steam_id(),
             team: line.steam_id().and_then(team_of),
             name: line.name().to_owned(),
             msg: line.msg().to_owned(),

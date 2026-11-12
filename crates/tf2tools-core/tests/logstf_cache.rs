@@ -157,3 +157,48 @@ fn removing_a_player_deletes_their_unshared_logs_and_listed_range_at_once() {
         Some("3m")
     );
 }
+
+#[test]
+fn a_nickname_shows_in_place_of_the_steam_name_and_clears_back_to_it() {
+    let (_tmp, _dir, cache) = open();
+    cache
+        .add_player(&TrackedPlayer::new(sid(1), "Alice").with_nickname(Some("Ally")))
+        .unwrap();
+    cache
+        .add_player(&TrackedPlayer::new(sid(2), "Bob"))
+        .unwrap();
+    let players = cache.players().unwrap();
+    assert_eq!(players[0].name(), "Alice");
+    assert_eq!(players[0].nickname(), Some("Ally"));
+    assert_eq!(players[0].display_name(), "Ally");
+    assert_eq!(players[1].nickname(), None);
+    assert_eq!(players[1].display_name(), "Bob");
+
+    cache.set_nickname(sid(2), Some("  Bobby ")).unwrap();
+    assert_eq!(cache.players().unwrap()[1].nickname(), Some("Bobby"));
+    // A blank nickname clears it, back to the Steam name.
+    cache.set_nickname(sid(1), Some("   ")).unwrap();
+    assert_eq!(cache.players().unwrap()[0].nickname(), None);
+    cache.set_nickname(sid(2), None).unwrap();
+    assert_eq!(cache.players().unwrap()[1].display_name(), "Bob");
+}
+
+#[test]
+fn a_steam_name_refresh_keeps_the_nickname() {
+    let (_tmp, _dir, cache) = open();
+    cache
+        .add_player(&TrackedPlayer::new(sid(1), "Alice"))
+        .unwrap();
+    cache.set_nickname(sid(1), Some("Ally")).unwrap();
+    cache
+        .add_player(&TrackedPlayer::new(sid(1), "Alice2"))
+        .unwrap();
+    let player = &cache.players().unwrap()[0];
+    assert_eq!(player.name(), "Alice2");
+    assert_eq!(player.nickname(), Some("Ally"));
+    // Re-adding with a nickname sets it.
+    cache
+        .add_player(&TrackedPlayer::new(sid(1), "Alice2").with_nickname(Some("Al")))
+        .unwrap();
+    assert_eq!(cache.players().unwrap()[0].nickname(), Some("Al"));
+}

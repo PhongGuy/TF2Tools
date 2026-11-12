@@ -44,6 +44,7 @@ pub(super) const STATE_UNREADABLE: i64 = 2;
 pub struct TrackedPlayer {
     steam_id: SteamId,
     name: String,
+    nickname: Option<String>,
     last_synced: Option<i64>,
 }
 
@@ -53,8 +54,15 @@ impl TrackedPlayer {
         TrackedPlayer {
             steam_id,
             name: name.into(),
+            nickname: None,
             last_synced: None,
         }
+    }
+
+    /// The same player with the nickname the user chose; a blank one counts as none.
+    pub fn with_nickname(mut self, nickname: Option<&str>) -> Self {
+        self.nickname = clean_nickname(nickname);
+        self
     }
 
     /// The player's Steam ID.
@@ -65,6 +73,16 @@ impl TrackedPlayer {
     /// The Steam name, or the SteamID64 as text when it could not be looked up.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// The nickname the user gave the player, kept apart from the Steam name.
+    pub fn nickname(&self) -> Option<&str> {
+        self.nickname.as_deref()
+    }
+
+    /// The nickname when the player has one, else the Steam name.
+    pub fn display_name(&self) -> &str {
+        self.nickname.as_deref().unwrap_or(&self.name)
     }
 
     /// When the player's logs last finished syncing, in unix seconds.
@@ -200,13 +218,15 @@ impl LogsCache {
             .db
             .read(|conn| {
                 let mut stmt = conn.prepare(
-                    "SELECT steam_id, name, last_synced FROM logstf_players ORDER BY position",
+                    "SELECT steam_id, name, nickname, last_synced FROM logstf_players
+                     ORDER BY position",
                 )?;
                 stmt.query_map([], |row| {
                     Ok((
                         row.get::<_, i64>(0)?,
                         row.get::<_, String>(1)?,
-                        row.get::<_, Option<i64>>(2)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, Option<i64>>(3)?,
                     ))
                 })?
                 .collect::<rusqlite::Result<Vec<_>>>()
@@ -215,10 +235,11 @@ impl LogsCache {
         // Only valid IDs are ever written, so a row outside the range is skipped, not fatal.
         Ok(rows
             .into_iter()
-            .filter_map(|(id, name, last_synced)| {
+            .filter_map(|(id, name, nickname, last_synced)| {
                 Some(TrackedPlayer {
                     steam_id: from_sql_id(id)?,
                     name,
+                    nickname,
                     last_synced,
                 })
             })
@@ -226,7 +247,8 @@ impl LogsCache {
     }
 
     /// Appends a new player at the end, or updates a tracked one's name in place unless the
-    /// new name is the id64 placeholder; either way the player becomes active.
+    /// new name is the id64 placeholder; either way the player becomes active. A nickname on
+    /// `player` is stored; without one, a tracked player keeps theirs.
     pub fn add_player(&self, player: &TrackedPlayer) -> Result<(), LogsCacheError> {
         let placeholder = player.steam_id.to_string();
         self.db
@@ -243,14 +265,21 @@ impl LogsCache {
                     .is_some();
                 if !tracked {
                     tx.execute(
-                        "INSERT INTO logstf_players (steam_id, name, position)
-                         VALUES (?1, ?2, (SELECT COALESCE(MAX(position), -1) + 1 FROM logstf_players))",
-                        params![id, player.name],
+                        "INSERT INTO logstf_players (steam_id, name, nickname, position)
+                         VALUES (?1, ?2, ?3,
+                                 (SELECT COALESCE(MAX(position), -1) + 1 FROM logstf_players))",
+                        params![id, player.name, player.nickname],
                     )?;
                 } else if player.name != placeholder {
                     tx.execute(
                         "UPDATE logstf_players SET name = ?2 WHERE steam_id = ?1",
                         params![id, player.name],
+                    )?;
+                }
+                if tracked && player.nickname.is_some() {
+                    tx.execute(
+                        "UPDATE logstf_players SET nickname = ?2 WHERE steam_id = ?1",
+                        params![id, player.nickname],
                     )?;
                 }
                 tx.execute(
@@ -259,6 +288,21 @@ impl LogsCache {
                 )?;
                 tx.commit()
             })
+            .map_err(db_error)
+    }
+
+    /// Gives a tracked player `nickname`, or clears it when `None` or blank; an untracked
+    /// player is left alone.
+    pub fn set_nickname(&self, id: SteamId, nickname: Option<&str>) -> Result<(), LogsCacheError> {
+        let nickname = clean_nickname(nickname);
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "UPDATE logstf_players SET nickname = ?2 WHERE steam_id = ?1",
+                    params![sql_id(id)?, nickname],
+                )
+            })
+            .map(drop)
             .map_err(db_error)
     }
 
@@ -1007,6 +1051,14 @@ fn damage_taken(detail: &LogDetail) -> HashMap<SteamId, i64> {
 /// `id` as SQLite stores it; every public-universe SteamID64 fits in an i64.
 pub(super) fn sql_id(id: SteamId) -> rusqlite::Result<i64> {
     i64::try_from(id.id64()).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
+}
+
+// A nickname trimmed, with a blank one meaning none.
+fn clean_nickname(nickname: Option<&str>) -> Option<String> {
+    nickname
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .map(str::to_owned)
 }
 
 /// A stored count as u32, clamped into range.
