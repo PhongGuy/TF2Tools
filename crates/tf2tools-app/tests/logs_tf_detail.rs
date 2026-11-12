@@ -1298,3 +1298,88 @@ fn card_names_line_up_behind_an_icon_slot_without_losing_room(cx: &mut TestAppCo
         "the card widens for the slot: {iconed:?} {before:?}"
     );
 }
+
+// The matrix rows' tops in the order the page draws them, read by player.
+fn matrix_tops(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    ids_in_order: &[tf2tools_core::SteamId],
+) -> Vec<gpui_kit::Pixels> {
+    ids_in_order
+        .iter()
+        .map(|id| {
+            support::bounds_of(cx, s.win, ids::logstf_matrix_row(*id))
+                .unwrap()
+                .top()
+        })
+        .collect()
+}
+
+#[gpui_kit::test]
+fn a_matrix_class_header_sorts_its_column_flips_and_holds_across_tabs(cx: &mut TestAppContext) {
+    use tf2tools_app::pages::logs_tf::sort::{MatrixColumn, MatrixSort, sort_matrix_rows};
+    use tf2tools_app::pages::logs_tf::tables::matrix_rows;
+    use tf2tools_core::MatrixKind;
+    let (_env, _server, s, page) = opened(cx, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_MATRIX);
+    let scout = MatrixColumn::Class(TfClass::Scout);
+    let shown = |cx: &mut TestAppContext, kind: MatrixKind, sort: MatrixSort| {
+        cx.update(|cx| {
+            let log = page.read(cx).detail().unwrap();
+            sort_matrix_rows(matrix_rows(log, kind), Some(sort))
+                .iter()
+                .map(|(_, r)| r.steam_id())
+                .collect::<Vec<_>>()
+        })
+    };
+    let ordered = |tops: Vec<gpui_kit::Pixels>| tops.windows(2).all(|w| w[0] < w[1]);
+
+    support::click_id(cx, s.win, ids::logstf_matrix_head(TfClass::Scout));
+    let down = MatrixSort {
+        column: scout,
+        descending: true,
+    };
+    assert_eq!(cx.update(|cx| page.read(cx).matrix_sort()), Some(down));
+    let order = shown(cx, MatrixKind::Kills, down);
+    assert!(
+        ordered(matrix_tops(cx, &s, &order)),
+        "scout kills high to low"
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_matrix_arrow(Some(TfClass::Scout))).as_deref(),
+        Some("high to low")
+    );
+    assert!(!support::present(cx, s.win, ids::logstf_matrix_arrow(None)));
+
+    support::click_id(cx, s.win, ids::logstf_matrix_head(TfClass::Scout));
+    let up = MatrixSort {
+        column: scout,
+        descending: false,
+    };
+    assert_eq!(cx.update(|cx| page.read(cx).matrix_sort()), Some(up));
+    let order = shown(cx, MatrixKind::Kills, up);
+    assert!(ordered(matrix_tops(cx, &s, &order)), "a second click flips");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_matrix_arrow(Some(TfClass::Scout))).as_deref(),
+        Some("low to high")
+    );
+
+    // A switch of tab keeps the sort and re-sorts by the new tab's numbers.
+    support::click_id(cx, s.win, ids::logstf_matrix_tab(MatrixKind::Deaths));
+    assert_eq!(cx.update(|cx| page.read(cx).matrix_sort()), Some(up));
+    let order = shown(cx, MatrixKind::Deaths, up);
+    assert!(ordered(matrix_tops(cx, &s, &order)), "deaths by scout");
+
+    support::click_id(cx, s.win, ids::LOGSTF_MATRIX_TOTAL);
+    let total = MatrixSort {
+        column: MatrixColumn::Total,
+        descending: true,
+    };
+    assert_eq!(cx.update(|cx| page.read(cx).matrix_sort()), Some(total));
+    assert!(support::present(cx, s.win, ids::logstf_matrix_arrow(None)));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::logstf_matrix_arrow(Some(TfClass::Scout))
+    ));
+}

@@ -181,3 +181,90 @@ fn sorting_by_name_goes_by_the_name_the_table_shows() {
     };
     assert_eq!(sort_players_shown(players, by_name, &shown)[0], last);
 }
+
+#[test]
+fn a_number_sort_opens_high_to_low_and_a_second_click_flips() {
+    use tf2tools_app::pages::logs_tf::sort::{MatrixColumn, MatrixSort, NumberSort};
+    let scout = MatrixColumn::Class(TfClass::Scout);
+    let first = NumberSort::clicked(None, scout);
+    assert_eq!(
+        first,
+        MatrixSort {
+            column: scout,
+            descending: true
+        }
+    );
+    let flipped = NumberSort::clicked(Some(first), scout);
+    assert!(!flipped.descending, "the same column flips");
+    let total = NumberSort::clicked(Some(flipped), MatrixColumn::Total);
+    assert!(total.descending, "another column opens high to low");
+    assert!(!NumberSort::clicked(Some(total), MatrixColumn::Total).descending);
+}
+
+#[test]
+fn the_matrix_sorts_by_a_class_or_the_total_both_ways_ties_keeping_its_order() {
+    use tf2tools_app::pages::logs_tf::sort::{MatrixColumn, MatrixSort, sort_matrix_rows};
+    use tf2tools_app::pages::logs_tf::tables::matrix_rows;
+    use tf2tools_core::{MatrixKind, MatrixRow};
+    let log = six();
+    let value = |column: MatrixColumn, row: &MatrixRow| match column {
+        MatrixColumn::Class(class) => {
+            row.counts()[TfClass::ALL.iter().position(|c| *c == class).unwrap()]
+        }
+        MatrixColumn::Total => row.total(),
+    };
+    let columns = TfClass::ALL
+        .map(MatrixColumn::Class)
+        .into_iter()
+        .chain([MatrixColumn::Total]);
+    for kind in [
+        MatrixKind::Kills,
+        MatrixKind::KillsAssists,
+        MatrixKind::Deaths,
+    ] {
+        let default: Vec<_> = matrix_rows(&log, kind)
+            .iter()
+            .map(|(_, r)| r.steam_id())
+            .collect();
+        assert_eq!(
+            sort_matrix_rows(matrix_rows(&log, kind), None)
+                .iter()
+                .map(|(_, r)| r.steam_id())
+                .collect::<Vec<_>>(),
+            default,
+            "no sort keeps the default"
+        );
+        let rank = |r: &MatrixRow| default.iter().position(|id| *id == r.steam_id()).unwrap();
+        for column in columns.clone() {
+            for descending in [true, false] {
+                let sort = MatrixSort { column, descending };
+                let rows = sort_matrix_rows(matrix_rows(&log, kind), Some(sort));
+                assert_eq!(rows.len(), default.len());
+                for pair in rows.windows(2) {
+                    let (a, b) = (pair[0].1, pair[1].1);
+                    let (va, vb) = (value(column, a), value(column, b));
+                    if va == vb {
+                        assert!(rank(a) < rank(b), "{kind:?} {sort:?} tie out of order");
+                    } else {
+                        assert_eq!(va > vb, descending, "{kind:?} {sort:?} {va} {vb}");
+                    }
+                }
+            }
+        }
+    }
+    // Some class's kills in the 6v6 log are not in total order, so a sort shows.
+    let kills = |sort| {
+        sort_matrix_rows(matrix_rows(&log, MatrixKind::Kills), sort)
+            .iter()
+            .map(|(_, r)| r.steam_id())
+            .collect::<Vec<_>>()
+    };
+    let default = kills(None);
+    assert!(TfClass::ALL.into_iter().any(|class| {
+        let sort = MatrixSort {
+            column: MatrixColumn::Class(class),
+            descending: true,
+        };
+        kills(Some(sort)) != default
+    }));
+}

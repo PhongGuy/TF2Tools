@@ -1,9 +1,10 @@
 //! The class averages: how many logs they cover beside the history range slider, then one
-//! compact table row per class in TF2 order, the open class's weapons right under its row.
+//! compact table row per class in TF2 order or sorted by a title, the open class's weapons
+//! right under its row.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::{Slider, SliderState};
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Entity, FontWeight, InteractiveElement as _, IntoElement, MouseButton,
@@ -13,6 +14,8 @@ use gpui_kit::{
 use tf2tools_core::{ClassAverage, LogsRange, TfClass};
 
 use super::LogsTfPage;
+use super::head::sortable;
+use super::sort::{ClassSort, ClassStat, sort_classes};
 use super::text::{one_decimal, range_label, summary_text, time_played_text, whole};
 use crate::ids;
 use crate::services::Services;
@@ -26,16 +29,16 @@ const GAP: Pixels = px(10.);
 // The class column grows to fill the box but keeps room for "Demoman" beside its icon; each
 // number column fits its title and widest value on one line, so the table fits a 1200 px window.
 const CLASS_MIN: Pixels = px(120.);
-const COLUMNS: [(&str, Pixels); 9] = [
-    ("Played", px(72.)),
-    ("Logs", px(44.)),
-    ("Kills/min", px(64.)),
-    ("Assists/min", px(76.)),
-    ("Deaths/min", px(76.)),
-    ("Dmg/min", px(60.)),
-    ("KA/D", px(44.)),
-    ("Heals/min", px(68.)),
-    ("Ubers/10 min", px(84.)),
+const COLUMNS: [(ClassStat, Pixels); 9] = [
+    (ClassStat::Played, px(72.)),
+    (ClassStat::Logs, px(44.)),
+    (ClassStat::KillsPerMin, px(64.)),
+    (ClassStat::AssistsPerMin, px(76.)),
+    (ClassStat::DeathsPerMin, px(76.)),
+    (ClassStat::DmgPerMin, px(60.)),
+    (ClassStat::Kad, px(44.)),
+    (ClassStat::HealsPerMin, px(68.)),
+    (ClassStat::UbersPer10Min, px(84.)),
 ];
 
 // The stop labels sit one cell apart, each centred on its thumb stop. The slider's track is
@@ -45,8 +48,8 @@ const RANGE_WIDTH: f32 = STOP_CELL * LogsRange::STOPS.len() as f32;
 const LABEL_HEIGHT: f32 = 24.;
 
 /// The summary line for `logs` in `range` back from `newest` and the range slider, so the
-/// range is picked before the stats are read, then the class table. A played row opens its
-/// weapons; `selected` is highlighted with `weapons`, the open block, drawn under it.
+/// range is picked before the stats are read, then the class table in `sort`'s order. A played
+/// row opens its weapons; `selected` is highlighted with `weapons`, the open block, under it.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn class_grid(
     averages: &[ClassAverage; 9],
@@ -56,13 +59,14 @@ pub(super) fn class_grid(
     slider: &Entity<SliderState>,
     page: WeakEntity<LogsTfPage>,
     selected: Option<TfClass>,
+    sort: Option<ClassSort>,
     weapons: Option<AnyElement>,
     window: &mut Window,
     cx: &mut App,
 ) -> impl IntoElement {
     let muted = cx.theme().muted_foreground;
     // The table comes after the picker, which takes `page`, so it is built first.
-    let table = class_table(averages, page.clone(), selected, weapons, window, cx);
+    let table = class_table(averages, page.clone(), selected, sort, weapons, window, cx);
     v_flex()
         .gap_2()
         .child(
@@ -137,6 +141,7 @@ fn class_table(
     averages: &[ClassAverage; 9],
     page: WeakEntity<LogsTfPage>,
     selected: Option<TfClass>,
+    sort: Option<ClassSort>,
     mut weapons: Option<AnyElement>,
     window: &mut Window,
     cx: &mut App,
@@ -145,34 +150,51 @@ fn class_table(
     let min_width = CLASS_MIN + numbers + GAP * COLUMNS.len() as f32 + ROW_PAD * 2. + px(2.);
     let theme = cx.theme();
     let (border, radius) = (theme.border, theme.radius_lg);
+    // Every title is a button: a stat sorts by it or flips, Class goes back to class order.
+    // They keep no padding so each title stays flush with its column's values.
+    let title = |label: &'static str, stat: Option<ClassStat>, end: bool| {
+        let page = page.clone();
+        let sorted = sort.filter(|s| Some(s.column) == stat);
+        let button = Button::new(ids::logstf_class_head(label))
+            .ghost()
+            .xsmall()
+            .label(label)
+            .selected(sorted.is_some())
+            .w_full()
+            .px_0()
+            .when(end, |b| b.justify_end())
+            .when(!end, |b| b.justify_start())
+            .on_click(move |_, _, cx| {
+                let _ = page.update(cx, |page, cx| page.sort_classes_by(stat, cx));
+            });
+        sortable(
+            button,
+            ids::logstf_class_arrow(label),
+            sorted.map(|s| s.descending),
+        )
+    };
     let head = line()
+        .items_start()
         .text_xs()
         .text_color(theme.muted_foreground)
         .font_weight(FontWeight::MEDIUM)
         .child(
-            div()
-                .id(ids::logstf_class_head("Class"))
-                .test_support()
+            title("Class", None, false)
                 .flex_1()
                 .min_w(CLASS_MIN)
-                .child("Class"),
+                .items_start(),
         )
-        .children(COLUMNS.map(|(label, width)| {
-            div()
-                .id(ids::logstf_class_head(label))
-                .test_support()
-                .w(width)
-                .flex_none()
-                .text_right()
-                .child(label)
-        }));
+        .children(
+            COLUMNS.map(|(stat, width)| title(stat.title(), Some(stat), true).w(width).items_end()),
+        );
     let mut rows = v_flex()
         .w_full()
         .min_w(min_width)
         .text_sm()
         .child(head)
         .child(div().h(px(1.)).bg(border));
-    for average in averages {
+    for i in sort_classes(averages, sort) {
+        let average = &averages[i];
         let class = average.class();
         let open = selected == Some(class);
         rows = rows
@@ -231,7 +253,8 @@ fn class_row(
     let cells = COLUMNS
         .into_iter()
         .zip(values)
-        .map(|((label, width), value)| {
+        .map(|((stat, width), value)| {
+            let label = stat.title();
             let cell = h_flex().w(width).flex_none().justify_end();
             match value {
                 Some(value) => cell.child(labelled(

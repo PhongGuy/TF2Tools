@@ -4,6 +4,7 @@
 mod class_weapons;
 mod detail;
 mod grid;
+mod head;
 mod list;
 pub mod sort;
 pub mod tables;
@@ -47,7 +48,7 @@ use crate::weapon_names::LoadedWeaponNames;
 use crate::widgets::dialog_frame::{DETAIL_WIDTH, DIALOG_WIDTH, DialogFrame};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
-use sort::{PlayerColumn, PlayerSort};
+use sort::{ClassSort, ClassStat, MatrixColumn, MatrixSort, PlayerColumn, PlayerSort};
 use text::{
     DOWNLOAD_FAILED, DOWNLOADED, EMPTY_TEXT, LOG_UNREADABLE, LOGS_TF_DOWN, LOGS_TF_URL, LOOKING_UP,
     REMOVING, SAVE_FAILED, STEAM_UNREACHABLE, WRITE_FAILED, download_reason, fetch_message,
@@ -101,8 +102,11 @@ pub struct LogsTfPage {
     open: Option<OpenLog>,
     // The players table's order, kept across logs while the page lives.
     player_sort: PlayerSort,
-    // The kill matrix tab, kept the same way.
+    // The kill matrix tab and its sort, kept the same way.
     matrix: MatrixKind,
+    matrix_sort: Option<MatrixSort>,
+    // The class table's sort, kept across ranges and players.
+    class_sort: Option<ClassSort>,
     list: ListState,
     // Which optional row columns fit, from the list's width at the last frame; the list's
     // state cannot be asked while it lays its own items out.
@@ -220,6 +224,8 @@ impl LogsTfPage {
             open: None,
             player_sort: PlayerSort::default(),
             matrix: MatrixKind::Kills,
+            matrix_sort: None,
+            class_sort: None,
             list: ListState::new(1, ListAlignment::Top, px(200.)),
             fit: list::Fit::ALL,
             sync,
@@ -515,6 +521,29 @@ impl LogsTfPage {
     /// A click on the kill matrix's `kind` tab.
     pub fn show_matrix(&mut self, kind: MatrixKind, cx: &mut Context<Self>) {
         self.matrix = kind;
+        cx.notify();
+    }
+
+    /// The kill matrix's sort; None for its default order, total high to low.
+    pub fn matrix_sort(&self) -> Option<MatrixSort> {
+        self.matrix_sort
+    }
+
+    /// A click on the kill matrix's `column` header: sorts by it, or flips it if it leads.
+    pub fn sort_matrix_by(&mut self, column: MatrixColumn, cx: &mut Context<Self>) {
+        self.matrix_sort = Some(MatrixSort::clicked(self.matrix_sort, column));
+        cx.notify();
+    }
+
+    /// The class table's sort; None for class order.
+    pub fn class_sort(&self) -> Option<ClassSort> {
+        self.class_sort
+    }
+
+    /// A click on a class table title: `Some` sorts by that stat or flips it if it leads,
+    /// `None` (the Class title) goes back to class order.
+    pub fn sort_classes_by(&mut self, stat: Option<ClassStat>, cx: &mut Context<Self>) {
+        self.class_sort = stat.map(|stat| ClassSort::clicked(self.class_sort, stat));
         cx.notify();
     }
 
@@ -1480,6 +1509,7 @@ impl LogsTfPage {
                             &self.range_slider,
                             cx.entity().downgrade(),
                             self.selected_class,
+                            self.class_sort,
                             weapons,
                             window,
                             cx,

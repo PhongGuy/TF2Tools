@@ -1,7 +1,7 @@
 //! The open log's kill matrix: every player's kills, kills plus assists or deaths against each
 //! class, one tab per kind as on logs.tf.
 
-use gpui_kit::component::button::Button;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -10,13 +10,14 @@ use gpui_kit::{
 };
 use tf2tools_core::{LogDetail, MatrixKind, TfClass};
 
-use super::{ICON, class_cell, team_cell};
+use super::{ICON, NUMBER, team_cell};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
+use crate::pages::logs_tf::head::sortable;
+use crate::pages::logs_tf::sort::{MatrixColumn, MatrixSort, sort_matrix_rows};
 use crate::pages::logs_tf::tables::matrix_rows;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
-use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
 
 // The fixed columns before the nine classes. The name is sized at its minimum so a long one
@@ -32,11 +33,12 @@ const TABS: [(MatrixKind, &str, &str); 3] = [
     (MatrixKind::Deaths, "Deaths", "D"),
 ];
 
-/// The tabs over `kind`'s matrix, a row for each player with a count, K high to low. A tab asks `page` to
-/// show its kind; tracked players stay highlighted as in the players table.
+/// The tabs over `kind`'s matrix, a row for each player with a count, K high to low or by
+/// `sort`. A tab asks `page` to show its kind and a header to sort by its column; tracked
+/// players stay highlighted as in the players table.
 pub(super) fn matrix(
     log: &LogDetail,
-    kind: MatrixKind,
+    (kind, sort): (MatrixKind, Option<MatrixSort>),
     tracked: &super::Tracked,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
@@ -69,16 +71,61 @@ pub(super) fn matrix(
         .children(TABS.map(tab));
     v_flex().gap_2().child(tabs).child(sideways(
         ids::LOGSTF_MATRIX_SCROLL,
-        table(log, kind, tracked, cx),
+        table(log, kind, sort, tracked, page, cx),
     ))
 }
 
-fn table(log: &LogDetail, kind: MatrixKind, tracked: &super::Tracked, cx: &App) -> Div {
+fn table(
+    log: &LogDetail,
+    kind: MatrixKind,
+    sort: Option<MatrixSort>,
+    tracked: &super::Tracked,
+    page: WeakEntity<LogsTfPage>,
+    cx: &App,
+) -> Div {
     let muted = cx.theme().muted_foreground;
-    let heading = |text: &'static str| div().flex_none().child(text);
+    // The plain headings sit at the buttons' height, level with their titles.
+    let heading = |text: &'static str| div().flex_none().h_5().flex().items_center().child(text);
     let total = TABS.iter().find(|t| t.0 == kind).map_or("K", |t| t.2);
+    let assets = &cx.global::<Services>().assets;
+    // Each count column's header is a button that sorts by it, its arrow centred under it.
+    let header = |column: MatrixColumn| {
+        let page = page.clone();
+        let sorted = sort.filter(|s| s.column == column);
+        let (id, class) = match column {
+            MatrixColumn::Class(class) => (ids::logstf_matrix_head(class), Some(class)),
+            MatrixColumn::Total => (ids::LOGSTF_MATRIX_TOTAL.into(), None),
+        };
+        let button = Button::new(id)
+            .ghost()
+            .xsmall()
+            .compact()
+            .selected(sorted.is_some())
+            .w_full()
+            .justify_end()
+            .px_0()
+            .on_click(move |_, _, cx| {
+                let _ = page.update(cx, |page, cx| page.sort_matrix_by(column, cx));
+            });
+        let button = match class {
+            Some(class) => button.accessibility_label(class.name()).child(class_icon(
+                class,
+                assets.class_icon(class).as_deref(),
+                ICON,
+            )),
+            None => button.label(total),
+        };
+        sortable(
+            button,
+            ids::logstf_matrix_arrow(class),
+            sorted.map(|s| s.descending),
+        )
+        .w(NUMBER)
+        .items_end()
+    };
     let mut table = v_flex().w_full().child(
         h_flex()
+            .items_start()
             .gap_1()
             .px_1()
             .py_1()
@@ -87,19 +134,10 @@ fn table(log: &LogDetail, kind: MatrixKind, tracked: &super::Tracked, cx: &App) 
             .child(heading("Team").w(TEAM))
             .child(heading("Player").w(NAME_MIN).flex_grow(1.))
             .child(heading("C").w(MAIN))
-            .children(TfClass::ALL.map(|class| {
-                class_cell(class, cx)
-                    .id(ids::logstf_matrix_head(class))
-                    .test_support()
-            }))
-            .child(labelled(
-                super::number(String::new()),
-                ids::LOGSTF_MATRIX_TOTAL,
-                total,
-            )),
+            .children(TfClass::ALL.map(|class| header(MatrixColumn::Class(class))))
+            .child(header(MatrixColumn::Total)),
     );
-    let assets = &cx.global::<Services>().assets;
-    for (player, row) in matrix_rows(log, kind) {
+    for (player, row) in sort_matrix_rows(matrix_rows(log, kind), sort) {
         let id = row.steam_id();
         let main = player.classes().first().map(|c| {
             let class = c.class();

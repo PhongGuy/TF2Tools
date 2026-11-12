@@ -1,9 +1,10 @@
-//! The open log's players table order: logs.tf's default (BLU first, then main class in TF2
-//! order) and a sort by any column, ties keeping that default.
+//! The logs.tf tables' orders: the open log's players table (logs.tf's default, BLU first, then
+//! main class in TF2 order, or any column, ties keeping that default), its kill matrix and the
+//! class averages table.
 
 use std::cmp::Ordering;
 
-use tf2tools_core::{LogColumns, PlayerLine, Team, TfClass};
+use tf2tools_core::{ClassAverage, LogColumns, MatrixRow, PlayerLine, Team, TfClass};
 
 /// One players table column, in logs.tf's order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -197,4 +198,135 @@ fn main_class(p: &PlayerLine) -> usize {
         .first()
         .and_then(|c| TfClass::ALL.iter().position(|k| *k == c.class()))
         .unwrap_or(TfClass::ALL.len())
+}
+
+/// A sort by a column of numbers, which opens high to low; the page keeps `None` for the
+/// table's default order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NumberSort<C> {
+    pub column: C,
+    pub descending: bool,
+}
+
+impl<C: Copy + PartialEq> NumberSort<C> {
+    /// The sort after a click on `column` while `sort` leads: the same column flips, another
+    /// opens high to low.
+    pub fn clicked(sort: Option<Self>, column: C) -> Self {
+        let descending = !sort.is_some_and(|s| s.column == column && s.descending);
+        Self { column, descending }
+    }
+}
+
+/// One kill matrix column that sorts: a class's counts or the total.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatrixColumn {
+    Class(TfClass),
+    Total,
+}
+
+/// The kill matrix's sort, kept across its three tabs.
+pub type MatrixSort = NumberSort<MatrixColumn>;
+
+/// `rows` (in the matrix's default order) by `sort`'s column; ties keep the default order.
+pub fn sort_matrix_rows<'a>(
+    rows: Vec<(&'a PlayerLine, &'a MatrixRow)>,
+    sort: Option<MatrixSort>,
+) -> Vec<(&'a PlayerLine, &'a MatrixRow)> {
+    let Some(sort) = sort else {
+        return rows;
+    };
+    // A stable sort, so rows with the same count keep the default order.
+    let value = |row: &MatrixRow| match sort.column {
+        MatrixColumn::Class(class) => TfClass::ALL
+            .iter()
+            .position(|c| *c == class)
+            .map_or(0, |i| row.counts()[i]),
+        MatrixColumn::Total => row.total(),
+    };
+    let mut rows = rows;
+    rows.sort_by(|(_, a), (_, b)| {
+        let ord = value(a).cmp(&value(b));
+        if sort.descending { ord.reverse() } else { ord }
+    });
+    rows
+}
+
+/// One class table column that sorts, in the table's order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClassStat {
+    Played,
+    Logs,
+    KillsPerMin,
+    AssistsPerMin,
+    DeathsPerMin,
+    DmgPerMin,
+    Kad,
+    HealsPerMin,
+    UbersPer10Min,
+}
+
+impl ClassStat {
+    /// Every column in the table's order.
+    pub const ALL: [ClassStat; 9] = [
+        Self::Played,
+        Self::Logs,
+        Self::KillsPerMin,
+        Self::AssistsPerMin,
+        Self::DeathsPerMin,
+        Self::DmgPerMin,
+        Self::Kad,
+        Self::HealsPerMin,
+        Self::UbersPer10Min,
+    ];
+
+    /// The column's title.
+    pub fn title(self) -> &'static str {
+        match self {
+            Self::Played => "Played",
+            Self::Logs => "Logs",
+            Self::KillsPerMin => "Kills/min",
+            Self::AssistsPerMin => "Assists/min",
+            Self::DeathsPerMin => "Deaths/min",
+            Self::DmgPerMin => "Dmg/min",
+            Self::Kad => "KA/D",
+            Self::HealsPerMin => "Heals/min",
+            Self::UbersPer10Min => "Ubers/10 min",
+        }
+    }
+
+    // The value behind the column's text; an empty Medic cell is None.
+    fn value(self, a: &ClassAverage) -> Option<f64> {
+        match self {
+            Self::Played => Some(a.seconds() as f64),
+            Self::Logs => Some(f64::from(a.logs())),
+            Self::KillsPerMin => Some(a.kills_per_min()),
+            Self::AssistsPerMin => Some(a.assists_per_min()),
+            Self::DeathsPerMin => Some(a.deaths_per_min()),
+            Self::DmgPerMin => Some(a.dmg_per_min()),
+            Self::Kad => Some(a.kad()),
+            Self::HealsPerMin => a.heal_per_min(),
+            Self::UbersPer10Min => a.ubers_per_10min(),
+        }
+    }
+}
+
+/// The class table's sort.
+pub type ClassSort = NumberSort<ClassStat>;
+
+/// Indexes into `averages` in display order: class order unsorted, else the played classes
+/// by `sort` with ties in class order, then the unplayed ones in class order.
+pub fn sort_classes(averages: &[ClassAverage], sort: Option<ClassSort>) -> Vec<usize> {
+    let mut order: Vec<usize> = (0..averages.len()).collect();
+    let Some(sort) = sort else {
+        return order;
+    };
+    // Unplayed classes go last whatever the direction; an empty cell reads lowest. The sort
+    // is stable, so ties keep class order.
+    let key = |i: usize| sort.column.value(&averages[i]).unwrap_or(f64::NEG_INFINITY);
+    order.sort_by(|&a, &b| {
+        let played = averages[b].played().cmp(&averages[a].played());
+        let ord = key(a).total_cmp(&key(b));
+        played.then(if sort.descending { ord.reverse() } else { ord })
+    });
+    order
 }
