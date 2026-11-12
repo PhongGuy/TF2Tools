@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 18;
+pub(crate) const SCHEMA_VERSION: u32 = 19;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -127,6 +127,12 @@ const STEPS: &[Step] = &[
             ("logstf_class_rows", "dt", "INTEGER"),
             ("logstf_logs", "dt_counted", "INTEGER NOT NULL DEFAULT 0"),
         ],
+    },
+    // v6 step 19: the user's own name for a tracked logs.tf player, apart from the Steam name.
+    Step {
+        version: 19,
+        sql: "",
+        add_columns: &[("logstf_players", "nickname", "TEXT")],
     },
 ];
 

@@ -227,9 +227,13 @@ const M18_COLUMNS: &str = "
     ALTER TABLE logstf_logs ADD COLUMN dt_counted INTEGER NOT NULL DEFAULT 0;
 ";
 
+/// The column migration 19 adds, as the schema should hold it.
+const M19_COLUMNS: &str = "ALTER TABLE logstf_players ADD COLUMN nickname TEXT;";
+
 /// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables,
 /// migration 13's mastercomfig tables, migration 14's add-on table, migration 15's logs.tf
-/// tables, migration 16's weapon rows, migration 17's HUD checks and migration 18's damage taken:
+/// tables, migration 16's weapon rows, migration 17's HUD checks, migration 18's damage taken and migration 19's
+/// nicknames:
 /// the schema v6 opens to.
 pub fn current_shape() -> SchemaShape {
     let conn = v5_fixture_connection();
@@ -240,6 +244,7 @@ pub fn current_shape() -> SchemaShape {
     conn.execute_batch(M16_TABLES).unwrap();
     conn.execute_batch(M17_TABLES).unwrap();
     conn.execute_batch(M18_COLUMNS).unwrap();
+    conn.execute_batch(M19_COLUMNS).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape
