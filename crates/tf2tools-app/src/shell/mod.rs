@@ -21,7 +21,7 @@ use gpui_kit::{
     ParentElement as _, Pixels, Render, Styled as _, Subscription, Window, div, px,
 };
 
-use tf2tools_core::{CrosshairId, CrosshairRef, HudEntry, HudId};
+use tf2tools_core::{CrosshairId, CrosshairRef, HudEntry, HudId, ProfileId};
 
 use crate::audio::player::show_idle;
 use crate::keymap::ToggleSidebar;
@@ -31,7 +31,7 @@ use crate::pages::addon_store::AddonStorePage;
 use crate::pages::addons::AddonsPage;
 use crate::pages::crosshair_maker::CrosshairMakerPage;
 use crate::pages::crosshair_store::CrosshairStorePage;
-use crate::pages::crosshairs::{CopyToMaker, CrosshairsPage, EditPainted};
+use crate::pages::crosshairs::{AddToProfile, CopyToMaker, CrosshairsPage, EditPainted};
 use crate::pages::graphics::GraphicsPage;
 use crate::pages::hud_maker::HudMakerPage;
 use crate::pages::hud_store::HudStorePage;
@@ -85,6 +85,9 @@ pub struct Shell {
     pending_hud: Option<HudId>,
     /// The crosshair the next maker copies in as a new drawing, set by `copy_to_maker`.
     pending_copy: Option<CrosshairRef>,
+    /// The profile the next Profiles page opens, with this crosshair picked, set by
+    /// `crosshair_to_profile`.
+    pending_profile: Option<(ProfileId, CrosshairRef)>,
     hud_maker: Option<Entity<HudMakerPage>>,
     settings: Option<Entity<SettingsPage>>,
     hud_store: Option<Entity<HudStorePage>>,
@@ -193,6 +196,7 @@ impl Shell {
             pending_edit: None,
             pending_hud: None,
             pending_copy: None,
+            pending_profile: None,
             hud_maker: None,
             settings: None,
             hud_store: None,
@@ -338,6 +342,18 @@ impl Shell {
     pub fn copy_to_maker(&mut self, crosshair: CrosshairRef, cx: &mut Context<Self>) {
         self.navigate(Page::CrosshairMaker, cx);
         self.pending_copy = Some(crosshair);
+        cx.notify();
+    }
+
+    /// Shows a fresh Profiles page that opens profile `id`'s crosshairs with `crosshair` picked.
+    pub fn crosshair_to_profile(
+        &mut self,
+        id: ProfileId,
+        crosshair: CrosshairRef,
+        cx: &mut Context<Self>,
+    ) {
+        self.navigate(Page::Profiles, cx);
+        self.pending_profile = Some((id, crosshair));
         cx.notify();
     }
 
@@ -504,6 +520,10 @@ impl Render for Shell {
                         shell.copy_to_maker(copy.0.clone(), cx)
                     })
                     .detach();
+                    cx.subscribe(&page, |shell, _, add: &AddToProfile, cx| {
+                        shell.crosshair_to_profile(add.0.clone(), add.1.clone(), cx)
+                    })
+                    .detach();
                     cx.subscribe(&page, |shell, _, nav: &NavigateTo, cx| {
                         shell.navigate(nav.0, cx)
                     })
@@ -622,18 +642,26 @@ impl Render for Shell {
                 .clone()
                 .into_any_element(),
             // The editor's empty pickers ask for a store by event.
-            Page::Profiles => self
-                .profiles
-                .get_or_insert_with(|| {
-                    let page = cx.new(|cx| ProfilesPage::new(window, cx));
-                    cx.subscribe(&page, |shell, _, nav: &NavigateTo, cx| {
-                        shell.navigate(nav.0, cx)
+            Page::Profiles => {
+                let pending = self.pending_profile.take();
+                self.profiles
+                    .get_or_insert_with(|| {
+                        let page = cx.new(|cx| {
+                            let mut page = ProfilesPage::new(window, cx);
+                            if let Some((id, crosshair)) = pending {
+                                page.open_with_crosshair(id, crosshair, window, cx);
+                            }
+                            page
+                        });
+                        cx.subscribe(&page, |shell, _, nav: &NavigateTo, cx| {
+                            shell.navigate(nav.0, cx)
+                        })
+                        .detach();
+                        page
                     })
-                    .detach();
-                    page
-                })
-                .clone()
-                .into_any_element(),
+                    .clone()
+                    .into_any_element()
+            }
         };
         h_flex()
             .key_context("Shell")

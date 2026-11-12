@@ -5,10 +5,12 @@ use crate::support;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, TestAppContext};
 use tf2tools_app::ids;
+use tf2tools_app::pages::profiles::editor_model::Slot;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    DraftSlot, HudEntry, Profile, ProfileDraft, Provenance, SoundEntry, Tf2Install,
+    CrosshairEntry, CrosshairRef, DraftSlot, HudEntry, Profile, ProfileDraft, Provenance,
+    RgbaImage, SoundEntry, Tf2Install, rgba_to_vtf,
 };
 
 fn found(env: &support::Env) -> Tf2State {
@@ -288,4 +290,102 @@ fn the_sound_button_fits_inside_its_card(cx: &mut TestAppContext) {
             "button {button:?} in card {card:?}"
         );
     }
+}
+
+fn seed_crosshair(s: &support::ShellWindow, env: &support::Env, name: &str) -> CrosshairEntry {
+    let image = RgbaImage::from_pixels(8, 8, [255, 0, 0, 255].repeat(64)).unwrap();
+    let path = env.tmp.path().join(format!("{name}.vtf"));
+    std::fs::write(&path, rgba_to_vtf(&image).unwrap()).unwrap();
+    s.services
+        .library
+        .import_crosshair(&path, name, Provenance::Local)
+        .unwrap()
+}
+
+fn open_crosshairs(cx: &mut TestAppContext, s: &support::ShellWindow) {
+    support::click_id(cx, s.win, ids::nav(Page::Crosshairs));
+    let page = cx
+        .update(|cx| s.shell.read(cx).crosshairs_page())
+        .expect("a Crosshairs page");
+    support::wait_real(cx, "Crosshairs to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+}
+
+/// Picks profile `p` from the selection panel's menu and checks the Profiles page opened `p`'s
+/// editor on its Crosshairs slot with `crosshair` picked and nothing saved.
+fn pick_opens_editor(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    p: &Profile,
+    crosshair: CrosshairRef,
+) {
+    support::click_id(cx, s.win, ids::CROSSHAIRS_ADD_TO_PROFILE);
+    support::click_id(cx, s.win, ids::crosshair_profile_pick(p.id()));
+    assert_eq!(
+        cx.update(|cx| s.shell.read(cx).page()),
+        Page::Profiles,
+        "the pick shows Profiles"
+    );
+    let page = cx
+        .update(|cx| s.shell.read(cx).profiles_page())
+        .expect("a Profiles page");
+    let editor = cx.update(|cx| page.read(cx).editor()).expect("the editor");
+    let (id, slot, picked) = cx.update(|cx| {
+        let e = editor.read(cx);
+        (
+            e.id().clone(),
+            e.selected(),
+            e.picker().read(cx).selected().cloned(),
+        )
+    });
+    assert_eq!(&id, p.id(), "the picked profile's editor");
+    assert_eq!(slot, Slot::Crosshairs, "on the Crosshairs slot");
+    assert_eq!(picked, Some(crosshair), "with the crosshair picked");
+    support::settle(cx, s.win);
+    assert_eq!(
+        reload(s, p).crosshairs(),
+        p.crosshairs(),
+        "nothing saved yet"
+    );
+}
+
+#[gpui_kit::test]
+fn a_library_crosshair_opens_the_profile_editor_picked(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let entry = seed_crosshair(&s, &env, "Dot");
+    profile(&s, ProfileDraft::new("Alpha"));
+    let p = profile(&s, ProfileDraft::new("Comp"));
+    open_crosshairs(cx, &s);
+    support::click_id(cx, s.win, ids::crosshair_library(entry.folder_name()));
+    pick_opens_editor(cx, &s, &p, CrosshairRef::Library(entry.id().clone()));
+}
+
+#[gpui_kit::test]
+fn a_builtin_crosshair_opens_the_profile_editor_picked(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let p = profile(&s, ProfileDraft::new("Comp"));
+    open_crosshairs(cx, &s);
+    let first = s.services.builtins.all()[0].clone();
+    support::click_id(cx, s.win, ids::crosshair_builtin(first.name()));
+    pick_opens_editor(cx, &s, &p, CrosshairRef::Builtin(first.name().to_owned()));
+}
+
+#[gpui_kit::test]
+fn the_crosshair_menu_says_no_profiles_and_stays(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    open_crosshairs(cx, &s);
+    let first = s.services.builtins.all()[0].clone();
+    support::click_id(cx, s.win, ids::crosshair_builtin(first.name()));
+    support::click_id(cx, s.win, ids::CROSSHAIRS_ADD_TO_PROFILE);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILE_MENU_EMPTY).as_deref(),
+        Some("No profiles yet")
+    );
+    support::click_id(cx, s.win, ids::PROFILE_MENU_EMPTY);
+    assert_eq!(cx.update(|cx| s.shell.read(cx).page()), Page::Crosshairs);
 }

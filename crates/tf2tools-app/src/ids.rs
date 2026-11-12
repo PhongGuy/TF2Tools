@@ -596,6 +596,9 @@ pub const CROSSHAIRS_EDIT: &str = "crosshairs-edit";
 pub const CROSSHAIRS_DELETE: &str = "crosshairs-delete";
 /// The Crosshairs page's "Copy to Crosshair Maker" button; present while a crosshair is selected.
 pub const CROSSHAIRS_COPY_TO_MAKER: &str = "crosshairs-copy-to-maker";
+/// The Crosshairs page's "Add to profile" button, opening the profile menu; present while a
+/// crosshair is selected.
+pub const CROSSHAIRS_ADD_TO_PROFILE: &str = "crosshair-add-to-profile";
 /// The Crosshairs page's Export PNG button; present while a crosshair is selected.
 pub const CROSSHAIRS_EXPORT_PNG: &str = "crosshairs-export-png";
 /// The installed HUD card, or the empty card when none is installed.
@@ -1348,6 +1351,11 @@ pub fn hud_add_to_profile(folder: &str) -> ElementId {
 /// One profile in a HUD card's "Add to profile" menu.
 pub fn hud_profile_pick(profile: &ProfileId) -> ElementId {
     keyed("hud-profile-pick", profile.as_str())
+}
+
+/// One profile in the Crosshairs page's "Add to profile" menu.
+pub fn crosshair_profile_pick(profile: &ProfileId) -> ElementId {
+    keyed("crosshair-profile-pick", profile.as_str())
 }
 
 /// The disabled "No profiles yet" item an "Add to profile" menu shows when there are none.
