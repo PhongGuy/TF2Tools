@@ -157,6 +157,23 @@ async fn ensuring_an_item_again_keeps_its_check() {
 }
 
 #[tokio::test]
+async fn a_new_file_clears_gone_and_a_removal_keeps_the_last_file_date() {
+    let env = store_env().await;
+    env.lib.ensure_gb_hud_checks(&ids(&[7, 8])).unwrap();
+    let record = |id, check, at| {
+        env.lib
+            .record_gb_hud_check(GbId::new(id), check, at)
+            .unwrap()
+    };
+    record(7, GbAddonCheck::Gone, NOW);
+    record(7, GbAddonCheck::Latest { file_date: 300 }, NOW + 1);
+    assert_eq!(check_row(&env.dir, 7), (Some(300), Some(NOW + 1), false));
+    record(8, GbAddonCheck::Latest { file_date: 200 }, NOW);
+    record(8, GbAddonCheck::Gone, NOW + 1);
+    assert_eq!(check_row(&env.dir, 8), (Some(200), Some(NOW + 1), true));
+}
+
+#[tokio::test]
 async fn a_check_records_the_newest_file_gone_items_and_failures() {
     let env = store_env().await;
     env.lib
