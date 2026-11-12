@@ -103,6 +103,7 @@ pub struct LogRow {
     deaths: u32,
     assists: u32,
     dmg: u32,
+    dt: Option<u32>,
 }
 
 impl LogRow {
@@ -164,6 +165,11 @@ impl LogRow {
     /// The player's damage.
     pub fn dmg(&self) -> u32 {
         self.dmg
+    }
+
+    /// The player's damage taken; `None` for a log stored before the cache kept it.
+    pub fn dt(&self) -> Option<u32> {
+        self.dt
     }
 }
 
@@ -346,7 +352,7 @@ impl LogsCache {
         let sql = format!(
             "{WINDOW_LOGS}
              SELECT l.id, l.title, l.map, l.date, l.length, l.state, l.body IS NOT NULL,
-                    r.class, r.seconds, r.kills, r.deaths, r.assists, r.dmg
+                    r.class, r.seconds, r.kills, r.deaths, r.assists, r.dmg, r.dt
              FROM logstf_logs l
              LEFT JOIN logstf_class_rows r ON r.log_id = l.id AND r.steam_id = ?1
              WHERE l.id IN (SELECT id FROM window_logs)
@@ -379,6 +385,7 @@ impl LogsCache {
                             deaths: 0,
                             assists: 0,
                             dmg: 0,
+                            dt: None,
                         });
                     }
                     let Some(log) = out.last_mut() else { continue };
@@ -390,6 +397,10 @@ impl LogsCache {
                         continue;
                     }
                     let stat = |i| row.get::<_, i64>(i).map(clamp_u32);
+                    // Damage taken is the player's whole-log figure, repeated on each class row.
+                    if log.classes.is_empty() {
+                        log.dt = row.get::<_, Option<i64>>(13)?.map(clamp_u32);
+                    }
                     log.classes.push(class);
                     log.seconds = log.seconds.saturating_add(stat(8)?);
                     log.kills = log.kills.saturating_add(stat(9)?);
@@ -718,13 +729,14 @@ impl LogsCache {
                 {
                     let mut row = tx.prepare(
                         "INSERT INTO logstf_class_rows (log_id, steam_id, class, seconds, kills,
-                             deaths, assists, dmg, heal, ubers, drops)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                             deaths, assists, dmg, heal, ubers, drops, dt)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                     )?;
                     let mut rename = tx.prepare(
                         "UPDATE logstf_players SET name = ?2
                          WHERE steam_id = ?1 AND name = CAST(steam_id AS TEXT)",
                     )?;
+                    let taken = damage_taken(detail);
                     for ((id, class), stats) in fold_class_rows(detail) {
                         let [seconds, kills, deaths, assists, dmg, heal, ubers, drops] = stats;
                         row.execute(params![
@@ -738,7 +750,8 @@ impl LogsCache {
                             dmg,
                             heal,
                             ubers,
-                            drops
+                            drops,
+                            taken.get(&id).copied().unwrap_or(0)
                         ])?;
                     }
                     for p in detail.players() {
@@ -901,6 +914,15 @@ fn fold_class_rows(detail: &LogDetail) -> HashMap<(SteamId, TfClass), ClassStats
         }
     }
     rows
+}
+
+/// Each player's damage taken over the log, summing a player named under two keys.
+fn damage_taken(detail: &LogDetail) -> HashMap<SteamId, i64> {
+    let mut taken: HashMap<SteamId, i64> = HashMap::new();
+    for p in detail.players() {
+        *taken.entry(p.steam_id()).or_default() += i64::from(p.dt());
+    }
+    taken
 }
 
 /// `id` as SQLite stores it; every public-universe SteamID64 fits in an i64.

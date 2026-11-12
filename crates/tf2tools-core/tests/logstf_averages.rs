@@ -185,8 +185,36 @@ async fn a_log_row_carries_the_players_line_and_state() {
         (7, 21, 6, 3896)
     );
     assert_eq!(ready.seconds(), 1714);
+    assert_eq!(ready.dt(), Some(5964), "the player line's damage taken");
     assert!(env.client.cache().log_body(3).unwrap().is_some());
     assert_eq!(env.client.cache().log_body(2).unwrap(), None);
+}
+
+#[tokio::test]
+async fn a_row_cached_before_damage_taken_was_kept_has_none() {
+    let env = logs_env().await;
+    env.client
+        .cache()
+        .add_player(&TrackedPlayer::new(arie(), "Arie"))
+        .unwrap();
+    mount_list(&env.server, ARIE, list_body(&[(3, days_ago(1))])).await;
+    mount_log(&env.server, 3, 200, logstf_fixture("log-4137103-6v6.json")).await;
+    env.client
+        .sync_player(
+            arie(),
+            LogsRange::Months3,
+            false,
+            &LogsCancel::new(),
+            &|_| {},
+        )
+        .await
+        .unwrap();
+    // Class rows stored before schema 18 carry no damage taken.
+    common::sql(&env.dir)
+        .execute_batch("UPDATE logstf_class_rows SET dt = NULL")
+        .unwrap();
+    let rows = env.client.cache().logs(arie(), LogsRange::Months3).unwrap();
+    assert_eq!((rows[0].kills(), rows[0].dt()), (7, None));
 }
 
 #[test]
