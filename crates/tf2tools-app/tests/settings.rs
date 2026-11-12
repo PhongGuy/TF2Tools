@@ -461,3 +461,40 @@ fn the_add_ons_card_toggles_mature_add_ons_and_saves_at_once(cx: &mut TestAppCon
         Some(true)
     );
 }
+
+#[gpui_kit::test]
+fn the_logs_tf_card_toggles_nicknames_in_match_logs_and_saves_at_once(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(
+        cx,
+        &env,
+        Tf2State::Found(Tf2Install::from_path(&env.game).unwrap()),
+    );
+    let _page = open_settings(cx, &s);
+    support::wait_real(cx, "the saved value", |cx| {
+        cx.update(|cx| {
+            let nicknames = tf2tools_app::log_nicknames::LogNicknames::global(cx);
+            nicknames.read(cx).known()
+        })
+    });
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::SETTINGS_LOG_NICKNAMES),
+        Some(true)
+    );
+    cx.update_window(s.win, |_, w, cx| {
+        w.scroll(
+            ids::page(Page::Settings),
+            ScrollDelta::Pixels(point(px(0.), px(-800.))),
+            cx,
+        )
+    })
+    .unwrap();
+    support::click_id(cx, s.win, ids::SETTINGS_LOG_NICKNAMES);
+    support::wait_real(cx, "the save", |_| {
+        !s.services.db.settings().unwrap().show_log_nicknames()
+    });
+    assert_eq!(
+        support::checked_of(cx, s.win, ids::SETTINGS_LOG_NICKNAMES),
+        Some(false)
+    );
+}

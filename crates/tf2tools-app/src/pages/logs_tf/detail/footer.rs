@@ -8,7 +8,7 @@ use gpui_kit::{
     Pixels, SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _,
     WeakEntity, Window, div, px,
 };
-use tf2tools_core::{LogDetail, Team};
+use tf2tools_core::{LogDetail, SteamId, Team};
 
 use super::{team_cell, team_colour};
 use crate::ids;
@@ -29,6 +29,7 @@ const MESSAGE_MIN: Pixels = px(160.);
 #[derive(Clone)]
 pub(in crate::pages::logs_tf) struct StreakRow {
     time: String,
+    steam_id: SteamId,
     team: Option<Team>,
     name: String,
     streak: u32,
@@ -42,6 +43,7 @@ pub(in crate::pages::logs_tf) fn streak_rows(log: &LogDetail) -> Vec<StreakRow> 
             let player = log.players().iter().find(|p| p.steam_id() == k.steam_id());
             StreakRow {
                 time: duration_text(k.at()),
+                steam_id: k.steam_id(),
                 team: player.map(|p| p.team()),
                 name: player.map_or_else(|| k.steam_id().id64().to_string(), |p| p.name().into()),
                 streak: k.streak(),
@@ -92,11 +94,16 @@ pub(super) fn footer(id: u64, log: &LogDetail, page: WeakEntity<LogsTfPage>) -> 
 /// message, scrolling inside the dialog when it outgrows the window.
 pub(in crate::pages::logs_tf) fn chat_dialog(
     rows: &[ChatRow],
+    tracked: &super::Tracked,
     window: &Window,
     cx: &App,
 ) -> AnyElement {
     let lines = rows.iter().enumerate().map(|(ix, row)| {
-        let label = SharedString::from(format!("{}: {}", row.name, row.msg));
+        let nickname = row
+            .steam_id
+            .and_then(|id| Some((id, tracked.nickname(id)?)));
+        let shown = nickname.map_or(row.name.as_str(), |(_, n)| n);
+        let label = SharedString::from(format!("{shown}: {}", row.msg));
         h_flex()
             .id(ids::logstf_chat_line(ix))
             .aria_label(label)
@@ -106,14 +113,17 @@ pub(in crate::pages::logs_tf) fn chat_dialog(
             .child(badge(row.team, cx))
             .child(
                 // The name takes the line's spare room and is cut only past it.
-                name(&row.name, row.team, cx)
+                name(shown, row.team, cx)
                     .flex_initial()
                     .min_w_0()
                     .max_w_full()
                     .id(ids::logstf_chat_name(ix))
                     .test_support()
-                    .tooltip(tip(ids::LOGSTF_NAME_TIP, row.name.clone())),
+                    .tooltip(tip(ids::LOGSTF_NAME_TIP, shown.to_owned())),
             )
+            .children(nickname.map(|(id, _)| {
+                super::nick_marker(ids::logstf_nick(&format!("chat:{ix}"), id), &row.name)
+            }))
             .child(div().flex_1().min_w(MESSAGE_MIN).child(row.msg.clone()))
     });
     let body = if rows.is_empty() {
@@ -127,6 +137,7 @@ pub(in crate::pages::logs_tf) fn chat_dialog(
 /// The killstreaks dialog's content: when, who and how many, earliest first.
 pub(in crate::pages::logs_tf) fn streaks_dialog(
     rows: &[StreakRow],
+    tracked: &super::Tracked,
     window: &Window,
     cx: &App,
 ) -> AnyElement {
@@ -137,7 +148,9 @@ pub(in crate::pages::logs_tf) fn streaks_dialog(
         .child(div().flex_1().child("Player"))
         .child(div().w(TIME).flex_none().text_right().child("Streak"));
     let lines = rows.iter().enumerate().map(|(ix, row)| {
-        let label = SharedString::from(format!("{} {} {}", row.time, row.name, row.streak));
+        let nickname = tracked.nickname(row.steam_id);
+        let shown = nickname.unwrap_or(&row.name);
+        let label = SharedString::from(format!("{} {shown} {}", row.time, row.streak));
         h_flex()
             .id(ids::logstf_streak(ix))
             .aria_label(label)
@@ -146,13 +159,23 @@ pub(in crate::pages::logs_tf) fn streaks_dialog(
             .child(div().w(TIME).flex_none().child(row.time.clone()))
             .child(
                 // The streak's name has the row to itself, so it is cut only at the row's end.
-                div().flex_1().min_w_0().child(
-                    name(&row.name, row.team, cx)
-                        .id(ids::logstf_streak_name(ix))
-                        .aria_label(row.name.clone())
-                        .test_support()
-                        .max_w_full(),
-                ),
+                h_flex()
+                    .flex_1()
+                    .min_w_0()
+                    .gap_1()
+                    .child(
+                        name(shown, row.team, cx)
+                            .flex_initial()
+                            .min_w_0()
+                            .id(ids::logstf_streak_name(ix))
+                            .aria_label(shown.to_owned())
+                            .test_support()
+                            .max_w_full(),
+                    )
+                    .children(nickname.map(|_| {
+                        let place = format!("streak:{ix}");
+                        super::nick_marker(ids::logstf_nick(&place, row.steam_id), &row.name)
+                    })),
             )
             .child(
                 div()

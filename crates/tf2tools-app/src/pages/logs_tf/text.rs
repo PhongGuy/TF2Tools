@@ -384,6 +384,14 @@ pub fn streaks_label(n: usize) -> String {
     format!("Show Killstreaks ({n})")
 }
 
+/// What a nickname marker's tooltip says, naming the player as the log does.
+pub fn nickname_note(log_name: &str) -> String {
+    format!(
+        "This is your nickname for this player. Their name in this log is {log_name}. \
+         You can turn this off in Settings."
+    )
+}
+
 /// A team's name as the app writes it: "BLU" or "RED".
 pub fn team_name(team: Team) -> &'static str {
     match team {

@@ -8,7 +8,7 @@ use gpui_kit::{
     App, Div, FontWeight, InteractiveElement as _, ParentElement as _, Pixels, Role,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, div, px,
 };
-use tf2tools_core::{LogDetail, MatrixKind, SteamId, TfClass};
+use tf2tools_core::{LogDetail, MatrixKind, TfClass};
 
 use super::{ICON, class_cell, team_cell};
 use crate::ids;
@@ -18,7 +18,6 @@ use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
-use crate::widgets::tip::tip;
 
 // The fixed columns before the nine classes. The name is sized at its minimum so a long one
 // never widens the table, and grows into any room the window leaves, truncating the rest.
@@ -38,7 +37,7 @@ const TABS: [(MatrixKind, &str, &str); 3] = [
 pub(super) fn matrix(
     log: &LogDetail,
     kind: MatrixKind,
-    is_tracked: &dyn Fn(SteamId) -> bool,
+    tracked: &super::Tracked,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> Div {
@@ -70,11 +69,11 @@ pub(super) fn matrix(
         .children(TABS.map(tab));
     v_flex().gap_2().child(tabs).child(sideways(
         ids::LOGSTF_MATRIX_SCROLL,
-        table(log, kind, is_tracked, cx),
+        table(log, kind, tracked, cx),
     ))
 }
 
-fn table(log: &LogDetail, kind: MatrixKind, is_tracked: &dyn Fn(SteamId) -> bool, cx: &App) -> Div {
+fn table(log: &LogDetail, kind: MatrixKind, tracked: &super::Tracked, cx: &App) -> Div {
     let muted = cx.theme().muted_foreground;
     let heading = |text: &'static str| div().flex_none().child(text);
     let total = TABS.iter().find(|t| t.0 == kind).map_or("K", |t| t.2);
@@ -116,7 +115,7 @@ fn table(log: &LogDetail, kind: MatrixKind, is_tracked: &dyn Fn(SteamId) -> bool
         };
         let counts = row.counts();
         table = table.child(
-            super::player_row(h_flex().id(ids::logstf_matrix_row(id)), is_tracked(id), cx)
+            super::player_row(h_flex().id(ids::logstf_matrix_row(id)), tracked.is(id), cx)
                 .test_support()
                 .gap_1()
                 .px_1()
@@ -124,16 +123,16 @@ fn table(log: &LogDetail, kind: MatrixKind, is_tracked: &dyn Fn(SteamId) -> bool
                 .border_t_1()
                 .border_color(cx.theme().border)
                 .child(team_cell(player.team(), cx).w(TEAM))
-                .child(
+                .child(super::name_cell(
                     div()
                         .id(ids::logstf_matrix_name(id))
-                        .test_support()
-                        .tooltip(tip(ids::LOGSTF_NAME_TIP, player.name().to_owned()))
                         .w(NAME_MIN)
-                        .flex_grow(1.)
-                        .truncate()
-                        .child(player.name().to_owned()),
-                )
+                        .flex_grow(1.),
+                    id,
+                    player.name(),
+                    tracked,
+                    "matrix",
+                ))
                 .child(div().w(MAIN).flex_none().children(main))
                 .children(
                     TfClass::ALL

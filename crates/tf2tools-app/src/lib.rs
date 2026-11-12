@@ -25,6 +25,7 @@ pub mod library_events;
 pub mod links;
 pub mod loadout;
 pub mod local_messages;
+pub mod log_nicknames;
 pub mod logs_sync;
 pub mod map_messages;
 pub mod mastercomfig_restore;

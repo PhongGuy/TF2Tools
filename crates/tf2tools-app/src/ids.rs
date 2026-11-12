@@ -793,6 +793,8 @@ pub const ADDON_DETAIL_BAR: &str = "addon-detail-bar";
 pub const ADDON_DETAIL_BLOCKED: &str = "addon-detail-blocked";
 /// The Settings "Show mature add-ons" switch.
 pub const SETTINGS_MATURE_ADDONS: &str = "settings-mature-addons";
+/// The Settings "Show nicknames in match logs" switch.
+pub const SETTINGS_LOG_NICKNAMES: &str = "settings-log-nicknames";
 /// Wraps the Activity Log's category select.
 pub const LOGS_CATEGORY: &str = "logs-category";
 /// Wraps the Activity Log's level select.
@@ -2518,6 +2520,16 @@ pub const LOGSTF_ADD_CONFIRM: &str = "logstf-add-confirm";
 pub const LOGSTF_ADD_CANCEL: &str = "logstf-add-cancel";
 /// Labelled with why the add-player dialog could not add the player.
 pub const LOGSTF_ADD_ERROR: &str = "logstf-add-error";
+/// The add-player dialog's optional nickname field.
+pub const LOGSTF_ADD_NICKNAME: &str = "logstf-add-nickname";
+/// The rename dialog's nickname field.
+pub const LOGSTF_RENAME_INPUT: &str = "logstf-rename-input";
+/// The rename dialog's Save button; a blank field clears the nickname.
+pub const LOGSTF_RENAME_SAVE: &str = "logstf-rename-save";
+/// The rename dialog's Cancel button.
+pub const LOGSTF_RENAME_CANCEL: &str = "logstf-rename-cancel";
+/// Labelled with a nickname marker's tooltip, which gives the player's name in the log.
+pub const LOGSTF_NICK_TIP: &str = "logstf-nick-tip";
 /// Forces a fresh logs.tf sync of the active player.
 pub const LOGSTF_REFRESH: &str = "logstf-refresh";
 /// "Open profile on logs.tf" for the active player.
@@ -2994,6 +3006,18 @@ pub fn logstf_download(id: u64) -> ElementId {
 /// One tracked player's chip, selected while active: "logstf-chip:<id64>".
 pub fn logstf_chip(id: SteamId) -> ElementId {
     keyed("logstf-chip", &id.id64().to_string())
+}
+
+/// The pencil beside a player's chip that opens their nickname: "logstf-chip-rename:<id64>".
+pub fn logstf_chip_rename(id: SteamId) -> ElementId {
+    keyed("logstf-chip-rename", &id.id64().to_string())
+}
+
+/// The marker after a nicknamed player's name in an open log, `place` naming the table
+/// ("player", "matrix", "medic", "heal:<medic id64>", "round:<log>:<n>", "chat:<ix>",
+/// "streak:<ix>"): "logstf-nick:<place>:<id64>".
+pub fn logstf_nick(place: &str, id: SteamId) -> ElementId {
+    keyed("logstf-nick", &format!("{place}:{}", id.id64()))
 }
 
 /// The x beside a player's chip that asks to stop tracking them: "logstf-chip-remove:<id64>".

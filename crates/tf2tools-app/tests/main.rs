@@ -149,6 +149,7 @@ mod logs;
 mod logs_model;
 mod logs_tf;
 mod logs_tf_detail;
+mod logs_tf_nicknames;
 mod logs_tf_open;
 mod logs_tf_range;
 mod logs_tf_rows;
