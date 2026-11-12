@@ -52,6 +52,7 @@ mod curated_model;
 mod diagnostics;
 mod dialog_frame;
 mod external_huds;
+mod folder_load;
 mod font_check;
 mod font_check_flow;
 mod font_dialog;
