@@ -12,7 +12,7 @@ use common::{
 };
 use tf2tools_core::{
     BuiltinCrosshairs, CrosshairEntry, CrosshairRef, InstallError, Provenance, SkipReason,
-    crosshair_scripts_need_repair,
+    crosshair_scripts_need_repair, decode_vtf,
 };
 
 const MATERIALS: &str = "tf2tools-crosshairs/materials/vgui/replay/thumbnails";
@@ -83,10 +83,10 @@ fn apply_writes_textures_and_scripts_for_builtin_and_library_crosshairs() {
     expected.sort();
     let custom = env.tf2.custom_dir();
     assert_eq!(tree(&custom), expected);
-    assert_eq!(
-        fs::read(custom.join(MATERIALS).join("cpma_9.vtf")).unwrap(),
-        fs::read(bundled().join("vtf/cpma_9.vtf")).unwrap()
-    );
+    // cpma_9 ships at 32x32, so it lands in the game scaled to the 64x64 the scripts expect.
+    let installed =
+        decode_vtf(&fs::read(custom.join(MATERIALS).join("cpma_9.vtf")).unwrap()).unwrap();
+    assert_eq!((installed.width(), installed.height()), (64, 64));
     assert_eq!(
         fs::read(custom.join(MATERIALS).join("cpma_9.vmt")).unwrap(),
         fs::read(bundled().join("vmt/cpma_9.vmt")).unwrap()
@@ -762,4 +762,58 @@ fn no_repair_without_old_weapon_scripts() {
         OLD_SCRIPT.as_bytes(),
     );
     assert!(!crosshair_scripts_need_repair(&env.tf2));
+}
+
+/// Applies `name` on the rocket launcher and returns the VTF the game would load.
+fn apply_builtin(env: &LibraryEnv, name: &str) -> Vec<u8> {
+    env.lib
+        .assign("tf_weapon_rocketlauncher", &builtin(name))
+        .unwrap();
+    env.lib.apply_crosshairs(&env.tf2, &catalog()).unwrap();
+    fs::read(
+        env.tf2
+            .custom_dir()
+            .join(MATERIALS)
+            .join(format!("{name}.vtf")),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_32x32_crosshair_is_installed_scaled_to_64x64_pixel_for_pixel() {
+    let env = crosshair_env();
+    let source = decode_vtf(&fs::read(bundled().join("vtf/ql_6.vtf")).unwrap()).unwrap();
+    assert_eq!((source.width(), source.height()), (32, 32));
+    let installed = decode_vtf(&apply_builtin(&env, "ql_6")).unwrap();
+    assert_eq!((installed.width(), installed.height()), (64, 64));
+
+    // Nearest neighbour: every source pixel becomes a 2x2 block, so the single centre dot
+    // stays one dot in the middle instead of tiling into four.
+    let at = |img: &tf2tools_core::RgbaImage, x: u32, y: u32| {
+        let i = ((y * img.width() + x) * 4) as usize;
+        img.pixels()[i..i + 4].to_vec()
+    };
+    let opaque = (0..32)
+        .flat_map(|y| (0..32).map(move |x| (x, y)))
+        .filter(|&(x, y)| at(&source, x, y)[3] > 0)
+        .count();
+    assert!(opaque > 0, "ql_6 should draw a dot");
+    for y in 0..64 {
+        for x in 0..64 {
+            assert_eq!(
+                at(&installed, x, y),
+                at(&source, x / 2, y / 2),
+                "pixel {x},{y}"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_64x64_crosshair_is_installed_byte_for_byte() {
+    let env = crosshair_env();
+    assert_eq!(
+        apply_builtin(&env, "cross2"),
+        fs::read(bundled().join("vtf/cross2.vtf")).unwrap()
+    );
 }
