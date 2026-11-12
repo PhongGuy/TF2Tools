@@ -3,7 +3,7 @@
 
 use super::probe;
 use super::rules::{
-    CLASS_SELECT, FREEZE_PANEL, HOLD_SCORES, MAIN_MENU, RULES, SCOREBOARD, SPECTATOR_PANELS,
+    CLASS_SELECT, FREEZE_PANELS, HOLD_SCORES, MAIN_MENU, RULES, SCOREBOARD, SPECTATOR_PANELS,
     WIN_PANEL,
 };
 use super::{
@@ -322,6 +322,18 @@ const POWERUP_WHEN: &str = "Shows while you carry a Mannpower powerup";
 const TYPING: ShowsFor = ShowsFor::Mode("typing");
 const TYPING_WHEN: &str = "Shows while you type a chat message";
 
+// The KOTH panel shows only on a King of the Hill map, in the HUD and the freeze cam alike.
+const KOTH_TOGGLED: CodeToggled = fitted(
+    when(
+        "HudKothTimeStatus",
+        ShowsFor::Mode("koth"),
+        "Shows on King of the Hill maps",
+    ),
+    &[],
+    HideTechnique::OffScreenY,
+    Fit::None,
+);
+
 // What the game checks before it shows each HUD part its code toggles; the preview shows the
 // default situation, `ShowsFor::in_default`.
 static HUD_TOGGLED: [CodeToggled; 55] = [
@@ -468,16 +480,7 @@ static HUD_TOGGLED: [CodeToggled; 55] = [
     when("ChatFiltersButton", TYPING, TYPING_WHEN),
     // On a King of the Hill map the KOTH timers take the round timer's place; both keep the
     // round timer's off-screen hide.
-    fitted(
-        when(
-            "HudKothTimeStatus",
-            ShowsFor::Mode("koth"),
-            "Shows on King of the Hill maps",
-        ),
-        &[],
-        HideTechnique::OffScreenY,
-        Fit::None,
-    ),
+    KOTH_TOGGLED,
     fitted(
         when(
             "ObjectiveStatusTimePanel",
@@ -827,7 +830,7 @@ static MENU: SceneRule = SceneRule {
 // What the freeze cam's code shows or hides (`tf_hud_freezepanel.cpp`, by function name):
 // the screenshot hint only with a screenshot key bound, the nemesis and item panels only in
 // their situations. The last two are the killer health panel's, assumed rather than checked in game.
-static FREEZE_TOGGLED: [CodeToggled; 5] = [
+static FREEZE_TOGGLED: [CodeToggled; 9] = [
     toggled(
         "ScreenshotPanel",
         true,
@@ -853,10 +856,20 @@ static FREEZE_TOGGLED: [CodeToggled; 5] = [
         false,
         "Shows when your killer is a building",
     ),
+    // The HUD parts kept over the freeze cam: the KOTH panel only on a KOTH map, its timers'
+    // digits blank until the respawn count starts, and no chat typing in the sample.
+    KOTH_TOGGLED,
+    toggled("ChatInputLine", false, TYPING_WHEN),
+    toggled("ChatFiltersButton", false, TYPING_WHEN),
+    toggled(
+        "TimePanelValue",
+        false,
+        "Shows the time left while you are alive",
+    ),
 ];
 
 // The freeze cam reads its root's box from hudlayout, the panel file and the killer health
-// file; the HUD is not drawn there.
+// file; of the HUD only the killfeed, chat and KOTH panel stay, read from their own files.
 static FREEZE: SceneRule = SceneRule {
     scene: Scene::FreezeCam,
     label: "Death and freeze cam",
@@ -864,18 +877,29 @@ static FREEZE: SceneRule = SceneRule {
         "scripts/hudlayout.res",
         "resource/ui/freezepanel_basic.res",
         "resource/ui/freezepanelkillerhealth.res",
+        "resource/ui/basechat.res",
+        "resource/ui/hudobjectivekothtimepanel.res",
+        TIME_PANEL,
     ],
-    extras: &[],
+    extras: &[
+        "resource/ui/basechat.res",
+        "resource/ui/hudobjectivekothtimepanel.res",
+        TIME_PANEL,
+    ],
     read_only: &[],
     root: Some("FreezePanel"),
-    rules: std::slice::from_ref(&FREEZE_PANEL),
+    rules: &FREEZE_PANELS,
     code_toggled: &FREEZE_TOGGLED,
     code_classes: &[],
     toggle_any_depth: true,
-    nested: &[(
-        "FreezePanelHealth",
-        "resource/ui/freezepanelkillerhealth.res",
-    )],
+    nested: &[
+        (
+            "FreezePanelHealth",
+            "resource/ui/freezepanelkillerhealth.res",
+        ),
+        ("BlueTimer", TIME_PANEL),
+        ("RedTimer", TIME_PANEL),
+    ],
     hides_hud: true,
     sample: SampleSet::Killed,
     mode: BoardMode::Casual,
@@ -1284,7 +1308,7 @@ impl SceneRule {
         self.nested
     }
 
-    /// Whether the game hides the HUD while this scene is up.
+    /// Whether the game hides the HUD's crosshair and every HUD part the scene's rules omit.
     pub fn hides_hud(&self) -> bool {
         self.hides_hud
     }

@@ -484,6 +484,8 @@ pub const HUD_MAKER_BACKDROP: &str = "hud-maker-backdrop";
 pub const HUD_MAKER_BACKDROP_CLEAR: &str = "hud-maker-backdrop-clear";
 /// The screenshot drawn behind the HUD, stretched over the screen.
 pub const HUD_MAKER_BACKDROP_IMAGE: &str = "hud-maker-backdrop-image";
+/// The shade over the backdrop that darkens the world during the freeze cam.
+pub const HUD_MAKER_FREEZE_SHADE: &str = "hud-maker-freeze-shade";
 /// The game's picture behind the main menu scene.
 pub const HUD_MAKER_MENU_BACKGROUND: &str = "hud-maker-menu-background";
 /// The line shown over the main menu screen while its picture is being read.

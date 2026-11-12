@@ -23,7 +23,16 @@ fn k(text: &str) -> PartKey {
 #[test]
 fn the_killer_health_file_fills_the_health_panel() {
     let rule = SceneRule::get(Scene::FreezeCam);
-    assert_eq!(rule.nested(), [("FreezePanelHealth", HEALTH)]);
+    // The KOTH timers kept over the freeze cam load the round timer's file, as in the HUD.
+    let time = "resource/ui/hudobjectivetimepanel.res";
+    assert_eq!(
+        rule.nested(),
+        [
+            ("FreezePanelHealth", HEALTH),
+            ("BlueTimer", time),
+            ("RedTimer", time)
+        ]
+    );
     let m = freeze();
     assert!(m.problems().is_empty());
     let l = m.layout(SD);

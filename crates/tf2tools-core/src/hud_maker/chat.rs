@@ -86,10 +86,10 @@ impl ChatLine {
 }
 
 impl HudModel {
-    /// The sample chat at `screen`; `None` outside the HUD scene, without a HudChat or
+    /// The sample chat at `screen`; `None` outside the HUD and freeze cam, without a HudChat or
     /// HudChatHistory part, when the history is unreadable, or when its box is hidden.
     pub fn chat_sample(&self, screen: Screen) -> Option<ChatSample> {
-        if self.scene() != Scene::Hud {
+        if !matches!(self.scene(), Scene::Hud | Scene::FreezeCam) {
             return None;
         }
         let history = PartKey::new(HISTORY);

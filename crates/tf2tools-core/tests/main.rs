@@ -135,6 +135,7 @@ mod hud_scene_class_edits;
 mod hud_scene_class_toggles;
 mod hud_scene_edits;
 mod hud_scene_freeze;
+mod hud_scene_freeze_hud;
 mod hud_scene_freeze_nested;
 mod hud_scene_freeze_toggles;
 mod hud_scene_layout;

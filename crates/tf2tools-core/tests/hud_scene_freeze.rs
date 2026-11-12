@@ -30,11 +30,15 @@ fn at(m: &HudModel, key: &str) -> (i32, i32, i32, i32) {
 fn the_scene_reads_two_files_and_one_root_and_hides_the_hud() {
     let rule = SceneRule::get(Scene::FreezeCam);
     assert_eq!(rule.label(), "Death and freeze cam");
-    assert_eq!(rule.files(), ["scripts/hudlayout.res", BASIC, HEALTH]);
+    assert_eq!(
+        rule.problem_files(),
+        ["scripts/hudlayout.res", BASIC, HEALTH]
+    );
     assert!(rule.read_only_files().is_empty());
     assert_eq!(rule.root(), Some("FreezePanel"));
     assert!(rule.hides_hud());
-    let [panel] = rule.rules() else {
+    // The freeze panel leads; the HUD parts kept over it follow.
+    let [panel, ..] = rule.rules() else {
         panic!("one root")
     };
     assert_eq!(panel.id(), PartId::FreezeCam);
