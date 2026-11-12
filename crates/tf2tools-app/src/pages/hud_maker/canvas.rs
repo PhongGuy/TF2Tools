@@ -1748,9 +1748,12 @@ fn look_kind<'l>(part: &Part, look: &'l Look) -> Kind<'l> {
         return Kind::Image(image);
     }
     // The game's code sets some labels' text itself, over what the file's labelText says.
+    let code_text = || {
+        SampleSet::koth_clock(part.key().as_str()).or_else(|| look.sample.code_text(part.name()))
+    };
     let text = match look.sample.code_label(part.name()) {
         Some(label) => label.text(),
-        None => match look.sample.code_text(part.name()) {
+        None => match code_text() {
             Some(text) => text,
             None => match part.value("labelText") {
                 Some(text) => text.text(),

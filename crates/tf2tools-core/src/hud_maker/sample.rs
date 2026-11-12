@@ -761,6 +761,24 @@ impl SampleSet {
         (self == SampleSet::Won).then_some(Team::Blue)
     }
 
+    /// The time the game's code writes into the KOTH team clock at part path `key`, over the
+    /// file's labelText; `None` for any other part. Both clocks start at 3:00 and only the
+    /// team holding the point counts down, so the sample has BLU holding it part-way through.
+    pub fn koth_clock(key: &str) -> Option<&'static str> {
+        let (panel, rest) = key.split_once('/')?;
+        let (timer, label) = rest.split_once('/')?;
+        if !panel.eq_ignore_ascii_case("HudKothTimeStatus")
+            || !label.eq_ignore_ascii_case("TimePanelValue")
+        {
+            return None;
+        }
+        match timer.to_ascii_lowercase().as_str() {
+            "bluetimer" => Some("2:14"),
+            "redtimer" => Some("3:00"),
+            _ => None,
+        }
+    }
+
     /// The text and colour the game's code sets on the part named `part`, matched ASCII
     /// case-insensitively; only the win panel sample has any.
     pub fn code_label(self, part: &str) -> Option<CodeLabel> {
