@@ -528,6 +528,59 @@ async fn remove_refuses_while_tf2_runs_when_a_vpk_is_installed() {
 }
 
 #[tokio::test]
+async fn remove_deletes_the_sound_cache_tf2_wrote_beside_its_vpk() {
+    let s = setup().await;
+    let d = download(&s, 23, "Crit", "crit.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["crit.vpk"]), &s.tf2, &no)
+        .unwrap();
+    let dir = s.tf2.custom_dir();
+    common::write_file(&dir.join("tf2tools-gb-23-crit.vpk.sound.cache"), b"c");
+    s.env
+        .lib
+        .remove_gb_addon(GbId::new(23), &s.tf2, &no)
+        .unwrap();
+    assert!(custom(&s).is_empty(), "{:?}", custom(&s));
+}
+
+#[tokio::test]
+async fn remove_deletes_a_multi_chunk_vpks_sound_cache_and_keeps_others() {
+    let s = setup().await;
+    let body = common::zip_bytes(&[("big_dir.vpk", &vpk(b"d")), ("big_000.vpk", &[0u8; 32])]);
+    let d = download(&s, 24, "Big", "big.zip", body, 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["big_dir.vpk"]), &s.tf2, &no)
+        .unwrap();
+    let dir = s.tf2.custom_dir();
+    common::write_file(&dir.join("tf2tools-gb-24-big_dir.vpk.sound.cache"), b"c");
+    common::write_file(&dir.join("tf2tools-gb-24-big.vpk.sound.cache"), b"c");
+    common::write_file(&dir.join("foreign.vpk.sound.cache"), b"f");
+    s.env
+        .lib
+        .remove_gb_addon(GbId::new(24), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(custom(&s), ["foreign.vpk.sound.cache"]);
+}
+
+#[tokio::test]
+async fn remove_without_a_sound_cache_is_not_an_error() {
+    let s = setup().await;
+    let d = download(&s, 25, "Crit", "crit.vpk", vpk(b"v"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["crit.vpk"]), &s.tf2, &no)
+        .unwrap();
+    common::write_file(&s.tf2.custom_dir().join("other.vpk.sound.cache"), b"f");
+    s.env
+        .lib
+        .remove_gb_addon(GbId::new(25), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(custom(&s), ["other.vpk.sound.cache"]);
+}
+
+#[tokio::test]
 async fn removing_an_unknown_addon_is_not_in_library() {
     let s = setup().await;
     let err = s
