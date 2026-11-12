@@ -306,9 +306,15 @@ impl Http {
         self.open_retrying_until(url, stop).await
     }
 
-    /// `open_retrying` with no way to stop its 429 waits.
-    pub(crate) async fn open_retrying(&self, url: &str) -> Result<Body, NetFailure> {
-        self.open_retrying_until(url, std::future::pending()).await
+    /// `open_retrying_until` with no way to stop its 429 waits, calling `on_rate_limit` on
+    /// every 429 so a pacer can widen its gaps.
+    pub(crate) async fn open_retrying(
+        &self,
+        url: &str,
+        on_rate_limit: impl Fn(),
+    ) -> Result<Body, NetFailure> {
+        self.open_retrying_reporting(url, std::future::pending(), on_rate_limit)
+            .await
     }
 
     /// Sends with the User-Agent and no spacing, retries a 429 after backoff, 2x and 4x
@@ -321,6 +327,16 @@ impl Http {
         url: &str,
         stop: impl Future<Output = ()>,
     ) -> Result<Body, NetFailure> {
+        self.open_retrying_reporting(url, stop, || {}).await
+    }
+
+    /// `open_retrying_until` that also calls `on_rate_limit` on every 429.
+    async fn open_retrying_reporting(
+        &self,
+        url: &str,
+        stop: impl Future<Output = ()>,
+        on_rate_limit: impl Fn(),
+    ) -> Result<Body, NetFailure> {
         let mut stop = pin!(stop);
         let mut retries = 0;
         let mut waited = Duration::ZERO;
@@ -330,6 +346,7 @@ impl Http {
                 return accept(url, response);
             }
             let _ = RATE_LIMITS.try_with(|count| count.set(count.get() + 1));
+            on_rate_limit();
             let host = reqwest::Url::parse(url)
                 .ok()
                 .and_then(|u| u.host_str().map(str::to_owned))
@@ -747,7 +764,7 @@ mod tests {
         let http = Http::new(Duration::from_secs(5), Duration::from_millis(1), USER_AGENT);
         let start = Instant::now();
         let body = http
-            .open_retrying(&format!("{}/x", server.uri()))
+            .open_retrying(&format!("{}/x", server.uri()), || {})
             .await
             .unwrap()
             .read_to_end(1024)

@@ -574,10 +574,10 @@ impl StoreClient {
         read: impl Fn(&[u8]) -> pacer::Reply<T>,
     ) -> Result<T, GbFailure> {
         // Shared references are Copy, so every attempt's future owns its own captures.
-        let (http, read) = (&self.http, &read);
+        let (http, read, pacer) = (&self.http, &read, &self.pacer);
         let attempt = move || async move {
             let body = http
-                .open_retrying(url)
+                .open_retrying(url, || pacer.rate_limited())
                 .await?
                 .read_to_end(API_BODY_LIMIT)
                 .await?;

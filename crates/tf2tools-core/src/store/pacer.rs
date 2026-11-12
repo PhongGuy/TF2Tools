@@ -54,22 +54,50 @@ pub(crate) struct PacerStats {
     pub(crate) throttled: u64,
 }
 
+/// One priority's spacing: the gap it keeps after any start and how its own replies widened it.
+#[derive(Debug)]
+struct Lane {
+    gap: Duration,
+    /// The earliest this lane's next call may start; None before the first call.
+    next: Option<Instant>,
+    /// Clean replies in a row while this lane is backed off.
+    clean: u32,
+}
+
+impl Lane {
+    fn new(base: Duration) -> Self {
+        Self {
+            gap: base,
+            next: None,
+            clean: 0,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct State {
     base: Duration,
-    gap: Duration,
-    /// The earliest the next call may start; None before the first call.
-    next: Option<Instant>,
-    /// When the latest call started.
+    /// Interactive calls keep their own gap, so a sync's empty replies never slow a page.
+    interactive: Lane,
+    background: Lane,
+    /// When the latest call of either priority started.
     last: Option<Instant>,
-    clean: u32,
-    /// Answers in a row since the last 429, while the gap is widened.
+    /// Answers in a row since the last 429, while a gap is widened.
     answers: u32,
     interactive_waiting: usize,
     stats: PacerStats,
     /// Every start with the gap it reserved after itself, so tests check spacing exactly.
     #[cfg(test)]
     starts: Vec<(Instant, Duration)>,
+}
+
+impl State {
+    fn lane(&mut self, priority: Priority) -> &mut Lane {
+        match priority {
+            Priority::Interactive => &mut self.interactive,
+            Priority::Background => &mut self.background,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -88,10 +116,9 @@ impl Pacer {
     pub(crate) fn new(base: Duration) -> Self {
         let state = State {
             base,
-            gap: base,
-            next: None,
+            interactive: Lane::new(base),
+            background: Lane::new(base),
             last: None,
-            clean: 0,
             answers: 0,
             interactive_waiting: 0,
             stats: PacerStats::default(),
@@ -106,8 +133,15 @@ impl Pacer {
         }
     }
 
+    /// The background gap, the one sync work keeps between its calls.
     pub(crate) fn gap(&self) -> Duration {
-        self.lock().gap
+        self.lock().background.gap
+    }
+
+    /// The gap a call of `priority` waits after the latest start.
+    #[cfg(test)]
+    pub(crate) fn gap_of(&self, priority: Priority) -> Duration {
+        self.lock().lane(priority).gap
     }
 
     #[cfg_attr(
@@ -145,7 +179,7 @@ impl Pacer {
                 Ok(Reply::Empty) => {
                     empties += 1;
                     let throttled = empties >= EMPTY_LIMIT;
-                    self.empty(throttled);
+                    self.empty(priority, throttled);
                     if throttled {
                         return Err(Paced::Throttled);
                     }
@@ -162,41 +196,55 @@ impl Pacer {
             .unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Sets the base gap and the current gap to `base` from the next start on, clearing any
-    /// 429 widening and the run of answers easing it; a start already promised keeps its
-    /// time, so a shorter gap never pulls it forward.
+    /// Sets the base gap and both lanes' gaps to `base` from the next start on, clearing any
+    /// widening and the runs easing it; a start already promised keeps its time, so a
+    /// shorter gap never pulls it forward.
     pub(crate) fn set_base(&self, base: Duration) {
-        let mut s = self.lock();
+        let mut guard = self.lock();
+        let s = &mut *guard;
         s.base = base;
-        s.gap = base;
-        s.clean = 0;
+        for lane in [&mut s.interactive, &mut s.background] {
+            lane.gap = base;
+            lane.clean = 0;
+        }
         s.answers = 0;
     }
 
     /// Waits for this caller's start; a background caller also waits while any interactive one does.
     pub(crate) async fn slot(&self, priority: Priority) {
         let _ticket = Ticket::new(self, priority);
+        let asked = Instant::now();
         loop {
             // Made before the state is read, so a notify between the read and the await is kept.
             let notified = pin!(self.shared.interactive_left.notified());
             let wait = {
-                let mut s = self.lock();
+                let mut guard = self.lock();
+                let s = &mut *guard;
                 let now = Instant::now();
                 if priority == Priority::Background && s.interactive_waiting > 0 {
                     None
-                } else if s.next.is_none_or(|next| next <= now) {
-                    let gap = s.gap;
-                    s.next = Some(now + gap);
+                } else if s.lane(priority).next.is_none_or(|next| next <= now) {
+                    // Each lane keeps its own gap after every start, whichever lane took it.
+                    for lane in [&mut s.interactive, &mut s.background] {
+                        let after = now + lane.gap;
+                        lane.next = Some(lane.next.map_or(after, |next| next.max(after)));
+                    }
                     s.last = Some(now);
                     #[cfg(test)]
-                    s.starts.push((now, gap));
+                    {
+                        let gap = s.lane(priority).gap;
+                        s.starts.push((now, gap));
+                    }
                     match priority {
                         Priority::Interactive => s.stats.interactive += 1,
                         Priority::Background => s.stats.background += 1,
                     }
+                    drop(guard);
+                    let waited = now - asked;
+                    tracing::debug!(?priority, ?waited, "pacer slot");
                     return;
                 } else {
-                    s.next
+                    s.lane(priority).next
                 }
             };
             match wait {
@@ -206,57 +254,82 @@ impl Pacer {
         }
     }
 
-    /// A 429 came back: doubles the gap up to `MAX_GAP`, pushes the next start back to
-    /// match and restarts the run of answers that eases it.
+    /// A 429 came back: doubles both lanes' gaps up to `MAX_GAP`, pushes their next starts
+    /// back to match and restarts the run of answers that eases them.
     pub(crate) fn rate_limited(&self) {
         let mut s = self.lock();
         s.answers = 0;
-        widen(&mut s);
+        for priority in [Priority::Interactive, Priority::Background] {
+            let gap = widen(&mut s, priority);
+            tracing::debug!(?priority, ?gap, "pacer widened after a 429");
+        }
     }
 
-    /// A request was answered without a 429: every `EASE_AFTER` in a row halve a widened
+    /// A request was answered without a 429: every `EASE_AFTER` in a row halve each widened
     /// gap, never below the base.
     pub(crate) fn answered(&self) {
-        let mut s = self.lock();
-        if s.gap > s.base {
+        let mut guard = self.lock();
+        let s = &mut *guard;
+        let base = s.base;
+        if s.interactive.gap > base || s.background.gap > base {
             s.answers += 1;
             if s.answers >= EASE_AFTER {
-                s.gap = (s.gap / 2).max(s.base);
+                for lane in [&mut s.interactive, &mut s.background] {
+                    lane.gap = (lane.gap / 2).max(base);
+                }
                 s.answers = 0;
             }
         }
     }
 
-    fn empty(&self, throttled: bool) {
+    /// An empty reply widens only the lane of the call that got it.
+    fn empty(&self, priority: Priority, throttled: bool) {
         let mut s = self.lock();
         s.stats.empty += 1;
         if throttled {
             s.stats.throttled += 1;
         }
-        s.clean = 0;
-        widen(&mut s);
+        s.lane(priority).clean = 0;
+        let gap = widen(&mut s, priority);
+        tracing::debug!(
+            ?priority,
+            ?gap,
+            throttled,
+            "pacer widened after an empty reply"
+        );
     }
 
+    /// A clean reply counts toward resetting every widened lane, since the server is answering.
     fn clean(&self) {
-        let mut s = self.lock();
-        if s.gap > s.base {
-            s.clean += 1;
-            if s.clean >= CLEAN_TO_RESET {
-                s.gap = s.base;
-                s.clean = 0;
+        let mut guard = self.lock();
+        let s = &mut *guard;
+        let base = s.base;
+        for (priority, lane) in [
+            (Priority::Interactive, &mut s.interactive),
+            (Priority::Background, &mut s.background),
+        ] {
+            if lane.gap > base {
+                lane.clean += 1;
+                if lane.clean >= CLEAN_TO_RESET {
+                    lane.gap = base;
+                    lane.clean = 0;
+                    tracing::debug!(?priority, gap = ?base, "pacer gap back to base");
+                }
             }
         }
     }
 }
 
-/// Doubles the gap up to `MAX_GAP` and moves the next start to one new gap after the last.
-fn widen(s: &mut State) {
-    s.gap = s.gap.saturating_mul(2).min(MAX_GAP);
+/// Doubles the lane's gap up to `MAX_GAP`, moves its next start to one new gap after the
+/// last start and returns the new gap.
+fn widen(s: &mut State, priority: Priority) -> Duration {
+    let last = s.last;
+    let lane = s.lane(priority);
+    lane.gap = lane.gap.saturating_mul(2).min(MAX_GAP);
     // Never pull a pending start forward: a reset gap must not shorten a longer wait.
-    let gap = s.gap;
-    s.next = s
-        .last
-        .map(|last| s.next.map_or(last + gap, |next| next.max(last + gap)));
+    let gap = lane.gap;
+    lane.next = last.map(|last| lane.next.map_or(last + gap, |next| next.max(last + gap)));
+    gap
 }
 
 /// Counts an interactive caller as waiting until its slot starts or its future is dropped.
@@ -453,6 +526,20 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn an_interactive_call_never_waits_a_gap_background_replies_widened() {
+        let (pacer, log, t0) = (Pacer::new(BASE), Log::default(), Instant::now());
+        for _ in 0..3 {
+            let result = scripted(&pacer, Background, &[true, true, true], &log, t0).await;
+            assert_eq!(result, Err(Paced::Throttled));
+        }
+        assert_eq!(pacer.gap(), MAX_GAP);
+        assert_eq!(pacer.gap_of(Interactive), BASE);
+        scripted(&pacer, Interactive, &[], &log, t0).await.unwrap();
+        let at = starts(&log);
+        assert_eq!(at[9] - at[8], BASE, "the page waits only the base spacing");
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn ten_clean_replies_return_the_gap_to_its_base() {
         let (pacer, log, t0) = (Pacer::new(BASE), Log::default(), Instant::now());
         scripted(&pacer, Background, &[true], &log, t0)
@@ -590,6 +677,16 @@ mod tests {
             pacer.rate_limited();
         }
         assert_eq!(pacer.gap(), MAX_GAP);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_rate_limit_widens_the_interactive_lane_too() {
+        let (pacer, log, t0) = (Pacer::new(BASE), Log::default(), Instant::now());
+        scripted(&pacer, Background, &[], &log, t0).await.unwrap();
+        pacer.rate_limited();
+        assert_eq!(pacer.gap_of(Interactive), ms(400));
+        scripted(&pacer, Interactive, &[], &log, t0).await.unwrap();
+        assert_eq!(starts(&log), [ms(0), ms(400)]);
     }
 
     #[tokio::test(start_paused = true)]
