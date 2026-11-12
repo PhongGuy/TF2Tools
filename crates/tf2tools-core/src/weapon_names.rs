@@ -2,11 +2,14 @@
 //! and tf_english.txt.
 
 use std::collections::HashMap;
+use std::path::Path;
 
-use crate::GameText;
 use crate::fonts::Platform;
 use crate::fonts::keyvalues::{self, KvPair, block, block_named};
+use crate::fonts::read_regular_capped;
+use crate::game_icons::ITEMS_GAME_MAX_BYTES;
 use crate::weapon_icons::{inherited, prefab_map};
+use crate::{GameText, WeaponNamesError};
 
 /// Display names keyed by logs.tf weapon log name, looked up without regard to ASCII case.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -15,7 +18,33 @@ pub struct WeaponNames {
     names: HashMap<String, String>,
 }
 
+/// tf_english.txt read cap, matching what `GameText::parse` reads.
+const ENGLISH_MAX_BYTES: u64 = 16 * 1024 * 1024;
+
 impl WeaponNames {
+    /// Names from the game's `tf` folder: `scripts/items/items_game.txt` and
+    /// `resource/tf_english.txt`. Blocking; fails when either file cannot be read.
+    pub fn load(tf_dir: &Path) -> Result<WeaponNames, WeaponNamesError> {
+        let items_path = tf_dir.join("scripts/items/items_game.txt");
+        let items = read_capped(&items_path, ITEMS_GAME_MAX_BYTES).map_err(|source| {
+            WeaponNamesError::ItemsGame {
+                path: items_path,
+                source,
+            }
+        })?;
+        let english_path = tf_dir.join("resource/tf_english.txt");
+        let english = read_capped(&english_path, ENGLISH_MAX_BYTES).map_err(|source| {
+            WeaponNamesError::English {
+                path: english_path,
+                source,
+            }
+        })?;
+        Ok(WeaponNames::from_files(
+            &String::from_utf8_lossy(&items),
+            &english,
+        ))
+    }
+
     /// Names from items_game.txt text and tf_english.txt bytes (UTF-16 or UTF-8). An unlock is
     /// named by its `item_logname`, a stock weapon by its `tf_weapon_` class; the lowest
     /// defindex whose name localises wins, and an unlock beats a stock weapon of the same name.
@@ -74,4 +103,11 @@ impl WeaponNames {
             .get(&log_name.to_ascii_lowercase())
             .map(String::as_str)
     }
+}
+
+/// A whole regular file of at most `cap` bytes; anything else is an I/O error.
+fn read_capped(path: &Path, cap: u64) -> std::io::Result<Vec<u8>> {
+    read_regular_capped(path, cap)?.ok_or_else(|| {
+        std::io::Error::other(format!("not a file or over {} MiB", cap / (1024 * 1024)))
+    })
 }

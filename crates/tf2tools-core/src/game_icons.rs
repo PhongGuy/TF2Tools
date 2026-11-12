@@ -12,7 +12,7 @@ use crate::pak::{open_vpk, read_entry};
 use crate::texture::{RgbaImage, as_buffer, decode_vtf, stretch, write_png};
 use crate::weapon_inventory_images;
 
-const ITEMS_GAME_MAX_BYTES: u64 = 64 * 1024 * 1024;
+pub(crate) const ITEMS_GAME_MAX_BYTES: u64 = 64 * 1024 * 1024;
 const ICON_MAX_SIDE: u32 = 128;
 /// Part of every cache name; bump it when the size or filter changes so old icons are redrawn.
 const FORMAT: &str = "v1";

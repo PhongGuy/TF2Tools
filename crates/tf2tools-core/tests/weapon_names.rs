@@ -1,6 +1,6 @@
 //! Readable weapon names for logs.tf's log names, from items_game.txt and tf_english.txt.
 
-use tf2tools_core::WeaponNames;
+use tf2tools_core::{WeaponNames, WeaponNamesError};
 
 fn utf16le(text: &str) -> Vec<u8> {
     let mut out = vec![0xFF, 0xFE];
@@ -162,4 +162,48 @@ fn text_that_is_no_items_game_gives_no_names() {
         "UTF-8 lang too"
     );
     assert_eq!(WeaponNames::default().get("quake_rl"), None);
+}
+
+fn tf_folder(items: Option<&str>, english: Option<&[u8]>) -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    if let Some(items) = items {
+        std::fs::create_dir_all(dir.path().join("scripts/items")).unwrap();
+        std::fs::write(dir.path().join("scripts/items/items_game.txt"), items).unwrap();
+    }
+    if let Some(english) = english {
+        std::fs::create_dir_all(dir.path().join("resource")).unwrap();
+        std::fs::write(dir.path().join("resource/tf_english.txt"), english).unwrap();
+    }
+    dir
+}
+
+#[test]
+fn load_reads_items_game_and_the_english_lang_file() {
+    let lang = utf16le(LANG);
+    let tf = tf_folder(Some(ITEMS_GAME), Some(&lang));
+    assert_eq!(WeaponNames::load(tf.path()).unwrap(), names());
+}
+
+#[test]
+fn a_missing_items_game_or_lang_file_fails_the_load() {
+    let lang = utf16le(LANG);
+    let err = WeaponNames::load(tf_folder(None, Some(&lang)).path()).unwrap_err();
+    assert!(matches!(err, WeaponNamesError::ItemsGame { .. }), "{err:?}");
+    let err = WeaponNames::load(tf_folder(Some(ITEMS_GAME), None).path()).unwrap_err();
+    assert!(matches!(err, WeaponNamesError::English { .. }), "{err:?}");
+}
+
+#[test]
+#[ignore = "needs a TF2 game folder in TF2TOOLS_TF2_GAME"]
+fn the_real_game_names_the_fixture_weapons() {
+    let game =
+        std::path::PathBuf::from(std::env::var("TF2TOOLS_TF2_GAME").expect("TF2TOOLS_TF2_GAME"));
+    let started = std::time::Instant::now();
+    let n = WeaponNames::load(&game.join("tf")).unwrap();
+    eprintln!("loaded in {:?}", started.elapsed());
+    assert_eq!(n.get("quake_rl"), Some("The Original"));
+    assert_eq!(n.get("spy_cicle"), Some("The Spy-Cicle"));
+    assert_eq!(n.get("iron_bomber"), Some("The Iron Bomber"));
+    assert_eq!(n.get("scattergun"), Some("Scattergun"));
+    assert_eq!(n.get("rocketlauncher"), Some("Rocket Launcher"));
 }

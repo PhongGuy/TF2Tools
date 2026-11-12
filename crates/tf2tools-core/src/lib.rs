@@ -51,7 +51,7 @@ pub use error::{
     PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
     ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
     SettingsError, SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
-    UpdateDownloadError, VpkError, VtfError, WavError, WeaponIconsError,
+    UpdateDownloadError, VpkError, VtfError, WavError, WeaponIconsError, WeaponNamesError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
