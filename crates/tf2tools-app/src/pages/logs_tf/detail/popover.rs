@@ -9,7 +9,7 @@ use gpui_kit::{
     SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity,
     div, px,
 };
-use tf2tools_core::{PlayerLine, SteamId, TfClass};
+use tf2tools_core::{PlayerLine, SteamId, TfClass, WeaponNames};
 
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
@@ -45,15 +45,26 @@ pub(super) fn class_hover(
         .open_delay(OPEN_DELAY)
         .trigger(icon)
         .content(move |_, _, cx| {
-            let card = page
-                .upgrade()
-                .and_then(|page| card_for(page.read(cx).detail()?.players(), player, class));
+            let card = page.upgrade().and_then(|page| {
+                let page = page.read(cx);
+                card_for(
+                    page.detail()?.players(),
+                    page.weapon_names(cx),
+                    player,
+                    class,
+                )
+            });
             div().children(card.map(|card| class_card(&card, cx)))
         })
 }
 
 // `player`'s numbers on `class` in the open log, worded for the card.
-fn card_for(players: &[PlayerLine], player: SteamId, class: TfClass) -> Option<Card> {
+fn card_for(
+    players: &[PlayerLine],
+    names: &WeaponNames,
+    player: SteamId,
+    class: TfClass,
+) -> Option<Card> {
     let line = players.iter().find(|p| p.steam_id() == player)?;
     let on = line.classes().iter().find(|c| c.class() == class)?;
     Some(Card {
@@ -66,7 +77,7 @@ fn card_for(players: &[PlayerLine], player: SteamId, class: TfClass) -> Option<C
             ("D", on.deaths().to_string()),
             ("DA", on.dmg().to_string()),
         ],
-        weapons: weapon_rows(line, on),
+        weapons: weapon_rows(line, on, names),
     })
 }
 
@@ -101,7 +112,7 @@ fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
         let dmg = format!("{} ({})", w.dmg, w.dmg_share);
         let label: SharedString = format!("{} {kills} {dmg} {}", w.name, w.accuracy).into();
         h_flex()
-            .id(ids::logstf_weapon(card.id, card.class, &w.name))
+            .id(ids::logstf_weapon(card.id, card.class, &w.raw))
             .aria_label(label)
             .test_support()
             .gap_1()

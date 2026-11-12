@@ -14,8 +14,8 @@ use tf2tools_core::{LogsRange, TfClass};
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, HIGHLANDER, SIXES, day_ago, list_body, mount_list_for, mount_list_with, open_page,
-    requests_to, shell, sid, to_end,
+    ARIE, HIGHLANDER, SIXES, day_ago, install_names, list_body, load_names, mount_list_for,
+    mount_list_with, open_page, requests_to, shell, sid, to_end,
 };
 
 /// Serves Arie's one log, the 6v6 fixture, a day old.
@@ -654,4 +654,32 @@ fn a_failed_weapon_read_does_not_stop_the_page_load(cx: &mut TestAppContext) {
         [],
     )
     .unwrap();
+}
+
+#[gpui_kit::test]
+fn the_panel_switches_to_game_names_when_they_load(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let names = install_names(cx);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    wait_for(cx, &page, TfClass::Scout);
+    assert_eq!(
+        row(cx, &s, TfClass::Scout, "scattergun").as_deref(),
+        Some("scattergun 7 (100%) 3334 (95%) 56%")
+    );
+    load_names(cx, &env, &names);
+    support::settle(cx, s.win);
+    assert_eq!(
+        row(cx, &s, TfClass::Scout, "scattergun").as_deref(),
+        Some("Scattergun 7 (100%) 3334 (95%) 56%"),
+        "the id keeps the log name"
+    );
+    assert_eq!(
+        row(cx, &s, TfClass::Scout, "pistol_scout").as_deref(),
+        Some("pistol_scout 0 (0%) 177 (5%) 10%"),
+        "an unknown name stays raw"
+    );
 }

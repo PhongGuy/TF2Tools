@@ -9,7 +9,7 @@ use gpui_kit::{
     SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity,
     div, px,
 };
-use tf2tools_core::{ClassWeapons, LogsRange, TfClass};
+use tf2tools_core::{ClassWeapons, LogsRange, TfClass, WeaponNames};
 
 use super::LogsTfPage;
 use super::tables::class_weapon_rows;
@@ -25,10 +25,12 @@ const KILLS: Pixels = px(80.);
 const DAMAGE: Pixels = px(104.);
 const ACCURACY: Pixels = px(80.);
 
-/// The panel for `weapons`, read for `class` over `range`; its close button closes it on `page`.
+/// The panel for `weapons`, read for `class` over `range` and named by `names`; its close button
+/// closes it on `page`.
 pub(super) fn class_weapons_panel(
     class: TfClass,
     weapons: &ClassWeapons,
+    names: &WeaponNames,
     range: LogsRange,
     page: WeakEntity<LogsTfPage>,
     cx: &App,
@@ -78,13 +80,18 @@ pub(super) fn class_weapons_panel(
         .children((!weapons.weapons().is_empty()).then(|| {
             sideways(
                 ids::LOGSTF_CLASS_WEAPONS_TABLE,
-                weapon_table(class, weapons, cx),
+                weapon_table(class, weapons, names, cx),
             )
         }))
 }
 
 // The column titles, then one line per weapon labelled as the class card's rows are.
-fn weapon_table(class: TfClass, weapons: &ClassWeapons, cx: &App) -> impl IntoElement + use<> {
+fn weapon_table(
+    class: TfClass,
+    weapons: &ClassWeapons,
+    names: &WeaponNames,
+    cx: &App,
+) -> impl IntoElement + use<> {
     let border = cx.theme().border;
     let cell = |width: Pixels| div().w(width).flex_none().text_right();
     let head = h_flex()
@@ -98,12 +105,12 @@ fn weapon_table(class: TfClass, weapons: &ClassWeapons, cx: &App) -> impl IntoEl
         .child(cell(KILLS).child("Kills"))
         .child(cell(DAMAGE).child("Damage"))
         .child(cell(ACCURACY).child("Accuracy"));
-    let rows = class_weapon_rows(weapons).into_iter().map(|w| {
+    let rows = class_weapon_rows(weapons, names).into_iter().map(|w| {
         let kills = format!("{} ({})", w.kills, w.kill_share);
         let dmg = format!("{} ({})", w.dmg, w.dmg_share);
         let label: SharedString = format!("{} {kills} {dmg} {}", w.name, w.accuracy).into();
         h_flex()
-            .id(ids::logstf_class_weapon(class, &w.name))
+            .id(ids::logstf_class_weapon(class, &w.raw))
             .aria_label(label)
             .test_support()
             .gap_2()

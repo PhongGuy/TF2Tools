@@ -3,14 +3,16 @@
 
 use tf2tools_core::{
     ClassLine, ClassWeapons, LogDetail, MatrixKind, MatrixRow, MedicLine, PlayerLine, SteamId,
-    Team, TfClass, WeaponSum,
+    Team, TfClass, WeaponNames, WeaponSum,
 };
 
 use super::text::{accuracy_text, floored_share_text, share_text};
 
-/// One weapon's line in a class card, its shares already worded.
+/// One weapon's line in a class card, its shares already worded. `raw` is the logs.tf name the
+/// row's id uses; `name` is what it shows, the game's name when known.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WeaponRow {
+    pub raw: String,
     pub name: String,
     pub kills: u32,
     pub kill_share: String,
@@ -21,13 +23,14 @@ pub struct WeaponRow {
 
 /// `class`'s weapons by kills high to low (ties keep core's order); shares are of the player's
 /// whole-log kills and damage.
-pub fn weapon_rows(player: &PlayerLine, class: &ClassLine) -> Vec<WeaponRow> {
+pub fn weapon_rows(player: &PlayerLine, class: &ClassLine, names: &WeaponNames) -> Vec<WeaponRow> {
     let mut weapons: Vec<_> = class.weapons().iter().collect();
     weapons.sort_by_key(|w| std::cmp::Reverse(w.kills()));
     weapons
         .into_iter()
         .map(|w| WeaponRow {
-            name: w.name().to_owned(),
+            raw: w.name().to_owned(),
+            name: shown_name(w.name(), names),
             kills: w.kills(),
             kill_share: share_text(w.kills(), player.kills()),
             dmg: w.dmg(),
@@ -39,7 +42,7 @@ pub fn weapon_rows(player: &PlayerLine, class: &ClassLine) -> Vec<WeaponRow> {
 
 /// The class weapons panel's rows in core's order (damage high to low); shares are of the
 /// class's summed weapon kills and damage, so they add to about 100%.
-pub fn class_weapon_rows(weapons: &ClassWeapons) -> Vec<WeaponRow> {
+pub fn class_weapon_rows(weapons: &ClassWeapons, names: &WeaponNames) -> Vec<WeaponRow> {
     let narrow = |n: i64| u32::try_from(n).unwrap_or(u32::MAX);
     let kills = narrow(weapons.weapons().iter().map(WeaponSum::kills).sum());
     let dmg = narrow(weapons.weapons().iter().map(WeaponSum::dmg).sum());
@@ -47,7 +50,8 @@ pub fn class_weapon_rows(weapons: &ClassWeapons) -> Vec<WeaponRow> {
         .weapons()
         .iter()
         .map(|w| WeaponRow {
-            name: w.name().to_owned(),
+            raw: w.name().to_owned(),
+            name: shown_name(w.name(), names),
             kills: narrow(w.kills()),
             kill_share: share_text(narrow(w.kills()), kills),
             dmg: narrow(w.dmg()),
@@ -55,6 +59,11 @@ pub fn class_weapon_rows(weapons: &ClassWeapons) -> Vec<WeaponRow> {
             accuracy: accuracy_text(narrow(w.hits()), narrow(w.shots())),
         })
         .collect()
+}
+
+// The game's name for a logs.tf weapon, or the log name when the game has none.
+fn shown_name(raw: &str, names: &WeaponNames) -> String {
+    names.get(raw).unwrap_or(raw).to_owned()
 }
 
 /// One player a Medic healed, with their share of the Medic's healing worded.

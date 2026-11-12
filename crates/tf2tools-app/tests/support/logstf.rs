@@ -382,11 +382,7 @@ pub fn install_names(cx: &mut TestAppContext) -> Entity<LoadedWeaponNames> {
 }
 
 /// Loads `env`'s game into `names` and waits until the load lands.
-pub fn load_names(
-    cx: &mut TestAppContext,
-    env: &support::Env,
-    names: &Entity<LoadedWeaponNames>,
-) {
+pub fn load_names(cx: &mut TestAppContext, env: &support::Env, names: &Entity<LoadedWeaponNames>) {
     let tf = env.game.join("tf");
     cx.update(|cx| names.update(cx, |n, cx| n.show_game(Some(tf), cx)));
     support::wait_real(cx, "the weapon names", |cx| {

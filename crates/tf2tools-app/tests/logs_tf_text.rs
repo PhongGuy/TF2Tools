@@ -324,19 +324,20 @@ fn arie_scout_weapons_read_like_logs_tf() {
         .unwrap();
     let scout = &arie.classes()[0];
     assert_eq!(scout.class(), tf2tools_core::TfClass::Scout);
-    let shown: Vec<(String, u32, String, u32, String, String)> = weapon_rows(arie, scout)
-        .into_iter()
-        .map(|r| {
-            (
-                r.name,
-                r.kills,
-                r.kill_share,
-                r.dmg,
-                r.dmg_share,
-                r.accuracy,
-            )
-        })
-        .collect();
+    let shown: Vec<(String, u32, String, u32, String, String)> =
+        weapon_rows(arie, scout, &tf2tools_core::WeaponNames::default())
+            .into_iter()
+            .map(|r| {
+                (
+                    r.name,
+                    r.kills,
+                    r.kill_share,
+                    r.dmg,
+                    r.dmg_share,
+                    r.accuracy,
+                )
+            })
+            .collect();
     let row = |n: &str, k, ks: &str, d, ds: &str, a: &str| {
         (
             n.to_owned(),
@@ -359,7 +360,7 @@ fn arie_scout_weapons_read_like_logs_tf() {
         .iter()
         .find(|c| c.class() == tf2tools_core::TfClass::Pyro)
         .unwrap();
-    let flames = weapon_rows(arie, pyro)
+    let flames = weapon_rows(arie, pyro, &tf2tools_core::WeaponNames::default())
         .into_iter()
         .find(|r| r.name == "flamethrower")
         .unwrap();
@@ -674,4 +675,35 @@ fn download_failures_say_why() {
         "logs.tf isn't responding right now. Try again later."
     );
     assert_eq!(DOWNLOAD_FAILED, "Couldn't download this log.");
+}
+
+#[test]
+fn a_known_log_name_reads_as_the_games_name_and_keeps_its_raw_id() {
+    use crate::support::logstf::{SIXES, sid, weapon_names};
+    use tf2tools_app::pages::logs_tf::tables::weapon_rows;
+    let log = tf2tools_core::parse_log(SIXES).unwrap();
+    let player = log
+        .players()
+        .iter()
+        .find(|p| p.steam_id() == sid(172_588_788))
+        .unwrap();
+    let soldier = player
+        .classes()
+        .iter()
+        .find(|c| c.class() == tf2tools_core::TfClass::Soldier)
+        .unwrap();
+    let pairs = |names: &tf2tools_core::WeaponNames| -> Vec<(String, String)> {
+        weapon_rows(player, soldier, names)
+            .into_iter()
+            .map(|r| (r.raw, r.name))
+            .collect()
+    };
+    assert_eq!(
+        pairs(&weapon_names()),
+        [("quake_rl".to_owned(), "The Original".to_owned())]
+    );
+    assert_eq!(
+        pairs(&tf2tools_core::WeaponNames::default()),
+        [("quake_rl".to_owned(), "quake_rl".to_owned())]
+    );
 }
