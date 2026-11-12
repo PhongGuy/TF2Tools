@@ -2568,6 +2568,12 @@ pub fn logstf_class_head(label: &str) -> ElementId {
     keyed("logstf-class-head", label)
 }
 
+/// The text inside a class table title's button, sitting where the title reads:
+/// "logstf-class-title:<label>".
+pub fn logstf_class_title(label: &str) -> ElementId {
+    keyed("logstf-class-title", label)
+}
+
 /// The arrow on the sorted class table title, labelled "high to low" or "low to high":
 /// "logstf-class-arrow:<label>".
 pub fn logstf_class_arrow(label: &str) -> ElementId {

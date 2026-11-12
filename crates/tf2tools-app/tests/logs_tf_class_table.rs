@@ -445,3 +445,31 @@ fn low_to_high_puts_empty_medic_cells_first_among_played_rows(cx: &mut TestAppCo
     want.extend(TfClass::ALL.into_iter().filter(|c| !played(*c)));
     assert_eq!(drawn_order(cx, &s), want);
 }
+
+#[gpui_kit::test]
+fn the_class_title_reads_from_the_left_and_the_numbers_from_the_right(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let _page = open_page(cx, &s);
+    let title = |cx: &mut TestAppContext, label| {
+        support::bounds_of(cx, s.win, ids::logstf_class_title(label)).expect(label)
+    };
+    // The first row's icon starts past the row's 12 px padding and 1 px border.
+    let row = support::bounds_of(cx, s.win, ids::logstf_class(TfClass::Scout)).unwrap();
+    let class = title(cx, "Class");
+    let icon_left = f32::from(row.left()) + 13.;
+    assert!(
+        (f32::from(class.left()) - icon_left).abs() <= 2.,
+        "{class:?} not over the icon at {icon_left}"
+    );
+    for label in COLUMNS {
+        let text = title(cx, label);
+        let head = support::bounds_of(cx, s.win, ids::logstf_class_head(label)).unwrap();
+        assert!(
+            (f32::from(text.right()) - f32::from(head.right())).abs() <= 1.,
+            "{label}: {text:?} not flush right in {head:?}"
+        );
+    }
+}

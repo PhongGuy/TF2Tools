@@ -151,20 +151,31 @@ fn class_table(
     let theme = cx.theme();
     let (border, radius) = (theme.border, theme.radius_lg);
     // Every title is a button that sorts by its column, or flips it when it leads.
-    // They keep no padding so each title stays flush with its column's values.
+    // They keep no padding so each title stays flush with its column's values or icons.
     let title = |stat: ClassStat, end: bool| {
         let label = stat.title();
         let page = page.clone();
         let sorted = sort.filter(|s| s.column == stat);
+        // The kit centres a button's label, so the title is a child in a row that fills it,
+        // pushed to its column's side.
+        let text = h_flex()
+            .flex_1()
+            .min_w_0()
+            .when(end, |row| row.justify_end())
+            .child(
+                div()
+                    .id(ids::logstf_class_title(label))
+                    .test_support()
+                    .child(label),
+            );
         let button = Button::new(ids::logstf_class_head(label))
             .ghost()
             .xsmall()
-            .label(label)
+            .accessibility_label(label)
+            .child(text)
             .selected(sorted.is_some())
             .w_full()
             .px_0()
-            .when(end, |b| b.justify_end())
-            .when(!end, |b| b.justify_start())
             .on_click(move |_, _, cx| {
                 let _ = page.update(cx, |page, cx| page.sort_classes_by(stat, cx));
             });
