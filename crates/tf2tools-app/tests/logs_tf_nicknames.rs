@@ -198,7 +198,7 @@ fn an_open_log_names_a_nicknamed_player_with_a_marker_that_explains(cx: &mut Tes
 
 #[gpui_kit::test]
 fn turning_nicknames_off_shows_the_logs_own_names(cx: &mut TestAppContext) {
-    let (_env, _server, s, page, _) = opened_with_nickname(cx);
+    let (_env, _server, s, page, in_log) = opened_with_nickname(cx);
     let arie = sid(ARIE);
     scroll_to_in_log(cx, &s, &page, 3, ids::logstf_player_name(arie));
     assert!(support::present(
@@ -216,9 +216,9 @@ fn turning_nicknames_off_shows_the_logs_own_names(cx: &mut TestAppContext) {
         s.win,
         ids::logstf_nick("player", arie)
     ));
-    assert_ne!(
-        support::label_of(cx, s.win, ids::logstf_player_name(arie)).as_deref(),
-        Some("Me")
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_player_name(arie)),
+        Some(in_log)
     );
     // The chip keeps the nickname: the setting is about the match tables only.
     let list = cx.update(|cx| page.read(cx).list_state().clone());
@@ -265,4 +265,38 @@ fn the_chat_names_a_nicknamed_player_by_the_nickname(cx: &mut TestAppContext) {
     ));
     let line = support::label_of(cx, s.win, ids::logstf_chat_line(said)).unwrap();
     assert!(line.starts_with("Desh: "), "{line}");
+}
+
+#[gpui_kit::test]
+fn a_nickname_matching_the_log_name_shows_no_marker(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let arie = sid(ARIE);
+    let log = tf2tools_core::parse_log(SIXES).unwrap();
+    let in_log = log
+        .players()
+        .iter()
+        .find(|p| p.steam_id() == arie)
+        .unwrap()
+        .name()
+        .to_owned();
+    s.services
+        .logs
+        .cache()
+        .set_nickname(arie, Some(&in_log))
+        .unwrap();
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_player_name(arie));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_player_name(arie)),
+        Some(in_log)
+    );
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::logstf_nick("player", arie)
+    ));
 }

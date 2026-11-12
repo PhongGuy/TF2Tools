@@ -14,7 +14,7 @@ use super::popover::class_hover;
 use super::{NUMBER, team_cell};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
-use crate::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players};
+use crate::pages::logs_tf::sort::{PlayerColumn, PlayerSort, sort_players_shown};
 use crate::pages::logs_tf::text::{floored, one_decimal, reads_zero};
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
@@ -86,7 +86,8 @@ pub(super) fn players_table(
     );
     let assets = &cx.global::<Services>().assets;
     let players = log.players();
-    for i in sort_players(players, shown.unwrap_or_default()) {
+    let shown_name = |p: &PlayerLine| tracked.shown(p.steam_id(), p.name());
+    for i in sort_players_shown(players, shown.unwrap_or_default(), &shown_name) {
         let player = &players[i];
         // Classes come longest first; the main one is solid, the rest fade.
         // Hovering one opens its class card.

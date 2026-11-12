@@ -2530,6 +2530,12 @@ pub const LOGSTF_RENAME_SAVE: &str = "logstf-rename-save";
 pub const LOGSTF_RENAME_CANCEL: &str = "logstf-rename-cancel";
 /// Labelled with a nickname marker's tooltip, which gives the player's name in the log.
 pub const LOGSTF_NICK_TIP: &str = "logstf-nick-tip";
+/// A nickname's text inside a name cell, before its marker; scoped by the cell's id.
+pub const LOGSTF_NICK_NAME: &str = "logstf-nick-name";
+/// A Medic block's name, labelled with the name it shows; scoped by the block's id.
+pub const LOGSTF_MEDIC_NAME: &str = "logstf-medic-name";
+/// An open round's player name, labelled with the name it shows; scoped by the row's id.
+pub const LOGSTF_ROUND_NAME: &str = "logstf-round-name";
 /// Forces a fresh logs.tf sync of the active player.
 pub const LOGSTF_REFRESH: &str = "logstf-refresh";
 /// "Open profile on logs.tf" for the active player.

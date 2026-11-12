@@ -1053,7 +1053,6 @@ pub(super) fn sql_id(id: SteamId) -> rusqlite::Result<i64> {
     i64::try_from(id.id64()).map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))
 }
 
-/// A stored count as u32, clamped into range.
 // A nickname trimmed, with a blank one meaning none.
 fn clean_nickname(nickname: Option<&str>) -> Option<String> {
     nickname
@@ -1062,6 +1061,7 @@ fn clean_nickname(nickname: Option<&str>) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// A stored count as u32, clamped into range.
 fn clamp_u32(n: i64) -> u32 {
     u32::try_from(n.max(0)).unwrap_or(u32::MAX)
 }

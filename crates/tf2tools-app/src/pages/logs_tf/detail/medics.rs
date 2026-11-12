@@ -76,7 +76,7 @@ fn medic_block(medic: &MedicLine, tracked: &super::Tracked, cx: &App) -> impl In
                 .font_weight(FontWeight::SEMIBOLD)
                 .child(team_cell(medic.team(), cx))
                 .child(super::name_cell(
-                    div().id("logstf-medic-name").min_w_0(),
+                    div().id(ids::LOGSTF_MEDIC_NAME).min_w_0(),
                     id,
                     medic.name(),
                     tracked,

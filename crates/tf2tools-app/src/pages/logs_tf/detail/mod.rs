@@ -74,9 +74,9 @@ impl Tracked {
     }
 }
 
-// A table's name in `cell`, which the caller ids and sizes: cut to fit with the tooltip giving it
-// whole. A nicknamed player shows the nickname, then a marker whose tooltip names them as
-// the log does; the cell is labelled with the nickname.
+// A table's name in `cell`, which the caller ids and sizes, labelled and cut to fit with the
+// tooltip giving it whole. A nickname other than the log's name shows instead, followed by a
+// marker whose tooltip names the player as the log does.
 pub(super) fn name_cell(
     cell: Stateful<Div>,
     player: SteamId,
@@ -84,8 +84,10 @@ pub(super) fn name_cell(
     tracked: &Tracked,
     place: &str,
 ) -> AnyElement {
-    let Some(nickname) = tracked.nickname(player) else {
+    let nickname = tracked.nickname(player).filter(|n| *n != log_name.trim());
+    let Some(nickname) = nickname else {
         return cell
+            .aria_label(log_name.to_owned())
             .test_support()
             .tooltip(tip(ids::LOGSTF_NAME_TIP, log_name.to_owned()))
             .truncate()
@@ -100,7 +102,7 @@ pub(super) fn name_cell(
         .aria_label(nickname.to_owned())
         .child(
             div()
-                .id("logstf-nick-name")
+                .id(ids::LOGSTF_NICK_NAME)
                 .tooltip(tip(ids::LOGSTF_NAME_TIP, nickname.to_owned()))
                 .min_w_0()
                 .truncate()

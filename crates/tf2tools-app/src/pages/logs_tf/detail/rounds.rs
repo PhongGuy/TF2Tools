@@ -235,7 +235,7 @@ fn round_panel(
                 .test_support()
                 .child(team_cell(p.team(), cx).w(TEAM))
                 .child(super::name_cell(
-                    div().id("logstf-round-name").w(NAME).flex_none(),
+                    div().id(ids::LOGSTF_ROUND_NAME).w(NAME).flex_none(),
                     p.steam_id(),
                     &in_log,
                     tracked,
