@@ -194,15 +194,33 @@ const M15_TABLES: &str = "
     CREATE INDEX logstf_player_logs_log ON logstf_player_logs(log_id);
 ";
 
+/// The tables and column migration 16 adds, as the schema should hold them.
+const M16_TABLES: &str = "
+    CREATE TABLE logstf_weapon_rows (
+        log_id INTEGER NOT NULL REFERENCES logstf_logs(id) ON DELETE CASCADE,
+        steam_id INTEGER NOT NULL,
+        class TEXT NOT NULL,
+        weapon TEXT NOT NULL,
+        kills INTEGER NOT NULL,
+        dmg INTEGER NOT NULL,
+        shots INTEGER NOT NULL,
+        hits INTEGER NOT NULL,
+        PRIMARY KEY (log_id, steam_id, class, weapon)
+    );
+    CREATE INDEX logstf_weapon_rows_player ON logstf_weapon_rows(steam_id);
+    ALTER TABLE logstf_logs ADD COLUMN weapons_counted INTEGER NOT NULL DEFAULT 0;
+";
+
 /// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables,
-/// migration 13's mastercomfig tables, migration 14's add-on table and migration 15's logs.tf
-/// tables: the schema v6 opens to.
+/// migration 13's mastercomfig tables, migration 14's add-on table, migration 15's logs.tf
+/// tables and migration 16's weapon rows: the schema v6 opens to.
 pub fn current_shape() -> SchemaShape {
     let conn = v5_fixture_connection();
     conn.execute_batch(M12_TABLES).unwrap();
     conn.execute_batch(M13_TABLES).unwrap();
     conn.execute_batch(M14_TABLES).unwrap();
     conn.execute_batch(M15_TABLES).unwrap();
+    conn.execute_batch(M16_TABLES).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape

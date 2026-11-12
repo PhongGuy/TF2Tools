@@ -4,11 +4,12 @@
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::{Slider, SliderState};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     App, Entity, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, div, px,
 };
-use tf2tools_core::{ClassAverage, LogsRange};
+use tf2tools_core::{ClassAverage, LogsRange, TfClass};
 
 use super::LogsTfPage;
 use super::text::{one_decimal, range_label, summary_text, time_played_text, whole};
@@ -27,7 +28,8 @@ const RANGE_WIDTH: f32 = STOP_CELL * LogsRange::STOPS.len() as f32;
 const LABEL_HEIGHT: f32 = 24.;
 
 /// The nine cards, wrapping, with the summary line for `logs` in `range` back from `newest`
-/// and the range slider under them.
+/// and the range slider under them. A played card opens its weapons; `selected` is ringed.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn class_grid(
     averages: &[ClassAverage; 9],
     logs: usize,
@@ -35,18 +37,17 @@ pub(super) fn class_grid(
     range: LogsRange,
     slider: &Entity<SliderState>,
     page: WeakEntity<LogsTfPage>,
+    selected: Option<TfClass>,
     cx: &App,
 ) -> impl IntoElement {
     let muted = cx.theme().muted_foreground;
+    let cards = averages.iter().map(|average| {
+        let class = average.class();
+        class_card(average, selected == Some(class), page.clone(), cx)
+    });
     v_flex()
         .gap_2()
-        .child(
-            h_flex()
-                .flex_wrap()
-                .items_start()
-                .gap_3()
-                .children(averages.iter().map(|average| class_card(average, cx))),
-        )
+        .child(h_flex().flex_wrap().items_start().gap_3().children(cards))
         .child(
             h_flex()
                 .flex_wrap()
@@ -113,8 +114,14 @@ fn range_picker(slider: &Entity<SliderState>, page: WeakEntity<LogsTfPage>) -> i
 }
 
 // The icon and name, then the rates as label and value rows; Medic's two extra rates only
-// exist when there is time on Medic. A class with no time says so in the muted colour.
-fn class_card(average: &ClassAverage, cx: &App) -> impl IntoElement {
+// exist when there is time on Medic. A class with no time says so in the muted colour and,
+// having no weapons to show, takes no click and exposes no selected state.
+fn class_card(
+    average: &ClassAverage,
+    selected: bool,
+    page: WeakEntity<LogsTfPage>,
+    cx: &App,
+) -> impl IntoElement {
     let class = average.class();
     let muted = cx.theme().muted_foreground;
     let icon = cx.global::<Services>().assets.class_icon(class);
@@ -177,6 +184,14 @@ fn class_card(average: &ClassAverage, cx: &App) -> impl IntoElement {
         .rounded(cx.theme().radius_lg)
         .border_1()
         .border_color(cx.theme().border)
+        .when(average.played(), |card| {
+            card.aria_selected(selected)
+                .cursor_pointer()
+                .when(selected, |card| card.border_color(cx.theme().primary))
+                .on_click(move |_, _, cx| {
+                    let _ = page.update(cx, |page, cx| page.pick_class(class, cx));
+                })
+        })
         .child(header)
         .child(body)
 }

@@ -2517,6 +2517,28 @@ pub fn logstf_class_unplayed(class: TfClass) -> ElementId {
     keyed("logstf-class-unplayed", &class.name().to_lowercase())
 }
 
+/// The panel under the class grid with the selected class's weapon sums over the range.
+pub const LOGSTF_CLASS_WEAPONS: &str = "logstf-class-weapons";
+/// Labelled "<Class> weapons · <range> · N logs" atop the class weapons panel.
+pub const LOGSTF_CLASS_WEAPONS_TITLE: &str = "logstf-class-weapons-title";
+/// Labelled with the panel's muted note: logs still being counted, or no weapon stats.
+pub const LOGSTF_CLASS_WEAPONS_NOTE: &str = "logstf-class-weapons-note";
+/// Closes the class weapons panel.
+pub const LOGSTF_CLASS_WEAPONS_CLOSE: &str = "logstf-class-weapons-close";
+/// The column titles atop the class weapons table.
+pub const LOGSTF_CLASS_WEAPONS_HEAD: &str = "logstf-class-weapons-head";
+/// The sideways scroll box around the class weapons table.
+pub const LOGSTF_CLASS_WEAPONS_TABLE: &str = "logstf-class-weapons-table";
+
+/// One weapon's row in the class weapons panel, labelled as a class card's weapon row:
+/// "logstf-class-weapon:<class>:<weapon>".
+pub fn logstf_class_weapon(class: TfClass, weapon: &str) -> ElementId {
+    keyed(
+        "logstf-class-weapon",
+        &format!("{}:{weapon}", class.name().to_lowercase()),
+    )
+}
+
 /// The logs.tf page's scrolling list: the chips and grid as its first item, then the logs.
 pub const LOGSTF_LIST: &str = "logstf-list";
 /// The scrollbar beside the logs.tf page's list.

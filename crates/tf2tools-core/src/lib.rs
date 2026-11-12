@@ -107,13 +107,13 @@ pub use library::{
 pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
 pub use logstf::{
-    ClassAverage, ClassLine, EventKind, HealTarget, Killstreak, LOG_BODY_LIMIT, LOG_ZIP_LIMIT,
-    LOGS_LONG_SPACING, LOGS_SPACING, LONG_PULL, LogChatLine, LogColumns, LogDetail, LogRow,
-    LogState, LogsCache, LogsCancel, LogsClient, LogsEndpoints, LogsProgress, LogsRange,
+    ClassAverage, ClassLine, ClassWeapons, EventKind, HealTarget, Killstreak, LOG_BODY_LIMIT,
+    LOG_ZIP_LIMIT, LOGS_LONG_SPACING, LOGS_SPACING, LONG_PULL, LogChatLine, LogColumns, LogDetail,
+    LogRow, LogState, LogsCache, LogsCancel, LogsClient, LogsEndpoints, LogsProgress, LogsRange,
     LogsSyncSummary, MatrixKind, MatrixRow, MedicLine, Medigun, PROVISIONAL_SECS, PlayerInput,
     PlayerLine, RoundEvent, RoundLine, RoundPlayer, RoundTeam, STALE_SECS, STEAM_ID64_BASE,
-    SteamId, TeamTotals, TrackedPlayer, WeaponLine, leaderboard_icon_stem, logstf_class, parse_log,
-    parse_player_input, window_start,
+    SteamId, TeamTotals, TrackedPlayer, WeaponBackfill, WeaponLine, WeaponSum,
+    leaderboard_icon_stem, logstf_class, parse_log, parse_player_input, window_start,
 };
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;

@@ -1,6 +1,7 @@
 //! The logs.tf page: tracked players as chips, their class averages and their logs over the
 //! history range the player picks.
 
+mod class_weapons;
 mod detail;
 mod grid;
 mod list;
@@ -24,8 +25,8 @@ use gpui_kit::{
     div, px,
 };
 use tf2tools_core::{
-    ClassAverage, LogDetail, LogRow, LogState, LogsRange, MatrixKind, SteamId, TrackedPlayer,
-    parse_log, parse_player_input,
+    ClassAverage, ClassWeapons, LogDetail, LogRow, LogState, LogsRange, MatrixKind, SteamId,
+    TfClass, TrackedPlayer, parse_log, parse_player_input,
 };
 
 use crate::ids;
@@ -47,6 +48,9 @@ use text::{
     REMOVING, SAVE_FAILED, STEAM_UNREACHABLE, WRITE_FAILED, download_reason, fetch_message,
     profile_url, progress_line, resolve_message,
 };
+
+// Logs counted per backfill batch: small enough that one batch's transaction stays short.
+const WEAPON_BATCH: usize = 50;
 
 // The open log: its id, how far its body got and which of its rounds are open.
 pub(super) struct OpenLog {
@@ -71,6 +75,13 @@ pub struct LogsTfPage {
     loaded: bool,
     rows: Vec<LogRow>,
     averages: Option<[ClassAverage; 9]>,
+    // The class whose card is ringed, and the weapons the panel shows with the class they were
+    // read for; a pick moves the ring at once but the panel keeps its pair until the read lands.
+    selected_class: Option<TfClass>,
+    weapons: Option<(TfClass, ClassWeapons)>,
+    weapons_generation: u64,
+    // Set while the weapon backfill runs, so a second start is a no-op.
+    weapons_counting: bool,
     // The history range as the settings keep it, and the slider that picks it. `slider_range`
     // is the stop last pushed into the slider, so a drag is never snapped back mid-way.
     range: LogsRange,
@@ -157,6 +168,10 @@ impl LogsTfPage {
             loaded: false,
             rows: Vec::new(),
             averages: None,
+            selected_class: None,
+            weapons: None,
+            weapons_generation: 0,
+            weapons_counting: false,
             range: LogsRange::default(),
             range_slider,
             slider_range: LogsRange::default(),
@@ -214,6 +229,128 @@ impl LogsTfPage {
     /// The active player's class averages; None before the first load.
     pub fn averages(&self) -> Option<&[ClassAverage; 9]> {
         self.averages.as_ref()
+    }
+
+    /// The class whose card is selected, if any.
+    pub fn selected_class(&self) -> Option<TfClass> {
+        self.selected_class
+    }
+
+    /// The weapons the panel holds and the class they were read for.
+    pub fn class_weapons(&self) -> Option<(TfClass, &ClassWeapons)> {
+        self.weapons
+            .as_ref()
+            .map(|(class, weapons)| (*class, weapons))
+    }
+
+    /// Selects `class` and reads its weapons, keeping the held ones shown until then; on the
+    /// selected class it closes. An unplayed class does nothing.
+    pub fn pick_class(&mut self, class: TfClass, cx: &mut Context<Self>) {
+        if self.selected_class == Some(class) {
+            self.close_class(cx);
+            return;
+        }
+        let played = self
+            .averages
+            .as_ref()
+            .is_some_and(|a| a.iter().any(|a| a.class() == class && a.played()));
+        if !played {
+            return;
+        }
+        self.selected_class = Some(class);
+        self.read_weapons(cx);
+        self.list.remeasure_items(0..1);
+        cx.notify();
+    }
+
+    /// Closes the class weapons panel and clears the selection.
+    pub fn close_class(&mut self, cx: &mut Context<Self>) {
+        self.selected_class = None;
+        self.weapons = None;
+        // A read still out must not reopen the panel.
+        self.weapons_generation += 1;
+        self.list.remeasure_items(0..1);
+        cx.notify();
+    }
+
+    // Reads the selected class's weapons off the UI thread. The landing applies only while the
+    // page still shows the player, range and class it read for and no newer read went out; a
+    // failed read keeps the panel as it was.
+    fn read_weapons(&mut self, cx: &mut Context<Self>) {
+        let (Some(active), Some(class)) = (self.active, self.selected_class) else {
+            return;
+        };
+        let range = self.range;
+        self.weapons_generation += 1;
+        let generation = self.weapons_generation;
+        let reading = run_blocking(cx, move |s| {
+            s.logs
+                .cache()
+                .class_weapons(active, range, class)
+                .map_err(|e| OpError::core("Failed to read class weapons", e))
+        });
+        cx.spawn(async move |page, cx| {
+            let read = reading.await;
+            let _ = page.update(cx, |page, cx| {
+                let current = page.weapons_generation == generation
+                    && !stale_read(page.range_writes, page.range, range)
+                    && page.active == Some(active)
+                    && page.range == range
+                    && page.selected_class == Some(class);
+                if !current {
+                    return;
+                }
+                match read {
+                    Ok(weapons) => {
+                        page.weapons = Some((class, weapons));
+                        page.list.remeasure_items(0..1);
+                        cx.notify();
+                    }
+                    Err(error) => tracing::warn!(%error, "reading logs.tf class weapons failed"),
+                }
+            });
+        })
+        .detach();
+    }
+
+    /// Counts weapon stats for logs stored before weapon rows existed, one batch at a time off
+    /// the UI thread, rereading the open panel after each batch that counted a log. A no-op
+    /// while a backfill runs; it stops when none are left, on an error, or when a batch counts
+    /// nothing, and the next run resumes.
+    pub fn count_older_weapons(&mut self, cx: &mut Context<Self>) {
+        if std::mem::replace(&mut self.weapons_counting, true) {
+            return;
+        }
+        cx.spawn(async move |page, cx| {
+            loop {
+                let Ok(batch) = page.update(cx, |_, cx| {
+                    run_blocking(cx, |s| {
+                        s.logs
+                            .cache()
+                            .count_weapons(WEAPON_BATCH)
+                            .map_err(|e| OpError::core("Failed to count logs.tf weapon stats", e))
+                    })
+                }) else {
+                    break;
+                };
+                match batch.await {
+                    Ok(done) => {
+                        if done.counted() > 0 {
+                            let _ = page.update(cx, |page, cx| page.read_weapons(cx));
+                        }
+                        if done.left() == 0 || done.counted() == 0 {
+                            break;
+                        }
+                    }
+                    Err(error) => {
+                        tracing::warn!(%error, "counting logs.tf weapon stats failed");
+                        break;
+                    }
+                }
+            }
+            let _ = page.update(cx, |page, _| page.weapons_counting = false);
+        })
+        .detach();
     }
 
     /// Why the active player's last sync failed, shown under the chips.
@@ -810,7 +947,8 @@ impl LogsTfPage {
         self.sync_wanted |= sync;
         self.load_generation += 1;
         let generation = self.load_generation;
-        let loading = run_blocking(cx, |s| {
+        let selected = self.selected_class;
+        let loading = run_blocking(cx, move |s| {
             let cache = s.logs.cache();
             let read = |e| OpError::core("Failed to load logs.tf players", e);
             let players = cache.players().map_err(read)?;
@@ -823,33 +961,49 @@ impl LogsTfPage {
                 )),
                 None => None,
             };
-            Ok((players, active, range, logs))
+            // A failed weapon read costs only the panel, which keeps its last rows; the rest
+            // of the load still lands.
+            let weapons = match (active, selected) {
+                (Some(id), Some(class)) => match cache.class_weapons(id, range, class) {
+                    Ok(weapons) => Some((class, weapons)),
+                    Err(error) => {
+                        tracing::warn!(%error, "reading the logs.tf class weapons failed");
+                        None
+                    }
+                },
+                _ => None,
+            };
+            Ok((players, active, range, logs, weapons))
         });
         cx.spawn(async move |page, cx| {
             let loaded = loading.await;
             let _ = page.update(cx, |page, cx| {
                 // A read that ran before a range pick was saved saw the old range; the pick's
                 // own reread follows, so this one is dropped like a superseded one.
-                let before_pick = matches!(&loaded, Ok((_, _, range, _))
+                let before_pick = matches!(&loaded, Ok((_, _, range, _, _))
                     if stale_read(page.range_writes, page.range, *range));
                 page.stale_reads += u32::from(before_pick);
                 if page.load_generation != generation || before_pick {
                     return;
                 }
                 match loaded {
-                    Ok((players, active, range, logs)) => {
+                    Ok((players, active, range, logs, weapons)) => {
                         page.players = players;
                         page.active = active;
                         page.range = range;
                         let (rows, averages) = logs.unzip();
                         let old = std::mem::replace(&mut page.rows, rows.unwrap_or_default());
                         page.averages = averages;
+                        page.carry_class(weapons, cx);
                         page.fit_list(&old);
                         page.read_downloaded(&old, cx);
                     }
                     Err(error) => tracing::warn!(%error, "reading the logs.tf cache failed"),
                 }
-                page.loaded = true;
+                // The first landing starts counting logs an earlier build stored.
+                if !std::mem::replace(&mut page.loaded, true) {
+                    page.count_older_weapons(cx);
+                }
                 if std::mem::take(&mut page.sync_wanted)
                     && let Some(id) = page.active
                 {
@@ -858,6 +1012,35 @@ impl LogsTfPage {
                 cx.notify();
             });
         })
+    }
+
+    // Keeps the panel in step with fresh averages: it closes when the active player never
+    // played the selected class, else takes the load's weapons if they were read for the
+    // class still selected. The bump drops a click read that went out before this one. A
+    // class picked while the load read gets its own read, since its click read saw the old
+    // player or range and is dropped.
+    fn carry_class(&mut self, weapons: Option<(TfClass, ClassWeapons)>, cx: &mut Context<Self>) {
+        let Some(class) = self.selected_class else {
+            return;
+        };
+        let played = self
+            .averages
+            .as_ref()
+            .is_some_and(|a| a.iter().any(|a| a.class() == class && a.played()));
+        if !played {
+            self.selected_class = None;
+            self.weapons = None;
+            self.weapons_generation += 1;
+            return;
+        }
+        if let Some((read, weapons)) = weapons
+            && read == class
+        {
+            self.weapons = Some((read, weapons));
+            self.weapons_generation += 1;
+        } else {
+            self.read_weapons(cx);
+        }
     }
 
     // Matches the list to fresh rows that replaced `old`: added or dropped rows splice in
@@ -1074,13 +1257,28 @@ impl LogsTfPage {
                             self.range,
                             &self.range_slider,
                             cx.entity().downgrade(),
+                            self.selected_class,
                             cx,
                         )
                     }),
             )
+            .children(self.weapons_panel(cx))
             .children(empty.then(|| self.empty_state(cx)))
             .children(no_logs.map(|id| list::no_logs(id, cx)))
             .children((!self.rows.is_empty()).then(|| list::column_header(self.fit, cx)))
+    }
+
+    // The panel for the held weapons, while a class is selected.
+    fn weapons_panel(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
+        self.selected_class?;
+        let (class, weapons) = self.weapons.as_ref()?;
+        Some(class_weapons::class_weapons_panel(
+            *class,
+            weapons,
+            self.range,
+            cx.entity().downgrade(),
+            cx,
+        ))
     }
 
     // The no-player explanation and its way to track someone.

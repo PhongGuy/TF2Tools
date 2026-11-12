@@ -66,7 +66,7 @@ The Maps page lists the community maps from serveme.tf. Search them by name, sor
 
 ### logs.tf stats
 
-The logs.tf page shows your competitive stats from logs.tf. Paste your Steam profile link or Steam ID to track yourself, and add teammates the same way. Each player gets a card per class with their averages, and below it a list of their logs. Drag the range slider to look at only your most recent logs. Open a log to see it the way logs.tf shows it: the players, the kills between classes, the rounds and the events. TF2Tools downloads your logs once and keeps them, so the page works offline, and a download that stopped picks up where it left off.
+The logs.tf page shows your competitive stats from logs.tf. Paste your Steam profile link or Steam ID to track yourself, and add teammates the same way. Each player gets a card per class with their averages, and below it a list of their logs. Click a class someone played to see their weapons for it: kills, damage and accuracy for each one. Drag the range slider to look at only your most recent logs. Open a log to see it the way logs.tf shows it: the players, the kills between classes, the rounds and the events. TF2Tools downloads your logs once and keeps them, so the page works offline, and a download that stopped picks up where it left off.
 
 ### Profiles
 

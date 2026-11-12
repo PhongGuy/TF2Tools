@@ -33,7 +33,8 @@ fn storage(dir: &tf2tools_core::DataDir, id: i64) -> (String, i64) {
         .unwrap()
 }
 
-/// Recreates `logstf_logs` as the pre-release step 15 declared it, with a TEXT body column.
+/// Recreates `logstf_logs` with a TEXT body column, as the pre-release step 15 declared it,
+/// plus the column step 16 adds on upgrade.
 fn old_body_column(dir: &tf2tools_core::DataDir) {
     common::sql(dir)
         .execute_batch(
@@ -42,7 +43,8 @@ fn old_body_column(dir: &tf2tools_core::DataDir) {
              CREATE TABLE logstf_logs (
                  id INTEGER PRIMARY KEY, title TEXT NOT NULL, map TEXT NOT NULL,
                  date INTEGER NOT NULL, length INTEGER, body TEXT, fetched_at INTEGER,
-                 state INTEGER NOT NULL DEFAULT 0);",
+                 state INTEGER NOT NULL DEFAULT 0,
+                 weapons_counted INTEGER NOT NULL DEFAULT 0);",
         )
         .unwrap();
 }
