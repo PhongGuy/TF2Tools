@@ -1736,6 +1736,11 @@ pub fn hud_fonts_issue(ix: usize) -> ElementId {
     keyed("hud-fonts-issue", &ix.to_string())
 }
 
+/// The warning text inside a HUD fonts issue row: "hud-fonts-issue-text:<ix>".
+pub fn hud_fonts_issue_text(ix: usize) -> ElementId {
+    keyed("hud-fonts-issue-text", &ix.to_string())
+}
+
 /// The HUD fonts dialog's scrolling list of font and issue rows.
 pub const HUD_FONTS_LIST: &str = "hud-fonts-list";
 /// The HUD fonts list's scrollbar, over its right edge.
