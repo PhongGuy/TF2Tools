@@ -546,7 +546,9 @@ fn open_shell(
         picker,
         detector,
         Arc::<RecordingAudio>::clone(&audio),
-        Endpoints::default().with_mastercomfig_data("http://127.0.0.1:9"),
+        Endpoints::default()
+            .with_mastercomfig_data("http://127.0.0.1:9")
+            .with_gamebanana("http://127.0.0.1:9/apiv11"),
         false,
     )
     .unwrap()
@@ -1006,6 +1008,15 @@ impl StoreServer {
     /// Mounts a mock the helpers here do not cover.
     pub fn mount(&self, mock: Mock) {
         self.rt.block_on(mock.mount(&self.server));
+    }
+
+    /// How many requests whose path `keep` accepts have arrived.
+    pub fn requests_where(&self, keep: impl Fn(&str) -> bool) -> usize {
+        let asked = self
+            .rt
+            .block_on(self.server.received_requests())
+            .unwrap_or_default();
+        asked.iter().filter(|r| keep(r.url.path())).count()
     }
 
     /// Answers every GET of `route` with `status` only after `delay`.

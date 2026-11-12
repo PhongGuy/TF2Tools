@@ -17,15 +17,16 @@ use gpui_kit::component::{
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, AsyncApp, ClickEvent, Context, Div,
-    ElementId, Entity, EventEmitter, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    ObjectFit, ParentElement as _, Pixels, Render, Role, ScrollHandle, SharedString, Stateful,
-    StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription, Task,
+    ElementId, Entity, EventEmitter, FontWeight, Global, Hsla, InteractiveElement as _,
+    IntoElement, ObjectFit, ParentElement as _, Pixels, Render, Role, ScrollHandle, SharedString,
+    Stateful, StatefulInteractiveElement as _, Styled as _, StyledImage as _, Subscription, Task,
     TestSupportExt as _, WeakEntity, Window, div, img, px, relative, rgb, transparent_black,
 };
 
 use tf2tools_core::{
-    CopyUpdate, DownloadUpdate, HudEntry, HudId, HudInstall, HudStatus, LibraryEntry, LibraryError,
-    LogLevel, NewLogEntry, Platform, Provenance, StoreItem, StoreItemId, StoreKind, Tf2Install,
+    CopyUpdate, DownloadUpdate, GbId, HudEntry, HudId, HudInstall, HudStatus, LibraryEntry,
+    LibraryError, LogLevel, NewLogEntry, Platform, Provenance, StoreItem, StoreItemId, StoreKind,
+    Tf2Install,
 };
 
 use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, needs_tf2, no_tf2_notice};
@@ -90,6 +91,14 @@ enum Busy {
     /// Keyed by the updated HUD's folder name.
     Update(String),
 }
+
+/// Whether this session's GameBanana HUD check has started.
+#[derive(Default)]
+struct GbHudCheckSession {
+    claimed: bool,
+}
+
+impl Global for GbHudCheckSession {}
 
 /// Asks the shell to open made HUD `0` in the HUD Maker.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -279,15 +288,29 @@ impl HudsPage {
                 .filter(|h| s.library.is_made_hud(h.id()).unwrap_or(false))
                 .map(|h| h.folder_name().to_owned())
                 .collect();
+            // GameBanana items to check: library downloads and the items copies were made from.
+            let mut gb_ids: Vec<GbId> = (huds.iter())
+                .filter_map(|h| match h.provenance() {
+                    Provenance::GameBanana { gb_id, .. } => Some(*gb_id),
+                    Provenance::Local | Provenance::Curated { .. } | _ => None,
+                })
+                .collect();
             // A copy record that cannot be read leaves a plain made HUD card, never a failure.
             let copies: HashMap<String, String> = (huds.iter())
                 .filter(|h| made.contains(h.folder_name()))
                 .filter_map(|h| {
                     let base = s.library.copy_base(h.id()).ok().flatten()?;
+                    let gb = base
+                        .store_id()
+                        .strip_prefix("gb:")
+                        .and_then(|n| n.parse().ok());
+                    gb_ids.extend(gb.map(GbId::new));
                     Some((h.folder_name().to_owned(), base.name().to_owned()))
                 })
                 .collect();
-            Ok((huds, status, urls, made, copies))
+            gb_ids.sort_unstable();
+            gb_ids.dedup();
+            Ok((huds, status, urls, made, copies, gb_ids))
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {
@@ -301,12 +324,13 @@ impl HudsPage {
                     }
                     // A current failure toasts only when it differs from the last one shown.
                     let fresh = match &loaded {
-                        Ok((huds, status, urls, made, copies)) => {
+                        Ok((huds, status, urls, made, copies, gb_ids)) => {
                             page.lowered = huds.iter().map(|h| h.name().to_lowercase()).collect();
                             page.huds = huds.as_slice().into();
                             page.made = Rc::new(made.clone());
                             page.copies = Rc::new(copies.clone());
                             page.check_updates(generation, cx);
+                            page.check_gamebanana(gb_ids.clone(), cx);
                             page.status = status.clone();
                             page.set_store_links(urls.clone(), cx);
                             page.last_failure = None;
@@ -358,8 +382,10 @@ impl HudsPage {
         let (copies, downloads): (Vec<_>, Vec<_>) = (self.huds.iter())
             .filter(|h| {
                 self.copies.contains_key(h.folder_name())
-                    || matches!(h.provenance(), Provenance::Curated { .. })
-                        && !self.made.contains(h.folder_name())
+                    || matches!(
+                        h.provenance(),
+                        Provenance::Curated { .. } | Provenance::GameBanana { .. }
+                    ) && !self.made.contains(h.folder_name())
             })
             .map(|h| (h.folder_name().to_owned(), h.id().clone()))
             .partition(|(folder, _)| self.copies.contains_key(folder));
@@ -391,6 +417,48 @@ impl HudsPage {
                     cx.notify();
                 }
             });
+        })
+        .detach();
+    }
+
+    // Asks GameBanana about `ids` once a session, after making sure each has a check row. The
+    // session is claimed only when a row is due, so a visit with nothing to ask keeps it. The
+    // app starts the runtime on its first frame; a load before that leaves the check to the next.
+    fn check_gamebanana(&mut self, ids: Vec<GbId>, cx: &mut Context<Self>) {
+        let claimed = cx
+            .try_global::<GbHudCheckSession>()
+            .is_some_and(|s| s.claimed);
+        if ids.is_empty() || claimed || !tokio_bridge::is_running(cx) {
+            return;
+        }
+        let due = run_blocking(cx, move |s| {
+            let now = chrono::Utc::now().timestamp();
+            let failed = |e: LibraryError| describe_library(&e).into_op("Couldn't list HUDs");
+            s.library.ensure_gb_hud_checks(&ids).map_err(failed)?;
+            s.library.gb_huds_due_for_check(now).map_err(failed)
+        });
+        cx.spawn(async move |page, cx| {
+            if !due.await.is_ok_and(|due| !due.is_empty()) {
+                return;
+            }
+            let job = cx.update(|cx| {
+                let session = cx.default_global::<GbHudCheckSession>();
+                if std::mem::replace(&mut session.claimed, true) {
+                    return None;
+                }
+                let store = cx.global::<Services>().store.clone();
+                let now = chrono::Utc::now().timestamp();
+                Some(tokio_bridge::spawn(cx, async move {
+                    store.check_gb_hud_updates(now).await
+                }))
+            });
+            let Some(job) = job else { return };
+            match job.await {
+                Ok(Ok(_)) => {}
+                Ok(Err(err)) => tracing::warn!("GameBanana HUD update check failed: {err}"),
+                Err(join) => tracing::warn!("GameBanana HUD update check stopped: {join}"),
+            }
+            let _ = page.update(cx, |page, cx| page.reload(cx));
         })
         .detach();
     }
