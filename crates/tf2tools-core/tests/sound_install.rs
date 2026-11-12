@@ -206,6 +206,19 @@ fn deleting_an_installed_vpk_sound_uninstalls_it() {
 }
 
 #[test]
+fn deleting_an_installed_vpk_sound_removes_its_sound_cache() {
+    let env = library_env();
+    let sound = import_vpk(&env, "Pack");
+    env.lib
+        .install_sound(sound.id(), SoundKind::Hitsound, &env.tf2)
+        .unwrap();
+    let custom = env.tf2.custom_dir();
+    write_file(&custom.join("tf2tools-hitsound.vpk.sound.cache"), b"cache");
+    env.lib.delete_sound(sound.id(), Some(&env.tf2)).unwrap();
+    assert!(tree(&custom).is_empty(), "{:?}", tree(&custom));
+}
+
+#[test]
 fn deleting_an_installed_wav_sound_uninstalls_it() {
     let env = library_env();
     let sound = import_wav(&env, "Ding");
@@ -276,7 +289,7 @@ fn installing_a_wav_over_a_vpk_removes_the_vpk_sound_cache() {
 }
 
 #[test]
-fn uninstalling_without_a_cache_keeps_the_other_kinds_cache() {
+fn uninstalling_one_kind_keeps_the_other_kinds_cache() {
     let env = library_env();
     let custom = env.tf2.custom_dir();
     write_file(&custom.join("tf2tools-hitsound.vpk"), b"v");

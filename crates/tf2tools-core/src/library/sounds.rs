@@ -368,10 +368,13 @@ impl Library {
         if let Some(tf2) = tf2 {
             let custom = tf2.custom_dir();
             for kind in &installed_kinds {
-                remove_file_if_present(&match format {
-                    SoundFormat::Wav => kind.wav_target(&custom),
-                    SoundFormat::Vpk => kind.vpk_target(&custom),
-                })?;
+                match format {
+                    SoundFormat::Wav => remove_file_if_present(&kind.wav_target(&custom))?,
+                    SoundFormat::Vpk => {
+                        remove_file_if_present(&kind.vpk_target(&custom))?;
+                        remove_file_if_present(&kind.vpk_cache_target(&custom))?;
+                    }
+                }
             }
         }
         // The row goes before the library folder, so a failed removal never leaves a row
