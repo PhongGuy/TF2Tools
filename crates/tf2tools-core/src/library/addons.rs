@@ -7,9 +7,10 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::{OptionalExtension, params};
 
+use super::movement::{NULL_MOVEMENT, read_movement_keys, restore_config};
 use super::{
-    IoFailure, Library, check_vpk_magic, create_dir_all, game_custom_dir, import_db, install_db,
-    io_at, is_plain_name, library_db, now, remove_file_if_present,
+    IoFailure, Library, MovementKeys, check_vpk_magic, create_dir_all, game_custom_dir, import_db,
+    install_db, io_at, is_plain_name, library_db, now, remove_file_if_present,
 };
 use crate::error::{ImportError, InstallError, LibraryError};
 use crate::paths::LibraryKind;
@@ -25,7 +26,7 @@ const ADDON_METADATA: &[(&str, &str, &str)] = &[
     (
         "mastercomfig-addon-null-canceling-movement.vpk",
         "Null-Canceling Movement",
-        "Pressing opposing movement keys cancels to standing still instead of the last key winning",
+        "Pressing opposite movement keys together moves you the way of the last one pressed, instead of stopping you",
     ),
     (
         "mastercomfig-addon-no-tutorial.vpk",
@@ -82,6 +83,12 @@ impl AddonName {
     /// The asset file name.
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Whether this is mastercomfig's Null-Canceling Movement addon, which TF2Tools binds
+    /// the movement keys for while it is installed.
+    pub fn is_null_movement(&self) -> bool {
+        self.0 == NULL_MOVEMENT
     }
 
     /// The `<name>` between the prefix and the extension; never empty.
@@ -285,8 +292,13 @@ impl Library {
     }
 
     /// Copies a library addon into `tf/custom`, drops its stale `.sound.cache` and
-    /// rewrites `addons.cfg`.
-    pub fn install_addon(&self, name: &AddonName, tf2: &Tf2Install) -> Result<(), InstallError> {
+    /// rewrites `addons.cfg`. For Null-Canceling Movement it returns the movement keys
+    /// `addons.cfg` now binds to it; None for any other addon.
+    pub fn install_addon(
+        &self,
+        name: &AddonName,
+        tf2: &Tf2Install,
+    ) -> Result<Option<MovementKeys>, InstallError> {
         let source = self.addon_path(name);
         let recorded = self.addon_recorded(name).map_err(install_db)?;
         if !recorded || !source.is_file() {
@@ -300,7 +312,7 @@ impl Library {
         let dest = custom.join(name.as_str());
         std::fs::copy(&source, &dest).map_err(io_at(&dest))?;
         remove_file_if_present(&sound_cache(&custom, name))?;
-        rewrite_addons_cfg(&custom)?;
+        let movement = rewrite_addons_cfg(&custom)?;
 
         self.db
             .write(|conn| {
@@ -310,17 +322,18 @@ impl Library {
                 )
             })
             .map_err(install_db)?;
-        Ok(())
+        Ok(name.is_null_movement().then_some(movement))
     }
 
     /// Removes an addon's VPK and `.sound.cache` from `tf/custom` and rewrites
-    /// `addons.cfg`; the library entry stays.
+    /// `addons.cfg`; the library entry stays. For Null-Canceling Movement the stock movement
+    /// commands go back into `config.cfg`.
     pub fn uninstall_addon(&self, name: &AddonName, tf2: &Tf2Install) -> Result<(), InstallError> {
         Ok(remove_installed(name, &game_custom_dir(tf2)?)?)
     }
 
-    /// Forgets an addon: with a TF2 install it is uninstalled first, then its library
-    /// VPK and row are removed.
+    /// Forgets an addon: with a TF2 install it is uninstalled first (as `uninstall_addon`
+    /// does), then its library VPK and row are removed.
     pub fn delete_addon(
         &self,
         name: &AddonName,
@@ -495,26 +508,40 @@ fn sound_cache(custom: &Path, name: &AddonName) -> PathBuf {
 fn remove_installed(name: &AddonName, custom: &Path) -> Result<(), IoFailure> {
     remove_file_if_present(&custom.join(name.as_str()))?;
     remove_file_if_present(&sound_cache(custom, name))?;
-    rewrite_addons_cfg(custom)
+    rewrite_addons_cfg(custom)?;
+    // With the addon gone its +mf/+mb/+ml/+mr no longer exist, so keys TF2 saved on them
+    // would stop moving the player.
+    if name.is_null_movement()
+        && let Some(tf_dir) = custom.parent()
+    {
+        restore_config(tf_dir)?;
+    }
+    Ok(())
 }
 
-/// Regenerates `addons.cfg` from the addon VPKs now in `tf/custom`. With none left the
-/// file is removed and its directory kept, as v5 did.
-pub(crate) fn rewrite_addons_cfg(custom: &Path) -> Result<(), IoFailure> {
+/// Regenerates `addons.cfg` from the addon VPKs now in `tf/custom`, binding the movement
+/// keys `config.cfg` names when Null-Canceling Movement is among them. With none left the
+/// file is removed and its directory kept, as v5 did. Returns the movement keys it read.
+pub(crate) fn rewrite_addons_cfg(custom: &Path) -> Result<MovementKeys, IoFailure> {
     let files = custom_files(custom)?;
     let names: Vec<&str> = files.iter().map(String::as_str).collect();
+    let movement = match custom.parent() {
+        Some(tf_dir) if files.iter().any(|f| f == NULL_MOVEMENT) => read_movement_keys(tf_dir)?,
+        _ => MovementKeys::default(),
+    };
     let cfg = ADDONS_CFG
         .iter()
         .fold(custom.to_path_buf(), |p, c| p.join(c));
-    match templates::addons_cfg(&names) {
+    match templates::addons_cfg(&names, &movement) {
         Some(content) => {
             if let Some(dir) = cfg.parent() {
                 create_dir_all(dir)?;
             }
-            std::fs::write(&cfg, content).map_err(io_at(&cfg))
+            std::fs::write(&cfg, content).map_err(io_at(&cfg))?;
         }
-        None => remove_file_if_present(&cfg),
+        None => remove_file_if_present(&cfg)?,
     }
+    Ok(movement)
 }
 
 /// The UTF-8 names of the regular files directly in `tf/custom`; none when it is absent.

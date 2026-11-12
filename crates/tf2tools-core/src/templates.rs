@@ -5,6 +5,7 @@ use std::borrow::Cow;
 use std::fmt::Write as _;
 
 use crate::AddonName;
+use crate::library::{MoveDirection, MovementKeys, NULL_MOVEMENT};
 
 pub(crate) const ADDON_PREFIX: &str = "mastercomfig-addon-";
 /// mastercomfig's base VPK, both as a release asset and in `tf/custom`.
@@ -125,8 +126,9 @@ pub(crate) fn names_texture(script: &str, crosshair: &str) -> bool {
 }
 
 /// `exec addons/<name>.cfg` lines for each file name `AddonName` accepts, sorted;
-/// None when there are none.
-pub(crate) fn addons_cfg(file_names: &[&str]) -> Option<String> {
+/// None when there are none. Null-Canceling Movement's exec is followed by binds of
+/// `movement`'s keys to the addon's commands.
+pub(crate) fn addons_cfg(file_names: &[&str], movement: &MovementKeys) -> Option<String> {
     // The AddonName rule decides what is an addon, so a name the library refuses never
     // reaches the cfg; sort by full file name as v5 did.
     let mut addons: Vec<AddonName> = file_names
@@ -140,6 +142,16 @@ pub(crate) fn addons_cfg(file_names: &[&str]) -> Option<String> {
     let mut content = String::new();
     for addon in &addons {
         let _ = writeln!(content, "exec addons/{}.cfg", addon.stem());
+        // The addon only defines +mf/+mb/+ml/+mr; these binds put the player's own keys on
+        // them, after config.cfg runs and before the player's overrides can change them.
+        if addon.as_str() == NULL_MOVEMENT && !movement.is_empty() {
+            content.push_str("// TF2Tools: movement keys for Null-Canceling Movement\n");
+            for direction in MoveDirection::ALL {
+                for key in movement.keys(direction) {
+                    let _ = writeln!(content, "bind \"{key}\" \"{}\"", direction.null_command());
+                }
+            }
+        }
     }
     Some(content)
 }
@@ -243,15 +255,15 @@ mod tests {
             "mastercomfig-addon-c.vpk.bak",
         ];
         assert_eq!(
-            addons_cfg(&names).as_deref(),
+            addons_cfg(&names, &none()).as_deref(),
             Some("exec addons/a.cfg\nexec addons/b.cfg\n")
         );
     }
 
     #[test]
     fn addons_cfg_is_none_without_addons() {
-        assert_eq!(addons_cfg(&[]), None);
-        assert_eq!(addons_cfg(&["tf2tools-hitsound.vpk"]), None);
+        assert_eq!(addons_cfg(&[], &none()), None);
+        assert_eq!(addons_cfg(&["tf2tools-hitsound.vpk"], &none()), None);
     }
 
     #[test]
@@ -261,7 +273,54 @@ mod tests {
             "mastercomfig-addon-a..b.vpk",
             "mastercomfig-addon-a.vpk",
         ];
-        assert_eq!(addons_cfg(&names).as_deref(), Some("exec addons/a.cfg\n"));
-        assert_eq!(addons_cfg(&["mastercomfig-addon-.vpk"]), None);
+        assert_eq!(
+            addons_cfg(&names, &none()).as_deref(),
+            Some("exec addons/a.cfg\n")
+        );
+        assert_eq!(addons_cfg(&["mastercomfig-addon-.vpk"], &none()), None);
+    }
+
+    fn none() -> MovementKeys {
+        MovementKeys::default()
+    }
+
+    #[test]
+    fn addons_cfg_binds_movement_keys_after_the_null_canceling_exec() {
+        let movement = crate::library::movement_keys(
+            "bind \"w\" \"+forward\"\nbind \"UPARROW\" \"+forward\"\nbind \"s\" \"+back\"\n\
+             bind \"a\" \"+moveleft\"\nbind \"d\" \"+moveright\"\n",
+        );
+        let names = [
+            "mastercomfig-addon-flat-mouse.vpk",
+            "mastercomfig-addon-null-canceling-movement.vpk",
+            "mastercomfig-addon-no-tutorial.vpk",
+        ];
+        assert_eq!(
+            addons_cfg(&names, &movement).as_deref(),
+            Some(
+                "exec addons/flat-mouse.cfg\n\
+                 exec addons/no-tutorial.cfg\n\
+                 exec addons/null-canceling-movement.cfg\n\
+                 // TF2Tools: movement keys for Null-Canceling Movement\n\
+                 bind \"w\" \"+mf\"\n\
+                 bind \"UPARROW\" \"+mf\"\n\
+                 bind \"s\" \"+mb\"\n\
+                 bind \"a\" \"+ml\"\n\
+                 bind \"d\" \"+mr\"\n"
+            )
+        );
+    }
+
+    #[test]
+    fn addons_cfg_has_no_binds_without_the_addon_or_without_keys() {
+        let movement = crate::library::movement_keys("bind \"w\" \"+forward\"\n");
+        assert_eq!(
+            addons_cfg(&["mastercomfig-addon-flat-mouse.vpk"], &movement).as_deref(),
+            Some("exec addons/flat-mouse.cfg\n")
+        );
+        assert_eq!(
+            addons_cfg(&["mastercomfig-addon-null-canceling-movement.vpk"], &none()).as_deref(),
+            Some("exec addons/null-canceling-movement.cfg\n")
+        );
     }
 }

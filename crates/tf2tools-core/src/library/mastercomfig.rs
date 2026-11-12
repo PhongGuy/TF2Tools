@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::OptionalExtension;
 
 use super::addons::{ADDONS_CFG, rewrite_addons_cfg};
+use super::movement::restore_config;
 use super::{
     Choices, IoFailure, Library, ModuleCatalog, ModuleChoice, game_custom_dir, io_at,
     remove_file_if_present,
@@ -123,8 +124,9 @@ impl Library {
 
     /// Deletes the base VPK and its .sound.cache, the three override VPKs and their caches,
     /// `comfig-custom/cfg/app/setup_hook.cfg`, `tf/cfg/overrides/modules.cfg` when its first
-    /// line is MODULES_HEADER, then the state row. Refuses an unmanaged install.
-    pub fn remove_mastercomfig(&self, tf2: &Tf2Install) -> Result<(), RemoveMastercomfigError> {
+    /// line is MODULES_HEADER, then the state row. Refuses an unmanaged install. Returns true
+    /// when `config.cfg` had Null-Canceling Movement's binds put back on the stock commands.
+    pub fn remove_mastercomfig(&self, tf2: &Tf2Install) -> Result<bool, RemoveMastercomfigError> {
         let db = |e: rusqlite::Error| RemoveMastercomfigError::Database {
             message: e.to_string(),
         };
@@ -144,11 +146,13 @@ impl Library {
         if written_by_us(&modules)? {
             remove_file_if_present(&modules)?;
         }
+        // Without mastercomfig no addon runs, so keys left on +mf/+mb/+ml/+mr would not move.
+        let restored = restore_config(&tf2.tf_dir())?;
 
         self.db
             .write(|conn| conn.execute("DELETE FROM mastercomfig_state", []))
             .map_err(db)?;
-        Ok(())
+        Ok(restored)
     }
 
     /// The saved preset and module choices of a TF2Tools-managed install; None when not managed.

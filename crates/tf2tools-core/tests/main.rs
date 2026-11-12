@@ -11,6 +11,7 @@
 mod activity_log;
 mod addon_adopt;
 mod addon_catalog;
+mod addon_null_movement;
 mod archive;
 mod ci_workflow;
 mod common;
