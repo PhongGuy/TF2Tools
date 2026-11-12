@@ -122,18 +122,18 @@ fn the_smallest_window_cuts_the_title_and_keeps_every_stat(cx: &mut TestAppConte
 }
 
 #[gpui_kit::test]
-fn the_range_sits_above_the_class_cards(cx: &mut TestAppContext) {
+fn the_range_sits_above_the_class_table(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     serve_two_logs(&server);
     let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
     let _page = open_page(cx, &s);
-    let card = support::bounds_of(cx, s.win, ids::logstf_class(TfClass::Scout)).unwrap();
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_CLASS_TABLE).unwrap();
     for id in [ids::LOGSTF_RANGE, ids::LOGSTF_SUMMARY] {
         let b = support::bounds_of(cx, s.win, id).unwrap();
         assert!(
-            b.bottom() <= card.top(),
-            "{id} {b:?} above the cards {card:?}"
+            b.bottom() <= table.top(),
+            "{id} {b:?} above the table {table:?}"
         );
     }
 }

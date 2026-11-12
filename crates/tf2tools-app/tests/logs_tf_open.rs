@@ -189,6 +189,8 @@ fn retry_fetches_a_log_that_failed_to_load(cx: &mut TestAppContext) {
     support::wait_real(cx, "the retry button", |cx| {
         support::present(cx, s.win, ids::logstf_log_retry(3))
     });
+    // The open log grew past the window's foot, so the button is scrolled into view.
+    to_end(cx, &page);
     server.reset();
     server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
     support::click_id(cx, s.win, ids::logstf_log_retry(3));

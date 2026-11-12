@@ -1,23 +1,18 @@
-//! The class weapons panel under the averages grid: the selected class's weapon sums over the
+//! The class weapons block under an open class row: the selected class's weapon sums over the
 //! history range, in the open log's class card layout.
 
-use gpui_kit::assets::IconName;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
     App, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
-    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity,
-    div, px,
+    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
 use tf2tools_core::{ClassWeapons, LogsRange, TfClass, WeaponNames};
 
-use super::LogsTfPage;
 use super::tables::class_weapon_rows;
 use super::text::{NO_WEAPONS_TEXT, counting_text, weapons_title};
 use crate::ids;
 use crate::kill_icons::{ICON_SLOT, KillIconImages, SLOT_GAP, icon_slot, weapon_icon};
-use crate::widgets::scroll::sideways;
-use crate::widgets::{Named as _, labelled};
+use crate::widgets::labelled;
 
 // The name column keeps room for long logs.tf names; the rest fit "14029 (100%)" and
 // their own title on one line.
@@ -25,16 +20,17 @@ const NAME: Pixels = px(200.);
 const KILLS: Pixels = px(80.);
 const DAMAGE: Pixels = px(104.);
 const ACCURACY: Pixels = px(80.);
+// The block starts under the class name, past the row's padding and icon.
+const INDENT: Pixels = px(40.);
 
-/// The panel for `weapons`, read for `class` over `range` and named by `names`; its close button
-/// closes it on `page`.
-pub(super) fn class_weapons_panel(
+/// The block for `weapons`, read for `class` over `range` and named by `names`; a second click
+/// on its class row closes it.
+pub(super) fn class_weapons_block(
     class: TfClass,
     weapons: &ClassWeapons,
     names: &WeaponNames,
     icons: &KillIconImages,
     range: LogsRange,
-    page: WeakEntity<LogsTfPage>,
     cx: &App,
 ) -> impl IntoElement + use<> {
     let muted = cx.theme().muted_foreground;
@@ -45,32 +41,21 @@ pub(super) fn class_weapons_panel(
     } else {
         None
     };
-    let header = h_flex()
-        .gap_2()
-        .child(labelled(
-            div().flex_1().min_w_0().font_weight(FontWeight::SEMIBOLD),
-            ids::LOGSTF_CLASS_WEAPONS_TITLE,
-            weapons_title(class, range, weapons.logs()),
-        ))
-        .child(
-            Button::new(ids::LOGSTF_CLASS_WEAPONS_CLOSE)
-                .ghost()
-                .xsmall()
-                .icon(IconName::X)
-                .named(format!("Close {} weapons", class.name()))
-                .on_click(move |_, _, cx| {
-                    let _ = page.update(cx, |page, cx| page.close_class(cx));
-                }),
-        );
+    let header = labelled(
+        div().font_weight(FontWeight::SEMIBOLD),
+        ids::LOGSTF_CLASS_WEAPONS_TITLE,
+        weapons_title(class, range, weapons.logs()),
+    );
     v_flex()
         .id(ids::LOGSTF_CLASS_WEAPONS)
         .test_support()
-        .w_full()
+        .ml(INDENT)
+        .mr_3()
+        .my_1()
         .gap_2()
         .p_3()
-        .rounded(cx.theme().radius_lg)
-        .border_1()
-        .border_color(cx.theme().border)
+        .rounded(cx.theme().radius)
+        .bg(cx.theme().muted.opacity(0.4))
         .child(header)
         .children(note.map(|note| {
             labelled(
@@ -79,12 +64,9 @@ pub(super) fn class_weapons_panel(
                 note,
             )
         }))
-        .children((!weapons.weapons().is_empty()).then(|| {
-            sideways(
-                ids::LOGSTF_CLASS_WEAPONS_TABLE,
-                weapon_table(class, weapons, names, icons, cx),
-            )
-        }))
+        .children(
+            (!weapons.weapons().is_empty()).then(|| weapon_table(class, weapons, names, icons, cx)),
+        )
 }
 
 // The column titles, then one line per weapon labelled as the class card's rows are.

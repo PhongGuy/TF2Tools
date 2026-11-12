@@ -1,4 +1,4 @@
-//! The class weapons panel: a played class card opens its weapon sums over the range.
+//! The class weapons block: a played class row opens its weapon sums over the range.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -72,7 +72,7 @@ fn the_panel_wording() {
 }
 
 #[gpui_kit::test]
-fn a_played_card_opens_its_weapons_and_a_second_click_closes_them(cx: &mut TestAppContext) {
+fn a_played_row_opens_its_weapons_and_a_second_click_closes_them(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
     serve_sixes(&server);
@@ -116,7 +116,7 @@ fn a_played_card_opens_its_weapons_and_a_second_click_closes_them(cx: &mut TestA
     assert_eq!(picked(cx, &page), None);
     assert!(!support::present(cx, s.win, ids::LOGSTF_CLASS_WEAPONS));
 
-    // Reopened, the top item grows, so the log row sits under the panel.
+    // Reopened, the top item grows, so the log row sits under the block.
     support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
     wait_for(cx, &page, TfClass::Scout);
     to_end(cx, &page);
@@ -161,7 +161,7 @@ fn close_switch_unplayed_and_no_shots(cx: &mut TestAppContext) {
     let page = open_page(cx, &s);
 
     support::click_id(cx, s.win, ids::logstf_class(TfClass::Soldier));
-    assert_eq!(picked(cx, &page), None, "an unplayed card opens nothing");
+    assert_eq!(picked(cx, &page), None, "an unplayed row opens nothing");
     assert_eq!(
         support::selected_of(cx, s.win, ids::logstf_class(TfClass::Soldier)),
         None
@@ -169,7 +169,7 @@ fn close_switch_unplayed_and_no_shots(cx: &mut TestAppContext) {
 
     support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
     wait_for(cx, &page, TfClass::Scout);
-    // The ring moves at once; Scout's title and rows stay until Pyro's read lands.
+    // The highlight moves at once; Scout's title and rows stay until Pyro's read lands.
     cx.update(|cx| page.update(cx, |p, cx| p.pick_class(TfClass::Pyro, cx)));
     assert_eq!(
         (picked(cx, &page), shown(cx, &page)),
@@ -198,7 +198,8 @@ fn close_switch_unplayed_and_no_shots(cx: &mut TestAppContext) {
         ids::logstf_class_weapon(TfClass::Scout, "scattergun")
     ));
 
-    support::click_id(cx, s.win, ids::LOGSTF_CLASS_WEAPONS_CLOSE);
+    // A second click on the open row closes it.
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Pyro));
     assert_eq!(picked(cx, &page), None);
     assert!(!support::present(cx, s.win, ids::LOGSTF_CLASS_WEAPONS));
 }

@@ -2547,7 +2547,7 @@ pub const LOGSTF_ERROR: &str = "logstf-error";
 /// Retries a failed logs.tf sync.
 pub const LOGSTF_RETRY: &str = "logstf-retry";
 
-/// Labelled "Last <range>, <n> logs" (or "All logs, <n>") above the class grid, once the
+/// Labelled "Last <range>, <n> logs" (or "All logs, <n>") above the class table, once the
 /// player has logs.
 pub const LOGSTF_SUMMARY: &str = "logstf-summary";
 /// The history range slider beside the summary, six stops from 1 month to All.
@@ -2559,20 +2559,21 @@ pub fn logstf_range_stop(range: LogsRange) -> ElementId {
     keyed("logstf-range-stop", range.key())
 }
 
-/// One class's card in the logs.tf averages grid: "logstf-class:<class>".
+/// The bordered box holding the class averages table, scrolling it sideways when narrow.
+pub const LOGSTF_CLASS_TABLE: &str = "logstf-class-table";
+
+/// One column title atop the class averages table, by its text: "logstf-class-head:<label>".
+pub fn logstf_class_head(label: &str) -> ElementId {
+    keyed("logstf-class-head", label)
+}
+
+/// One class's row in the logs.tf averages table, a played one opens its weapons:
+/// "logstf-class:<class>".
 pub fn logstf_class(class: TfClass) -> ElementId {
     keyed("logstf-class", &class.name().to_lowercase())
 }
 
-/// A class card's stat name, by its label: "logstf-class-label:<class>:<label>".
-pub fn logstf_class_label(class: TfClass, label: &str) -> ElementId {
-    keyed(
-        "logstf-class-label",
-        &format!("{}:{label}", class.name().to_lowercase()),
-    )
-}
-
-/// A class card's stat value, labelled with its text: "logstf-class-value:<class>:<label>".
+/// A class row's stat value, labelled with its text: "logstf-class-value:<class>:<label>".
 pub fn logstf_class_value(class: TfClass, label: &str) -> ElementId {
     keyed(
         "logstf-class-value",
@@ -2580,25 +2581,21 @@ pub fn logstf_class_value(class: TfClass, label: &str) -> ElementId {
     )
 }
 
-/// The dimmed "Not played" on a class card with no time: "logstf-class-unplayed:<class>".
+/// The "Not played" in the Played column of a dimmed class row with no time: "logstf-class-unplayed:<class>".
 pub fn logstf_class_unplayed(class: TfClass) -> ElementId {
     keyed("logstf-class-unplayed", &class.name().to_lowercase())
 }
 
-/// The panel under the class grid with the selected class's weapon sums over the range.
+/// The block under the open class row with its weapon sums over the range.
 pub const LOGSTF_CLASS_WEAPONS: &str = "logstf-class-weapons";
-/// Labelled "<Class> weapons · <range> · N logs" atop the class weapons panel.
+/// Labelled "<Class> weapons · <range> · N logs" atop the class weapons block.
 pub const LOGSTF_CLASS_WEAPONS_TITLE: &str = "logstf-class-weapons-title";
-/// Labelled with the panel's muted note: logs still being counted, or no weapon stats.
+/// Labelled with the block's muted note: logs still being counted, or no weapon stats.
 pub const LOGSTF_CLASS_WEAPONS_NOTE: &str = "logstf-class-weapons-note";
-/// Closes the class weapons panel.
-pub const LOGSTF_CLASS_WEAPONS_CLOSE: &str = "logstf-class-weapons-close";
 /// The column titles atop the class weapons table.
 pub const LOGSTF_CLASS_WEAPONS_HEAD: &str = "logstf-class-weapons-head";
-/// The sideways scroll box around the class weapons table.
-pub const LOGSTF_CLASS_WEAPONS_TABLE: &str = "logstf-class-weapons-table";
 
-/// One weapon's row in the class weapons panel, labelled as a class card's weapon row:
+/// One weapon's row in the class weapons block, labelled as a class card's weapon row:
 /// "logstf-class-weapon:<class>:<weapon>".
 pub fn logstf_class_weapon(class: TfClass, weapon: &str) -> ElementId {
     keyed(
@@ -2607,7 +2604,7 @@ pub fn logstf_class_weapon(class: TfClass, weapon: &str) -> ElementId {
     )
 }
 
-/// A weapon's kill icon in the class weapons panel: "logstf-class-weapon-icon:<class>:<weapon>".
+/// A weapon's kill icon in the class weapons block: "logstf-class-weapon-icon:<class>:<weapon>".
 pub fn logstf_class_weapon_icon(class: TfClass, weapon: &str) -> ElementId {
     keyed(
         "logstf-class-weapon-icon",
@@ -2615,7 +2612,7 @@ pub fn logstf_class_weapon_icon(class: TfClass, weapon: &str) -> ElementId {
     )
 }
 
-/// A weapon's name text in the class weapons panel:
+/// A weapon's name text in the class weapons block:
 /// "logstf-class-weapon-name:<class>:<weapon>".
 pub fn logstf_class_weapon_name(class: TfClass, weapon: &str) -> ElementId {
     keyed(

@@ -238,7 +238,7 @@ pub fn range_label(range: LogsRange) -> &'static str {
     }
 }
 
-/// The line under the class grid: the range, then how many logs it holds. The range counts
+/// The line above the class table: the range, then how many logs it holds. The range counts
 /// back from `newest`, the newest log's upload time, so it reads as "Last 3 months, 87 logs"
 /// only while that log is at most a week before `now`; an older one names the day the range
 /// ends: "1 year up to 13 Dec 2022, 274 logs". `All` reads "All logs, 4,812".
@@ -280,10 +280,10 @@ fn day_text(unix: i64) -> String {
         .unwrap_or_default()
 }
 
-/// The class weapons panel's line when the class's logs carry no weapon stats at all.
+/// The class weapons block's line when the class's logs carry no weapon stats at all.
 pub const NO_WEAPONS_TEXT: &str = "No weapon stats in these logs";
 
-/// The class weapons panel's title: "Scout weapons · 3 months · 1 log", "All" for every log.
+/// The class weapons block's title: "Scout weapons · 3 months · 1 log", "All" for every log.
 pub fn weapons_title(class: TfClass, range: LogsRange, logs: u32) -> String {
     let noun = if logs == 1 { "log" } else { "logs" };
     let count = count_text(usize::try_from(logs).unwrap_or(usize::MAX));
@@ -294,7 +294,7 @@ pub fn weapons_title(class: TfClass, range: LogsRange, logs: u32) -> String {
     )
 }
 
-/// The class weapons panel's note while older logs still wait for their weapons counted.
+/// The class weapons block's note while older logs still wait for their weapons counted.
 pub fn counting_text(left: u32) -> String {
     format!("Counting older logs, {left} left")
 }

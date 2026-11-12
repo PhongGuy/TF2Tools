@@ -40,7 +40,7 @@ pub fn weapon_rows(player: &PlayerLine, class: &ClassLine, names: &WeaponNames) 
         .collect()
 }
 
-/// The class weapons panel's rows in core's order (damage high to low); shares are of the
+/// The class weapons block's rows in core's order (damage high to low); shares are of the
 /// class's summed weapon kills and damage, so they add to about 100%.
 pub fn class_weapon_rows(weapons: &ClassWeapons, names: &WeaponNames) -> Vec<WeaponRow> {
     let narrow = |n: i64| u32::try_from(n).unwrap_or(u32::MAX);
