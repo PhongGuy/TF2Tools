@@ -1,6 +1,7 @@
 //! The class averages table: one compact row per class under shared column titles, a played
 //! row opening its weapons right under it, scrolling sideways in a narrow window.
 
+use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{
     AppContext as _, InputEvent as _, ScrollDelta, ScrollEvent, TestAppContext, point, px, size,
 };
@@ -115,12 +116,16 @@ fn an_unplayed_row_says_so_in_the_played_column_and_takes_no_keyboard(cx: &mut T
             ids::logstf_class_value(TfClass::Soldier, label)
         ));
     }
+    // A played row is a tab stop; Tab from Scout skips unplayed Soldier for Pyro.
+    support::tab_to(cx, s.win, ids::logstf_class(TfClass::Scout), 64);
+    cx.update_window(s.win, |_, w, cx| w.focus_next(cx))
+        .unwrap();
     assert_eq!(
-        support::focused_of(cx, s.win, ids::logstf_class(TfClass::Soldier)),
-        None
+        support::focused_of(cx, s.win, ids::logstf_class(TfClass::Pyro)),
+        Some(true)
     );
 
-    // A played row is a tab stop, and Enter opens its weapons.
+    // Enter opens the focused row's weapons.
     support::tab_to(cx, s.win, ids::logstf_class(TfClass::Scout), 64);
     support::press(cx, s.win, "enter");
     assert_eq!(
@@ -158,6 +163,38 @@ fn the_weapons_open_indented_under_their_row_and_move_with_the_pick(cx: &mut Tes
         s.win,
         ids::logstf_class_weapon(TfClass::Scout, "scattergun")
     ));
+}
+
+// While a newly picked class's weapons load, the old class's held weapons never show under it.
+#[gpui_kit::test]
+fn a_switch_shows_no_old_weapons_under_the_new_row(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    support::wait_real(cx, "scout's weapons", |cx| {
+        cx.update(|cx| page.read(cx).class_weapons().map(|(c, _)| c)) == Some(TfClass::Scout)
+    });
+    // Click Pyro and draw before the executor runs its read, so Scout's weapons are still held.
+    support::settle(cx, s.win);
+    let (title, scattergun) = cx
+        .update_window(s.win, |_, w, cx| {
+            w.click(ids::logstf_class(TfClass::Pyro), cx);
+            w.render_frame(cx);
+            w.simulate_next_frame(cx);
+            let title = w
+                .try_find(ids::LOGSTF_CLASS_WEAPONS_TITLE)
+                .and_then(|e| e.label().map(str::to_owned));
+            let row = w.try_find(ids::logstf_class_weapon(TfClass::Scout, "scattergun"));
+            (title, row.is_some())
+        })
+        .unwrap();
+    let held = cx.update(|cx| page.read(cx).class_weapons().map(|(c, _)| c));
+    assert_eq!(held, Some(TfClass::Scout), "Pyro's read landed too soon");
+    assert_eq!(title, None, "{title:?} shows under Pyro");
+    assert!(!scattergun, "Scout's rows show under Pyro");
 }
 
 #[gpui_kit::test]

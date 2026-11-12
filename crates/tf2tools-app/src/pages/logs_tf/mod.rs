@@ -80,8 +80,8 @@ pub struct LogsTfPage {
     loaded: bool,
     rows: Vec<LogRow>,
     averages: Option<[ClassAverage; 9]>,
-    // The class whose card is ringed, and the weapons the panel shows with the class they were
-    // read for; a pick moves the ring at once but the panel keeps its pair until the read lands.
+    // The class whose row is open, and the weapons the block shows with the class they were
+    // read for; a pick moves the highlight at once, its block waiting for the read to land.
     selected_class: Option<TfClass>,
     weapons: Option<(TfClass, ClassWeapons)>,
     weapons_generation: u64,
@@ -283,7 +283,7 @@ impl LogsTfPage {
         self.selected_class
     }
 
-    /// The weapons the panel holds and the class they were read for.
+    /// The weapons the block holds and the class they were read for.
     pub fn class_weapons(&self) -> Option<(TfClass, &ClassWeapons)> {
         self.weapons
             .as_ref()
@@ -314,7 +314,7 @@ impl LogsTfPage {
     pub fn close_class(&mut self, cx: &mut Context<Self>) {
         self.selected_class = None;
         self.weapons = None;
-        // A read still out must not reopen the panel.
+        // A read still out must not reopen the block.
         self.weapons_generation += 1;
         self.list.remeasure_items(0..1);
         cx.notify();
@@ -322,7 +322,7 @@ impl LogsTfPage {
 
     // Reads the selected class's weapons off the UI thread. The landing applies only while the
     // page still shows the player, range and class it read for and no newer read went out; a
-    // failed read keeps the panel as it was.
+    // failed read keeps the block as it was.
     fn read_weapons(&mut self, cx: &mut Context<Self>) {
         let (Some(active), Some(class)) = (self.active, self.selected_class) else {
             return;
@@ -361,7 +361,7 @@ impl LogsTfPage {
     }
 
     /// Counts weapon stats, then damage taken, for logs stored before the cache kept them, one
-    /// batch at a time off the UI thread, rereading the open panel or the rows after each batch
+    /// batch at a time off the UI thread, rereading the open weapons or the rows after each batch
     /// that counted a log. A no-op while a backfill runs; each pass stops when none are left,
     /// on an error, or when a batch counts nothing, and the next run resumes.
     pub fn count_older_weapons(&mut self, cx: &mut Context<Self>) {
@@ -1173,7 +1173,7 @@ impl LogsTfPage {
                 )),
                 None => None,
             };
-            // A failed weapon read costs only the panel, which keeps its last rows; the rest
+            // A failed weapon read costs only the weapons block, which keeps its last rows; the rest
             // of the load still lands.
             let weapons = match (active, selected) {
                 (Some(id), Some(class)) => match cache.class_weapons(id, range, class) {
@@ -1226,7 +1226,7 @@ impl LogsTfPage {
         })
     }
 
-    // Keeps the panel in step with fresh averages: it closes when the active player never
+    // Keeps the weapons block in step with fresh averages: it closes when the active player never
     // played the selected class, else takes the load's weapons if they were read for the
     // class still selected. The bump drops a click read that went out before this one. A
     // class picked while the load read gets its own read, since its click read saw the old
@@ -1491,10 +1491,11 @@ impl LogsTfPage {
             .children((!self.rows.is_empty()).then(|| list::column_header(self.fit, cx)))
     }
 
-    // The block for the held weapons, under the selected row, while a class is selected.
+    // The block for the held weapons under the selected row, only once they are that class's:
+    // while a new pick's read is out, its row shows nothing rather than the old class's weapons.
     fn weapons_block(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        self.selected_class?;
-        let (class, weapons) = self.weapons.as_ref()?;
+        let selected = self.selected_class?;
+        let (class, weapons) = self.weapons.as_ref().filter(|(c, _)| *c == selected)?;
         let block = class_weapons::class_weapons_block(
             *class,
             weapons,
