@@ -443,6 +443,35 @@ fn an_older_copy_s_mark_is_its_base_s_download_time_else_its_own() {
     );
 }
 
+#[test]
+fn a_copy_with_a_non_numeric_mark_is_offered_nothing() {
+    let env = library_env();
+    let base = import_stock_hud(&env, "darhud-202517", &[], common::gb(37));
+    let copy = env.lib.copy_hud(base.id()).unwrap();
+    env.lib.delete_hud(base.id()).unwrap();
+    rewrite_record(&env, &copy, "abc123", "2026-01-01T00:00:00Z");
+    checked(&env, 37, latest(now_secs() + 3600));
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::UpToDate,
+        "a hash that is no file date gives no mark, so no offer"
+    );
+}
+
+#[test]
+fn a_copy_of_a_removed_item_is_offered_nothing() {
+    let env = library_env();
+    let base = import_stock_hud(&env, "darhud-202517", &[], common::gb(38));
+    set_mark(&env, &base, Some(100));
+    let copy = env.lib.copy_hud(base.id()).unwrap();
+    env.lib.delete_hud(base.id()).unwrap();
+    checked(&env, 38, GbAddonCheck::Gone);
+    assert_eq!(
+        env.lib.copy_update(copy.id()).unwrap(),
+        CopyUpdate::UpToDate
+    );
+}
+
 async fn replacing(env: &StoreEnv, file: &StoreFile, old: &HudId) -> HudEntry {
     only_hud(
         env.client
