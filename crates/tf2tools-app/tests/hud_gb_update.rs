@@ -276,3 +276,144 @@ fn a_failed_file_listing_toasts_and_keeps_the_hud(cx: &mut TestAppContext) {
         "busy is cleared"
     );
 }
+
+#[gpui_kit::test]
+fn a_several_file_item_asks_which_file_before_replacing(cx: &mut TestAppContext) {
+    let (env, s, server) = ready(cx);
+    let old = import(&s, &env, "darhud-202517", 48, 100);
+    checked(&env, 48, 300, false);
+    server.mount_gb_files_dated(
+        48,
+        &[
+            (
+                "darhud-202618.zip",
+                support::hud_zip_bytes("darhud-202618"),
+                300,
+            ),
+            ("darhud-4k.zip", support::hud_zip_bytes("darhud-4k"), 290),
+        ],
+    );
+    click_update(cx, &s, &old);
+    support::wait_real(cx, "the files", |cx| {
+        support::present(cx, s.win, ids::store_file(1))
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::store_file(0)).as_deref(),
+        Some("Update with this file")
+    );
+    let ids_now: Vec<_> = (s.services.library.list_huds().unwrap().iter())
+        .map(|h| h.id().clone())
+        .collect();
+    assert_eq!(
+        ids_now,
+        [old.id().clone()],
+        "nothing replaced before the pick"
+    );
+    support::click_id(cx, s.win, ids::store_file(1));
+    support::wait_real(cx, "the picked file", |_| {
+        let huds = s.services.library.list_huds().unwrap();
+        huds.len() == 1 && huds[0].folder_name() == "darhud-4k"
+    });
+}
+
+#[gpui_kit::test]
+fn a_copy_whose_base_was_removed_opens_the_store_download(cx: &mut TestAppContext) {
+    let (env, s, server) = ready(cx);
+    let base = import(&s, &env, "darhud-202517", 49, 100);
+    let copy = s.services.library.copy_hud(base.id()).unwrap();
+    s.services.library.delete_hud(base.id()).unwrap();
+    checked(&env, 49, 300, false);
+    server.mount_gb_files_dated(
+        49,
+        &[(
+            "darhud-202618.zip",
+            support::hud_zip_bytes("darhud-202618"),
+            300,
+        )],
+    );
+    revisit_huds(cx, &s);
+    support::wait_real(cx, "the store note", |cx| {
+        support::present(cx, s.win, ids::hud_update_note(copy.folder_name()))
+    });
+    support::click_id(cx, s.win, ids::hud_update(copy.folder_name()));
+    support::wait_real(cx, "the files", |cx| {
+        support::present(cx, s.win, ids::store_file(0))
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::store_file(0)).as_deref(),
+        Some("Download")
+    );
+    assert!(!support::disabled_of(cx, s.win, ids::store_file(0)));
+}
+
+#[gpui_kit::test]
+fn a_copy_takes_a_newer_library_download_of_its_gamebanana_item(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = shell(cx, &env);
+    let base = import(&s, &env, "darhud-202517", 50, 100);
+    let copy = s.services.library.copy_hud(base.id()).unwrap();
+    let newer = support::hud_copies::import_stock_hud(
+        &s.services,
+        env.tmp.path(),
+        "darhud-202618",
+        &[("NEW.txt", "new")],
+        gb(50),
+    );
+    support::sql(&env)
+        .execute(
+            "UPDATE library_huds SET gb_file_date = 300 WHERE id = ?1",
+            [newer.id().as_str()],
+        )
+        .unwrap();
+    revisit_huds(cx, &s);
+    support::wait_real(cx, "the copy's Update", |cx| {
+        support::present(cx, s.win, ids::hud_update(copy.folder_name()))
+    });
+    assert!(
+        !support::present(cx, s.win, ids::hud_update_note(copy.folder_name())),
+        "a library offer, not the store's"
+    );
+    support::click_id(cx, s.win, ids::hud_update(copy.folder_name()));
+    support::wait_real(cx, "the copy updated", |_| {
+        s.services
+            .library
+            .copy_base(copy.id())
+            .unwrap()
+            .is_some_and(|b| b.hash() == "300")
+    });
+}
+
+#[gpui_kit::test]
+fn picking_a_file_refuses_while_tf2_runs_before_any_download(cx: &mut TestAppContext) {
+    let (env, s, server) = ready(cx);
+    let old = import(&s, &env, "darhud-202517", 52, 100);
+    checked(&env, 52, 300, false);
+    server.mount_gb_files_dated(
+        52,
+        &[
+            (
+                "darhud-202618.zip",
+                support::hud_zip_bytes("darhud-202618"),
+                300,
+            ),
+            ("darhud-4k.zip", support::hud_zip_bytes("darhud-4k"), 290),
+        ],
+    );
+    click_update(cx, &s, &old);
+    support::wait_real(cx, "the files", |cx| {
+        support::present(cx, s.win, ids::store_file(1))
+    });
+    // TF2 starts while the player is choosing.
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    support::click_id(cx, s.win, ids::store_file(1));
+    support::wait_real(cx, "the refusal", |cx| {
+        support::toast_labels(cx, s.win)
+            .iter()
+            .any(|t| t == "Close TF2 first. TF2 is running. Close the game, then try again.")
+    });
+    assert_eq!(server.requests_where(|p| p.starts_with("/dl/")), 0);
+    let ids_now: Vec<_> = (s.services.library.list_huds().unwrap().iter())
+        .map(|h| h.id().clone())
+        .collect();
+    assert_eq!(ids_now, [old.id().clone()]);
+}
