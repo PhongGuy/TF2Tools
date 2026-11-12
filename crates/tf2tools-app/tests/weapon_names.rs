@@ -117,17 +117,49 @@ fn moving_tf2_mid_load_shows_only_the_new_folders_names(cx: &mut TestAppContext)
     assert_eq!(cx.update(|cx| names.read(cx).loads()), 2);
 }
 
-#[gpui_kit::test]
-fn a_game_without_items_game_leaves_log_names_raw(cx: &mut TestAppContext) {
-    let env = support::env();
+// The production loader on env's game folder, waited on until its read has landed.
+fn load_for_real(cx: &mut TestAppContext, env: &support::Env) -> Entity<LoadedWeaponNames> {
     support::init(cx);
-    support::install_services(cx, support::services(&env, support::no_steam()));
+    support::install_services(cx, support::services(env, support::no_steam()));
     cx.update(|cx| install_tf2_state(cx, found(&env.game)));
     let names = cx.update(LoadedWeaponNames::global);
     support::wait_real(cx, "the load", |cx| {
-        cx.update(|cx| names.read(cx).loads()) == 1
+        cx.update(|cx| names.read(cx).loads() == 1 && !names.read(cx).loading())
     });
-    cx.run_until_parked();
+    names
+}
+
+#[gpui_kit::test]
+fn the_games_files_give_its_weapon_names(cx: &mut TestAppContext) {
+    let env = support::env();
+    let tf = env.game.join("tf");
+    std::fs::create_dir_all(tf.join("scripts/items")).unwrap();
+    std::fs::create_dir_all(tf.join("resource")).unwrap();
+    std::fs::write(
+        tf.join("scripts/items/items_game.txt"),
+        support::logstf::NAMES_ITEMS,
+    )
+    .unwrap();
+    std::fs::write(
+        tf.join("resource/tf_english.txt"),
+        support::logstf::NAMES_LANG,
+    )
+    .unwrap();
+    let names = load_for_real(cx, &env);
+    assert_eq!(
+        name_of(cx, &names, "quake_rl").as_deref(),
+        Some("The Original")
+    );
+    assert_eq!(
+        cx.update(|cx| names.read(cx).names().clone()),
+        support::logstf::weapon_names()
+    );
+}
+
+#[gpui_kit::test]
+fn a_game_without_items_game_leaves_log_names_raw(cx: &mut TestAppContext) {
+    let env = support::env();
+    let names = load_for_real(cx, &env);
     assert_eq!(
         cx.update(|cx| names.read(cx).names().clone()),
         WeaponNames::default()

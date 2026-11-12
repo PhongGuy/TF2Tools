@@ -77,6 +77,11 @@ impl LoadedWeaponNames {
         self.loads
     }
 
+    /// Whether a started load has yet to land.
+    pub fn loading(&self) -> bool {
+        self.task.is_some()
+    }
+
     /// Shows `tf_dir`'s names, loading them unless they are shown or loading already; None clears.
     pub fn show_game(&mut self, tf_dir: Option<PathBuf>, cx: &mut Context<Self>) {
         if tf_dir == self.shown_for {
@@ -100,6 +105,7 @@ impl LoadedWeaponNames {
                 // Backstop: a newer show_game drops this task, but never apply another folder's names.
                 if this.shown_for.as_deref() == Some(dir.as_path()) {
                     this.names = names;
+                    this.task = None;
                     cx.notify();
                 }
             });
