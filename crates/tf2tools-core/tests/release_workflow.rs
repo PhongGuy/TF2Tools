@@ -209,7 +209,6 @@ fn the_gate_runs_the_checks_and_the_trailer_check_over_full_history() {
 fn the_linux_job_builds_a_release_without_the_test_seam() {
     let text = workflow();
     let linux = job(&text, "linux");
-    assert!(linux.contains("runs-on: ubuntu-22.04"), "{linux}");
     assert!(linux.contains("TF2TOOLS_RELEASE_BUILD: \"1\""), "{linux}");
     assert!(linux.contains("run: make package-check"), "{linux}");
     assert!(
@@ -220,6 +219,41 @@ fn the_linux_job_builds_a_release_without_the_test_seam() {
     // `make check` lints with --all-features, which the release guard turns into a build error.
     assert!(!preamble(&text).contains("TF2TOOLS_RELEASE_BUILD"));
     assert!(!job(&text, "gate").contains("TF2TOOLS_RELEASE_BUILD"));
+}
+
+// The Linux binary needs at most GLIBC_2.35, so it runs on Ubuntu 22.04 LTS and its derivatives.
+// GitHub retires the ubuntu-22.04 runner, so the build keeps 22.04's glibc inside a pinned container.
+#[test]
+fn the_linux_job_builds_in_a_pinned_ubuntu_22_04_container_on_ubuntu_24_04() {
+    let linux = job(&workflow(), "linux");
+    assert!(linux.contains("    runs-on: ubuntu-24.04\n"), "{linux}");
+    assert!(
+        linux.contains("    container:\n      image: ubuntu:22.04@sha256:"),
+        "{linux}"
+    );
+    // Root in the container, which has no sudo, and no prompt for debconf.
+    assert!(!linux.contains("sudo"), "{linux}");
+    assert!(linux.contains("DEBIAN_FRONTEND: noninteractive"), "{linux}");
+    // The bare image lacks the compiler, make, git for checkout and curl for rustup.
+    let install = step(&linux, "Install build tools and system libraries");
+    for package in ["build-essential", "ca-certificates", "curl", "git", "file"] {
+        assert!(install.contains(&format!(" {package} ")), "{install}");
+    }
+    assert!(linux.contains("APPIMAGE_EXTRACT_AND_RUN: \"1\""), "{linux}");
+}
+
+#[test]
+fn no_workflow_runs_on_a_retired_ubuntu_22_04_runner() {
+    let dir = repo().join(".github/workflows");
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let path = entry.unwrap().path();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            !text.contains("runs-on: ubuntu-22.04"),
+            "{}",
+            path.display()
+        );
+    }
 }
 
 #[test]
