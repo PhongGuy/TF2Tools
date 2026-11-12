@@ -200,19 +200,30 @@ fn main_class(p: &PlayerLine) -> usize {
         .unwrap_or(TfClass::ALL.len())
 }
 
-/// A sort by a column of numbers, which opens high to low; the page keeps `None` for the
-/// table's default order.
+/// A sort by one column of a table and its direction; the page keeps `None` for the table's
+/// default order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NumberSort<C> {
     pub column: C,
     pub descending: bool,
 }
 
-impl<C: Copy + PartialEq> NumberSort<C> {
+/// A column a `NumberSort` can lead with.
+pub trait SortColumn: Copy + PartialEq {
+    /// Whether a first click sorts high to low: numbers do.
+    fn descending_first(self) -> bool {
+        true
+    }
+}
+
+impl<C: SortColumn> NumberSort<C> {
     /// The sort after a click on `column` while `sort` leads: the same column flips, another
-    /// opens high to low.
+    /// opens in its own first direction.
     pub fn clicked(sort: Option<Self>, column: C) -> Self {
-        let descending = !sort.is_some_and(|s| s.column == column && s.descending);
+        let descending = match sort {
+            Some(s) if s.column == column => !s.descending,
+            _ => column.descending_first(),
+        };
         Self { column, descending }
     }
 }
@@ -224,10 +235,13 @@ pub enum MatrixColumn {
     Total,
 }
 
+impl SortColumn for MatrixColumn {}
+
 /// The kill matrix's sort, kept across its three tabs.
 pub type MatrixSort = NumberSort<MatrixColumn>;
 
 /// `rows` (in the matrix's default order) by `sort`'s column; ties keep the default order.
+#[allow(clippy::expect_used)]
 pub fn sort_matrix_rows<'a>(
     rows: Vec<(&'a PlayerLine, &'a MatrixRow)>,
     sort: Option<MatrixSort>,
@@ -240,7 +254,8 @@ pub fn sort_matrix_rows<'a>(
         MatrixColumn::Class(class) => TfClass::ALL
             .iter()
             .position(|c| *c == class)
-            .map_or(0, |i| row.counts()[i]),
+            .map(|i| row.counts()[i])
+            .expect("every class is in TfClass::ALL"),
         MatrixColumn::Total => row.total(),
     };
     let mut rows = rows;
@@ -254,6 +269,7 @@ pub fn sort_matrix_rows<'a>(
 /// One class table column that sorts, in the table's order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClassStat {
+    Class,
     Played,
     Logs,
     KillsPerMin,
@@ -266,7 +282,7 @@ pub enum ClassStat {
 }
 
 impl ClassStat {
-    /// Every column in the table's order.
+    /// Every number column in the table's order, after the Class title.
     pub const ALL: [ClassStat; 9] = [
         Self::Played,
         Self::Logs,
@@ -282,6 +298,7 @@ impl ClassStat {
     /// The column's title.
     pub fn title(self) -> &'static str {
         match self {
+            Self::Class => "Class",
             Self::Played => "Played",
             Self::Logs => "Logs",
             Self::KillsPerMin => "Kills/min",
@@ -297,6 +314,10 @@ impl ClassStat {
     // The value behind the column's text; an empty Medic cell is None.
     fn value(self, a: &ClassAverage) -> Option<f64> {
         match self {
+            Self::Class => TfClass::ALL
+                .iter()
+                .position(|c| *c == a.class())
+                .map(|i| i as f64),
             Self::Played => Some(a.seconds() as f64),
             Self::Logs => Some(f64::from(a.logs())),
             Self::KillsPerMin => Some(a.kills_per_min()),
@@ -310,6 +331,13 @@ impl ClassStat {
     }
 }
 
+impl SortColumn for ClassStat {
+    // Class opens Scout to Spy; the numbers open high to low.
+    fn descending_first(self) -> bool {
+        self != Self::Class
+    }
+}
+
 /// The class table's sort.
 pub type ClassSort = NumberSort<ClassStat>;
 
@@ -320,13 +348,16 @@ pub fn sort_classes(averages: &[ClassAverage], sort: Option<ClassSort>) -> Vec<u
     let Some(sort) = sort else {
         return order;
     };
-    // Unplayed classes go last whatever the direction; an empty cell reads lowest. The sort
-    // is stable, so ties keep class order.
+    // Unplayed classes go last in class order whatever the direction; an empty cell reads
+    // lowest. The sort is stable, so ties keep class order.
     let key = |i: usize| sort.column.value(&averages[i]).unwrap_or(f64::NEG_INFINITY);
     order.sort_by(|&a, &b| {
-        let played = averages[b].played().cmp(&averages[a].played());
+        let (pa, pb) = (averages[a].played(), averages[b].played());
+        if !(pa && pb) {
+            return pb.cmp(&pa);
+        }
         let ord = key(a).total_cmp(&key(b));
-        played.then(if sort.descending { ord.reverse() } else { ord })
+        if sort.descending { ord.reverse() } else { ord }
     });
     order
 }

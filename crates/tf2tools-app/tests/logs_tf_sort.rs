@@ -268,3 +268,14 @@ fn the_matrix_sorts_by_a_class_or_the_total_both_ways_ties_keeping_its_order() {
         kills(Some(sort)) != default
     }));
 }
+
+#[test]
+fn the_class_title_opens_in_class_order_and_flips() {
+    use tf2tools_app::pages::logs_tf::sort::{ClassStat, NumberSort};
+    let first = NumberSort::clicked(None, ClassStat::Class);
+    assert!(!first.descending, "Scout to Spy first");
+    assert!(NumberSort::clicked(Some(first), ClassStat::Class).descending);
+    let kills = NumberSort::clicked(Some(first), ClassStat::KillsPerMin);
+    assert!(kills.descending);
+    assert!(!NumberSort::clicked(Some(kills), ClassStat::Class).descending);
+}

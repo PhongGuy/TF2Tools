@@ -150,11 +150,12 @@ fn class_table(
     let min_width = CLASS_MIN + numbers + GAP * COLUMNS.len() as f32 + ROW_PAD * 2. + px(2.);
     let theme = cx.theme();
     let (border, radius) = (theme.border, theme.radius_lg);
-    // Every title is a button: a stat sorts by it or flips, Class goes back to class order.
+    // Every title is a button that sorts by its column, or flips it when it leads.
     // They keep no padding so each title stays flush with its column's values.
-    let title = |label: &'static str, stat: Option<ClassStat>, end: bool| {
+    let title = |stat: ClassStat, end: bool| {
+        let label = stat.title();
         let page = page.clone();
-        let sorted = sort.filter(|s| Some(s.column) == stat);
+        let sorted = sort.filter(|s| s.column == stat);
         let button = Button::new(ids::logstf_class_head(label))
             .ghost()
             .xsmall()
@@ -179,14 +180,12 @@ fn class_table(
         .text_color(theme.muted_foreground)
         .font_weight(FontWeight::MEDIUM)
         .child(
-            title("Class", None, false)
+            title(ClassStat::Class, false)
                 .flex_1()
                 .min_w(CLASS_MIN)
                 .items_start(),
         )
-        .children(
-            COLUMNS.map(|(stat, width)| title(stat.title(), Some(stat), true).w(width).items_end()),
-        );
+        .children(COLUMNS.map(|(stat, width)| title(stat, true).w(width).items_end()));
     let mut rows = v_flex()
         .w_full()
         .min_w(min_width)

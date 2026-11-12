@@ -540,10 +540,9 @@ impl LogsTfPage {
         self.class_sort
     }
 
-    /// A click on a class table title: `Some` sorts by that stat or flips it if it leads,
-    /// `None` (the Class title) goes back to class order.
-    pub fn sort_classes_by(&mut self, stat: Option<ClassStat>, cx: &mut Context<Self>) {
-        self.class_sort = stat.map(|stat| ClassSort::clicked(self.class_sort, stat));
+    /// A click on a class table title: sorts by its column, or flips it if it leads.
+    pub fn sort_classes_by(&mut self, stat: ClassStat, cx: &mut Context<Self>) {
+        self.class_sort = Some(ClassSort::clicked(self.class_sort, stat));
         cx.notify();
     }
 
