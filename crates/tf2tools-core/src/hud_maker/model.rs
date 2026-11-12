@@ -642,10 +642,17 @@ impl HudModel {
         let Some(part) = self.index.get(key).and_then(|&i| self.parts.get(i)) else {
             return Vec::new();
         };
+        // A stub's blocks sit in its bases, so the chain read is that of the one entry reaching
+        // the block's file, keeping an off slot the stub names (missing) in reach. A base many
+        // entries share stays out, or every entry's slots would land on the part.
         let mut files = Vec::new();
         for (file, _) in part.blocks() {
             files.push(file.to_ascii_lowercase());
-            files.extend(self.bases.named.get(file).into_iter().flatten().cloned());
+            let shared = self.bases.shared.contains(file);
+            let reaching = (self.bases.named.iter())
+                .filter(|(entry, named)| *entry == file || (!shared && named.contains(file)))
+                .flat_map(|(_, named)| named.iter().cloned());
+            files.extend(reaching);
         }
         files.sort();
         files.dedup();

@@ -88,3 +88,45 @@ fn a_folder_move_covers_the_files_under_it() {
         ["c:customizations/streamermode_"]
     );
 }
+
+/// A budhud-like copy: the health file is a `#base`-only stub whose blocks live in a base
+/// folder, and the cross option's file sits beside `_enabled` (off) or inside it (on).
+fn stub_health_files(on: bool) -> tf2tools_core::HudFiles {
+    use common::hud_stock::HEALTH;
+    let slot = if on {
+        "#customization/_enabled/bh_player_healthcross.res"
+    } else {
+        "#customization/bh_player_healthcross.res"
+    };
+    let stub = "#base \"../../#customization/_enabled/bh_player_healthcross.res\"\n#base \"../../_base/resource/ui/hudplayerhealth.res\"\n";
+    let cross = "\"Resource/UI/HudPlayerHealth.res\" { PlayerStatusHealthValue { xpos 9 } }\n";
+    switch_files(&[
+        ("resource/ui/hudplayerhealth.res", stub),
+        ("_base/resource/ui/hudplayerhealth.res", HEALTH),
+        (slot, cross),
+    ])
+}
+
+const CROSS_SCHEMA: &str = r##"{ "CustomizationsFolder": "#customization", "EnabledFolder": "#customization//_enabled",
+  "Controls": { "Health": [
+    { "Name": "bh_cross", "Label": "Health Cross", "Type": "Checkbox", "Value": "false", "FileName": "bh_player_healthcross.res" } ] } }"##;
+
+fn cross_ids(on: bool) -> Vec<String> {
+    let files = stub_health_files(on);
+    let model = HudModel::load(&files, Platform::Linux).unwrap();
+    let schema = tf2tools_core::HudSchema::parse("somehud", CROSS_SCHEMA.as_bytes()).unwrap();
+    let options = HudOptions::read(&files, Some(&schema), Platform::Linux);
+    ids(&options, &model, HV)
+}
+
+#[test]
+fn an_off_option_is_offered_on_the_part_a_stub_chain_reaches() {
+    let tied = cross_ids(false);
+    assert!(tied.contains(&"e:bh_cross".to_owned()), "{tied:?}");
+}
+
+#[test]
+fn an_on_option_is_still_offered_on_its_part() {
+    let tied = cross_ids(true);
+    assert!(tied.contains(&"e:bh_cross".to_owned()), "{tied:?}");
+}
