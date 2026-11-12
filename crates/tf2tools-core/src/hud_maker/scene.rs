@@ -322,6 +322,18 @@ const POWERUP_WHEN: &str = "Shows while you carry a Mannpower powerup";
 const TYPING: ShowsFor = ShowsFor::Mode("typing");
 const TYPING_WHEN: &str = "Shows while you type a chat message";
 
+// The KOTH panel shows only on a King of the Hill map, in the HUD and the freeze cam alike.
+const KOTH_TOGGLED: CodeToggled = fitted(
+    when(
+        "HudKothTimeStatus",
+        ShowsFor::Mode("koth"),
+        "Shows on King of the Hill maps",
+    ),
+    &[],
+    HideTechnique::OffScreenY,
+    Fit::None,
+);
+
 // What the game checks before it shows each HUD part its code toggles; the preview shows the
 // default situation, `ShowsFor::in_default`.
 static HUD_TOGGLED: [CodeToggled; 55] = [
@@ -468,16 +480,7 @@ static HUD_TOGGLED: [CodeToggled; 55] = [
     when("ChatFiltersButton", TYPING, TYPING_WHEN),
     // On a King of the Hill map the KOTH timers take the round timer's place; both keep the
     // round timer's off-screen hide.
-    fitted(
-        when(
-            "HudKothTimeStatus",
-            ShowsFor::Mode("koth"),
-            "Shows on King of the Hill maps",
-        ),
-        &[],
-        HideTechnique::OffScreenY,
-        Fit::None,
-    ),
+    KOTH_TOGGLED,
     fitted(
         when(
             "ObjectiveStatusTimePanel",
@@ -827,7 +830,7 @@ static MENU: SceneRule = SceneRule {
 // What the freeze cam's code shows or hides (`tf_hud_freezepanel.cpp`, by function name):
 // the screenshot hint only with a screenshot key bound, the nemesis and item panels only in
 // their situations. The last two are the killer health panel's, assumed rather than checked in game.
-static FREEZE_TOGGLED: [CodeToggled; 8] = [
+static FREEZE_TOGGLED: [CodeToggled; 9] = [
     toggled(
         "ScreenshotPanel",
         true,
@@ -853,8 +856,9 @@ static FREEZE_TOGGLED: [CodeToggled; 8] = [
         false,
         "Shows when your killer is a building",
     ),
-    // The HUD parts kept over the freeze cam: nobody types in the sample, and the KOTH timers
-    // blank their digits until the respawn count starts.
+    // The HUD parts kept over the freeze cam: the KOTH panel only on a KOTH map, its timers'
+    // digits blank until the respawn count starts, and no chat typing in the sample.
+    KOTH_TOGGLED,
     toggled("ChatInputLine", false, TYPING_WHEN),
     toggled("ChatFiltersButton", false, TYPING_WHEN),
     toggled(

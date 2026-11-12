@@ -33,6 +33,7 @@ fn the_game_shows_the_screenshot_hint_and_hides_the_rest() {
             ("NemesisSubPanel", false),
             ("PlayerStatusHealthBonusImage", false),
             ("BuildingStatusHealthImageBG", false),
+            ("HudKothTimeStatus", false),
             ("ChatInputLine", false),
             ("ChatFiltersButton", false),
             ("TimePanelValue", false),
@@ -40,7 +41,9 @@ fn the_game_shows_the_screenshot_hint_and_hides_the_rest() {
     );
     for t in rule.code_toggled() {
         assert!(t.shows_when().starts_with("Shows "), "{}", t.panel());
-        assert!(t.shows_for().is_none(), "{}", t.panel());
+        // Only the KOTH panel follows the situation, as it does over the HUD.
+        let koth = t.panel() == "HudKothTimeStatus";
+        assert_eq!(t.shows_for().is_some(), koth, "{}", t.panel());
     }
     let m = freeze();
     let l = m.layout(SD);

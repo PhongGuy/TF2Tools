@@ -4,7 +4,10 @@
 use crate::common;
 
 use common::hud_stock::{hudlayout_with_killfeed, stock_files_with, with_blocks};
-use tf2tools_core::{HiddenBy, HudModel, PartId, PartKey, Platform, Scene, SceneRule, Screen};
+use tf2tools_core::{
+    GameSituation, HiddenBy, HudModel, PartId, PartKey, Platform, Scene, SceneRule, Screen,
+    SituationSwitch,
+};
 
 const SD: Screen = Screen::new(640, 480);
 const HD: Screen = Screen::new(1920, 1080);
@@ -34,7 +37,15 @@ fn freeze() -> HudModel {
 }
 
 fn hidden(m: &HudModel, key: &str) -> Option<HiddenBy> {
-    let l = m.layout(SD);
+    hidden_in(m, key, &GameSituation::default())
+}
+
+fn koth() -> GameSituation {
+    GameSituation::default().with_switch(SituationSwitch::Koth, true)
+}
+
+fn hidden_in(m: &HudModel, key: &str, s: &GameSituation) -> Option<HiddenBy> {
+    let l = m.layout_in(SD, s);
     l.get(&PartKey::new(key))
         .unwrap_or_else(|| panic!("{key} is not in the freeze cam"))
         .hidden()
@@ -60,12 +71,7 @@ fn the_freeze_cam_keeps_the_killfeed_chat_and_koth_panel() {
     }
     let m = freeze();
     assert!(m.problems().is_empty(), "{:?}", m.problems());
-    for key in [
-        "HudDeathNotice",
-        "HudChat",
-        "HudChat/HudChatHistory",
-        "HudKothTimeStatus",
-    ] {
+    for key in ["HudDeathNotice", "HudChat", "HudChat/HudChatHistory"] {
         assert_eq!(hidden(&m, key), None, "{key}");
     }
     // The sample lines draw as they do over the HUD.
@@ -80,12 +86,25 @@ fn the_freeze_cam_keeps_the_killfeed_chat_and_koth_panel() {
 }
 
 #[test]
+fn the_koth_panel_shows_only_on_a_koth_map() {
+    let m = freeze();
+    // Off a King of the Hill map the game has no KOTH panel at all.
+    assert_eq!(hidden(&m, "HudKothTimeStatus"), Some(HiddenBy::Game));
+    assert_eq!(hidden_in(&m, "HudKothTimeStatus", &koth()), None);
+}
+
+#[test]
 fn the_koth_timers_hide_their_digits_during_the_freeze_cam() {
     let m = freeze();
     for timer in ["BlueTimer", "RedTimer"] {
         let value = format!("HudKothTimeStatus/{timer}/TimePanelValue");
-        assert_eq!(hidden(&m, &value), Some(HiddenBy::Game), "{value}");
-        assert_eq!(hidden(&m, &format!("HudKothTimeStatus/{timer}")), None);
+        assert_eq!(
+            hidden_in(&m, &value, &koth()),
+            Some(HiddenBy::Game),
+            "{value}"
+        );
+        let panel = format!("HudKothTimeStatus/{timer}");
+        assert_eq!(hidden_in(&m, &panel, &koth()), None);
     }
     // Only the freeze cam hides the digits; the HUD scene never toggles them.
     let hud = m.with_scene(Scene::Hud);
