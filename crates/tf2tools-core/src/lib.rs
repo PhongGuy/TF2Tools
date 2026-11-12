@@ -72,7 +72,7 @@ pub use hud_maker::{
     NoMirror, NoticeLine, OptionAction, OptionChange, OptionKind, OptionNeed, OptionSource,
     OptionSpec, OptionValue, PanelRule, Part, PartBox, PartCaps, PartId, PartKey, Pick, PinCorner,
     PingLevel, PlayerListLayout, Point, PosExpr, PosTerm, PosUnit, PropertyKind, PropertySpec,
-    RankControl, RankLayout, RankPieces, Recipe, RecipeApplied, Rect, RemoveKey, Rgba,
+    RankControl, RankLabel, RankLayout, RankPieces, Recipe, RecipeApplied, Rect, RemoveKey, Rgba,
     SampleKiller, SamplePlayer, SampleSet, SampleWatched, Scene, SceneRule, Scheme, Screen,
     ScreenBaseline, ScreenCheck, ScreenFlag, ScreenProblem, ScreenScale, SetKey, ShowsFor, Size,
     SizeExpr, SizeForm, Snap, StartingPoint, SwitchAction, Switched, Team, TermOp, ValueMap,

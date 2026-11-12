@@ -397,8 +397,12 @@ pub const RANK_PANEL: &str = r##""Resource/UI/PvPRankPanel.res"
 {
   BGPanel { ControlName EditablePanel xpos rs1 ypos 20 wide 260 tall f40 visible 1
     NameLabel { ControlName Label xpos 65 ypos 5 wide f0 tall 20 visible 1 font HudFontSmallishBold fgcolor_override TanLight textAlignment north-west }
+    DescLine1 { ControlName CAutoFittingLabel xpos 65 ypos 19 wide 195 tall 20 font HudFontSmallestBold fgcolor_override TanLight textAlignment north-west }
+    DescLine2 { ControlName CAutoFittingLabel xpos 65 ypos 29 wide 195 tall 20 font HudFontSmallestBold fgcolor_override TanLight textAlignment north-west }
     StatsContainer { ControlName EditablePanel xpos rs1-5 ypos 0 wide f70 tall f0
       XPBar { ControlName EditablePanel xpos cs-0.5 ypos rs1-3 wide p1 tall 30
+        CurrentXPLabel { ControlName Label xpos 0 ypos rs1 wide 100 tall 20 font ItemFontAttribSmall fgcolor_override TanLight textAlignment south-west }
+        NextLevelXPLabel { ControlName Label xpos rs1 ypos rs1 wide 100 tall 20 font ItemFontAttribSmall fgcolor_override TanLight textAlignment south-east }
         ProgressBarsContainer { ControlName EditablePanel xpos 0 ypos rs1-10 wide p1 tall 7
           ProgressBar { ControlName ProgressBar xpos 0 ypos cs-0.5 wide f0 tall f-2 fgcolor_override "20 20 20 180" }
           ContinuousProgressBar { ControlName ContinuousProgressBar xpos cs-0.5 ypos cs-0.5 wide f2 tall f2 fgcolor_override CreditsGreen } } } } }

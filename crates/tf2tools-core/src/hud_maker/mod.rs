@@ -102,7 +102,7 @@ pub use pictures::{NewPicture, PictureTarget, picture_id, picture_material};
 pub use pins::PinRefused;
 pub use playback::{AnimFrame, Animated, Fired};
 pub use probe::font_tall_px;
-pub use rank_panel::{RankControl, RankLayout, RankPieces, rank_medal, rank_pieces};
+pub use rank_panel::{RankControl, RankLabel, RankLayout, RankPieces, rank_medal, rank_pieces};
 pub use recipe::{Recipe, RecipeApplied};
 pub use rules::{HideTechnique, PanelRule, PartId, PinCorner};
 pub use sample::{

@@ -33,10 +33,16 @@ fn with(from: &str, to: &str) -> String {
     RANK_PANEL.replace(from, to)
 }
 
+/// The labels' (field, text, visible box) in the order the pieces report them.
+fn labels(p: &RankPieces) -> Vec<(&str, &str, Rect)> {
+    (p.labels().iter())
+        .map(|l| (l.field(), l.text(), l.shown()))
+        .collect()
+}
+
 #[test]
-fn stock_places_the_name_the_track_and_the_inset_fill() {
-    // Built in and from a file alike; the track is the container (f-2 clipped to it), the fill
-    // is 1 unit inside it and three fifths of its own 188 units wide.
+fn stock_places_the_name_and_the_track() {
+    // Built in and from a file alike; the track is the container (f-2 clipped to it).
     for rank in [None, Some(RANK_PANEL)] {
         let p = pieces(rank, 320, 100, SD);
         assert_eq!(p.name(), Some(Rect::new(125, 25, 195, 20)));
@@ -46,13 +52,74 @@ fn stock_places_the_name_the_track_and_the_inset_fill() {
             "the label reaches past BGPanel"
         );
         assert_eq!(p.bar(), Some(Rect::new(126, 60, 188, 7)));
-        assert_eq!(p.fill(), Some(Rect::new(127, 61, 111, 5)));
         assert_eq!(p.name_font(), Some("HudFontSmallishBold"));
         assert_eq!(p.name_colour(), Some("TanLight"));
         assert_eq!(p.name_alignment(), "north-west");
         assert!(!p.name_all_caps());
         assert_eq!(p.track_colour(), Some("20 20 20 180"));
+    }
+}
+
+#[test]
+fn three_of_the_ten_segments_are_filled_in_the_fill_colour() {
+    // The fill control sits a unit inside the track; its own ten segments, three of them shown.
+    for (screen, wide, tall, gap) in [(SD, 320, 100, 1), (X2, 640, 200, 2)] {
+        let p = pieces(Some(RANK_PANEL), wide, tall, screen);
+        let f = p.fill_segments();
+        assert_eq!(f.len(), 3, "{f:?}");
+        let bar = p.bar().unwrap();
+        assert!(f[0].x > bar.x && f[0].y > bar.y && f[0].tall < bar.tall);
+        for (a, b) in f.iter().zip(&f[1..]) {
+            assert_eq!(b.x - (a.x + a.wide), gap, "{f:?}");
+        }
         assert_eq!(p.fill_colour(), Some("CreditsGreen"));
+    }
+    assert_eq!(
+        pieces(Some(RANK_PANEL), 320, 100, SD).fill_segments()[0],
+        Rect::new(127, 61, 17, 5)
+    );
+}
+
+#[test]
+fn the_sample_is_a_level_one_casual_rank_with_its_xp() {
+    // As the game shows a new player: the type and level under the name, and the xp so far
+    // and needed under the bar's two ends.
+    for rank in [None, Some(RANK_PANEL)] {
+        let p = pieces(rank, 320, 100, SD);
+        assert_eq!(
+            labels(&p),
+            [
+                ("DescLine1", "Casual", Rect::new(125, 39, 195, 20)),
+                ("DescLine2", "Level: 1", Rect::new(125, 49, 195, 20)),
+                ("CurrentXPLabel", "225 xp", Rect::new(126, 57, 100, 20)),
+                ("NextLevelXPLabel", "750 xp", Rect::new(215, 57, 100, 20)),
+            ]
+        );
+        let xp = &p.labels()[2];
+        assert_eq!(xp.font(), Some("ItemFontAttribSmall"));
+        assert_eq!(xp.colour(), Some("TanLight"));
+        assert_eq!(xp.alignment(), "south-west");
+        assert_eq!(p.labels()[3].alignment(), "south-east");
+        assert_eq!(p.labels()[0].font(), Some("HudFontSmallestBold"));
+        assert!(!xp.all_caps());
+    }
+    assert_ne!(RankPieces::SAMPLE_NAME, "Level 42");
+}
+
+#[test]
+fn the_bar_is_ten_segments_across_the_track() {
+    for (screen, wide, tall, gap) in [(SD, 320, 100, 1), (X2, 640, 200, 2)] {
+        let p = pieces(Some(RANK_PANEL), wide, tall, screen);
+        let bar = p.bar().unwrap();
+        let s = p.segments();
+        assert_eq!(s.len(), 10);
+        assert_eq!(s[0].x, bar.x);
+        assert_eq!(s[9].x + s[9].wide, bar.x + bar.wide);
+        for (a, b) in s.iter().zip(&s[1..]) {
+            assert_eq!(b.x - (a.x + a.wide), gap, "{s:?}");
+            assert!((a.wide - b.wide).abs() <= gap + 1, "{s:?}");
+        }
+        assert!(s.iter().all(|r| r.y == bar.y && r.tall == bar.tall));
     }
 }
 
@@ -61,7 +128,6 @@ fn the_pieces_scale_with_the_screen() {
     let p = pieces(Some(RANK_PANEL), 640, 200, X2);
     assert_eq!(p.name(), Some(Rect::new(250, 50, 390, 40)));
     assert_eq!(p.bar(), Some(Rect::new(251, 120, 376, 14)));
-    assert_eq!(p.fill(), Some(Rect::new(253, 122, 223, 10)));
 }
 
 #[test]
@@ -105,26 +171,30 @@ fn a_hidden_name_leaves_the_bar_alone() {
 fn a_hidden_bgpanel_hides_everything_inside_it() {
     let own = with("tall f40 visible 1", "tall f40 visible 0");
     let p = pieces(Some(&own), 320, 100, SD);
-    assert_eq!((p.name(), p.bar(), p.fill()), (None, None, None));
+    assert_eq!((p.name(), p.bar()), (None, None));
+    assert!(p.segments().is_empty() && p.labels().is_empty());
 }
 
 #[test]
-fn a_hidden_track_leaves_the_fill() {
+fn a_hidden_track_draws_no_segments_but_keeps_the_xp_text() {
     // Seven corpus HUDs do this with wide 0.
     let own = with("wide f0 tall f-2", "wide 0 tall f-2");
     let p = pieces(Some(&own), 320, 100, SD);
     assert_eq!(p.bar(), None);
-    assert_eq!(p.fill(), Some(Rect::new(127, 61, 111, 5)));
+    assert!(p.segments().is_empty());
+    assert_eq!(p.fill_segments().len(), 3, "the fill stays");
+    assert_eq!(p.labels().len(), 4);
 }
 
 #[test]
-fn a_fill_that_fills_its_container_has_no_inset() {
+fn a_hidden_xp_label_is_left_out() {
     let own = with(
-        "xpos cs-0.5 ypos cs-0.5 wide f2 tall f2",
-        "xpos 0 ypos 0 wide f0 tall f0",
+        "NextLevelXPLabel { ControlName Label",
+        "NextLevelXPLabel { visible 0 ControlName Label",
     );
     let p = pieces(Some(&own), 320, 100, SD);
-    assert_eq!(p.fill(), Some(Rect::new(126, 60, 112, 7)));
+    let fields: Vec<_> = p.labels().iter().map(|l| l.field()).collect();
+    assert_eq!(fields, ["DescLine1", "DescLine2", "CurrentXPLabel"]);
 }
 
 #[test]
@@ -132,7 +202,8 @@ fn a_file_missing_the_bar_blocks_draws_no_bar() {
     let partial = r#""Resource/UI/PvPRankPanel.res" { BGPanel { xpos rs1 ypos 20 wide 260 tall f40 NameLabel { xpos 65 ypos 5 wide f0 tall 20 } } }"#;
     let p = pieces(Some(partial), 320, 100, SD);
     assert_eq!(p.name(), Some(Rect::new(125, 25, 195, 20)));
-    assert_eq!((p.bar(), p.fill()), (None, None));
+    assert_eq!(p.bar(), None);
+    assert!(p.segments().is_empty() && p.labels().is_empty());
     assert_eq!(p.name_font(), None);
 }
 
@@ -140,15 +211,15 @@ fn a_file_missing_the_bar_blocks_draws_no_bar() {
 fn a_broken_file_draws_stock() {
     let p = pieces(Some("{{{ not a rank file"), 320, 100, SD);
     assert_eq!(p.bar(), Some(Rect::new(126, 60, 188, 7)));
-    assert_eq!(p.fill(), Some(Rect::new(127, 61, 111, 5)));
+    assert_eq!(p.segments().len(), 10);
 }
 
 #[test]
 fn extreme_boxes_never_overflow() {
     let tiny = pieces(None, 10, 10, SD);
     assert_eq!(
-        (tiny.name(), tiny.bar(), tiny.fill()),
-        (None, None, None),
+        (tiny.name(), tiny.bar(), tiny.segments().len()),
+        (None, None, 0),
         "BGPanel has no height"
     );
     // RankPanel has its medal off, so the medal check uses a panel with it on.
