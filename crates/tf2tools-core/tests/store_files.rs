@@ -322,3 +322,30 @@ async fn clients_sharing_a_pacer_space_their_gamebanana_calls() {
         start.elapsed()
     );
 }
+
+#[tokio::test]
+async fn files_carry_their_date_added_when_listed() {
+    let env = store_env().await;
+    mount_files(
+        &env,
+        "Mod",
+        456577,
+        store_fixture("gb-crosshair-files.json"),
+    )
+    .await;
+    let files = env
+        .client
+        .item_files(StoreKind::GameBananaHuds, &gb(456577))
+        .await
+        .unwrap();
+    assert_eq!(files[0].date_added(), Some(1718115617));
+    let body = serde_json::json!({"_idRow": 8, "_sName": "x", "_aFiles": [
+        {"_idRow": 1, "_sFile": "b.zip", "_sDownloadUrl": "https://gamebanana.com/dl/2"}]});
+    mount_files(&env, "Mod", 8, serde_json::to_vec(&body).unwrap()).await;
+    let files = env
+        .client
+        .item_files(StoreKind::GameBananaHuds, &gb(8))
+        .await
+        .unwrap();
+    assert_eq!(files[0].date_added(), None);
+}

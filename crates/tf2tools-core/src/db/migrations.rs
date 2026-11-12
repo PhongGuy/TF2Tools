@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 16;
+pub(crate) const SCHEMA_VERSION: u32 = 17;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -111,6 +111,11 @@ const STEPS: &[Step] = &[
             "weapons_counted",
             "INTEGER NOT NULL DEFAULT 0",
         )],
+    },
+    Step {
+        version: 17,
+        sql: STEP_17_SQL,
+        add_columns: &[("library_huds", "gb_file_date", "INTEGER")],
     },
 ];
 
@@ -516,4 +521,17 @@ const STEP_16_SQL: &str = "
         PRIMARY KEY (log_id, steam_id, class, weapon)
     );
     CREATE INDEX IF NOT EXISTS logstf_weapon_rows_player ON logstf_weapon_rows(steam_id);
+";
+
+/// v6 step 17: the daily GameBanana check per HUD item, seeded with every GameBanana HUD
+/// already in the library, and the upload date of the file each HUD came from.
+const STEP_17_SQL: &str = "
+    CREATE TABLE IF NOT EXISTS gb_hud_checks (
+        gb_id INTEGER PRIMARY KEY,
+        latest_file_date INTEGER,
+        checked_at INTEGER,
+        gone INTEGER NOT NULL DEFAULT 0
+    );
+    INSERT OR IGNORE INTO gb_hud_checks (gb_id)
+        SELECT DISTINCT store_gb_id FROM library_huds WHERE store_gb_id IS NOT NULL;
 ";

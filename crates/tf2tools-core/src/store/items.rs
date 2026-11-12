@@ -203,6 +203,7 @@ pub struct StoreFile {
     md5: Option<String>,
     url: String,
     release_tag: Option<String>,
+    date_added: Option<i64>,
 }
 
 impl StoreFile {
@@ -234,6 +235,11 @@ impl StoreFile {
     /// The download address.
     pub fn url(&self) -> &str {
         &self.url
+    }
+
+    /// When the store says the file was uploaded (unix seconds), if it says.
+    pub fn date_added(&self) -> Option<i64> {
+        self.date_added
     }
 
     /// The mastercomfig release an addon file comes from.
@@ -304,7 +310,7 @@ impl StoreClient {
         let not_in_store = || FilesError::NotInStore {
             what: item.describe(),
         };
-        let file = |file_name: String, size, md5, url, release_tag| StoreFile {
+        let file = |file_name: String, size, md5, url, release_tag, date_added| StoreFile {
             kind,
             item: item.clone(),
             file_name,
@@ -312,6 +318,7 @@ impl StoreClient {
             md5,
             url,
             release_tag,
+            date_added,
         };
         match (kind, item) {
             (
@@ -327,7 +334,7 @@ impl StoreClient {
                 })?;
                 Ok(files
                     .into_iter()
-                    .map(|f| file(f.file_name, f.size, f.md5, f.url, None))
+                    .map(|f| file(f.file_name, f.size, f.md5, f.url, None, f.date_added))
                     .collect())
             }
             (StoreKind::CuratedHuds, StoreItemId::Curated(hud_id)) => {
@@ -347,7 +354,14 @@ impl StoreClient {
                     return Err(not_in_store());
                 };
                 let url = format!("{repo}/archive/{hash}.zip");
-                Ok(vec![file(format!("{hud_id}.zip"), None, None, url, None)])
+                Ok(vec![file(
+                    format!("{hud_id}.zip"),
+                    None,
+                    None,
+                    url,
+                    None,
+                    None,
+                )])
             }
             (StoreKind::Addons, StoreItemId::Addon(name)) => {
                 let row: Option<(String, i64, String)> = self
@@ -370,6 +384,7 @@ impl StoreClient {
                     None,
                     url,
                     Some(tag),
+                    None,
                 )])
             }
             _ => Err(not_in_store()),

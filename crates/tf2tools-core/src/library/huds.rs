@@ -449,6 +449,19 @@ impl Library {
             .map_err(import_db)
     }
 
+    /// Records the upload date of the GameBanana file a HUD came from.
+    pub(crate) fn set_gb_file_date(&self, id: &HudId, date: i64) -> Result<(), LibraryError> {
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "UPDATE library_huds SET gb_file_date = ?1 WHERE id = ?2",
+                    params![date, id.as_str()],
+                )
+            })
+            .map_err(library_db)?;
+        Ok(())
+    }
+
     /// Removes a HUD's library folder and its row; `tf/custom` is not touched. A made HUD's
     /// previous save stranded as `<folder>.old` by an interrupted re-save goes too. A row
     /// whose folder name is not a plain name has no files, so only the row goes.

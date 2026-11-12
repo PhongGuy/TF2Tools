@@ -52,7 +52,8 @@ impl DownloadProgress {
 
 /// The item a download imports as, settled before any request is made.
 enum Target {
-    GameBananaHud(GbId),
+    /// The item and the listed file's upload date, recorded on the imported HUD.
+    GameBananaHud(GbId, Option<i64>),
     CuratedHud(String),
     Addon(AddonName, String),
     Sound(GbId),
@@ -286,7 +287,7 @@ fn target(kind: StoreKind, file: &StoreFile) -> Option<Target> {
     }
     match (kind, file.item()) {
         (StoreKind::GameBananaHuds, StoreItemId::GameBanana(id)) => {
-            Some(Target::GameBananaHud(*id))
+            Some(Target::GameBananaHud(*id, file.date_added()))
         }
         (StoreKind::Sounds, StoreItemId::GameBanana(id)) => Some(Target::Sound(*id)),
         (StoreKind::Crosshairs, StoreItemId::GameBanana(id)) => Some(Target::Crosshair(*id)),
@@ -330,9 +331,17 @@ fn import(
     scratch: &Path,
 ) -> Result<Vec<LibraryEntry>, DownloadError> {
     let entry = match target {
-        Target::GameBananaHud(gb_id) => {
+        Target::GameBananaHud(gb_id, date) => {
             let author = media_row(db, StoreKind::GameBananaHuds, gb_id)?.1;
-            LibraryEntry::Hud(library.import_hud(saved, Provenance::GameBanana { gb_id, author })?)
+            let hud = library.import_hud(saved, Provenance::GameBanana { gb_id, author })?;
+            // Recorded after the import, whose row insert starts the column empty. A failed
+            // write keeps the HUD: an unrecorded date only falls back to the row's age.
+            if let Some(date) = date
+                && let Err(e) = library.set_gb_file_date(hud.id(), date)
+            {
+                tracing::warn!(error = %e, "could not record a GameBanana HUD's file date");
+            }
+            LibraryEntry::Hud(hud)
         }
         Target::CuratedHud(hud_id) => {
             LibraryEntry::Hud(library.import_hud(saved, Provenance::Curated { hud_id })?)
