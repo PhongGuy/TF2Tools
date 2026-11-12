@@ -464,19 +464,19 @@ fn a_rank_panel_lays_out_the_games_level_bar_name_and_medal() {
         rank_pieces(&m, part, wide, tall, screen)
     };
     // The level panel: the rank name and the bar on the right, beside where the medal sits;
-    // the sample fills the bar three fifths of the way.
+    // the sample is a new player's, so the bar's ten segments show no progress.
     let level = pieces("RankPanel", 320, 100);
     assert_eq!(level.medal(), None);
     assert_eq!(level.name(), Some(Rect::new(125, 25, 195, 20)));
     assert_eq!(level.bar(), Some(Rect::new(126, 60, 188, 7)));
-    assert_eq!(level.fill(), Some(Rect::new(127, 61, 111, 5)));
-    assert_eq!(RankPieces::SAMPLE_NAME, "Level 42");
+    assert_eq!(level.segments().len(), 10);
+    assert_eq!(RankPieces::SAMPLE_NAME, "Player");
     // The medal panel: the medal as big as the game's camera shows it, centred, no bar.
     let medal = pieces("RankModelPanel", 1000, 1000);
     assert_eq!(medal.medal(), Some(Rect::new(458, 458, 84, 84)));
     assert_eq!(
-        (medal.name(), medal.bar(), medal.fill()),
-        (None, None, None)
+        (medal.name(), medal.bar(), medal.segments().len()),
+        (None, None, 0)
     );
     // Unset keys show both; on a 1080-line screen the pieces scale with it.
     let plain = m.part(&k("MainMenuOverride/Plain")).unwrap();
@@ -484,7 +484,7 @@ fn a_rank_panel_lays_out_the_games_level_bar_name_and_medal() {
     assert_eq!(both.medal(), Some(Rect::new(351, 103, 18, 18)));
     assert_eq!(both.name(), Some(Rect::new(281, 56, 439, 45)));
     assert_eq!(both.bar(), Some(Rect::new(282, 137, 424, 15)));
-    assert_eq!(both.fill(), Some(Rect::new(284, 139, 252, 11)));
+    assert_eq!(both.segments().len(), 10);
     // The level area keeps its width past a narrow box's left edge and no height below zero;
     // extreme boxes never overflow.
     let tiny = pieces("RankPanel", 10, 10);

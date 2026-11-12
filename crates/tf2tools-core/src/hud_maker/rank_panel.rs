@@ -1,5 +1,6 @@
-//! What a rank panel (`CPvPRankPanel`) draws from code: the medal, the rank name and the level
-//! bar, laid out as the game's own `PvPRankPanel.res` places them and filled with a sample rank.
+//! What a rank panel (`CPvPRankPanel`) draws from code: the medal, the player's name, the rank
+//! lines, the level bar and its xp, laid out as the game's own `PvPRankPanel.res` places them and
+//! filled with a new player's casual rank.
 
 use super::expr::{AxisSize, PosExpr, ScreenScale, SizeExpr};
 use super::layout::{HudLayout, Screen};
@@ -22,13 +23,13 @@ pub struct RankPieces {
     name_all_caps: bool,
     bar: Option<Rect>,
     track_colour: Option<String>,
-    fill: Option<Rect>,
-    fill_colour: Option<String>,
+    segments: Vec<Rect>,
+    labels: Vec<RankLabel>,
 }
 
 impl RankPieces {
-    /// The sample rank's name, a casual level, as the preview draws it.
-    pub const SAMPLE_NAME: &'static str = "Level 42";
+    /// The sample player's name, which the game draws in `NameLabel`.
+    pub const SAMPLE_NAME: &'static str = "Player";
 
     /// The medal, a square centred on the panel; the game draws it as a 3D model.
     pub fn medal(&self) -> Option<Rect> {
@@ -76,21 +77,90 @@ impl RankPieces {
         self.track_colour.as_deref()
     }
 
-    /// The filled part, clipped; its width is three fifths of the fill control's own width, the
-    /// sample's progress. A hidden track leaves it alone.
-    pub fn fill(&self) -> Option<Rect> {
-        self.fill
+    /// The track's ten segments, each clipped to the track; empty when the track is hidden.
+    /// The sample has no xp yet, so the green progress bar over them is empty.
+    pub fn segments(&self) -> &[Rect] {
+        &self.segments
     }
 
-    /// The fill's colour from the file, if it sets one.
-    pub fn fill_colour(&self) -> Option<&str> {
-        self.fill_colour.as_deref()
+    /// The rank lines and xp labels that show: `DescLine1`, `DescLine2`, `CurrentXPLabel`, then
+    /// `NextLevelXPLabel`.
+    pub fn labels(&self) -> &[RankLabel] {
+        &self.labels
+    }
+}
+
+/// One of the panel's code-filled labels besides the name, with its sample text and the look
+/// the HUD's rank file gives it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct RankLabel {
+    field: &'static str,
+    text: &'static str,
+    shown: Rect,
+    own: Rect,
+    font: Option<String>,
+    colour: Option<String>,
+    alignment: String,
+    all_caps: bool,
+}
+
+impl RankLabel {
+    /// The label's block name in the file, such as `CurrentXPLabel`.
+    pub fn field(&self) -> &str {
+        self.field
+    }
+
+    /// The sample text the preview draws in it.
+    pub fn text(&self) -> &str {
+        self.text
+    }
+
+    /// The label's visible part: its box clipped to its parents.
+    pub fn shown(&self) -> Rect {
+        self.shown
+    }
+
+    /// The label's own box, which may reach past `shown()`; text aligns inside it, then clips.
+    pub fn own(&self) -> Rect {
+        self.own
+    }
+
+    /// The font name from the file, if it sets one.
+    pub fn font(&self) -> Option<&str> {
+        self.font.as_deref()
+    }
+
+    /// The colour: `fgcolor_override`, else `fgcolor` for a `CExLabel`, else unset.
+    pub fn colour(&self) -> Option<&str> {
+        self.colour.as_deref()
+    }
+
+    /// The `textAlignment`, empty when unset.
+    pub fn alignment(&self) -> &str {
+        &self.alignment
+    }
+
+    /// Whether the label draws in capitals (`allcaps` above 0).
+    pub fn all_caps(&self) -> bool {
+        self.all_caps
     }
 }
 
 const NAME_PATH: &str = "BGPanel/NameLabel";
 const TRACK_PATH: &str = "BGPanel/StatsContainer/XPBar/ProgressBarsContainer/ProgressBar";
-const FILL_PATH: &str = "BGPanel/StatsContainer/XPBar/ProgressBarsContainer/ContinuousProgressBar";
+
+/// The labels the game fills for a new casual player: the rank type and level under the name,
+/// and the xp so far and needed for the next level under the bar's ends.
+const SAMPLE_LABELS: [(&str, &str); 4] = [
+    ("BGPanel/DescLine1", "Casual"),
+    ("BGPanel/DescLine2", "Level: 1"),
+    ("BGPanel/StatsContainer/XPBar/CurrentXPLabel", "0 xp"),
+    ("BGPanel/StatsContainer/XPBar/NextLevelXPLabel", "750 xp"),
+];
+
+/// The casual level bar is split into this many segments.
+const SEGMENTS: i32 = 10;
 
 /// Edges (left, top, right, bottom) of the area a control may draw in.
 type Edges = (i32, i32, i32, i32);
@@ -207,44 +277,81 @@ pub fn rank_pieces(
             .then(|| place(layout, path, wide, tall, scale))
             .flatten()
     };
-    let (name, track, fill) = (find(NAME_PATH), find(TRACK_PATH), find(FILL_PATH));
+    let (name, track) = (find(NAME_PATH), find(TRACK_PATH));
     let text =
         |p: Option<&Placed>, key: &str| p.and_then(|p| p.control.value(key)).map(str::to_owned);
-    // Only a CExLabel reads `fgcolor`; a plain Label has just the override.
-    let name_colour = text(name.as_ref(), "fgcolor_override").or_else(|| {
-        let is_ex = name.as_ref().is_some_and(|p| {
-            (p.control.value("ControlName")).is_some_and(|c| c.eq_ignore_ascii_case("CExLabel"))
-        });
-        is_ex.then(|| text(name.as_ref(), "fgcolor")).flatten()
-    });
     // The label shows as a whole box or not at all: hidden or clipped away leaves neither.
     let name_box = name.as_ref().and_then(|p| p.shown.map(|_| p.own));
-    // Progress is three fifths of the fill's own width, then clipped like any other box.
-    let fill_rect = fill.as_ref().and_then(|p| {
-        let progress = edges(Rect {
-            wide: (p.own.wide as f32 * 0.6) as i32,
-            ..p.own
-        });
-        let shown = p.shown.map(edges)?;
-        overlap(progress, shown).map(rect_of)
-    });
+    let labels = SAMPLE_LABELS
+        .iter()
+        .filter_map(|&(path, sample)| {
+            let p = find(path)?;
+            let field = path.rsplit('/').next().unwrap_or(path);
+            Some(RankLabel {
+                field,
+                text: sample,
+                shown: p.shown?,
+                own: p.own,
+                font: text(Some(&p), "font"),
+                colour: label_colour(&p),
+                alignment: text(Some(&p), "textAlignment").unwrap_or_default(),
+                all_caps: all_caps(&p),
+            })
+        })
+        .collect();
     RankPieces {
         medal,
         name: name.as_ref().and_then(|p| p.shown),
         name_box,
         name_font: text(name.as_ref(), "font"),
-        name_colour,
+        name_colour: name.as_ref().and_then(label_colour),
         name_alignment: text(name.as_ref(), "textAlignment").unwrap_or_default(),
-        name_all_caps: name
-            .as_ref()
-            .and_then(|p| p.control.value("allcaps"))
-            .and_then(|t| t.trim().parse::<i64>().ok())
-            .is_some_and(|v| v > 0),
+        name_all_caps: name.as_ref().is_some_and(all_caps),
         bar: track.as_ref().and_then(|p| p.shown),
         track_colour: text(track.as_ref(), "fgcolor_override"),
-        fill: fill_rect,
-        fill_colour: text(fill.as_ref(), "fgcolor_override"),
+        segments: track.as_ref().map_or_else(Vec::new, |p| segments(p, scale)),
+        labels,
     }
+}
+
+/// A label's colour: only a CExLabel reads `fgcolor`; a plain Label has just the override.
+fn label_colour(p: &Placed) -> Option<String> {
+    let value = |key: &str| p.control.value(key).map(str::to_owned);
+    value("fgcolor_override").or_else(|| {
+        let is_ex =
+            (p.control.value("ControlName")).is_some_and(|c| c.eq_ignore_ascii_case("CExLabel"));
+        is_ex.then(|| value("fgcolor")).flatten()
+    })
+}
+
+fn all_caps(p: &Placed) -> bool {
+    (p.control.value("allcaps"))
+        .and_then(|t| t.trim().parse::<i64>().ok())
+        .is_some_and(|v| v > 0)
+}
+
+/// The track's own box cut into equal segments with a one-unit gap between neighbours, each
+/// clipped to what shows of the track; none when the track is hidden or clipped away.
+fn segments(track: &Placed, scale: ScreenScale) -> Vec<Rect> {
+    let Some(shown) = track.shown.map(edges) else {
+        return Vec::new();
+    };
+    let gap = i64::from(scale.scale(1).max(1));
+    let (x, wide) = (i64::from(track.own.x), i64::from(track.own.wide));
+    let (top, bottom) = (i64::from(track.own.y), i64::from(edges(track.own).3));
+    let n = i64::from(SEGMENTS);
+    (0..n)
+        .filter_map(|i| {
+            let left = x + i * wide / n;
+            let right = x + (i + 1) * wide / n - if i + 1 < n { gap } else { 0 };
+            let clamp = |v: i64| v.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32;
+            overlap(
+                (clamp(left), clamp(top), clamp(right), clamp(bottom)),
+                shown,
+            )
+            .map(rect_of)
+        })
+        .collect()
 }
 
 /// The medal stand-in of rank panel `key`, as (x, y, wide, tall) from the panel's top-left.
@@ -340,8 +447,12 @@ const STOCK_RANK_PANEL: &str = r##""Resource/UI/PvPRankPanel.res"
 {
   BGPanel { ControlName EditablePanel xpos rs1 ypos 20 wide 260 tall f40 visible 1
     NameLabel { ControlName Label xpos 65 ypos 5 wide f0 tall 20 visible 1 font HudFontSmallishBold fgcolor_override TanLight textAlignment north-west }
+    DescLine1 { ControlName CAutoFittingLabel xpos 65 ypos 19 wide 195 tall 20 font HudFontSmallestBold fgcolor_override TanLight textAlignment north-west }
+    DescLine2 { ControlName CAutoFittingLabel xpos 65 ypos 29 wide 195 tall 20 font HudFontSmallestBold fgcolor_override TanLight textAlignment north-west }
     StatsContainer { ControlName EditablePanel xpos rs1-5 ypos 0 wide f70 tall f0
       XPBar { ControlName EditablePanel xpos cs-0.5 ypos rs1-3 wide p1 tall 30
+        CurrentXPLabel { ControlName Label xpos 0 ypos rs1 wide 100 tall 20 font ItemFontAttribSmall fgcolor_override TanLight textAlignment south-west }
+        NextLevelXPLabel { ControlName Label xpos rs1 ypos rs1 wide 100 tall 20 font ItemFontAttribSmall fgcolor_override TanLight textAlignment south-east }
         ProgressBarsContainer { ControlName EditablePanel xpos 0 ypos rs1-10 wide p1 tall 7
           ProgressBar { ControlName ProgressBar xpos 0 ypos cs-0.5 wide f0 tall f-2 fgcolor_override "20 20 20 180" }
           ContinuousProgressBar { ControlName ContinuousProgressBar xpos cs-0.5 ypos cs-0.5 wide f2 tall f2 fgcolor_override CreditsGreen } } } } }

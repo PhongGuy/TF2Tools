@@ -26,7 +26,7 @@ use tf2tools_core::{
 };
 
 use super::editor::{Guide, Handle};
-use super::rank_paint::rank_paint;
+use super::rank_paint::{RankText, rank_paint, rank_text};
 use super::view::{CanvasFit, list_font_px};
 use super::{HudMakerPage, Images};
 use crate::ids;
@@ -2399,8 +2399,8 @@ fn model_block_value(part: &Part, model: &HudModel, key: &str) -> Option<f32> {
 }
 
 // The sample rank where the game draws the player's: the medal, a 3D model whose flat picture
-// the game does not ship, as the plain stand-in; the name in the game's font and colour; and the
-// level bar, a dark track filled green part of the way.
+// the game does not ship, as the plain stand-in; the name, rank lines and xp in the game's fonts
+// and colours; and the level bar's ten segments, empty as a new player's.
 fn rank(part: &Part, b: &PartBox, look: &Look) -> Vec<AnyElement> {
     let pieces = rank_pieces(look.model, part, b.wide(), b.tall(), look.screen);
     // The game draws its medal left of the name, so the stand-in keeps off the text.
@@ -2423,10 +2423,10 @@ fn rank(part: &Part, b: &PartBox, look: &Look) -> Vec<AnyElement> {
             .into_any_element()
     });
     let paint = rank_paint(&pieces, scheme, look.screen.tall());
-    // The label's own box holds the aligned text; the outer element shows only the visible part.
-    let name = pieces.name().zip(pieces.name_box()).map(|(shown, boxed)| {
-        let (col, row) = paint.alignment();
-        let font = paint.font();
+    // A label's own box holds the aligned text; the outer element shows only the visible part.
+    let label = |id: gpui_kit::ElementId, shown: Rect, boxed: Rect, t: &RankText| {
+        let (col, row) = t.alignment();
+        let font = t.font();
         let mut inner = div()
             .absolute()
             .left(at(boxed.x - shown.x))
@@ -2436,7 +2436,7 @@ fn rank(part: &Part, b: &PartBox, look: &Look) -> Vec<AnyElement> {
             .flex()
             .whitespace_nowrap()
             .text_size(px(font_px(font, look, boxed.tall)))
-            .text_color(paint.colour().map_or(gpui_kit::white(), |c| look.shade(c)));
+            .text_color(t.colour().map_or(gpui_kit::white(), |c| look.shade(c)));
         inner = match col {
             0 => inner.justify_start(),
             1 => inner.justify_center(),
@@ -2450,24 +2450,46 @@ fn rank(part: &Part, b: &PartBox, look: &Look) -> Vec<AnyElement> {
         if let Some(family) = font.and_then(|f| drawn_family(f.family(), look.fonts)) {
             inner = inner.font_family(family);
         }
-        let inner = inner.child(paint.text().to_owned());
-        piece(ids::hud_maker_rank_name(part.key()), shown)
+        let inner = inner.child(t.text().to_owned());
+        piece(id, shown)
             .overflow_hidden()
-            .aria_label(paint.text().to_owned())
+            .aria_label(t.text().to_owned())
             .child(inner)
             .into_any_element()
+    };
+    let name = (pieces.name().zip(pieces.name_box())).map(|(shown, boxed)| {
+        label(
+            ids::hud_maker_rank_name(part.key()),
+            shown,
+            boxed,
+            paint.name(),
+        )
     });
-    let bar = pieces.bar().map(|r| {
-        piece(ids::hud_maker_rank_bar(part.key()), r)
-            .bg(look.shade(paint.track()))
+    let lines = pieces.labels().iter().map(|l| {
+        let id = ids::hud_maker_rank_label(part.key(), l.field());
+        label(
+            id,
+            l.shown(),
+            l.own(),
+            &rank_text(l, scheme, look.screen.tall()),
+        )
+    });
+    // The bar's outline is a bare frame; its segments carry the track colour.
+    let bar = pieces
+        .bar()
+        .map(|r| piece(ids::hud_maker_rank_bar(part.key()), r).into_any_element());
+    let track = look.shade(paint.track());
+    let segments = pieces.segments().iter().enumerate().map(|(n, &r)| {
+        piece(ids::hud_maker_rank_segment(part.key(), n), r)
+            .bg(track)
             .into_any_element()
     });
-    let fill = pieces.fill().map(|r| {
-        piece(ids::hud_maker_rank_fill(part.key()), r)
-            .bg(look.shade(paint.fill()))
-            .into_any_element()
-    });
-    [medal, name, bar, fill].into_iter().flatten().collect()
+    [medal, name, bar]
+        .into_iter()
+        .flatten()
+        .chain(lines)
+        .chain(segments)
+        .collect()
 }
 
 // The sample chat inside the history part at core's offsets times the canvas scale, each line

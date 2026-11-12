@@ -1906,9 +1906,15 @@ pub fn hud_maker_rank_bar(key: &PartKey) -> ElementId {
     keyed("hud-maker-rank-bar", key.as_str())
 }
 
-/// The filled part of a rank panel's level bar: "hud-maker-rank-fill:<key>".
-pub fn hud_maker_rank_fill(key: &PartKey) -> ElementId {
-    keyed("hud-maker-rank-fill", key.as_str())
+/// One of the ten segments of a rank panel's level bar: "hud-maker-rank-segment:<key>#<n>".
+pub fn hud_maker_rank_segment(key: &PartKey, n: usize) -> ElementId {
+    keyed("hud-maker-rank-segment", &format!("{}#{n}", key.as_str()))
+}
+
+/// A rank panel's rank line or xp label, by its block name in the file:
+/// "hud-maker-rank-label:<key>#<field>".
+pub fn hud_maker_rank_label(key: &PartKey, field: &str) -> ElementId {
+    keyed("hud-maker-rank-label", &format!("{}#{field}", key.as_str()))
 }
 
 /// The colour a part paints behind its content: "hud-maker-fill:<key>".

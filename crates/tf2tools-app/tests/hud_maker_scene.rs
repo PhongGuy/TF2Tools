@@ -2173,19 +2173,34 @@ fn the_main_menu_draws_a_sample_rank_where_the_game_draws_yours(cx: &mut TestApp
     to_scene(cx, &s, Scene::MainMenu);
     let level = PartKey::new("MainMenuOverride/RankPanel");
     let model = PartKey::new("MainMenuOverride/RankModelPanel");
-    // The level panel draws the sample rank's name and a level bar three fifths full.
+    // The level panel draws a new player's casual rank: the name, the type and level, a bar
+    // of ten segments and the xp so far and needed.
     assert_eq!(
         support::label_of(cx, s.win, ids::hud_maker_rank_name(&level)).as_deref(),
-        Some("Level 42")
+        Some("Player")
     );
+    for (field, text) in [
+        ("DescLine1", "Casual"),
+        ("DescLine2", "Level: 1"),
+        ("CurrentXPLabel", "0 xp"),
+        ("NextLevelXPLabel", "750 xp"),
+    ] {
+        assert_eq!(
+            support::label_of(cx, s.win, ids::hud_maker_rank_label(&level, field)).as_deref(),
+            Some(text)
+        );
+    }
     let bar = bounds(cx, &s, ids::hud_maker_rank_bar(&level));
-    let filled = bounds(cx, &s, ids::hud_maker_rank_fill(&level));
     assert!(f(bar.size.width) > 0. && f(bar.size.height) > 0.);
-    // The fill sits a unit inside the track and is three fifths of its own width.
-    assert!(f(filled.left()) > f(bar.left()) && f(filled.top()) > f(bar.top()));
-    assert!(f(filled.right()) < f(bar.right()) && f(filled.bottom()) < f(bar.bottom()));
-    let ratio = f(filled.size.width) / f(bar.size.width);
-    assert!((0.55..0.6).contains(&ratio), "filled {ratio}");
+    let first = bounds(cx, &s, ids::hud_maker_rank_segment(&level, 0));
+    let last = bounds(cx, &s, ids::hud_maker_rank_segment(&level, 9));
+    assert!((f(first.left()) - f(bar.left())).abs() < 1.);
+    assert!((f(last.right()) - f(bar.right())).abs() < 1.);
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::hud_maker_rank_segment(&level, 10)
+    ));
     // Its medal is off; the medal panel draws the medal as the plain stand-in, beside the name
     // and nothing else.
     assert!(!support::present(
