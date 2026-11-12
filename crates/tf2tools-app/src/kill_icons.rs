@@ -6,13 +6,14 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
+use gpui_kit::component::h_flex;
 use gpui_kit::{
-    App, ElementId, Entity, InteractiveElement as _, IntoElement, RenderImage, Styled as _,
-    TestSupportExt as _, img, px,
+    App, Div, ElementId, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
+    RenderImage, Styled as _, TestSupportExt as _, img, px,
 };
 use tf2tools_core::{HudFiles, Platform, RgbaImage};
 
-use crate::folder_load::{FolderLoad, FolderLoader};
+use crate::folder_load::FolderLoad;
 use crate::hud_textures::{crop, texture_pixels};
 use crate::previews::to_render_image;
 use crate::services::Services;
@@ -49,8 +50,12 @@ impl KillIconImages {
 
 /// The session's kill icons, loaded once per found `tf` folder.
 pub type LoadedKillIcons = FolderLoad<KillIconImages>;
-/// Reads a `tf` folder's kill icons on the background pool.
-pub type IconsLoader = FolderLoader<KillIconImages>;
+
+/// The room every weapon row keeps for its icon once any row has one: the game's widest kill
+/// icon, 128 x 32, at 16 px tall.
+pub(crate) const ICON_SLOT: Pixels = px(64.);
+// The gap between the slot and the name, as the rows' `gap_1`.
+pub(crate) const SLOT_GAP: Pixels = px(4.);
 
 impl FolderLoad<KillIconImages> {
     /// The session's icons on the production loader, created on first use. Needs `Services`.
@@ -64,16 +69,23 @@ impl FolderLoad<KillIconImages> {
     }
 }
 
-/// `image` as a 16 px tall icon keeping its aspect, under `id`.
+/// `image` as a 16 px tall icon keeping its aspect, under `id`; one wider than the slot
+/// shrinks to fit it.
 pub(crate) fn weapon_icon(id: ElementId, image: &Arc<RenderImage>) -> impl IntoElement + use<> {
     let size = image.size(0);
-    let width = 16. * size.width.0.max(1) as f32 / size.height.0.max(1) as f32;
+    let aspect = size.width.0.max(1) as f32 / size.height.0.max(1) as f32;
+    let width = (16. * aspect).min(f32::from(ICON_SLOT));
     img(Arc::clone(image))
-        .h(px(16.))
+        .h(px(width / aspect))
         .w(px(width))
         .flex_none()
         .id(id)
         .test_support()
+}
+
+/// The fixed slot holding a row's icon, left-aligned, or kept empty so its name lines up.
+pub(crate) fn icon_slot(icon: Option<impl IntoElement>) -> Div {
+    h_flex().w(ICON_SLOT).flex_none().children(icon)
 }
 
 // The production loader. Each sheet decodes once and serves every icon on it; an unreadable

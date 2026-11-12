@@ -15,7 +15,7 @@ use super::LogsTfPage;
 use super::tables::class_weapon_rows;
 use super::text::{NO_WEAPONS_TEXT, counting_text, weapons_title};
 use crate::ids;
-use crate::kill_icons::{KillIconImages, weapon_icon};
+use crate::kill_icons::{ICON_SLOT, KillIconImages, SLOT_GAP, icon_slot, weapon_icon};
 use crate::widgets::scroll::sideways;
 use crate::widgets::{Named as _, labelled};
 
@@ -97,6 +97,15 @@ fn weapon_table(
 ) -> impl IntoElement + use<> {
     let border = cx.theme().border;
     let cell = |width: Pixels| div().w(width).flex_none().text_right();
+    let rows = class_weapon_rows(weapons, names);
+    // Once any row has an icon, every row keeps a slot for one so the names line up; the name
+    // column grows by the slot so long names keep their room.
+    let slotted = rows.iter().any(|w| icons.get(&w.raw).is_some());
+    let name_min = if slotted {
+        NAME + ICON_SLOT + SLOT_GAP
+    } else {
+        NAME
+    };
     let head = h_flex()
         .id(ids::LOGSTF_CLASS_WEAPONS_HEAD)
         .test_support()
@@ -104,11 +113,11 @@ fn weapon_table(
         .whitespace_nowrap()
         .text_color(cx.theme().muted_foreground)
         .font_weight(FontWeight::MEDIUM)
-        .child(div().flex_1().min_w(NAME).child("Weapon"))
+        .child(div().flex_1().min_w(name_min).child("Weapon"))
         .child(cell(KILLS).child("Kills"))
         .child(cell(DAMAGE).child("Damage"))
         .child(cell(ACCURACY).child("Accuracy"));
-    let rows = class_weapon_rows(weapons, names).into_iter().map(|w| {
+    let rows = rows.into_iter().map(|w| {
         let kills = format!("{} ({})", w.kills, w.kill_share);
         let dmg = format!("{} ({})", w.dmg, w.dmg_share);
         let label: SharedString = format!("{} {kills} {dmg} {}", w.name, w.accuracy).into();
@@ -117,11 +126,19 @@ fn weapon_table(
             .map(|image| weapon_icon(ids::logstf_class_weapon_icon(class, &w.raw), image));
         let name = h_flex()
             .flex_1()
-            .min_w(NAME)
+            .min_w(name_min)
             .gap_1()
             .items_center()
-            .children(icon)
-            .child(div().flex_1().min_w_0().truncate().child(w.name));
+            .children(slotted.then(|| icon_slot(icon)))
+            .child(
+                div()
+                    .id(ids::logstf_class_weapon_name(class, &w.raw))
+                    .test_support()
+                    .flex_1()
+                    .min_w_0()
+                    .truncate()
+                    .child(w.name),
+            );
         h_flex()
             .id(ids::logstf_class_weapon(class, &w.raw))
             .aria_label(label)

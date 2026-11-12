@@ -13,7 +13,7 @@ use gpui_kit::{
 use tf2tools_core::{PlayerLine, SteamId, TfClass, WeaponNames};
 
 use crate::ids;
-use crate::kill_icons::{KillIconImages, weapon_icon};
+use crate::kill_icons::{ICON_SLOT, KillIconImages, SLOT_GAP, icon_slot, weapon_icon};
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::tables::{WeaponRow, weapon_rows};
 use crate::pages::logs_tf::text::duration_text;
@@ -21,7 +21,7 @@ use crate::pages::logs_tf::text::duration_text;
 // logs.tf opens its card a tenth of a second after the pointer arrives.
 const OPEN_DELAY: Duration = Duration::from_millis(100);
 // The kills and damage columns fit the fixtures' widest, "46 (100%)" and "14029 (100%)"; the
-// weapon name takes what is left.
+// weapon name takes what is left, and the card widens by the icon slot when it has one.
 const CARD_WIDTH: Pixels = px(360.);
 const KILLS: Pixels = px(80.);
 const DAMAGE: Pixels = px(104.);
@@ -95,6 +95,13 @@ fn card_for(
 fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
     let muted = cx.theme().muted_foreground;
     let cell = |width: Pixels| div().w(width).flex_none().text_right();
+    // Once any weapon has an icon, every row keeps a slot for one so the names line up.
+    let slotted = card.weapons.iter().any(|(_, icon)| icon.is_some());
+    let width = if slotted {
+        CARD_WIDTH + ICON_SLOT + SLOT_GAP
+    } else {
+        CARD_WIDTH
+    };
     let column = |title: &'static str, width: Pixels| {
         cell(width)
             .id(ids::logstf_card_column(card.id, card.class, title))
@@ -126,8 +133,16 @@ fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
             .min_w_0()
             .gap_1()
             .items_center()
-            .children(icon)
-            .child(div().flex_1().min_w_0().truncate().child(w.name.clone()));
+            .children(slotted.then(|| icon_slot(icon)))
+            .child(
+                div()
+                    .id(ids::logstf_weapon_name(card.id, card.class, &w.raw))
+                    .test_support()
+                    .flex_1()
+                    .min_w_0()
+                    .truncate()
+                    .child(w.name.clone()),
+            );
         let kills = format!("{} ({})", w.kills, w.kill_share);
         let dmg = format!("{} ({})", w.dmg, w.dmg_share);
         let label: SharedString = format!("{} {kills} {dmg} {}", w.name, w.accuracy).into();
@@ -147,7 +162,7 @@ fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
     v_flex()
         .id(ids::logstf_class_popover(card.id, card.class))
         .test_support()
-        .w(CARD_WIDTH)
+        .w(width)
         .gap_1()
         .text_sm()
         .child(

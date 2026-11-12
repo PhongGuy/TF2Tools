@@ -750,3 +750,39 @@ fn an_open_panel_gains_icons_when_they_load(cx: &mut TestAppContext) {
         "the page re-renders when they land"
     );
 }
+
+// The left edges of a panel row and of its name text.
+fn name_edges(cx: &mut TestAppContext, s: &support::ShellWindow, weapon: &str) -> (f32, f32) {
+    let row = support::bounds_of(cx, s.win, ids::logstf_class_weapon(TfClass::Scout, weapon));
+    let name = support::bounds_of(
+        cx,
+        s.win,
+        ids::logstf_class_weapon_name(TfClass::Scout, weapon),
+    );
+    let (row, name) = (row.expect("the row"), name.expect("its name"));
+    (f32::from(row.left()), f32::from(name.left()))
+}
+
+#[gpui_kit::test]
+fn panel_names_line_up_behind_an_icon_slot_only_when_icons_show(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_sixes(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let icons = install_icons(cx);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::logstf_class(TfClass::Scout));
+    wait_for(cx, &page, TfClass::Scout);
+    let (row, name) = name_edges(cx, &s, "scattergun");
+    assert!((name - row).abs() <= 0.5, "no game, no slot: {row} {name}");
+
+    load_icons(cx, &env, &icons);
+    support::settle(cx, s.win);
+    let (row, iconed) = name_edges(cx, &s, "scattergun");
+    let (_, plain) = name_edges(cx, &s, "pistol_scout");
+    assert!(
+        (iconed - plain).abs() <= 0.5,
+        "names line up: {iconed} {plain}"
+    );
+    assert!(iconed - row >= 64., "a 64 px slot first: {row} {iconed}");
+}

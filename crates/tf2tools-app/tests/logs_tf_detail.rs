@@ -1247,3 +1247,54 @@ fn an_open_class_card_gains_icons_when_they_load(cx: &mut TestAppContext) {
         "the open card re-renders with the icon"
     );
 }
+
+// The left edge of Arie's Scout row for `weapon` and its name text's bounds.
+fn card_name(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    weapon: &str,
+) -> (f32, gpui_kit::Bounds<gpui_kit::Pixels>) {
+    let row = support::bounds_of(
+        cx,
+        s.win,
+        ids::logstf_weapon(sid(ARIE), TfClass::Scout, weapon),
+    );
+    let name = support::bounds_of(
+        cx,
+        s.win,
+        ids::logstf_weapon_name(sid(ARIE), TfClass::Scout, weapon),
+    );
+    (
+        f32::from(row.expect("the row").left()),
+        name.expect("its name"),
+    )
+}
+
+#[gpui_kit::test]
+fn card_names_line_up_behind_an_icon_slot_without_losing_room(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let icons = install_icons(cx);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    open_scout_card(cx, &s, &page);
+    let (row, before) = card_name(cx, &s, "scattergun");
+    let left = f32::from(before.left());
+    assert!((left - row).abs() <= 0.5, "no game, no slot: {row} {left}");
+
+    load_icons(cx, &env, &icons);
+    support::settle(cx, s.win);
+    let (row, iconed) = card_name(cx, &s, "scattergun");
+    let (_, plain) = card_name(cx, &s, "pistol_scout");
+    assert!(
+        (iconed.left() - plain.left()).abs() <= gpui_kit::px(0.5),
+        "names line up: {iconed:?} {plain:?}"
+    );
+    assert!(f32::from(iconed.left()) - row >= 64., "a 64 px slot first");
+    assert!(
+        iconed.size.width >= before.size.width,
+        "the card widens for the slot: {iconed:?} {before:?}"
+    );
+}
