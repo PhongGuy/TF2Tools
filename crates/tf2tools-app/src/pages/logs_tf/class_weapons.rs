@@ -79,10 +79,16 @@ fn weapon_table(
 ) -> impl IntoElement + use<> {
     let border = cx.theme().border;
     let cell = |width: Pixels| div().w(width).flex_none().text_right();
-    let rows = class_weapon_rows(weapons, names);
+    let rows: Vec<_> = class_weapon_rows(weapons, names)
+        .into_iter()
+        .map(|w| {
+            let image = icons.for_weapon(&w.raw, names).cloned();
+            (w, image)
+        })
+        .collect();
     // Once any row has an icon, every row keeps a slot for one so the names line up; the name
     // column grows by the slot so long names keep their room.
-    let slotted = rows.iter().any(|w| icons.get(&w.raw).is_some());
+    let slotted = rows.iter().any(|(_, image)| image.is_some());
     let name_min = if slotted {
         NAME + ICON_SLOT + SLOT_GAP
     } else {
@@ -99,13 +105,12 @@ fn weapon_table(
         .child(cell(KILLS).child("Kills"))
         .child(cell(DAMAGE).child("Damage"))
         .child(cell(ACCURACY).child("Accuracy"));
-    let rows = rows.into_iter().map(|w| {
+    let rows = rows.into_iter().map(|(w, image)| {
         let kills = format!("{} ({})", w.kills, w.kill_share);
         let dmg = format!("{} ({})", w.dmg, w.dmg_share);
         let label: SharedString = format!("{} {kills} {dmg} {}", w.name, w.accuracy).into();
-        let icon = icons
-            .get(&w.raw)
-            .map(|image| weapon_icon(ids::logstf_class_weapon_icon(class, &w.raw), image));
+        let icon =
+            image.map(|image| weapon_icon(ids::logstf_class_weapon_icon(class, &w.raw), &image));
         let name = h_flex()
             .flex_1()
             .min_w(name_min)

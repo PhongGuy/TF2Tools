@@ -84,3 +84,26 @@ fn a_game_without_icon_tables_has_no_icons(cx: &mut TestAppContext) {
     let icons = load(cx, &env);
     assert!(cx.update(|cx| icons.read(cx).icons().is_empty()));
 }
+
+#[gpui_kit::test]
+fn the_escape_plan_shows_the_pickaxe_icon_and_an_iconless_item_the_skull(_: &mut TestAppContext) {
+    use std::collections::HashMap;
+    use tf2tools_app::kill_icons::KillIconImages;
+    let image = |w| tf2tools_app::previews::to_render_image(w, 1, vec![255; w as usize * 4]);
+    let icons = KillIconImages::from_map(HashMap::from([
+        ("pickaxe".to_owned(), image(3).unwrap()),
+        ("skull_tf".to_owned(), image(5).unwrap()),
+        ("scattergun".to_owned(), image(2).unwrap()),
+    ]));
+    let items = r##""items_game" { "items" {
+        "775" { "item_class" "tf_weapon_shovel" "item_logname" "unique_pickaxe_escape" }
+        "1152" { "item_logname" "grappling_hook" "item_iconname" "grappling_hook" }
+    } }"##;
+    let names = tf2tools_core::WeaponNames::from_files(items, b"");
+    let width = |raw: &str| icons.for_weapon(raw, &names).map(|i| i.size(0).width.0);
+    assert_eq!(width("unique_pickaxe_escape"), Some(3));
+    assert_eq!(width("grappling_hook"), Some(5), "the game's own skull");
+    assert_eq!(width("Scattergun"), Some(2));
+    assert_eq!(width("world"), None);
+    assert_eq!(width("player"), None);
+}

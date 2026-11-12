@@ -207,3 +207,168 @@ fn the_real_game_names_the_fixture_weapons() {
     assert_eq!(n.get("scattergun"), Some("Scattergun"));
     assert_eq!(n.get("rocketlauncher"), Some("Rocket Launcher"));
 }
+
+// Kill-icon shapes from the live items_game.txt: an unlock with no item_iconname (775), one whose
+// icon is named apart from its log name (141), one whose named icon the game lacks (939), and the
+// stock Soldier shotgun whose entity name differs from its item_class.
+const ICON_ITEMS: &str = r##""items_game" { "items" {
+    "10" { "name" "TF_WEAPON_SHOTGUN_SOLDIER" "item_class" "tf_weapon_shotgun" "item_name" "#TF_Weapon_Shotgun" }
+    "141" { "item_class" "tf_weapon_sentry_revenge" "item_logname" "frontier_justice" "item_iconname" "frontier_kill" }
+    "775" { "name" "The Escape Plan" "item_class" "tf_weapon_shovel" "item_logname" "unique_pickaxe_escape" "item_name" "#TF_Nowhere" }
+    "939" { "item_class" "saxxy" "item_logname" "skullbat" "item_iconname" "skullbat" }
+} }"##;
+
+fn icon_names() -> WeaponNames {
+    let lang = utf16le("\"lang\" { \"Tokens\" { \"TF_Weapon_Shotgun\" \"Shotgun\" } }");
+    WeaponNames::from_files(ICON_ITEMS, &lang)
+}
+
+#[test]
+fn the_escape_plan_draws_the_pickaxe_kill_icon() {
+    let n = icon_names();
+    assert_eq!(n.kill_icons("unique_pickaxe_escape")[0], "pickaxe");
+    assert_eq!(n.kill_icons("UNIQUE_PICKAXE_ESCAPE")[0], "pickaxe");
+}
+
+#[test]
+fn an_item_icon_comes_before_its_log_name_and_the_skull_comes_last() {
+    let n = icon_names();
+    assert_eq!(
+        n.kill_icons("frontier_justice"),
+        ["frontier_kill", "frontier_justice", "skull_tf"]
+    );
+    assert_eq!(n.kill_icons("skullbat"), ["skullbat", "skull_tf"]);
+    assert_eq!(
+        n.kill_icons("tf_projectile_rocket"),
+        ["tf_projectile_rocket"]
+    );
+    assert_eq!(n.kill_icons("world"), ["world"]);
+}
+
+#[test]
+fn every_item_log_and_icon_name_is_a_key() {
+    let names = icon_names();
+    let mut keys: Vec<&str> = names.log_names().collect();
+    keys.sort_unstable();
+    assert_eq!(
+        keys,
+        [
+            "frontier_justice",
+            "frontier_kill",
+            "skullbat",
+            "unique_pickaxe_escape"
+        ]
+    );
+}
+
+#[test]
+fn a_stock_weapon_is_named_by_its_entity_name_too() {
+    let n = icon_names();
+    assert_eq!(n.get("shotgun_soldier"), Some("Shotgun"));
+    assert_eq!(n.get("shotgun"), Some("Shotgun"));
+}
+
+#[test]
+fn each_log_name_without_its_own_icon_draws_the_games_entry_for_it() {
+    let n = WeaponNames::default();
+    for (log, icon) in [
+        ("tf_projectile_arrow", "huntsman"),
+        ("tf_pumpkin_bomb", "pumpkindeath"),
+        ("unique_pickaxe", "pickaxe"),
+        ("unique_pickaxe_escape", "pickaxe"),
+        ("awper_hand", "sniperrifle"),
+        ("stickybomb_defender", "sticky_resistance"),
+        ("rocketpack", "rocketpack_stomp"),
+        ("laser_pointer", "wrangler_kill"),
+    ] {
+        assert_eq!(n.kill_icons(log)[0], icon, "{log}");
+    }
+}
+
+// Kill names logs.tf records that are no item: sentries, reflects, stock projectiles, class
+// taunts, bleeding and pumpkin bombs. Each draws a `d_` icon of the game's.
+const NON_ITEM_KEYS: [&str; 23] = [
+    "obj_sentrygun",
+    "obj_sentrygun2",
+    "obj_sentrygun3",
+    "obj_minisentry",
+    "deflect_rocket",
+    "deflect_promode",
+    "deflect_sticky",
+    "deflect_arrow",
+    "deflect_flare",
+    "tf_projectile_rocket",
+    "tf_projectile_pipe",
+    "tf_projectile_pipe_remote",
+    "tf_projectile_arrow",
+    "tf_pumpkin_bomb",
+    "taunt_scout",
+    "taunt_soldier",
+    "taunt_pyro",
+    "taunt_demoman",
+    "taunt_heavy",
+    "taunt_medic",
+    "taunt_sniper",
+    "taunt_spy",
+    "bleed_kill",
+];
+
+// Kills logs.tf records with no weapon behind them; the game's table has no icon for them.
+const BLANK_KEYS: [&str; 5] = [
+    "world",
+    "player",
+    "telefrag",
+    "trigger_hurt",
+    "env_explosion",
+];
+
+// Every weapon key the game can log (each item's log and icon name, plus the documented non-item
+// kills) must resolve to a killfeed icon the game's own table draws, and only the two items the
+// table truly lacks may fall back to the skull.
+#[test]
+#[ignore = "needs a TF2 game folder in TF2TOOLS_TF2_GAME"]
+fn every_real_weapon_key_has_a_kill_icon() {
+    let game =
+        std::path::PathBuf::from(std::env::var("TF2TOOLS_TF2_GAME").expect("TF2TOOLS_TF2_GAME"));
+    let tf = game.join("tf");
+    let names = WeaponNames::load(&tf).unwrap();
+    let platform = tf2tools_core::Platform::current().unwrap();
+    let icons = tf2tools_core::HudFiles::open_game(&tf)
+        .unwrap()
+        .kill_icons(platform)
+        .unwrap();
+    let drawn = |key: &str| {
+        names
+            .kill_icons(key)
+            .into_iter()
+            .find(|icon| icons.get(&format!("d_{icon}")).is_some())
+            .map(str::to_owned)
+    };
+    let items: Vec<&str> = names.log_names().collect();
+    assert!(items.len() > 100, "{} keys", items.len());
+    let keys: Vec<&str> = items.iter().copied().chain(NON_ITEM_KEYS).collect();
+    let missing: Vec<&str> = keys
+        .iter()
+        .copied()
+        .filter(|k| drawn(k).is_none())
+        .collect();
+    let mut skulls: Vec<&str> = keys
+        .iter()
+        .copied()
+        .filter(|k| drawn(k).as_deref() == Some("skull_tf"))
+        .collect();
+    skulls.sort_unstable();
+    eprintln!(
+        "{} keys, {} without an icon, skull for {skulls:?}",
+        keys.len(),
+        missing.len()
+    );
+    assert!(missing.is_empty(), "no kill icon for {missing:?}");
+    assert_eq!(skulls, ["grappling_hook", "skullbat"]);
+    for key in BLANK_KEYS {
+        assert!(!items.contains(&key), "{key} is no item");
+        assert_eq!(drawn(key), None, "{key}");
+    }
+    assert_eq!(drawn("unique_pickaxe_escape").as_deref(), Some("pickaxe"));
+    assert_eq!(names.get("shotgun_soldier"), Some("Shotgun"));
+}
