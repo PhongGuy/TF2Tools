@@ -23,9 +23,11 @@ pub struct WeaponNames {
     items: HashSet<String>,
 }
 
-// Items whose log and icon names have no `d_` icon in mod_textures.txt, each with the entry the
-// game's table draws for that weapon instead.
-const ICON_ALIASES: [(&str, &str); 6] = [
+// Log names with no `d_` icon in mod_textures.txt, each with the entry the game's table draws
+// for that kill instead: items, the Huntsman's arrow (it has no log name) and pumpkin bombs.
+const ICON_ALIASES: [(&str, &str); 8] = [
+    ("tf_projectile_arrow", "huntsman"),
+    ("tf_pumpkin_bomb", "pumpkindeath"),
     ("unique_pickaxe", "pickaxe"),
     ("unique_pickaxe_escape", "pickaxe"),
     ("awper_hand", "sniperrifle"),
