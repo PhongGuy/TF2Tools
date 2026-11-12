@@ -68,15 +68,15 @@ pub(crate) async fn gamebanana(
     });
 
     let mut total = 0;
-    // GameBanana's count can exceed its listing, and the page past the end looks like a
-    // throttled reply. Once a full page is in, that reply ends the walk as unconfirmed.
+    // GameBanana's count can exceed its listing. Once a full page is in, a parsed page with
+    // no records is the page past the end, and ends the walk as unconfirmed.
     let mut full_seen = fetched >= gamebanana::PAGE_SIZE;
     let confirmed = loop {
-        let index = match fetch_page(client, kind, page).await {
-            Err(SyncError::Throttled { .. }) if full_seen => break false,
-            other => other?,
-        };
+        let index = fetch_page(client, kind, page, full_seen).await?;
         let count = u32::try_from(index.records.len()).unwrap_or(u32::MAX);
+        if count == 0 {
+            break false;
+        }
         full_seen |= count >= gamebanana::PAGE_SIZE;
         if total == 0 {
             total = index.total;
@@ -116,7 +116,7 @@ pub(crate) async fn gamebanana(
         tracing::warn!(
             ?kind,
             page,
-            "store sync stopped at its page limit or an empty page before a confirmed end; unseen rows kept"
+            "store sync stopped before a confirmed end; unseen rows kept"
         );
     }
 
@@ -141,19 +141,21 @@ pub(crate) async fn gamebanana(
     })
 }
 
-/// Fetches one index page with at least one record, as a background call through the pacer.
-/// A blank body or an empty page is retried until it fails as `Throttled`; any other
-/// unparseable body fails `Malformed` at once, and network errors pass through.
+/// Fetches one index page as a background call through the pacer. A blank body, or a page
+/// with no records before `full_seen`, is retried until it fails as `Throttled`; after it,
+/// that page is returned as the listing's end. Other unparseable bodies fail `Malformed`.
 async fn fetch_page(
     client: &StoreClient,
     kind: StoreKind,
     page: u32,
+    full_seen: bool,
 ) -> Result<IndexPage, SyncError> {
     let Some(url) = gamebanana::index_url(client.endpoints.gamebanana(), kind, page) else {
         return Err(malformed(String::new(), "not a GameBanana store"));
     };
     let read = |body: &[u8]| match gamebanana::parse_index(kind, body) {
         Ok(index) if index.records.len() > 0 => Reply::Done(Ok(index)),
+        Ok(index) if full_seen => Reply::Rejected(Ok(index)),
         Ok(_) => Reply::Empty,
         Err(_) if body.trim_ascii().is_empty() => Reply::Empty,
         Err(e) => Reply::Rejected(Err(e.to_string())),

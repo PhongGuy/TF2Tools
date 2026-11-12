@@ -835,6 +835,7 @@ async fn a_listing_shorter_than_its_count_ends_at_the_empty_page_past_it() {
     mount_page(&env.server, "Sound", 2, empty_page(19718)).await;
     let (result, _) = sync_sounds(&env, false).await;
     let outcome = result.unwrap();
+    assert_eq!(requested_pages(&env.server).await, ["1", "2"]);
     assert_eq!((outcome.fetched(), outcome.rows()), (15, 16));
     assert!(names(&env, "store_sounds").contains(&"stale".to_owned()));
     assert_store_timestamp(&meta(&env.dir, "sounds_last_synced").unwrap());
@@ -853,4 +854,33 @@ async fn an_empty_first_page_still_fails_as_throttled() {
     );
     assert_eq!(requested_pages(&env.server).await, ["1", "1", "1"]);
     assert_eq!(meta(&env.dir, "sounds_last_synced"), None);
+}
+
+#[tokio::test]
+async fn a_blank_body_after_a_full_page_still_fails_as_throttled() {
+    let env = store_env().await;
+    mount_page(&env.server, "Sound", 1, full_page(false)).await;
+    mount_page(&env.server, "Sound", 2, Vec::new()).await;
+    let (result, _) = sync_sounds(&env, false).await;
+    assert!(
+        matches!(result, Err(SyncError::Throttled { .. })),
+        "{result:?}"
+    );
+    assert_eq!(requested_pages(&env.server).await, ["1", "2", "2", "2"]);
+    assert_eq!(meta(&env.dir, "sounds_sync_page").as_deref(), Some("2"));
+    assert_eq!(meta(&env.dir, "sounds_last_synced"), None);
+}
+
+#[tokio::test]
+async fn a_resumed_sync_past_a_full_page_ends_at_an_empty_page() {
+    let env = store_env().await;
+    set_meta(&env.dir, "sounds_sync_order", "newest");
+    set_meta(&env.dir, "sounds_sync_page", "4");
+    set_meta(&env.dir, "sounds_sync_start", &hours_ago(1));
+    set_meta(&env.dir, "sounds_sync_fetched", "45");
+    mount_page(&env.server, "Sound", 4, empty_page(19718)).await;
+    let (result, _) = sync_sounds(&env, false).await;
+    assert_eq!(result.unwrap().fetched(), 45);
+    assert_eq!(requested_pages(&env.server).await, ["4"]);
+    assert_eq!(meta(&env.dir, "sounds_sync_page"), None);
 }
