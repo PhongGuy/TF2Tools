@@ -13,8 +13,8 @@ use tf2tools_core::TfClass;
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, HIGHLANDER, SIXES, day_ago, list_body, open_log, open_page, requests_to,
-    scroll_to_in_log, serve_two_logs, shell, shell_with_picker, sid,
+    ARIE, HIGHLANDER, SIXES, day_ago, install_names, list_body, load_names, open_log, open_page,
+    requests_to, scroll_to_in_log, serve_two_logs, shell, shell_with_picker, sid,
 };
 
 /// Arie's two logs synced, log `log` open; the env and server live as long as the test.
@@ -235,7 +235,7 @@ fn the_widest_card_cells_in_the_fixtures_fit_their_columns(cx: &mut TestAppConte
         let log = tf2tools_core::parse_log(body).unwrap();
         for player in log.players() {
             for class in player.classes() {
-                for w in weapon_rows(player, class) {
+                for w in weapon_rows(player, class, &tf2tools_core::WeaponNames::default()) {
                     kills.push(format!("{} ({})", w.kills, w.kill_share));
                     dmg.push(format!("{} ({})", w.dmg, w.dmg_share));
                 }
@@ -1129,4 +1129,52 @@ fn a_chat_name_shows_whole_in_its_tooltip(cx: &mut TestAppContext) {
     let (_env, _server, s) = long_chatter_chat(cx, 800., 600.);
     let tip = name_tip(cx, &s, ids::logstf_chat_name(0));
     assert_eq!(tip.as_deref(), Some(LONG_NAME));
+}
+
+fn scout_scattergun(cx: &mut TestAppContext, s: &support::ShellWindow) -> Option<String> {
+    support::label_of(
+        cx,
+        s.win,
+        ids::logstf_weapon(sid(ARIE), TfClass::Scout, "scattergun"),
+    )
+}
+
+#[gpui_kit::test]
+fn the_class_card_shows_the_games_weapon_names(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let names = install_names(cx);
+    load_names(cx, &env, &names);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    open_scout_card(cx, &s, &page);
+    assert_eq!(
+        scout_scattergun(cx, &s).as_deref(),
+        Some("Scattergun 7 (100%) 3334 (86%) 56%")
+    );
+}
+
+#[gpui_kit::test]
+fn an_open_class_card_switches_to_game_names_when_they_load(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let names = install_names(cx);
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    open_scout_card(cx, &s, &page);
+    assert_eq!(
+        scout_scattergun(cx, &s).as_deref(),
+        Some("scattergun 7 (100%) 3334 (86%) 56%")
+    );
+    load_names(cx, &env, &names);
+    support::settle(cx, s.win);
+    assert_eq!(
+        scout_scattergun(cx, &s).as_deref(),
+        Some("Scattergun 7 (100%) 3334 (86%) 56%"),
+        "the open card re-renders with the game's name"
+    );
 }

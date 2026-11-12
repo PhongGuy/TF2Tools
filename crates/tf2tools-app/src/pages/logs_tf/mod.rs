@@ -26,7 +26,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{
     ClassAverage, ClassWeapons, LogDetail, LogRow, LogState, LogsRange, MatrixKind, SteamId,
-    TfClass, TrackedPlayer, parse_log, parse_player_input,
+    TfClass, TrackedPlayer, WeaponNames, parse_log, parse_player_input,
 };
 
 use crate::ids;
@@ -39,6 +39,7 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::tokio_bridge;
+use crate::weapon_names::LoadedWeaponNames;
 use crate::widgets::dialog_frame::{DETAIL_WIDTH, DIALOG_WIDTH, DialogFrame};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
@@ -119,6 +120,7 @@ pub struct LogsTfPage {
     add_error: Option<SharedString>,
     adding: bool,
     add_open: bool,
+    names: Entity<LoadedWeaponNames>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -162,7 +164,11 @@ impl LogsTfPage {
                 }
             },
         );
+        // The game's weapon names landing re-renders the panel and any open class card.
+        let names = LoadedWeaponNames::global(cx);
+        let named = cx.observe(&names, |_, _, cx| cx.notify());
         let mut page = Self {
+            names,
             players: Vec::new(),
             active: None,
             loaded: false,
@@ -192,7 +198,7 @@ impl LogsTfPage {
             add_error: None,
             adding: false,
             add_open: false,
-            _subscriptions: vec![enter, heard, redraw, released],
+            _subscriptions: vec![enter, heard, redraw, released, named],
         };
         page.load(true, cx).detach();
         page
@@ -448,6 +454,11 @@ impl LogsTfPage {
     /// The log whose row is open, if any.
     pub fn expanded(&self) -> Option<u64> {
         self.open.as_ref().map(|open| open.id)
+    }
+
+    /// The game's names for logs.tf weapons, empty until the found TF2's load lands.
+    pub fn weapon_names<'a>(&self, cx: &'a App) -> &'a WeaponNames {
+        self.names.read(cx).names()
     }
 
     /// The open row's log, once its body is read and parsed.
@@ -1272,11 +1283,13 @@ impl LogsTfPage {
     fn weapons_panel(&self, cx: &mut Context<Self>) -> Option<impl IntoElement + use<>> {
         self.selected_class?;
         let (class, weapons) = self.weapons.as_ref()?;
+        let page = cx.entity().downgrade();
         Some(class_weapons::class_weapons_panel(
             *class,
             weapons,
+            self.weapon_names(cx),
             self.range,
-            cx.entity().downgrade(),
+            page,
             cx,
         ))
     }

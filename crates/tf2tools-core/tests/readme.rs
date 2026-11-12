@@ -357,3 +357,16 @@ fn weapon_icons_come_from_the_game_not_the_wiki() {
         "the Privacy section lacks the icon sentence"
     );
 }
+
+#[test]
+fn the_logs_section_says_where_weapon_names_come_from() {
+    let readme = repo_file("README.md");
+    let (_, logs) = readme
+        .split_once("### logs.tf stats")
+        .expect("a logs.tf section");
+    let (logs, _) = logs.split_once("\n### ").expect("a section after it");
+    assert!(
+        logs.contains("in-game names, read from your TF2 install"),
+        "logs.tf section: {logs}"
+    );
+}

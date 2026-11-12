@@ -11,8 +11,10 @@ use tf2tools_app::pages::logs_tf::LogsTfPage;
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::{Services, Tf2State};
 use tf2tools_app::shell::route::Page;
+use tf2tools_app::weapon_names::LoadedWeaponNames;
 use tf2tools_core::{
     LogsCache, LogsClient, LogsEndpoints, STEAM_ID64_BASE, SteamId, StoreConfig, TrackedPlayer,
+    WeaponNames,
 };
 
 use crate::support;
@@ -353,4 +355,37 @@ pub fn scroll_to_in_log(
         offset_in_item: at.top() - row.top() - px(8.),
     });
     super::settle(cx, s.win);
+}
+
+/// The Original as an unlock and the stock Scattergun, in items_game's shape.
+pub const NAMES_ITEMS: &str = r##""items_game" {
+    "prefabs" { "weapon_scattergun" { "item_class" "tf_weapon_scattergun" "item_name" "#TF_Weapon_Scattergun" } }
+    "items" {
+        "13" { "name" "TF_WEAPON_SCATTERGUN" "prefab" "weapon_scattergun" }
+        "513" { "item_class" "tf_weapon_rocketlauncher" "item_logname" "quake_rl" "item_name" "#TF_TheOriginal" "propername" "1" }
+    }
+}"##;
+pub const NAMES_LANG: &str = r#""lang" { "Language" "English" "Tokens" { "TF_Weapon_Scattergun" "Scattergun" "TF_TheOriginal" "Original" } }"#;
+
+pub fn weapon_names() -> WeaponNames {
+    WeaponNames::from_files(NAMES_ITEMS, NAMES_LANG.as_bytes())
+}
+
+/// The session's weapon names on a loader that gives `weapon_names()` for any folder.
+pub fn install_names(cx: &mut TestAppContext) -> Entity<LoadedWeaponNames> {
+    cx.update(|cx| {
+        LoadedWeaponNames::install_with(
+            cx,
+            Arc::new(|_: &Services, _: &std::path::Path| weapon_names()),
+        )
+    })
+}
+
+/// Loads `env`'s game into `names` and waits until the load lands.
+pub fn load_names(cx: &mut TestAppContext, env: &support::Env, names: &Entity<LoadedWeaponNames>) {
+    let tf = env.game.join("tf");
+    cx.update(|cx| names.update(cx, |n, cx| n.show_game(Some(tf), cx)));
+    support::wait_real(cx, "the weapon names", |cx| {
+        cx.update(|cx| names.read(cx).names().get("scattergun").is_some())
+    });
 }

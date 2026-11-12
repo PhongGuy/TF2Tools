@@ -2235,6 +2235,28 @@ pub enum WeaponIconsError {
     },
 }
 
+/// Why the game's weapon names could not be read.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum WeaponNamesError {
+    /// items_game.txt is missing, unreadable, not a file or over 64 MiB.
+    #[error("cannot read {path}: {source}")]
+    ItemsGame {
+        /// The items_game.txt path.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// tf_english.txt is missing, unreadable, not a file or over 16 MiB.
+    #[error("cannot read {path}: {source}")]
+    English {
+        /// The tf_english.txt path.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+}
+
 /// Why the player box text could not be read.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]

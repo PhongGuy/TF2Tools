@@ -33,6 +33,7 @@ mod timestamp;
 mod update;
 mod wav;
 mod weapon_icons;
+mod weapon_names;
 mod weapons;
 
 pub use activity::{ActivityLog, LOG_KEEP, LogEntry, LogLevel, LogQuery, NewLogEntry};
@@ -50,7 +51,7 @@ pub use error::{
     PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
     ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
     SettingsError, SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
-    UpdateDownloadError, VpkError, VtfError, WavError, WeaponIconsError,
+    UpdateDownloadError, VpkError, VtfError, WavError, WeaponIconsError, WeaponNamesError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
@@ -140,4 +141,5 @@ pub use update::{
 };
 pub use wav::{WavInfo, inspect_wav};
 pub use weapon_icons::weapon_inventory_images;
+pub use weapon_names::WeaponNames;
 pub use weapons::{TfClass, Weapon, WeaponSlot, weapons};
