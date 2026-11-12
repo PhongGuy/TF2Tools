@@ -137,3 +137,44 @@ fn the_range_sits_above_the_class_cards(cx: &mut TestAppContext) {
         );
     }
 }
+
+#[gpui_kit::test]
+fn a_log_stored_without_damage_taken_gets_it_from_its_body(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    // As an earlier build stored them: no damage taken, waiting for the backfill.
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute_batch(
+            "UPDATE logstf_class_rows SET dt = NULL; UPDATE logstf_logs SET dt_counted = 0;",
+        )
+        .unwrap();
+    cx.update(|cx| page.update(cx, |p, cx| p.refresh(cx)));
+    let dt = |cx: &mut TestAppContext| {
+        cx.update(|cx| {
+            page.read(cx)
+                .rows()
+                .iter()
+                .find(|r| r.id() == 3)
+                .map(|r| r.dt())
+        })
+    };
+    support::wait_real(cx, "the reread without DT", |cx| dt(cx) == Some(None));
+    to_end(cx, &page);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_log_stat(3, "DT")).as_deref(),
+        Some("\u{2013}")
+    );
+
+    cx.update(|cx| page.update(cx, |p, cx| p.count_older_weapons(cx)));
+    while cx.dispatcher.scheduler().tick_background_only() {}
+    support::wait_real(cx, "the filled DT", |cx| dt(cx) == Some(Some(5964)));
+    to_end(cx, &page);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_log_stat(3, "DT")).as_deref(),
+        Some("5964")
+    );
+}

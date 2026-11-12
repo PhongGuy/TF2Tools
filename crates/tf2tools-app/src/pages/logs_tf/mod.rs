@@ -327,10 +327,10 @@ impl LogsTfPage {
         .detach();
     }
 
-    /// Counts weapon stats for logs stored before weapon rows existed, one batch at a time off
-    /// the UI thread, rereading the open panel after each batch that counted a log. A no-op
-    /// while a backfill runs; it stops when none are left, on an error, or when a batch counts
-    /// nothing, and the next run resumes.
+    /// Counts weapon stats, then damage taken, for logs stored before the cache kept them, one
+    /// batch at a time off the UI thread, rereading the open panel or the rows after each batch
+    /// that counted a log. A no-op while a backfill runs; each pass stops when none are left,
+    /// on an error, or when a batch counts nothing, and the next run resumes.
     pub fn count_older_weapons(&mut self, cx: &mut Context<Self>) {
         if std::mem::replace(&mut self.weapons_counting, true) {
             return;
@@ -358,6 +358,32 @@ impl LogsTfPage {
                     }
                     Err(error) => {
                         tracing::warn!(%error, "counting logs.tf weapon stats failed");
+                        break;
+                    }
+                }
+            }
+            loop {
+                let Ok(batch) = page.update(cx, |_, cx| {
+                    run_blocking(cx, |s| {
+                        s.logs
+                            .cache()
+                            .fill_damage_taken(WEAPON_BATCH)
+                            .map_err(|e| OpError::core("Failed to fill logs.tf damage taken", e))
+                    })
+                }) else {
+                    break;
+                };
+                match batch.await {
+                    Ok(done) => {
+                        if done.counted() > 0 {
+                            let _ = page.update(cx, |page, cx| page.reread(cx));
+                        }
+                        if done.left() == 0 || done.counted() == 0 {
+                            break;
+                        }
+                    }
+                    Err(error) => {
+                        tracing::warn!(%error, "filling logs.tf damage taken failed");
                         break;
                     }
                 }
