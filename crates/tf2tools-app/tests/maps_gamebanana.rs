@@ -270,3 +270,20 @@ fn a_map_card_opens_its_details_with_the_gamebanana_link(cx: &mut TestAppContext
         ids::store_detail_link("gamebanana")
     ));
 }
+
+#[gpui_kit::test]
+fn a_map_detail_offers_no_install(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    one_map_listing(&server);
+    server.mount_gb_addon(1, "koth_x", &[("koth_x_b1.bsp", b"map".to_vec(), 100)]);
+    let s = shell(cx, &env, &server);
+    let page = open_maps(cx, &s);
+    open_gamebanana(cx, &s, &page);
+    support::click_id(cx, s.win, ids::addon_gb_card("maps", GbId::new(1)));
+    support::wait_real(cx, "the map's profile", |cx| {
+        support::present(cx, s.win, ids::ADDON_DETAIL_DOWNLOADS)
+    });
+    // Until maps install, a map's detail neither offers Install nor explains why it can't.
+    assert!(!support::present(cx, s.win, ids::ADDON_DETAIL_INSTALL));
+    assert!(!support::present(cx, s.win, ids::ADDON_DETAIL_BLOCKED));
+}
