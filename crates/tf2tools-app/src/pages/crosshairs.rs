@@ -10,6 +10,7 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::InputState;
+use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::select::{Select, SelectState};
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
@@ -24,8 +25,8 @@ use gpui_kit::{
 
 use tf2tools_core::{
     ApplyReport, Assignment, CrosshairEntry, CrosshairFormat, CrosshairId, CrosshairRef,
-    InstalledCrosshairs, LibraryError, LogLevel, NewLogEntry, Provenance, SkipReason, TfClass,
-    WeaponSlot, write_png,
+    InstalledCrosshairs, LibraryError, LogLevel, NewLogEntry, ProfileId, Provenance, SkipReason,
+    TfClass, WeaponSlot, write_png,
 };
 
 use super::common::{SM_ICON_PX, YELLOW_500, needs_tf2, no_tf2_notice};
@@ -50,6 +51,7 @@ use crate::widgets::crosshair_picker::{
 };
 use crate::widgets::label_option::LabelOption;
 use crate::widgets::labelled;
+use crate::widgets::profile_menu::{Section, profile_menu};
 use crate::widgets::scroll::scroll_area;
 use crate::widgets::weapon_assigner::{
     AssignRequested, AssignTarget, AssignedCell, AssignerState, ClassChanged, WeaponAssigner,
@@ -108,6 +110,10 @@ pub struct EditPainted(pub CrosshairId);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CopyToMaker(pub CrosshairRef);
 
+/// Asks the shell to open profile `0` in the Profiles editor with crosshair `1` picked.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AddToProfile(pub ProfileId, pub CrosshairRef);
+
 /// The Crosshairs page. Built fresh on each visit; it reloads whenever the TF2 state changes.
 pub struct CrosshairsPage {
     win: AnyWindowHandle,
@@ -153,6 +159,7 @@ pub struct CrosshairsPage {
 
 impl EventEmitter<EditPainted> for CrosshairsPage {}
 impl EventEmitter<CopyToMaker> for CrosshairsPage {}
+impl EventEmitter<AddToProfile> for CrosshairsPage {}
 impl EventEmitter<NavigateTo> for CrosshairsPage {}
 
 impl CrosshairsPage {
@@ -947,6 +954,27 @@ impl CrosshairsPage {
                 .disabled(self.busy.is_some())
                 .on_click(cx.listener(move |_, _, _, cx| cx.emit(CopyToMaker(selected.clone()))))
         });
+        // A pick saves nothing here: the profile's editor opens with this crosshair picked, so
+        // the player chooses its weapons there.
+        let add = self.selected.clone().map(|selected| {
+            let page = cx.entity().downgrade();
+            let on_pick = Rc::new(move |id: ProfileId, _: &mut Window, cx: &mut App| {
+                let crosshair = selected.clone();
+                let _ = page.update(cx, |_, cx| cx.emit(AddToProfile(id, crosshair)));
+            });
+            Button::new(ids::CROSSHAIRS_ADD_TO_PROFILE)
+                .outline()
+                .small()
+                .px(SM_ICON_PX)
+                .icon(IconName::LayersPlus)
+                .label("Add to profile")
+                .disabled(self.busy.is_some())
+                .dropdown_menu(profile_menu(vec![Section {
+                    heading: None,
+                    item_id: ids::crosshair_profile_pick,
+                    on_pick,
+                }]))
+        });
         let exporting = self.busy == Some(Busy::Export);
         let export = self.selected.is_some().then(|| {
             Button::new(ids::CROSSHAIRS_EXPORT_PNG)
@@ -1014,6 +1042,7 @@ impl CrosshairsPage {
                             .flex_wrap()
                             .gap_2()
                             .children(copy)
+                            .children(add)
                             .children(export)
                             .children(edit)
                             .children(delete),

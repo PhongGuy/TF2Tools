@@ -24,13 +24,13 @@ use gpui_kit::{
 };
 
 use tf2tools_core::{
-    ApplyProfileError, ApplyProfileReport, ApplyStep, ExternalHud, LogLevel, MissingItem,
-    MissingKind, NewLogEntry, Profile, ProfileDraft, ProfileError, ProfileId, StoreKind,
-    Tf2Install,
+    ApplyProfileError, ApplyProfileReport, ApplyStep, CrosshairRef, ExternalHud, LogLevel,
+    MissingItem, MissingKind, NewLogEntry, Profile, ProfileDraft, ProfileError, ProfileId,
+    StoreKind, Tf2Install,
 };
 
 use self::editor::ProfileEditor;
-use self::editor_model::next_profile_name;
+use self::editor_model::{Slot, next_profile_name};
 use self::probe::Tf2Probe;
 use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, no_tf2_warning};
 use super::hud_store::bodies::{curated_body, gamebanana_body};
@@ -174,6 +174,33 @@ impl ProfilesPage {
             return;
         };
         self.show_editor(profile, window, cx);
+    }
+
+    /// Opens the editor for `id` on its Crosshairs slot with `crosshair` picked, saving nothing;
+    /// a profile that can't be read toasts its error and leaves the grid.
+    // Reads the one profile at once rather than waiting for the page's first load.
+    pub fn open_with_crosshair(
+        &mut self,
+        id: ProfileId,
+        crosshair: CrosshairRef,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let profile = match cx.global::<Services>().library.profile(&id) {
+            Ok(profile) => profile,
+            Err(e) => {
+                let err = describe_profile(&e).into_op("Failed to open the profile");
+                return toast_error(window, cx, &err);
+            }
+        };
+        self.show_editor(profile, window, cx);
+        if let Some(editor) = self.editor() {
+            editor.update(cx, |editor, cx| {
+                editor.select(Slot::Crosshairs, cx);
+                let picker = editor.picker().clone();
+                picker.update(cx, |picker, cx| picker.select(Some(crosshair), cx));
+            });
+        }
     }
 
     // Opens the editor on a profile already in hand, such as one just created.

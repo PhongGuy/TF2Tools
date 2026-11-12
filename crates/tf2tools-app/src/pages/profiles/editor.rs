@@ -921,7 +921,7 @@ impl ProfileEditor {
                         labelled(
                             div().text_xs().text_color(cx.theme().muted_foreground),
                             ids::PROFILE_EDITOR_NOT_APPLIED,
-                            "Changes not applied yet",
+                            super::model::NOT_APPLIED,
                         )
                     })),
             )

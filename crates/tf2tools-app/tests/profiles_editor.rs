@@ -32,26 +32,6 @@ fn found(env: &support::Env) -> Tf2State {
     Tf2State::Found(tf2(env))
 }
 
-/// 441 frames of 44.1 kHz stereo 16-bit silence, a file `import_sound` accepts.
-fn wav() -> Vec<u8> {
-    let data_len: u32 = 441 * 4;
-    let mut out = Vec::new();
-    out.extend_from_slice(b"RIFF");
-    out.extend_from_slice(&(36 + data_len).to_le_bytes());
-    out.extend_from_slice(b"WAVEfmt ");
-    out.extend_from_slice(&16u32.to_le_bytes());
-    out.extend_from_slice(&1u16.to_le_bytes());
-    out.extend_from_slice(&2u16.to_le_bytes());
-    out.extend_from_slice(&44_100u32.to_le_bytes());
-    out.extend_from_slice(&(44_100u32 * 4).to_le_bytes());
-    out.extend_from_slice(&4u16.to_le_bytes());
-    out.extend_from_slice(&16u16.to_le_bytes());
-    out.extend_from_slice(b"data");
-    out.extend_from_slice(&data_len.to_le_bytes());
-    out.resize(out.len() + data_len as usize, 0);
-    out
-}
-
 fn seed_hud(s: &support::ShellWindow, env: &support::Env, name: &str) -> HudEntry {
     let path = env.tmp.path().join(format!("{name}.zip"));
     std::fs::write(&path, support::hud_zip_bytes(name)).unwrap();
@@ -66,7 +46,7 @@ fn seed_sound(s: &support::ShellWindow, env: &support::Env, name: &str) -> Sound
         .tmp
         .path()
         .join(format!("{}.wav", name.replace(' ', "-")));
-    std::fs::write(&path, wav()).unwrap();
+    std::fs::write(&path, support::wav_bytes()).unwrap();
     s.services
         .library
         .import_sound(&path, name, Provenance::Local)

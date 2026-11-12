@@ -10,6 +10,7 @@ use gpui_kit::assets::IconName;
 use gpui_kit::base::ObservedElement;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
@@ -24,9 +25,9 @@ use gpui_kit::{
 };
 
 use tf2tools_core::{
-    CopyUpdate, DownloadUpdate, GbId, HudEntry, HudId, HudInstall, HudStatus, LibraryEntry,
-    LibraryError, LogLevel, NewLogEntry, Platform, Provenance, StoreFile, StoreItem, StoreItemId,
-    StoreKind, Tf2Install,
+    CopyUpdate, DownloadUpdate, DraftSlot, GbId, HudEntry, HudId, HudInstall, HudStatus,
+    LibraryEntry, LibraryError, LogLevel, NewLogEntry, Platform, ProfileDraft, ProfileError,
+    ProfileId, Provenance, StoreFile, StoreItem, StoreItemId, StoreKind, Tf2Install,
 };
 
 use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, needs_tf2, no_tf2_notice};
@@ -36,11 +37,13 @@ use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
     copy_in_store_text, copy_made_text, copy_updated_notice, describe_copy_hud, describe_import,
-    describe_library, describe_tf2_install, describe_update_copy, editing_copy_text,
+    describe_library, describe_profile, describe_tf2_install, describe_update_copy,
+    editing_copy_text,
 };
 use crate::pages::graphics::jobs::refuse_while_running;
 use crate::pages::hud_maker::live::{Live, live_job};
 use crate::pages::hud_store::bodies::gamebanana_body;
+use crate::pages::profiles::model::NOT_APPLIED;
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::picker::PickKind;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages, local_image_url};
@@ -59,6 +62,7 @@ use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::carousel::open_lightbox;
 use crate::widgets::labelled;
+use crate::widgets::profile_menu::{Section, added_title, profile_menu};
 use crate::widgets::scroll::scroll_area;
 
 /// The card's text and buttons below a store HUD's 16:9 screenshot, and a local card's height.
@@ -94,6 +98,8 @@ enum Busy {
     Copy(String),
     /// Keyed by the updated HUD's folder name.
     Update(String),
+    /// Keyed by the folder name of the HUD being put in a profile.
+    AddToProfile(String),
 }
 
 /// Whether this session's GameBanana HUD check has started.
@@ -720,6 +726,31 @@ impl HudsPage {
 }
 
 impl HudsPage {
+    // Puts `hud` in profile `id`, keeping its other slots. The profile is read again here, so
+    // one deleted while the menu was open fails with an error toast instead of being recreated.
+    fn add_to_profile(&mut self, hud: &HudEntry, id: ProfileId, cx: &mut Context<Self>) {
+        let (hud_id, name) = (hud.id().clone(), hud.name().to_owned());
+        let busy = Busy::AddToProfile(hud.folder_name().to_owned());
+        let op = move |s: &Services| {
+            let failed = |e: ProfileError| describe_profile(&e).into_op("Couldn't add to profile");
+            let before = s.library.profile(&id).map_err(failed)?;
+            let draft = ProfileDraft::from_profile(&before).with_hud(DraftSlot::Item(hud_id));
+            let update = s.library.update_profile(&id, &draft).map_err(failed)?;
+            let after = update.profile().hud().map(|h| h.folder_name());
+            let replaced = (before.hud())
+                .filter(|old| Some(old.folder_name()) != after)
+                .map(|old| old.name());
+            let title = added_title(&name, update.profile().name(), None, replaced);
+            let note = if update.deactivated() {
+                NOT_APPLIED
+            } else {
+                ""
+            };
+            Ok((ToastKind::Success, title.into(), note.into()))
+        };
+        self.run(busy, op, cx, None);
+    }
+
     // The library card's "Edit a copy".
     fn copy(&mut self, hud: &HudEntry, _: &mut Window, cx: &mut Context<Self>) {
         self.copy_and_edit(hud, false, cx);
@@ -1665,7 +1696,8 @@ fn hud_card(
                         .children(store_note)
                         .children(update_mark),
                 )
-                // The page link sits by the badge, since the action row is full on a narrow card.
+                // The page link and "Add to profile" sit by the badge, since the action row is
+                // full on a narrow card.
                 .child(
                     h_flex()
                         .flex_none()
@@ -1680,6 +1712,7 @@ fn hud_card(
                                 .named("Visit page")
                                 .on_click(move |_, _, cx| cx.open_url(&url))
                         }))
+                        .child(add_to_profile_button(hud, busy, page))
                         .child(badge_of(
                             ids::hud_badge(folder),
                             badge,
@@ -1745,6 +1778,30 @@ fn hud_card(
                 )),
         )
         .into_any_element()
+}
+
+// The card's "Add to profile" menu. A pick saves through the page, so it waits behind any
+// other HUD action like the card's other buttons.
+fn add_to_profile_button(
+    hud: &HudEntry,
+    busy: Option<&Busy>,
+    page: &WeakEntity<HudsPage>,
+) -> impl IntoElement {
+    let (page, entry) = (page.clone(), hud.clone());
+    let on_pick = Rc::new(move |id: ProfileId, _: &mut Window, cx: &mut App| {
+        let _ = page.update(cx, |page, cx| page.add_to_profile(&entry, id, cx));
+    });
+    Button::new(ids::hud_add_to_profile(hud.folder_name()))
+        .ghost()
+        .icon(IconName::LayersPlus)
+        .named("Add to profile")
+        .loading(busy == Some(&Busy::AddToProfile(hud.folder_name().to_owned())))
+        .disabled(busy.is_some())
+        .dropdown_menu(profile_menu(vec![Section {
+            heading: None,
+            item_id: ids::hud_profile_pick,
+            on_pick,
+        }]))
 }
 
 // v5's library EmptyState: an empty library, or a search that matched nothing.
