@@ -138,6 +138,7 @@ mod huds_images;
 mod icons;
 mod ids;
 mod kept_pages;
+mod kill_icons;
 mod library_events;
 mod loadout;
 mod local_log;
