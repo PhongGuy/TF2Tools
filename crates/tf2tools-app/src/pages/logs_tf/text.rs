@@ -194,14 +194,27 @@ pub fn whole(value: f64) -> String {
     format!("{value:.0}")
 }
 
-/// The log list's DPM: the open log's DA/M, damage over the whole log floored, or "-"
-/// before the log's length is known.
-pub fn list_dpm_text(dmg: u32, length: Option<u32>) -> String {
+/// What a log row shows for a value it does not have.
+pub const UNKNOWN: &str = "\u{2013}";
+
+/// A log row's per-minute rate: `n` over the whole log, floored as the open log's DA/M and
+/// DT/M are, or a dash while either is unknown.
+pub fn per_min_text(n: Option<u32>, length: Option<u32>) -> String {
     // Whole-number math, as core's per-minute rates, so an exact answer never floors one less.
-    match length.filter(|&length| length > 0) {
-        Some(length) => (u64::from(dmg) * 60 / u64::from(length)).to_string(),
-        None => "-".to_owned(),
+    match (n, length.filter(|&length| length > 0)) {
+        (Some(n), Some(length)) => (u64::from(n) * 60 / u64::from(length)).to_string(),
+        _ => UNKNOWN.to_owned(),
     }
+}
+
+/// A log row's KA/D with one decimal, no deaths counting as one as on logs.tf.
+pub fn kapd_text(kills: u32, assists: u32, deaths: u32) -> String {
+    one_decimal((f64::from(kills) + f64::from(assists)) / f64::from(deaths.max(1)))
+}
+
+/// A count a log row may not have: the number, or a dash.
+pub fn known_text(n: Option<u32>) -> String {
+    n.map_or_else(|| UNKNOWN.to_owned(), |n| n.to_string())
 }
 
 /// A number logs.tf shows whole, cut down as logs.tf does: 154.9 reads "154". These counts
@@ -307,6 +320,17 @@ pub fn round_length_text(seconds: u32) -> String {
 /// A match length as minutes and seconds, as logs.tf writes it: "28:34", "60:00".
 pub fn duration_text(seconds: u32) -> String {
     format!("{}:{:02}", seconds / 60, seconds % 60)
+}
+
+/// An upload time as a date and minute on this computer's clock: "2026-10-17 20:56".
+pub fn date_time_text(unix: i64) -> String {
+    chrono::DateTime::from_timestamp(unix, 0)
+        .map(|t| {
+            t.with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M")
+                .to_string()
+        })
+        .unwrap_or_default()
 }
 
 /// An upload time as a date on this computer's clock: "2026-10-17".

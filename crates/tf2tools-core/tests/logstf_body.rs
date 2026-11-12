@@ -44,7 +44,8 @@ fn old_body_column(dir: &tf2tools_core::DataDir) {
                  id INTEGER PRIMARY KEY, title TEXT NOT NULL, map TEXT NOT NULL,
                  date INTEGER NOT NULL, length INTEGER, body TEXT, fetched_at INTEGER,
                  state INTEGER NOT NULL DEFAULT 0,
-                 weapons_counted INTEGER NOT NULL DEFAULT 0);",
+                 weapons_counted INTEGER NOT NULL DEFAULT 0,
+                 dt_counted INTEGER NOT NULL DEFAULT 0);",
         )
         .unwrap();
 }

@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 17;
+pub(crate) const SCHEMA_VERSION: u32 = 18;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -116,6 +116,17 @@ const STEPS: &[Step] = &[
         version: 17,
         sql: STEP_17_SQL,
         add_columns: &[("library_huds", "gb_file_date", "INTEGER")],
+    },
+    // v6 step 18: the player's damage taken, the same on each of their class rows of a log.
+    // Rows stored before it stay NULL, so the list can tell unknown from zero, until the
+    // backfill reads them from the body; `dt_counted` is that backfill's progress marker.
+    Step {
+        version: 18,
+        sql: "",
+        add_columns: &[
+            ("logstf_class_rows", "dt", "INTEGER"),
+            ("logstf_logs", "dt_counted", "INTEGER NOT NULL DEFAULT 0"),
+        ],
     },
 ];
 

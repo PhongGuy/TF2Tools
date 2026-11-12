@@ -1,5 +1,5 @@
-//! The class averages grid: one card per class in TF2 order, then how many logs it covers
-//! beside the history range slider.
+//! The class averages grid: how many logs it covers beside the history range slider, then
+//! one card per class in TF2 order.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::slider::{Slider, SliderState};
@@ -27,8 +27,9 @@ const STOP_CELL: f32 = 68.;
 const RANGE_WIDTH: f32 = STOP_CELL * LogsRange::STOPS.len() as f32;
 const LABEL_HEIGHT: f32 = 24.;
 
-/// The nine cards, wrapping, with the summary line for `logs` in `range` back from `newest`
-/// and the range slider under them. A played card opens its weapons; `selected` is ringed.
+/// The summary line for `logs` in `range` back from `newest` and the range slider, so the
+/// range is picked before the stats are read, then the nine cards, wrapping. A played card
+/// opens its weapons; `selected` is ringed.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn class_grid(
     averages: &[ClassAverage; 9],
@@ -45,9 +46,10 @@ pub(super) fn class_grid(
         let class = average.class();
         class_card(average, selected == Some(class), page.clone(), cx)
     });
+    // The cards come after the picker, which takes `page`, so they are built first.
+    let cards: Vec<_> = cards.collect();
     v_flex()
         .gap_2()
-        .child(h_flex().flex_wrap().items_start().gap_3().children(cards))
         .child(
             h_flex()
                 .flex_wrap()
@@ -63,6 +65,7 @@ pub(super) fn class_grid(
                 }))
                 .child(range_picker(slider, page)),
         )
+        .child(h_flex().flex_wrap().items_start().gap_3().children(cards))
 }
 
 // The slider over its six stop labels; a label click picks its stop like a release there.

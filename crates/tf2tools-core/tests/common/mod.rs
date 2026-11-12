@@ -222,9 +222,15 @@ const M17_TABLES: &str = "
     ALTER TABLE library_huds ADD COLUMN gb_file_date INTEGER;
 ";
 
+const M18_COLUMNS: &str = "
+    ALTER TABLE logstf_class_rows ADD COLUMN dt INTEGER;
+    ALTER TABLE logstf_logs ADD COLUMN dt_counted INTEGER NOT NULL DEFAULT 0;
+";
+
 /// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables,
 /// migration 13's mastercomfig tables, migration 14's add-on table, migration 15's logs.tf
-/// tables, migration 16's weapon rows and migration 17's HUD checks: the schema v6 opens to.
+/// tables, migration 16's weapon rows, migration 17's HUD checks and migration 18's damage taken:
+/// the schema v6 opens to.
 pub fn current_shape() -> SchemaShape {
     let conn = v5_fixture_connection();
     conn.execute_batch(M12_TABLES).unwrap();
@@ -233,6 +239,7 @@ pub fn current_shape() -> SchemaShape {
     conn.execute_batch(M15_TABLES).unwrap();
     conn.execute_batch(M16_TABLES).unwrap();
     conn.execute_batch(M17_TABLES).unwrap();
+    conn.execute_batch(M18_COLUMNS).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape
