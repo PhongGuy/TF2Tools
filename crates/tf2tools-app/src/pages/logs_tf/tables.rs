@@ -69,8 +69,8 @@ pub fn class_weapon_rows(
     tallies.into_iter().map(|t| t.row(kills, dmg)).collect()
 }
 
-// One shown weapon line before wording: the first log name's id, the summed counts, and the
-// hits and shots of the one side that measured them, if exactly one did.
+// One shown weapon line before wording: the first log name's id and the summed counts, hits and
+// shots summed over the sides that fired shots.
 struct Tally {
     raw: String,
     name: String,
@@ -78,16 +78,10 @@ struct Tally {
     dmg: u32,
     hits: u32,
     shots: u32,
-    measured: u32,
 }
 
 impl Tally {
     fn row(self, all_kills: u32, all_dmg: u32) -> WeaponRow {
-        let (hits, shots) = if self.measured == 1 {
-            (self.hits, self.shots)
-        } else {
-            (0, 0)
-        };
         WeaponRow {
             raw: self.raw,
             name: self.name,
@@ -95,7 +89,7 @@ impl Tally {
             kill_share: share_text(self.kills, all_kills),
             dmg: self.dmg,
             dmg_share: share_text(self.dmg, all_dmg),
-            accuracy: accuracy_text(hits, shots),
+            accuracy: accuracy_text(self.hits, self.shots),
         }
     }
 }
@@ -110,14 +104,13 @@ fn class_tallies<'a>(
     let mut tallies: Vec<Tally> = Vec::new();
     for (raw, kills, dmg, hits, shots) in weapons.filter(|w| names.usable_by(w.0, class)) {
         let name = names.class_name(raw, class).unwrap_or(raw);
-        let measured = u32::from(shots > 0);
+        // A side without shots adds no hits, so a stray hit count cannot skew the accuracy.
+        let hits = if shots > 0 { hits } else { 0 };
         if let Some(t) = tallies.iter_mut().find(|t| t.name == name) {
             t.kills = t.kills.saturating_add(kills);
             t.dmg = t.dmg.saturating_add(dmg);
-            t.measured += measured;
-            if measured == 1 {
-                (t.hits, t.shots) = (hits, shots);
-            }
+            t.hits = t.hits.saturating_add(hits);
+            t.shots = t.shots.saturating_add(shots);
         } else {
             tallies.push(Tally {
                 raw: raw.to_owned(),
@@ -126,7 +119,6 @@ fn class_tallies<'a>(
                 dmg,
                 hits,
                 shots,
-                measured,
             });
         }
     }

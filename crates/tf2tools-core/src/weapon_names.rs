@@ -27,7 +27,7 @@ pub struct WeaponNames {
 }
 
 // Who logs the kill names that are no item. A stock projectile is its launcher's, and a Pyro
-// logs it too when reflecting it. Bleeding comes from Scout, Engineer and Sniper melee.
+// logs it too when reflecting it. Bleeding comes from Scout, Engineer and Sniper weapons.
 const NON_ITEM_CLASSES: [(&str, &[TfClass]); 9] = [
     ("tf_projectile_rocket", &[TfClass::Soldier, TfClass::Pyro]),
     ("tf_projectile_pipe", &[TfClass::Demoman, TfClass::Pyro]),

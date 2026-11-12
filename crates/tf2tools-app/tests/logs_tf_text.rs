@@ -803,8 +803,5 @@ fn rows_with_one_shown_name_merge_into_the_first() {
     let rocket = rockets[0];
     assert_eq!((rocket.kills, rocket.dmg), (3, 180));
     assert_eq!(rocket.raw, "deflect_rocket", "the first by kills");
-    assert_eq!(
-        rocket.accuracy, "-",
-        "both sides measured, so neither is kept"
-    );
+    assert_eq!(rocket.accuracy, "67%", "4 of 6 shots over both sides");
 }
