@@ -56,6 +56,12 @@ impl SoundKind {
     fn vpk_target(self, custom: &Path) -> PathBuf {
         custom.join(format!("tf2tools-{}.vpk", self.name()))
     }
+
+    /// The `.sound.cache` TF2 writes beside the kind's VPK; it points into that VPK, so it
+    /// goes whenever the VPK is replaced or removed.
+    fn vpk_cache_target(self, custom: &Path) -> PathBuf {
+        custom.join(format!("tf2tools-{}.vpk.sound.cache", self.name()))
+    }
 }
 
 /// What `tf/custom` holds for the hitsound and killsound, plus other folders' sounds.
@@ -362,10 +368,13 @@ impl Library {
         if let Some(tf2) = tf2 {
             let custom = tf2.custom_dir();
             for kind in &installed_kinds {
-                remove_file_if_present(&match format {
-                    SoundFormat::Wav => kind.wav_target(&custom),
-                    SoundFormat::Vpk => kind.vpk_target(&custom),
-                })?;
+                match format {
+                    SoundFormat::Wav => remove_file_if_present(&kind.wav_target(&custom))?,
+                    SoundFormat::Vpk => {
+                        remove_file_if_present(&kind.vpk_target(&custom))?;
+                        remove_file_if_present(&kind.vpk_cache_target(&custom))?;
+                    }
+                }
             }
         }
         // The row goes before the library folder, so a failed removal never leaves a row
@@ -403,7 +412,7 @@ impl Library {
 
     /// Installs a library sound as the hitsound or killsound, ported from v5: a WAV goes to
     /// `tf2tools-sounds/sound/ui/<kind>.wav`, a VPK to `tf2tools-<kind>.vpk`, the other form
-    /// of that kind is removed, and `sound.cache` is deleted so TF2 rebuilds it.
+    /// of that kind is removed, and the sound caches are deleted so TF2 rebuilds them.
     pub fn install_sound(
         &self,
         id: &SoundId,
@@ -438,6 +447,7 @@ impl Library {
         }
         std::fs::copy(&src, &target).map_err(io_at(&target))?;
         remove_file_if_present(&custom.join(SOUNDS_DIR).join("sound.cache"))?;
+        remove_file_if_present(&kind.vpk_cache_target(&custom))?;
 
         self.db
             .write(|conn| {
@@ -449,11 +459,13 @@ impl Library {
             .map_err(install_db)
     }
 
-    /// Removes both installed forms of one kind and clears its install settings.
+    /// Removes both installed forms of one kind and the VPK's sound cache, and clears its
+    /// install settings.
     pub fn uninstall_sound(&self, kind: SoundKind, tf2: &Tf2Install) -> Result<(), InstallError> {
         let custom = game_custom_dir(tf2)?;
         remove_file_if_present(&kind.wav_target(&custom))?;
         remove_file_if_present(&kind.vpk_target(&custom))?;
+        remove_file_if_present(&kind.vpk_cache_target(&custom))?;
         self.db
             .write(|conn| {
                 let tx = conn.transaction()?;
