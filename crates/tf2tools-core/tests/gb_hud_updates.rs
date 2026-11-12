@@ -5,6 +5,7 @@ use crate::common::{self, StoreEnv, sql, store_env, zip_bytes};
 use crate::common::{LibraryEnv, library_env};
 
 use serde_json::json;
+use tf2tools_core::DownloadError;
 use tf2tools_core::{CopyUpdate, DownloadUpdate, LibraryKind, Platform};
 use tf2tools_core::{
     DataDir, GbId, HudEntry, HudId, LibraryEntry, StoreFile, StoreItemId, StoreKind,
@@ -422,5 +423,103 @@ fn an_older_copy_s_mark_is_its_base_s_download_time_else_its_own() {
         env.lib.copy_update(copy.id()).unwrap(),
         CopyUpdate::UpToDate,
         "no mark, no offer"
+    );
+}
+
+async fn replacing(env: &StoreEnv, file: &StoreFile, old: &HudId) -> HudEntry {
+    only_hud(
+        env.client
+            .download_replacing(HUDS, file, old, &|_| {})
+            .await
+            .unwrap(),
+    )
+}
+
+#[tokio::test]
+async fn a_replacing_download_lands_in_a_new_folder_beside_the_old_row() {
+    let env = store_env().await;
+    let files = listed(
+        &env,
+        40,
+        &[
+            ("darhud-202618.zip", "darhud-202618", "v2", 300),
+            ("darhud-202517.zip", "darhud-202517", "v1", 100),
+        ],
+    )
+    .await;
+    let old = download_hud(&env, &files[1]).await;
+    let refused = env.client.download(HUDS, &files[0], &|_| {}).await;
+    assert!(
+        matches!(refused, Err(DownloadError::AlreadyInLibrary { .. })),
+        "{refused:?}"
+    );
+    let new = replacing(&env, &files[0], old.id()).await;
+    assert_eq!(new.folder_name(), "darhud-202618");
+    assert_eq!(file_date(&env.dir, new.id()), Some(300));
+    let mut folders: Vec<String> = env
+        .lib
+        .list_huds()
+        .unwrap()
+        .iter()
+        .map(|h| h.folder_name().to_owned())
+        .collect();
+    folders.sort();
+    assert_eq!(
+        folders,
+        ["darhud-202517", "darhud-202618"],
+        "the app removes the old row"
+    );
+}
+
+#[tokio::test]
+async fn a_replacing_download_into_the_same_folder_replaces_the_row() {
+    let env = store_env().await;
+    let files = listed(
+        &env,
+        41,
+        &[
+            ("darhud-v2.zip", "darhud", "v2", 300),
+            ("darhud-v1.zip", "darhud", "v1", 100),
+        ],
+    )
+    .await;
+    let old = download_hud(&env, &files[1]).await;
+    let new = replacing(&env, &files[0], old.id()).await;
+    assert_ne!(new.id(), old.id());
+    let ids: Vec<HudId> = env
+        .lib
+        .list_huds()
+        .unwrap()
+        .iter()
+        .map(|h| h.id().clone())
+        .collect();
+    assert_eq!(ids, [new.id().clone()]);
+    assert_eq!(file_date(&env.dir, new.id()), Some(300));
+    let layout = env
+        .dir
+        .library_dir(LibraryKind::Huds)
+        .join("darhud/resource/ui/hudlayout.res");
+    assert_eq!(std::fs::read_to_string(layout).unwrap(), "v2");
+}
+
+#[tokio::test]
+async fn naming_a_row_of_another_item_still_refuses_the_duplicate() {
+    let env = store_env().await;
+    let files = listed(
+        &env,
+        42,
+        &[("a2.zip", "a2", "v2", 300), ("a1.zip", "a1", "v1", 100)],
+    )
+    .await;
+    download_hud(&env, &files[1]).await;
+    let other = listed(&env, 43, &[("b.zip", "b", "b", 100)]).await;
+    let stranger = download_hud(&env, &other[0]).await;
+    let refused = env
+        .client
+        .download_replacing(HUDS, &files[0], stranger.id(), &|_| {})
+        .await;
+    assert!(
+        matches!(refused, Err(DownloadError::AlreadyInLibrary { .. })),
+        "{refused:?}"
     );
 }
