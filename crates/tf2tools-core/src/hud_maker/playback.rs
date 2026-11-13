@@ -85,16 +85,17 @@ fn gain(x: f32, g: f32) -> f32 {
     }
 }
 
-/// Reaches the end at a third, two thirds and the finish, dipping less each time.
+/// Source's Interpolator_Bounce: starts at the end, falls to the start and back by 0.33,
+/// then dips to 0.5 and 0.8 before settling at the end.
 fn bounce(p: f32) -> f32 {
-    use std::f32::consts::{FRAC_PI_2, PI};
-    let (h1, h2) = (1.0 / 3.0, 2.0 / 3.0);
+    use std::f32::consts::PI;
+    let (h1, h2) = (0.33, 0.67);
     if p < h1 {
-        (FRAC_PI_2 * p / h1).sin()
+        1.0 - (PI * p / h1).sin()
     } else if p < h2 {
-        1.0 - 0.5 * (PI * (p - h1) / (h2 - h1)).sin()
+        0.5 + 0.5 * (1.0 - (PI * (p - h1) / (h2 - h1)).sin())
     } else {
-        1.0 - 0.2 * (PI * (p - h2) / (1.0 - h2)).sin()
+        0.8 + 0.2 * (1.0 - (PI * (p - h2) / (1.0 - h2)).sin())
     }
 }
 
