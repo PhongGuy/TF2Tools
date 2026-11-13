@@ -130,7 +130,7 @@ pub use store::{
     STEP_CARDS, StoreCard, StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem,
     StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
 };
-pub use store::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
+pub use store::{CommunityMap, MapEntry, MapSource, MapState, parse_serveme_maps};
 pub use texture::{
     FitChange, PNG_MAX_FILE_BYTES, PNG_MAX_SIDE, RgbaImage, decode_vtf, fit_hud_texture,
     fit_to_maker, hud_texture_vtf, menu_textures, png_to_vtf, read_picture, read_png, rgba_to_vtf,

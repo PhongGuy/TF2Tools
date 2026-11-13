@@ -7,6 +7,7 @@ mod borrow;
 mod crosshairs;
 mod gb_addons;
 mod gb_huds;
+mod gb_maps;
 mod hud_cfg;
 mod hud_copy;
 mod hud_folder;

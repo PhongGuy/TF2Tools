@@ -348,3 +348,24 @@ async fn a_downloaded_map_deleted_by_hand_can_be_downloaded_again() {
         .unwrap();
     assert_eq!(state_of(&env, &install, "1cp_cage"), MapState::Downloaded);
 }
+
+#[tokio::test]
+async fn a_map_in_a_custom_folder_shows_as_in_game_and_is_never_downloaded() {
+    let env = store_env().await;
+    let (_game, install) = game();
+    serve_list(&env, page()).await;
+    env.client.sync_maps(false).await.unwrap();
+    let folder = install.tf_dir().join("custom/tf2tools-gb-3-afkd/maps");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(folder.join("1cp_afkd.bsp"), b"VBSP").unwrap();
+    serve_map(&env, "1cp_afkd", bsp(100)).await;
+
+    assert_eq!(state_of(&env, &install, "1cp_afkd"), MapState::InGame);
+    let err = env
+        .client
+        .download_map(&install, "1cp_afkd", &|_, _| {})
+        .await
+        .unwrap_err();
+    assert!(matches!(err, MapDownloadError::InGame { .. }), "{err:?}");
+    assert!(!map_file(&install, "1cp_afkd").exists());
+}
