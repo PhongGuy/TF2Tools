@@ -296,6 +296,15 @@ pub const KOTH_PANEL: &str = r#""Resource/UI/HudObjectiveKothTimePanel.res"
 }
 "#;
 
+/// A stock-shaped hudroundcounter.res: the counter's own box and the picture behind the clocks.
+pub const ROUND_COUNTER: &str = r#""Resource/UI/HudRoundCounter.res"
+{
+  RoundCounter { xpos cs-0.5 ypos -2 zpos 2 wide 300 tall 25 visible 1 proportionaltoparent 1
+    RoundIndicatorPanel_kv { ypos 4 wide 6 tall 6 } }
+  Background { ControlName ImagePanel xpos cs-0.5 ypos 0 zpos 5 wide o3.833 tall 35 proportionaltoparent 1 image ../hud/comp_round_timer scaleimage 1 }
+}
+"#;
+
 /// Every stock file as (lowercase game path, text).
 pub fn stock() -> Vec<(String, String)> {
     let class = class_select();
@@ -313,12 +322,15 @@ pub fn stock() -> Vec<(String, String)> {
         ("resource/ui/huditemeffectmeter.res", r#""Resource/UI/HudItemEffectMeter.res" { HudItemEffectMeter { xpos r174 ypos r62 } ItemEffectMeterLabel { ControlName CExLabel xpos 5 ypos 5 wide 90 tall 15 } }"#),
         ("resource/ui/huditemeffectmeter_demoman.res", METER_DEMOMAN),
         ("resource/ui/hudmatchstatus.res", r#""Resource/UI/HudMatchStatus.res" { ObjectiveStatusTimePanel { ControlName EditablePanel visible 0
-  xpos c-55 ypos 0 wide 110 tall 30 if_match { xpos cs-0.5 wide 130 } } RoundSignModel { ControlName CModelPanel } }"#),
+  xpos c-55 ypos 0 wide 110 tall 30 if_match { xpos cs-0.5 wide 130 } } RoundSignModel { ControlName CModelPanel }
+  RoundCounter { xpos cs-0.5 ypos -2 zpos 1 wide 300 tall 100 visible 1 }
+  BGFrame { ControlName EditablePanel xpos cs-0.5 ypos -5 zpos 0 wide 365 tall 28 visible 0 border TFFatLineBorder if_match { visible 1 } } }"#),
         ("resource/ui/hudobjectivetimepanel.res", r#""Resource/UI/HudObjectiveTimePanel.res" { TimePanelValue { ControlName CExLabel xpos 25 ypos 2 wide 60 tall 20 labelText 0:00 if_match { xpos 35 } } }"#),
         ("resource/ui/scoreboard.res", SCOREBOARD),
         ("resource/ui/mvmscoreboard.res", MVM_SCOREBOARD),
         ("resource/ui/basechat.res", BASECHAT),
         ("resource/ui/hudobjectivekothtimepanel.res", KOTH_PANEL),
+        ("resource/ui/hudroundcounter.res", ROUND_COUNTER),
         ("resource/ui/mainmenuoverride.res", MAINMENU),
         ("resource/ui/freezepanel_basic.res", FREEZE_PANEL),
         ("resource/ui/freezepanelkillerhealth.res", FREEZE_HEALTH),

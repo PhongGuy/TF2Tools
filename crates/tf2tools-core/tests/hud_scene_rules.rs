@@ -54,7 +54,7 @@ fn the_hud_scene_is_stage_1_unchanged() {
         (hud.root(), hud.hides_hud(), hud.sample()),
         (None, false, SampleSet::Empty)
     );
-    assert_eq!(hud.code_toggled().len(), 55);
+    assert_eq!(hud.code_toggled().len(), 57);
 }
 
 #[test]

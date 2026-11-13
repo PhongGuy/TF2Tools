@@ -116,7 +116,7 @@ fn the_soldiers_own_parts_show() {
 #[test]
 fn every_hud_toggle_names_what_the_game_checks() {
     let hud = SceneRule::get(Scene::Hud);
-    assert_eq!(hud.code_toggled().len(), 55);
+    assert_eq!(hud.code_toggled().len(), 57);
     for t in hud.code_toggled() {
         let shows_for = t.shows_for().unwrap_or_else(|| panic!("{}", t.panel()));
         assert_eq!(t.shown_in_sample(), shows_for.in_default(), "{}", t.panel());
