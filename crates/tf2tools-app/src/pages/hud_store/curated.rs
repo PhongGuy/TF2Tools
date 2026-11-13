@@ -214,7 +214,9 @@ impl CuratedFilter {
         };
         searched
             && !(self.hide_prerelease && hud.prerelease)
+            // A HUD that lists no OS claims none, so the OS filter cannot rule it out.
             && (self.os.is_empty()
+                || hud.os.is_empty()
                 || self
                     .os
                     .iter()
