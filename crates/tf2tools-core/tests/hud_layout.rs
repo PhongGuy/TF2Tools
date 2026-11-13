@@ -130,7 +130,7 @@ fn other_screen_shapes() {
 }
 
 #[test]
-fn pins_follow_the_sibling_corner_pending_probe() {
+fn pins_follow_the_sibling_corner() {
     fn pin<'a>(own: &'a str, sib: &'a str, to: &'a str) -> [(&'static str, &'a str); 3] {
         [
             ("pin_to_sibling", to),
@@ -161,9 +161,10 @@ fn pins_follow_the_sibling_corner_pending_probe() {
             .unwrap();
         (b.x(), b.y(), b.pinned())
     };
-    assert_eq!(at("PinA"), (279, 923, true));
+    // A top sibling corner turns y around, so PinA's ypos -2 lands below the corner.
+    assert_eq!(at("PinA"), (279, 931, true));
     assert_eq!(at("PinB"), (184, 941, true));
-    assert_eq!(at("PinC"), (279, 923, true));
+    assert_eq!(at("PinC"), (279, 931, true));
     assert_eq!(at("Lost"), (9, 806, false));
     assert_eq!(at("LoopA"), (9, 819, false));
     assert_eq!(at("LoopB"), (9, 819, false));
@@ -350,7 +351,11 @@ fn extreme_values_saturate_instead_of_overflowing() {
             "Far",
             far,
             far,
-            &[("pin_to_sibling", "PlayerStatusHealthValue")],
+            // A bottom-right sibling corner keeps both offsets' signs.
+            &[
+                ("pin_to_sibling", "PlayerStatusHealthValue"),
+                ("pin_to_sibling_corner", "PIN_BOTTOMRIGHT"),
+            ],
         ),
         block(
             "Huge",

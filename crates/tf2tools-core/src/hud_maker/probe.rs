@@ -11,9 +11,19 @@ pub fn font_tall_px(tall: i32, screen_tall: u32) -> i32 {
 
 /// The sign applied to a pinned panel's offset per axis, by its own and its sibling's corner.
 pub(crate) fn pin_offset_sign(own: PinCorner, sibling: PinCorner) -> (i32, i32) {
-    // The survey reads no sign flip for any corner pair; the probe may refine this table.
-    let _ = (own, sibling);
-    (1, 1)
+    // VPanel::Solve turns an axis around when the sibling's corner sits on its left or top
+    // edge, so positive offsets push away from the sibling; the own corner plays no part.
+    let _ = own;
+    use PinCorner::*;
+    let x = match sibling {
+        TopLeft | BottomLeft | CenterLeft => -1,
+        TopRight | BottomRight | CenterTop | CenterRight | CenterBottom => 1,
+    };
+    let y = match sibling {
+        TopLeft | TopRight | CenterTop => -1,
+        BottomLeft | BottomRight | CenterRight | CenterBottom | CenterLeft => 1,
+    };
+    (x, y)
 }
 
 /// A pinned panel's offset from its `xpos`/`ypos` text.
@@ -111,24 +121,25 @@ mod tests {
     use crate::hud_maker::{HideTechnique, PartId, PinCorner, PosExpr, ScreenScale};
 
     #[test]
-    fn pin_offset_signs_pending_probe() {
+    fn pin_offset_signs_follow_the_sibling_corner() {
+        use PinCorner::*;
         let table = [
-            ((PinCorner::TopLeft, PinCorner::TopRight), (1, 1)),
-            ((PinCorner::TopRight, PinCorner::TopLeft), (1, 1)),
-            ((PinCorner::BottomRight, PinCorner::CenterBottom), (1, 1)),
-            ((PinCorner::CenterRight, PinCorner::CenterLeft), (1, 1)),
+            (TopLeft, (-1, -1)),
+            (TopRight, (1, -1)),
+            (BottomLeft, (-1, 1)),
+            (BottomRight, (1, 1)),
+            (CenterTop, (1, -1)),
+            (CenterRight, (1, 1)),
+            (CenterBottom, (1, 1)),
+            (CenterLeft, (-1, 1)),
         ];
-        for ((own, sibling), want) in table {
-            assert_eq!(
-                pin_offset_sign(own, sibling),
-                want,
-                "{own:?} to {sibling:?}"
-            );
-        }
-        for own in PinCorner::ALL {
-            for sibling in PinCorner::ALL {
-                let (x, y) = pin_offset_sign(own, sibling);
-                assert!(x.abs() == 1 && y.abs() == 1);
+        for (sibling, want) in table {
+            for own in PinCorner::ALL {
+                assert_eq!(
+                    pin_offset_sign(own, sibling),
+                    want,
+                    "{own:?} to {sibling:?}"
+                );
             }
         }
     }

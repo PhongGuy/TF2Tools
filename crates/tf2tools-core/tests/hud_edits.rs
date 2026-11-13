@@ -180,8 +180,8 @@ fn resizes_and_pinned_moves() {
         .unwrap();
     assert_eq!(
         sets(&moved, 5),
-        [row("xpos", None, Some("4"), "24", 2)],
-        "sign +1 pending probe"
+        [row("xpos", None, Some("4"), "-16", 2)],
+        "a top-left pin turns x around"
     );
 }
 
