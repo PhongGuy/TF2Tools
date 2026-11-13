@@ -36,4 +36,10 @@ impl HudModel {
     pub fn image_fill(&self, part: &Part, s: &GameSituation) -> Option<f32> {
         GameSituation::is_health_image(part).then(|| s.health_share())
     }
+
+    /// The share of progress bar `part` the game fills in situation `s`, from the left: the
+    /// Medic's charge on the charge meter, `None` for any other part.
+    pub fn bar_fill(&self, part: &Part, s: &GameSituation) -> Option<f32> {
+        GameSituation::is_charge_meter(part).then(|| f32::from(s.charge()) / 100.)
+    }
 }

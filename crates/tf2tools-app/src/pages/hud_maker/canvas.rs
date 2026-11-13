@@ -1994,6 +1994,27 @@ fn part_element(
             .bg(look.shade(c))
             .children(fill_band(part, b, look))
     }));
+    // A progress bar the game fills, such as the charge meter, paints its share from the left
+    // in its played colour, else its own, else the scheme's bar colour.
+    let bar = look.model.bar_fill(part, look.situation).map(|share| {
+        let colour = played(look, part)
+            .and_then(Animated::fg)
+            .unwrap_or_else(|| match part.value("fgcolor_override") {
+                Some(_) => look.model.text_colour(part),
+                None => (look.model.scheme().named_colour("ProgressBar.FgColor"))
+                    .unwrap_or(tf2tools_core::Rgba::WHITE),
+            });
+        div()
+            .id(ids::hud_maker_bar(part.key()))
+            .test_support()
+            .absolute()
+            .top_0()
+            .left_0()
+            .h_full()
+            .w(px(b.wide() as f32 * share * look.scale))
+            .bg(look.shade(colour))
+    });
+    let el = el.children(bar);
     let el = match look_kind(part, look) {
         Kind::Portrait => el.overflow_hidden().children(portrait(part, b, look)),
         Kind::Rank => el.overflow_hidden().children(rank(part, b, look)),

@@ -1214,6 +1214,35 @@ fn the_health_cross_draws_the_texture_its_code_paints(cx: &mut TestAppContext) {
     );
 }
 
+#[gpui_kit::test]
+fn the_charge_meter_fills_to_the_medic_s_charge(cx: &mut TestAppContext) {
+    let env = support::env();
+    let charge = r#""Resource/UI/HudMedicCharge.res" { ChargeMeter { ControlName ContinuousProgressBar xpos 0 ypos 0 wide 80 tall 8 } }"#;
+    let s = shell_with(
+        cx,
+        &env,
+        &[("resource/ui/hudmediccharge.res", Some(charge))],
+    );
+    let page = open_maker(cx, &s);
+    let medic = tf2tools_core::GameSituation::default()
+        .with_class(tf2tools_core::TfClass::Medic)
+        .with_charge(75);
+    cx.update_window(s.win, |_, w, cx| {
+        page.update(cx, |p, cx| p.set_situation(medic, w, cx))
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    let key = PartKey::new("HudMedicCharge/ChargeMeter");
+    let part = bounds(cx, &s, ids::hud_maker_part(&key));
+    let bar = bounds(cx, &s, ids::hud_maker_bar(&key));
+    assert!(
+        (f(bar.size.width) - f(part.size.width) * 0.75).abs() <= 1.0
+            && bar.origin == part.origin
+            && bar.size.height == part.size.height,
+        "{bar:?} vs {part:?}"
+    );
+}
+
 const MAIN_BG: &str = "scores/MainBG";
 
 /// The scoreboard with a MainBG whose scheme border is a scalable image, that image seeded

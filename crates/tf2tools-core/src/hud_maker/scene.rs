@@ -9,6 +9,7 @@ use super::rules::{
 use super::{
     GameSituation, HideTechnique, HudModel, PanelRule, SampleSet, SituationSwitch, WeaponKind,
 };
+use crate::weapons::TfClass;
 
 /// A screen the maker previews and edits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -113,7 +114,8 @@ impl BoardMode {
 pub enum ShowsFor {
     /// While you play this class, such as `"Medic"`.
     Class(&'static str),
-    /// While the weapon you hold is of this kind: `"clip"`, `"no clip"`, `"meter"`, `"low ammo"`.
+    /// While the weapon you hold is of this kind: `"ammo"` (anything but the Medi Gun), `"clip"`,
+    /// `"no clip"`, `"meter"`, `"low ammo"`, `"vaccinator"`.
     Weapon(&'static str),
     /// While an effect is on you: `"condition"` or `"powerup"`.
     Effect(&'static str),
@@ -151,6 +153,8 @@ impl ShowsFor {
     pub fn holds(self, s: &GameSituation) -> bool {
         match self {
             ShowsFor::Class(class) => s.class().name() == class,
+            // The Medic situation holds the Medi Gun, which uses no ammo.
+            ShowsFor::Weapon("ammo") => s.class() != TfClass::Medic,
             ShowsFor::Weapon("clip") => s.weapon() == WeaponKind::Clip,
             ShowsFor::Weapon("no clip") => s.weapon() == WeaponKind::NoClip,
             ShowsFor::Weapon("meter") => s.is_on(SituationSwitch::Meter),
@@ -321,6 +325,9 @@ const POWERUP: ShowsFor = ShowsFor::Effect("powerup");
 const POWERUP_WHEN: &str = "Shows while you carry a Mannpower powerup";
 const TYPING: ShowsFor = ShowsFor::Mode("typing");
 const TYPING_WHEN: &str = "Shows while you type a chat message";
+// The situation has no Vaccinator, so its bars never show.
+const VACCINATOR: ShowsFor = ShowsFor::Weapon("vaccinator");
+const VACCINATOR_WHEN: &str = "Shows when you hold the Vaccinator";
 
 // The KOTH panel shows only on a King of the Hill map, in the HUD and the freeze cam alike.
 const KOTH_TOGGLED: CodeToggled = fitted(
@@ -336,7 +343,7 @@ const KOTH_TOGGLED: CodeToggled = fitted(
 
 // What the game checks before it shows each HUD part its code toggles; the preview shows the
 // default situation, `ShowsFor::in_default`.
-static HUD_TOGGLED: [CodeToggled; 55] = [
+static HUD_TOGGLED: [CodeToggled; 61] = [
     when(
         "CMainTargetID",
         ShowsFor::Aim("player"),
@@ -367,6 +374,17 @@ static HUD_TOGGLED: [CodeToggled; 55] = [
         ShowsFor::Class("Medic"),
         "Shows when you hold a Medi Gun",
     ),
+    when(
+        "HudWeaponAmmo",
+        ShowsFor::Weapon("ammo"),
+        "Shows when your weapon uses ammo",
+    ),
+    // CHudMedicChargeMeter shows the per-charge bars only for the Vaccinator.
+    when("IndividualChargesLabel", VACCINATOR, VACCINATOR_WHEN),
+    when("ChargeMeter1", VACCINATOR, VACCINATOR_WHEN),
+    when("ChargeMeter2", VACCINATOR, VACCINATOR_WHEN),
+    when("ChargeMeter3", VACCINATOR, VACCINATOR_WHEN),
+    when("ChargeMeter4", VACCINATOR, VACCINATOR_WHEN),
     when(
         "HudItemEffectMeter",
         ShowsFor::Weapon("meter"),

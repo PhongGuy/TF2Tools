@@ -12,6 +12,8 @@ const HEALTH_PANEL: &str = "HudPlayerStatus/HudPlayerHealth";
 const AMMO_PANEL: &str = "HudWeaponAmmo";
 /// The Medic's charge meter, where the game starts the charged pulse.
 const CHARGE_PANEL: &str = "HudMedicCharge";
+/// The Medi Gun's charge bar, which `CHudMedicChargeMeter` fills to the charge.
+const CHARGE_METER: &str = "ChargeMeter";
 /// The share of max health under which the dying pulse runs when the HUD sets none.
 pub(super) const DEATH_WARNING: f32 = 0.49;
 /// The health pulse image, which the health element sizes and colours itself.
@@ -206,6 +208,12 @@ impl GameSituation {
     pub(super) fn is_health_image(part: &Part) -> bool {
         part.name().eq_ignore_ascii_case(HEALTH_IMAGE)
             && part.parent() == Some(&PartKey::new(HEALTH_PANEL))
+    }
+
+    /// Whether `part` is the Medic's charge bar.
+    pub(super) fn is_charge_meter(part: &Part) -> bool {
+        part.name().eq_ignore_ascii_case(CHARGE_METER)
+            && part.parent() == Some(&PartKey::new(CHARGE_PANEL))
     }
 
     /// Health over max health, at most 1: how much of the health cross the game fills.
