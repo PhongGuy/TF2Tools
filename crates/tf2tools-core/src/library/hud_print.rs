@@ -67,6 +67,7 @@ pub(super) fn same_lowercased(
     let entries = tree_copy::entries(src, &is_generated)?;
     let rels: Vec<_> = entries.iter().map(|(rel, _)| rel.clone()).collect();
     let plan = hud_lowercase::plan(&rels);
+    let own = hud_lowercase::Own::new(folder, &plan);
     // Lowercasing keeps every length, so sizes still rule out visible differences cheaply.
     let mut expected: Vec<_> = entries
         .iter()
@@ -92,7 +93,7 @@ pub(super) fn same_lowercased(
         let (have, from) = (installed.join(lower), src.join(rel));
         let same = if hud_lowercase::is_text_file(lower) {
             let read = |path: &Path| std::fs::read(path).map_err(io_at(path));
-            read(&have)? == hud_lowercase::lowercase_bytes(&read(&from)?, folder)
+            read(&have)? == hud_lowercase::lowercase_bytes(&read(&from)?, &own)
         } else {
             sha256_file(&have)? == sha256_file(&from)?
         };

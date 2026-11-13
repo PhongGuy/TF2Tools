@@ -106,6 +106,37 @@ fn a_mixed_case_hud_installs_in_lowercase_with_its_references_to_match() {
 
 #[cfg(target_os = "linux")]
 #[test]
+fn references_to_the_huds_own_materials_follow_the_renamed_files() {
+    let env = library_env();
+    let hud = import_kn_edit(
+        &env,
+        &[
+            (
+                "materials/vgui/Replay/Thumbnails/Foo.vmt",
+                b"\"UnlitGeneric\" { \"$baseTexture\" \"VGUI/Replay/Thumbnails/Foo\" }",
+            ),
+            ("materials/vgui/Replay/Thumbnails/Foo.vtf", b"VTF\0"),
+            (
+                "resource/ui/Images.res",
+                b"\"image\" \"Replay/Thumbnails/Foo\"\n\"image\" \"Stock/Thing\"\n",
+            ),
+        ],
+    );
+    env.lib.install_hud(hud.id(), &env.tf2).unwrap();
+    assert_eq!(
+        read(&env, "kn-edit/materials/vgui/replay/thumbnails/foo.vmt"),
+        "\"UnlitGeneric\" { \"$baseTexture\" \"vgui/replay/thumbnails/foo\" }"
+    );
+    assert_eq!(
+        read(&env, "kn-edit/resource/ui/images.res"),
+        "\"image\" \"replay/thumbnails/foo\"\n\"image\" \"Stock/Thing\"\n",
+        "a stock image the HUD does not ship stays as written"
+    );
+    assert!(env.lib.external_huds(&env.tf2).unwrap().is_empty());
+}
+
+#[cfg(target_os = "linux")]
+#[test]
 fn the_library_copy_keeps_its_capitals() {
     let env = library_env();
     let hud = import_kn_edit(&env, &[]);

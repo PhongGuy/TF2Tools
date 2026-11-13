@@ -1,7 +1,7 @@
 //! Lowercase HUD installs: on Linux TF2 ignores a HUD whose folder or files carry capitals,
 //! so the installed copy is renamed to lowercase and its own file references follow.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -71,12 +71,67 @@ pub(super) fn plan(entries: &[PathBuf]) -> BTreeMap<PathBuf, PathBuf> {
         .collect()
 }
 
+/// What a lowercase install calls its own: the folder it installs under and the lowercase
+/// paths of the files it ships, so references to them can follow the renames.
+pub(super) struct Own {
+    folder: String,
+    files: HashSet<String>,
+}
+
+impl Own {
+    /// The install under `folder` of the files `plan` keeps.
+    pub(super) fn new(folder: &str, plan: &BTreeMap<PathBuf, PathBuf>) -> Own {
+        Own {
+            folder: folder.to_ascii_lowercase(),
+            files: plan
+                .values()
+                .map(|lower| lower.to_string_lossy().replace('\\', "/"))
+                .collect(),
+        }
+    }
+}
+
+impl Own {
+    /// Whether `value` (lowercase, `/`-separated) names a material the HUD ships: material
+    /// names are relative to `materials/` or, in VGUI images, `materials/vgui/`, and usually
+    /// leave out the extension.
+    fn ships_material(&self, value: &str) -> bool {
+        let value = value.trim_start_matches('/');
+        if value.is_empty() {
+            return false;
+        }
+        self.files.contains(value)
+            || ["materials", "materials/vgui"].iter().any(|base| {
+                ["", ".vmt", ".vtf"].iter().any(|ext| {
+                    resolve(&format!("{base}/{value}{ext}"))
+                        .is_some_and(|path| self.files.contains(&path))
+                })
+            })
+    }
+}
+
+/// `path` with its `.` and `..` segments resolved, or `None` when it climbs above its root.
+fn resolve(path: &str) -> Option<String> {
+    let mut parts: Vec<&str> = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop()?;
+            }
+            _ => parts.push(part),
+        }
+    }
+    Some(parts.join("/"))
+}
+
 /// Lowercases every name under `dir` as `plan` says, removing the entries it drops, then the
 /// file references in its text files. `folder` is the name the HUD installs under.
 pub(super) fn lowercase_tree(dir: &Path, folder: &str) -> Result<(), IoFailure> {
     let entries = tree_copy::entries(dir, &|_: &Path| false)?;
     let rels: Vec<PathBuf> = entries.iter().map(|(rel, _)| rel.clone()).collect();
     let kept = plan(&rels);
+    let own = Own::new(folder, &kept);
     // A dropped entry under a kept folder goes; one under a dropped folder goes with it.
     for (rel, is_dir) in &entries {
         let parent_kept = rel
@@ -110,7 +165,7 @@ pub(super) fn lowercase_tree(dir: &Path, folder: &str) -> Result<(), IoFailure> 
             continue;
         }
         let bytes = std::fs::read(&path).map_err(io_at(&path))?;
-        let rewritten = lowercase_bytes(&bytes, folder);
+        let rewritten = lowercase_bytes(&bytes, &own);
         if rewritten != bytes {
             std::fs::write(&path, rewritten).map_err(io_at(&path))?;
         }
@@ -119,19 +174,20 @@ pub(super) fn lowercase_tree(dir: &Path, folder: &str) -> Result<(), IoFailure> 
 }
 
 /// `bytes` with their file references lowercased when they are UTF-8 text, else as they are.
-pub(super) fn lowercase_bytes(bytes: &[u8], folder: &str) -> Vec<u8> {
+pub(super) fn lowercase_bytes(bytes: &[u8], own: &Own) -> Vec<u8> {
     match std::str::from_utf8(bytes) {
-        Ok(text) => lowercase_references(text, folder).into_bytes(),
+        Ok(text) => lowercase_references(text, own).into_bytes(),
         Err(_) => bytes.to_vec(),
     }
 }
 
 /// `text` with the file paths in it lowercased: `#base` and `#include` targets, quoted
-/// values naming a file by its extension, and quoted paths into `custom/<folder>/`. ASCII
+/// values naming a file by its extension or a material the HUD ships, and quoted paths into
+/// `custom/<folder>/`. A stock material the HUD does not ship stays as written. ASCII
 /// lowercasing keeps every byte offset, so everything else stays byte for byte.
-pub(super) fn lowercase_references(text: &str, folder: &str) -> String {
+pub(super) fn lowercase_references(text: &str, own: &Own) -> String {
     let mut out = text.as_bytes().to_vec();
-    let own = format!("custom/{}/", folder.to_ascii_lowercase());
+    let own_folder = format!("custom/{}/", own.folder);
     let mut at = 0;
     for line in text.split_inclusive('\n') {
         if let Some(range) = directive_target(line) {
@@ -151,7 +207,10 @@ pub(super) fn lowercase_references(text: &str, folder: &str) -> String {
             while value.contains("//") {
                 value = value.replace("//", "/");
             }
-            if FILE_EXTENSIONS.iter().any(|ext| value.ends_with(ext)) || value.contains(&own) {
+            if FILE_EXTENSIONS.iter().any(|ext| value.ends_with(ext))
+                || value.contains(&own_folder)
+                || own.ships_material(&value)
+            {
                 out[at + open..at + close].make_ascii_lowercase();
             }
             rest = close + 1;
@@ -186,6 +245,18 @@ mod tests {
 
     fn paths(list: &[&str]) -> Vec<PathBuf> {
         list.iter().map(PathBuf::from).collect()
+    }
+
+    /// The `Own` of an install shipping `files`, with their folders listed as a walk would.
+    fn own(folder: &str, files: &[&str]) -> Own {
+        let mut all: Vec<PathBuf> = paths(files)
+            .iter()
+            .flat_map(|file| file.ancestors().map(Path::to_path_buf))
+            .filter(|path| !path.as_os_str().is_empty())
+            .collect();
+        all.sort();
+        all.dedup();
+        Own::new(folder, &plan(&all))
     }
 
     fn planned(list: &[&str]) -> Vec<(String, String)> {
@@ -233,7 +304,7 @@ mod tests {
     fn base_and_include_targets_are_lowercased() {
         let text = "#base \"Scheme/Base.res\"\n  #include Other/File.res // Keep\n#BASE \"X\"\n";
         assert_eq!(
-            lowercase_references(text, "kn-edit"),
+            lowercase_references(text, &own("kn-edit", &[])),
             "#base \"scheme/base.res\"\n  #include other/file.res // Keep\n#BASE \"x\"\n"
         );
     }
@@ -243,7 +314,7 @@ mod tests {
         let text = "\"font\" \"Resource/Fonts/TF2Build.TTF\" \"x\" \"A.otf\" \"vdf\" \"B.VDF\"\n\
                     \"t\" \"C.vtf\" \"m\" \"D.vmt\" \"s\" \"E.txt\" \"w\" \"F\\\\G.res\"";
         assert_eq!(
-            lowercase_references(text, "kn-edit"),
+            lowercase_references(text, &own("kn-edit", &[])),
             "\"font\" \"resource/fonts/tf2build.ttf\" \"x\" \"a.otf\" \"vdf\" \"b.vdf\"\n\
              \"t\" \"c.vtf\" \"m\" \"d.vmt\" \"s\" \"e.txt\" \"w\" \"f\\\\g.res\""
         );
@@ -255,10 +326,38 @@ mod tests {
                     \"image\" \"../../custom/OtherHud/Materials/Bg\"\n\
                     \"image\" \"..\\\\..\\\\custom\\\\KN-Edit\\\\Bg\"";
         assert_eq!(
-            lowercase_references(text, "kn-edit"),
+            lowercase_references(text, &own("kn-edit", &[])),
             "\"image\" \"../../custom/kn-edit/materials/bg\"\n\
              \"image\" \"../../custom/OtherHud/Materials/Bg\"\n\
              \"image\" \"..\\\\..\\\\custom\\\\kn-edit\\\\bg\""
+        );
+    }
+
+    #[test]
+    fn references_to_materials_the_hud_ships_are_lowercased() {
+        let own = own(
+            "kn-edit",
+            &[
+                "materials/vgui/Replay/Thumbnails/Foo.vmt",
+                "materials/vgui/Replay/Thumbnails/Foo.vtf",
+                "materials/Hud/Bar.vtf",
+                "materials/Sign.vmt",
+            ],
+        );
+        let text = "\"image\" \"Replay/Thumbnails/Foo\"\n\
+                    \"$baseTexture\" \"VGUI\\\\Replay/Thumbnails/Foo\"\n\
+                    \"image\" \"../Hud/Bar\"\n\
+                    \"material\" \"Sign\"\n\
+                    \"image\" \"Stock/Thing\"\n\
+                    \"labelText\" \"Foo\"\n";
+        assert_eq!(
+            lowercase_references(text, &own),
+            "\"image\" \"replay/thumbnails/foo\"\n\
+             \"$baseTexture\" \"vgui\\\\replay/thumbnails/foo\"\n\
+             \"image\" \"../hud/bar\"\n\
+             \"material\" \"sign\"\n\
+             \"image\" \"Stock/Thing\"\n\
+             \"labelText\" \"Foo\"\n"
         );
     }
 
@@ -268,7 +367,7 @@ mod tests {
                     \"name\" \"TF2 Build\"\n\"TanLight\" \"235 226 202 255\"\n\
                     // An \"Unclosed quote\nthen \"Next.Res\"";
         assert_eq!(
-            lowercase_references(text, "kn-edit"),
+            lowercase_references(text, &own("kn-edit", &[])),
             text.replace("Next.Res", "next.res")
         );
     }
