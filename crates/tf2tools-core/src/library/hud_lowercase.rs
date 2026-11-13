@@ -607,6 +607,7 @@ mod tests {
                     .unwrap()
                     .display()
                     .to_string()
+                    .replace('\\', "/")
             })
             .collect();
         names.sort();
