@@ -11,7 +11,7 @@ use gpui_kit::{
     App, Div, ElementId, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
     RenderImage, Styled as _, TestSupportExt as _, img, px,
 };
-use tf2tools_core::{HudFiles, Platform, RgbaImage, WeaponNames};
+use tf2tools_core::{HudFiles, Platform, RgbaImage, TfClass, WeaponNames};
 
 use crate::folder_load::FolderLoad;
 use crate::hud_textures::{crop, texture_pixels};
@@ -38,10 +38,16 @@ impl KillIconImages {
     }
 
     /// The icon the killfeed draws for a logs.tf weapon name: the first of `names`' candidates
-    /// the game has, so unlocks logged apart from their icon still get one.
-    pub fn for_weapon(&self, log_name: &str, names: &WeaponNames) -> Option<&Arc<RenderImage>> {
+    /// the game has, so unlocks logged apart from their icon still get one. `class` is the class
+    /// it was logged on, if known, so a Pyro's reflected projectile draws the reflect icon.
+    pub fn for_weapon(
+        &self,
+        log_name: &str,
+        class: Option<TfClass>,
+        names: &WeaponNames,
+    ) -> Option<&Arc<RenderImage>> {
         names
-            .kill_icons(log_name)
+            .kill_icons(log_name, class)
             .into_iter()
             .find_map(|name| self.get(name))
     }

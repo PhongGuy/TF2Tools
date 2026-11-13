@@ -81,7 +81,7 @@ fn weapon_table(
     let rows: Vec<_> = rows
         .into_iter()
         .map(|w| {
-            let image = icons.for_weapon(&w.raw, names).cloned();
+            let image = icons.for_weapon(&w.raw, Some(class), names).cloned();
             (w, image)
         })
         .collect();

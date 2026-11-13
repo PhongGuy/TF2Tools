@@ -46,20 +46,17 @@ const NON_ITEM_CLASSES: [(&str, &[TfClass]); 9] = [
     ),
 ];
 
-// Stock projectiles by the launcher that fires them, and as a Pyro's reflect.
+// Stock projectiles by the launcher that fires them, and the `deflect_` kill they become when a
+// Pyro reflects them, which names the kill and picks its killfeed icon.
 const PROJECTILE_NAMES: [(&str, &str, &str); 4] = [
-    (
-        "tf_projectile_rocket",
-        "Rocket Launcher",
-        "Reflected rocket",
-    ),
-    ("tf_projectile_pipe", "Grenade Launcher", "Reflected pipe"),
+    ("tf_projectile_rocket", "Rocket Launcher", "deflect_rocket"),
+    ("tf_projectile_pipe", "Grenade Launcher", "deflect_promode"),
     (
         "tf_projectile_pipe_remote",
         "Stickybomb Launcher",
-        "Reflected sticky",
+        "deflect_sticky",
     ),
-    ("tf_projectile_arrow", "Huntsman", "Reflected arrow"),
+    ("tf_projectile_arrow", "Huntsman", "deflect_arrow"),
 ];
 
 // The `deflect_` kill names, all Pyro's, by what was reflected; promode is a grenade.
@@ -239,22 +236,23 @@ impl WeaponNames {
     /// or as a reflect on Pyro, else [`WeaponNames::get`].
     pub fn class_name(&self, log_name: &str, class: TfClass) -> Option<&str> {
         let log = log_name.to_ascii_lowercase();
-        let reflect = DEFLECT_NAMES
-            .iter()
-            .find(|(key, _)| *key == log)
-            .map(|&(_, n)| n);
-        let projectile =
-            PROJECTILE_NAMES
+        let deflect_name = |key: &str| {
+            DEFLECT_NAMES
                 .iter()
-                .find(|(key, ..)| *key == log)
-                .map(|&(_, own, reflected)| {
-                    if class == TfClass::Pyro {
-                        reflected
-                    } else {
-                        own
-                    }
-                });
-        reflect.or(projectile).or_else(|| self.get(&log))
+                .find(|(k, _)| *k == key)
+                .map(|&(_, n)| n)
+        };
+        let projectile = PROJECTILE_NAMES
+            .iter()
+            .find(|(key, ..)| *key == log)
+            .and_then(|&(_, own, deflect)| {
+                if class == TfClass::Pyro {
+                    deflect_name(deflect)
+                } else {
+                    Some(own)
+                }
+            });
+        deflect_name(&log).or(projectile).or_else(|| self.get(&log))
     }
 
     // The class bits for a lowercase log name, from items_game then the hand rules; None when
@@ -284,8 +282,9 @@ impl WeaponNames {
 
     /// The killfeed icon names to try for a logs.tf weapon log name, best first and without the
     /// `d_` prefix: the item's icon name or the entry the game draws for it, the log name
-    /// itself, then the killfeed's skull for an item the table lacks.
-    pub fn kill_icons<'a>(&'a self, log_name: &'a str) -> Vec<&'a str> {
+    /// itself, then the killfeed's skull for an item the table lacks. On Pyro a stock projectile
+    /// is a reflect, so its `deflect_` icon leads; `None` for an unknown class.
+    pub fn kill_icons<'a>(&'a self, log_name: &'a str, class: Option<TfClass>) -> Vec<&'a str> {
         let log = log_name.to_ascii_lowercase();
         let icon = self.icons.get(&log).map(String::as_str);
         let alias = |name: &str| {
@@ -295,8 +294,13 @@ impl WeaponNames {
                 .map(|&(_, to)| to)
         };
         let item = self.items.contains(&log);
-        let mut found: Vec<&str> = Vec::with_capacity(4);
+        let reflect = PROJECTILE_NAMES
+            .iter()
+            .find(|(key, ..)| *key == log && class == Some(TfClass::Pyro))
+            .map(|&(.., deflect)| deflect);
+        let mut found: Vec<&str> = Vec::with_capacity(5);
         for name in [
+            reflect,
             icon.and_then(alias),
             icon,
             alias(&log),
