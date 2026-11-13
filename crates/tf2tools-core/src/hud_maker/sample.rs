@@ -835,11 +835,12 @@ impl SampleSet {
     }
 
     /// The flat colour the game's code fills `part` with, standing in for the 3D room behind
-    /// the class menu; only the class menu sample has any.
+    /// the class menu (its wall) and the spectator bars.
     pub fn code_fill(self, part: &str) -> Option<Rgba> {
         match self {
+            // The class menu's room, measured in game on the default HUD.
             SampleSet::ClassPick if part.eq_ignore_ascii_case("MenuBG") => {
-                Some(Rgba::new(26, 24, 22, 255))
+                Some(Rgba::new(181, 174, 168, 255))
             }
             SampleSet::Spectating if self.code_fill_wins(part) => Some(Rgba::new(52, 48, 45, 255)),
             SampleSet::Empty
@@ -851,6 +852,14 @@ impl SampleSet {
             | SampleSet::ClassPick
             | SampleSet::Spectating => None,
         }
+    }
+
+    /// The band the game's room draws across the top of `part`, over its `code_fill`: the
+    /// band's colour and its share of the part's height. Only the class menu's room has one.
+    pub fn code_band(self, part: &str) -> Option<(Rgba, f32)> {
+        // The room's dark bar behind the class buttons: 111 of the screen's 480 rows in game.
+        (self == SampleSet::ClassPick && part.eq_ignore_ascii_case("MenuBG"))
+            .then(|| (Rgba::new(49, 47, 46, 255), 111. / 480.))
     }
 
     /// Whether the game paints `part` after its file loads, so the code fill beats the file's

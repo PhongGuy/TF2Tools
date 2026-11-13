@@ -265,16 +265,26 @@ impl HudModel {
             ) else {
                 continue;
             };
+            let fill = (self.fill_colour(part)).filter(|_| paints_background(part));
+            // A band the game's room draws over the top of the fill, cut to the shown area.
+            let band = fill
+                .and(self.scene_rule().sample().code_band(part.name()))
+                .and_then(|(colour, share)| {
+                    let bottom = b
+                        .y()
+                        .saturating_add((b.tall() as f32 * share).round() as i32);
+                    let tall = bottom.min(area.y.saturating_add(area.tall)) - area.y;
+                    (tall > 0).then(|| (Rect::new(area.x, area.y, area.wide, tall), colour))
+                });
             // Any team's picture will do, since only whether one draws matters; RED is the preview's.
             let colours = [
-                self.picture_border(part).map(|_| None),
-                (self.fill_colour(part))
-                    .filter(|_| paints_background(part))
-                    .map(Some),
-                scene_image(self, part, Team::Red).map(|_| None),
+                self.picture_border(part).map(|_| (area, None)),
+                fill.map(|c| (area, Some(c))),
+                band.map(|(area, c)| (area, Some(c))),
+                scene_image(self, part, Team::Red).map(|_| (area, None)),
             ];
             let layers = colours.into_iter().flatten();
-            backgrounds.extend(layers.map(|colour| Background { rank, area, colour }));
+            backgrounds.extend(layers.map(|(area, colour)| Background { rank, area, colour }));
         }
         backgrounds
     }

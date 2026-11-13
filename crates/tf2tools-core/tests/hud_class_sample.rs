@@ -2,8 +2,10 @@
 
 use crate::common;
 
-use common::hud_stock::stock_files;
-use tf2tools_core::{HudModel, PartKey, Platform, Rgba, SampleSet, Scene, SceneRule, Team};
+use common::hud_stock::{class_select, stock_files, stock_files_with};
+use tf2tools_core::{
+    Backdrop, HudModel, PartKey, Platform, Rgba, SampleSet, Scene, SceneRule, Screen, Team, Vision,
+};
 
 #[test]
 fn the_scene_previews_one_made_up_class_pick() {
@@ -102,17 +104,54 @@ fn the_code_sets_the_selected_button_the_teammate_row_and_the_local_picture() {
 }
 
 #[test]
-fn the_backdrop_room_is_a_dark_fill_and_the_tips_box_is_drawn_in_game() {
+fn the_backdrop_room_has_the_game_s_light_wall_under_a_dark_top_bar() {
+    // Measured in game on the default HUD at 1920x1080: the wall about 181 174 168, the bar
+    // above the class buttons 49 47 46 down to 111 of the screen's 480 rows.
+    let wall = Rgba::new(181, 174, 168, 255);
+    let bar = Rgba::new(49, 47, 46, 255);
+    assert_eq!(SampleSet::ClassPick.code_fill("MenuBG"), Some(wall));
+    assert_eq!(SampleSet::ClassPick.code_fill("menubg"), Some(wall));
     assert_eq!(
-        SampleSet::ClassPick.code_fill("MenuBG"),
-        Some(Rgba::new(26, 24, 22, 255))
-    );
-    assert_eq!(
-        SampleSet::ClassPick.code_fill("menubg"),
-        Some(Rgba::new(26, 24, 22, 255))
+        SampleSet::ClassPick.code_band("MenuBG"),
+        Some((bar, 111. / 480.))
     );
     assert_eq!(SampleSet::ClassPick.code_fill("ShadedBar"), None);
+    assert_eq!(SampleSet::ClassPick.code_band("ShadedBar"), None);
     assert_eq!(SampleSet::Casual.code_fill("MenuBG"), None);
+    assert_eq!(SampleSet::Casual.code_band("MenuBG"), None);
+    assert_eq!(SampleSet::Spectating.code_band("topbar"), None);
+    // The stock MenuBG has no colour key, so the room's wall is what the part fills with.
+    let files = stock_files();
+    let m = HudModel::load_scene(&files, Platform::Linux, Scene::ClassSelect).unwrap();
+    let bg = m.part(&PartKey::new("class/MenuBG")).unwrap();
+    assert_eq!(m.fill_colour(bg), Some(wall));
+}
+
+#[test]
+fn the_counts_over_the_top_bar_are_judged_against_the_bar_not_the_wall() {
+    // White count text is about 2.2 to 1 on the light wall but 12 to 1 on the dark bar. The
+    // labels take the stock file's zpos, so they paint over the room.
+    let class = class_select()
+        .replace(
+            "numScout { ControlName CExLabel",
+            "numScout { ControlName CExLabel zpos 5",
+        )
+        .replace(
+            "CountLabel { ControlName CExLabel",
+            "CountLabel { ControlName CExLabel zpos 10",
+        );
+    assert_ne!(class, class_select());
+    let files = stock_files_with(&[("resource/ui/classselection.res", Some(&class))]);
+    let m = HudModel::load_scene(&files, Platform::Linux, Scene::ClassSelect).unwrap();
+    let layout = m.layout(Screen::new(1920, 1080));
+    let black = Backdrop::new(1, 1, vec![0, 0, 0, 255]).unwrap();
+    let hard = m.hard_to_read(&layout, &black, Vision::Normal);
+    assert!(!hard.contains(&PartKey::new("class/numScout")), "{hard:?}");
+    assert!(hard.contains(&PartKey::new("class/CountLabel")), "{hard:?}");
+}
+
+#[test]
+fn the_tips_box_is_drawn_in_game() {
     assert_eq!(
         SampleSet::ClassPick.game_filled("ClassTipsPanel"),
         Some("Class tips draw in game")

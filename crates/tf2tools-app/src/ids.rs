@@ -1934,6 +1934,11 @@ pub fn hud_maker_fill(key: &PartKey) -> ElementId {
     keyed("hud-maker-fill", key.as_str())
 }
 
+/// The band the game's room draws across the top of a part's colour: "hud-maker-fill-band:<key>".
+pub fn hud_maker_fill_band(key: &PartKey) -> ElementId {
+    keyed("hud-maker-fill-band", key.as_str())
+}
+
 /// A scoreboard player list's column header: "hud-maker-list-header:<key>".
 pub fn hud_maker_list_header(list: &PartKey) -> ElementId {
     keyed("hud-maker-list-header", list.as_str())

@@ -1992,6 +1992,7 @@ fn part_element(
             .when(corners & 4 != 0, |el| el.rounded_bl(radius))
             .when(corners & 8 != 0, |el| el.rounded_br(radius))
             .bg(look.shade(c))
+            .children(fill_band(part, b, look))
     }));
     let el = match look_kind(part, look) {
         Kind::Portrait => el.overflow_hidden().children(portrait(part, b, look)),
@@ -2300,6 +2301,24 @@ fn border_image<'l>(
     let border = look.model.picture_border(part)?;
     let image = look.images.get(&PartKey::new(border.image()))?;
     Some((border, image))
+}
+
+// The band the game's room draws across the top of a part's colour, such as the dark bar
+// behind the class buttons; none where the scene's code draws no band.
+fn fill_band(part: &Part, b: &PartBox, look: &Look) -> Option<AnyElement> {
+    let (colour, share) = look.sample.code_band(part.name())?;
+    Some(
+        div()
+            .id(ids::hud_maker_fill_band(part.key()))
+            .test_support()
+            .absolute()
+            .top_0()
+            .left_0()
+            .w_full()
+            .h(px(b.tall() as f32 * share * look.scale))
+            .bg(look.shade(colour))
+            .into_any_element(),
+    )
 }
 
 // A scalable border's nine pieces over the part's whole box; none for any other border.
