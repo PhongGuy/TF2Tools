@@ -2,7 +2,7 @@
 //! read as the engine's `Panel` reads its keys.
 
 use super::expr::atoi;
-use super::{HudModel, ImageBorder, Part, Rgba, Screen};
+use super::{HudModel, ImageBorder, Part, PartId, Rgba, Screen};
 
 /// The background type that draws a box with rounded corners.
 const ROUNDED: i32 = 2;
@@ -38,6 +38,10 @@ impl HudModel {
     /// or fully clear. `paints_background` is the caller's to check.
     pub fn fill_colour(&self, part: &Part) -> Option<Rgba> {
         // The game repaints some parts after their file loads, so its fill beats any colour key.
+        // The meter's code fills its bars in white each update; the preview shows them full.
+        if is_meter_bar(part) {
+            return Some(Rgba::WHITE);
+        }
         let sample = self.scene_rule().sample();
         if sample.code_fill_wins(part.name()) {
             return sample.code_fill(part.name());
@@ -69,4 +73,17 @@ impl HudModel {
         };
         self.scheme().image_border(name)
     }
+}
+
+/// Whether `part` is one of the Item meter's progress bars the game's code fills: a
+/// `ContinuousProgressBar` named `ItemEffectMeter`, `ItemEffectMeter2` and so on.
+fn is_meter_bar(part: &Part) -> bool {
+    let numbered = |name: &str| {
+        let lower = name.to_ascii_lowercase();
+        lower.strip_prefix("itemeffectmeter").is_some_and(|n| n.bytes().all(|b| b.is_ascii_digit()))
+    };
+    part.owner() == Some(PartId::ItemMeter)
+        && !part.is_root()
+        && part.class().is_some_and(|c| c.eq_ignore_ascii_case("ContinuousProgressBar"))
+        && numbered(part.name())
 }

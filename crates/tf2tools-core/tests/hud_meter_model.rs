@@ -171,3 +171,16 @@ fn the_stock_phlogistinator_meter_draws_the_plain_file_it_bases() {
     let root = m.part(&PartKey::new(METER)).unwrap();
     assert_eq!(root.value("xpos").unwrap().text(), "r214", "its own box wins");
 }
+
+#[test]
+fn the_meter_bars_draw_full_in_the_white_the_meter_code_sets() {
+    let m = stock_with_bases().with_meter(MeterKind::RocketPack);
+    assert!(has(&m, LABEL), "the label from the plain file");
+    for key in [BAR, "HudItemEffectMeter/ItemEffectMeter2"] {
+        let bar = m.part(&PartKey::new(key)).unwrap();
+        assert_eq!(m.fill_colour(bar), Some(tf2tools_core::Rgba::WHITE), "{key}");
+    }
+    let sword = stock().with_meter(MeterKind::Sword);
+    let bar = sword.part(&PartKey::new(BAR)).unwrap();
+    assert_eq!(sword.fill_colour(bar), Some(tf2tools_core::Rgba::WHITE));
+}
