@@ -33,6 +33,7 @@ mod gb_addon_install;
 mod gb_addon_library;
 mod gb_addon_updates;
 mod gb_hud_updates;
+mod gb_map_cards;
 mod gb_map_download;
 mod gb_map_install;
 mod gb_maps_sync;

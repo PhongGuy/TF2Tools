@@ -174,7 +174,7 @@ impl StoreClient {
     }
 }
 
-fn database(e: rusqlite::Error) -> QueryError {
+pub(super) fn database(e: rusqlite::Error) -> QueryError {
     QueryError::Database {
         message: e.to_string(),
     }
@@ -213,15 +213,7 @@ pub(super) fn cards_sql(
     let search = q.search.as_deref().filter(|t| !t.trim().is_empty());
     let searching = search.is_some();
     if let Some(text) = search {
-        // Escape LIKE's wildcards so the text matches literally.
-        let mut pattern = String::from("%");
-        for c in text.chars() {
-            if matches!(c, '\\' | '%' | '_') {
-                pattern.push('\\');
-            }
-            pattern.push(c);
-        }
-        pattern.push('%');
+        let pattern = like_pattern(text);
         filters.push("(s.name LIKE ? ESCAPE '\\' OR s.author LIKE ? ESCAPE '\\')".to_owned());
         params.push(Value::Text(pattern.clone()));
         params.push(Value::Text(pattern));
@@ -251,7 +243,21 @@ pub(super) fn cards_sql(
     Some((sql, params))
 }
 
-fn where_clause(filters: &[String]) -> String {
+/// A LIKE pattern matching `text` anywhere, with LIKE's wildcards escaped by `\` so the
+/// text matches literally.
+pub(super) fn like_pattern(text: &str) -> String {
+    let mut pattern = String::from("%");
+    for c in text.chars() {
+        if matches!(c, '\\' | '%' | '_') {
+            pattern.push('\\');
+        }
+        pattern.push(c);
+    }
+    pattern.push('%');
+    pattern
+}
+
+pub(super) fn where_clause(filters: &[String]) -> String {
     if filters.is_empty() {
         String::new()
     } else {
