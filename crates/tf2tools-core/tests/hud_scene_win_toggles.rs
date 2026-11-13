@@ -18,8 +18,10 @@ fn k(text: &str) -> PartKey {
 #[test]
 fn the_table_has_the_game_s_27_cases_and_none_is_class_or_weapon_driven() {
     let rule = SceneRule::get(Scene::WinPanel);
-    assert_eq!(rule.code_toggled().len(), 27);
-    for t in rule.code_toggled() {
+    // The panel's own cases lead; the kept HUD parts' toggles follow, each with what it checks.
+    let (own, kept) = rule.code_toggled().split_at(27);
+    assert!(kept.iter().all(|t| t.shows_for().is_some()));
+    for t in own {
         assert!(t.shows_when().starts_with("Shows "), "{}", t.panel());
         assert!(t.shows_for().is_none(), "{}", t.panel());
     }

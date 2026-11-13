@@ -42,10 +42,11 @@ fn the_tab_is_last_and_switches_to_the_win_panel(cx: &mut TestAppContext) {
     assert!(support::present(cx, s.win, tab.clone()));
     support::click_scene(cx, s.win, Scene::WinPanel);
     assert_eq!(cx.update(|cx| page.read(cx).scene()), Some(Scene::WinPanel));
-    // Its own parts, none of the HUD's or the freeze cam's, and no crosshair.
+    // Its own parts with the HUD parts the game keeps at round end and the crosshair, but none
+    // of the freeze cam's.
     assert!(present(cx, &s, TEAMS) && present(cx, &s, LINE));
-    assert!(!present(cx, &s, HV) && !present(cx, &s, FREEZE));
-    assert!(!support::present(cx, s.win, ids::HUD_MAKER_CROSSHAIR));
+    assert!(present(cx, &s, HV) && present(cx, &s, "HudChat") && !present(cx, &s, FREEZE));
+    assert!(support::present(cx, s.win, ids::HUD_MAKER_CROSSHAIR));
     assert!(!support::present(cx, s.win, ids::HUD_MAKER_SCENE_NOTE));
     // What the game hides stays off the canvas; the top players it shows are on it.
     assert!(!present(
@@ -57,6 +58,19 @@ fn the_tab_is_last_and_switches_to_the_win_panel(cx: &mut TestAppContext) {
     assert!(present(cx, &s, "WinPanel/Player3Name"));
     support::click_scene(cx, s.win, Scene::Hud);
     assert!(present(cx, &s, HV) && !present(cx, &s, LINE));
+}
+
+#[gpui_kit::test]
+fn the_panel_body_draws_faded_by_its_material(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = shell_with_borders(cx, &env, true);
+    let page = open_maker(cx, &s);
+    support::click_scene(cx, s.win, Scene::WinPanel);
+    // The BLU material fades its panel by `$alpha`, so the body's texels draw see-through.
+    let image = cx.update(|cx| page.read(cx).image(&PartKey::new("../hud/color_panel_blu")));
+    let bytes = image.and_then(|image| image.as_bytes(0).map(<[u8]>::to_vec));
+    let alphas: Vec<u8> = bytes.unwrap().chunks(4).map(|p| p[3]).collect();
+    assert!(alphas.iter().all(|&a| a < 255 && a > 0), "{alphas:?}");
 }
 
 #[gpui_kit::test]
@@ -150,6 +164,8 @@ fn shell_with_borders(
         "the stock win panel should hold the border to replace"
     );
     let (blu_vmt, blu_vtf) = texture("color_panel_blu", [0, 0, 255, 255]);
+    // The BLU material fades its solid texture, as the game's see-through team panels do.
+    let blu_vmt = blu_vmt.replacen('}', r#""$alpha" ".6" }"#, 1);
     let (red_vmt, red_vtf) = texture("color_panel_red", [255, 0, 0, 255]);
     let english = utf16le(ENGLISH);
     let mut extra: Vec<(&str, &[u8])> = vec![("resource/tf_english.txt", english.as_slice())];
