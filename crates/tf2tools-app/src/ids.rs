@@ -1888,6 +1888,17 @@ pub fn hud_maker_killfeed_icon(index: usize) -> ElementId {
     keyed("hud-maker-killfeed-icon", &index.to_string())
 }
 
+/// A sample player panel in the match HUD's timer frame, BLU first:
+/// "hud-maker-team-status-panel:<index>".
+pub fn hud_maker_team_status_panel(index: usize) -> ElementId {
+    keyed("hud-maker-team-status-panel", &index.to_string())
+}
+
+/// A sample player panel's health bar: "hud-maker-team-status-health:<index>".
+pub fn hud_maker_team_status_health(index: usize) -> ElementId {
+    keyed("hud-maker-team-status-health", &index.to_string())
+}
+
 /// A player list row's class icon: "hud-maker-list-class:<list>/<row>".
 pub fn hud_maker_list_class(list: &PartKey, row: usize) -> ElementId {
     keyed("hud-maker-list-class", &format!("{}/{row}", list.as_str()))

@@ -119,8 +119,8 @@ pub enum ShowsFor {
     Weapon(&'static str),
     /// While an effect is on you: `"condition"` or `"powerup"`.
     Effect(&'static str),
-    /// While a mode or setting is on: `"3D model"`, `"2D portrait"`, `"typing"` (a chat message)
-    /// or `"full hud"` (Minimal HUD off).
+    /// While a mode or setting is on: `"3D model"`, `"2D portrait"`, `"typing"` (a chat message),
+    /// `"full hud"` (Minimal HUD off) or `"match"` (the match HUD).
     Mode(&'static str),
     /// While you aim at something: `"player"`.
     Aim(&'static str),
@@ -168,6 +168,8 @@ impl ShowsFor {
             ShowsFor::Mode("typing") => s.is_on(SituationSwitch::Typing),
             ShowsFor::Mode("koth") => s.is_on(SituationSwitch::Koth),
             ShowsFor::Mode("not koth") => !s.is_on(SituationSwitch::Koth),
+            // tf_use_match_hud is on by default and off only in MvM, which the HUD scene is not.
+            ShowsFor::Mode("match") => true,
             // The sample's HUD is the full one; only `holds_in` knows the model's mode.
             ShowsFor::Mode("full hud") => true,
             ShowsFor::Aim(_) => s.is_on(SituationSwitch::Aiming),
@@ -435,17 +437,17 @@ const HUD_ONLY_TOGGLED: [CodeToggled; 19] = [
         ShowsFor::Class("Engineer"),
         "Shows when you aim at a building you can move",
     ),
-    // The match HUD's frame around the KOTH clocks: the code shows the round counter, while the
-    // border's own file decides whether it draws.
+    // The match HUD's frame around the round timer or the KOTH clocks: the code shows the round
+    // counter whenever the match HUD is on, while the border's own file decides whether it draws.
     fitted(
-        when("RoundCounter", ShowsFor::Mode("koth"), KOTH_FRAME_WHEN),
+        when("RoundCounter", ShowsFor::Mode("match"), FRAME_WHEN),
         &[],
         HideTechnique::OffScreenY,
         Fit::None,
     ),
     CodeToggled {
         keeps_visible: true,
-        ..when("BGFrame", ShowsFor::Mode("koth"), KOTH_FRAME_WHEN)
+        ..when("BGFrame", ShowsFor::Mode("match"), FRAME_WHEN)
     },
 ];
 
@@ -559,7 +561,7 @@ const ROUND_END_TOGGLED: [CodeToggled; 44] = [
     ),
 ];
 
-const KOTH_FRAME_WHEN: &str = "Shows around the timer on King of the Hill maps";
+const FRAME_WHEN: &str = "Shows around the timer in a match";
 
 static HUD_TOGGLED: [CodeToggled; 63] = joined(HUD_ONLY_TOGGLED, ROUND_END_TOGGLED);
 

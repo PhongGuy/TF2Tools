@@ -300,7 +300,7 @@ pub(super) static RULES: [PanelRule; 14] = [
     PanelRule {
         id: PartId::TimerFrame,
         label: "Timer frame",
-        shows_when: "Shows around the timer on King of the Hill maps",
+        shows_when: "Shows around the timer in a match",
         panel: "BGFrame",
         parent: Some("HudMatchStatus"),
         geometry: &[],
@@ -315,7 +315,7 @@ pub(super) static RULES: [PanelRule; 14] = [
     PanelRule {
         id: PartId::TimerBacking,
         label: "Timer backing",
-        shows_when: "Shows behind the timer on King of the Hill maps",
+        shows_when: "Shows behind the timer in a match",
         panel: "RoundCounter",
         parent: Some("HudMatchStatus"),
         geometry: &[(MATCH_STATUS, "RoundCounter")],

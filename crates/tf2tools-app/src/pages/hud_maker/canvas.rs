@@ -304,9 +304,11 @@ impl HudMakerPage {
         if killfeed.is_none() {
             measured.borrow_mut().clear();
         }
+        let players = team_status_panels(&look, |r| local(fit.rect(r.x, r.y, r.wide, r.tall)));
         // While comparing, the snapshot's parts and the current ones each fill the whole screen
         // but show only their side of the split, so a backdrop shows through both.
         let mut now_content = parts;
+        now_content.extend(players);
         now_content.extend(killfeed);
         // The screen's place in the view, and the part of it the view shows, view-local.
         let shift = screen.origin - room.origin;
@@ -2937,6 +2939,60 @@ fn thousands(n: i64) -> String {
         out.insert(0, '-');
     }
     out
+}
+
+// The match HUD's sample player panels: each portrait's coloured backing with a stand-in
+// silhouette for the portrait, and your own team's health bar. They take no clicks, so a press
+// still reaches the frame under them.
+fn team_status_panels(look: &Look, at: impl Fn(Rect) -> Bounds<Pixels>) -> Vec<AnyElement> {
+    let panels = look.model.team_status(look.screen);
+    let silhouette = look.shade(Rgba::new(0, 0, 0, 255));
+    (panels.iter().enumerate())
+        .map(|(i, panel)| {
+            let outer = at(panel.rect());
+            let inside = |r: Rect| {
+                let b = at(r);
+                Bounds::new(b.origin - outer.origin, b.size)
+            };
+            let portrait = inside(panel.portrait());
+            let (wide, tall) = (portrait.size.width, portrait.size.height);
+            // Head and shoulders, centred in the portrait.
+            let head = div()
+                .absolute()
+                .left(wide * 0.3)
+                .top(tall * 0.12)
+                .w(wide * 0.4)
+                .h(tall * 0.45)
+                .rounded_full()
+                .bg(silhouette);
+            let shoulders = div()
+                .absolute()
+                .left(wide * 0.12)
+                .top(tall * 0.6)
+                .w(wide * 0.76)
+                .h(tall * 0.4)
+                .rounded_t(wide * 0.3)
+                .bg(silhouette);
+            let health = panel.health().map(|r| {
+                place(div(), inside(r))
+                    .id(ids::hud_maker_team_status_health(i))
+                    .test_support()
+                    .bg(look.shade(panel.health_colour()))
+            });
+            place(div(), outer)
+                .id(ids::hud_maker_team_status_panel(i))
+                .test_support()
+                .child(place(div(), inside(panel.backing())).bg(look.shade(panel.backing_colour())))
+                .child(
+                    place(div(), portrait)
+                        .overflow_hidden()
+                        .child(head)
+                        .child(shoulders),
+                )
+                .children(health)
+                .into_any_element()
+        })
+        .collect()
 }
 
 // The sample killfeed over its part's box at core's box-relative screen pixels times the canvas

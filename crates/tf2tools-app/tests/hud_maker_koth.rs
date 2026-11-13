@@ -94,7 +94,9 @@ event ActiveTimerDim
 "#;
 
 #[gpui_kit::test]
-fn the_koth_clocks_sit_in_the_timer_frame_in_the_timer_events_colours(cx: &mut TestAppContext) {
+fn the_timer_frame_holds_the_round_timer_and_the_koth_clocks_in_their_colours(
+    cx: &mut TestAppContext,
+) {
     let (_env, s, page) = open_maker_with(cx, &format!("{ANIMS}{TIMER_EVENTS}"));
     let frame = [
         "HudMatchStatus/BGFrame",
@@ -102,7 +104,7 @@ fn the_koth_clocks_sit_in_the_timer_frame_in_the_timer_events_colours(cx: &mut T
         "HudMatchStatus/RoundCounter/Background",
     ];
     for key in frame {
-        assert!(!shown(cx, &s, key), "{key} off a KOTH map");
+        assert!(shown(cx, &s, key), "{key} around the round timer");
     }
     support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
     support::click_id(
@@ -119,4 +121,33 @@ fn the_koth_clocks_sit_in_the_timer_frame_in_the_timer_events_colours(cx: &mut T
     };
     assert_eq!(drawn(cx, "BlueTimer"), Some(Rgba::new(235, 226, 202, 255)));
     assert_eq!(drawn(cx, "RedTimer"), Some(Rgba::new(142, 134, 115, 255)));
+}
+
+#[gpui_kit::test]
+fn the_player_panels_sit_in_the_timer_frame_either_side_of_the_tab(cx: &mut TestAppContext) {
+    let (_env, s, _page) = open_maker(cx);
+    let frame = support::bounds_of(
+        cx,
+        s.win,
+        ids::hud_maker_part(&PartKey::new("HudMatchStatus/BGFrame")),
+    )
+    .expect("the timer frame");
+    let panel = |cx: &mut TestAppContext, i| {
+        support::bounds_of(cx, s.win, ids::hud_maker_team_status_panel(i)).expect("a panel")
+    };
+    let (blue, red) = (panel(cx, 0), panel(cx, 1));
+    let middle = frame.center().x;
+    assert!(blue.right() <= middle && red.left() >= middle);
+    assert!(blue.left() >= frame.left() && red.right() <= frame.right());
+    // Only your own team's panel shows a health bar.
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::hud_maker_team_status_health(1)
+    ));
+    assert!(!support::present(
+        cx,
+        s.win,
+        ids::hud_maker_team_status_health(0)
+    ));
 }

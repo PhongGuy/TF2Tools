@@ -305,9 +305,29 @@ pub const ROUND_COUNTER: &str = r#""Resource/UI/HudRoundCounter.res"
 }
 "#;
 
+/// The stock TeamStatus block, trimmed to what places and colours the panels.
+pub const TEAM_STATUS: &str = r#"TeamStatus { ControlName CTFTeamStatus xpos 0 ypos 0 zpos 2 wide f0 tall 75
+    max_size 19 6v6_gap 4 12v12_gap 1
+    team1_grow_dir west team1_base_x c-45 team1_max_expand 133
+    team2_grow_dir east team2_base_x c47 team2_max_expand 133
+    playerpanels_kv { visible 0 wide 25 tall 50 zpos 1
+      color_portrait_bg_red "119 62 61 255" color_portrait_bg_blue "62 81 101 255"
+      color_bar_health_high "84 191 58 255"
+      classimage { ControlName CTFClassImage xpos cs-0.5 ypos 0 zpos 3 wide 19 tall 19 proportionaltoparent 1 }
+      classimagebg { ControlName Panel xpos 0 ypos 0 zpos 2 wide f0 tall 19 proportionaltoparent 1 }
+      healthbar { ControlName ContinuousProgressBar xpos 0 ypos 19 zpos 5 wide f0 tall 2 proportionaltoparent 1 } } }"#;
+
 /// Every stock file as (lowercase game path, text).
 pub fn stock() -> Vec<(String, String)> {
     let class = class_select();
+    let match_status = format!(
+        r#"{}
+  {TEAM_STATUS} }}"#,
+        r#""Resource/UI/HudMatchStatus.res" { ObjectiveStatusTimePanel { ControlName EditablePanel visible 0
+  xpos c-55 ypos 0 zpos 2 wide 110 tall 30 if_match { xpos cs-0.5 wide 130 } } RoundSignModel { ControlName CModelPanel }
+  RoundCounter { xpos cs-0.5 ypos -2 zpos 1 wide 300 tall 100 visible 1 }
+  BGFrame { ControlName EditablePanel xpos cs-0.5 ypos -5 zpos 0 wide 365 tall 28 visible 0 border TFFatLineBorder if_match { visible 1 } }"#
+    );
     [
         ("scripts/hudlayout.res", HUDLAYOUT),
         ("resource/ui/hudplayerhealth.res", HEALTH),
@@ -321,10 +341,7 @@ pub fn stock() -> Vec<(String, String)> {
         ("resource/ui/targetid.res", r#""Resource/UI/TargetID.res" { TargetNameLabel { ControlName CExLabel xpos 35 ypos 6 wide 200 tall 20 } }"#),
         ("resource/ui/huditemeffectmeter.res", r#""Resource/UI/HudItemEffectMeter.res" { HudItemEffectMeter { xpos r174 ypos r62 } ItemEffectMeterLabel { ControlName CExLabel xpos 5 ypos 5 wide 90 tall 15 } }"#),
         ("resource/ui/huditemeffectmeter_demoman.res", METER_DEMOMAN),
-        ("resource/ui/hudmatchstatus.res", r#""Resource/UI/HudMatchStatus.res" { ObjectiveStatusTimePanel { ControlName EditablePanel visible 0
-  xpos c-55 ypos 0 wide 110 tall 30 if_match { xpos cs-0.5 wide 130 } } RoundSignModel { ControlName CModelPanel }
-  RoundCounter { xpos cs-0.5 ypos -2 zpos 1 wide 300 tall 100 visible 1 }
-  BGFrame { ControlName EditablePanel xpos cs-0.5 ypos -5 zpos 0 wide 365 tall 28 visible 0 border TFFatLineBorder if_match { visible 1 } } }"#),
+        ("resource/ui/hudmatchstatus.res", &match_status),
         ("resource/ui/hudobjectivetimepanel.res", r#""Resource/UI/HudObjectiveTimePanel.res" { TimePanelValue { ControlName CExLabel xpos 25 ypos 2 wide 60 tall 20 labelText 0:00 if_match { xpos 35 } } }"#),
         ("resource/ui/scoreboard.res", SCOREBOARD),
         ("resource/ui/mvmscoreboard.res", MVM_SCOREBOARD),

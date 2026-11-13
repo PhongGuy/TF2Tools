@@ -75,10 +75,10 @@ pub use hud_maker::{
     RankControl, RankLabel, RankLayout, RankPieces, Recipe, RecipeApplied, Rect, RemoveKey, Rgba,
     SampleKiller, SamplePlayer, SampleSet, SampleWatched, Scene, SceneRule, Scheme, Screen,
     ScreenBaseline, ScreenCheck, ScreenFlag, ScreenProblem, ScreenScale, SetKey, ShowsFor, Size,
-    SizeExpr, SizeForm, Snap, StartingPoint, SwitchAction, Switched, Team, TermOp, ValueMap,
-    Vision, check_hud_path, contrast_ratio, drawn_image, font_families, font_family, font_tall_px,
-    image_cells, nine_slice, normalise_game_path, rank_medal, rank_pieces, relative_luminance,
-    scene_image, stand_in_families, tint_pixels,
+    SizeExpr, SizeForm, Snap, StartingPoint, SwitchAction, Switched, Team, TeamStatusPanel, TermOp,
+    ValueMap, Vision, check_hud_path, contrast_ratio, drawn_image, font_families, font_family,
+    font_tall_px, image_cells, nine_slice, normalise_game_path, rank_medal, rank_pieces,
+    relative_luminance, scene_image, stand_in_families, tint_pixels,
 };
 pub use hud_maker::{
     AnimCommand, AnimEvent, AnimFrame, AnimScript, Animated, Fired, GAME_TRIGGERS, GameSituation,
