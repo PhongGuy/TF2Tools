@@ -19,6 +19,9 @@ use crate::tf2::Tf2Install;
 /// The longest slug an installed name carries, so names stay well inside path limits.
 const MAX_SLUG: usize = 40;
 
+/// The section key of a GameBanana map item's row.
+pub(super) const MAP_SECTION: &str = "maps";
+
 const COLUMNS: &str = "gb_id, section, name, author, file_date, latest_file_date, checked_at,
     payloads, files, installed, gone";
 
@@ -52,7 +55,7 @@ impl GbAddonEntry {
     ) -> Self {
         Self {
             gb_id,
-            section: "maps".to_owned(),
+            section: MAP_SECTION.to_owned(),
             name,
             author,
             file_date,
@@ -331,6 +334,17 @@ impl Library {
         tf2_running: &dyn Fn() -> bool,
     ) -> Result<(), GbAddonInstallError> {
         let _writes = self.lock_writes();
+        self.remove_gb_addon_locked(gb_id, tf2, tf2_running)
+    }
+
+    /// [`remove_gb_addon`](Self::remove_gb_addon)'s body, for a caller already holding the
+    /// write lock.
+    pub(super) fn remove_gb_addon_locked(
+        &self,
+        gb_id: GbId,
+        tf2: &Tf2Install,
+        tf2_running: &dyn Fn() -> bool,
+    ) -> Result<(), GbAddonInstallError> {
         let entry = self
             .gb_addon_row(gb_id)?
             .ok_or(GbAddonInstallError::NotInLibrary { gb_id })?;

@@ -1298,6 +1298,12 @@ pub enum GbMapRemoveError {
         /// The item asked for.
         gb_id: GbId,
     },
+    /// The library's item `gb_id` is not a map, so Remove for maps leaves it alone.
+    #[error("GameBanana item {gb_id} is not a map")]
+    NotAMap {
+        /// The item asked for.
+        gb_id: GbId,
+    },
     /// A file or directory could not be removed; the row stays so Remove can be retried.
     #[error("cannot remove {path}: {source}")]
     Io {

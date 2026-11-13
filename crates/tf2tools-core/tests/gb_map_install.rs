@@ -38,6 +38,12 @@ fn custom(s: &Setup) -> Vec<String> {
     common::tree(&s.tf2.custom_dir())
 }
 
+/// The marker a swap leaves while `folder`'s installed copy sits in staging.
+fn mark_swapping(s: &Setup, folder: &str) {
+    let staging = s.tf2.custom_dir().join(".tf2tools-map-staging");
+    std::fs::write(staging.join("swapping"), folder).unwrap();
+}
+
 fn row(s: &Setup, id: u64) -> Option<GbAddonEntry> {
     s.env
         .lib
@@ -369,6 +375,7 @@ async fn a_map_folder_left_aside_by_an_interrupted_update_is_put_back() {
         aside.join("tf2tools-gb-7-x"),
     )
     .unwrap();
+    mark_swapping(&s, "tf2tools-gb-7-x");
 
     let d = download(&s, 8, "Y", &[("maps/cp_y.bsp", &bsp(b"y"))], 100).await;
     s.env
@@ -459,6 +466,7 @@ async fn remove_clears_its_own_set_aside_folder_but_not_another_items() {
     for folder in ["tf2tools-gb-7-x", "tf2tools-gb-77-y"] {
         std::fs::rename(custom_dir.join(folder), aside.join(folder)).unwrap();
     }
+    mark_swapping(&s, "tf2tools-gb-77-y");
 
     s.env.lib.remove_gb_map(GbId::new(7), &s.tf2, &no).unwrap();
     assert!(!aside.join("tf2tools-gb-7-x").exists());
@@ -477,4 +485,62 @@ async fn remove_clears_its_own_set_aside_folder_but_not_another_items() {
             "tf2tools-gb-8-z/maps/cp_z.bsp",
         ]
     );
+}
+
+#[tokio::test]
+async fn a_stale_set_aside_copy_is_not_put_back_after_the_folder_is_deleted() {
+    let s = setup().await;
+    let d = download(&s, 7, "X", &[("maps/cp_x.bsp", &bsp(b"1"))], 100).await;
+    s.env
+        .lib
+        .install_gb_map(d, &chosen(&["cp_x"]), &s.tf2, &no)
+        .unwrap();
+    // A swap that finished but could not clear staging leaves the old copy unmarked; the
+    // player then deletes the folder by hand.
+    let custom_dir = s.tf2.custom_dir();
+    let aside = custom_dir.join(".tf2tools-map-staging/old");
+    std::fs::create_dir_all(&aside).unwrap();
+    std::fs::rename(
+        custom_dir.join("tf2tools-gb-7-x"),
+        aside.join("tf2tools-gb-7-x"),
+    )
+    .unwrap();
+
+    let d = download(&s, 8, "Y", &[("maps/cp_y.bsp", &bsp(b"y"))], 100).await;
+    s.env
+        .lib
+        .install_gb_map(d, &chosen(&["cp_y"]), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(custom(&s), ["tf2tools-gb-8-y/maps/cp_y.bsp"]);
+}
+
+#[tokio::test]
+async fn remove_refuses_an_item_that_is_not_a_map() {
+    let s = setup().await;
+    let d = crate::gb_addon_install::download(
+        &s,
+        12,
+        "Toon",
+        "toon.vpk",
+        crate::gb_addon_install::vpk(b"t"),
+        100,
+    )
+    .await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["toon.vpk"]), &s.tf2, &no)
+        .unwrap();
+    let before = custom(&s);
+
+    let err = s
+        .env
+        .lib
+        .remove_gb_map(GbId::new(12), &s.tf2, &no)
+        .unwrap_err();
+    assert!(
+        matches!(err, GbMapRemoveError::NotAMap { gb_id } if gb_id == GbId::new(12)),
+        "{err:?}"
+    );
+    assert_eq!(custom(&s), before);
+    assert!(row(&s, 12).is_some());
 }

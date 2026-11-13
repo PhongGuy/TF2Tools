@@ -4,13 +4,13 @@
 use std::path::Path;
 
 use super::gb_addons::{
-    GbAddonEntry, installed_base, recorded_path, remove_entry, remove_installed,
+    GbAddonEntry, MAP_SECTION, installed_base, recorded_path, remove_entry, remove_installed,
 };
 use super::hud_lowercase::{LOWERCASE_INSTALLS, lowercase_tree};
+use super::live_link::{MARKER, marked_aside};
 use super::tree_copy::copy_tree;
 use super::{
-    GameMissing, GbId, IoFailure, Library, create_dir_all, game_custom_dir, io_at, is_plain_name,
-    library_db,
+    GameMissing, GbId, IoFailure, Library, create_dir_all, game_custom_dir, io_at, library_db,
 };
 use crate::error::{GbAddonInstallError, GbMapInstallError, GbMapRemoveError, LibraryError};
 use crate::map_payloads::MapPayload;
@@ -77,36 +77,38 @@ impl Library {
     ///
     /// # Errors
     /// [`GbMapRemoveError::Tf2Running`] before anything changed, `NotInLibrary` without a
-    /// row, or an I/O or database failure, which keeps the row so Remove can be retried.
+    /// row, `NotAMap` for another kind of item, or an I/O or database failure, which keeps
+    /// the row so Remove can be retried.
     pub fn remove_gb_map(
         &self,
         gb_id: GbId,
         tf2: &Tf2Install,
         tf2_running: &dyn Fn() -> bool,
     ) -> Result<(), GbMapRemoveError> {
+        let _writes = self.lock_writes();
         if tf2_running() {
             return Err(GbMapRemoveError::Tf2Running);
         }
-        // The item's set-aside copies go first, while its row still lets Remove be retried;
-        // left behind, the next install's recovery would put a removed item back.
-        {
-            let _writes = self.lock_writes();
-            if self.gb_addon_row(gb_id).map_err(remove_error)?.is_none() {
-                return Err(GbMapRemoveError::NotInLibrary { gb_id });
+        match self.gb_addon_row(gb_id).map_err(remove_error)? {
+            None => return Err(GbMapRemoveError::NotInLibrary { gb_id }),
+            Some(row) if row.section() != MAP_SECTION => {
+                return Err(GbMapRemoveError::NotAMap { gb_id });
             }
-            let staging = tf2.custom_dir().join(MAP_STAGING_DIR);
-            let own = format!("tf2tools-gb-{gb_id}-");
-            for side in [staging.join("old"), staging.join("new")] {
-                for entry in std::fs::read_dir(&side).into_iter().flatten().flatten() {
-                    if entry.file_name().to_string_lossy().starts_with(&own) {
-                        remove_entry(&entry.path()).map_err(|IoFailure { path, source }| {
-                            GbMapRemoveError::Io { path, source }
-                        })?;
-                    }
+            Some(_) => {}
+        }
+        // The item's set-aside copies go first, while its row still lets Remove be retried.
+        let staging = tf2.custom_dir().join(MAP_STAGING_DIR);
+        let own = format!("tf2tools-gb-{gb_id}-");
+        for side in [staging.join("old"), staging.join("new")] {
+            for entry in std::fs::read_dir(&side).into_iter().flatten().flatten() {
+                if entry.file_name().to_string_lossy().starts_with(&own) {
+                    remove_entry(&entry.path()).map_err(|IoFailure { path, source }| {
+                        GbMapRemoveError::Io { path, source }
+                    })?;
                 }
             }
         }
-        self.remove_gb_addon(gb_id, tf2, &|| false)
+        self.remove_gb_addon_locked(gb_id, tf2, &|| false)
             .map_err(remove_error)
     }
 
@@ -195,7 +197,6 @@ impl Library {
         // into a staging folder beside the target first. Only a complete copy goes in, by
         // renames on the game's own disk that set the old folder aside rather than delete it.
         let tf = tf2.tf_dir();
-        let target = custom.join(&folder);
         let staging = custom.join(MAP_STAGING_DIR);
         let (fresh, aside) = (
             staging.join("new").join(&folder),
@@ -215,7 +216,7 @@ impl Library {
             let _ = remove_entry(&staging);
             return Err(e.into());
         }
-        let swapped = swap_in(&target, &fresh, &aside);
+        let swapped = swap_in(&custom, &staging, &folder);
         // A set-aside copy that could not be put back is the only one left, so it stays.
         if (swapped.is_ok() || !aside.exists())
             && let Err(IoFailure { path, source }) = remove_entry(&staging)
@@ -232,35 +233,38 @@ impl Library {
     }
 }
 
-/// Puts back each folder an interrupted swap left in the staging dir's `old/` whose place in
-/// `custom` is empty, so the scan sees it and the staging clear never deletes the only copy.
+/// Puts back the folder an interrupted swap left marked in the staging dir's `old/`, so the
+/// scan sees it and the staging clear never deletes the only copy. Unmarked copies are stale.
 fn recover_aside(custom: &Path) -> Result<(), IoFailure> {
-    let old = custom.join(MAP_STAGING_DIR).join("old");
-    for entry in std::fs::read_dir(&old).into_iter().flatten().flatten() {
-        let name = entry.file_name().to_string_lossy().into_owned();
+    let staging = custom.join(MAP_STAGING_DIR);
+    if let Some(name) = marked_aside(&staging, custom)? {
         let home = custom.join(&name);
-        if is_plain_name(&name) && !name.contains(':') && home.symlink_metadata().is_err() {
-            std::fs::rename(entry.path(), &home).map_err(io_at(&home))?;
-        }
+        std::fs::rename(staging.join("old").join(&name), &home).map_err(io_at(&home))?;
     }
     Ok(())
 }
 
-/// Renames the folder at `target`, if any, aside to `aside`, then `fresh` in at `target`.
-/// When the second rename fails the first is undone, so `target` never goes missing while
-/// its old copy can be put back.
-fn swap_in(target: &Path, fresh: &Path, aside: &Path) -> Result<(), IoFailure> {
+/// Swaps `staging/new/<folder>` in at `custom/<folder>`, setting any old copy aside to
+/// `staging/old/<folder>` under the swap marker. A failed swap-in is undone; only when the
+/// undo fails too does the marker stay, so recovery puts the old copy back.
+fn swap_in(custom: &Path, staging: &Path, folder: &str) -> Result<(), IoFailure> {
+    let (target, fresh) = (custom.join(folder), staging.join("new").join(folder));
+    let (aside, marker) = (staging.join("old").join(folder), staging.join(MARKER));
     let had_old = target.symlink_metadata().is_ok();
     if had_old {
-        std::fs::rename(target, aside).map_err(io_at(target))?;
+        std::fs::write(&marker, folder).map_err(io_at(&marker))?;
+        std::fs::rename(&target, &aside).map_err(io_at(&target))?;
     }
-    std::fs::rename(fresh, target)
-        .map_err(io_at(target))
-        .inspect_err(|_| {
-            if had_old {
-                let _ = std::fs::rename(aside, target);
-            }
-        })
+    let swapped = std::fs::rename(&fresh, &target).map_err(io_at(&target));
+    let finished = swapped.is_ok() || (had_old && std::fs::rename(&aside, &target).is_ok());
+    // Once the old copy is no longer the only one, it must never come back.
+    if had_old
+        && finished
+        && let Err(e) = std::fs::remove_file(&marker)
+    {
+        tracing::warn!(path = %marker.display(), error = %e, "map swap marker left behind");
+    }
+    swapped
 }
 
 /// Moves each map into `stage/maps/<name>.bsp` and each companion to its destination, the

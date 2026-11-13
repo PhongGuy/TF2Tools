@@ -20,8 +20,8 @@ use crate::tf2::Tf2Install;
 /// The staging folder under `tf/custom`. Its leading dot keeps it from ever being a HUD's
 /// folder name, and its copies sit one level down so no scan mistakes it for a HUD.
 pub(crate) const STAGING_DIR: &str = ".tf2tools-reinstall";
-/// Inside `STAGING_DIR`: names the folder while its installed copy may sit in `old/`.
-const MARKER: &str = "swapping";
+/// Inside a staging folder: names the folder while its installed copy may sit in `old/`.
+pub(crate) const MARKER: &str = "swapping";
 
 /// Serialises every change to installed HUD folders across the process.
 static HUD_SWAP: Mutex<()> = Mutex::new(());
@@ -250,6 +250,27 @@ fn swap_in(custom: &Path, folder: &str, rename: Rename<'_>) -> Result<(), Reinst
     Ok(())
 }
 
+/// The folder a swap through `staging` set aside and never finished: the marker names it,
+/// its copy is in `staging/old/` and its place in `custom` is empty. An unmarked copy is
+/// stale and is never one.
+pub(crate) fn marked_aside(staging: &Path, custom: &Path) -> Result<Option<String>, IoFailure> {
+    let marker = staging.join(MARKER);
+    let name = match std::fs::read_to_string(&marker) {
+        Ok(name) => name,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(source) => {
+            return Err(IoFailure {
+                path: marker,
+                source,
+            });
+        }
+    };
+    let pending = is_restorable_name(&name)
+        && staging.join("old").join(&name).is_dir()
+        && custom.join(&name).symlink_metadata().is_err();
+    Ok(pending.then_some(name))
+}
+
 /// Puts back `old/<name>` when the marker names `<name>` and `custom/<name>` is absent, then
 /// removes the staging folder. Without the marker a set-aside copy is stale and is deleted.
 fn recover_in(custom: &Path, rename: Rename<'_>) -> Result<Recovery, ReinstallError> {
@@ -257,27 +278,16 @@ fn recover_in(custom: &Path, rename: Rename<'_>) -> Result<Recovery, ReinstallEr
     if staging.symlink_metadata().is_err() {
         return Ok(Recovery::Clean);
     }
-    let marker = staging.join(MARKER);
-    let named = match std::fs::read_to_string(&marker) {
-        Ok(name) => Some(name),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => None,
-        Err(source) => {
-            return Err(ReinstallError::Unchanged {
-                path: marker,
-                source,
-            });
-        }
-    };
     let mut restored = None;
-    if let Some(name) = named.filter(|n| is_restorable_name(n)) {
-        let (aside, home) = (staging.join("old").join(&name), custom.join(&name));
-        if aside.is_dir() && home.symlink_metadata().is_err() {
-            rename(&aside, &home).map_err(|source| ReinstallError::SetAside {
-                path: aside.clone(),
-                source,
-            })?;
-            restored = Some(name);
-        }
+    let marked = marked_aside(&staging, custom)
+        .map_err(|IoFailure { path, source }| ReinstallError::Unchanged { path, source })?;
+    if let Some(name) = marked {
+        let aside = staging.join("old").join(&name);
+        rename(&aside, &custom.join(&name)).map_err(|source| ReinstallError::SetAside {
+            path: aside.clone(),
+            source,
+        })?;
+        restored = Some(name);
     }
     remove_dir_if_present(&staging).map_err(|e| ReinstallError::Unchanged {
         path: e.path,
