@@ -6,7 +6,7 @@ use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
-use bzip2::read::BzDecoder;
+use bzip2::read::MultiBzDecoder;
 use tempfile::NamedTempFile;
 use walkdir::WalkDir;
 
@@ -56,11 +56,12 @@ impl MapPayload {
 }
 
 /// Every map in an extracted tree, in walk order, with its companions. `.bsp.bz2` maps are
-/// decompressed first, at most [`MAX_MAPS`] of them and `cap` bytes in all; one that is
-/// corrupt or over budget is left as it is and is not a map. A name repeated in another
-/// case keeps the first. Returns an empty list when there is no map.
+/// decompressed first, at most [`MAX_MAPS`] of them and `cap` bytes in all; a corrupt one
+/// is left as it is and is not a map. A name repeated in another case keeps the first.
+/// Returns an empty list when there is no map.
 ///
 /// # Errors
+/// [`ArchiveError::TooLarge`] when the compressed maps come to more than `cap` bytes, or
 /// [`ArchiveError::Io`] when the tree cannot be walked or a decompressed map not written.
 pub fn find_maps(tree: &Path, cap: u64) -> Result<Vec<MapPayload>, ArchiveError> {
     decompress_bz2_maps(tree, cap)?;
@@ -214,7 +215,8 @@ pub(crate) fn ends_with_ignore_case(name: &str, suffix: &str) -> bool {
 
 /// Decompresses each `<stem>.bsp.bz2` with a map-name stem to `<stem>.bsp` beside it and
 /// removes the `.bz2`, within one `cap` budget and [`MAX_MAPS`] files. Each goes through a
-/// temporary file, so a corrupt or oversized one leaves only its `.bz2` behind.
+/// temporary file, so a corrupt one, or one that runs past the budget and fails the call,
+/// leaves only its `.bz2` behind.
 fn decompress_bz2_maps(tree: &Path, cap: u64) -> Result<(), ArchiveError> {
     let files = walk_files(tree)?;
     let mut taken: HashSet<PathBuf> = files.iter().map(|f| lowercase_path(f)).collect();
@@ -233,6 +235,12 @@ fn decompress_bz2_maps(tree: &Path, cap: u64) -> Result<(), ArchiveError> {
         let Some((part, size)) = decompress(bz2, remaining)? else {
             continue;
         };
+        if size > remaining {
+            return Err(ArchiveError::TooLarge {
+                path: bz2.clone(),
+                limit: cap,
+            });
+        }
         // A failed persist drops the temporary file, which deletes it.
         part.persist(&bsp).map_err(|e| io_at(&bsp)(e.error))?;
         fs::remove_file(bz2).map_err(io_at(bz2))?;
@@ -243,19 +251,15 @@ fn decompress_bz2_maps(tree: &Path, cap: u64) -> Result<(), ArchiveError> {
     Ok(())
 }
 
-/// Decompresses `bz2` into a temporary file beside it, or `None` when its bytes are not
-/// bzip2 or come to more than `limit`. Only a decode error is a skip; a disk error is `Io`.
+/// Decompresses every stream of `bz2` into a temporary file beside it, stopping one byte
+/// past `limit`, or `None` when its bytes are not bzip2. A disk error is `Io`.
 fn decompress(bz2: &Path, limit: u64) -> Result<Option<(NamedTempFile, u64)>, ArchiveError> {
     let dir = bz2.parent().unwrap_or(bz2);
     let source = File::open(bz2).map_err(io_at(bz2))?;
     let mut part = NamedTempFile::new_in(dir).map_err(io_at(dir))?;
-    let mut reader = BzDecoder::new(source).take(limit.saturating_add(1));
+    let mut reader = MultiBzDecoder::new(source).take(limit.saturating_add(1));
     match io::copy(&mut reader, &mut part) {
-        Ok(size) if size <= limit => Ok(Some((part, size))),
-        Ok(_) => {
-            tracing::debug!(file = %bz2.display(), "compressed map too large");
-            Ok(None)
-        }
+        Ok(size) => Ok(Some((part, size))),
         Err(e)
             if matches!(
                 e.kind(),
@@ -270,5 +274,5 @@ fn decompress(bz2: &Path, limit: u64) -> Result<Option<(NamedTempFile, u64)>, Ar
 }
 
 fn lowercase_path(path: &Path) -> PathBuf {
-    PathBuf::from(path.to_string_lossy().to_lowercase())
+    PathBuf::from(path.to_string_lossy().to_ascii_lowercase())
 }

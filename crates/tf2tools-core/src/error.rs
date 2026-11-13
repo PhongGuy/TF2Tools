@@ -166,6 +166,14 @@ pub enum ArchiveError {
         /// The offending entry name.
         entry: String,
     },
+    /// Compressed maps decompress to more than the map size cap.
+    #[error("{path} is too large: the maps come to more than {limit} bytes")]
+    TooLarge {
+        /// The compressed map that went past the cap.
+        path: PathBuf,
+        /// The cap in bytes, shared by every compressed map of the download.
+        limit: u64,
+    },
 }
 
 /// Why a WAV file cannot be used as a TF2 sound.

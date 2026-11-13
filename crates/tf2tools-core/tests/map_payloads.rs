@@ -5,7 +5,7 @@ use crate::common::{self, write_file};
 use std::io::Write;
 use std::path::Path;
 
-use tf2tools_core::{MapPayload, find_maps};
+use tf2tools_core::{ArchiveError, MapPayload, find_maps};
 
 const CAP: u64 = 1 << 20;
 
@@ -195,41 +195,74 @@ fn a_bz2_map_is_decompressed_in_place() {
 }
 
 #[test]
-fn a_bz2_that_is_corrupt_or_too_large_is_skipped() {
+fn a_multi_stream_bz2_map_is_decompressed_whole() {
+    let tmp = tempfile::tempdir().unwrap();
+    let t = tmp.path();
+    // Parallel compressors write one bzip2 stream per block, back to back.
+    let mut body = bz2(&bsp(b"first half,"));
+    body.extend(bz2(b" second half"));
+    write_file(&t.join("maps/cp_m.bsp.bz2"), &body);
+    let maps = find_maps(t, CAP).unwrap();
+    assert_eq!(
+        std::fs::read(maps[0].bsp()).unwrap(),
+        bsp(b"first half, second half")
+    );
+}
+
+#[test]
+fn a_corrupt_bz2_is_skipped() {
+    let tmp = tempfile::tempdir().unwrap();
+    let t = tmp.path();
+    write_file(&t.join("maps/cp_bad.bsp.bz2"), b"not bzip2 at all");
+    assert!(find_maps(t, CAP).unwrap().is_empty());
+    assert_eq!(common::tree(t), ["maps/cp_bad.bsp.bz2"]);
+}
+
+#[test]
+fn a_bz2_past_the_cap_fails_as_too_large() {
     let tmp = tempfile::tempdir().unwrap();
     let t = tmp.path();
     write_file(&t.join("maps/cp_big.bsp.bz2"), &bz2(&bsp(&[0u8; 64])));
-    write_file(&t.join("maps/cp_bad.bsp.bz2"), b"not bzip2 at all");
-    assert!(find_maps(t, 16).unwrap().is_empty());
+    match find_maps(t, 16) {
+        Err(ArchiveError::TooLarge { path, limit: 16 }) => {
+            assert!(path.ends_with("cp_big.bsp.bz2"), "{path:?}");
+        }
+        other => panic!("expected TooLarge, got {other:?}"),
+    }
     assert_eq!(
         common::tree(t),
-        ["maps/cp_bad.bsp.bz2", "maps/cp_big.bsp.bz2"],
+        ["maps/cp_big.bsp.bz2"],
         "no partial map is left behind"
     );
 }
 
 #[test]
 fn many_bz2_maps_share_one_budget() {
-    let tmp = tempfile::tempdir().unwrap();
-    let t = tmp.path();
-    for i in 1..=3 {
+    // Three 40-byte maps and one with a bad name, which is never unpacked.
+    let three_maps = || {
+        let tmp = tempfile::tempdir().unwrap();
+        for i in 1..=3 {
+            write_file(
+                &tmp.path().join(format!("maps/cp_{i}.bsp.bz2")),
+                &bz2(&bsp(&[0u8; 36])),
+            );
+        }
         write_file(
-            &t.join(format!("maps/cp_{i}.bsp.bz2")),
-            &bz2(&bsp(&[0u8; 36])),
+            &tmp.path().join("maps/bad name.bsp.bz2"),
+            &bz2(&bsp(&[0u8; 99])),
         );
-    }
-    write_file(&t.join("maps/bad name.bsp.bz2"), &bz2(&bsp(b"b")));
-    // Each map is 40 bytes, so a 100-byte budget holds two of them.
-    assert_eq!(names(&find_maps(t, 100).unwrap()), ["cp_1", "cp_2"]);
+        tmp
+    };
+    let fits = three_maps();
     assert_eq!(
-        common::tree(t),
-        [
-            "maps/bad name.bsp.bz2",
-            "maps/cp_1.bsp",
-            "maps/cp_2.bsp",
-            "maps/cp_3.bsp.bz2"
-        ]
+        names(&find_maps(fits.path(), 120).unwrap()),
+        ["cp_1", "cp_2", "cp_3"]
     );
+    let over = three_maps();
+    assert!(matches!(
+        find_maps(over.path(), 100),
+        Err(ArchiveError::TooLarge { limit: 100, .. })
+    ));
 }
 
 #[test]
