@@ -63,6 +63,11 @@ impl GbMapDownload {
     pub fn maps(&self) -> &[MapPayload] {
         &self.maps
     }
+
+    /// The scratch dir the maps were unpacked into, removed with the download.
+    pub(crate) fn scratch_dir(&self) -> &Path {
+        self._scratch.path()
+    }
 }
 
 impl StoreClient {

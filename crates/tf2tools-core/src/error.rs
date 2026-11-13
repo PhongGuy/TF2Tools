@@ -1233,6 +1233,50 @@ pub enum GbAddonInstallError {
     NothingChosen,
 }
 
+/// Why a GameBanana map item could not be installed or updated.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GbMapInstallError {
+    /// TF2 is running, so an update waits; nothing changed.
+    #[error("TF2 is running; close it to update the maps")]
+    Tf2Running,
+    /// The game folder (`tf/`) is gone, so nothing was written.
+    #[error("Team Fortress 2 is no longer at {path}")]
+    GameMissing {
+        /// The `tf` folder that is missing.
+        path: PathBuf,
+    },
+    /// The game already has every chosen map; nothing changed.
+    #[error("the game already has {}", names.join(", "))]
+    AlreadyPresent {
+        /// The chosen names, as chosen.
+        names: Vec<String>,
+    },
+    /// No map was chosen.
+    #[error("no map was chosen")]
+    NothingChosen,
+    /// A chosen name is not one of the download's maps.
+    #[error("{name} is not a map of this download")]
+    UnknownMap {
+        /// The chosen name.
+        name: String,
+    },
+    /// A file or directory could not be read or written.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// SQLite failed to read or record the item.
+    #[error("library database error: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+}
+
 /// Why an item's audio preview could not be fetched.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

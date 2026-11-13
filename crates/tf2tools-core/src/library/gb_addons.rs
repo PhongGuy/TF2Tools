@@ -41,6 +41,37 @@ pub struct GbAddonEntry {
 }
 
 impl GbAddonEntry {
+    /// A map item's row, not installed, current as of `file_date` and checked now.
+    pub(super) fn new_map_row(
+        gb_id: GbId,
+        name: String,
+        author: String,
+        file_date: i64,
+        payloads: Vec<String>,
+        files: Vec<String>,
+    ) -> Self {
+        Self {
+            gb_id,
+            section: "maps".to_owned(),
+            name,
+            author,
+            file_date,
+            latest_file_date: file_date,
+            checked_at: unix_now(),
+            payloads,
+            files,
+            installed: false,
+            gone: false,
+            present: false,
+        }
+    }
+
+    /// Marks the row installed and its files present, as a finished install leaves it.
+    pub(super) fn mark_installed(&mut self) {
+        self.installed = true;
+        self.present = true;
+    }
+
     /// The GameBanana item id.
     pub fn gb_id(&self) -> GbId {
         self.gb_id
@@ -406,7 +437,10 @@ impl Library {
         Ok(entry)
     }
 
-    fn gb_addon_row(&self, gb_id: GbId) -> Result<Option<GbAddonEntry>, GbAddonInstallError> {
+    pub(super) fn gb_addon_row(
+        &self,
+        gb_id: GbId,
+    ) -> Result<Option<GbAddonEntry>, GbAddonInstallError> {
         let id = gb_id_column(gb_id, install_db)?;
         self.db
             .read(|conn| {
@@ -434,7 +468,11 @@ impl Library {
     }
 
     /// Writes `entry` as the add-on's whole row, replacing any earlier one.
-    fn save_gb_addon(&self, entry: &GbAddonEntry, file_id: u64) -> Result<(), GbAddonInstallError> {
+    pub(super) fn save_gb_addon(
+        &self,
+        entry: &GbAddonEntry,
+        file_id: u64,
+    ) -> Result<(), GbAddonInstallError> {
         let id = gb_id_column(entry.gb_id, install_db)?;
         let file_id = i64::try_from(file_id).map_err(|e| GbAddonInstallError::Database {
             message: format!("file id {file_id} does not fit the database: {e}"),
@@ -542,14 +580,14 @@ impl Library {
 /// `tf/custom/<name>` for a recorded `custom/<name>` that is a plain name of this add-on's
 /// own (`tf2tools-gb-<id>-...`, no `:` that Windows reads as a drive). Any other shape, such
 /// as a tampered row's `../x`, an absolute path or another add-on's folder, is never followed.
-fn recorded_path(tf: &Path, gb_id: GbId, file: &str) -> Option<PathBuf> {
+pub(super) fn recorded_path(tf: &Path, gb_id: GbId, file: &str) -> Option<PathBuf> {
     let name = file.strip_prefix("custom/")?;
     let own = name.starts_with(&format!("tf2tools-gb-{gb_id}-"));
     (own && is_plain_name(name) && !name.contains(':')).then(|| tf.join("custom").join(name))
 }
 
 /// `tf2tools-gb-<id>-<slug>`: the name's slug capped and trimmed of `-`, or `addon`.
-fn installed_base(gb_id: GbId, name: &str) -> String {
+pub(super) fn installed_base(gb_id: GbId, name: &str) -> String {
     let capped: String = slug(name).chars().take(MAX_SLUG).collect();
     let trimmed = capped.trim_matches('-');
     let slug = if trimmed.is_empty() { "addon" } else { trimmed };
@@ -703,7 +741,7 @@ fn copy_entry(src: &Path, dst: &Path) -> Result<(), IoFailure> {
 
 /// Removes a file or folder; one already gone counts as removed. A symlink is removed
 /// itself, never followed.
-fn remove_entry(path: &Path) -> Result<(), IoFailure> {
+pub(super) fn remove_entry(path: &Path) -> Result<(), IoFailure> {
     match std::fs::symlink_metadata(path) {
         Ok(meta) if meta.is_dir() => remove_dir_if_present(path),
         Ok(_) => remove_file_if_present(path),
@@ -714,7 +752,7 @@ fn remove_entry(path: &Path) -> Result<(), IoFailure> {
 
 /// Removes an installed file or folder and, for a VPK, the `.sound.cache` TF2 wrote beside
 /// it. A multi-chunk VPK's cache may be named after `_dir.vpk` or the bare `.vpk`, so both go.
-fn remove_installed(path: &Path) -> Result<(), IoFailure> {
+pub(super) fn remove_installed(path: &Path) -> Result<(), IoFailure> {
     remove_entry(path)?;
     let name = path.file_name().map(|n| n.to_string_lossy().into_owned());
     let Some(name) = name.filter(|n| is_vpk(n)) else {
@@ -734,7 +772,7 @@ fn is_vpk(name: &str) -> bool {
         .is_some_and(|e| e.eq_ignore_ascii_case("vpk"))
 }
 
-fn unix_now() -> i64 {
+pub(super) fn unix_now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
