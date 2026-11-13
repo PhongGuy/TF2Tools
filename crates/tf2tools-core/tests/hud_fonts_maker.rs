@@ -473,15 +473,17 @@ fn font_edits_refuse_what_they_cannot_write() {
     );
     let shared = HudModel::load(&files, Platform::Linux).unwrap();
     assert!(shared.scheme().font("HudFontMedium", 1080).is_some());
-    assert_eq!(
-        shared.edit_font(
-            &k(DAMAGE),
-            "delta_item_font",
-            FontEdit::Outline(true),
-            1080,
-            1
-        ),
-        Err(EditRefused::ReadOnly)
+    // The font lives in the scheme's #base, which the model merges as the game does.
+    assert!(
+        shared
+            .edit_font(
+                &k(DAMAGE),
+                "delta_item_font",
+                FontEdit::Outline(true),
+                1080,
+                1
+            )
+            .is_ok()
     );
     let none = HudModel::load(&stock_files_with(&[(CS, None)]), Platform::Linux).unwrap();
     assert_eq!(

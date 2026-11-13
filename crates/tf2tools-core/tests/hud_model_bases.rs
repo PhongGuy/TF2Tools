@@ -102,19 +102,15 @@ fn a_missing_base_in_a_copy_is_named() {
 }
 
 #[test]
-fn a_stock_model_ignores_bases_as_before() {
+fn a_stock_model_reads_bases_as_the_game_merges_them() {
     let m = HudModel::load(
         &health_over(r#""Base" { PlayerStatusHealthValue { fgcolor "1 2 3 255" } }"#),
         Platform::Linux,
     )
     .unwrap();
-    assert!(m.base_files().is_empty());
-    assert!(
-        m.part(&PartKey::new(HV))
-            .unwrap()
-            .value("fgcolor")
-            .is_none()
-    );
+    assert_eq!(m.base_files(), [BASE_PATH]);
+    let colour = m.part(&PartKey::new(HV)).unwrap().value("fgcolor").unwrap();
+    assert_eq!((colour.text(), colour.file()), ("1 2 3 255", BASE_PATH));
 }
 
 #[test]
