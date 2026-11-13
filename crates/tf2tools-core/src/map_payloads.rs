@@ -205,7 +205,7 @@ fn file_name_is(path: &Path, want: &str) -> bool {
 }
 
 /// True for a name longer than `suffix` that ends in it, ignoring case.
-fn ends_with_ignore_case(name: &str, suffix: &str) -> bool {
+pub(crate) fn ends_with_ignore_case(name: &str, suffix: &str) -> bool {
     name.len() > suffix.len()
         && name
             .get(name.len() - suffix.len()..)

@@ -10,7 +10,7 @@ use super::{AddonProfile, DownloadProgress, StoreClient};
 use crate::archive::extract_archive;
 use crate::error::GbAddonFetchError;
 use crate::library::{GbId, io_at};
-use crate::map_payloads::{MAX_MAPS, MapPayload, find_maps};
+use crate::map_payloads::{MAX_MAPS, MapPayload, ends_with_ignore_case, find_maps};
 
 /// A downloaded, extracted map item waiting to be installed. Its scratch dir, which holds
 /// every map, is removed when it is dropped.
@@ -138,9 +138,6 @@ fn unpack_maps(
 
 /// Whether `saved` is a lone map file, compressed or not, which no extractor would open.
 fn is_bare_map(saved: &Path) -> bool {
-    let name = saved
-        .file_name()
-        .map(|n| n.to_string_lossy().to_ascii_lowercase())
-        .unwrap_or_default();
-    name.ends_with(".bsp.bz2") || name.ends_with(".bsp")
+    let name = saved.file_name().unwrap_or_default().to_string_lossy();
+    ends_with_ignore_case(&name, ".bsp.bz2") || ends_with_ignore_case(&name, ".bsp")
 }
