@@ -181,3 +181,19 @@ async fn installed_lists_library_maps_then_rows_gone_from_the_catalogue() {
     );
     assert_eq!(read(&env, &newest.with_gamemode(Some(5383))), [11]);
 }
+
+#[tokio::test]
+async fn installed_search_matches_catalogue_and_library_only_rows() {
+    let env = store_env().await;
+    seed(&env);
+    let search = |text: &str| {
+        let q = GbMapQuery::new(MD, 60)
+            .with_show(GbMapShow::Installed)
+            .with_search(text);
+        read(&env, &q)
+    };
+    assert_eq!(search("PLAZA"), [11]);
+    assert_eq!(search("gone_"), [99]);
+    assert_eq!(search("old"), [99]);
+    assert!(search("cp_alpha").is_empty());
+}
