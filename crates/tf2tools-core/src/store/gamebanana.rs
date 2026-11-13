@@ -48,6 +48,11 @@ pub(crate) struct ModRecord {
 pub(crate) enum Records {
     Sounds(Vec<SoundRecord>),
     Mods(Vec<ModRecord>),
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "the maps walk that builds these is not built yet")
+    )]
+    Maps(Vec<super::gb_maps::MapRecord>),
 }
 
 impl Records {
@@ -55,6 +60,7 @@ impl Records {
         match self {
             Records::Sounds(rows) => rows.len(),
             Records::Mods(rows) => rows.len(),
+            Records::Maps(rows) => rows.len(),
         }
     }
 }
@@ -153,19 +159,28 @@ pub(crate) fn parse_files(body: &[u8]) -> Result<Vec<ItemFile>, serde_json::Erro
 
 /// Parses an index page body for `kind`; an error only when the body is not JSON.
 pub(crate) fn parse_index(kind: StoreKind, body: &[u8]) -> Result<IndexPage, serde_json::Error> {
+    index_page(body, |records| {
+        if kind == StoreKind::Sounds {
+            Records::Sounds(records.iter().filter_map(parse_sound).collect())
+        } else {
+            Records::Mods(records.iter().filter_map(parse_mod).collect())
+        }
+    })
+}
+
+/// Parses an index page body, turning its record array into `Records` with `parse`.
+pub(crate) fn index_page(
+    body: &[u8],
+    parse: impl FnOnce(&[Value]) -> Records,
+) -> Result<IndexPage, serde_json::Error> {
     let json: Value = serde_json::from_slice(body)?;
     let metadata = &json["_aMetadata"];
     let records = json["_aRecords"]
         .as_array()
         .map(Vec::as_slice)
         .unwrap_or_default();
-    let records = if kind == StoreKind::Sounds {
-        Records::Sounds(records.iter().filter_map(parse_sound).collect())
-    } else {
-        Records::Mods(records.iter().filter_map(parse_mod).collect())
-    };
     Ok(IndexPage {
-        records,
+        records: parse(records),
         total: u32::try_from(int(&metadata["_nRecordCount"])).unwrap_or(0),
         more: !metadata["_bIsComplete"].as_bool().unwrap_or(true),
     })

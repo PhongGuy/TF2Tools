@@ -111,7 +111,7 @@ pub(crate) fn parse_listing(body: &[u8]) -> Result<ListingPage, serde_json::Erro
     Ok(ListingPage { records, complete })
 }
 
-fn parse_record(record: &Value) -> Option<AddonRecord> {
+pub(crate) fn parse_record(record: &Value) -> Option<AddonRecord> {
     let id = u64::try_from(int(&record["_idRow"]))
         .ok()
         .filter(|&id| id > 0)?;

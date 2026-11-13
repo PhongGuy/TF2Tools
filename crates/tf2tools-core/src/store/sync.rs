@@ -5,6 +5,7 @@
 use rusqlite::{Connection, OptionalExtension, params};
 
 use super::gamebanana::{self, IndexPage, Records};
+use super::gb_maps;
 use super::pacer::{Priority, Reply};
 use super::{Endpoints, StoreClient, StoreConfig, StoreKind, SyncOutcome, SyncProgress};
 use crate::error::SyncError;
@@ -384,10 +385,11 @@ fn upsert(
     conn: &Connection,
     table: &str,
     records: &Records,
-    _page: u32,
+    page: u32,
     fetched_at: &str,
 ) -> rusqlite::Result<()> {
     match records {
+        Records::Maps(rows) => gb_maps::upsert_maps(conn, rows, page, fetched_at)?,
         Records::Sounds(rows) => {
             let mut stmt = conn.prepare(
                 "INSERT INTO store_sounds (gb_id, name, author, category, preview_url,

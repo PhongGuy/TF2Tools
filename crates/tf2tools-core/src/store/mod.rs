@@ -9,6 +9,7 @@ mod download;
 mod gamebanana;
 mod gb_addon_download;
 mod gb_map_download;
+mod gb_maps;
 mod github;
 pub(crate) mod http;
 mod images;
@@ -42,6 +43,7 @@ pub use cards::{StoreCard, StoreCursor, StoreQuery, StoreSort};
 pub use download::{DownloadPhase, DownloadProgress};
 pub use gb_addon_download::GbAddonDownload;
 pub use gb_map_download::GbMapDownload;
+pub use gb_maps::GbMapGamemode;
 use http::{API_BODY_LIMIT, Http, NetFailure, Redirects, Timeouts};
 pub use items::{StoreFile, StoreItem, StoreItemId};
 pub(crate) use maps::{BSP_MAGIC, is_map_name};
@@ -274,6 +276,7 @@ impl Endpoints {
 #[non_exhaustive]
 pub struct StoreConfig {
     page_limits: [Option<u32>; 5],
+    gb_maps_page_limit: Option<u32>,
     request_spacing: Duration,
     retry_backoff: Duration,
     size_caps: [u64; 5],
@@ -289,6 +292,7 @@ impl Default for StoreConfig {
     fn default() -> Self {
         Self {
             page_limits: [None; 5],
+            gb_maps_page_limit: None,
             request_spacing: Duration::from_millis(200),
             retry_backoff: Duration::from_secs(2),
             size_caps: [200 * MB, 200 * MB, 100 * MB, 50 * MB, 50 * MB],
@@ -302,6 +306,18 @@ impl Default for StoreConfig {
     }
 }
 
+/// Every page of a `record_count` catalogue at `page_size` plus 10%; a missing count (0)
+/// falls back to the flat limit.
+fn derived_limit(record_count: u32, page_size: u32) -> u32 {
+    if record_count == 0 {
+        return DEFAULT_PAGE_LIMIT;
+    }
+    record_count
+        .div_ceil(page_size)
+        .saturating_mul(11)
+        .div_ceil(10)
+}
+
 impl StoreConfig {
     /// The last GameBanana page a sync of `kind` fetches, given the catalogue size the
     /// first page reported: 500, or for sounds every page plus 10%, unless fixed.
@@ -309,12 +325,16 @@ impl StoreConfig {
         match self.page_limits[kind.index()] {
             Some(pages) => pages,
             // A missing catalogue size reads as 0, so it falls back to the flat limit.
-            None if kind == StoreKind::Sounds && record_count > 0 => {
-                let pages = record_count.div_ceil(gamebanana::PAGE_SIZE);
-                pages.saturating_mul(11).div_ceil(10)
-            }
+            None if kind == StoreKind::Sounds => derived_limit(record_count, gamebanana::PAGE_SIZE),
             None => DEFAULT_PAGE_LIMIT,
         }
+    }
+
+    /// The last page a GameBanana maps sync fetches: every page of `record_count` plus 10%,
+    /// 500 when the count is missing, unless fixed.
+    pub fn gb_maps_page_limit(&self, record_count: u32) -> u32 {
+        self.gb_maps_page_limit
+            .unwrap_or_else(|| derived_limit(record_count, gb_maps::MAPS_PAGE_SIZE))
     }
 
     /// The gap between API requests: the GameBanana pacer's base gap, measured start to start,
@@ -382,6 +402,12 @@ impl StoreConfig {
     /// This config with a fixed page limit for `kind`.
     pub fn with_page_limit(mut self, kind: StoreKind, pages: u32) -> Self {
         self.page_limits[kind.index()] = Some(pages);
+        self
+    }
+
+    /// This config with a fixed page limit for the GameBanana maps sync.
+    pub fn with_gb_maps_page_limit(mut self, pages: u32) -> Self {
+        self.gb_maps_page_limit = Some(pages);
         self
     }
 
