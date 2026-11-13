@@ -195,21 +195,7 @@ pub struct PanelRule {
 
 // The survey's PanelRules table, in `PartId` order so `get` can index by discriminant.
 pub(super) static RULES: [PanelRule; 12] = [
-    PanelRule {
-        id: PartId::Health,
-        label: "Health",
-        shows_when: "Shows while you are alive",
-        panel: "HudPlayerHealth",
-        parent: Some("HudPlayerStatus"),
-        geometry: &[],
-        children_file: "resource/ui/hudplayerhealth.res",
-        ignores: &[],
-        centres_x: false,
-        centres_y: false,
-        children: true,
-        clickable: true,
-        fills_screen: false,
-    },
+    HEALTH,
     PanelRule {
         id: PartId::ClassPortrait,
         label: "Class portrait",
@@ -225,21 +211,7 @@ pub(super) static RULES: [PanelRule; 12] = [
         clickable: true,
         fills_screen: false,
     },
-    PanelRule {
-        id: PartId::Ammo,
-        label: "Ammo",
-        shows_when: "Shows when your weapon uses ammo",
-        panel: "HudWeaponAmmo",
-        parent: None,
-        geometry: &[(HUDLAYOUT, "HudWeaponAmmo")],
-        children_file: "resource/ui/hudammoweapons.res",
-        ignores: &["visible"],
-        centres_x: false,
-        centres_y: false,
-        children: true,
-        clickable: true,
-        fills_screen: false,
-    },
+    AMMO,
     PanelRule {
         id: PartId::UberMeter,
         label: "Uber meter",
@@ -315,25 +287,61 @@ pub(super) static RULES: [PanelRule; 12] = [
         clickable: true,
         fills_screen: false,
     },
-    PanelRule {
-        id: PartId::RoundTimer,
-        label: "Round timer",
-        shows_when: "Shows in a timed round",
-        panel: "ObjectiveStatusTimePanel",
-        parent: Some("HudMatchStatus"),
-        geometry: &[("resource/ui/hudmatchstatus.res", "ObjectiveStatusTimePanel")],
-        children_file: "resource/ui/hudobjectivetimepanel.res",
-        ignores: &["visible"],
-        centres_x: false,
-        centres_y: false,
-        children: true,
-        clickable: true,
-        fills_screen: false,
-    },
+    ROUND_TIMER,
     KILLFEED,
     CHAT,
     KOTH_TIMER,
 ];
+
+// The health cross hangs in hudlayout's HudPlayerStatus container; its own file gives its box.
+const HEALTH: PanelRule = PanelRule {
+    id: PartId::Health,
+    label: "Health",
+    shows_when: "Shows while you are alive",
+    panel: "HudPlayerHealth",
+    parent: Some("HudPlayerStatus"),
+    geometry: &[],
+    children_file: "resource/ui/hudplayerhealth.res",
+    ignores: &[],
+    centres_x: false,
+    centres_y: false,
+    children: true,
+    clickable: true,
+    fills_screen: false,
+};
+
+const AMMO: PanelRule = PanelRule {
+    id: PartId::Ammo,
+    label: "Ammo",
+    shows_when: "Shows when your weapon uses ammo",
+    panel: "HudWeaponAmmo",
+    parent: None,
+    geometry: &[(HUDLAYOUT, "HudWeaponAmmo")],
+    children_file: "resource/ui/hudammoweapons.res",
+    ignores: &["visible"],
+    centres_x: false,
+    centres_y: false,
+    children: true,
+    clickable: true,
+    fills_screen: false,
+};
+
+// The round timer sits in the match status container, its box from that container's file.
+const ROUND_TIMER: PanelRule = PanelRule {
+    id: PartId::RoundTimer,
+    label: "Round timer",
+    shows_when: "Shows in a timed round",
+    panel: "ObjectiveStatusTimePanel",
+    parent: Some("HudMatchStatus"),
+    geometry: &[("resource/ui/hudmatchstatus.res", "ObjectiveStatusTimePanel")],
+    children_file: "resource/ui/hudobjectivetimepanel.res",
+    ignores: &["visible"],
+    centres_x: false,
+    centres_y: false,
+    children: true,
+    clickable: true,
+    fills_screen: false,
+};
 
 // HudDeathNotice draws its notices in code, so its block's ControlName siblings in
 // hudlayout.res are not its children; its box spans most of the screen, so the canvas
@@ -453,22 +461,30 @@ pub(super) static FREEZE_PANELS: [PanelRule; 4] = [
 ];
 
 // The win panel's box comes from hudlayout and everything hangs off it, so it is neither
-// clickable nor hideable.
-pub(super) static WIN_PANEL: PanelRule = PanelRule {
-    id: PartId::WinPanel,
-    label: "Win panel",
-    shows_when: "Shows when a round ends",
-    panel: "WinPanel",
-    parent: None,
-    geometry: &[(HUDLAYOUT, "WinPanel")],
-    children_file: "resource/ui/winpanel.res",
-    ignores: &[],
-    centres_x: false,
-    centres_y: false,
-    children: true,
-    clickable: false,
-    fills_screen: false,
-};
+// clickable nor hideable. The game keeps health, ammo, the timer and chat around it at round
+// end; the point icons share its "mid" render group, so it hides them.
+pub(super) static WIN_PANELS: [PanelRule; 6] = [
+    PanelRule {
+        id: PartId::WinPanel,
+        label: "Win panel",
+        shows_when: "Shows when a round ends",
+        panel: "WinPanel",
+        parent: None,
+        geometry: &[(HUDLAYOUT, "WinPanel")],
+        children_file: "resource/ui/winpanel.res",
+        ignores: &[],
+        centres_x: false,
+        centres_y: false,
+        children: true,
+        clickable: false,
+        fills_screen: false,
+    },
+    HEALTH,
+    AMMO,
+    ROUND_TIMER,
+    CHAT,
+    KOTH_TIMER,
+];
 
 // The class menu's own box is its file's first block, `class`, so it is neither clickable
 // nor hideable.
@@ -490,7 +506,8 @@ pub(super) static CLASS_SELECT: PanelRule = PanelRule {
 
 // The spectator screen is the file's first block, `Spectator`; the game sizes it to the whole
 // screen whatever the file says, so it is neither clickable nor hideable and ignores its box.
-pub(super) static SPECTATOR_PANELS: [PanelRule; 2] = [
+// While you are dead the game keeps the killfeed, chat and KOTH panel over it.
+pub(super) static SPECTATOR_PANELS: [PanelRule; 5] = [
     PanelRule {
         id: PartId::Spectator,
         label: "Spectator",
@@ -521,6 +538,9 @@ pub(super) static SPECTATOR_PANELS: [PanelRule; 2] = [
         clickable: true,
         fills_screen: false,
     },
+    KILLFEED,
+    CHAT,
+    KOTH_TIMER,
 ];
 
 impl PanelRule {
@@ -535,7 +555,7 @@ impl PanelRule {
             PartId::Scoreboard => &SCOREBOARD,
             PartId::MainMenu => &MAIN_MENU,
             PartId::FreezeCam => &FREEZE_PANELS[0],
-            PartId::WinPanel => &WIN_PANEL,
+            PartId::WinPanel => &WIN_PANELS[0],
             PartId::ClassSelect => &CLASS_SELECT,
             PartId::Spectator => &SPECTATOR_PANELS[0],
             PartId::SpectatorTargetId => &SPECTATOR_PANELS[1],

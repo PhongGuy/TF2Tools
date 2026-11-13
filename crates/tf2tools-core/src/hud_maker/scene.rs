@@ -4,7 +4,7 @@
 use super::probe;
 use super::rules::{
     CLASS_SELECT, FREEZE_PANELS, HOLD_SCORES, MAIN_MENU, RULES, SCOREBOARD, SPECTATOR_PANELS,
-    WIN_PANEL,
+    WIN_PANELS,
 };
 use super::{
     GameSituation, HideTechnique, HudModel, PanelRule, SampleSet, SituationSwitch, WeaponKind,
@@ -119,7 +119,8 @@ pub enum ShowsFor {
     Weapon(&'static str),
     /// While an effect is on you: `"condition"` or `"powerup"`.
     Effect(&'static str),
-    /// While a mode or setting is on: `"3D model"`, `"2D portrait"` or `"typing"` (a chat message).
+    /// While a mode or setting is on: `"3D model"`, `"2D portrait"`, `"typing"` (a chat message)
+    /// or `"full hud"` (Minimal HUD off).
     Mode(&'static str),
     /// While you aim at something: `"player"`.
     Aim(&'static str),
@@ -139,6 +140,7 @@ impl ShowsFor {
     pub fn holds_in(self, s: &GameSituation, model: &HudModel) -> bool {
         match self {
             ShowsFor::Health("pulse") => s.health_pulse(model),
+            ShowsFor::Mode("full hud") => !model.minmode(),
             ShowsFor::Class(_)
             | ShowsFor::Weapon(_)
             | ShowsFor::Effect(_)
@@ -166,6 +168,8 @@ impl ShowsFor {
             ShowsFor::Mode("typing") => s.is_on(SituationSwitch::Typing),
             ShowsFor::Mode("koth") => s.is_on(SituationSwitch::Koth),
             ShowsFor::Mode("not koth") => !s.is_on(SituationSwitch::Koth),
+            // The sample's HUD is the full one; only `holds_in` knows the model's mode.
+            ShowsFor::Mode("full hud") => true,
             ShowsFor::Aim(_) => s.is_on(SituationSwitch::Aiming),
             ShowsFor::Health("pulse") => s.health_pulse_under(super::situation::DEATH_WARNING),
             ShowsFor::Weapon(_) | ShowsFor::Effect(_) | ShowsFor::Mode(_) | ShowsFor::Health(_) => {
@@ -176,7 +180,7 @@ impl ShowsFor {
 }
 
 /// A panel the game's code shows or hides in a scene, whatever its file says.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub struct CodeToggled {
     panel: &'static str,
@@ -311,6 +315,24 @@ const fn when(panel: &'static str, shows_for: ShowsFor, shows_when: &'static str
     }
 }
 
+// Table `a` then table `b`, so scenes that keep the same HUD parts share their toggles.
+const fn joined<const A: usize, const B: usize, const N: usize>(
+    a: [CodeToggled; A],
+    b: [CodeToggled; B],
+) -> [CodeToggled; N] {
+    assert!(
+        A > 0 && A + B == N,
+        "the joined table's length is both tables'"
+    );
+    let mut out = [a[0]; N];
+    let mut i = 0;
+    while i < N {
+        out[i] = if i < A { a[i] } else { b[i - A] };
+        i += 1;
+    }
+    out
+}
+
 const CLIP: ShowsFor = ShowsFor::Weapon("clip");
 const CLIP_WHEN: &str = "Shows for weapons with a clip";
 const NO_CLIP: ShowsFor = ShowsFor::Weapon("no clip");
@@ -342,8 +364,8 @@ const KOTH_TOGGLED: CodeToggled = fitted(
 );
 
 // What the game checks before it shows each HUD part its code toggles; the preview shows the
-// default situation, `ShowsFor::in_default`.
-static HUD_TOGGLED: [CodeToggled; 61] = [
+// default situation, `ShowsFor::in_default`. These are the parts only the HUD scene draws.
+const HUD_ONLY_TOGGLED: [CodeToggled; 17] = [
     when(
         "CMainTargetID",
         ShowsFor::Aim("player"),
@@ -374,11 +396,6 @@ static HUD_TOGGLED: [CodeToggled; 61] = [
         ShowsFor::Class("Medic"),
         "Shows when you hold a Medi Gun",
     ),
-    when(
-        "HudWeaponAmmo",
-        ShowsFor::Weapon("ammo"),
-        "Shows when your weapon uses ammo",
-    ),
     // CHudMedicChargeMeter shows the per-charge bars only for the Vaccinator.
     when("IndividualChargesLabel", VACCINATOR, VACCINATOR_WHEN),
     when("ChargeMeter1", VACCINATOR, VACCINATOR_WHEN),
@@ -389,22 +406,6 @@ static HUD_TOGGLED: [CodeToggled; 61] = [
         "HudItemEffectMeter",
         ShowsFor::Weapon("meter"),
         "Shows with weapons that have a meter, such as the Sandman",
-    ),
-    when("AmmoInClip", CLIP, CLIP_WHEN),
-    when("AmmoInClipShadow", CLIP, CLIP_WHEN),
-    when("AmmoInReserve", CLIP, CLIP_WHEN),
-    when("AmmoInReserveShadow", CLIP, CLIP_WHEN),
-    when("AmmoNoClip", NO_CLIP, NO_CLIP_WHEN),
-    when("AmmoNoClipShadow", NO_CLIP, NO_CLIP_WHEN),
-    when(
-        "PlayerStatusHealthBonusImage",
-        ShowsFor::Health("pulse"),
-        "Shows while you are overhealed or low on health",
-    ),
-    when(
-        "HudWeaponLowAmmoImage",
-        ShowsFor::Weapon("low ammo"),
-        "Shows when your ammo runs low",
     ),
     when("PlayerStatusClassImage", PORTRAIT, PORTRAIT_WHEN),
     when("PlayerStatusClassImageBG", PORTRAIT, PORTRAIT_WHEN),
@@ -424,6 +425,32 @@ static HUD_TOGGLED: [CodeToggled; 61] = [
         "MoveableSubPanel",
         ShowsFor::Class("Engineer"),
         "Shows when you aim at a building you can move",
+    ),
+];
+
+// The toggles of the HUD parts the game keeps around the win panel at round end: health, ammo,
+// the round timer or KOTH clocks, and chat.
+const ROUND_END_TOGGLED: [CodeToggled; 44] = [
+    when(
+        "HudWeaponAmmo",
+        ShowsFor::Weapon("ammo"),
+        "Shows when your weapon uses ammo",
+    ),
+    when("AmmoInClip", CLIP, CLIP_WHEN),
+    when("AmmoInClipShadow", CLIP, CLIP_WHEN),
+    when("AmmoInReserve", CLIP, CLIP_WHEN),
+    when("AmmoInReserveShadow", CLIP, CLIP_WHEN),
+    when("AmmoNoClip", NO_CLIP, NO_CLIP_WHEN),
+    when("AmmoNoClipShadow", NO_CLIP, NO_CLIP_WHEN),
+    when(
+        "PlayerStatusHealthBonusImage",
+        ShowsFor::Health("pulse"),
+        "Shows while you are overhealed or low on health",
+    ),
+    when(
+        "HudWeaponLowAmmoImage",
+        ShowsFor::Weapon("low ammo"),
+        "Shows when your ammo runs low",
     ),
     when("PlayerStatusBleedImage", CONDITION, CONDITION_WHEN),
     when("PlayerStatusHookBleedImage", CONDITION, CONDITION_WHEN),
@@ -510,6 +537,8 @@ static HUD_TOGGLED: [CodeToggled; 61] = [
         Fit::None,
     ),
 ];
+
+static HUD_TOGGLED: [CodeToggled; 61] = joined(HUD_ONLY_TOGGLED, ROUND_END_TOGGLED);
 
 /// The round timer's children file, which each KOTH team timer loads too.
 const TIME_PANEL: &str = "resource/ui/hudobjectivetimepanel.res";
@@ -877,13 +906,24 @@ static FREEZE_TOGGLED: [CodeToggled; 9] = [
     // The HUD parts kept over the freeze cam: the KOTH panel only on a KOTH map, its timers'
     // digits blank until the respawn count starts, and no chat typing in the sample.
     KOTH_TOGGLED,
-    toggled("ChatInputLine", false, TYPING_WHEN),
-    toggled("ChatFiltersButton", false, TYPING_WHEN),
-    toggled(
-        "TimePanelValue",
-        false,
-        "Shows the time left while you are alive",
-    ),
+    CHAT_INPUT_TOGGLED,
+    CHAT_FILTERS_TOGGLED,
+    KOTH_DIGITS_TOGGLED,
+];
+
+// The HUD parts the game keeps while you are dead, in the freeze cam and the spectator screen:
+// nobody types in the sample; in the freeze cam the KOTH timers also blank their digits.
+const CHAT_INPUT_TOGGLED: CodeToggled = toggled("ChatInputLine", false, TYPING_WHEN);
+const CHAT_FILTERS_TOGGLED: CodeToggled = toggled("ChatFiltersButton", false, TYPING_WHEN);
+const KOTH_DIGITS_TOGGLED: CodeToggled = toggled(
+    "TimePanelValue",
+    false,
+    "Shows the time left while you are alive",
+);
+const DEAD_HUD_FILES: [&str; 3] = [
+    "resource/ui/basechat.res",
+    "resource/ui/hudobjectivekothtimepanel.res",
+    TIME_PANEL,
 ];
 
 // The freeze cam reads its root's box from hudlayout, the panel file and the killer health
@@ -895,15 +935,11 @@ static FREEZE: SceneRule = SceneRule {
         "scripts/hudlayout.res",
         "resource/ui/freezepanel_basic.res",
         "resource/ui/freezepanelkillerhealth.res",
-        "resource/ui/basechat.res",
-        "resource/ui/hudobjectivekothtimepanel.res",
-        TIME_PANEL,
+        DEAD_HUD_FILES[0],
+        DEAD_HUD_FILES[1],
+        DEAD_HUD_FILES[2],
     ],
-    extras: &[
-        "resource/ui/basechat.res",
-        "resource/ui/hudobjectivekothtimepanel.res",
-        TIME_PANEL,
-    ],
+    extras: &DEAD_HUD_FILES,
     read_only: &[],
     root: Some("FreezePanel"),
     rules: &FREEZE_PANELS,
@@ -934,7 +970,7 @@ const STREAK: &str = "Shows when a player has a killstreak";
 // What the win panel's code shows or hides (`CTFWinPanel::FireGameEvent` and `UpdateTeamInfo`,
 // by function name): the scores only at a round's end, the leader pictures only for premade
 // parties, the player rows only for a player who scored, the badges only with player ranks.
-static WIN_TOGGLED: [CodeToggled; 27] = [
+const WIN_OWN_TOGGLED: [CodeToggled; 27] = [
     toggled("TeamScoresPanel", true, ROUND_END),
     toggled("BlueTeamLabel", true, NO_LEADER),
     toggled("RedTeamLabel", true, NO_LEADER),
@@ -964,21 +1000,41 @@ static WIN_TOGGLED: [CodeToggled; 27] = [
     toggled("KillStreakPlayer1Badge", false, RANKED),
 ];
 
+static WIN_TOGGLED: [CodeToggled; 27 + ROUND_END_TOGGLED.len()] =
+    joined(WIN_OWN_TOGGLED, ROUND_END_TOGGLED);
+
 // The win panel reads its root's box from hudlayout and its controls from one file; the HUD
-// is not drawn there. Its code toggles match at any depth because the scores sit one level down.
+// parts kept around it and the crosshair stay, read from their own files. Its code toggles
+// match at any depth because the scores sit one level down.
 static WIN: SceneRule = SceneRule {
     scene: Scene::WinPanel,
     label: "Win panel",
-    files: &["scripts/hudlayout.res", "resource/ui/winpanel.res"],
-    extras: &[],
+    files: &[
+        "scripts/hudlayout.res",
+        "resource/ui/winpanel.res",
+        "resource/ui/hudplayerhealth.res",
+        "resource/ui/hudammoweapons.res",
+        "resource/ui/hudmatchstatus.res",
+        TIME_PANEL,
+        "resource/ui/basechat.res",
+        "resource/ui/hudobjectivekothtimepanel.res",
+    ],
+    extras: &[
+        "resource/ui/hudplayerhealth.res",
+        "resource/ui/hudammoweapons.res",
+        "resource/ui/hudmatchstatus.res",
+        TIME_PANEL,
+        "resource/ui/basechat.res",
+        "resource/ui/hudobjectivekothtimepanel.res",
+    ],
     read_only: &[],
     root: Some("WinPanel"),
-    rules: std::slice::from_ref(&WIN_PANEL),
+    rules: &WIN_PANELS,
     code_toggled: &WIN_TOGGLED,
     code_classes: &[],
     toggle_any_depth: true,
-    nested: &[],
-    hides_hud: true,
+    nested: &[("BlueTimer", TIME_PANEL), ("RedTimer", TIME_PANEL)],
+    hides_hud: false,
     sample: SampleSet::Won,
     mode: BoardMode::Casual,
     conditions: &[],
@@ -1056,12 +1112,15 @@ static CLASS: SceneRule = SceneRule {
 };
 
 const WATCHING: &str = "Shows while you watch other players";
-const CAMERA: &str = "Shows when you may change the camera mode";
-const PICKING: &str = "Shows when you may pick who to watch";
+const WATCHING_FULL: &str = "Shows while you watch other players with Minimal HUD off";
+const CAMERA: &str = "Shows when the server lets you change the camera mode";
+const PICKING_FULL: &str = "Shows when you may pick who to watch, with Minimal HUD off";
+// Minimal HUD drops the bars and the key hints from the spectator screen.
+const FULL_HUD: ShowsFor = ShowsFor::Mode("full hud");
 
 // What the spectator code (`CTFSpectatorGUI` and `CSpectatorGUI`, by function name) shows or
-// fits: the bars are turned on and sized after the file loads, the key hints forced on while
-// the server lets the dead watch anyone, the buy-back line and item panel kept for their modes.
+// fits: the bars are turned on and sized after the file loads, the camera hint hidden under the
+// default mp_forcecamera 1, the buy-back line and item panel kept for their modes.
 const TARGET: &str = "Shows while you watch a player in first person";
 // The HUD tab's target ID labels: the game sets their colour on every update. Their x is the
 // file's here, so only the colour keys are owned. Whether fgcolor_override is also overwritten is
@@ -1071,16 +1130,16 @@ const LABEL_COLOUR_OWNED: &[&str] = &["fgcolor", "fgcolor_override"];
 // The target ID labels' x and colour are the game's: the code places them after the health
 // panel and overwrites their colour with the scheme's label colour.
 const LABEL_OWNED: &[&str] = &["xpos", "fgcolor", "fgcolor_override"];
-static SPECTATOR_TOGGLED: [CodeToggled; 23] = [
+static SPECTATOR_TOGGLED: [CodeToggled; 26] = [
     toggled("Spectator", true, WATCHING),
     fitted(
-        toggled("topbar", true, WATCHING),
+        when("topbar", FULL_HUD, WATCHING_FULL),
         &["xpos", "ypos", "wide"],
         HideTechnique::TallZero,
         Fit::TopBar,
     ),
     fitted(
-        toggled("bottombarblank", true, WATCHING),
+        when("bottombarblank", FULL_HUD, WATCHING_FULL),
         &["xpos", "ypos", "wide", "tall"],
         HideTechnique::NotOffered,
         Fit::BottomBar,
@@ -1090,12 +1149,12 @@ static SPECTATOR_TOGGLED: [CodeToggled; 23] = [
         true,
         "Shows to a dead player waiting to respawn",
     ),
-    toggled("SwitchCamModeKeyLabel", true, CAMERA),
-    toggled("SwitchCamModeLabel", true, CAMERA),
-    toggled("CycleTargetFwdKeyLabel", true, PICKING),
-    toggled("CycleTargetFwdLabel", true, PICKING),
-    toggled("CycleTargetRevKeyLabel", true, PICKING),
-    toggled("CycleTargetRevLabel", true, PICKING),
+    toggled("SwitchCamModeKeyLabel", false, CAMERA),
+    toggled("SwitchCamModeLabel", false, CAMERA),
+    when("CycleTargetFwdKeyLabel", FULL_HUD, PICKING_FULL),
+    when("CycleTargetFwdLabel", FULL_HUD, PICKING_FULL),
+    when("CycleTargetRevKeyLabel", FULL_HUD, PICKING_FULL),
+    when("CycleTargetRevLabel", FULL_HUD, PICKING_FULL),
     toggled(
         "BuyBackLabel",
         false,
@@ -1169,10 +1228,14 @@ static SPECTATOR_TOGGLED: [CodeToggled; 23] = [
             gap: 8,
         },
     ),
+    // The HUD parts kept while dead; the KOTH digits, three levels down, keep the file's state.
+    KOTH_TOGGLED,
+    CHAT_INPUT_TOGGLED,
+    CHAT_FILTERS_TOGGLED,
 ];
 
-// The spectator screen is one file whose first block is the screen's own box; no HUD part
-// is drawn over the bars.
+// The spectator screen is one file whose first block is the screen's own box; of the HUD only
+// the killfeed, chat and KOTH panel stay over it, as in the freeze cam.
 static SPECTATE: SceneRule = SceneRule {
     scene: Scene::Spectator,
     label: "Spectator",
@@ -1181,11 +1244,17 @@ static SPECTATE: SceneRule = SceneRule {
         "scripts/hudlayout.res",
         "resource/ui/targetid.res",
         "resource/ui/spectatorguihealth.res",
+        DEAD_HUD_FILES[0],
+        DEAD_HUD_FILES[1],
+        DEAD_HUD_FILES[2],
     ],
     extras: &[
         "scripts/hudlayout.res",
         "resource/ui/targetid.res",
         "resource/ui/spectatorguihealth.res",
+        DEAD_HUD_FILES[0],
+        DEAD_HUD_FILES[1],
+        DEAD_HUD_FILES[2],
     ],
     read_only: &[],
     root: Some("Spectator"),
@@ -1193,7 +1262,11 @@ static SPECTATE: SceneRule = SceneRule {
     code_toggled: &SPECTATOR_TOGGLED,
     code_classes: &[],
     toggle_any_depth: false,
-    nested: &[("SpectatorGUIHealth", "resource/ui/spectatorguihealth.res")],
+    nested: &[
+        ("SpectatorGUIHealth", "resource/ui/spectatorguihealth.res"),
+        ("BlueTimer", TIME_PANEL),
+        ("RedTimer", TIME_PANEL),
+    ],
     hides_hud: true,
     sample: SampleSet::Spectating,
     mode: BoardMode::Casual,
@@ -1326,7 +1399,7 @@ impl SceneRule {
         self.nested
     }
 
-    /// Whether the game hides the HUD's crosshair and every HUD part the scene's rules omit.
+    /// Whether the game hides the crosshair in this scene; HUD parts its rules omit never draw.
     pub fn hides_hud(&self) -> bool {
         self.hides_hud
     }

@@ -655,10 +655,11 @@ static CLASS_VARIABLES: [(&str, &str); 9] = [
     ("numspy", "1"),
 ];
 
-// What the spectator view fills in: the tip and the default key names the game puts in its hints.
+// What the spectator view fills in: the tip and the key names of TF2's default binds, which the
+// game puts in its hints (changeclass is bound to the comma key).
 static SPECTATOR_VARIABLES: [(&str, &str); 8] = [
     ("tip", "Tip: Stick with the Medic to find the next fight."),
-    ("changeclass", "N"),
+    ("changeclass", ","),
     ("jump", "SPACE"),
     ("attack", "MOUSE1"),
     ("attack2", "MOUSE2"),

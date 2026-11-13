@@ -30,8 +30,8 @@ fn at(m: &HudModel, key: &str) -> (i32, i32, i32, i32) {
 fn the_scene_has_a_second_root_for_the_target_id() {
     let rule = SceneRule::get(Scene::Spectator);
     let ids: Vec<PartId> = rule.rules().iter().map(PanelRule::id).collect();
-    assert_eq!(ids, [PartId::Spectator, PartId::SpectatorTargetId]);
-    assert_eq!(rule.extras().len(), 3);
+    assert_eq!(ids[..2], [PartId::Spectator, PartId::SpectatorTargetId]);
+    assert_eq!(rule.extras().len(), 6);
     assert_eq!(rule.problem_files(), ["resource/ui/spectator.res"]);
     let id = PanelRule::get(PartId::SpectatorTargetId);
     assert_eq!(

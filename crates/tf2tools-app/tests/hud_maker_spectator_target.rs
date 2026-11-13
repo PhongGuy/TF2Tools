@@ -2,7 +2,8 @@
 
 use crate::support;
 
-use gpui_kit::{AppContext as _, Entity, TestAppContext};
+use gpui_kit::test::TestWindowExt as _;
+use gpui_kit::{AppContext as _, Entity, Pixels, TestAppContext, point, px};
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::{Field, HudMakerPage};
 use tf2tools_app::services::Tf2State;
@@ -12,6 +13,7 @@ const ROOT: &str = "CSpectatorTargetID";
 const NAME: &str = "CSpectatorTargetID/TargetNameLabel";
 const DATA: &str = "CSpectatorTargetID/TargetDataLabel";
 const VALUE: &str = "CSpectatorTargetID/SpectatorGUIHealth/PlayerStatusHealthValue";
+const BG: &str = "CSpectatorTargetID/TargetIDBG_Spec_Red";
 
 fn found(env: &support::Env) -> Tf2State {
     Tf2State::Found(Tf2Install::from_path(&env.game).unwrap())
@@ -80,14 +82,68 @@ fn the_tab_draws_the_watched_players_name_line_and_health(cx: &mut TestAppContex
 fn the_name_label_sits_at_the_x_the_code_gives_it(cx: &mut TestAppContext) {
     let (s, _page) = on_spectator(cx);
     let canvas = support::bounds_of(cx, s.win, ids::HUD_MAKER_CANVAS).unwrap();
+    let bg = support::bounds_of(cx, s.win, ids::hud_maker_part(&PartKey::new(BG))).unwrap();
     let name = support::bounds_of(cx, s.win, ids::hud_maker_part(&PartKey::new(NAME))).unwrap();
-    // 1920x1080 at scale 2.25: the root is (1920 - 567) / 2 = 676 px from the left, the health
-    // panel 72 px wide, and XRES(8) = 8 * 1920 / 640 = 24 px: the label starts at 772 px.
-    let fx = f32::from(name.left() - canvas.left()) / f32::from(canvas.size.width);
+    // 1920x1080 at scale 2.25: the health panel is 72 px wide and XRES(8) = 8 * 1920 / 640 =
+    // 24 px, so the label starts 96 px into the panel, whose left the red background shares.
+    let per_px = f32::from(canvas.size.width) / 1920.;
+    let into = f32::from(name.left() - bg.left()) / per_px;
     let fy = f32::from(name.top() - canvas.top()) / f32::from(canvas.size.height);
-    assert!((fx - 772. / 1920.).abs() < 0.005, "{fx}");
+    assert!((into - 96.).abs() < 2., "{into}");
     // The root's y is 250 * 2.25 = 562 px, the label's 5 * 2.25 = 11 px below it.
     assert!((fy - 573. / 1080.).abs() < 0.005, "{fy}");
+}
+
+#[gpui_kit::test]
+fn the_panel_is_sized_around_the_name_not_the_file_s_width(cx: &mut TestAppContext) {
+    let (s, _page) = on_spectator(cx);
+    let screen = support::bounds_of(cx, s.win, ids::HUD_MAKER_CANVAS).unwrap();
+    let bg = support::bounds_of(cx, s.win, ids::hud_maker_part(&PartKey::new(BG))).unwrap();
+    let name = support::bounds_of(cx, s.win, ids::hud_maker_text(&PartKey::new(NAME))).unwrap();
+    let data = support::bounds_of(cx, s.win, ids::hud_maker_text(&PartKey::new(DATA))).unwrap();
+    let per_px = f32::from(screen.size.width) / 1920.;
+    let wide = f32::from(bg.size.width) / per_px;
+    let text = f32::from(name.size.width.max(data.size.width)) / per_px;
+    // CSpectatorTargetID::PerformLayout: the health panel (72 px), XRES(5 + 10) = 45 px and
+    // the wider line; the file's 252 units (567 px) no longer count.
+    assert!(
+        (wide - (72. + 45. + text)).abs() < 3.,
+        "{wide} for text {text}"
+    );
+    assert!(wide < 400., "{wide}");
+    // Still centred across the screen.
+    let left = f32::from(bg.left() - screen.left()) / per_px;
+    assert!((left - (1920. - wide) / 2.).abs() < 2., "{left}");
+}
+
+#[gpui_kit::test]
+fn a_click_selects_the_panel_only_where_it_is_drawn(cx: &mut TestAppContext) {
+    let (s, page) = on_spectator(cx);
+    support::put_start_card_away(cx, s.win);
+    let screen = support::bounds_of(cx, s.win, ids::HUD_MAKER_CANVAS).unwrap();
+    let bg = support::bounds_of(cx, s.win, ids::hud_maker_part(&PartKey::new(BG))).unwrap();
+    let per_px = screen.size.width / 1920.;
+    // The file's box is 252 units (567 px) wide and centred: its right edge is at 1243 px.
+    let file_right = screen.left() + per_px * 1243.;
+    assert!(
+        bg.right() + px(4.) < file_right,
+        "the drawn panel is narrower"
+    );
+    let y = bg.top() + bg.size.height / 2. - screen.top();
+    let mut click = |x: Pixels| {
+        cx.update_window(s.win, |_, w, cx| {
+            w.click_at(ids::HUD_MAKER_CANVAS, point(x - screen.left(), y), cx)
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+        cx.update(|cx| page.read(cx).editor().and_then(|e| e.selected().cloned()))
+    };
+    // Right of the drawn panel, still inside the file's box: nothing is there in game.
+    let outside = bg.right() + (file_right - bg.right()) / 2.;
+    assert_eq!(click(outside), None);
+    // On the drawn panel: the target ID.
+    let inside = click(bg.right() - px(3.)).expect("a selection");
+    assert!(inside.as_str().starts_with(ROOT), "{inside:?}");
 }
 
 #[gpui_kit::test]
