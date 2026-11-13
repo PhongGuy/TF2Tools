@@ -290,10 +290,14 @@ impl GraphicsPage {
                 page.run(
                     move |s| {
                         jobs::refuse_while_running(&*probe)?;
-                        s.library.remove_mastercomfig(&tf2).map_err(|e| {
+                        let restored = s.library.remove_mastercomfig(&tf2).map_err(|e| {
                             describe_remove(&e).into_op("Failed to remove mastercomfig")
                         })?;
-                        let text = "mastercomfig is no longer in TF2.";
+                        let mut text = "mastercomfig is no longer in TF2.".to_owned();
+                        if restored {
+                            text.push(' ');
+                            text.push_str(crate::pages::addons::model::MOVEMENT_OFF);
+                        }
                         Ok(("mastercomfig removed".into(), text.into()))
                     },
                     cx,

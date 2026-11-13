@@ -32,7 +32,7 @@ Go class by class and give each weapon its own crosshair: one of TF2's own, an i
 
 ### mastercomfig addons
 
-Install mastercomfig's addons from the Addon Store. The Addons page shows what you have and offers updates when mastercomfig releases new ones.
+Install mastercomfig's addons from the Addon Store. The Addons page shows what you have and offers updates when mastercomfig releases new ones. Turning on Null-Canceling Movement sets up your movement keys for you, and turning it off puts them back.
 
 ![The Addon Store](.github/readme/addon-store.webp)
 

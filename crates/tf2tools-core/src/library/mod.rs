@@ -19,6 +19,7 @@ mod live_link;
 mod made_huds;
 mod mastercomfig;
 mod mastercomfig_modules;
+mod movement;
 mod sounds;
 mod tree_copy;
 
@@ -65,6 +66,10 @@ pub(crate) use mastercomfig::{
 pub use mastercomfig_modules::{
     Choices, ComfigModule, ModuleCatalog, ModuleCategory, ModuleChoice, ModuleValue, readable_name,
 };
+pub(crate) use movement::NULL_MOVEMENT;
+#[cfg(test)]
+pub(crate) use movement::movement_keys;
+pub use movement::{MoveDirection, MovementKeys};
 pub use profiles::{
     ApplyProfileReport, ApplyStep, DraftCrosshair, DraftSlot, MissingItem, MissingKind, Profile,
     ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate,

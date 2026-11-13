@@ -39,3 +39,41 @@ pub fn count_line(library: usize, installed: usize) -> String {
         format!("{library} in library, {installed} installed")
     }
 }
+
+/// The toast line when Null-Canceling Movement is turned off.
+pub const MOVEMENT_OFF: &str = "Your movement keys are back to normal.";
+
+/// The toast line when Null-Canceling Movement is turned on: the keys now on it (in W, A, S,
+/// D order), the directions with no key, and whether TF2 must restart first.
+pub fn movement_on_text(keys: &[String], missing: &[&str], running: bool) -> String {
+    let mut text = if keys.is_empty() {
+        "No movement keys were found in your TF2 settings, so it has nothing to use yet.".to_owned()
+    } else {
+        let names: Vec<String> = keys.iter().map(|k| key_label(k)).collect();
+        let mut text = format!("Your {} keys now use it.", names.join(", "));
+        if !missing.is_empty() {
+            let directions = missing.join(" or ");
+            text.push_str(&format!(
+                " No key moves you {directions}, so set one in TF2."
+            ));
+        }
+        text
+    };
+    if running && !keys.is_empty() {
+        text.push_str(" It starts next time TF2 opens.");
+    }
+    text
+}
+
+// A key as a player reads it: letters in capitals, arrow keys spelled out.
+fn key_label(key: &str) -> String {
+    let lower = key.to_ascii_lowercase();
+    match lower.strip_suffix("arrow") {
+        Some(way @ ("up" | "down" | "left" | "right")) => {
+            let mut chars = way.chars();
+            let first = chars.next().map(|c| c.to_ascii_uppercase());
+            format!("{}{} arrow", first.unwrap_or_default(), chars.as_str())
+        }
+        _ => key.to_ascii_uppercase(),
+    }
+}

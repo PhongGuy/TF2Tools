@@ -5,6 +5,7 @@ mod gamebanana;
 pub mod model;
 
 use std::rc::Rc;
+use std::sync::Arc;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -19,7 +20,8 @@ use gpui_kit::{
     WeakEntity, Window, div, px,
 };
 use tf2tools_core::{
-    AddonEntry, AddonName, LogLevel, NewLogEntry, StoreItemId, StoreKind, Tf2Install,
+    AddonEntry, AddonName, LogLevel, MoveDirection, MovementKeys, NewLogEntry, StoreItemId,
+    StoreKind, Tf2Install,
 };
 
 use crate::activity;
@@ -30,6 +32,7 @@ use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_library, describe_tf2_install};
 use crate::pages::common::{badge_of, card_frame, no_tf2_warning};
 use crate::pages::graphics::jobs;
+use crate::pages::profiles::probe::Tf2Probe;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
@@ -40,7 +43,7 @@ use crate::widgets::Named as _;
 use crate::widgets::card_grid::{SHELL_CHROME_WIDTH, columns_for, stretch_rows};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
-use model::{AddonAction, actions, count_line, needs_tf2};
+use model::{AddonAction, MOVEMENT_OFF, actions, count_line, movement_on_text, needs_tf2};
 
 /// The Addons page. Built fresh on each visit; it reloads when TF2's state or the library changes.
 pub struct AddonsPage {
@@ -148,7 +151,12 @@ impl AddonsPage {
         self.busy = Some((name.clone(), AddonAction::Install));
         cx.notify();
         let job = {
-            let copy = copy_job(name.clone(), display.clone(), tf2.clone());
+            let copy = copy_job(
+                name.clone(),
+                display.clone(),
+                tf2.clone(),
+                Tf2Probe::get(cx),
+            );
             let tf2 = tf2.clone();
             run_blocking(cx, move |s| {
                 if jobs::needs_base(s, &tf2) {
@@ -171,7 +179,10 @@ impl AddonsPage {
                     });
                     return;
                 }
-                let job = cx.update(|cx| run_blocking(cx, copy_job(name, display, tf2)));
+                let job = cx.update(|cx| {
+                    let copy = copy_job(name, display, tf2, Tf2Probe::get(cx));
+                    run_blocking(cx, copy)
+                });
                 announce(win, page, job.await, cx);
             }
             Ok(Installed::Done(title, text)) => announce(win, page, Ok((title, text)), cx),
@@ -191,9 +202,14 @@ impl AddonsPage {
             Ok(tf2) => tf2,
             Err(err) => return toast_error(window, cx, &err),
         };
+        let probe = Tf2Probe::get(cx);
         self.run(
             (name.clone(), AddonAction::Uninstall),
             move |s| {
+                // TF2 saves its binds on exit, so it would undo the restored movement keys.
+                if name.is_null_movement() {
+                    jobs::refuse_while_running(&*probe)?;
+                }
                 s.library
                     .uninstall_addon(&name, &tf2)
                     .map_err(|e| describe_tf2_install(&e).into_op("Failed to uninstall addon"))?;
@@ -202,7 +218,7 @@ impl AddonsPage {
                     s,
                     &NewLogEntry::new(LogLevel::Info, "addon_store", "uninstall", message),
                 );
-                let removed = format!("{display} has been removed");
+                let removed = with_movement_off(&name, format!("{display} has been removed"));
                 Ok(("Addon uninstalled".into(), removed.into()))
             },
             cx,
@@ -226,16 +242,25 @@ impl AddonsPage {
             let _ = page.update(cx, |page, cx| {
                 // Read TF2 only once answered, so a path change during the dialog counts.
                 let tf2 = tf2_state(cx).read(cx).install().cloned();
+                let probe = Tf2Probe::get(cx);
                 page.run(
                     (name.clone(), AddonAction::Delete),
                     move |s| {
+                        // As with uninstall: a running TF2 would undo the restored keys.
+                        let restores = tf2.is_some() && name.is_null_movement();
+                        if restores {
+                            jobs::refuse_while_running(&*probe)?;
+                        }
                         s.library
                             .delete_addon(&name, tf2.as_ref())
                             .map_err(|e| describe_library(&e).into_op("Failed to delete addon"))?;
                         let message = format!("Deleted addon from library: {display}");
                         let entry = NewLogEntry::new(LogLevel::Info, "addon", "delete", message);
                         activity::write(s, &entry);
-                        let removed = format!("{display} removed from library");
+                        let mut removed = format!("{display} removed from library");
+                        if restores {
+                            removed = with_movement_off(&name, removed);
+                        }
                         Ok(("Addon removed".into(), removed.into()))
                     },
                     cx,
@@ -417,13 +442,17 @@ enum Installed {
 }
 
 // Copies the addon into TF2 and logs it; resolves to the success toast's title and text.
+// For Null-Canceling Movement the text names the keys it bound, and `probe` says whether
+// TF2 must restart before they work.
 fn copy_job(
     name: AddonName,
     display: String,
     tf2: Tf2Install,
+    probe: Arc<dyn Fn() -> bool + Send + Sync>,
 ) -> impl FnOnce(&Services) -> Result<(SharedString, SharedString), OpError> + Send + 'static {
     move |s| {
-        s.library
+        let movement = s
+            .library
             .install_addon(&name, &tf2)
             .map_err(|e| describe_tf2_install(&e).into_op("Failed to install addon"))?;
         let message = format!("Installed addon: {display}");
@@ -431,10 +460,39 @@ fn copy_job(
             s,
             &NewLogEntry::new(LogLevel::Info, "addon_store", "install", message),
         );
-        Ok((
-            "Addon installed".into(),
-            format!("{display} is now active").into(),
-        ))
+        let mut text = format!("{display} is now active");
+        if let Some(keys) = movement {
+            text = format!("{text}. {}", movement_line(&keys, probe()));
+        }
+        Ok(("Addon installed".into(), text.into()))
+    }
+}
+
+// The toast line for the keys Null-Canceling Movement now uses, in W, A, S, D order.
+fn movement_line(keys: &MovementKeys, running: bool) -> String {
+    let order = [
+        (MoveDirection::Forward, "forward"),
+        (MoveDirection::Left, "left"),
+        (MoveDirection::Back, "back"),
+        (MoveDirection::Right, "right"),
+    ];
+    let bound: Vec<String> = order
+        .iter()
+        .flat_map(|(d, _)| keys.keys(*d).to_vec())
+        .collect();
+    let missing: Vec<&str> = order
+        .iter()
+        .filter(|(d, _)| keys.keys(*d).is_empty())
+        .map(|(_, word)| *word)
+        .collect();
+    movement_on_text(&bound, &missing, running)
+}
+
+// `text` followed by the movement-keys line when `name` is Null-Canceling Movement.
+fn with_movement_off(name: &AddonName, text: String) -> String {
+    match name.is_null_movement() {
+        true => format!("{text}. {MOVEMENT_OFF}"),
+        false => text,
     }
 }
 
