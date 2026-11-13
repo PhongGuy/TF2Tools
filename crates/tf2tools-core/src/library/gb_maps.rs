@@ -12,7 +12,7 @@ use super::{
     GameMissing, GbId, IoFailure, Library, create_dir_all, game_custom_dir, io_at, is_plain_name,
     library_db,
 };
-use crate::error::{GbAddonInstallError, GbMapInstallError, LibraryError};
+use crate::error::{GbAddonInstallError, GbMapInstallError, GbMapRemoveError, LibraryError};
 use crate::map_payloads::MapPayload;
 use crate::store::{GbMapDownload, MapIndex, MapSource, downloaded_names, lowercase_all};
 use crate::tf2::Tf2Install;
@@ -70,6 +70,44 @@ impl Library {
             return Err(GbMapInstallError::Tf2Running);
         }
         self.write_gb_map(download, chosen, tf2)
+    }
+
+    /// Removes map item `gb_id`'s folder from `tf/custom`, any copy of it an interrupted
+    /// update left in the staging folder, and its row. Other items' files are untouched.
+    ///
+    /// # Errors
+    /// [`GbMapRemoveError::Tf2Running`] before anything changed, `NotInLibrary` without a
+    /// row, or an I/O or database failure, which keeps the row so Remove can be retried.
+    pub fn remove_gb_map(
+        &self,
+        gb_id: GbId,
+        tf2: &Tf2Install,
+        tf2_running: &dyn Fn() -> bool,
+    ) -> Result<(), GbMapRemoveError> {
+        if tf2_running() {
+            return Err(GbMapRemoveError::Tf2Running);
+        }
+        // The item's set-aside copies go first, while its row still lets Remove be retried;
+        // left behind, the next install's recovery would put a removed item back.
+        {
+            let _writes = self.lock_writes();
+            if self.gb_addon_row(gb_id).map_err(remove_error)?.is_none() {
+                return Err(GbMapRemoveError::NotInLibrary { gb_id });
+            }
+            let staging = tf2.custom_dir().join(MAP_STAGING_DIR);
+            let own = format!("tf2tools-gb-{gb_id}-");
+            for side in [staging.join("old"), staging.join("new")] {
+                for entry in std::fs::read_dir(&side).into_iter().flatten().flatten() {
+                    if entry.file_name().to_string_lossy().starts_with(&own) {
+                        remove_entry(&entry.path()).map_err(|IoFailure { path, source }| {
+                            GbMapRemoveError::Io { path, source }
+                        })?;
+                    }
+                }
+            }
+        }
+        self.remove_gb_addon(gb_id, tf2, &|| false)
+            .map_err(remove_error)
     }
 
     /// Install's body, under the write lock: stage the folder in the download's scratch dir,
@@ -261,6 +299,22 @@ fn map_error(e: GbAddonInstallError) -> GbMapInstallError {
         GbAddonInstallError::UnknownPayload { name } => GbMapInstallError::UnknownMap { name },
         GbAddonInstallError::NotInLibrary { gb_id } => GbMapInstallError::Database {
             message: format!("GameBanana item {gb_id} is not in the library"),
+        },
+    }
+}
+
+/// The add-on removal's errors as a map removal's; the refusals it cannot raise for a map
+/// row, given TF2 is not running, read as database failures.
+fn remove_error(e: GbAddonInstallError) -> GbMapRemoveError {
+    match e {
+        GbAddonInstallError::Io { path, source } => GbMapRemoveError::Io { path, source },
+        GbAddonInstallError::NotInLibrary { gb_id } => GbMapRemoveError::NotInLibrary { gb_id },
+        GbAddonInstallError::Tf2Running => GbMapRemoveError::Tf2Running,
+        GbAddonInstallError::Database { message } => GbMapRemoveError::Database { message },
+        other @ (GbAddonInstallError::GameMissing { .. }
+        | GbAddonInstallError::NothingChosen
+        | GbAddonInstallError::UnknownPayload { .. }) => GbMapRemoveError::Database {
+            message: other.to_string(),
         },
     }
 }

@@ -3,7 +3,7 @@
 use crate::common::{self, gb_addon_file, gb_addon_profile};
 use crate::gb_addon_install::{Setup, no, setup, yes};
 
-use tf2tools_core::{GbAddonEntry, GbId, GbMapDownload, GbMapInstallError};
+use tf2tools_core::{GbAddonEntry, GbId, GbMapDownload, GbMapInstallError, GbMapRemoveError};
 
 fn bsp(tag: &[u8]) -> Vec<u8> {
     let mut body = b"VBSP".to_vec();
@@ -380,6 +380,101 @@ async fn a_map_folder_left_aside_by_an_interrupted_update_is_put_back() {
         [
             "tf2tools-gb-7-x/maps/cp_x.bsp",
             "tf2tools-gb-8-y/maps/cp_y.bsp",
+        ]
+    );
+}
+
+#[tokio::test]
+async fn remove_deletes_only_the_maps_folder_and_its_row() {
+    let s = setup().await;
+    common::write_file(&s.tf2.tf_dir().join("maps/itemtest.bsp"), b"VBSP stock");
+    common::write_file(&s.tf2.custom_dir().join("myhud/maps/x.bsp"), b"VBSP hud");
+    let d = download(&s, 9, "P", &[("maps/cp_a.bsp", &bsp(b"a"))], 100).await;
+    s.env
+        .lib
+        .install_gb_map(d, &chosen(&["cp_a"]), &s.tf2, &no)
+        .unwrap();
+
+    let err = s
+        .env
+        .lib
+        .remove_gb_map(GbId::new(9), &s.tf2, &yes)
+        .unwrap_err();
+    assert!(matches!(err, GbMapRemoveError::Tf2Running), "{err:?}");
+    assert!(custom(&s).contains(&"tf2tools-gb-9-p/maps/cp_a.bsp".to_owned()));
+
+    s.env.lib.remove_gb_map(GbId::new(9), &s.tf2, &no).unwrap();
+    assert_eq!(custom(&s), ["myhud/maps/x.bsp"]);
+    assert!(s.tf2.tf_dir().join("maps/itemtest.bsp").exists());
+    assert!(row(&s, 9).is_none());
+
+    let err = s
+        .env
+        .lib
+        .remove_gb_map(GbId::new(9), &s.tf2, &no)
+        .unwrap_err();
+    assert!(
+        matches!(err, GbMapRemoveError::NotInLibrary { gb_id } if gb_id == GbId::new(9)),
+        "{err:?}"
+    );
+}
+
+#[tokio::test]
+async fn a_map_row_is_due_for_the_daily_update_check() {
+    let s = setup().await;
+    let d = download(&s, 10, "P", &[("maps/cp_a.bsp", &bsp(b"a"))], 100).await;
+    s.env
+        .lib
+        .install_gb_map(d, &chosen(&["cp_a"]), &s.tf2, &no)
+        .unwrap();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let later = i64::try_from(now).unwrap() + 2 * 86_400;
+    assert!(
+        s.env
+            .lib
+            .gb_addons_due_for_check(later)
+            .unwrap()
+            .contains(&GbId::new(10))
+    );
+}
+
+#[tokio::test]
+async fn remove_clears_its_own_set_aside_folder_but_not_another_items() {
+    let s = setup().await;
+    for (id, name, map) in [(7, "X", "cp_x"), (77, "Y", "cp_y")] {
+        let entry = format!("maps/{map}.bsp");
+        let d = download(&s, id, name, &[(entry.as_str(), &bsp(b"m"))], 100).await;
+        s.env
+            .lib
+            .install_gb_map(d, &chosen(&[map]), &s.tf2, &no)
+            .unwrap();
+    }
+    // Interrupted updates left both items' old folders only in staging.
+    let custom_dir = s.tf2.custom_dir();
+    let aside = custom_dir.join(".tf2tools-map-staging/old");
+    std::fs::create_dir_all(&aside).unwrap();
+    for folder in ["tf2tools-gb-7-x", "tf2tools-gb-77-y"] {
+        std::fs::rename(custom_dir.join(folder), aside.join(folder)).unwrap();
+    }
+
+    s.env.lib.remove_gb_map(GbId::new(7), &s.tf2, &no).unwrap();
+    assert!(!aside.join("tf2tools-gb-7-x").exists());
+    assert!(aside.join("tf2tools-gb-77-y/maps/cp_y.bsp").exists());
+
+    // The next install puts back the other item's folder, never the removed one.
+    let d = download(&s, 8, "Z", &[("maps/cp_z.bsp", &bsp(b"z"))], 100).await;
+    s.env
+        .lib
+        .install_gb_map(d, &chosen(&["cp_z"]), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(
+        custom(&s),
+        [
+            "tf2tools-gb-77-y/maps/cp_y.bsp",
+            "tf2tools-gb-8-z/maps/cp_z.bsp",
         ]
     );
 }

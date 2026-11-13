@@ -1277,6 +1277,35 @@ pub enum GbMapInstallError {
     },
 }
 
+/// Why a GameBanana map item could not be removed.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GbMapRemoveError {
+    /// TF2 is running and may hold the maps open; nothing changed.
+    #[error("TF2 is running; close it to remove the maps")]
+    Tf2Running,
+    /// The library has no item `gb_id`.
+    #[error("GameBanana item {gb_id} is not in the library")]
+    NotInLibrary {
+        /// The item asked for.
+        gb_id: GbId,
+    },
+    /// A file or directory could not be removed; the row stays so Remove can be retried.
+    #[error("cannot remove {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// SQLite failed to read or delete the row.
+    #[error("library database error: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+}
+
 /// Why an item's audio preview could not be fetched.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
