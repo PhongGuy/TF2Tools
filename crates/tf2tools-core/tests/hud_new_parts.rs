@@ -129,12 +129,13 @@ fn a_shadow_of_a_pinned_label_pins_to_the_label_instead() {
         text(&after, &key, "pin_corner_to_sibling").as_deref(),
         Some("PIN_TOPLEFT")
     );
+    // One unit down and right of a top-left corner is written turned around, as the game reads it.
     assert_eq!(
         (
             text(&after, &key, "xpos").as_deref(),
             text(&after, &key, "ypos").as_deref()
         ),
-        (Some("1"), Some("1"))
+        (Some("-1"), Some("-1"))
     );
 }
 

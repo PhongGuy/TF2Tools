@@ -135,7 +135,7 @@ fn a_nudge_skips_code_owned_axes_and_refuses_what_it_cannot_move() {
 fn a_pinned_part_nudges_by_the_pin_sign() {
     assert_eq!(
         sets(&pinned().nudge_part(&k(PIN_A), 1, 0, 5).unwrap(), 5),
-        [row("xpos", None, Some("4"), "5", 2)]
+        [row("xpos", None, Some("4"), "3", 2)]
     );
 }
 

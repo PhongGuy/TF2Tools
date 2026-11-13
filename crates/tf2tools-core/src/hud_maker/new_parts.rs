@@ -6,7 +6,7 @@ use super::expr::atoi;
 use super::model::{live_blocks, root_block};
 use super::{
     AddBlock, AnimCommand, AnimationAppend, AnimationChange, BlockLine, Change, ChangeTarget,
-    EditRefused, HudModel, Interp, KeyLine, Part, PartKey, check_hud_path,
+    EditRefused, HudModel, Interp, KeyLine, Part, PartKey, PinCorner, check_hud_path, probe,
 };
 
 /// A kind of part the player can add.
@@ -468,15 +468,21 @@ fn anchor_lines(name: &str) -> Vec<(String, String)> {
     .collect()
 }
 
-/// Pin keys to `sibling` by both top-left corners, offset `units` on each axis.
+/// Pin keys to `sibling` by both top-left corners, placed `units` right and down of it.
 fn pinned_to(sibling: &str, units: i32) -> Vec<(String, String)> {
-    let units = units.to_string();
+    // The engine reads offsets from a top-left corner turned around, so the text holds the
+    // screen move times the pin sign.
+    let (sign_x, sign_y) = probe::pin_offset_sign(PinCorner::TopLeft, PinCorner::TopLeft);
+    let (x, y) = (
+        units.saturating_mul(sign_x).to_string(),
+        units.saturating_mul(sign_y).to_string(),
+    );
     [
         ("pin_to_sibling", sibling),
         ("pin_corner_to_sibling", "PIN_TOPLEFT"),
         ("pin_to_sibling_corner", "PIN_TOPLEFT"),
-        ("xpos", &units),
-        ("ypos", &units),
+        ("xpos", &x),
+        ("ypos", &y),
     ]
     .into_iter()
     .map(|(k, v)| (k.to_owned(), v.to_owned()))
