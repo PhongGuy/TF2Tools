@@ -112,6 +112,22 @@ fn library_health(env: &support::Env, s: &support::ShellWindow) -> Vec<u8> {
     .unwrap()
 }
 
+/// The library file as an install writes it: on Linux its own file path is lowercased.
+fn installed_form(library: Vec<u8>) -> Vec<u8> {
+    if cfg!(target_os = "linux") {
+        String::from_utf8(library)
+            .unwrap()
+            .replacen(
+                "\"Resource/UI/HudPlayerHealth.res\"",
+                "\"resource/ui/hudplayerhealth.res\"",
+                1,
+            )
+            .into_bytes()
+    } else {
+        library
+    }
+}
+
 fn staging(env: &support::Env) -> PathBuf {
     env.game.join("tf/custom/.tf2tools-reinstall")
 }
@@ -129,7 +145,7 @@ fn saving_the_installed_hud_updates_it_and_says_how_to_see_it(cx: &mut TestAppCo
     save(cx, &s, &page, ids::HUD_MAKER_SAVE);
     let after = std::fs::read(target.join(HEALTH)).unwrap();
     assert_ne!(after, before);
-    assert_eq!(after, library_health(&env, &s));
+    assert_eq!(after, installed_form(library_health(&env, &s)));
     assert!(!target.join(".tf2tools").exists());
     assert!(!staging(&env).exists());
     assert_eq!(

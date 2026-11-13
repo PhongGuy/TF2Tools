@@ -10,9 +10,9 @@ use walkdir::WalkDir;
 
 use super::{
     HudId, IoFailure, Library, METADATA_DIR, Provenance, copy_dir_excluding_metadata,
-    create_dir_all, first_free_number, game_custom_dir, gb_id_column, hud_folder, hud_print,
-    import_db, install_db, io_at, is_plain_name, library_db, live_link, made_huds, new_id, now,
-    read_setting, remove_dir_if_present, save_setting, walk_failure,
+    create_dir_all, first_free_number, game_custom_dir, gb_id_column, hud_folder, hud_lowercase,
+    hud_print, import_db, install_db, io_at, is_plain_name, library_db, live_link, made_huds,
+    new_id, now, read_setting, remove_dir_if_present, save_setting, walk_failure,
 };
 use crate::archive::extract_archive;
 use crate::error::{ImportError, InstallError, KeepHudError, LibraryError};
@@ -547,6 +547,15 @@ impl Library {
         self.refuse_unnamed_huds(&custom, discard, None)?;
         // Scan before touching tf/custom, so a failed scan leaves the old install in place.
         let mut target = self.install_name(&src, store_hud_id, store_gb_id, &folder)?;
+        // TF2 on Linux ignores a HUD with capitals in its folder or file names.
+        let lower = |name: &str| {
+            if hud_lowercase::LOWERCASE_INSTALLS {
+                name.to_ascii_lowercase()
+            } else {
+                name.to_owned()
+            }
+        };
+        target = lower(&target);
         // Blanked before anything moves, so a failed removal or copy never leaves the
         // previous HUD recorded as installed; unset keys stay unset.
         self.db
@@ -567,13 +576,20 @@ impl Library {
         // HUD takes its library folder name, numbered if need be, rather than merging into it.
         let mut blocked_name = None;
         if custom.join(&target).symlink_metadata().is_ok() {
-            let free = free_custom_folder(&custom, &folder);
+            let free = free_custom_folder(&custom, &lower(&folder));
             blocked_name = Some(std::mem::replace(&mut target, free));
         }
         // The target was free, so a half copy is ours to clear; left behind it would hold the
         // name against the retry.
         let dest = custom.join(&target);
-        if let Err(failure) = copy_dir_excluding_metadata(&src, &dest) {
+        let copied = copy_dir_excluding_metadata(&src, &dest).and_then(|()| {
+            if hud_lowercase::lowercases(&target) {
+                hud_lowercase::lowercase_tree(&dest, &target)
+            } else {
+                Ok(())
+            }
+        });
+        if let Err(failure) = copied {
             let _ = remove_dir_if_present(&dest);
             return Err(failure.into());
         }
@@ -835,7 +851,15 @@ impl Library {
             {
                 true
             }
-            _ => hud_print::same_files(path, &src)?,
+            // A lowercased install differs from its library copy by case, so it is compared
+            // with the library as lowercased; one made before lowercasing matches as it is.
+            _ => match name.filter(|name| hud_lowercase::lowercases(name)) {
+                Some(name) => {
+                    hud_print::same_files(path, &src)?
+                        || hud_print::same_lowercased(path, &src, name)?
+                }
+                None => hud_print::same_files(path, &src)?,
+            },
         };
         Ok(if same {
             Standing::PutBack

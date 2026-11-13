@@ -11,6 +11,7 @@ mod hud_cfg;
 mod hud_copy;
 mod hud_folder;
 mod hud_history;
+mod hud_lowercase;
 mod hud_presets;
 mod hud_print;
 mod hud_thumbnail;

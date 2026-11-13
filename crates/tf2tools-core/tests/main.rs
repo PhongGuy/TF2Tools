@@ -89,6 +89,7 @@ mod hud_images;
 mod hud_import_clash;
 mod hud_install;
 mod hud_install_folder;
+mod hud_install_lowercase;
 mod hud_install_name;
 mod hud_kill_icons;
 mod hud_killfeed;
