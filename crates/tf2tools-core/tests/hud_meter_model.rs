@@ -146,3 +146,28 @@ fn a_meter_file_other_meters_base_keeps_its_own_controls() {
         "a meter reading only a meter file it #bases"
     );
 }
+
+// The stock Phlogistinator and Thermal Thruster files, each a #base of the plain file.
+const PYRO: &str = "#base \"HudItemEffectMeter.res\"\n\"Resource/UI/HudItemEffectMeter_Pyro.res\" { HudItemEffectMeter { xpos r214 } }";
+const ROCKET_PACK: &str = "#base \"HudItemEffectMeter.res\"\n\"Resource/UI/HudRocketPack.res\" {
+  HudItemEffectMeter { xpos r95 ypos r105 wide 94 tall 45 }
+  ItemEffectMeter { ControlName ContinuousProgressBar xpos 26 ypos 28 wide 22 tall 8 fgcolor White }
+  ItemEffectMeter2 { ControlName ContinuousProgressBar xpos 52 ypos 28 wide 22 tall 8 fgcolor White }
+}";
+
+fn stock_with_bases() -> HudModel {
+    let files = stock_files_with(&[
+        ("resource/ui/huditemeffectmeter_pyro.res", Some(PYRO)),
+        ("resource/ui/hudrocketpack.res", Some(ROCKET_PACK)),
+    ]);
+    HudModel::load(&files, Platform::Linux).unwrap()
+}
+
+#[test]
+fn the_stock_phlogistinator_meter_draws_the_plain_file_it_bases() {
+    let m = stock_with_bases().with_meter(MeterKind::Flamethrower);
+    let label = m.part(&PartKey::new(LABEL)).expect("the plain file's label");
+    assert_eq!(label.value("xpos").unwrap().file(), PLAIN);
+    let root = m.part(&PartKey::new(METER)).unwrap();
+    assert_eq!(root.value("xpos").unwrap().text(), "r214", "its own box wins");
+}

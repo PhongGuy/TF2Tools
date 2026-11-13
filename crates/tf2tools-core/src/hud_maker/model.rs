@@ -249,7 +249,7 @@ struct Stub {
     incomplete: bool,
 }
 
-/// A copy's read-only `#base` documents and each entry file's chain; empty for a stock model.
+/// The read-only `#base` documents and each entry file's chain.
 #[derive(Debug, Default)]
 pub(super) struct BaseChains {
     /// Every file reached from an entry file, by resolver id.
@@ -528,7 +528,7 @@ impl HudModel {
                 Err(HudFilesError::TooLarge { .. }) => None,
                 Err(e) => return Err(e),
             };
-            if copy && let Some(file) = &read {
+            if let Some(file) = &read {
                 entries.push((path.to_owned(), file.bytes().to_vec()));
             }
             let parsed = read.and_then(|file| KvDocument::parse(file.bytes()).ok());
@@ -555,10 +555,12 @@ impl HudModel {
             }
         }
         problems.sort();
-        let bases = match copy {
-            true => BaseChains::load(files, &entries, platform)?,
-            false => BaseChains::default(),
-        };
+        // The game merges each file's #base chain, stock files too (the Phlogistinator's meter
+        // is only a box over the plain file). A stock stub is already its merged tree.
+        if !copy {
+            entries.retain(|(path, _)| docs.contains_key(path));
+        }
+        let bases = BaseChains::load(files, &entries, platform)?;
         // A copy's stub whose bases all vanish merges to nothing, a problem like a missing file.
         let empty: Vec<String> = (docs.iter())
             .filter(|(path, doc)| root_block(doc).is_none() && bases.roots(path).next().is_none())
@@ -666,7 +668,7 @@ impl HudModel {
         files
     }
 
-    /// Files reached through `#base`/`#include` from scene files and the scheme (copies only), sorted.
+    /// Files reached through `#base`/`#include` from scene files and the scheme, sorted.
     pub fn base_files(&self) -> Vec<&str> {
         self.bases.docs.keys().map(String::as_str).collect()
     }
