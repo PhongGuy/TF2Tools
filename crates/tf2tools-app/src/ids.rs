@@ -2537,6 +2537,22 @@ pub const MAPS_SOURCE_TABS: &str = "maps-source-tabs";
 pub const MAPS_SOURCE_GROUP: &str = "maps-source-group";
 /// The GameBanana source's info line.
 pub const MAPS_GB_INFO: &str = "maps-gb-info";
+/// Wraps the GameBanana maps search box.
+pub const MAPS_GB_SEARCH: &str = "maps-gb-search";
+/// Wraps the GameBanana maps sort select.
+pub const MAPS_GB_SORT: &str = "maps-gb-sort";
+/// Wraps the GameBanana maps gamemode select.
+pub const MAPS_GB_GAMEMODE: &str = "maps-gb-gamemode";
+/// The GameBanana maps card grid.
+pub const MAPS_GB_GRID: &str = "maps-gb-grid";
+/// The GameBanana maps skeleton cards, labelled "Loading...", before the first page lands.
+pub const MAPS_GB_LOADING: &str = "maps-gb-loading";
+/// Labelled "No maps found" when the GameBanana maps query lists nothing.
+pub const MAPS_GB_EMPTY: &str = "maps-gb-empty";
+/// The text of a failed GameBanana maps read or sync.
+pub const MAPS_GB_ERROR: &str = "maps-gb-error";
+/// Retries a failed GameBanana maps read or sync.
+pub const MAPS_GB_RETRY: &str = "maps-gb-retry";
 
 /// One source's button in the strip, labelled with its title: "maps-source:<key>".
 pub fn maps_source(key: &str) -> ElementId {

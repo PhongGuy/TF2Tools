@@ -1,7 +1,8 @@
 //! The Maps page: serveme.tf's community maps in a searchable, sortable list, each one
 //! downloadable into `tf/maps`, and removable when TF2Tools put it there. A source strip
-//! switches to GameBanana's maps, browsed with the Addon Store's GameBanana tab.
+//! switches to GameBanana's maps, browsed from the synced catalogue.
 
+pub mod gb_tab;
 pub mod model;
 
 use gpui_kit::assets::IconName;
@@ -19,13 +20,12 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
     Window, div, list, px,
 };
-use tf2tools_core::{AddonSection, MapState, StoreClient};
+use tf2tools_core::{MapState, StoreClient};
 
 use crate::ids;
 use crate::map_messages::{
     describe_map_download, describe_map_remove, describe_map_sync, map_stopped,
 };
-use crate::pages::addon_store::gamebanana_tab::AddonTab;
 use crate::pages::common::no_tf2_warning;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
@@ -39,6 +39,7 @@ use crate::widgets::label_option::LabelOption;
 use crate::widgets::scroll::scroll_beside;
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
+use gb_tab::GbMapsTab;
 use model::{MapRow, MapSort, SORTS, count_label, last_played_label, visible};
 
 const MAP_READ: &str = "TF2Tools couldn't read its map list. Restart TF2Tools and try again.";
@@ -123,7 +124,7 @@ pub struct MapsPage {
     sort_select: Labels,
     source: MapsSource,
     /// GameBanana's map tab, built the first time that source shows.
-    gamebanana: Option<Entity<AddonTab>>,
+    gamebanana: Option<Entity<GbMapsTab>>,
     hidden: bool,
     _subscriptions: Vec<Subscription>,
 }
@@ -244,7 +245,7 @@ impl MapsPage {
         self.source
     }
 
-    /// Shows `source`, building the GameBanana tab the first time, which starts its first step.
+    /// Shows `source`, building the GameBanana tab the first time, which reads its first page.
     pub fn select_source(
         &mut self,
         source: MapsSource,
@@ -253,18 +254,18 @@ impl MapsPage {
     ) {
         self.source = source;
         if source == MapsSource::GameBanana && self.gamebanana.is_none() {
-            self.gamebanana = Some(cx.new(|cx| AddonTab::new(AddonSection::MAPS, window, cx)));
+            self.gamebanana = Some(cx.new(|cx| GbMapsTab::new(window, cx)));
         }
         self.sync_tab_hidden(cx);
         cx.notify();
     }
 
     /// GameBanana's map tab, once built.
-    pub fn gamebanana(&self) -> Option<Entity<AddonTab>> {
+    pub fn gamebanana(&self) -> Option<Entity<GbMapsTab>> {
         self.gamebanana.clone()
     }
 
-    // Only a drawn tab holds image wants and steps, so it shows only on a shown page under
+    // Only a drawn tab holds image wants, so it shows only on a shown page under
     // the GameBanana source.
     fn sync_tab_hidden(&self, cx: &mut Context<Self>) {
         let hidden = self.hidden || self.source != MapsSource::GameBanana;
