@@ -166,3 +166,15 @@ fn a_filter_is_active_like_v5_s_has_active_filters() {
         assert!(f.is_active(), "edit {ix}");
     }
 }
+
+#[test]
+fn a_hud_listing_no_os_passes_the_os_filter() {
+    let huds = vec![
+        hud("kn-hud", "KN", r#"{"flags":["menus"]}"#),
+        hud("winhud", "W", r#"{"traits":{"os":["windows"]}}"#),
+    ];
+    let f = CuratedFilter::new(Os::Linux);
+    assert_eq!(shown(&f, &huds), ["kn-hud"]);
+    let f = CuratedFilter::new(Os::Windows);
+    assert_eq!(shown(&f, &huds), ["kn-hud", "winhud"]);
+}
