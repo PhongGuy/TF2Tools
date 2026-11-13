@@ -12,13 +12,14 @@ use super::SyncOutcome;
 use super::http::API_BODY_LIMIT;
 use super::sync::{database, is_stale, malformed, set_meta};
 use crate::error::{MapDownloadError, MapRemoveError, QueryError, SyncError};
+use crate::library::GbId;
 use crate::tf2::Tf2Install;
 use crate::timestamp;
 
 /// The `store_cache_meta` key prefix of the map list.
 const KEY: &str = "maps";
 /// The first bytes of every Source engine map file.
-const BSP_MAGIC: &[u8; 4] = b"VBSP";
+pub(crate) const BSP_MAGIC: &[u8; 4] = b"VBSP";
 /// The longest map name accepted; serveme's longest is under 70.
 const MAX_NAME: usize = 128;
 
@@ -72,6 +73,23 @@ pub enum MapState {
     InGame,
 }
 
+/// Where the game already has a map from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MapSource {
+    /// In `tf/maps` and not downloaded by TF2Tools: the game's own or put there by hand.
+    Valve,
+    /// In `tf/maps`, downloaded from serveme.tf by TF2Tools.
+    Serveme,
+    /// In `tf/download/maps`, fetched by the game from a server.
+    Download,
+    /// In `tf/custom/<folder>/maps`.
+    Custom {
+        /// The custom folder's name.
+        folder: String,
+    },
+}
+
 /// A cached map and where it stands.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -94,7 +112,7 @@ impl MapEntry {
 
 /// True for a name that is safe as a file name on every platform: ASCII letters, digits,
 /// `_`, `-` and `.`, not starting with a dot and never `..`.
-fn is_map_name(name: &str) -> bool {
+pub(crate) fn is_map_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= MAX_NAME
         && !name.starts_with('.')
@@ -199,6 +217,92 @@ fn bsp_stems(dir: &Path) -> HashSet<String> {
         .collect()
 }
 
+/// The lowercased map stems in each place the game loads maps from, read once so a whole
+/// list can be checked without touching the disk per name.
+pub(crate) struct MapIndex {
+    own: HashSet<String>,
+    server: HashSet<String>,
+    /// Each `tf/custom` folder with maps, sorted by folder name.
+    custom: Vec<(String, HashSet<String>)>,
+}
+
+impl MapIndex {
+    /// Reads `tf/maps`, `tf/download/maps` and the `maps` dir (any case) of every folder
+    /// directly in `tf/custom`. VPKs are never opened; unreadable dirs count as empty.
+    pub(crate) fn scan(tf2: &Tf2Install) -> Self {
+        let mut custom: Vec<(String, HashSet<String>)> = std::fs::read_dir(tf2.custom_dir())
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .filter(|e| e.path().is_dir())
+            .filter_map(|folder| {
+                // A case-sensitive disk may hold both `maps` and `Maps`; the game reads both.
+                let stems: HashSet<String> = std::fs::read_dir(folder.path())
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Result::ok)
+                    .filter(|e| e.file_name().eq_ignore_ascii_case("maps"))
+                    .flat_map(|e| bsp_stems(&e.path()))
+                    .collect();
+                let name = folder.file_name().to_string_lossy().into_owned();
+                (!stems.is_empty()).then_some((name, stems))
+            })
+            .collect();
+        custom.sort_by(|a, b| a.0.cmp(&b.0));
+        Self {
+            own: bsp_stems(&maps_dir(tf2)),
+            server: bsp_stems(&server_maps_dir(tf2)),
+            custom,
+        }
+    }
+
+    /// Where the game has map `name`, ignoring case: `tf/maps` first, then
+    /// `tf/download/maps`, then custom folders by name. `except` skips that GameBanana
+    /// item's own folder. `serveme` holds lowercase `downloaded_maps` names.
+    pub(crate) fn source(
+        &self,
+        name: &str,
+        except: Option<GbId>,
+        serveme: &HashSet<String>,
+    ) -> Option<MapSource> {
+        let lower = name.to_lowercase();
+        if self.own.contains(&lower) {
+            return Some(if serveme.contains(&lower) {
+                MapSource::Serveme
+            } else {
+                MapSource::Valve
+            });
+        }
+        if self.server.contains(&lower) {
+            return Some(MapSource::Download);
+        }
+        // The trailing `-` keeps item 7 from hiding item 77's folder.
+        let skip = except.map(|id| format!("tf2tools-gb-{id}-"));
+        self.custom
+            .iter()
+            .filter(|(folder, _)| {
+                skip.as_ref()
+                    .is_none_or(|p| !folder.starts_with(p.as_str()))
+            })
+            .find(|(_, stems)| stems.contains(&lower))
+            .map(|(folder, _)| MapSource::Custom {
+                folder: folder.clone(),
+            })
+    }
+}
+
+/// Every name in `downloaded_maps`, as recorded.
+pub(crate) fn downloaded_names(conn: &rusqlite::Connection) -> rusqlite::Result<HashSet<String>> {
+    conn.prepare("SELECT name FROM downloaded_maps")?
+        .query_map([], |r| r.get(0))?
+        .collect()
+}
+
+/// `downloaded_names` lowercased, for matching against the game folder ignoring case.
+pub(crate) fn lowercase_all(names: HashSet<String>) -> HashSet<String> {
+    names.into_iter().map(|n| n.to_lowercase()).collect()
+}
+
 fn maps_dir(install: &Tf2Install) -> PathBuf {
     install.tf_dir().join("maps")
 }
@@ -291,32 +395,26 @@ impl StoreClient {
                         })
                     })?
                     .collect::<rusqlite::Result<Vec<_>>>()?;
-                Ok((maps, self.downloaded_names(conn)?))
+                Ok((maps, downloaded_names(conn)?))
             })
             .map_err(query_error)?;
-        let (own, server) = install
-            .map(|i| (bsp_stems(&maps_dir(i)), bsp_stems(&server_maps_dir(i))))
-            .unwrap_or_default();
+        // One scan for the whole list; the list can hold thousands of maps.
+        let index = install.map(MapIndex::scan);
+        let downloaded = lowercase_all(downloaded);
         Ok(maps
             .into_iter()
             .map(|map| {
-                let lower = map.name.to_lowercase();
-                let state = if own.contains(&lower) && downloaded.contains(&map.name) {
-                    MapState::Downloaded
-                } else if own.contains(&lower) || server.contains(&lower) {
-                    MapState::InGame
-                } else {
-                    MapState::Available
+                let source = index
+                    .as_ref()
+                    .and_then(|i| i.source(&map.name, None, &downloaded));
+                let state = match source {
+                    Some(MapSource::Serveme) => MapState::Downloaded,
+                    Some(_) => MapState::InGame,
+                    None => MapState::Available,
                 };
                 MapEntry { map, state }
             })
             .collect())
-    }
-
-    fn downloaded_names(&self, conn: &rusqlite::Connection) -> rusqlite::Result<HashSet<String>> {
-        conn.prepare("SELECT name FROM downloaded_maps")?
-            .query_map([], |r| r.get(0))?
-            .collect()
     }
 
     /// Downloads map `name` from serveme's file server into `tf/maps/<name>.bsp` through a
@@ -389,27 +487,22 @@ impl StoreClient {
         Ok(())
     }
 
-    /// InGame or AlreadyDownloaded when the game can already load a map named `name`.
+    /// InGame or AlreadyDownloaded when the game can already load a map named `name`, from
+    /// any place `MapIndex` reads.
     fn refuse_present(&self, install: &Tf2Install, name: &str) -> Result<(), MapDownloadError> {
-        let lower = name.to_lowercase();
-        let own = bsp_stems(&maps_dir(install)).contains(&lower);
-        if !own && !bsp_stems(&server_maps_dir(install)).contains(&lower) {
-            return Ok(());
-        }
-        let ours = own
-            && self
-                .db
-                .read(|conn| self.downloaded_names(conn))
+        let downloaded =
+            self.db
+                .read(downloaded_names)
                 .map_err(|e| MapDownloadError::Database {
                     message: e.to_string(),
-                })?
-                .contains(name);
+                })?;
+        let source = MapIndex::scan(install).source(name, None, &lowercase_all(downloaded));
         let name = name.to_owned();
-        Err(if ours {
-            MapDownloadError::AlreadyDownloaded { name }
-        } else {
-            MapDownloadError::InGame { name }
-        })
+        match source {
+            None => Ok(()),
+            Some(MapSource::Serveme) => Err(MapDownloadError::AlreadyDownloaded { name }),
+            Some(_) => Err(MapDownloadError::InGame { name }),
+        }
     }
 
     /// Streams the map into `dest`, failing as soon as it passes the cap or its first bytes
@@ -471,7 +564,7 @@ impl StoreClient {
         let ours = is_map_name(name)
             && self
                 .db
-                .read(|conn| self.downloaded_names(conn))
+                .read(downloaded_names)
                 .map_err(database)?
                 .contains(name);
         if !ours {

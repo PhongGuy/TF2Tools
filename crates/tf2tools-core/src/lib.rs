@@ -19,6 +19,7 @@ mod hud_maker;
 mod ice;
 mod library;
 mod logstf;
+mod map_payloads;
 mod old_v4;
 mod pak;
 pub mod panic_mark;
@@ -44,14 +45,15 @@ pub use error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, BorrowSourceError,
     BrowseError, CatalogError, CopyHudError, DataDirError, DetectError, DownloadError, FilesError,
     FontCheckError, FontInstallError, GbAddonCheckError, GbAddonFetchError, GbAddonInstallError,
-    HistoryError, HudFilesError, HudLoadError, ImageError, ImportError, InstallError,
-    InstallMastercomfigError, KeepHudError, KvParseError, LibraryError, LogError, LogParseError,
-    LogsCacheError, LogsFetchError, LogsSyncError, MakeHudError, MapDownloadError, MapRemoveError,
-    MastercomfigStatusError, ModuleCatalogError, OpenError, PaintError, PlayerInputError,
-    PngReadError, PngWriteError, PresetError, PreviewError, ProfileError, QueryError, RecipeError,
-    ReinstallError, RemoveMastercomfigError, ResolveError, RestoreMastercomfigError, SchemaError,
-    SettingsError, SyncError, TakeOverError, UpdateApplyError, UpdateCheckError, UpdateCopyError,
-    UpdateDownloadError, VpkError, VtfError, WavError, WeaponIconsError, WeaponNamesError,
+    GbMapInstallError, GbMapRemoveError, HistoryError, HudFilesError, HudLoadError, ImageError,
+    ImportError, InstallError, InstallMastercomfigError, KeepHudError, KvParseError, LibraryError,
+    LogError, LogParseError, LogsCacheError, LogsFetchError, LogsSyncError, MakeHudError,
+    MapDownloadError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError, OpenError,
+    PaintError, PlayerInputError, PngReadError, PngWriteError, PresetError, PreviewError,
+    ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError, ResolveError,
+    RestoreMastercomfigError, SchemaError, SettingsError, SyncError, TakeOverError,
+    UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
+    WavError, WeaponIconsError, WeaponNamesError,
 };
 pub use fonts::{
     FontCheck, FontHost, FontHostError, FontInstallReport, FontIssue, FontSkipReason, HudFont,
@@ -116,6 +118,7 @@ pub use logstf::{
     SteamId, TeamTotals, TrackedPlayer, WeaponBackfill, WeaponLine, WeaponSum,
     leaderboard_icon_stem, logstf_class, parse_log, parse_player_input, window_start,
 };
+pub use map_payloads::{MAX_MAPS, MapPayload, find_maps};
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};
@@ -124,11 +127,12 @@ pub use settings::{Settings, Volume};
 pub use store::{
     AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
     AddonProfile, AddonQuery, AddonSection, AddonSort, AddonStep, DownloadPhase, DownloadProgress,
-    Endpoints, GbAddonDownload, INDEX_STEP_CALLS, MastercomfigRelease, SEARCH_STEP_CALLS,
-    STEP_CARDS, StoreCard, StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem,
-    StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
+    Endpoints, GbAddonDownload, GbMapDownload, INDEX_STEP_CALLS, MastercomfigRelease,
+    SEARCH_STEP_CALLS, STEP_CARDS, StoreCard, StoreClient, StoreConfig, StoreCursor, StoreFile,
+    StoreItem, StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome,
+    SyncProgress,
 };
-pub use store::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
+pub use store::{CommunityMap, MapEntry, MapSource, MapState, parse_serveme_maps};
 pub use texture::{
     FitChange, PNG_MAX_FILE_BYTES, PNG_MAX_SIDE, RgbaImage, decode_vtf, fit_hud_texture,
     fit_to_maker, hud_texture_vtf, menu_textures, png_to_vtf, read_picture, read_png, rgba_to_vtf,

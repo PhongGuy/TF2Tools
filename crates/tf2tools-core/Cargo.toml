@@ -20,6 +20,7 @@ steamlocate.workspace = true
 zip.workspace = true
 flate2.workspace = true
 sevenz-rust2.workspace = true
+bzip2.workspace = true
 vpk.workspace = true
 rars.workspace = true
 vtf.workspace = true

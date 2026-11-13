@@ -34,6 +34,8 @@ tempfile = "3"
 zip = "9"
 flate2 = "1.1.10"
 sevenz-rust2 = "0.24"
+# Already locked through zip and sevenz-rust2; decodes `.bsp.bz2` maps.
+bzip2 = "=0.6.1"
 vpk = "0.3"
 rars = { version = "=0.12.4", default-features = false }
 vtf = "0.4.1"

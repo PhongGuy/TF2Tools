@@ -166,6 +166,14 @@ pub enum ArchiveError {
         /// The offending entry name.
         entry: String,
     },
+    /// Compressed maps decompress to more than the map size cap.
+    #[error("{path} is too large: the maps come to more than {limit} bytes")]
+    TooLarge {
+        /// The compressed map that went past the cap.
+        path: PathBuf,
+        /// The cap in bytes, shared by every compressed map of the download.
+        limit: u64,
+    },
 }
 
 /// Why a WAV file cannot be used as a TF2 sound.
@@ -1231,6 +1239,85 @@ pub enum GbAddonInstallError {
     /// No payload was chosen.
     #[error("no payload was chosen")]
     NothingChosen,
+}
+
+/// Why a GameBanana map item could not be installed or updated.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GbMapInstallError {
+    /// TF2 is running, so an update waits; nothing changed.
+    #[error("TF2 is running; close it to update the maps")]
+    Tf2Running,
+    /// The game folder (`tf/`) is gone, so nothing was written.
+    #[error("Team Fortress 2 is no longer at {path}")]
+    GameMissing {
+        /// The `tf` folder that is missing.
+        path: PathBuf,
+    },
+    /// The game already has every chosen map; nothing changed.
+    #[error("the game already has {}", names.join(", "))]
+    AlreadyPresent {
+        /// The chosen names, as chosen.
+        names: Vec<String>,
+    },
+    /// No map was chosen.
+    #[error("no map was chosen")]
+    NothingChosen,
+    /// A chosen name is not one of the download's maps.
+    #[error("{name} is not a map of this download")]
+    UnknownMap {
+        /// The chosen name.
+        name: String,
+    },
+    /// A file or directory could not be read or written.
+    #[error("cannot read or write {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// SQLite failed to read or record the item.
+    #[error("library database error: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+}
+
+/// Why a GameBanana map item could not be removed.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum GbMapRemoveError {
+    /// TF2 is running and may hold the maps open; nothing changed.
+    #[error("TF2 is running; close it to remove the maps")]
+    Tf2Running,
+    /// The library has no item `gb_id`.
+    #[error("GameBanana item {gb_id} is not in the library")]
+    NotInLibrary {
+        /// The item asked for.
+        gb_id: GbId,
+    },
+    /// The library's item `gb_id` is not a map, so Remove for maps leaves it alone.
+    #[error("GameBanana item {gb_id} is not a map")]
+    NotAMap {
+        /// The item asked for.
+        gb_id: GbId,
+    },
+    /// A file or directory could not be removed; the row stays so Remove can be retried.
+    #[error("cannot remove {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// SQLite failed to read or delete the row.
+    #[error("library database error: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
 }
 
 /// Why an item's audio preview could not be fetched.
