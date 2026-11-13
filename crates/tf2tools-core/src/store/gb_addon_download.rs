@@ -151,13 +151,16 @@ impl StoreClient {
     /// listing alone, before any request: no files, a failed virus scan, or a listed size
     /// over this client's configured cap. None when the download may start.
     pub fn gb_addon_refusal(&self, profile: &AddonProfile) -> Option<GbAddonFetchError> {
-        self.listed_file(profile).err()
+        self.listed_file(profile, self.config.gb_addon_size_cap())
+            .err()
     }
 
-    /// `profile`'s newest file when its listing passes every pre-download check.
-    fn listed_file<'p>(
+    /// `profile`'s newest file when its listing passes every pre-download check, with
+    /// `limit` as the size cap.
+    pub(super) fn listed_file<'p>(
         &self,
         profile: &'p AddonProfile,
+        limit: u64,
     ) -> Result<&'p AddonFile, GbAddonFetchError> {
         let file = profile.files().first().ok_or(GbAddonFetchError::NoFiles {
             gb_id: profile.id(),
@@ -168,7 +171,6 @@ impl StoreClient {
                 result: file.av_result().to_owned(),
             });
         }
-        let limit = self.config.gb_addon_size_cap();
         if file.size().is_some_and(|size| size > limit) {
             return Err(GbAddonFetchError::TooLarge {
                 url: file.download_url().to_owned(),
@@ -187,9 +189,35 @@ impl StoreClient {
         profile: &AddonProfile,
         progress: &(dyn Fn(DownloadProgress) + Send + Sync),
     ) -> Result<GbAddonDownload, GbAddonFetchError> {
+        let (scratch, file, payloads) = self
+            .fetch_unpacked(profile, self.config.gb_addon_size_cap(), progress, unpack)
+            .await?;
+        Ok(GbAddonDownload {
+            _scratch: scratch,
+            gb_id: profile.id(),
+            section: section.key(),
+            name: profile.name().to_owned(),
+            author: profile.author().to_owned(),
+            file_id: file.id(),
+            file_date: file.date_added(),
+            file_name: file.name().to_owned(),
+            payloads,
+        })
+    }
+
+    /// Downloads `profile`'s newest file, at most `limit` bytes, into a scratch dir under
+    /// `<data>/tmp`, one download at a time, and hands it to `unpack(saved, tree, file_name)`
+    /// on a blocking thread. Returns the scratch dir, the file and what `unpack` made; every
+    /// error removes the dir.
+    pub(super) async fn fetch_unpacked<'p, T: Send + 'static>(
+        &self,
+        profile: &'p AddonProfile,
+        limit: u64,
+        progress: &(dyn Fn(DownloadProgress) + Send + Sync),
+        unpack: impl FnOnce(&Path, &Path, &str) -> Result<T, GbAddonFetchError> + Send + 'static,
+    ) -> Result<(TempDir, &'p AddonFile, T), GbAddonFetchError> {
         // Every refusal the listing alone can settle comes before any request is made.
-        let file = self.listed_file(profile)?;
-        let limit = self.config.gb_addon_size_cap();
+        let file = self.listed_file(profile, limit)?;
 
         let _turn = self.download_lock.lock().await;
         let tmp = self.dir.tmp_dir();
@@ -213,28 +241,17 @@ impl StoreClient {
         // it is still extracting; it hands the dir back only when the walk succeeded.
         // Tokio turns a panic in it into Interrupted, so it runs marked as handled.
         let file_name = file.name().to_owned();
-        let (scratch, payloads) = tokio::task::spawn_blocking(move || {
+        let (scratch, found) = tokio::task::spawn_blocking(move || {
             crate::panic_mark::marked(|| {
-                let payloads = unpack(&saved, &scratch.path().join("tree"), &file_name)?;
-                Ok::<_, GbAddonFetchError>((scratch, payloads))
+                let found = unpack(&saved, &scratch.path().join("tree"), &file_name)?;
+                Ok::<_, GbAddonFetchError>((scratch, found))
             })
         })
         .await
         .map_err(|e| GbAddonFetchError::Interrupted {
             message: e.to_string(),
         })??;
-
-        Ok(GbAddonDownload {
-            _scratch: scratch,
-            gb_id: profile.id(),
-            section: section.key(),
-            name: profile.name().to_owned(),
-            author: profile.author().to_owned(),
-            file_id: file.id(),
-            file_date: file.date_added(),
-            file_name: file.name().to_owned(),
-            payloads,
-        })
+        Ok((scratch, file, found))
     }
 }
 
@@ -273,13 +290,13 @@ fn unpack(saved: &Path, tree: &Path, file_name: &str) -> Result<Vec<Payload>, Gb
     Ok(payloads)
 }
 
-fn has_extension(path: &Path, ext: &str) -> bool {
+pub(super) fn has_extension(path: &Path, ext: &str) -> bool {
     path.extension()
         .is_some_and(|e| e.eq_ignore_ascii_case(ext))
 }
 
 /// Whether any `.exe` sits in `tree`; an unreadable entry counts as none.
-fn holds_exe(tree: &Path) -> bool {
+pub(super) fn holds_exe(tree: &Path) -> bool {
     WalkDir::new(tree)
         .into_iter()
         .filter_map(Result::ok)

@@ -33,6 +33,7 @@ mod gb_addon_install;
 mod gb_addon_library;
 mod gb_addon_updates;
 mod gb_hud_updates;
+mod gb_map_download;
 mod hud_align;
 mod hud_anim_playback;
 mod hud_anim_script;
