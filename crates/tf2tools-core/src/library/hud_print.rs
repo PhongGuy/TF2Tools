@@ -93,7 +93,7 @@ pub(super) fn same_lowercased(
         let (have, from) = (installed.join(lower), src.join(rel));
         let same = if hud_lowercase::is_text_file(lower) {
             let read = |path: &Path| std::fs::read(path).map_err(io_at(path));
-            read(&have)? == hud_lowercase::lowercase_bytes(&read(&from)?, &own)
+            read(&have)? == hud_lowercase::lowercase_bytes(lower, &read(&from)?, &own)
         } else {
             sha256_file(&have)? == sha256_file(&from)?
         };

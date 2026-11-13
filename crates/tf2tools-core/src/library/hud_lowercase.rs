@@ -14,18 +14,17 @@ pub(super) const LOWERCASE_INSTALLS: bool = cfg!(target_os = "linux");
 const TEXT_EXTENSIONS: [&str; 5] = [".res", ".txt", ".vdf", ".vmt", ".cfg"];
 
 /// A quoted value ending in one of these names a file.
-const FILE_EXTENSIONS: [&str; 9] = [
-    ".res", ".txt", ".ttf", ".otf", ".vdf", ".vtf", ".vmt", ".wav", ".mp3",
-];
+const FILE_EXTENSIONS: [&str; 7] = [".res", ".txt", ".ttf", ".otf", ".vdf", ".vtf", ".vmt"];
 
-/// Where the game looks up a name given without its root folder, and the extensions it may
-/// leave out: materials (VGUI images sit under `materials/vgui/`), sounds and cfgs.
-const LOOKUPS: [(&str, &[&str]); 4] = [
+/// Where the game looks up a material named without its root folder (VGUI images sit
+/// under `materials/vgui/`), and the extensions such a name may leave out.
+const MATERIAL_LOOKUPS: [(&str, &[&str]); 2] = [
     ("materials", &["", ".vmt", ".vtf"]),
     ("materials/vgui", &["", ".vmt", ".vtf"]),
-    ("sound", &[""]),
-    ("cfg", &["", ".cfg"]),
 ];
+
+/// A sound is only ever named with one of these.
+const SOUND_EXTENSIONS: [&str; 2] = [".wav", ".mp3"];
 
 /// The characters a sound name may start with to set how it plays; not part of its path.
 const SOUND_PREFIXES: &[char] = &[
@@ -109,22 +108,35 @@ impl Own {
         }
     }
 
-    /// Whether `value` (lowercase, `/`-separated) names a file the HUD ships, as written or
-    /// the way the game looks it up.
+    /// Whether `value` (lowercase, `/`-separated) names a file the HUD ships: as written, as a
+    /// material, or as a sound under `sound/` past its play-mode prefix.
     fn ships(&self, value: &str) -> bool {
-        let value = value
-            .trim_start_matches(SOUND_PREFIXES)
-            .trim_start_matches('/');
+        let value = value.trim_start_matches('/');
         if value.is_empty() {
             return false;
         }
+        let sound = value.trim_start_matches(SOUND_PREFIXES);
         self.files.contains(value)
-            || LOOKUPS.iter().any(|(base, exts)| {
-                exts.iter().any(|ext| {
-                    resolve(&format!("{base}/{value}{ext}"))
-                        .is_some_and(|path| self.files.contains(&path))
-                })
+            || self.found(value, &MATERIAL_LOOKUPS)
+            || (SOUND_EXTENSIONS.iter().any(|ext| sound.ends_with(ext))
+                && self.found(sound, &[("sound", &[""])]))
+    }
+
+    /// Whether `target` names a cfg the HUD ships, as `exec` looks it up under `cfg/`.
+    fn ships_cfg(&self, target: &str) -> bool {
+        let target = target.trim_start_matches('/');
+        !target.is_empty() && self.found(target, &[("cfg", &["", ".cfg"])])
+    }
+
+    /// Whether `value` resolves under any of `lookups`' roots, with any of their extensions,
+    /// to a shipped file.
+    fn found(&self, value: &str, lookups: &[(&str, &[&str])]) -> bool {
+        lookups.iter().any(|(base, exts)| {
+            exts.iter().any(|ext| {
+                resolve(&format!("{base}/{value}{ext}"))
+                    .is_some_and(|path| self.files.contains(&path))
             })
+        })
     }
 }
 
@@ -183,7 +195,7 @@ pub(super) fn lowercase_tree(dir: &Path, folder: &str) -> Result<(), IoFailure> 
             continue;
         }
         let bytes = std::fs::read(&path).map_err(io_at(&path))?;
-        let rewritten = lowercase_bytes(&bytes, &own);
+        let rewritten = lowercase_bytes(lower, &bytes, &own);
         if rewritten != bytes {
             std::fs::write(&path, rewritten).map_err(io_at(&path))?;
         }
@@ -191,13 +203,25 @@ pub(super) fn lowercase_tree(dir: &Path, folder: &str) -> Result<(), IoFailure> 
     Ok(())
 }
 
-/// `bytes` with the file paths in them lowercased: `#base` and `#include` targets, quoted
-/// values naming a file by its extension, values naming a file the HUD ships, and quoted
-/// paths into `custom/<folder>/`. Only ASCII letters inside those spans change, so any
-/// ASCII-compatible encoding comes through; UTF-16 text is left as it is.
-pub(super) fn lowercase_bytes(bytes: &[u8], own: &Own) -> Vec<u8> {
+/// The text file at `rel` as `bytes` with the file paths in it lowercased. In a cfg only
+/// `exec` targets naming a shipped cfg change. Elsewhere: `#base` and `#include` targets,
+/// quoted values naming a file by its extension, values naming a file the HUD ships, and
+/// quoted paths into `custom/<folder>/`. Only ASCII letters inside those spans change, which
+/// is safe for UTF-8 and single-byte encodings such as Windows-1252; UTF-16 is left alone.
+pub(super) fn lowercase_bytes(rel: &Path, bytes: &[u8], own: &Own) -> Vec<u8> {
     let mut out = bytes.to_vec();
     if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) || bytes.contains(&0) {
+        return out;
+    }
+    let is_cfg = rel
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("cfg"));
+    if is_cfg {
+        for range in exec_targets(bytes) {
+            if own.ships_cfg(&normalized(&bytes[range.clone()])) {
+                out[range].make_ascii_lowercase();
+            }
+        }
         return out;
     }
     let own_folder = format!("custom/{}/", own.folder);
@@ -222,6 +246,39 @@ pub(super) fn lowercase_bytes(bytes: &[u8], own: &Own) -> Vec<u8> {
         at += line.len();
     }
     out
+}
+
+/// The target of every `exec` command in cfg text `bytes`, including inside quoted alias
+/// and bind bodies and `;`-separated sequences.
+fn exec_targets(bytes: &[u8]) -> Vec<std::ops::Range<usize>> {
+    let is_break = |b: u8| b.is_ascii_whitespace() || matches!(b, b'"' | b';');
+    let mut found = Vec::new();
+    let mut i = 0;
+    while i + 4 < bytes.len() {
+        let command = bytes[i..i + 4].eq_ignore_ascii_case(b"exec")
+            && (i == 0 || is_break(bytes[i - 1]))
+            && matches!(bytes[i + 4], b' ' | b'\t');
+        if !command {
+            i += 1;
+            continue;
+        }
+        let mut start = i + 4;
+        while start < bytes.len() && matches!(bytes[start], b' ' | b'\t') {
+            start += 1;
+        }
+        if bytes.get(start) == Some(&b'"') {
+            start += 1;
+        }
+        let len = bytes[start..]
+            .iter()
+            .position(|&b| is_break(b))
+            .unwrap_or(bytes.len() - start);
+        if len > 0 {
+            found.push(start..start + len);
+        }
+        i = start + len;
+    }
+    found
 }
 
 /// `value` lowercased with `/` separators; KeyValues may escape a backslash as `\\`, so a
@@ -320,7 +377,7 @@ mod tests {
 
     /// `text` as a lowercase install writes it.
     fn fix(text: &str, own: &Own) -> String {
-        String::from_utf8(lowercase_bytes(text.as_bytes(), own)).unwrap()
+        String::from_utf8(lowercase_bytes(Path::new("x.res"), text.as_bytes(), own)).unwrap()
     }
 
     fn planned(list: &[&str]) -> Vec<(String, String)> {
@@ -429,7 +486,11 @@ mod tests {
     fn text_in_any_ascii_compatible_encoding_is_rewritten() {
         let own = own("kn-edit", &[]);
         assert_eq!(
-            lowercase_bytes(b"// \xa9 Caf\xe9\n#base \"Scheme/Base.res\"\n", &own),
+            lowercase_bytes(
+                Path::new("x.res"),
+                b"// \xa9 Caf\xe9\n#base \"Scheme/Base.res\"\n",
+                &own
+            ),
             b"// \xa9 Caf\xe9\n#base \"scheme/base.res\"\n"
         );
     }
@@ -438,29 +499,42 @@ mod tests {
     fn utf16_text_is_left_alone() {
         let own = own("kn-edit", &[]);
         let bom = b"\xff\xfe#\0b\0";
-        assert_eq!(lowercase_bytes(bom, &own), bom);
+        assert_eq!(lowercase_bytes(Path::new("x.res"), bom, &own), bom);
         let nul = b"\"A.res\"\0";
-        assert_eq!(lowercase_bytes(nul, &own), nul);
+        assert_eq!(lowercase_bytes(Path::new("x.res"), nul, &own), nul);
     }
 
     #[test]
-    fn references_to_sounds_and_cfgs_the_hud_ships_are_lowercased() {
-        let own = own(
-            "kn-edit",
-            &[
-                "sound/UI/HitSound.wav",
-                "sound/UI/Kill.mp3",
-                "cfg/KN/Extra.cfg",
-            ],
-        );
+    fn references_to_sounds_the_hud_ships_are_lowercased() {
+        let own = own("kn-edit", &["sound/UI/HitSound.wav", "sound/UI/Kill.mp3"]);
         let text = "\"wave\" \"UI/HitSound.wav\"\n\"wave\" \")UI/Kill.mp3\"\n\
-                    exec \"KN/Extra\"\nexec KN/Extra.cfg\nexec Stock_Thing\n\
-                    \"wave\" \"Stock/Other.WAV\"\n";
+                    \"wave\" \"Stock/Other.WAV\"\n\"labelText\" \"UI/HitSound\"\n";
         assert_eq!(
             fix(text, &own),
             "\"wave\" \"ui/hitsound.wav\"\n\"wave\" \")ui/kill.mp3\"\n\
-             exec \"kn/extra\"\nexec kn/extra.cfg\nexec Stock_Thing\n\
-             \"wave\" \"stock/other.wav\"\n"
+             \"wave\" \"Stock/Other.WAV\"\n\"labelText\" \"UI/HitSound\"\n"
+        );
+    }
+
+    #[test]
+    fn a_label_naming_a_shipped_cfg_stays_as_written() {
+        let own = own("kn-edit", &["cfg/Menu.cfg"]);
+        let text = "\"labelText\" \"Menu\"\nlabelText Menu\n";
+        assert_eq!(fix(text, &own), text);
+    }
+
+    #[test]
+    fn exec_targets_in_cfgs_naming_shipped_cfgs_are_lowercased() {
+        let own = own("kn-edit", &["cfg/KN/Extra.cfg", "cfg/Menu.cfg"]);
+        let text = "exec KN/Extra\nEXEC \"KN/Extra.cfg\"\n\
+                    alias x \"exec KN/Extra;echo hi\"\nbind k \"exec KN/Extra\"\n\
+                    exec Stock_Thing\necho \"Loaded Foo.txt\"\necho Menu\n";
+        let fixed = lowercase_bytes(Path::new("cfg/kn/menu.cfg"), text.as_bytes(), &own);
+        assert_eq!(
+            String::from_utf8(fixed).unwrap(),
+            "exec kn/extra\nEXEC \"kn/extra.cfg\"\n\
+             alias x \"exec kn/extra;echo hi\"\nbind k \"exec kn/extra\"\n\
+             exec Stock_Thing\necho \"Loaded Foo.txt\"\necho Menu\n"
         );
     }
 
