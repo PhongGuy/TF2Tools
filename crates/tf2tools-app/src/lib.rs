@@ -28,6 +28,7 @@ pub mod local_messages;
 pub mod log_nicknames;
 pub mod logs_sync;
 pub mod map_messages;
+pub mod maps_sync;
 pub mod mastercomfig_restore;
 pub mod mature;
 pub mod notices;

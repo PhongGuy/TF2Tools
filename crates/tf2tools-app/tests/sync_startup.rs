@@ -4,6 +4,7 @@ use gpui_kit::{AnyWindowHandle, TestAppContext};
 use tf2tools_app::app::{Boot, CLOSED_BASE, start};
 use tf2tools_app::audio::RecordingAudio;
 use tf2tools_app::ids;
+use tf2tools_app::maps_sync::maps_sync;
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::remote_images::RemoteImages;
 use tf2tools_app::services::Services;
@@ -161,4 +162,34 @@ fn an_offline_app_refuses_remote_requests(cx: &mut TestAppContext) {
         matches!(&remote, Err(ImageError::UntrustedUrl { .. })),
         "{remote:?}"
     );
+}
+
+#[gpui_kit::test]
+fn startup_also_syncs_the_map_catalogue(cx: &mut TestAppContext) {
+    let env = support::env();
+    started(cx, boot(&env, true));
+    support::wait_hub(cx, "the maps sync to fail against the closed port", |cx| {
+        cx.update(|cx| {
+            maps_sync(cx)
+                .expect("start installs the maps sync")
+                .read(cx)
+                .error()
+                .is_some()
+        })
+    });
+}
+
+#[gpui_kit::test]
+fn a_boot_without_auto_sync_leaves_the_maps_sync_idle(cx: &mut TestAppContext) {
+    let env = support::env();
+    let win = started(cx, boot(&env, false));
+    for _ in 0..5 {
+        support::next_repaint(cx);
+        support::settle(cx, win);
+    }
+    cx.update(|cx| {
+        let sync = maps_sync(cx).expect("start installs the maps sync");
+        let sync = sync.read(cx);
+        assert!(!sync.is_running() && sync.last().is_none() && sync.error().is_none());
+    });
 }
