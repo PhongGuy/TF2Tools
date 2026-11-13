@@ -1,6 +1,7 @@
 //! The HUD Maker's canvas: the screen fitted into the free area, its parts, the selection,
 //! pin markers and the crosshair marker.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -242,7 +243,7 @@ impl HudMakerPage {
         };
 
         let model = editor.model();
-        let shown_layout = editor.shown_layout();
+        let shown_layout = self.drawn_layout(loaded);
         let layout: &HudLayout = &shown_layout;
         let played_frame = (editor.moment() > 0.).then(|| editor.frame());
         let rule = model.scene_rule();
@@ -1120,7 +1121,7 @@ impl HudMakerPage {
             return Vec::new();
         }
         let model = editor.model();
-        let shown_layout = editor.shown_layout();
+        let shown_layout = self.drawn_layout(loaded);
         let layout: &HudLayout = &shown_layout;
         let inside = |key: &PartKey| {
             layout.visible(key).is_some_and(|v| {
@@ -1180,6 +1181,20 @@ impl HudMakerPage {
         }
     }
 
+    // The editor's shown layout with the spectator target ID sized around its text, which only
+    // the canvas can measure; drawing and clicks both use it.
+    fn drawn_layout<'a>(&'a self, loaded: &'a super::Loaded) -> Cow<'a, HudLayout> {
+        let shown = loaded.editor.shown_layout();
+        if loaded.editor.model().scene() != Scene::Spectator {
+            return shown;
+        }
+        let probe = self.look(loaded, &shown, 1., Hsla::default(), Hsla::default());
+        match target_text_wide(&probe) {
+            Some(wide) => Cow::Owned(shown.target_id_around(wide)),
+            None => shown,
+        }
+    }
+
     // Every part under screen pixel (x, y) a click may select, best first: the parts on the
     // canvas, plus the faint panel of a selected part the game hides.
     fn picks_at(&self, x: i32, y: i32) -> Vec<Pick> {
@@ -1187,7 +1202,7 @@ impl HudMakerPage {
             return Vec::new();
         };
         let model = loaded.editor.model();
-        let shown_layout = loaded.editor.shown_layout();
+        let shown_layout = self.drawn_layout(loaded);
         let layout: &HudLayout = &shown_layout;
         // Chrome colours do not change what a part draws.
         let look = self.look(loaded, layout, 1., Hsla::default(), Hsla::default());
@@ -1203,7 +1218,7 @@ impl HudMakerPage {
             return top.clone();
         };
         let model = loaded.editor.model();
-        let layout = loaded.editor.shown_layout();
+        let layout = self.drawn_layout(loaded);
         let selected = loaded.editor.selected();
         let shown = takes_clicks(model, &layout, selected);
         match group_of(model, &layout, top, &shown) {
@@ -1226,7 +1241,7 @@ impl HudMakerPage {
         if selected == top || !is_within(model, top, selected) {
             return None;
         }
-        let layout = loaded.editor.shown_layout();
+        let layout = self.drawn_layout(loaded);
         let shown = takes_clicks(model, &layout, Some(selected));
         let mut inner = top.clone();
         let mut at = model.part(top).and_then(|p| p.parent());
@@ -1247,7 +1262,7 @@ impl HudMakerPage {
             return false;
         };
         let model = loaded.editor.model();
-        let shown_layout = loaded.editor.shown_layout();
+        let shown_layout = self.drawn_layout(loaded);
         let layout: &HudLayout = &shown_layout;
         let Some(key) = loaded.editor.selected() else {
             return false;
@@ -1893,13 +1908,8 @@ fn wrapped_lines(
     if !centred && !switched_on(part, "wrap") {
         return None;
     }
-    let family = font.and_then(|f| drawn_family(f.family(), look.fonts));
-    let id = (look.text_system).resolve_font(&font_named(family.unwrap_or(look.ui_family.clone())));
     let tall = font_tall(font, look, b.tall());
-    let advance = |ch| {
-        let glyph = look.text_system.advance(id, px(tall), ch);
-        glyph.map_or(tall / 2., |size| f32::from(size.width))
-    };
+    let advance = glyph_advance(font, tall, look);
     let room = b
         .wide()
         .saturating_sub(look.model.text_inset(part.key(), look.screen).x);
@@ -1909,6 +1919,44 @@ fn wrapped_lines(
         lines: lines.into_iter().map(|l| l.to_owned().into()).collect(),
         centred,
     })
+}
+
+// A glyph's width in screen pixels in `font` at `tall`, or half the height when the text
+// system has no such glyph.
+fn glyph_advance<'l>(
+    font: Option<&FontVariant>,
+    tall: f32,
+    look: &Look<'l>,
+) -> impl Fn(char) -> f32 + 'l {
+    let family = font.and_then(|f| drawn_family(f.family(), look.fonts));
+    let id = (look.text_system).resolve_font(&font_named(family.unwrap_or(look.ui_family.clone())));
+    let text_system = look.text_system;
+    move |ch| {
+        let glyph = text_system.advance(id, px(tall), ch);
+        glyph.map_or(tall / 2., |size| f32::from(size.width))
+    }
+}
+
+// The wider of the spectator target ID's name and data lines in screen pixels, the width
+// `CSpectatorTargetID::PerformLayout` adds; `None` when the scene has neither line.
+fn target_text_wide(look: &Look) -> Option<i32> {
+    let lines = [
+        "CSpectatorTargetID/TargetNameLabel",
+        "CSpectatorTargetID/TargetDataLabel",
+    ];
+    (lines.iter())
+        .filter_map(|key| {
+            let key = PartKey::new(*key);
+            let part = look.model.part(&key)?;
+            let Kind::Label(text) = look_kind(part, look) else {
+                return None;
+            };
+            let font = part_font(part, look);
+            let tall = font_tall(font, look, look.layout.get(&key).map_or(0, PartBox::tall));
+            let wide: f32 = text.chars().map(glyph_advance(font, tall, look)).sum();
+            Some(wide.ceil() as i32)
+        })
+        .max()
 }
 
 // A wrapped label's lines, and whether `centerwrap` centres each one.

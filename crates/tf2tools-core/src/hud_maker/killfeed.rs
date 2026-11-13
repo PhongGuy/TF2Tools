@@ -121,11 +121,14 @@ impl NoticeLine {
 impl HudModel {
     /// The sample lines at `screen` from the part's settings: MaxDeathNotices of them (0 to
     /// 20) when the part sets it, else two, each other absent key taking its schema default;
-    /// `None` outside the HUD and freeze cam, when the HUD has no HudDeathNotice block
-    /// (`Part::blocks()` is empty), when the part is unreadable, or when its box at `screen`
-    /// is hidden (`layout(screen).get(..).hidden()`).
+    /// `None` outside the HUD, freeze cam and spectator screen, when the HUD has no
+    /// HudDeathNotice block (`Part::blocks()` is empty), when the part is unreadable, or when
+    /// its box at `screen` is hidden (`layout(screen).get(..).hidden()`).
     pub fn death_notices(&self, screen: Screen) -> Option<DeathNotices> {
-        if !matches!(self.scene(), Scene::Hud | Scene::FreezeCam) {
+        if !matches!(
+            self.scene(),
+            Scene::Hud | Scene::FreezeCam | Scene::Spectator
+        ) {
             return None;
         }
         let key = PartKey::new(PANEL);

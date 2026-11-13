@@ -76,15 +76,17 @@ fn the_code_writes_the_countdown_the_hints_the_map_and_the_tip(cx: &mut TestAppC
     let want = [
         ("ReinforcementsLabel", "Respawn in: 7 seconds"),
         ("MapLabel", "Map: 2Fort"),
-        ("ClassOrTeamLabel", "Press [ N ] to pick a class"),
-        ("SwitchCamModeKeyLabel", "[SPACE]"),
+        // The key names are TF2's default binds: changeclass is on the comma key.
+        ("ClassOrTeamLabel", "Press [ , ] to pick a class"),
         ("CycleTargetFwdKeyLabel", "[MOUSE1]"),
         ("CycleTargetRevKeyLabel", "[MOUSE2]"),
-        // A label the code leaves alone keeps the file's token, resolved through the game text.
-        ("SwitchCamModeLabel", "Switch the camera"),
     ];
     for (name, text) in want {
         assert_eq!(label(cx, &s, name).as_deref(), Some(text), "{name}");
+    }
+    // The default mp_forcecamera 1 keeps the camera mode fixed, so its hint is not drawn.
+    for name in ["SwitchCamModeKeyLabel", "SwitchCamModeLabel"] {
+        assert_eq!(label(cx, &s, name), None, "{name}");
     }
     let tip = label(cx, &s, "TipLabel").unwrap_or_default();
     assert!(tip.starts_with("Tip: "), "{tip}");
