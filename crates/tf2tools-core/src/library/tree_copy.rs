@@ -59,7 +59,7 @@ pub(crate) fn tree_files(
 
 /// The folders and regular files under `src` as relative paths, with whether each is a
 /// folder; links and anything else are left out, and skipped folders are not entered.
-fn entries(
+pub(super) fn entries(
     src: &Path,
     skip: &dyn Fn(&Path) -> bool,
 ) -> Result<Vec<(std::path::PathBuf, bool)>, IoFailure> {

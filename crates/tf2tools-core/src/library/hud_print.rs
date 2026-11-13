@@ -6,7 +6,7 @@
 use std::path::Path;
 
 use super::hud_copy::{mtime_ns, sha256_file, sha256_hex};
-use super::{IoFailure, METADATA_DIR, io_at, tree_copy};
+use super::{IoFailure, METADATA_DIR, hud_lowercase, io_at, tree_copy};
 
 /// What the fingerprint and comparison ignore: the app's metadata and the sound cache the
 /// game writes into a custom folder on its own.
@@ -51,6 +51,53 @@ pub(super) fn same_files(a: &Path, b: &Path) -> Result<bool, IoFailure> {
     }
     for rel in &files {
         if sha256_file(&a.join(rel))? != sha256_file(&b.join(rel))? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// Whether the install at `installed` is the library HUD at `src` as a lowercase install
+/// under `folder` would have written it: the same surviving files, renamed and rewritten.
+pub(super) fn same_lowercased(
+    installed: &Path,
+    src: &Path,
+    folder: &str,
+) -> Result<bool, IoFailure> {
+    let entries = tree_copy::entries(src, &is_generated)?;
+    let rels: Vec<_> = entries.iter().map(|(rel, _)| rel.clone()).collect();
+    let plan = hud_lowercase::plan(&rels);
+    let own = hud_lowercase::Own::new(folder, &plan);
+    // Lowercasing keeps every length, so sizes still rule out visible differences cheaply.
+    let mut expected: Vec<_> = entries
+        .iter()
+        .filter(|(_, is_dir)| !is_dir)
+        .filter_map(|(rel, _)| Some((plan.get(rel)?.clone(), rel.clone())))
+        .collect();
+    expected.sort();
+    let files = tree_copy::tree_files(installed, &is_generated)?;
+    if files.len() != expected.len() || files.iter().zip(&expected).any(|(a, (b, _))| a != b) {
+        return Ok(false);
+    }
+    let len = |path: &Path| {
+        std::fs::symlink_metadata(path)
+            .map(|meta| meta.len())
+            .map_err(io_at(path))
+    };
+    for (lower, rel) in &expected {
+        if len(&installed.join(lower))? != len(&src.join(rel))? {
+            return Ok(false);
+        }
+    }
+    for (lower, rel) in &expected {
+        let (have, from) = (installed.join(lower), src.join(rel));
+        let same = if hud_lowercase::is_text_file(lower) {
+            let read = |path: &Path| std::fs::read(path).map_err(io_at(path));
+            read(&have)? == hud_lowercase::lowercase_bytes(lower, &read(&from)?, &own)
+        } else {
+            sha256_file(&have)? == sha256_file(&from)?
+        };
+        if !same {
             return Ok(false);
         }
     }

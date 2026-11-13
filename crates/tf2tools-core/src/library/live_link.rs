@@ -10,7 +10,7 @@ use rusqlite::OptionalExtension;
 
 use super::{
     HudId, HudStatus, IoFailure, Library, copy_dir_excluding_metadata, create_dir_all,
-    game_custom_dir, is_plain_name, made_huds, remove_dir_if_present,
+    game_custom_dir, hud_lowercase, is_plain_name, made_huds, remove_dir_if_present,
 };
 use crate::error::{LibraryError, ReinstallError};
 use crate::hud_maker::is_device_name;
@@ -96,7 +96,15 @@ impl Library {
 
         // Staged one level down, so no scan of `tf/custom` takes the copy for a HUD.
         let staging = custom.join(STAGING_DIR);
-        let staged = copy_dir_excluding_metadata(&src, &staging.join("new").join(&folder))
+        let fresh = staging.join("new").join(&folder);
+        let staged = copy_dir_excluding_metadata(&src, &fresh)
+            .and_then(|()| {
+                if hud_lowercase::lowercases(&folder) {
+                    hud_lowercase::lowercase_tree(&fresh, &folder)
+                } else {
+                    Ok(())
+                }
+            })
             .and_then(|()| create_dir_all(&staging.join("old")));
         if let Err(IoFailure { path, source }) = staged {
             discard(&staging);
