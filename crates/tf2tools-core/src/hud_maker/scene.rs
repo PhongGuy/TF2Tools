@@ -117,7 +117,8 @@ pub enum ShowsFor {
     Weapon(&'static str),
     /// While an effect is on you: `"condition"` or `"powerup"`.
     Effect(&'static str),
-    /// While a mode or setting is on: `"3D model"`, `"2D portrait"` or `"typing"` (a chat message).
+    /// While a mode or setting is on: `"3D model"`, `"2D portrait"`, `"typing"` (a chat message)
+    /// or `"full hud"` (Minimal HUD off).
     Mode(&'static str),
     /// While you aim at something: `"player"`.
     Aim(&'static str),
@@ -137,6 +138,7 @@ impl ShowsFor {
     pub fn holds_in(self, s: &GameSituation, model: &HudModel) -> bool {
         match self {
             ShowsFor::Health("pulse") => s.health_pulse(model),
+            ShowsFor::Mode("full hud") => !model.minmode(),
             ShowsFor::Class(_)
             | ShowsFor::Weapon(_)
             | ShowsFor::Effect(_)
@@ -162,6 +164,8 @@ impl ShowsFor {
             ShowsFor::Mode("typing") => s.is_on(SituationSwitch::Typing),
             ShowsFor::Mode("koth") => s.is_on(SituationSwitch::Koth),
             ShowsFor::Mode("not koth") => !s.is_on(SituationSwitch::Koth),
+            // The sample's HUD is the full one; only `holds_in` knows the model's mode.
+            ShowsFor::Mode("full hud") => true,
             ShowsFor::Aim(_) => s.is_on(SituationSwitch::Aiming),
             ShowsFor::Health("pulse") => s.health_pulse_under(super::situation::DEATH_WARNING),
             ShowsFor::Weapon(_) | ShowsFor::Effect(_) | ShowsFor::Mode(_) | ShowsFor::Health(_) => {
@@ -884,13 +888,24 @@ static FREEZE_TOGGLED: [CodeToggled; 9] = [
     // The HUD parts kept over the freeze cam: the KOTH panel only on a KOTH map, its timers'
     // digits blank until the respawn count starts, and no chat typing in the sample.
     KOTH_TOGGLED,
-    toggled("ChatInputLine", false, TYPING_WHEN),
-    toggled("ChatFiltersButton", false, TYPING_WHEN),
-    toggled(
-        "TimePanelValue",
-        false,
-        "Shows the time left while you are alive",
-    ),
+    CHAT_INPUT_TOGGLED,
+    CHAT_FILTERS_TOGGLED,
+    KOTH_DIGITS_TOGGLED,
+];
+
+// The HUD parts the game keeps while you are dead, in the freeze cam and the spectator screen:
+// nobody types in the sample; in the freeze cam the KOTH timers also blank their digits.
+const CHAT_INPUT_TOGGLED: CodeToggled = toggled("ChatInputLine", false, TYPING_WHEN);
+const CHAT_FILTERS_TOGGLED: CodeToggled = toggled("ChatFiltersButton", false, TYPING_WHEN);
+const KOTH_DIGITS_TOGGLED: CodeToggled = toggled(
+    "TimePanelValue",
+    false,
+    "Shows the time left while you are alive",
+);
+const DEAD_HUD_FILES: [&str; 3] = [
+    "resource/ui/basechat.res",
+    "resource/ui/hudobjectivekothtimepanel.res",
+    TIME_PANEL,
 ];
 
 // The freeze cam reads its root's box from hudlayout, the panel file and the killer health
@@ -902,15 +917,11 @@ static FREEZE: SceneRule = SceneRule {
         "scripts/hudlayout.res",
         "resource/ui/freezepanel_basic.res",
         "resource/ui/freezepanelkillerhealth.res",
-        "resource/ui/basechat.res",
-        "resource/ui/hudobjectivekothtimepanel.res",
-        TIME_PANEL,
+        DEAD_HUD_FILES[0],
+        DEAD_HUD_FILES[1],
+        DEAD_HUD_FILES[2],
     ],
-    extras: &[
-        "resource/ui/basechat.res",
-        "resource/ui/hudobjectivekothtimepanel.res",
-        TIME_PANEL,
-    ],
+    extras: &DEAD_HUD_FILES,
     read_only: &[],
     root: Some("FreezePanel"),
     rules: &FREEZE_PANELS,
@@ -1083,12 +1094,15 @@ static CLASS: SceneRule = SceneRule {
 };
 
 const WATCHING: &str = "Shows while you watch other players";
-const CAMERA: &str = "Shows when you may change the camera mode";
-const PICKING: &str = "Shows when you may pick who to watch";
+const WATCHING_FULL: &str = "Shows while you watch other players with Minimal HUD off";
+const CAMERA: &str = "Shows when the server lets you change the camera mode";
+const PICKING_FULL: &str = "Shows when you may pick who to watch, with Minimal HUD off";
+// Minimal HUD drops the bars and the key hints from the spectator screen.
+const FULL_HUD: ShowsFor = ShowsFor::Mode("full hud");
 
 // What the spectator code (`CTFSpectatorGUI` and `CSpectatorGUI`, by function name) shows or
-// fits: the bars are turned on and sized after the file loads, the key hints forced on while
-// the server lets the dead watch anyone, the buy-back line and item panel kept for their modes.
+// fits: the bars are turned on and sized after the file loads, the camera hint hidden under the
+// default mp_forcecamera 1, the buy-back line and item panel kept for their modes.
 const TARGET: &str = "Shows while you watch a player in first person";
 // The HUD tab's target ID labels: the game sets their colour on every update. Their x is the
 // file's here, so only the colour keys are owned. Whether fgcolor_override is also overwritten is
@@ -1098,16 +1112,16 @@ const LABEL_COLOUR_OWNED: &[&str] = &["fgcolor", "fgcolor_override"];
 // The target ID labels' x and colour are the game's: the code places them after the health
 // panel and overwrites their colour with the scheme's label colour.
 const LABEL_OWNED: &[&str] = &["xpos", "fgcolor", "fgcolor_override"];
-static SPECTATOR_TOGGLED: [CodeToggled; 23] = [
+static SPECTATOR_TOGGLED: [CodeToggled; 26] = [
     toggled("Spectator", true, WATCHING),
     fitted(
-        toggled("topbar", true, WATCHING),
+        when("topbar", FULL_HUD, WATCHING_FULL),
         &["xpos", "ypos", "wide"],
         HideTechnique::TallZero,
         Fit::TopBar,
     ),
     fitted(
-        toggled("bottombarblank", true, WATCHING),
+        when("bottombarblank", FULL_HUD, WATCHING_FULL),
         &["xpos", "ypos", "wide", "tall"],
         HideTechnique::NotOffered,
         Fit::BottomBar,
@@ -1117,12 +1131,12 @@ static SPECTATOR_TOGGLED: [CodeToggled; 23] = [
         true,
         "Shows to a dead player waiting to respawn",
     ),
-    toggled("SwitchCamModeKeyLabel", true, CAMERA),
-    toggled("SwitchCamModeLabel", true, CAMERA),
-    toggled("CycleTargetFwdKeyLabel", true, PICKING),
-    toggled("CycleTargetFwdLabel", true, PICKING),
-    toggled("CycleTargetRevKeyLabel", true, PICKING),
-    toggled("CycleTargetRevLabel", true, PICKING),
+    toggled("SwitchCamModeKeyLabel", false, CAMERA),
+    toggled("SwitchCamModeLabel", false, CAMERA),
+    when("CycleTargetFwdKeyLabel", FULL_HUD, PICKING_FULL),
+    when("CycleTargetFwdLabel", FULL_HUD, PICKING_FULL),
+    when("CycleTargetRevKeyLabel", FULL_HUD, PICKING_FULL),
+    when("CycleTargetRevLabel", FULL_HUD, PICKING_FULL),
     toggled(
         "BuyBackLabel",
         false,
@@ -1196,10 +1210,14 @@ static SPECTATOR_TOGGLED: [CodeToggled; 23] = [
             gap: 8,
         },
     ),
+    // The HUD parts kept while dead; the KOTH digits, three levels down, keep the file's state.
+    KOTH_TOGGLED,
+    CHAT_INPUT_TOGGLED,
+    CHAT_FILTERS_TOGGLED,
 ];
 
-// The spectator screen is one file whose first block is the screen's own box; no HUD part
-// is drawn over the bars.
+// The spectator screen is one file whose first block is the screen's own box; of the HUD only
+// the killfeed, chat and KOTH panel stay over it, as in the freeze cam.
 static SPECTATE: SceneRule = SceneRule {
     scene: Scene::Spectator,
     label: "Spectator",
@@ -1208,11 +1226,17 @@ static SPECTATE: SceneRule = SceneRule {
         "scripts/hudlayout.res",
         "resource/ui/targetid.res",
         "resource/ui/spectatorguihealth.res",
+        DEAD_HUD_FILES[0],
+        DEAD_HUD_FILES[1],
+        DEAD_HUD_FILES[2],
     ],
     extras: &[
         "scripts/hudlayout.res",
         "resource/ui/targetid.res",
         "resource/ui/spectatorguihealth.res",
+        DEAD_HUD_FILES[0],
+        DEAD_HUD_FILES[1],
+        DEAD_HUD_FILES[2],
     ],
     read_only: &[],
     root: Some("Spectator"),
@@ -1220,7 +1244,11 @@ static SPECTATE: SceneRule = SceneRule {
     code_toggled: &SPECTATOR_TOGGLED,
     code_classes: &[],
     toggle_any_depth: false,
-    nested: &[("SpectatorGUIHealth", "resource/ui/spectatorguihealth.res")],
+    nested: &[
+        ("SpectatorGUIHealth", "resource/ui/spectatorguihealth.res"),
+        ("BlueTimer", TIME_PANEL),
+        ("RedTimer", TIME_PANEL),
+    ],
     hides_hud: true,
     sample: SampleSet::Spectating,
     mode: BoardMode::Casual,

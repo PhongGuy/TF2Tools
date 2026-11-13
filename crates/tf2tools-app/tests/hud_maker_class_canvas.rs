@@ -154,13 +154,23 @@ fn the_cancel_button_hides_its_hotkey_marker(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn the_backdrop_room_is_a_dark_fill_unless_the_hud_hides_it(cx: &mut TestAppContext) {
+fn the_backdrop_room_is_a_wall_under_a_top_bar_unless_the_hud_hides_it(cx: &mut TestAppContext) {
     let env = support::env();
     let s = shell_with_textures(cx, &env, &[]);
     let _page = open_maker(cx, &s);
     support::click_scene(cx, s.win, Scene::ClassSelect);
     let bg = PartKey::new("class/MenuBG");
     assert!(support::present(cx, s.win, ids::hud_maker_fill(&bg)));
+    // The bar spans the room's top 111 of its 480 rows, as the game's room model draws it.
+    let room = support::bounds_of(cx, s.win, ids::hud_maker_part(&bg)).unwrap();
+    let bar = support::bounds_of(cx, s.win, ids::hud_maker_fill_band(&bg)).unwrap();
+    let tall = f32::from(room.size.height) * 111. / 480.;
+    assert_eq!(bar.top(), room.top());
+    assert_eq!(bar.size.width, room.size.width);
+    assert!(
+        (f32::from(bar.size.height) - tall).abs() <= 1.,
+        "{bar:?} in {room:?}"
+    );
     let hidden = support::hud_stock::class_select().replace(
         "MenuBG { ControlName CModelPanel xpos 0 ypos 0 zpos 0 wide f0 tall 480 visible 1",
         "MenuBG { ControlName CModelPanel xpos 0 ypos 0 zpos 0 wide f0 tall 480 visible 0",
@@ -175,6 +185,7 @@ fn the_backdrop_room_is_a_dark_fill_unless_the_hud_hides_it(cx: &mut TestAppCont
     let _page = open_maker(cx, &s);
     support::click_scene(cx, s.win, Scene::ClassSelect);
     assert!(!support::present(cx, s.win, ids::hud_maker_fill(&bg)));
+    assert!(!support::present(cx, s.win, ids::hud_maker_fill_band(&bg)));
 }
 
 // The model's top and bottom as fractions of its box under the stock camera: fov 25 at 320

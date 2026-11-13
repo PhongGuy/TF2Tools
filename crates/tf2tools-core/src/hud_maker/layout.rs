@@ -409,6 +409,41 @@ impl HudLayout {
     }
 }
 
+// The spectator target ID, the health panel and the team backgrounds its code resizes.
+const SPEC_TARGET: &str = "CSpectatorTargetID";
+const SPEC_TARGET_HEALTH: &str = "CSpectatorTargetID/SpectatorGUIHealth";
+const SPEC_TARGET_BACKGROUNDS: [&str; 2] = [
+    "CSpectatorTargetID/TargetIDBG_Spec_Red",
+    "CSpectatorTargetID/TargetIDBG_Spec_Blue",
+];
+
+impl HudLayout {
+    /// The layout with the spectator target ID sized around text `text_wide` screen pixels
+    /// wide (the wider of its name and data lines), as `CSpectatorTargetID::PerformLayout`
+    /// does: the health panel's width, XRES(15) and the text, centred across the screen, its
+    /// team backgrounds as wide. Unchanged when the layout has no spectator target ID.
+    pub fn target_id_around(&self, text_wide: i32) -> HudLayout {
+        let (Some(root), Some(health)) = (
+            self.get(&PartKey::new(SPEC_TARGET)),
+            self.get(&PartKey::new(SPEC_TARGET_HEALTH)),
+        ) else {
+            return self.clone();
+        };
+        let screen_wide = clamp(self.screen.wide);
+        let indents = i32::try_from(15 * i64::from(screen_wide) / 640).unwrap_or(i32::MAX);
+        let wide = (health.wide.saturating_add(indents)).saturating_add(text_wide.max(0));
+        let x = screen_wide.saturating_sub(wide) / 2;
+        let mut rects = HashMap::from([(root.key.clone(), Rect::new(x, root.y, wide, root.tall))]);
+        // The backgrounds' rects stand where they were; `moved` carries them with the root.
+        for bg in SPEC_TARGET_BACKGROUNDS {
+            if let Some(b) = self.get(&PartKey::new(bg)) {
+                rects.insert(b.key.clone(), Rect::new(b.x, b.y, wide, b.tall));
+            }
+        }
+        self.moved(&rects)
+    }
+}
+
 /// A part's box before pins are applied: its size and its position inside its parent.
 struct Placed {
     rel: Point,

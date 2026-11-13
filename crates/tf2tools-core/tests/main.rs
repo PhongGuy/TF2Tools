@@ -154,6 +154,7 @@ mod hud_scene_sample;
 mod hud_scene_spacing;
 mod hud_scene_spectator;
 mod hud_scene_spectator_edits;
+mod hud_scene_spectator_game;
 mod hud_scene_spectator_target;
 mod hud_scene_spectator_toggles;
 mod hud_scene_target_shared;

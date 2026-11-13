@@ -506,7 +506,8 @@ pub(super) static CLASS_SELECT: PanelRule = PanelRule {
 
 // The spectator screen is the file's first block, `Spectator`; the game sizes it to the whole
 // screen whatever the file says, so it is neither clickable nor hideable and ignores its box.
-pub(super) static SPECTATOR_PANELS: [PanelRule; 2] = [
+// While you are dead the game keeps the killfeed, chat and KOTH panel over it.
+pub(super) static SPECTATOR_PANELS: [PanelRule; 5] = [
     PanelRule {
         id: PartId::Spectator,
         label: "Spectator",
@@ -537,6 +538,9 @@ pub(super) static SPECTATOR_PANELS: [PanelRule; 2] = [
         clickable: true,
         fills_screen: false,
     },
+    KILLFEED,
+    CHAT,
+    KOTH_TIMER,
 ];
 
 impl PanelRule {
