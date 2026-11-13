@@ -42,6 +42,7 @@ pub use download::{DownloadPhase, DownloadProgress};
 pub use gb_addon_download::GbAddonDownload;
 use http::{API_BODY_LIMIT, Http, NetFailure, Redirects, Timeouts};
 pub use items::{StoreFile, StoreItem, StoreItemId};
+pub(crate) use maps::{BSP_MAGIC, is_map_name};
 pub use maps::{CommunityMap, MapEntry, MapState, parse_serveme_maps};
 pub use mastercomfig::MastercomfigRelease;
 

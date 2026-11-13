@@ -19,6 +19,7 @@ mod hud_maker;
 mod ice;
 mod library;
 mod logstf;
+mod map_payloads;
 mod old_v4;
 mod pak;
 pub mod panic_mark;
@@ -116,6 +117,7 @@ pub use logstf::{
     SteamId, TeamTotals, TrackedPlayer, WeaponBackfill, WeaponLine, WeaponSum,
     leaderboard_icon_stem, logstf_class, parse_log, parse_player_input, window_start,
 };
+pub use map_payloads::{MAX_MAPS, MapPayload, find_maps};
 pub use old_v4::{OldV4, UninstallEntry, detect_old_v4, find_old_v4};
 pub use pak::first_wav_in_vpk;
 pub use paths::{DataDir, LibraryKind};

@@ -8010,6 +8010,7 @@ name = "tf2tools-core"
 version = "6.0.2"
 dependencies = [
  "base64 0.23.1",
+ "bzip2",
  "chrono",
  "dirs 7.0.0",
  "flate2",

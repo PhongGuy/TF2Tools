@@ -217,6 +217,7 @@ mod logstf_sync;
 mod logstf_sync_failures;
 mod logstf_weapons;
 mod logstf_window;
+mod map_payloads;
 mod maps;
 mod mastercomfig;
 mod mastercomfig_catalog;

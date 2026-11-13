@@ -18,7 +18,7 @@ use crate::timestamp;
 /// The `store_cache_meta` key prefix of the map list.
 const KEY: &str = "maps";
 /// The first bytes of every Source engine map file.
-const BSP_MAGIC: &[u8; 4] = b"VBSP";
+pub(crate) const BSP_MAGIC: &[u8; 4] = b"VBSP";
 /// The longest map name accepted; serveme's longest is under 70.
 const MAX_NAME: usize = 128;
 
@@ -94,7 +94,7 @@ impl MapEntry {
 
 /// True for a name that is safe as a file name on every platform: ASCII letters, digits,
 /// `_`, `-` and `.`, not starting with a dot and never `..`.
-fn is_map_name(name: &str) -> bool {
+pub(crate) fn is_map_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= MAX_NAME
         && !name.starts_with('.')
