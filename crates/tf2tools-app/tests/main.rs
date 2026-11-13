@@ -160,6 +160,7 @@ mod logs_tf_text;
 mod logs_tf_weapons;
 mod maps;
 mod maps_gamebanana;
+mod maps_gamebanana_sync;
 mod maps_model;
 mod maps_sync;
 mod mastercomfig_restore;
