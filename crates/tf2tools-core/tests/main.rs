@@ -160,6 +160,7 @@ mod hud_scene_spectator_toggles;
 mod hud_scene_target_shared;
 mod hud_scene_win;
 mod hud_scene_win_edits;
+mod hud_scene_win_hud;
 mod hud_scene_win_toggles;
 mod hud_schema;
 mod hud_schema_apply;
