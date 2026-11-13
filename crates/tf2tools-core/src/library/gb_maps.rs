@@ -16,6 +16,10 @@ use crate::map_payloads::MapPayload;
 use crate::store::{GbMapDownload, MapIndex, MapSource, downloaded_names, lowercase_all};
 use crate::tf2::Tf2Install;
 
+/// Where a new map folder is copied under `tf/custom` before it replaces the old one. The
+/// leading dot and the copy one level down keep any scan from taking it for a map folder.
+const MAP_STAGING_DIR: &str = ".tf2tools-map-staging";
+
 impl Library {
     /// Where `tf2` already has map `name`, ignoring case, or None. `except` skips that
     /// GameBanana item's own folder, so an update does not find the map it replaces.
@@ -147,9 +151,19 @@ impl Library {
         self.save_gb_addon(&row(files.clone()), download.file_id)
             .map_err(map_error)?;
 
-        // The scratch dir and the game are often on different disks, so the stage is copied.
+        // The scratch dir and the game are often on different disks, so the stage is copied
+        // into a staging folder beside the target first; only a complete copy replaces the
+        // old folder, by a rename on the game's own disk.
         let tf = tf2.tf_dir();
         let target = custom.join(&folder);
+        let staging = custom.join(MAP_STAGING_DIR);
+        let fresh = staging.join(&folder);
+        let copied = remove_entry(&staging)
+            .and_then(|()| copy_tree(&stage, &fresh, &|_: &Path| false).map(drop));
+        if let Err(e) = copied {
+            let _ = remove_entry(&staging);
+            return Err(e.into());
+        }
         let swapped = (|| {
             for file in &files {
                 if let Some(path) = recorded_path(&tf, gb_id, file) {
@@ -157,8 +171,9 @@ impl Library {
                 }
             }
             remove_entry(&target)?;
-            copy_tree(&stage, &target, &|_: &Path| false).map(drop)
+            std::fs::rename(&fresh, &target).map_err(io_at(&target))
         })();
+        let _ = remove_entry(&staging);
         if let Err(e) = swapped {
             let _ = remove_entry(&target);
             return Err(e.into());

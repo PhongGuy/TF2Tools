@@ -267,3 +267,35 @@ async fn a_write_failure_leaves_no_folder_and_the_row_not_installed() {
     assert!(custom(&s).is_empty());
     assert!(!row(&s, 9).unwrap().is_installed());
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn an_update_whose_copy_fails_keeps_the_installed_map() {
+    use std::os::unix::fs::PermissionsExt;
+    let s = setup().await;
+    let d = download(&s, 7, "X", &[("maps/cp_x_rc2.bsp", &bsp(b"2"))], 100).await;
+    s.env
+        .lib
+        .install_gb_map(d, &chosen(&["cp_x_rc2"]), &s.tf2, &no)
+        .unwrap();
+
+    // An unreadable new map makes the copy into the game fail part-way.
+    let d = download(&s, 7, "X", &[("maps/cp_x_rc3.bsp", &bsp(b"3"))], 200).await;
+    let new_map = d.maps()[0].bsp().to_path_buf();
+    std::fs::set_permissions(&new_map, std::fs::Permissions::from_mode(0o000)).unwrap();
+    // Root reads through any mode, so there is nothing to test there.
+    if std::fs::read(&new_map).is_ok() {
+        return;
+    }
+    let result = s
+        .env
+        .lib
+        .update_gb_map(d, &chosen(&["cp_x_rc3"]), &s.tf2, &no);
+    assert!(
+        matches!(result, Err(GbMapInstallError::Io { .. })),
+        "{result:?}"
+    );
+    assert_eq!(custom(&s), ["tf2tools-gb-7-x/maps/cp_x_rc2.bsp"]);
+    let old = s.tf2.custom_dir().join("tf2tools-gb-7-x/maps/cp_x_rc2.bsp");
+    assert_eq!(std::fs::read(old).unwrap(), bsp(b"2"));
+}
