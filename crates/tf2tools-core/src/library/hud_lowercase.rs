@@ -11,10 +11,26 @@ use super::{IoFailure, io_at, tree_copy};
 pub(super) const LOWERCASE_INSTALLS: bool = cfg!(target_os = "linux");
 
 /// Text files whose file references are lowercased to match the renamed files.
-const TEXT_EXTENSIONS: [&str; 4] = [".res", ".txt", ".vdf", ".vmt"];
+const TEXT_EXTENSIONS: [&str; 5] = [".res", ".txt", ".vdf", ".vmt", ".cfg"];
 
 /// A quoted value ending in one of these names a file.
-const FILE_EXTENSIONS: [&str; 7] = [".res", ".txt", ".ttf", ".otf", ".vdf", ".vtf", ".vmt"];
+const FILE_EXTENSIONS: [&str; 9] = [
+    ".res", ".txt", ".ttf", ".otf", ".vdf", ".vtf", ".vmt", ".wav", ".mp3",
+];
+
+/// Where the game looks up a name given without its root folder, and the extensions it may
+/// leave out: materials (VGUI images sit under `materials/vgui/`), sounds and cfgs.
+const LOOKUPS: [(&str, &[&str]); 4] = [
+    ("materials", &["", ".vmt", ".vtf"]),
+    ("materials/vgui", &["", ".vmt", ".vtf"]),
+    ("sound", &[""]),
+    ("cfg", &["", ".cfg"]),
+];
+
+/// The characters a sound name may start with to set how it plays; not part of its path.
+const SOUND_PREFIXES: &[char] = &[
+    '*', '#', '@', '<', '>', '^', ')', '(', '}', '$', '!', '?', '&', '~',
+];
 
 /// Whether the install at `tf/custom/<folder>` is one this platform lowercases. An install
 /// made before lowercasing keeps its capitals, so a live update leaves it as it was.
@@ -79,30 +95,32 @@ pub(super) struct Own {
 }
 
 impl Own {
-    /// The install under `folder` of the files `plan` keeps.
+    /// The install under `folder` of the files `plan` keeps; `plan`'s folders are left out,
+    /// since a folder name alone is never a reference.
     pub(super) fn new(folder: &str, plan: &BTreeMap<PathBuf, PathBuf>) -> Own {
+        let folders: HashSet<&Path> = plan.values().filter_map(|lower| lower.parent()).collect();
         Own {
             folder: folder.to_ascii_lowercase(),
             files: plan
                 .values()
+                .filter(|lower| !folders.contains(lower.as_path()))
                 .map(|lower| lower.to_string_lossy().replace('\\', "/"))
                 .collect(),
         }
     }
-}
 
-impl Own {
-    /// Whether `value` (lowercase, `/`-separated) names a material the HUD ships: material
-    /// names are relative to `materials/` or, in VGUI images, `materials/vgui/`, and usually
-    /// leave out the extension.
-    fn ships_material(&self, value: &str) -> bool {
-        let value = value.trim_start_matches('/');
+    /// Whether `value` (lowercase, `/`-separated) names a file the HUD ships, as written or
+    /// the way the game looks it up.
+    fn ships(&self, value: &str) -> bool {
+        let value = value
+            .trim_start_matches(SOUND_PREFIXES)
+            .trim_start_matches('/');
         if value.is_empty() {
             return false;
         }
         self.files.contains(value)
-            || ["materials", "materials/vgui"].iter().any(|base| {
-                ["", ".vmt", ".vtf"].iter().any(|ext| {
+            || LOOKUPS.iter().any(|(base, exts)| {
+                exts.iter().any(|ext| {
                     resolve(&format!("{base}/{value}{ext}"))
                         .is_some_and(|path| self.files.contains(&path))
                 })
@@ -173,68 +191,109 @@ pub(super) fn lowercase_tree(dir: &Path, folder: &str) -> Result<(), IoFailure> 
     Ok(())
 }
 
-/// `bytes` with their file references lowercased when they are UTF-8 text, else as they are.
+/// `bytes` with the file paths in them lowercased: `#base` and `#include` targets, quoted
+/// values naming a file by its extension, values naming a file the HUD ships, and quoted
+/// paths into `custom/<folder>/`. Only ASCII letters inside those spans change, so any
+/// ASCII-compatible encoding comes through; UTF-16 text is left as it is.
 pub(super) fn lowercase_bytes(bytes: &[u8], own: &Own) -> Vec<u8> {
-    match std::str::from_utf8(bytes) {
-        Ok(text) => lowercase_references(text, own).into_bytes(),
-        Err(_) => bytes.to_vec(),
+    let mut out = bytes.to_vec();
+    if bytes.starts_with(&[0xff, 0xfe]) || bytes.starts_with(&[0xfe, 0xff]) || bytes.contains(&0) {
+        return out;
     }
-}
-
-/// `text` with the file paths in it lowercased: `#base` and `#include` targets, quoted
-/// values naming a file by its extension or a material the HUD ships, and quoted paths into
-/// `custom/<folder>/`. A stock material the HUD does not ship stays as written. ASCII
-/// lowercasing keeps every byte offset, so everything else stays byte for byte.
-pub(super) fn lowercase_references(text: &str, own: &Own) -> String {
-    let mut out = text.as_bytes().to_vec();
     let own_folder = format!("custom/{}/", own.folder);
     let mut at = 0;
-    for line in text.split_inclusive('\n') {
+    for line in bytes.split_inclusive(|&b| b == b'\n') {
         if let Some(range) = directive_target(line) {
             out[at + range.start..at + range.end].make_ascii_lowercase();
         }
-        // Quoted values never span lines, so an unpaired quote costs only its own line.
-        let mut rest = 0;
-        while let Some(open) = line[rest..].find('"').map(|i| rest + i + 1) {
-            let Some(close) = line[open..].find(['"', '\n']).map(|i| open + i) else {
-                break;
+        for (range, quoted) in tokens(line) {
+            let value = normalized(&line[range.clone()]);
+            let names_file = if quoted {
+                FILE_EXTENSIONS.iter().any(|ext| value.ends_with(ext))
+                    || value.contains(&own_folder)
+                    || own.ships(&value)
+            } else {
+                own.ships(&value)
             };
-            if line.as_bytes()[close] != b'"' {
-                break;
+            if names_file {
+                out[at + range.start..at + range.end].make_ascii_lowercase();
             }
-            // KeyValues may escape a backslash as `\\`, so a separator run counts as one.
-            let mut value = line[open..close].to_ascii_lowercase().replace('\\', "/");
-            while value.contains("//") {
-                value = value.replace("//", "/");
-            }
-            if FILE_EXTENSIONS.iter().any(|ext| value.ends_with(ext))
-                || value.contains(&own_folder)
-                || own.ships_material(&value)
-            {
-                out[at + open..at + close].make_ascii_lowercase();
-            }
-            rest = close + 1;
         }
         at += line.len();
     }
-    String::from_utf8(out).unwrap_or_else(|_| text.to_owned())
+    out
+}
+
+/// `value` lowercased with `/` separators; KeyValues may escape a backslash as `\\`, so a
+/// separator run counts as one.
+fn normalized(value: &[u8]) -> String {
+    let mut value = String::from_utf8_lossy(value)
+        .to_ascii_lowercase()
+        .replace('\\', "/");
+    while value.contains("//") {
+        value = value.replace("//", "/");
+    }
+    value
+}
+
+/// The values on `line`: each quoted string's inside, and each bare word between
+/// whitespace, braces and quotes. A quote never pairs across lines, so an unpaired one costs
+/// only the rest of its line.
+fn tokens(line: &[u8]) -> Vec<(std::ops::Range<usize>, bool)> {
+    let mut found = Vec::new();
+    let mut i = 0;
+    while i < line.len() {
+        match line[i] {
+            b'"' => {
+                let open = i + 1;
+                let Some(len) = line[open..].iter().position(|&b| b == b'"' || b == b'\n') else {
+                    break;
+                };
+                if line[open + len] != b'"' {
+                    break;
+                }
+                found.push((open..open + len, true));
+                i = open + len + 1;
+            }
+            b'{' | b'}' => i += 1,
+            b if b.is_ascii_whitespace() => i += 1,
+            _ => {
+                let len = line[i..]
+                    .iter()
+                    .position(|&b| b.is_ascii_whitespace() || matches!(b, b'"' | b'{' | b'}'))
+                    .unwrap_or(line.len() - i);
+                found.push((i..i + len, false));
+                i += len;
+            }
+        }
+    }
+    found
 }
 
 /// Where in `line` a `#base` or `#include` directive's target sits, quoted or bare.
-fn directive_target(line: &str) -> Option<std::ops::Range<usize>> {
-    let lead = line.len() - line.trim_start().len();
-    let lower = line[lead..].to_ascii_lowercase();
-    let word = ["#base", "#include"]
-        .into_iter()
-        .find(|word| lower.starts_with(word))?;
+fn directive_target(line: &[u8]) -> Option<std::ops::Range<usize>> {
+    let lead = line.iter().take_while(|b| b.is_ascii_whitespace()).count();
+    let word = [&b"#base"[..], b"#include"].into_iter().find(|word| {
+        line.len() >= lead + word.len() && line[lead..lead + word.len()].eq_ignore_ascii_case(word)
+    })?;
     let after = lead + word.len();
-    let start = after + (line[after..].len() - line[after..].trim_start().len());
+    let start = after
+        + line[after..]
+            .iter()
+            .take_while(|b| b.is_ascii_whitespace())
+            .count();
     let target = &line[start..];
-    if let Some(quoted) = target.strip_prefix('"') {
-        let end = quoted.find(['"', '\n']).unwrap_or(quoted.len());
+    if let Some(quoted) = target.strip_prefix(b"\"") {
+        let end = quoted
+            .iter()
+            .position(|&b| b == b'"' || b == b'\n')
+            .unwrap_or(quoted.len());
         Some(start + 1..start + 1 + end)
     } else {
-        let end = target.find(char::is_whitespace).unwrap_or(target.len());
+        let end = target
+            .iter()
+            .position(u8::is_ascii_whitespace)
+            .unwrap_or(target.len());
         Some(start..start + end)
     }
 }
@@ -257,6 +316,11 @@ mod tests {
         all.sort();
         all.dedup();
         Own::new(folder, &plan(&all))
+    }
+
+    /// `text` as a lowercase install writes it.
+    fn fix(text: &str, own: &Own) -> String {
+        String::from_utf8(lowercase_bytes(text.as_bytes(), own)).unwrap()
     }
 
     fn planned(list: &[&str]) -> Vec<(String, String)> {
@@ -304,7 +368,7 @@ mod tests {
     fn base_and_include_targets_are_lowercased() {
         let text = "#base \"Scheme/Base.res\"\n  #include Other/File.res // Keep\n#BASE \"X\"\n";
         assert_eq!(
-            lowercase_references(text, &own("kn-edit", &[])),
+            fix(text, &own("kn-edit", &[])),
             "#base \"scheme/base.res\"\n  #include other/file.res // Keep\n#BASE \"x\"\n"
         );
     }
@@ -314,7 +378,7 @@ mod tests {
         let text = "\"font\" \"Resource/Fonts/TF2Build.TTF\" \"x\" \"A.otf\" \"vdf\" \"B.VDF\"\n\
                     \"t\" \"C.vtf\" \"m\" \"D.vmt\" \"s\" \"E.txt\" \"w\" \"F\\\\G.res\"";
         assert_eq!(
-            lowercase_references(text, &own("kn-edit", &[])),
+            fix(text, &own("kn-edit", &[])),
             "\"font\" \"resource/fonts/tf2build.ttf\" \"x\" \"a.otf\" \"vdf\" \"b.vdf\"\n\
              \"t\" \"c.vtf\" \"m\" \"d.vmt\" \"s\" \"e.txt\" \"w\" \"f\\\\g.res\""
         );
@@ -326,7 +390,7 @@ mod tests {
                     \"image\" \"../../custom/OtherHud/Materials/Bg\"\n\
                     \"image\" \"..\\\\..\\\\custom\\\\KN-Edit\\\\Bg\"";
         assert_eq!(
-            lowercase_references(text, &own("kn-edit", &[])),
+            fix(text, &own("kn-edit", &[])),
             "\"image\" \"../../custom/kn-edit/materials/bg\"\n\
              \"image\" \"../../custom/OtherHud/Materials/Bg\"\n\
              \"image\" \"..\\\\..\\\\custom\\\\kn-edit\\\\bg\""
@@ -351,7 +415,7 @@ mod tests {
                     \"image\" \"Stock/Thing\"\n\
                     \"labelText\" \"Foo\"\n";
         assert_eq!(
-            lowercase_references(text, &own),
+            fix(text, &own),
             "\"image\" \"replay/thumbnails/foo\"\n\
              \"$baseTexture\" \"vgui\\\\replay/thumbnails/foo\"\n\
              \"image\" \"../hud/bar\"\n\
@@ -362,12 +426,73 @@ mod tests {
     }
 
     #[test]
+    fn text_in_any_ascii_compatible_encoding_is_rewritten() {
+        let own = own("kn-edit", &[]);
+        assert_eq!(
+            lowercase_bytes(b"// \xa9 Caf\xe9\n#base \"Scheme/Base.res\"\n", &own),
+            b"// \xa9 Caf\xe9\n#base \"scheme/base.res\"\n"
+        );
+    }
+
+    #[test]
+    fn utf16_text_is_left_alone() {
+        let own = own("kn-edit", &[]);
+        let bom = b"\xff\xfe#\0b\0";
+        assert_eq!(lowercase_bytes(bom, &own), bom);
+        let nul = b"\"A.res\"\0";
+        assert_eq!(lowercase_bytes(nul, &own), nul);
+    }
+
+    #[test]
+    fn references_to_sounds_and_cfgs_the_hud_ships_are_lowercased() {
+        let own = own(
+            "kn-edit",
+            &[
+                "sound/UI/HitSound.wav",
+                "sound/UI/Kill.mp3",
+                "cfg/KN/Extra.cfg",
+            ],
+        );
+        let text = "\"wave\" \"UI/HitSound.wav\"\n\"wave\" \")UI/Kill.mp3\"\n\
+                    exec \"KN/Extra\"\nexec KN/Extra.cfg\nexec Stock_Thing\n\
+                    \"wave\" \"Stock/Other.WAV\"\n";
+        assert_eq!(
+            fix(text, &own),
+            "\"wave\" \"ui/hitsound.wav\"\n\"wave\" \")ui/kill.mp3\"\n\
+             exec \"kn/extra\"\nexec kn/extra.cfg\nexec Stock_Thing\n\
+             \"wave\" \"stock/other.wav\"\n"
+        );
+    }
+
+    #[test]
+    fn a_folder_name_alone_is_no_reference() {
+        let own = own("kn-edit", &["resource/x.res", "materials/vgui/Foo.vtf"]);
+        let text = "\"name\" \"Resource\"\n\"name\" \"VGUI\"\n";
+        assert_eq!(fix(text, &own), text);
+    }
+
+    #[test]
+    fn unquoted_values_naming_shipped_files_are_lowercased() {
+        let own = own(
+            "kn-edit",
+            &["Resource/UI/X.res", "materials/vgui/Replay/Foo.vmt"],
+        );
+        let text = "Panel\n{\n  file Resource/UI/X.res\n  image Replay/Foo\n  \
+                    labelText Foo\n  image Stock/Thing\n  ControlName CExLabel\n}\n";
+        assert_eq!(
+            fix(text, &own),
+            "Panel\n{\n  file resource/ui/x.res\n  image replay/foo\n  \
+             labelText Foo\n  image Stock/Thing\n  ControlName CExLabel\n}\n"
+        );
+    }
+
+    #[test]
     fn labels_colours_fonts_and_controls_stay_as_written() {
         let text = "\"ControlName\" \"CExLabel\"\n\"labelText\" \"%Health%\"\n\
                     \"name\" \"TF2 Build\"\n\"TanLight\" \"235 226 202 255\"\n\
                     // An \"Unclosed quote\nthen \"Next.Res\"";
         assert_eq!(
-            lowercase_references(text, &own("kn-edit", &[])),
+            fix(text, &own("kn-edit", &[])),
             text.replace("Next.Res", "next.res")
         );
     }
@@ -384,6 +509,8 @@ mod tests {
         write("Resource/UI/HudLayout.res", b"#base \"Base.res\" \"Label\"");
         write("Resource/Fonts/Font.TTF", b"\"Binary.res\"");
         write("Resource/UI/Odd.res", b"\"Odd.res\" \xff");
+        write("cfg/KN/Menu.cfg", b"exec KN/Extra\nexec Stock_Thing\n");
+        write("cfg/KN/Extra.cfg", b"");
         lowercase_tree(&dir, "kn-edit").unwrap();
         let read = |rel: &str| std::fs::read(dir.join(rel)).unwrap();
         assert_eq!(
@@ -391,7 +518,11 @@ mod tests {
             b"#base \"base.res\" \"Label\""
         );
         assert_eq!(read("resource/fonts/font.ttf"), b"\"Binary.res\"");
-        assert_eq!(read("resource/ui/odd.res"), b"\"Odd.res\" \xff");
+        assert_eq!(read("resource/ui/odd.res"), b"\"odd.res\" \xff");
+        assert_eq!(
+            read("cfg/kn/menu.cfg"),
+            b"exec kn/extra\nexec Stock_Thing\n"
+        );
         let mut names: Vec<String> = walkdir::WalkDir::new(&dir)
             .min_depth(1)
             .into_iter()
@@ -408,6 +539,10 @@ mod tests {
         assert_eq!(
             names,
             [
+                "cfg",
+                "cfg/kn",
+                "cfg/kn/extra.cfg",
+                "cfg/kn/menu.cfg",
                 "resource",
                 "resource/fonts",
                 "resource/fonts/font.ttf",

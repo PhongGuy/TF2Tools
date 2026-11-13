@@ -22,7 +22,7 @@ const HEALTH: &str = "\"Resource/UI/HudPlayerHealth.res\"\n{\n\
 \t\"PlayerStatusHealthValue\" { \"ControlName\" \"CExLabel\" \"fieldName\" \"PlayerStatusHealthValue\" \
 \"font\" \"HudFontBig\" \"labelText\" \"%Health%\" }\n}\n";
 
-/// Not UTF-8, so it must come through byte for byte.
+/// Windows-1252 rather than UTF-8, with a `#base` that must still follow the renames.
 const ODD: &[u8] = b"#base \"Odd_Base.res\" \xff\n";
 
 /// Imports KN Edit's shape: capitals in the archive folder, file names and references.
@@ -100,7 +100,8 @@ fn a_mixed_case_hud_installs_in_lowercase_with_its_references_to_match() {
     );
     assert_eq!(
         fs::read(env.tf2.custom_dir().join("kn-edit/resource/ui/odd.res")).unwrap(),
-        ODD
+        b"#base \"odd_base.res\" \xff\n",
+        "a file that is not UTF-8 is still rewritten"
     );
 }
 
@@ -262,6 +263,49 @@ fn the_font_check_finds_no_capitals_in_an_installed_hud() {
         "{:?}",
         fonts.issues()
     );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn a_live_update_of_an_install_made_before_lowercasing_keeps_its_capitals() {
+    let env = library_env();
+    let hud = import_kn_edit(&env, &[]);
+    let library = env
+        .dir
+        .library_dir(LibraryKind::Huds)
+        .join(hud.folder_name());
+    let installed = env.tf2.custom_dir().join("KN-Edit");
+    let copy_library = || {
+        for rel in tree(&library)
+            .iter()
+            .filter(|rel| !rel.starts_with(".tf2tools/"))
+        {
+            write_file(&installed.join(rel), &fs::read(library.join(rel)).unwrap());
+        }
+    };
+    copy_library();
+    common::set_setting(&env.dir, "installed_hud_folder", "KN-Edit");
+    common::set_setting(&env.dir, "installed_hud_id", hud.id().as_str());
+    // The first update records the install's fingerprint, as an install made before would have.
+    env.lib.reinstall_hud(hud.id(), &env.tf2).unwrap();
+
+    write_file(
+        &library.join("resource/ui/HudPlayerHealth.res"),
+        b"#base \"../../custom/KN-Edit/resource/ui/Base.res\"\n",
+    );
+    let done = env.lib.reinstall_hud(hud.id(), &env.tf2).unwrap();
+    assert!(matches!(done, Reinstall::Updated { .. }), "{done:?}");
+    let snapshot = |root: &std::path::Path| -> Vec<(String, Vec<u8>)> {
+        tree(root)
+            .into_iter()
+            .filter(|rel| !rel.starts_with(".tf2tools/"))
+            .map(|rel| {
+                let bytes = fs::read(root.join(&rel)).unwrap();
+                (rel, bytes)
+            })
+            .collect()
+    };
+    assert_eq!(snapshot(&installed), snapshot(&library));
 }
 
 #[cfg(not(target_os = "linux"))]
