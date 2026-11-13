@@ -7,7 +7,8 @@ use gpui_kit::TestAppContext;
 use tf2tools_app::ids;
 use tf2tools_app::pages::maps::MapsSource;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::GbId;
+use tf2tools_app::store_grid::SEARCH_DEBOUNCE;
+use tf2tools_core::{GbId, GbMapSort};
 
 #[gpui_kit::test]
 fn the_page_opens_on_serveme_and_builds_no_gamebanana_tab(cx: &mut TestAppContext) {
@@ -163,4 +164,63 @@ fn a_map_detail_offers_no_install(cx: &mut TestAppContext) {
     // Until maps install, a map's detail neither offers Install nor explains why it can't.
     assert!(!support::present(cx, s.win, ids::ADDON_DETAIL_INSTALL));
     assert!(!support::present(cx, s.win, ids::ADDON_DETAIL_BLOCKED));
+}
+
+#[gpui_kit::test]
+fn the_gamemode_select_lists_first_level_gamemodes_and_filters(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = maps_shell(cx, &env, &server);
+    seed_maps(&env);
+    let page = open_maps(cx, &s);
+    let tab = open_gamebanana(cx, &s, &page);
+    support::wait_real(cx, "the gamemodes", |cx| {
+        cx.update(|cx| tab.read(cx).gamemodes().len() == 3)
+    });
+    support::click_id(cx, s.win, ids::MAPS_GB_GAMEMODE);
+    let option = |key: &str| ids::select_option(ids::MAPS_GB_GAMEMODE, key);
+    assert_eq!(
+        support::label_of(cx, s.win, option("all")).as_deref(),
+        Some("All gamemodes")
+    );
+    for key in ["5383", "5373", "5385"] {
+        assert!(support::present(cx, s.win, option(key)), "{key}");
+    }
+    assert!(
+        !support::present(cx, s.win, option("5388")),
+        "a nested category is no gamemode"
+    );
+    support::click_id(cx, s.win, option("5383"));
+    support::wait_real(cx, "Achievement/Idle", |cx| shown(cx, &tab) == [11]);
+    assert_eq!(cx.update(|cx| tab.read(cx).gamemode()), Some(5383));
+}
+
+#[gpui_kit::test]
+fn the_sort_select_orders_newest_first(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = maps_shell(cx, &env, &server);
+    seed_maps(&env);
+    let page = open_maps(cx, &s);
+    let tab = open_gamebanana(cx, &s, &page);
+    support::click_id(cx, s.win, ids::MAPS_GB_SORT);
+    support::click_id(cx, s.win, ids::select_option(ids::MAPS_GB_SORT, "Newest"));
+    support::wait_real(cx, "newest first", |cx| shown(cx, &tab) == [11, 10, 12]);
+    assert_eq!(cx.update(|cx| tab.read(cx).sort()), GbMapSort::Newest);
+}
+
+#[gpui_kit::test]
+fn search_matches_name_or_author_locally_and_says_when_nothing_does(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = maps_shell(cx, &env, &server);
+    seed_maps(&env);
+    let page = open_maps(cx, &s);
+    let tab = open_gamebanana(cx, &s, &page);
+    cx.update(|cx| tab.update(cx, |t, cx| t.search_typed("VEX".to_owned(), cx)));
+    cx.executor().advance_clock(SEARCH_DEBOUNCE);
+    support::wait_real(cx, "the author search", |cx| shown(cx, &tab) == [10, 12]);
+    cx.update(|cx| tab.update(cx, |t, cx| t.search_typed("zzz".to_owned(), cx)));
+    cx.executor().advance_clock(SEARCH_DEBOUNCE);
+    support::wait_real(cx, "no results", |cx| shown(cx, &tab).is_empty());
+    support::settle(cx, s.win);
+    assert!(support::present(cx, s.win, ids::MAPS_GB_EMPTY));
+    assert_eq!(server.requests_where(|p| p.starts_with("/apiv11")), 0);
 }

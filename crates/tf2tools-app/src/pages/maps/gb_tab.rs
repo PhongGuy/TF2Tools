@@ -6,12 +6,12 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::select::{Select, SelectState};
+use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::select::{Select, SelectEvent, SelectState};
 use gpui_kit::component::{ActiveTheme as _, Icon, IndexPath, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _,
-    IntoElement, ParentElement as _, Render, Styled as _, Subscription, TestSupportExt as _,
+    IntoElement, ParentElement as _, Render, Styled as _, Subscription, Task, TestSupportExt as _,
     Window, div, point, px,
 };
 use tf2tools_core::{
@@ -26,6 +26,7 @@ use crate::pages::addon_store::gamebanana_tab::CategoryOption;
 use crate::pages::common::{SkeletonTop, empty_state_card, skeleton_cards};
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, run_blocking};
+use crate::store_grid::SEARCH_DEBOUNCE;
 use crate::store_grid::feed::{Feed, FeedItem, PAGE};
 use crate::store_messages::read_failed;
 use crate::widgets::card_grid::{CardGrid, SHELL_CHROME_WIDTH, columns_for_store};
@@ -73,6 +74,7 @@ pub struct GbMapsTab {
     search_input: Entity<InputState>,
     sort_select: Entity<SelectState<Vec<LabelOption>>>,
     gamemode_select: Entity<SelectState<Vec<CategoryOption>>>,
+    debounce: Option<Task<()>>,
     /// The mature setting the current query uses; no page is read until it is known.
     mature: bool,
     mature_known: bool,
@@ -127,6 +129,37 @@ impl GbMapsTab {
         )];
         let gamemode_select =
             cx.new(|cx| SelectState::new(rows, Some(IndexPath::default()), window, cx));
+        subscriptions.extend([
+            cx.subscribe(&search_input, |tab, input, event: &InputEvent, cx| {
+                if matches!(event, InputEvent::Change) {
+                    let text = input.read(cx).value().to_string();
+                    tab.search_typed(text, cx);
+                }
+            }),
+            cx.subscribe(
+                &sort_select,
+                |tab, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
+                    if let SelectEvent::Confirm(Some(label)) = event
+                        && let Some((_, sort)) = SORTS.iter().find(|(l, _)| l == label)
+                        && *sort != tab.sort
+                    {
+                        tab.sort = *sort;
+                        tab.restart(cx);
+                    }
+                },
+            ),
+            cx.subscribe(
+                &gamemode_select,
+                |tab, _, event: &SelectEvent<Vec<CategoryOption>>, cx| {
+                    if let SelectEvent::Confirm(Some(id)) = event
+                        && *id != tab.gamemode
+                    {
+                        tab.gamemode = *id;
+                        tab.restart(cx);
+                    }
+                },
+            ),
+        ]);
         let mut tab = Self {
             feed: Feed::new(),
             grid,
@@ -137,6 +170,7 @@ impl GbMapsTab {
             search_input,
             sort_select,
             gamemode_select,
+            debounce: None,
             mature: show_mature,
             mature_known,
             revealed: HashSet::new(),
@@ -157,6 +191,42 @@ impl GbMapsTab {
     /// The cards read so far for the current query.
     pub fn cards(&self) -> &[GbMapCard] {
         self.feed.items()
+    }
+
+    /// The order the catalogue is listed in.
+    pub fn sort(&self) -> GbMapSort {
+        self.sort
+    }
+
+    /// The catalogue's first-level gamemodes, A to Z; empty before the first sync.
+    pub fn gamemodes(&self) -> &[GbMapGamemode] {
+        &self.gamemodes
+    }
+
+    /// The chosen gamemode; `None` lists every map.
+    pub fn gamemode(&self) -> Option<u32> {
+        self.gamemode
+    }
+
+    /// The search the tab queries, once typing has paused.
+    pub fn search(&self) -> &str {
+        &self.search
+    }
+
+    /// Searches for `text` once typing pauses for `SEARCH_DEBOUNCE`; a newer keystroke replaces
+    /// the pending one, and text that trims to the current search changes nothing.
+    pub fn search_typed(&mut self, text: String, cx: &mut Context<Self>) {
+        let timer = cx.background_executor().timer(SEARCH_DEBOUNCE);
+        self.debounce = Some(cx.spawn(async move |tab, cx| {
+            timer.await;
+            let _ = tab.update(cx, |tab, cx| {
+                if tab.search.trim() == text.trim() {
+                    return;
+                }
+                tab.search = text;
+                tab.restart(cx);
+            });
+        }));
     }
 
     /// Whether the first page of the current query landed, empty or not.
@@ -428,13 +498,18 @@ impl GbMapsTab {
                 cx,
             ));
         }
+        let hint = if self.search.trim().is_empty() {
+            "Try another gamemode."
+        } else {
+            "Try another search."
+        };
         self.feed.is_end().then(|| {
             empty_state_card(
                 ids::MAPS_GB_EMPTY,
                 IconName::Store,
                 "No maps found",
                 Some(ids::STORE_EMPTY_HINT),
-                "Try another gamemode.",
+                hint,
                 cx,
             )
         })

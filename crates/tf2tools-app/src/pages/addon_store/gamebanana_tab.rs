@@ -13,8 +13,9 @@ use gpui_kit::component::{ActiveTheme as _, Icon, IndexPath, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, ElementId, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
-    Subscription, Task, TestSupportExt as _, Window, div, point, px,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _, Window,
+    div, point, px,
 };
 use tf2tools_core::{
     AddonCard, AddonCategory, AddonCursor, AddonQuery, AddonSection, AddonSort, AddonStep,
@@ -102,6 +103,7 @@ impl SelectItem for CategoryOption {
     fn render(&self, _: &mut Window, _: &mut App) -> impl IntoElement {
         div()
             .id(self.id.clone())
+            .aria_label(self.title.clone())
             .test_support()
             .child(self.title.clone())
     }
