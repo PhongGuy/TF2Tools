@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use crate::support;
 use crate::support::logstf::{
-    ARIE, Gate, HIGHLANDER, SIXES, day_ago, expanded, list_body, list_requests, list_requests_for,
-    mount_held, mount_list_for, open_log, open_page, players_of, requests_to, row_ids,
-    serve_two_logs, shell, sid, to_end, unix_now,
+    ARIE, Gate, HIGHLANDER, SIXES, day_ago, expanded, list_body, list_requests_for, mount_held,
+    mount_list_for, open_log, open_page, players_of, requests_to, row_ids, serve_two_logs, shell,
+    sid, to_end, unix_now,
 };
 
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
@@ -391,14 +391,17 @@ fn switching_chips_mid_sync_cancels_the_first_and_syncs_the_second(cx: &mut Test
 fn removing_a_player_mid_sync_stops_their_sync_before_their_logs_go(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    // Arie's list answers slowly, so the removal lands while it is in flight. The other
-    // player's list is empty; their sync still lists (no listed range is stamped, so it is
-    // not skipped), finds nothing and downloads nothing.
-    mount_list_for(
+    // Arie's list waits on the gate until the removal has stopped their sync, so the stop
+    // always meets a list on the wire. The other player's list is empty; their sync still
+    // lists (no listed range is stamped, so it is not skipped), finds nothing and downloads
+    // nothing.
+    let list = Gate::default();
+    mount_held(
         &server,
-        ARIE,
-        &[(3, day_ago(1))],
-        Duration::from_millis(500),
+        &list,
+        "/api/v1/log",
+        Some(ARIE),
+        list_body(&[(3, day_ago(1))]),
     );
     mount_list_for(&server, 1, &[], Duration::ZERO);
     server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
@@ -412,13 +415,19 @@ fn removing_a_player_mid_sync_stops_their_sync_before_their_logs_go(cx: &mut Tes
         .unwrap();
     support::click_id(cx, s.win, ids::nav(Page::LogsTf));
     let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
-    // Waiting for the request itself means the removal meets a list that is on the wire.
+    // A held reply blocks the server's request log, so the gate counts the arrival instead.
     support::wait_real(cx, "Arie's list request", |cx| {
         cx.update(|cx| page.read(cx).is_loaded() && page.read(cx).is_syncing(cx))
-            && list_requests(&server) == 1
+            && list.arrived() == 1
     });
     support::click_id(cx, s.win, ids::logstf_chip_remove(sid(ARIE)));
     support::click_id(cx, s.win, ids::CONFIRM_OK);
+    // "Removing..." shows in the same update that cancels Arie's sync, so the list lands late.
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_chip(sid(ARIE))).as_deref(),
+        Some("Removing...")
+    );
+    list.open();
     support::wait_real(cx, "the removal and the next sync", |cx| {
         cx.update(|cx| {
             let p = page.read(cx);
