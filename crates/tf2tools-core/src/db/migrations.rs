@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 19;
+pub(crate) const SCHEMA_VERSION: u32 = 20;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -133,6 +133,11 @@ const STEPS: &[Step] = &[
         version: 19,
         sql: "",
         add_columns: &[("logstf_players", "nickname", "TEXT")],
+    },
+    Step {
+        version: 20,
+        sql: STEP_20_SQL,
+        add_columns: &[],
     },
 ];
 
@@ -551,4 +556,38 @@ const STEP_17_SQL: &str = "
     );
     INSERT OR IGNORE INTO gb_hud_checks (gb_id)
         SELECT DISTINCT store_gb_id FROM library_huds WHERE store_gb_id IS NOT NULL;
+";
+
+/// v6 step 20: the synced GameBanana map catalogue and its category tree, with one index per
+/// keyset walk (rank or newest, with and without a gamemode filter).
+const STEP_20_SQL: &str = "
+    CREATE TABLE IF NOT EXISTS store_gb_maps (
+        gb_id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        author TEXT NOT NULL DEFAULT '',
+        thumbnail_url TEXT,
+        like_count INTEGER NOT NULL DEFAULT 0,
+        view_count INTEGER NOT NULL DEFAULT 0,
+        date_added INTEGER NOT NULL DEFAULT 0,
+        date_modified INTEGER NOT NULL DEFAULT 0,
+        category_id INTEGER,
+        category_name TEXT,
+        gamemode_id INTEGER,
+        download_rank INTEGER NOT NULL,
+        obsolete INTEGER NOT NULL DEFAULT 0,
+        mature INTEGER NOT NULL DEFAULT 0,
+        profile_url TEXT NOT NULL DEFAULT '',
+        fetched_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS store_gb_map_categories (
+        category_id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        gamemode_id INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_store_gb_maps_rank ON store_gb_maps(download_rank, gb_id DESC);
+    CREATE INDEX IF NOT EXISTS idx_store_gb_maps_date ON store_gb_maps(date_added DESC, gb_id DESC);
+    CREATE INDEX IF NOT EXISTS idx_store_gb_maps_mode_rank
+        ON store_gb_maps(gamemode_id, download_rank, gb_id DESC);
+    CREATE INDEX IF NOT EXISTS idx_store_gb_maps_mode_date
+        ON store_gb_maps(gamemode_id, date_added DESC, gb_id DESC);
 ";
