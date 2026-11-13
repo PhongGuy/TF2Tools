@@ -48,10 +48,6 @@ pub(crate) struct ModRecord {
 pub(crate) enum Records {
     Sounds(Vec<SoundRecord>),
     Mods(Vec<ModRecord>),
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the maps walk that builds these is not built yet")
-    )]
     Maps(Vec<super::gb_maps::MapRecord>),
 }
 

@@ -1,18 +1,16 @@
 //! The synced GameBanana map catalogue: its URLs, record and category parsers, and the
 //! upserts behind the maps walk.
-#![cfg_attr(
-    not(test),
-    expect(dead_code, reason = "the maps walk that calls these is not built yet")
-)]
 
 use rusqlite::{Connection, params};
 use serde_json::Value;
 
-use super::StoreClient;
 use super::addon_api;
 use super::addon_catalog::{AddonCard, AddonSort};
 use super::gamebanana::{self, IndexPage, Records, int, text};
-use crate::error::QueryError;
+use super::pacer::Priority;
+use super::sync::{self, Confirm, Walk, database, malformed};
+use super::{StoreClient, SyncOutcome, SyncProgress};
+use crate::error::{QueryError, SyncError};
 
 /// GameBanana's TF2 Maps root category.
 pub(crate) const MAPS_CATEGORY: u32 = 5371;
@@ -153,6 +151,78 @@ pub(crate) fn upsert_maps(
         ])?;
     }
     Ok(())
+}
+
+/// The most-downloaded maps listing, checkpointed under `gb_maps_*` and confirmed only by
+/// `_nRecordCount`, which can run ahead of the listing.
+fn walk() -> Walk {
+    Walk {
+        key: "gb_maps",
+        table: "store_gb_maps",
+        page_size: MAPS_PAGE_SIZE,
+        page_limit: Box::new(|config, total| config.gb_maps_page_limit(total)),
+        url: Box::new(|endpoints, page| Some(index_url(endpoints.gamebanana(), page))),
+        parse: Box::new(parse_index),
+        confirm: Confirm::CountOrRepeatedEnd,
+        page_meta: None,
+    }
+}
+
+/// Syncs the maps catalogue like a GameBanana store. A fresh walk first replaces the
+/// category tree, so each page's gamemodes resolve; a resumed walk reuses the stored one.
+pub(crate) async fn sync(
+    client: &StoreClient,
+    force: bool,
+    progress: &(dyn Fn(SyncProgress) + Send + Sync),
+) -> Result<SyncOutcome, SyncError> {
+    let walk = walk();
+    let Some(start) = sync::begin(client, &walk, force, false)? else {
+        return Ok(SyncOutcome::skipped());
+    };
+    if !start.resumed {
+        refresh_categories(client).await?;
+    }
+    sync::run(client, &walk, start, progress).await
+}
+
+/// Reads the two-level tree under the maps root and stores it in one transaction; a failed
+/// call leaves the old tree in place.
+async fn refresh_categories(client: &StoreClient) -> Result<(), SyncError> {
+    let mut tree = Vec::new();
+    for mode in fetch_categories(client, MAPS_CATEGORY).await? {
+        let children = if mode.children > 0 {
+            fetch_categories(client, mode.id).await?
+        } else {
+            Vec::new()
+        };
+        tree.push(MapCategory {
+            id: mode.id,
+            name: mode.name,
+            gamemode: mode.id,
+        });
+        tree.extend(children.into_iter().map(|child| MapCategory {
+            id: child.id,
+            name: child.name,
+            gamemode: mode.id,
+        }));
+    }
+    client
+        .db
+        .write(|conn| {
+            let tx = conn.transaction()?;
+            replace_categories(&tx, &tree)?;
+            tx.commit()
+        })
+        .map_err(database)
+}
+
+async fn fetch_categories(
+    client: &StoreClient,
+    parent: u32,
+) -> Result<Vec<CategoryRow>, SyncError> {
+    let url = categories_url(client.endpoints.gamebanana(), parent);
+    let body = client.gamebanana_get(&url, Priority::Background).await?;
+    parse_categories(&body).map_err(|e| malformed(url, &e.to_string()))
 }
 
 /// One first-level category of the maps tree, offered as a gamemode filter.

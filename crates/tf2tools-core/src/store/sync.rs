@@ -27,6 +27,24 @@ struct Session {
 pub(crate) enum Confirm {
     /// A short last page, or as many distinct rows as `_nRecordCount`.
     ShortPageOrCount,
+    /// As many distinct rows as `_nRecordCount` only. A real last page short of the count
+    /// prunes when two such walks in a row, both above the floor, agree; see `settle_listing_end`.
+    CountOrRepeatedEnd,
+}
+
+/// The share of `_nRecordCount` (percent) a walk ending on the listing's real last page must
+/// have seen before it may take part in a two-walk prune.
+const PRUNE_FLOOR_PERCENT: u64 = 95;
+
+/// How a walk ended.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum End {
+    /// The walk confirmed it saw the whole listing.
+    Confirmed,
+    /// A short page with `_bIsComplete`, under a walk that does not take that as confirmation.
+    LastPage,
+    /// An empty page after a full one, or the page limit.
+    Stopped,
 }
 
 /// A walk's page cap from `_nRecordCount`, its page URL, and its page parser. Each is shared
@@ -76,7 +94,7 @@ impl Walk {
 /// Where a walk begins: a saved checkpoint (`resumed`) or page 1 of a fresh run.
 pub(crate) struct Start {
     session: Session,
-    resumed: bool,
+    pub(crate) resumed: bool,
 }
 
 /// Syncs a GameBanana store page by page, resuming from a checkpoint when one exists.
@@ -158,14 +176,15 @@ pub(crate) async fn run(
     tracing::debug!(key = walk.key, page, resumed, "store sync walking");
 
     let mut total = 0;
+    let mut distinct = 0;
     // GameBanana's count can exceed its listing. Once a full page is in, a parsed page with
     // no records is the page past the end, and ends the walk as unconfirmed.
     let mut full_seen = fetched >= walk.page_size;
-    let confirmed = loop {
+    let end = loop {
         let index = fetch_page(client, walk, page, full_seen).await?;
         let count = u32::try_from(index.records.len()).unwrap_or(u32::MAX);
         if count == 0 {
-            break false;
+            break End::Stopped;
         }
         full_seen |= count >= walk.page_size;
         if total == 0 {
@@ -175,7 +194,7 @@ pub(crate) async fn run(
 
         // Rows, checkpoint and the run's distinct-row count share one transaction, so a
         // sync dropped or failed between pages resumes after the last page it stored.
-        let distinct = client
+        distinct = client
             .db
             .write(|conn| {
                 let tx = conn.transaction()?;
@@ -191,23 +210,23 @@ pub(crate) async fn run(
             .map_err(database)?;
         progress(SyncProgress { fetched, total });
 
-        // A confirmed end: a short last page, or every catalogue item seen this run. A full
-        // page that claims completeness is not trusted, so one bad flag cannot wipe rows.
-        let ended = match walk.confirm {
-            Confirm::ShortPageOrCount => {
-                let short_last = !index.more && count < walk.page_size;
-                short_last || (total > 0 && distinct >= u64::from(total))
-            }
-        };
-        if ended {
-            break true;
+        // A confirmed end: every catalogue item seen this run or, where the walk trusts it, a
+        // short last page. A full page that claims completeness is not trusted, so one bad
+        // flag cannot wipe rows.
+        let short_last = !index.more && count < walk.page_size;
+        let counted = total > 0 && distinct >= u64::from(total);
+        match walk.confirm {
+            Confirm::ShortPageOrCount if short_last || counted => break End::Confirmed,
+            Confirm::CountOrRepeatedEnd if counted => break End::Confirmed,
+            Confirm::CountOrRepeatedEnd if short_last => break End::LastPage,
+            Confirm::ShortPageOrCount | Confirm::CountOrRepeatedEnd => {}
         }
         if page >= (walk.page_limit)(&client.config, total) {
-            break false;
+            break End::Stopped;
         }
         page += 1;
     };
-    if !confirmed {
+    if end != End::Confirmed {
         tracing::warn!(
             key = walk.key,
             page,
@@ -219,8 +238,11 @@ pub(crate) async fn run(
         .db
         .write(|conn| {
             let tx = conn.transaction()?;
-            if confirmed {
+            if end == End::Confirmed {
                 drop_unseen(&tx, walk.table, &start)?;
+            }
+            if let Confirm::CountOrRepeatedEnd = walk.confirm {
+                settle_listing_end(&tx, walk, end, distinct, total, &start)?;
             }
             let rows = stamp(&tx, walk.key, walk.table)?;
             clear_session(&tx, walk.key)?;
@@ -268,14 +290,44 @@ pub(super) fn finish(tx: &Connection, kind: StoreKind, start: &str) -> rusqlite:
     stamp(tx, kind.key(), kind.table())
 }
 
-/// Deletes the rows this run (started at `start`) did not see.
-fn drop_unseen(tx: &Connection, table: &str, start: &str) -> rusqlite::Result<()> {
+/// Keeps `{key}_listing_end_start`, the start of the last walk that ended on the real last
+/// page with at least `PRUNE_FLOOR_PERCENT` of the count. A second such walk drops the rows
+/// neither walk saw; any other end forgets the marker, and a confirmed end has already pruned.
+fn settle_listing_end(
+    tx: &Connection,
+    walk: &Walk,
+    end: End,
+    distinct: u64,
+    total: u32,
+    start: &str,
+) -> rusqlite::Result<()> {
+    let key = format!("{}_listing_end_start", walk.key);
+    let near_complete = total > 0
+        && distinct.saturating_mul(100) >= u64::from(total).saturating_mul(PRUNE_FLOOR_PERCENT);
+    if end != End::LastPage || !near_complete {
+        tx.execute("DELETE FROM store_cache_meta WHERE key = ?1", [&key])?;
+        return Ok(());
+    }
+    if let Some(marker) = get_meta(tx, &key)? {
+        let dropped = drop_unseen(tx, walk.table, &marker)?;
+        tracing::warn!(
+            key = walk.key,
+            dropped,
+            distinct,
+            total,
+            "two walks ended on the listing's last page; rows neither saw dropped"
+        );
+    }
+    set_meta(tx, &key, start)
+}
+
+/// Deletes the rows this run (started at `start`) did not see, returning how many.
+fn drop_unseen(tx: &Connection, table: &str, start: &str) -> rusqlite::Result<usize> {
     // The table name is one of the crate's own constants, never caller text.
     tx.execute(
         &format!("DELETE FROM {table} WHERE fetched_at < ?1"),
         [start],
-    )?;
-    Ok(())
+    )
 }
 
 /// Stamps `{key}_last_synced` and returns the table's row count.

@@ -724,6 +724,35 @@ impl StoreClient {
         }
         result
     }
+
+    /// Syncs the GameBanana maps catalogue under `sync`'s rules: when stale, forced or
+    /// checkpointed, with `progress` after every committed page. Needs a tokio runtime.
+    pub async fn sync_gb_maps(
+        &self,
+        force: bool,
+        progress: &(dyn Fn(SyncProgress) + Send + Sync),
+    ) -> Result<SyncOutcome, SyncError> {
+        let (mut result, rate_limited) = http::RATE_LIMITS
+            .scope(Cell::new(0), async {
+                let result = gb_maps::sync(self, force, progress).await;
+                (result, http::RATE_LIMITS.with(Cell::get))
+            })
+            .await;
+        if let Ok(outcome) = &mut result {
+            outcome.rate_limited = rate_limited;
+        }
+        match &result {
+            Ok(outcome) if !outcome.fresh => tracing::info!(
+                fetched = outcome.fetched,
+                rows = outcome.rows,
+                rate_limited = outcome.rate_limited,
+                "gb maps sync finished"
+            ),
+            Ok(_) => {}
+            Err(error) => tracing::warn!(%error, "gb maps sync failed"),
+        }
+        result
+    }
 }
 
 pub(crate) fn http_for(config: &StoreConfig, redirects: &Redirects) -> Http {
