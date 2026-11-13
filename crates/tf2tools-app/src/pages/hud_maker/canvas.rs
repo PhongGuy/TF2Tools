@@ -243,6 +243,17 @@ impl HudMakerPage {
 
         let model = editor.model();
         let shown_layout = editor.shown_layout();
+        // The spectator target ID sizes itself around its text, which only the canvas measures.
+        let shown_layout = match model.scene() == Scene::Spectator {
+            true => {
+                let probe = self.look(loaded, &shown_layout, fit.scale(), border, primary);
+                match target_text_wide(&probe) {
+                    Some(wide) => std::borrow::Cow::Owned(shown_layout.target_id_around(wide)),
+                    None => shown_layout,
+                }
+            }
+            false => shown_layout,
+        };
         let layout: &HudLayout = &shown_layout;
         let played_frame = (editor.moment() > 0.).then(|| editor.frame());
         let rule = model.scene_rule();
@@ -1893,13 +1904,8 @@ fn wrapped_lines(
     if !centred && !switched_on(part, "wrap") {
         return None;
     }
-    let family = font.and_then(|f| drawn_family(f.family(), look.fonts));
-    let id = (look.text_system).resolve_font(&font_named(family.unwrap_or(look.ui_family.clone())));
     let tall = font_tall(font, look, b.tall());
-    let advance = |ch| {
-        let glyph = look.text_system.advance(id, px(tall), ch);
-        glyph.map_or(tall / 2., |size| f32::from(size.width))
-    };
+    let advance = glyph_advance(font, tall, look);
     let room = b
         .wide()
         .saturating_sub(look.model.text_inset(part.key(), look.screen).x);
@@ -1909,6 +1915,44 @@ fn wrapped_lines(
         lines: lines.into_iter().map(|l| l.to_owned().into()).collect(),
         centred,
     })
+}
+
+// A glyph's width in screen pixels in `font` at `tall`, or half the height when the text
+// system has no such glyph.
+fn glyph_advance<'l>(
+    font: Option<&FontVariant>,
+    tall: f32,
+    look: &Look<'l>,
+) -> impl Fn(char) -> f32 + 'l {
+    let family = font.and_then(|f| drawn_family(f.family(), look.fonts));
+    let id = (look.text_system).resolve_font(&font_named(family.unwrap_or(look.ui_family.clone())));
+    let text_system = look.text_system;
+    move |ch| {
+        let glyph = text_system.advance(id, px(tall), ch);
+        glyph.map_or(tall / 2., |size| f32::from(size.width))
+    }
+}
+
+// The wider of the spectator target ID's name and data lines in screen pixels, the width
+// `CSpectatorTargetID::PerformLayout` adds; `None` when the scene has neither line.
+fn target_text_wide(look: &Look) -> Option<i32> {
+    let lines = [
+        "CSpectatorTargetID/TargetNameLabel",
+        "CSpectatorTargetID/TargetDataLabel",
+    ];
+    (lines.iter())
+        .filter_map(|key| {
+            let key = PartKey::new(*key);
+            let part = look.model.part(&key)?;
+            let Kind::Label(text) = look_kind(part, look) else {
+                return None;
+            };
+            let font = part_font(part, look);
+            let tall = font_tall(font, look, look.layout.get(&key).map_or(0, PartBox::tall));
+            let wide: f32 = text.chars().map(glyph_advance(font, tall, look)).sum();
+            Some(wide.ceil() as i32)
+        })
+        .max()
 }
 
 // A wrapped label's lines, and whether `centerwrap` centres each one.

@@ -35,17 +35,24 @@ fn the_scene_reads_the_bar_and_the_target_id_files_and_hides_the_hud() {
             FILE,
             "scripts/hudlayout.res",
             "resource/ui/targetid.res",
-            "resource/ui/spectatorguihealth.res"
+            "resource/ui/spectatorguihealth.res",
+            "resource/ui/basechat.res",
+            "resource/ui/hudobjectivekothtimepanel.res",
+            "resource/ui/hudobjectivetimepanel.res"
         ]
     );
     assert!(rule.read_only_files().is_empty());
     assert_eq!(
         rule.nested(),
-        [("SpectatorGUIHealth", "resource/ui/spectatorguihealth.res")]
+        [
+            ("SpectatorGUIHealth", "resource/ui/spectatorguihealth.res"),
+            ("BlueTimer", "resource/ui/hudobjectivetimepanel.res"),
+            ("RedTimer", "resource/ui/hudobjectivetimepanel.res")
+        ]
     );
     assert_eq!(rule.root(), Some("Spectator"));
     assert!(rule.hides_hud() && !rule.toggles_any_depth());
-    let [panel, _id] = rule.rules() else {
+    let [panel, _id, ..] = rule.rules() else {
         panic!("two roots")
     };
     assert_eq!(panel.id(), PartId::Spectator);

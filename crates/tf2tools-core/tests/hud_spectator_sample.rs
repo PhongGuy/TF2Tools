@@ -26,7 +26,7 @@ fn the_variables_fill_the_tip_and_the_key_names() {
     assert_eq!(fill("[%jump%]"), "[SPACE]");
     assert_eq!(fill("[%JUMP%]"), "[SPACE]");
     assert_eq!(fill("[%attack%] [%attack2%]"), "[MOUSE1] [MOUSE2]");
-    assert_eq!(fill("Press [ %changeclass% ]"), "Press [ N ]");
+    assert_eq!(fill("Press [ %changeclass% ]"), "Press [ , ]");
     assert_eq!(fill("%changeteam%"), "");
     // The other samples do not know these tokens.
     assert_eq!(SampleSet::Casual.fill("[%jump%]"), "[]");

@@ -13,7 +13,7 @@ const TOP: &str =
     "topbar { ControlName Panel fieldName TopBar xpos 0 ypos 0 tall 84 wide f0 visible 1 }";
 const BOTTOM: &str = "bottombarblank { ControlName Panel fieldName bottombarblank xpos 0 ypos r70 tall 70 wide f0 visible 1 }";
 const KEY: &str =
-    "SwitchCamModeKeyLabel { ControlName CExLabel xpos 5 ypos 10 wide 60 tall 20 visible 1";
+    "CycleTargetFwdKeyLabel { ControlName CExLabel xpos 5 ypos 20 wide 60 tall 20 visible 1";
 const SD: Screen = Screen::new(640, 480);
 
 fn bar(files: &HudFiles) -> HudModel {
@@ -35,12 +35,11 @@ fn with(from: &str, to: &str) -> HudFiles {
 }
 
 #[test]
-fn the_table_has_the_game_s_23_cases() {
+fn the_table_has_the_game_s_26_cases() {
     let rule = SceneRule::get(Scene::Spectator);
-    assert_eq!(rule.code_toggled().len(), 23);
+    assert_eq!(rule.code_toggled().len(), 26);
     for t in rule.code_toggled() {
         assert!(t.shows_when().starts_with("Shows "), "{}", t.panel());
-        assert!(t.shows_for().is_none(), "{}", t.panel());
     }
     let shown = |name: &str| rule.toggled(name).map(|t| t.shown_in_sample());
     for name in [
@@ -48,8 +47,6 @@ fn the_table_has_the_game_s_23_cases() {
         "topbar",
         "bottombarblank",
         "ReinforcementsLabel",
-        "SwitchCamModeKeyLabel",
-        "SwitchCamModeLabel",
         "CycleTargetFwdKeyLabel",
         "CycleTargetFwdLabel",
         "CycleTargetRevKeyLabel",
@@ -57,7 +54,12 @@ fn the_table_has_the_game_s_23_cases() {
     ] {
         assert_eq!(shown(name), Some(true), "{name}");
     }
-    for name in ["BuyBackLabel", "itempanel"] {
+    for name in [
+        "BuyBackLabel",
+        "itempanel",
+        "SwitchCamModeKeyLabel",
+        "SwitchCamModeLabel",
+    ] {
         assert_eq!(shown(name), Some(false), "{name}");
     }
     // Not toggled: the file's own visibility stands.
@@ -159,7 +161,7 @@ fn the_top_bar_hides_by_tall_alone_and_owns_its_width_and_place() {
 }
 
 #[test]
-fn a_camera_label_the_file_marks_not_visible_is_still_drawn() {
+fn a_key_hint_the_file_marks_not_visible_is_still_drawn() {
     let files = with(KEY, &KEY.replace("visible 1", "visible 0"));
-    assert_eq!(hidden(&files, "Spectator/SwitchCamModeKeyLabel"), None);
+    assert_eq!(hidden(&files, "Spectator/CycleTargetFwdKeyLabel"), None);
 }
