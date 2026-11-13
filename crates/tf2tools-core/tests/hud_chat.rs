@@ -55,11 +55,21 @@ fn the_chat_is_a_hud_part_read_from_basechat() {
     let hud = SceneRule::get(Scene::Hud);
     // The weapon meters' extra files follow the last rule's file.
     let rule_files = &hud.files()[..hud.files().len() - hud.extras().len()];
-    // The KOTH timer's rule and file follow the chat's.
+    // The KOTH timer's rule and file follow the chat's, then the frame around it.
     let koth = "resource/ui/hudobjectivekothtimepanel.res";
-    assert!(rule_files.ends_with(&[CHAT_FILE, koth]), "{rule_files:?}");
+    let counter = "resource/ui/hudroundcounter.res";
+    assert!(
+        rule_files.ends_with(&[CHAT_FILE, koth, counter]),
+        "{rule_files:?}"
+    );
     let ids: Vec<PartId> = hud.rules().iter().map(PanelRule::id).collect();
-    assert!(ids.ends_with(&[PartId::Chat, PartId::KothTimer]), "{ids:?}");
+    let tail = [
+        PartId::Chat,
+        PartId::KothTimer,
+        PartId::TimerFrame,
+        PartId::TimerBacking,
+    ];
+    assert!(ids.ends_with(&tail), "{ids:?}");
     assert_eq!(Scene::for_file(CHAT_FILE), Some(Scene::Hud));
 }
 

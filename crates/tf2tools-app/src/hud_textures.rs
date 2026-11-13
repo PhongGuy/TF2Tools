@@ -11,7 +11,8 @@ use crate::previews::to_render_image;
 /// A texture decoded, with the pixels kept for cutting icons out of a sheet.
 pub(crate) type Decoded = Option<(Arc<RgbaImage>, Arc<RenderImage>)>;
 
-/// `name`'s texture as pixels; `None` when it is missing or unreadable.
+/// `name`'s texture as the game draws it, faded by its material; `None` when it is missing or
+/// unreadable.
 pub(crate) fn texture_pixels(
     files: &HudFiles,
     name: &str,
@@ -20,7 +21,7 @@ pub(crate) fn texture_pixels(
     let Ok(HudImage::Found(texture)) = files.image(name, platform) else {
         return None;
     };
-    Some(Arc::new(texture.image().clone()))
+    Some(Arc::new(texture.drawn()))
 }
 
 /// `name`'s texture as pixels and as a render image; `None` when it is missing or unreadable.

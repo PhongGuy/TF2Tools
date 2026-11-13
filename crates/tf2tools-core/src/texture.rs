@@ -73,6 +73,11 @@ impl RgbaImage {
         &self.pixels
     }
 
+    /// The RGBA bytes to change in place, row by row from the top.
+    pub fn pixels_mut(&mut self) -> &mut [u8] {
+        &mut self.pixels
+    }
+
     /// Takes the RGBA bytes, row by row from the top.
     pub fn into_pixels(self) -> Vec<u8> {
         self.pixels

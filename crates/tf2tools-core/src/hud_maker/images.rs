@@ -60,6 +60,7 @@ pub struct HudTexture {
     texture: String,
     scale: (f32, f32),
     distance_field: bool,
+    alpha: f32,
 }
 
 impl HudTexture {
@@ -86,6 +87,22 @@ impl HudTexture {
     /// `$distancealpha` is set nonzero, so the preview cannot match the game exactly.
     pub fn distance_field(&self) -> bool {
         self.distance_field
+    }
+
+    /// The material's `$alpha`, 0.0 to 1.0, which fades every texel; 1.0 when absent.
+    pub fn alpha(&self) -> f32 {
+        self.alpha
+    }
+
+    /// The texture as the game draws it: each texel's alpha scaled by [`HudTexture::alpha`].
+    pub fn drawn(&self) -> RgbaImage {
+        let mut image = self.image.clone();
+        if self.alpha < 1.0 {
+            for texel in image.pixels_mut().as_chunks_mut::<4>().0 {
+                texel[3] = (f32::from(texel[3]) * self.alpha).round() as u8;
+            }
+        }
+        image
     }
 }
 
@@ -147,12 +164,18 @@ impl HudFiles {
         let distance_field = setting("$distancealpha")
             .and_then(|v| v.trim().parse::<f32>().ok())
             .is_some_and(|v| v != 0.0);
+        // The engine fades the whole material by `$alpha`, as the win panel's team panels are.
+        let alpha = setting("$alpha")
+            .and_then(|v| v.trim().parse::<f32>().ok())
+            .filter(|v| v.is_finite())
+            .map_or(1.0, |v| v.clamp(0.0, 1.0));
         Ok(HudImage::Found(HudTexture {
             image,
             material,
             texture,
             scale: setting("$basetexturetransform").map_or((1.0, 1.0), transform_scale),
             distance_field,
+            alpha,
         }))
     }
 }

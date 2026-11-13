@@ -26,14 +26,15 @@ fn at(m: &HudModel, key: &str) -> (i32, i32, i32, i32) {
 }
 
 #[test]
-fn the_scene_reads_hudlayout_and_winpanel_and_hides_the_hud() {
+fn the_scene_reads_hudlayout_and_winpanel_and_keeps_the_crosshair() {
     let rule = SceneRule::get(Scene::WinPanel);
     assert_eq!(rule.label(), "Win panel");
-    assert_eq!(rule.files(), ["scripts/hudlayout.res", WIN]);
-    assert!(rule.read_only_files().is_empty() && rule.nested().is_empty());
+    assert_eq!(rule.problem_files(), ["scripts/hudlayout.res", WIN]);
+    assert!(rule.read_only_files().is_empty());
     assert_eq!(rule.root(), Some("WinPanel"));
-    assert!(rule.hides_hud() && rule.toggles_any_depth());
-    let [panel] = rule.rules() else {
+    assert!(!rule.hides_hud() && rule.toggles_any_depth());
+    // The win panel leads; the HUD parts kept around it follow.
+    let [panel, ..] = rule.rules() else {
         panic!("one root")
     };
     assert_eq!(panel.id(), PartId::WinPanel);

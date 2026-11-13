@@ -73,7 +73,9 @@ fn every_stage1_part_has_one_rule_in_table_order() {
             RoundTimer,
             Killfeed,
             Chat,
-            KothTimer
+            KothTimer,
+            TimerFrame,
+            TimerBacking
         ]
     );
     for rule in PanelRule::all() {

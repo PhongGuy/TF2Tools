@@ -97,6 +97,35 @@ fn transforms_and_distance_fields_are_reported() {
 }
 
 #[test]
+fn a_material_s_alpha_fades_the_texture_as_drawn() {
+    let vmt = |alpha: &str| {
+        format!(r#""UnlitGeneric" {{ "$basetexture" "hud/panel" "$translucent" "1"{alpha} }}"#)
+            .into_bytes()
+    };
+    let found = |alpha: &str| {
+        let files = files(vec![
+            ("materials/hud/panel.vmt", vmt(alpha)),
+            ("materials/hud/panel.vtf", rgba_to_vtf(&red_2x2()).unwrap()),
+        ]);
+        match files.image("../hud/panel", Platform::Linux).unwrap() {
+            HudImage::Found(texture) => texture,
+            other => panic!("{other:?}"),
+        }
+    };
+    // The win panel's team panels fade this way: the texels stay, the game draws them faded.
+    let faded = found(r#" "$alpha" ".5""#);
+    assert_eq!(faded.alpha(), 0.5);
+    assert_eq!(faded.image(), &red_2x2());
+    assert_eq!(faded.drawn().pixels(), [255, 0, 0, 128].repeat(4));
+    // Without the key the texture draws as it is; a value past either end is clamped.
+    let plain = found("");
+    assert_eq!(plain.alpha(), 1.0);
+    assert_eq!(plain.drawn(), red_2x2());
+    assert_eq!(found(r#" "$alpha" "3""#).alpha(), 1.0);
+    assert_eq!(found(r#" "$alpha" "-1""#).alpha(), 0.0);
+}
+
+#[test]
 fn missing_and_unreadable_images_say_why() {
     let vmt = |base: &str| format!(r#""UnlitGeneric" {{ "$basetexture" "{base}" }}"#).into_bytes();
     let files = files(vec![
