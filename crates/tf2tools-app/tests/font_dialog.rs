@@ -323,3 +323,41 @@ fn the_press_probe_sees_a_drawn_scrollbar(cx: &mut TestAppContext) {
         "the overflowing list's bar stops the press"
     );
 }
+
+#[cfg(target_os = "linux")]
+#[gpui_kit::test]
+fn long_rows_wrap_inside_the_dialog(cx: &mut TestAppContext) {
+    let env = support::env();
+    // An uppercase file name raises a long Linux warning; the long lowercase path stays missing.
+    let long = "resource/fonts/a_very_long_folder_name_for_fonts/another_nested_folder/codepro.ttf";
+    let (win, _rx) = open(
+        cx,
+        prompt(
+            &env,
+            &[
+                ("Surface", "resource/fonts/Surface.ttf"),
+                ("Code Pro", long),
+            ],
+            &["Surface"],
+        ),
+    );
+    let dialog = support::dialog_box(cx, win);
+    let list = support::bounds_of(cx, win, ids::HUD_FONTS_LIST).unwrap();
+    let text = support::bounds_of(cx, win, ids::hud_fonts_issue_text(0)).unwrap();
+    let row = support::bounds_of(cx, win, ids::hud_fonts_issue(0)).unwrap();
+    let font = support::bounds_of(cx, win, ids::hud_fonts_font(0)).unwrap();
+    for (what, b) in [
+        ("warning text", text),
+        ("warning row", row),
+        ("font row", font),
+    ] {
+        assert!(
+            b.right() <= list.right() && list.right() <= dialog.right(),
+            "the {what} runs past the dialog: {b:?} in {list:?} in {dialog:?}"
+        );
+    }
+    assert!(
+        text.size.height > px(20.),
+        "the warning wraps onto more lines: {text:?}"
+    );
+}

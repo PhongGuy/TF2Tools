@@ -167,7 +167,7 @@ pub fn font_check_dialog(
             let issue_rows = issues
                 .iter()
                 .enumerate()
-                .map(|(ix, label)| issue_row(ids::hud_fonts_issue(ix), label.clone(), cx));
+                .map(|(ix, label)| issue_row(ix, label.clone(), cx));
             frame
                 .apply(dialog, &*window, &*cx)
                 .close_button(false)
@@ -264,10 +264,10 @@ fn font_row(id: ElementId, label: SharedString, cx: &App) -> AnyElement {
 }
 
 /// A Linux issue, flagged with v5's orange warning triangle.
-fn issue_row(id: ElementId, label: SharedString, cx: &App) -> AnyElement {
+fn issue_row(ix: usize, label: SharedString, cx: &App) -> AnyElement {
     let orange: Hsla = rgb(ORANGE_500).into();
     h_flex()
-        .id(id)
+        .id(ids::hud_fonts_issue(ix))
         .aria_label(label.clone())
         .test_support()
         .items_start()
@@ -284,6 +284,12 @@ fn issue_row(id: ElementId, label: SharedString, cx: &App) -> AnyElement {
         )
         .child(
             div()
+                .id(ids::hud_fonts_issue_text(ix))
+                .test_support()
+                // The text takes the room beside the icon and may shrink below its one-line
+                // width, so a long warning wraps inside the row.
+                .flex_1()
+                .min_w_0()
                 .text_sm()
                 .text_color(cx.theme().muted_foreground)
                 .child(label),
