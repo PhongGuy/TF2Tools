@@ -1,6 +1,7 @@
 //! The HUD Maker's canvas: the screen fitted into the free area, its parts, the selection,
 //! pin markers and the crosshair marker.
 
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -242,18 +243,7 @@ impl HudMakerPage {
         };
 
         let model = editor.model();
-        let shown_layout = editor.shown_layout();
-        // The spectator target ID sizes itself around its text, which only the canvas measures.
-        let shown_layout = match model.scene() == Scene::Spectator {
-            true => {
-                let probe = self.look(loaded, &shown_layout, fit.scale(), border, primary);
-                match target_text_wide(&probe) {
-                    Some(wide) => std::borrow::Cow::Owned(shown_layout.target_id_around(wide)),
-                    None => shown_layout,
-                }
-            }
-            false => shown_layout,
-        };
+        let shown_layout = self.drawn_layout(loaded);
         let layout: &HudLayout = &shown_layout;
         let played_frame = (editor.moment() > 0.).then(|| editor.frame());
         let rule = model.scene_rule();
@@ -1131,7 +1121,7 @@ impl HudMakerPage {
             return Vec::new();
         }
         let model = editor.model();
-        let shown_layout = editor.shown_layout();
+        let shown_layout = self.drawn_layout(loaded);
         let layout: &HudLayout = &shown_layout;
         let inside = |key: &PartKey| {
             layout.visible(key).is_some_and(|v| {
@@ -1191,6 +1181,20 @@ impl HudMakerPage {
         }
     }
 
+    // The editor's shown layout with the spectator target ID sized around its text, which only
+    // the canvas can measure; drawing and clicks both use it.
+    fn drawn_layout<'a>(&'a self, loaded: &'a super::Loaded) -> Cow<'a, HudLayout> {
+        let shown = loaded.editor.shown_layout();
+        if loaded.editor.model().scene() != Scene::Spectator {
+            return shown;
+        }
+        let probe = self.look(loaded, &shown, 1., Hsla::default(), Hsla::default());
+        match target_text_wide(&probe) {
+            Some(wide) => Cow::Owned(shown.target_id_around(wide)),
+            None => shown,
+        }
+    }
+
     // Every part under screen pixel (x, y) a click may select, best first: the parts on the
     // canvas, plus the faint panel of a selected part the game hides.
     fn picks_at(&self, x: i32, y: i32) -> Vec<Pick> {
@@ -1198,7 +1202,7 @@ impl HudMakerPage {
             return Vec::new();
         };
         let model = loaded.editor.model();
-        let shown_layout = loaded.editor.shown_layout();
+        let shown_layout = self.drawn_layout(loaded);
         let layout: &HudLayout = &shown_layout;
         // Chrome colours do not change what a part draws.
         let look = self.look(loaded, layout, 1., Hsla::default(), Hsla::default());
@@ -1214,7 +1218,7 @@ impl HudMakerPage {
             return top.clone();
         };
         let model = loaded.editor.model();
-        let layout = loaded.editor.shown_layout();
+        let layout = self.drawn_layout(loaded);
         let selected = loaded.editor.selected();
         let shown = takes_clicks(model, &layout, selected);
         match group_of(model, &layout, top, &shown) {
@@ -1237,7 +1241,7 @@ impl HudMakerPage {
         if selected == top || !is_within(model, top, selected) {
             return None;
         }
-        let layout = loaded.editor.shown_layout();
+        let layout = self.drawn_layout(loaded);
         let shown = takes_clicks(model, &layout, Some(selected));
         let mut inner = top.clone();
         let mut at = model.part(top).and_then(|p| p.parent());
@@ -1258,7 +1262,7 @@ impl HudMakerPage {
             return false;
         };
         let model = loaded.editor.model();
-        let shown_layout = loaded.editor.shown_layout();
+        let shown_layout = self.drawn_layout(loaded);
         let layout: &HudLayout = &shown_layout;
         let Some(key) = loaded.editor.selected() else {
             return false;

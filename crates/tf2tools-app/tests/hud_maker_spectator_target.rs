@@ -2,7 +2,8 @@
 
 use crate::support;
 
-use gpui_kit::{AppContext as _, Entity, TestAppContext};
+use gpui_kit::test::TestWindowExt as _;
+use gpui_kit::{AppContext as _, Entity, Pixels, TestAppContext, point, px};
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::{Field, HudMakerPage};
 use tf2tools_app::services::Tf2State;
@@ -113,6 +114,36 @@ fn the_panel_is_sized_around_the_name_not_the_file_s_width(cx: &mut TestAppConte
     // Still centred across the screen.
     let left = f32::from(bg.left() - screen.left()) / per_px;
     assert!((left - (1920. - wide) / 2.).abs() < 2., "{left}");
+}
+
+#[gpui_kit::test]
+fn a_click_selects_the_panel_only_where_it_is_drawn(cx: &mut TestAppContext) {
+    let (s, page) = on_spectator(cx);
+    support::put_start_card_away(cx, s.win);
+    let screen = support::bounds_of(cx, s.win, ids::HUD_MAKER_CANVAS).unwrap();
+    let bg = support::bounds_of(cx, s.win, ids::hud_maker_part(&PartKey::new(BG))).unwrap();
+    let per_px = screen.size.width / 1920.;
+    // The file's box is 252 units (567 px) wide and centred: its right edge is at 1243 px.
+    let file_right = screen.left() + per_px * 1243.;
+    assert!(
+        bg.right() + px(4.) < file_right,
+        "the drawn panel is narrower"
+    );
+    let y = bg.top() + bg.size.height / 2. - screen.top();
+    let mut click = |x: Pixels| {
+        cx.update_window(s.win, |_, w, cx| {
+            w.click_at(ids::HUD_MAKER_CANVAS, point(x - screen.left(), y), cx)
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+        cx.update(|cx| page.read(cx).editor().and_then(|e| e.selected().cloned()))
+    };
+    // Right of the drawn panel, still inside the file's box: nothing is there in game.
+    let outside = bg.right() + (file_right - bg.right()) / 2.;
+    assert_eq!(click(outside), None);
+    // On the drawn panel: the target ID.
+    let inside = click(bg.right() - px(3.)).expect("a selection");
+    assert!(inside.as_str().starts_with(ROOT), "{inside:?}");
 }
 
 #[gpui_kit::test]
