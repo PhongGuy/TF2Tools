@@ -5,10 +5,12 @@ use crate::common;
 
 use std::fs;
 
-use common::{LibraryEnv, library_env, setting, tree, write_file, zip_bytes};
+use common::{LibraryEnv, library_env, write_file, zip_bytes};
 #[cfg(target_os = "linux")]
-use tf2tools_core::{FontIssue, HudStatus, Platform, Reinstall, scan_hud_fonts};
-use tf2tools_core::{HudEntry, LibraryKind, Provenance};
+use common::{setting, tree};
+#[cfg(target_os = "linux")]
+use tf2tools_core::{FontIssue, HudStatus, LibraryKind, Platform, Reinstall, scan_hud_fonts};
+use tf2tools_core::{HudEntry, Provenance};
 
 const ROOT: &str = "TF2HUDsArchive-KN-Edit-55d1256";
 
