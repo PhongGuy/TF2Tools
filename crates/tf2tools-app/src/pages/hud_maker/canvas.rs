@@ -2244,7 +2244,10 @@ fn image_pieces(
     let colour = look.model.draw_colour(part, look.situation);
     let image = &super::tint::drawn(look.tints, image, colour, look.vision);
     let cells = image_cells(part, b.wide(), b.tall(), texture_size(image), look.screen);
-    pieces(&cells, image, look, |i| {
+    // The health cross draws only its bottom share, so everything above that line is cut.
+    let top = (look.model.image_fill(part, look.situation))
+        .map_or(0., |share| b.tall() as f32 * (1. - share));
+    pieces_below(&cells, image, look, top, |i| {
         ids::hud_maker_image_cell(part.key(), i)
     })
 }
@@ -2263,29 +2266,42 @@ fn pieces(
     look: &Look,
     id: impl Fn(usize) -> gpui_kit::ElementId,
 ) -> Vec<AnyElement> {
+    pieces_below(cells, image, look, 0., id)
+}
+
+// As `pieces`, each piece cut to what lies below `top` screen pixels from the part's top.
+fn pieces_below(
+    cells: &[ImageCell],
+    image: &Arc<RenderImage>,
+    look: &Look,
+    top: f32,
+    id: impl Fn(usize) -> gpui_kit::ElementId,
+) -> Vec<AnyElement> {
     let texture = texture_size(image);
-    let at = |v: i32| px(v as f32 * look.scale);
+    let at = |v: f32| px(v * look.scale);
     cells
         .iter()
         .enumerate()
+        .filter(|(_, c)| (c.y() + c.tall()) as f32 > top)
         .map(|(i, c)| {
             let fx = c.wide() as f32 / c.src_wide() as f32 * look.scale;
             let fy = c.tall() as f32 / c.src_tall() as f32 * look.scale;
+            let cut = (top - c.y() as f32).max(0.);
             let whole = img(Arc::clone(image))
                 .object_fit(ObjectFit::Fill)
                 .absolute()
                 .left(px(-(c.src_x() as f32) * fx))
-                .top(px(-(c.src_y() as f32) * fy))
+                .top(px(-(c.src_y() as f32) * fy - cut * look.scale))
                 .w(px(texture.wide as f32 * fx))
                 .h(px(texture.tall as f32 * fy));
             div()
                 .id(id(i))
                 .test_support()
                 .absolute()
-                .left(at(c.x()))
-                .top(at(c.y()))
-                .w(at(c.wide()))
-                .h(at(c.tall()))
+                .left(at(c.x() as f32))
+                .top(at(c.y() as f32 + cut))
+                .w(at(c.wide() as f32))
+                .h(at(c.tall() as f32 - cut))
                 .overflow_hidden()
                 .child(whole)
                 .into_any_element()

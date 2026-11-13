@@ -78,3 +78,30 @@ fn another_image_draws_in_its_own_draw_colour() {
         None
     );
 }
+
+const CROSS: &str = "HudPlayerStatus/HudPlayerHealth/PlayerStatusHealthImage";
+
+#[test]
+fn the_dying_health_cross_draws_in_the_death_warning_colour() {
+    let m = model("    HealthDeathWarningColor \"200 30 30 255\"\n", "");
+    let cross = m.part(&PartKey::new(CROSS)).unwrap();
+    let dying = GameSituation::default().with_health(60);
+    assert_eq!(
+        m.draw_colour(cross, &dying),
+        Some(Rgba::new(200, 30, 30, 255))
+    );
+    assert_eq!(m.draw_colour(cross, &GameSituation::default()), None);
+}
+
+#[test]
+fn the_health_cross_fills_up_to_the_share_of_max_health_left() {
+    // CTFHealthPanel::Paint draws the cross from h * (1 - health / max) down.
+    let m = model("", "");
+    let cross = m.part(&PartKey::new(CROSS)).unwrap();
+    let s = GameSituation::default();
+    assert_eq!(m.image_fill(cross, &s.clone().with_health(60)), Some(0.3));
+    assert_eq!(m.image_fill(cross, &s), Some(0.75));
+    assert_eq!(m.image_fill(cross, &s.clone().with_health(260)), Some(1.0));
+    let bonus = m.part(&PartKey::new(BONUS)).unwrap();
+    assert_eq!(m.image_fill(bonus, &s), None);
+}

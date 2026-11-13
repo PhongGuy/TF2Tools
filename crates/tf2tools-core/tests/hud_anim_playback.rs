@@ -40,8 +40,16 @@ fn bounce_follows_the_engine_s_interpolator() {
     // Source's Interpolator_Bounce: hits at 0.33 and 0.67, starting at the end value.
     let close = |a: f32, b: f32| (a - b).abs() < 1e-3;
     let b = |p: f32| Interp::Bounce.at(p, 0);
-    assert!(close(b(0.0), 1.0), "starts at the end value, got {}", b(0.0));
-    assert!(close(b(0.165), 0.0), "first dip reaches the start, got {}", b(0.165));
+    assert!(
+        close(b(0.0), 1.0),
+        "starts at the end value, got {}",
+        b(0.0)
+    );
+    assert!(
+        close(b(0.165), 0.0),
+        "first dip reaches the start, got {}",
+        b(0.165)
+    );
     assert!(close(b(0.0825), 1.0 - (std::f32::consts::PI * 0.25).sin()));
     assert!(close(b(0.33), 1.0), "back at the end, got {}", b(0.33));
     assert!(close(b(0.5), 0.5), "second dip, got {}", b(0.5));

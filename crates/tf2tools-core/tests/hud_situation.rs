@@ -87,6 +87,17 @@ fn sample_numbers_follow_the_situation() {
 }
 
 #[test]
+fn the_max_health_label_shows_once_five_or_more_below_max() {
+    // CTFHudPlayerHealth::SetHealth sets MaxHealth only when max - health >= 5.
+    let s = GameSituation::default();
+    let max = |h: u16| SampleSet::Empty.fill_in("%MaxHealth%", &s.clone().with_health(h));
+    assert_eq!(max(60), "200");
+    assert_eq!(max(195), "200");
+    assert_eq!(max(196), "");
+    assert_eq!(max(250), "");
+}
+
+#[test]
 fn a_moment_fires_the_events_the_game_would() {
     let m = model();
     let health = Some(PartKey::new(HEALTH_KEY));

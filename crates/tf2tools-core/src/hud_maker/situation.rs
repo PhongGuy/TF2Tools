@@ -16,6 +16,8 @@ const CHARGE_PANEL: &str = "HudMedicCharge";
 pub(super) const DEATH_WARNING: f32 = 0.49;
 /// The health pulse image, which the health element sizes and colours itself.
 pub(super) const PULSE_IMAGE: &str = "PlayerStatusHealthBonusImage";
+/// The health cross, which `CTFHealthPanel` fills from the bottom by the health left.
+const HEALTH_IMAGE: &str = "PlayerStatusHealthImage";
 /// How far the pulse image grows on each side at its fullest when the HUD sets no
 /// `HealthBonusPosAdj`.
 const PULSE_POS_ADJ: f32 = 25.;
@@ -194,6 +196,26 @@ impl GameSituation {
     pub(super) fn is_pulse_image(part: &Part) -> bool {
         part.name().eq_ignore_ascii_case(PULSE_IMAGE)
             && part.parent() == Some(&PartKey::new(HEALTH_PANEL))
+    }
+
+    /// Whether `part` is the health element's cross, which the game fills and colours.
+    pub(super) fn is_health_image(part: &Part) -> bool {
+        part.name().eq_ignore_ascii_case(HEALTH_IMAGE)
+            && part.parent() == Some(&PartKey::new(HEALTH_PANEL))
+    }
+
+    /// Health over max health, at most 1: how much of the health cross the game fills.
+    pub(super) fn health_share(&self) -> f32 {
+        (f32::from(self.health) / f32::from(self.max_health())).min(1.)
+    }
+
+    /// The max health label's number, which the game sets only while at least 5 below max.
+    pub fn max_health_label(&self) -> String {
+        if self.health.saturating_add(5) <= self.max_health() {
+            self.max_health().to_string()
+        } else {
+            String::new()
+        }
     }
 
     /// How many pixels the game grows the pulse image by on each side in `model`.

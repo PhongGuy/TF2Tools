@@ -1203,8 +1203,13 @@ fn the_health_cross_draws_the_texture_its_code_paints(cx: &mut TestAppContext) {
     let key = PartKey::new("HudPlayerStatus/HudPlayerHealth/PlayerStatusHealthImage");
     let part = bounds(cx, &s, ids::hud_maker_part(&key));
     let cell = bounds(cx, &s, ids::hud_maker_image_cell(&key, 0));
+    // The default Soldier at 150 of 200 fills the bottom three quarters, as CTFHealthPanel does.
+    let tall = f(part.size.height);
+    let near = |a: f32, b: f32| (a - b).abs() <= 1.0;
     assert!(
-        inside(cell, part) && inside(part, cell),
+        near(f(cell.size.width), f(part.size.width))
+            && near(f(cell.origin.y), f(part.origin.y) + tall * 0.25)
+            && near(f(cell.size.height), tall * 0.75),
         "{cell:?} vs {part:?}"
     );
 }
