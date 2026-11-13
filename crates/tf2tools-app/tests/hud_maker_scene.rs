@@ -1203,9 +1203,43 @@ fn the_health_cross_draws_the_texture_its_code_paints(cx: &mut TestAppContext) {
     let key = PartKey::new("HudPlayerStatus/HudPlayerHealth/PlayerStatusHealthImage");
     let part = bounds(cx, &s, ids::hud_maker_part(&key));
     let cell = bounds(cx, &s, ids::hud_maker_image_cell(&key, 0));
+    // The default Soldier at 150 of 200 fills the bottom three quarters, as CTFHealthPanel does.
+    let tall = f(part.size.height);
+    let near = |a: f32, b: f32| (a - b).abs() <= 1.0;
     assert!(
-        inside(cell, part) && inside(part, cell),
+        near(f(cell.size.width), f(part.size.width))
+            && near(f(cell.origin.y), f(part.origin.y) + tall * 0.25)
+            && near(f(cell.size.height), tall * 0.75),
         "{cell:?} vs {part:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn the_charge_meter_fills_to_the_medic_s_charge(cx: &mut TestAppContext) {
+    let env = support::env();
+    let charge = r#""Resource/UI/HudMedicCharge.res" { ChargeMeter { ControlName ContinuousProgressBar xpos 0 ypos 0 wide 80 tall 8 } }"#;
+    let s = shell_with(
+        cx,
+        &env,
+        &[("resource/ui/hudmediccharge.res", Some(charge))],
+    );
+    let page = open_maker(cx, &s);
+    let medic = tf2tools_core::GameSituation::default()
+        .with_class(tf2tools_core::TfClass::Medic)
+        .with_charge(75);
+    cx.update_window(s.win, |_, w, cx| {
+        page.update(cx, |p, cx| p.set_situation(medic, w, cx))
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+    let key = PartKey::new("HudMedicCharge/ChargeMeter");
+    let part = bounds(cx, &s, ids::hud_maker_part(&key));
+    let bar = bounds(cx, &s, ids::hud_maker_bar(&key));
+    assert!(
+        (f(bar.size.width) - f(part.size.width) * 0.75).abs() <= 1.0
+            && bar.origin == part.origin
+            && bar.size.height == part.size.height,
+        "{bar:?} vs {part:?}"
     );
 }
 

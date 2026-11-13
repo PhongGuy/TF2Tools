@@ -100,6 +100,7 @@ mod hud_label_wrap;
 mod hud_layout;
 mod hud_live_link;
 mod hud_live_recovery;
+mod hud_low_ammo;
 mod hud_make_animations;
 mod hud_make_assets;
 mod hud_make_picture_prune;
