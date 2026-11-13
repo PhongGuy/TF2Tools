@@ -299,7 +299,7 @@ pub(crate) fn downloaded_names(conn: &rusqlite::Connection) -> rusqlite::Result<
 }
 
 /// `downloaded_names` lowercased, for matching against the game folder ignoring case.
-fn lowercase_all(names: HashSet<String>) -> HashSet<String> {
+pub(crate) fn lowercase_all(names: HashSet<String>) -> HashSet<String> {
     names.into_iter().map(|n| n.to_lowercase()).collect()
 }
 

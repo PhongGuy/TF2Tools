@@ -2,7 +2,7 @@
 
 use super::{GbId, Library, library_db};
 use crate::error::LibraryError;
-use crate::store::{MapIndex, MapSource, downloaded_names};
+use crate::store::{MapIndex, MapSource, downloaded_names, lowercase_all};
 use crate::tf2::Tf2Install;
 
 impl Library {
@@ -14,13 +14,7 @@ impl Library {
         name: &str,
         except: Option<GbId>,
     ) -> Result<Option<MapSource>, LibraryError> {
-        let serveme = self
-            .db
-            .read(downloaded_names)
-            .map_err(library_db)?
-            .into_iter()
-            .map(|n| n.to_lowercase())
-            .collect();
+        let serveme = lowercase_all(self.db.read(downloaded_names).map_err(library_db)?);
         Ok(MapIndex::scan(tf2).source(name, except, &serveme))
     }
 }
