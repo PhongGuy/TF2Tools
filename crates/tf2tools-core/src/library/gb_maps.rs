@@ -152,32 +152,37 @@ impl Library {
             .map_err(map_error)?;
 
         // The scratch dir and the game are often on different disks, so the stage is copied
-        // into a staging folder beside the target first; only a complete copy replaces the
-        // old folder, by a rename on the game's own disk.
+        // into a staging folder beside the target first. Only a complete copy goes in, by
+        // renames on the game's own disk that set the old folder aside rather than delete it.
         let tf = tf2.tf_dir();
         let target = custom.join(&folder);
         let staging = custom.join(MAP_STAGING_DIR);
-        let fresh = staging.join(&folder);
-        let copied = remove_entry(&staging)
-            .and_then(|()| copy_tree(&stage, &fresh, &|_: &Path| false).map(drop));
-        if let Err(e) = copied {
+        let (fresh, aside) = (
+            staging.join("new").join(&folder),
+            staging.join("old").join(&folder),
+        );
+        let ready = remove_entry(&staging)
+            .and_then(|()| copy_tree(&stage, &fresh, &|_: &Path| false).map(drop))
+            .and_then(|()| create_dir_all(&staging.join("old")))
+            .and_then(|()| {
+                files
+                    .iter()
+                    .filter(|file| **file != own)
+                    .filter_map(|file| recorded_path(&tf, gb_id, file))
+                    .try_for_each(|path| remove_installed(&path))
+            });
+        if let Err(e) = ready {
             let _ = remove_entry(&staging);
             return Err(e.into());
         }
-        let swapped = (|| {
-            for file in &files {
-                if let Some(path) = recorded_path(&tf, gb_id, file) {
-                    remove_installed(&path)?;
-                }
-            }
-            remove_entry(&target)?;
-            std::fs::rename(&fresh, &target).map_err(io_at(&target))
-        })();
-        let _ = remove_entry(&staging);
-        if let Err(e) = swapped {
-            let _ = remove_entry(&target);
-            return Err(e.into());
+        let swapped = swap_in(&target, &fresh, &aside);
+        // A set-aside copy that could not be put back is the only one left, so it stays.
+        if (swapped.is_ok() || !aside.exists())
+            && let Err(IoFailure { path, source }) = remove_entry(&staging)
+        {
+            tracing::warn!(path = %path.display(), error = %source, "map staging left behind");
         }
+        swapped?;
 
         let mut entry = row(vec![own]);
         entry.mark_installed();
@@ -185,6 +190,23 @@ impl Library {
             .map_err(map_error)?;
         Ok(entry)
     }
+}
+
+/// Renames the folder at `target`, if any, aside to `aside`, then `fresh` in at `target`.
+/// When the second rename fails the first is undone, so `target` never goes missing while
+/// its old copy can be put back.
+fn swap_in(target: &Path, fresh: &Path, aside: &Path) -> Result<(), IoFailure> {
+    let had_old = target.symlink_metadata().is_ok();
+    if had_old {
+        std::fs::rename(target, aside).map_err(io_at(target))?;
+    }
+    std::fs::rename(fresh, target)
+        .map_err(io_at(target))
+        .inspect_err(|_| {
+            if had_old {
+                let _ = std::fs::rename(aside, target);
+            }
+        })
 }
 
 /// Moves each map into `stage/maps/<name>.bsp` and each companion to its destination, the

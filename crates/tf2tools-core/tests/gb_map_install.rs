@@ -299,3 +299,55 @@ async fn an_update_whose_copy_fails_keeps_the_installed_map() {
     let old = s.tf2.custom_dir().join("tf2tools-gb-7-x/maps/cp_x_rc2.bsp");
     assert_eq!(std::fs::read(old).unwrap(), bsp(b"2"));
 }
+
+#[cfg(unix)]
+#[tokio::test]
+async fn an_update_installs_even_when_the_old_folder_cannot_be_fully_deleted() {
+    use std::os::unix::fs::PermissionsExt;
+    let s = setup().await;
+    let d = download(
+        &s,
+        7,
+        "X",
+        &[
+            ("maps/cp_x_rc2.bsp", &bsp(b"2")),
+            ("scripts/population/cp_x_rc2.pop", b"pop"),
+        ],
+        100,
+    )
+    .await;
+    s.env
+        .lib
+        .install_gb_map(d, &chosen(&["cp_x_rc2"]), &s.tf2, &no)
+        .unwrap();
+
+    // A folder of the old install whose files cannot be deleted, as a held file would be.
+    let held = s
+        .tf2
+        .custom_dir()
+        .join("tf2tools-gb-7-x/scripts/population");
+    std::fs::set_permissions(&held, std::fs::Permissions::from_mode(0o555)).unwrap();
+    // Root deletes through any mode, so there is nothing to test there.
+    if std::fs::write(held.join(".probe"), b"").is_ok() {
+        std::fs::remove_file(held.join(".probe")).unwrap();
+        return;
+    }
+    let d = download(&s, 7, "X", &[("maps/cp_x_rc3.bsp", &bsp(b"3"))], 200).await;
+    let result = s
+        .env
+        .lib
+        .update_gb_map(d, &chosen(&["cp_x_rc3"]), &s.tf2, &no);
+    for dir in common::tree(&s.tf2.custom_dir()) {
+        if let Some(rel) = dir.strip_suffix("/cp_x_rc2.pop") {
+            let path = s.tf2.custom_dir().join(rel);
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+    }
+    let entry = result.unwrap();
+    assert_eq!(entry.payloads(), ["cp_x_rc3"]);
+    let installed: Vec<String> = custom(&s)
+        .into_iter()
+        .filter(|p| p.starts_with("tf2tools-gb-7-x/"))
+        .collect();
+    assert_eq!(installed, ["tf2tools-gb-7-x/maps/cp_x_rc3.bsp"]);
+}
