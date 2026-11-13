@@ -265,3 +265,39 @@ fn a_dotted_name_is_a_map() {
     write_file(&t.join("maps/pl_x.1.bsp"), &bsp(b"d"));
     assert_eq!(names(&find_maps(t, CAP).unwrap()), ["pl_x.1"]);
 }
+
+#[cfg(unix)]
+#[test]
+fn a_bz2_map_that_cannot_be_written_is_an_io_error_not_a_skip() {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::tempdir().unwrap();
+    let t = tmp.path();
+    let maps = t.join("maps");
+    write_file(&maps.join("cp_ro.bsp.bz2"), &bz2(&bsp(b"r")));
+    std::fs::set_permissions(&maps, std::fs::Permissions::from_mode(0o555)).unwrap();
+    if std::fs::write(maps.join("probe"), b"").is_ok() {
+        return; // running as root: permissions are not enforced
+    }
+    let result = find_maps(t, CAP);
+    // Restore first so a failing assertion cannot leave an undeletable tempdir behind.
+    std::fs::set_permissions(&maps, std::fs::Permissions::from_mode(0o755)).unwrap();
+    match result {
+        Err(tf2tools_core::ArchiveError::Io { path, .. }) => {
+            assert!(path.starts_with(&maps), "{path:?}");
+        }
+        other => panic!("expected Io, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_shipped_part_file_is_left_alone() {
+    let tmp = tempfile::tempdir().unwrap();
+    let t = tmp.path();
+    write_file(&t.join("maps/cp_p.bsp.bz2"), &bz2(&bsp(b"p")));
+    write_file(&t.join("maps/cp_p.bsp.part"), b"shipped");
+    assert_eq!(names(&find_maps(t, CAP).unwrap()), ["cp_p"]);
+    assert_eq!(
+        std::fs::read(t.join("maps/cp_p.bsp.part")).unwrap(),
+        b"shipped"
+    );
+}

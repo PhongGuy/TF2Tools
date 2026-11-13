@@ -7,6 +7,7 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use bzip2::read::BzDecoder;
+use tempfile::NamedTempFile;
 use walkdir::WalkDir;
 
 use crate::error::ArchiveError;
@@ -134,9 +135,8 @@ fn walk_files(tree: &Path) -> Result<Vec<PathBuf>, ArchiveError> {
 /// is a safe map name.
 fn map_stem<'a>(path: &'a Path, suffix: &str) -> Option<&'a str> {
     let name = path.file_name()?.to_str()?;
-    let cut = name.len().checked_sub(suffix.len())?;
-    let (stem, end) = (name.get(..cut)?, name.get(cut..)?);
-    (end.eq_ignore_ascii_case(suffix) && is_map_name(stem)).then_some(stem)
+    let stem = name.get(..name.len().checked_sub(suffix.len())?)?;
+    (ends_with_ignore_case(name, suffix) && is_map_name(stem)).then_some(stem)
 }
 
 fn has_bsp_magic(path: &Path) -> bool {
@@ -214,7 +214,7 @@ fn ends_with_ignore_case(name: &str, suffix: &str) -> bool {
 
 /// Decompresses each `<stem>.bsp.bz2` with a map-name stem to `<stem>.bsp` beside it and
 /// removes the `.bz2`, within one `cap` budget and [`MAX_MAPS`] files. Each goes through a
-/// `.part` file, so a corrupt or oversized one leaves only its `.bz2` behind.
+/// temporary file, so a corrupt or oversized one leaves only its `.bz2` behind.
 fn decompress_bz2_maps(tree: &Path, cap: u64) -> Result<(), ArchiveError> {
     let files = walk_files(tree)?;
     let mut taken: HashSet<PathBuf> = files.iter().map(|f| lowercase_path(f)).collect();
@@ -229,32 +229,44 @@ fn decompress_bz2_maps(tree: &Path, cap: u64) -> Result<(), ArchiveError> {
             tracing::debug!(file = %bz2.display(), "compressed map not unpacked");
             continue;
         }
-        let part = bz2.with_file_name(format!("{stem}.bsp.part"));
         let remaining = cap.saturating_sub(used);
-        match decompress(bz2, &part, remaining) {
-            Ok(size) if size <= remaining => {
-                fs::rename(&part, &bsp).map_err(io_at(&part))?;
-                fs::remove_file(bz2).map_err(io_at(bz2))?;
-                used += size;
-                count += 1;
-                taken.insert(lowercase_path(&bsp));
-            }
-            outcome => {
-                tracing::debug!(file = %bz2.display(), ?outcome, "compressed map corrupt or too large");
-                match fs::remove_file(&part) {
-                    Err(e) if e.kind() != io::ErrorKind::NotFound => Err(io_at(&part)(e))?,
-                    _ => {}
-                }
-            }
-        }
+        let Some((part, size)) = decompress(bz2, remaining)? else {
+            continue;
+        };
+        // A failed persist drops the temporary file, which deletes it.
+        part.persist(&bsp).map_err(|e| io_at(&bsp)(e.error))?;
+        fs::remove_file(bz2).map_err(io_at(bz2))?;
+        used += size;
+        count += 1;
+        taken.insert(lowercase_path(&bsp));
     }
     Ok(())
 }
 
-/// Writes at most `limit + 1` decompressed bytes of `bz2` to `out`; the byte count.
-fn decompress(bz2: &Path, out: &Path, limit: u64) -> io::Result<u64> {
-    let mut reader = BzDecoder::new(File::open(bz2)?).take(limit.saturating_add(1));
-    io::copy(&mut reader, &mut File::create(out)?)
+/// Decompresses `bz2` into a temporary file beside it, or `None` when its bytes are not
+/// bzip2 or come to more than `limit`. Only a decode error is a skip; a disk error is `Io`.
+fn decompress(bz2: &Path, limit: u64) -> Result<Option<(NamedTempFile, u64)>, ArchiveError> {
+    let dir = bz2.parent().unwrap_or(bz2);
+    let source = File::open(bz2).map_err(io_at(bz2))?;
+    let mut part = NamedTempFile::new_in(dir).map_err(io_at(dir))?;
+    let mut reader = BzDecoder::new(source).take(limit.saturating_add(1));
+    match io::copy(&mut reader, &mut part) {
+        Ok(size) if size <= limit => Ok(Some((part, size))),
+        Ok(_) => {
+            tracing::debug!(file = %bz2.display(), "compressed map too large");
+            Ok(None)
+        }
+        Err(e)
+            if matches!(
+                e.kind(),
+                io::ErrorKind::InvalidInput | io::ErrorKind::UnexpectedEof
+            ) =>
+        {
+            tracing::debug!(file = %bz2.display(), error = %e, "compressed map corrupt");
+            Ok(None)
+        }
+        Err(e) => Err(io_at(part.path())(e).into()),
+    }
 }
 
 fn lowercase_path(path: &Path) -> PathBuf {
