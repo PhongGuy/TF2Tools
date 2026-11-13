@@ -85,6 +85,7 @@ mod hud_health_pulse;
 mod hud_history;
 mod hud_image_cells;
 mod hud_image_tint;
+mod hud_low_ammo;
 mod hud_images;
 mod hud_import_clash;
 mod hud_install;

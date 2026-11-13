@@ -23,6 +23,10 @@ const HEALTH_IMAGE: &str = "PlayerStatusHealthImage";
 const PULSE_POS_ADJ: f32 = 25.;
 /// Below this ammo percent the low ammo pulse runs.
 const LOW_AMMO: u8 = 40;
+/// The low ammo image, which the ammo element grows past its background as ammo runs out.
+const LOW_AMMO_IMAGE: &str = "HudWeaponLowAmmoImage";
+/// The most pixels the low ammo image grows by on each side (`hud_lowammowarning_maxposadjust`).
+const LOW_AMMO_POS_ADJ: f32 = 5.;
 
 /// The kind of weapon held.
 #[non_exhaustive]
@@ -239,6 +243,18 @@ impl GameSituation {
         };
         // RoundFloatToInt converts in the default rounding mode, which breaks ties to even.
         (share * pos_adj).round_ties_even() as i32
+    }
+
+    /// Pixels the game grows `part` by on each side: `CTFHudWeaponAmmo::SizeLowAmmoIndicator`
+    /// grows the low ammo image by round(share * 5), share being how far under the threshold.
+    pub(super) fn low_ammo_grow(&self, part: &Part) -> i32 {
+        let is_image = part.name().eq_ignore_ascii_case(LOW_AMMO_IMAGE)
+            && part.parent() == Some(&PartKey::new(AMMO_PANEL));
+        if !is_image || !self.low_ammo() {
+            return 0;
+        }
+        let (ammo, low) = (f32::from(self.ammo_percent), f32::from(LOW_AMMO));
+        ((low - ammo) / low * LOW_AMMO_POS_ADJ).round_ties_even() as i32
     }
 
     /// The colour the game draws the pulse image in: `HealthDeathWarningColor` (default the
