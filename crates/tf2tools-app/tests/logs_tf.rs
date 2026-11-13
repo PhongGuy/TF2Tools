@@ -341,21 +341,27 @@ fn offline_with_nothing_saved_the_page_says_logs_tf_was_not_reached(cx: &mut Tes
 fn switching_chips_mid_sync_cancels_the_first_and_syncs_the_second(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    // The list answers slowly, so Arie's sync is still listing when the chip is clicked.
-    server.mount_bytes_after(
-        "/api/v1/log",
-        list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
-        Duration::from_millis(500),
-    );
+    // Arie's list waits on the gate until the switch has cancelled their sync, so the switch
+    // always meets a list on the wire.
+    let logs = [(3, day_ago(1)), (2, day_ago(2))];
+    let list = Gate::default();
+    mount_held(&server, &list, "/api/v1/log", Some(ARIE), list_body(&logs));
+    mount_list_for(&server, 1, &logs, Duration::ZERO);
     server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
     server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
     let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
     support::click_id(cx, s.win, ids::nav(Page::LogsTf));
     let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
-    support::wait_real(cx, "Arie's sync", |cx| {
+    support::wait_real(cx, "Arie's list request", |cx| {
         cx.update(|cx| page.read(cx).is_loaded() && page.read(cx).is_syncing(cx))
+            && list.arrived() == 1
     });
     support::click_id(cx, s.win, ids::logstf_chip(sid(1)));
+    // The chip turns selected in the same update that cancels Arie's sync, so the list lands late.
+    support::wait_real(cx, "the selected chip", |cx| {
+        support::selected_of(cx, s.win, ids::logstf_chip(sid(1))) == Some(true)
+    });
+    list.open();
     support::wait_real(cx, "the switch", |cx| {
         cx.update(|cx| {
             let p = page.read(cx);
@@ -712,8 +718,16 @@ fn the_progress_line_belongs_to_the_active_player(cx: &mut TestAppContext) {
         "/api/v1/log",
         list_body(&[(3, day_ago(1)), (2, day_ago(2))]),
     );
-    // The first download answers slowly, so Arie's sync is mid-download at the switch.
-    server.mount_bytes_after("/json/3", SIXES.as_bytes().to_vec(), Duration::from_secs(1));
+    // The first download waits on the gate until the switch is checked, so Arie's sync is
+    // mid-download at the switch.
+    let download = Gate::default();
+    mount_held(
+        &server,
+        &download,
+        "/json/3",
+        None,
+        SIXES.as_bytes().to_vec(),
+    );
     server.mount_bytes("/json/2", HIGHLANDER.as_bytes().to_vec());
     let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
     support::click_id(cx, s.win, ids::nav(Page::LogsTf));
@@ -721,6 +735,7 @@ fn the_progress_line_belongs_to_the_active_player(cx: &mut TestAppContext) {
     support::wait_real(cx, "Arie's progress", |cx| {
         support::label_of(cx, s.win, ids::LOGSTF_PROGRESS).as_deref()
             == Some("Downloading logs: 0 of 2")
+            && download.arrived() == 1
     });
 
     support::click_id(cx, s.win, ids::logstf_chip(sid(1)));
@@ -733,6 +748,7 @@ fn the_progress_line_belongs_to_the_active_player(cx: &mut TestAppContext) {
         "Arie's sync is open"
     );
     assert!(!support::present(cx, s.win, ids::LOGSTF_PROGRESS));
+    download.open();
     support::wait_real(cx, "both syncs", |cx| {
         cx.update(|cx| !page.read(cx).is_syncing(cx))
     });
@@ -1168,18 +1184,23 @@ fn an_open_log_fits_the_smallest_window(cx: &mut TestAppContext) {
 fn a_player_waiting_for_their_first_sync_is_not_shown_as_without_logs(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
-    // Arie's list answers slowly, so the other player's sync waits its turn behind it.
-    server.mount_bytes_after(
+    // Arie's list waits on the gate until the switch is checked, so the other player's sync
+    // waits its turn behind it.
+    let list = Gate::default();
+    mount_held(
+        &server,
+        &list,
         "/api/v1/log",
+        Some(ARIE),
         list_body(&[(3, day_ago(1))]),
-        Duration::from_millis(500),
     );
+    mount_list_for(&server, 1, &[(3, day_ago(1))], Duration::ZERO);
     server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
     let s = shell(cx, &env, &server.uri(), &[(1, "other"), (ARIE, "Arie")]);
     support::click_id(cx, s.win, ids::nav(Page::LogsTf));
     let page = cx.update(|cx| s.shell.read(cx).logs_tf_page()).unwrap();
-    support::wait_real(cx, "the chips", |cx| {
-        cx.update(|cx| page.read(cx).is_loaded())
+    support::wait_real(cx, "Arie's list request", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded()) && list.arrived() == 1
     });
     support::click_id(cx, s.win, ids::logstf_chip(sid(1)));
     support::wait_real(cx, "the switch", |cx| {
@@ -1190,6 +1211,7 @@ fn a_player_waiting_for_their_first_sync_is_not_shown_as_without_logs(cx: &mut T
         "Arie's sync is open"
     );
     assert!(!support::present(cx, s.win, ids::LOGSTF_NO_LOGS));
+    list.open();
     support::wait_real(cx, "both syncs", |cx| {
         cx.update(|cx| !page.read(cx).is_syncing(cx))
     });
