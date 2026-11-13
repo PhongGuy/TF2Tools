@@ -1,5 +1,5 @@
-//! On a KOTH map the clocks sit in the match HUD's timer frame, coloured as the game's code
-//! leaves them once each timer's highlight or dim event settles.
+//! The round timer and the KOTH clocks sit in the match HUD's timer frame; the clocks are
+//! coloured as the game's code leaves them once each timer's highlight or dim event settles.
 
 use crate::common;
 
@@ -78,15 +78,27 @@ fn colour(m: &HudModel, key: &str) -> Rgba {
 }
 
 #[test]
-fn the_frame_shows_on_a_koth_map_and_not_elsewhere() {
+fn the_frame_shows_around_the_round_timer_and_the_koth_clocks() {
+    // The match HUD shows the round counter whenever it is on, KOTH or not (in game on
+    // cp_dustbowl and koth_harvest_final, 2026-11-13).
     let m = model(&[]);
-    for key in [FRAME, COUNTER, PICTURE] {
-        assert_eq!(hidden(&m, &koth(), key), None, "{key} on KOTH");
+    for situation in [GameSituation::default(), koth()] {
+        for key in [FRAME, COUNTER, PICTURE] {
+            assert_eq!(hidden(&m, &situation, key), None, "{key}");
+        }
     }
-    let usual = GameSituation::default();
-    assert_eq!(hidden(&m, &usual, FRAME), Some(HiddenBy::Game));
-    assert_eq!(hidden(&m, &usual, COUNTER), Some(HiddenBy::Game));
-    assert_eq!(hidden(&m, &usual, PICTURE), Some(HiddenBy::Parent));
+}
+
+#[test]
+fn the_round_timer_draws_over_the_backing_the_counters_file_raises() {
+    // The match file sorts RoundCounter at zpos 1 under the timer's 2; the counter's own file
+    // raises it to 2 later, which moves it past no sibling of equal zpos.
+    let m = model(&[]);
+    let layout = m.layout_in(SD, &GameSituation::default());
+    let rank = |key: &str| layout.paint_rank(&PartKey::new(key)).expect(key);
+    let timer = "HudMatchStatus/ObjectiveStatusTimePanel";
+    assert!(rank(timer) > rank(PICTURE));
+    assert!(rank(COUNTER) > rank(FRAME));
 }
 
 #[test]

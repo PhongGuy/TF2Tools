@@ -2,7 +2,7 @@
 
 use crate::support;
 
-use support::hud_stock::{HEALTH, label, stock_files_with, with_blocks};
+use support::hud_stock::{HEALTH, ROUND_COUNTER, label, stock_files_with, with_blocks};
 use tf2tools_app::pages::hud_maker::checks::Checks;
 use tf2tools_app::pages::hud_maker::editor::HudEditor;
 use tf2tools_core::{
@@ -95,8 +95,12 @@ fn the_screens_are_checked_against_the_hud_as_opened() {
 
 #[test]
 fn hard_to_read_follows_the_situation_shown() {
-    // Each game mode shows its own timer panel, so the labels to judge differ between them.
-    let (mut e, mut checks) = (editor(), Checks::default());
+    // Each game mode shows its own timer panel, so the labels to judge differ between them. The
+    // round counter's picture is sized away, as some HUDs do, so the timers sit on the backdrop.
+    let counter = ROUND_COUNTER.replace("tall 35", "tall 0");
+    let files = stock_files_with(&[("resource/ui/hudroundcounter.res", Some(&counter))]);
+    let model = HudModel::load(&files, Platform::Linux).unwrap();
+    let (mut e, mut checks) = (HudEditor::new(model, Vec::new()), Checks::default());
     let white = Backdrop::new(1, 1, vec![255, 255, 255, 255]).unwrap();
     let usual = checks.hard_to_read(&e, &white, 1, Vision::Normal);
     let koth = e

@@ -190,6 +190,7 @@ mod hud_switches_detect;
 mod hud_switches_parts;
 mod hud_switches_save;
 mod hud_switches_update;
+mod hud_team_status;
 mod hud_thumbnail;
 mod hud_win_sample;
 mod layout;
