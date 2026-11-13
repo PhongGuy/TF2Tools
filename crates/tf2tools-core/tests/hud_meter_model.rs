@@ -109,3 +109,40 @@ fn a_meter_neither_the_hud_nor_the_game_has_is_unreadable_not_a_problem() {
     assert!(!killstreak.part(&PartKey::new(METER)).unwrap().is_readable());
     assert!(killstreak.problems().is_empty());
 }
+
+const PLAIN: &str = "resource/ui/huditemeffectmeter.res";
+const BAR: &str = "HudItemEffectMeter/ItemEffectMeter";
+
+// A plain meter shaped as some HUDs ship it: its own label and bar, no #base, while other
+// meter files #base it.
+const OWN_PLAIN: &str = r##""Resource/UI/HudItemEffectMeter.res"
+{
+  HudItemEffectMeter { xpos c-60 ypos c103 wide 120 tall 8 }
+  ItemEffectMeterLabel { ControlName CExLabel xpos 0 ypos 0 wide 120 tall 8 labelText "#TF_Ball" }
+  ItemEffectMeter { ControlName ContinuousProgressBar xpos 0 ypos 0 wide 120 tall 8 }
+}
+"##;
+
+fn copy_with(files: &[(&str, Option<&str>)]) -> HudModel {
+    HudModel::load(&stock_files_with(files).with_install_folder("myhud"), Platform::Linux)
+        .unwrap()
+}
+
+#[test]
+fn a_meter_file_other_meters_base_keeps_its_own_controls() {
+    let cleaver = "#base \"huditemeffectmeter.res\"\n\"C\" { HudItemEffectMeter { xpos 1 } }";
+    let spy = "#base \"huditemeffectmeter_demoman.res\"";
+    let m = copy_with(&[
+        (PLAIN, Some(OWN_PLAIN)),
+        ("resource/ui/huditemeffectmeter_cleaver.res", Some(cleaver)),
+        ("resource/ui/huditemeffectmeter_sodapopper.res", Some(cleaver)),
+        ("resource/ui/huditemeffectmeter_spy.res", Some(spy)),
+        ("resource/ui/huditemeffectmeter_engineer.res", Some(spy)),
+    ]);
+    assert!(has(&m, LABEL) && has(&m, BAR), "the plain meter's own pieces");
+    assert!(has(&m.with_meter(MeterKind::Sword), COUNT), "the sword's own count");
+    assert!(
+        has(&m.with_meter(MeterKind::Revolver), COUNT),
+        "a meter reading only a meter file it #bases"
+    );
+}
