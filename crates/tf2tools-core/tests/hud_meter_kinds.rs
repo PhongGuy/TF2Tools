@@ -63,3 +63,11 @@ fn the_hud_reads_every_meter_file_and_none_is_a_problem() {
         );
     }
 }
+
+#[test]
+fn the_drink_meter_leaves_out_the_medi_gun_which_has_its_own_charge_meter() {
+    assert_eq!(
+        MeterKind::Drink.label(),
+        "Bonk!, Crit-a-Cola and Mad Milk"
+    );
+}
