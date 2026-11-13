@@ -226,23 +226,23 @@ fn icon_names() -> WeaponNames {
 #[test]
 fn the_escape_plan_draws_the_pickaxe_kill_icon() {
     let n = icon_names();
-    assert_eq!(n.kill_icons("unique_pickaxe_escape")[0], "pickaxe");
-    assert_eq!(n.kill_icons("UNIQUE_PICKAXE_ESCAPE")[0], "pickaxe");
+    assert_eq!(n.kill_icons("unique_pickaxe_escape", None)[0], "pickaxe");
+    assert_eq!(n.kill_icons("UNIQUE_PICKAXE_ESCAPE", None)[0], "pickaxe");
 }
 
 #[test]
 fn an_item_icon_comes_before_its_log_name_and_the_skull_comes_last() {
     let n = icon_names();
     assert_eq!(
-        n.kill_icons("frontier_justice"),
+        n.kill_icons("frontier_justice", None),
         ["frontier_kill", "frontier_justice", "skull_tf"]
     );
-    assert_eq!(n.kill_icons("skullbat"), ["skullbat", "skull_tf"]);
+    assert_eq!(n.kill_icons("skullbat", None), ["skullbat", "skull_tf"]);
     assert_eq!(
-        n.kill_icons("tf_projectile_rocket"),
+        n.kill_icons("tf_projectile_rocket", None),
         ["tf_projectile_rocket"]
     );
-    assert_eq!(n.kill_icons("world"), ["world"]);
+    assert_eq!(n.kill_icons("world", None), ["world"]);
 }
 
 #[test]
@@ -281,8 +281,46 @@ fn each_log_name_without_its_own_icon_draws_the_games_entry_for_it() {
         ("rocketpack", "rocketpack_stomp"),
         ("laser_pointer", "wrangler_kill"),
     ] {
-        assert_eq!(n.kill_icons(log)[0], icon, "{log}");
+        assert_eq!(n.kill_icons(log, None)[0], icon, "{log}");
     }
+}
+
+#[test]
+fn a_pyros_stock_projectile_kill_draws_the_reflect_icon_first() {
+    let n = WeaponNames::default();
+    let pyro = Some(TfClass::Pyro);
+    assert_eq!(
+        n.kill_icons("tf_projectile_rocket", pyro),
+        ["deflect_rocket", "tf_projectile_rocket"]
+    );
+    assert_eq!(
+        n.kill_icons("TF_PROJECTILE_PIPE", pyro)[0],
+        "deflect_promode"
+    );
+    assert_eq!(
+        n.kill_icons("tf_projectile_pipe_remote", pyro)[0],
+        "deflect_sticky"
+    );
+    assert_eq!(
+        n.kill_icons("tf_projectile_arrow", pyro),
+        ["deflect_arrow", "huntsman", "tf_projectile_arrow"]
+    );
+}
+
+#[test]
+fn another_class_keeps_the_launchers_projectile_icon() {
+    let n = WeaponNames::default();
+    for class in [Some(TfClass::Soldier), None] {
+        assert_eq!(
+            n.kill_icons("tf_projectile_rocket", class),
+            ["tf_projectile_rocket"]
+        );
+        assert_eq!(n.kill_icons("tf_projectile_arrow", class)[0], "huntsman");
+    }
+    assert_eq!(
+        n.kill_icons("deflect_rocket", Some(TfClass::Pyro)),
+        ["deflect_rocket"]
+    );
 }
 
 // Kill names logs.tf records that are no item: sentries, reflects, stock projectiles, class
@@ -339,7 +377,7 @@ fn every_real_weapon_key_has_a_kill_icon() {
         .unwrap();
     let drawn = |key: &str| {
         names
-            .kill_icons(key)
+            .kill_icons(key, None)
             .into_iter()
             .find(|icon| icons.get(&format!("d_{icon}")).is_some())
             .map(str::to_owned)
@@ -371,6 +409,12 @@ fn every_real_weapon_key_has_a_kill_icon() {
     }
     assert_eq!(drawn("unique_pickaxe_escape").as_deref(), Some("pickaxe"));
     assert_eq!(names.get("shotgun_soldier"), Some("Shotgun"));
+    // A Pyro's stock projectile kill leads with a reflect icon the game really draws.
+    for key in &NON_ITEM_KEYS[9..13] {
+        let first = names.kill_icons(key, Some(TfClass::Pyro))[0];
+        assert!(first.starts_with("deflect_"), "{key}: {first}");
+        assert!(icons.get(&format!("d_{first}")).is_some(), "{key}: {first}");
+    }
 }
 
 // Class shapes from the live items_game.txt: a class list on a prefab (18), on an unlock (513),

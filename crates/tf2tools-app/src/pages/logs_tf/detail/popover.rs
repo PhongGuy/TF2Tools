@@ -84,7 +84,7 @@ fn card_for(
         weapons: weapon_rows(line, on, names)
             .into_iter()
             .map(|row| {
-                let icon = icons.for_weapon(&row.raw, names).cloned();
+                let icon = icons.for_weapon(&row.raw, Some(class), names).cloned();
                 (row, icon)
             })
             .collect(),
