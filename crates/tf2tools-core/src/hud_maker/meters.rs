@@ -8,7 +8,7 @@ pub enum MeterKind {
     /// The Sandman, Jarate, banners and most other items: the plain file.
     #[default]
     Plain,
-    /// Bonk!, Crit-a-Cola, Mad Milk and the Medi Gun.
+    /// Bonk!, Crit-a-Cola and Mad Milk.
     Drink,
     /// The Soda Popper and Baby Face's Blaster.
     SodaPopper,
@@ -80,7 +80,7 @@ impl MeterKind {
     pub fn label(self) -> &'static str {
         match self {
             MeterKind::Plain => "Sandman, Jarate, banners and most items",
-            MeterKind::Drink => "Bonk!, Crit-a-Cola, Mad Milk and Medi Gun",
+            MeterKind::Drink => "Bonk!, Crit-a-Cola and Mad Milk",
             MeterKind::SodaPopper => "Soda Popper and Baby Face's Blaster",
             MeterKind::Cleaver => "Flying Guillotine",
             MeterKind::Minigun => "Heavy's minigun",

@@ -62,6 +62,45 @@ fn class_and_switches_drive_code_toggled_parts() {
 }
 
 #[test]
+fn a_medic_holds_the_medi_gun_so_the_ammo_hides() {
+    // CTFHudWeaponAmmo::ShouldDraw is false for the Medi Gun, which the Medic situation holds.
+    let m = model();
+    let medic = GameSituation::default()
+        .with_class(TfClass::Medic)
+        .with_charge(100);
+    assert_eq!(hidden(&m, &medic, "HudWeaponAmmo"), Some(HiddenBy::Game));
+    assert_eq!(hidden(&m, &medic, "HudMedicCharge"), None);
+    assert_eq!(hidden(&m, &GameSituation::default(), "HudWeaponAmmo"), None);
+}
+
+#[test]
+fn the_charge_meter_fills_to_the_medic_s_charge() {
+    // CHudMedicChargeMeter sets ChargeMeter's progress to the charge; other bars draw whole.
+    let charge = r#""Resource/UI/HudMedicCharge.res" { ChargeLabel { ControlName CExLabel xpos 0 ypos 0 wide 100 tall 20 } ChargeMeter { ControlName ContinuousProgressBar xpos 30 ypos 38 wide 86 tall 8 }
+  IndividualChargesLabel { ControlName CExLabel xpos 30 ypos 24 wide 90 tall 15 }
+  ChargeMeter1 { ControlName ContinuousProgressBar xpos 30 ypos 38 wide 19 tall 8 }
+  ChargeMeter4 { ControlName ContinuousProgressBar xpos 96 ypos 38 wide 19 tall 8 } }"#;
+    let m = HudModel::load(
+        &stock_files_with(&[("resource/ui/hudmediccharge.res", Some(charge))]),
+        Platform::Linux,
+    )
+    .unwrap();
+    // Without the Vaccinator the game hides the per-charge bars and their label.
+    let medic = GameSituation::default().with_class(TfClass::Medic);
+    for bar in ["IndividualChargesLabel", "ChargeMeter1", "ChargeMeter4"] {
+        let key = format!("HudMedicCharge/{bar}");
+        assert_eq!(hidden(&m, &medic, &key), Some(HiddenBy::Game), "{bar}");
+    }
+    let meter = m.part(&PartKey::new("HudMedicCharge/ChargeMeter")).unwrap();
+    let medic = GameSituation::default()
+        .with_class(TfClass::Medic)
+        .with_charge(75);
+    assert_eq!(m.bar_fill(meter, &medic), Some(0.75));
+    let label = m.part(&PartKey::new("HudMedicCharge/ChargeLabel")).unwrap();
+    assert_eq!(m.bar_fill(label, &medic), None);
+}
+
+#[test]
 fn health_is_clamped_to_the_class_s_overheal() {
     let s = GameSituation::default().with_health(999);
     assert_eq!(
@@ -84,6 +123,17 @@ fn sample_numbers_follow_the_situation() {
         "60 / 20 / 75 / 75%"
     );
     assert_eq!(SampleSet::Empty.fill("%Health%"), "150");
+}
+
+#[test]
+fn the_max_health_label_shows_once_five_or_more_below_max() {
+    // CTFHudPlayerHealth::SetHealth sets MaxHealth only when max - health >= 5.
+    let s = GameSituation::default();
+    let max = |h: u16| SampleSet::Empty.fill_in("%MaxHealth%", &s.clone().with_health(h));
+    assert_eq!(max(60), "200");
+    assert_eq!(max(195), "200");
+    assert_eq!(max(196), "");
+    assert_eq!(max(250), "");
 }
 
 #[test]

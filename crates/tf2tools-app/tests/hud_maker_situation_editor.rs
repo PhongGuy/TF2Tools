@@ -86,6 +86,9 @@ fn show_it_picks_the_situation_a_part_needs() {
     assert!(e.show_part_situation(&PartKey::new("CMainTargetID")));
     assert!(e.situation().is_on(SituationSwitch::Aiming));
     assert!(!e.show_part_situation(&PartKey::new(VALUE)));
+    // The Medic holds the Medi Gun, so showing the ammo goes back to a class with a gun.
+    assert!(e.show_part_situation(&PartKey::new("HudWeaponAmmo")));
+    assert_eq!(e.situation().class(), TfClass::Soldier);
 }
 
 const BONUS: &str = "HudPlayerStatus/HudPlayerHealth/PlayerStatusHealthBonusImage";

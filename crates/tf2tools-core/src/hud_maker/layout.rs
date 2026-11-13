@@ -184,6 +184,20 @@ impl Pick {
 static GENERATIONS: AtomicU64 = AtomicU64::new(0);
 
 impl HudLayout {
+    /// A layout of `screen` with no boxes, for work that needs no part's place.
+    pub(super) fn empty(screen: Screen) -> HudLayout {
+        HudLayout {
+            screen,
+            boxes: Vec::new(),
+            parents: Vec::new(),
+            index: HashMap::new(),
+            paint: Vec::new(),
+            paint_rank: Vec::new(),
+            buttons: Vec::new(),
+            generation: GENERATIONS.fetch_add(1, Ordering::Relaxed),
+        }
+    }
+
     /// A number no other layout built in this process shares, so a caller can tell whether
     /// anything was laid out again since it last looked; a clone keeps it.
     pub fn generation(&self) -> u64 {
@@ -527,10 +541,11 @@ impl HudModel {
             let (px, py) = parents[i].map_or((0, 0), |p| (boxes[p].x, boxes[p].y));
             let Size { wide, tall } = placed[i].size;
             let (x, y) = (px.saturating_add(at.x), py.saturating_add(at.y));
-            // The health element grows its pulse image about its centre as health moves.
+            // The health element grows its pulse image about its centre as health moves, and
+            // the ammo element its low ammo image as ammo runs out.
             let grow = match GameSituation::is_pulse_image(part) {
                 true => s.health_pulse_grow(self),
-                false => 0,
+                false => s.low_ammo_grow(part),
             };
             let (x, y) = (x.saturating_sub(grow), y.saturating_sub(grow));
             let (wide, tall) = (wide.saturating_add(2 * grow), tall.saturating_add(2 * grow));
@@ -831,7 +846,7 @@ fn pinned_rel(
 }
 
 /// The first hide that holds, in order: parent, the game's code (a code-toggled part ignores
-/// its own `visible`/`enabled`), `visible`/`enabled`, `alpha`, size, off screen.
+/// its own `visible`/`enabled` unless it keeps them), `visible`/`enabled`, `alpha`, size, off screen.
 fn hidden_by(
     part: &Part,
     parent_hidden: bool,
@@ -851,7 +866,7 @@ fn hidden_by(
         Some(HiddenBy::Parent)
     } else if toggled.is_some_and(|t| !t.shown_in(situation, model)) {
         Some(HiddenBy::Game)
-    } else if toggled.is_none()
+    } else if toggled.is_none_or(|t| t.keeps_visible())
         && ((off("visible") && probe::hide_holds(HideHow::Visible, element))
             || (off("enabled") && probe::hide_holds(HideHow::Enabled, element)))
     {

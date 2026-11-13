@@ -9,6 +9,7 @@ use super::rules::{
 use super::{
     GameSituation, HideTechnique, HudModel, PanelRule, SampleSet, SituationSwitch, WeaponKind,
 };
+use crate::weapons::TfClass;
 
 /// A screen the maker previews and edits.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -113,7 +114,8 @@ impl BoardMode {
 pub enum ShowsFor {
     /// While you play this class, such as `"Medic"`.
     Class(&'static str),
-    /// While the weapon you hold is of this kind: `"clip"`, `"no clip"`, `"meter"`, `"low ammo"`.
+    /// While the weapon you hold is of this kind: `"ammo"` (anything but the Medi Gun), `"clip"`,
+    /// `"no clip"`, `"meter"`, `"low ammo"`, `"vaccinator"`.
     Weapon(&'static str),
     /// While an effect is on you: `"condition"` or `"powerup"`.
     Effect(&'static str),
@@ -153,6 +155,8 @@ impl ShowsFor {
     pub fn holds(self, s: &GameSituation) -> bool {
         match self {
             ShowsFor::Class(class) => s.class().name() == class,
+            // The Medic situation holds the Medi Gun, which uses no ammo.
+            ShowsFor::Weapon("ammo") => s.class() != TfClass::Medic,
             ShowsFor::Weapon("clip") => s.weapon() == WeaponKind::Clip,
             ShowsFor::Weapon("no clip") => s.weapon() == WeaponKind::NoClip,
             ShowsFor::Weapon("meter") => s.is_on(SituationSwitch::Meter),
@@ -186,6 +190,8 @@ pub struct CodeToggled {
     owned: &'static [&'static str],
     hide_as: Option<HideTechnique>,
     fit: Fit,
+    /// The file's `visible` still counts while the code shows the panel.
+    keeps_visible: bool,
 }
 
 /// How the game fits a code-sized bar to the screen, read by the layout.
@@ -246,6 +252,11 @@ impl CodeToggled {
     pub(super) fn fit(&self) -> Fit {
         self.fit
     }
+
+    /// Whether the file's `visible` can still hide the panel where the code shows it.
+    pub(super) fn keeps_visible(&self) -> bool {
+        self.keeps_visible
+    }
 }
 
 /// One scene's files, part rules, code-toggled panels and preview sample.
@@ -280,6 +291,7 @@ const fn toggled(panel: &'static str, shown: bool, shows_when: &'static str) -> 
         owned: &[],
         hide_as: None,
         fit: Fit::None,
+        keeps_visible: false,
     }
 }
 
@@ -308,6 +320,7 @@ const fn when(panel: &'static str, shows_for: ShowsFor, shows_when: &'static str
         owned: &[],
         hide_as: None,
         fit: Fit::None,
+        keeps_visible: false,
     }
 }
 
@@ -343,6 +356,9 @@ const POWERUP: ShowsFor = ShowsFor::Effect("powerup");
 const POWERUP_WHEN: &str = "Shows while you carry a Mannpower powerup";
 const TYPING: ShowsFor = ShowsFor::Mode("typing");
 const TYPING_WHEN: &str = "Shows while you type a chat message";
+// The situation has no Vaccinator, so its bars never show.
+const VACCINATOR: ShowsFor = ShowsFor::Weapon("vaccinator");
+const VACCINATOR_WHEN: &str = "Shows when you hold the Vaccinator";
 
 // The KOTH panel shows only on a King of the Hill map, in the HUD and the freeze cam alike.
 const KOTH_TOGGLED: CodeToggled = fitted(
@@ -358,7 +374,7 @@ const KOTH_TOGGLED: CodeToggled = fitted(
 
 // What the game checks before it shows each HUD part its code toggles; the preview shows the
 // default situation, `ShowsFor::in_default`. These are the parts only the HUD scene draws.
-const HUD_ONLY_TOGGLED: [CodeToggled; 12] = [
+const HUD_ONLY_TOGGLED: [CodeToggled; 19] = [
     when(
         "CMainTargetID",
         ShowsFor::Aim("player"),
@@ -389,6 +405,12 @@ const HUD_ONLY_TOGGLED: [CodeToggled; 12] = [
         ShowsFor::Class("Medic"),
         "Shows when you hold a Medi Gun",
     ),
+    // CHudMedicChargeMeter shows the per-charge bars only for the Vaccinator.
+    when("IndividualChargesLabel", VACCINATOR, VACCINATOR_WHEN),
+    when("ChargeMeter1", VACCINATOR, VACCINATOR_WHEN),
+    when("ChargeMeter2", VACCINATOR, VACCINATOR_WHEN),
+    when("ChargeMeter3", VACCINATOR, VACCINATOR_WHEN),
+    when("ChargeMeter4", VACCINATOR, VACCINATOR_WHEN),
     when(
         "HudItemEffectMeter",
         ShowsFor::Weapon("meter"),
@@ -413,11 +435,28 @@ const HUD_ONLY_TOGGLED: [CodeToggled; 12] = [
         ShowsFor::Class("Engineer"),
         "Shows when you aim at a building you can move",
     ),
+    // The match HUD's frame around the KOTH clocks: the code shows the round counter, while the
+    // border's own file decides whether it draws.
+    fitted(
+        when("RoundCounter", ShowsFor::Mode("koth"), KOTH_FRAME_WHEN),
+        &[],
+        HideTechnique::OffScreenY,
+        Fit::None,
+    ),
+    CodeToggled {
+        keeps_visible: true,
+        ..when("BGFrame", ShowsFor::Mode("koth"), KOTH_FRAME_WHEN)
+    },
 ];
 
 // The toggles of the HUD parts the game keeps around the win panel at round end: health, ammo,
 // the round timer or KOTH clocks, and chat.
-const ROUND_END_TOGGLED: [CodeToggled; 43] = [
+const ROUND_END_TOGGLED: [CodeToggled; 44] = [
+    when(
+        "HudWeaponAmmo",
+        ShowsFor::Weapon("ammo"),
+        "Shows when your weapon uses ammo",
+    ),
     when("AmmoInClip", CLIP, CLIP_WHEN),
     when("AmmoInClipShadow", CLIP, CLIP_WHEN),
     when("AmmoInReserve", CLIP, CLIP_WHEN),
@@ -520,7 +559,9 @@ const ROUND_END_TOGGLED: [CodeToggled; 43] = [
     ),
 ];
 
-static HUD_TOGGLED: [CodeToggled; 55] = joined(HUD_ONLY_TOGGLED, ROUND_END_TOGGLED);
+const KOTH_FRAME_WHEN: &str = "Shows around the timer on King of the Hill maps";
+
+static HUD_TOGGLED: [CodeToggled; 63] = joined(HUD_ONLY_TOGGLED, ROUND_END_TOGGLED);
 
 /// The round timer's children file, which each KOTH team timer loads too.
 const TIME_PANEL: &str = "resource/ui/hudobjectivetimepanel.res";
@@ -543,6 +584,7 @@ static HUD: SceneRule = SceneRule {
         "resource/ui/hudobjectivetimepanel.res",
         "resource/ui/basechat.res",
         "resource/ui/hudobjectivekothtimepanel.res",
+        "resource/ui/hudroundcounter.res",
         // Each weapon's own meter file, in `MeterKind::ALL` order after Plain.
         "resource/ui/huditemeffectmeter_scout.res",
         "resource/ui/huditemeffectmeter_sodapopper.res",

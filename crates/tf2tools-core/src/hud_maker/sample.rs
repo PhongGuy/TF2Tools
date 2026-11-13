@@ -780,6 +780,19 @@ impl SampleSet {
         }
     }
 
+    /// The animation event the game's code runs on the KOTH team timer that holds the clock at
+    /// part path `key`: BLU holds the point in the sample, so its clock is highlighted and RED's
+    /// dimmed (`CTFHudKothTimeStatus::UpdateActiveTeam`). `None` for any other part.
+    pub fn koth_clock_event(key: &str) -> Option<&'static str> {
+        SampleSet::koth_clock(key)?;
+        let blue = key.to_ascii_lowercase().contains("/bluetimer/");
+        Some(if blue {
+            "ActiveTimerHighlight"
+        } else {
+            "ActiveTimerDim"
+        })
+    }
+
     /// The text and colour the game's code sets on the part named `part`, matched ASCII
     /// case-insensitively; only the win panel sample has any.
     pub fn code_label(self, part: &str) -> Option<CodeLabel> {
@@ -929,12 +942,13 @@ impl SampleSet {
         self.fill_in(text, &GameSituation::default())
     }
 
-    /// `text` with each `%name%` filled, the health, ammo, reserve and charge numbers taken
-    /// from situation `s`.
+    /// `text` with each `%name%` filled, the health, max health, ammo, reserve and charge
+    /// numbers taken from situation `s`.
     pub fn fill_in(self, text: &str, s: &GameSituation) -> String {
         let percent = u32::from(s.ammo_percent());
         let numbers = [
             ("health", s.health().to_string()),
+            ("maxhealth", s.max_health_label()),
             ("ammo", (40 * percent / 100).to_string()),
             ("ammoinreserve", (150 * percent / 100).to_string()),
             ("charge", format!("{}%", s.charge())),

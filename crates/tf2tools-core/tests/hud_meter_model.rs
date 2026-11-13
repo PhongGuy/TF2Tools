@@ -109,3 +109,100 @@ fn a_meter_neither_the_hud_nor_the_game_has_is_unreadable_not_a_problem() {
     assert!(!killstreak.part(&PartKey::new(METER)).unwrap().is_readable());
     assert!(killstreak.problems().is_empty());
 }
+
+const PLAIN: &str = "resource/ui/huditemeffectmeter.res";
+const BAR: &str = "HudItemEffectMeter/ItemEffectMeter";
+
+// A plain meter shaped as some HUDs ship it: its own label and bar, no #base, while other
+// meter files #base it.
+const OWN_PLAIN: &str = r##""Resource/UI/HudItemEffectMeter.res"
+{
+  HudItemEffectMeter { xpos c-60 ypos c103 wide 120 tall 8 }
+  ItemEffectMeterLabel { ControlName CExLabel xpos 0 ypos 0 wide 120 tall 8 labelText "#TF_Ball" }
+  ItemEffectMeter { ControlName ContinuousProgressBar xpos 0 ypos 0 wide 120 tall 8 }
+}
+"##;
+
+fn copy_with(files: &[(&str, Option<&str>)]) -> HudModel {
+    HudModel::load(
+        &stock_files_with(files).with_install_folder("myhud"),
+        Platform::Linux,
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_meter_file_other_meters_base_keeps_its_own_controls() {
+    let cleaver = "#base \"huditemeffectmeter.res\"\n\"C\" { HudItemEffectMeter { xpos 1 } }";
+    let spy = "#base \"huditemeffectmeter_demoman.res\"";
+    let m = copy_with(&[
+        (PLAIN, Some(OWN_PLAIN)),
+        ("resource/ui/huditemeffectmeter_cleaver.res", Some(cleaver)),
+        (
+            "resource/ui/huditemeffectmeter_sodapopper.res",
+            Some(cleaver),
+        ),
+        ("resource/ui/huditemeffectmeter_spy.res", Some(spy)),
+        ("resource/ui/huditemeffectmeter_engineer.res", Some(spy)),
+    ]);
+    assert!(
+        has(&m, LABEL) && has(&m, BAR),
+        "the plain meter's own pieces"
+    );
+    assert!(
+        has(&m.with_meter(MeterKind::Sword), COUNT),
+        "the sword's own count"
+    );
+    assert!(
+        has(&m.with_meter(MeterKind::Revolver), COUNT),
+        "a meter reading only a meter file it #bases"
+    );
+}
+
+// The stock Phlogistinator and Thermal Thruster files, each a #base of the plain file.
+const PYRO: &str = "#base \"HudItemEffectMeter.res\"\n\"Resource/UI/HudItemEffectMeter_Pyro.res\" { HudItemEffectMeter { xpos r214 } }";
+const ROCKET_PACK: &str = "#base \"HudItemEffectMeter.res\"\n\"Resource/UI/HudRocketPack.res\" {
+  HudItemEffectMeter { xpos r95 ypos r105 wide 94 tall 45 }
+  ItemEffectMeter { ControlName ContinuousProgressBar xpos 26 ypos 28 wide 22 tall 8 fgcolor White }
+  ItemEffectMeter2 { ControlName ContinuousProgressBar xpos 52 ypos 28 wide 22 tall 8 fgcolor White }
+}";
+
+fn stock_with_bases() -> HudModel {
+    let files = stock_files_with(&[
+        ("resource/ui/huditemeffectmeter_pyro.res", Some(PYRO)),
+        ("resource/ui/hudrocketpack.res", Some(ROCKET_PACK)),
+    ]);
+    HudModel::load(&files, Platform::Linux).unwrap()
+}
+
+#[test]
+fn the_stock_phlogistinator_meter_draws_the_plain_file_it_bases() {
+    let m = stock_with_bases().with_meter(MeterKind::Flamethrower);
+    let label = m
+        .part(&PartKey::new(LABEL))
+        .expect("the plain file's label");
+    assert_eq!(label.value("xpos").unwrap().file(), PLAIN);
+    let root = m.part(&PartKey::new(METER)).unwrap();
+    assert_eq!(
+        root.value("xpos").unwrap().text(),
+        "r214",
+        "its own box wins"
+    );
+}
+
+#[test]
+fn the_meter_bars_draw_full_in_the_white_the_meter_code_sets() {
+    let m = stock_with_bases().with_meter(MeterKind::RocketPack);
+    assert!(has(&m, LABEL), "the label from the plain file");
+    for key in [BAR, "HudItemEffectMeter/ItemEffectMeter2"] {
+        let bar = m.part(&PartKey::new(key)).unwrap();
+        assert_eq!(
+            m.fill_colour(bar),
+            Some(tf2tools_core::Rgba::WHITE),
+            "{key}"
+        );
+    }
+    let sword = stock().with_meter(MeterKind::Sword);
+    let bar = sword.part(&PartKey::new(BAR)).unwrap();
+    assert_eq!(sword.fill_colour(bar), Some(tf2tools_core::Rgba::WHITE));
+}

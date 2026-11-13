@@ -68,7 +68,9 @@ pub(crate) fn hide_technique(part: PartId) -> HideTechnique {
         | PartId::SpectatorTargetId
         | PartId::ItemMeter
         | PartId::RoundTimer
-        | PartId::KothTimer => HideTechnique::OffScreenY,
+        | PartId::KothTimer
+        | PartId::TimerBacking => HideTechnique::OffScreenY,
+        PartId::TimerFrame => HideTechnique::SizeZero,
         PartId::Scoreboard => HideTechnique::SizeZero,
         // ASSUMED, not probed in game: the unclassified hudlayout element's hide.
         PartId::Killfeed | PartId::Chat => HideTechnique::OffScreenX,
@@ -93,7 +95,9 @@ pub(crate) fn unclassified_hide(element: bool) -> HideTechnique {
 /// `["if_match"]` for the timer, `["if_wider"]` for the main menu.
 pub(crate) fn active_conditions(part: PartId) -> &'static [&'static str] {
     match part {
-        PartId::RoundTimer | PartId::KothTimer => &["if_match"],
+        PartId::RoundTimer | PartId::KothTimer | PartId::TimerFrame | PartId::TimerBacking => {
+            &["if_match"]
+        }
         // The main menu previews a wide screen with no holiday running.
         PartId::MainMenu => &["if_wider"],
         PartId::Health

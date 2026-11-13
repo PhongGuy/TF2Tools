@@ -619,6 +619,7 @@ impl HudEditor {
                 Some(class) => s.with_class(class),
                 None => return false,
             },
+            ShowsFor::Weapon("ammo") => s.with_class(TfClass::Soldier),
             ShowsFor::Weapon("no clip") => s.with_weapon(WeaponKind::NoClip),
             ShowsFor::Weapon("clip") => s.with_weapon(WeaponKind::Clip),
             ShowsFor::Weapon("meter") => s.with_switch(SituationSwitch::Meter, true),

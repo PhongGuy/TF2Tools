@@ -249,7 +249,7 @@ struct Stub {
     incomplete: bool,
 }
 
-/// A copy's read-only `#base` documents and each entry file's chain; empty for a stock model.
+/// The read-only `#base` documents and each entry file's chain.
 #[derive(Debug, Default)]
 pub(super) struct BaseChains {
     /// Every file reached from an entry file, by resolver id.
@@ -338,6 +338,13 @@ impl BaseChains {
             }
             !level.is_empty()
         })
+    }
+
+    /// Whether `file`'s blocks are injected into many files rather than declared: a base two or
+    /// more entries merge, unless the game also loads it as a panel's own file, as meter files
+    /// that #base one another are.
+    fn injects(&self, file: &str) -> bool {
+        self.shared.contains(file) && !self.named.contains_key(file)
     }
 
     /// The root blocks merged into `entry`'s root, in load order, with their base ids.
@@ -521,7 +528,7 @@ impl HudModel {
                 Err(HudFilesError::TooLarge { .. }) => None,
                 Err(e) => return Err(e),
             };
-            if copy && let Some(file) = &read {
+            if let Some(file) = &read {
                 entries.push((path.to_owned(), file.bytes().to_vec()));
             }
             let parsed = read.and_then(|file| KvDocument::parse(file.bytes()).ok());
@@ -548,10 +555,12 @@ impl HudModel {
             }
         }
         problems.sort();
-        let bases = match copy {
-            true => BaseChains::load(files, &entries, platform)?,
-            false => BaseChains::default(),
-        };
+        // The game merges each file's #base chain, stock files too (the Phlogistinator's meter
+        // is only a box over the plain file). A stock stub is already its merged tree.
+        if !copy {
+            entries.retain(|(path, _)| docs.contains_key(path));
+        }
+        let bases = BaseChains::load(files, &entries, platform)?;
         // A copy's stub whose bases all vanish merges to nothing, a problem like a missing file.
         let empty: Vec<String> = (docs.iter())
             .filter(|(path, doc)| root_block(doc).is_none() && bases.roots(path).next().is_none())
@@ -659,7 +668,7 @@ impl HudModel {
         files
     }
 
-    /// Files reached through `#base`/`#include` from scene files and the scheme (copies only), sorted.
+    /// Files reached through `#base`/`#include` from scene files and the scheme, sorted.
     pub fn base_files(&self) -> Vec<&str> {
         self.bases.docs.keys().map(String::as_str).collect()
     }
@@ -1708,7 +1717,7 @@ fn build_parts(
             push_controls(
                 &mut parts,
                 children,
-                (children_file, &bases.shared),
+                (children_file, bases),
                 parent,
                 (Some(rule), conditions),
                 reading,
@@ -1784,7 +1793,7 @@ fn add_nested(
         push_controls(
             &mut subtree,
             children,
-            (&parent_file, &bases.shared),
+            (&parent_file, bases),
             (&key, access),
             (rule, conditions),
             reading,
@@ -1829,11 +1838,11 @@ fn own_children<'a>(
 /// they merge in load order; the name is a control when any of its blocks has a `ControlName`.
 /// A control is readable only when its parent is, since its box hangs off the parent's.
 /// `made` names the class of a block the game's code creates; deeper levels get none. A name
-/// whose every block comes from a `shared` base is no control unless `made` knows it.
+/// whose every block a shared base injects is no control unless `made` knows it.
 fn push_controls(
     parts: &mut Vec<Part>,
     blocks: Vec<Located<'_>>,
-    (file, shared): (&str, &BTreeSet<String>),
+    (file, bases): (&str, &BaseChains),
     (parent, access): (&PartKey, Access),
     (rule, conditions): (Option<&PanelRule>, &[&str]),
     reading: Reading,
@@ -1853,7 +1862,7 @@ fn push_controls(
             .filter(|b| b.entry.key().eq_ignore_ascii_case(name))
             .cloned()
             .collect();
-        let injected = located.iter().all(|b| shared.contains(b.file));
+        let injected = located.iter().all(|b| bases.injects(b.file));
         let class = (located.iter())
             .find_map(|b| control_name(b.entry, platform))
             .filter(|_| !injected);
@@ -1877,7 +1886,7 @@ fn push_controls(
         push_controls(
             parts,
             located.iter().flat_map(Located::child_blocks).collect(),
-            (file, shared),
+            (file, bases),
             (&key, access),
             (rule, conditions),
             reading,

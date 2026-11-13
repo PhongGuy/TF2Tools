@@ -7,8 +7,8 @@ use std::collections::{BinaryHeap, HashMap, HashSet};
 use super::animations::atof;
 use super::expr::atoi;
 use super::{
-    AnimCommand, HudAnimations, HudLayout, HudModel, Interp, PartKey, PosExpr, Rect, Rgba,
-    ScreenScale,
+    AnimCommand, HudAnimations, HudLayout, HudModel, Interp, Part, PartKey, PosExpr, Rect, Rgba,
+    SampleSet, Screen, ScreenScale,
 };
 
 /// Most commands one simulation executes, so a zero-delay loop still returns.
@@ -85,16 +85,17 @@ fn gain(x: f32, g: f32) -> f32 {
     }
 }
 
-/// Reaches the end at a third, two thirds and the finish, dipping less each time.
+/// Source's Interpolator_Bounce: starts at the end, falls to the start and back by 0.33,
+/// then dips to 0.5 and 0.8 before settling at the end.
 fn bounce(p: f32) -> f32 {
-    use std::f32::consts::{FRAC_PI_2, PI};
-    let (h1, h2) = (1.0 / 3.0, 2.0 / 3.0);
+    use std::f32::consts::PI;
+    let (h1, h2) = (0.33, 0.67);
     if p < h1 {
-        (FRAC_PI_2 * p / h1).sin()
+        1.0 - (PI * p / h1).sin()
     } else if p < h2 {
-        1.0 - 0.5 * (PI * (p - h1) / (h2 - h1)).sin()
+        0.5 + 0.5 * (1.0 - (PI * (p - h1) / (h2 - h1)).sin())
     } else {
-        1.0 - 0.2 * (PI * (p - h2) / (1.0 - h2)).sin()
+        0.8 + 0.2 * (1.0 - (PI * (p - h2) / (1.0 - h2)).sin())
     }
 }
 
@@ -303,6 +304,20 @@ impl Ord for Queued {
     // Reversed so the heap pops the earliest time first, then the earliest queued.
     fn cmp(&self, other: &Self) -> Ordering {
         (other.time.total_cmp(&self.time)).then(other.order.cmp(&self.order))
+    }
+}
+
+impl HudModel {
+    /// The text colour the game's code leaves on `part` once the HUD's event it runs there
+    /// settles, such as a KOTH clock's highlight; `None` when it runs none or none colours it.
+    pub fn code_text_colour(&self, part: &Part) -> Option<Rgba> {
+        let event = SampleSet::koth_clock_event(part.key().as_str())?;
+        let fired = [Fired::new(event, part.parent().cloned())];
+        // Only colours are read, so no part needs a place.
+        let layout = HudLayout::empty(Screen::new(640, 480));
+        let anims = self.animations();
+        let frame = anims.frame(self, &layout, &fired, anims.length(&fired));
+        frame.get(part.key())?.fg()
     }
 }
 
