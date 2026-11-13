@@ -124,8 +124,11 @@ const OWN_PLAIN: &str = r##""Resource/UI/HudItemEffectMeter.res"
 "##;
 
 fn copy_with(files: &[(&str, Option<&str>)]) -> HudModel {
-    HudModel::load(&stock_files_with(files).with_install_folder("myhud"), Platform::Linux)
-        .unwrap()
+    HudModel::load(
+        &stock_files_with(files).with_install_folder("myhud"),
+        Platform::Linux,
+    )
+    .unwrap()
 }
 
 #[test]
@@ -135,12 +138,21 @@ fn a_meter_file_other_meters_base_keeps_its_own_controls() {
     let m = copy_with(&[
         (PLAIN, Some(OWN_PLAIN)),
         ("resource/ui/huditemeffectmeter_cleaver.res", Some(cleaver)),
-        ("resource/ui/huditemeffectmeter_sodapopper.res", Some(cleaver)),
+        (
+            "resource/ui/huditemeffectmeter_sodapopper.res",
+            Some(cleaver),
+        ),
         ("resource/ui/huditemeffectmeter_spy.res", Some(spy)),
         ("resource/ui/huditemeffectmeter_engineer.res", Some(spy)),
     ]);
-    assert!(has(&m, LABEL) && has(&m, BAR), "the plain meter's own pieces");
-    assert!(has(&m.with_meter(MeterKind::Sword), COUNT), "the sword's own count");
+    assert!(
+        has(&m, LABEL) && has(&m, BAR),
+        "the plain meter's own pieces"
+    );
+    assert!(
+        has(&m.with_meter(MeterKind::Sword), COUNT),
+        "the sword's own count"
+    );
     assert!(
         has(&m.with_meter(MeterKind::Revolver), COUNT),
         "a meter reading only a meter file it #bases"
@@ -166,10 +178,16 @@ fn stock_with_bases() -> HudModel {
 #[test]
 fn the_stock_phlogistinator_meter_draws_the_plain_file_it_bases() {
     let m = stock_with_bases().with_meter(MeterKind::Flamethrower);
-    let label = m.part(&PartKey::new(LABEL)).expect("the plain file's label");
+    let label = m
+        .part(&PartKey::new(LABEL))
+        .expect("the plain file's label");
     assert_eq!(label.value("xpos").unwrap().file(), PLAIN);
     let root = m.part(&PartKey::new(METER)).unwrap();
-    assert_eq!(root.value("xpos").unwrap().text(), "r214", "its own box wins");
+    assert_eq!(
+        root.value("xpos").unwrap().text(),
+        "r214",
+        "its own box wins"
+    );
 }
 
 #[test]
@@ -178,7 +196,11 @@ fn the_meter_bars_draw_full_in_the_white_the_meter_code_sets() {
     assert!(has(&m, LABEL), "the label from the plain file");
     for key in [BAR, "HudItemEffectMeter/ItemEffectMeter2"] {
         let bar = m.part(&PartKey::new(key)).unwrap();
-        assert_eq!(m.fill_colour(bar), Some(tf2tools_core::Rgba::WHITE), "{key}");
+        assert_eq!(
+            m.fill_colour(bar),
+            Some(tf2tools_core::Rgba::WHITE),
+            "{key}"
+        );
     }
     let sword = stock().with_meter(MeterKind::Sword);
     let bar = sword.part(&PartKey::new(BAR)).unwrap();

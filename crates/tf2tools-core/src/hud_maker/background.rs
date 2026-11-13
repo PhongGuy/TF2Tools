@@ -80,10 +80,14 @@ impl HudModel {
 fn is_meter_bar(part: &Part) -> bool {
     let numbered = |name: &str| {
         let lower = name.to_ascii_lowercase();
-        lower.strip_prefix("itemeffectmeter").is_some_and(|n| n.bytes().all(|b| b.is_ascii_digit()))
+        lower
+            .strip_prefix("itemeffectmeter")
+            .is_some_and(|n| n.bytes().all(|b| b.is_ascii_digit()))
     };
     part.owner() == Some(PartId::ItemMeter)
         && !part.is_root()
-        && part.class().is_some_and(|c| c.eq_ignore_ascii_case("ContinuousProgressBar"))
+        && part
+            .class()
+            .is_some_and(|c| c.eq_ignore_ascii_case("ContinuousProgressBar"))
         && numbered(part.name())
 }
