@@ -73,7 +73,10 @@ impl HudMakerPage {
     /// The colour `part`'s text draws in under the view.
     pub fn drawn_colour(&self, part: &PartKey) -> Option<Rgba> {
         let model = self.editor()?.model();
-        Some(self.vision().simulate(model.text_colour(model.part(part)?)))
+        Some(
+            self.vision()
+                .simulate(model.drawn_text_colour(model.part(part)?)),
+        )
     }
 
     /// The simulated images for the loaded HUD under a colour-blind view; until its set lands,

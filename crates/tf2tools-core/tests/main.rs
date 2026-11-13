@@ -93,6 +93,7 @@ mod hud_install_name;
 mod hud_kill_icons;
 mod hud_killfeed;
 mod hud_koth_clocks;
+mod hud_koth_frame;
 mod hud_koth_nested;
 mod hud_koth_rule;
 mod hud_koth_situation;

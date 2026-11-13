@@ -208,6 +208,13 @@ impl HudModel {
             .unwrap_or(Rgba::WHITE)
     }
 
+    /// The colour `part`'s text draws in before any played animation: where the game's code
+    /// runs an event on it in the sample, the colour that event settles on, else `text_colour`.
+    pub fn drawn_text_colour(&self, part: &Part) -> Rgba {
+        self.code_text_colour(part)
+            .unwrap_or_else(|| self.text_colour(part))
+    }
+
     /// Every visible label in `layout` whose text has a contrast under `MIN_CONTRAST` with what
     /// is behind it, both as `vision` sees them; part order.
     ///
@@ -246,7 +253,7 @@ impl HudModel {
                         None => None,
                     };
                 }
-                let text = vision.simulate(self.text_colour(part));
+                let text = vision.simulate(self.drawn_text_colour(part));
                 under.is_some_and(|u| contrast_ratio(mix(text, u), u) < MIN_CONTRAST)
             })
             .map(|(part, _)| part.key().clone())

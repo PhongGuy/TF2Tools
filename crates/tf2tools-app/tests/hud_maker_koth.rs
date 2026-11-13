@@ -3,10 +3,10 @@
 use crate::support;
 
 use gpui_kit::{Entity, TestAppContext};
-use support::maker_page::open_maker;
+use support::maker_page::{ANIMS, open_maker, open_maker_with};
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
-use tf2tools_core::{PartKey, SituationSwitch};
+use tf2tools_core::{PartKey, Rgba, SituationSwitch};
 
 const KOTH_VALUE: &str = "HudKothTimeStatus/BlueTimer/TimePanelValue";
 const ROUND: &str = "HudMatchStatus/ObjectiveStatusTimePanel";
@@ -80,4 +80,43 @@ fn the_koth_clocks_show_a_round_in_progress(cx: &mut TestAppContext) {
     };
     assert_eq!(text(cx, "RedTimer").as_deref(), Some("3:00"));
     assert_eq!(text(cx, "BlueTimer").as_deref(), Some("2:14"));
+}
+
+/// The game's two timer events in their stock shape: the highlight ends bright, the dim fades.
+const TIMER_EVENTS: &str = r#"event ActiveTimerHighlight
+{
+    Animate TimePanelValue FgColor "TanLight" Linear 1.3 0.3
+}
+event ActiveTimerDim
+{
+    Animate TimePanelValue FgColor "142 134 115 255" Linear 0.0 0.4
+}
+"#;
+
+#[gpui_kit::test]
+fn the_koth_clocks_sit_in_the_timer_frame_in_the_timer_events_colours(cx: &mut TestAppContext) {
+    let (_env, s, page) = open_maker_with(cx, &format!("{ANIMS}{TIMER_EVENTS}"));
+    let frame = [
+        "HudMatchStatus/BGFrame",
+        "HudMatchStatus/RoundCounter",
+        "HudMatchStatus/RoundCounter/Background",
+    ];
+    for key in frame {
+        assert!(!shown(cx, &s, key), "{key} off a KOTH map");
+    }
+    support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
+    support::click_id(
+        cx,
+        s.win,
+        ids::hud_maker_situation_switch(SituationSwitch::Koth),
+    );
+    for key in frame {
+        assert!(shown(cx, &s, key), "{key} on a KOTH map");
+    }
+    let drawn = |cx: &mut TestAppContext, timer: &str| {
+        let key = PartKey::new(format!("HudKothTimeStatus/{timer}/TimePanelValue"));
+        cx.update(|cx| page.read(cx).drawn_colour(&key))
+    };
+    assert_eq!(drawn(cx, "BlueTimer"), Some(Rgba::new(235, 226, 202, 255)));
+    assert_eq!(drawn(cx, "RedTimer"), Some(Rgba::new(142, 134, 115, 255)));
 }

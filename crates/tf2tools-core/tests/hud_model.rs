@@ -49,6 +49,9 @@ fn parts_are_code_elements_and_controls_in_table_order() {
             "HudKothTimeStatus/RedTimer",
             "HudKothTimeStatus/RedTimer/TimePanelValue",
             "HudKothTimeStatus/ActiveTimerBG",
+            "HudMatchStatus/BGFrame",
+            "HudMatchStatus/RoundCounter",
+            "HudMatchStatus/RoundCounter/Background",
         ]
     );
     let value = m

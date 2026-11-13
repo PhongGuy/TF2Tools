@@ -190,6 +190,8 @@ pub struct CodeToggled {
     owned: &'static [&'static str],
     hide_as: Option<HideTechnique>,
     fit: Fit,
+    /// The file's `visible` still counts while the code shows the panel.
+    keeps_visible: bool,
 }
 
 /// How the game fits a code-sized bar to the screen, read by the layout.
@@ -250,6 +252,11 @@ impl CodeToggled {
     pub(super) fn fit(&self) -> Fit {
         self.fit
     }
+
+    /// Whether the file's `visible` can still hide the panel where the code shows it.
+    pub(super) fn keeps_visible(&self) -> bool {
+        self.keeps_visible
+    }
 }
 
 /// One scene's files, part rules, code-toggled panels and preview sample.
@@ -284,6 +291,7 @@ const fn toggled(panel: &'static str, shown: bool, shows_when: &'static str) -> 
         owned: &[],
         hide_as: None,
         fit: Fit::None,
+        keeps_visible: false,
     }
 }
 
@@ -312,6 +320,7 @@ const fn when(panel: &'static str, shows_for: ShowsFor, shows_when: &'static str
         owned: &[],
         hide_as: None,
         fit: Fit::None,
+        keeps_visible: false,
     }
 }
 
@@ -365,7 +374,7 @@ const KOTH_TOGGLED: CodeToggled = fitted(
 
 // What the game checks before it shows each HUD part its code toggles; the preview shows the
 // default situation, `ShowsFor::in_default`. These are the parts only the HUD scene draws.
-const HUD_ONLY_TOGGLED: [CodeToggled; 17] = [
+const HUD_ONLY_TOGGLED: [CodeToggled; 19] = [
     when(
         "CMainTargetID",
         ShowsFor::Aim("player"),
@@ -426,6 +435,18 @@ const HUD_ONLY_TOGGLED: [CodeToggled; 17] = [
         ShowsFor::Class("Engineer"),
         "Shows when you aim at a building you can move",
     ),
+    // The match HUD's frame around the KOTH clocks: the code shows the round counter, while the
+    // border's own file decides whether it draws.
+    fitted(
+        when("RoundCounter", ShowsFor::Mode("koth"), KOTH_FRAME_WHEN),
+        &[],
+        HideTechnique::OffScreenY,
+        Fit::None,
+    ),
+    CodeToggled {
+        keeps_visible: true,
+        ..when("BGFrame", ShowsFor::Mode("koth"), KOTH_FRAME_WHEN)
+    },
 ];
 
 // The toggles of the HUD parts the game keeps around the win panel at round end: health, ammo,
@@ -538,7 +559,9 @@ const ROUND_END_TOGGLED: [CodeToggled; 44] = [
     ),
 ];
 
-static HUD_TOGGLED: [CodeToggled; 61] = joined(HUD_ONLY_TOGGLED, ROUND_END_TOGGLED);
+const KOTH_FRAME_WHEN: &str = "Shows around the timer on King of the Hill maps";
+
+static HUD_TOGGLED: [CodeToggled; 63] = joined(HUD_ONLY_TOGGLED, ROUND_END_TOGGLED);
 
 /// The round timer's children file, which each KOTH team timer loads too.
 const TIME_PANEL: &str = "resource/ui/hudobjectivetimepanel.res";
@@ -561,6 +584,7 @@ static HUD: SceneRule = SceneRule {
         "resource/ui/hudobjectivetimepanel.res",
         "resource/ui/basechat.res",
         "resource/ui/hudobjectivekothtimepanel.res",
+        "resource/ui/hudroundcounter.res",
         // Each weapon's own meter file, in `MeterKind::ALL` order after Plain.
         "resource/ui/huditemeffectmeter_scout.res",
         "resource/ui/huditemeffectmeter_sodapopper.res",

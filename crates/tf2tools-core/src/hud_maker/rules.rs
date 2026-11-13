@@ -32,6 +32,10 @@ pub enum PartId {
     Chat,
     /// The two team timers on King of the Hill maps.
     KothTimer,
+    /// The match HUD's border around the timer, BGFrame.
+    TimerFrame,
+    /// The match HUD's round counter, which holds the backing behind the timer.
+    TimerBacking,
     /// The scoreboard's root panel.
     Scoreboard,
     /// The main menu's root panel.
@@ -194,7 +198,7 @@ pub struct PanelRule {
 }
 
 // The survey's PanelRules table, in `PartId` order so `get` can index by discriminant.
-pub(super) static RULES: [PanelRule; 12] = [
+pub(super) static RULES: [PanelRule; 14] = [
     HEALTH,
     PanelRule {
         id: PartId::ClassPortrait,
@@ -291,7 +295,42 @@ pub(super) static RULES: [PanelRule; 12] = [
     KILLFEED,
     CHAT,
     KOTH_TIMER,
+    // The match HUD frames the timer: a border, then the round counter, whose own file holds
+    // the picture or panels behind the clocks. The game draws the counter's file over its block.
+    PanelRule {
+        id: PartId::TimerFrame,
+        label: "Timer frame",
+        shows_when: "Shows around the timer on King of the Hill maps",
+        panel: "BGFrame",
+        parent: Some("HudMatchStatus"),
+        geometry: &[],
+        children_file: MATCH_STATUS,
+        ignores: &[],
+        centres_x: false,
+        centres_y: false,
+        children: false,
+        clickable: true,
+        fills_screen: false,
+    },
+    PanelRule {
+        id: PartId::TimerBacking,
+        label: "Timer backing",
+        shows_when: "Shows behind the timer on King of the Hill maps",
+        panel: "RoundCounter",
+        parent: Some("HudMatchStatus"),
+        geometry: &[(MATCH_STATUS, "RoundCounter")],
+        children_file: "resource/ui/hudroundcounter.res",
+        ignores: &["visible"],
+        centres_x: false,
+        centres_y: false,
+        children: true,
+        clickable: true,
+        fills_screen: false,
+    },
 ];
+
+/// The match HUD's file, which holds the round timer and the frame around it.
+const MATCH_STATUS: &str = "resource/ui/hudmatchstatus.res";
 
 // The health cross hangs in hudlayout's HudPlayerStatus container; its own file gives its box.
 const HEALTH: PanelRule = PanelRule {
@@ -570,7 +609,9 @@ impl PanelRule {
             | PartId::RoundTimer
             | PartId::Killfeed
             | PartId::Chat
-            | PartId::KothTimer => &RULES[id as usize],
+            | PartId::KothTimer
+            | PartId::TimerFrame
+            | PartId::TimerBacking => &RULES[id as usize],
         }
     }
 

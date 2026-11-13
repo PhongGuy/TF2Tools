@@ -1865,8 +1865,10 @@ fn label_element(
                 played(look, part)
                     .and_then(Animated::fg)
                     .unwrap_or_else(|| {
-                        (look.sample.code_label(part.name()))
-                            .map_or_else(|| look.model.text_colour(part), |label| label.colour())
+                        (look.sample.code_label(part.name())).map_or_else(
+                            || look.model.drawn_text_colour(part),
+                            |label| label.colour(),
+                        )
                     }),
             ),
         );
