@@ -43,7 +43,7 @@ pub use addon_sections::AddonSection;
 pub use cards::{StoreCard, StoreCursor, StoreQuery, StoreSort};
 pub use download::{DownloadPhase, DownloadProgress};
 pub use gb_addon_download::GbAddonDownload;
-pub use gb_map_cards::{GbMapCard, GbMapCursor, GbMapLibrary, GbMapQuery, GbMapSort};
+pub use gb_map_cards::{GbMapCard, GbMapCursor, GbMapLibrary, GbMapQuery, GbMapShow, GbMapSort};
 pub use gb_map_download::GbMapDownload;
 pub use gb_maps::GbMapGamemode;
 use http::{API_BODY_LIMIT, Http, NetFailure, Redirects, Timeouts};

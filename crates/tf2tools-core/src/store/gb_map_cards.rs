@@ -19,9 +19,19 @@ pub enum GbMapSort {
     Newest,
 }
 
+/// Which maps a page lists.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum GbMapShow {
+    /// Every map in the synced catalogue.
+    All,
+    /// The library's maps: catalogue rows in the chosen sort, then rows the catalogue no
+    /// longer lists, newest id first.
+    Installed,
+}
+
 /// Where the next page starts; valid only for the query of the page it came from.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
 pub struct GbMapCursor {
     group: i64,
     key: i64,
@@ -32,6 +42,8 @@ pub struct GbMapCursor {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct GbMapQuery {
+    /// Which maps to list.
+    pub show: GbMapShow,
     /// The order of the cards.
     pub sort: GbMapSort,
     /// The gamemode (a first-level category id) to keep; `None` shows every map.
@@ -39,7 +51,7 @@ pub struct GbMapQuery {
     /// Text matched literally and ASCII case-insensitively against name or author; blank
     /// means no filter.
     pub search: Option<String>,
-    /// Show maps GameBanana rates mature.
+    /// Show maps GameBanana rates mature; the Installed view always shows them.
     pub mature: bool,
     /// Continue after this card; `None` reads the first page.
     pub after: Option<GbMapCursor>,
@@ -48,9 +60,11 @@ pub struct GbMapQuery {
 }
 
 impl GbMapQuery {
-    /// The first page of `limit` cards in `sort` order, unfiltered, mature maps hidden.
+    /// The first page of `limit` catalogue cards in `sort` order, unfiltered, mature maps
+    /// hidden.
     pub fn new(sort: GbMapSort, limit: u32) -> Self {
         Self {
+            show: GbMapShow::All,
             sort,
             gamemode: None,
             search: None,
@@ -60,7 +74,14 @@ impl GbMapQuery {
         }
     }
 
-    /// Keep only maps of `gamemode`, or every map with `None`.
+    /// List every map or only the library's.
+    pub fn with_show(mut self, show: GbMapShow) -> Self {
+        self.show = show;
+        self
+    }
+
+    /// Keep only maps of `gamemode`, or every map with `None`; a gamemode hides library maps
+    /// the catalogue no longer lists.
     pub fn with_gamemode(mut self, gamemode: Option<u32>) -> Self {
         self.gamemode = gamemode;
         self
@@ -112,10 +133,14 @@ pub struct GbMapCard {
 }
 
 impl StoreClient {
-    /// One page of the synced maps catalogue, read through the reader connection. Blocking.
+    /// One page of the synced maps catalogue or of the library's maps, read through the
+    /// reader connection. Blocking.
     pub fn gb_map_cards(&self, q: &GbMapQuery) -> Result<Vec<GbMapCard>, QueryError> {
-        let (sql, params) = catalogue_sql(q);
-        let sort = q.sort;
+        // Both queries share one column layout: 11 is the cursor key, 15 its group.
+        let (sql, params) = match q.show {
+            GbMapShow::All => catalogue_sql(q),
+            GbMapShow::Installed => installed_sql(q),
+        };
         self.db
             .read(|conn| {
                 let mut stmt = conn.prepare(&sql)?;
@@ -126,10 +151,7 @@ impl StoreClient {
                     };
                     let date_added: i64 = r.get(5)?;
                     let profile_url: String = r.get(10)?;
-                    let key = match sort {
-                        GbMapSort::MostDownloaded => r.get(11)?,
-                        GbMapSort::Newest => date_added,
-                    };
+                    let group: i64 = r.get(15)?;
                     let library = match r.get::<_, Option<bool>>(12)? {
                         Some(installed) => Some(GbMapLibrary {
                             installed,
@@ -159,10 +181,10 @@ impl StoreClient {
                             },
                         },
                         library,
-                        in_catalogue: true,
+                        in_catalogue: group == 0,
                         cursor: GbMapCursor {
-                            group: 0,
-                            key,
+                            group,
+                            key: r.get(11)?,
                             gb_id: raw_id,
                         },
                     }))
@@ -194,7 +216,7 @@ fn catalogue_sql(q: &GbMapQuery) -> (String, Vec<Value>) {
     }
     // Rank ascends while the id tiebreak descends, so its keyset cannot be one row-value
     // comparison; the split form still seeks the rank index.
-    let order = match q.sort {
+    let (key, order) = match q.sort {
         GbMapSort::MostDownloaded => {
             if let Some(after) = &q.after {
                 filters.push(
@@ -204,7 +226,7 @@ fn catalogue_sql(q: &GbMapQuery) -> (String, Vec<Value>) {
                 params.push(Value::Integer(after.key));
                 params.push(Value::Integer(after.gb_id));
             }
-            "m.download_rank, m.gb_id DESC"
+            ("m.download_rank", "m.download_rank, m.gb_id DESC")
         }
         GbMapSort::Newest => {
             if let Some(after) = &q.after {
@@ -212,7 +234,7 @@ fn catalogue_sql(q: &GbMapQuery) -> (String, Vec<Value>) {
                 params.push(Value::Integer(after.key));
                 params.push(Value::Integer(after.gb_id));
             }
-            "m.date_added DESC, m.gb_id DESC"
+            ("m.date_added", "m.date_added DESC, m.gb_id DESC")
         }
     };
     let clause = where_clause(&filters);
@@ -221,10 +243,58 @@ fn catalogue_sql(q: &GbMapQuery) -> (String, Vec<Value>) {
     let sql = format!(
         "SELECT m.gb_id, m.name, m.author, m.thumbnail_url, m.like_count, m.date_added,
                 m.category_id, m.category_name, m.obsolete, m.mature, m.profile_url,
-                m.download_rank, l.installed, l.latest_file_date > l.file_date, l.gone
+                {key}, l.installed, l.latest_file_date > l.file_date, l.gone, 0
          FROM store_gb_maps m{scan}
          LEFT JOIN library_gb_addons l ON l.gb_id = m.gb_id AND l.section = 'maps'{clause}
          ORDER BY {order} LIMIT ?"
+    );
+    (sql, params)
+}
+
+/// The Installed page query: library map rows with their catalogue columns when listed.
+/// Listed rows (group 0) come first in the sort; the rest (group 1) follow by id. The
+/// library is small, so this sorts rather than walking an index.
+fn installed_sql(q: &GbMapQuery) -> (String, Vec<Value>) {
+    let key = match q.sort {
+        GbMapSort::MostDownloaded => "m.download_rank",
+        GbMapSort::Newest => "-m.date_added",
+    };
+    let mut inner = vec!["l.section = 'maps'".to_owned()];
+    let mut params = Vec::new();
+    if let Some(gamemode) = q.gamemode {
+        inner.push("m.gamemode_id = ?".to_owned());
+        params.push(Value::Integer(i64::from(gamemode)));
+    }
+    let mut outer = Vec::new();
+    if let Some(text) = q.search.as_deref().filter(|t| !t.trim().is_empty()) {
+        let pattern = like_pattern(text);
+        outer.push("(name LIKE ? ESCAPE '\\' OR author LIKE ? ESCAPE '\\')".to_owned());
+        params.push(Value::Text(pattern.clone()));
+        params.push(Value::Text(pattern));
+    }
+    if let Some(after) = &q.after {
+        outer.push("(grp, k, -gb_id) > (?, ?, ?)".to_owned());
+        params.push(Value::Integer(after.group));
+        params.push(Value::Integer(after.key));
+        params.push(Value::Integer(after.gb_id.saturating_neg()));
+    }
+    let (inner, outer) = (where_clause(&inner), where_clause(&outer));
+    params.push(Value::Integer(i64::from(q.limit)));
+    let sql = format!(
+        "SELECT gb_id, name, author, thumbnail_url, like_count, date_added, category_id,
+                category_name, obsolete, mature, profile_url, k, installed, has_update, gone, grp
+         FROM (SELECT l.gb_id, COALESCE(m.name, l.name) AS name,
+                      COALESCE(m.author, l.author) AS author, m.thumbnail_url,
+                      COALESCE(m.like_count, 0) AS like_count,
+                      COALESCE(m.date_added, 0) AS date_added, m.category_id, m.category_name,
+                      COALESCE(m.obsolete, 0) AS obsolete, COALESCE(m.mature, 0) AS mature,
+                      COALESCE(m.profile_url, '') AS profile_url,
+                      COALESCE({key}, 0) AS k, l.installed,
+                      l.latest_file_date > l.file_date AS has_update, l.gone,
+                      m.gb_id IS NULL AS grp
+               FROM library_gb_addons l LEFT JOIN store_gb_maps m ON m.gb_id = l.gb_id{inner})
+         {outer}
+         ORDER BY grp, k, gb_id DESC LIMIT ?"
     );
     (sql, params)
 }

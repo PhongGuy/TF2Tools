@@ -3,7 +3,7 @@
 use crate::common;
 
 use common::{StoreEnv, sql, store_env};
-use tf2tools_core::{GbId, GbMapCard, GbMapQuery, GbMapSort};
+use tf2tools_core::{GbId, GbMapCard, GbMapQuery, GbMapShow, GbMapSort};
 
 const MD: GbMapSort = GbMapSort::MostDownloaded;
 
@@ -148,4 +148,36 @@ async fn a_card_carries_the_catalogue_columns_and_its_library_row() {
     assert!(koth.card.obsolete);
     assert!(!koth.library.as_ref().unwrap().installed);
     assert!(card(&env, &q, 10).library.is_none());
+}
+
+#[tokio::test]
+async fn installed_lists_library_maps_then_rows_gone_from_the_catalogue() {
+    let env = store_env().await;
+    seed(&env);
+    let installed = GbMapQuery::new(MD, 2).with_show(GbMapShow::Installed);
+    assert_eq!(
+        pages(&env, installed.clone()),
+        vec![vec![11, 12], vec![99], vec![]]
+    );
+    let gone = card(
+        &env,
+        &GbMapQuery::new(MD, 60).with_show(GbMapShow::Installed),
+        99,
+    );
+    assert!(!gone.in_catalogue);
+    assert_eq!(
+        (gone.card.name.as_str(), gone.card.author.as_str()),
+        ("gone_map", "old")
+    );
+    assert_eq!(gone.card.profile_url, "https://gamebanana.com/mods/99");
+    assert!(gone.library.as_ref().unwrap().gone);
+    let newest = GbMapQuery::new(GbMapSort::Newest, 60).with_show(GbMapShow::Installed);
+    assert_eq!(
+        pages(
+            &env,
+            GbMapQuery::new(GbMapSort::Newest, 1).with_show(GbMapShow::Installed)
+        ),
+        vec![vec![11], vec![12], vec![99], vec![]]
+    );
+    assert_eq!(read(&env, &newest.with_gamemode(Some(5383))), [11]);
 }
