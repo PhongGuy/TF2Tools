@@ -9,7 +9,8 @@ use super::gb_addons::{
 use super::hud_lowercase::{LOWERCASE_INSTALLS, lowercase_tree};
 use super::tree_copy::copy_tree;
 use super::{
-    GameMissing, GbId, IoFailure, Library, create_dir_all, game_custom_dir, io_at, library_db,
+    GameMissing, GbId, IoFailure, Library, create_dir_all, game_custom_dir, io_at, is_plain_name,
+    library_db,
 };
 use crate::error::{GbAddonInstallError, GbMapInstallError, LibraryError};
 use crate::map_payloads::MapPayload;
@@ -89,6 +90,7 @@ impl Library {
             return Err(GbMapInstallError::UnknownMap { name: name.clone() });
         }
         let custom = game_custom_dir(tf2)?;
+        recover_aside(&custom)?;
         let gb_id = download.gb_id;
 
         // One scan of the game serves every chosen map; the item's own folder is skipped so
@@ -190,6 +192,20 @@ impl Library {
             .map_err(map_error)?;
         Ok(entry)
     }
+}
+
+/// Puts back each folder an interrupted swap left in the staging dir's `old/` whose place in
+/// `custom` is empty, so the scan sees it and the staging clear never deletes the only copy.
+fn recover_aside(custom: &Path) -> Result<(), IoFailure> {
+    let old = custom.join(MAP_STAGING_DIR).join("old");
+    for entry in std::fs::read_dir(&old).into_iter().flatten().flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let home = custom.join(&name);
+        if is_plain_name(&name) && !name.contains(':') && home.symlink_metadata().is_err() {
+            std::fs::rename(entry.path(), &home).map_err(io_at(&home))?;
+        }
+    }
+    Ok(())
 }
 
 /// Renames the folder at `target`, if any, aside to `aside`, then `fresh` in at `target`.

@@ -351,3 +351,35 @@ async fn an_update_installs_even_when_the_old_folder_cannot_be_fully_deleted() {
         .collect();
     assert_eq!(installed, ["tf2tools-gb-7-x/maps/cp_x_rc3.bsp"]);
 }
+
+#[tokio::test]
+async fn a_map_folder_left_aside_by_an_interrupted_update_is_put_back() {
+    let s = setup().await;
+    let d = download(&s, 7, "X", &[("maps/cp_x.bsp", &bsp(b"x"))], 100).await;
+    s.env
+        .lib
+        .install_gb_map(d, &chosen(&["cp_x"]), &s.tf2, &no)
+        .unwrap();
+    // A crash between the two renames of a swap leaves the old folder only in staging.
+    let custom_dir = s.tf2.custom_dir();
+    let aside = custom_dir.join(".tf2tools-map-staging/old");
+    std::fs::create_dir_all(&aside).unwrap();
+    std::fs::rename(
+        custom_dir.join("tf2tools-gb-7-x"),
+        aside.join("tf2tools-gb-7-x"),
+    )
+    .unwrap();
+
+    let d = download(&s, 8, "Y", &[("maps/cp_y.bsp", &bsp(b"y"))], 100).await;
+    s.env
+        .lib
+        .install_gb_map(d, &chosen(&["cp_y"]), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(
+        custom(&s),
+        [
+            "tf2tools-gb-7-x/maps/cp_x.bsp",
+            "tf2tools-gb-8-y/maps/cp_y.bsp",
+        ]
+    );
+}
