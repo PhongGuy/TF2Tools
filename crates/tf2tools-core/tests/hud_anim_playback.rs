@@ -36,6 +36,20 @@ fn curves_shape_progress_like_the_engine() {
 }
 
 #[test]
+fn bounce_follows_the_engine_s_interpolator() {
+    // Source's Interpolator_Bounce: hits at 0.33 and 0.67, starting at the end value.
+    let close = |a: f32, b: f32| (a - b).abs() < 1e-3;
+    let b = |p: f32| Interp::Bounce.at(p, 0);
+    assert!(close(b(0.0), 1.0), "starts at the end value, got {}", b(0.0));
+    assert!(close(b(0.165), 0.0), "first dip reaches the start, got {}", b(0.165));
+    assert!(close(b(0.0825), 1.0 - (std::f32::consts::PI * 0.25).sin()));
+    assert!(close(b(0.33), 1.0), "back at the end, got {}", b(0.33));
+    assert!(close(b(0.5), 0.5), "second dip, got {}", b(0.5));
+    assert!(close(b(0.835), 0.8), "third dip, got {}", b(0.835));
+    assert!(close(b(1.0), 1.0));
+}
+
+#[test]
 fn a_colour_pulse_blends_from_the_part_s_colour() {
     let model = anim_model(&[]);
     let layout = model.layout(HD);
