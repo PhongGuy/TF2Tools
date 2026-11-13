@@ -188,8 +188,14 @@ pub(crate) async fn sync(
 /// Reads the two-level tree under the maps root and stores it in one transaction; a failed
 /// call leaves the old tree in place.
 async fn refresh_categories(client: &StoreClient) -> Result<(), SyncError> {
+    // An empty root is a GameBanana hiccup, not a map section without gamemodes.
+    let modes = fetch_categories(client, MAPS_CATEGORY).await?;
+    if modes.is_empty() {
+        tracing::warn!("GameBanana listed no map gamemodes; the stored tree is kept");
+        return Ok(());
+    }
     let mut tree = Vec::new();
-    for mode in fetch_categories(client, MAPS_CATEGORY).await? {
+    for mode in modes {
         let children = if mode.children > 0 {
             fetch_categories(client, mode.id).await?
         } else {

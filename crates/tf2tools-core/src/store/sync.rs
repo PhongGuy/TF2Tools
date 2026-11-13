@@ -171,9 +171,8 @@ pub(crate) async fn run(
                 start,
                 mut fetched,
             },
-        resumed,
+        resumed: _,
     } = start;
-    tracing::debug!(key = walk.key, page, resumed, "store sync walking");
 
     let mut total = 0;
     let mut distinct = 0;

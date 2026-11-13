@@ -302,3 +302,37 @@ async fn a_failed_category_call_fails_before_any_page_and_keeps_the_old_tree() {
     assert_eq!(ids(&env), [1]);
     assert_eq!(meta(&env.dir, "gb_maps_last_synced"), None);
 }
+
+#[tokio::test]
+async fn an_empty_root_category_reply_keeps_the_stored_tree() {
+    let env = store_env().await;
+    sql(&env.dir)
+        .execute_batch("INSERT INTO store_gb_map_categories VALUES (5373, 'Control Points', 5373);")
+        .unwrap();
+    mount_categories(&env, 5371, &[]).await;
+    mount_page(&env, 1, page(vec![record(7, Some(5373))], 1, true)).await;
+    sync(&client(&env, 500), false).await.unwrap();
+    assert_eq!(count(&env.dir, "store_gb_map_categories"), 1);
+    let mode: Option<i64> = sql(&env.dir)
+        .query_row(
+            "SELECT gamemode_id FROM store_gb_maps WHERE gb_id = 7",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(mode, Some(5373));
+}
+
+#[tokio::test]
+async fn last_page_walks_without_a_record_count_never_prune() {
+    let env = store_env().await;
+    seed_stale(&env, 1, &hours_ago(3));
+    for force in [false, true] {
+        env.server.reset().await;
+        mount_tree(&env).await;
+        mount_page(&env, 1, page(vec![record(7, None)], 0, true)).await;
+        sync(&client(&env, 500), force).await.unwrap();
+        assert_eq!(meta(&env.dir, "gb_maps_listing_end_start"), None);
+    }
+    assert_eq!(ids(&env), [1, 7]);
+}
