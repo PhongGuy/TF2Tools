@@ -57,6 +57,18 @@ impl GbAddonOffer {
         }
     }
 
+    /// A map's offer puts a missing folder before an update, since `update_gb_map` never
+    /// runs on a missing folder: Install with no entry, Install again when out of TF2,
+    /// Update when newer and still on GameBanana, Installed otherwise.
+    pub fn of_map(entry: Option<&GbAddonEntry>) -> Self {
+        match entry {
+            None => Self::Install,
+            Some(e) if !e.is_installed() => Self::InstallAgain,
+            Some(e) if e.has_update() && !e.is_gone() => Self::Update,
+            Some(_) => Self::Installed,
+        }
+    }
+
     /// The control's label.
     pub fn label(self) -> &'static str {
         match self {
@@ -923,4 +935,11 @@ pub fn install_blocker(store: &StoreClient, profile: &AddonProfile) -> Option<St
     store
         .gb_addon_refusal(profile)
         .map(|err| describe_gb_fetch(&err).message)
+}
+
+/// `install_blocker` for a map: core's refusals judged against the map size cap.
+pub fn map_install_blocker(store: &StoreClient, profile: &AddonProfile) -> Option<String> {
+    store
+        .gb_map_refusal(profile)
+        .map(|err| describe_gb_map_fetch(&err).message)
 }

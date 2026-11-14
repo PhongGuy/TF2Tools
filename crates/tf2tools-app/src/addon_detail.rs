@@ -16,13 +16,14 @@ use gpui_kit::{
 use tf2tools_core::{AddonCard, AddonFile, AddonProfile, AddonSection, BrowseError, DownloadPhase};
 
 use crate::gb_addon_installs::{
-    GbAddonInstalls, GbAddonOffer as Offer, GbAddonStage, install_blocker,
+    GbAddonInstalls, GbAddonOffer as Offer, GbAddonStage, install_blocker, map_install_blocker,
 };
 use crate::ids;
 use crate::links::gamebanana_page;
 use crate::pages::addon_store::model::downloads_label;
 use crate::pages::common::{badge_of, needs_tf2};
 use crate::services::{Services, tf2_state};
+use crate::shell::confirm::{Confirm, confirm};
 use crate::store_download::{Progress, format_bytes, progress_label, progress_percent};
 use crate::store_messages::{addon_stopped, describe_browse};
 use crate::tokio_bridge;
@@ -128,14 +129,29 @@ impl AddonDetail {
         cx.notify();
     }
 
+    fn is_map(&self) -> bool {
+        self.section == AddonSection::MAPS
+    }
+
+    // A map puts a missing folder before an update; add-ons keep their own order.
+    fn offer(&self, cx: &App) -> Offer {
+        let entry = self.installs.read(cx).entry(self.card.id);
+        if self.is_map() {
+            Offer::of_map(entry)
+        } else {
+            Offer::of(entry)
+        }
+    }
+
     // Starts what the control offers; GbAddonInstalls refuses it while another operation runs.
     // Only a first install needs the read profile; the rest work from the library entry.
     fn act(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let ready = self.ready().cloned();
         let (section, id) = (self.section, self.card.id);
+        let offer = self.offer(cx);
         let win = window.window_handle();
         self.installs.update(cx, |installs, cx| {
-            match Offer::of(installs.entry(id)) {
+            match offer {
                 Offer::Install => {
                     ready.is_some_and(|profile| installs.install(section, profile, win, cx))
                 }
@@ -150,19 +166,21 @@ impl AddonDetail {
     // what the library holds; or, once the profile is read, why a download can't happen.
     // A first install waits for the profile, which it downloads from.
     fn install_control(&self, cx: &mut Context<Self>) -> (Option<Button>, Option<AnyElement>) {
-        // Maps are browse-only until map installing exists, so their detail has no control.
-        if self.section == AddonSection::MAPS {
-            return (None, None);
-        }
         let ready = self.ready();
+        let offer = self.offer(cx);
         let installs = self.installs.read(cx);
-        let offer = Offer::of(installs.entry(self.card.id));
         let stage = installs.stage(self.card.id);
         let busy = installs.is_busy();
         let store = &cx.global::<Services>().store;
         if stage.is_none()
             && offer.downloads()
-            && let Some(reason) = ready.and_then(|profile| install_blocker(store, profile))
+            && let Some(reason) = ready.and_then(|profile| {
+                if self.is_map() {
+                    map_install_blocker(store, profile)
+                } else {
+                    install_blocker(store, profile)
+                }
+            })
         {
             let line = labelled(
                 div().text_sm().text_color(cx.theme().muted_foreground),
@@ -190,6 +208,67 @@ impl AddonDetail {
         };
         let has_tf2 = tf2_state(cx).read(cx).install().is_some();
         (Some(needs_tf2(button, has_tf2)), None)
+    }
+
+    // A map's Remove, once the library records it; core refuses it while TF2 runs.
+    fn remove_control(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let installs = self.installs.read(cx);
+        if !self.is_map() || installs.entry(self.card.id).is_none() {
+            return None;
+        }
+        let button = Button::new(ids::ADDON_DETAIL_REMOVE)
+            .outline()
+            .icon(IconName::Trash)
+            .label("Remove")
+            .disabled(installs.is_busy())
+            .on_click(cx.listener(|this, _, window, cx| this.remove(window, cx)));
+        let has_tf2 = tf2_state(cx).read(cx).install().is_some();
+        Some(needs_tf2(button, has_tf2).into_any_element())
+    }
+
+    // Asks first, then hands the removal to the installs, which toast the outcome.
+    fn remove(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let id = self.card.id;
+        let Some(name) = self
+            .installs
+            .read(cx)
+            .entry(id)
+            .map(|e| e.name().to_owned())
+        else {
+            return;
+        };
+        let installs = self.installs.clone();
+        let win = window.window_handle();
+        let answer = confirm(Confirm::remove_gb_map(&name), window, cx);
+        cx.spawn(async move |_, cx| {
+            if answer.recv().await.unwrap_or(false) {
+                cx.update(|cx| installs.update(cx, |i, cx| i.remove(id, win, cx)));
+            }
+        })
+        .detach();
+    }
+
+    // The maps an installed map item put into TF2, one row each.
+    fn installed_maps(&self, cx: &App) -> Option<AnyElement> {
+        let entry = self.installs.read(cx).entry(self.card.id)?;
+        if !self.is_map() || !entry.is_installed() {
+            return None;
+        }
+        let rows =
+            entry.payloads().iter().enumerate().map(|(i, name)| {
+                labelled(div().text_sm(), ids::addon_detail_map(i), map_line(name))
+            });
+        Some(
+            v_flex()
+                .gap_1()
+                .child(labelled(
+                    div().text_sm().font_weight(FontWeight::SEMIBOLD),
+                    ids::ADDON_DETAIL_MAPS,
+                    "Installed maps",
+                ))
+                .children(rows)
+                .into_any_element(),
+        )
     }
 
     // The download's text and bar while this item downloads.
@@ -340,6 +419,15 @@ fn file_line(name: &str, size: Option<u64>, date_added: i64) -> String {
         .join(" · ")
 }
 
+// An installed map's row; TF2's Create Server leaves out a map whose name has a dot.
+fn map_line(name: &str) -> String {
+    if name.contains('.') {
+        format!("{name} (not listed in Create Server; type map {name} in the console)")
+    } else {
+        name.to_owned()
+    }
+}
+
 fn file_text(file: &AddonFile) -> String {
     file_line(file.name(), file.size(), file.date_added())
 }
@@ -405,6 +493,7 @@ impl Render for AddonDetail {
             ProfileState::Ready(profile) => self.ready_body(profile, cx),
         };
         let (control, blocked) = self.install_control(cx);
+        let remove = self.remove_control(cx);
         let scrolled = v_flex()
             .id(ids::ADDON_DETAIL_BODY)
             .test_support()
@@ -459,6 +548,7 @@ impl Render for AddonDetail {
                             .flex_none()
                             .gap_2()
                             .children(control)
+                            .children(remove)
                             .child(link_button(
                                 "gamebanana",
                                 "Open on GameBanana",
@@ -469,6 +559,7 @@ impl Render for AddonDetail {
             .children(blocked)
             // Pinned under the header so a scrolled body never hides the download.
             .children(self.progress(cx))
+            .children(self.installed_maps(cx))
             .child(scroll_beside(ids::ADDON_DETAIL_SCROLLBAR, &self.scroll, scrolled).min_h_0())
     }
 }
@@ -510,5 +601,14 @@ mod tests {
         assert_eq!(file_line("a.zip", None, 86_400), "a.zip · 1970-01-02");
         assert_eq!(file_line("a.zip", Some(2048), 0), format!("a.zip · {size}"));
         assert_eq!(file_line("a.zip", None, 0), "a.zip");
+    }
+
+    #[test]
+    fn a_dotted_map_name_says_create_server_does_not_list_it() {
+        assert_eq!(super::map_line("cp_alpha"), "cp_alpha");
+        assert_eq!(
+            super::map_line("ctf_2fort.v2"),
+            "ctf_2fort.v2 (not listed in Create Server; type map ctf_2fort.v2 in the console)"
+        );
     }
 }

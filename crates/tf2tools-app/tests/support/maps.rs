@@ -8,10 +8,12 @@ use tf2tools_app::ids;
 use tf2tools_app::maps_sync::{MapsRunner, MapsSync};
 use tf2tools_app::pages::maps::gb_tab::GbMapsTab;
 use tf2tools_app::pages::maps::{MapListSource, MapsPage};
+use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::sync::{ProgressSink, SyncSummary};
 use tf2tools_app::sync_messages::{SyncFailure, sync_stopped};
+use tf2tools_core::Tf2Install;
 
 /// One maps sync the fake runner was asked for; the test reports progress and ends it.
 pub struct FakeMapsRun {
@@ -74,6 +76,27 @@ pub fn maps_shell(
     env: &super::Env,
     server: &super::StoreServer,
 ) -> super::ShellWindow {
+    maps_shell_in(cx, env, server, Tf2State::Missing { saved: None })
+}
+
+/// `maps_shell` with TF2 found at the env's game and not running, so maps install.
+pub fn maps_shell_found(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    server: &super::StoreServer,
+) -> super::ShellWindow {
+    let state = Tf2State::Found(Tf2Install::from_path(&env.game).unwrap());
+    let s = maps_shell_in(cx, env, server, state);
+    cx.update(|cx| Tf2Probe::install(cx, || false));
+    s
+}
+
+fn maps_shell_in(
+    cx: &mut TestAppContext,
+    env: &super::Env,
+    server: &super::StoreServer,
+    state: Tf2State,
+) -> super::ShellWindow {
     cx.executor().allow_parking();
     server.mount_bytes("/serveme/maps", LIST.as_bytes().to_vec());
     let uri = server.uri();
@@ -81,7 +104,7 @@ pub fn maps_shell(
         .endpoints()
         .with_serveme(format!("{uri}/serveme"))
         .with_map_downloads(format!("{uri}/fastdl/maps"));
-    let s = super::shell_window_tweaked(cx, env, Tf2State::Missing { saved: None }, |services| {
+    let s = super::shell_window_tweaked(cx, env, state, |services| {
         *services = services.clone().with_endpoints(endpoints);
     });
     let store = s.services.store.clone();

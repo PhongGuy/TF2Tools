@@ -172,6 +172,19 @@ impl Confirm {
         }
     }
 
+    /// The prompt before removing the GameBanana map called `name` from TF2.
+    pub fn remove_gb_map(name: &str) -> Self {
+        Self {
+            title: "Remove Map".into(),
+            description: format!(
+                "Are you sure you want to remove {name}? It will be removed from TF2."
+            )
+            .into(),
+            confirm_label: "Remove".into(),
+            cancel_label: "Cancel".into(),
+        }
+    }
+
     /// v5's ProfileCard delete prompt for the profile called `name`.
     pub fn delete_profile(name: &str) -> Self {
         Self {
