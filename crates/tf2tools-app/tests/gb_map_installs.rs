@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use gpui_kit::{Entity, TestAppContext};
+use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::gb_addon_installs::GbAddonInstalls;
 use tf2tools_app::ids;
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
@@ -285,17 +285,26 @@ fn install_again_with_tf2_closed_reads_as_a_map(cx: &mut TestAppContext) {
     server.mount_gb_addon(39, "Alpha", &[("cp_alpha.bsp", bsp(b"a"), 100)]);
     let w = window(cx, &env, &server);
     install(cx, &w, 39);
+    toast_is(cx, w.win, "Map installed. Alpha");
     idle(cx);
+    // Clear the first install's toast so only Install again can show the map wording.
+    cx.update_window(w.win, |_, window, cx| {
+        tf2tools_app::shell::toast::clear_toasts(window, cx)
+    })
+    .unwrap();
+    // The close animates on the fake clock; a second of ticks stays inside the 5 s autohide.
+    for _ in 0..20 {
+        if support::toast_labels(cx, w.win).is_empty() {
+            break;
+        }
+        cx.executor()
+            .advance_clock(std::time::Duration::from_millis(50));
+    }
+    assert_eq!(support::toast_labels(cx, w.win), Vec::<String>::new());
     std::fs::remove_dir_all(folder(&env, 39, "alpha")).unwrap();
     run(cx, &w, |i, win, cx| i.reinstall(GbId::new(39), win, cx));
+    toast_is(cx, w.win, "Map installed. Alpha");
     idle(cx);
-    // The first install's toast is still up, so Install again's is the second of its kind.
-    let labels = support::toast_labels(cx, w.win);
-    let maps = labels
-        .iter()
-        .filter(|l| *l == "Map installed. Alpha")
-        .count();
-    assert_eq!(maps, 2, "{labels:?}");
     assert!(
         folder(&env, 39, "alpha")
             .join("maps/cp_alpha.bsp")
