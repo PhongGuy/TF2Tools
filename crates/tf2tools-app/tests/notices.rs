@@ -140,6 +140,14 @@ fn known_notices_get_plain_titles() {
         notices::title_for("rars-Apache-2.0.txt"),
         "rars RAR reader (Apache-2.0)"
     );
+    assert_eq!(
+        notices::title_for("crosshairs-notice.txt"),
+        "Built-in crosshairs"
+    );
+    assert_eq!(
+        notices::title_for("comfig-app-MIT.txt"),
+        "mastercomfig app preset text (MIT)"
+    );
     // A notice nobody titled still shows, named after its file.
     assert_eq!(notices::title_for("Some-Thing-MIT.txt"), "Some Thing MIT");
 }
@@ -161,6 +169,12 @@ const SOURCES: &[(&str, &str, &str)] = &[
     ("Maps page list", "serveme-notice.txt", "serveme.tf"),
     ("logs.tf page", "logstf-notice.txt", "logs.tf"),
     ("game artwork", "Valve-notice.txt", "Valve Corporation"),
+    ("built-in crosshairs", "crosshairs-notice.txt", "Kenney"),
+    (
+        "Graphics preset text",
+        "comfig-app-MIT.txt",
+        "Copyright (c) 2016-2026 mastercoms",
+    ),
 ];
 
 #[test]

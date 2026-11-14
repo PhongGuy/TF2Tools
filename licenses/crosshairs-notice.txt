@@ -1,0 +1,19 @@
+Built-in crosshairs
+
+The crosshairs that come with TF2Tools were made by players over many years. Each one
+belongs to its maker.
+
+- crosshair001 to crosshair200: the Crosshair Pack by Kenney (https://kenney.nl), released
+  under Creative Commons CC0.
+- The cpma, ql, xhairshadow, tob, wings, seeker and sniper sets: the weapon-specific
+  crosshair set from joshuawn's guide on teamfortress.tv
+  (https://www.teamfortress.tv/30866/guide-weapon-specific-custom-crosshairs), with
+  crosshairs by Watson, the CPMA crosshairs by Quik, the Quake Live crosshairs by povohat
+  and the wings by RainofLight.
+- crosshair1 to crosshair7: Valve's own crosshairs from Team Fortress 2.
+- The rest, such as the collaide, yz50, blanc, Brackets and Dot crosshairs: community
+  crosshairs whose makers we could not trace. If you made one, open an issue and we will
+  credit you, or take it out if you prefer.
+
+TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with any of these
+makers.

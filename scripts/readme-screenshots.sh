@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Regenerates the README screenshots in .github/readme: `make readme-shots`. Drives the real app
-# (TF2TOOLS_PILOT_REAL=1: your own library, TF2 install and the online stores) through eleven
+# (TF2TOOLS_PILOT_REAL=1: your own library, TF2 install and the online stores) through fourteen
 # pages with gpui-pilot's drive.py and saves each page as lossless WebP. Besides looking, it
 # installs your first library HUD if none is installed, and opens the sidebar; it adds a
 # "Competitive" profile for the Profiles shot and deletes it, and closes the sidebar again if it
@@ -12,8 +12,8 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cargo=${CARGO:-cargo}
 pilot_repo=${GPUI_PILOT_REPO:-${HOME:?HOME is not set}/git/gpui-pilot}
-NAMES="huds sounds crosshairs hud-store sound-store crosshair-store addon-store profiles settings hud-maker crosshair-maker"
-COUNT=11
+NAMES="huds sounds crosshairs hud-store sound-store crosshair-store addon-store profiles settings graphics maps logs-tf hud-maker crosshair-maker"
+COUNT=14
 # Shots cut to a box (WxH+X+Y): the Sound Store loses the bottom strip where the floating
 # volume bar would cover a card.
 crop_of() {
@@ -24,9 +24,10 @@ crop_of() {
 }
 
 # Stops the run. Mid-drive it first puts back what the run changed and closes the app.
-# Labels the conversion paints over with the card behind them: the installed HUD's folder
-# path, which holds the player's home path.
-BLANKED="huds-installed-path"
+# Labels the conversion paints over with what is just above them: the installed HUD's folder
+# path, which holds the player's home path, and the logs.tf player chips, which name the player.
+# An entry ending in ":" covers every id it starts, painted as one box.
+BLANKED="huds-installed-path logstf-chip: logstf-chip-rename: logstf-chip-remove: logstf-add"
 
 die() {
   echo "readme-shots: $*" >&2
@@ -61,7 +62,7 @@ for path in trees:
         if not node.get("visible", True):
             continue
         ids = [str(seg) for seg in node.get("path", [])]
-        if ids and ids[-1] in blanked:
+        if ids and any(ids[-1] == b or (b.endswith(":") and ids[-1].startswith(b)) for b in blanked):
             continue
         if ids and ids[-1] == "hud-maker-backdrop-image":
             print("a screenshot shows the HUD Maker backdrop picture")
@@ -117,7 +118,7 @@ EOF
 # Moves the pointer onto the sidebar's empty middle first, so no tooltip or hover outline shows.
 shot() {
   send "# shot $1"
-  send 'hover {"target": {"x": 24, "y": 600}}'
+  send 'hover {"target": {"x": 24, "y": 690}}'
   send 'wait {"ms": 1500}'
   send screenshot
   send tree
@@ -133,15 +134,18 @@ skip_fonts() {
   [ "$ANSWER" = 0 ] || click hud-fonts-skip
 }
 
-# Waits, ten seconds at a time for at most five minutes, until store $1's sync ring is gone.
-wait_sync() {
+# Waits, ten seconds at a time for at most $2 minutes, until no id starts with $1.
+wait_gone() {
   local n=0
-  while ask "count sync-ring:$1" 0 && [ "$ANSWER" != 0 ]; do
+  while ask "count $1" 0 && [ "$ANSWER" != 0 ]; do
     n=$((n + 1))
-    [ $n -lt 30 ] || die "the $1 store still syncs after five minutes; try again later"
+    [ $n -lt $(($2 * 6)) ] || die "$1 still shows after $2 minutes; try again later"
     send 'wait {"ms": 10000}'
   done
 }
+
+# Waits at most thirty minutes until store $1's sync ring is gone; a full resync takes that long.
+wait_sync() { wait_gone "sync-ring:$1" 30; }
 
 # What the run changed and still has to undo: the sidebar it opened, the profile it added.
 opened_sidebar=""
@@ -214,6 +218,34 @@ calls() {
   click nav-settings
   send 'scroll {"target": {"id_suffix": "page-settings"}, "dy": 470}'
   shot settings
+  click nav-graphics
+  send 'wait {"target": {"id_suffix": "graphics-status"}, "timeout_ms": 20000}'
+  send 'wait {"ms": 2000}'
+  shot graphics
+  # The GameBanana tab once its catalogue sync is done; with auto-sync off it syncs now.
+  click nav-maps
+  click maps-source:gamebanana
+  send 'wait {"ms": 3000}'
+  ask "count maps-gb-sync" 0
+  [ "$ANSWER" = 0 ] || { click maps-gb-sync; send 'wait {"ms": 3000}'; }
+  wait_gone sync-banner 20
+  ask "count addon-gb-card-image:maps:" 1
+  [ "$ANSWER" != 0 ] || die "the GameBanana maps tab shows no map"
+  send 'wait {"ms": 8000}'
+  shot maps
+  # The tracked player's most played class with its weapons open; their chips are painted
+  # over (BLANKED), and no log opens, since an open log names everyone in it.
+  click nav-logs-tf
+  send 'wait {"ms": 3000}'
+  ask "count logstf-chip:" 1
+  [ "$ANSWER" != 0 ] || die "no logs.tf player is tracked"
+  wait_gone sync-ring:logs-tf 10
+  click logstf-class-head:Played
+  ask "first logstf-class:" logstf-class:soldier
+  click "$ANSWER"
+  send 'wait {"target": {"id_suffix": "logstf-class-weapons"}, "timeout_ms": 30000}'
+  send 'wait {"ms": 2000}'
+  shot logs-tf
   click nav-hud-maker
   send 'click {"target": {"id_suffix": "hud-maker-scene:main-menu"}, "timeout_ms": 30000}'
   send 'wait {"target": {"id_suffix": "hud-maker-menu-background"}, "timeout_ms": 20000}'
@@ -289,11 +321,19 @@ for name in $NAMES; do
   for box in $(python3 - "$S/shots/tree-$(sed -n "${i}p" "$S/shot-trees").json" "$BLANKED" << 'EOF'
 import json, sys
 nodes, blanked = json.load(open(sys.argv[1]))["nodes"], sys.argv[2].split()
-for n in nodes:
-    if n.get("path") and str(n["path"][-1]) in blanked and n.get("visible", True):
-        b = n["bounds"]
-        x, y, w, h = int(b["x"]), int(b["y"]), int(b["w"]), int(b["h"])
-        print(f"{x},{y},{x + w},{y + h}")
+for entry in blanked:
+    boxes = []
+    for n in nodes:
+        last = str(n["path"][-1]) if n.get("path") else ""
+        hit = last.startswith(entry) if entry.endswith(":") else last == entry
+        if hit and n.get("visible", True):
+            b = n["bounds"]
+            x, y, w, h = int(b["x"]), int(b["y"]), int(b["w"]), int(b["h"])
+            boxes.append((x, y, x + w, y + h))
+    if boxes:
+        x0, y0 = min(b[0] for b in boxes), min(b[1] for b in boxes)
+        x1, y1 = max(b[2] for b in boxes), max(b[3] for b in boxes)
+        print(f"{x0},{y0},{x1},{y1}")
 EOF
   ); do
     IFS=, read -r x0 y0 x1 y1 << EOF

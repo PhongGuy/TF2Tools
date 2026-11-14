@@ -40,7 +40,7 @@ fn contributing_holds_the_developer_guide() {
 }
 
 const DEVELOPERS: &str = "\n## For developers\n";
-const IMAGES: [&str; 11] = [
+const IMAGES: [&str; 14] = [
     "huds",
     "sounds",
     "crosshairs",
@@ -50,6 +50,9 @@ const IMAGES: [&str; 11] = [
     "addon-store",
     "profiles",
     "settings",
+    "graphics",
+    "maps",
+    "logs-tf",
     "crosshair-maker",
     "hud-maker",
 ];
@@ -103,6 +106,7 @@ fn the_readme_has_the_player_sections_in_order() {
         "### Make your own crosshair",
         "### Make your own HUD",
         "### Maps",
+        "### logs.tf stats",
         "### Profiles",
         "### Settings",
         "## Download and install",
@@ -179,7 +183,7 @@ fn every_relative_link_and_image_exists() {
 }
 
 #[test]
-fn the_screenshots_are_the_eleven_webp_images_within_budget() {
+fn the_screenshots_are_the_fourteen_webp_images_within_budget() {
     let readme = repo_file("README.md");
     let mut used: Vec<String> = image_targets(&readme)
         .iter()

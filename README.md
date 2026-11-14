@@ -14,7 +14,7 @@ This is TF2Tools 6, a native desktop app rebuilt from the ground up. It replaces
 
 ### HUDs
 
-Keep all your HUDs in one place and switch between them with one click. TF2 can only use one HUD at a time, so TF2Tools takes the old one out when you install another. If a HUD needs fonts you don't have, TF2Tools offers to install them. Get new HUDs from the HUD Store: the hand-picked list from hud-db, or everything on GameBanana. When a newer version of a HUD you got from the HUD Store is out, its card shows **Update**. If it has several files on GameBanana, you pick which one.
+Keep all your HUDs in one place and switch between them with one click. TF2 can only use one HUD at a time, so TF2Tools takes the old one out when you install another. If a HUD needs fonts you don't have, TF2Tools offers to install them. Get new HUDs from the HUD Store: the hand-picked list from hud-db, or everything on GameBanana. When a newer version of a HUD you got from the HUD Store is out, its card shows **Update**. If it has several files on GameBanana, you pick which one. On Linux, TF2Tools installs HUDs with lowercase file names, the way TF2 on Linux needs them.
 
 ![The HUDs page: the HUD in your game at the top, your library below](.github/readme/huds.webp)
 
@@ -26,7 +26,7 @@ Add your own sounds or download them from the Sound Store, play them right in th
 
 ### A crosshair for every weapon
 
-Go class by class and give each weapon its own crosshair: one of TF2's own, an image of your own, or one from the Crosshair Store.
+Go class by class and give each weapon its own crosshair: one of TF2's own, an image of your own, or one from the Crosshair Store. Small 32x32 crosshairs are scaled up so they show as one crosshair in the game.
 
 ![The Crosshairs page: a crosshair picked in the list and previewed over a map, above Scout's weapons](.github/readme/crosshairs.webp)
 
@@ -39,6 +39,8 @@ Install mastercomfig's addons from the Addon Store. The Addons page shows what y
 ### Graphics
 
 The Graphics page sets TF2's graphics with mastercomfig. Install mastercomfig in one click, update it when a new version is out, or let TF2Tools take over the copy you already have. Pick a graphics preset, from Ultra down to Low, then change any of its settings one by one, or reset them to the preset. Changes apply the next time TF2 starts.
+
+![The Graphics page: mastercomfig's status, the graphics presets and the settings below](.github/readme/graphics.webp)
 
 ### The stores
 
@@ -64,11 +66,15 @@ The HUD Maker shows your HUD the way the game draws it: in a fight, on the score
 
 The Maps page lists the community maps from serveme.tf. Search them by name, sort them by name, by most played or by recently played, and download a map straight into your game. Remove a map you downloaded when you no longer need it.
 
-Switch the page to GameBanana to browse the TF2 maps there. Search them, sort them and pick a gamemode such as King of the Hill, Payload or Mann vs. Machine. Open a map to see its pictures and downloads, with a link to its GameBanana page. Installing GameBanana maps from the app is not there yet.
+Switch the page to GameBanana to browse the TF2 maps there. TF2Tools keeps GameBanana's map list on your computer and refreshes it in the background. Search the maps, sort them and pick a gamemode such as King of the Hill, Payload or Mann vs. Machine. Open a map to see its pictures, ratings and files, with a link to its GameBanana page.
+
+![The Maps page on its GameBanana tab: community maps as cards, with search, sort and a gamemode filter](.github/readme/maps.webp)
 
 ### logs.tf stats
 
-The logs.tf page shows your competitive stats from logs.tf. Paste your Steam profile link or Steam ID to track yourself, and add teammates the same way. Each player gets a table with a row per class and their averages, and below it a list of their logs. Each log shows when the match started and your own kills, assists, deaths, damage and damage taken in it. Click a class someone played to see their weapons for it right under its row: kills, damage and accuracy for each one. Click it again to close them. Weapons go by their in-game names, read from your TF2 install when TF2Tools finds it. Each weapon shows its kill feed icon, also read from your TF2 install. Drag the range slider to look at only your most recent logs. Open a log to see it the way logs.tf shows it: the players, the kills between classes, the rounds and the events. Click a column title in the class table or the kill matrix to sort by it, and click it again to flip the order. Give a player a nickname when you add them, or with the pencil beside their name, and opened logs call them by it; you can turn that off in Settings. TF2Tools downloads your logs once and keeps them, so the page works offline, and a download that stopped picks up where it left off.
+The logs.tf page shows your competitive stats from logs.tf. Paste your Steam profile link or Steam ID to track yourself, and add teammates the same way. Each player gets a table with a row per class and their averages, and below it a list of their logs with your own kills, assists, deaths, damage and damage taken in each. Click a class to see its weapons right under its row, with kills, damage and accuracy for each. Weapons go by their in-game names, read from your TF2 install, and each shows its kill feed icon, also read from your TF2 install. Click a column title to sort by it, and drag the range slider to look at only your most recent logs. Open a log to see it the way logs.tf shows it: the players, the kills between classes, the rounds and the events. Give a player a nickname when you add them, or with the pencil beside their name, and opened logs call them by it. TF2Tools downloads your logs once and keeps them, so the page works offline.
+
+![The logs.tf page: a player's class averages, their most played class open on its weapons](.github/readme/logs-tf.webp)
 
 ### Profiles
 
@@ -143,10 +149,14 @@ MIT, see [LICENSE](LICENSE). The bundled Inter font is under the SIL Open Font L
 - **GameBanana:** the HUDs, sounds, crosshairs and other items in the GameBanana stores come from [GameBanana](https://gamebanana.com), owned and run by GameBanana Co LLC. Each item belongs to the creators credited on its GameBanana page, and TF2Tools claims no rights to it. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with GameBanana or GameBanana Co LLC.
 - **serveme.tf:** the community map list on the Maps page, and its map files, come from [serveme.tf](https://serveme.tf). Each map belongs to its makers. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with serveme.tf.
 - **logs.tf:** the stats and logs on the logs.tf page come from [logs.tf](https://logs.tf). TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with logs.tf.
+- **Built-in crosshairs:** made by players over many years. crosshair001 to crosshair200 are Kenney's [Crosshair Pack](https://kenney.nl/assets/crosshair-pack) (CC0). The cpma, ql, wings and similar sets come from [joshuawn's guide](https://www.teamfortress.tv/30866/guide-weapon-specific-custom-crosshairs), with crosshairs by Watson, Quik, povohat and RainofLight. crosshair1 to crosshair7 are Valve's own. We could not trace the makers of the rest; if you made one, open an issue and we will credit you or take it out. The full list is in `licenses/crosshairs-notice.txt`.
+- **Graphics page:** the preset descriptions come from the [mastercomfig app](https://github.com/mastercomfig/comfig-app), Copyright (c) 2016-2026 mastercoms, under the MIT License, in `licenses/comfig-app-MIT.txt`.
+- **HUD Maker:** the HUD option data comes from CriticalFlaw's HUD editor project, under the MIT License, in `licenses/HUD-option-schemas-MIT.txt`.
+- **RAR files:** TF2Tools opens RAR downloads with the rars library, under the Apache License 2.0, in `licenses/rars-Apache-2.0.txt`.
 
 ### Valve
 
-Team Fortress 2, its weapon icons, crosshairs and other game artwork are the property of Valve Corporation. TF2Tools uses them with credit, in a free fan tool for players of the game. The weapon icons in the crosshair list are read from your own TF2 install.
+Team Fortress 2, its weapon icons, its own crosshairs and other game artwork are the property of Valve Corporation. TF2Tools uses them with credit, in a free fan tool for players of the game. The weapon icons in the crosshair list are read from your own TF2 install.
 
 Valve, the Valve logo, Steam, the Steam logo, Team Fortress and the Team Fortress logo are trademarks and/or registered trademarks of Valve Corporation in the U.S. and/or other countries. All other trademarks are property of their respective owners.
 
