@@ -17,16 +17,18 @@ use crate::ids;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 use crate::widgets::scroll::scroll_beside;
 
-/// One row: the payload's name (what is answered) and the label shown.
+/// One row: the payload's name (what is answered), the label shown, and whether the game
+/// already has it. A present row is shown disabled and can never be ticked.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChecklistItem {
     pub name: String,
     pub label: String,
+    pub present: bool,
 }
 
 type Answer = Option<Vec<String>>;
 
-/// The checklist's state: which rows are checked. The first starts checked.
+/// The checklist's state: which rows are checked.
 pub struct PayloadChecklist {
     description: SharedString,
     items: Rc<[ChecklistItem]>,
@@ -41,8 +43,11 @@ impl PayloadChecklist {
         &self.checked
     }
 
-    /// Flips row `index`; an index past the last row changes nothing.
+    /// Flips row `index`; an index past the last row or a present row changes nothing.
     pub fn toggle(&mut self, index: usize, cx: &mut Context<Self>) {
+        if self.items.get(index).is_some_and(|item| item.present) {
+            return;
+        }
         if let Some(tick) = self.checked.get_mut(index) {
             *tick = !*tick;
             cx.notify();
@@ -69,9 +74,15 @@ impl Render for PayloadChecklist {
             .zip(&self.checked)
             .enumerate()
             .map(|(ix, (item, on))| {
+                let label = if item.present {
+                    format!("{} · Already in the game", item.label)
+                } else {
+                    item.label.clone()
+                };
                 Checkbox::new(ids::payload_check(ix))
-                    .label(item.label.clone())
+                    .label(label)
                     .checked(*on)
+                    .disabled(item.present)
                     .on_click(cx.listener(move |list, _: &bool, _, cx| list.toggle(ix, cx)))
             })
             .collect::<Vec<_>>();
@@ -113,6 +124,7 @@ impl Render for PayloadChecklist {
                 &self.scroll,
                 v_flex()
                     .id(ids::PAYLOAD_CHECKLIST_ROWS)
+                    .test_support()
                     .track_scroll(&self.scroll)
                     .gap_3()
                     .max_h(px(256.))
@@ -157,10 +169,47 @@ pub fn open_payload_checklist(
     Entity<PayloadChecklist>,
     async_channel::Receiver<Option<Vec<String>>>,
 ) {
-    let (tx, rx) = async_channel::bounded(1);
     let checked = (0..items.len()).map(|ix| ix == 0).collect();
+    let description = format!("{addon_name} has several parts. Pick the ones to install.");
+    open_checklist(description, items, checked, window, cx)
+}
+
+/// Opens "Choose what to install" for a GameBanana item holding several maps. Every map the
+/// game lacks starts checked, since a pack is meant to be installed whole; `skipped` adds that
+/// some extra files in the download were left out.
+pub fn open_map_checklist(
+    item_name: &str,
+    items: Vec<ChecklistItem>,
+    skipped: bool,
+    window: &mut Window,
+    cx: &mut App,
+) -> (
+    Entity<PayloadChecklist>,
+    async_channel::Receiver<Option<Vec<String>>>,
+) {
+    let checked = items.iter().map(|item| !item.present).collect();
+    let mut description = format!("{item_name} holds several maps. Pick the ones to install.");
+    if skipped {
+        description.push_str(" Some extra files in this download were skipped.");
+    }
+    open_checklist(description, items, checked, window, cx)
+}
+
+/// Builds the checklist entity and opens it in a dialog; both openers differ only in the
+/// description and the starting ticks.
+fn open_checklist(
+    description: String,
+    items: Vec<ChecklistItem>,
+    checked: Vec<bool>,
+    window: &mut Window,
+    cx: &mut App,
+) -> (
+    Entity<PayloadChecklist>,
+    async_channel::Receiver<Option<Vec<String>>>,
+) {
+    let (tx, rx) = async_channel::bounded(1);
     let list = cx.new(|_| PayloadChecklist {
-        description: format!("{addon_name} has several parts. Pick the ones to install.").into(),
+        description: description.into(),
         items: items.into(),
         checked,
         answer: tx.clone(),

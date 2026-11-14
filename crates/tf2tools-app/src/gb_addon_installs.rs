@@ -605,6 +605,7 @@ async fn ask_payloads(
         .map(|p| ChecklistItem {
             name: p.name().to_owned(),
             label: p.label().to_owned(),
+            present: false,
         })
         .collect();
     let name = download.name().to_owned();
