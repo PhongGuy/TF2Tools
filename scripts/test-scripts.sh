@@ -190,11 +190,11 @@ test_readme_shots_dry_run_drives_every_page_of_the_real_app() {
     return 0
   }
   local name
-  for name in huds sounds crosshairs hud-store sound-store crosshair-store addon-store profiles settings hud-maker crosshair-maker; do
+  for name in huds sounds crosshairs hud-store sound-store crosshair-store addon-store profiles settings graphics maps logs-tf hud-maker crosshair-maker; do
     [[ $out == *"\"nav-$name\""* ]] || fail "no nav-$name click in [$out]"
     [[ $out == *"# shot $name"* ]] || fail "no $name screenshot in [$out]"
   done
-  [[ $(printf '%s\n' "$out" | grep -c '^screenshot$') == 11 ]] || fail "not eleven screenshots: [$out]"
+  [[ $(printf '%s\n' "$out" | grep -c '^screenshot$') == 14 ]] || fail "not fourteen screenshots: [$out]"
   [[ $out != *XDG_* ]] || fail "launch.env refuses XDG names: [$out]"
   [[ $out == *'"mode": "headless"'* ]] || fail "not headless: [$out]"
   [[ $out == *'"build": false'* ]] || fail "lets the server build: [$out]"
@@ -204,6 +204,8 @@ test_readme_shots_dry_run_drives_every_page_of_the_real_app() {
   [[ $out == *'"hud-maker-scene:main-menu"'* ]] || fail "HUD Maker not on the main menu: [$out]"
   [[ $out == *'"hud-maker-part:'* ]] || fail "selects no HUD part: [$out]"
   [[ $out == *'"crosshair-maker-starter-use"'* ]] || fail "draws no crosshair: [$out]"
+  [[ $out == *'"maps-source:gamebanana"'*'# shot maps'* ]] || fail "Maps not on the GameBanana tab: [$out]"
+  [[ $out == *'"logstf-class:'*'"logstf-class-weapons"'*'# shot logs-tf'* ]] || fail "logs.tf opens no class: [$out]"
   # The run's own changes: the sidebar opened and closed again, a temporary profile added and
   # deleted, and a HUD installed from the library.
   [[ $(printf '%s\n' "$out" | grep -c '"sidebar-toggle"') == 2 ]] || fail "the sidebar is not put back: [$out]"
@@ -218,7 +220,7 @@ test_readme_shots_dry_run_drives_every_page_of_the_real_app() {
   [[ $out != *'"hud-fonts-install"'* ]] || fail "installs fonts onto the machine: [$out]"
   # Clicking a weapon row assigns a crosshair, and these change the player's library or game.
   local banned
-  for banned in weapon-row sound-play hud-delete crosshair-maker-save hud-maker-save hud-maker-backdrop settings-save; do
+  for banned in weapon-row sound-play hud-delete crosshair-maker-save hud-maker-save hud-maker-backdrop settings-save map-download map-remove logstf-log: logstf-chip-remove logstf-add-confirm logstf-rename-save graphics-install graphics-update graphics-remove graphics-take-over graphics-preset graphics-module graphics-reset; do
     [[ $out != *"$banned"* ]] || fail "touches $banned: [$out]"
   done
   [[ $(printf '%s\n' "$out" | tail -n 1) == close* ]] || fail "does not close the app: [$out]"
@@ -229,11 +231,11 @@ shots_check() {
   README_SHOTS_CHECK=$2 bash "$ROOT/scripts/readme-screenshots.sh" > "$1" 2>&1
 }
 
-# Fills shots dir $1 with eleven empty shots and trees holding one on-screen label.
+# Fills shots dir $1 with fourteen empty shots and trees holding one on-screen label.
 clean_shots() {
   local i
   mkdir -p "$1"
-  for i in $(seq 11); do
+  for i in $(seq 14); do
     : > "$1/shot-$i.png"
     echo '{"nodes": [{"path": ["tf2-badge"], "name": "Team Fortress 2", "visible": true}]}' > "$1/tree-$i.json"
   done
@@ -242,7 +244,7 @@ clean_shots() {
 test_readme_shots_check_fails_loudly_without_screen_trees() {
   local dir=$WORK/shots-notree i
   mkdir -p "$dir"
-  for i in $(seq 11); do : > "$dir/shot-$i.png"; done
+  for i in $(seq 14); do : > "$dir/shot-$i.png"; done
   if shots_check "$WORK/notree.out" "$dir"; then
     fail "passed with no tree-*.json: $(cat "$WORK/notree.out")"
   fi
@@ -259,6 +261,9 @@ test_readme_shots_check_catches_a_home_path_and_passes_clean_shots() {
   # The installed HUD's folder path is painted over when the shot is converted.
   echo '{"nodes": [{"path": ["huds-installed-path"], "name": "/home/someone/tf/custom/x", "visible": true}]}' > "$dir/tree-4.json"
   shots_check "$WORK/blanked.out" "$dir" || fail "a blanked path failed: $(cat "$WORK/blanked.out")"
+  # So are the logs.tf chips, by their id prefix.
+  echo '{"nodes": [{"path": ["logstf-chip:76561197960287930"], "name": "/home/someone", "visible": true}]}' > "$dir/tree-4.json"
+  shots_check "$WORK/chip.out" "$dir" || fail "a blanked chip failed: $(cat "$WORK/chip.out")"
   echo '{"nodes": [{"path": ["input-1"], "value": "/home/someone/tf", "visible": true}]}' > "$dir/tree-4.json"
   if shots_check "$WORK/home.out" "$dir"; then
     fail "passed with a home path on screen"
@@ -275,11 +280,11 @@ test_readme_shots_check_catches_the_hud_maker_backdrop_and_a_missing_shot() {
   fi
   grep -q "backdrop" "$WORK/backdrop.out" || fail "no clear message: $(cat "$WORK/backdrop.out")"
   clean_shots "$dir"
-  rm -f "$dir/shot-11.png"
+  rm -f "$dir/shot-14.png"
   if shots_check "$WORK/missing.out" "$dir"; then
-    fail "passed with ten screenshots"
+    fail "passed with thirteen screenshots"
   fi
-  grep -q "expected 11 screenshots" "$WORK/missing.out" || fail "no clear message: $(cat "$WORK/missing.out")"
+  grep -q "expected 14 screenshots" "$WORK/missing.out" || fail "no clear message: $(cat "$WORK/missing.out")"
 }
 
 # Stubs magick, drive.py and a cargo that sleeps briefly, so a real run stops in its build step.
