@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use gpui_kit::{Entity, TestAppContext};
 use tf2tools_app::gb_addon_installs::GbAddonInstalls;
 use tf2tools_app::ids;
+use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_core::{AddonSection, GbAddonEntry, GbId};
 
 use crate::gb_addon_installs::{profile, toast_is, window};
@@ -133,4 +134,80 @@ fn a_download_without_a_map_says_so(cx: &mut TestAppContext) {
         w.win,
         "Couldn't install the map. No playable map was found in this download.",
     );
+}
+
+fn run(
+    cx: &mut TestAppContext,
+    w: &support::AddonStoreWindow,
+    f: impl FnOnce(
+        &mut GbAddonInstalls,
+        gpui_kit::AnyWindowHandle,
+        &mut gpui_kit::Context<GbAddonInstalls>,
+    ) -> bool,
+) {
+    let (i, win) = (installs(cx), w.win);
+    assert!(
+        cx.update(|cx| i.update(cx, |i, cx| f(i, win, cx))),
+        "the operation starts"
+    );
+}
+
+#[gpui_kit::test]
+fn installing_while_tf2_runs_goes_ahead_and_says_restart(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(40, "Alpha", &[("cp_alpha.bsp", bsp(b"a"), 100)]);
+    let w = window(cx, &env, &server);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    install(cx, &w, 40);
+    toast_is(cx, w.win, "Installed. Restart TF2 to play it. Alpha");
+    assert!(
+        folder(&env, 40, "alpha")
+            .join("maps/cp_alpha.bsp")
+            .is_file()
+    );
+}
+
+#[gpui_kit::test]
+fn skipped_extra_files_are_named(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let body = support::zip_of(&[
+        ("maps/cp_alpha.bsp", &bsp(b"a")),
+        ("resource/ui/x.res", b"res"),
+    ]);
+    server.mount_gb_addon(41, "Alpha", &[("alpha.zip", body, 100)]);
+    let w = window(cx, &env, &server);
+    install(cx, &w, 41);
+    toast_is(
+        cx,
+        w.win,
+        "Map installed. Alpha. Some extra files in this download were skipped.",
+    );
+    assert!(!folder(&env, 41, "alpha").join("resource").exists());
+}
+
+#[gpui_kit::test]
+fn an_update_waits_for_tf2_then_replaces_the_maps_in_place(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(34, "Alpha", &[("cp_alpha.bsp", bsp(b"old"), 100)]);
+    let w = window(cx, &env, &server);
+    install(cx, &w, 34);
+    idle(cx);
+    server.reset();
+    let body = support::zip_of(&[("cp_alpha.bsp", &bsp(b"new"))]);
+    server.mount_gb_addon(34, "Alpha", &[("cp_alpha_v2.zip", body, 300)]);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    run(cx, &w, |i, win, cx| i.update(GbId::new(34), win, cx));
+    toast_is(
+        cx,
+        w.win,
+        "Close TF2 first. TF2 is running. Close the game, then try again.",
+    );
+    idle(cx);
+    cx.update(|cx| Tf2Probe::install(cx, || false));
+    run(cx, &w, |i, win, cx| i.update(GbId::new(34), win, cx));
+    toast_is(cx, w.win, "Map updated. Alpha");
+    idle(cx);
+    let path = folder(&env, 34, "alpha").join("maps/cp_alpha.bsp");
+    assert_eq!(std::fs::read(path).unwrap(), bsp(b"new"));
+    assert_eq!(entry(cx, 34).unwrap().file_date(), 300);
 }

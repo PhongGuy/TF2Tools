@@ -95,6 +95,12 @@ pub fn gb_install_op(err: &GbAddonInstallError, action: &'static str) -> OpError
     describe_gb_install(err).into_op(action)
 }
 
+/// The toast title of a map installed while TF2 runs: the game only sees it after a restart.
+pub const MAP_RESTART: &str = "Installed. Restart TF2 to play it.";
+
+/// Added to a map toast's description when files beside the maps were left out.
+pub const MAP_SKIPPED: &str = "Some extra files in this download were skipped.";
+
 /// A failed map install or update in player words.
 pub fn describe_gb_map_install(err: &GbMapInstallError) -> LocalFailure {
     let message = match err {

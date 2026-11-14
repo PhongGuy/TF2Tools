@@ -240,6 +240,9 @@ pub fn describe_gb_map_fetch(err: &GbAddonFetchError) -> StoreFailure {
         }
         GbAddonFetchError::TooLarge { .. } => "This map is too big for TF2Tools to install.",
         GbAddonFetchError::NoFiles { .. } => "This map has no files to install.",
+        GbAddonFetchError::Archive(ArchiveError::Malformed { .. }) => {
+            "This download can't be opened. Pick another map."
+        }
         GbAddonFetchError::VirusScan { .. }
         | GbAddonFetchError::RateLimited { .. }
         | GbAddonFetchError::Http { .. }

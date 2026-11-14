@@ -786,3 +786,16 @@ fn map_fetch_failures_read_in_map_words() {
         "This download is too big for TF2Tools to install."
     );
 }
+
+#[test]
+fn a_map_download_that_cannot_be_opened_names_a_map() {
+    use tf2tools_app::store_messages::describe_gb_map_fetch;
+    use tf2tools_core::{ArchiveError, GbAddonFetchError};
+    let err = GbAddonFetchError::Archive(ArchiveError::Malformed {
+        path: PathBuf::from("/tmp/a.zip"),
+        message: "invalid Zip archive: bad magic".into(),
+    });
+    let want = "This download can't be opened. Pick another map.";
+    assert_eq!(describe_gb_map_fetch(&err).message, want);
+    support::assert_plain(want);
+}

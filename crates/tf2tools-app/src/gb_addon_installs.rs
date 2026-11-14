@@ -15,7 +15,8 @@ use tf2tools_core::{
 
 use crate::library_events::LibraryEvents;
 use crate::local_messages::{
-    LocalFailure, already_have, describe_library, gb_install_op, gb_map_install_op,
+    LocalFailure, MAP_RESTART, MAP_SKIPPED, already_have, describe_library, gb_install_op,
+    gb_map_install_op,
 };
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::payload_checklist::{ChecklistItem, open_map_checklist, open_payload_checklist};
@@ -77,36 +78,43 @@ impl GbAddonOffer {
     }
 }
 
-/// The toast titles of one kind of operation: on success and on failure.
+/// The toast titles of one kind of operation, on success and on failure, and whether it
+/// updates an install (a map update refuses while TF2 runs).
 #[derive(Clone, Copy)]
 struct Titles {
     done: &'static str,
     failed: &'static str,
+    update: bool,
 }
 
 const INSTALL: Titles = Titles {
     done: "Add-on installed",
     failed: "Couldn't install the add-on",
+    update: false,
 };
 
 const UPDATE: Titles = Titles {
     done: "Add-on updated",
     failed: "Couldn't update the add-on",
+    update: true,
 };
 
 const MAP_INSTALL: Titles = Titles {
     done: "Map installed",
     failed: "Couldn't install the map",
+    update: false,
 };
 
 const MAP_UPDATE: Titles = Titles {
     done: "Map updated",
     failed: "Couldn't update the map",
+    update: true,
 };
 
 const REMOVE: Titles = Titles {
     done: "Add-on removed",
     failed: "Couldn't remove the add-on",
+    update: false,
 };
 
 /// One download-choose-install run: what to fetch, the payloads chosen last time, where to
@@ -123,7 +131,16 @@ struct Run {
 /// How a download-choose-install run ended.
 enum Outcome {
     Installed(GbAddonEntry),
-    Removed { id: GbId, name: String },
+    /// `restart` when TF2 ran as the maps went in; `skipped` when extra files were left out.
+    MapInstalled {
+        entry: GbAddonEntry,
+        restart: bool,
+        skipped: bool,
+    },
+    Removed {
+        id: GbId,
+        name: String,
+    },
     Cancelled,
     Failed(OpError),
 }
@@ -397,6 +414,21 @@ impl GbAddonInstalls {
                 let name = entry.name().to_owned();
                 self.put(entry);
                 Some((ToastKind::Success, titles.done.to_owned(), name))
+            }
+            Outcome::MapInstalled {
+                entry,
+                restart,
+                skipped,
+            } => {
+                let name = entry.name();
+                let description = if skipped {
+                    format!("{name}. {MAP_SKIPPED}")
+                } else {
+                    name.to_owned()
+                };
+                self.put(entry);
+                let title = if restart { MAP_RESTART } else { titles.done };
+                Some((ToastKind::Success, title.to_owned(), description))
             }
             Outcome::Removed { id, name } => {
                 self.entries = self
@@ -689,25 +721,42 @@ async fn fetch_and_install_map(
         }
     };
 
+    let skipped = download
+        .maps()
+        .iter()
+        .any(|m| m.skipped() > 0 && chosen.iter().any(|c| c == m.name()));
     let _ = this.update(cx, |me, cx| me.set_stage(GbAddonStage::Installing, cx));
     let install = cx.update(|cx| {
         let probe = Tf2Probe::get(cx);
         run_blocking(cx, move |s: &Services| {
-            s.library
-                .install_gb_map(download, &chosen, &tf2, &*probe)
-                .map_err(|e| {
-                    // Only here is it known whether one of the maps came from serveme.tf.
-                    if let GbMapInstallError::AlreadyPresent { names } = &e {
-                        LocalFailure::new(already_have(names, serveme), e.to_string())
-                            .into_op(titles.failed)
-                    } else {
-                        gb_map_install_op(&e, titles.failed)
-                    }
-                })
+            // An update refuses while TF2 runs; a first install goes ahead and asks the probe
+            // afterwards whether the game needs a restart to see the new folder.
+            let written = if titles.update {
+                s.library
+                    .update_gb_map(download, &chosen, &tf2, &*probe)
+                    .map(|entry| (entry, false))
+            } else {
+                s.library
+                    .install_gb_map(download, &chosen, &tf2, &*probe)
+                    .map(|entry| (entry, probe()))
+            };
+            written.map_err(|e| {
+                // Only here is it known whether one of the maps came from serveme.tf.
+                if let GbMapInstallError::AlreadyPresent { names } = &e {
+                    LocalFailure::new(already_have(names, serveme), e.to_string())
+                        .into_op(titles.failed)
+                } else {
+                    gb_map_install_op(&e, titles.failed)
+                }
+            })
         })
     });
     match install.await {
-        Ok(entry) => Outcome::Installed(entry),
+        Ok((entry, restart)) => Outcome::MapInstalled {
+            entry,
+            restart,
+            skipped,
+        },
         Err(err) => Outcome::Failed(err),
     }
 }
