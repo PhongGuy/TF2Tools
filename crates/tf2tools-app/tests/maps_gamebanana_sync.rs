@@ -8,6 +8,7 @@ use crate::support::maps::{
 use gpui_kit::TestAppContext;
 use tf2tools_app::ids;
 use tf2tools_app::maps_sync::MapsSync;
+use tf2tools_app::store_grid::SEARCH_DEBOUNCE;
 use tf2tools_app::sync::SyncSummary;
 
 const DONE: SyncSummary = SyncSummary {
@@ -139,4 +140,79 @@ fn a_finished_sync_fills_the_gamemodes_and_the_grid(cx: &mut TestAppContext) {
         s.win,
         ids::select_option(ids::MAPS_GB_GAMEMODE, "5385")
     ));
+}
+
+#[gpui_kit::test]
+fn a_search_or_gamemode_matching_nothing_says_no_maps_found_despite_a_failed_sync(
+    cx: &mut TestAppContext,
+) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = maps_shell(cx, &env, &server);
+    let (sync, runs) = fake_maps_sync(cx);
+    seed_maps(&env);
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute(
+            "INSERT INTO store_gb_map_categories (category_id, name, gamemode_id) VALUES (5400, 'Zombie', 5400)",
+            [],
+        )
+        .unwrap();
+    let page = open_maps(cx, &s);
+    let tab = open_gamebanana(cx, &s, &page);
+    start(cx, &sync);
+    runs.try_recv()
+        .unwrap()
+        .finish(Err(support::offline_failure()));
+    support::wait_hub(cx, "the run to fail", |cx| {
+        cx.update(|cx| sync.read(cx).error().is_some())
+    });
+    cx.update(|cx| tab.update(cx, |t, cx| t.search_typed("zzz".to_owned(), cx)));
+    cx.executor().advance_clock(SEARCH_DEBOUNCE);
+    support::wait_real(cx, "no search results", |cx| shown(cx, &tab).is_empty());
+    support::settle(cx, s.win);
+    assert!(support::present(cx, s.win, ids::MAPS_GB_EMPTY), "search");
+    assert!(!support::present(cx, s.win, ids::MAPS_GB_ERROR), "search");
+
+    cx.update(|cx| tab.update(cx, |t, cx| t.search_typed(String::new(), cx)));
+    cx.executor().advance_clock(SEARCH_DEBOUNCE);
+    support::wait_real(cx, "every map", |cx| shown(cx, &tab).len() == 3);
+    support::wait_real(cx, "the gamemodes", |cx| {
+        cx.update(|cx| tab.read(cx).gamemodes().len() == 4)
+    });
+    support::click_id(cx, s.win, ids::MAPS_GB_GAMEMODE);
+    support::click_id(cx, s.win, ids::select_option(ids::MAPS_GB_GAMEMODE, "5400"));
+    support::wait_real(cx, "no Zombie maps", |cx| shown(cx, &tab).is_empty());
+    support::settle(cx, s.win);
+    assert!(support::present(cx, s.win, ids::MAPS_GB_EMPTY), "gamemode");
+    assert!(!support::present(cx, s.win, ids::MAPS_GB_ERROR), "gamemode");
+}
+
+#[gpui_kit::test]
+fn a_gamemode_gone_after_a_sync_falls_back_to_every_map(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = maps_shell(cx, &env, &server);
+    let (sync, runs) = fake_maps_sync(cx);
+    seed_maps(&env);
+    let page = open_maps(cx, &s);
+    let tab = open_gamebanana(cx, &s, &page);
+    support::wait_real(cx, "the gamemodes", |cx| {
+        cx.update(|cx| tab.read(cx).gamemodes().len() == 3)
+    });
+    support::click_id(cx, s.win, ids::MAPS_GB_GAMEMODE);
+    support::click_id(cx, s.win, ids::select_option(ids::MAPS_GB_GAMEMODE, "5385"));
+    support::wait_real(cx, "King of the Hill", |cx| shown(cx, &tab) == [12]);
+    start(cx, &sync);
+    let run = runs.try_recv().unwrap();
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute(
+            "DELETE FROM store_gb_map_categories WHERE category_id = 5385",
+            [],
+        )
+        .unwrap();
+    run.finish(Ok(DONE));
+    support::wait_hub(cx, "every map again", |cx| {
+        cx.update(|cx| tab.read(cx).gamemodes().len() == 2) && shown(cx, &tab) == [10, 11, 12]
+    });
+    assert_eq!(cx.update(|cx| tab.read(cx).gamemode()), None);
 }

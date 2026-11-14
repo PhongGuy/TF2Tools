@@ -566,9 +566,21 @@ impl GbMapsTab {
                     CategoryOption::new(ids::MAPS_GB_GAMEMODE, Some(g.id), g.name.clone())
                 }))
                 .collect();
-                tab.gamemode_select
-                    .update(cx, |select, cx| select.set_items(rows, window, cx));
+                // A chosen gamemode the new tree no longer has falls back to every map.
+                let gone = tab
+                    .gamemode
+                    .is_some_and(|id| !gamemodes.iter().any(|g| g.id == id));
+                tab.gamemode_select.update(cx, |select, cx| {
+                    select.set_items(rows, window, cx);
+                    if gone {
+                        select.set_selected_index(Some(IndexPath::default()), window, cx);
+                    }
+                });
                 tab.gamemodes = gamemodes;
+                if gone {
+                    tab.gamemode = None;
+                    tab.restart(cx);
+                }
                 cx.notify();
             });
         })
@@ -682,7 +694,9 @@ impl GbMapsTab {
             if sync.is_running() {
                 return None;
             }
-            if let Some(message) = sync.error() {
+            // The sync's failure explains an empty catalogue, not a filter that matches nothing.
+            let unfiltered = self.search.trim().is_empty() && self.gamemode.is_none();
+            if let Some(message) = sync.error().filter(|_| unfiltered) {
                 let message = message.to_owned();
                 let sync = maps_sync(cx).map(|s| s.downgrade());
                 let on_retry = move |_: &mut Window, cx: &mut App| {
