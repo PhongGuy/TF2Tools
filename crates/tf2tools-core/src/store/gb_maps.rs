@@ -259,9 +259,7 @@ impl StoreClient {
                 })?;
                 rows.collect()
             })
-            .map_err(|e| QueryError::Database {
-                message: e.to_string(),
-            })
+            .map_err(super::cards::database)
     }
 }
 
