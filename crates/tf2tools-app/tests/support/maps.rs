@@ -175,3 +175,36 @@ pub fn shown(cx: &mut TestAppContext, tab: &Entity<GbMapsTab>) -> Vec<u64> {
             .collect()
     })
 }
+
+/// Library rows over `seed_maps`, all checked just now so nothing is due: 10 installed; 11
+/// installed with an update; 12 with an update but its folder deleted; 99 installed but gone
+/// from GameBanana and the catalogue.
+pub fn seed_map_library(env: &super::Env) {
+    let custom = env.game.join("tf/custom");
+    for folder in [
+        "tf2tools-gb-10-cp_alpha",
+        "tf2tools-gb-11-trade_plaza",
+        "tf2tools-gb-99-gone_map",
+    ] {
+        std::fs::create_dir_all(custom.join(folder).join("maps")).unwrap();
+    }
+    let row = |id: u64, name: &str, latest: i64, gone: u8| {
+        format!(
+            "({id}, 'maps', '{name}', 'x', 1, 100, {latest}, CAST(strftime('%s','now') AS INTEGER), \
+             '[\"{name}\"]', '[\"custom/tf2tools-gb-{id}-{name}\"]', 1, {gone})"
+        )
+    };
+    let rows = [
+        row(10, "cp_alpha", 100, 0),
+        row(11, "trade_plaza", 200, 0),
+        row(12, "koth_beta", 200, 0),
+        row(99, "gone_map", 100, 1),
+    ];
+    super::sql(env)
+        .execute_batch(&format!(
+            "INSERT INTO library_gb_addons (gb_id, section, name, author, file_id, file_date,
+                latest_file_date, checked_at, payloads, files, installed, gone) VALUES {};",
+            rows.join(", ")
+        ))
+        .unwrap();
+}

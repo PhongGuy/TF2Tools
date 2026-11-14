@@ -17,10 +17,11 @@ use gpui_kit::{
     Window, div, point, px,
 };
 use tf2tools_core::{
-    AddonSection, GbId, GbMapCard, GbMapCursor, GbMapGamemode, GbMapQuery, GbMapSort,
+    AddonSection, GbAddonEntry, GbId, GbMapCard, GbMapCursor, GbMapGamemode, GbMapQuery, GbMapSort,
 };
 
 use crate::addon_detail::open_addon_detail;
+use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer};
 use crate::ids;
 use crate::maps_sync::{MapsSync, MapsSyncEvent, maps_sync};
 use crate::mature::MatureAddons;
@@ -116,6 +117,14 @@ impl GbMapsTab {
         };
         // Thumbnails redraw the grid as they land, and the wants go back when the tab goes.
         let mut subscriptions = vec![cx.observe(&mature, Self::mature_changed)];
+        // The installs' entries badge the cards, so a finished operation repaints them; the
+        // shared once-a-session update check starts here too.
+        let installs = GbAddonInstalls::global(cx);
+        subscriptions.push(cx.observe(&installs, |_, _, cx| cx.notify()));
+        installs.update(cx, |installs, cx| {
+            installs.reload(cx);
+            installs.check_updates(cx);
+        });
         if let Some(images) = RemoteImages::global(cx) {
             subscriptions.push(cx.observe(&images, |_, _, cx| cx.notify()));
             let released = viewer.clone();
@@ -743,6 +752,7 @@ impl GbMapsTab {
     // the drawn cards.
     fn cards_grid(&self, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity().downgrade();
+        let installs = GbAddonInstalls::global(cx).downgrade();
         self.grid
             .render_sized(self.feed.items().len(), card_height, move |ix, _, cx| {
                 let card = this.upgrade().and_then(|tab| {
@@ -762,6 +772,9 @@ impl GbMapsTab {
                     RemoteImages::global(cx).map(|images| images.read(cx).image(&key))
                 });
                 let id = card.id;
+                let badge = installs
+                    .upgrade()
+                    .and_then(|i| map_badge(i.read(cx).entry(id)));
                 let opened = card.clone();
                 let open: OpenAddon = Rc::new(move |window, cx: &mut App| {
                     open_addon_detail(AddonSection::MAPS, &opened, window, cx);
@@ -776,12 +789,25 @@ impl GbMapsTab {
                     AddonSection::MAPS.key(),
                     &card,
                     image,
-                    None,
+                    badge,
                     open,
                     reveal,
                     cx,
                 )
             })
+    }
+}
+
+// A map card's badge from its library entry, in `GbAddonOffer::of_map`'s order; an item gone
+// from GameBanana says so first.
+fn map_badge(entry: Option<&GbAddonEntry>) -> Option<&'static str> {
+    if entry?.is_gone() {
+        return Some("No longer on GameBanana");
+    }
+    match GbAddonOffer::of_map(entry) {
+        GbAddonOffer::Install => None,
+        GbAddonOffer::InstallAgain => Some("Not installed"),
+        offer @ (GbAddonOffer::Update | GbAddonOffer::Installed) => Some(offer.label()),
     }
 }
 
