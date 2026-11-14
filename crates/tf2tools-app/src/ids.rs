@@ -2547,6 +2547,8 @@ pub const MAPS_GB_SEARCH: &str = "maps-gb-search";
 pub const MAPS_GB_SORT: &str = "maps-gb-sort";
 /// Wraps the GameBanana maps gamemode select.
 pub const MAPS_GB_GAMEMODE: &str = "maps-gb-gamemode";
+/// Wraps the GameBanana maps Show select ("All maps" or "Installed").
+pub const MAPS_GB_SHOW: &str = "maps-gb-show";
 /// The GameBanana maps card grid.
 pub const MAPS_GB_GRID: &str = "maps-gb-grid";
 /// The GameBanana maps skeleton cards, labelled "Loading...", before the first page lands.

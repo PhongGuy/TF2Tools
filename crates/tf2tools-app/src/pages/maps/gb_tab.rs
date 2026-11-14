@@ -14,10 +14,11 @@ use gpui_kit::component::{ActiveTheme as _, Icon, IndexPath, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _,
     IntoElement, ParentElement as _, Render, Styled as _, Subscription, Task, TestSupportExt as _,
-    Window, div, point, px,
+    WeakEntity, Window, div, point, px,
 };
 use tf2tools_core::{
-    AddonSection, GbAddonEntry, GbId, GbMapCard, GbMapCursor, GbMapGamemode, GbMapQuery, GbMapSort,
+    AddonSection, GbAddonEntry, GbId, GbMapCard, GbMapCursor, GbMapGamemode, GbMapQuery, GbMapShow,
+    GbMapSort,
 };
 
 use crate::addon_detail::open_addon_detail;
@@ -55,6 +56,25 @@ const SORTS: [(&str, GbMapSort); 2] = [
     ("Newest", GbMapSort::Newest),
 ];
 
+/// Fits "All maps" whole beside the kit's caret and padding.
+const SHOW_WIDTH: f32 = 144.;
+
+/// The Show Select's labels, in menu order.
+const SHOWS: [(&str, GbMapShow); 2] = [
+    ("All maps", GbMapShow::All),
+    ("Installed", GbMapShow::Installed),
+];
+
+/// What a library entry shows on its card, so only a change to it relists the Installed view.
+type EntryState = (GbId, bool, bool, bool);
+
+fn entry_states(entries: &[GbAddonEntry]) -> Vec<EntryState> {
+    entries
+        .iter()
+        .map(|e| (e.gb_id(), e.is_installed(), e.has_update(), e.is_gone()))
+        .collect()
+}
+
 impl FeedItem for GbMapCard {
     type Id = GbId;
     type Cursor = GbMapCursor;
@@ -75,12 +95,17 @@ pub struct GbMapsTab {
     grid: CardGrid,
     sort: GbMapSort,
     gamemode: Option<u32>,
+    show: GbMapShow,
     search: String,
     /// The catalogue's first-level gamemodes, A to Z; empty until read.
     gamemodes: Vec<GbMapGamemode>,
     search_input: Entity<InputState>,
     sort_select: Entity<SelectState<Vec<LabelOption>>>,
     gamemode_select: Entity<SelectState<Vec<CategoryOption>>>,
+    show_select: Entity<SelectState<Vec<LabelOption>>>,
+    installs: WeakEntity<GbAddonInstalls>,
+    /// The library entries' states the current list was read with.
+    entry_states: Vec<EntryState>,
     debounce: Option<Task<()>>,
     /// The mature setting the current query uses; no page is read until it is known.
     mature: bool,
@@ -120,7 +145,8 @@ impl GbMapsTab {
         // The installs' entries badge the cards, so a finished operation repaints them; the
         // shared once-a-session update check starts here too.
         let installs = GbAddonInstalls::global(cx);
-        subscriptions.push(cx.observe(&installs, |_, _, cx| cx.notify()));
+        subscriptions.push(cx.observe(&installs, Self::installs_changed));
+        let entry_states = entry_states(installs.read(cx).entries());
         installs.update(cx, |installs, cx| {
             installs.reload(cx);
             installs.check_updates(cx);
@@ -152,6 +178,9 @@ impl GbMapsTab {
         )];
         let gamemode_select =
             cx.new(|cx| SelectState::new(rows, Some(IndexPath::default()), window, cx));
+        let labels = LabelOption::all(ids::MAPS_GB_SHOW, SHOWS.iter().map(|(label, _)| *label));
+        let show_select =
+            cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
         subscriptions.extend([
             cx.subscribe(&search_input, |tab, input, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -167,6 +196,18 @@ impl GbMapsTab {
                         && *sort != tab.sort
                     {
                         tab.sort = *sort;
+                        tab.restart(cx);
+                    }
+                },
+            ),
+            cx.subscribe(
+                &show_select,
+                |tab, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
+                    if let SelectEvent::Confirm(Some(label)) = event
+                        && let Some((_, show)) = SHOWS.iter().find(|(l, _)| l == label)
+                        && *show != tab.show
+                    {
+                        tab.show = *show;
                         tab.restart(cx);
                     }
                 },
@@ -203,11 +244,15 @@ impl GbMapsTab {
             grid,
             sort: GbMapSort::MostDownloaded,
             gamemode: None,
+            show: GbMapShow::All,
             search: String::new(),
             gamemodes: Vec::new(),
             search_input,
             sort_select,
             gamemode_select,
+            show_select,
+            installs: installs.downgrade(),
+            entry_states,
             debounce: None,
             mature: show_mature,
             mature_known,
@@ -249,6 +294,11 @@ impl GbMapsTab {
     /// The chosen gamemode; `None` lists every map.
     pub fn gamemode(&self) -> Option<u32> {
         self.gamemode
+    }
+
+    /// Whether the tab lists every synced map or only the library's.
+    pub fn show(&self) -> GbMapShow {
+        self.show
     }
 
     /// The search the tab queries, once typing has paused.
@@ -332,6 +382,20 @@ impl GbMapsTab {
         cx.notify();
     }
 
+    // Repaints the badges; the Installed view relists only when an entry's state changes, not
+    // on every progress tick.
+    fn installs_changed(&mut self, installs: Entity<GbAddonInstalls>, cx: &mut Context<Self>) {
+        cx.notify();
+        let states = entry_states(installs.read(cx).entries());
+        if states == self.entry_states {
+            return;
+        }
+        self.entry_states = states;
+        if self.show == GbMapShow::Installed {
+            self.restart(cx);
+        }
+    }
+
     // The first known value reads page one; a later flip relists with or without mature maps.
     fn mature_changed(&mut self, mature: Entity<MatureAddons>, cx: &mut Context<Self>) {
         let (known, show) = {
@@ -372,6 +436,7 @@ impl GbMapsTab {
             .with_gamemode(self.gamemode)
             .with_search(self.search.clone())
             .with_mature(self.mature)
+            .with_show(self.show)
     }
 
     // Reads the page after the last card on a pool thread; a page of an older query is dropped.
@@ -673,6 +738,11 @@ impl GbMapsTab {
                 192.,
                 Select::new(&self.gamemode_select).h_9().into_any_element(),
             ))
+            .child(select(
+                ids::MAPS_GB_SHOW,
+                SHOW_WIDTH,
+                Select::new(&self.show_select).h_9().into_any_element(),
+            ))
     }
 
     // Cards fill the grid; before the first card, a pending first page shows skeletons. With
@@ -700,7 +770,20 @@ impl GbMapsTab {
             return None;
         }
         let unfiltered = self.search.trim().is_empty() && self.gamemode.is_none();
-        if let Some(sync) = maps_sync(cx) {
+        // The library lists without the catalogue, so the sync neither explains nor fills it.
+        if self.show == GbMapShow::Installed && unfiltered {
+            return Some(empty_state_with_action(
+                ids::MAPS_GB_EMPTY,
+                IconName::Store,
+                "No maps installed",
+                Some(ids::STORE_EMPTY_HINT),
+                "Install a map from All maps.",
+                None,
+                cx,
+            ));
+        }
+        let all = self.show == GbMapShow::All;
+        if let Some(sync) = maps_sync(cx).filter(|_| all) {
             let sync = sync.read(cx);
             if sync.is_running() {
                 return None;
@@ -730,7 +813,7 @@ impl GbMapsTab {
             "Maps appear here after a sync with GameBanana."
         };
         // An empty catalogue with an idle sync (auto-sync off) offers the sync itself.
-        let sync = (unfiltered && maps_sync(cx).is_some()).then(|| {
+        let sync = (all && unfiltered && maps_sync(cx).is_some()).then(|| {
             Button::new(ids::MAPS_GB_SYNC)
                 .outline()
                 .label("Sync")
@@ -752,7 +835,7 @@ impl GbMapsTab {
     // the drawn cards.
     fn cards_grid(&self, cx: &mut Context<Self>) -> AnyElement {
         let this = cx.entity().downgrade();
-        let installs = GbAddonInstalls::global(cx).downgrade();
+        let installs = self.installs.clone();
         self.grid
             .render_sized(self.feed.items().len(), card_height, move |ix, _, cx| {
                 let card = this.upgrade().and_then(|tab| {
