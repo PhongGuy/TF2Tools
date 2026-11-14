@@ -36,6 +36,10 @@ pub struct SyncSummary {
 pub struct ProgressSink(tokio::sync::watch::Sender<SyncTick>);
 
 impl ProgressSink {
+    pub(crate) fn new(tx: tokio::sync::watch::Sender<SyncTick>) -> Self {
+        Self(tx)
+    }
+
     pub fn report(&self, fetched: u32, total: u32) {
         self.0.send_replace(SyncTick { fetched, total });
     }
@@ -103,39 +107,13 @@ impl SyncHub {
         if !tokio_bridge::is_running(cx) {
             tokio_bridge::init(cx);
         }
-        let (tx, mut rx) = tokio::sync::watch::channel(SyncTick::default());
-        let mut job = tokio_bridge::spawn(cx, (self.runner)(kind, force, ProgressSink(tx)));
-        // Publish the newest tick, then hold off one interval: at most ten repaints a second.
-        // The sink drops with the sync future, which ends the loop; a run that ends inside the
-        // hold-off cuts it short, so its outcome is recorded at once.
-        let task = cx.spawn(async move |this, cx| {
-            let joined = loop {
-                if rx.changed().await.is_err() {
-                    break job.await;
-                }
-                let tick = *rx.borrow_and_update();
-                if this
-                    .update(cx, |hub, cx| hub.set_tick(kind, tick, cx))
-                    .is_err()
-                {
-                    return;
-                }
-                let mut hold = cx.background_executor().timer(REPAINT_INTERVAL);
-                let ended = std::future::poll_fn(|waker| {
-                    if let Poll::Ready(joined) = Pin::new(&mut job).poll(waker) {
-                        return Poll::Ready(Some(joined));
-                    }
-                    Pin::new(&mut hold).poll(waker).map(|()| None)
-                })
-                .await;
-                if let Some(joined) = ended {
-                    break joined;
-                }
-            };
-            let outcome =
-                joined.unwrap_or_else(|e| Err(sync_stopped(format!("the sync stopped: {e}"))));
-            let _ = this.update(cx, |hub, cx| hub.finish(kind, outcome, cx));
-        });
+        let runner = Arc::clone(&self.runner);
+        let task = pump(
+            cx,
+            move |sink| runner(kind, force, sink),
+            move |hub, tick, cx| hub.set_tick(kind, tick, cx),
+            move |hub, outcome, cx| hub.finish(kind, outcome, cx),
+        );
         // A retry keeps the error it replaces, so the Settings card still shows it.
         let last_error = match self.states.remove(&kind) {
             Some(SyncState::Failed { error }) => Some(error),
@@ -237,11 +215,53 @@ impl SyncHub {
             }
         };
         // This drops the Running state's pump task, which is the caller; safe only while finish is
-        // the pump's last step, so add nothing after the call in start.
+        // the pump's last step, which `pump` guarantees.
         self.states.insert(kind, state);
         cx.emit(event);
         cx.notify();
     }
+}
+
+/// Runs one sync on tokio for entity `T`, handing it the newest tick at most once per
+/// `REPAINT_INTERVAL` and then the outcome. The sink drops with the sync future, which ends
+/// the loop; a run that ends inside the hold-off cuts it short, so its outcome lands at once.
+/// `on_finish` must be the task's last step, since it may drop the task that runs it.
+pub(crate) fn pump<T: 'static>(
+    cx: &mut Context<T>,
+    run: impl FnOnce(ProgressSink) -> SyncFuture,
+    on_tick: impl Fn(&mut T, SyncTick, &mut Context<T>) + 'static,
+    on_finish: impl FnOnce(&mut T, Result<SyncSummary, SyncFailure>, &mut Context<T>) + 'static,
+) -> Task<()> {
+    let (tx, mut rx) = tokio::sync::watch::channel(SyncTick::default());
+    let mut job = tokio_bridge::spawn(cx, run(ProgressSink::new(tx)));
+    cx.spawn(async move |this, cx| {
+        let joined = loop {
+            if rx.changed().await.is_err() {
+                break job.await;
+            }
+            let tick = *rx.borrow_and_update();
+            if this
+                .update(cx, |owner, cx| on_tick(owner, tick, cx))
+                .is_err()
+            {
+                return;
+            }
+            let mut hold = cx.background_executor().timer(REPAINT_INTERVAL);
+            let ended = std::future::poll_fn(|waker| {
+                if let Poll::Ready(joined) = Pin::new(&mut job).poll(waker) {
+                    return Poll::Ready(Some(joined));
+                }
+                Pin::new(&mut hold).poll(waker).map(|()| None)
+            })
+            .await;
+            if let Some(joined) = ended {
+                break joined;
+            }
+        };
+        let outcome =
+            joined.unwrap_or_else(|e| Err(sync_stopped(format!("the sync stopped: {e}"))));
+        let _ = this.update(cx, |owner, cx| on_finish(owner, outcome, cx));
+    })
 }
 
 /// The app's runner: `StoreClient::sync`, with core's outcome and error mapped to app types.

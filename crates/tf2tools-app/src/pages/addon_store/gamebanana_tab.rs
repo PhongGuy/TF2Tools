@@ -13,8 +13,9 @@ use gpui_kit::component::{ActiveTheme as _, Icon, IndexPath, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, ElementId, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString, Styled as _,
-    Subscription, Task, TestSupportExt as _, Window, div, point, px,
+    InteractiveElement as _, IntoElement, ParentElement as _, Render, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _, Window,
+    div, point, px,
 };
 use tf2tools_core::{
     AddonCard, AddonCategory, AddonCursor, AddonQuery, AddonSection, AddonSort, AddonStep,
@@ -52,15 +53,6 @@ pub fn search_placeholder(section: AddonSection) -> String {
     format!("Search {}...", section.title())
 }
 
-/// The subcategory Select's first row: "All gamemodes" for maps, "All" for add-on sections.
-pub fn category_all_label(section: AddonSection) -> &'static str {
-    if section == AddonSection::MAPS {
-        "All gamemodes"
-    } else {
-        "All"
-    }
-}
-
 /// The sort Select's labels, in menu order.
 const SORTS: [(&str, AddonSort); 2] = [
     ("Most downloaded", AddonSort::MostDownloaded),
@@ -79,18 +71,22 @@ pub struct CategoryOption {
 }
 
 impl CategoryOption {
-    // "All" first, then `children`, each row keyed under `select` by its id ("all" for None).
-    fn rows(select: &str, all: &str, children: &[AddonCategory]) -> Vec<CategoryOption> {
-        let row = |value: Option<u32>, title: SharedString| CategoryOption {
+    /// A row titled `title` for `value`, keyed under `select` by its id ("all" for None).
+    pub fn new(select: &str, value: Option<u32>, title: impl Into<SharedString>) -> Self {
+        CategoryOption {
             value,
-            title,
+            title: title.into(),
             id: ids::select_option(select, &value.map_or("all".into(), |i| i.to_string())),
-        };
-        std::iter::once(row(None, SharedString::new(all)))
+        }
+    }
+
+    // "All" first, then `children`.
+    fn rows(select: &str, all: &str, children: &[AddonCategory]) -> Vec<CategoryOption> {
+        std::iter::once(Self::new(select, None, SharedString::new(all)))
             .chain(
                 children
                     .iter()
-                    .map(|c| row(Some(c.id()), c.name().to_owned().into())),
+                    .map(|c| Self::new(select, Some(c.id()), c.name().to_owned())),
             )
             .collect()
     }
@@ -107,6 +103,7 @@ impl SelectItem for CategoryOption {
     fn render(&self, _: &mut Window, _: &mut App) -> impl IntoElement {
         div()
             .id(self.id.clone())
+            .aria_label(self.title.clone())
             .test_support()
             .child(self.title.clone())
     }
@@ -191,7 +188,7 @@ impl AddonTab {
         let labels = LabelOption::all(ids::ADDON_SORT, SORTS.iter().map(|(label, _)| *label));
         let sort_select =
             cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
-        let rows = CategoryOption::rows(ids::ADDON_CATEGORY, category_all_label(section), &[]);
+        let rows = CategoryOption::rows(ids::ADDON_CATEGORY, "All", &[]);
         let category_select =
             cx.new(|cx| SelectState::new(rows, Some(IndexPath::default()), window, cx));
         let rows = CategoryOption::rows(ids::ADDON_WEAPON, "All weapons", &[]);
@@ -386,11 +383,7 @@ impl AddonTab {
         cx: &mut Context<Self>,
     ) {
         if parent == self.section.root_category() {
-            let rows = CategoryOption::rows(
-                ids::ADDON_CATEGORY,
-                category_all_label(self.section),
-                &children,
-            );
+            let rows = CategoryOption::rows(ids::ADDON_CATEGORY, "All", &children);
             self.category_select
                 .update(cx, |select, cx| select.set_items(rows, window, cx));
             self.categories = children;

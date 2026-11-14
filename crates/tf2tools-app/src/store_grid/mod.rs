@@ -912,7 +912,7 @@ impl StoreGrid {
 
 // Whether two search texts are the same query: equal, or both blank, since a blank search is
 // no filter. Non-blank text compares exactly, as core matches its spaces literally.
-fn same_search(a: &str, b: &str) -> bool {
+pub(crate) fn same_search(a: &str, b: &str) -> bool {
     a == b || (a.trim().is_empty() && b.trim().is_empty())
 }
 

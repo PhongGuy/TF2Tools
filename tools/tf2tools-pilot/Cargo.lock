@@ -6329,6 +6329,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a611d15b50743feb4c76b7d03edcb0e64f399c26961e4efe6975bc398be6aa3d"
 
 [[package]]
+name = "rars"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f10c4922c8ceb429e2eed0b2f61672f673d53a42fdfeb07fd0e143777ee9a979"
+dependencies = [
+ "aho-corasick",
+ "crc32fast",
+]
+
+[[package]]
 name = "rav1e"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7910,6 +7920,7 @@ dependencies = [
  "rodio",
  "rust-embed",
  "serde_json",
+ "tempfile",
  "tf2tools-core",
  "thiserror 2.0.21",
  "tokio",
@@ -7922,12 +7933,15 @@ name = "tf2tools-core"
 version = "6.0.2"
 dependencies = [
  "base64 0.23.1",
+ "bzip2",
  "chrono",
  "dirs 7.0.0",
+ "flate2",
  "image",
  "libc",
  "md-5 0.11.0",
  "minisign-verify",
+ "rars",
  "reqwest",
  "rusqlite",
  "semver",

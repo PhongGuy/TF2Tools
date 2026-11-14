@@ -230,10 +230,43 @@ const M18_COLUMNS: &str = "
 /// The column migration 19 adds, as the schema should hold it.
 const M19_COLUMNS: &str = "ALTER TABLE logstf_players ADD COLUMN nickname TEXT;";
 
+/// The GameBanana map tables and indexes migration 20 adds, as the schema should hold them.
+const M20_TABLES: &str = "
+    CREATE TABLE IF NOT EXISTS store_gb_maps (
+        gb_id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        author TEXT NOT NULL DEFAULT '',
+        thumbnail_url TEXT,
+        like_count INTEGER NOT NULL DEFAULT 0,
+        view_count INTEGER NOT NULL DEFAULT 0,
+        date_added INTEGER NOT NULL DEFAULT 0,
+        date_modified INTEGER NOT NULL DEFAULT 0,
+        category_id INTEGER,
+        category_name TEXT,
+        gamemode_id INTEGER,
+        download_rank INTEGER NOT NULL,
+        obsolete INTEGER NOT NULL DEFAULT 0,
+        mature INTEGER NOT NULL DEFAULT 0,
+        profile_url TEXT NOT NULL DEFAULT '',
+        fetched_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS store_gb_map_categories (
+        category_id INTEGER PRIMARY KEY,
+        name TEXT NOT NULL,
+        gamemode_id INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_store_gb_maps_rank ON store_gb_maps(download_rank, gb_id DESC);
+    CREATE INDEX IF NOT EXISTS idx_store_gb_maps_date ON store_gb_maps(date_added DESC, gb_id DESC);
+    CREATE INDEX IF NOT EXISTS idx_store_gb_maps_mode_rank
+        ON store_gb_maps(gamemode_id, download_rank, gb_id DESC);
+    CREATE INDEX IF NOT EXISTS idx_store_gb_maps_mode_date
+        ON store_gb_maps(gamemode_id, date_added DESC, gb_id DESC);
+";
+
 /// The v5 fixture's shape plus migration 10's indexes, plus migration 12's map tables,
 /// migration 13's mastercomfig tables, migration 14's add-on table, migration 15's logs.tf
-/// tables, migration 16's weapon rows, migration 17's HUD checks, migration 18's damage taken and migration 19's
-/// nicknames:
+/// tables, migration 16's weapon rows, migration 17's HUD checks, migration 18's damage taken, migration 19's
+/// nicknames and migration 20's GameBanana maps:
 /// the schema v6 opens to.
 pub fn current_shape() -> SchemaShape {
     let conn = v5_fixture_connection();
@@ -245,6 +278,7 @@ pub fn current_shape() -> SchemaShape {
     conn.execute_batch(M17_TABLES).unwrap();
     conn.execute_batch(M18_COLUMNS).unwrap();
     conn.execute_batch(M19_COLUMNS).unwrap();
+    conn.execute_batch(M20_TABLES).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape

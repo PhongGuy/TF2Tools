@@ -16,6 +16,7 @@ use crate::audio::{AudioOut, RecordingAudio, RodioOut};
 use crate::crash::{self, notice::CrashNotice};
 use crate::crosshair_repair;
 use crate::local_messages::describe_startup;
+use crate::maps_sync::{MapsSync, gb_maps_runner, maps_sync};
 use crate::mastercomfig_restore;
 use crate::old_v4::{self, OldV4Notice};
 use crate::picker::{NativePicker, PathPicker};
@@ -101,7 +102,7 @@ impl Boot {
 /// Opens the 1200x900 window (min 800x600, title "TF2Tools", app id com.tf2tools.app) on the loading view,
 /// opens `Services`, reads settings and the HUD list off the UI thread, then shows the shell or the error view.
 /// After the shell's first frame it runs `resolve_tf2` in `run_blocking` and stores the result in `Tf2State`,
-/// repairs pre-6.0.2 crosshair scripts once TF2 is found, starts the tokio runtime, checks for an update once and, when `auto_sync`, syncs every store.
+/// repairs pre-6.0.2 crosshair scripts once TF2 is found, starts the tokio runtime, checks for an update once and, when `auto_sync`, syncs every store and the maps catalogue.
 pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
     let Boot {
         data,
@@ -175,6 +176,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                     cx.set_global(services);
                     // The shell subscribes to the hub, so the hub must exist before it.
                     SyncHub::install(cx, store_runner(store.clone()));
+                    MapsSync::install(cx, gb_maps_runner(store.clone()));
                     RemoteImages::install(cx, store_fetch(store));
                     StoreDownloads::install(cx);
                     crate::pages::maps::MapListSource::install(cx, store_for_maps);
@@ -197,6 +199,9 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                         updates.update(cx, |updates, cx| updates.check(cx));
                         if auto_sync && let Some(hub) = sync_hub(cx) {
                             hub.update(cx, |hub, cx| hub.start_all(cx));
+                        }
+                        if auto_sync && let Some(maps) = maps_sync(cx) {
+                            maps.update(cx, |maps, cx| maps.start(false, cx));
                         }
                     });
                     AppRoot::Ready(shell)

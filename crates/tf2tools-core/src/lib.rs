@@ -127,10 +127,10 @@ pub use settings::{Settings, Volume};
 pub use store::{
     AddonCard, AddonCatalog, AddonCategory, AddonCredit, AddonCreditGroup, AddonCursor, AddonFile,
     AddonProfile, AddonQuery, AddonSection, AddonSort, AddonStep, DownloadPhase, DownloadProgress,
-    Endpoints, GbAddonDownload, GbMapDownload, INDEX_STEP_CALLS, MastercomfigRelease,
-    SEARCH_STEP_CALLS, STEP_CARDS, StoreCard, StoreClient, StoreConfig, StoreCursor, StoreFile,
-    StoreItem, StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome,
-    SyncProgress,
+    Endpoints, GbAddonDownload, GbMapCard, GbMapCursor, GbMapDownload, GbMapGamemode, GbMapLibrary,
+    GbMapQuery, GbMapShow, GbMapSort, INDEX_STEP_CALLS, MastercomfigRelease, SEARCH_STEP_CALLS,
+    STEP_CARDS, StoreCard, StoreClient, StoreConfig, StoreCursor, StoreFile, StoreItem,
+    StoreItemId, StoreKind, StoreQuery, StoreSort, StoreSyncStatus, SyncOutcome, SyncProgress,
 };
 pub use store::{CommunityMap, MapEntry, MapSource, MapState, parse_serveme_maps};
 pub use texture::{
