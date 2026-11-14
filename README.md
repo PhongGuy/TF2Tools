@@ -149,10 +149,14 @@ MIT, see [LICENSE](LICENSE). The bundled Inter font is under the SIL Open Font L
 - **GameBanana:** the HUDs, sounds, crosshairs and other items in the GameBanana stores come from [GameBanana](https://gamebanana.com), owned and run by GameBanana Co LLC. Each item belongs to the creators credited on its GameBanana page, and TF2Tools claims no rights to it. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with GameBanana or GameBanana Co LLC.
 - **serveme.tf:** the community map list on the Maps page, and its map files, come from [serveme.tf](https://serveme.tf). Each map belongs to its makers. TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with serveme.tf.
 - **logs.tf:** the stats and logs on the logs.tf page come from [logs.tf](https://logs.tf). TF2Tools is not made, sponsored, endorsed or licensed by, or affiliated with logs.tf.
+- **Built-in crosshairs:** made by players over many years. crosshair001 to crosshair200 are Kenney's [Crosshair Pack](https://kenney.nl/assets/crosshair-pack) (CC0). The cpma, ql, wings and similar sets come from [joshuawn's guide](https://www.teamfortress.tv/30866/guide-weapon-specific-custom-crosshairs), with crosshairs by Watson, Quik, povohat and RainofLight. crosshair1 to crosshair7 are Valve's own. We could not trace the makers of the rest; if you made one, open an issue and we will credit you or take it out. The full list is in `licenses/crosshairs-notice.txt`.
+- **Graphics page:** the preset descriptions come from the [mastercomfig app](https://github.com/mastercomfig/comfig-app), Copyright (c) 2016-2026 mastercoms, under the MIT License, in `licenses/comfig-app-MIT.txt`.
+- **HUD Maker:** the HUD option data comes from CriticalFlaw's HUD editor project, under the MIT License, in `licenses/HUD-option-schemas-MIT.txt`.
+- **RAR files:** TF2Tools opens RAR downloads with the rars library, under the Apache License 2.0, in `licenses/rars-Apache-2.0.txt`.
 
 ### Valve
 
-Team Fortress 2, its weapon icons, crosshairs and other game artwork are the property of Valve Corporation. TF2Tools uses them with credit, in a free fan tool for players of the game. The weapon icons in the crosshair list are read from your own TF2 install.
+Team Fortress 2, its weapon icons, its own crosshairs and other game artwork are the property of Valve Corporation. TF2Tools uses them with credit, in a free fan tool for players of the game. The weapon icons in the crosshair list are read from your own TF2 install.
 
 Valve, the Valve logo, Steam, the Steam logo, Team Fortress and the Team Fortress logo are trademarks and/or registered trademarks of Valve Corporation in the U.S. and/or other countries. All other trademarks are property of their respective owners.
 
