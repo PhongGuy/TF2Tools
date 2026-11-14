@@ -7,6 +7,7 @@ use std::ops::Range;
 use std::rc::Rc;
 
 use gpui_kit::assets::IconName;
+use gpui_kit::component::button::Button;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
 use gpui_kit::component::{ActiveTheme as _, Icon, IndexPath, h_flex, v_flex};
@@ -25,7 +26,7 @@ use crate::maps_sync::{MapsSync, MapsSyncEvent, maps_sync};
 use crate::mature::MatureAddons;
 use crate::pages::addon_store::card::{OpenAddon, card_height, gb_addon_card};
 use crate::pages::addon_store::gamebanana_tab::CategoryOption;
-use crate::pages::common::{SkeletonTop, empty_state_card, skeleton_cards};
+use crate::pages::common::{SkeletonTop, empty_state_with_action, skeleton_cards};
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::{OpError, run_blocking};
 use crate::store_grid::feed::{
@@ -689,21 +690,16 @@ impl GbMapsTab {
         if self.error.is_some() || !self.feed.is_end() {
             return None;
         }
+        let unfiltered = self.search.trim().is_empty() && self.gamemode.is_none();
         if let Some(sync) = maps_sync(cx) {
             let sync = sync.read(cx);
             if sync.is_running() {
                 return None;
             }
             // The sync's failure explains an empty catalogue, not a filter that matches nothing.
-            let unfiltered = self.search.trim().is_empty() && self.gamemode.is_none();
             if let Some(message) = sync.error().filter(|_| unfiltered) {
                 let message = message.to_owned();
-                let sync = maps_sync(cx).map(|s| s.downgrade());
-                let on_retry = move |_: &mut Window, cx: &mut App| {
-                    if let Some(sync) = sync.as_ref().and_then(|s| s.upgrade()) {
-                        sync.update(cx, |sync, cx| sync.start(false, cx));
-                    }
-                };
+                let on_retry = move |_: &mut Window, cx: &mut App| start_maps_sync(cx);
                 return Some(
                     error_line(
                         ids::MAPS_GB_ERROR,
@@ -724,12 +720,21 @@ impl GbMapsTab {
         } else {
             "Maps appear here after a sync with GameBanana."
         };
-        Some(empty_state_card(
+        // An empty catalogue with an idle sync (auto-sync off) offers the sync itself.
+        let sync = (unfiltered && maps_sync(cx).is_some()).then(|| {
+            Button::new(ids::MAPS_GB_SYNC)
+                .outline()
+                .label("Sync")
+                .on_click(|_, _, cx| start_maps_sync(cx))
+                .into_any_element()
+        });
+        Some(empty_state_with_action(
             ids::MAPS_GB_EMPTY,
             IconName::Store,
             "No maps found",
             Some(ids::STORE_EMPTY_HINT),
             hint,
+            sync,
             cx,
         ))
     }
@@ -777,6 +782,13 @@ impl GbMapsTab {
                     cx,
                 )
             })
+    }
+}
+
+// Starts a maps sync that is not forced; a no-op without the app's maps sync or while one runs.
+fn start_maps_sync(cx: &mut App) {
+    if let Some(sync) = maps_sync(cx) {
+        sync.update(cx, |sync, cx| sync.start(false, cx));
     }
 }
 

@@ -2553,6 +2553,8 @@ pub const MAPS_GB_EMPTY: &str = "maps-gb-empty";
 pub const MAPS_GB_ERROR: &str = "maps-gb-error";
 /// Retries a failed GameBanana maps read or sync.
 pub const MAPS_GB_RETRY: &str = "maps-gb-retry";
+/// Starts the maps sync from the empty GameBanana maps tab, labelled "Sync".
+pub const MAPS_GB_SYNC: &str = "maps-gb-sync";
 
 /// One source's button in the strip, labelled with its title: "maps-source:<key>".
 pub fn maps_source(key: &str) -> ElementId {

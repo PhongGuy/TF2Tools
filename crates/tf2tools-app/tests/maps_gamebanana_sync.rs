@@ -220,3 +220,41 @@ fn a_gamemode_gone_after_a_sync_falls_back_to_every_map(cx: &mut TestAppContext)
     });
     assert_eq!(cx.update(|cx| tab.read(cx).gamemode()), None);
 }
+
+// With auto-sync off nothing starts the maps sync, so the empty tab offers it.
+#[gpui_kit::test]
+fn an_empty_catalogue_with_an_idle_sync_offers_sync(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = maps_shell(cx, &env, &server);
+    let (_sync, runs) = fake_maps_sync(cx);
+    let page = open_maps(cx, &s);
+    let tab = open_gamebanana(cx, &s, &page);
+    assert!(support::present(cx, s.win, ids::MAPS_GB_EMPTY));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::MAPS_GB_SYNC).as_deref(),
+        Some("Sync")
+    );
+    support::click_id(cx, s.win, ids::MAPS_GB_SYNC);
+    cx.run_until_parked();
+    assert!(!runs.try_recv().expect("Sync starts a run").force);
+    support::settle(cx, s.win);
+    assert!(
+        !support::present(cx, s.win, ids::MAPS_GB_SYNC),
+        "a running sync shows the banner instead"
+    );
+
+    // A search that matches nothing is no reason to sync.
+    drop(runs);
+    support::wait_hub(cx, "the dropped run to end", |cx| {
+        support::settle(cx, s.win);
+        support::present(cx, s.win, ids::MAPS_GB_ERROR)
+    });
+    cx.update(|cx| tab.update(cx, |t, cx| t.search_typed("zzz".to_owned(), cx)));
+    cx.executor().advance_clock(SEARCH_DEBOUNCE);
+    support::wait_real(cx, "the search", |cx| {
+        cx.update(|cx| tab.read(cx).search() == "zzz" && tab.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+    assert!(support::present(cx, s.win, ids::MAPS_GB_EMPTY));
+    assert!(!support::present(cx, s.win, ids::MAPS_GB_SYNC));
+}
