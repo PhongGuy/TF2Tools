@@ -716,10 +716,13 @@ impl GbMapsTab {
                 );
             }
         }
-        let hint = if self.search.trim().is_empty() {
+        // The hint names what narrowed the grid; with nothing narrowing it, the catalogue is empty.
+        let hint = if !self.search.trim().is_empty() {
+            "Try another search."
+        } else if self.gamemode.is_some() {
             "Try another gamemode."
         } else {
-            "Try another search."
+            "Maps appear here after a sync with GameBanana."
         };
         Some(empty_state_card(
             ids::MAPS_GB_EMPTY,

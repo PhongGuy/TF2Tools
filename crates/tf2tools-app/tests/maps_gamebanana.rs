@@ -72,6 +72,10 @@ fn an_empty_catalogue_says_no_maps_found(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::MAPS_GB_EMPTY).as_deref(),
         Some("No maps found")
     );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::STORE_EMPTY_HINT).as_deref(),
+        Some("Maps appear here after a sync with GameBanana.")
+    );
     assert!(!support::present(cx, s.win, ids::MAPS_GB_LOADING));
 }
 
@@ -222,5 +226,9 @@ fn search_matches_name_or_author_locally_and_says_when_nothing_does(cx: &mut Tes
     support::wait_real(cx, "no results", |cx| shown(cx, &tab).is_empty());
     support::settle(cx, s.win);
     assert!(support::present(cx, s.win, ids::MAPS_GB_EMPTY));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::STORE_EMPTY_HINT).as_deref(),
+        Some("Try another search.")
+    );
     assert_eq!(server.requests_where(|p| p.starts_with("/apiv11")), 0);
 }

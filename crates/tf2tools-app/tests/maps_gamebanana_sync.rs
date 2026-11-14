@@ -185,6 +185,10 @@ fn a_search_or_gamemode_matching_nothing_says_no_maps_found_despite_a_failed_syn
     support::settle(cx, s.win);
     assert!(support::present(cx, s.win, ids::MAPS_GB_EMPTY), "gamemode");
     assert!(!support::present(cx, s.win, ids::MAPS_GB_ERROR), "gamemode");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::STORE_EMPTY_HINT).as_deref(),
+        Some("Try another gamemode.")
+    );
 }
 
 #[gpui_kit::test]
