@@ -217,7 +217,40 @@ pub fn describe_gb_fetch(err: &GbAddonFetchError) -> StoreFailure {
             "GameBanana sent something TF2Tools couldn't read. Try again later."
         }
         GbAddonFetchError::Interrupted { .. } => DL_STOPPED,
+        GbAddonFetchError::Archive(ArchiveError::TooLarge { .. }) => {
+            "This download is too big for TF2Tools to install."
+        }
         GbAddonFetchError::Archive(_) | _ => DL_UNKNOWN,
+    };
+    StoreFailure::new(message, err.to_string())
+}
+
+/// A failed map download or unpack in player words: the size and layout refusals name
+/// maps, the rest read as for any add-on.
+pub fn describe_gb_map_fetch(err: &GbAddonFetchError) -> StoreFailure {
+    let message = match err {
+        GbAddonFetchError::UnknownLayout { payloads: 0, .. } => {
+            "No playable map was found in this download."
+        }
+        GbAddonFetchError::UnknownLayout { .. } => {
+            "This download holds too many maps for TF2Tools to install."
+        }
+        GbAddonFetchError::Archive(ArchiveError::TooLarge { .. }) => {
+            "This download's maps are too big for TF2Tools to install."
+        }
+        GbAddonFetchError::TooLarge { .. } => "This map is too big for TF2Tools to install.",
+        GbAddonFetchError::NoFiles { .. } => "This map has no files to install.",
+        GbAddonFetchError::VirusScan { .. }
+        | GbAddonFetchError::RateLimited { .. }
+        | GbAddonFetchError::Http { .. }
+        | GbAddonFetchError::Network { .. }
+        | GbAddonFetchError::EmptyBody { .. }
+        | GbAddonFetchError::ChecksumMismatch { .. }
+        | GbAddonFetchError::Archive(_)
+        | GbAddonFetchError::OnlyExe { .. }
+        | GbAddonFetchError::Io { .. }
+        | GbAddonFetchError::Interrupted { .. }
+        | _ => return describe_gb_fetch(err),
     };
     StoreFailure::new(message, err.to_string())
 }

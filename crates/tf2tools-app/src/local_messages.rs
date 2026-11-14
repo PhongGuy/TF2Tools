@@ -3,9 +3,9 @@
 
 use tf2tools_core::{
     ApplyProfileError, CopyHudError, DetectError, FontInstallError, GbAddonInstallError,
-    HudLoadError, ImportError, InstallError, KeepHudError, LibraryError, LogError, MakeHudError,
-    PaintError, PngReadError, PngWriteError, ProfileError, QueryError, SettingsError,
-    UpdateCopyError, WavError,
+    GbMapInstallError, HudLoadError, ImportError, InstallError, KeepHudError, LibraryError,
+    LogError, MakeHudError, PaintError, PngReadError, PngWriteError, ProfileError, QueryError,
+    SettingsError, UpdateCopyError, WavError,
 };
 
 use crate::audio::AudioError;
@@ -93,6 +93,46 @@ pub fn gb_install_op(err: &GbAddonInstallError, action: &'static str) -> OpError
         action
     };
     describe_gb_install(err).into_op(action)
+}
+
+/// A failed map install or update in player words.
+pub fn describe_gb_map_install(err: &GbMapInstallError) -> LocalFailure {
+    let message = match err {
+        GbMapInstallError::Tf2Running => CLOSE_TF2_TEXT.to_owned(),
+        GbMapInstallError::GameMissing { .. } => GAME_MOVED.to_owned(),
+        GbMapInstallError::AlreadyPresent { names } => already_have(names, false),
+        GbMapInstallError::Io { .. } => "Couldn't write the map into TF2. If TF2 is running, close it and try again. Otherwise make sure your disk has free space.".to_owned(),
+        GbMapInstallError::Database { .. } => LIBRARY_UPDATE.to_owned(),
+        GbMapInstallError::NothingChosen | GbMapInstallError::UnknownMap { .. } | _ => {
+            UNKNOWN.to_owned()
+        }
+    };
+    LocalFailure::new(message, err.to_string())
+}
+
+/// The toast for a failed map operation titled `action`: "Close TF2 first" when TF2 runs.
+pub fn gb_map_install_op(err: &GbMapInstallError, action: &'static str) -> OpError {
+    let action = if matches!(err, GbMapInstallError::Tf2Running) {
+        CLOSE_TF2
+    } else {
+        action
+    };
+    describe_gb_map_install(err).into_op(action)
+}
+
+/// "You already have cp_a, cp_b and cp_c." When `serveme`, one of them came from the
+/// serveme.tf tab, which is where the player removes it.
+pub fn already_have(names: &[String], serveme: bool) -> String {
+    let list = match names {
+        [] => String::new(),
+        [one] => one.clone(),
+        [rest @ .., last] => format!("{} and {last}", rest.join(", ")),
+    };
+    let mut text = format!("You already have {list}.");
+    if serveme {
+        text.push_str(" Remove it on the serveme.tf tab to use GameBanana's version.");
+    }
+    text
 }
 
 /// A failed read or change of the library in player words; `detail` is the error's own text.

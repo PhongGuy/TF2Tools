@@ -726,3 +726,63 @@ fn addon_fetch_failures_read_as_plain_words() {
     });
     assert!(describe_gb_fetch(&unsafe_path).detail.contains("../x"));
 }
+
+#[test]
+fn map_fetch_failures_read_in_map_words() {
+    use tf2tools_app::store_messages::{describe_gb_fetch, describe_gb_map_fetch};
+    use tf2tools_core::{ArchiveError, GbAddonFetchError, GbId};
+    let big = || {
+        GbAddonFetchError::Archive(ArchiveError::TooLarge {
+            path: PathBuf::from("/tmp/a.bz2"),
+            limit: 1,
+        })
+    };
+    let cases: Vec<(GbAddonFetchError, &str)> = vec![
+        (
+            GbAddonFetchError::UnknownLayout {
+                file_name: "a.zip".into(),
+                payloads: 0,
+            },
+            "No playable map was found in this download.",
+        ),
+        (
+            GbAddonFetchError::UnknownLayout {
+                file_name: "a.zip".into(),
+                payloads: 65,
+            },
+            "This download holds too many maps for TF2Tools to install.",
+        ),
+        (
+            big(),
+            "This download's maps are too big for TF2Tools to install.",
+        ),
+        (
+            GbAddonFetchError::TooLarge {
+                url: GB_URL.into(),
+                limit: 1,
+            },
+            "This map is too big for TF2Tools to install.",
+        ),
+        (
+            GbAddonFetchError::NoFiles {
+                gb_id: GbId::new(1),
+            },
+            "This map has no files to install.",
+        ),
+        (
+            GbAddonFetchError::Network {
+                url: GB_URL.into(),
+                message: "reset".into(),
+            },
+            "Couldn't reach GameBanana. Check your internet connection and try again.",
+        ),
+    ];
+    for (err, want) in cases {
+        assert_eq!(describe_gb_map_fetch(&err).message, want, "{err:?}");
+        support::assert_plain(want);
+    }
+    assert_eq!(
+        describe_gb_fetch(&big()).message,
+        "This download is too big for TF2Tools to install."
+    );
+}
