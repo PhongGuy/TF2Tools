@@ -1,8 +1,9 @@
 //! The Maps page's GameBanana tab with a library: badges, the update check and the Installed view.
 
 use gpui_kit::{AnyWindowHandle, TestAppContext};
+use tf2tools_app::gb_addon_installs::GbAddonInstalls;
 use tf2tools_app::ids;
-use tf2tools_core::{GbId, GbMapShow};
+use tf2tools_core::{AddonSection, GbId, GbMapShow};
 
 use crate::support;
 use crate::support::maps::{
@@ -158,4 +159,44 @@ fn removing_a_gone_map_drops_its_installed_card(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::CONFIRM_OK);
     support::wait_real(cx, "the card gone", |cx| shown(cx, &tab) == [10, 11, 12]);
     assert!(!env.game.join("tf/custom/tf2tools-gb-99-gone_map").exists());
+}
+
+#[gpui_kit::test]
+fn install_progress_leaves_the_installed_list_alone(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(
+        10,
+        "cp_alpha",
+        &[("cp_alpha.bsp", bsp(&[7; 256 * 1024]), 100)],
+    );
+    let s = maps_shell_found(cx, &env, &server);
+    seed_maps(&env);
+    let page = open_maps(cx, &s);
+    let tab = open_gamebanana(cx, &s, &page);
+    show_installed(cx, s.win);
+    support::wait_real(cx, "the empty library", |cx| {
+        support::label_of(cx, s.win, ids::MAPS_GB_EMPTY).as_deref() == Some("No maps installed")
+    });
+    let installs = cx.update(GbAddonInstalls::global);
+    let before = cx.update(|cx| tab.read(cx).requeries());
+    let profile = crate::gb_addon_installs::profile(cx, 10);
+    let started = cx.update(|cx| {
+        installs.update(cx, |i, cx| {
+            i.install(AddonSection::MAPS, profile, s.win, cx)
+        })
+    });
+    assert!(started);
+    // Every stage and byte count notifies; none of them changes an entry's state.
+    let mut stages = 0;
+    support::wait_real(cx, "the install", |cx| {
+        let busy = cx.update(|cx| installs.read(cx).is_busy());
+        if busy {
+            stages += 1;
+            assert_eq!(cx.update(|cx| tab.read(cx).requeries()), before);
+        }
+        !busy
+    });
+    assert!(stages > 0, "the install ran while watched");
+    support::wait_real(cx, "the installed card", |cx| shown(cx, &tab) == [10]);
+    assert_eq!(cx.update(|cx| tab.read(cx).requeries()), before + 1);
 }

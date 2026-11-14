@@ -392,7 +392,7 @@ impl GbMapsTab {
         }
         self.entry_states = states;
         if self.show == GbMapShow::Installed {
-            self.restart(cx);
+            self.requery(cx);
         }
     }
 
