@@ -3,9 +3,9 @@
 
 use tf2tools_core::{
     ApplyProfileError, CopyHudError, DetectError, FontInstallError, GbAddonInstallError,
-    GbMapInstallError, HudLoadError, ImportError, InstallError, KeepHudError, LibraryError,
-    LogError, MakeHudError, PaintError, PngReadError, PngWriteError, ProfileError, QueryError,
-    SettingsError, UpdateCopyError, WavError,
+    GbMapInstallError, GbMapRemoveError, HudLoadError, ImportError, InstallError, KeepHudError,
+    LibraryError, LogError, MakeHudError, PaintError, PngReadError, PngWriteError, ProfileError,
+    QueryError, SettingsError, UpdateCopyError, WavError,
 };
 
 use crate::audio::AudioError;
@@ -124,6 +124,30 @@ pub fn gb_map_install_op(err: &GbMapInstallError, action: &'static str) -> OpErr
         action
     };
     describe_gb_map_install(err).into_op(action)
+}
+
+/// A failed map remove in player words.
+pub fn describe_gb_map_remove(err: &GbMapRemoveError) -> LocalFailure {
+    let message = match err {
+        GbMapRemoveError::Tf2Running => CLOSE_TF2_TEXT,
+        GbMapRemoveError::Io { .. } => {
+            "Couldn't delete the map's files. Close TF2 if it is running, then try again."
+        }
+        GbMapRemoveError::NotInLibrary { .. } => "This map is no longer in your library.",
+        GbMapRemoveError::Database { .. } => LIBRARY_UPDATE,
+        GbMapRemoveError::NotAMap { .. } | _ => UNKNOWN,
+    };
+    LocalFailure::new(message, err.to_string())
+}
+
+/// The toast for a failed map remove titled `action`: "Close TF2 first" when TF2 runs.
+pub fn gb_map_remove_op(err: &GbMapRemoveError, action: &'static str) -> OpError {
+    let action = if matches!(err, GbMapRemoveError::Tf2Running) {
+        CLOSE_TF2
+    } else {
+        action
+    };
+    describe_gb_map_remove(err).into_op(action)
 }
 
 /// "You already have cp_a, cp_b and cp_c." When `serveme`, one of them came from the

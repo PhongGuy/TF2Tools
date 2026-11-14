@@ -211,3 +211,117 @@ fn an_update_waits_for_tf2_then_replaces_the_maps_in_place(cx: &mut TestAppConte
     assert_eq!(std::fs::read(path).unwrap(), bsp(b"new"));
     assert_eq!(entry(cx, 34).unwrap().file_date(), 300);
 }
+
+#[gpui_kit::test]
+fn remove_waits_for_tf2_then_deletes_the_folder(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(35, "Alpha", &[("cp_alpha.bsp", bsp(b"a"), 100)]);
+    let w = window(cx, &env, &server);
+    install(cx, &w, 35);
+    idle(cx);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    run(cx, &w, |i, win, cx| i.remove(GbId::new(35), win, cx));
+    toast_is(
+        cx,
+        w.win,
+        "Close TF2 first. TF2 is running. Close the game, then try again.",
+    );
+    idle(cx);
+    assert!(folder(&env, 35, "alpha").is_dir());
+    cx.update(|cx| Tf2Probe::install(cx, || false));
+    run(cx, &w, |i, win, cx| i.remove(GbId::new(35), win, cx));
+    toast_is(cx, w.win, "Map removed. Alpha");
+    idle(cx);
+    assert!(!folder(&env, 35, "alpha").exists());
+    assert!(entry(cx, 35).is_none());
+}
+
+#[gpui_kit::test]
+fn install_again_downloads_even_while_tf2_runs_and_says_restart(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(36, "Alpha", &[("cp_alpha.bsp", bsp(b"a"), 100)]);
+    let w = window(cx, &env, &server);
+    install(cx, &w, 36);
+    idle(cx);
+    std::fs::remove_dir_all(folder(&env, 36, "alpha")).unwrap();
+    let i = installs(cx);
+    cx.update(|cx| i.update(cx, |i, cx| i.reload(cx)));
+    support::wait_real(cx, "not installed", |cx| {
+        cx.update(|cx| {
+            i.read(cx)
+                .entry(GbId::new(36))
+                .is_some_and(|e| !e.is_installed())
+        })
+    });
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    run(cx, &w, |i, win, cx| i.reinstall(GbId::new(36), win, cx));
+    toast_is(cx, w.win, "Installed. Restart TF2 to play it. Alpha");
+    assert!(
+        folder(&env, 36, "alpha")
+            .join("maps/cp_alpha.bsp")
+            .is_file()
+    );
+}
+
+// Remove reads only the library row, so a map GameBanana no longer serves still goes.
+#[gpui_kit::test]
+fn remove_works_when_gamebanana_no_longer_has_the_map(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(38, "Alpha", &[("cp_alpha.bsp", bsp(b"a"), 100)]);
+    let w = window(cx, &env, &server);
+    install(cx, &w, 38);
+    idle(cx);
+    server.reset();
+    run(cx, &w, |i, win, cx| i.remove(GbId::new(38), win, cx));
+    toast_is(cx, w.win, "Map removed. Alpha");
+    idle(cx);
+    assert!(!folder(&env, 38, "alpha").exists());
+    assert!(entry(cx, 38).is_none());
+}
+
+#[gpui_kit::test]
+fn install_again_with_tf2_closed_reads_as_a_map(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(39, "Alpha", &[("cp_alpha.bsp", bsp(b"a"), 100)]);
+    let w = window(cx, &env, &server);
+    install(cx, &w, 39);
+    idle(cx);
+    std::fs::remove_dir_all(folder(&env, 39, "alpha")).unwrap();
+    run(cx, &w, |i, win, cx| i.reinstall(GbId::new(39), win, cx));
+    idle(cx);
+    // The first install's toast is still up, so Install again's is the second of its kind.
+    let labels = support::toast_labels(cx, w.win);
+    let maps = labels
+        .iter()
+        .filter(|l| *l == "Map installed. Alpha")
+        .count();
+    assert_eq!(maps, 2, "{labels:?}");
+    assert!(
+        folder(&env, 39, "alpha")
+            .join("maps/cp_alpha.bsp")
+            .is_file()
+    );
+}
+
+#[gpui_kit::test]
+fn install_again_of_a_gone_map_says_remove_it(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(42, "Alpha", &[("cp_alpha.bsp", bsp(b"a"), 100)]);
+    let w = window(cx, &env, &server);
+    install(cx, &w, 42);
+    idle(cx);
+    std::fs::remove_dir_all(folder(&env, 42, "alpha")).unwrap();
+    server.reset();
+    server.mount_gb_profile(
+        42,
+        serde_json::json!({"_idRow": 42, "_sName": "Alpha", "_bIsTrashed": true}),
+    );
+    run(cx, &w, |i, win, cx| i.reinstall(GbId::new(42), win, cx));
+    toast_is(
+        cx,
+        w.win,
+        "Couldn't install the map. This map is no longer on GameBanana, so it can't be installed again. Remove it.",
+    );
+    idle(cx);
+    assert!(entry(cx, 42).unwrap().is_gone());
+}

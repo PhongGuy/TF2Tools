@@ -16,7 +16,7 @@ use tf2tools_core::{
 use crate::library_events::LibraryEvents;
 use crate::local_messages::{
     LocalFailure, MAP_RESTART, MAP_SKIPPED, already_have, describe_library, gb_install_op,
-    gb_map_install_op,
+    gb_map_install_op, gb_map_remove_op,
 };
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::payload_checklist::{ChecklistItem, open_map_checklist, open_payload_checklist};
@@ -109,6 +109,12 @@ const MAP_UPDATE: Titles = Titles {
     done: "Map updated",
     failed: "Couldn't update the map",
     update: true,
+};
+
+const MAP_REMOVE: Titles = Titles {
+    done: "Map removed",
+    failed: "Couldn't remove the map",
+    update: false,
 };
 
 const REMOVE: Titles = Titles {
@@ -246,11 +252,7 @@ impl GbAddonInstalls {
         let Some(tf2) = self.begin(id, DOWNLOADING, win, cx) else {
             return false;
         };
-        let titles = if entry.section() == AddonSection::MAPS.key() {
-            MAP_UPDATE
-        } else {
-            UPDATE
-        };
+        let titles = if is_map(&entry) { MAP_UPDATE } else { UPDATE };
         self.task = Some(cx.spawn(async move |this, cx| {
             let outcome = refetch(&this, cx, entry, tf2, win, titles, None).await;
             let _ = this.update(cx, |me, cx| me.finish(outcome, titles, win, cx));
@@ -266,6 +268,9 @@ impl GbAddonInstalls {
         let Some(entry) = self.entry(id).cloned() else {
             return false;
         };
+        if is_map(&entry) {
+            return self.reinstall_map(entry, win, cx);
+        }
         let Some(tf2) = self.begin(id, GbAddonStage::Installing, win, cx) else {
             return false;
         };
@@ -296,12 +301,37 @@ impl GbAddonInstalls {
         true
     }
 
-    /// Removes `id` from TF2 and the library; the caller has asked the player first.
-    /// Returns false as `update` does.
-    pub fn remove(&mut self, id: GbId, win: AnyWindowHandle, cx: &mut Context<Self>) -> bool {
-        let Some(name) = self.entry(id).map(|e| e.name().to_owned()) else {
+    /// Install again for a map: maps keep no library copy, so it always downloads the
+    /// newest file, and a map gone from GameBanana can only be removed.
+    fn reinstall_map(
+        &mut self,
+        entry: GbAddonEntry,
+        win: AnyWindowHandle,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(tf2) = self.begin(entry.gb_id(), DOWNLOADING, win, cx) else {
             return false;
         };
+        self.task = Some(cx.spawn(async move |this, cx| {
+            let gone = Some(MAP_REINSTALL_GONE);
+            let outcome = refetch(&this, cx, entry, tf2, win, MAP_INSTALL, gone).await;
+            let _ = this.update(cx, |me, cx| me.finish(outcome, MAP_INSTALL, win, cx));
+        }));
+        cx.notify();
+        true
+    }
+
+    /// Removes `id` from TF2 and the library; the caller has asked the player first.
+    /// Returns false as `update` does. Reads only the library row, so an item gone from
+    /// GameBanana can still be removed.
+    pub fn remove(&mut self, id: GbId, win: AnyWindowHandle, cx: &mut Context<Self>) -> bool {
+        let Some(entry) = self.entry(id) else {
+            return false;
+        };
+        let name = entry.name().to_owned();
+        if is_map(entry) {
+            return self.remove_map(id, name, win, cx);
+        }
         let Some(tf2) = self.begin(id, GbAddonStage::Removing, win, cx) else {
             return false;
         };
@@ -317,6 +347,34 @@ impl GbAddonInstalls {
                 Err(err) => Outcome::Failed(err),
             };
             let _ = this.update(cx, |me, cx| me.finish(outcome, REMOVE, win, cx));
+        }));
+        cx.notify();
+        true
+    }
+
+    /// Remove for a map: core also clears any copy an interrupted update left in staging.
+    fn remove_map(
+        &mut self,
+        id: GbId,
+        name: String,
+        win: AnyWindowHandle,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(tf2) = self.begin(id, GbAddonStage::Removing, win, cx) else {
+            return false;
+        };
+        let probe = Tf2Probe::get(cx);
+        let job = run_blocking(cx, move |s: &Services| {
+            s.library
+                .remove_gb_map(id, &tf2, &*probe)
+                .map_err(|e| gb_map_remove_op(&e, MAP_REMOVE.failed))
+        });
+        self.task = Some(cx.spawn(async move |this, cx| {
+            let outcome = match job.await {
+                Ok(()) => Outcome::Removed { id, name },
+                Err(err) => Outcome::Failed(err),
+            };
+            let _ = this.update(cx, |me, cx| me.finish(outcome, MAP_REMOVE, win, cx));
         }));
         cx.notify();
         true
@@ -543,6 +601,15 @@ async fn refetch(
 /// The player words for Install again when the library copy is incomplete and GameBanana no
 /// longer has the item to download.
 const REINSTALL_GONE: &str = "This add-on is no longer on GameBanana and its copy in your library is incomplete, so it can't be installed again. Remove it.";
+
+/// The player words for Install again on a map GameBanana no longer has.
+const MAP_REINSTALL_GONE: &str =
+    "This map is no longer on GameBanana, so it can't be installed again. Remove it.";
+
+/// Whether `entry` is a map item, which installs, updates and removes through core's map path.
+fn is_map(entry: &GbAddonEntry) -> bool {
+    entry.section() == AddonSection::MAPS.key()
+}
 
 /// The player words for an update whose recorded section this build does not know.
 const UPDATE_UNKNOWN_SECTION: &str = "TF2Tools can't tell where this add-on goes. Remove it, then install it again from the Addon Store.";
@@ -807,7 +874,12 @@ async fn ask_maps(
             present: source.is_some(),
         })
         .collect();
-    let skipped = download.maps().iter().any(|m| m.skipped() > 0);
+    // Only maps the player can keep count: a present map is never installed.
+    let skipped = download
+        .maps()
+        .iter()
+        .zip(sources)
+        .any(|(m, source)| source.is_none() && m.skipped() > 0);
     let name = download.name().to_owned();
     // As in `ask_payloads`, the entity's handle is dropped before waiting.
     let answer = win
