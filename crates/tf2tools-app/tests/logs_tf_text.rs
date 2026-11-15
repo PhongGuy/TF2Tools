@@ -790,6 +790,21 @@ fn a_match_class_card_lists_only_weapons_the_class_can_equip() {
 }
 
 #[test]
+fn world_and_player_kill_rows_show_readable_names() {
+    let rows = arie_pyro_rows(&[
+        ("world", weapon(35, 0, 0, 0)),
+        ("player", weapon(21, 0, 0, 0)),
+    ]);
+    let shown = |raw: &str| {
+        rows.iter()
+            .find(|r| r.raw == raw)
+            .map(|r| (r.name.clone(), r.kills))
+    };
+    assert_eq!(shown("world"), Some(("Environment".to_owned(), 35)));
+    assert_eq!(shown("player"), Some(("Enemy suicide".to_owned(), 21)));
+}
+
+#[test]
 fn rows_with_one_shown_name_merge_into_the_first() {
     let rows = arie_pyro_rows(&[
         ("tf_projectile_rocket", weapon(1, 150, 4, 2)),
