@@ -356,7 +356,8 @@ impl GbMapsTab {
     }
 
     /// Hides or shows the tab. Hidden, it drops its image wants and holds sync re-reads;
-    /// shown again, it rearms the grid's hooks and re-reads once if the sync committed meanwhile.
+    /// shown again, it rearms the grid's hooks, lists the library again and re-reads once if
+    /// the sync committed meanwhile.
     pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
         if hidden == std::mem::replace(&mut self.hidden, hidden) {
             return;
@@ -369,6 +370,11 @@ impl GbMapsTab {
             return;
         }
         self.grid.rearm();
+        // Lists the library again off the UI thread, as startup does, so a map folder deleted
+        // outside the app reads not installed; `installs_changed` relists if a state flipped.
+        if let Some(installs) = self.installs.upgrade() {
+            installs.update(cx, |installs, cx| installs.reload(cx));
+        }
         if std::mem::take(&mut self.stale) {
             self.requery(cx);
         }
