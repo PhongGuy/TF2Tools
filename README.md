@@ -64,7 +64,7 @@ The HUD Maker shows your HUD the way the game draws it: in a fight, on the score
 
 The Maps page lists the community maps from serveme.tf. Search them by name, sort them by name, by most played or by recently played, and download a map straight into your game. Remove a map you downloaded when you no longer need it.
 
-Switch the page to GameBanana to browse the TF2 maps there. Search them, sort them and pick a gamemode such as King of the Hill, Payload or Mann vs. Machine. Open a map to see its pictures and downloads, with a link to its GameBanana page. Installing GameBanana maps from the app is not there yet.
+Switch the page to GameBanana to browse the TF2 maps there. Search them, sort them and pick a gamemode such as King of the Hill, Payload or Mann vs. Machine. Open a map to see its pictures and downloads, with a link to its GameBanana page, and install it with one click. A map pack lets you tick which of its maps to install. Show only your installed maps to see which ones have an update, then update or remove them from the same page.
 
 ### logs.tf stats
 
