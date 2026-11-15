@@ -79,3 +79,24 @@ fn checkouts_keep_bytes_exact_on_windows() {
         "{attributes}"
     );
 }
+
+/// The gate fails on stale notices or a disallowed licence, with the cargo-about the script pins.
+#[test]
+fn the_gate_checks_the_third_party_notices_with_the_pinned_cargo_about() {
+    let script = std::fs::read_to_string(repo().join("scripts/third-party-notices.sh"))
+        .expect("third-party-notices.sh");
+    let version = script
+        .lines()
+        .find_map(|l| l.strip_prefix("VERSION="))
+        .expect("the script pins a VERSION");
+    let gate = job(&ci(), "gate");
+    for want in [
+        format!("cargo install --locked cargo-about --version {version} --features cli"),
+        "scripts/third-party-notices.sh --check".to_owned(),
+    ] {
+        assert!(
+            gate.lines().any(|l| l.trim() == want),
+            "missing `{want}`:\n{gate}"
+        );
+    }
+}

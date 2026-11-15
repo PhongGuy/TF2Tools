@@ -40,6 +40,11 @@ jobs:
         with:
           # The key ignores build profiles; bump it when Cargo.toml changes how deps compile.
           prefix-key: v1-rust
+      - name: Third-party notices
+        # Fails when Cargo.lock changed without licenses/THIRD-PARTY-NOTICES.txt, or a crate's licence is not in about.toml.
+        run: |
+          cargo install --locked cargo-about --version 0.9.3 --features cli
+          scripts/third-party-notices.sh --check
       # GPUI's windowing, font and GPU libraries, plus ALSA for the sound player.
       - name: Install system libraries
         run: |
