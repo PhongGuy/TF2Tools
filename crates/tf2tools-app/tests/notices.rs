@@ -234,11 +234,12 @@ fn only_the_crate_notices_are_long() {
     assert_eq!(long, ["THIRD-PARTY-NOTICES.txt"]);
 }
 
-/// Lines are rewrapped at word breaks to fit one row each, and nothing is lost.
+/// Lines are rewrapped at word breaks to fit one row each, and nothing is lost. Every character
+/// is one unit wide here, so a 30-unit row holds 30 characters.
 #[test]
 fn long_notice_lines_wrap_at_words_and_keep_every_word() {
     let text = format!("short\n\n{}\n  indented", "word ".repeat(40).trim_end());
-    let lines = notices::wrap_lines(&text, 30);
+    let lines = notices::wrap_lines(&text, 30., |_| 1.);
     assert_eq!(lines[0], "short");
     assert_eq!(lines[1], "");
     assert!(lines.iter().all(|l| l.chars().count() <= 30), "{lines:?}");
@@ -246,6 +247,6 @@ fn long_notice_lines_wrap_at_words_and_keep_every_word() {
     let words: Vec<&str> = lines.iter().flat_map(|l| l.split_whitespace()).collect();
     assert_eq!(words, text.split_whitespace().collect::<Vec<_>>());
     // A word longer than a row is cut rather than overflowing it.
-    let cut = notices::wrap_lines(&"x".repeat(70), 30);
+    let cut = notices::wrap_lines(&"x".repeat(70), 30., |_| 1.);
     assert_eq!(cut, ["x".repeat(30), "x".repeat(30), "x".repeat(10)]);
 }

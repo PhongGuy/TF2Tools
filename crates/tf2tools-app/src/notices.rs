@@ -31,9 +31,6 @@ const THIRD_PARTY: &str = "THIRD-PARTY-NOTICES.txt";
 /// A notice over this many lines is long, like the generated crate notices.
 const LONG_LINES: usize = 500;
 
-/// How many characters a notice's row in Settings holds; its lines are rewrapped to fit.
-pub const WRAP_COLUMNS: usize = 80;
-
 /// One licence notice: its file under `licenses/`, a plain title and the full text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Notice {
@@ -63,39 +60,48 @@ impl Notice {
         self.text.lines().nth(LONG_LINES).is_some()
     }
 
-    /// The text as rows of at most `WRAP_COLUMNS` characters.
-    pub fn lines(&self) -> Vec<String> {
-        wrap_lines(&self.text, WRAP_COLUMNS)
+    /// The text as rows no wider than `width`, with `advance` giving each character's width.
+    pub fn lines(&self, width: f32, advance: impl FnMut(char) -> f32) -> Vec<String> {
+        wrap_lines(&self.text, width, advance)
     }
 }
 
-/// Splits `text` into rows of at most `columns` characters. A longer line breaks at its spaces,
-/// losing its indent and runs of spaces, and a word longer than a row is cut.
-pub fn wrap_lines(text: &str, columns: usize) -> Vec<String> {
+/// Splits `text` into rows no wider than `width`, with `advance` giving each character's width.
+/// Every source line starts a row. A wider line breaks at its spaces, losing its indent and runs
+/// of spaces, and a word wider than a row is cut, keeping at least one character per row.
+pub fn wrap_lines(text: &str, width: f32, mut advance: impl FnMut(char) -> f32) -> Vec<String> {
+    let mut measure = |s: &str| s.chars().map(&mut advance).sum::<f32>();
+    let space = measure(" ");
     let mut out = Vec::new();
     for line in text.lines() {
-        if line.chars().count() <= columns {
+        if measure(line) <= width {
             out.push(line.to_owned());
             continue;
         }
-        let mut row = String::new();
+        let (mut row, mut used) = (String::new(), 0.);
         for mut word in line.split_whitespace() {
             loop {
-                let used = row.chars().count();
-                if used + usize::from(used > 0) + word.chars().count() <= columns {
-                    if used > 0 {
+                let wide = measure(word);
+                let gap = if row.is_empty() { 0. } else { space };
+                if used + gap + wide <= width {
+                    if !row.is_empty() {
                         row.push(' ');
                     }
                     row.push_str(word);
+                    used += gap + wide;
                     break;
                 }
-                if used > 0 {
+                if !row.is_empty() {
                     out.push(std::mem::take(&mut row));
+                    used = 0.;
                     continue;
                 }
-                let cut = word
-                    .char_indices()
-                    .nth(columns)
+                let mut taken = 0.;
+                let cut = (word.char_indices())
+                    .find(|&(i, c)| {
+                        taken += measure(&word[i..i + c.len_utf8()]);
+                        i > 0 && taken > width
+                    })
                     .map_or(word.len(), |(i, _)| i);
                 out.push(word[..cut].to_owned());
                 word = &word[cut..];
