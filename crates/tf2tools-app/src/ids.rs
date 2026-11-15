@@ -104,7 +104,7 @@ pub const SETTINGS_SYNC: &str = "settings-sync";
 pub const SETTINGS_RESYNC: &str = "settings-resync";
 /// The Licences card's "Show notices" / "Hide notices" button.
 pub const SETTINGS_NOTICES: &str = "settings-notices";
-/// The scrollable box of third-party notices, present while shown.
+/// The virtualized list of third-party notices, present while shown.
 pub const SETTINGS_NOTICES_VIEW: &str = "settings-notices-view";
 /// The notices box's scrollbar, over its right edge.
 pub const SETTINGS_NOTICES_SCROLLBAR: &str = "settings-notices-scrollbar";
@@ -1026,6 +1026,12 @@ pub fn keyed(kind: &str, key: &str) -> ElementId {
 /// One notice's heading in the notices box, labelled with its title: "settings-notice:<file>".
 pub fn settings_notice(file: &str) -> ElementId {
     keyed("settings-notice", file)
+}
+
+/// One wrapped line of a notice in the notices list, laid out only while in view:
+/// "settings-notice-line:<file>:<row>".
+pub fn settings_notice_line(file: &str, row: usize) -> ElementId {
+    keyed("settings-notice-line", &format!("{file}:{row}"))
 }
 
 /// An Activity Log row, keyed by its row id: "log-row:<id>".

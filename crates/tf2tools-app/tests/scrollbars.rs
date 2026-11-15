@@ -141,12 +141,8 @@ fn the_licence_notices_show_a_bar(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::SETTINGS_NOTICES);
     let view = ids::SETTINGS_NOTICES_VIEW;
     assert_bar_on_right_edge(cx, s.win, view, ids::SETTINGS_NOTICES_SCROLLBAR);
-    let last = tf2tools_app::notices::all()
-        .last()
-        .unwrap()
-        .file()
-        .to_owned();
-    assert_track_scrolls(cx, s.win, view, ids::settings_notice(&last));
+    let first = tf2tools_app::notices::all()[0].file().to_owned();
+    assert_track_scrolls_virtual(cx, s.win, view, ids::settings_notice(&first));
 }
 
 #[gpui_kit::test]

@@ -3,7 +3,10 @@
 //! Below them, a Licences card shows the third-party notices the app carries, and a Help and
 //! feedback card links to the help page and the place to report a problem.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::Path;
+use std::rc::Rc;
 
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -14,10 +17,10 @@ use gpui_kit::component::slider::{Slider, SliderState};
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
-    px, relative,
+    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, Font, FontWeight, Hsla,
+    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement as _, Styled, Subscription, TestSupportExt as _,
+    UniformListScrollHandle, Window, canvas, div, px, relative, rems, uniform_list,
 };
 
 use tf2tools_core::{
@@ -42,7 +45,7 @@ use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, error_label, toast, toast_error};
 use crate::sync::{SyncEvent, SyncHub, sync_hub};
 use crate::updater::{self, updater};
-use crate::widgets::scroll::scroll_area;
+use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 
 /// What the page is waiting on; while set, the form's buttons are disabled.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -137,9 +140,28 @@ pub struct SettingsPage {
     /// The embedded licence notices, and whether the Licences card shows them.
     notices: Vec<Notice>,
     show_notices: bool,
+    /// Every notice as list rows, shared with the list's row builder, and the text width they
+    /// were wrapped to; split once the list's width is known and again when it changes.
+    notice_rows: Option<Rc<[NoticeRow]>>,
+    notice_width: Pixels,
+    /// The notices list's text width and font as its last layout measured them.
+    notice_measure: Rc<RefCell<Option<(Pixels, Font)>>>,
     scroll: ScrollHandle,
-    notices_scroll: ScrollHandle,
+    notices_scroll: UniformListScrollHandle,
 }
+
+/// One row of the notices list: the blank before a title, a notice's title, or one wrapped line.
+enum NoticeRow {
+    Gap,
+    Title(SharedString, SharedString),
+    Line(SharedString, usize, SharedString),
+}
+
+/// The notices list's height and its fixed row height, since `uniform_list` sizes rows alike.
+const NOTICE_LIST_HEIGHT: f32 = 320.;
+const NOTICE_ROW_HEIGHT: f32 = 16.;
+/// The notices list's left padding; the right holds the scrollbar's width instead.
+const NOTICE_PADDING: f32 = 12.;
 
 /// One store's running flag and failure text, the only hub state Settings draws.
 type HubDrawn = (StoreKind, bool, Option<String>);
@@ -188,6 +210,47 @@ pub const SYNC_CARDS: [(StoreKind, &str, &str); 5] = [
 ];
 
 impl SettingsPage {
+    // Splits every notice into a title and lines wrapped to the list's measured text width, only
+    // while shown and when that width changed, so neither startup nor a frame pays for it. A blank
+    // row parts each notice from the one before.
+    fn split_notices(&mut self, window: &Window) {
+        let measured = self.notice_measure.borrow().clone();
+        let Some((width, font)) = measured.filter(|_| self.show_notices) else {
+            return;
+        };
+        if self.notice_rows.is_some() && self.notice_width == width {
+            return;
+        }
+        let text = window.text_system();
+        let (font, size) = (
+            text.resolve_font(&font),
+            rems(0.75).to_pixels(window.rem_size()),
+        );
+        let mut widths = HashMap::new();
+        let mut advance = |c: char| {
+            *widths
+                .entry(c)
+                .or_insert_with(|| (text.advance(font, size, c)).map_or(0., |a| a.width / px(1.)))
+        };
+        // A pixel of slack keeps shaping from drawing a row wider than its measured characters.
+        let room = (width - px(1.)) / px(1.);
+        let mut rows = Vec::new();
+        for notice in &self.notices {
+            if !rows.is_empty() {
+                rows.push(NoticeRow::Gap);
+            }
+            let file = SharedString::from(notice.file().to_owned());
+            rows.push(NoticeRow::Title(
+                file.clone(),
+                notice.title().to_owned().into(),
+            ));
+            let lines = notice.lines(room, &mut advance).into_iter().enumerate();
+            rows.extend(lines.map(|(row, text)| NoticeRow::Line(file.clone(), row, text.into())));
+        }
+        self.notice_rows = Some(rows.into());
+        self.notice_width = width;
+    }
+
     /// Needs the `Services` global. Starts the settings load off the UI thread.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let path = cx.new(|cx| InputState::new(window, cx).placeholder("/path/to/Team Fortress 2"));
@@ -254,8 +317,11 @@ impl SettingsPage {
             _volume: volume_bound,
             notices: notices::all(),
             show_notices: false,
+            notice_rows: None,
+            notice_width: px(0.),
+            notice_measure: Rc::default(),
             scroll: ScrollHandle::new(),
-            notices_scroll: ScrollHandle::new(),
+            notices_scroll: UniformListScrollHandle::new(),
         };
         page.load(true, cx);
         page.load_sync(window, cx);
@@ -269,6 +335,17 @@ impl SettingsPage {
 
     pub fn is_loaded(&self) -> bool {
         self.loaded
+    }
+
+    /// The wrapped notice lines the open notices list holds, as (file, text) in order.
+    pub fn notice_lines(&self) -> Vec<(String, String)> {
+        let rows = self.notice_rows.as_deref().unwrap_or_default();
+        (rows.iter())
+            .filter_map(|row| match row {
+                NoticeRow::Line(file, _, text) => Some((file.to_string(), text.to_string())),
+                NoticeRow::Gap | NoticeRow::Title(..) => None,
+            })
+            .collect()
     }
 
     pub fn path_input(&self) -> &Entity<InputState> {
@@ -683,43 +760,55 @@ fn mature_switch(cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
-// The Licences card's content: a toggle and, while shown, a scrollable box with each notice's
-// title over its full text.
+// The Licences card's content: a toggle and, while shown, a bordered list of every notice's
+// title over its text, laying out only the rows in view. An invisible layer measures the list's
+// text width and font, and a change asks the page to rewrap.
 fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyElement {
     let theme = cx.theme();
     let shown = page.show_notices;
     let view = shown.then(|| {
-        let view = v_flex()
-            .id(ids::SETTINGS_NOTICES_VIEW)
-            .test_support()
-            .max_h(px(320.))
-            .track_scroll(&page.notices_scroll)
-            .overflow_y_scroll()
-            .gap_4()
-            .p_3()
+        let rows = page.notice_rows.clone().unwrap_or_else(|| Rc::from([]));
+        let muted = theme.muted_foreground;
+        let list = uniform_list(
+            ids::SETTINGS_NOTICES_VIEW,
+            rows.len(),
+            move |range, _, _| range.map(|row| notice_row(&rows[row], muted)).collect(),
+        )
+        .track_scroll(&page.notices_scroll)
+        .test_support()
+        .w_full()
+        .h(px(NOTICE_LIST_HEIGHT))
+        .py_3()
+        .pl(px(NOTICE_PADDING))
+        .pr(BAR_WIDTH);
+        let (measure, owner) = (Rc::clone(&page.notice_measure), cx.entity().downgrade());
+        let watch = canvas(
+            move |bounds, window, _| {
+                let width = bounds.size.width - px(NOTICE_PADDING) - BAR_WIDTH;
+                let font = window.text_style().font();
+                let now = Some((width, font));
+                if *measure.borrow() != now {
+                    *measure.borrow_mut() = now;
+                    window.on_next_frame(move |_, cx| {
+                        let _ = owner.update(cx, |_, cx| cx.notify());
+                    });
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .inset_0();
+        let content = div().relative().text_xs().child(list).child(watch);
+        div()
             .rounded(theme.radius)
             .border_1()
             .border_color(theme.border)
-            .children(page.notices.iter().map(|notice| {
-                v_flex()
-                    .gap_2()
-                    .child(
-                        div()
-                            .id(ids::settings_notice(notice.file()))
-                            .aria_label(SharedString::from(notice.title().to_owned()))
-                            .test_support()
-                            .text_sm()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(notice.title().to_owned()),
-                    )
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(theme.muted_foreground)
-                            .child(notice.text().to_owned()),
-                    )
-            }));
-        scroll_area(ids::SETTINGS_NOTICES_SCROLLBAR, &page.notices_scroll, view)
+            .overflow_hidden()
+            .child(scroll_area(
+                ids::SETTINGS_NOTICES_SCROLLBAR,
+                &page.notices_scroll,
+                content,
+            ))
     });
     v_flex()
         .gap_3()
@@ -741,6 +830,42 @@ fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyEl
         )
         .children(view)
         .into_any_element()
+}
+
+// One notices list row at the list's fixed height: a blank, a semibold title or a muted line.
+// A line's text sits in a box as wide as the text itself, so its bounds show what it covers.
+fn notice_row(row: &NoticeRow, muted: Hsla) -> AnyElement {
+    fn cell<E: Styled>(el: E) -> E {
+        (el.h(px(NOTICE_ROW_HEIGHT))
+            .line_height(px(NOTICE_ROW_HEIGHT)))
+        .whitespace_nowrap()
+        .overflow_hidden()
+    }
+    match row {
+        NoticeRow::Gap => cell(div()).into_any_element(),
+        NoticeRow::Title(file, title) => cell(
+            div()
+                .id(ids::settings_notice(file))
+                .aria_label(title.clone())
+                .test_support(),
+        )
+        .text_ellipsis()
+        .text_sm()
+        .font_weight(FontWeight::SEMIBOLD)
+        .child(title.clone())
+        .into_any_element(),
+        NoticeRow::Line(file, row, text) => cell(h_flex())
+            .text_xs()
+            .text_color(muted)
+            .child(
+                div()
+                    .id(ids::settings_notice_line(file, *row))
+                    .test_support()
+                    .flex_none()
+                    .child(text.clone()),
+            )
+            .into_any_element(),
+    }
 }
 
 // The Help and feedback card's two links, opened in the player's browser.
@@ -817,7 +942,8 @@ fn labelled(id: &'static str, text: impl Into<SharedString>) -> impl IntoElement
 }
 
 impl Render for SettingsPage {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.split_notices(window);
         // Until the load lands the buttons stay off, so a late load cannot overwrite an edit.
         let busy = self.busy.is_some() || !self.loaded;
         let muted = cx.theme().muted_foreground;

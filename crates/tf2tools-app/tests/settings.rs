@@ -8,6 +8,7 @@ use tf2tools_app::picker::{PickKind, ScriptedPicker};
 use tf2tools_app::services::{Tf2State, require_tf2};
 use tf2tools_app::shell::CONTENT_PADDING;
 use tf2tools_app::shell::route::Page;
+use tf2tools_app::widgets::scroll::BAR_WIDTH;
 use tf2tools_core::{Tf2Install, Volume};
 
 use crate::support;
@@ -419,16 +420,154 @@ fn third_party_notices_open_from_settings(cx: &mut TestAppContext) {
     .unwrap();
     support::click_id(cx, s.win, ids::SETTINGS_NOTICES);
     assert!(support::present(cx, s.win, ids::SETTINGS_NOTICES_VIEW));
-    for notice in &notices {
-        assert_eq!(
-            support::label_of(cx, s.win, ids::settings_notice(notice.file())).as_deref(),
-            Some(notice.title()),
-            "{} is not shown",
-            notice.file()
-        );
+    // Only the titles in view are laid out, so scroll the box a few rows at a time until each
+    // title has shown with its label.
+    let mut unseen: Vec<_> = notices.iter().collect();
+    for _ in 0..400 {
+        unseen.retain(|notice| {
+            support::label_of(cx, s.win, ids::settings_notice(notice.file())).as_deref()
+                != Some(notice.title())
+        });
+        if unseen.is_empty() {
+            break;
+        }
+        cx.update_window(s.win, |_, w, cx| {
+            let down = ScrollDelta::Pixels(point(px(0.), px(-48.)));
+            w.scroll(ids::SETTINGS_NOTICES_VIEW, down, cx)
+        })
+        .unwrap();
     }
+    let unseen: Vec<_> = unseen.iter().map(|n| n.file()).collect();
+    assert!(unseen.is_empty(), "never shown: {unseen:?}");
     support::click_id(cx, s.win, ids::SETTINGS_NOTICES);
     assert!(!support::present(cx, s.win, ids::SETTINGS_NOTICES_VIEW));
+}
+
+/// The notices run to thousands of lines, so opening them lays out only the rows in view, the
+/// short credits' lines and titles as well as the crate notices'.
+#[gpui_kit::test]
+fn the_notices_lay_out_only_the_visible_lines(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let page = open_settings(cx, &s);
+    let notices = tf2tools_app::notices::all();
+    assert!(
+        notices.iter().any(|n| n.is_long()),
+        "the crate notices are long"
+    );
+    cx.update_window(s.win, |_, w, cx| {
+        let down = ScrollDelta::Pixels(point(px(0.), px(-4000.)));
+        w.scroll(ids::page(Page::Settings), down, cx)
+    })
+    .unwrap();
+    support::click_id(cx, s.win, ids::SETTINGS_NOTICES);
+    support::settle(cx, s.win);
+    let rows = cx.update(|cx| page.read(cx).notice_lines());
+    let lines: Vec<_> = (notices.iter())
+        .map(|n| rows.iter().filter(|(file, _)| file == n.file()).count())
+        .collect();
+    let total: usize = lines.iter().sum();
+    assert!(total > 5_000, "{total} lines");
+    let (rendered, titles, first) = cx
+        .update_window(s.win, |_, w, _| {
+            let shown = |notice: &tf2tools_app::notices::Notice, count: usize| {
+                (0..count)
+                    .filter(|&i| {
+                        w.try_find(ids::settings_notice_line(notice.file(), i))
+                            .is_some()
+                    })
+                    .count()
+            };
+            let rendered: usize = notices.iter().zip(&lines).map(|(n, &c)| shown(n, c)).sum();
+            let titles = (notices.iter())
+                .filter(|n| w.try_find(ids::settings_notice(n.file())).is_some())
+                .count();
+            let first = w.try_find(ids::settings_notice_line(notices[0].file(), 0));
+            (rendered, titles, first.is_some())
+        })
+        .unwrap();
+    assert!(
+        first,
+        "the first line of {} is not a row",
+        notices[0].file()
+    );
+    assert!(rendered < 100, "{rendered} of {total} lines laid out");
+    assert!(titles < notices.len(), "all {titles} titles laid out");
+}
+
+/// At the smallest window the notices rows wrap to the box: no line runs under the bar, and
+/// every word of each short notice is still there in order.
+#[gpui_kit::test]
+fn the_notices_wrap_to_the_box_at_the_smallest_window(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    let page = open_settings(cx, &s);
+    cx.update_window(s.win, |_, w, cx| {
+        let down = ScrollDelta::Pixels(point(px(0.), px(-4000.)));
+        w.scroll(ids::page(Page::Settings), down, cx)
+    })
+    .unwrap();
+    support::click_id(cx, s.win, ids::SETTINGS_NOTICES);
+    support::settle(cx, s.win);
+    let rows = cx.update(|cx| page.read(cx).notice_lines());
+    let notices = tf2tools_app::notices::all();
+    for notice in notices.iter().filter(|n| !n.is_long()) {
+        // A word wider than a row is cut across rows, so compare the text without its spaces.
+        let shown: String = (rows.iter())
+            .filter(|(file, _)| file == notice.file())
+            .flat_map(|(_, text)| text.split_whitespace())
+            .collect();
+        let words: String = notice.text().split_whitespace().collect();
+        assert_eq!(shown, words, "{} lost words", notice.file());
+    }
+    // Walk the box a few rows at a time so every short notice's rows are laid out once, each
+    // ending left of the bar's track.
+    let mut counts = std::collections::HashMap::<&str, usize>::new();
+    let short: Vec<_> = (rows.iter())
+        .take_while(|(file, _)| notices.iter().any(|n| !n.is_long() && n.file() == file))
+        .map(|(file, _)| {
+            let row = counts.entry(file.as_str()).or_default();
+            *row += 1;
+            ids::settings_notice_line(file, *row - 1)
+        })
+        .collect();
+    let mut seen = vec![false; short.len()];
+    for _ in 0..400 {
+        support::settle(cx, s.win);
+        let (bar, found) = cx
+            .update_window(s.win, |_, w, _| {
+                let bar = w
+                    .try_find(ids::SETTINGS_NOTICES_SCROLLBAR)
+                    .unwrap()
+                    .bounds();
+                let found: Vec<_> = (short.iter())
+                    .map(|id| w.try_find(id.clone()).map(|e| e.bounds()))
+                    .collect();
+                (bar, found)
+            })
+            .unwrap();
+        for (i, line) in found.iter().enumerate() {
+            if let Some(line) = line {
+                assert!(
+                    line.right() <= bar.right() - BAR_WIDTH + px(1.),
+                    "{:?} runs under the bar: {line:?} vs {bar:?}",
+                    short[i]
+                );
+                seen[i] = true;
+            }
+        }
+        if seen.iter().all(|&s| s) {
+            break;
+        }
+        cx.update_window(s.win, |_, w, cx| {
+            let down = ScrollDelta::Pixels(point(px(0.), px(-160.)));
+            w.scroll(ids::SETTINGS_NOTICES_VIEW, down, cx)
+        })
+        .unwrap();
+    }
+    let missed = seen.iter().filter(|&&s| !s).count();
+    assert_eq!(missed, 0, "{missed} short notice rows were never laid out");
 }
 
 #[gpui_kit::test]
