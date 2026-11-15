@@ -529,6 +529,19 @@ fn without_class_lists_every_class_uses_everything() {
     }
 }
 
+// logs.tf files a kill under "world" when the victim died to the map after the killer hurt them,
+// and under "player" when the victim killed themselves after it; neither is a game item.
+#[test]
+fn world_and_player_kills_read_as_what_happened_on_every_class() {
+    for n in [WeaponNames::default(), names(), class_names()] {
+        for class in TfClass::ALL {
+            assert_eq!(n.class_name("world", class), Some("Environment"));
+            assert_eq!(n.class_name("WORLD", class), Some("Environment"));
+            assert_eq!(n.class_name("player", class), Some("Enemy suicide"));
+        }
+    }
+}
+
 #[test]
 fn projectiles_read_as_their_launcher_or_a_reflect_on_pyro() {
     let n = WeaponNames::default();

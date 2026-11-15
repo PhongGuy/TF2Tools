@@ -71,6 +71,10 @@ const DEFLECT_NAMES: [(&str, &str); 8] = [
     ("deflect_ball", "Reflected ball"),
 ];
 
+// Kills logs.tf files under no weapon: "world" when the victim died to the map after the killer
+// hurt them, "player" when the victim killed themselves after it.
+const KILL_NAMES: [(&str, &str); 2] = [("world", "Environment"), ("player", "Enemy suicide")];
+
 // Log names with no `d_` icon in mod_textures.txt, each with the entry the game's table draws
 // for that kill instead: items, the Huntsman's arrow (it has no log name) and pumpkin bombs.
 const ICON_ALIASES: [(&str, &str); 8] = [
@@ -233,7 +237,8 @@ impl WeaponNames {
     }
 
     /// The display name for `log_name` logged on `class`: a stock projectile as its launcher,
-    /// or as a reflect on Pyro, else [`WeaponNames::get`].
+    /// or as a reflect on Pyro, a world or suicide kill by what happened, else
+    /// [`WeaponNames::get`].
     pub fn class_name(&self, log_name: &str, class: TfClass) -> Option<&str> {
         let log = log_name.to_ascii_lowercase();
         let deflect_name = |key: &str| {
@@ -252,7 +257,11 @@ impl WeaponNames {
                     Some(own)
                 }
             });
-        deflect_name(&log).or(projectile).or_else(|| self.get(&log))
+        let kill = KILL_NAMES.iter().find(|(k, _)| *k == log).map(|&(_, n)| n);
+        deflect_name(&log)
+            .or(projectile)
+            .or(kill)
+            .or_else(|| self.get(&log))
     }
 
     // The class bits for a lowercase log name, from items_game then the hand rules; None when
