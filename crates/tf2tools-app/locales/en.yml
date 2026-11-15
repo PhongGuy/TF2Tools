@@ -1,0 +1,7 @@
+# English: the source text and the fallback for every other language.
+# To translate, copy this file to <code>.yml; see CONTRIBUTING.md, Translations.
+settings:
+  language:
+    title: "Language"
+    description: "The language TF2Tools shows its text in"
+    note: "Parts of TF2Tools not yet translated stay in English."

@@ -1,0 +1,5 @@
+settings:
+  language:
+    title: "Язык"
+    description: "Язык, на котором TF2Tools показывает текст"
+    note: "Ещё не переведённые части TF2Tools остаются на английском."
