@@ -213,6 +213,56 @@ fn an_update_waits_for_tf2_then_replaces_the_maps_in_place(cx: &mut TestAppConte
 }
 
 #[gpui_kit::test]
+fn a_pack_update_offers_every_map_ticked_including_the_ones_it_already_holds(
+    cx: &mut TestAppContext,
+) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let old = support::zip_of(&[
+        ("maps/cp_a.bsp", &bsp(b"a1")),
+        ("maps/cp_b.bsp", &bsp(b"b1")),
+    ]);
+    server.mount_gb_addon(38, "Pack", &[("pack.zip", old, 100)]);
+    let w = window(cx, &env, &server);
+    install(cx, &w, 38);
+    support::wait_real(cx, "the install checklist", |cx| {
+        support::present(cx, w.win, ids::PAYLOAD_CHECKLIST)
+    });
+    support::click_id(cx, w.win, ids::PAYLOAD_INSTALL);
+    toast_is(cx, w.win, "Map installed. Pack");
+    idle(cx);
+    server.reset();
+    let new = support::zip_of(&[
+        ("maps/cp_a.bsp", &bsp(b"a2")),
+        ("maps/cp_b.bsp", &bsp(b"b2")),
+        ("maps/cp_c.bsp", &bsp(b"c2")),
+    ]);
+    server.mount_gb_addon(38, "Pack", &[("pack_v2.zip", new, 300)]);
+    cx.update(|cx| Tf2Probe::install(cx, || false));
+    run(cx, &w, |i, win, cx| i.update(GbId::new(38), win, cx));
+    support::wait_real(cx, "the update checklist", |cx| {
+        support::present(cx, w.win, ids::PAYLOAD_CHECKLIST)
+    });
+    // The item's own installed maps are not "already in the game", so none is disabled.
+    for (n, name) in ["cp_a", "cp_b", "cp_c"].iter().enumerate() {
+        assert_eq!(
+            support::label_of(cx, w.win, ids::payload_check(n)).as_deref(),
+            Some(*name)
+        );
+    }
+    support::click_id(cx, w.win, ids::PAYLOAD_INSTALL);
+    toast_is(cx, w.win, "Map updated. Pack");
+    idle(cx);
+    let maps = folder(&env, 38, "pack").join("maps");
+    for (name, tag) in [("cp_a", b"a2"), ("cp_b", b"b2"), ("cp_c", b"c2")] {
+        assert_eq!(
+            std::fs::read(maps.join(format!("{name}.bsp"))).unwrap(),
+            bsp(tag),
+            "{name} is the updated map"
+        );
+    }
+}
+
+#[gpui_kit::test]
 fn remove_waits_for_tf2_then_deletes_the_folder(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
     server.mount_gb_addon(35, "Alpha", &[("cp_alpha.bsp", bsp(b"a"), 100)]);
