@@ -64,3 +64,20 @@ settings:
     not_found: "TF2 not found"
     manual: "Select your TF2 folder manually"
     installs: { one: "%{count} install found; choose one below", other: "%{count} installs found; choose one below" }
+
+updater:
+  status:
+    up_to_date: "Up to date"
+    checking: "Checking for updates..."
+    available: "v%{version} available"
+    available_page: "v%{version} available. Download it from the release page."
+    downloading: "Downloading... %{percent}%"
+    ready: "Update ready — restart to apply"
+    installing: "Installing update..."
+    unavailable: "Automatic updates aren't available in this version. Get new versions from the release page."
+    reopen: "TF2Tools has been updated. Close and reopen it to finish."
+  button:
+    check: "Check for Updates"
+    install: "Download & Install"
+    release_page: "Open release page"
+    restart: "Restart Now"
