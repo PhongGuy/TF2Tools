@@ -1057,3 +1057,90 @@ fn addon_install_failures_read_as_plain_words() {
         }
     ));
 }
+
+#[test]
+fn map_install_failures_read_as_plain_words() {
+    use tf2tools_app::local_messages::{already_have, describe_gb_map_install, gb_map_install_op};
+    use tf2tools_app::pages::graphics::jobs::{CLOSE_TF2, CLOSE_TF2_TEXT};
+    use tf2tools_core::GbMapInstallError;
+    let cases: Vec<(GbMapInstallError, &str)> = vec![
+        (GbMapInstallError::Tf2Running, CLOSE_TF2_TEXT),
+        (
+            GbMapInstallError::GameMissing {
+                path: PathBuf::from("/g/tf"),
+            },
+            GAME_MOVED,
+        ),
+        (
+            GbMapInstallError::Io {
+                path: PathBuf::from("/g/tf/custom"),
+                source: io("Permission denied (os error 13)"),
+            },
+            "Couldn't write the map into TF2. If TF2 is running, close it and try again. Otherwise make sure your disk has free space.",
+        ),
+        (
+            GbMapInstallError::Database {
+                message: "locked".into(),
+            },
+            LIBRARY_UPDATE,
+        ),
+    ];
+    for (err, want) in cases {
+        assert_eq!(describe_gb_map_install(&err).message, want, "{err:?}");
+        support::assert_plain(want);
+    }
+    assert!(matches!(
+        gb_map_install_op(&GbMapInstallError::Tf2Running, "Couldn't update the map"),
+        OpError::Core { action, ref message } if action == CLOSE_TF2 && message == CLOSE_TF2_TEXT
+    ));
+    let names = |n: &[&str]| n.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
+    assert_eq!(
+        already_have(&names(&["cp_a"]), false),
+        "You already have cp_a."
+    );
+    assert_eq!(
+        already_have(&names(&["cp_a", "cp_b", "cp_c"]), false),
+        "You already have cp_a, cp_b and cp_c."
+    );
+    assert_eq!(
+        already_have(&names(&["cp_a", "cp_b"]), true),
+        "You already have cp_a and cp_b. Remove it on the serveme.tf tab to use GameBanana's version."
+    );
+}
+
+#[test]
+fn map_remove_failures_read_as_plain_words() {
+    use tf2tools_app::local_messages::{describe_gb_map_remove, gb_map_remove_op};
+    use tf2tools_app::pages::graphics::jobs::{CLOSE_TF2, CLOSE_TF2_TEXT};
+    use tf2tools_core::{GbId, GbMapRemoveError};
+    let cases: Vec<(GbMapRemoveError, &str)> = vec![
+        (GbMapRemoveError::Tf2Running, CLOSE_TF2_TEXT),
+        (
+            GbMapRemoveError::Io {
+                path: PathBuf::from("/g/tf/custom"),
+                source: io("Permission denied (os error 13)"),
+            },
+            "Couldn't delete the map's files. Close TF2 if it is running, then try again.",
+        ),
+        (
+            GbMapRemoveError::NotInLibrary {
+                gb_id: GbId::new(3),
+            },
+            "This map is no longer in your library.",
+        ),
+        (
+            GbMapRemoveError::Database {
+                message: "locked".into(),
+            },
+            LIBRARY_UPDATE,
+        ),
+    ];
+    for (err, want) in cases {
+        assert_eq!(describe_gb_map_remove(&err).message, want, "{err:?}");
+        support::assert_plain(want);
+    }
+    assert!(matches!(
+        gb_map_remove_op(&GbMapRemoveError::Tf2Running, "Couldn't remove the map"),
+        OpError::Core { action, .. } if action == CLOSE_TF2
+    ));
+}

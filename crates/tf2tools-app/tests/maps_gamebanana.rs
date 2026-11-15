@@ -1,7 +1,9 @@
 //! The Maps page's GameBanana source: the synced grid, its Selects and search, and details.
 
 use crate::support;
-use crate::support::maps::{maps_shell, open_gamebanana, open_maps, seed_maps, shown};
+use crate::support::maps::{
+    maps_shell, maps_shell_found, open_gamebanana, open_maps, seed_maps, shown,
+};
 
 use gpui_kit::TestAppContext;
 use tf2tools_app::ids;
@@ -153,21 +155,111 @@ fn a_map_card_opens_its_details_with_the_gamebanana_link(cx: &mut TestAppContext
     ));
 }
 
+fn bsp(tag: &[u8]) -> Vec<u8> {
+    let mut body = b"VBSP".to_vec();
+    body.extend_from_slice(tag);
+    body
+}
+fn install_label(cx: &mut TestAppContext, win: gpui_kit::AnyWindowHandle) -> Option<String> {
+    support::label_of(cx, win, ids::ADDON_DETAIL_INSTALL)
+}
+
 #[gpui_kit::test]
-fn a_map_detail_offers_no_install(cx: &mut TestAppContext) {
+fn a_map_detail_installs_lists_the_maps_and_removes(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
-    server.mount_gb_addon(10, "cp_alpha", &[("cp_alpha.bsp", b"map".to_vec(), 100)]);
-    let s = maps_shell(cx, &env, &server);
+    server.mount_gb_addon(10, "cp_alpha", &[("cp_alpha.bsp", bsp(b"a"), 100)]);
+    let s = maps_shell_found(cx, &env, &server);
     seed_maps(&env);
     let page = open_maps(cx, &s);
     open_gamebanana(cx, &s, &page);
     support::click_id(cx, s.win, ids::addon_gb_card("maps", GbId::new(10)));
-    support::wait_real(cx, "the map's profile", |cx| {
+    support::wait_real(cx, "Install", |cx| {
+        support::present(cx, s.win, ids::ADDON_DETAIL_DOWNLOADS)
+            && install_label(cx, s.win).as_deref() == Some("Install")
+    });
+    assert!(!support::present(cx, s.win, ids::ADDON_DETAIL_REMOVE));
+    assert!(!support::present(cx, s.win, ids::ADDON_DETAIL_MAPS));
+    support::click_id(cx, s.win, ids::ADDON_DETAIL_INSTALL);
+    support::wait_real(cx, "installed", |cx| {
+        install_label(cx, s.win).as_deref() == Some("Installed")
+    });
+    let folder = env.game.join("tf/custom/tf2tools-gb-10-cp_alpha");
+    assert!(folder.join("maps/cp_alpha.bsp").is_file());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::addon_detail_map(0)).as_deref(),
+        Some("cp_alpha")
+    );
+    support::click_id(cx, s.win, ids::ADDON_DETAIL_REMOVE);
+    support::wait_real(cx, "the confirm", |cx| {
+        support::present(cx, s.win, ids::CONFIRM_DIALOG)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref(),
+        Some("Remove Map")
+    );
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    support::wait_real(cx, "removed", |cx| {
+        install_label(cx, s.win).as_deref() == Some("Install")
+    });
+    assert!(!folder.exists());
+    assert!(!support::present(cx, s.win, ids::ADDON_DETAIL_MAPS));
+}
+
+#[gpui_kit::test]
+fn a_missing_folder_offers_install_again_over_update(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = maps_shell_found(cx, &env, &server);
+    seed_maps(&env);
+    support::sql(&env).execute_batch(
+        "INSERT INTO library_gb_addons (gb_id, section, name, author, file_id, file_date, latest_file_date,
+            checked_at, payloads, files, installed, gone) VALUES (12, 'maps', 'koth_beta', 'vex', 1, 100, 200,
+            CAST(strftime('%s','now') AS INTEGER), '[\"koth_beta\"]', '[\"custom/tf2tools-gb-12-koth_beta\"]', 1, 0);",
+    ).unwrap();
+    let page = open_maps(cx, &s);
+    open_gamebanana(cx, &s, &page);
+    support::click_id(cx, s.win, ids::addon_gb_card("maps", GbId::new(12)));
+    support::wait_real(cx, "the control", |cx| {
+        install_label(cx, s.win).as_deref() == Some("Install again")
+    });
+}
+
+/// Map 10's detail with one file listed at `size` bytes; env and server outlive the body.
+fn detail_with_size(
+    cx: &mut TestAppContext,
+    size: u64,
+) -> (support::Env, support::StoreServer, support::ShellWindow) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_profile(
+        10,
+        serde_json::json!({"_idRow": 10, "_sName": "cp_alpha", "_aFiles": [
+        {"_idRow": 1, "_sFile": "a.zip", "_nFilesize": size, "_tsDateAdded": 100,
+         "_sAvResult": "clean", "_sDownloadUrl": format!("{}/dl/x", server.uri())}]}),
+    );
+    let s = maps_shell_found(cx, &env, &server);
+    seed_maps(&env);
+    let page = open_maps(cx, &s);
+    open_gamebanana(cx, &s, &page);
+    support::click_id(cx, s.win, ids::addon_gb_card("maps", GbId::new(10)));
+    support::wait_real(cx, "the profile", |cx| {
         support::present(cx, s.win, ids::ADDON_DETAIL_DOWNLOADS)
     });
-    // Until maps install, a map's detail neither offers Install nor explains why it can't.
-    assert!(!support::present(cx, s.win, ids::ADDON_DETAIL_INSTALL));
+    (env, server, s)
+}
+
+#[gpui_kit::test]
+fn a_map_past_the_add_on_cap_can_still_install(cx: &mut TestAppContext) {
+    let (_env, _server, s) = detail_with_size(cx, 400 * 1024 * 1024);
     assert!(!support::present(cx, s.win, ids::ADDON_DETAIL_BLOCKED));
+    assert_eq!(install_label(cx, s.win).as_deref(), Some("Install"));
+}
+
+#[gpui_kit::test]
+fn a_map_past_the_map_cap_says_it_is_too_big(cx: &mut TestAppContext) {
+    let (_env, _server, s) = detail_with_size(cx, 600 * 1024 * 1024);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::ADDON_DETAIL_BLOCKED).as_deref(),
+        Some("This map is too big for TF2Tools to install.")
+    );
 }
 
 #[gpui_kit::test]

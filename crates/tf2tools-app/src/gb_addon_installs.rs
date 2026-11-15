@@ -9,16 +9,22 @@ use gpui_kit::{
 };
 use tf2tools_core::{
     AddonProfile, AddonSection, BrowseError, DownloadProgress, GbAddonCheck, GbAddonDownload,
-    GbAddonEntry, GbAddonInstallError, GbId, StoreClient, Tf2Install,
+    GbAddonEntry, GbAddonInstallError, GbId, GbMapDownload, GbMapInstallError, MapSource,
+    StoreClient, Tf2Install,
 };
 
 use crate::library_events::LibraryEvents;
-use crate::local_messages::{describe_library, gb_install_op};
+use crate::local_messages::{
+    LocalFailure, MAP_RESTART, MAP_SKIPPED, already_have, describe_library, gb_install_op,
+    gb_map_install_op, gb_map_remove_op,
+};
 use crate::pages::profiles::probe::Tf2Probe;
-use crate::payload_checklist::{ChecklistItem, open_payload_checklist};
+use crate::payload_checklist::{ChecklistItem, open_map_checklist, open_payload_checklist};
 use crate::services::{OpError, Services, require_tf2, run_blocking, tf2_state};
 use crate::shell::toast::{ToastKind, toast, toast_error};
-use crate::store_messages::{describe_browse, describe_gb_fetch, download_stopped};
+use crate::store_messages::{
+    describe_browse, describe_gb_fetch, describe_gb_map_fetch, download_stopped,
+};
 use crate::tokio_bridge;
 
 /// What the running operation is doing.
@@ -51,6 +57,18 @@ impl GbAddonOffer {
         }
     }
 
+    /// A map's offer puts a missing folder before an update, since `update_gb_map` never
+    /// runs on a missing folder: Install with no entry, Install again when out of TF2,
+    /// Update when newer and still on GameBanana, Installed otherwise.
+    pub fn of_map(entry: Option<&GbAddonEntry>) -> Self {
+        match entry {
+            None => Self::Install,
+            Some(e) if !e.is_installed() => Self::InstallAgain,
+            Some(e) if e.has_update() && !e.is_gone() => Self::Update,
+            Some(_) => Self::Installed,
+        }
+    }
+
     /// The control's label.
     pub fn label(self) -> &'static str {
         match self {
@@ -72,26 +90,49 @@ impl GbAddonOffer {
     }
 }
 
-/// The toast titles of one kind of operation: on success and on failure.
+/// The toast titles of one kind of operation, on success and on failure, and whether it
+/// updates an install (a map update refuses while TF2 runs).
 #[derive(Clone, Copy)]
 struct Titles {
     done: &'static str,
     failed: &'static str,
+    update: bool,
 }
 
 const INSTALL: Titles = Titles {
     done: "Add-on installed",
     failed: "Couldn't install the add-on",
+    update: false,
 };
 
 const UPDATE: Titles = Titles {
     done: "Add-on updated",
     failed: "Couldn't update the add-on",
+    update: true,
+};
+
+const MAP_INSTALL: Titles = Titles {
+    done: "Map installed",
+    failed: "Couldn't install the map",
+    update: false,
+};
+
+const MAP_UPDATE: Titles = Titles {
+    done: "Map updated",
+    failed: "Couldn't update the map",
+    update: true,
+};
+
+const MAP_REMOVE: Titles = Titles {
+    done: "Map removed",
+    failed: "Couldn't remove the map",
+    update: false,
 };
 
 const REMOVE: Titles = Titles {
     done: "Add-on removed",
     failed: "Couldn't remove the add-on",
+    update: false,
 };
 
 /// One download-choose-install run: what to fetch, the payloads chosen last time, where to
@@ -108,7 +149,16 @@ struct Run {
 /// How a download-choose-install run ended.
 enum Outcome {
     Installed(GbAddonEntry),
-    Removed { id: GbId, name: String },
+    /// `restart` when TF2 ran as the maps went in; `skipped` when extra files were left out.
+    MapInstalled {
+        entry: GbAddonEntry,
+        restart: bool,
+        skipped: bool,
+    },
+    Removed {
+        id: GbId,
+        name: String,
+    },
     Cancelled,
     Failed(OpError),
 }
@@ -182,17 +232,22 @@ impl GbAddonInstalls {
         let Some(tf2) = self.begin(profile.id(), DOWNLOADING, win, cx) else {
             return false;
         };
+        let titles = if section == AddonSection::MAPS {
+            MAP_INSTALL
+        } else {
+            INSTALL
+        };
         self.task = Some(cx.spawn(async move |this, cx| {
             let run = Run {
                 section,
                 profile,
                 previous: Vec::new(),
                 tf2,
-                titles: INSTALL,
+                titles,
                 win,
             };
             let outcome = fetch_and_install(&this, cx, run).await;
-            let _ = this.update(cx, |me, cx| me.finish(outcome, INSTALL, win, cx));
+            let _ = this.update(cx, |me, cx| me.finish(outcome, titles, win, cx));
         }));
         cx.notify();
         true
@@ -209,9 +264,18 @@ impl GbAddonInstalls {
         let Some(tf2) = self.begin(id, DOWNLOADING, win, cx) else {
             return false;
         };
+        let map = is_map(&entry);
+        let titles = if map { MAP_UPDATE } else { UPDATE };
+        let probe = Tf2Probe::get(cx);
         self.task = Some(cx.spawn(async move |this, cx| {
-            let outcome = refetch(&this, cx, entry, tf2, win, UPDATE, None).await;
-            let _ = this.update(cx, |me, cx| me.finish(outcome, UPDATE, win, cx));
+            // Core refuses a map update while TF2 runs, so ask first rather than download for nothing.
+            let outcome = if map && cx.background_spawn(async move { probe() }).await {
+                let refused = GbMapInstallError::Tf2Running;
+                Outcome::Failed(gb_map_install_op(&refused, titles.failed))
+            } else {
+                refetch(&this, cx, entry, tf2, win, titles, None).await
+            };
+            let _ = this.update(cx, |me, cx| me.finish(outcome, titles, win, cx));
         }));
         cx.notify();
         true
@@ -224,6 +288,9 @@ impl GbAddonInstalls {
         let Some(entry) = self.entry(id).cloned() else {
             return false;
         };
+        if is_map(&entry) {
+            return self.reinstall_map(entry, win, cx);
+        }
         let Some(tf2) = self.begin(id, GbAddonStage::Installing, win, cx) else {
             return false;
         };
@@ -254,12 +321,37 @@ impl GbAddonInstalls {
         true
     }
 
-    /// Removes `id` from TF2 and the library; the caller has asked the player first.
-    /// Returns false as `update` does.
-    pub fn remove(&mut self, id: GbId, win: AnyWindowHandle, cx: &mut Context<Self>) -> bool {
-        let Some(name) = self.entry(id).map(|e| e.name().to_owned()) else {
+    /// Install again for a map: maps keep no library copy, so it always downloads the
+    /// newest file, and a map gone from GameBanana can only be removed.
+    fn reinstall_map(
+        &mut self,
+        entry: GbAddonEntry,
+        win: AnyWindowHandle,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(tf2) = self.begin(entry.gb_id(), DOWNLOADING, win, cx) else {
             return false;
         };
+        self.task = Some(cx.spawn(async move |this, cx| {
+            let gone = Some(MAP_REINSTALL_GONE);
+            let outcome = refetch(&this, cx, entry, tf2, win, MAP_INSTALL, gone).await;
+            let _ = this.update(cx, |me, cx| me.finish(outcome, MAP_INSTALL, win, cx));
+        }));
+        cx.notify();
+        true
+    }
+
+    /// Removes `id` from TF2 and the library; the caller has asked the player first.
+    /// Returns false as `update` does. Reads only the library row, so an item gone from
+    /// GameBanana can still be removed.
+    pub fn remove(&mut self, id: GbId, win: AnyWindowHandle, cx: &mut Context<Self>) -> bool {
+        let Some(entry) = self.entry(id) else {
+            return false;
+        };
+        let name = entry.name().to_owned();
+        if is_map(entry) {
+            return self.remove_map(id, name, win, cx);
+        }
         let Some(tf2) = self.begin(id, GbAddonStage::Removing, win, cx) else {
             return false;
         };
@@ -275,6 +367,34 @@ impl GbAddonInstalls {
                 Err(err) => Outcome::Failed(err),
             };
             let _ = this.update(cx, |me, cx| me.finish(outcome, REMOVE, win, cx));
+        }));
+        cx.notify();
+        true
+    }
+
+    /// Remove for a map: core also clears any copy an interrupted update left in staging.
+    fn remove_map(
+        &mut self,
+        id: GbId,
+        name: String,
+        win: AnyWindowHandle,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(tf2) = self.begin(id, GbAddonStage::Removing, win, cx) else {
+            return false;
+        };
+        let probe = Tf2Probe::get(cx);
+        let job = run_blocking(cx, move |s: &Services| {
+            s.library
+                .remove_gb_map(id, &tf2, &*probe)
+                .map_err(|e| gb_map_remove_op(&e, MAP_REMOVE.failed))
+        });
+        self.task = Some(cx.spawn(async move |this, cx| {
+            let outcome = match job.await {
+                Ok(()) => Outcome::Removed { id, name },
+                Err(err) => Outcome::Failed(err),
+            };
+            let _ = this.update(cx, |me, cx| me.finish(outcome, MAP_REMOVE, win, cx));
         }));
         cx.notify();
         true
@@ -372,6 +492,21 @@ impl GbAddonInstalls {
                 let name = entry.name().to_owned();
                 self.put(entry);
                 Some((ToastKind::Success, titles.done.to_owned(), name))
+            }
+            Outcome::MapInstalled {
+                entry,
+                restart,
+                skipped,
+            } => {
+                let name = entry.name();
+                let description = if skipped {
+                    format!("{name}. {MAP_SKIPPED}")
+                } else {
+                    name.to_owned()
+                };
+                self.put(entry);
+                let title = if restart { MAP_RESTART } else { titles.done };
+                Some((ToastKind::Success, title.to_owned(), description))
             }
             Outcome::Removed { id, name } => {
                 self.entries = self
@@ -487,6 +622,15 @@ async fn refetch(
 /// longer has the item to download.
 const REINSTALL_GONE: &str = "This add-on is no longer on GameBanana and its copy in your library is incomplete, so it can't be installed again. Remove it.";
 
+/// The player words for Install again on a map GameBanana no longer has.
+const MAP_REINSTALL_GONE: &str =
+    "This map is no longer on GameBanana, so it can't be installed again. Remove it.";
+
+/// Whether `entry` is a map item, which installs, updates and removes through core's map path.
+fn is_map(entry: &GbAddonEntry) -> bool {
+    entry.section() == AddonSection::MAPS.key()
+}
+
 /// The player words for an update whose recorded section this build does not know.
 const UPDATE_UNKNOWN_SECTION: &str = "TF2Tools can't tell where this add-on goes. Remove it, then install it again from the Addon Store.";
 
@@ -521,6 +665,9 @@ async fn fetch_and_install(
     cx: &mut AsyncApp,
     run: Run,
 ) -> Outcome {
+    if run.section == AddonSection::MAPS {
+        return fetch_and_install_map(this, cx, run).await;
+    }
     let Run {
         section,
         profile,
@@ -592,6 +739,177 @@ async fn fetch_and_install(
     }
 }
 
+/// The map path of [`fetch_and_install`]: downloads `run.profile`'s maps, asks which to install
+/// only when the item holds several and the game lacks at least one, and installs them.
+async fn fetch_and_install_map(
+    this: &WeakEntity<GbAddonInstalls>,
+    cx: &mut AsyncApp,
+    run: Run,
+) -> Outcome {
+    let Run {
+        profile,
+        tf2,
+        titles,
+        win,
+        ..
+    } = run;
+    let (tx, rx) = async_channel::unbounded::<DownloadProgress>();
+    let store = cx.update(|cx| cx.global::<Services>().store.clone());
+    let job = cx.update(|cx| {
+        tokio_bridge::spawn(cx, async move {
+            let report = move |p: DownloadProgress| {
+                let _ = tx.try_send(p);
+            };
+            store.download_gb_map(&profile, &report).await
+        })
+    });
+    while let Ok(p) = rx.recv().await {
+        let stage = GbAddonStage::Downloading {
+            downloaded: p.downloaded(),
+            total: p.total(),
+        };
+        let _ = this.update(cx, |me, cx| me.set_stage(stage, cx));
+    }
+    let download = match job.await {
+        Ok(Ok(download)) => download,
+        Ok(Err(err)) => {
+            let failure = describe_gb_map_fetch(&err);
+            failure.log("map download");
+            return Outcome::Failed(OpError::core(titles.failed, failure.message));
+        }
+        Err(join) => {
+            let failure = download_stopped(&join.to_string());
+            failure.log("map download");
+            return Outcome::Failed(OpError::core(titles.failed, failure.message));
+        }
+    };
+
+    let names: Vec<String> = download
+        .maps()
+        .iter()
+        .map(|m| m.name().to_owned())
+        .collect();
+    let sources = map_sources(cx, &tf2, download.gb_id(), names.clone()).await;
+    let serveme = sources.contains(&Some(MapSource::Serveme));
+    let all_present = sources.iter().all(Option::is_some);
+    // One map, or a pack the game has whole, goes straight to core: the checklist would offer
+    // nothing to choose, and core's AlreadyPresent says what the player already has.
+    let chosen = if names.len() < 2 || all_present {
+        names
+    } else {
+        let _ = this.update(cx, |me, cx| me.set_stage(GbAddonStage::Choosing, cx));
+        match ask_maps(&download, &sources, win, cx).await {
+            Some(chosen) => chosen,
+            None => {
+                // The scratch dir can hold hundreds of megabytes; deleting it stays off the UI thread.
+                cx.background_spawn(async move { drop(download) }).detach();
+                return Outcome::Cancelled;
+            }
+        }
+    };
+
+    let skipped = download
+        .maps()
+        .iter()
+        .any(|m| m.skipped() > 0 && chosen.iter().any(|c| c == m.name()));
+    let _ = this.update(cx, |me, cx| me.set_stage(GbAddonStage::Installing, cx));
+    let install = cx.update(|cx| {
+        let probe = Tf2Probe::get(cx);
+        run_blocking(cx, move |s: &Services| {
+            // An update refuses while TF2 runs; a first install goes ahead and asks the probe
+            // afterwards whether the game needs a restart to see the new folder.
+            let written = if titles.update {
+                s.library
+                    .update_gb_map(download, &chosen, &tf2, &*probe)
+                    .map(|entry| (entry, false))
+            } else {
+                s.library
+                    .install_gb_map(download, &chosen, &tf2, &*probe)
+                    .map(|entry| (entry, probe()))
+            };
+            written.map_err(|e| {
+                // Only here is it known whether one of the maps came from serveme.tf.
+                if let GbMapInstallError::AlreadyPresent { names } = &e {
+                    LocalFailure::new(already_have(names, serveme), e.to_string())
+                        .into_op(titles.failed)
+                } else {
+                    gb_map_install_op(&e, titles.failed)
+                }
+            })
+        })
+    });
+    match install.await {
+        Ok((entry, restart)) => Outcome::MapInstalled {
+            entry,
+            restart,
+            skipped,
+        },
+        Err(err) => Outcome::Failed(err),
+    }
+}
+
+/// Where the game already has each of `names`, skipping item `gb_id`'s own folder, read on a
+/// pool thread. A map whose presence can't be read counts as absent, so core decides.
+async fn map_sources(
+    cx: &mut AsyncApp,
+    tf2: &Tf2Install,
+    gb_id: GbId,
+    names: Vec<String>,
+) -> Vec<Option<MapSource>> {
+    let tf2 = tf2.clone();
+    let count = names.len();
+    let job = cx.update(|cx| {
+        run_blocking(cx, move |s: &Services| {
+            Ok(names
+                .iter()
+                .map(|name| {
+                    s.library
+                        .map_presence(&tf2, name, Some(gb_id))
+                        .unwrap_or_else(|e| {
+                            tracing::warn!("couldn't tell whether the game has {name}: {e}");
+                            None
+                        })
+                })
+                .collect())
+        })
+    });
+    job.await.unwrap_or_else(|_| vec![None; count])
+}
+
+/// Asks in `win` which of `download`'s maps to install, showing the ones in `sources` the
+/// game already has as disabled. None when the player backs out or the dialog goes away.
+async fn ask_maps(
+    download: &GbMapDownload,
+    sources: &[Option<MapSource>],
+    win: AnyWindowHandle,
+    cx: &mut AsyncApp,
+) -> Option<Vec<String>> {
+    let items = download
+        .maps()
+        .iter()
+        .zip(sources)
+        .map(|(m, source)| ChecklistItem {
+            name: m.name().to_owned(),
+            label: m.name().to_owned(),
+            present: source.is_some(),
+        })
+        .collect();
+    // Only maps the player can keep count: a present map is never installed.
+    let skipped = download
+        .maps()
+        .iter()
+        .zip(sources)
+        .any(|(m, source)| source.is_none() && m.skipped() > 0);
+    let name = download.name().to_owned();
+    // As in `ask_payloads`, the entity's handle is dropped before waiting.
+    let answer = win
+        .update(cx, |_, window, cx| {
+            open_map_checklist(&name, items, skipped, window, cx).1
+        })
+        .ok()?;
+    answer.recv().await.ok().flatten()
+}
+
 /// Asks in `win` which of `download`'s payloads to install. None when the player backs out,
 /// the dialog goes away or `win` is closed.
 async fn ask_payloads(
@@ -605,6 +923,7 @@ async fn ask_payloads(
         .map(|p| ChecklistItem {
             name: p.name().to_owned(),
             label: p.label().to_owned(),
+            present: false,
         })
         .collect();
     let name = download.name().to_owned();
@@ -624,4 +943,11 @@ pub fn install_blocker(store: &StoreClient, profile: &AddonProfile) -> Option<St
     store
         .gb_addon_refusal(profile)
         .map(|err| describe_gb_fetch(&err).message)
+}
+
+/// `install_blocker` for a map: core's refusals judged against the map size cap.
+pub fn map_install_blocker(store: &StoreClient, profile: &AddonProfile) -> Option<String> {
+    store
+        .gb_map_refusal(profile)
+        .map(|err| describe_gb_map_fetch(&err).message)
 }

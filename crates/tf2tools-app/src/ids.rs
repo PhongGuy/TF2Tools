@@ -793,6 +793,10 @@ pub const ADDON_DETAIL_PROGRESS: &str = "addon-detail-progress";
 pub const ADDON_DETAIL_BAR: &str = "addon-detail-bar";
 /// Why the add-on detail offers no install, in its place.
 pub const ADDON_DETAIL_BLOCKED: &str = "addon-detail-blocked";
+/// The add-on detail's Remove button, present when the library records the item.
+pub const ADDON_DETAIL_REMOVE: &str = "addon-detail-remove";
+/// The map detail's "Installed maps" heading, present while the item is in TF2.
+pub const ADDON_DETAIL_MAPS: &str = "addon-detail-maps";
 /// The Settings "Show mature add-ons" switch.
 pub const SETTINGS_MATURE_ADDONS: &str = "settings-mature-addons";
 /// The Settings "Show nicknames in match logs" switch.
@@ -2543,6 +2547,8 @@ pub const MAPS_GB_SEARCH: &str = "maps-gb-search";
 pub const MAPS_GB_SORT: &str = "maps-gb-sort";
 /// Wraps the GameBanana maps gamemode select.
 pub const MAPS_GB_GAMEMODE: &str = "maps-gb-gamemode";
+/// Wraps the GameBanana maps Show select ("All maps" or "Installed").
+pub const MAPS_GB_SHOW: &str = "maps-gb-show";
 /// The GameBanana maps card grid.
 pub const MAPS_GB_GRID: &str = "maps-gb-grid";
 /// The GameBanana maps skeleton cards, labelled "Loading...", before the first page lands.
@@ -3216,6 +3222,11 @@ pub fn addon_detail_credit(group: usize, index: usize) -> ElementId {
 /// One file row in the add-on detail, by position: "addon-detail-file:<i>".
 pub fn addon_detail_file(index: usize) -> ElementId {
     keyed("addon-detail-file", &index.to_string())
+}
+
+/// The map detail's `index`th installed map row, labelled with its line.
+pub fn addon_detail_map(index: usize) -> ElementId {
+    keyed("addon-detail-map", &index.to_string())
 }
 
 /// The "Choose what to install" dialog for an add-on with several parts.
