@@ -9,6 +9,7 @@ use crate::db::Database;
 use crate::error::SettingsError;
 
 const DEFAULT_THEME: &str = "dark";
+const DEFAULT_LANGUAGE: &str = "en";
 const DEFAULT_SYNC_CACHE_HOURS: u32 = 168;
 
 /// A snapshot of the user's settings, with v5's defaults for missing or unreadable keys.
@@ -18,6 +19,7 @@ pub struct Settings {
     tf2_path: Option<PathBuf>,
     volume: Volume,
     theme: String,
+    language: String,
     sync_cache_hours: u32,
     sidebar_collapsed: bool,
     maker_grid_lines: bool,
@@ -42,6 +44,11 @@ impl Settings {
     /// The UI theme name, `"dark"` by default.
     pub fn theme(&self) -> &str {
         &self.theme
+    }
+
+    /// The UI language code as saved, `"en"` by default. Not validated here.
+    pub fn language(&self) -> &str {
+        &self.language
     }
 
     /// How many hours a store sync stays fresh.
@@ -91,6 +98,7 @@ impl Default for Settings {
             tf2_path: None,
             volume: Volume::default(),
             theme: DEFAULT_THEME.to_owned(),
+            language: DEFAULT_LANGUAGE.to_owned(),
             sync_cache_hours: DEFAULT_SYNC_CACHE_HOURS,
             sidebar_collapsed: false,
             maker_grid_lines: false,
@@ -151,6 +159,7 @@ impl Database {
                 "tf2_path" => settings.tf2_path = (!value.is_empty()).then(|| value.into()),
                 "volume" => settings.volume = Volume::parse_lenient(&value),
                 "theme" => settings.theme = value,
+                "language" => settings.language = value,
                 "sync_cache_hours" => {
                     settings.sync_cache_hours = value.parse().unwrap_or(DEFAULT_SYNC_CACHE_HOURS);
                 }
@@ -225,6 +234,11 @@ impl Database {
     /// Stores the UI theme name.
     pub fn set_theme(&self, theme: &str) -> Result<(), SettingsError> {
         self.save_setting("theme", theme)
+    }
+
+    /// Stores the UI language code.
+    pub fn set_language(&self, code: &str) -> Result<(), SettingsError> {
+        self.save_setting("language", code)
     }
 
     /// Stores whether the sidebar is collapsed, as `"true"` or `"false"`.
