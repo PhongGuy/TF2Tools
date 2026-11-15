@@ -65,6 +65,11 @@ gpui-pre-wgpu = "=0.3.12"
 name = "integration"
 path = "tests/main.rs"
 
+# Tests that switch the process-wide locale, kept apart from the English suite.
+[[test]]
+name = "i18n"
+path = "tests/i18n.rs"
+
 [[example]]
 name = "app_timing"
 test = true
