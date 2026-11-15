@@ -28,10 +28,10 @@ const TITLES: &[(&str, &str)] = &[
 /// The notices cargo-about generates for every linked crate; thousands of lines, so shown last.
 const THIRD_PARTY: &str = "THIRD-PARTY-NOTICES.txt";
 
-/// A notice over this many lines is long: Settings lays out only its visible lines.
+/// A notice over this many lines is long, like the generated crate notices.
 const LONG_LINES: usize = 500;
 
-/// How many characters a long notice's row holds; its lines are rewrapped to fit.
+/// How many characters a notice's row in Settings holds; its lines are rewrapped to fit.
 pub const WRAP_COLUMNS: usize = 80;
 
 /// One licence notice: its file under `licenses/`, a plain title and the full text.

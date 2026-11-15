@@ -17,7 +17,7 @@ use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight, Hsla,
     InteractiveElement as _, IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
+    StatefulInteractiveElement as _, Styled, Subscription, TestSupportExt as _,
     UniformListScrollHandle, Window, div, px, relative, uniform_list,
 };
 
@@ -109,17 +109,21 @@ pub struct SettingsPage {
     /// The embedded licence notices, and whether the Licences card shows them.
     notices: Vec<Notice>,
     show_notices: bool,
-    /// Each long notice's wrapped rows and list scroll, by index into `notices`; split on first open.
-    notice_rows: Vec<Option<NoticeRows>>,
+    /// Every notice as list rows, shared with the list's row builder; split on first open.
+    notice_rows: Option<Rc<[NoticeRow]>>,
     scroll: ScrollHandle,
-    notices_scroll: ScrollHandle,
+    notices_scroll: UniformListScrollHandle,
 }
 
-/// A long notice's rows, shared with its list's row builder, and that list's scroll.
-type NoticeRows = (Rc<[SharedString]>, UniformListScrollHandle);
+/// One row of the notices list: the blank before a title, a notice's title, or one wrapped line.
+enum NoticeRow {
+    Gap,
+    Title(SharedString, SharedString),
+    Line(SharedString, usize, SharedString),
+}
 
-/// A long notice's list box height and its fixed row height, since `uniform_list` sizes rows alike.
-const NOTICE_LIST_HEIGHT: f32 = 280.;
+/// The notices list's height and its fixed row height, since `uniform_list` sizes rows alike.
+const NOTICE_LIST_HEIGHT: f32 = 320.;
 const NOTICE_ROW_HEIGHT: f32 = 16.;
 
 /// One store's running flag and failure text, the only hub state Settings draws.
@@ -169,19 +173,26 @@ pub const SYNC_CARDS: [(StoreKind, &str, &str); 5] = [
 ];
 
 impl SettingsPage {
-    // Splits each long notice into rows the first time the notices open, so startup pays nothing.
-    fn split_long_notices(&mut self) {
-        if !self.notice_rows.is_empty() {
+    // Splits every notice into a title and wrapped lines the first time the notices open, so
+    // startup pays nothing; a blank row parts each notice from the one before.
+    fn split_notices(&mut self) {
+        if self.notice_rows.is_some() {
             return;
         }
-        self.notice_rows = (self.notices.iter())
-            .map(|notice| {
-                notice.is_long().then(|| {
-                    let rows = notice.lines().into_iter().map(SharedString::from).collect();
-                    (rows, UniformListScrollHandle::new())
-                })
-            })
-            .collect();
+        let mut rows = Vec::new();
+        for notice in &self.notices {
+            if !rows.is_empty() {
+                rows.push(NoticeRow::Gap);
+            }
+            let file = SharedString::from(notice.file().to_owned());
+            rows.push(NoticeRow::Title(
+                file.clone(),
+                notice.title().to_owned().into(),
+            ));
+            let lines = notice.lines().into_iter().enumerate();
+            rows.extend(lines.map(|(row, text)| NoticeRow::Line(file.clone(), row, text.into())));
+        }
+        self.notice_rows = Some(rows.into());
     }
 
     /// Needs the `Services` global. Starts the settings load off the UI thread.
@@ -248,9 +259,9 @@ impl SettingsPage {
             _volume: volume_bound,
             notices: notices::all(),
             show_notices: false,
-            notice_rows: Vec::new(),
+            notice_rows: None,
             scroll: ScrollHandle::new(),
-            notices_scroll: ScrollHandle::new(),
+            notices_scroll: UniformListScrollHandle::new(),
         };
         page.load(true, cx);
         page.load_sync(window, cx);
@@ -634,46 +645,33 @@ fn mature_switch(cx: &mut App) -> AnyElement {
         .into_any_element()
 }
 
-// The Licences card's content: a toggle and, while shown, a scrollable box with each notice's
-// title over its full text.
+// The Licences card's content: a toggle and, while shown, a bordered list of every notice's
+// title over its text, laying out only the rows in view.
 fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyElement {
     let theme = cx.theme();
     let shown = page.show_notices;
-    let view = shown.then(|| {
-        let view = v_flex()
-            .id(ids::SETTINGS_NOTICES_VIEW)
-            .test_support()
-            .max_h(px(320.))
-            .track_scroll(&page.notices_scroll)
-            .overflow_y_scroll()
-            .gap_4()
-            .p_3()
+    let view = (page.notice_rows.clone()).filter(|_| shown).map(|rows| {
+        let muted = theme.muted_foreground;
+        let list = uniform_list(
+            ids::SETTINGS_NOTICES_VIEW,
+            rows.len(),
+            move |range, _, _| range.map(|row| notice_row(&rows[row], muted)).collect(),
+        )
+        .track_scroll(&page.notices_scroll)
+        .test_support()
+        .w_full()
+        .h(px(NOTICE_LIST_HEIGHT))
+        .p_3();
+        div()
             .rounded(theme.radius)
             .border_1()
             .border_color(theme.border)
-            .children(page.notices.iter().enumerate().map(|(index, notice)| {
-                let rows = page.notice_rows.get(index).and_then(Option::as_ref);
-                v_flex()
-                    .gap_2()
-                    .child(
-                        div()
-                            .id(ids::settings_notice(notice.file()))
-                            .aria_label(SharedString::from(notice.title().to_owned()))
-                            .test_support()
-                            .text_sm()
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(notice.title().to_owned()),
-                    )
-                    .child(match rows {
-                        Some(rows) => notice_list(notice.file(), rows, theme.muted_foreground),
-                        None => div()
-                            .text_xs()
-                            .text_color(theme.muted_foreground)
-                            .child(notice.text().to_owned())
-                            .into_any_element(),
-                    })
-            }));
-        scroll_area(ids::SETTINGS_NOTICES_SCROLLBAR, &page.notices_scroll, view)
+            .overflow_hidden()
+            .child(scroll_area(
+                ids::SETTINGS_NOTICES_SCROLLBAR,
+                &page.notices_scroll,
+                list,
+            ))
     });
     v_flex()
         .gap_3()
@@ -689,7 +687,7 @@ fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyEl
                     })
                     .on_click(cx.listener(|page, _, _, cx| {
                         page.show_notices = !page.show_notices;
-                        page.split_long_notices();
+                        page.split_notices();
                         cx.notify();
                     })),
             ),
@@ -698,34 +696,37 @@ fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyEl
         .into_any_element()
 }
 
-// A long notice's rows as a fixed-height list with its own bar, so only the rows in view are laid out.
-fn notice_list(file: &str, (rows, scroll): &NoticeRows, color: Hsla) -> AnyElement {
-    let (rows, owner) = (Rc::clone(rows), file.to_owned());
-    let list = uniform_list(
-        ids::keyed("settings-notice-lines", file),
-        rows.len(),
-        move |range, _, _| {
-            range
-                .map(|row| {
-                    div()
-                        .id(ids::settings_notice_line(&owner, row))
-                        .test_support()
-                        .h(px(NOTICE_ROW_HEIGHT))
-                        .line_height(px(NOTICE_ROW_HEIGHT))
-                        .text_xs()
-                        .text_color(color)
-                        .whitespace_nowrap()
-                        .overflow_hidden()
-                        .text_ellipsis()
-                        .child(rows[row].clone())
-                })
-                .collect()
-        },
-    )
-    .track_scroll(scroll)
-    .w_full()
-    .h(px(NOTICE_LIST_HEIGHT));
-    scroll_area(ids::keyed("settings-notice-lines-bar", file), scroll, list).into_any_element()
+// One notices list row at the list's fixed height: a blank, a semibold title or a muted line.
+fn notice_row(row: &NoticeRow, muted: Hsla) -> AnyElement {
+    fn cell<E: Styled>(el: E) -> E {
+        (el.h(px(NOTICE_ROW_HEIGHT))
+            .line_height(px(NOTICE_ROW_HEIGHT)))
+        .whitespace_nowrap()
+        .overflow_hidden()
+        .text_ellipsis()
+    }
+    match row {
+        NoticeRow::Gap => cell(div()).into_any_element(),
+        NoticeRow::Title(file, title) => cell(
+            div()
+                .id(ids::settings_notice(file))
+                .aria_label(title.clone())
+                .test_support(),
+        )
+        .text_sm()
+        .font_weight(FontWeight::SEMIBOLD)
+        .child(title.clone())
+        .into_any_element(),
+        NoticeRow::Line(file, row, text) => cell(
+            div()
+                .id(ids::settings_notice_line(file, *row))
+                .test_support(),
+        )
+        .text_xs()
+        .text_color(muted)
+        .child(text.clone())
+        .into_any_element(),
+    }
 }
 
 // The Help and feedback card's two links, opened in the player's browser.

@@ -419,29 +419,43 @@ fn third_party_notices_open_from_settings(cx: &mut TestAppContext) {
     .unwrap();
     support::click_id(cx, s.win, ids::SETTINGS_NOTICES);
     assert!(support::present(cx, s.win, ids::SETTINGS_NOTICES_VIEW));
-    for notice in &notices {
-        assert_eq!(
-            support::label_of(cx, s.win, ids::settings_notice(notice.file())).as_deref(),
-            Some(notice.title()),
-            "{} is not shown",
-            notice.file()
-        );
+    // Only the titles in view are laid out, so scroll the box a few rows at a time until each
+    // title has shown with its label.
+    let mut unseen: Vec<_> = notices.iter().collect();
+    for _ in 0..400 {
+        unseen.retain(|notice| {
+            support::label_of(cx, s.win, ids::settings_notice(notice.file())).as_deref()
+                != Some(notice.title())
+        });
+        if unseen.is_empty() {
+            break;
+        }
+        cx.update_window(s.win, |_, w, cx| {
+            let down = ScrollDelta::Pixels(point(px(0.), px(-48.)));
+            w.scroll(ids::SETTINGS_NOTICES_VIEW, down, cx)
+        })
+        .unwrap();
     }
+    let unseen: Vec<_> = unseen.iter().map(|n| n.file()).collect();
+    assert!(unseen.is_empty(), "never shown: {unseen:?}");
     support::click_id(cx, s.win, ids::SETTINGS_NOTICES);
     assert!(!support::present(cx, s.win, ids::SETTINGS_NOTICES_VIEW));
 }
 
-/// The crate notices run to thousands of lines, so opening them lays out only the lines in view.
+/// The notices run to thousands of lines, so opening them lays out only the rows in view, the
+/// short credits' lines and titles as well as the crate notices'.
 #[gpui_kit::test]
-fn the_long_notices_lay_out_only_the_visible_lines(cx: &mut TestAppContext) {
+fn the_notices_lay_out_only_the_visible_lines(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     open_settings(cx, &s);
-    let long = tf2tools_app::notices::all()
-        .into_iter()
-        .find(|n| n.is_long())
-        .expect("the third-party notices are long");
-    let total = long.lines().len();
+    let notices = tf2tools_app::notices::all();
+    assert!(
+        notices.iter().any(|n| n.is_long()),
+        "the crate notices are long"
+    );
+    let lines: Vec<_> = notices.iter().map(|n| n.lines().len()).collect();
+    let total: usize = lines.iter().sum();
     assert!(total > 5_000, "{total} lines");
     cx.update_window(s.win, |_, w, cx| {
         let down = ScrollDelta::Pixels(point(px(0.), px(-4000.)));
@@ -450,18 +464,31 @@ fn the_long_notices_lay_out_only_the_visible_lines(cx: &mut TestAppContext) {
     .unwrap();
     support::click_id(cx, s.win, ids::SETTINGS_NOTICES);
     support::settle(cx, s.win);
-    let rendered = cx
+    let (rendered, titles, first) = cx
         .update_window(s.win, |_, w, _| {
-            (0..total)
-                .filter(|&i| {
-                    w.try_find(ids::settings_notice_line(long.file(), i))
-                        .is_some()
-                })
-                .count()
+            let shown = |notice: &tf2tools_app::notices::Notice, count: usize| {
+                (0..count)
+                    .filter(|&i| {
+                        w.try_find(ids::settings_notice_line(notice.file(), i))
+                            .is_some()
+                    })
+                    .count()
+            };
+            let rendered: usize = notices.iter().zip(&lines).map(|(n, &c)| shown(n, c)).sum();
+            let titles = (notices.iter())
+                .filter(|n| w.try_find(ids::settings_notice(n.file())).is_some())
+                .count();
+            let first = w.try_find(ids::settings_notice_line(notices[0].file(), 0));
+            (rendered, titles, first.is_some())
         })
         .unwrap();
-    assert!(rendered > 0, "no line of {} is shown", long.file());
+    assert!(
+        first,
+        "the first line of {} is not a row",
+        notices[0].file()
+    );
     assert!(rendered < 100, "{rendered} of {total} lines laid out");
+    assert!(titles < notices.len(), "all {titles} titles laid out");
 }
 
 #[gpui_kit::test]
