@@ -22,7 +22,11 @@ const TITLES: &[(&str, &str)] = &[
     ("rars-Apache-2.0.txt", "rars RAR reader (Apache-2.0)"),
     ("crosshairs-notice.txt", "Built-in crosshairs"),
     ("comfig-app-MIT.txt", "mastercomfig app preset text (MIT)"),
+    (THIRD_PARTY, "Rust crates TF2Tools is built from"),
 ];
+
+/// The notices cargo-about generates for every linked crate; thousands of lines, so shown last.
+const THIRD_PARTY: &str = "THIRD-PARTY-NOTICES.txt";
 
 /// One licence notice: its file under `licenses/`, a plain title and the full text.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,10 +53,10 @@ impl Notice {
     }
 }
 
-/// Every embedded notice, ordered by file name.
+/// Every embedded notice, ordered by file name with the third-party crate notices last.
 pub fn all() -> Vec<Notice> {
     let mut files: Vec<String> = Licences::iter().map(|f| f.into_owned()).collect();
-    files.sort();
+    files.sort_by(|a, b| (a == THIRD_PARTY, a).cmp(&(b == THIRD_PARTY, b)));
     files
         .into_iter()
         .filter_map(|file| {

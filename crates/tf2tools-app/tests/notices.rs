@@ -36,7 +36,10 @@ const BUNDLED: &[(&str, Owner)] = &[
 ];
 
 /// Third-party work compiled in from a dependency rather than a folder of ours.
-const COMPILED_IN: &[(&str, &str)] = &[("Lucide icons via gpui-kit", "Lucide-ISC.txt")];
+const COMPILED_IN: &[(&str, &str)] = &[
+    ("Lucide icons via gpui-kit", "Lucide-ISC.txt"),
+    ("the Rust crates in Cargo.lock", "THIRD-PARTY-NOTICES.txt"),
+];
 
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -148,6 +151,10 @@ fn known_notices_get_plain_titles() {
         notices::title_for("comfig-app-MIT.txt"),
         "mastercomfig app preset text (MIT)"
     );
+    assert_eq!(
+        notices::title_for("THIRD-PARTY-NOTICES.txt"),
+        "Rust crates TF2Tools is built from"
+    );
     // A notice nobody titled still shows, named after its file.
     assert_eq!(notices::title_for("Some-Thing-MIT.txt"), "Some Thing MIT");
 }
@@ -198,4 +205,21 @@ fn every_outside_source_has_a_notice_that_disclaims_affiliation() {
             "{file} lacks the not-affiliated statement"
         );
     }
+}
+
+/// The generated crate notices run to thousands of lines, so they come after every short credit.
+#[test]
+fn the_third_party_notices_come_last() {
+    let shipped = notices::all();
+    assert_eq!(
+        shipped.last().map(|n| n.file()),
+        Some("THIRD-PARTY-NOTICES.txt")
+    );
+    let rest: Vec<&str> = shipped[..shipped.len() - 1]
+        .iter()
+        .map(|n| n.file())
+        .collect();
+    let mut sorted = rest.clone();
+    sorted.sort();
+    assert_eq!(rest, sorted, "the short notices stay in file order");
 }
