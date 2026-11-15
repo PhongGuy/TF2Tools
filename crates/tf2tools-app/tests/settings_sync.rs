@@ -100,8 +100,26 @@ fn settings_sync_ids_carry_the_store_slug() {
 fn the_sync_cards_name_their_sources_in_player_words() {
     // A repository path like owner/name means nothing to a player.
     for (_, title, description) in SYNC_CARDS {
-        assert!(!description.contains('/'), "{title}: {description:?}");
+        let text = tf2tools_app::_rust_i18n_try_translate("en", description)
+            .unwrap_or_else(|| panic!("{title}: {description} is not in en.yml"));
+        assert!(!text.contains('/'), "{title}: {text:?}");
+        assert!(
+            tf2tools_app::_rust_i18n_try_translate("en", title).is_some(),
+            "{title}"
+        );
     }
+}
+
+#[test]
+fn one_cached_item_is_singular_in_english() {
+    assert_eq!(
+        tf2tools_app::i18n::plural("settings.sync.items", 1),
+        "1 item cached"
+    );
+    assert_eq!(
+        tf2tools_app::i18n::plural("settings.sync.items", 0),
+        "0 items cached"
+    );
 }
 
 #[gpui_kit::test]
