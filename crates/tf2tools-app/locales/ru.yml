@@ -4,61 +4,61 @@ settings:
     description: "Язык, на котором TF2Tools показывает текст"
     note: "Ещё не переведённые части TF2Tools остаются на английском."
   app_updates:
-    title: "App Updates"
-    version: "Current version: v%{version}"
+    title: "Обновления приложения"
+    version: "Текущая версия: v%{version}"
   tf2:
-    title: "TF2 Installation"
-    description: "Path to your Team Fortress 2 installation folder"
-    placeholder: "/path/to/Team Fortress 2"
-    browse: "Browse"
-    detect: "Auto-detect"
+    title: "Установка TF2"
+    description: "Путь к папке, в которую установлена Team Fortress 2"
+    placeholder: "/путь/к/Team Fortress 2"
+    browse: "Обзор"
+    detect: "Найти автоматически"
   audio:
-    title: "Audio"
-    description: "Preview volume for hitsounds and killsounds"
-    volume: "Volume: %{percent}%"
+    title: "Звук"
+    description: "Громкость предпрослушивания хитсаундов и килсаундов"
+    volume: "Громкость: %{percent}%"
   cache:
-    title: "Store Cache"
-    description: "How often to re-sync store data"
-    duration: "Cache duration: %{duration}"
-    hint: "Stores will re-sync automatically when cache expires. Default: 7 days (168 hours)."
-    hours: { one: "%{count} hour", few: "%{count} hours", many: "%{count} hours" }
-    days: { one: "%{count} day", few: "%{count} days", many: "%{count} days" }
-    days_hours: "%{days}d %{hours}h"
+    title: "Кэш магазинов"
+    description: "Как часто заново синхронизировать данные магазинов"
+    duration: "Срок хранения кэша: %{duration}"
+    hint: "Магазины синхронизируются заново, когда истекает срок кэша. По умолчанию: 7 дней (168 часов)."
+    hours: { one: "%{count} час", few: "%{count} часа", many: "%{count} часов" }
+    days: { one: "%{count} день", few: "%{count} дня", many: "%{count} дней" }
+    days_hours: "%{days} д %{hours} ч"
   addons:
-    title: "Add-ons"
-    description: "GameBanana skins, effects, GUIs, textures and game files"
-    mature: "Show mature add-ons"
+    title: "Дополнения"
+    description: "Скины, эффекты, интерфейсы, текстуры и игровые файлы с GameBanana"
+    mature: "Показывать дополнения для взрослых"
   logs_tf:
     title: "logs.tf"
-    description: "How opened match logs name the players you track"
-    nicknames: "Show nicknames in match logs"
+    description: "Как открытые логи матчей называют игроков, которых вы отслеживаете"
+    nicknames: "Показывать никнеймы в логах матчей"
   sync:
-    items: { one: "%{count} item cached", few: "%{count} items cached", many: "%{count} items cached" }
-    last_synced: "Last synced: %{when}"
-    failed: "Sync failed: %{error}"
-    never: "Never"
-    unknown: "Unknown"
-    resync: "Resync"
-    syncing: "Syncing..."
-    sounds: { title: "Sound Store", description: "GameBanana hitsounds and killsounds" }
-    crosshairs: { title: "Crosshair Store", description: "GameBanana crosshair mods" }
-    gamebanana_huds: { title: "GameBanana HUD Store", description: "GameBanana HUD mods" }
-    curated_huds: { title: "Curated HUD Store", description: "Curated HUDs from mastercomfig" }
-    addons: { title: "Addon Store", description: "Mastercomfig performance and QoL addons" }
-  save: "Save Settings"
+    items: { one: "%{count} элемент в кэше", few: "%{count} элемента в кэше", many: "%{count} элементов в кэше" }
+    last_synced: "Последняя синхронизация: %{when}"
+    failed: "Ошибка синхронизации: %{error}"
+    never: "Никогда"
+    unknown: "Неизвестно"
+    resync: "Синхронизировать"
+    syncing: "Синхронизация..."
+    sounds: { title: "Магазин звуков", description: "Хитсаунды и килсаунды с GameBanana" }
+    crosshairs: { title: "Магазин прицелов", description: "Моды прицелов с GameBanana" }
+    gamebanana_huds: { title: "Магазин HUD с GameBanana", description: "Моды HUD с GameBanana" }
+    curated_huds: { title: "Подборка HUD", description: "HUD, отобранные mastercomfig" }
+    addons: { title: "Магазин дополнений", description: "Дополнения mastercomfig для производительности и удобства" }
+  save: "Сохранить настройки"
   licences:
-    title: "Licences"
-    description: "TF2Tools uses work and content made by others. These are their licences and credits."
-    show: "Show notices"
-    hide: "Hide notices"
+    title: "Лицензии"
+    description: "TF2Tools использует работы и материалы других авторов. Здесь их лицензии и благодарности."
+    show: "Показать лицензии"
+    hide: "Скрыть лицензии"
   help:
-    title: "Help and feedback"
-    description: "Stuck, or found something broken? Read the help or tell us about it."
-    report: "Report a problem"
-    open: "Help"
+    title: "Помощь и обратная связь"
+    description: "Что-то не получается или сломалось? Загляните в справку или расскажите нам."
+    report: "Сообщить о проблеме"
+    open: "Справка"
   toast:
-    saved: "Settings saved"
-    found: "TF2 found"
-    not_found: "TF2 not found"
-    manual: "Select your TF2 folder manually"
-    installs: { one: "%{count} install found; choose one below", few: "%{count} installs found; choose one below", many: "%{count} installs found; choose one below" }
+    saved: "Настройки сохранены"
+    found: "TF2 найдена"
+    not_found: "TF2 не найдена"
+    manual: "Укажите папку TF2 вручную"
+    installs: { one: "Найдена %{count} установка; выберите нужную ниже", few: "Найдено %{count} установки; выберите нужную ниже", many: "Найдено %{count} установок; выберите нужную ниже" }
