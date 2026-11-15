@@ -407,3 +407,37 @@ fn install_again_of_a_gone_map_says_remove_it(cx: &mut TestAppContext) {
     idle(cx);
     assert!(entry(cx, 42).unwrap().is_gone());
 }
+
+#[gpui_kit::test]
+fn a_folder_deleted_outside_the_app_reads_not_installed_when_the_tab_opens_again(
+    cx: &mut TestAppContext,
+) {
+    use crate::support::maps::{maps_shell_found, open_gamebanana, open_maps, seed_maps};
+    use tf2tools_app::shell::route::Page;
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(10, "cp_alpha", &[("cp_alpha.bsp", bsp(b"a"), 100)]);
+    let s = maps_shell_found(cx, &env, &server);
+    seed_maps(&env);
+    let page = open_maps(cx, &s);
+    open_gamebanana(cx, &s, &page);
+    let p = profile(cx, 10);
+    let (i, win) = (installs(cx), s.win);
+    assert!(cx.update(|cx| i.update(cx, |i, cx| i.install(AddonSection::MAPS, p, win, cx))));
+    idle(cx);
+    let badge = ids::addon_gb_card_badge("maps", GbId::new(10));
+    support::wait_real(cx, "the Installed badge", |cx| {
+        support::label_of(cx, s.win, badge.clone()).as_deref() == Some("Installed")
+    });
+    std::fs::remove_dir_all(folder(&env, 10, "cp_alpha")).unwrap();
+    // Leaving Maps and coming back is the tab opening again.
+    support::click_id(cx, s.win, ids::nav(Page::Settings));
+    support::settle(cx, s.win);
+    support::click_id(cx, s.win, ids::nav(Page::Maps));
+    support::wait_real(cx, "the Not installed badge", |cx| {
+        support::label_of(cx, s.win, badge.clone()).as_deref() == Some("Not installed")
+    });
+    support::click_id(cx, s.win, ids::addon_gb_card("maps", GbId::new(10)));
+    support::wait_real(cx, "Install again", |cx| {
+        support::label_of(cx, s.win, ids::ADDON_DETAIL_INSTALL).as_deref() == Some("Install again")
+    });
+}
