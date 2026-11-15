@@ -264,9 +264,17 @@ impl GbAddonInstalls {
         let Some(tf2) = self.begin(id, DOWNLOADING, win, cx) else {
             return false;
         };
-        let titles = if is_map(&entry) { MAP_UPDATE } else { UPDATE };
+        let map = is_map(&entry);
+        let titles = if map { MAP_UPDATE } else { UPDATE };
+        let probe = Tf2Probe::get(cx);
         self.task = Some(cx.spawn(async move |this, cx| {
-            let outcome = refetch(&this, cx, entry, tf2, win, titles, None).await;
+            // Core refuses a map update while TF2 runs, so ask first rather than download for nothing.
+            let outcome = if map && cx.background_spawn(async move { probe() }).await {
+                let refused = GbMapInstallError::Tf2Running;
+                Outcome::Failed(gb_map_install_op(&refused, titles.failed))
+            } else {
+                refetch(&this, cx, entry, tf2, win, titles, None).await
+            };
             let _ = this.update(cx, |me, cx| me.finish(outcome, titles, win, cx));
         }));
         cx.notify();

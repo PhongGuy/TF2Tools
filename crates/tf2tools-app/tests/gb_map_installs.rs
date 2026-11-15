@@ -262,6 +262,29 @@ fn a_pack_update_offers_every_map_ticked_including_the_ones_it_already_holds(
     }
 }
 
+// The refusal comes before the download, so a big map isn't fetched only to be thrown away.
+#[gpui_kit::test]
+fn an_update_while_tf2_runs_refuses_without_downloading(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(43, "Alpha", &[("cp_alpha.bsp", bsp(b"old"), 100)]);
+    let w = window(cx, &env, &server);
+    install(cx, &w, 43);
+    idle(cx);
+    server.reset();
+    server.mount_gb_addon(43, "Alpha", &[("cp_alpha_v2.bsp", bsp(b"new"), 300)]);
+    cx.update(|cx| Tf2Probe::install(cx, || true));
+    run(cx, &w, |i, win, cx| i.update(GbId::new(43), win, cx));
+    toast_is(
+        cx,
+        w.win,
+        "Close TF2 first. TF2 is running. Close the game, then try again.",
+    );
+    idle(cx);
+    assert_eq!(server.requests_where(|p| p.starts_with("/dl/addon/43/")), 0);
+    let path = folder(&env, 43, "alpha").join("maps/cp_alpha.bsp");
+    assert_eq!(std::fs::read(path).unwrap(), bsp(b"old"));
+}
+
 #[gpui_kit::test]
 fn remove_waits_for_tf2_then_deletes_the_folder(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());
