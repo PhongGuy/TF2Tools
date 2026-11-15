@@ -205,6 +205,80 @@ fn a_map_detail_installs_lists_the_maps_and_removes(cx: &mut TestAppContext) {
     assert!(!support::present(cx, s.win, ids::ADDON_DETAIL_MAPS));
 }
 
+// Installs map 10 under `name` in a window `width` wide and returns the bounds of the header's name,
+// Remove and GameBanana link, and of the whole dialog.
+fn installed_header(
+    cx: &mut TestAppContext,
+    name: &str,
+    width: f32,
+) -> [gpui_kit::Bounds<gpui_kit::Pixels>; 4] {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_addon(10, name, &[("cp_alpha.bsp", bsp(b"a"), 100)]);
+    let s = maps_shell_found(cx, &env, &server);
+    seed_maps(&env);
+    let page = open_maps(cx, &s);
+    open_gamebanana(cx, &s, &page);
+    support::click_id(cx, s.win, ids::addon_gb_card("maps", GbId::new(10)));
+    support::wait_real(cx, "Install", |cx| {
+        support::present(cx, s.win, ids::ADDON_DETAIL_DOWNLOADS)
+            && install_label(cx, s.win).as_deref() == Some("Install")
+    });
+    support::click_id(cx, s.win, ids::ADDON_DETAIL_INSTALL);
+    support::wait_real(cx, "installed", |cx| {
+        install_label(cx, s.win).as_deref() == Some("Installed")
+            && support::present(cx, s.win, ids::ADDON_DETAIL_REMOVE)
+    });
+    // Sized once installed, so the grid and the dialog open at the usual size first.
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(width), gpui_kit::px(600.)),
+    );
+    support::settle(cx, s.win);
+    [
+        ids::ADDON_DETAIL_NAME.into(),
+        ids::ADDON_DETAIL_REMOVE.into(),
+        ids::store_detail_link("gamebanana"),
+        ids::ADDON_DETAIL.into(),
+    ]
+    .map(|id: gpui_kit::ElementId| support::bounds_of(cx, s.win, id).unwrap())
+}
+
+// A name with no spaces never breaks mid-word; the buttons move under it instead.
+#[gpui_kit::test]
+fn a_long_name_without_spaces_stays_whole_and_the_buttons_go_under_it(cx: &mut TestAppContext) {
+    let [name, remove, link, _] = installed_header(cx, "cp_orange_orange_rush_v3.1", 900.);
+    assert_eq!(
+        name.size.height,
+        gpui_kit::px(28.),
+        "the name broke mid-word: {name:?}"
+    );
+    assert!(
+        remove.top() >= name.bottom() && link.top() >= name.bottom(),
+        "the buttons {remove:?} {link:?} should sit under the name {name:?}"
+    );
+}
+
+// A short name keeps the buttons beside it on the same row.
+#[gpui_kit::test]
+fn a_short_name_keeps_the_buttons_beside_it(cx: &mut TestAppContext) {
+    let [name, remove, link, _] = installed_header(cx, "cp_alpha", 900.);
+    assert!(
+        remove.top() < name.bottom() && remove.left() > name.right() && link.top() < name.bottom(),
+        "the buttons {remove:?} {link:?} should sit beside the name {name:?}"
+    );
+}
+
+// A name wider than the whole dialog still stays inside it.
+#[gpui_kit::test]
+fn a_name_wider_than_the_dialog_stays_inside_it(cx: &mut TestAppContext) {
+    let long = "cp_orange_orange_rush_v3.1_".repeat(4);
+    let [name, _, _, dialog] = installed_header(cx, &long, 544.);
+    assert!(
+        name.right() <= dialog.right(),
+        "the name {name:?} overflows the dialog {dialog:?}"
+    );
+}
+
 #[gpui_kit::test]
 fn a_missing_folder_offers_install_again_over_update(cx: &mut TestAppContext) {
     let (env, server) = (support::env(), support::StoreServer::start());

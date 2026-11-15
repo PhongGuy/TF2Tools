@@ -4,6 +4,7 @@ pub mod card_grid;
 pub mod carousel;
 pub mod class_icon;
 pub mod crosshair_picker;
+pub mod detail_header;
 pub mod dialog_frame;
 pub mod label_option;
 pub mod profile_menu;
