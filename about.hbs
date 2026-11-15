@@ -1,0 +1,21 @@
+Third-party notices for TF2Tools
+
+TF2Tools is built from the open-source Rust crates below. Each licence follows with the crates it covers.
+This file is generated from Cargo.lock by scripts/third-party-notices.sh; do not edit it by hand.
+
+Overview:
+{{#each overview}}
+  {{{name}}} ({{id}}): {{count}}
+{{/each}}
+
+{{#each licenses}}
+================================================================================
+{{{name}}} ({{id}})
+Used by:
+{{#each used_by}}
+  {{crate.name}} {{crate.version}}
+{{/each}}
+
+{{{text}}}
+
+{{/each}}

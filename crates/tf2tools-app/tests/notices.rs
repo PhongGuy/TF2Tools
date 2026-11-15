@@ -36,7 +36,10 @@ const BUNDLED: &[(&str, Owner)] = &[
 ];
 
 /// Third-party work compiled in from a dependency rather than a folder of ours.
-const COMPILED_IN: &[(&str, &str)] = &[("Lucide icons via gpui-kit", "Lucide-ISC.txt")];
+const COMPILED_IN: &[(&str, &str)] = &[
+    ("Lucide icons via gpui-kit", "Lucide-ISC.txt"),
+    ("the Rust crates in Cargo.lock", "THIRD-PARTY-NOTICES.txt"),
+];
 
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
@@ -148,6 +151,10 @@ fn known_notices_get_plain_titles() {
         notices::title_for("comfig-app-MIT.txt"),
         "mastercomfig app preset text (MIT)"
     );
+    assert_eq!(
+        notices::title_for("THIRD-PARTY-NOTICES.txt"),
+        "Rust crates TF2Tools is built from"
+    );
     // A notice nobody titled still shows, named after its file.
     assert_eq!(notices::title_for("Some-Thing-MIT.txt"), "Some Thing MIT");
 }
@@ -198,4 +205,47 @@ fn every_outside_source_has_a_notice_that_disclaims_affiliation() {
             "{file} lacks the not-affiliated statement"
         );
     }
+}
+
+/// The generated crate notices run to thousands of lines, so they come after every short credit.
+#[test]
+fn the_third_party_notices_come_last() {
+    let shipped = notices::all();
+    assert_eq!(
+        shipped.last().map(|n| n.file()),
+        Some("THIRD-PARTY-NOTICES.txt")
+    );
+    let rest: Vec<&str> = shipped[..shipped.len() - 1]
+        .iter()
+        .map(|n| n.file())
+        .collect();
+    let mut sorted = rest.clone();
+    sorted.sort();
+    assert_eq!(rest, sorted, "the short notices stay in file order");
+}
+
+#[test]
+fn only_the_crate_notices_are_long() {
+    let long: Vec<String> = notices::all()
+        .into_iter()
+        .filter(|n| n.is_long())
+        .map(|n| n.file().to_owned())
+        .collect();
+    assert_eq!(long, ["THIRD-PARTY-NOTICES.txt"]);
+}
+
+/// Lines are rewrapped at word breaks to fit one row each, and nothing is lost.
+#[test]
+fn long_notice_lines_wrap_at_words_and_keep_every_word() {
+    let text = format!("short\n\n{}\n  indented", "word ".repeat(40).trim_end());
+    let lines = notices::wrap_lines(&text, 30);
+    assert_eq!(lines[0], "short");
+    assert_eq!(lines[1], "");
+    assert!(lines.iter().all(|l| l.chars().count() <= 30), "{lines:?}");
+    assert_eq!(lines.last().unwrap(), "  indented");
+    let words: Vec<&str> = lines.iter().flat_map(|l| l.split_whitespace()).collect();
+    assert_eq!(words, text.split_whitespace().collect::<Vec<_>>());
+    // A word longer than a row is cut rather than overflowing it.
+    let cut = notices::wrap_lines(&"x".repeat(70), 30);
+    assert_eq!(cut, ["x".repeat(30), "x".repeat(30), "x".repeat(10)]);
 }

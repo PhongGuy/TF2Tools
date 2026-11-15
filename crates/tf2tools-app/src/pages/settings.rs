@@ -4,6 +4,7 @@
 //! feedback card links to the help page and the place to report a problem.
 
 use std::path::Path;
+use std::rc::Rc;
 
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -14,10 +15,10 @@ use gpui_kit::component::slider::{Slider, SliderState};
 use gpui_kit::component::switch::Switch;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, h_flex, v_flex};
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
+    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight, Hsla,
     InteractiveElement as _, IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, Window, div,
-    px, relative,
+    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
+    UniformListScrollHandle, Window, div, px, relative, uniform_list,
 };
 
 use tf2tools_core::{
@@ -108,9 +109,18 @@ pub struct SettingsPage {
     /// The embedded licence notices, and whether the Licences card shows them.
     notices: Vec<Notice>,
     show_notices: bool,
+    /// Each long notice's wrapped rows and list scroll, by index into `notices`; split on first open.
+    notice_rows: Vec<Option<NoticeRows>>,
     scroll: ScrollHandle,
     notices_scroll: ScrollHandle,
 }
+
+/// A long notice's rows, shared with its list's row builder, and that list's scroll.
+type NoticeRows = (Rc<[SharedString]>, UniformListScrollHandle);
+
+/// A long notice's list box height and its fixed row height, since `uniform_list` sizes rows alike.
+const NOTICE_LIST_HEIGHT: f32 = 280.;
+const NOTICE_ROW_HEIGHT: f32 = 16.;
 
 /// One store's running flag and failure text, the only hub state Settings draws.
 type HubDrawn = (StoreKind, bool, Option<String>);
@@ -159,6 +169,21 @@ pub const SYNC_CARDS: [(StoreKind, &str, &str); 5] = [
 ];
 
 impl SettingsPage {
+    // Splits each long notice into rows the first time the notices open, so startup pays nothing.
+    fn split_long_notices(&mut self) {
+        if !self.notice_rows.is_empty() {
+            return;
+        }
+        self.notice_rows = (self.notices.iter())
+            .map(|notice| {
+                notice.is_long().then(|| {
+                    let rows = notice.lines().into_iter().map(SharedString::from).collect();
+                    (rows, UniformListScrollHandle::new())
+                })
+            })
+            .collect();
+    }
+
     /// Needs the `Services` global. Starts the settings load off the UI thread.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let path = cx.new(|cx| InputState::new(window, cx).placeholder("/path/to/Team Fortress 2"));
@@ -223,6 +248,7 @@ impl SettingsPage {
             _volume: volume_bound,
             notices: notices::all(),
             show_notices: false,
+            notice_rows: Vec::new(),
             scroll: ScrollHandle::new(),
             notices_scroll: ScrollHandle::new(),
         };
@@ -625,7 +651,8 @@ fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyEl
             .rounded(theme.radius)
             .border_1()
             .border_color(theme.border)
-            .children(page.notices.iter().map(|notice| {
+            .children(page.notices.iter().enumerate().map(|(index, notice)| {
+                let rows = page.notice_rows.get(index).and_then(Option::as_ref);
                 v_flex()
                     .gap_2()
                     .child(
@@ -637,12 +664,14 @@ fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyEl
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(notice.title().to_owned()),
                     )
-                    .child(
-                        div()
+                    .child(match rows {
+                        Some(rows) => notice_list(notice.file(), rows, theme.muted_foreground),
+                        None => div()
                             .text_xs()
                             .text_color(theme.muted_foreground)
-                            .child(notice.text().to_owned()),
-                    )
+                            .child(notice.text().to_owned())
+                            .into_any_element(),
+                    })
             }));
         scroll_area(ids::SETTINGS_NOTICES_SCROLLBAR, &page.notices_scroll, view)
     });
@@ -660,12 +689,43 @@ fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyEl
                     })
                     .on_click(cx.listener(|page, _, _, cx| {
                         page.show_notices = !page.show_notices;
+                        page.split_long_notices();
                         cx.notify();
                     })),
             ),
         )
         .children(view)
         .into_any_element()
+}
+
+// A long notice's rows as a fixed-height list with its own bar, so only the rows in view are laid out.
+fn notice_list(file: &str, (rows, scroll): &NoticeRows, color: Hsla) -> AnyElement {
+    let (rows, owner) = (Rc::clone(rows), file.to_owned());
+    let list = uniform_list(
+        ids::keyed("settings-notice-lines", file),
+        rows.len(),
+        move |range, _, _| {
+            range
+                .map(|row| {
+                    div()
+                        .id(ids::settings_notice_line(&owner, row))
+                        .test_support()
+                        .h(px(NOTICE_ROW_HEIGHT))
+                        .line_height(px(NOTICE_ROW_HEIGHT))
+                        .text_xs()
+                        .text_color(color)
+                        .whitespace_nowrap()
+                        .overflow_hidden()
+                        .text_ellipsis()
+                        .child(rows[row].clone())
+                })
+                .collect()
+        },
+    )
+    .track_scroll(scroll)
+    .w_full()
+    .h(px(NOTICE_LIST_HEIGHT));
+    scroll_area(ids::keyed("settings-notice-lines-bar", file), scroll, list).into_any_element()
 }
 
 // The Help and feedback card's two links, opened in the player's browser.
