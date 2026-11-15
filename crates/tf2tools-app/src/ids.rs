@@ -1018,6 +1018,12 @@ pub fn settings_notice(file: &str) -> ElementId {
     keyed("settings-notice", file)
 }
 
+/// One row of a long notice's line list, laid out only while in view:
+/// "settings-notice-line:<file>:<row>".
+pub fn settings_notice_line(file: &str, row: usize) -> ElementId {
+    keyed("settings-notice-line", &format!("{file}:{row}"))
+}
+
 /// An Activity Log row, keyed by its row id: "log-row:<id>".
 pub fn log_row(id: i64) -> ElementId {
     keyed("log-row", &id.to_string())

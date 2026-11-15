@@ -223,3 +223,29 @@ fn the_third_party_notices_come_last() {
     sorted.sort();
     assert_eq!(rest, sorted, "the short notices stay in file order");
 }
+
+#[test]
+fn only_the_crate_notices_are_long() {
+    let long: Vec<String> = notices::all()
+        .into_iter()
+        .filter(|n| n.is_long())
+        .map(|n| n.file().to_owned())
+        .collect();
+    assert_eq!(long, ["THIRD-PARTY-NOTICES.txt"]);
+}
+
+/// Lines are rewrapped at word breaks to fit one row each, and nothing is lost.
+#[test]
+fn long_notice_lines_wrap_at_words_and_keep_every_word() {
+    let text = format!("short\n\n{}\n  indented", "word ".repeat(40).trim_end());
+    let lines = notices::wrap_lines(&text, 30);
+    assert_eq!(lines[0], "short");
+    assert_eq!(lines[1], "");
+    assert!(lines.iter().all(|l| l.chars().count() <= 30), "{lines:?}");
+    assert_eq!(lines.last().unwrap(), "  indented");
+    let words: Vec<&str> = lines.iter().flat_map(|l| l.split_whitespace()).collect();
+    assert_eq!(words, text.split_whitespace().collect::<Vec<_>>());
+    // A word longer than a row is cut rather than overflowing it.
+    let cut = notices::wrap_lines(&"x".repeat(70), 30);
+    assert_eq!(cut, ["x".repeat(30), "x".repeat(30), "x".repeat(10)]);
+}

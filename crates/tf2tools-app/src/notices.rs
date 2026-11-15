@@ -28,6 +28,12 @@ const TITLES: &[(&str, &str)] = &[
 /// The notices cargo-about generates for every linked crate; thousands of lines, so shown last.
 const THIRD_PARTY: &str = "THIRD-PARTY-NOTICES.txt";
 
+/// A notice over this many lines is long: Settings lays out only its visible lines.
+const LONG_LINES: usize = 500;
+
+/// How many characters a long notice's row holds; its lines are rewrapped to fit.
+pub const WRAP_COLUMNS: usize = 80;
+
 /// One licence notice: its file under `licenses/`, a plain title and the full text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Notice {
@@ -51,6 +57,58 @@ impl Notice {
     pub fn text(&self) -> &str {
         &self.text
     }
+
+    /// Whether the text runs past `LONG_LINES`, so it is shown as a list of rows.
+    pub fn is_long(&self) -> bool {
+        self.text.lines().nth(LONG_LINES).is_some()
+    }
+
+    /// The text as rows of at most `WRAP_COLUMNS` characters.
+    pub fn lines(&self) -> Vec<String> {
+        wrap_lines(&self.text, WRAP_COLUMNS)
+    }
+}
+
+/// Splits `text` into rows of at most `columns` characters. A longer line breaks at its spaces,
+/// losing its indent and runs of spaces, and a word longer than a row is cut.
+pub fn wrap_lines(text: &str, columns: usize) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in text.lines() {
+        if line.chars().count() <= columns {
+            out.push(line.to_owned());
+            continue;
+        }
+        let mut row = String::new();
+        for mut word in line.split_whitespace() {
+            loop {
+                let used = row.chars().count();
+                if used + usize::from(used > 0) + word.chars().count() <= columns {
+                    if used > 0 {
+                        row.push(' ');
+                    }
+                    row.push_str(word);
+                    break;
+                }
+                if used > 0 {
+                    out.push(std::mem::take(&mut row));
+                    continue;
+                }
+                let cut = word
+                    .char_indices()
+                    .nth(columns)
+                    .map_or(word.len(), |(i, _)| i);
+                out.push(word[..cut].to_owned());
+                word = &word[cut..];
+                if word.is_empty() {
+                    break;
+                }
+            }
+        }
+        if !row.is_empty() {
+            out.push(row);
+        }
+    }
+    out
 }
 
 /// Every embedded notice, ordered by file name with the third-party crate notices last.

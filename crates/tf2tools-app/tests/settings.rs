@@ -431,6 +431,39 @@ fn third_party_notices_open_from_settings(cx: &mut TestAppContext) {
     assert!(!support::present(cx, s.win, ids::SETTINGS_NOTICES_VIEW));
 }
 
+/// The crate notices run to thousands of lines, so opening them lays out only the lines in view.
+#[gpui_kit::test]
+fn the_long_notices_lay_out_only_the_visible_lines(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    open_settings(cx, &s);
+    let long = tf2tools_app::notices::all()
+        .into_iter()
+        .find(|n| n.is_long())
+        .expect("the third-party notices are long");
+    let total = long.lines().len();
+    assert!(total > 5_000, "{total} lines");
+    cx.update_window(s.win, |_, w, cx| {
+        let down = ScrollDelta::Pixels(point(px(0.), px(-4000.)));
+        w.scroll(ids::page(Page::Settings), down, cx)
+    })
+    .unwrap();
+    support::click_id(cx, s.win, ids::SETTINGS_NOTICES);
+    support::settle(cx, s.win);
+    let rendered = cx
+        .update_window(s.win, |_, w, _| {
+            (0..total)
+                .filter(|&i| {
+                    w.try_find(ids::settings_notice_line(long.file(), i))
+                        .is_some()
+                })
+                .count()
+        })
+        .unwrap();
+    assert!(rendered > 0, "no line of {} is shown", long.file());
+    assert!(rendered < 100, "{rendered} of {total} lines laid out");
+}
+
 #[gpui_kit::test]
 fn the_add_ons_card_toggles_mature_add_ons_and_saves_at_once(cx: &mut TestAppContext) {
     let env = support::env();
