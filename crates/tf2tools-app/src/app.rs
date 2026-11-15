@@ -147,6 +147,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
         Ok::<_, StartupError>((
             services,
             settings.sidebar_collapsed(),
+            settings.language().to_owned(),
             huds,
             update_source,
             crash,
@@ -169,7 +170,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
         let opened = opening.await;
         let _ = win.update(cx, |_, window, cx| {
             let next = match opened {
-                Ok((services, collapsed, huds, update_source, crash, old_v4)) => {
+                Ok((services, collapsed, language, huds, update_source, crash, old_v4)) => {
                     timing::mark(cx, "services");
                     let store = services.store.clone();
                     let store_for_maps = store.clone();
@@ -187,6 +188,8 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                     mastercomfig_restore::install(cx);
                     CrashNotice::install(cx, crash);
                     OldV4Notice::install(cx, old_v4, old_v4::system_runner());
+                    // The shell's first frame is drawn in the language the player last chose.
+                    crate::i18n::apply(&language);
                     let shell = cx.new(|cx| Shell::with_huds(collapsed, huds, window, cx));
                     // The runtime and the syncs wait for the first frame, so they never delay it.
                     window.on_next_frame(move |_, cx| {

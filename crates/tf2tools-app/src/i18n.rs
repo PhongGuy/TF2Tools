@@ -93,6 +93,14 @@ pub fn plural(key: &str, n: u64) -> SharedString {
     rust_i18n::replace_patterns(&text, &["count"], &[n.to_string()]).into()
 }
 
+/// `rust_i18n::t!` as a `SharedString`; takes the same arguments, e.g. `tr!("k", percent = 70)`.
+macro_rules! tr {
+    ($($arg:tt)*) => {
+        gpui_kit::SharedString::from(rust_i18n::t!($($arg)*).into_owned())
+    };
+}
+pub(crate) use tr;
+
 /// Serialises tests that switch the process-wide locale; a panicked holder does not wedge it.
 #[doc(hidden)]
 pub fn test_lock() -> MutexGuard<'static, ()> {

@@ -13,6 +13,9 @@ mod support;
 #[path = "i18n/apply.rs"]
 mod apply;
 
+#[path = "i18n/settings.rs"]
+mod settings;
+
 /// The locale lock for one test; English is back when it drops, panic included.
 pub struct LocaleGuard {
     _lock: MutexGuard<'static, ()>,

@@ -79,6 +79,10 @@ pub const SETTINGS_UPDATE_CHECK: &str = "settings-update-check";
 pub const SETTINGS_UPDATE_INSTALL: &str = "settings-update-install";
 /// "Restart Now".
 pub const SETTINGS_UPDATE_RESTART: &str = "settings-update-restart";
+/// Wraps the Language select.
+pub const SETTINGS_LANGUAGE: &str = "settings-language";
+/// The Language card's note, labelled with its text.
+pub const SETTINGS_LANGUAGE_NOTE: &str = "settings-language-note";
 /// Wraps the TF2 path input.
 pub const SETTINGS_PATH: &str = "settings-path";
 pub const SETTINGS_BROWSE: &str = "settings-browse";
@@ -1290,6 +1294,11 @@ pub fn settings_resync(kind: StoreKind) -> ElementId {
 /// label: "<select>-option:<label>", for example "maps-sort-option:Most played".
 pub fn select_option(select: &str, label: &str) -> ElementId {
     keyed(&format!("{select}-option"), label)
+}
+
+/// One row of the Language select, keyed by language code: "settings-language:<code>".
+pub fn settings_language(code: &str) -> ElementId {
+    keyed(SETTINGS_LANGUAGE, code)
 }
 
 /// One row of the install select, keyed by its index: "settings-candidate:<i>".

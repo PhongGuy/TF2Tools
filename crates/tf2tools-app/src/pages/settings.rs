@@ -26,6 +26,7 @@ use tf2tools_core::{
 
 use crate::activity;
 use crate::audio::volume::{bind_slider, shared_volume};
+use crate::i18n::{self, tr};
 use crate::ids;
 use crate::links;
 use crate::local_messages::{
@@ -80,6 +81,33 @@ impl SearchableListItem for Tf2Candidate {
 
 type Candidates = Entity<SelectState<Vec<Tf2Candidate>>>;
 
+/// One offered language, as a row of the Language select.
+#[derive(Debug, Clone)]
+struct LanguageRow {
+    code: SharedString,
+    name: SharedString,
+}
+
+impl SearchableListItem for LanguageRow {
+    type Value = SharedString;
+
+    fn title(&self) -> SharedString {
+        self.name.clone()
+    }
+
+    // Like the install rows, each row draws its own test id.
+    fn render(&self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        div()
+            .id(ids::settings_language(&self.code))
+            .test_support()
+            .child(self.name.clone())
+    }
+
+    fn value(&self) -> &SharedString {
+        &self.code
+    }
+}
+
 /// The Settings form. The shell keeps it across visits, so unsaved edits stay until Save; it
 /// loads the saved settings on creation and rereads them each time it shows again.
 pub struct SettingsPage {
@@ -92,6 +120,7 @@ pub struct SettingsPage {
     saved_hours: u32,
     /// The install select, present only after Auto-detect found several installs.
     candidates: Option<Candidates>,
+    language: Entity<SelectState<Vec<LanguageRow>>>,
     loaded: bool,
     busy: Option<Busy>,
     /// Each store's cached count and last sync, absent until the first read lands or if it failed.
@@ -201,6 +230,7 @@ impl SettingsPage {
                 ]
             })
             .unwrap_or_default();
+        let language = Self::language_select(window, cx);
         // The App Updates card draws the updater's state, so every change redraws the page.
         let updates = updater(cx).map(|u| cx.observe(&u, |_, _, cx| cx.notify()));
         let mut page = Self {
@@ -211,6 +241,7 @@ impl SettingsPage {
             saved_path: SharedString::default(),
             saved_hours: 0,
             candidates: None,
+            language,
             loaded: false,
             busy: None,
             sync_status: None,
@@ -472,6 +503,50 @@ impl SettingsPage {
         .detach();
     }
 
+    // The Language select with the current language chosen; confirming a row switches to it.
+    fn language_select(
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Entity<SelectState<Vec<LanguageRow>>> {
+        let rows: Vec<LanguageRow> = i18n::LANGUAGES
+            .iter()
+            .map(|l| LanguageRow {
+                code: l.code.into(),
+                name: l.name.into(),
+            })
+            .collect();
+        let chosen = rows
+            .iter()
+            .position(|r| r.code == i18n::current())
+            .unwrap_or_default();
+        let select =
+            cx.new(|cx| SelectState::new(rows, Some(IndexPath::default().row(chosen)), window, cx));
+        cx.subscribe_in(&select, window, |page, _, event, window, cx| {
+            if let SelectEvent::Confirm(Some(code)) = event {
+                page.pick_language(code, window, cx);
+            }
+        })
+        .detach();
+        select
+    }
+
+    // Switches the whole app at once and saves the choice in the background, as the
+    // mature add-ons switch does; a failed save only logs, the switch already happened.
+    fn pick_language(&mut self, code: &str, _: &mut Window, cx: &mut Context<Self>) {
+        let applied = i18n::apply(code);
+        let save = run_blocking(cx, move |s| {
+            s.db.set_language(applied)
+                .map_err(|e| describe_settings(&e).into_op("Save language"))
+        });
+        cx.spawn(async move |_, _| {
+            if let Err(err) = save.await {
+                tracing::warn!("the language setting could not be saved: {err}");
+            }
+        })
+        .detach();
+        cx.refresh_windows();
+    }
+
     // A select over `paths` with the first chosen; confirming a row puts its path in the input.
     fn candidate_select(
         &self,
@@ -697,7 +772,7 @@ fn whole(slider: &Entity<SliderState>, cx: &App) -> u32 {
 
 // v5's shadcn Card: a bordered, rounded panel with a title, a muted description and content.
 fn card(
-    title: &'static str,
+    title: impl Into<SharedString>,
     description: impl IntoElement,
     content: Option<AnyElement>,
     cx: &App,
@@ -718,7 +793,7 @@ fn card(
                     div()
                         .font_weight(FontWeight::SEMIBOLD)
                         .line_height(relative(1.))
-                        .child(title),
+                        .child(title.into()),
                 )
                 .child(
                     div()
@@ -753,6 +828,18 @@ impl Render for SettingsPage {
             ids::SETTINGS_VERSION,
             format!("Current version: v{}", env!("CARGO_PKG_VERSION")),
         );
+        let language = v_flex()
+            .gap_3()
+            .child(
+                div()
+                    .id(ids::SETTINGS_LANGUAGE)
+                    .test_support()
+                    .child(Select::new(&self.language)),
+            )
+            .child(div().text_xs().text_color(muted).child(labelled(
+                ids::SETTINGS_LANGUAGE_NOTE,
+                tr!("settings.language.note"),
+            )));
         let installation = v_flex()
             .gap_3()
             .child(
@@ -844,6 +931,12 @@ impl Render for SettingsPage {
                         "App Updates",
                         version,
                         updater::view::settings_content(cx),
+                        cx,
+                    ))
+                    .child(card(
+                        tr!("settings.language.title"),
+                        tr!("settings.language.description"),
+                        Some(language.into_any_element()),
                         cx,
                     ))
                     .child(card(

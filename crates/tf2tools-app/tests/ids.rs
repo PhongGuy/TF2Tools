@@ -789,3 +789,9 @@ fn addons_page_gamebanana_ids_are_keyed_by_section_and_item() {
     assert_eq!(name(ids::addons_gb_tag(id)), "addons-gb-tag:5");
     assert_eq!(name(ids::addons_gb_busy(id)), "addons-gb-busy:5");
 }
+
+#[test]
+fn language_rows_are_keyed_by_code() {
+    assert_eq!(name(ids::settings_language("ru")), "settings-language:ru");
+    assert_eq!(ids::SETTINGS_LANGUAGE, "settings-language");
+}
