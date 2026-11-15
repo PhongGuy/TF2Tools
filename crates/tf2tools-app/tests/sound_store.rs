@@ -569,3 +569,14 @@ fn the_banner_count_fits_a_narrow_page(cx: &mut TestAppContext) {
     assert!(text.right() <= count.left(), "{text:?} {count:?}");
     run.finish(Ok(SyncSummary::default()));
 }
+
+#[gpui_kit::test]
+fn the_page_names_gamebanana_as_its_source(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let w = support::sound_store_window(cx, &env, &server, seed);
+    assert_eq!(
+        support::label_of(cx, w.win, ids::SOUND_STORE_SOURCE).as_deref(),
+        Some("Hitsounds and killsounds from GameBanana.")
+    );
+}

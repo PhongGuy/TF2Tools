@@ -699,6 +699,11 @@ impl Render for CuratedTab {
         v_flex()
             .flex_1()
             .gap_6()
+            .child(labelled(
+                div().text_sm().text_color(cx.theme().muted_foreground),
+                ids::HUD_STORE_CURATED_SOURCE,
+                "Curated HUDs from hud-db.",
+            ))
             .child(self.toolbar(cx))
             .children(self.error_line(cx))
             .child(

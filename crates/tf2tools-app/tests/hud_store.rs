@@ -926,3 +926,14 @@ fn a_failed_reload_shows_its_error_over_the_last_huds(cx: &mut TestAppContext) {
     }
     assert!(!support::present(cx, win, ids::STORE_UNLOADED));
 }
+
+#[gpui_kit::test]
+fn curated_names_hud_db_as_its_source(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (win, _page, _tab) = open(cx, &env, &server);
+    assert_eq!(
+        support::label_of(cx, win, ids::HUD_STORE_CURATED_SOURCE).as_deref(),
+        Some("Curated HUDs from hud-db.")
+    );
+}

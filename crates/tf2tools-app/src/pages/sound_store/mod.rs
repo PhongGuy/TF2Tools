@@ -24,6 +24,7 @@ use crate::store_grid::{CardRenderer, CardSize, StoreGrid, StoreGridConfig};
 use crate::store_preview::{parse_preview_key, preview_key};
 use crate::sync::sync_hub;
 use crate::widgets::card_grid::GRID_GAP;
+use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
 use crate::widgets::sync_banner::sync_banner;
 use card::{CardState, sound_card};
@@ -212,6 +213,11 @@ impl Render for SoundStorePage {
             .p(CONTENT_PADDING)
             .gap_6()
             .children(sync_banner(KIND, self.grid.read(cx).total() > Some(0), cx))
+            .child(labelled(
+                div().text_sm().text_color(cx.theme().muted_foreground),
+                ids::SOUND_STORE_SOURCE,
+                "Hitsounds and killsounds from GameBanana.",
+            ))
             .child(self.grid.read(cx).search_row(cx))
             .child(self.filter_row(window, cx))
             .child(

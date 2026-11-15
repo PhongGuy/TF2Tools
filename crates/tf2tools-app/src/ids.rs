@@ -704,6 +704,8 @@ pub const HUD_STORE_TABS: &str = "hud-store-tabs";
 pub const HUD_STORE_TAB_CURATED: &str = "hud-store-tab-curated";
 /// The HUD Store's "GameBanana" tab button.
 pub const HUD_STORE_TAB_GAMEBANANA: &str = "hud-store-tab-gamebanana";
+/// The Curated tab's line naming hud-db as its source.
+pub const HUD_STORE_CURATED_SOURCE: &str = "hud-store-curated-source";
 /// The curated tab's "Hide prereleases" checkbox.
 pub const STORE_FILTER_PRERELEASE: &str = "store-filter-prerelease";
 /// The curated tab's "Clear filters" button.
@@ -1592,6 +1594,9 @@ pub fn store_card_name(kind: StoreKind, id: &StoreItemId) -> ElementId {
 pub fn store_card_repo(kind: StoreKind, id: &StoreItemId) -> ElementId {
     keyed("store-card-repo", &store_key(kind, id))
 }
+
+/// The Sound Store's line naming GameBanana as its source.
+pub const SOUND_STORE_SOURCE: &str = "sound-store-source";
 
 /// A sound store card's click target inside its `store_card` wrapper; opens the detail dialog.
 pub const SOUND_STORE_CARD_TARGET: &str = "sound-card";
