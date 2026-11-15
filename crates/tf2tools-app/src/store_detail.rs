@@ -9,10 +9,10 @@ use gpui_kit::component::progress::Progress as ProgressBar;
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::{
-    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, FontWeight,
-    InteractiveElement as _, IntoElement, ParentElement as _, Pixels, Render, ScrollHandle,
-    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, Task,
-    TestSupportExt as _, Window, div, px, transparent_black,
+    AnyElement, AnyWindowHandle, App, AppContext as _, Context, Entity, InteractiveElement as _,
+    IntoElement, ParentElement as _, Pixels, Render, ScrollHandle, SharedString,
+    StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _, Window,
+    div, px, transparent_black,
 };
 use tf2tools_core::{StoreFile, StoreItem, StoreItemId, StoreKind};
 
@@ -26,6 +26,7 @@ use crate::store_download::{
 use crate::store_messages::{DETAILS_FAILED_TITLE, describe_files, listing_stopped, read_failed};
 use crate::tokio_bridge;
 use crate::widgets::carousel::Carousel;
+use crate::widgets::detail_header::detail_header;
 use crate::widgets::dialog_frame::{DETAIL_WIDTH, DIALOG_WIDTH, DialogFrame, content_max_height};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_beside;
@@ -467,40 +468,16 @@ impl Render for StoreDetail {
             .max_h(content_max_height(window, cx))
             .gap_4()
             // v5's header: the badge rides 8 px after the name, the author on the line below,
-            // and the kind's action at the top right beside that block. v5 draws the header
-            // under the image; here the kit's 24 px close X floats 14 px into this corner, so
-            // the row keeps 22 px clear and the action ends 8 px left of the X.
-            .child(
-                h_flex()
-                    .items_start()
-                    .justify_between()
-                    .gap_3()
-                    .pr(px(22.))
-                    .child(
-                        v_flex()
-                            .min_w_0()
-                            .child(
-                                // The name may shrink and wrap, so a long one stays clear
-                                // of the header button and the close X.
-                                h_flex()
-                                    .min_w_0()
-                                    .items_center()
-                                    .gap_2()
-                                    .child(labelled(
-                                        div()
-                                            .min_w_0()
-                                            .text_xl()
-                                            .line_height(px(28.))
-                                            .font_weight(FontWeight::SEMIBOLD),
-                                        ids::STORE_DETAIL_NAME,
-                                        self.item.name.clone(),
-                                    ))
-                                    .children(badge),
-                            )
-                            .children(author),
-                    )
-                    .children(action),
-            )
+            // and the kind's action at the top right beside that block.
+            .child(detail_header(
+                ids::STORE_DETAIL_NAME,
+                self.item.name.clone().into(),
+                badge.map(IntoElement::into_any_element),
+                author.map(IntoElement::into_any_element),
+                action,
+                window,
+                cx,
+            ))
             .child(scroll_beside(ids::STORE_DETAIL_SCROLLBAR, &self.scroll, scrolled).min_h_0())
     }
 }

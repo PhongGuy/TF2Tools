@@ -6,12 +6,12 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::progress::Progress as ProgressBar;
 use gpui_kit::component::tag::Tag;
-use gpui_kit::component::{ActiveTheme as _, Disableable as _, WindowExt as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Disableable as _, WindowExt as _, v_flex};
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _,
     IntoElement, ParentElement as _, Render, ScrollHandle, SharedString,
     StatefulInteractiveElement as _, Styled as _, Subscription, Task, TestSupportExt as _, Window,
-    div, px, transparent_black,
+    div, transparent_black,
 };
 use tf2tools_core::{AddonCard, AddonFile, AddonProfile, AddonSection, BrowseError, DownloadPhase};
 
@@ -28,6 +28,7 @@ use crate::store_download::{Progress, format_bytes, progress_label, progress_per
 use crate::store_messages::{addon_stopped, describe_browse};
 use crate::tokio_bridge;
 use crate::widgets::carousel::Carousel;
+use crate::widgets::detail_header::detail_header;
 use crate::widgets::dialog_frame::{DETAIL_WIDTH, DialogFrame, content_max_height};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_beside;
@@ -502,60 +503,36 @@ impl Render for AddonDetail {
             .overflow_y_scroll()
             .gap_4()
             .children(body);
-        // The kit's close X floats into the top right corner, so the header keeps 22 px clear.
+        let link = link_button(
+            "gamebanana",
+            "Open on GameBanana",
+            gamebanana_page(&self.card.profile_url, self.card.id),
+        );
+        let actions = control
+            .map(IntoElement::into_any_element)
+            .into_iter()
+            .chain(remove)
+            .chain([link.into_any_element()]);
+        let author = div()
+            .text_sm()
+            .text_color(muted)
+            .child(format!("by {author}"))
+            .into_any_element();
         v_flex()
             .id(ids::ADDON_DETAIL)
             .test_support()
             .w_full()
             .max_h(content_max_height(window, cx))
             .gap_4()
-            .child(
-                h_flex()
-                    .items_start()
-                    .justify_between()
-                    .gap_3()
-                    .pr(px(22.))
-                    .child(
-                        v_flex()
-                            .min_w_0()
-                            .child(
-                                // The name may shrink and wrap, so a long one stays clear
-                                // of the header button and the close X.
-                                h_flex()
-                                    .min_w_0()
-                                    .items_center()
-                                    .gap_2()
-                                    .child(labelled(
-                                        div()
-                                            .min_w_0()
-                                            .text_xl()
-                                            .line_height(px(28.))
-                                            .font_weight(FontWeight::SEMIBOLD),
-                                        ids::ADDON_DETAIL_NAME,
-                                        name,
-                                    ))
-                                    .children(outdated),
-                            )
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .text_color(muted)
-                                    .child(format!("by {author}")),
-                            ),
-                    )
-                    .child(
-                        h_flex()
-                            .flex_none()
-                            .gap_2()
-                            .children(control)
-                            .children(remove)
-                            .child(link_button(
-                                "gamebanana",
-                                "Open on GameBanana",
-                                gamebanana_page(&self.card.profile_url, self.card.id),
-                            )),
-                    ),
-            )
+            .child(detail_header(
+                ids::ADDON_DETAIL_NAME,
+                name.into(),
+                outdated.map(IntoElement::into_any_element),
+                Some(author),
+                actions,
+                window,
+                cx,
+            ))
             .children(blocked)
             // Pinned under the header so a scrolled body never hides the download.
             .children(self.progress(cx))
