@@ -73,17 +73,48 @@ pub(super) fn same_lowercased(
             return Ok(false);
         }
     }
-    for (lower, rel) in &expected {
-        let have = installed.join(lower);
-        let same = if hud_lowercase::is_text_file(lower) {
-            std::fs::read(&have).map_err(io_at(&have))?
-                == hud_lowercase::lowercase_bytes(lower, &src.read(rel)?, &own)
-        } else {
-            sha256_file(&have)? == src.sha256(rel)?
-        };
-        if !same {
-            return Ok(false);
-        }
+    // One visit in `expected` order, so a packed source opens its zip once for every file.
+    let mut lowers = expected.iter().map(|(lower, _)| lower);
+    src.visit(
+        expected.iter().map(|(_, rel)| rel.as_path()),
+        &mut |_, file| {
+            let Some(lower) = lowers.next() else {
+                return Ok(false);
+            };
+            let have = installed.join(lower);
+            Ok(if hud_lowercase::is_text_file(lower) {
+                std::fs::read(&have).map_err(io_at(&have))?
+                    == hud_lowercase::lowercase_bytes(lower, &file.bytes()?, &own)
+            } else {
+                sha256_file(&have)? == file.sha256()?
+            })
+        },
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::library::packed::{HUD_ZIP, packed_fixture, zip_opens};
+
+    #[test]
+    fn a_lowercased_check_opens_the_zip_a_fixed_number_of_times() {
+        let t = tempfile::tempdir().unwrap();
+        let hud = t.path().join("hud");
+        // Half text files, compared rewritten, and half binary ones, compared by hash.
+        packed_fixture(&hud, 2000, |i| match i % 2 {
+            0 => format!("resource/ui/f{i:04}.res"),
+            _ => format!("materials/f{i:04}.vtf"),
+        });
+        let src = ItemSource::open(&hud, HUD_ZIP).unwrap();
+        let installed = t.path().join("installed");
+        src.extract_into(&installed, &is_generated).unwrap();
+        let before = zip_opens();
+        assert!(same_lowercased(&installed, &src, "hud").unwrap());
+        assert!(
+            zip_opens() - before <= 1,
+            "opened {} times",
+            zip_opens() - before
+        );
     }
-    Ok(true)
 }

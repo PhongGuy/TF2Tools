@@ -10,7 +10,7 @@ use zip::result::ZipError;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
-use super::hud_copy::{mtime_ns, sha256_file, sha256_hex, sha256_reader};
+use super::hud_copy::{mtime_ns, sha256_hex, sha256_reader};
 use super::{IoFailure, METADATA_DIR, create_dir_all, io_at, tree_copy};
 use crate::archive::check_entry_name;
 
@@ -125,10 +125,11 @@ impl ItemSource {
         }
     }
 
-    /// SHA-256 hex of the file at `rel`.
+    /// SHA-256 hex of the file at `rel`; a loop over many files uses `visit` instead.
+    #[cfg(test)]
     pub(crate) fn sha256(&self, rel: &Path) -> Result<String, IoFailure> {
         match self {
-            ItemSource::Loose(dir) => sha256_file(&dir.join(rel)),
+            ItemSource::Loose(dir) => super::hud_copy::sha256_file(&dir.join(rel)),
             ItemSource::Packed(packed) => {
                 let name = packed.name_of(rel)?;
                 let mut archive = open_zip(&packed.zip)?;
@@ -136,6 +137,50 @@ impl ItemSource {
                 sha256_reader(&packed.zip, entry)
             }
         }
+    }
+
+    /// Hands each file of `rels` to `f` in order, opening a packed item's zip at most once
+    /// for all of them. Stops at the first `false` from `f` and returns it.
+    pub(crate) fn visit<'r>(
+        &self,
+        rels: impl IntoIterator<Item = &'r Path>,
+        f: &mut dyn FnMut(&Path, Opened<'_>) -> Result<bool, IoFailure>,
+    ) -> Result<bool, IoFailure> {
+        match self {
+            ItemSource::Loose(dir) => {
+                for rel in rels {
+                    let path = dir.join(rel);
+                    let mut file = File::open(&path).map_err(io_at(&path))?;
+                    let opened = Opened {
+                        origin: &path,
+                        reader: &mut file,
+                    };
+                    if !f(rel, opened)? {
+                        return Ok(false);
+                    }
+                }
+            }
+            ItemSource::Packed(packed) => {
+                // Opened on the first file, so a visit of nothing costs nothing.
+                let mut archive = None;
+                for rel in rels {
+                    let name = packed.name_of(rel)?;
+                    let archive = match &mut archive {
+                        Some(archive) => archive,
+                        None => archive.insert(open_zip(&packed.zip)?),
+                    };
+                    let mut entry = archive.by_name(name).map_err(damaged(&packed.zip))?;
+                    let opened = Opened {
+                        origin: &packed.zip,
+                        reader: &mut entry,
+                    };
+                    if !f(rel, opened)? {
+                        return Ok(false);
+                    }
+                }
+            }
+        }
+        Ok(true)
     }
 
     /// Writes the files `skip` keeps under `dest`, creating folders; returns bytes written.
@@ -249,6 +294,29 @@ impl ItemSource {
                 .iter()
                 .fold(0u64, |sum, e| sum.saturating_add(e.size))),
         }
+    }
+}
+
+/// One file handed out by [`ItemSource::visit`]; a read failure names the loose file or
+/// the zip it came from.
+pub(crate) struct Opened<'a> {
+    origin: &'a Path,
+    reader: &'a mut dyn Read,
+}
+
+impl Opened<'_> {
+    /// The file's bytes.
+    pub(crate) fn bytes(self) -> Result<Vec<u8>, IoFailure> {
+        let mut bytes = Vec::new();
+        self.reader
+            .read_to_end(&mut bytes)
+            .map_err(io_at(self.origin))?;
+        Ok(bytes)
+    }
+
+    /// SHA-256 hex of the file.
+    pub(crate) fn sha256(self) -> Result<String, IoFailure> {
+        sha256_reader(self.origin, self.reader)
     }
 }
 
@@ -475,7 +543,20 @@ pub(crate) fn read_packed_entry(zip: &Path, rel: &str, cap: u64) -> io::Result<V
     Ok(bytes)
 }
 
+#[cfg(test)]
+thread_local! {
+    static ZIP_OPENS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// How many times this thread has opened a packed item's zip.
+#[cfg(test)]
+pub(crate) fn zip_opens() -> usize {
+    ZIP_OPENS.with(std::cell::Cell::get)
+}
+
 fn open_zip(zip: &Path) -> Result<ZipArchive<File>, IoFailure> {
+    #[cfg(test)]
+    ZIP_OPENS.with(|n| n.set(n.get() + 1));
     let file = File::open(zip).map_err(io_at(zip))?;
     ZipArchive::new(file).map_err(damaged(zip))
 }
@@ -500,6 +581,18 @@ fn invalid(path: &Path, error: impl Into<Box<dyn std::error::Error + Send + Sync
         path: path.to_path_buf(),
         source: io::Error::new(io::ErrorKind::InvalidData, error),
     }
+}
+
+/// Writes `count` small files under `dir` and packs them, for tests that count zip opens.
+#[cfg(test)]
+pub(crate) fn packed_fixture(dir: &Path, count: usize, name: impl Fn(usize) -> String) {
+    for i in 0..count {
+        let path = dir.join(name(i));
+        std::fs::create_dir_all(path.parent().unwrap_or(dir)).unwrap();
+        std::fs::write(&path, format!("\"file{i}\" {{}}")).unwrap();
+    }
+    let top_meta = |rel: &Path| rel == Path::new(METADATA_DIR);
+    pack(dir, &top_meta, &dir.join(HUD_ZIP)).unwrap();
 }
 
 #[cfg(test)]

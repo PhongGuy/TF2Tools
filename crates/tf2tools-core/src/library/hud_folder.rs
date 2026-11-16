@@ -40,19 +40,20 @@ const RESERVED: [&str; 11] = [
 pub(super) fn referenced_folder(src: &ItemSource) -> Result<Option<String>, IoFailure> {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
     let any_metadata = |rel: &Path| rel.components().any(|c| c.as_os_str() == METADATA_DIR);
-    for (rel, len) in src.files(&any_metadata)? {
+    let files = src.files(&any_metadata)?;
+    let scanned = files.iter().filter(|(rel, len)| {
         let name = rel
             .file_name()
             .map(|n| n.to_string_lossy().to_ascii_lowercase())
             .unwrap_or_default();
-        if len > MAX_SCANNED_BYTES || !TEXT_EXTENSIONS.iter().any(|ext| name.ends_with(ext)) {
-            continue;
-        }
-        let bytes = src.read(&rel)?;
-        for found in references(&String::from_utf8_lossy(&bytes)) {
+        *len <= MAX_SCANNED_BYTES && TEXT_EXTENSIONS.iter().any(|ext| name.ends_with(ext))
+    });
+    src.visit(scanned.map(|(rel, _)| rel.as_path()), &mut |_, file| {
+        for found in references(&String::from_utf8_lossy(&file.bytes()?)) {
             *counts.entry(found.to_owned()).or_default() += 1;
         }
-    }
+        Ok(true)
+    })?;
     // `max_by_key` keeps the last maximum, so walk in reverse to keep the smallest name.
     Ok(counts
         .into_iter()
@@ -125,4 +126,25 @@ pub(super) fn strip_commit_hash(folder: &str) -> Option<String> {
     let (rest, hash) = folder.rsplit_once('-')?;
     let is_hash = (7..=40).contains(&hash.len()) && hash.bytes().all(|b| b.is_ascii_hexdigit());
     (is_hash && is_safe_folder(rest)).then(|| rest.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::library::packed::{HUD_ZIP, packed_fixture, zip_opens};
+
+    #[test]
+    fn the_reference_scan_opens_the_zip_a_fixed_number_of_times() {
+        let t = tempfile::tempdir().unwrap();
+        let hud = t.path().join("hud");
+        packed_fixture(&hud, 2000, |i| format!("resource/ui/f{i:04}.res"));
+        let src = ItemSource::open(&hud, HUD_ZIP).unwrap();
+        let before = zip_opens();
+        assert_eq!(referenced_folder(&src).unwrap(), None);
+        assert!(
+            zip_opens() - before <= 1,
+            "opened {} times",
+            zip_opens() - before
+        );
+    }
 }

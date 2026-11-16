@@ -679,8 +679,7 @@ impl Library {
         let zip_stamp = source.zip_mtime_ns()?;
         let skip = |rel: &Path| rel == Path::new(METADATA_DIR);
         let mut fresh = BTreeMap::new();
-        let mut lines = Vec::new();
-        let mut files_read = 0;
+        let mut missed = Vec::new();
         for (rel, size) in source.files(&skip)? {
             let mtime_ns = match zip_stamp {
                 Some(stamp) => stamp,
@@ -692,20 +691,35 @@ impl Library {
             let key = rel
                 .to_string_lossy()
                 .replace(std::path::MAIN_SEPARATOR, "/");
-            let file = match cached.get(&key) {
-                Some(hit) if hit.size == size && hit.mtime_ns == mtime_ns => hit.clone(),
-                _ => {
-                    files_read += 1;
-                    CachedFile {
-                        size,
-                        mtime_ns,
-                        sha: source.sha256(&rel)?,
-                    }
+            match cached.get(&key) {
+                Some(hit) if hit.size == size && hit.mtime_ns == mtime_ns => {
+                    fresh.insert(key, hit.clone());
                 }
-            };
-            lines.push(tree_line(&key, &file.sha));
-            fresh.insert(key, file);
+                _ => missed.push((rel, key, size, mtime_ns)),
+            }
         }
+        // The misses are hashed in one pass, so a packed HUD's zip is opened once for them all.
+        let files_read = missed.len();
+        let rels: Vec<&Path> = missed.iter().map(|(rel, ..)| rel.as_path()).collect();
+        let mut shas = Vec::with_capacity(files_read);
+        source.visit(rels, &mut |_, file| {
+            shas.push(file.sha256()?);
+            Ok(true)
+        })?;
+        for ((_, key, size, mtime_ns), sha) in missed.into_iter().zip(shas) {
+            fresh.insert(
+                key,
+                CachedFile {
+                    size,
+                    mtime_ns,
+                    sha,
+                },
+            );
+        }
+        let lines = fresh
+            .iter()
+            .map(|(key, file)| tree_line(key, &file.sha))
+            .collect();
         let hash = tree_hash_of(lines);
 
         cache.folders.insert(folder.clone(), (0, fresh));
@@ -1200,6 +1214,7 @@ mod tests {
         save_library,
     };
     use crate::db::Database;
+    use crate::library::packed::{packed_fixture, zip_opens};
     use crate::paths::{DataDir, LibraryKind};
 
     /// A library holding one local HUD `hud-1` in folder `somehud`.
@@ -1221,6 +1236,21 @@ mod tests {
         std::fs::create_dir_all(&folder).unwrap();
         std::fs::write(folder.join("info.vdf"), "\"somehud\" {}").unwrap();
         (tmp, lib)
+    }
+
+    #[test]
+    fn a_packed_tree_hash_opens_its_zip_a_fixed_number_of_times() {
+        let (_tmp, lib) = library_with_hud();
+        let folder = lib.dir.library_dir(LibraryKind::Huds).join("somehud");
+        packed_fixture(&folder, 2000, |i| format!("resource/ui/f{i:04}.res"));
+        let before = zip_opens();
+        let hash = lib.hud_tree_hash(&HudId::new("hud-1")).unwrap();
+        assert_eq!(hash.files_read(), 2001);
+        assert!(
+            zip_opens() - before <= 2,
+            "opened {} times",
+            zip_opens() - before
+        );
     }
 
     #[test]
