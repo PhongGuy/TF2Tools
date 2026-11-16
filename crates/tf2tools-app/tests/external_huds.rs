@@ -259,7 +259,11 @@ fn keeping_a_copy_adds_it_then_installs(cx: &mut TestAppContext) {
     );
     assert!(in_library(&s, "manual"));
     let library = env.data.library_dir(LibraryKind::Huds);
-    assert!(library.join("manual/resource/mine.res").is_file());
+    let kept = support::packed::library_files(&library.join("manual"));
+    assert!(
+        kept.iter().any(|(rel, _)| rel == "resource/mine.res"),
+        "{kept:?}"
+    );
     assert!(!custom(&env).join("manual").exists());
     assert!(custom(&env).join("budhud/info.vdf").is_file());
 }

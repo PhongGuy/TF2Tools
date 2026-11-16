@@ -1,18 +1,21 @@
 //! Library HUDs in either form: a loose tree, or `.tf2tools/files.zip` beside loose metadata.
 
 use std::io::Read;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use tf2tools_core::{ConvertReport, HudEntry, LibraryKind, Provenance};
+use tf2tools_core::{ConvertReport, DataDir, HudEntry, LibraryKind, Provenance};
 
 use super::{LibraryEnv, tree, write_file, zip_bytes};
 
 /// The HUD's library folder.
 pub fn hud_dir(env: &LibraryEnv, hud: &HudEntry) -> PathBuf {
-    env.dir
-        .library_dir(LibraryKind::Huds)
-        .join(hud.folder_name())
+    hud_dir_in(&env.dir, hud)
+}
+
+/// The HUD's library folder under the data dir `dir`.
+fn hud_dir_in(dir: &DataDir, hud: &HudEntry) -> PathBuf {
+    dir.library_dir(LibraryKind::Huds).join(hud.folder_name())
 }
 
 /// Where the HUD's zip is when it is packed.
@@ -29,7 +32,11 @@ pub fn loose_files(env: &LibraryEnv, hud: &HudEntry) -> Vec<String> {
 
 /// The zip's entries with their bytes, sorted by name.
 pub fn packed_files(env: &LibraryEnv, hud: &HudEntry) -> Vec<(String, Vec<u8>)> {
-    let file = std::fs::File::open(zip_path(env, hud)).unwrap();
+    zip_files(&zip_path(env, hud))
+}
+
+fn zip_files(zip: &Path) -> Vec<(String, Vec<u8>)> {
+    let file = std::fs::File::open(zip).unwrap();
     let mut zip = zip::ZipArchive::new(file).unwrap();
     let mut out = Vec::new();
     for i in 0..zip.len() {
@@ -44,16 +51,32 @@ pub fn packed_files(env: &LibraryEnv, hud: &HudEntry) -> Vec<(String, Vec<u8>)> 
 
 /// The HUD's files outside `.tf2tools/` with their bytes, read from whichever form it has.
 pub fn library_files(env: &LibraryEnv, hud: &HudEntry) -> Vec<(String, Vec<u8>)> {
-    if zip_path(env, hud).is_file() {
-        return packed_files(env, hud);
+    library_files_in(&env.dir, hud)
+}
+
+/// `library_files` for a HUD in the library under the data dir `dir`.
+pub fn library_files_in(dir: &DataDir, hud: &HudEntry) -> Vec<(String, Vec<u8>)> {
+    let folder = hud_dir_in(dir, hud);
+    let zip = folder.join(".tf2tools/files.zip");
+    if zip.is_file() {
+        return zip_files(&zip);
     }
-    let dir = hud_dir(env, hud);
-    loose_files(env, hud)
+    let mut files = tree(&folder);
+    files.retain(|rel| !rel.starts_with(".tf2tools/"));
+    files
         .into_iter()
         .map(|rel| {
-            let bytes = std::fs::read(dir.join(&rel)).unwrap();
+            let bytes = std::fs::read(folder.join(&rel)).unwrap();
             (rel, bytes)
         })
+        .collect()
+}
+
+/// The names `library_files` lists, in order.
+pub fn library_names(env: &LibraryEnv, hud: &HudEntry) -> Vec<String> {
+    library_files(env, hud)
+        .into_iter()
+        .map(|(rel, _)| rel)
         .collect()
 }
 

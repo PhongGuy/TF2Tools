@@ -4,6 +4,7 @@ use crate::common;
 
 use common::hud_copy::{game_for, import_stock_hud, snapshot};
 use common::hud_stock::{HEALTH, stock_files};
+use common::packed::library_files;
 use common::{library_env, tree};
 // Only the Unix permission and link tests use these.
 #[cfg(unix)]
@@ -26,7 +27,8 @@ fn a_copy_holds_the_base_files_and_a_copy_record() {
         },
     );
     let huds = env.dir.library_dir(LibraryKind::Huds);
-    let before = snapshot(&huds.join(base.folder_name()));
+    let base_before = snapshot(&huds.join(base.folder_name()));
+    let before = library_files(&env, &base);
     let copy = env.lib.copy_hud(base.id()).unwrap();
     assert_eq!(copy.name(), format!("{} (copy)", base.name()));
     assert!(
@@ -37,7 +39,7 @@ fn a_copy_holds_the_base_files_and_a_copy_record() {
         .filter(|(p, _)| !p.starts_with(".tf2tools"))
         .collect();
     assert_eq!(copied, before);
-    assert_eq!(snapshot(&huds.join(base.folder_name())), before);
+    assert_eq!(snapshot(&huds.join(base.folder_name())), base_before);
     let r = env.lib.copy_base(copy.id()).unwrap().expect("a copy");
     assert_eq!(
         (r.hud_id(), r.store_id(), r.origin()),
@@ -61,6 +63,7 @@ fn a_copy_shares_no_file_with_its_base() {
     use std::os::unix::fs::MetadataExt;
     let env = library_env();
     let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    env.lib.unpack_hud_for_tests(base.id()).unwrap();
     let copy = env.lib.copy_hud(base.id()).unwrap();
     let huds = env.dir.library_dir(LibraryKind::Huds);
     let ino = |folder: &str| {
@@ -110,6 +113,7 @@ fn made_unknown_and_missing_huds_are_refused() {
 fn a_linked_base_folder_or_file_is_never_copied_through() {
     let env = library_env();
     let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    env.lib.unpack_hud_for_tests(base.id()).unwrap();
     let huds = env.dir.library_dir(LibraryKind::Huds);
     let secret = write_file(&env.tmp.path().join("secret.txt"), b"no");
     std::os::unix::fs::symlink(&secret, huds.join(base.folder_name()).join("link.txt")).unwrap();
@@ -129,6 +133,7 @@ fn a_linked_base_folder_or_file_is_never_copied_through() {
 fn a_copy_without_room_is_refused_before_anything_is_written() {
     let mut env = library_env();
     let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    env.lib.unpack_hud_for_tests(base.id()).unwrap();
     env.lib.set_free_space_probe(|_| Ok(1024));
     let before = tree(&env.dir.library_dir(LibraryKind::Huds));
     let err = env.lib.copy_hud(base.id()).unwrap_err();
@@ -145,6 +150,7 @@ fn a_failure_part_way_leaves_nothing_behind() {
     use std::os::unix::fs::PermissionsExt;
     let env = library_env();
     let base = import_stock_hud(&env, "somehud", &[("zz_last.res", "x")], Provenance::Local);
+    env.lib.unpack_hud_for_tests(base.id()).unwrap();
     let locked = env
         .dir
         .library_dir(LibraryKind::Huds)

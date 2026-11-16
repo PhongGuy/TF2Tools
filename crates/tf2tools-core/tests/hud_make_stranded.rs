@@ -3,6 +3,7 @@
 use crate::common;
 
 use common::hud_stock::stock_files;
+use common::packed::library_files;
 use common::{LibraryEnv, import_hud_as, library_env, tree, write_file};
 use std::path::{Path, PathBuf};
 use tf2tools_core::{
@@ -103,7 +104,8 @@ fn a_plain_folder_named_like_an_old_save_is_never_touched() {
         "{install:?}"
     );
     env.lib.delete_hud(rays.id()).unwrap();
-    assert!(huds.join("rayshud.old/info.vdf").is_file());
+    let left = library_files(&env, &other);
+    assert!(left.iter().any(|(rel, _)| rel == "info.vdf"), "{left:?}");
 }
 
 #[cfg(unix)]

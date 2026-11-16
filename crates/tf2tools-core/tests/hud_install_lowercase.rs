@@ -143,6 +143,7 @@ fn references_to_the_huds_own_materials_follow_the_renamed_files() {
 fn the_library_copy_keeps_its_capitals() {
     let env = library_env();
     let hud = import_kn_edit(&env, &[]);
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
     let library = env
         .dir
         .library_dir(LibraryKind::Huds)
@@ -222,6 +223,7 @@ fn a_lowercased_install_without_its_fingerprint_matches_the_library_by_bytes() {
 fn a_live_update_stays_lowercase_and_uninstall_and_reinstall_work() {
     let env = library_env();
     let hud = import_kn_edit(&env, &[]);
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
     env.lib.install_hud(hud.id(), &env.tf2).unwrap();
     let library = env
         .dir
@@ -272,6 +274,7 @@ fn the_font_check_finds_no_capitals_in_an_installed_hud() {
 fn a_live_update_of_an_install_made_before_lowercasing_keeps_its_capitals() {
     let env = library_env();
     let hud = import_kn_edit(&env, &[]);
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
     let library = env
         .dir
         .library_dir(LibraryKind::Huds)

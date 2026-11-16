@@ -4,6 +4,7 @@ use crate::common;
 
 use std::fs;
 
+use common::packed::library_files;
 use common::{
     LibraryEnv, builtin_catalog, gb, library_env, set_setting, setting, tree, write_file, zip_bytes,
 };
@@ -384,9 +385,7 @@ fn reinstalling_moves_an_old_install_to_the_expected_folder() {
         Provenance::Local,
     );
     // An install made before this change sits under the library folder name.
-    let library = env.dir.library_dir(LibraryKind::Huds).join(&root);
-    for rel in tree(&library) {
-        let bytes = fs::read(library.join(&rel)).unwrap();
+    for (rel, bytes) in library_files(&env, &hud) {
         write_file(&env.tf2.custom_dir().join(&root).join(&rel), &bytes);
     }
     set_setting(&env.dir, "installed_hud_folder", &root);
@@ -523,6 +522,7 @@ fn a_referenced_name_over_64_bytes_keeps_the_library_folder() {
 fn text_files_over_4_mib_are_not_scanned() {
     let env = library_env();
     let hud = import_hud(&env, "bighud-main", &[], Provenance::Local);
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
     let mut big = base_ref("bighud").into_bytes();
     big.resize(4 * 1024 * 1024 + 1, b' ');
     let lib = env.dir.library_dir(LibraryKind::Huds).join("bighud-main");
@@ -558,6 +558,7 @@ fn a_failed_copy_leaves_no_hud_recorded_as_installed() {
         &[("materials/n.vtf", "x")],
         Provenance::Local,
     );
+    env.lib.unpack_hud_for_tests(new.id()).unwrap();
     let locked = env
         .dir
         .library_dir(LibraryKind::Huds)

@@ -3,9 +3,9 @@
 
 use crate::common;
 
-use std::fs;
 use std::path::PathBuf;
 
+use common::packed::library_files;
 use common::{LibraryEnv, library_env, sql, write_file, zip_bytes};
 use tf2tools_core::{GbId, HudEntry, LibraryKind, Provenance};
 
@@ -46,9 +46,16 @@ fn store_gb(env: &LibraryEnv, gb_id: i64, name: &str) {
         .unwrap();
 }
 
+/// The layout file of the library HUD in `folder`, read from whichever form it is stored in.
 fn layout(env: &LibraryEnv, folder: &str) -> Vec<u8> {
-    let dir = env.dir.library_dir(LibraryKind::Huds).join(folder);
-    fs::read(dir.join("resource/ui/hudlayout.res")).unwrap()
+    let huds = env.lib.list_huds().unwrap();
+    let hud = huds.iter().find(|h| h.folder_name() == folder).unwrap();
+    let files = library_files(env, hud);
+    let (_, bytes) = files
+        .into_iter()
+        .find(|(rel, _)| rel == "resource/ui/hudlayout.res")
+        .unwrap();
+    bytes
 }
 
 /// Each library HUD as (folder, name), sorted by folder.

@@ -60,6 +60,9 @@ fn only_huds_with_readable_res_files_are_borrowable_and_never_the_one_being_edit
     let good = import_hud_as(&env, "goodhud", gb(1));
     let bare = import_hud_as(&env, "barehud", gb(2));
     let mine = import_hud_as(&env, "minehud", gb(3));
+    for hud in [&good, &bare, &mine] {
+        env.lib.unpack_hud_for_tests(hud.id()).unwrap();
+    }
     for (hud, name) in [(&good, "goodhud"), (&mine, "minehud")] {
         write_file(
             &hud_dir(&env, hud.folder_name()).join("resource/ui/hudplayerhealth.res"),
@@ -87,6 +90,7 @@ fn borrow_files_reads_the_huds_folder_over_the_game_and_refuses_unknown_ids() {
     let env = library_env();
     let (_tmp, tf) = game_with_misc();
     let hud = import_hud_as(&env, "goodhud", gb(1));
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
     write_file(
         &hud_dir(&env, hud.folder_name()).join("resource/ui/hudplayerhealth.res"),
         b"borrowed",

@@ -107,6 +107,7 @@ fn an_unrelated_hud_is_never_offered() {
 fn tree_hashes_are_cached_by_size_and_time() {
     let env = library_env();
     let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    env.lib.unpack_hud_for_tests(base.id()).unwrap();
     let first = env.lib.hud_tree_hash(base.id()).unwrap();
     assert!(first.files_read() > 10);
     let again = env.lib.hud_tree_hash(base.id()).unwrap();

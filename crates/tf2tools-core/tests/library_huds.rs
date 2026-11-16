@@ -5,6 +5,7 @@ use crate::common;
 use std::fs;
 use std::path::PathBuf;
 
+use common::packed::library_names;
 use common::{LibraryEnv, library_env, sql, tree, write_file, zip_bytes};
 use tf2tools_core::{GbId, HudId, ImportError, LibraryError, LibraryKind, Provenance};
 
@@ -53,7 +54,10 @@ fn import_finds_the_info_vdf_folder_and_copies_it_into_the_library() {
     assert!(!entry.created_at().is_empty());
 
     let dest = env.dir.library_dir(LibraryKind::Huds).join("rayshud");
-    assert_eq!(tree(&dest), ["info.vdf", "resource/ui/hudlayout.res"]);
+    assert_eq!(
+        library_names(&env, &entry),
+        ["info.vdf", "resource/ui/hudlayout.res"]
+    );
     assert!(dest.join(".tf2tools").is_dir());
     assert_eq!(
         columns(&env, "rayshud"),
@@ -166,8 +170,8 @@ fn reimporting_the_same_store_item_replaces_files_and_row() {
     let listed = env.lib.list_huds().unwrap();
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].id(), entry.id());
-    let dest = env.dir.library_dir(LibraryKind::Huds).join("myhud");
-    assert_eq!(tree(&dest), ["info.vdf", "new.res"]);
+    assert_eq!(entry.folder_name(), "myhud");
+    assert_eq!(library_names(&env, &entry), ["info.vdf", "new.res"]);
 }
 
 #[test]
@@ -180,8 +184,7 @@ fn a_hud_at_the_archive_root_is_named_after_the_archive() {
     );
     let entry = env.lib.import_hud(&archive, Provenance::Local).unwrap();
     assert_eq!(entry.folder_name(), "flawhud");
-    let dest = env.dir.library_dir(LibraryKind::Huds).join("flawhud");
-    assert_eq!(tree(&dest), ["info.vdf", "resource/a.res"]);
+    assert_eq!(library_names(&env, &entry), ["info.vdf", "resource/a.res"]);
 }
 
 #[test]
@@ -198,9 +201,8 @@ fn the_shallowest_info_vdf_wins() {
     );
     let entry = env.lib.import_hud(&archive, Provenance::Local).unwrap();
     assert_eq!(entry.folder_name(), "hud");
-    let dest = env.dir.library_dir(LibraryKind::Huds).join("hud");
     assert_eq!(
-        tree(&dest),
+        library_names(&env, &entry),
         ["a.res", "customizations/alt/info.vdf", "info.vdf"]
     );
 }
@@ -216,9 +218,17 @@ fn metadata_folders_in_the_archive_are_not_copied() {
             ("m/.tf2tools/thumbnail.webp", b"stale"),
         ],
     );
-    env.lib.import_hud(&archive, Provenance::Local).unwrap();
+    let entry = env.lib.import_hud(&archive, Provenance::Local).unwrap();
     let dest = env.dir.library_dir(LibraryKind::Huds).join("m");
-    assert_eq!(tree(&dest), ["info.vdf"]);
+    assert_eq!(library_names(&env, &entry), ["info.vdf"]);
+    let metadata = tree(&dest.join(".tf2tools"));
+    // Only the app's own metadata is there: the archive's stale picture never came along.
+    assert!(
+        metadata
+            .iter()
+            .all(|rel| rel == "files.zip" || rel == "thumbnail.jpg"),
+        "{metadata:?}"
+    );
 }
 
 #[test]
@@ -261,8 +271,10 @@ fn a_rar_hud_imports_like_a_zip() {
     );
     let entry = env.lib.import_hud(&file, Provenance::Local).unwrap();
     assert_eq!(entry.folder_name(), "myhud");
-    let dest = env.dir.library_dir(LibraryKind::Huds).join("myhud");
-    assert_eq!(tree(&dest), ["info.vdf", "resource/ui/a.res"]);
+    assert_eq!(
+        library_names(&env, &entry),
+        ["info.vdf", "resource/ui/a.res"]
+    );
 }
 
 #[test]

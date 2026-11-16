@@ -116,6 +116,7 @@ fn a_file_the_maker_adds_over_a_game_file_stays_out_of_the_base() {
     let env = library_env();
     let tf = game_for(&env, &[(A, AMMO.as_bytes())]);
     let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    env.lib.unpack_hud_for_tests(base.id()).unwrap();
     std::fs::remove_file(dir(&env, &base).join(A)).unwrap();
     let copy = env.lib.copy_hud(base.id()).unwrap();
     save(&env, &tf, &copy, &[ammo()]);
@@ -188,6 +189,7 @@ fn a_crash_while_adding_a_game_file_reopens_on_the_game_s_bytes_and_repairs() {
     let env = library_env();
     let tf = game_for(&env, &[(A, AMMO.as_bytes())]);
     let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    env.lib.unpack_hud_for_tests(base.id()).unwrap();
     std::fs::remove_file(dir(&env, &base).join(A)).unwrap();
     let twin = env.lib.copy_hud(base.id()).unwrap();
     save(&env, &tf, &twin, &[red()]);

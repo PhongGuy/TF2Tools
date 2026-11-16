@@ -61,6 +61,7 @@ fn opened_with_source_hud(
     std::fs::create_dir_all(archive.parent().unwrap()).unwrap();
     std::fs::write(&archive, support::hud_zip_bytes("minehud")).unwrap();
     let entry = s.services.library.import_hud(&archive, provenance).unwrap();
+    s.services.library.unpack_hud_for_tests(entry.id()).unwrap();
     let dir = env
         .data
         .library_dir(LibraryKind::Huds)

@@ -5,6 +5,7 @@ use crate::common;
 
 use std::time::{Duration, Instant};
 
+use common::packed::library_files_in;
 use common::{
     count, download_collecting, download_requests, fast_config, gb_file, md5_hex, sql, store_env,
     tmp_is_empty, vpk_bytes, zip_bytes,
@@ -63,12 +64,8 @@ async fn a_gamebanana_hud_downloads_into_the_library() {
             author: "DarSitam".to_owned()
         }
     );
-    assert!(
-        env.dir
-            .library_dir(LibraryKind::Huds)
-            .join("darhud/info.vdf")
-            .is_file()
-    );
+    let files = library_files_in(&env.dir, hud);
+    assert!(files.iter().any(|(rel, _)| rel == "info.vdf"), "{files:?}");
     assert!(tmp_is_empty(&env.dir));
 
     let len = body.len() as u64;
