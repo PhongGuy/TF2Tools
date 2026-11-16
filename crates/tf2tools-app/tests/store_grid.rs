@@ -766,3 +766,18 @@ fn the_sort_rows_carry_ids_and_pick_the_sort(cx: &mut TestAppContext) {
     support::click_id(cx, win, ids::select_option(ids::STORE_SORT, "Newest"));
     assert_eq!(cx.update(|cx| grid.read(cx).sort()), StoreSort::Newest);
 }
+
+#[test]
+fn the_count_line_names_each_stores_items() {
+    use tf2tools_app::store_grid::count_text;
+    use tf2tools_core::StoreKind;
+    assert_eq!(
+        count_text(StoreKind::Crosshairs, 11, 150),
+        "11 of 150 crosshairs"
+    );
+    assert_eq!(count_text(StoreKind::GameBananaHuds, 2, 2), "2 of 2 HUDs");
+    assert_eq!(count_text(StoreKind::CuratedHuds, 2, 304), "2 of 304 HUDs");
+    assert_eq!(count_text(StoreKind::Sounds, 1, 1), "1 of 1 sound");
+    assert_eq!(count_text(StoreKind::Crosshairs, 1, 1), "1 of 1 crosshair");
+    assert_eq!(count_text(StoreKind::CuratedHuds, 1, 1), "1 of 1 HUD");
+}

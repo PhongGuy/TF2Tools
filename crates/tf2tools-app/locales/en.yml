@@ -182,6 +182,32 @@ logs_tf:
     up_to: { one: "%{range} up to %{date}, %{count} log", other: "%{range} up to %{date}, %{count} logs" }
   weapons_title: { one: "%{class} weapons · %{range} · %{count} log", other: "%{class} weapons · %{range} · %{count} logs" }
 
+maps:
+  count: { one: "%{count} map", other: "%{count} maps" }
+  count_of: { one: "%{shown} of %{count} map", other: "%{shown} of %{count} maps" }
+
+store_grid:
+  count:
+    huds: { one: "%{shown} of %{count} HUD", other: "%{shown} of %{count} HUDs" }
+    sounds: { one: "%{shown} of %{count} sound", other: "%{shown} of %{count} sounds" }
+    crosshairs: { one: "%{shown} of %{count} crosshair", other: "%{shown} of %{count} crosshairs" }
+
+profiles:
+  crosshairs: { one: "%{count} crosshair", other: "%{count} crosshairs" }
+  weapons: { one: "%{count} weapon", other: "%{count} weapons" }
+
+crosshairs_page:
+  no_weapon: "Not on any weapon yet"
+  on_weapons: { one: "On %{count} weapon", other: "On %{count} weapons" }
+
+confirm:
+  crosshair_used: { one: "It is used by %{count} weapon. It goes back to the default crosshair.", other: "It is used by %{count} weapons. They go back to the default crosshair." }
+
+font_check:
+  installed: { one: "Installed %{count} font for %{folder}. Restart TF2 to use them.", other: "Installed %{count} fonts for %{folder}. Restart TF2 to use them." }
+  installed_some: { one: "Installed %{installed} of %{count} font for %{folder}; see the Activity Log. Restart TF2 to use them.", other: "Installed %{installed} of %{count} fonts for %{folder}; see the Activity Log. Restart TF2 to use them." }
+  skipped: { one: "Skipped %{count} font for %{folder}; see the Activity Log.", other: "Skipped %{count} fonts for %{folder}; see the Activity Log." }
+
 messages:
   shared:
     no_tf2_title: "TF2 not found"

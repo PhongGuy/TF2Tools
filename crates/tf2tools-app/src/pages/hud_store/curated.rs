@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 
 use serde_json::Value;
-use tf2tools_core::{StoreItem, StoreItemId};
+use tf2tools_core::{StoreItem, StoreItemId, StoreKind};
 
 /// An operating system a curated HUD declares support for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -296,5 +296,5 @@ pub fn facets(huds: &[CuratedHud], facet: Facet) -> Vec<String> {
 
 /// The count line: "{shown} of {total} HUDs".
 pub fn count_label(shown: usize, total: usize) -> String {
-    format!("{shown} of {total} HUDs")
+    crate::store_grid::count_text(StoreKind::CuratedHuds, shown, total).to_string()
 }

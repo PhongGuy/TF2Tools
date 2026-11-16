@@ -8,6 +8,7 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window, div,
 };
 
+use crate::i18n::plural;
 use crate::ids;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 
@@ -96,8 +97,13 @@ impl Confirm {
     pub fn delete_crosshair(name: &str, weapons: usize, installed: bool) -> Self {
         let used = match weapons {
             0 => String::new(),
-            1 => " It is used by 1 weapon. It goes back to the default crosshair.".to_owned(),
-            n => format!(" It is used by {n} weapons. They go back to the default crosshair."),
+            n => format!(
+                " {}",
+                plural(
+                    "confirm.crosshair_used",
+                    u64::try_from(n).unwrap_or(u64::MAX)
+                )
+            ),
         };
         let game = if installed {
             " It is also removed from TF2."

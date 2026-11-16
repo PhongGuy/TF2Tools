@@ -344,3 +344,30 @@ fn issues_read_in_plain_words() {
          VPK files."
     );
 }
+
+#[test]
+fn the_install_toast_counts_its_fonts() {
+    use tf2tools_app::font_check::installed_text;
+    let cases = [
+        (
+            1,
+            0,
+            "Installed 1 font for fonthud. Restart TF2 to use them.",
+        ),
+        (
+            2,
+            0,
+            "Installed 2 fonts for fonthud. Restart TF2 to use them.",
+        ),
+        (
+            1,
+            1,
+            "Installed 1 of 2 fonts for fonthud; see the Activity Log. Restart TF2 to use them.",
+        ),
+        (0, 1, "Skipped 1 font for fonthud; see the Activity Log."),
+        (0, 2, "Skipped 2 fonts for fonthud; see the Activity Log."),
+    ];
+    for (installed, skipped, text) in cases {
+        assert_eq!(installed_text("fonthud", installed, skipped), text);
+    }
+}

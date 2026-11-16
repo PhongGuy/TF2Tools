@@ -321,3 +321,61 @@ fn logs_tf_sentences_read_in_russian() {
         "Оружие: Heavy · All · 1\u{a0}234 лога"
     );
 }
+
+#[test]
+fn library_and_store_counts_read_in_russian() {
+    use tf2tools_app::pages::maps::model::count_label;
+    use tf2tools_app::pages::profiles::editor_model::weapon_count;
+    use tf2tools_app::pages::profiles::model::crosshair_count;
+    use tf2tools_app::store_grid::count_text;
+    use tf2tools_core::StoreKind;
+    let _guard = LocaleGuard::switch("ru");
+    let maps = [(1, "1 карта"), (2, "2 карты"), (5, "5 карт")];
+    let maps = maps
+        .into_iter()
+        .chain([(11, "11 карт"), (21, "21 карта"), (22, "22 карты")]);
+    for (n, text) in maps {
+        assert_eq!(count_label(n, n), text, "{n} maps");
+    }
+    assert_eq!(count_label(2, 21), "2 из 21 карты");
+    assert_eq!(count_label(2, 4368), "2 из 4368 карт");
+    assert_eq!(count_text(StoreKind::Sounds, 2, 5), "2 из 5 звуков");
+    assert_eq!(count_text(StoreKind::Crosshairs, 1, 21), "1 из 21 прицела");
+    assert_eq!(count_text(StoreKind::GameBananaHuds, 2, 3), "2 из 3 HUD");
+    let curated = tf2tools_app::pages::hud_store::curated::count_label(2, 304);
+    assert_eq!(curated, "2 из 304 HUD");
+    assert_eq!(crosshair_count(1), "1 прицел");
+    assert_eq!(crosshair_count(3), "3 прицела");
+    assert_eq!(crosshair_count(5), "5 прицелов");
+    assert_eq!(weapon_count(1), "1 оружие");
+    assert_eq!(weapon_count(2), "2 оружия");
+    assert_eq!(weapon_count(5), "5 оружий");
+}
+
+#[test]
+fn crosshair_and_font_sentences_read_in_russian() {
+    use tf2tools_app::font_check::installed_text;
+    use tf2tools_app::pages::crosshairs::weapons_detail;
+    use tf2tools_app::shell::confirm::Confirm;
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(weapons_detail(0), "Пока не назначен ни на одно оружие");
+    assert_eq!(weapons_detail(21), "Назначен на 21 оружие");
+    assert_eq!(weapons_detail(3), "Назначен на 3 оружия");
+    let two = Confirm::delete_crosshair("Dot", 2, false).description;
+    let used = " Его используют 2 оружия. Они вернутся к прицелу по умолчанию.";
+    assert!(two.contains(used), "{two}");
+    let none = Confirm::delete_crosshair("Dot", 0, false).description;
+    assert!(!none.contains("Его"), "{none}");
+    let fonts = installed_text("fonthud", 2, 0);
+    let tail = "Перезапустите TF2, чтобы применить их.";
+    assert_eq!(fonts, format!("Установлено 2 шрифта для fonthud. {tail}"));
+    assert_ru(&fonts);
+    assert_eq!(
+        installed_text("fonthud", 1, 1),
+        format!("Установлено 1 из 2 шрифтов для fonthud; подробности в журнале действий. {tail}")
+    );
+    assert_eq!(
+        installed_text("fonthud", 0, 5),
+        "Пропущено 5 шрифтов для fonthud; подробности в журнале действий."
+    );
+}

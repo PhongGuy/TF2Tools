@@ -12,7 +12,7 @@ use tf2tools_core::{
 };
 
 use crate::activity;
-use crate::i18n::tr;
+use crate::i18n::{counted_plural, tr};
 use crate::local_messages::{describe_font_install, describe_settings};
 use crate::services::{OpError, Services};
 use crate::shell::toast::ToastKind;
@@ -211,35 +211,14 @@ fn installed(
     } else {
         format!("Installed {n} {} for HUD: {folder}", fonts(n))
     };
-    let (kind, title, description) = if k == 0 {
-        (
-            ToastKind::Success,
-            "Fonts installed",
-            format!(
-                "Installed {n} {} for {folder}. Restart TF2 to use them.",
-                fonts(n)
-            ),
-        )
+    let (kind, title) = if k == 0 {
+        (ToastKind::Success, "Fonts installed")
     } else if n > 0 {
-        (
-            ToastKind::Warning,
-            "Some fonts were not installed",
-            format!(
-                "Installed {n} of {} {} for {folder}; see the Activity Log. Restart TF2 to use them.",
-                n + k,
-                fonts(n + k)
-            ),
-        )
+        (ToastKind::Warning, "Some fonts were not installed")
     } else {
-        (
-            ToastKind::Warning,
-            "No fonts installed",
-            format!(
-                "Skipped {k} {} for {folder}; see the Activity Log.",
-                fonts(k)
-            ),
-        )
+        (ToastKind::Warning, "No fonts installed")
     };
+    let description = installed_text(folder, n, k);
     let level = if k == 0 {
         LogLevel::Info
     } else {
@@ -251,6 +230,34 @@ fn installed(
         description,
     };
     (Ok(toast), row(level, message, lines.join("\n")))
+}
+
+/// The install toast's description for `installed` fonts copied and `skipped` left out.
+pub fn installed_text(folder: &str, installed: usize, skipped: usize) -> String {
+    // Each sentence counts the fonts it names: the installed, all of them, or the skipped.
+    let wide = |n: usize| u64::try_from(n).unwrap_or(u64::MAX);
+    let folder = [("folder", folder)];
+    let text = if skipped == 0 {
+        counted_plural(
+            "font_check.installed",
+            wide(installed),
+            &installed.to_string(),
+            &folder,
+        )
+    } else if installed > 0 {
+        let total = installed.saturating_add(skipped);
+        let (done, all) = (installed.to_string(), total.to_string());
+        let vars = [folder[0], ("installed", done.as_str())];
+        counted_plural("font_check.installed_some", wide(total), &all, &vars)
+    } else {
+        counted_plural(
+            "font_check.skipped",
+            wide(skipped),
+            &skipped.to_string(),
+            &folder,
+        )
+    };
+    text.to_string()
 }
 
 fn row(level: LogLevel, message: String, details: String) -> NewLogEntry {

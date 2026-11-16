@@ -180,6 +180,32 @@ logs_tf:
     up_to: { one: "%{range} до %{date}: %{count} лог", few: "%{range} до %{date}: %{count} лога", many: "%{range} до %{date}: %{count} логов" }
   weapons_title: { one: "Оружие: %{class} · %{range} · %{count} лог", few: "Оружие: %{class} · %{range} · %{count} лога", many: "Оружие: %{class} · %{range} · %{count} логов" }
 
+maps:
+  count: { one: "%{count} карта", few: "%{count} карты", many: "%{count} карт" }
+  count_of: { one: "%{shown} из %{count} карты", few: "%{shown} из %{count} карт", many: "%{shown} из %{count} карт" }
+
+store_grid:
+  count:
+    huds: { one: "%{shown} из %{count} HUD", few: "%{shown} из %{count} HUD", many: "%{shown} из %{count} HUD" }
+    sounds: { one: "%{shown} из %{count} звука", few: "%{shown} из %{count} звуков", many: "%{shown} из %{count} звуков" }
+    crosshairs: { one: "%{shown} из %{count} прицела", few: "%{shown} из %{count} прицелов", many: "%{shown} из %{count} прицелов" }
+
+profiles:
+  crosshairs: { one: "%{count} прицел", few: "%{count} прицела", many: "%{count} прицелов" }
+  weapons: { one: "%{count} оружие", few: "%{count} оружия", many: "%{count} оружий" }
+
+crosshairs_page:
+  no_weapon: "Пока не назначен ни на одно оружие"
+  on_weapons: { one: "Назначен на %{count} оружие", few: "Назначен на %{count} оружия", many: "Назначен на %{count} оружий" }
+
+confirm:
+  crosshair_used: { one: "Его использует %{count} оружие. Оно вернётся к прицелу по умолчанию.", few: "Его используют %{count} оружия. Они вернутся к прицелу по умолчанию.", many: "Его используют %{count} оружий. Они вернутся к прицелу по умолчанию." }
+
+font_check:
+  installed: { one: "Установлен %{count} шрифт для %{folder}. Перезапустите TF2, чтобы применить его.", few: "Установлено %{count} шрифта для %{folder}. Перезапустите TF2, чтобы применить их.", many: "Установлено %{count} шрифтов для %{folder}. Перезапустите TF2, чтобы применить их." }
+  installed_some: { one: "Установлено %{installed} из %{count} шрифта для %{folder}; подробности в журнале действий. Перезапустите TF2, чтобы применить их.", few: "Установлено %{installed} из %{count} шрифтов для %{folder}; подробности в журнале действий. Перезапустите TF2, чтобы применить их.", many: "Установлено %{installed} из %{count} шрифтов для %{folder}; подробности в журнале действий. Перезапустите TF2, чтобы применить их." }
+  skipped: { one: "Пропущен %{count} шрифт для %{folder}; подробности в журнале действий.", few: "Пропущено %{count} шрифта для %{folder}; подробности в журнале действий.", many: "Пропущено %{count} шрифтов для %{folder}; подробности в журнале действий." }
+
 messages:
   shared:
     no_tf2_title: "TF2 не найдена"
