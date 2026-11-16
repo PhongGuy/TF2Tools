@@ -264,7 +264,7 @@ impl LogsCache {
         let bytes_after = self
             .db
             .write(|conn| {
-                if let Err(e) = compact(conn, trimmed) {
+                if let Err(e) = compact(conn, trimmed, recompressed > 0) {
                     tracing::warn!(error = %e, "the logs.tf cache could not be compacted");
                 }
                 file_bytes(conn)
@@ -346,9 +346,14 @@ fn file_bytes(conn: &Connection) -> rusqlite::Result<u64> {
 // Gives free pages back to the file system. A trimmed row stays in a near-empty leaf page that
 // only VACUUM packs, so the file is rewritten once enough trims add up, or once when an old file
 // without auto_vacuum holds many free pages; the rewrite also turns incremental vacuum on.
-// Between rewrites an incremental file frees pages in place. A busy checkpoint is not an error.
-fn compact(conn: &Connection, trimmed: usize) -> rusqlite::Result<()> {
-    let since: i64 = conn
+// Between rewrites an incremental file frees pages in place. A pass that changed nothing and
+// left no free pages skips it all. A busy checkpoint is not an error.
+fn compact(conn: &Connection, trimmed: usize, recompressed: bool) -> rusqlite::Result<()> {
+    let free: i64 = conn.pragma_query_value(None, "freelist_count", |r| r.get(0))?;
+    if trimmed == 0 && !recompressed && free == 0 {
+        return Ok(());
+    }
+    let counted: i64 = conn
         .query_row(
             "SELECT CAST(value AS INTEGER) FROM settings WHERE key = ?1",
             [TRIMS_KEY],
@@ -356,21 +361,24 @@ fn compact(conn: &Connection, trimmed: usize) -> rusqlite::Result<()> {
         )
         .optional()?
         .unwrap_or(0);
-    let since = since.saturating_add(i64::try_from(trimmed).unwrap_or(i64::MAX));
+    let since = counted.saturating_add(i64::try_from(trimmed).unwrap_or(i64::MAX));
     let store = |n: i64| {
         conn.execute(
             "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
             params![TRIMS_KEY, n.to_string()],
         )
     };
-    store(since)?;
+    if trimmed > 0 {
+        store(since)?;
+    }
     let auto: i64 = conn.pragma_query_value(None, "auto_vacuum", |r| r.get(0))?;
-    let free: i64 = conn.pragma_query_value(None, "freelist_count", |r| r.get(0))?;
     let page: i64 = conn.pragma_query_value(None, "page_size", |r| r.get(0))?;
     let old_file_full = auto != 2 && free.saturating_mul(page) > VACUUM_FREE_BYTES;
     if since >= VACUUM_AFTER_TRIMS || old_file_full {
         conn.execute_batch("PRAGMA auto_vacuum = INCREMENTAL; VACUUM;")?;
-        store(0)?;
+        if since != 0 {
+            store(0)?;
+        }
     } else if auto == 2 && free > 0 {
         // Each step frees one page, so the statement is stepped to its end.
         let mut stmt = conn.prepare("PRAGMA incremental_vacuum")?;

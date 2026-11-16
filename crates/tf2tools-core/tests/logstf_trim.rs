@@ -214,6 +214,17 @@ fn a_small_trim_of_an_incremental_file_returns_its_free_pages() {
 }
 
 #[test]
+fn a_pass_with_nothing_to_do_leaves_the_trim_counter_alone() {
+    let (_tmp, dir) = common::temp_data_dir();
+    let cache = tracked(&dir);
+    seed_stored(&dir, 1, NOW - 2 * DAY, NOW - DAY);
+    checkpoint(&dir);
+    let report = cache.trim(KeepFullLogs::Days7, NOW).unwrap();
+    assert_eq!((report.trimmed(), report.recompressed()), (0, 0));
+    assert_eq!(common::setting(&dir, "logstf_trimmed_since_vacuum"), None);
+}
+
+#[test]
 fn trims_that_add_up_rewrite_the_file() {
     let (_tmp, dir) = common::temp_data_dir();
     let cache = tracked(&dir);
