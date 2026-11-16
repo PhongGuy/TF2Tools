@@ -262,6 +262,7 @@ impl Library {
         archive: &Path,
         provenance: Provenance,
     ) -> Result<HudEntry, ImportError> {
+        let _copies = self.copies_write();
         // The scratch dir is removed when the guard drops, on every return path.
         let tmp = self.dir.tmp_dir();
         create_dir_all(&tmp)?;
@@ -466,6 +467,7 @@ impl Library {
     /// previous save stranded as `<folder>.old` by an interrupted re-save goes too. A row
     /// whose folder name is not a plain name has no files, so only the row goes.
     pub fn delete_hud(&self, id: &HudId) -> Result<(), LibraryError> {
+        let _copies = self.copies_write();
         let folder: Option<String> = self
             .db
             .read(|conn| {
@@ -504,7 +506,9 @@ impl Library {
     /// so an unknown or vanished HUD leaves the installed one. Fails with `ExternalHuds` and
     /// changes nothing when a HUD the library cannot put back is in `tf/custom`.
     pub fn install_hud(&self, id: &HudId, tf2: &Tf2Install) -> Result<HudInstall, InstallError> {
-        self.install_hud_discarding(id, tf2, &[])
+        let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_read();
+        self.install_hud_discarding_locked(id, tf2, &[])
     }
 
     /// `install_hud`, except that it may remove the HUDs in `discard`. It fails with
@@ -517,6 +521,17 @@ impl Library {
         discard: &[ExternalHud],
     ) -> Result<HudInstall, InstallError> {
         let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_read();
+        self.install_hud_discarding_locked(id, tf2, discard)
+    }
+
+    /// `install_hud_discarding` for a caller already holding the swap lock and a copies guard.
+    pub(super) fn install_hud_discarding_locked(
+        &self,
+        id: &HudId,
+        tf2: &Tf2Install,
+        discard: &[ExternalHud],
+    ) -> Result<HudInstall, InstallError> {
         let not_in_library = || InstallError::NotInLibrary {
             what: format!("HUD {id}"),
         };
@@ -659,7 +674,9 @@ impl Library {
     /// Removes every installed HUD from `tf/custom` and clears v5's install settings. Fails
     /// with `ExternalHuds` and changes nothing when one is a HUD the library cannot put back.
     pub fn uninstall_hud(&self, tf2: &Tf2Install) -> Result<(), InstallError> {
-        self.uninstall_hud_discarding(tf2, &[])
+        let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_read();
+        self.uninstall_hud_discarding_locked(tf2, &[])
     }
 
     /// `uninstall_hud`, except that it may remove the HUDs in `discard`. It fails with
@@ -671,6 +688,16 @@ impl Library {
         discard: &[ExternalHud],
     ) -> Result<(), InstallError> {
         let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_read();
+        self.uninstall_hud_discarding_locked(tf2, discard)
+    }
+
+    /// `uninstall_hud_discarding` for a caller already holding the swap lock and a copies guard.
+    pub(super) fn uninstall_hud_discarding_locked(
+        &self,
+        tf2: &Tf2Install,
+        discard: &[ExternalHud],
+    ) -> Result<(), InstallError> {
         let custom = game_custom_dir(tf2)?;
         self.refuse_unnamed_huds(&custom, discard, None)?;
         live_link::clear_staging(&custom)?;
@@ -691,6 +718,7 @@ impl Library {
         discard: &[ExternalHud],
     ) -> Result<(), InstallError> {
         let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_read();
         let custom = game_custom_dir(tf2)?;
         // Only what the scan found can go, so no name reaches outside tf/custom.
         let found = scan_hud_folders(&custom)?;
@@ -737,6 +765,7 @@ impl Library {
     /// The HUD folders in `tf/custom` that installing or uninstalling would lose for good,
     /// because the library cannot put them back; sorted.
     pub fn external_huds(&self, tf2: &Tf2Install) -> Result<Vec<ExternalHud>, LibraryError> {
+        let _copies = self.copies_read();
         self.external_in(&tf2.custom_dir())
     }
 
@@ -750,6 +779,7 @@ impl Library {
         tf2: &Tf2Install,
     ) -> Result<Vec<HudEntry>, KeepHudError> {
         let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_write();
         let custom = tf2.custom_dir();
         let present = self.external_in(&custom).map_err(keep_library)?;
         let mut kept = Vec::new();

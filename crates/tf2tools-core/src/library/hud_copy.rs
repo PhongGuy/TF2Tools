@@ -57,6 +57,7 @@ impl Library {
     /// is written, `NameTaken` past "(copy 99)", `Io` or `Database` when writing fails; a
     /// failure leaves no folder, no row and nothing in the library tmp dir.
     pub fn copy_hud(&self, base: &HudId) -> Result<HudEntry, CopyHudError> {
+        let _copies = self.copies_read();
         let row = self.base_row(base)?.ok_or_else(|| CopyHudError::NotFound {
             id: base.as_str().to_owned(),
         })?;
@@ -241,7 +242,7 @@ impl Library {
             ),
         };
         // Deleting a HUD takes no write lock, so its row can vanish between reads.
-        let tree = self.hud_tree_hash(entry.id()).map_err(|e| match e {
+        let tree = self.hud_tree_hash_locked(entry.id()).map_err(|e| match e {
             LibraryError::Io { path, source } => CopyHudError::Io { path, source },
             LibraryError::NotFound { .. } => CopyHudError::NotFound {
                 id: entry.id().as_str().to_owned(),
@@ -573,6 +574,7 @@ impl Library {
     /// # Errors
     /// `NotFound` for no such row; `Io` or `Database` when reading fails.
     pub fn copy_update(&self, id: &HudId) -> Result<CopyUpdate, LibraryError> {
+        let _copies = self.copies_read();
         let Some(base) = self.copy_base(id)? else {
             return Ok(CopyUpdate::UpToDate);
         };
@@ -645,6 +647,12 @@ impl Library {
     /// # Errors
     /// `NotFound` for no such row; `Io` when a file cannot be read; `Database`.
     pub fn hud_tree_hash(&self, id: &HudId) -> Result<TreeHash, LibraryError> {
+        let _copies = self.copies_read();
+        self.hud_tree_hash_locked(id)
+    }
+
+    /// `hud_tree_hash` for a caller already holding a copies guard.
+    pub(crate) fn hud_tree_hash_locked(&self, id: &HudId) -> Result<TreeHash, LibraryError> {
         let folder =
             self.hud_folder(id)
                 .map_err(library_db)?
@@ -724,7 +732,7 @@ impl Library {
             && let (Some(theirs), Some(ours)) =
                 (self.hud_gb_mark(candidate)?, self.copy_mark(id, copy)?)
             && theirs > ours
-            && self.hud_tree_hash(candidate.id())?.hash() != copy.tree()
+            && self.hud_tree_hash_locked(candidate.id())?.hash() != copy.tree()
         {
             return Ok(true);
         }
@@ -738,14 +746,15 @@ impl Library {
             && !commits_match(&current, copy.hash())
         {
             // With no recorded commit, the download is newer only when its bytes differ.
-            if !copy.hash().is_empty() || self.hud_tree_hash(candidate.id())?.hash() != copy.tree()
+            if !copy.hash().is_empty()
+                || self.hud_tree_hash_locked(candidate.id())?.hash() != copy.tree()
             {
                 return Ok(true);
             }
         }
         let reinstall = candidate.folder_name() == copy.base_folder()
             && candidate.updated_at() > copy.base_updated_at();
-        Ok(reinstall && self.hud_tree_hash(candidate.id())?.hash() != copy.tree())
+        Ok(reinstall && self.hud_tree_hash_locked(candidate.id())?.hash() != copy.tree())
     }
 
     /// The version mark of copy `id`'s GameBanana base: the number its record holds, or for
@@ -828,7 +837,10 @@ impl Library {
             let same_hud = matches!(candidate.provenance(), Provenance::Curated { hud_id } if hud_id == store_hud);
             let at_current =
                 commit_suffix(candidate.folder_name()).is_some_and(|c| commits_match(current, c));
-            if same_hud && at_current && self.hud_tree_hash(candidate.id())?.hash() == base.tree() {
+            if same_hud
+                && at_current
+                && self.hud_tree_hash_locked(candidate.id())?.hash() == base.tree()
+            {
                 return Ok(true);
             }
         }
@@ -981,6 +993,7 @@ impl Library {
     ) -> Result<CopyUpdated, UpdateCopyError> {
         // Held from the first read, so a save checking this copy's base waits for the new one.
         let _writes = self.lock_writes();
+        let _copies = self.copies_read();
         let text = |id: &HudId| id.as_str().to_owned();
         let folder = (self.hud_folder(id).map_err(save_db)?)
             .ok_or_else(|| UpdateCopyError::NotFound { id: text(id) })?;

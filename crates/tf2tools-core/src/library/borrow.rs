@@ -31,6 +31,7 @@ impl Library {
     /// The library HUDs with a readable folder holding `.res` files, except `except` (the HUD
     /// being edited), ordered by name.
     pub fn list_borrowable(&self, except: Option<&HudId>) -> Result<Vec<HudEntry>, LibraryError> {
+        let _copies = self.copies_read();
         let huds_dir = self.dir.library_dir(LibraryKind::Huds);
         Ok(self
             .list_huds()?
@@ -55,6 +56,7 @@ impl Library {
         id: &HudId,
         tf_dir: &Path,
     ) -> Result<(HudEntry, HudFiles), BorrowSourceError> {
+        let _copies = self.copies_read();
         let entry = self
             .db
             .read(|conn| read_row(conn, id.as_str()).optional())

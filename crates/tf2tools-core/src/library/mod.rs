@@ -29,7 +29,7 @@ mod tree_copy;
 use std::fmt;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock};
 
 use rusqlite::OptionalExtension;
 use walkdir::WalkDir;
@@ -97,6 +97,9 @@ pub struct Library {
     /// Held for the whole of a made HUD's save and a copy's update, so a save that checks the
     /// copy's base never interleaves with an update rewriting it.
     writes: Arc<Mutex<()>>,
+    /// Read by every entry point that reads a HUD copy, written by any that replaces one, so a
+    /// copy is never repacked under a reader. Taken after `writes` and the swap lock, never before.
+    copies: Arc<RwLock<()>>,
 }
 
 impl Library {
@@ -108,13 +111,31 @@ impl Library {
             free_space: crate::disk::free_bytes,
             hud_schemas: Arc::new(HudSchemas::bundled()),
             writes: Arc::new(Mutex::new(())),
+            copies: Arc::new(RwLock::new(())),
         }
     }
 
     /// Takes the library write lock; a writer that panicked leaves nothing it guards half done
     /// that the next writer relies on, so a poisoned lock is taken as is.
     pub(crate) fn lock_writes(&self) -> MutexGuard<'_, ()> {
+        assert_copies_free();
         self.writes.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Takes the copies lock for reading. Not reentrant: code under it calls the `_locked` forms.
+    pub(crate) fn copies_read(&self) -> CopiesGuard<'_> {
+        mark_copies_held();
+        CopiesGuard {
+            _held: CopiesHeld::Read(self.copies.read().unwrap_or_else(PoisonError::into_inner)),
+        }
+    }
+
+    /// Takes the copies lock for writing, waiting out every reader. Not reentrant.
+    pub(crate) fn copies_write(&self) -> CopiesGuard<'_> {
+        mark_copies_held();
+        CopiesGuard {
+            _held: CopiesHeld::Write(self.copies.write().unwrap_or_else(PoisonError::into_inner)),
+        }
     }
 
     /// Replaces the schemas copies are read with; the bundled set is the default.
@@ -587,6 +608,47 @@ pub(crate) fn remove_dir_if_present(dir: &Path) -> Result<(), IoFailure> {
     }
 }
 
+thread_local! {
+    /// Whether this thread holds the copies lock; debug builds check nesting and order with it.
+    static COPIES_HELD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// A held copies lock, read or write. Dropping it frees the thread for the next guard.
+pub(crate) struct CopiesGuard<'a> {
+    _held: CopiesHeld<'a>,
+}
+
+/// The std guard behind a `CopiesGuard`; held only for its drop.
+enum CopiesHeld<'a> {
+    Read(#[expect(dead_code, reason = "held for its drop")] std::sync::RwLockReadGuard<'a, ()>),
+    Write(#[expect(dead_code, reason = "held for its drop")] std::sync::RwLockWriteGuard<'a, ()>),
+}
+
+impl Drop for CopiesGuard<'_> {
+    fn drop(&mut self) {
+        COPIES_HELD.with(|held| held.set(false));
+    }
+}
+
+/// Marks the thread before it blocks, so a nested guard panics instead of deadlocking.
+fn mark_copies_held() {
+    COPIES_HELD.with(|held| {
+        debug_assert!(
+            !held.get(),
+            "the library copies lock is not reentrant; call the _locked form"
+        );
+        held.set(true);
+    });
+}
+
+/// `lock_writes` and `hud_swap_lock` come before the copies lock, never after it.
+pub(crate) fn assert_copies_free() {
+    debug_assert!(
+        !COPIES_HELD.with(std::cell::Cell::get),
+        "lock order: lock_writes, hud_swap_lock, then copies"
+    );
+}
+
 /// v5 checked only the four magic bytes; a file shorter than that is not a VPK either.
 pub(crate) fn check_vpk_magic(path: &Path) -> Result<(), ImportError> {
     let mut head = Vec::with_capacity(VPK_MAGIC.len());
@@ -607,5 +669,49 @@ pub(crate) fn remove_file_if_present(path: &Path) -> Result<(), IoFailure> {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(io_at(path)(e)),
+    }
+}
+
+#[cfg(all(test, debug_assertions))]
+mod copies_lock_tests {
+    use super::*;
+    use crate::db::Database;
+
+    fn library() -> (tempfile::TempDir, Library) {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = DataDir::at(tmp.path().join("data"));
+        (tmp, Library::new(Database::open(&dir).unwrap(), dir))
+    }
+
+    #[test]
+    #[should_panic(expected = "not reentrant")]
+    fn a_nested_copies_guard_panics() {
+        let (_tmp, lib) = library();
+        let _outer = lib.copies_read();
+        let _inner = lib.copies_read();
+    }
+
+    #[test]
+    #[should_panic(expected = "lock order")]
+    fn the_swap_lock_under_the_copies_lock_panics() {
+        let (_tmp, lib) = library();
+        let _copies = lib.copies_write();
+        let _swap = live_link::hud_swap_lock();
+    }
+
+    #[test]
+    #[should_panic(expected = "lock order")]
+    fn the_write_lock_under_the_copies_lock_panics() {
+        let (_tmp, lib) = library();
+        let _copies = lib.copies_read();
+        let _writes = lib.lock_writes();
+    }
+
+    #[test]
+    fn a_dropped_guard_frees_the_thread() {
+        let (_tmp, lib) = library();
+        drop(lib.copies_read());
+        drop(lib.copies_write());
+        let _swap = live_link::hud_swap_lock();
     }
 }
