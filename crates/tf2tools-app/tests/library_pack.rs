@@ -105,3 +105,22 @@ fn a_hud_that_cannot_be_packed_adds_no_activity_row_or_toast(cx: &mut TestAppCon
         "the measure still lands"
     );
 }
+
+#[gpui_kit::test]
+fn a_conversion_asked_for_during_a_measure_runs_next(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let hud = loose_hud(&s, &env, "rayshud");
+    let job = job(cx);
+    // The measure marks the job running before it returns, so the conversion has to queue.
+    job.update(cx, |job, cx| {
+        job.measure(cx);
+        assert!(job.is_running());
+        job.convert_once(cx);
+    });
+    wait_passes(cx, &job, 2);
+    assert_eq!(cx.update(|cx| job.read(cx).passes()), 2);
+    assert!(hud_zip(&env, &hud).is_file());
+    let space = cx.update(|cx| job.read(cx).space());
+    assert_eq!(space, Some(s.services.library.space().unwrap()));
+}
