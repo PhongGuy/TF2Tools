@@ -32,8 +32,19 @@ settings:
     mature: "Show mature add-ons"
   logs_tf:
     title: "logs.tf"
-    description: "How opened match logs name the players you track"
+    description: "How opened match logs name players, and how long full logs are kept"
     nicknames: "Show nicknames in match logs"
+    keep:
+      label: "Keep full logs for"
+      days: { one: "%{count} day", other: "%{count} days" }
+      forever: "Forever"
+      frees: "%{option}, frees about %{size}"
+    cost: "Each full log takes about 10 KB. The space grows with how many logs your tracked players have, so Forever can grow large."
+    usage: "The logs cache uses about %{cache}; %{logs} about %{full}."
+    full_logs: { one: "%{count} full log uses", other: "%{count} full logs use" }
+    measuring: "Measuring..."
+    size_mb: "%{size} MB"
+    size_kb: "%{size} KB"
   sync:
     items: { one: "%{count} item cached", other: "%{count} items cached" }
     last_synced: "Last synced: %{when}"

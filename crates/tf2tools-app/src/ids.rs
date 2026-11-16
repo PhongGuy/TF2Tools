@@ -807,6 +807,10 @@ pub const ADDON_DETAIL_MAPS: &str = "addon-detail-maps";
 pub const SETTINGS_MATURE_ADDONS: &str = "settings-mature-addons";
 /// The Settings "Show nicknames in match logs" switch.
 pub const SETTINGS_LOG_NICKNAMES: &str = "settings-log-nicknames";
+/// Wraps the Settings "Keep full logs for" select.
+pub const SETTINGS_LOG_KEEP: &str = "settings-log-keep";
+/// The Settings line saying what the logs cache and its full logs take, labelled with its text.
+pub const SETTINGS_LOG_SPACE: &str = "settings-log-space";
 /// Wraps the Activity Log's category select.
 pub const LOGS_CATEGORY: &str = "logs-category";
 /// Wraps the Activity Log's level select.
@@ -1305,6 +1309,11 @@ pub fn select_option(select: &str, label: &str) -> ElementId {
 /// One row of the Language select, keyed by language code: "settings-language:<code>".
 pub fn settings_language(code: &str) -> ElementId {
     keyed(SETTINGS_LANGUAGE, code)
+}
+
+/// One row of the keep select, keyed by the choice's key: "settings-log-keep:<key>".
+pub fn settings_log_keep(key: &str) -> ElementId {
+    keyed(SETTINGS_LOG_KEEP, key)
 }
 
 /// One row of the install select, keyed by its index: "settings-candidate:<i>".

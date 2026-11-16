@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AppContext as _, Entity, ScrollDelta, TestAppContext, point, px};
+use gpui_kit::{AppContext as _, ElementId, Entity, ScrollDelta, TestAppContext, point, px};
 use tf2tools_app::ids;
 use tf2tools_app::pages::settings::{SettingsPage, format_hours};
 use tf2tools_app::picker::{PickKind, ScriptedPicker};
@@ -636,4 +636,88 @@ fn the_logs_tf_card_toggles_nicknames_in_match_logs_and_saves_at_once(cx: &mut T
         support::checked_of(cx, s.win, ids::SETTINGS_LOG_NICKNAMES),
         Some(false)
     );
+}
+
+#[test]
+fn log_space_reads_in_kilobytes_or_megabytes() {
+    use tf2tools_app::pages::settings::{keep_text, size_text, usage_text};
+    use tf2tools_core::KeepFullLogs;
+    assert_eq!(size_text(0), "0 KB");
+    assert_eq!(size_text(10_300), "10 KB");
+    assert_eq!(size_text(640_499), "640 KB");
+    assert_eq!(size_text(1_000_000), "1.0 MB");
+    assert_eq!(size_text(12_345_678), "12.3 MB");
+    assert_eq!(keep_text(KeepFullLogs::Day1, 0), "1 day");
+    assert_eq!(keep_text(KeepFullLogs::Days7, 0), "7 days");
+    assert_eq!(
+        keep_text(KeepFullLogs::Days3, 12_345_678),
+        "3 days, frees about 12.3 MB"
+    );
+    assert_eq!(keep_text(KeepFullLogs::Forever, 0), "Forever");
+    assert_eq!(
+        usage_text(25_000_000, 1, 10_300),
+        "The logs cache uses about 25.0 MB; 1 full log uses about 10 KB."
+    );
+    assert_eq!(
+        usage_text(25_000_000, 21, 216_300),
+        "The logs cache uses about 25.0 MB; 21 full logs use about 216 KB."
+    );
+}
+
+// Wheels the Settings page a notch at a time until all of `id` lies inside it.
+fn scroll_settings_to(cx: &mut TestAppContext, s: &support::ShellWindow, id: ElementId) {
+    for _ in 0..120 {
+        let page = support::bounds_of(cx, s.win, ids::page(Page::Settings)).unwrap();
+        let b = support::bounds_of(cx, s.win, id.clone()).unwrap();
+        if b.top() >= page.top() && b.bottom() <= page.bottom() {
+            return;
+        }
+        let step = if b.top() < page.top() { 1. } else { -1. };
+        let turn = ScrollDelta::Lines(point(0., step));
+        cx.update_window(s.win, |_, w, cx| {
+            w.scroll(ids::page(Page::Settings), turn, cx)
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+    }
+    panic!("{id:?} never scrolled into the Settings page");
+}
+
+#[gpui_kit::test]
+fn the_logs_tf_card_keeps_full_logs_for_the_chosen_days_and_saves_at_once(cx: &mut TestAppContext) {
+    use tf2tools_app::logs_trim::LogsTrim;
+    use tf2tools_core::{KeepFullLogs, LogsCache};
+    let env = support::env();
+    let s = support::shell_window(
+        cx,
+        &env,
+        Tf2State::Found(Tf2Install::from_path(&env.game).unwrap()),
+    );
+    let _page = open_settings(cx, &s);
+    support::wait_real(cx, "the logs cache figures", |cx| {
+        cx.update(|cx| LogsTrim::global(cx).read(cx).space().is_some())
+    });
+    support::settle(cx, s.win);
+    scroll_settings_to(cx, &s, ids::SETTINGS_LOG_KEEP.into());
+    scroll_settings_to(cx, &s, ids::SETTINGS_LOG_SPACE.into());
+    let usage = support::label_of(cx, s.win, ids::SETTINGS_LOG_SPACE).unwrap_or_default();
+    assert!(
+        usage.starts_with("The logs cache uses about ")
+            && usage.contains("; 0 full logs use about "),
+        "{usage}"
+    );
+    support::click_id(cx, s.win, ids::SETTINGS_LOG_KEEP);
+    for keep in KeepFullLogs::ALL {
+        assert!(
+            support::present(cx, s.win, ids::settings_log_keep(keep.key())),
+            "{keep:?} row"
+        );
+    }
+    support::click_id(cx, s.win, ids::settings_log_keep("30d"));
+    support::wait_real(cx, "the save", |_| {
+        LogsCache::new(s.services.db.clone())
+            .keep_full_logs()
+            .unwrap()
+            == KeepFullLogs::Days30
+    });
 }

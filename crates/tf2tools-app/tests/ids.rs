@@ -795,3 +795,10 @@ fn language_rows_are_keyed_by_code() {
     assert_eq!(name(ids::settings_language("ru")), "settings-language:ru");
     assert_eq!(ids::SETTINGS_LANGUAGE, "settings-language");
 }
+
+#[test]
+fn log_keep_rows_are_keyed_by_choice() {
+    assert_eq!(name(ids::settings_log_keep("7d")), "settings-log-keep:7d");
+    assert_eq!(ids::SETTINGS_LOG_KEEP, "settings-log-keep");
+    assert_eq!(ids::SETTINGS_LOG_SPACE, "settings-log-space");
+}
