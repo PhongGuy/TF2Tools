@@ -37,7 +37,7 @@ impl Library {
     /// mid-count. Links are not followed; a missing `library/` is empty.
     ///
     /// # Errors
-    /// `LibraryError::Io` when a folder cannot be walked.
+    /// `LibraryError::Io` when a folder cannot be walked; an entry removed mid-walk is skipped.
     pub fn space(&self) -> Result<LibrarySpace, LibraryError> {
         let _copies = self.copies_read();
         let root = self.dir.root().join("library");
@@ -45,12 +45,22 @@ impl Library {
         if !root.is_dir() {
             return Ok(space);
         }
+        // Sound and crosshair writes skip the copies guard, so a file that vanishes
+        // mid-walk is skipped rather than failing the count.
         for entry in WalkDir::new(&root).min_depth(1) {
-            let entry = entry.map_err(|e| walk_failure(&root, e))?;
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(e) if vanished(&e) => continue,
+                Err(e) => return Err(walk_failure(&root, e).into()),
+            };
             if !entry.file_type().is_file() {
                 continue;
             }
-            let len = entry.metadata().map_err(|e| walk_failure(&root, e))?.len();
+            let len = match entry.metadata() {
+                Ok(meta) => meta.len(),
+                Err(e) if vanished(&e) => continue,
+                Err(e) => return Err(walk_failure(&root, e).into()),
+            };
             let rel = entry.path().strip_prefix(&root).unwrap_or(entry.path());
             space.on_disk = space.on_disk.saturating_add(len);
             space.unpacked = space
@@ -59,6 +69,12 @@ impl Library {
         }
         Ok(space)
     }
+}
+
+/// Whether a walk error means the entry was removed after it was listed.
+fn vanished(e: &walkdir::Error) -> bool {
+    e.io_error()
+        .is_some_and(|io| io.kind() == std::io::ErrorKind::NotFound)
 }
 
 /// The unpacked size of the item zip at `rel`, or `None` when `rel` is not an item zip or

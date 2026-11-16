@@ -77,3 +77,18 @@ async fn a_packed_addon_copy_counts_its_files_unpacked() {
     let vpk_len = vpk(&[0u8; 65536]).len() as u64;
     assert_eq!(space.unpacked(), lengths(&s.env.dir) - zip + vpk_len);
 }
+
+#[cfg(unix)]
+#[test]
+fn a_link_inside_the_library_does_not_count_what_it_points_at() {
+    let env = library_env();
+    loose_hud(&env, "rayshud", &[("a.res", b"a")], Provenance::Local);
+    let outside = env.tmp.path().join("outside");
+    write_file(&outside.join("big.bin"), &[1u8; 1 << 20]);
+    let library = env.dir.root().join("library");
+    std::os::unix::fs::symlink(&outside, library.join("link")).unwrap();
+    std::os::unix::fs::symlink(outside.join("big.bin"), library.join("big-link")).unwrap();
+    let space = env.lib.space().unwrap();
+    assert!(space.on_disk() < 1 << 20, "{}", space.on_disk());
+    assert!(space.unpacked() < 1 << 20, "{}", space.unpacked());
+}
