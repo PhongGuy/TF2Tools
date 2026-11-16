@@ -197,6 +197,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                             .detach();
                         activity::startup(cx);
                         crate::pages::huds::make_missing_thumbnails(cx);
+                        crate::library_pack::startup(cx);
                         detect_tf2(win, cx);
                         tokio_bridge::init(cx);
                         updates.update(cx, |updates, cx| updates.check(cx));

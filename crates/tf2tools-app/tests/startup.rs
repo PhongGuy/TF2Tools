@@ -14,7 +14,7 @@ use tf2tools_app::pages::huds::HudsPage;
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::{Tf2Detector, Tf2State, tf2_state};
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::{Database, Provenance, Tf2Install};
+use tf2tools_core::{Database, LibraryKind, Provenance, Tf2Install};
 
 use tf2tools_app::audio::RecordingAudio;
 
@@ -401,5 +401,30 @@ fn startup_puts_back_a_hud_an_interrupted_reinstall_set_aside(cx: &mut TestAppCo
     });
     support::wait_real(cx, "the installed HUD", |cx| {
         support::label_of(cx, win, ids::HUDS_INSTALLED_NAME).as_deref() == Some("rayshud")
+    });
+}
+
+#[gpui_kit::test]
+fn the_first_frame_starts_the_library_pass(cx: &mut TestAppContext) {
+    let env = support::env();
+    let services = support::services(&env, support::no_steam());
+    let archive = env.tmp.path().join("rayshud.zip");
+    std::fs::write(&archive, support::hud_zip_bytes("rayshud")).unwrap();
+    let hud = services
+        .library
+        .import_hud(&archive, Provenance::Local)
+        .unwrap();
+    services.library.unpack_hud_for_tests(hud.id()).unwrap();
+    let zip = env
+        .data
+        .library_dir(LibraryKind::Huds)
+        .join(hud.folder_name())
+        .join(".tf2tools/files.zip");
+    assert!(!zip.exists());
+    let win = started(cx, boot(&env, support::no_steam()));
+    // Settling draws frames, which is what fires the first-frame closure.
+    support::wait_real(cx, "the library pass", |cx| {
+        support::settle(cx, win);
+        zip.is_file()
     });
 }
