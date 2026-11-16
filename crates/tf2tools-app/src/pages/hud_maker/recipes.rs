@@ -832,6 +832,7 @@ mod tests {
         let left = "of your changes no longer fit and were left out.";
         assert_eq!(no_longer_fit(1), Some(format!("1 {left}")));
         assert_eq!(no_longer_fit(2), Some(format!("2 {left}")));
+        assert_eq!(fonts_left_out(0), None);
         assert_eq!(fonts_left_out(1).as_deref(), Some("1 font was left out."));
         assert_eq!(fonts_left_out(3).as_deref(), Some("3 fonts were left out."));
     }

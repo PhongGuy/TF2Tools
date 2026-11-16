@@ -188,7 +188,7 @@ fn store_sizes_and_counts_read_in_russian() {
     use tf2tools_core::DownloadPhase;
     let _guard = LocaleGuard::switch("ru");
     assert_eq!(format_bytes(1_536), "1,5\u{a0}КБ");
-    assert_eq!(progress_label(None), "Загрузка...");
+    assert_eq!(progress_label(None), "Скачивание...");
     let p = Progress {
         phase: DownloadPhase::Downloading,
         downloaded: 1_048_576,
@@ -196,10 +196,10 @@ fn store_sizes_and_counts_read_in_russian() {
     };
     assert_eq!(
         progress_label(Some(p)),
-        "Загрузка... 1,0\u{a0}МБ / 2,0\u{a0}МБ"
+        "Скачивание... 1,0\u{a0}МБ / 2,0\u{a0}МБ"
     );
     let unsized_ = Progress { total: None, ..p };
-    assert_eq!(progress_label(Some(unsized_)), "Загрузка... 1,0\u{a0}МБ");
+    assert_eq!(progress_label(Some(unsized_)), "Скачивание... 1,0\u{a0}МБ");
     let importing = Progress {
         phase: DownloadPhase::Importing,
         ..p
@@ -364,12 +364,19 @@ fn crosshair_and_font_sentences_read_in_russian() {
     let two = Confirm::delete_crosshair("Dot", 2, false).description;
     let used = " Его используют 2 оружия. Они вернутся к прицелу по умолчанию.";
     assert!(two.contains(used), "{two}");
+    let many = Confirm::delete_crosshair("Dot", 21, false).description;
+    let after = " Его использует 21 оружие. После удаления там будет прицел по умолчанию.";
+    assert!(many.contains(after), "{many}");
     let none = Confirm::delete_crosshair("Dot", 0, false).description;
     assert!(!none.contains("Его"), "{none}");
     let fonts = installed_text("fonthud", 2, 0);
     let tail = "Перезапустите TF2, чтобы применить их.";
     assert_eq!(fonts, format!("Установлено 2 шрифта для fonthud. {tail}"));
     assert_ru(&fonts);
+    assert_eq!(
+        installed_text("fonthud", 21, 0),
+        "Установлен 21 шрифт для fonthud. Перезапустите TF2, чтобы изменения вступили в силу."
+    );
     assert_eq!(
         installed_text("fonthud", 1, 1),
         format!("Установлено 1 из 2 шрифтов для fonthud; подробности в журнале действий. {tail}")

@@ -293,7 +293,7 @@ pub fn weapons_title(class: TfClass, range: LogsRange, logs: u32) -> String {
     counted_plural(
         "logs_tf.weapons_title",
         u64::from(logs),
-        &format::grouped(u64::from(logs)),
+        &count_text(usize::try_from(logs).unwrap_or(usize::MAX)),
         &[("class", class.name()), ("range", range_label(range))],
     )
     .to_string()
