@@ -83,3 +83,7 @@ test = true
 [[example]]
 name = "hud_switch_timing"
 test = true
+
+[[example]]
+name = "library_compress_sizes"
+test = true
