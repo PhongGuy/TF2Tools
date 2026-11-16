@@ -11,6 +11,7 @@ pub mod hud_schema;
 pub mod hud_stock;
 pub mod hud_switches;
 pub mod logstf;
+pub mod packed;
 pub mod sfnt;
 pub mod update;
 

@@ -107,6 +107,7 @@ pub use library::{
 pub use library::{
     Choices, ComfigModule, ModuleCatalog, ModuleCategory, ModuleChoice, ModuleValue, readable_name,
 };
+pub use library::{ConvertReport, KindConverted};
 pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
 pub use logstf::{

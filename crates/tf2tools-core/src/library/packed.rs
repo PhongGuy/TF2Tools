@@ -15,7 +15,6 @@ use super::{IoFailure, METADATA_DIR, create_dir_all, io_at, tree_copy};
 use crate::archive::check_entry_name;
 
 /// Where a packed HUD keeps its tree, relative to its library folder.
-#[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 2b"))]
 pub(crate) const HUD_ZIP: &str = ".tf2tools/files.zip";
 
 /// How many times a refused rename is tried again, and how long to wait between tries.
@@ -23,7 +22,6 @@ const RENAME_RETRIES: u32 = 5;
 const RENAME_PAUSE: Duration = Duration::from_millis(200);
 
 /// A library item's tree, either loose files in its folder or one zip.
-#[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 2b"))]
 pub(crate) enum ItemSource {
     /// The item's folder; its top-level `.tf2tools` is the app's, not the item's.
     Loose(PathBuf),
@@ -32,7 +30,6 @@ pub(crate) enum ItemSource {
 }
 
 /// A zip's path and its regular-file entries in `Path` order.
-#[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 2b"))]
 pub(crate) struct Packed {
     zip: PathBuf,
     entries: Vec<Entry>,
@@ -48,7 +45,6 @@ struct Entry {
 impl ItemSource {
     /// `Packed` when `dir/zip_rel` is a regular file (its central directory read and every
     /// name checked with `archive::check_entry_name` and `enclosed_name`), else `Loose(dir)`.
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 2b"))]
     pub(crate) fn open(dir: &Path, zip_rel: &str) -> Result<ItemSource, IoFailure> {
         let zip = dir.join(zip_rel);
         if !std::fs::symlink_metadata(&zip).is_ok_and(|m| m.is_file()) {
@@ -73,7 +69,6 @@ impl ItemSource {
     }
 
     /// Whether the tree is read from a zip.
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 2b"))]
     pub(crate) fn is_packed(&self) -> bool {
         matches!(self, ItemSource::Packed(_))
     }
@@ -151,7 +146,6 @@ impl ItemSource {
     }
 
     /// Writes the files `skip` keeps under `dest`, creating folders; returns bytes written.
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 2b"))]
     pub(crate) fn extract_into(
         &self,
         dest: &Path,
@@ -243,7 +237,6 @@ impl ItemSource {
     }
 
     /// The entries' uncompressed sizes, or the same loose sum.
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 2b"))]
     pub(crate) fn unpacked_bytes(&self) -> Result<u64, IoFailure> {
         match self {
             ItemSource::Loose(dir) => loose_bytes(dir),
@@ -281,7 +274,6 @@ impl Packed {
 /// Packs `src` (regular files `skip` keeps, `Path` order) into `dest_zip` through `<dest_zip>.tmp`:
 /// zstd level 3, synced, read back (entry count and every entry's CRC), then renamed over.
 /// Returns the zip's length. A failure removes the `.tmp` and leaves any old zip as it was.
-#[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 2b"))]
 pub(crate) fn pack(
     src: &Path,
     skip: &dyn Fn(&Path) -> bool,
@@ -293,7 +285,6 @@ pub(crate) fn pack(
 }
 
 /// `pack` with the final rename supplied, so a refused rename can be simulated.
-#[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 2b"))]
 pub(crate) fn pack_with(
     src: &Path,
     skip: &dyn Fn(&Path) -> bool,

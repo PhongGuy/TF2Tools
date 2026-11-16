@@ -4,6 +4,7 @@
 
 mod addons;
 mod borrow;
+mod convert;
 mod crosshairs;
 mod gb_addons;
 mod gb_huds;
@@ -49,6 +50,7 @@ use crate::tf2::Tf2Install;
 
 pub use addons::{AddonEntry, AddonName};
 pub(crate) use addons::{display_info, is_override};
+pub use convert::{ConvertReport, KindConverted};
 pub use crosshairs::{
     ApplyReport, Assignment, CrosshairEntry, CrosshairFormat, CrosshairRef, InstalledCrosshairs,
     PaintTarget, PaintedSource, SkipReason, SkippedAssignment, crosshair_scripts_need_repair,
@@ -132,6 +134,13 @@ impl Library {
         let held = CopiesHeld::Write(COPIES.write().unwrap_or_else(PoisonError::into_inner));
         COPIES_HELD.with(|flag| flag.set(true));
         CopiesGuard { _held: held }
+    }
+
+    /// Runs `f` holding the copies lock for reading, so a test can make a writer wait.
+    #[doc(hidden)]
+    pub fn with_copies_read<R>(&self, f: impl FnOnce() -> R) -> R {
+        let _copies = self.copies_read();
+        f()
     }
 
     /// Replaces the schemas copies are read with; the bundled set is the default.
