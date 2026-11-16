@@ -13,7 +13,7 @@ use super::made_huds::{
     prune_pictures, read_adding, read_capped, read_row, readable_folder, recover_swap,
     replay_with_kept_copies, roll_back, write_build, write_copy_in_place,
 };
-use super::packed::{HUD_ZIP, ItemSource};
+use super::packed::{HUD_ZIP, ItemSource, tree_hash_of, tree_line};
 use super::{
     GbId, HudEntry, HudId, IoFailure, Library, METADATA_DIR, Provenance, create_dir_all,
     folder_name, io_at, is_plain_name, library_db, new_id, now, tree_copy,
@@ -643,8 +643,9 @@ impl Library {
         })
     }
 
-    /// The tree hash of library HUD `id`'s folder: regular files outside `.tf2tools/`, links
-    /// skipped. Files whose size and modified time match the cache are not read again.
+    /// The tree hash of library HUD `id`'s files, the same for its loose and packed forms:
+    /// regular files outside `.tf2tools/`, links skipped. Files whose size and modified time
+    /// (a packed file's: its zip's) match the cache are not read again.
     ///
     /// # Errors
     /// `NotFound` for no such row; `Io` when a file cannot be read; `Database`.
@@ -672,33 +673,40 @@ impl Library {
             .map(|(_, f)| f.clone())
             .unwrap_or_default();
 
+        // A packed entry is keyed by its size and the zip's modified time, so a rewritten
+        // zip is hashed again; a loose file by its own size and modified time.
+        let source = ItemSource::open(&dir, HUD_ZIP)?;
+        let zip_stamp = source.zip_mtime_ns()?;
         let skip = |rel: &Path| rel == Path::new(METADATA_DIR);
         let mut fresh = BTreeMap::new();
         let mut lines = Vec::new();
         let mut files_read = 0;
-        for rel in tree_copy::tree_files(&dir, &skip)? {
-            let path = dir.join(&rel);
-            let meta = std::fs::symlink_metadata(&path).map_err(io_at(&path))?;
-            let mtime_ns = mtime_ns(&meta);
+        for (rel, size) in source.files(&skip)? {
+            let mtime_ns = match zip_stamp {
+                Some(stamp) => stamp,
+                None => {
+                    let path = dir.join(&rel);
+                    mtime_ns(&std::fs::symlink_metadata(&path).map_err(io_at(&path))?)
+                }
+            };
             let key = rel
                 .to_string_lossy()
                 .replace(std::path::MAIN_SEPARATOR, "/");
             let file = match cached.get(&key) {
-                Some(hit) if hit.size == meta.len() && hit.mtime_ns == mtime_ns => hit.clone(),
+                Some(hit) if hit.size == size && hit.mtime_ns == mtime_ns => hit.clone(),
                 _ => {
                     files_read += 1;
                     CachedFile {
-                        size: meta.len(),
+                        size,
                         mtime_ns,
-                        sha: sha256_file(&path)?,
+                        sha: source.sha256(&rel)?,
                     }
                 }
             };
-            lines.push(format!("{}\0{}\n", key.to_lowercase(), file.sha));
+            lines.push(tree_line(&key, &file.sha));
             fresh.insert(key, file);
         }
-        lines.sort();
-        let hash = sha256_hex(lines.concat().as_bytes());
+        let hash = tree_hash_of(lines);
 
         cache.folders.insert(folder.clone(), (0, fresh));
         cache.touch(&folder);

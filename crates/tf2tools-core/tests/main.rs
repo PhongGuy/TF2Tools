@@ -203,6 +203,7 @@ mod library_crosshairs;
 mod library_huds;
 mod library_packed_convert;
 mod library_packed_install;
+mod library_packed_read;
 mod library_painted;
 mod library_sounds;
 mod license;

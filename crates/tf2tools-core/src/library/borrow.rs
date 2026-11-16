@@ -6,24 +6,39 @@ use rusqlite::OptionalExtension;
 use walkdir::WalkDir;
 
 use super::made_huds::{read_row, readable_folder};
-use super::{HudEntry, HudId, Library, is_plain_name};
+use super::packed::{HUD_ZIP, ItemSource};
+use super::{HudEntry, HudId, Library, METADATA_DIR, is_plain_name};
 use crate::error::{BorrowSourceError, LibraryError};
 use crate::hud_maker::HudFiles;
 use crate::paths::LibraryKind;
 
-/// Whether `folder` holds a `.res` file under `resource/` or `scripts/`; symlinks are not followed.
+/// Whether `folder` holds a `.res` file under `resource/` or `scripts/`; symlinks are not
+/// followed. A packed folder is judged by its zip's entries alone.
 fn has_res_files(folder: &Path) -> bool {
+    let is_res = |rel: &Path| {
+        rel.extension()
+            .is_some_and(|x| x.eq_ignore_ascii_case("res"))
+    };
+    match ItemSource::open(folder, HUD_ZIP) {
+        Ok(source) if source.is_packed() => {
+            let top_meta = |rel: &Path| rel == Path::new(METADATA_DIR);
+            return source.files(&top_meta).is_ok_and(|files| {
+                files.iter().any(|(rel, _)| {
+                    let top = rel.components().next().map(|c| c.as_os_str());
+                    let under = top.is_some_and(|t| t == "resource" || t == "scripts");
+                    under && is_res(rel)
+                })
+            });
+        }
+        Ok(_) => {}
+        Err(_) => return false,
+    }
     ["resource", "scripts"].iter().any(|top| {
         WalkDir::new(folder.join(top))
             .follow_links(false)
             .into_iter()
             .filter_map(Result::ok)
-            .any(|e| {
-                e.file_type().is_file()
-                    && e.path()
-                        .extension()
-                        .is_some_and(|x| x.eq_ignore_ascii_case("res"))
-            })
+            .any(|e| e.file_type().is_file() && is_res(e.path()))
     })
 }
 

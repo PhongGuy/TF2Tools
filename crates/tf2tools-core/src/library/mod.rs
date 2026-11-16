@@ -39,7 +39,7 @@ use crate::archive::VPK_MAGIC;
 use crate::db::Database;
 use crate::error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, GbAddonFetchError,
-    GbAddonInstallError, HistoryError, HudLoadError, ImportError, InstallError,
+    GbAddonInstallError, HistoryError, HudFilesError, HudLoadError, ImportError, InstallError,
     InstallMastercomfigError, KeepHudError, LibraryError, MakeHudError, PaintError, PresetError,
     ProfileError, ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError,
 };
@@ -75,6 +75,7 @@ pub(crate) use movement::NULL_MOVEMENT;
 #[cfg(test)]
 pub(crate) use movement::movement_keys;
 pub use movement::{MoveDirection, MovementKeys};
+pub(crate) use packed::{HUD_ZIP, ItemSource, read_packed_entry};
 pub use profiles::{
     ApplyProfileReport, ApplyStep, DraftCrosshair, DraftSlot, MissingItem, MissingKind, Profile,
     ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate,
@@ -384,6 +385,12 @@ impl From<IoFailure> for PaintError {
 }
 
 impl From<IoFailure> for MakeHudError {
+    fn from(IoFailure { path, source }: IoFailure) -> Self {
+        Self::Io { path, source }
+    }
+}
+
+impl From<IoFailure> for HudFilesError {
     fn from(IoFailure { path, source }: IoFailure) -> Self {
         Self::Io { path, source }
     }

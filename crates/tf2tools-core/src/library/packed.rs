@@ -10,7 +10,7 @@ use zip::result::ZipError;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
-use super::hud_copy::{sha256_file, sha256_hex, sha256_reader};
+use super::hud_copy::{mtime_ns, sha256_file, sha256_hex, sha256_reader};
 use super::{IoFailure, METADATA_DIR, create_dir_all, io_at, tree_copy};
 use crate::archive::check_entry_name;
 
@@ -217,6 +217,18 @@ impl ItemSource {
         Ok(tree_hash_of(lines))
     }
 
+    /// The zip's modified time in nanoseconds (0 when the system has none), or `None` for a
+    /// loose item, whose files each carry their own.
+    pub(crate) fn zip_mtime_ns(&self) -> Result<Option<u64>, IoFailure> {
+        match self {
+            ItemSource::Loose(_) => Ok(None),
+            ItemSource::Packed(packed) => {
+                let meta = std::fs::metadata(&packed.zip).map_err(io_at(&packed.zip))?;
+                Ok(Some(mtime_ns(&meta)))
+            }
+        }
+    }
+
     /// The zip's length, or the loose files' lengths outside the top-level `.tf2tools`.
     #[cfg_attr(not(test), expect(dead_code, reason = "Library::space in plan 2"))]
     pub(crate) fn packed_bytes(&self) -> Result<u64, IoFailure> {
@@ -376,13 +388,11 @@ fn rename_retrying(
 }
 
 /// One tree-hash line: lowercase `/`-separated path, NUL, file SHA-256 hex, newline.
-#[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 4"))]
 pub(crate) fn tree_line(key: &str, sha: &str) -> String {
     format!("{}\0{sha}\n", key.to_lowercase())
 }
 
 /// SHA-256 hex of the sorted, concatenated lines.
-#[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 4"))]
 pub(crate) fn tree_hash_of(mut lines: Vec<String>) -> String {
     lines.sort();
     sha256_hex(lines.concat().as_bytes())
@@ -431,6 +441,38 @@ fn zip_name(rel: &Path) -> Option<String> {
         parts.push(part.to_str()?);
     }
     Some(parts.join("/"))
+}
+
+/// The bytes of entry `rel` (its `/`-separated zip name) of the zip at `zip`, opened for this
+/// one read so a zip replaced since indexing is read as it now is. `NotFound` when the zip is
+/// missing, not a regular file or lacks the entry; `InvalidData` when it is damaged or the
+/// entry is over `cap` bytes.
+pub(crate) fn read_packed_entry(zip: &Path, rel: &str, cap: u64) -> io::Result<Vec<u8>> {
+    if !std::fs::symlink_metadata(zip)?.is_file() {
+        return Err(io::Error::from(io::ErrorKind::NotFound));
+    }
+    let mut archive = ZipArchive::new(File::open(zip)?).map_err(io::Error::from)?;
+    let entry = match archive.by_name(rel) {
+        Ok(entry) => entry,
+        Err(ZipError::FileNotFound) => return Err(io::Error::from(io::ErrorKind::NotFound)),
+        Err(e) => return Err(io::Error::new(io::ErrorKind::InvalidData, e)),
+    };
+    if entry.size() > cap {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "entry too large",
+        ));
+    }
+    // The claimed size is capped, and `take` holds the read to it whatever the data says.
+    let mut bytes = Vec::with_capacity(usize::try_from(entry.size()).unwrap_or(0));
+    entry.take(cap.saturating_add(1)).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > cap {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "entry too large",
+        ));
+    }
+    Ok(bytes)
 }
 
 fn open_zip(zip: &Path) -> Result<ZipArchive<File>, IoFailure> {
