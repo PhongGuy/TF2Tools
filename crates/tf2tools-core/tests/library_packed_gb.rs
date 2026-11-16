@@ -207,3 +207,71 @@ async fn a_row_without_a_copy_and_a_staging_dir_are_left_alone() {
     assert!(staged.is_file());
     assert!(!s.env.dir.gb_addon_dir().join("50").exists());
 }
+
+#[tokio::test]
+async fn an_install_stores_the_copy_packed() {
+    let s = setup().await;
+    let body = common::zip_bytes(&[
+        ("Toon/toon.vpk", &vpk(&[1u8; 4096])),
+        ("pack/materials/b.vmt", &[2u8; 4096]),
+    ]);
+    let d = download(&s, 7, "Toon FX", "toon.zip", body, 200).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["Toon/toon.vpk", "pack"]), &s.tf2, &no)
+        .unwrap();
+    assert!(gb_zip(&s.env.dir, 7).is_file());
+    assert_eq!(gb_loose(&s.env.dir, 7), Vec::<String>::new());
+    // Each zip entry is `7/<slot>/<installed path>`, and the game holds exactly those paths.
+    let mut in_zip: Vec<String> = gb_tree(&s.env.dir)
+        .into_iter()
+        .map(|rel| rel.splitn(3, '/').nth(2).unwrap().to_owned())
+        .collect();
+    in_zip.sort();
+    let in_game: Vec<String> = custom_files(&s).into_iter().map(|(rel, _)| rel).collect();
+    assert_eq!(in_zip, in_game);
+}
+
+#[tokio::test]
+async fn an_install_whose_pack_fails_keeps_the_loose_copy() {
+    let mut s = setup().await;
+    s.env
+        .lib
+        .set_pack_rename(common::packed::rename_then_damage);
+    let d = download(&s, 8, "Crit", "crit.vpk", vpk(b"c"), 100).await;
+    let entry = s
+        .env
+        .lib
+        .install_gb_addon(d, &chosen(&["crit.vpk"]), &s.tf2, &no)
+        .unwrap();
+    assert!(entry.is_installed());
+    assert!(!gb_zip(&s.env.dir, 8).exists());
+    assert_eq!(gb_loose(&s.env.dir, 8), ["1/tf2tools-gb-8-crit.vpk"]);
+    clear_custom(&s);
+    s.env
+        .lib
+        .reinstall_gb_addon(GbId::new(8), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(
+        common::tree(&s.tf2.custom_dir()),
+        ["tf2tools-gb-8-crit.vpk"]
+    );
+}
+
+#[tokio::test]
+async fn an_update_over_a_packed_copy_replaces_it_whole() {
+    let s = setup().await;
+    let d = download(&s, 9, "Old", "old.vpk", vpk(b"o"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["old.vpk"]), &s.tf2, &no)
+        .unwrap();
+    let d = download(&s, 9, "New", "new.vpk", vpk(b"n"), 200).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["new.vpk"]), &s.tf2, &no)
+        .unwrap();
+    assert_eq!(gb_tree(&s.env.dir), ["9/1/tf2tools-gb-9-new.vpk"]);
+    assert_eq!(gb_loose(&s.env.dir, 9), Vec::<String>::new());
+    assert_eq!(common::tree(&s.tf2.custom_dir()), ["tf2tools-gb-9-new.vpk"]);
+}

@@ -205,7 +205,8 @@ impl Library {
 
     /// Installs `chosen` (payload names of `download`) as add-on `download.gb_id()`,
     /// replacing any earlier install of it, and returns its row. `tf2_running` is asked
-    /// once, before anything changes, when a VPK would be written or deleted.
+    /// once, before anything changes, when a VPK would be written or deleted. The library
+    /// copy is then stored packed in `copy.zip`, or left loose when a zip cannot hold it.
     ///
     /// # Errors
     /// [`GbAddonInstallError`]: a refusal before anything changed, or an I/O or database
@@ -288,6 +289,8 @@ impl Library {
 
         // From the clear on, a failure keeps the pending row with installed = 0 so the page
         // offers to install it again from the library copy, which deletes old leftovers.
+        // Copies stay locked through the pack, so a conversion pass never meets a half swap.
+        let _copies = self.copies_write();
         let library_copy = root.join(gb_id.to_string());
         let mut copied = Vec::new();
         let swapped = (|| {
@@ -319,6 +322,18 @@ impl Library {
         entry.installed = true;
         entry.present = true;
         self.save_gb_addon(&entry, download.file_id)?;
+        // The copy is packed only once the install stands; a failed pack leaves it loose,
+        // which reinstall reads just as well.
+        if slots_survive_packing(&library_copy)
+            && let Err(IoFailure { path, source }) = self.pack_folder(&library_copy, GB_ZIP)
+        {
+            tracing::warn!(
+                gb_id = %gb_id,
+                path = %path.display(),
+                error = %source,
+                "installed add-on copy left loose: it could not be packed"
+            );
+        }
         Ok(entry)
     }
 
