@@ -202,6 +202,7 @@ mod library_addons;
 mod library_crosshairs;
 mod library_huds;
 mod library_packed_convert;
+mod library_packed_copy;
 mod library_packed_install;
 mod library_packed_read;
 mod library_painted;

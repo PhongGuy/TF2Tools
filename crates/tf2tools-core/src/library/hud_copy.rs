@@ -74,8 +74,10 @@ impl Library {
                 id: base.as_str().to_owned(),
             });
         }
+        // A packed base is read through its zip and copied out loose, as a copy is edited.
+        let source = ItemSource::open(&src, HUD_ZIP)?;
         let skip = |rel: &Path| rel == Path::new(METADATA_DIR);
-        let bytes = tree_copy::tree_bytes(&src, &skip)?;
+        let bytes = source.unpacked_bytes()?;
         self.check_space(bytes)
             .map_err(|(needed, free)| CopyHudError::NoSpace { needed, free })?;
 
@@ -87,7 +89,7 @@ impl Library {
             .ok_or_else(|| CopyHudError::NameTaken {
                 name: base_name.clone(),
             })?;
-        let record = self.copy_record(&row, &src)?;
+        let record = self.copy_record(&row, &src, &source)?;
 
         // Built under the tmp dir, whose guard removes it on every early return.
         let tmp = self.dir.tmp_dir();
@@ -99,7 +101,7 @@ impl Library {
         let short: String = first.chars().take(MAX_SLUG_CHARS).collect();
         let folder = folder_name(&short, &id);
         let build = scratch.path().join(&folder);
-        tree_copy::copy_tree(&src, &build, &skip)?;
+        source.extract_into(&build, &skip)?;
         let maker =
             MakerFile::new(Default::default(), Vec::new()).with_base(MakerBase::Copy(record));
         let maker_path = build.join(METADATA_DIR).join(MAKER_FILE);
@@ -203,8 +205,13 @@ impl Library {
         Ok(row.filter(|r| is_plain_name(r.entry.folder_name())))
     }
 
-    /// What a copy of `row` (files at `src`) records about its base.
-    fn copy_record(&self, row: &BaseRow, src: &Path) -> Result<CopyBase, CopyHudError> {
+    /// What a copy of `row` (files at `src`, read through `source`) records about its base.
+    fn copy_record(
+        &self,
+        row: &BaseRow,
+        src: &Path,
+        source: &ItemSource,
+    ) -> Result<CopyBase, CopyHudError> {
         let entry = &row.entry;
         let (store_id, origin, repo, hash) = match entry.provenance() {
             Provenance::Curated { hud_id } => {
@@ -256,7 +263,7 @@ impl Library {
         let install = self
             .install_name(
                 src,
-                &ItemSource::open(src, HUD_ZIP)?,
+                source,
                 row.store_hud_id.clone(),
                 row.store_gb_id,
                 entry.folder_name(),
@@ -1046,15 +1053,16 @@ impl Library {
         if !std::fs::symlink_metadata(&src).is_ok_and(|m| m.is_dir()) {
             return Err(UpdateCopyError::SourceGone { id: text(from) });
         }
+        let source = ItemSource::open(&src, HUD_ZIP).map_err(MakeHudError::from)?;
         let skip_meta = |rel: &Path| rel == Path::new(METADATA_DIR);
-        let bytes = tree_copy::tree_bytes(&src, &skip_meta).map_err(MakeHudError::from)?;
+        let bytes = source.unpacked_bytes().map_err(MakeHudError::from)?;
         self.check_space(bytes)
             .map_err(|(needed, free)| UpdateCopyError::NoSpace { needed, free })?;
 
         let live = huds.join(&folder);
         let previous =
             read_maker(&live)?.ok_or_else(|| UpdateCopyError::NotACopy { id: text(id) })?;
-        let record = self.copy_record(&row, &src).map_err(save_copy)?;
+        let record = self.copy_record(&row, &src, &source).map_err(save_copy)?;
         // The copy's base as it reads now, to tell which kept changes the update also touched.
         // Both bases are switched by the same choices, so a switch's own effect never reads as
         // a change the update made.
@@ -1073,7 +1081,9 @@ impl Library {
             .map_err(io_at(&tmp))
             .map_err(MakeHudError::from)?;
         let stage = scratch.path().join(&folder);
-        tree_copy::copy_tree(&src, &stage, &skip_meta).map_err(MakeHudError::from)?;
+        source
+            .extract_into(&stage, &skip_meta)
+            .map_err(MakeHudError::from)?;
         let skip_originals = |rel: &Path| rel == Path::new(ORIGINAL_DIR);
         let live_meta = live.join(METADATA_DIR);
         if std::fs::symlink_metadata(&live_meta).is_ok_and(|m| m.is_dir()) {
@@ -1214,7 +1224,7 @@ mod tests {
         save_library,
     };
     use crate::db::Database;
-    use crate::library::packed::{packed_fixture, zip_opens};
+    use crate::library::packed::{HUD_ZIP, ItemSource, packed_fixture, zip_opens};
     use crate::paths::{DataDir, LibraryKind};
 
     /// A library holding one local HUD `hud-1` in folder `somehud`.
@@ -1260,7 +1270,8 @@ mod tests {
         let row = lib.base_row(&id).unwrap().unwrap();
         lib.delete_hud(&id).unwrap();
         let src = lib.dir.library_dir(LibraryKind::Huds).join("somehud");
-        let err = lib.copy_record(&row, &src).unwrap_err();
+        let source = ItemSource::open(&src, HUD_ZIP).unwrap();
+        let err = lib.copy_record(&row, &src, &source).unwrap_err();
         assert!(
             matches!(&err, CopyHudError::NotFound { id } if id == "hud-1"),
             "{err:?}"
