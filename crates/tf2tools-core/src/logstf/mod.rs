@@ -26,7 +26,7 @@ pub use detail::{
 pub use keep::KeepFullLogs;
 pub use range::{LogsRange, window_start};
 pub use steam_id::{PlayerInput, SteamId, parse_player_input};
-pub use trim::{LogsSpace, TrimReport};
+pub use trim::{LogsSpace, OpenedBody, TrimReport};
 pub use weapons::{ClassWeapons, WeaponBackfill, WeaponSum};
 
 /// The SteamID64 of account number 0 in the public universe.

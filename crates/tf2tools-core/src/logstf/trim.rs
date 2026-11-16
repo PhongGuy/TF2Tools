@@ -3,7 +3,7 @@
 use rusqlite::types::ValueRef;
 use rusqlite::{Connection, OptionalExtension, params};
 
-use super::cache::{STATE_TRIMMED, db_error, deflate};
+use super::cache::{BodyRead, STATE_TRIMMED, db_error, deflate};
 use super::{KeepFullLogs, LogsCache, PROVISIONAL_SECS};
 use crate::error::LogsCacheError;
 
@@ -17,6 +17,8 @@ const VACUUM_AFTER_TRIMS: i64 = 256;
 const VACUUM_FREE_BYTES: i64 = 1024 * 1024;
 /// Plain bodies read per recompression batch.
 const RECOMPRESS_BATCH: i64 = 50;
+/// Seconds in a day, turning a keep choice's days into the cutoff both `trim` and `space` use.
+const DAY_SECS: i64 = 86_400;
 
 /// Matches a log a pass would trim, with ?1 the provisional gap and ?2 the cutoff: stored,
 /// both backfills counted, settled, and last opened (or fetched) at or before the cutoff.
@@ -94,7 +96,65 @@ impl LogsSpace {
     }
 }
 
+/// What opening a log found in the cache.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum OpenedBody {
+    /// The stored full log.
+    Body(String),
+    /// The full log was trimmed; its stats stay and it can be downloaded again.
+    Trimmed,
+    /// No such log, or no full log stored and it was not trimmed.
+    Missing,
+    /// A stored body that does not inflate or decode to text.
+    Damaged,
+}
+
 impl LogsCache {
+    /// Stamps `log_id` opened at `now`, then reads its body. The stamp lands first, so a trim
+    /// pass running meanwhile spares the log.
+    pub fn open_body(&self, log_id: u64, now: i64) -> Result<OpenedBody, LogsCacheError> {
+        let Ok(log_id) = i64::try_from(log_id) else {
+            return Ok(OpenedBody::Missing);
+        };
+        self.mark_opened(log_id, now)?;
+        Ok(match self.read_body(log_id)? {
+            BodyRead::Text(body) => OpenedBody::Body(body),
+            BodyRead::Damaged => OpenedBody::Damaged,
+            BodyRead::Missing => {
+                let state = self
+                    .db
+                    .read(|conn| {
+                        conn.query_row(
+                            "SELECT state FROM logstf_logs WHERE id = ?1",
+                            [log_id],
+                            |row| row.get::<_, i64>(0),
+                        )
+                        .optional()
+                    })
+                    .map_err(db_error)?;
+                if state == Some(STATE_TRIMMED) {
+                    OpenedBody::Trimmed
+                } else {
+                    OpenedBody::Missing
+                }
+            }
+        })
+    }
+
+    /// Records that the player opened `log_id` at `now`, which keeps a trim pass off it.
+    pub(crate) fn mark_opened(&self, log_id: i64, now: i64) -> Result<(), LogsCacheError> {
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "UPDATE logstf_logs SET opened_at = ?2 WHERE id = ?1",
+                    params![log_id, now],
+                )
+            })
+            .map(drop)
+            .map_err(db_error)
+    }
+
     /// The chosen keep choice; a missing or unknown setting reads as the default, a week.
     pub fn keep_full_logs(&self) -> Result<KeepFullLogs, LogsCacheError> {
         let key = self
@@ -161,7 +221,7 @@ impl LogsCache {
                             "SELECT COALESCE(SUM(octet_length(body)), 0) FROM logstf_logs WHERE ",
                             trimmable!()
                         ),
-                        params![PROVISIONAL_SECS, now - days * 86_400],
+                        params![PROVISIONAL_SECS, now - days * DAY_SECS],
                         |r| r.get(0),
                     )?;
                     if total > 0 {
@@ -195,7 +255,7 @@ impl LogsCache {
                             "UPDATE logstf_logs SET body = NULL, state = ?3 WHERE ",
                             trimmable!()
                         ),
-                        params![PROVISIONAL_SECS, now - days * 86_400, STATE_TRIMMED],
+                        params![PROVISIONAL_SECS, now - days * DAY_SECS, STATE_TRIMMED],
                     )
                 })
                 .map_err(db_error)?,

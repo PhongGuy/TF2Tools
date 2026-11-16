@@ -771,7 +771,7 @@ impl LogsCache {
     /// Stores a downloaded log: its body and length, a class row per player per class played
     /// (Medic heals, ubers and drops on the medic row only), its weapon rows, and real names for
     /// any player still named by the offline placeholder. Old rows go first, so a refetch
-    /// replaces them.
+    /// replaces them. A trimmed log only gets its body back and is stamped opened at `now`.
     /// Returns false, storing nothing, when the log's row is gone (pruned or its player removed).
     pub(crate) fn ingest(
         &self,
@@ -784,6 +784,16 @@ impl LogsCache {
         self.db
             .write(|conn| {
                 let tx = conn.transaction()?;
+                // A trimmed log gets its body back and nothing else, so its rows stay as counted.
+                let restored = tx.execute(
+                    "UPDATE logstf_logs SET body = ?2, state = 0, opened_at = ?3
+                     WHERE id = ?1 AND state = ?4",
+                    params![log_id, stored, now, STATE_TRIMMED],
+                )?;
+                if restored > 0 {
+                    tx.commit()?;
+                    return Ok(true);
+                }
                 let updated = tx.execute(
                     "UPDATE logstf_logs SET body = ?2, fetched_at = ?3, length = ?4, state = 0
                      WHERE id = ?1",
@@ -840,30 +850,49 @@ impl LogsCache {
 
     /// Marks a log `STATE_GONE` or `STATE_UNREADABLE` as of `now`. Any earlier body, class
     /// and weapon rows go too, so a marked log never counts and the needs-download rule skips it.
+    /// Returns false when the log is trimmed, which is left exactly as it was, else true.
     pub(crate) fn mark_failed(
         &self,
         log_id: i64,
         state: i64,
         now: i64,
-    ) -> Result<(), LogsCacheError> {
+    ) -> Result<bool, LogsCacheError> {
         self.db
             .write(|conn| {
                 let tx = conn.transaction()?;
-                tx.execute(
-                    "UPDATE logstf_logs SET state = ?2, fetched_at = ?3, body = NULL WHERE id = ?1",
-                    params![log_id, state, now],
+                let marked = tx.execute(
+                    "UPDATE logstf_logs SET state = ?2, fetched_at = ?3, body = NULL
+                     WHERE id = ?1 AND state <> ?4",
+                    params![log_id, state, now, STATE_TRIMMED],
                 )?;
+                // No row changed: the log is trimmed (its stats must stay) or no longer exists.
+                if marked == 0 {
+                    let trimmed = tx
+                        .query_row(
+                            "SELECT state = ?2 FROM logstf_logs WHERE id = ?1",
+                            params![log_id, STATE_TRIMMED],
+                            |row| row.get::<_, bool>(0),
+                        )
+                        .optional()?
+                        .unwrap_or(false);
+                    return Ok(!trimmed);
+                }
                 tx.execute("DELETE FROM logstf_class_rows WHERE log_id = ?1", [log_id])?;
                 tx.execute("DELETE FROM logstf_weapon_rows WHERE log_id = ?1", [log_id])?;
-                tx.commit()
+                tx.commit()?;
+                Ok(true)
             })
             .map_err(db_error)
     }
 
     /// Handles a log whose download could not be read. A log that already holds a good body
-    /// (a provisional refetch) keeps it and is stamped settled as of `now`; any other is marked
-    /// unreadable. Returns true when the log was marked.
-    pub(crate) fn mark_unreadable(&self, log_id: i64, now: i64) -> Result<bool, LogsCacheError> {
+    /// (a provisional refetch) keeps it and is stamped settled as of `now`; a trimmed log is
+    /// left as it was; any other is marked unreadable.
+    pub(crate) fn mark_unreadable(
+        &self,
+        log_id: i64,
+        now: i64,
+    ) -> Result<Unreadable, LogsCacheError> {
         let kept = self
             .db
             .write(|conn| {
@@ -874,10 +903,13 @@ impl LogsCache {
             })
             .map_err(db_error)?;
         if kept > 0 {
-            return Ok(false);
+            return Ok(Unreadable::KeptBody);
         }
-        self.mark_failed(log_id, STATE_UNREADABLE, now)?;
-        Ok(true)
+        Ok(if self.mark_failed(log_id, STATE_UNREADABLE, now)? {
+            Unreadable::Marked
+        } else {
+            Unreadable::Trimmed
+        })
     }
 
     /// Whether any of `player`'s logs `logs` would return is still pending.
@@ -1081,6 +1113,17 @@ enum Stored {
     Plain(Vec<u8>),
     /// A number, which no build ever stored as a body.
     Other,
+}
+
+/// What `mark_unreadable` did with a log whose download could not be read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Unreadable {
+    /// Marked unreadable; its body and rows are gone.
+    Marked,
+    /// It already held a good body, which it keeps.
+    KeptBody,
+    /// It is trimmed and was left as it was.
+    Trimmed,
 }
 
 /// A stored body as `read_body` found it.

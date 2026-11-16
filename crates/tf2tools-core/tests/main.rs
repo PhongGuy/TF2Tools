@@ -217,6 +217,7 @@ mod logstf_ingest;
 mod logstf_paging;
 mod logstf_range;
 mod logstf_resolve;
+mod logstf_restore;
 mod logstf_resume;
 mod logstf_space;
 mod logstf_sync;

@@ -2486,6 +2486,9 @@ pub enum LogsFetchError {
     /// The body was not UTF-8 or not a log; it is marked unreadable.
     #[error("logs.tf sent a log that could not be read")]
     Unreadable,
+    /// The log was trimmed and logs.tf no longer serves it; its stats stay.
+    #[error("logs.tf no longer has this full log")]
+    FullLogGone,
     /// logs.tf could not be reached or redirected off the allowlist.
     #[error("cannot reach {url}: {message}")]
     Network {

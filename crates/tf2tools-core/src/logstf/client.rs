@@ -14,7 +14,7 @@ use crate::store::StoreConfig;
 use crate::store::http::{Http, NetFailure, RATE_LIMITS, Redirects};
 use crate::store::pacer::{Pacer, Priority};
 
-use super::cache::{ListedLog, STATE_GONE};
+use super::cache::{ListedLog, STATE_GONE, Unreadable};
 use super::steam_xml::xml_text;
 use super::{
     LOG_BODY_LIMIT, LOG_ZIP_LIMIT, LOGS_LONG_SPACING, LOGS_SPACING, LONG_PULL, LogDetail,
@@ -450,7 +450,7 @@ impl LogsClient {
                 Downloaded::Vanished(_) => {}
                 Downloaded::Gone => summary.gone += 1,
                 Downloaded::Unreadable { marked: true, .. } => summary.unreadable += 1,
-                Downloaded::Unreadable { marked: false, .. } => {}
+                Downloaded::Unreadable { marked: false, .. } | Downloaded::Trimmed => {}
             }
             on_progress(progress(done + 1));
         }
@@ -464,9 +464,10 @@ impl LogsClient {
     /// a running sync, and stores it as the sync would. Callers read the stored body first
     /// (`LogsCache::log_body`) and call this only for a log without one.
     ///
-    /// A gone, unreadable or oversized log is marked like the sync marks it; a failed request
-    /// leaves the log pending. When a good body is already stored and the new download is
-    /// unreadable, the stored body is kept and its detail returned. A log removed while it
+    /// A gone, unreadable or oversized log is marked like the sync marks it, except a trimmed
+    /// one, which keeps its stats and returns `FullLogGone`; a failed request changes nothing.
+    /// The log is stamped opened first. When a good body is already stored and the new download
+    /// is unreadable, the stored body is kept and its detail returned. A log removed while it
     /// downloads is returned without being stored.
     pub async fn fetch_log(&self, log_id: u64) -> Result<LogDetail, LogsFetchError> {
         // The cache keys logs by i64, so an id past it names no log logs.tf could have.
@@ -474,6 +475,8 @@ impl LogsClient {
             return Err(LogsFetchError::Gone);
         };
         let now = chrono::Utc::now().timestamp();
+        // Fetching is opening, so the stamp lands even when the download then fails.
+        self.cache.mark_opened(log_id, now)?;
         let no_cancel = LogsCancel::new();
         match self
             .download::<LogsFetchError>(log_id, Priority::Interactive, now, &no_cancel)
@@ -481,6 +484,7 @@ impl LogsClient {
         {
             Downloaded::Ready(detail) | Downloaded::Vanished(detail) => Ok(*detail),
             Downloaded::Gone => Err(LogsFetchError::Gone),
+            Downloaded::Trimmed => Err(LogsFetchError::FullLogGone),
             // A refetch that came back unreadable kept the good body, so the player gets that.
             Downloaded::Unreadable { marked: false, .. }
                 if let Some(detail) = self.stored_detail(log_id) =>
@@ -541,8 +545,11 @@ impl LogsClient {
             ),
             Err(NetFailure::TooLarge { url, limit }) => (None, Some((url, limit))),
             Err(NetFailure::Status { status: 404, .. }) => {
-                self.cache.mark_failed(log_id, STATE_GONE, now)?;
-                return Ok(Downloaded::Gone);
+                return Ok(if self.cache.mark_failed(log_id, STATE_GONE, now)? {
+                    Downloaded::Gone
+                } else {
+                    Downloaded::Trimmed
+                });
             }
             Err(failure) => return Err(failure.into()),
         };
@@ -554,9 +561,12 @@ impl LogsClient {
                     Downloaded::Vanished(Box::new(detail))
                 }
             }
-            None => Downloaded::Unreadable {
-                marked: self.cache.mark_unreadable(log_id, now)?,
-                too_large,
+            None => match self.cache.mark_unreadable(log_id, now)? {
+                Unreadable::Trimmed => Downloaded::Trimmed,
+                done @ (Unreadable::Marked | Unreadable::KeptBody) => Downloaded::Unreadable {
+                    marked: done == Unreadable::Marked,
+                    too_large,
+                },
             },
         })
     }
@@ -692,6 +702,8 @@ enum Downloaded {
     /// Downloaded fine, but the log's row was removed meanwhile, so nothing was stored.
     Vanished(Box<LogDetail>),
     Gone,
+    /// The log is trimmed and logs.tf did not send it back; it was left as it was.
+    Trimmed,
     /// `marked` is false when a good copy was already stored; `too_large` names the cap hit.
     Unreadable {
         marked: bool,
