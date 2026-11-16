@@ -79,3 +79,7 @@ name = "extract_class_icons"
 [[example]]
 name = "logs_trim_sizes"
 test = true
+
+[[example]]
+name = "hud_switch_timing"
+test = true
