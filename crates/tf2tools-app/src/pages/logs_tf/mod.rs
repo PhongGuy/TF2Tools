@@ -36,6 +36,7 @@ use crate::ids;
 use crate::kill_icons::{KillIconImages, LoadedKillIcons};
 use crate::log_nicknames::LogNicknames;
 use crate::logs_sync::{LogsSync, LogsSyncEvent, SyncProgress, logs_sync};
+use crate::logs_trim::{LogsTrim, LogsTrimEvent};
 use crate::pages::common::filter_badge;
 use crate::picker::PickKind;
 use crate::services::{OpError, Services, run_blocking};
@@ -204,6 +205,11 @@ impl LogsTfPage {
         // Settings turning nicknames on or off redraws the open log.
         let nicknames = LogNicknames::global(cx);
         let nicknamed = cx.observe(&nicknames, |_, _, cx| cx.notify());
+        // A trim pass landing may have dropped full logs, so the rows reread their state.
+        let trim = LogsTrim::global(cx);
+        let trimmed = cx.subscribe(&trim, |page, _, _: &LogsTrimEvent, cx| {
+            page.reread(cx);
+        });
         let mut page = Self {
             names,
             icons,
@@ -244,7 +250,7 @@ impl LogsTfPage {
             nicknames,
             _subscriptions: entered
                 .into_iter()
-                .chain([heard, redraw, released, named, iconed, nicknamed])
+                .chain([heard, redraw, released, named, iconed, nicknamed, trimmed])
                 .collect(),
         };
         page.load(true, cx).detach();
