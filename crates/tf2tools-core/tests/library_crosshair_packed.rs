@@ -5,6 +5,7 @@ use crate::common;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use common::packed::crosshair_zip_files;
 use common::{
     LibraryEnv, builtin_catalog, crosshair_env, import_png_as, tree, write_file, zip_bytes,
 };
@@ -60,6 +61,15 @@ fn pack(env: &LibraryEnv, entry: &CrosshairEntry) {
     );
 }
 
+/// Unpacks `entry`, which import packed, so a test can read its loose form first.
+fn loose(env: &LibraryEnv, entry: &CrosshairEntry) {
+    env.lib.unpack_crosshair_for_tests(entry.id()).unwrap();
+    assert!(
+        !dir_of(env, entry).join("copy.zip").exists(),
+        "the copy is loose after unpacking"
+    );
+}
+
 fn library(entry: &CrosshairEntry) -> CrosshairRef {
     CrosshairRef::Library(entry.id().clone())
 }
@@ -84,6 +94,7 @@ fn a_packed_crosshair_previews_and_draws_as_the_loose_one() {
         import_vtf(&env, "Brackets"),
         import_png_as(&env, "Dot", Provenance::Local),
     ] {
+        loose(&env, &entry);
         let preview = env.lib.crosshair_preview(&library(&entry), &builtins);
         let drawing = env.lib.crosshair_drawing(&library(&entry), &builtins);
         pack(&env, &entry);
@@ -108,6 +119,8 @@ fn a_packed_library_applies_the_same_files_and_is_then_in_game() {
     let builtins = builtin_catalog();
     let brackets = import_vtf(&env, "Brackets");
     let dot = import_png_as(&env, "Dot", Provenance::Local);
+    loose(&env, &brackets);
+    loose(&env, &dot);
     env.lib
         .assign("tf_weapon_rocketlauncher", &library(&brackets))
         .unwrap();
@@ -212,4 +225,73 @@ fn the_scan_counts_a_crosshair_with_a_damaged_zip_as_waiting() {
         env.lib.crosshairs_not_in_game(&env.tf2, &builtins).unwrap(),
         ["tf_weapon_scattergun"]
     );
+}
+
+#[test]
+fn an_imported_crosshair_is_packed_with_the_files_the_loose_import_wrote() {
+    let env = crosshair_env();
+    let dot = import_png_as(&env, "Dot", Provenance::Local);
+    assert_eq!(tree(&dir_of(&env, &dot)), ["copy.zip"]);
+    let packed = crosshair_zip_files(&env.dir, dot.folder_name());
+    let folder = dot.folder_name();
+    let names: Vec<&str> = packed.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            format!("{folder}.vmt"),
+            format!("{folder}.vtf"),
+            s("preview.png")
+        ]
+    );
+    let source = fs::read(env.tmp.path().join("in/Dot.png")).unwrap();
+    assert_eq!(packed[2].1, source, "the PNG is kept as the preview");
+
+    // Unpacked, the folder holds exactly the bytes the zip carried.
+    env.lib.unpack_crosshair_for_tests(dot.id()).unwrap();
+    let loose: Vec<(String, Vec<u8>)> = tree(&dir_of(&env, &dot))
+        .into_iter()
+        .map(|rel| {
+            let bytes = fs::read(dir_of(&env, &dot).join(&rel)).unwrap();
+            (rel, bytes)
+        })
+        .collect();
+    assert_eq!(loose, packed);
+}
+
+#[test]
+fn an_import_whose_pack_fails_stays_loose_and_works() {
+    let mut env = crosshair_env();
+    env.lib.set_pack_rename(common::packed::rename_then_damage);
+    let builtins = builtin_catalog();
+    let dot = import_png_as(&env, "Dot", Provenance::Local);
+    let folder = dot.folder_name();
+    assert_eq!(
+        tree(&dir_of(&env, &dot)),
+        [
+            format!("{folder}.vmt"),
+            format!("{folder}.vtf"),
+            s("preview.png")
+        ]
+    );
+    assert!(env.lib.crosshair_preview(&library(&dot), &builtins).is_ok());
+    env.lib
+        .assign("tf_weapon_scattergun", &library(&dot))
+        .unwrap();
+    let report = env.lib.apply_crosshairs(&env.tf2, &builtins).unwrap();
+    assert!(report.skipped().is_empty());
+    assert_eq!(report.applied().len(), 1);
+}
+
+#[test]
+fn deleting_a_packed_crosshair_removes_its_folder() {
+    let env = crosshair_env();
+    let dot = import_png_as(&env, "Dot", Provenance::Local);
+    assert!(dir_of(&env, &dot).join("copy.zip").is_file());
+    env.lib.delete_crosshair(dot.id()).unwrap();
+    assert!(!dir_of(&env, &dot).exists());
+    assert!(env.lib.list_crosshairs().unwrap().is_empty());
+}
+
+fn s(text: &str) -> String {
+    text.to_owned()
 }

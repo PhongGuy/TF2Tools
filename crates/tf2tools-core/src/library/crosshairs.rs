@@ -364,8 +364,9 @@ impl Library {
     /// Imports a `.png` (converted to a 64x64 VTF, the PNG kept as `preview.png`) or a
     /// `.vtf` (copied, with a best-effort decoded `preview.png`) into
     /// `library/crosshairs/<slug>-<id8>/` beside its VMT, and records it. A name another
-    /// crosshair holds keeps that one and takes "<name> (<n>)" (see `wanted_name`). Curated
-    /// provenance is refused, since only HUDs come from the curated store.
+    /// crosshair holds keeps that one and takes "<name> (<n>)" (see `wanted_name`). The folder is
+    /// then packed into `copy.zip`, or left loose if that fails. Curated provenance is refused,
+    /// since only HUDs come from the curated store.
     pub fn import_crosshair(
         &self,
         path: &Path,
@@ -453,6 +454,18 @@ impl Library {
         if let Err(e) = recorded {
             let _ = remove_dir_if_present(&dest);
             return Err(import_db(e));
+        }
+        // The copy is packed once its row stands; a failed pack leaves it loose, which every
+        // reader takes and the next conversion pass retries.
+        let _copies = self.copies_write();
+        if let Err(IoFailure { path, source }) = self.pack_folder(&dest, CROSSHAIR_ZIP) {
+            let placed = ItemSource::open(&dest, CROSSHAIR_ZIP).is_ok_and(|s| s.is_packed());
+            let message = if placed {
+                "imported crosshair packed, but its loose files could not be removed"
+            } else {
+                "imported crosshair left loose: it could not be packed"
+            };
+            tracing::warn!(folder = %entry.folder_name, path = %path.display(), error = %source, "{message}");
         }
         Ok(entry)
     }
@@ -741,6 +754,7 @@ impl Library {
             .map_err(library_db)?;
         // A row whose folder name is not a plain name has no files, so only the row goes.
         if is_plain_name(&folder) {
+            let _copies = self.copies_write();
             remove_dir_if_present(&self.dir.library_dir(LibraryKind::Crosshairs).join(&folder))?;
         }
         Ok(())

@@ -129,6 +129,7 @@ fn a_quote_in_a_library_folder_name_installs_under_a_safe_name() {
     const SAFE: &str = "q-t-1a2b3c4d";
     let env = crosshair_env();
     let dot = import_png(&env, "Dot");
+    env.lib.unpack_crosshair_for_tests(dot.id()).unwrap();
     let library = env.dir.library_dir(tf2tools_core::LibraryKind::Crosshairs);
     let old = library.join(dot.folder_name());
     fs::rename(
