@@ -199,6 +199,7 @@ mod hud_thumbnail;
 mod hud_win_sample;
 mod layout;
 mod library_addons;
+mod library_crosshair_packed;
 mod library_crosshairs;
 mod library_huds;
 mod library_packed_convert;

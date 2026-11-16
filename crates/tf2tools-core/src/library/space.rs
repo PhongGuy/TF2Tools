@@ -4,7 +4,7 @@ use std::path::Path;
 
 use walkdir::WalkDir;
 
-use super::packed::{GB_ZIP, HUD_ZIP, ItemSource};
+use super::packed::{CROSSHAIR_ZIP, GB_ZIP, HUD_ZIP, ItemSource};
 use super::{Library, walk_failure};
 use crate::error::LibraryError;
 
@@ -30,7 +30,11 @@ impl LibrarySpace {
 }
 
 /// The kinds whose items may be packed, and where each keeps its zip under the item folder.
-const ITEM_ZIPS: [(&str, &str); 2] = [("huds", HUD_ZIP), ("gb-addons", GB_ZIP)];
+const ITEM_ZIPS: [(&str, &str); 3] = [
+    ("huds", HUD_ZIP),
+    ("gb-addons", GB_ZIP),
+    ("crosshairs", CROSSHAIR_ZIP),
+];
 
 impl Library {
     /// Sums `<root>/library` under the copies read guard, so no conversion swaps an item
@@ -45,8 +49,8 @@ impl Library {
         if !root.is_dir() {
             return Ok(space);
         }
-        // Sound and crosshair writes skip the copies guard, so a file that vanishes
-        // mid-walk is skipped rather than failing the count.
+        // Sound writes and painted crosshair saves skip the copies guard, so a file that
+        // vanishes mid-walk is skipped rather than failing the count.
         for entry in WalkDir::new(&root).min_depth(1) {
             let entry = match entry {
                 Ok(entry) => entry,

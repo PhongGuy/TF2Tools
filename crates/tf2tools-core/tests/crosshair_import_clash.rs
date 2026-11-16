@@ -3,11 +3,11 @@
 
 use crate::common;
 
-use std::fs;
 use std::io::Cursor;
 
+use common::packed::crosshair_zip_files;
 use common::{LibraryEnv, library_env, write_file};
-use tf2tools_core::{CrosshairEntry, GbId, LibraryKind, Provenance};
+use tf2tools_core::{CrosshairEntry, GbId, Provenance};
 
 fn png(colour: [u8; 4]) -> Vec<u8> {
     let img = image::RgbaImage::from_pixel(32, 32, image::Rgba(colour));
@@ -21,9 +21,13 @@ fn import(env: &LibraryEnv, name: &str, colour: [u8; 4], p: Provenance) -> Cross
     env.lib.import_crosshair(&src, name, p).unwrap()
 }
 
+/// The `preview.png` in the crosshair's packed copy.
 fn preview(env: &LibraryEnv, entry: &CrosshairEntry) -> Vec<u8> {
-    let dir = env.dir.library_dir(LibraryKind::Crosshairs);
-    fs::read(dir.join(entry.folder_name()).join("preview.png")).unwrap()
+    crosshair_zip_files(&env.dir, entry.folder_name())
+        .into_iter()
+        .find(|(name, _)| name == "preview.png")
+        .expect("preview.png in the zip")
+        .1
 }
 
 /// Each library crosshair's name, sorted.

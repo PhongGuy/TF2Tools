@@ -78,6 +78,24 @@ async fn a_packed_addon_copy_counts_its_files_unpacked() {
     assert_eq!(space.unpacked(), lengths(&s.env.dir) - zip + vpk_len);
 }
 
+#[test]
+fn a_packed_crosshair_counts_its_zip_on_disk_and_its_files_unpacked() {
+    let env = library_env();
+    let dot = common::import_png_as(&env, "Dot", Provenance::Local);
+    let folder = env
+        .dir
+        .library_dir(tf2tools_core::LibraryKind::Crosshairs)
+        .join(dot.folder_name());
+    let zip = std::fs::metadata(folder.join("copy.zip")).unwrap().len();
+    let entries: u64 = common::packed::crosshair_zip_files(&env.dir, dot.folder_name())
+        .iter()
+        .map(|(_, b)| b.len() as u64)
+        .sum();
+    let space = env.lib.space().unwrap();
+    assert_eq!(space.on_disk(), lengths(&env.dir));
+    assert_eq!(space.unpacked(), lengths(&env.dir) - zip + entries);
+}
+
 #[cfg(unix)]
 #[test]
 fn a_link_inside_the_library_does_not_count_what_it_points_at() {

@@ -136,19 +136,25 @@ impl LibraryPack {
 
 // Only a pass that changed something is worth a log line; failures are logged by core.
 fn log_conversion(report: &ConvertReport) {
-    let (huds, addons) = (report.huds(), report.gb_addons());
-    if huds.packed() + huds.cleaned() + addons.packed() + addons.cleaned() == 0 {
+    let (huds, addons, crosshairs) = (report.huds(), report.gb_addons(), report.crosshairs());
+    let kinds = [huds, addons, crosshairs];
+    let changed: usize = kinds.iter().map(|k| k.packed() + k.cleaned()).sum();
+    if changed == 0 {
         return;
     }
     tracing::info!(
-        "library packed: {} HUDs ({} -> {} bytes), {} add-on copies ({} -> {} bytes), {} cleaned",
+        "library packed: {} HUDs ({} -> {} bytes), {} add-on copies ({} -> {} bytes), \
+         {} crosshairs ({} -> {} bytes), {} cleaned",
         huds.packed(),
         huds.bytes_before(),
         huds.bytes_after(),
         addons.packed(),
         addons.bytes_before(),
         addons.bytes_after(),
-        huds.cleaned() + addons.cleaned(),
+        crosshairs.packed(),
+        crosshairs.bytes_before(),
+        crosshairs.bytes_after(),
+        kinds.iter().map(|k| k.cleaned()).sum::<usize>(),
     );
 }
 

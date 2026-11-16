@@ -278,6 +278,31 @@ async fn a_bare_vtf_is_one_crosshair() {
 }
 
 #[tokio::test]
+async fn a_downloaded_crosshair_is_kept_packed() {
+    let env = store_env().await;
+    seed_store_rows(&env);
+    let entries = fetch(&env, StoreKind::Crosshairs, 456577, "dot.vtf", vtf())
+        .await
+        .unwrap();
+    let LibraryEntry::Crosshair(crosshair) = &entries[0] else {
+        unreachable!()
+    };
+    let folder = env
+        .dir
+        .library_dir(LibraryKind::Crosshairs)
+        .join(crosshair.folder_name());
+    assert_eq!(tree(&folder), ["copy.zip"]);
+    // The zip carries the downloaded VTF byte for byte under the folder's own stem.
+    let packed = common::packed::crosshair_zip_files(&env.dir, crosshair.folder_name());
+    let vtf_name = format!("{}.vtf", crosshair.folder_name());
+    let stored = packed.iter().find(|(name, _)| *name == vtf_name);
+    assert_eq!(
+        stored.map(|(_, bytes)| bytes.as_slice()),
+        Some(vtf().as_slice())
+    );
+}
+
+#[tokio::test]
 async fn a_crosshair_download_with_nothing_usable_is_refused() {
     let env = store_env().await;
     let archive = zip_bytes(&[

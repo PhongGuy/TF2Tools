@@ -484,6 +484,10 @@ fn a_copy_that_cannot_be_read_says_so_and_leaves_the_canvas(cx: &mut TestAppCont
     let env = support::env();
     let s = shell(cx, &env);
     let big = seed_vtf(&s, &env, "Big", 128, [255, 255, 255, 255]);
+    s.services
+        .library
+        .unpack_crosshair_for_tests(big.id())
+        .unwrap();
     let dir = crosshair_dir(&env, &big);
     std::fs::write(dir.join(format!("{}.vtf", big.folder_name())), b"not a vtf").unwrap();
     let page = open_maker(cx, &s);

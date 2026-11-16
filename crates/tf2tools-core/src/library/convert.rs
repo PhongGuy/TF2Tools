@@ -3,12 +3,13 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::crosshairs::{CrosshairFormat, PAINTED_SOURCE};
 use super::gb_addons::slots_survive_packing;
 use super::made_huds::{MAKER_FILE, old_folder};
-use super::packed::{GB_ZIP, HUD_ZIP, ItemSource, pack_with};
+use super::packed::{CROSSHAIR_ZIP, GB_ZIP, HUD_ZIP, ItemSource, pack_with};
 use super::{
-    GbId, HudId, IoFailure, Library, METADATA_DIR, io_at, is_plain_name, library_db, read_setting,
-    remove_dir_if_present, remove_file_if_present, save_setting,
+    CrosshairId, GbId, HudId, IoFailure, Library, METADATA_DIR, io_at, is_plain_name, library_db,
+    read_setting, remove_dir_if_present, remove_file_if_present, save_setting,
 };
 use crate::error::LibraryError;
 use crate::paths::LibraryKind;
@@ -19,6 +20,7 @@ use crate::paths::LibraryKind;
 pub struct ConvertReport {
     huds: KindConverted,
     gb_addons: KindConverted,
+    crosshairs: KindConverted,
     new_failures: Vec<String>,
 }
 
@@ -33,8 +35,14 @@ impl ConvertReport {
         &self.gb_addons
     }
 
+    /// The library crosshairs' tally.
+    pub fn crosshairs(&self) -> &KindConverted {
+        &self.crosshairs
+    }
+
     /// The items that failed this pass but not the one before (`huds/<folder>`,
-    /// `gb-addons/<id>`), in pass order; these are the ones logged at `warn`.
+    /// `gb-addons/<id>`, `crosshairs/<folder>`), in pass order; these are the ones logged at
+    /// `warn`.
     pub fn new_failures(&self) -> &[String] {
         &self.new_failures
     }
@@ -134,11 +142,12 @@ enum Converted {
 }
 
 impl Library {
-    /// Packs every loose, non-made library HUD into `.tf2tools/files.zip` and every GameBanana
-    /// add-on copy into `copy.zip`, and clears leftovers beside existing zips. Each item is its
-    /// own step; a failure leaves that item loose, is logged and counted, and the pass moves on.
-    /// A failed listing of one kind is logged and skips only that kind. An item that failed the
-    /// pass before too is logged at `debug` only; the failed keys persist in `settings`.
+    /// Packs every loose, non-made library HUD into `.tf2tools/files.zip`, every GameBanana
+    /// add-on copy and every non-painted crosshair into `copy.zip`, and clears leftovers beside
+    /// existing zips. Each item is its own step; a failure leaves that item loose, is logged and
+    /// counted, and the pass moves on. A failed listing of one kind is logged and skips only
+    /// that kind. An item that failed the pass before too is logged at `debug` only; the failed
+    /// keys persist in `settings`.
     pub fn convert_library(&self) -> ConvertReport {
         let mut report = ConvertReport::default();
         let mut failures = self.read_failures();
@@ -199,6 +208,39 @@ impl Library {
             Err(error) => {
                 tracing::warn!(%error, "library conversion could not list add-ons");
                 failures.keep_kind("gb-addons/");
+            }
+        }
+        match self.list_crosshairs() {
+            Ok(crosshairs) => {
+                let root = self.dir.library_dir(LibraryKind::Crosshairs);
+                for crosshair in crosshairs {
+                    let folder = crosshair.folder_name();
+                    if !is_plain_name(folder) {
+                        tracing::warn!(
+                            folder,
+                            "crosshair not packed: its folder name is not plain"
+                        );
+                        continue;
+                    }
+                    // Painted crosshairs are resaved in place, so they stay loose like made HUDs.
+                    let painted = crosshair.format() == CrosshairFormat::Painted;
+                    let keep = |dir: &Path| painted || dir.join(PAINTED_SOURCE).exists();
+                    let result = self.convert_item(&root.join(folder), CROSSHAIR_ZIP, &keep);
+                    let Some(IoFailure { path, source }) = report.crosshairs.add(result) else {
+                        continue;
+                    };
+                    let path = path.display();
+                    let message = "crosshair left loose: it could not be packed";
+                    if failures.note(format!("crosshairs/{folder}")) {
+                        tracing::warn!(folder, %path, error = %source, "{message}");
+                    } else {
+                        tracing::debug!(folder, %path, error = %source, "{message}");
+                    }
+                }
+            }
+            Err(error) => {
+                tracing::warn!(%error, "library conversion could not list crosshairs");
+                failures.keep_kind("crosshairs/");
             }
         }
         self.save_failures(&failures);
@@ -273,6 +315,51 @@ impl Library {
         Ok(())
     }
 
+    /// Packs crosshair `id`'s loose folder into its `copy.zip`, as the conversion pass will, so a
+    /// test can read the packed form; an already packed copy is left as it is.
+    ///
+    /// # Errors
+    /// `NotFound` for no such row or an unsafe folder name, `Database` when the lookup fails,
+    /// `Io` when the pack fails.
+    #[doc(hidden)]
+    pub fn pack_crosshair_for_tests(&self, id: &CrosshairId) -> Result<(), LibraryError> {
+        let live = self.crosshair_dir_for_tests(id)?;
+        let _copies = self.copies_write();
+        if !ItemSource::open(&live, CROSSHAIR_ZIP)?.is_packed() {
+            self.pack_folder(&live, CROSSHAIR_ZIP)?;
+        }
+        Ok(())
+    }
+
+    /// Extracts crosshair `id`'s packed copy back into its folder and removes `copy.zip`, so a
+    /// test can edit it; a loose copy is left as it is.
+    ///
+    /// # Errors
+    /// `NotFound` for no such row or an unsafe folder name, `Database` when the lookup fails,
+    /// `Io` when the zip does not open or a file fails.
+    #[doc(hidden)]
+    pub fn unpack_crosshair_for_tests(&self, id: &CrosshairId) -> Result<(), LibraryError> {
+        let live = self.crosshair_dir_for_tests(id)?;
+        let _copies = self.copies_write();
+        let source = ItemSource::open(&live, CROSSHAIR_ZIP)?;
+        if source.is_packed() {
+            source.extract_into(&live, &|_| false)?;
+            remove_file_if_present(&live.join(CROSSHAIR_ZIP))?;
+        }
+        Ok(())
+    }
+
+    /// The library folder of crosshair `id`, refusing a folder name that is not plain.
+    fn crosshair_dir_for_tests(&self, id: &CrosshairId) -> Result<PathBuf, LibraryError> {
+        let folder = self.crosshair_folder(id)?;
+        if !is_plain_name(&folder) {
+            return Err(LibraryError::NotFound {
+                what: format!("crosshair {id}"),
+            });
+        }
+        Ok(self.dir.library_dir(LibraryKind::Crosshairs).join(folder))
+    }
+
     /// Replaces how a written zip is moved into place; tests use it to make the read-back fail.
     #[doc(hidden)]
     pub fn set_pack_rename(&mut self, rename: fn(&Path, &Path) -> io::Result<()>) {
@@ -281,12 +368,16 @@ impl Library {
 
     /// Packs the loose item at `live` into `live/zip_rel`, leaving out `zip_rel`'s first
     /// component and its `.tmp`, then clears the loose files; returns the zip's length. A zip
-    /// that does not read back is removed (best effort), leaving the loose tree.
+    /// that does not read back is removed (best effort), leaving the loose tree. A folder that
+    /// already holds the zip is refused with `AlreadyExists` and left as it is.
     pub(super) fn pack_folder(&self, live: &Path, zip_rel: &str) -> Result<u64, IoFailure> {
         let top = top_of(zip_rel);
         let tmp = tmp_of(Path::new(zip_rel));
         let left_out = |rel: &Path| rel == top || rel == tmp;
         let zip = live.join(zip_rel);
+        if std::fs::symlink_metadata(&zip).is_ok() {
+            return Err(io_at(&zip)(io::ErrorKind::AlreadyExists.into()));
+        }
         let mut rename = self.pack_rename;
         let after = pack_with(live, &left_out, &zip, &mut rename)?;
         if let Err(failure) = require_packed(live, zip_rel) {
@@ -405,6 +496,27 @@ fn clear_read_only(path: &Path) -> Result<(), IoFailure> {
 #[cfg(test)]
 mod tests {
     use super::clear_read_only;
+    use crate::db::Database;
+    use crate::library::Library;
+    use crate::library::packed::{CROSSHAIR_ZIP, ItemSource};
+    use crate::paths::DataDir;
+    use std::path::Path;
+
+    // Packing over a placed zip would zip an empty folder; the zip that is there wins.
+    #[test]
+    fn a_folder_that_already_holds_its_zip_is_not_packed_again() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = DataDir::at(tmp.path().join("data"));
+        let lib = Library::new(Database::open(&dir).unwrap(), dir.clone());
+        let live = tmp.path().join("item");
+        std::fs::create_dir_all(&live).unwrap();
+        std::fs::write(live.join("a.vtf"), b"vtf").unwrap();
+        lib.pack_folder(&live, CROSSHAIR_ZIP).unwrap();
+        let failure = lib.pack_folder(&live, CROSSHAIR_ZIP).unwrap_err();
+        assert_eq!(failure.source.kind(), std::io::ErrorKind::AlreadyExists);
+        let source = ItemSource::open(&live, CROSSHAIR_ZIP).unwrap();
+        assert_eq!(source.read(Path::new("a.vtf")).unwrap(), b"vtf");
+    }
 
     #[test]
     fn a_read_only_file_is_made_writable() {

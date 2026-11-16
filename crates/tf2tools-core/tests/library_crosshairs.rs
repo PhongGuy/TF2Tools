@@ -6,6 +6,7 @@ use std::fs;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
+use common::packed::crosshair_zip_files;
 use common::{LibraryEnv, library_env, set_setting, setting, sql, tree, write_file};
 use tf2tools_core::{
     BuiltinCrosshairs, CrosshairEntry, CrosshairFormat, CrosshairId, CrosshairRef, GbId,
@@ -36,6 +37,28 @@ fn folder(env: &LibraryEnv, entry: &CrosshairEntry) -> PathBuf {
         .join(entry.folder_name())
 }
 
+/// The names in the crosshair's packed copy, checking the folder holds only `copy.zip`.
+fn packed_names(env: &LibraryEnv, entry: &CrosshairEntry) -> Vec<String> {
+    assert_eq!(
+        tree(&folder(env, entry)),
+        ["copy.zip"],
+        "only the zip stays in the folder"
+    );
+    crosshair_zip_files(&env.dir, entry.folder_name())
+        .into_iter()
+        .map(|(name, _)| name)
+        .collect()
+}
+
+/// The bytes of `name` in the crosshair's packed copy.
+fn packed(env: &LibraryEnv, entry: &CrosshairEntry, name: &str) -> Vec<u8> {
+    crosshair_zip_files(&env.dir, entry.folder_name())
+        .into_iter()
+        .find(|(entry_name, _)| entry_name == name)
+        .unwrap_or_else(|| panic!("{name} is not in the zip"))
+        .1
+}
+
 fn crosshairs_dir_is_empty(env: &LibraryEnv) -> bool {
     fs::read_dir(env.dir.library_dir(LibraryKind::Crosshairs))
         .unwrap()
@@ -64,26 +87,22 @@ fn a_png_becomes_a_vtf_a_vmt_and_a_preview() {
     let name = format!("my-cross-{id8}");
     assert_eq!(entry.folder_name(), name);
     assert_eq!(entry.format(), CrosshairFormat::Png);
-    let dir = folder(&env, &entry);
     assert_eq!(
-        tree(&dir),
+        packed_names(&env, &entry),
         [
             format!("{name}.vmt"),
             format!("{name}.vtf"),
             "preview.png".into()
         ]
     );
-    let vmt = fs::read_to_string(dir.join(format!("{name}.vmt"))).unwrap();
+    let vmt = String::from_utf8(packed(&env, &entry, &format!("{name}.vmt"))).unwrap();
     assert!(
         vmt.contains(&format!("\"vgui/replay/thumbnails/{name}\"")),
         "{vmt}"
     );
-    let decoded = decode_vtf(&fs::read(dir.join(format!("{name}.vtf"))).unwrap()).unwrap();
+    let decoded = decode_vtf(&packed(&env, &entry, &format!("{name}.vtf"))).unwrap();
     assert_eq!((decoded.width(), decoded.height()), (64, 64));
-    assert_eq!(
-        fs::read(dir.join("preview.png")).unwrap(),
-        fs::read(&src).unwrap()
-    );
+    assert_eq!(packed(&env, &entry, "preview.png"), fs::read(&src).unwrap());
     let row: (String, String, Option<i64>) = sql(&env.dir)
         .query_row(
             "SELECT source_type, source, store_gb_id FROM library_crosshairs WHERE id = ?1",
@@ -113,11 +132,10 @@ fn a_vtf_is_copied_with_a_decoded_preview() {
             author: String::new()
         }
     );
-    let dir = folder(&env, &entry);
-    let copied = fs::read(dir.join(format!("{}.vtf", entry.folder_name()))).unwrap();
+    let copied = packed(&env, &entry, &format!("{}.vtf", entry.folder_name()));
     assert_eq!(copied, original);
     let expected = decode_vtf(&original).unwrap();
-    let preview = image::load_from_memory(&fs::read(dir.join("preview.png")).unwrap()).unwrap();
+    let preview = image::load_from_memory(&packed(&env, &entry, "preview.png")).unwrap();
     assert_eq!(
         (preview.width(), preview.height()),
         (expected.width(), expected.height())
@@ -142,7 +160,7 @@ fn an_undecodable_vtf_still_imports_without_a_preview() {
         .unwrap();
     let name = entry.folder_name().to_owned();
     assert_eq!(
-        tree(&folder(&env, &entry)),
+        packed_names(&env, &entry),
         [format!("{name}.vmt"), format!("{name}.vtf")]
     );
 }

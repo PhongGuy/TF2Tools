@@ -164,3 +164,12 @@ pub fn gb_loose(dir: &DataDir, gb_id: u64) -> Vec<String> {
     files.retain(|rel| rel != "copy.zip");
     files
 }
+
+/// The entries of the packed crosshair in library folder `folder`, with their bytes, sorted.
+pub fn crosshair_zip_files(dir: &DataDir, folder: &str) -> Vec<(String, Vec<u8>)> {
+    zip_files(
+        &dir.library_dir(LibraryKind::Crosshairs)
+            .join(folder)
+            .join("copy.zip"),
+    )
+}

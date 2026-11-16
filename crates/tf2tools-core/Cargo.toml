@@ -87,3 +87,7 @@ test = true
 [[example]]
 name = "library_compress_sizes"
 test = true
+
+[[example]]
+name = "crosshair_apply_timing"
+test = true
