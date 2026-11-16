@@ -23,7 +23,7 @@ use tf2tools_core::{
 fn a_local_failure_toasts_its_plain_message_under_its_action() {
     let failure = LocalFailure::new("Try again.", "library database error: locked");
     assert_eq!(
-        failure.into_op("Failed to load HUDs"),
+        failure.into_op("Failed to load HUDs".into()),
         OpError::Core {
             action: "Failed to load HUDs".into(),
             message: "Try again.".into()
@@ -1056,13 +1056,13 @@ fn addon_install_failures_read_as_plain_words() {
         support::assert_plain(want);
     }
     assert!(matches!(
-        gb_install_op(&GbAddonInstallError::Tf2Running, "Couldn't install the add-on"),
+        gb_install_op(&GbAddonInstallError::Tf2Running, "Couldn't install the add-on".into()),
         OpError::Core { action, ref message } if action == close_tf2() && *message == close_tf2_text()
     ));
     assert!(matches!(
         gb_install_op(
             &GbAddonInstallError::NothingChosen,
-            "Couldn't install the add-on"
+            "Couldn't install the add-on".into()
         ),
         OpError::Core { ref action, .. } if action == "Couldn't install the add-on"
     ));
@@ -1101,7 +1101,7 @@ fn map_install_failures_read_as_plain_words() {
         support::assert_plain(want);
     }
     assert!(matches!(
-        gb_map_install_op(&GbMapInstallError::Tf2Running, "Couldn't update the map"),
+        gb_map_install_op(&GbMapInstallError::Tf2Running, "Couldn't update the map".into()),
         OpError::Core { action, ref message } if action == close_tf2() && *message == close_tf2_text()
     ));
     let names = |n: &[&str]| n.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
@@ -1152,7 +1152,7 @@ fn map_remove_failures_read_as_plain_words() {
         support::assert_plain(want);
     }
     assert!(matches!(
-        gb_map_remove_op(&GbMapRemoveError::Tf2Running, "Couldn't remove the map"),
+        gb_map_remove_op(&GbMapRemoveError::Tf2Running, "Couldn't remove the map".into()),
         OpError::Core { action, .. } if action == close_tf2()
     ));
 }

@@ -155,9 +155,13 @@ pub enum OpError {
 
 impl OpError {
     /// A core error, titled by the action that failed.
-    pub fn core(action: impl Into<SharedString>, err: impl fmt::Display) -> Self {
+    /// A title is text already in the player's language, so a bare literal does not compile:
+    /// ```compile_fail
+    /// tf2tools_app::services::OpError::core("Install HUD", "disk full");
+    /// ```
+    pub fn core(action: SharedString, err: impl fmt::Display) -> Self {
         Self::Core {
-            action: action.into(),
+            action,
             message: err.to_string().into(),
         }
     }

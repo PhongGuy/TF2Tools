@@ -980,24 +980,24 @@ impl HudMakerPage {
     pub fn open(&mut self, id: HudId, cx: &mut Context<Self>) {
         let tf2 = require_tf2(cx);
         let job = run_blocking(cx, move |s| {
-            let action = "Failed to open HUD";
+            let action = tr!("messages.action.open_hud");
             let tf_dir = tf2?.tf_dir();
             let load_failed = |e: HudLoadError| {
                 let failure = describe_hud_load(&e);
-                failure.log(action);
+                failure.log(&action);
                 failure.message.to_string()
             };
             // A copy reads its own layers over the game's; any other made HUD the game's.
             let files = match s.library.made_hud_files(&id, &tf_dir) {
                 Ok(files) => files,
-                Err(HudLoadError::Files(e)) => return Err(OpError::core(action, e)),
+                Err(HudLoadError::Files(e)) => return Err(OpError::core(action.clone(), e)),
                 Err(e) => return Ok(Err(load_failed(e))),
             };
             let copy_tf = (s.library.copy_base(&id).ok().flatten()).map(|_| tf_dir.clone());
             let platform = Platform::current().unwrap_or(Platform::Linux);
             let made = match s.library.open_made_hud(&id, &files, platform) {
                 Ok(made) => made,
-                Err(HudLoadError::Files(e)) => return Err(OpError::core(action, e)),
+                Err(HudLoadError::Files(e)) => return Err(OpError::core(action.clone(), e)),
                 Err(e) => return Ok(Err(load_failed(e))),
             };
             // Everything drawn reads the switched files; saves start from the files on disk.

@@ -80,8 +80,7 @@ impl LocalFailure {
     }
 
     /// Logs the raw detail under `action`, then returns the toast the player reads.
-    pub fn into_op(self, action: impl Into<SharedString>) -> OpError {
-        let action = action.into();
+    pub fn into_op(self, action: SharedString) -> OpError {
         self.log(&action);
         OpError::Core {
             action,
@@ -106,11 +105,11 @@ pub fn describe_gb_install(err: &GbAddonInstallError) -> LocalFailure {
 }
 
 /// The toast for a failed add-on operation titled `action`: "Close TF2 first" when TF2 runs.
-pub fn gb_install_op(err: &GbAddonInstallError, action: impl Into<SharedString>) -> OpError {
+pub fn gb_install_op(err: &GbAddonInstallError, action: SharedString) -> OpError {
     let action = if matches!(err, GbAddonInstallError::Tf2Running) {
         close_tf2()
     } else {
-        action.into()
+        action
     };
     describe_gb_install(err).into_op(action)
 }
@@ -139,11 +138,11 @@ pub fn describe_gb_map_install(err: &GbMapInstallError) -> LocalFailure {
 }
 
 /// The toast for a failed map operation titled `action`: "Close TF2 first" when TF2 runs.
-pub fn gb_map_install_op(err: &GbMapInstallError, action: impl Into<SharedString>) -> OpError {
+pub fn gb_map_install_op(err: &GbMapInstallError, action: SharedString) -> OpError {
     let action = if matches!(err, GbMapInstallError::Tf2Running) {
         close_tf2()
     } else {
-        action.into()
+        action
     };
     describe_gb_map_install(err).into_op(action)
 }
@@ -163,11 +162,11 @@ pub fn describe_gb_map_remove(err: &GbMapRemoveError) -> LocalFailure {
 }
 
 /// The toast for a failed map remove titled `action`: "Close TF2 first" when TF2 runs.
-pub fn gb_map_remove_op(err: &GbMapRemoveError, action: impl Into<SharedString>) -> OpError {
+pub fn gb_map_remove_op(err: &GbMapRemoveError, action: SharedString) -> OpError {
     let action = if matches!(err, GbMapRemoveError::Tf2Running) {
         close_tf2()
     } else {
-        action.into()
+        action
     };
     describe_gb_map_remove(err).into_op(action)
 }

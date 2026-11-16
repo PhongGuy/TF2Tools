@@ -40,7 +40,7 @@ async fn raw_details_go_to_the_developer_log(cx: &mut TestAppContext) {
         "Try again.",
         "library database error: no such table: library_huds",
     )
-    .into_op("Failed to load HUDs");
+    .into_op("Failed to load HUDs".into());
     assert_eq!(shown.description(), "Try again.");
     support::init(cx);
     let env = support::env();

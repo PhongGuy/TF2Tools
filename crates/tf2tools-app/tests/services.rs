@@ -144,7 +144,7 @@ fn op_errors_read_as_a_toast_title_and_description() {
         OpError::NoTf2.to_string(),
         "TF2 not found: Set the TF2 folder in Settings, then try again."
     );
-    let e = OpError::core("Install HUD", "disk full");
+    let e = OpError::core("Install HUD".into(), "disk full");
     assert_eq!(
         (e.title().as_str(), e.description().as_str()),
         ("Install HUD", "disk full")

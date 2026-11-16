@@ -456,7 +456,7 @@ impl GraphicsPage {
         let tf2 = tf2_state(cx).read(cx).install().cloned();
         let held = self.catalog.as_ref().map(|c| c.tag().to_owned());
         let loading = run_blocking(cx, move |s| {
-            let failed = "Failed to load mastercomfig";
+            let failed = || tr!("messages.action.load_mastercomfig");
             // Puts back a preset file another tool cleared; a failure only costs the restore.
             if let Some(tf2) = &tf2
                 && let Err(e) = s.library.restore_mastercomfig_files(tf2)
@@ -466,11 +466,11 @@ impl GraphicsPage {
             let status = tf2
                 .map(|tf2| s.library.mastercomfig_status(&tf2))
                 .transpose()
-                .map_err(|e| model::describe_status(&e).into_op(failed))?;
+                .map_err(|e| model::describe_status(&e).into_op(failed()))?;
             let release = s
                 .store
                 .mastercomfig_release()
-                .map_err(|e| describe_store_status(&e).into_op(failed))?;
+                .map_err(|e| describe_store_status(&e).into_op(failed()))?;
             let (choices, catalog) = match &status {
                 Some(MastercomfigStatus::Managed { version, .. }) => {
                     // Unreadable choices show the preset's values rather than failing the page.

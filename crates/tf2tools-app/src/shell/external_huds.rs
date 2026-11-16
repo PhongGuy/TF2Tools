@@ -59,7 +59,7 @@ impl ExternalPlan {
         &self,
         s: &Services,
         tf2: &Tf2Install,
-        action: impl Into<SharedString>,
+        action: SharedString,
     ) -> Result<&[ExternalHud], OpError> {
         if self.keep {
             let kept = s
@@ -160,10 +160,9 @@ pub async fn check_external(
     only: Option<String>,
     tf2: Tf2Install,
     win: AnyWindowHandle,
-    title: impl Into<SharedString>,
+    title: SharedString,
     cx: &AsyncApp,
 ) -> Option<ExternalPlan> {
-    let title = title.into();
     let scanning = cx.update(|cx| {
         run_blocking(cx, move |s| {
             let found = s.library.external_huds(&tf2);

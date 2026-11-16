@@ -240,8 +240,14 @@ impl SoundsPage {
             Err(err) => return toast_error(window, cx, &err),
         };
         let (done, failed) = match kind {
-            SoundKind::Hitsound => ("Hitsound uninstalled", "Failed to uninstall hitsound"),
-            SoundKind::Killsound | _ => ("Killsound uninstalled", "Failed to uninstall killsound"),
+            SoundKind::Hitsound => (
+                "Hitsound uninstalled",
+                tr!("messages.action.uninstall_hitsound"),
+            ),
+            SoundKind::Killsound | _ => (
+                "Killsound uninstalled",
+                tr!("messages.action.uninstall_killsound"),
+            ),
         };
         self.run(
             Busy::Uninstall(kind),
@@ -314,8 +320,14 @@ impl SoundsPage {
             Err(err) => return toast_error(window, cx, &err),
         };
         let (done, failed) = match kind {
-            SoundKind::Hitsound => ("Hitsound installed", "Failed to install hitsound"),
-            SoundKind::Killsound | _ => ("Killsound installed", "Failed to install killsound"),
+            SoundKind::Hitsound => (
+                "Hitsound installed",
+                tr!("messages.action.install_hitsound"),
+            ),
+            SoundKind::Killsound | _ => (
+                "Killsound installed",
+                tr!("messages.action.install_killsound"),
+            ),
         };
         let id = sound.id().clone();
         let name = sound.name().to_owned();
