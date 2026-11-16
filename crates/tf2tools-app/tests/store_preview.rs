@@ -58,7 +58,7 @@ fn a_missing_row_preview_or_file_fails_as_could_not_play_preview(cx: &mut TestAp
     for id in [2, 3, 4, 99] {
         let err = load(cx, id).unwrap_err();
         assert_eq!(err.title(), "Could not play preview", "sound {id}: {err}");
-        support::assert_plain(err.description());
+        support::assert_plain(&err.description());
     }
     assert_eq!(
         load(cx, 2).unwrap_err().description(),

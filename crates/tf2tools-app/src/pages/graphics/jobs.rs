@@ -3,13 +3,14 @@
 use std::future::Future;
 use std::sync::Arc;
 
-use gpui_kit::{AnyWindowHandle, App, AsyncApp};
+use gpui_kit::{AnyWindowHandle, App, AsyncApp, SharedString};
 use tf2tools_core::{
     ApplyModulesError, Choices, Library, MastercomfigStatus, ModuleCatalog, StoreClient, StoreKind,
     Tf2Install,
 };
 
 use super::model::{SettingsNote, catalog_note, describe_apply_modules, describe_install};
+use crate::i18n::tr;
 use crate::local_messages::describe_store_status;
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::services::{OpError, Services};
@@ -19,17 +20,21 @@ use crate::sync_messages::describe_sync;
 use crate::tokio_bridge;
 
 /// The toast title when an install, update or remove refuses because TF2 is running.
-pub const CLOSE_TF2: &str = "Close TF2 first";
+pub fn close_tf2() -> SharedString {
+    tr!("messages.shared.close_tf2")
+}
 /// Its description.
-pub const CLOSE_TF2_TEXT: &str = "TF2 is running. Close the game, then try again.";
+pub fn close_tf2_text() -> SharedString {
+    tr!("messages.shared.close_tf2_text")
+}
 
-/// Err(OpError::Core { action: CLOSE_TF2, message: CLOSE_TF2_TEXT }) when `probe` says TF2
+/// Err(OpError::Core { action: close_tf2(), message: close_tf2_text() }) when `probe` says TF2
 /// runs. Blocking: call off the UI thread.
 pub fn refuse_while_running(probe: &(dyn Fn() -> bool + Send + Sync)) -> Result<(), OpError> {
     if probe() {
         return Err(OpError::Core {
-            action: CLOSE_TF2,
-            message: CLOSE_TF2_TEXT.to_owned(),
+            action: close_tf2(),
+            message: close_tf2_text(),
         });
     }
     Ok(())
@@ -47,7 +52,7 @@ pub struct Installed {
 /// Installs or updates the base VPK on the tokio bridge. It refuses while TF2 runs. With no
 /// recorded release, it first forces the addon-store sync. Saved settings are then re-applied
 /// against the new tag's catalog, leaving a player's own modules.cfg alone; a failure there is
-/// only logged. Failures are OpErrors titled `action`, except the refusal, titled CLOSE_TF2.
+/// only logged. Failures are OpErrors titled `action`, except the refusal, titled `close_tf2()`.
 pub fn install_base(
     tf2: Tf2Install,
     action: &'static str,
@@ -142,7 +147,7 @@ pub enum ModulesFailure {
 }
 
 /// Applies `choices` through core on the tokio bridge. With `guard_tf2` it first refuses while
-/// TF2 runs (CLOSE_TF2). Resolves to the dropped module names. Errors are titled SAVE_FAILED.
+/// TF2 runs (`close_tf2()`). Resolves to the dropped module names. Errors are titled SAVE_FAILED.
 pub fn apply_modules(
     tf2: Tf2Install,
     catalog: Arc<ModuleCatalog>,
@@ -260,8 +265,8 @@ async fn force_sync(store: &StoreClient, action: &'static str) -> Result<(), OpE
             let failure = describe_sync(StoreKind::Addons, &e);
             tracing::warn!("{action}: {}", failure.detail);
             OpError::Core {
-                action,
-                message: failure.message,
+                action: action.into(),
+                message: failure.message.into(),
             }
         })
 }

@@ -1,4 +1,8 @@
+use gpui_kit::SharedString;
 use tf2tools_app::i18n::{self, list};
+use tf2tools_app::local_messages::{self as local, LocalFailure};
+use tf2tools_app::pages::graphics::jobs;
+use tf2tools_app::services::OpError;
 
 use crate::LocaleGuard;
 
@@ -39,4 +43,47 @@ fn lists_join_in_both_languages() {
         long.starts_with("i1, i2, ") && long.ends_with(", i20 и i21"),
         "{long}"
     );
+}
+
+#[test]
+fn shared_texts_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let shared = [
+        local::internal(),
+        local::hud_files(),
+        local::hud_base_changed(),
+        local::hud_options_unreadable(),
+        local::map_restart(),
+        local::map_skipped(),
+        jobs::close_tf2(),
+        jobs::close_tf2_text(),
+    ];
+    for text in &shared {
+        assert_russian(text);
+    }
+}
+
+#[test]
+fn op_errors_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    for err in [OpError::NoTf2, OpError::Internal("boom".into())] {
+        assert_russian(&err.title());
+        assert_russian(&err.description());
+        assert_russian(&err.to_string());
+    }
+    let op = LocalFailure::new(local::hud_files(), "x").into_op(SharedString::from("Худ"));
+    assert_russian(&op.description());
+    assert_russian(&op.to_string());
+}
+
+#[test]
+fn a_failure_keeps_the_language_it_was_built_in() {
+    let _guard = LocaleGuard::switch("ru");
+    let failure = LocalFailure::new(local::hud_files(), "x");
+    let op = LocalFailure::new(local::hud_files(), "x").into_op(SharedString::from("Сохранение"));
+    i18n::apply("en");
+    assert_russian(&failure.message);
+    assert_russian(&op.description());
+    // NoTf2 and Internal carry no text, so they read in the language of the moment.
+    assert_eq!(OpError::NoTf2.title(), "TF2 not found");
 }

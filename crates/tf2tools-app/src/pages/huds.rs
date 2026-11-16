@@ -903,8 +903,8 @@ impl HudsPage {
                         Err(failure.message)
                     });
                     file.map_err(|message| OpError::Core {
-                        action: UPDATE_FAILED,
-                        message,
+                        action: UPDATE_FAILED.into(),
+                        message: message.into(),
                     })
                 }
             };
@@ -1044,8 +1044,8 @@ impl HudsPage {
                 failed => {
                     let message = failed.err().unwrap_or(DOWNLOAD_GONE.to_owned());
                     let err = OpError::Core {
-                        action: UPDATE_FAILED,
-                        message,
+                        action: UPDATE_FAILED.into(),
+                        message: message.into(),
                     };
                     page.busy = None;
                     cx.notify();

@@ -8,43 +8,54 @@ use tf2tools_core::{
     QueryError, SettingsError, UpdateCopyError, WavError,
 };
 
+use gpui_kit::SharedString;
+
 use crate::audio::AudioError;
-use crate::pages::graphics::jobs::{CLOSE_TF2, CLOSE_TF2_TEXT};
+use crate::i18n::tr;
+use crate::pages::graphics::jobs::{close_tf2, close_tf2_text};
 use crate::services::{OpError, StartupError};
-use crate::store_messages::{LIBRARY_UPDATE, STORE_READ};
+use crate::store_messages::{library_update, store_read};
 
 /// What a caught panic tells the player.
-pub const INTERNAL: &str = "TF2Tools hit a problem it didn't expect. Try again, and restart TF2Tools if it keeps happening.";
+pub fn internal() -> SharedString {
+    tr!("messages.shared.internal")
+}
 
 const LIBRARY_DISK: &str = "TF2Tools couldn't read or save its files. Make sure your disk has free space and TF2Tools can write to its folder, then try again.";
-pub(crate) const LIBRARY_OPEN: &str =
-    "TF2Tools couldn't open your library. Restart TF2Tools and try again.";
+pub(crate) fn library_open() -> SharedString {
+    tr!("messages.shared.library_open")
+}
 const GONE: &str = "This item is no longer in your library. Pick another one.";
 const UNUSABLE: &str = "TF2Tools can't use this kind of file. Pick another file.";
-pub(crate) const TF2_WRITE: &str = "Couldn't change your TF2 folder. Make sure TF2 is closed and TF2Tools can write to it, then try again.";
+pub(crate) fn tf2_write() -> SharedString {
+    tr!("messages.shared.tf2_write")
+}
 const NEW_EXTERNAL_HUD: &str =
     "Another HUD turned up in your TF2 folder, so nothing was changed. Try again.";
 const PROFILE_GONE: &str = "This profile no longer exists. Pick another profile.";
 const PROFILES_OPEN: &str = "TF2Tools couldn't open your profiles. Restart TF2Tools and try again.";
 /// The game's HUD files are missing or unreadable.
-pub const HUD_FILES: &str =
-    "TF2Tools can't find TF2's HUD files. Check the TF2 folder in Settings.";
+pub fn hud_files() -> SharedString {
+    tr!("messages.shared.hud_files")
+}
 /// The game folder moved away since TF2Tools found it, so nothing was written.
-pub(crate) const GAME_MOVED: &str =
-    "TF2 wasn't found where it used to be. Check the TF2 folder in Settings.";
+pub(crate) fn game_moved() -> SharedString {
+    tr!("messages.shared.game_moved")
+}
 const UNKNOWN: &str =
     "Something went wrong. Try again, and restart TF2Tools if it keeps happening.";
 
-/// What the player reads about a failed local action, and the raw error for the developer log.
+/// What the player reads about a failed local action, in the language it was built in, and the
+/// raw error for the developer log.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LocalFailure {
-    pub message: String,
+    pub message: SharedString,
     pub detail: String,
 }
 
 impl LocalFailure {
     /// A failure with its player message and its raw developer detail.
-    pub fn new(message: impl Into<String>, detail: impl Into<String>) -> Self {
+    pub fn new(message: impl Into<SharedString>, detail: impl Into<String>) -> Self {
         Self {
             message: message.into(),
             detail: detail.into(),
@@ -57,8 +68,9 @@ impl LocalFailure {
     }
 
     /// Logs the raw detail under `action`, then returns the toast the player reads.
-    pub fn into_op(self, action: &'static str) -> OpError {
-        self.log(action);
+    pub fn into_op(self, action: impl Into<SharedString>) -> OpError {
+        let action = action.into();
+        self.log(&action);
         OpError::Core {
             action,
             message: self.message,
@@ -69,46 +81,50 @@ impl LocalFailure {
 /// A failed add-on install, reinstall or remove in player words.
 pub fn describe_gb_install(err: &GbAddonInstallError) -> LocalFailure {
     let message = match err {
-        GbAddonInstallError::Tf2Running => CLOSE_TF2_TEXT,
-        GbAddonInstallError::GameMissing { .. } => GAME_MOVED,
-        GbAddonInstallError::Io { .. } => {
-            "Couldn't write the add-on into TF2. Make sure your disk has free space, then try again."
-        }
-        GbAddonInstallError::NotInLibrary { .. } => {
-            "This add-on's files are no longer in your library. Install it again from the Addon Store."
-        }
-        GbAddonInstallError::Database { .. } => LIBRARY_UPDATE,
+        GbAddonInstallError::Tf2Running => close_tf2_text(),
+        GbAddonInstallError::GameMissing { .. } => game_moved(),
+        GbAddonInstallError::Io { .. } => SharedString::from(
+            "Couldn't write the add-on into TF2. Make sure your disk has free space, then try again.",
+        ),
+        GbAddonInstallError::NotInLibrary { .. } => SharedString::from(
+            "This add-on's files are no longer in your library. Install it again from the Addon Store.",
+        ),
+        GbAddonInstallError::Database { .. } => library_update(),
         GbAddonInstallError::UnknownPayload { .. } | GbAddonInstallError::NothingChosen | _ => {
-            UNKNOWN
+            SharedString::from(UNKNOWN)
         }
     };
     LocalFailure::new(message, err.to_string())
 }
 
 /// The toast for a failed add-on operation titled `action`: "Close TF2 first" when TF2 runs.
-pub fn gb_install_op(err: &GbAddonInstallError, action: &'static str) -> OpError {
+pub fn gb_install_op(err: &GbAddonInstallError, action: impl Into<SharedString>) -> OpError {
     let action = if matches!(err, GbAddonInstallError::Tf2Running) {
-        CLOSE_TF2
+        close_tf2()
     } else {
-        action
+        action.into()
     };
     describe_gb_install(err).into_op(action)
 }
 
 /// The toast title of a map installed while TF2 runs: the game only sees it after a restart.
-pub const MAP_RESTART: &str = "Installed. Restart TF2 to play it.";
+pub fn map_restart() -> SharedString {
+    tr!("messages.shared.map_restart")
+}
 
 /// Added to a map toast's description when files beside the maps were left out.
-pub const MAP_SKIPPED: &str = "Some extra files in this download were skipped.";
+pub fn map_skipped() -> SharedString {
+    tr!("messages.shared.map_skipped")
+}
 
 /// A failed map install or update in player words.
 pub fn describe_gb_map_install(err: &GbMapInstallError) -> LocalFailure {
     let message = match err {
-        GbMapInstallError::Tf2Running => CLOSE_TF2_TEXT.to_owned(),
-        GbMapInstallError::GameMissing { .. } => GAME_MOVED.to_owned(),
+        GbMapInstallError::Tf2Running => close_tf2_text().to_string(),
+        GbMapInstallError::GameMissing { .. } => game_moved().to_string(),
         GbMapInstallError::AlreadyPresent { names } => already_have(names, false),
         GbMapInstallError::Io { .. } => "Couldn't write the map into TF2. If TF2 is running, close it and try again. Otherwise make sure your disk has free space.".to_owned(),
-        GbMapInstallError::Database { .. } => LIBRARY_UPDATE.to_owned(),
+        GbMapInstallError::Database { .. } => library_update().to_string(),
         GbMapInstallError::NothingChosen | GbMapInstallError::UnknownMap { .. } | _ => {
             UNKNOWN.to_owned()
         }
@@ -117,11 +133,11 @@ pub fn describe_gb_map_install(err: &GbMapInstallError) -> LocalFailure {
 }
 
 /// The toast for a failed map operation titled `action`: "Close TF2 first" when TF2 runs.
-pub fn gb_map_install_op(err: &GbMapInstallError, action: &'static str) -> OpError {
+pub fn gb_map_install_op(err: &GbMapInstallError, action: impl Into<SharedString>) -> OpError {
     let action = if matches!(err, GbMapInstallError::Tf2Running) {
-        CLOSE_TF2
+        close_tf2()
     } else {
-        action
+        action.into()
     };
     describe_gb_map_install(err).into_op(action)
 }
@@ -129,23 +145,25 @@ pub fn gb_map_install_op(err: &GbMapInstallError, action: &'static str) -> OpErr
 /// A failed map remove in player words.
 pub fn describe_gb_map_remove(err: &GbMapRemoveError) -> LocalFailure {
     let message = match err {
-        GbMapRemoveError::Tf2Running => CLOSE_TF2_TEXT,
-        GbMapRemoveError::Io { .. } => {
-            "Couldn't delete the map's files. Close TF2 if it is running, then try again."
+        GbMapRemoveError::Tf2Running => close_tf2_text(),
+        GbMapRemoveError::Io { .. } => SharedString::from(
+            "Couldn't delete the map's files. Close TF2 if it is running, then try again.",
+        ),
+        GbMapRemoveError::NotInLibrary { .. } => {
+            SharedString::from("This map is no longer in your library.")
         }
-        GbMapRemoveError::NotInLibrary { .. } => "This map is no longer in your library.",
-        GbMapRemoveError::Database { .. } => LIBRARY_UPDATE,
-        GbMapRemoveError::NotAMap { .. } | _ => UNKNOWN,
+        GbMapRemoveError::Database { .. } => library_update(),
+        GbMapRemoveError::NotAMap { .. } | _ => SharedString::from(UNKNOWN),
     };
     LocalFailure::new(message, err.to_string())
 }
 
 /// The toast for a failed map remove titled `action`: "Close TF2 first" when TF2 runs.
-pub fn gb_map_remove_op(err: &GbMapRemoveError, action: &'static str) -> OpError {
+pub fn gb_map_remove_op(err: &GbMapRemoveError, action: impl Into<SharedString>) -> OpError {
     let action = if matches!(err, GbMapRemoveError::Tf2Running) {
-        CLOSE_TF2
+        close_tf2()
     } else {
-        action
+        action.into()
     };
     describe_gb_map_remove(err).into_op(action)
 }
@@ -168,27 +186,32 @@ pub fn already_have(names: &[String], serveme: bool) -> String {
 /// A failed read or change of the library in player words; `detail` is the error's own text.
 pub fn describe_library(err: &LibraryError) -> LocalFailure {
     let message = match err {
-        LibraryError::Io { .. } => LIBRARY_DISK,
-        LibraryError::NotFound { .. } => GONE,
+        LibraryError::Io { .. } => SharedString::from(LIBRARY_DISK),
+        LibraryError::NotFound { .. } => SharedString::from(GONE),
         LibraryError::InvalidWeaponScript { .. } => {
-            "TF2Tools doesn't know this weapon. Pick another weapon."
+            SharedString::from("TF2Tools doesn't know this weapon. Pick another weapon.")
         }
-        LibraryError::Vpk(_) => "This sound file couldn't be read. Delete it and add it again.",
+        LibraryError::Vpk(_) => {
+            SharedString::from("This sound file couldn't be read. Delete it and add it again.")
+        }
         LibraryError::Vtf(_) => {
-            "This crosshair image couldn't be read. Delete it and add it again."
+            SharedString::from("This crosshair image couldn't be read. Delete it and add it again.")
         }
-        LibraryError::Database { .. } => LIBRARY_OPEN,
-        _ => UNKNOWN,
+        LibraryError::Database { .. } => library_open(),
+        _ => SharedString::from(UNKNOWN),
     };
     LocalFailure::new(message, err.to_string())
 }
 
 /// A copy's files could not be read to show a newly chosen option of its own.
-pub const HUD_OPTIONS_UNREADABLE: &str = "This HUD's files couldn't be read, so the canvas can't show that option yet. Your choice is kept.";
+pub fn hud_options_unreadable() -> SharedString {
+    tr!("messages.shared.hud_options_unreadable")
+}
 
 /// A HUD Maker save refused because the copy was updated after the page opened it.
-pub const HUD_BASE_CHANGED: &str =
-    "This HUD was updated while it was open. Close it and open it again to keep editing.";
+pub fn hud_base_changed() -> SharedString {
+    tr!("messages.shared.hud_base_changed")
+}
 
 /// A failed HUD Maker save in player words; `detail` is the error's own text.
 pub fn describe_make_hud(err: &MakeHudError) -> LocalFailure {
@@ -205,9 +228,9 @@ pub fn describe_make_hud(err: &MakeHudError) -> LocalFailure {
             "This HUD wasn't made in the HUD Maker, so it can't be saved over.".to_owned()
         }
         MakeHudError::NoSpace { needed, .. } => no_space_text("save", *needed),
-        MakeHudError::Files(_) => HUD_FILES.to_owned(),
-        MakeHudError::Database { .. } => LIBRARY_UPDATE.to_owned(),
-        MakeHudError::BaseChanged => HUD_BASE_CHANGED.to_owned(),
+        MakeHudError::Files(_) => hud_files().to_string(),
+        MakeHudError::Database { .. } => library_update().to_string(),
+        MakeHudError::BaseChanged => hud_base_changed().to_string(),
         _ => UNKNOWN.to_owned(),
     };
     LocalFailure::new(message, err.to_string())
@@ -217,13 +240,13 @@ pub fn describe_make_hud(err: &MakeHudError) -> LocalFailure {
 pub fn describe_hud_load(err: &HudLoadError) -> LocalFailure {
     let message = match err {
         HudLoadError::Damaged { .. } | HudLoadError::Newer | HudLoadError::NotMade { .. } => {
-            "This HUD can't be opened for editing. You can still install it."
+            SharedString::from("This HUD can't be opened for editing. You can still install it.")
         }
-        HudLoadError::NotFound { .. } => GONE,
-        HudLoadError::Files(_) => HUD_FILES,
-        HudLoadError::Io { .. } => LIBRARY_DISK,
-        HudLoadError::Database { .. } => LIBRARY_OPEN,
-        _ => UNKNOWN,
+        HudLoadError::NotFound { .. } => SharedString::from(GONE),
+        HudLoadError::Files(_) => hud_files(),
+        HudLoadError::Io { .. } => SharedString::from(LIBRARY_DISK),
+        HudLoadError::Database { .. } => library_open(),
+        _ => SharedString::from(UNKNOWN),
     };
     LocalFailure::new(message, err.to_string())
 }
@@ -315,7 +338,7 @@ pub fn describe_copy_hud(err: &CopyHudError) -> LocalFailure {
         }
         CopyHudError::NoSpace { needed, .. } => no_space_text("copy", *needed),
         CopyHudError::Io { .. } => LIBRARY_DISK.to_owned(),
-        CopyHudError::Database { .. } => LIBRARY_OPEN.to_owned(),
+        CopyHudError::Database { .. } => library_open().to_string(),
         _ => UNKNOWN.to_owned(),
     };
     LocalFailure::new(message, err.to_string())
@@ -396,8 +419,8 @@ pub fn describe_update_copy(err: &UpdateCopyError) -> LocalFailure {
             "That HUD isn't a newer version of this copy's HUD.".to_owned()
         }
         UpdateCopyError::NoSpace { needed, .. } => no_space_text("update", *needed),
-        UpdateCopyError::Load(e) => describe_hud_load(e).message,
-        UpdateCopyError::Save(e) => describe_make_hud(e).message,
+        UpdateCopyError::Load(e) => describe_hud_load(e).message.to_string(),
+        UpdateCopyError::Save(e) => describe_make_hud(e).message.to_string(),
         _ => UNKNOWN.to_owned(),
     };
     LocalFailure::new(message, err.to_string())
@@ -419,10 +442,10 @@ pub fn describe_paint(err: &PaintError, step: PaintStep) -> LocalFailure {
     let message = match (err, step) {
         (PaintError::Io { .. }, PaintStep::Open) => LIBRARY_DISK.to_owned(),
         (PaintError::Io { .. }, _) => "Couldn't save the crosshair: your disk may be full or the folder isn't writable. Your drawing is still here.".to_owned(),
-        (PaintError::Database { .. }, PaintStep::SaveNew) => LIBRARY_UPDATE.to_owned(),
+        (PaintError::Database { .. }, PaintStep::SaveNew) => library_update().to_string(),
         // One sentence true whether the re-save failed before or after its files were written.
         (PaintError::Database { .. }, PaintStep::Resave) => "Couldn't update your crosshair library. Your drawing is still here, so try saving again.".to_owned(),
-        (PaintError::Database { .. }, PaintStep::Open) => LIBRARY_OPEN.to_owned(),
+        (PaintError::Database { .. }, PaintStep::Open) => library_open().to_string(),
         (PaintError::NameTaken { name }, _) => {
             format!("You already have a crosshair called {name}. Pick another name.")
         }
@@ -444,21 +467,29 @@ pub fn describe_paint(err: &PaintError, step: PaintStep) -> LocalFailure {
 /// A failed import of a picked file in player words; `detail` is the error's own text.
 pub fn describe_import(err: &ImportError) -> LocalFailure {
     let message = match err {
-        ImportError::Io { .. } => {
-            "Couldn't read that file or save it to your library. Make sure your disk has free space, then try again."
+        ImportError::Io { .. } => SharedString::from(
+            "Couldn't read that file or save it to your library. Make sure your disk has free space, then try again.",
+        ),
+        ImportError::Archive(_) => {
+            SharedString::from("This archive couldn't be unpacked. Pick another file.")
         }
-        ImportError::Archive(_) => "This archive couldn't be unpacked. Pick another file.",
-        ImportError::NotAHud { .. } => "This file doesn't contain a HUD. Pick another file.",
+        ImportError::NotAHud { .. } => {
+            SharedString::from("This file doesn't contain a HUD. Pick another file.")
+        }
         ImportError::UnsupportedFile { .. }
         | ImportError::NotAVpk { .. }
-        | ImportError::UnsupportedProvenance => UNUSABLE,
-        ImportError::Wav(WavError::Unsupported { .. }) => {
-            "TF2 can't play this sound's format. Save it as a CD-quality stereo WAV, then try again."
+        | ImportError::UnsupportedProvenance => SharedString::from(UNUSABLE),
+        ImportError::Wav(WavError::Unsupported { .. }) => SharedString::from(
+            "TF2 can't play this sound's format. Save it as a CD-quality stereo WAV, then try again.",
+        ),
+        ImportError::Wav(_) => {
+            SharedString::from("This sound file couldn't be read. Pick another file.")
         }
-        ImportError::Wav(_) => "This sound file couldn't be read. Pick another file.",
-        ImportError::Vtf(_) => "This image couldn't be read. Pick another PNG or VTF file.",
-        ImportError::Database { .. } => LIBRARY_UPDATE,
-        _ => UNKNOWN,
+        ImportError::Vtf(_) => {
+            SharedString::from("This image couldn't be read. Pick another PNG or VTF file.")
+        }
+        ImportError::Database { .. } => library_update(),
+        _ => SharedString::from(UNKNOWN),
     };
     LocalFailure::new(message, err.to_string())
 }
@@ -492,12 +523,12 @@ pub fn describe_png_write(err: &PngWriteError) -> LocalFailure {
 /// A failed copy into, or removal from, tf/custom; `detail` is the error's own text.
 pub fn describe_tf2_install(err: &InstallError) -> LocalFailure {
     let message = match err {
-        InstallError::Io { .. } => TF2_WRITE,
-        InstallError::NotInLibrary { .. } => GONE,
-        InstallError::Database { .. } => LIBRARY_UPDATE,
-        InstallError::ExternalHuds(_) => NEW_EXTERNAL_HUD,
-        InstallError::GameMissing { .. } => GAME_MOVED,
-        _ => UNKNOWN,
+        InstallError::Io { .. } => tf2_write(),
+        InstallError::NotInLibrary { .. } => SharedString::from(GONE),
+        InstallError::Database { .. } => library_update(),
+        InstallError::ExternalHuds(_) => SharedString::from(NEW_EXTERNAL_HUD),
+        InstallError::GameMissing { .. } => game_moved(),
+        _ => SharedString::from(UNKNOWN),
     };
     LocalFailure::new(message, err.to_string())
 }
@@ -505,14 +536,14 @@ pub fn describe_tf2_install(err: &InstallError) -> LocalFailure {
 /// A failed copy of a HUD into the library; nothing left TF2, and `detail` is the error's own text.
 pub fn describe_keep_hud(err: &KeepHudError) -> LocalFailure {
     let message = match err {
-        KeepHudError::Io { .. } => {
-            "Couldn't copy your HUD into your library, so nothing was removed. Make sure your drive has free space, then try again."
-        }
-        KeepHudError::NotCopyable { .. } => {
-            "Your HUD holds a shortcut TF2Tools can't copy, so nothing was removed."
-        }
-        KeepHudError::Database { .. } => LIBRARY_UPDATE,
-        _ => UNKNOWN,
+        KeepHudError::Io { .. } => SharedString::from(
+            "Couldn't copy your HUD into your library, so nothing was removed. Make sure your drive has free space, then try again.",
+        ),
+        KeepHudError::NotCopyable { .. } => SharedString::from(
+            "Your HUD holds a shortcut TF2Tools can't copy, so nothing was removed.",
+        ),
+        KeepHudError::Database { .. } => library_update(),
+        _ => SharedString::from(UNKNOWN),
     };
     LocalFailure::new(message, err.to_string())
 }
@@ -520,23 +551,23 @@ pub fn describe_keep_hud(err: &KeepHudError) -> LocalFailure {
 /// A failed read or save of a profile in player words; `detail` is the error's own text.
 pub fn describe_profile(err: &ProfileError) -> LocalFailure {
     let message = match err {
-        ProfileError::NotFound { .. } => PROFILE_GONE,
-        ProfileError::EmptyName => "Give the profile a name, then try again.",
+        ProfileError::NotFound { .. } => SharedString::from(PROFILE_GONE),
+        ProfileError::EmptyName => SharedString::from("Give the profile a name, then try again."),
         ProfileError::NameTaken { name } => {
             let message = crate::pages::profiles::model::taken_message(name);
             return LocalFailure::new(message, err.to_string());
         }
-        ProfileError::ItemNotFound { .. } => {
-            "An item you picked is no longer in your library. Pick another one, then try again."
-        }
-        ProfileError::InvalidWeaponScript { .. } => {
-            "TF2Tools doesn't know one of this profile's weapons. Edit the profile and try again."
-        }
+        ProfileError::ItemNotFound { .. } => SharedString::from(
+            "An item you picked is no longer in your library. Pick another one, then try again.",
+        ),
+        ProfileError::InvalidWeaponScript { .. } => SharedString::from(
+            "TF2Tools doesn't know one of this profile's weapons. Edit the profile and try again.",
+        ),
         ProfileError::Library(e) => {
             return LocalFailure::new(describe_library(e).message, err.to_string());
         }
-        ProfileError::Database { .. } => PROFILES_OPEN,
-        _ => UNKNOWN,
+        ProfileError::Database { .. } => SharedString::from(PROFILES_OPEN),
+        _ => SharedString::from(UNKNOWN),
     };
     LocalFailure::new(message, err.to_string())
 }
@@ -544,15 +575,15 @@ pub fn describe_profile(err: &ProfileError) -> LocalFailure {
 /// A profile activation that failed before any step ran; `detail` is the error's own text.
 pub fn describe_apply_profile(err: &ApplyProfileError) -> LocalFailure {
     let message = match err {
-        ApplyProfileError::NotFound { .. } => PROFILE_GONE,
-        ApplyProfileError::Missing(_) => {
-            "Some items in this profile are missing. Download them again, then try again."
-        }
-        ApplyProfileError::ExternalHuds(_) => NEW_EXTERNAL_HUD,
-        ApplyProfileError::Io { .. } => TF2_WRITE,
-        ApplyProfileError::Database { .. } => PROFILES_OPEN,
-        ApplyProfileError::GameMissing { .. } => GAME_MOVED,
-        _ => UNKNOWN,
+        ApplyProfileError::NotFound { .. } => SharedString::from(PROFILE_GONE),
+        ApplyProfileError::Missing(_) => SharedString::from(
+            "Some items in this profile are missing. Download them again, then try again.",
+        ),
+        ApplyProfileError::ExternalHuds(_) => SharedString::from(NEW_EXTERNAL_HUD),
+        ApplyProfileError::Io { .. } => tf2_write(),
+        ApplyProfileError::Database { .. } => SharedString::from(PROFILES_OPEN),
+        ApplyProfileError::GameMissing { .. } => game_moved(),
+        _ => SharedString::from(UNKNOWN),
     };
     LocalFailure::new(message, err.to_string())
 }
@@ -596,7 +627,7 @@ pub fn describe_detect(err: &DetectError) -> LocalFailure {
 
 /// A failed read of the stores' sync status; `detail` is the error's own text.
 pub fn describe_store_status(err: &QueryError) -> LocalFailure {
-    LocalFailure::new(STORE_READ, err.to_string())
+    LocalFailure::new(store_read(), err.to_string())
 }
 
 /// A failed install of a HUD's fonts in player words; `detail` is the error's own text.

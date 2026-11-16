@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use gpui_kit::AppContext as _;
-use gpui_kit::{App, Entity, Global, Task};
+use gpui_kit::{App, Entity, Global, SharedString, Task};
 use tf2tools_core::{
     ActivityLog, BuiltinCrosshairs, DataDir, Database, DetectError, Endpoints, FontHost, Library,
     LogsCache, LogsClient, LogsEndpoints, OpenError, StoreClient, StoreConfig, Tf2Install,
@@ -13,6 +13,7 @@ use tf2tools_core::{
 
 use crate::assets::{AssetRoot, AssetRootError};
 use crate::audio::AudioOut;
+use crate::i18n::tr;
 use crate::local_messages;
 use crate::picker::PathPicker;
 
@@ -140,39 +141,40 @@ pub enum StartupError {
     Catalog { path: PathBuf, message: String },
 }
 
-/// A failed page action, shaped as a toast's title and description.
+/// A failed page action, shaped as a toast's title and description. `Core` holds text already
+/// in the player's language; `NoTf2` and `Internal` read the catalogue when shown.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpError {
     NoTf2,
     Core {
-        action: &'static str,
-        message: String,
+        action: SharedString,
+        message: SharedString,
     },
     Internal(String),
 }
 
 impl OpError {
     /// A core error, titled by the action that failed.
-    pub fn core(action: &'static str, err: impl fmt::Display) -> Self {
+    pub fn core(action: impl Into<SharedString>, err: impl fmt::Display) -> Self {
         Self::Core {
-            action,
-            message: err.to_string(),
+            action: action.into(),
+            message: err.to_string().into(),
         }
     }
 
-    pub fn title(&self) -> &str {
+    pub fn title(&self) -> SharedString {
         match self {
-            Self::NoTf2 => "TF2 not found",
-            Self::Core { action, .. } => action,
-            Self::Internal(_) => "Something went wrong",
+            Self::NoTf2 => tr!("messages.shared.no_tf2_title"),
+            Self::Core { action, .. } => action.clone(),
+            Self::Internal(_) => tr!("messages.shared.internal_title"),
         }
     }
 
-    pub fn description(&self) -> &str {
+    pub fn description(&self) -> SharedString {
         match self {
-            Self::NoTf2 => "Set the TF2 folder in Settings, then try again.",
-            Self::Core { message, .. } => message,
-            Self::Internal(_) => local_messages::INTERNAL,
+            Self::NoTf2 => tr!("messages.shared.no_tf2_text"),
+            Self::Core { message, .. } => message.clone(),
+            Self::Internal(_) => local_messages::internal(),
         }
     }
 }
@@ -180,12 +182,12 @@ impl OpError {
 // A panic shows the player fixed words, but its own text stays in `Display` for the log.
 impl fmt::Display for OpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.title())?;
+        f.write_str(&self.title())?;
         let description = match self {
-            Self::Internal(raw) => raw,
+            Self::Internal(raw) => raw.as_str().into(),
             Self::NoTf2 | Self::Core { .. } => self.description(),
         };
-        match description {
+        match &*description {
             "" => Ok(()),
             description => write!(f, ": {description}"),
         }

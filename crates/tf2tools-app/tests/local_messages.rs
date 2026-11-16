@@ -2,14 +2,15 @@ use crate::support;
 
 use std::path::PathBuf;
 
+use gpui_kit::SharedString;
 use tf2tools_app::assets::AssetRoot;
 use tf2tools_app::audio::AudioError;
 use tf2tools_app::local_messages::{
-    INTERNAL, LocalFailure, PaintStep, describe_apply_profile, describe_audio, describe_detect,
+    LocalFailure, PaintStep, describe_apply_profile, describe_audio, describe_detect,
     describe_font_install, describe_hud_load, describe_import, describe_library, describe_log,
     describe_make_hud, describe_paint, describe_png_read, describe_png_write, describe_profile,
     describe_settings, describe_startup, describe_store_status, describe_tf2_folder,
-    describe_tf2_install, left_out, reopen_notice,
+    describe_tf2_install, internal, left_out, reopen_notice,
 };
 use tf2tools_app::services::{OpError, StartupError};
 use tf2tools_core::{
@@ -24,7 +25,7 @@ fn a_local_failure_toasts_its_plain_message_under_its_action() {
     assert_eq!(
         failure.into_op("Failed to load HUDs"),
         OpError::Core {
-            action: "Failed to load HUDs",
+            action: "Failed to load HUDs".into(),
             message: "Try again.".into()
         }
     );
@@ -33,17 +34,17 @@ fn a_local_failure_toasts_its_plain_message_under_its_action() {
 #[test]
 fn a_panic_reads_as_player_advice_and_keeps_its_text_for_the_log() {
     assert_eq!(
-        INTERNAL,
+        internal(),
         "TF2Tools hit a problem it didn't expect. Try again, and restart TF2Tools if it keeps happening."
     );
     let err = OpError::Internal("index out of bounds at src/pages/huds.rs:9".into());
     assert_eq!(err.title(), "Something went wrong");
-    assert_eq!(err.description(), INTERNAL);
+    assert_eq!(err.description(), internal());
     assert_eq!(
         err.to_string(),
         "Something went wrong: index out of bounds at src/pages/huds.rs:9"
     );
-    support::assert_plain(INTERNAL);
+    support::assert_plain(&internal());
 }
 
 const LIBRARY_OPEN: &str = "TF2Tools couldn't open your library. Restart TF2Tools and try again.";
@@ -732,7 +733,7 @@ fn every_hud_maker_save_failure_reads_as_player_words() {
             message: "locked".into(),
         },
     ];
-    let messages: Vec<String> = errors
+    let messages: Vec<SharedString> = errors
         .iter()
         .map(|e| describe_make_hud(e).message)
         .collect();
@@ -1008,10 +1009,11 @@ fn every_update_failure_reads_in_player_words() {
 #[test]
 fn addon_install_failures_read_as_plain_words() {
     use tf2tools_app::local_messages::{describe_gb_install, gb_install_op};
-    use tf2tools_app::pages::graphics::jobs::{CLOSE_TF2, CLOSE_TF2_TEXT};
+    use tf2tools_app::pages::graphics::jobs::{close_tf2, close_tf2_text};
     use tf2tools_core::{GbAddonInstallError, GbId};
+    let close_text = close_tf2_text();
     let cases: Vec<(GbAddonInstallError, &str)> = vec![
-        (GbAddonInstallError::Tf2Running, CLOSE_TF2_TEXT),
+        (GbAddonInstallError::Tf2Running, close_text.as_str()),
         (
             GbAddonInstallError::GameMissing {
                 path: PathBuf::from("/g/tf"),
@@ -1044,27 +1046,25 @@ fn addon_install_failures_read_as_plain_words() {
     }
     assert!(matches!(
         gb_install_op(&GbAddonInstallError::Tf2Running, "Couldn't install the add-on"),
-        OpError::Core { action, ref message } if action == CLOSE_TF2 && message == CLOSE_TF2_TEXT
+        OpError::Core { action, ref message } if action == close_tf2() && *message == close_tf2_text()
     ));
     assert!(matches!(
         gb_install_op(
             &GbAddonInstallError::NothingChosen,
             "Couldn't install the add-on"
         ),
-        OpError::Core {
-            action: "Couldn't install the add-on",
-            ..
-        }
+        OpError::Core { ref action, .. } if action == "Couldn't install the add-on"
     ));
 }
 
 #[test]
 fn map_install_failures_read_as_plain_words() {
     use tf2tools_app::local_messages::{already_have, describe_gb_map_install, gb_map_install_op};
-    use tf2tools_app::pages::graphics::jobs::{CLOSE_TF2, CLOSE_TF2_TEXT};
+    use tf2tools_app::pages::graphics::jobs::{close_tf2, close_tf2_text};
     use tf2tools_core::GbMapInstallError;
+    let close_text = close_tf2_text();
     let cases: Vec<(GbMapInstallError, &str)> = vec![
-        (GbMapInstallError::Tf2Running, CLOSE_TF2_TEXT),
+        (GbMapInstallError::Tf2Running, close_text.as_str()),
         (
             GbMapInstallError::GameMissing {
                 path: PathBuf::from("/g/tf"),
@@ -1091,7 +1091,7 @@ fn map_install_failures_read_as_plain_words() {
     }
     assert!(matches!(
         gb_map_install_op(&GbMapInstallError::Tf2Running, "Couldn't update the map"),
-        OpError::Core { action, ref message } if action == CLOSE_TF2 && message == CLOSE_TF2_TEXT
+        OpError::Core { action, ref message } if action == close_tf2() && *message == close_tf2_text()
     ));
     let names = |n: &[&str]| n.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
     assert_eq!(
@@ -1111,10 +1111,11 @@ fn map_install_failures_read_as_plain_words() {
 #[test]
 fn map_remove_failures_read_as_plain_words() {
     use tf2tools_app::local_messages::{describe_gb_map_remove, gb_map_remove_op};
-    use tf2tools_app::pages::graphics::jobs::{CLOSE_TF2, CLOSE_TF2_TEXT};
+    use tf2tools_app::pages::graphics::jobs::{close_tf2, close_tf2_text};
     use tf2tools_core::{GbId, GbMapRemoveError};
+    let close_text = close_tf2_text();
     let cases: Vec<(GbMapRemoveError, &str)> = vec![
-        (GbMapRemoveError::Tf2Running, CLOSE_TF2_TEXT),
+        (GbMapRemoveError::Tf2Running, close_text.as_str()),
         (
             GbMapRemoveError::Io {
                 path: PathBuf::from("/g/tf/custom"),
@@ -1141,6 +1142,6 @@ fn map_remove_failures_read_as_plain_words() {
     }
     assert!(matches!(
         gb_map_remove_op(&GbMapRemoveError::Tf2Running, "Couldn't remove the map"),
-        OpError::Core { action, .. } if action == CLOSE_TF2
+        OpError::Core { action, .. } if action == close_tf2()
     ));
 }

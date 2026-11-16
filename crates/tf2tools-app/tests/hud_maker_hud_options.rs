@@ -559,7 +559,7 @@ fn a_reload_that_cannot_read_the_files_says_so_in_plain_words(cx: &mut TestAppCo
     let said = support::toast_labels(cx, s.win);
     let line = said.iter().find(|t| t.contains("option")).expect("a toast");
     assert!(
-        line.ends_with(tf2tools_app::local_messages::HUD_OPTIONS_UNREADABLE),
+        line.ends_with(tf2tools_app::local_messages::hud_options_unreadable().as_str()),
         "{line}"
     );
     support::assert_plain(line);

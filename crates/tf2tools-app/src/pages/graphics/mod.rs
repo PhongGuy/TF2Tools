@@ -384,8 +384,8 @@ impl GraphicsPage {
                         (ToastKind::Warning, title.into(), text.into())
                     })),
                     Err(ModulesFailure::Foreign) => Err(OpError::Core {
-                        action: SAVE_FAILED,
-                        message: FOREIGN_MODULES_CFG.to_owned(),
+                        action: SAVE_FAILED.into(),
+                        message: FOREIGN_MODULES_CFG.into(),
                     }),
                     Err(ModulesFailure::Op(err)) => Err(err),
                 }

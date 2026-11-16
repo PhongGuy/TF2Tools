@@ -6,20 +6,25 @@ use tf2tools_core::{
     InstallError, PreviewError, StoreKind,
 };
 
+use gpui_kit::SharedString;
+
+use crate::i18n::tr;
 use crate::services::OpError;
 use crate::sync_messages::{THROTTLED, source_name};
 
 const DL_STOPPED: &str = "The download stopped before it finished. Try again.";
 const DL_DISK: &str = "Couldn't save the download. Make sure your disk has free space and TF2Tools can write to its folder, then try again.";
-pub(crate) const LIBRARY_UPDATE: &str =
-    "TF2Tools couldn't update your library. Restart TF2Tools and try again.";
+pub(crate) fn library_update() -> SharedString {
+    tr!("messages.shared.library_update")
+}
 const DL_UNUSABLE: &str = "This download has nothing TF2Tools can use. Pick another file.";
 const DL_LOCKED: &str = "This download is locked with a password, so TF2Tools can't open it.";
 const DL_UNPACK: &str = "The download couldn't be unpacked. Try again, or pick another file.";
 const DL_UNKNOWN: &str = "Something went wrong with the download. Try again later.";
 const FILES_STOPPED: &str = "Loading the files stopped before it finished. Try again.";
-pub(crate) const STORE_READ: &str =
-    "TF2Tools couldn't read the store. Restart TF2Tools and try again.";
+pub(crate) fn store_read() -> SharedString {
+    tr!("messages.shared.store_read")
+}
 const FILES_UNKNOWN: &str = "Couldn't load the files. Try again later.";
 const PV_FETCH: &str = "Couldn't get this preview from GameBanana. Try again later.";
 const PV_UNAVAILABLE: &str = "Couldn't play this preview. Try again later.";
@@ -97,7 +102,7 @@ fn download_message(kind: StoreKind, err: &DownloadError) -> String {
         }
         DownloadError::Io { .. } | DownloadError::Import(ImportError::Io { .. }) => DL_DISK.into(),
         DownloadError::Database { .. } | DownloadError::Import(ImportError::Database { .. }) => {
-            LIBRARY_UPDATE.into()
+            library_update().into()
         }
         DownloadError::NoUsableFiles { .. } | DownloadError::Import(_) => DL_UNUSABLE.into(),
         DownloadError::Interrupted { .. } => DL_STOPPED.into(),
@@ -133,7 +138,7 @@ pub fn describe_files(kind: StoreKind, err: &FilesError) -> StoreFailure {
         FilesError::Http { .. } | FilesError::TooLarge { .. } | FilesError::Malformed { .. } => {
             format!("{source} sent something TF2Tools couldn't read. Try again later.")
         }
-        FilesError::Database { .. } => STORE_READ.into(),
+        FilesError::Database { .. } => store_read().into(),
         FilesError::Throttled { .. } => THROTTLED.into(),
         _ => FILES_UNKNOWN.into(),
     };
@@ -317,7 +322,7 @@ pub fn preview_unavailable(detail: String) -> StoreFailure {
 /// A failed local read of a store or the library behind it; the message is fixed and
 /// `detail` is the error's own text, a panic included.
 pub fn describe_store_read(err: &OpError) -> StoreFailure {
-    StoreFailure::new(STORE_READ, err.to_string())
+    StoreFailure::new(store_read(), err.to_string())
 }
 
 /// Logs a failed store read as "store load failed: ..." and returns the line the player reads.
@@ -330,16 +335,16 @@ pub fn read_failed(err: &OpError) -> String {
 /// A failed copy of a library item into tf/custom in player words; `detail` is the error's own text.
 pub fn describe_install(err: &InstallError) -> StoreFailure {
     let message = match err {
-        InstallError::Io { .. } => {
-            "Couldn't copy the addon into TF2. Make sure TF2Tools can write to your TF2 folder, then try again."
-        }
+        InstallError::Io { .. } => SharedString::from(
+            "Couldn't copy the addon into TF2. Make sure TF2Tools can write to your TF2 folder, then try again.",
+        ),
         InstallError::NotInLibrary { .. } => {
-            "This addon is no longer in your library. Download it again."
+            SharedString::from("This addon is no longer in your library. Download it again.")
         }
-        InstallError::Database { .. } => LIBRARY_UPDATE,
-        InstallError::GameMissing { .. } => crate::local_messages::GAME_MOVED,
+        InstallError::Database { .. } => library_update(),
+        InstallError::GameMissing { .. } => crate::local_messages::game_moved(),
         InstallError::ExternalHuds(_) | _ => {
-            "Something went wrong while installing. Try again later."
+            SharedString::from("Something went wrong while installing. Try again later.")
         }
     };
     StoreFailure::new(message, err.to_string())

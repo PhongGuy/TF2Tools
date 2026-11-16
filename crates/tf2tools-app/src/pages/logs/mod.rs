@@ -309,7 +309,7 @@ impl LogsPage {
                     Err(err) => {
                         page.has_more = false;
                         page.entries.clear();
-                        page.error = Some(err.description().to_owned());
+                        page.error = Some(err.description().to_string());
                     }
                 }
                 page.list

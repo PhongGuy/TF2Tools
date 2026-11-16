@@ -15,8 +15,8 @@ use tf2tools_core::{
 
 use crate::library_events::LibraryEvents;
 use crate::local_messages::{
-    LocalFailure, MAP_RESTART, MAP_SKIPPED, already_have, describe_library, gb_install_op,
-    gb_map_install_op, gb_map_remove_op,
+    LocalFailure, already_have, describe_library, gb_install_op, gb_map_install_op,
+    gb_map_remove_op, map_restart, map_skipped,
 };
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::payload_checklist::{ChecklistItem, open_map_checklist, open_payload_checklist};
@@ -500,13 +500,17 @@ impl GbAddonInstalls {
             } => {
                 let name = entry.name();
                 let description = if skipped {
-                    format!("{name}. {MAP_SKIPPED}")
+                    format!("{name}. {}", map_skipped())
                 } else {
                     name.to_owned()
                 };
                 self.put(entry);
-                let title = if restart { MAP_RESTART } else { titles.done };
-                Some((ToastKind::Success, title.to_owned(), description))
+                let title = if restart {
+                    map_restart().to_string()
+                } else {
+                    titles.done.to_owned()
+                };
+                Some((ToastKind::Success, title, description))
             }
             Outcome::Removed { id, name } => {
                 self.entries = self
@@ -519,8 +523,8 @@ impl GbAddonInstalls {
             }
             Outcome::Failed(err) => Some((
                 ToastKind::Error,
-                err.title().to_owned(),
-                err.description().to_owned(),
+                err.title().to_string(),
+                err.description().to_string(),
             )),
             Outcome::Cancelled => None,
         };

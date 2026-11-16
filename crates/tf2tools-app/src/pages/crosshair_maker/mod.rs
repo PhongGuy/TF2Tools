@@ -720,7 +720,7 @@ impl CrosshairMakerPage {
                             },
                             PaintStep::SaveNew,
                         );
-                        page.name_error = Some((taken, line.message));
+                        page.name_error = Some((taken, line.message.to_string()));
                         cx.notify();
                     });
                     return;

@@ -6,7 +6,7 @@ use crate::support;
 use std::sync::{Arc, Mutex};
 
 use gpui_kit::TestAppContext;
-use tf2tools_app::local_messages::{INTERNAL, LocalFailure};
+use tf2tools_app::local_messages::{LocalFailure, internal};
 use tf2tools_app::services::{OpError, run_blocking};
 
 struct Capture(Arc<Mutex<Vec<u8>>>);
@@ -51,7 +51,7 @@ async fn raw_details_go_to_the_developer_log(cx: &mut TestAppContext) {
         })
     });
     let panicked = task.await.unwrap_err();
-    assert_eq!(panicked.description(), INTERNAL);
+    assert_eq!(panicked.description(), internal());
     let log = String::from_utf8(buf.lock().unwrap().clone()).unwrap();
     assert!(
         log.contains("Failed to load HUDs: library database error: no such table: library_huds"),

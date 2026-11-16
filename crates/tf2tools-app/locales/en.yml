@@ -106,3 +106,22 @@ common:
   list:
     separator: ", "
     last: "%{rest} and %{last}"
+
+messages:
+  shared:
+    no_tf2_title: "TF2 not found"
+    no_tf2_text: "Set the TF2 folder in Settings, then try again."
+    internal_title: "Something went wrong"
+    internal: "TF2Tools hit a problem it didn't expect. Try again, and restart TF2Tools if it keeps happening."
+    close_tf2: "Close TF2 first"
+    close_tf2_text: "TF2 is running. Close the game, then try again."
+    library_update: "TF2Tools couldn't update your library. Restart TF2Tools and try again."
+    store_read: "TF2Tools couldn't read the store. Restart TF2Tools and try again."
+    library_open: "TF2Tools couldn't open your library. Restart TF2Tools and try again."
+    tf2_write: "Couldn't change your TF2 folder. Make sure TF2 is closed and TF2Tools can write to it, then try again."
+    hud_files: "TF2Tools can't find TF2's HUD files. Check the TF2 folder in Settings."
+    game_moved: "TF2 wasn't found where it used to be. Check the TF2 folder in Settings."
+    map_restart: "Installed. Restart TF2 to play it."
+    map_skipped: "Some extra files in this download were skipped."
+    hud_options_unreadable: "This HUD's files couldn't be read, so the canvas can't show that option yet. Your choice is kept."
+    hud_base_changed: "This HUD was updated while it was open. Close it and open it again to keep editing."

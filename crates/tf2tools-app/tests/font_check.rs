@@ -285,7 +285,7 @@ fn a_failed_copy_is_an_error_with_a_row() {
     let prompt = prompt_job(&s, &tf2(&env), Some("fonthud")).unwrap();
     let err = install_job(&s, &prompt).unwrap_err();
     assert_eq!(err.title(), "Failed to install fonts");
-    support::assert_plain(err.description());
+    support::assert_plain(&err.description());
     let rows = support::log_rows(&s);
     assert_eq!(
         rows[0].message(),

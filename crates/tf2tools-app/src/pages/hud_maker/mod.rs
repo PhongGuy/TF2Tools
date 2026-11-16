@@ -75,8 +75,8 @@ use crate::keymap::{
 };
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
-    HUD_BASE_CHANGED, HUD_FILES, HUD_OPTIONS_UNREADABLE, LocalFailure, ReopenNotice,
-    describe_hud_load, describe_make_hud, describe_settings, left_out, reopen_notice,
+    LocalFailure, ReopenNotice, describe_hud_load, describe_make_hud, describe_settings,
+    hud_base_changed, hud_files, hud_options_unreadable, left_out, reopen_notice,
 };
 use crate::pages::crosshair_maker::model::{REDO_TIP, UNDO_TIP, hsla_of_rgba, rgb_of};
 use crate::pages::huds::{INSTALL_FAILED, install_job, install_toast};
@@ -705,7 +705,7 @@ impl HudMakerPage {
         let job = run_blocking(cx, move |_| {
             let tf_dir = tf2?.tf_dir();
             let failed = |e: HudFilesError| {
-                LocalFailure::new(HUD_FILES, e.to_string()).into_op("Load the default HUD")
+                LocalFailure::new(hud_files(), e.to_string()).into_op("Load the default HUD")
             };
             let files = HudFiles::open_game(&tf_dir).map_err(failed)?;
             let platform = Platform::current().unwrap_or(Platform::Linux);
@@ -981,7 +981,7 @@ impl HudMakerPage {
             let load_failed = |e: HudLoadError| {
                 let failure = describe_hud_load(&e);
                 failure.log(action);
-                failure.message
+                failure.message.to_string()
             };
             // A copy reads its own layers over the game's; any other made HUD the game's.
             let files = match s.library.made_hud_files(&id, &tf_dir) {
@@ -2863,7 +2863,7 @@ impl HudMakerPage {
         let job = run_blocking(cx, move |_| {
             // The raw error goes to the log; the player reads one plain sentence.
             let failed = |e: HudFilesError| {
-                LocalFailure::new(HUD_OPTIONS_UNREADABLE, e.to_string())
+                LocalFailure::new(hud_options_unreadable(), e.to_string())
                     .into_op("Failed to change the HUD's options")
             };
             let shown = (options.switch(&files, &choices))
@@ -3098,7 +3098,8 @@ impl HudMakerPage {
                             let err = MakeHudError::NameTaken {
                                 name: taken.clone(),
                             };
-                            page.name_error = Some((taken, describe_make_hud(&err).message));
+                            page.name_error =
+                                Some((taken, describe_make_hud(&err).message.to_string()));
                             None
                         }
                         Ok(Saved::Gone(err)) => {
@@ -3277,7 +3278,7 @@ impl HudMakerPage {
             .child(labelled(
                 div().text_color(cx.theme().muted_foreground),
                 ids::HUD_MAKER_NO_GAME,
-                HUD_FILES,
+                hud_files(),
             ))
             .child(
                 Button::new(ids::HUD_MAKER_OPEN_SETTINGS)
@@ -4193,8 +4194,8 @@ fn save_job(
         // The sentence is the whole toast; the editor keeps its changes.
         Err(MakeHudError::BaseChanged) => {
             return Err(OpError::Core {
-                action: HUD_BASE_CHANGED,
-                message: String::new(),
+                action: hud_base_changed(),
+                message: SharedString::default(),
             });
         }
         Err(e) => return Err(describe_make_hud(&e).into_op(SAVE_FAILED)),

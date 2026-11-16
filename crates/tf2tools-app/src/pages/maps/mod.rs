@@ -323,7 +323,7 @@ impl MapsPage {
                 }
                 match loaded {
                     Ok(rows) => page.rows = rows,
-                    Err(err) => page.error = Some(err.description().to_owned()),
+                    Err(err) => page.error = Some(err.description().to_string()),
                 }
                 page.loaded = true;
                 page.refilter(cx);
