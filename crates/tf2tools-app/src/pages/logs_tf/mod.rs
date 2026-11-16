@@ -28,8 +28,8 @@ use gpui_kit::{
     div, px,
 };
 use tf2tools_core::{
-    ClassAverage, ClassWeapons, LogDetail, LogRow, LogState, LogsRange, MatrixKind, SteamId,
-    TfClass, TrackedPlayer, WeaponNames, parse_log, parse_player_input,
+    ClassAverage, ClassWeapons, LogDetail, LogRow, LogState, LogsFetchError, LogsRange, MatrixKind,
+    OpenedBody, SteamId, TfClass, TrackedPlayer, WeaponNames, parse_log, parse_player_input,
 };
 
 use crate::ids;
@@ -52,8 +52,8 @@ use crate::widgets::{Named as _, labelled};
 use sort::{ClassSort, ClassStat, MatrixColumn, MatrixSort, PlayerColumn, PlayerSort};
 use text::{
     DOWNLOAD_FAILED, DOWNLOADED, EMPTY_TEXT, LOG_UNREADABLE, LOGS_TF_DOWN, LOGS_TF_URL, LOOKING_UP,
-    REMOVING, SAVE_FAILED, STEAM_UNREACHABLE, WRITE_FAILED, download_reason, fetch_message,
-    profile_url, progress_line, resolve_message,
+    REMOVING, SAVE_FAILED, STEAM_UNREACHABLE, TRIMMED_OFFLINE, WRITE_FAILED, download_reason,
+    fetch_message, profile_url, progress_line, resolve_message,
 };
 
 // Logs counted per backfill batch: small enough that one batch's transaction stays short.
@@ -101,6 +101,9 @@ pub struct LogsTfPage {
     // The open log and how far its body got; the list's item 0 is the page top, so row `i`
     // is item `i + 1`. A read or fetch that lands after its row closed is dropped.
     open: Option<OpenLog>,
+    // Logs whose fetch from logs.tf is out. A row reopened meanwhile waits for that fetch,
+    // since a second one of a trimmed log would miss the restore and rewrite its rows.
+    fetching: HashSet<u64>,
     // The players table's order, kept across logs while the page lives.
     player_sort: PlayerSort,
     // The kill matrix tab and its sort, kept the same way.
@@ -228,6 +231,7 @@ impl LogsTfPage {
             range_writes: 0,
             stale_reads: 0,
             open: None,
+            fetching: HashSet::new(),
             player_sort: PlayerSort::default(),
             matrix: MatrixKind::Kills,
             matrix_sort: None,
@@ -576,7 +580,7 @@ impl LogsTfPage {
     }
 
     /// Opens log `id`'s row, closing any other; on the open row it closes it. A downloaded
-    /// log reads its stored body, one still pending is fetched from logs.tf.
+    /// log reads its stored body, one still pending or trimmed is fetched from logs.tf.
     pub fn toggle(&mut self, id: u64, cx: &mut Context<Self>) {
         let closing = self.open.take().map(|open| open.id);
         if closing != Some(id) {
@@ -586,7 +590,7 @@ impl LogsTfPage {
                 rounds: BTreeSet::new(),
             });
             match self.rows.iter().find(|r| r.id() == id).map(LogRow::state) {
-                Some(LogState::Pending) => self.fetch_detail(id, cx),
+                Some(LogState::Pending | LogState::Trimmed) => self.fetch_detail(id, cx),
                 _ => self.read_detail(id, cx),
             }
         }
@@ -635,23 +639,38 @@ impl LogsTfPage {
         true
     }
 
-    // Reads and parses log `id`'s stored body off the UI thread. It lands only if that row is
-    // still the open one, and its row remeasures to fit the panel.
+    // Stamps log `id` opened and reads and parses its stored body off the UI thread. A body
+    // trimmed since the list was read is fetched instead. It lands only if that row is still
+    // the open one, and its row remeasures to fit the panel.
     fn read_detail(&mut self, id: u64, cx: &mut Context<Self>) {
         let reading = run_blocking(cx, move |s| {
-            let body = s
+            let failed = |e| OpError::core("Failed to read a logs.tf log", e);
+            let opened = s
                 .logs
                 .cache()
-                .log_body(id)
-                .map_err(|e| OpError::core("Failed to read a logs.tf log", e))?
-                .ok_or_else(|| OpError::core("Failed to read a logs.tf log", "no stored body"))?;
-            parse_log(&body).map_err(|e| OpError::core("Failed to read a logs.tf log", e))
+                .open_body(id, chrono::Utc::now().timestamp())
+                .map_err(|e| failed(e.to_string()))?;
+            match opened {
+                OpenedBody::Body(body) => parse_log(&body)
+                    .map(Some)
+                    .map_err(|e| failed(e.to_string())),
+                OpenedBody::Trimmed => Ok(None),
+                OpenedBody::Missing | OpenedBody::Damaged | _ => {
+                    Err(failed("no stored body".into()))
+                }
+            }
         });
         cx.spawn(async move |page, cx| {
             let read = reading.await;
             let _ = page.update(cx, |page, cx| {
                 let state = match read {
-                    Ok(detail) => OpenState::Ready(Box::new(detail)),
+                    Ok(Some(detail)) => OpenState::Ready(Box::new(detail)),
+                    Ok(None) => {
+                        if page.expanded() == Some(id) {
+                            page.fetch_detail(id, cx);
+                        }
+                        return;
+                    }
                     Err(error) => {
                         tracing::warn!(%error, id, "reading a logs.tf log failed");
                         OpenState::Failed(LOG_UNREADABLE)
@@ -663,10 +682,14 @@ impl LogsTfPage {
         .detach();
     }
 
-    // Fetches pending log `id` from logs.tf, which also stores it. A fetch the row's note will
-    // explain (removed, unreadable) closes the row; any other failure keeps it open with why.
-    // Either way the list is reread, since core marked the row.
+    // Fetches pending or trimmed log `id` from logs.tf, which also stores it; a fetch already
+    // out for it is not doubled. A fetch the row's note will explain (removed, unreadable)
+    // closes the row; any other failure keeps it open with why. Either way the list is reread,
+    // since core marked the row.
     fn fetch_detail(&mut self, id: u64, cx: &mut Context<Self>) {
+        if !self.fetching.insert(id) {
+            return;
+        }
         if !tokio_bridge::is_running(cx) {
             tokio_bridge::init(cx);
         }
@@ -675,11 +698,21 @@ impl LogsTfPage {
         cx.spawn(async move |page, cx| {
             let fetched = fetching.await;
             let _ = page.update(cx, |page, cx| {
+                page.fetching.remove(&id);
                 let state = match fetched {
                     Ok(Ok(detail)) => Some(OpenState::Ready(Box::new(detail))),
                     Ok(Err(error)) => {
                         tracing::warn!(%error, id, "fetching a logs.tf log failed");
-                        fetch_message(&error).map(OpenState::Failed)
+                        let trimmed = page
+                            .rows
+                            .iter()
+                            .any(|r| r.id() == id && r.state() == LogState::Trimmed);
+                        // A trimmed log offline says why its full log is not here.
+                        if trimmed && matches!(error, LogsFetchError::Network { .. }) {
+                            Some(OpenState::Failed(TRIMMED_OFFLINE))
+                        } else {
+                            fetch_message(&error).map(OpenState::Failed)
+                        }
                     }
                     Err(error) => {
                         tracing::warn!(%error, id, "the logs.tf fetch task stopped");
@@ -1310,7 +1343,12 @@ impl LogsTfPage {
             }
         }
         self.list.remeasure_items(0..items);
-        let opens = |r: &LogRow| matches!(r.state(), LogState::Ready | LogState::Pending);
+        let opens = |r: &LogRow| {
+            matches!(
+                r.state(),
+                LogState::Ready | LogState::Pending | LogState::Trimmed
+            )
+        };
         let still_open = |r: &LogRow| Some(r.id()) == self.expanded() && opens(r);
         if !self.rows.iter().any(still_open) {
             self.open = None;

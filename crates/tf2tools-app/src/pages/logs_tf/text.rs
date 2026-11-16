@@ -163,6 +163,13 @@ pub const LOG_LOADING: &str = "Loading log...";
 /// The open panel's line when a log can't be fetched for lack of a connection.
 pub const LOG_OFFLINE: &str = "Can't load this log while you're offline.";
 
+/// The open panel's line when logs.tf no longer serves a trimmed log.
+pub const FULL_LOG_GONE: &str = "logs.tf no longer has the full log; its stats stay.";
+
+/// The open panel's line when a trimmed log can't be downloaded for lack of a connection.
+pub const TRIMMED_OFFLINE: &str =
+    "This full log was cleared to save space. Connect to the internet to open it.";
+
 /// The open panel's line for a failed fetch; None when the row's own note says it (gone,
 /// unreadable, too large).
 pub fn fetch_message(error: &LogsFetchError) -> Option<&'static str> {
@@ -170,6 +177,7 @@ pub fn fetch_message(error: &LogsFetchError) -> Option<&'static str> {
         LogsFetchError::Network { .. } => Some(LOG_OFFLINE),
         LogsFetchError::RateLimited { .. } => Some(LOGS_TF_BUSY),
         LogsFetchError::Cache { .. } => Some(SAVE_FAILED),
+        LogsFetchError::FullLogGone => Some(FULL_LOG_GONE),
         LogsFetchError::Gone | LogsFetchError::Unreadable | LogsFetchError::TooLarge { .. } => None,
         LogsFetchError::Http { .. } | _ => Some(LOGS_TF_DOWN),
     }

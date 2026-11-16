@@ -12,7 +12,7 @@ use tf2tools_core::LogState;
 use crate::support;
 use crate::support::logstf::{
     ARIE, Gate, SIXES, day_ago, download_beside, expanded, list_body, mount_held,
-    mount_held_status, open_page, shell, sid, to_end,
+    mount_held_status, open_log, open_page, requests_to, shell, sid, to_end, unix_now,
 };
 
 #[gpui_kit::test]
@@ -247,5 +247,158 @@ fn a_fetch_that_fails_after_the_sync_downloaded_the_log_shows_it(cx: &mut TestAp
     support::wait_real(cx, "the stored log", |cx| {
         cx.update(|cx| page.read(cx).detail().is_some())
     });
+    assert_eq!(expanded(cx, &page), Some(3));
+}
+
+// Log 3 synced, then trimmed by hand and reread, so its row shows as trimmed.
+fn trimmed_page(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    server: &support::StoreServer,
+) -> (support::ShellWindow, Entity<LogsTfPage>) {
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    support::sql(env)
+        .execute(
+            "UPDATE logstf_logs SET body = NULL, state = 3 WHERE id = 3",
+            [],
+        )
+        .unwrap();
+    page.update(cx, |page, cx| page.set_hidden(false, cx));
+    support::wait_real(cx, "the trimmed row", |cx| {
+        state_of(cx, &page) == Some(LogState::Trimmed)
+    });
+    support::settle(cx, s.win);
+    (s, page)
+}
+
+#[gpui_kit::test]
+fn a_trimmed_log_shows_its_stats_and_downloads_again_when_opened(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (s, page) = trimmed_page(cx, &env, &server);
+    assert!(
+        !support::present(cx, s.win, ids::logstf_log_note(3)),
+        "a trimmed row shows stats, not a note"
+    );
+    let asked = requests_to(&server, "/json/3");
+    to_end(cx, &page);
+    support::click_id(cx, s.win, ids::logstf_log(3));
+    support::wait_real(cx, "the downloaded log", |cx| {
+        cx.update(|cx| page.read(cx).detail().is_some())
+    });
+    assert_eq!(requests_to(&server, "/json/3"), asked + 1);
+    support::wait_real(cx, "the restored row", |cx| {
+        state_of(cx, &page) == Some(LogState::Ready)
+    });
+    assert_eq!(expanded(cx, &page), Some(3));
+}
+
+#[gpui_kit::test]
+fn opening_a_stored_log_stamps_it_opened(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    let opened = || -> Option<i64> {
+        support::sql(&env)
+            .query_row("SELECT opened_at FROM logstf_logs WHERE id = 3", [], |r| {
+                r.get(0)
+            })
+            .unwrap()
+    };
+    assert_eq!(opened(), None, "a sync is not an open");
+    open_log(cx, &s, &page, 3);
+    assert!(opened().is_some());
+}
+
+#[gpui_kit::test]
+fn a_trimmed_log_logs_tf_no_longer_has_keeps_its_stats_and_says_so(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (s, page) = trimmed_page(cx, &env, &server);
+    server.reset();
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_status("/json/3", 404);
+    to_end(cx, &page);
+    support::click_id(cx, s.win, ids::logstf_log(3));
+    support::wait_real(cx, "the gone line", |cx| {
+        support::label_of(cx, s.win, ids::logstf_log_status(3)).as_deref()
+            == Some("logs.tf no longer has the full log; its stats stay.")
+    });
+    assert_eq!(expanded(cx, &page), Some(3));
+    assert_eq!(state_of(cx, &page), Some(LogState::Trimmed));
+    assert!(!support::present(cx, s.win, ids::logstf_log_note(3)));
+}
+
+#[gpui_kit::test]
+fn a_trimmed_log_opened_offline_says_it_needs_the_internet(cx: &mut TestAppContext) {
+    let env = support::env();
+    // Port 1 refuses at once, so the fetch fails as an offline one does.
+    let s = shell(cx, &env, "http://127.0.0.1:1", &[(ARIE, "Arie")]);
+    let steam = i64::try_from(sid(ARIE).id64()).unwrap();
+    // A trimmed log and a fresh sync stamp, so opening the page does not sync.
+    support::sql(&env)
+        .execute_batch(&format!(
+            "INSERT INTO logstf_logs (id, title, map, date, length, fetched_at, state,
+                 weapons_counted, dt_counted)
+                 VALUES (3, 'Log 3', 'cp_process_f12', {date}, 1714, {fetched}, 3, 1, 1);
+             INSERT INTO logstf_player_logs (steam_id, log_id) VALUES ({steam}, 3);
+             INSERT INTO logstf_class_rows (log_id, steam_id, class, seconds, kills, deaths,
+                 assists, dmg, dt) VALUES (3, {steam}, 'scout', 600, 5, 2, 3, 2000, 1500);
+             UPDATE logstf_players SET last_synced = {now};",
+            date = day_ago(2),
+            fetched = day_ago(1),
+            now = unix_now(),
+        ))
+        .unwrap();
+    let page = open_page(cx, &s);
+    assert_eq!(state_of(cx, &page), Some(LogState::Trimmed));
+    to_end(cx, &page);
+    support::click_id(cx, s.win, ids::logstf_log(3));
+    support::wait_real(cx, "the offline line", |cx| {
+        support::label_of(cx, s.win, ids::logstf_log_status(3)).as_deref()
+            == Some("This full log was cleared to save space. Connect to the internet to open it.")
+    });
+    assert!(support::present(cx, s.win, ids::logstf_log_retry(3)));
+    assert_eq!(state_of(cx, &page), Some(LogState::Trimmed));
+}
+
+// Closing and reopening a row while its fetch is out must not fetch again: a second fetch of
+// a trimmed log would miss the restore and rewrite the log's rows.
+#[gpui_kit::test]
+fn reopening_a_row_whose_fetch_is_out_waits_for_that_fetch(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    let (s, page) = trimmed_page(cx, &env, &server);
+    server.reset();
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    let gate = Gate::default();
+    mount_held(&server, &gate, "/json/3", None, SIXES.as_bytes().to_vec());
+    to_end(cx, &page);
+    support::click_id(cx, s.win, ids::logstf_log(3));
+    support::wait_real(cx, "the held fetch", |_| gate.arrived() == 1);
+    support::click_id(cx, s.win, ids::logstf_log(3));
+    assert_eq!(expanded(cx, &page), None);
+    support::click_id(cx, s.win, ids::logstf_log(3));
+    assert_eq!(expanded(cx, &page), Some(3));
+    support::settle(cx, s.win);
+    gate.open();
+    support::wait_real(cx, "the fetched log", |cx| {
+        cx.update(|cx| page.read(cx).detail().is_some())
+    });
+    support::wait_real(cx, "the restored row", |cx| {
+        state_of(cx, &page) == Some(LogState::Ready)
+    });
+    support::settle(cx, s.win);
+    assert_eq!(
+        requests_to(&server, "/json/3"),
+        1,
+        "one fetch for one open row"
+    );
     assert_eq!(expanded(cx, &page), Some(3));
 }
