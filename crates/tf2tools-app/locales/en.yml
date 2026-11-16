@@ -49,9 +49,11 @@ settings:
     full_logs: { one: "%{count} full log uses", other: "%{count} full logs use" }
     measuring: "Measuring..."
     unmeasured: "The logs cache size could not be measured."
+    size_tb: "%{size} TB"
     size_gb: "%{size} GB"
     size_mb: "%{size} MB"
     size_kb: "%{size} KB"
+    size_b: "%{size} B"
   sync:
     items: { one: "%{count} item cached", other: "%{count} items cached" }
     last_synced: "Last synced: %{when}"

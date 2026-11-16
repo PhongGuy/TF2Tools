@@ -164,16 +164,17 @@ fn the_logs_cache_lines_read_in_russian() {
     assert_eq!(keep_text(KeepFullLogs::Forever, 0), "Всегда");
     assert_eq!(
         keep_text(KeepFullLogs::Days3, 12_345_678),
-        "3 дня, освободит около 12.3 МБ"
+        "3 дня, освободит около 11.8 МБ"
     );
-    assert_eq!(size_text(10_300), "10 КБ");
+    assert_eq!(size_text(10_300), "10.1 КБ");
+    assert_eq!(size_text(512), "512 Б");
     assert_eq!(
         usage_text(25_000_000, 21, 216_300),
-        "Кэш логов занимает около 25.0 МБ; 21 полный лог занимает около 216 КБ."
+        "Кэш логов занимает около 23.8 МБ; 21 полный лог занимает около 211.2 КБ."
     );
     assert_eq!(
         usage_text(25_000_000, 3, 30_900),
-        "Кэш логов занимает около 25.0 МБ; 3 полных лога занимают около 31 КБ."
+        "Кэш логов занимает около 23.8 МБ; 3 полных лога занимают около 30.2 КБ."
     );
 }
 
@@ -181,9 +182,53 @@ fn the_logs_cache_lines_read_in_russian() {
 fn the_library_line_reads_in_russian() {
     use tf2tools_app::pages::settings::{library_text, size_text};
     let _guard = LocaleGuard::switch("ru");
-    assert_eq!(size_text(2_100_000_000), "2.1 ГБ");
+    assert_eq!(size_text(2_100_000_000), "2.0 ГБ");
+    assert_eq!(size_text(3 << 40), "3.0 ТБ");
     assert_eq!(
         library_text(412_000_000, 2_100_000_000),
-        "Библиотека занимает 412.0 МБ на диске (2.1 ГБ без сжатия)."
+        "Библиотека занимает 392.9 МБ на диске (2.0 ГБ без сжатия)."
+    );
+}
+
+#[gpui_kit::test]
+fn the_keep_rows_are_renamed_after_a_language_switch(cx: &mut TestAppContext) {
+    use gpui_kit::test::TestWindowExt as _;
+    use gpui_kit::{AppContext as _, ScrollDelta, point};
+    use tf2tools_app::logs_trim::LogsTrim;
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let _page = open_settings(cx, &s);
+    // The first pass lands before the switch, so no later pass can retitle the rows instead.
+    support::wait_real(cx, "the first trim pass", |cx| {
+        cx.update(|cx| {
+            let trim = LogsTrim::global(cx).read(cx);
+            trim.passes() >= 1 && !trim.is_running()
+        })
+    });
+    pick(cx, s.win, "ru");
+    // Wheel the page until the keep select is in view, then open it.
+    for _ in 0..120 {
+        let page = support::bounds_of(cx, s.win, ids::page(Page::Settings)).unwrap();
+        let b = support::bounds_of(cx, s.win, ids::SETTINGS_LOG_KEEP).unwrap();
+        if b.top() >= page.top() && b.bottom() <= page.bottom() {
+            break;
+        }
+        let step = if b.top() < page.top() { 1. } else { -1. };
+        let turn = ScrollDelta::Lines(point(0., step));
+        cx.update_window(s.win, |_, w, cx| {
+            w.scroll(ids::page(Page::Settings), turn, cx)
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+    }
+    support::click_id(cx, s.win, ids::SETTINGS_LOG_KEEP);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::settings_log_keep("3d")).as_deref(),
+        Some("3 дня")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::settings_log_keep("forever")).as_deref(),
+        Some("Всегда")
     );
 }

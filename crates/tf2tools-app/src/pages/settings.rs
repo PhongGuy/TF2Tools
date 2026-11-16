@@ -46,6 +46,7 @@ use crate::services::{Services, Tf2State, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, error_label, toast, toast_error};
+use crate::store_download::scaled_bytes;
 use crate::sync::{SyncEvent, SyncHub, sync_hub};
 use crate::updater::{self, updater};
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
@@ -131,6 +132,7 @@ impl SearchableListItem for KeepRow {
     fn render(&self, _: &mut Window, _: &mut App) -> impl IntoElement {
         div()
             .id(ids::settings_log_keep(&self.key))
+            .aria_label(self.title.clone())
             .test_support()
             .child(self.title.clone())
     }
@@ -151,20 +153,15 @@ fn keep_rows(space: Option<&LogsSpace>) -> Vec<KeepRow> {
         .collect()
 }
 
-/// A byte count in decimal units: whole KB under a megabyte, MB to one decimal, and GB to one
-/// decimal from the point MB would round to 1000.0.
+/// A byte count in the app's one size format (see `scaled_bytes`), with translated units.
 pub fn size_text(bytes: u64) -> SharedString {
-    if bytes < 1_000_000 {
-        tr!(
-            "settings.logs_tf.size_kb",
-            size = bytes.saturating_add(500) / 1000
-        )
-    } else if bytes >= 999_950_000 {
-        let gb = format!("{:.1}", bytes as f64 / 1_000_000_000.);
-        tr!("settings.logs_tf.size_gb", size = gb)
-    } else {
-        let mb = format!("{:.1}", bytes as f64 / 1_000_000.);
-        tr!("settings.logs_tf.size_mb", size = mb)
+    let (size, unit) = scaled_bytes(bytes);
+    match unit {
+        0 => tr!("settings.logs_tf.size_b", size = size),
+        1 => tr!("settings.logs_tf.size_kb", size = size),
+        2 => tr!("settings.logs_tf.size_mb", size = size),
+        3 => tr!("settings.logs_tf.size_gb", size = size),
+        _ => tr!("settings.logs_tf.size_tb", size = size),
     }
 }
 

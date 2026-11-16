@@ -272,3 +272,18 @@ fn an_old_file_is_rewritten_once_its_free_pages_pass_a_mib() {
         Some("0")
     );
 }
+
+#[test]
+fn a_pass_that_changes_nothing_still_truncates_the_wal() {
+    let (_tmp, dir) = common::temp_data_dir();
+    let cache = tracked(&dir);
+    // Fresh logs leave the -wal grown while the cache's connection keeps it open.
+    for id in 1..=20 {
+        seed_stored(&dir, id, NOW - 2 * DAY, NOW - DAY);
+    }
+    assert!(file_sizes(&dir).1 > 0, "the seed writes go to the -wal");
+    let report = cache.trim(KeepFullLogs::Days7, NOW).unwrap();
+    assert_eq!((report.trimmed(), report.recompressed()), (0, 0));
+    assert_eq!(pragma(&dir, "freelist_count"), 0);
+    assert_eq!(file_sizes(&dir).1, 0, "the checkpoint truncates the -wal");
+}

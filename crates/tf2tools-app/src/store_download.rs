@@ -48,19 +48,26 @@ impl From<DownloadProgress> for Progress {
 
 /// A byte count in binary units: whole bytes below 1 KB, else one decimal ("1.5 KB", "2.0 GB").
 pub fn format_bytes(bytes: u64) -> String {
-    const UNITS: [&str; 4] = ["KB", "MB", "GB", "TB"];
+    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
+    let (value, unit) = scaled_bytes(bytes);
+    format!("{value} {}", UNITS[unit])
+}
+
+/// The app's one size format: `bytes` as the number to show and its unit's power of 1024
+/// (0 bytes, 1 KB, up to 4 TB). Whole bytes below 1 KB, else one decimal.
+pub fn scaled_bytes(bytes: u64) -> (String, usize) {
     if bytes < 1024 {
-        return format!("{bytes} B");
+        return (bytes.to_string(), 0);
     }
     // Step up while the value would print as 1024.0 or more (judged on the one-decimal
-    // rounding the label shows), stopping at the largest unit.
+    // rounding the label shows), stopping at TB.
     let mut value = bytes as f64 / 1024.0;
-    let mut unit = 0;
-    while (value * 10.0).round() / 10.0 >= 1024.0 && unit + 1 < UNITS.len() {
+    let mut unit = 1;
+    while (value * 10.0).round() / 10.0 >= 1024.0 && unit < 4 {
         value /= 1024.0;
         unit += 1;
     }
-    format!("{value:.1} {}", UNITS[unit])
+    (format!("{value:.1}"), unit)
 }
 
 /// None or Downloading: "Downloading..." plus " {done} / {total}" or " {done}"; Importing: "Extracting...".

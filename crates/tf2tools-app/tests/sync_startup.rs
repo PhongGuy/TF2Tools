@@ -197,7 +197,18 @@ fn a_boot_without_auto_sync_leaves_the_maps_sync_idle(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn startup_trims_the_logs_cache_after_the_first_frame(cx: &mut TestAppContext) {
     let env = support::env();
-    let _win = started(cx, boot(&env, false));
+    cx.executor().allow_parking();
+    support::init(cx);
+    let win = cx.update(|cx| start(boot(&env, false), cx)).unwrap();
+    // The shell is installed but no frame is drawn yet, so the trim job must not exist.
+    support::wait_real(cx, "the hub", |cx| cx.update(|cx| sync_hub(cx).is_some()));
+    assert!(
+        cx.update(|cx| tf2tools_app::logs_trim::LogsTrim::try_global(cx).is_none()),
+        "the trim waits for the first frame"
+    );
+    support::wait_real(cx, "the shell", |cx| {
+        support::present(cx, win, ids::page(Page::Huds))
+    });
     support::wait_real(cx, "the startup trim", |cx| {
         cx.update(|cx| {
             tf2tools_app::logs_trim::LogsTrim::try_global(cx)

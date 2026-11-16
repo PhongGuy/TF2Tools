@@ -9,7 +9,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
-use rusqlite::{Connection, ErrorCode, OpenFlags};
+use rusqlite::{Connection, ErrorCode, OpenFlags, OptionalExtension};
 
 use crate::error::OpenError;
 use crate::paths::{DataDir, LibraryKind};
@@ -184,6 +184,23 @@ fn open_error(path: &Path, e: rusqlite::Error) -> OpenError {
         },
         _ => sqlite_error(path, e),
     }
+}
+
+/// Writes one v5 `settings` key on `conn`, which may be a transaction.
+pub(crate) fn save_setting(conn: &Connection, key: &str, value: &str) -> rusqlite::Result<()> {
+    conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+        [key, value],
+    )?;
+    Ok(())
+}
+
+/// Reads one v5 `settings` key; an unset key is `None`.
+pub(crate) fn read_setting(conn: &Connection, key: &str) -> rusqlite::Result<Option<String>> {
+    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
+        r.get(0)
+    })
+    .optional()
 }
 
 fn sqlite_error(path: &Path, e: rusqlite::Error) -> OpenError {

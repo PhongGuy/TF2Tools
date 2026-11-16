@@ -47,9 +47,11 @@ settings:
     full_logs: { one: "%{count} полный лог занимает", few: "%{count} полных лога занимают", many: "%{count} полных логов занимают" }
     measuring: "Измерение..."
     unmeasured: "Не удалось измерить размер кэша логов."
+    size_tb: "%{size} ТБ"
     size_gb: "%{size} ГБ"
     size_mb: "%{size} МБ"
     size_kb: "%{size} КБ"
+    size_b: "%{size} Б"
   sync:
     items: { one: "%{count} элемент в кэше", few: "%{count} элемента в кэше", many: "%{count} элементов в кэше" }
     last_synced: "Последняя синхронизация: %{when}"
