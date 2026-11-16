@@ -368,7 +368,6 @@ fn an_edit_of_the_same_size_counts_as_a_change() {
 fn an_install_whose_times_moved_but_bytes_did_not_is_no_change() {
     let env = library_env();
     let installed = hud(&env, "rayshud");
-    env.lib.unpack_hud_for_tests(installed.id()).unwrap();
     let next = hud(&env, "budhud");
     env.lib.install_hud(installed.id(), &env.tf2).unwrap();
     let custom = env.tf2.custom_dir();
@@ -382,6 +381,7 @@ fn an_install_whose_times_moved_but_bytes_did_not_is_no_change() {
         .unwrap();
 
     assert!(env.lib.external_huds(&env.tf2).unwrap().is_empty());
+    env.lib.unpack_hud_for_tests(installed.id()).unwrap();
     change_library_file(&env, "rayshud", b"saved");
     assert_eq!(
         names(&env.lib.external_huds(&env.tf2).unwrap()),

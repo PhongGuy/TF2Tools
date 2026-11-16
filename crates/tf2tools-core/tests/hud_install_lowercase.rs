@@ -5,6 +5,8 @@ use crate::common;
 
 use std::fs;
 
+#[cfg(target_os = "linux")]
+use common::packed::library_files;
 use common::{LibraryEnv, library_env, write_file, zip_bytes};
 #[cfg(target_os = "linux")]
 use common::{setting, tree};
@@ -143,17 +145,15 @@ fn references_to_the_huds_own_materials_follow_the_renamed_files() {
 fn the_library_copy_keeps_its_capitals() {
     let env = library_env();
     let hud = import_kn_edit(&env, &[]);
-    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
-    let library = env
-        .dir
-        .library_dir(LibraryKind::Huds)
-        .join(hud.folder_name());
-    let before = fs::read(library.join("resource/ClientScheme.res")).unwrap();
-    env.lib.install_hud(hud.id(), &env.tf2).unwrap();
-    assert_eq!(
-        fs::read(library.join("resource/ClientScheme.res")).unwrap(),
+    let before = library_files(&env, &hud);
+    assert!(
         before
+            .iter()
+            .any(|(rel, _)| rel == "resource/ClientScheme.res"),
+        "{before:?}"
     );
+    env.lib.install_hud(hud.id(), &env.tf2).unwrap();
+    assert_eq!(library_files(&env, &hud), before);
 }
 
 #[cfg(target_os = "linux")]

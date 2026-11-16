@@ -534,6 +534,7 @@ async fn a_replacing_download_into_the_same_folder_replaces_the_row() {
     let old = download_hud(&env, &files[1]).await;
     let new = replacing(&env, &files[0], old.id()).await;
     assert_ne!(new.id(), old.id());
+    assert_eq!(new.folder_name(), "darhud");
     let ids: Vec<HudId> = env
         .lib
         .list_huds()
