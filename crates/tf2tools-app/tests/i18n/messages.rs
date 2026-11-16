@@ -6,11 +6,14 @@ use tf2tools_app::i18n::{self, list};
 use tf2tools_app::local_messages::{self as local, LocalFailure, PaintStep, SpaceFor};
 use tf2tools_app::pages::graphics::jobs;
 use tf2tools_app::services::{OpError, StartupError};
+use tf2tools_app::{map_messages as map, store_messages as store, sync_messages as sync};
 use tf2tools_core::{
-    ApplyProfileError, CopyHudError, DetectError, FontInstallError, GbAddonInstallError, GbId,
-    GbMapInstallError, GbMapRemoveError, HudLoadError, ImportError, InstallError, KeepHudError,
-    LibraryError, LogError, MakeHudError, PaintError, PngReadError, PngWriteError, ProfileError,
-    QueryError, SettingsError, UpdateCopyError,
+    ApplyProfileError, BrowseError, CopyHudError, DetectError, DownloadError, FilesError,
+    FontInstallError, GbAddonFetchError, GbAddonInstallError, GbId, GbMapInstallError,
+    GbMapRemoveError, HudLoadError, ImportError, InstallError, KeepHudError, LibraryError,
+    LogError, MakeHudError, MapDownloadError, MapRemoveError, PaintError, PngReadError,
+    PngWriteError, PreviewError, ProfileError, QueryError, SettingsError, StoreKind, SyncError,
+    UpdateCopyError,
 };
 
 use crate::LocaleGuard;
@@ -210,4 +213,70 @@ fn counted_messages_take_each_languages_forms() {
         assert!(text.contains(&n.to_string()), "{text}");
     }
     assert!(say(21).contains("21"), "{}", say(21));
+}
+
+#[test]
+fn store_map_and_sync_failures_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let kind = StoreKind::Sounds;
+    let messages = [
+        store::describe_download(kind, &DownloadError::AlreadyInLibrary { what: "x".into() })
+            .message,
+        store::describe_download(kind, &DownloadError::RateLimited { url: "u".into() }).message,
+        store::describe_files(kind, &FilesError::NotInStore { what: "x".into() }).message,
+        store::describe_browse(&BrowseError::Gone {
+            gb_id: GbId::new(1),
+        })
+        .message,
+        store::describe_gb_fetch(&GbAddonFetchError::NoFiles {
+            gb_id: GbId::new(1),
+        })
+        .message,
+        store::describe_gb_map_fetch(&GbAddonFetchError::UnknownLayout {
+            file_name: "m.zip".into(),
+            payloads: 0,
+        })
+        .message,
+        store::describe_preview(&PreviewError::NoPreview).message,
+        store::describe_install(&InstallError::NotInLibrary { what: "x".into() }).message,
+        store::describe_store_read(&OpError::NoTf2).message,
+        store::read_failed(&OpError::NoTf2),
+        store::download_stopped("x").message,
+        store::listing_stopped("x".into()).message,
+        store::addons_stopped("x".into()).message,
+        store::addon_stopped("x".into()).message,
+        store::preview_gone(GbId::new(1)).message,
+        store::preview_unavailable("x".into()).message,
+        store::no_tf2().message,
+        store::release_has_no_file().message,
+        map::describe_map_sync(&SyncError::Database {
+            message: "x".into(),
+        })
+        .message,
+        map::describe_map_download(&MapDownloadError::InGame {
+            name: "cp_a".into(),
+        })
+        .message,
+        map::describe_map_remove(&MapRemoveError::NotDownloaded {
+            name: "cp_a".into(),
+        })
+        .message,
+        map::map_stopped("x".into()).message,
+        sync::describe_sync(kind, &SyncError::Throttled { url: "u".into() }).message,
+        sync::sync_stopped("x".into()).message,
+    ];
+    for message in &messages {
+        assert_russian(message);
+    }
+    for title in [
+        store::details_failed_title(),
+        store::busy_title(),
+        store::busy_text(),
+    ] {
+        assert_russian(&title);
+    }
+    // A store keeps the site name players know it by.
+    let busy = sync::describe_sync(kind, &SyncError::RateLimited { url: "u".into() }).message;
+    assert_russian(&busy);
+    assert!(busy.contains("GameBanana"), "{busy}");
 }

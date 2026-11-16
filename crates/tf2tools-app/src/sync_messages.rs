@@ -1,14 +1,15 @@
 //! Store sync failures in player words. The messages never carry URLs, paths or codes; the
 //! raw error rides along as `detail` for the developer log.
 
+use gpui_kit::SharedString;
 use tf2tools_core::{StoreKind, SyncError};
 
-const STOPPED: &str = "The sync stopped before it finished. Try again.";
-const DISK: &str = "Couldn't save the store data. Make sure your disk has free space and TF2Tools can write to its folder, then try again.";
-const DATABASE: &str = "TF2Tools couldn't update its store data. Restart TF2Tools and try again.";
-const UNKNOWN: &str = "Something went wrong while syncing. Try again later.";
+use crate::i18n::tr;
+
 // Only GameBanana calls are paced, so a throttled call always names GameBanana.
-pub(crate) const THROTTLED: &str = "GameBanana is busy, try again in a minute.";
+pub(crate) fn throttled() -> SharedString {
+    tr!("messages.sync.throttled")
+}
 
 /// What the player reads about a failed sync, and the raw error for the developer log.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,33 +32,27 @@ impl SyncFailure {
 pub fn describe_sync(kind: StoreKind, err: &SyncError) -> SyncFailure {
     let source = source_name(kind);
     let message = match err {
-        SyncError::Network { .. } => {
-            format!("Couldn't reach {source}. Check your internet connection and try again.")
-        }
-        SyncError::RateLimited { .. } => {
-            format!("{source} is busy right now. Wait a few minutes, then try again.")
-        }
+        SyncError::Network { .. } => tr!("messages.shared.source_unreachable", source = source),
+        SyncError::RateLimited { .. } => tr!("messages.shared.source_busy", source = source),
         SyncError::Http { status, .. } if *status >= 500 => {
-            format!("{source} is having problems right now. Try again later.")
+            tr!("messages.shared.source_down", source = source)
         }
         SyncError::Http { .. }
         | SyncError::Malformed { .. }
         | SyncError::TooLarge { .. }
-        | SyncError::Archive(_) => {
-            format!("{source} sent something TF2Tools couldn't read. Try again later.")
-        }
-        SyncError::Io { .. } => DISK.to_owned(),
-        SyncError::Database { .. } => DATABASE.to_owned(),
-        SyncError::Interrupted { .. } => STOPPED.to_owned(),
-        SyncError::Throttled { .. } => THROTTLED.to_owned(),
-        _ => UNKNOWN.to_owned(),
+        | SyncError::Archive(_) => tr!("messages.shared.source_unreadable", source = source),
+        SyncError::Io { .. } => tr!("messages.sync.disk"),
+        SyncError::Database { .. } => tr!("messages.sync.database"),
+        SyncError::Interrupted { .. } => tr!("messages.sync.stopped"),
+        SyncError::Throttled { .. } => throttled(),
+        _ => tr!("messages.sync.unknown"),
     };
     SyncFailure::new(message, err.to_string())
 }
 
 /// A sync whose task ended without an outcome, keeping `detail` for the log.
 pub fn sync_stopped(detail: String) -> SyncFailure {
-    SyncFailure::new(STOPPED, detail)
+    SyncFailure::new(tr!("messages.sync.stopped"), detail)
 }
 
 // The site a player knows each store by: hud-db and mastercomfig are both fetched from GitHub.

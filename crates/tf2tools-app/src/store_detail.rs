@@ -23,7 +23,7 @@ use crate::shell::toast::{ToastKind, toast};
 use crate::store_download::{
     DownloadEvent, DownloadTarget, StoreDownloads, format_bytes, progress_label, progress_percent,
 };
-use crate::store_messages::{DETAILS_FAILED_TITLE, describe_files, listing_stopped, read_failed};
+use crate::store_messages::{describe_files, details_failed_title, listing_stopped, read_failed};
 use crate::tokio_bridge;
 use crate::widgets::carousel::Carousel;
 use crate::widgets::detail_header::detail_header;
@@ -181,7 +181,7 @@ impl StoreDetail {
                             window,
                             cx,
                             ToastKind::Error,
-                            DETAILS_FAILED_TITLE,
+                            details_failed_title(),
                             description,
                         )
                     });

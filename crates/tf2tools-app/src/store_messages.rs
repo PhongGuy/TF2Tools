@@ -10,32 +10,57 @@ use gpui_kit::SharedString;
 
 use crate::i18n::tr;
 use crate::services::OpError;
-use crate::sync_messages::{THROTTLED, source_name};
+use crate::sync_messages::{source_name, throttled};
 
-const DL_STOPPED: &str = "The download stopped before it finished. Try again.";
-const DL_DISK: &str = "Couldn't save the download. Make sure your disk has free space and TF2Tools can write to its folder, then try again.";
+// Add-ons, maps and previews outside the sync stores always come from GameBanana.
+const GAMEBANANA: &str = "GameBanana";
+
 pub(crate) fn library_update() -> SharedString {
     tr!("messages.shared.library_update")
 }
-const DL_UNUSABLE: &str = "This download has nothing TF2Tools can use. Pick another file.";
-const DL_LOCKED: &str = "This download is locked with a password, so TF2Tools can't open it.";
-const DL_UNPACK: &str = "The download couldn't be unpacked. Try again, or pick another file.";
-const DL_UNKNOWN: &str = "Something went wrong with the download. Try again later.";
-const FILES_STOPPED: &str = "Loading the files stopped before it finished. Try again.";
+
 pub(crate) fn store_read() -> SharedString {
     tr!("messages.shared.store_read")
 }
-const FILES_UNKNOWN: &str = "Couldn't load the files. Try again later.";
-const PV_FETCH: &str = "Couldn't get this preview from GameBanana. Try again later.";
-const PV_UNAVAILABLE: &str = "Couldn't play this preview. Try again later.";
+
+fn download_stopped_text() -> SharedString {
+    tr!("messages.shared.download_stopped")
+}
+
+fn download_disk() -> SharedString {
+    tr!("messages.store.download.disk")
+}
+
+fn download_locked() -> SharedString {
+    tr!("messages.store.download.locked")
+}
+
+fn download_unknown() -> SharedString {
+    tr!("messages.store.download.unknown")
+}
+
+fn preview_unavailable_text() -> SharedString {
+    tr!("messages.store.preview.unavailable")
+}
+
+fn gb_too_large() -> SharedString {
+    tr!("messages.store.gb_fetch.too_large")
+}
 
 /// The toast title when a detail cannot read its cached store row.
-pub const DETAILS_FAILED_TITLE: &str = "Failed to load details";
+pub fn details_failed_title() -> SharedString {
+    tr!("messages.store.details_failed_title")
+}
 
 /// The info toast when a download cannot start because another one runs.
-pub const BUSY_TITLE: &str = "Another download is running";
+pub fn busy_title() -> SharedString {
+    tr!("messages.store.busy_title")
+}
+
 /// The info toast's description: what the player does next.
-pub const BUSY_TEXT: &str = "Wait for it to finish, then try again.";
+pub fn busy_text() -> SharedString {
+    tr!("messages.store.busy_text")
+}
 
 /// What the player reads about a failed store action, and the raw error for the developer log.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,58 +91,50 @@ pub fn describe_download(kind: StoreKind, err: &DownloadError) -> StoreFailure {
 
 /// A download task that ended without an outcome, keeping `detail` for the log.
 pub fn download_stopped(detail: &str) -> StoreFailure {
-    StoreFailure::new(DL_STOPPED, detail)
+    StoreFailure::new(download_stopped_text(), detail)
 }
 
 // A failed rollback is worded by the failure that caused it; the names it left behind are
 // appended by the caller.
-fn download_message(kind: StoreKind, err: &DownloadError) -> String {
+fn download_message(kind: StoreKind, err: &DownloadError) -> SharedString {
     let source = source_name(kind);
     match err {
-        DownloadError::AlreadyInLibrary { .. } => "This item is already in your library.".into(),
-        DownloadError::WrongKind { .. } => {
-            "This file doesn't belong in this store. Pick another file.".into()
-        }
-        DownloadError::RateLimited { .. } => {
-            format!("{source} is busy right now. Wait a few minutes, then try again.")
-        }
+        DownloadError::AlreadyInLibrary { .. } => tr!("messages.store.download.already_in_library"),
+        DownloadError::WrongKind { .. } => tr!("messages.store.download.wrong_kind"),
+        DownloadError::RateLimited { .. } => tr!("messages.shared.source_busy", source = source),
         DownloadError::Http { status, .. } if *status >= 500 => {
-            format!("{source} is having problems right now. Try again later.")
+            tr!("messages.shared.source_down", source = source)
         }
-        DownloadError::Http { .. } => {
-            format!("Couldn't get this file from {source}. Try again later.")
-        }
+        DownloadError::Http { .. } => tr!("messages.store.download.http", source = source),
         DownloadError::Network { .. } => {
-            format!("Couldn't reach {source}. Check your internet connection and try again.")
+            tr!("messages.shared.source_unreachable", source = source)
         }
-        DownloadError::TooLarge { .. } => {
-            "This file is too big for TF2Tools. Pick another file.".into()
-        }
-        DownloadError::EmptyBody { .. } => {
-            format!("{source} is busy and sent an empty file. Try again in a moment.")
-        }
-        DownloadError::ChecksumMismatch { .. } => "The download was damaged. Try again.".into(),
+        DownloadError::TooLarge { .. } => tr!("messages.store.download.too_large"),
+        DownloadError::EmptyBody { .. } => tr!("messages.shared.source_empty", source = source),
+        DownloadError::ChecksumMismatch { .. } => tr!("messages.store.download.damaged"),
         DownloadError::Archive(archive) | DownloadError::Import(ImportError::Archive(archive)) => {
-            archive_message(archive).into()
+            archive_message(archive)
         }
-        DownloadError::Io { .. } | DownloadError::Import(ImportError::Io { .. }) => DL_DISK.into(),
+        DownloadError::Io { .. } | DownloadError::Import(ImportError::Io { .. }) => download_disk(),
         DownloadError::Database { .. } | DownloadError::Import(ImportError::Database { .. }) => {
-            library_update().into()
+            library_update()
         }
-        DownloadError::NoUsableFiles { .. } | DownloadError::Import(_) => DL_UNUSABLE.into(),
-        DownloadError::Interrupted { .. } => DL_STOPPED.into(),
+        DownloadError::NoUsableFiles { .. } | DownloadError::Import(_) => {
+            tr!("messages.store.download.unusable")
+        }
+        DownloadError::Interrupted { .. } => download_stopped_text(),
         DownloadError::RollbackFailed { cause, .. } => download_message(kind, cause),
-        _ => DL_UNKNOWN.into(),
+        _ => download_unknown(),
     }
 }
 
-fn archive_message(err: &ArchiveError) -> &'static str {
+fn archive_message(err: &ArchiveError) -> SharedString {
     match err {
-        ArchiveError::Encrypted { .. } => DL_LOCKED,
+        ArchiveError::Encrypted { .. } => download_locked(),
         ArchiveError::Io { .. }
         | ArchiveError::Malformed { .. }
         | ArchiveError::UnsafePath { .. }
-        | _ => DL_UNPACK,
+        | _ => tr!("messages.store.download.unpack"),
     }
 }
 
@@ -125,22 +142,18 @@ fn archive_message(err: &ArchiveError) -> &'static str {
 pub fn describe_files(kind: StoreKind, err: &FilesError) -> StoreFailure {
     let source = source_name(kind);
     let message = match err {
-        FilesError::NotInStore { .. } => "This item is no longer in the store.".into(),
-        FilesError::RateLimited { .. } => {
-            format!("{source} is busy right now. Wait a few minutes, then try again.")
-        }
+        FilesError::NotInStore { .. } => tr!("messages.store.files.not_in_store"),
+        FilesError::RateLimited { .. } => tr!("messages.shared.source_busy", source = source),
         FilesError::Http { status, .. } if *status >= 500 => {
-            format!("{source} is having problems right now. Try again later.")
+            tr!("messages.shared.source_down", source = source)
         }
-        FilesError::Network { .. } => {
-            format!("Couldn't reach {source}. Check your internet connection and try again.")
-        }
+        FilesError::Network { .. } => tr!("messages.shared.source_unreachable", source = source),
         FilesError::Http { .. } | FilesError::TooLarge { .. } | FilesError::Malformed { .. } => {
-            format!("{source} sent something TF2Tools couldn't read. Try again later.")
+            tr!("messages.shared.source_unreadable", source = source)
         }
-        FilesError::Database { .. } => store_read().into(),
-        FilesError::Throttled { .. } => THROTTLED.into(),
-        _ => FILES_UNKNOWN.into(),
+        FilesError::Database { .. } => store_read(),
+        FilesError::Throttled { .. } => throttled(),
+        _ => tr!("messages.store.files.unknown"),
     };
     StoreFailure::new(message, err.to_string())
 }
@@ -150,22 +163,20 @@ pub fn describe_files(kind: StoreKind, err: &FilesError) -> StoreFailure {
 pub fn describe_browse(err: &BrowseError) -> StoreFailure {
     let message = match err {
         BrowseError::Network { .. } => {
-            "Couldn't reach GameBanana. Check your internet connection and try again."
+            tr!("messages.shared.source_unreachable", source = GAMEBANANA)
         }
-        BrowseError::Throttled { .. } => THROTTLED,
-        BrowseError::RateLimited { .. } => {
-            "GameBanana is busy right now. Wait a few minutes, then try again."
-        }
+        BrowseError::Throttled { .. } => throttled(),
+        BrowseError::RateLimited { .. } => tr!("messages.shared.source_busy", source = GAMEBANANA),
         // A 404 can come from a listing, a search or a category list as well as an item.
-        BrowseError::Http { status: 404, .. } => "GameBanana couldn't find this. Try again later.",
-        BrowseError::Gone { .. } => "This item is no longer on GameBanana.",
+        BrowseError::Http { status: 404, .. } => tr!("messages.store.browse.not_found"),
+        BrowseError::Gone { .. } => tr!("messages.store.browse.gone"),
         BrowseError::Http { status, .. } if *status >= 500 => {
-            "GameBanana is having problems right now. Try again later."
+            tr!("messages.shared.source_down", source = GAMEBANANA)
         }
         BrowseError::Http { .. } | BrowseError::TooLarge { .. } | BrowseError::Malformed { .. } => {
-            "GameBanana sent something TF2Tools couldn't read. Try again later."
+            tr!("messages.shared.source_unreadable", source = GAMEBANANA)
         }
-        _ => "Couldn't load add-ons. Try again later.",
+        _ => tr!("messages.store.browse.unknown"),
     };
     StoreFailure::new(message, err.to_string())
 }
@@ -173,59 +184,47 @@ pub fn describe_browse(err: &BrowseError) -> StoreFailure {
 /// A failed add-on download or unpack in player words; `detail` is the error's own text.
 pub fn describe_gb_fetch(err: &GbAddonFetchError) -> StoreFailure {
     let message = match err {
-        GbAddonFetchError::NoFiles { .. } => {
-            "This add-on has no files to install. Pick another add-on."
-        }
-        GbAddonFetchError::VirusScan { .. } => {
-            "GameBanana's virus scan didn't pass this file, so it wasn't installed."
-        }
-        GbAddonFetchError::TooLarge { .. } => "This download is too big for TF2Tools to install.",
-        GbAddonFetchError::OnlyExe { .. } => {
-            "This download only holds a program, which TF2Tools won't run. It wasn't installed."
-        }
+        GbAddonFetchError::NoFiles { .. } => tr!("messages.store.gb_fetch.no_files"),
+        GbAddonFetchError::VirusScan { .. } => tr!("messages.store.gb_fetch.virus_scan"),
+        GbAddonFetchError::TooLarge { .. } => gb_too_large(),
+        GbAddonFetchError::OnlyExe { .. } => tr!("messages.store.gb_fetch.only_exe"),
         // Nothing recognisable and too many parts to choose from need different next steps.
         GbAddonFetchError::UnknownLayout { payloads: 0, .. } => {
-            "TF2Tools found nothing in this download it knows how to install, so it wasn't installed."
+            tr!("messages.store.gb_fetch.nothing_known")
         }
-        GbAddonFetchError::UnknownLayout { .. } => {
-            "This download holds too many parts for TF2Tools to tell which to install, so it wasn't installed."
-        }
+        GbAddonFetchError::UnknownLayout { .. } => tr!("messages.store.gb_fetch.too_many_parts"),
         GbAddonFetchError::Archive(ArchiveError::UnsafePath { .. }) => {
-            "This download looks unsafe and was not installed."
+            tr!("messages.store.gb_fetch.unsafe")
         }
-        GbAddonFetchError::Archive(ArchiveError::Encrypted { .. }) => DL_LOCKED,
+        GbAddonFetchError::Archive(ArchiveError::Encrypted { .. }) => download_locked(),
         GbAddonFetchError::Archive(ArchiveError::Malformed { .. }) => {
-            "This download can't be opened. Pick another add-on."
+            tr!("messages.store.gb_fetch.cant_open")
         }
         GbAddonFetchError::Archive(ArchiveError::Io { .. }) | GbAddonFetchError::Io { .. } => {
-            DL_DISK
+            download_disk()
         }
         GbAddonFetchError::EmptyBody { .. } => {
-            "GameBanana is busy and sent an empty file. Try again in a moment."
+            tr!("messages.shared.source_empty", source = GAMEBANANA)
         }
-        GbAddonFetchError::ChecksumMismatch { .. } => {
-            "The download was damaged on the way. Try again."
-        }
+        GbAddonFetchError::ChecksumMismatch { .. } => tr!("messages.store.gb_fetch.damaged"),
         GbAddonFetchError::Network { .. } => {
-            "Couldn't reach GameBanana. Check your internet connection and try again."
+            tr!("messages.shared.source_unreachable", source = GAMEBANANA)
         }
         GbAddonFetchError::RateLimited { .. } => {
-            "GameBanana is busy right now. Wait a few minutes, then try again."
+            tr!("messages.shared.source_busy", source = GAMEBANANA)
         }
         GbAddonFetchError::Http { status: 404, .. } => {
-            "GameBanana couldn't find this file. Try again later."
+            tr!("messages.store.gb_fetch.file_not_found")
         }
         GbAddonFetchError::Http { status, .. } if *status >= 500 => {
-            "GameBanana is having problems right now. Try again later."
+            tr!("messages.shared.source_down", source = GAMEBANANA)
         }
         GbAddonFetchError::Http { .. } => {
-            "GameBanana sent something TF2Tools couldn't read. Try again later."
+            tr!("messages.shared.source_unreadable", source = GAMEBANANA)
         }
-        GbAddonFetchError::Interrupted { .. } => DL_STOPPED,
-        GbAddonFetchError::Archive(ArchiveError::TooLarge { .. }) => {
-            "This download is too big for TF2Tools to install."
-        }
-        GbAddonFetchError::Archive(_) | _ => DL_UNKNOWN,
+        GbAddonFetchError::Interrupted { .. } => download_stopped_text(),
+        GbAddonFetchError::Archive(ArchiveError::TooLarge { .. }) => gb_too_large(),
+        GbAddonFetchError::Archive(_) | _ => download_unknown(),
     };
     StoreFailure::new(message, err.to_string())
 }
@@ -235,18 +234,16 @@ pub fn describe_gb_fetch(err: &GbAddonFetchError) -> StoreFailure {
 pub fn describe_gb_map_fetch(err: &GbAddonFetchError) -> StoreFailure {
     let message = match err {
         GbAddonFetchError::UnknownLayout { payloads: 0, .. } => {
-            "No playable map was found in this download."
+            tr!("messages.store.gb_map_fetch.no_map")
         }
-        GbAddonFetchError::UnknownLayout { .. } => {
-            "This download holds too many maps for TF2Tools to install."
-        }
+        GbAddonFetchError::UnknownLayout { .. } => tr!("messages.store.gb_map_fetch.too_many_maps"),
         GbAddonFetchError::Archive(ArchiveError::TooLarge { .. }) => {
-            "This download's maps are too big for TF2Tools to install."
+            tr!("messages.store.gb_map_fetch.maps_too_large")
         }
-        GbAddonFetchError::TooLarge { .. } => "This map is too big for TF2Tools to install.",
-        GbAddonFetchError::NoFiles { .. } => "This map has no files to install.",
+        GbAddonFetchError::TooLarge { .. } => tr!("messages.store.gb_map_fetch.too_large"),
+        GbAddonFetchError::NoFiles { .. } => tr!("messages.store.gb_map_fetch.no_files"),
         GbAddonFetchError::Archive(ArchiveError::Malformed { .. }) => {
-            "This download can't be opened. Pick another map."
+            tr!("messages.store.gb_map_fetch.cant_open")
         }
         GbAddonFetchError::VirusScan { .. }
         | GbAddonFetchError::RateLimited { .. }
@@ -265,43 +262,35 @@ pub fn describe_gb_map_fetch(err: &GbAddonFetchError) -> StoreFailure {
 
 /// A listing task that ended without an outcome, keeping `detail` for the log.
 pub fn listing_stopped(detail: String) -> StoreFailure {
-    StoreFailure::new(FILES_STOPPED, detail)
+    StoreFailure::new(tr!("messages.store.files.stopped"), detail)
 }
 
 /// An add-on listing step that ended without an outcome, keeping `detail` for the log.
 pub fn addons_stopped(detail: String) -> StoreFailure {
-    StoreFailure::new(
-        "Loading add-ons stopped before it finished. Try again.",
-        detail,
-    )
+    StoreFailure::new(tr!("messages.store.browse.stopped"), detail)
 }
 
 /// An add-on profile read that ended without an outcome, keeping `detail` for the log.
 pub fn addon_stopped(detail: String) -> StoreFailure {
-    StoreFailure::new(
-        "Loading this add-on stopped before it finished. Try again.",
-        detail,
-    )
+    StoreFailure::new(tr!("messages.store.browse.addon_stopped"), detail)
 }
 
 /// A failed preview fetch in player words; previews only come from GameBanana.
 pub fn describe_preview(err: &PreviewError) -> StoreFailure {
     let message = match err {
-        PreviewError::NoPreview => "This sound has no preview.",
-        PreviewError::UntrustedUrl { .. } => {
-            "This preview isn't hosted on GameBanana, so TF2Tools won't play it."
-        }
-        PreviewError::RateLimited { .. } => {
-            "GameBanana is busy right now. Wait a few minutes, then try again."
-        }
+        PreviewError::NoPreview => tr!("messages.store.preview.none"),
+        PreviewError::UntrustedUrl { .. } => tr!("messages.store.preview.untrusted"),
+        PreviewError::RateLimited { .. } => tr!("messages.shared.source_busy", source = GAMEBANANA),
         PreviewError::Http { status, .. } if *status >= 500 => {
-            "GameBanana is having problems right now. Try again later."
+            tr!("messages.shared.source_down", source = GAMEBANANA)
         }
         PreviewError::Network { .. } => {
-            "Couldn't reach GameBanana. Check your internet connection and try again."
+            tr!("messages.shared.source_unreachable", source = GAMEBANANA)
         }
-        PreviewError::Http { .. } | PreviewError::TooLarge { .. } => PV_FETCH,
-        _ => PV_UNAVAILABLE,
+        PreviewError::Http { .. } | PreviewError::TooLarge { .. } => {
+            tr!("messages.store.preview.fetch")
+        }
+        _ => preview_unavailable_text(),
     };
     StoreFailure::new(message, err.to_string())
 }
@@ -309,14 +298,14 @@ pub fn describe_preview(err: &PreviewError) -> StoreFailure {
 /// The sound's store row is gone; `detail` names the id.
 pub fn preview_gone(id: GbId) -> StoreFailure {
     StoreFailure::new(
-        "This sound is no longer in the store.",
+        tr!("messages.store.preview.gone"),
         format!("sound {} is no longer in the store", id.get()),
     )
 }
 
 /// The row read or the fetch task failed without a `PreviewError`, keeping `detail` for the log.
 pub fn preview_unavailable(detail: String) -> StoreFailure {
-    StoreFailure::new(PV_UNAVAILABLE, detail)
+    StoreFailure::new(preview_unavailable_text(), detail)
 }
 
 /// A failed local read of a store or the library behind it; the message is fixed and
@@ -335,33 +324,24 @@ pub fn read_failed(err: &OpError) -> String {
 /// A failed copy of a library item into tf/custom in player words; `detail` is the error's own text.
 pub fn describe_install(err: &InstallError) -> StoreFailure {
     let message = match err {
-        InstallError::Io { .. } => SharedString::from(
-            "Couldn't copy the addon into TF2. Make sure TF2Tools can write to your TF2 folder, then try again.",
-        ),
-        InstallError::NotInLibrary { .. } => {
-            SharedString::from("This addon is no longer in your library. Download it again.")
-        }
+        InstallError::Io { .. } => tr!("messages.store.install.io"),
+        InstallError::NotInLibrary { .. } => tr!("messages.store.install.not_in_library"),
         InstallError::Database { .. } => library_update(),
         InstallError::GameMissing { .. } => crate::local_messages::game_moved(),
-        InstallError::ExternalHuds(_) | _ => {
-            SharedString::from("Something went wrong while installing. Try again later.")
-        }
+        InstallError::ExternalHuds(_) | _ => tr!("messages.store.install.unknown"),
     };
     StoreFailure::new(message, err.to_string())
 }
 
 /// No TF2 folder is known, so nothing can be installed.
 pub fn no_tf2() -> StoreFailure {
-    StoreFailure::new(
-        "Set your TF2 folder in Settings, then try again.",
-        OpError::NoTf2.to_string(),
-    )
+    StoreFailure::new(tr!("messages.store.no_tf2"), OpError::NoTf2.to_string())
 }
 
 /// The looked-up mastercomfig release lists no file.
 pub fn release_has_no_file() -> StoreFailure {
     StoreFailure::new(
-        "This mastercomfig release has nothing to download yet. Try again later.",
+        tr!("messages.store.release_no_file"),
         "the release has no file",
     )
 }

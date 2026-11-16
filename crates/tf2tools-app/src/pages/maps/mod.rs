@@ -33,7 +33,7 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_download::format_bytes;
-use crate::store_messages::{BUSY_TEXT, BUSY_TITLE};
+use crate::store_messages::{busy_text, busy_title};
 use crate::tokio_bridge;
 use crate::widgets::label_option::LabelOption;
 use crate::widgets::scroll::scroll_beside;
@@ -378,7 +378,7 @@ impl MapsPage {
     /// Downloads `name` into the game's maps folder, one at a time, then toasts and reloads.
     pub fn download(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
         if self.downloading.is_some() {
-            toast(window, cx, ToastKind::Info, BUSY_TITLE, BUSY_TEXT);
+            toast(window, cx, ToastKind::Info, busy_title(), busy_text());
             return;
         }
         let install = match require_tf2(cx) {

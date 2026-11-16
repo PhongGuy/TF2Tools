@@ -14,7 +14,7 @@ use crate::services::{OpError, Services, Tf2Global, run_blocking};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_download::{DownloadEvent, DownloadTarget, StoreDownloads};
 use crate::store_messages::{
-    BUSY_TEXT, BUSY_TITLE, StoreFailure, describe_files, describe_install, listing_stopped, no_tf2,
+    StoreFailure, busy_text, busy_title, describe_files, describe_install, listing_stopped, no_tf2,
     release_has_no_file,
 };
 use crate::tokio_bridge::{self, JoinError};
@@ -166,7 +166,7 @@ impl AddonUpdates {
                 cx.notify();
             } else {
                 let _ = win.update(cx, |_, window, cx| {
-                    toast(window, cx, ToastKind::Info, BUSY_TITLE, BUSY_TEXT)
+                    toast(window, cx, ToastKind::Info, busy_title(), busy_text())
                 });
                 self.settle(&name, cx);
             }
