@@ -888,11 +888,19 @@ fn commits_match(a: &str, b: &str) -> bool {
 }
 
 pub(super) fn sha256_file(path: &Path) -> Result<String, IoFailure> {
-    let mut file = std::fs::File::open(path).map_err(io_at(path))?;
+    let file = std::fs::File::open(path).map_err(io_at(path))?;
+    sha256_reader(path, file)
+}
+
+/// SHA-256 hex of everything `reader` yields; a read failure is reported at `path`.
+pub(super) fn sha256_reader(
+    path: &Path,
+    mut reader: impl std::io::Read,
+) -> Result<String, IoFailure> {
     let mut hasher = Sha256::new();
     let mut buf = vec![0u8; 64 * 1024];
     loop {
-        let n = std::io::Read::read(&mut file, &mut buf).map_err(io_at(path))?;
+        let n = reader.read(&mut buf).map_err(io_at(path))?;
         if n == 0 {
             break;
         }

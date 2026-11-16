@@ -22,6 +22,7 @@ mod made_huds;
 mod mastercomfig;
 mod mastercomfig_modules;
 mod movement;
+mod packed;
 mod sounds;
 mod tree_copy;
 
