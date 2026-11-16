@@ -232,3 +232,32 @@ fn trims_that_add_up_rewrite_the_file() {
         Some("0")
     );
 }
+
+#[test]
+fn an_old_file_is_rewritten_once_its_free_pages_pass_a_mib() {
+    let (_tmp, dir) = common::temp_data_dir();
+    drop(Database::open(&dir).unwrap());
+    common::sql(&dir)
+        .execute_batch("PRAGMA auto_vacuum = NONE; VACUUM;")
+        .unwrap();
+    let cache = tracked(&dir);
+    // A hundred trims stay under the counter's rewrite; their 16 KiB bodies free over a MiB.
+    for id in 1..=100 {
+        seed_stored(&dir, id, NOW - 20 * DAY, NOW - 19 * DAY);
+    }
+    common::sql(&dir)
+        .execute("UPDATE logstf_logs SET body = randomblob(16384)", [])
+        .unwrap();
+    checkpoint(&dir);
+    assert_eq!(pragma(&dir, "auto_vacuum"), 0);
+    let (before, _) = file_sizes(&dir);
+
+    assert_eq!(cache.trim(KeepFullLogs::Days7, NOW).unwrap().trimmed(), 100);
+    let (after, _) = file_sizes(&dir);
+    assert!(after + 1024 * 1024 < before, "{before} -> {after} bytes");
+    assert_eq!(pragma(&dir, "auto_vacuum"), 2);
+    assert_eq!(
+        common::setting(&dir, "logstf_trimmed_since_vacuum").as_deref(),
+        Some("0")
+    );
+}
