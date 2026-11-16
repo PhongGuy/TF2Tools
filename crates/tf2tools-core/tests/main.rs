@@ -203,6 +203,7 @@ mod library_crosshairs;
 mod library_huds;
 mod library_packed_convert;
 mod library_packed_copy;
+mod library_packed_gb;
 mod library_packed_install;
 mod library_packed_read;
 mod library_packed_write;

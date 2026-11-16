@@ -1,4 +1,5 @@
-//! Library HUDs in either form: a loose tree, or `.tf2tools/files.zip` beside loose metadata.
+//! Library items in either form: a HUD as a loose tree or `.tf2tools/files.zip` beside loose
+//! metadata, a GameBanana add-on as its slot folders or `copy.zip`.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -123,4 +124,43 @@ pub fn convert(env: &LibraryEnv) -> ConvertReport {
 pub fn rename_then_damage(from: &Path, to: &Path) -> std::io::Result<()> {
     std::fs::rename(from, to)?;
     std::fs::write(to, b"not a zip")
+}
+
+/// Where add-on `gb_id`'s zip is when its copy is packed.
+pub fn gb_zip(dir: &DataDir, gb_id: u64) -> PathBuf {
+    dir.gb_addon_dir().join(gb_id.to_string()).join("copy.zip")
+}
+
+/// Every file under the add-on library with its bytes, as `tree` lists it, each packed copy's
+/// entries listed under its id in place of its `copy.zip`, sorted by name.
+pub fn gb_files(dir: &DataDir) -> Vec<(String, Vec<u8>)> {
+    let root = dir.gb_addon_dir();
+    let mut out = Vec::new();
+    for rel in tree(&root) {
+        match rel.strip_suffix("/copy.zip") {
+            Some(id) if !id.contains('/') => out.extend(
+                zip_files(&root.join(&rel))
+                    .into_iter()
+                    .map(|(name, bytes)| (format!("{id}/{name}"), bytes)),
+            ),
+            _ => {
+                let bytes = std::fs::read(root.join(&rel)).unwrap();
+                out.push((rel, bytes));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// The names `gb_files` lists, in order.
+pub fn gb_tree(dir: &DataDir) -> Vec<String> {
+    gb_files(dir).into_iter().map(|(rel, _)| rel).collect()
+}
+
+/// The loose files of add-on `gb_id`'s copy, `copy.zip` left out.
+pub fn gb_loose(dir: &DataDir, gb_id: u64) -> Vec<String> {
+    let mut files = tree(&dir.gb_addon_dir().join(gb_id.to_string()));
+    files.retain(|rel| rel != "copy.zip");
+    files
 }

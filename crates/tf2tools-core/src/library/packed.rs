@@ -18,7 +18,6 @@ use crate::archive::check_entry_name;
 pub(crate) const HUD_ZIP: &str = ".tf2tools/files.zip";
 
 /// Where a packed GameBanana add-on keeps its slot tree, relative to its library folder.
-#[cfg_attr(not(test), expect(dead_code, reason = "GameBanana copies in Task 2"))]
 pub(crate) const GB_ZIP: &str = "copy.zip";
 
 /// How many times a refused rename is tried again, and how long to wait between tries.
@@ -213,9 +212,20 @@ impl ItemSource {
 
     /// Writes the file or folder at `prefix` (a relative path in the item) to `dest`: a file
     /// to `dest` itself, a folder's files under `dest` keeping their paths below `prefix`.
-    /// Matches by whole components. `NotFound` when nothing is at `prefix`. Returns bytes written.
-    #[cfg_attr(not(test), expect(dead_code, reason = "GameBanana copies in Task 2"))]
+    /// Matches by whole components. `InvalidInput` for an empty prefix or one with any component
+    /// but a plain name, `NotFound` when nothing is at `prefix`. Returns bytes written.
     pub(crate) fn extract_under(&self, prefix: &Path, dest: &Path) -> Result<u64, IoFailure> {
+        // Only plain names, so a prefix can never climb out of the item or name a root.
+        let plain = prefix
+            .components()
+            .all(|c| matches!(c, Component::Normal(_)));
+        if !plain || prefix.as_os_str().is_empty() {
+            let source = io::Error::new(io::ErrorKind::InvalidInput, "not a path in the item");
+            return Err(IoFailure {
+                path: prefix.to_path_buf(),
+                source,
+            });
+        }
         let packed = match self {
             ItemSource::Loose(dir) => return extract_loose(&dir.join(prefix), dest),
             ItemSource::Packed(packed) => packed,
@@ -350,7 +360,6 @@ fn copy_entry(zip: &Path, mut from: impl Read, target: &Path) -> Result<u64, IoF
 
 /// Copies the loose file or folder at `src` to `dest`, never following a link at `src`
 /// itself; `NotFound` when nothing (or a link) is there.
-#[cfg_attr(not(test), expect(dead_code, reason = "GameBanana copies in Task 2"))]
 fn extract_loose(src: &Path, dest: &Path) -> Result<u64, IoFailure> {
     let meta = std::fs::symlink_metadata(src).map_err(io_at(src))?;
     if meta.is_dir() {
@@ -953,6 +962,27 @@ mod tests {
                     .extract_under(Path::new(missing), &out.join("none"))
                     .unwrap_err();
                 assert_eq!(err.source.kind(), io::ErrorKind::NotFound, "{missing}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_prefix_that_is_not_a_plain_relative_path_is_refused_in_either_form() {
+        let t = tempfile::tempdir().unwrap();
+        let dir = t.path().join("7");
+        write(&dir.join("1/tf2tools-gb-7-a.vpk"), b"vpk bytes");
+        write(&t.path().join("outside.vpk"), b"outside");
+        let loose = ItemSource::open(&dir, GB_ZIP).unwrap();
+        pack(&dir, &nothing, &dir.join(GB_ZIP)).unwrap();
+        let packed = ItemSource::open(&dir, GB_ZIP).unwrap();
+        let outside = t.path().join("outside.vpk");
+        let absolute = outside.to_str().unwrap();
+        for source in [&loose, &packed] {
+            for prefix in ["../outside.vpk", absolute, "./1/tf2tools-gb-7-a.vpk", ""] {
+                let dest = t.path().join("out.vpk");
+                let err = source.extract_under(Path::new(prefix), &dest).unwrap_err();
+                assert_eq!(err.source.kind(), io::ErrorKind::InvalidInput, "{prefix}");
+                assert!(!dest.exists(), "{prefix}");
             }
         }
     }
