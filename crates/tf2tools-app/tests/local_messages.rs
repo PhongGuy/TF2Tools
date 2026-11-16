@@ -776,7 +776,11 @@ fn reopening_warns_only_when_changes_were_left_out() {
     assert_eq!(reopen_notice(0, false), None);
     let updated = reopen_notice(0, true).unwrap();
     assert_eq!(
-        (updated.title, updated.text.as_str(), updated.warning),
+        (
+            updated.title.as_str(),
+            updated.text.as_str(),
+            updated.warning
+        ),
         (
             "TF2 updated its HUD files",
             "Your changes still apply. Check the HUD looks right.",
@@ -785,7 +789,11 @@ fn reopening_warns_only_when_changes_were_left_out() {
     );
     let dropped = reopen_notice(2, true).unwrap();
     assert_eq!(
-        (dropped.title, dropped.text.as_str(), dropped.warning),
+        (
+            dropped.title.as_str(),
+            dropped.text.as_str(),
+            dropped.warning
+        ),
         (
             "Some changes were left out",
             "2 of your changes no longer fit and were left out. Save it again to bring it up to date.",
@@ -804,7 +812,7 @@ fn left_out_counts_and_mentions_a_tf2_update() {
     assert_eq!(
         left_out(1, true).as_deref(),
         Some(
-            "1 of your changes no longer fit and were left out. Save it again to bring it up to date."
+            "1 of your changes no longer fits and was left out. Save it again to bring it up to date."
         )
     );
     assert_eq!(
@@ -876,9 +884,9 @@ fn every_copy_failure_reads_in_player_words() {
 
 #[test]
 fn a_full_disk_says_how_much_room_is_needed() {
-    use tf2tools_app::local_messages::no_space_text;
+    use tf2tools_app::local_messages::{SpaceFor, no_space_text};
     assert_eq!(
-        no_space_text("copy", 557_000_001),
+        no_space_text(SpaceFor::Copy, 557_000_001),
         "There isn't enough free disk space to copy this HUD. It needs about 532 MB."
     );
 }
@@ -887,7 +895,7 @@ fn a_full_disk_says_how_much_room_is_needed() {
 fn an_update_that_keeps_everything_is_a_note() {
     use tf2tools_app::local_messages::copy_updated_notice;
     let n = copy_updated_notice("rayshud (copy)", &[], 0);
-    assert_eq!((n.title, n.warning), ("HUD updated", false));
+    assert_eq!((n.title.as_str(), n.warning), ("HUD updated", false));
     assert_eq!(
         n.text,
         "rayshud (copy) now uses the newest version of its HUD. All your changes still apply."
@@ -902,11 +910,14 @@ fn left_out_changes_are_named_in_player_words() {
         ("AmmoInClip", Some("xpos")),
     ];
     let n = copy_updated_notice("rayshud (copy)", &left, 3);
-    assert_eq!((n.title, n.warning), ("Some changes were left out", true));
+    assert_eq!(
+        (n.title.as_str(), n.warning),
+        ("Some changes were left out", true)
+    );
     assert_eq!(
         n.text,
         "rayshud (copy) now uses the newest version of its HUD. 2 of your changes no longer fit: the colour of \
-         PlayerStatusHealthValue, the position of AmmoInClip. 3 of your changes replaced something the \
+         PlayerStatusHealthValue and the position of AmmoInClip. 3 of your changes replaced something the \
          update also changed."
     );
 }
@@ -924,7 +935,7 @@ fn every_key_word_reads_plainly() {
     let n = copy_updated_notice("x", &left, 0);
     assert!(
         n.text.ends_with(
-            "the size of A, the layer of B, the visibility of C, the font of D, the text of E."
+            "the size of A, the layer of B, the visibility of C, the font of D and the text of E."
         ),
         "{}",
         n.text
@@ -932,7 +943,7 @@ fn every_key_word_reads_plainly() {
     let n = copy_updated_notice("x", &[("F", Some("tf2tools_odd"))], 0);
     assert!(
         n.text
-            .ends_with("1 of your changes no longer fit: the tf2tools_odd of F."),
+            .ends_with("1 of your changes no longer fits: the tf2tools_odd of F."),
         "{}",
         n.text
     );
@@ -942,7 +953,7 @@ fn every_key_word_reads_plainly() {
 fn both_changed_alone_is_a_note() {
     use tf2tools_app::local_messages::copy_updated_notice;
     let n = copy_updated_notice("x", &[], 2);
-    assert_eq!((n.title, n.warning), ("HUD updated", false));
+    assert_eq!((n.title.as_str(), n.warning), ("HUD updated", false));
     assert_eq!(
         n.text,
         "x now uses the newest version of its HUD. All your changes still apply. 2 of your changes replaced \
@@ -1144,4 +1155,14 @@ fn map_remove_failures_read_as_plain_words() {
         gb_map_remove_op(&GbMapRemoveError::Tf2Running, "Couldn't remove the map"),
         OpError::Core { action, .. } if action == close_tf2()
     ));
+}
+
+#[test]
+fn a_map_list_reads_a_b_and_c() {
+    use tf2tools_app::local_messages::already_have;
+    let names = ["cp_a".to_owned(), "cp_b".to_owned(), "cp_c".to_owned()];
+    assert_eq!(
+        already_have(&names, false),
+        "You already have cp_a, cp_b and cp_c."
+    );
 }

@@ -125,3 +125,129 @@ messages:
     map_skipped: "Some extra files in this download were skipped."
     hud_options_unreadable: "This HUD's files couldn't be read, so the canvas can't show that option yet. Your choice is kept."
     hud_base_changed: "This HUD was updated while it was open. Close it and open it again to keep editing."
+  local:
+    unknown: "Something went wrong. Try again, and restart TF2Tools if it keeps happening."
+    library_disk: "TF2Tools couldn't read or save its files. Make sure your disk has free space and TF2Tools can write to its folder, then try again."
+    gone: "This item is no longer in your library. Pick another one."
+    unusable: "TF2Tools can't use this kind of file. Pick another file."
+    new_external_hud: "Another HUD turned up in your TF2 folder, so nothing was changed. Try again."
+    profile_gone: "This profile no longer exists. Pick another profile."
+    profiles_open: "TF2Tools couldn't open your profiles. Restart TF2Tools and try again."
+    hud_gone: "This HUD isn't in your library any more."
+    gb_install:
+      io: "Couldn't write the add-on into TF2. Make sure your disk has free space, then try again."
+      not_in_library: "This add-on's files are no longer in your library. Install it again from the Addon Store."
+    gb_map_install:
+      io: "Couldn't write the map into TF2. If TF2 is running, close it and try again. Otherwise make sure your disk has free space."
+    gb_map_remove:
+      io: "Couldn't delete the map's files. Close TF2 if it is running, then try again."
+      not_in_library: "This map is no longer in your library."
+    already_have:
+      plain: "You already have %{list}."
+      serveme: "You already have %{list}. Remove it on the serveme.tf tab to use GameBanana's version."
+    library:
+      unknown_weapon: "TF2Tools doesn't know this weapon. Pick another weapon."
+      vpk: "This sound file couldn't be read. Delete it and add it again."
+      vtf: "This crosshair image couldn't be read. Delete it and add it again."
+    make_hud:
+      io: "Couldn't save the HUD: your disk may be full or the folder isn't writable. Your changes are still here."
+      name_taken: "You already have a HUD called %{name}. Pick another name."
+      empty_name: "Give your HUD a name, then save it."
+      not_found: "This HUD was deleted. Save it under a name to keep it as a new one."
+      not_made: "This HUD wasn't made in the HUD Maker, so it can't be saved over."
+    hud_load:
+      cant_edit: "This HUD can't be opened for editing. You can still install it."
+    left_out: { one: "%{count} of your changes no longer fits and was left out.", other: "%{count} of your changes no longer fit and were left out." }
+    save_again: "Save it again to bring it up to date."
+    left_out_title: "Some changes were left out"
+    reopen:
+      tf2_updated_title: "TF2 updated its HUD files"
+      tf2_updated: "Your changes still apply. Check the HUD looks right."
+    copy_made: "%{copy} is yours to edit. %{terms}"
+    editing_copy: "Editing a copy of %{base}. The original stays as it is. %{terms}"
+    terms:
+      author: "It's %{author}'s work: check the HUD's page for its terms before you share yours."
+      no_author: "It's another author's work: check the HUD's page for its terms before you share yours."
+    no_space:
+      save: "There isn't enough free disk space to save this HUD. It needs about %{mb} MB."
+      copy: "There isn't enough free disk space to copy this HUD. It needs about %{mb} MB."
+      update: "There isn't enough free disk space to update this HUD. It needs about %{mb} MB."
+    copy_hud:
+      base_missing: "This HUD's files are missing from your library. Download or import it again."
+      made_hud: "This HUD was made in the HUD Maker. Open it with Edit instead."
+      name_taken: "There are too many copies of this HUD. Rename or delete one, then try again."
+    copy_in_store: "A newer version of %{hud} is in the HUD Store. Download it, then choose Update here."
+    key_word:
+      position: "the position of %{part}"
+      size: "the size of %{part}"
+      layer: "the layer of %{part}"
+      visibility: "the visibility of %{part}"
+      colour: "the colour of %{part}"
+      font: "the font of %{part}"
+      text: "the text of %{part}"
+      fallback: "the %{key} of %{part}"
+    copy_updated:
+      title: "HUD updated"
+      lead: "%{hud} now uses the newest version of its HUD."
+      all_apply: "All your changes still apply."
+      no_longer_fit: { one: "%{count} of your changes no longer fits: %{list}.", other: "%{count} of your changes no longer fit: %{list}." }
+      more: { one: "%{count} more", other: "%{count} more" }
+      both_changed: { one: "%{count} of your changes replaced something the update also changed.", other: "%{count} of your changes replaced something the update also changed." }
+    update_copy:
+      not_a_copy: "Only a copy of a HUD can be updated."
+      source_gone: "The newer version isn't in your library any more. Download or import it again."
+      not_same_source: "That HUD isn't a newer version of this copy's HUD."
+    paint:
+      io: "Couldn't save the crosshair: your disk may be full or the folder isn't writable. Your drawing is still here."
+      resave_database: "Couldn't update your crosshair library. Your drawing is still here, so try saving again."
+      name_taken: "You already have a crosshair called %{name}. Pick another name."
+      not_found: "This crosshair was deleted. Save it under a name to keep it as a new one."
+      unreadable: "This crosshair can't be opened for editing. You can still use it, or delete it and draw a new one."
+      not_painted: "This crosshair wasn't drawn in the Crosshair Maker, so it can't be edited here."
+      empty_name: "Give your crosshair a name, then save it."
+    import:
+      io: "Couldn't read that file or save it to your library. Make sure your disk has free space, then try again."
+      archive: "This archive couldn't be unpacked. Pick another file."
+      not_a_hud: "This file doesn't contain a HUD. Pick another file."
+      wav_unsupported: "TF2 can't play this sound's format. Save it as a CD-quality stereo WAV, then try again."
+      wav: "This sound file couldn't be read. Pick another file."
+      vtf: "This image couldn't be read. Pick another PNG or VTF file."
+    png_read:
+      io: "Couldn't read that file. Pick another file."
+      too_large: "This picture is too big. Pick a smaller one."
+      invalid: "This file isn't a PNG TF2Tools can read. Pick another file."
+    png_write:
+      io: "Couldn't save the PNG there. Pick another folder, then try again."
+    keep_hud:
+      io: "Couldn't copy your HUD into your library, so nothing was removed. Make sure your drive has free space, then try again."
+      not_copyable: "Your HUD holds a shortcut TF2Tools can't copy, so nothing was removed."
+    profile:
+      empty_name: "Give the profile a name, then try again."
+      item_not_found: "An item you picked is no longer in your library. Pick another one, then try again."
+      unknown_weapon: "TF2Tools doesn't know one of this profile's weapons. Edit the profile and try again."
+    apply_profile:
+      missing: "Some items in this profile are missing. Download them again, then try again."
+    settings:
+      database: "TF2Tools couldn't read or save its settings. Restart TF2Tools and try again."
+      non_utf8_path: "TF2Tools can't save this folder's name. Pick a TF2 folder whose name uses plain letters."
+    tf2_folder:
+      not_tf2: "This folder isn't a TF2 install. Pick the folder TF2 is installed in, then try again."
+      io: "Couldn't set up this TF2 folder. Make sure TF2Tools can write to it, then try again."
+    detect:
+      failed: "Couldn't search your Steam library for TF2. Select your TF2 folder manually."
+    font_install:
+      io: "Couldn't copy the HUD's fonts. Make sure your disk has free space, then try again."
+      host: "Your system didn't accept the HUD's fonts. Restart TF2Tools and try again."
+      refresh: "The fonts were copied. Log out and back in for TF2 to see them."
+    audio:
+      device: "Couldn't play sound on this computer. Check that your speakers or headphones are connected, then try again."
+      decode: "This sound couldn't be played. Pick another sound."
+      closed: "Sound playback stopped working. Restart TF2Tools to play sounds again."
+    log:
+      database: "TF2Tools couldn't open the activity log. Restart TF2Tools and try again."
+    startup:
+      no_assets: "TF2Tools is missing some of its own files. Reinstall TF2Tools from the release page."
+      database: "TF2Tools couldn't open your saved library. Restart your computer and try again. If it keeps happening, ask for help on the TF2Tools GitHub page."
+      newer_database: "Your library was saved by a newer TF2Tools. Install the latest TF2Tools from the release page to open it."
+  profiles:
+    name_taken: "You already have a profile called %{name}. Pick another name."

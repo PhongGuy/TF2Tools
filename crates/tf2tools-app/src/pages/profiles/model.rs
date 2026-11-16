@@ -59,7 +59,7 @@ pub fn taken_by<'a>(
 
 /// The line under a name field holding another profile's name.
 pub fn taken_message(name: &str) -> String {
-    format!("You already have a profile called {name}. Pick another name.")
+    crate::i18n::tr!("messages.profiles.name_taken", name = name).into()
 }
 
 /// "HUD", "Hitsound", "Killsound", "Crosshairs".

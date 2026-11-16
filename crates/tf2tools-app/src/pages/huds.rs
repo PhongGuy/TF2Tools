@@ -846,7 +846,7 @@ impl HudsPage {
                     kind = ToastKind::Warning;
                     text = format!("{text} {NOT_REINSTALLED}");
                 }
-                Ok((kind, notice.title.into(), text.into()))
+                Ok((kind, notice.title, text.into()))
             },
             cx,
             None,

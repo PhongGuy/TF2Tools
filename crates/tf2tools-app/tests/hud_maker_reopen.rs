@@ -153,7 +153,7 @@ fn changes_that_no_longer_fit_are_counted(cx: &mut TestAppContext) {
     let _page = edit_from_huds(cx, &s, &hud);
     assert_eq!(
         support::label_of(cx, s.win, ids::TOAST).as_deref(),
-        Some("Some changes were left out. 1 of your changes no longer fit and were left out.")
+        Some("Some changes were left out. 1 of your changes no longer fits and was left out.")
     );
 }
 
