@@ -347,12 +347,18 @@ fn file_bytes(conn: &Connection) -> rusqlite::Result<u64> {
 // only VACUUM packs, so the file is rewritten once enough trims add up, or once when an old file
 // without auto_vacuum holds many free pages; the rewrite also turns incremental vacuum on.
 // Between rewrites an incremental file frees pages in place. A pass that changed nothing and
-// left no free pages skips it all. A busy checkpoint is not an error.
+// left no free pages skips the vacuum but still truncates the -wal a sync grew. A busy
+// checkpoint is not an error.
 fn compact(conn: &Connection, trimmed: usize, recompressed: bool) -> rusqlite::Result<()> {
     let free: i64 = conn.pragma_query_value(None, "freelist_count", |r| r.get(0))?;
-    if trimmed == 0 && !recompressed && free == 0 {
-        return Ok(());
+    if trimmed > 0 || recompressed || free > 0 {
+        vacuum(conn, trimmed, free)?;
     }
+    conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))
+}
+
+// Counts the pass's trims and rewrites the file or frees its pages in place.
+fn vacuum(conn: &Connection, trimmed: usize, free: i64) -> rusqlite::Result<()> {
     let counted: i64 = conn
         .query_row(
             "SELECT CAST(value AS INTEGER) FROM settings WHERE key = ?1",
@@ -385,5 +391,5 @@ fn compact(conn: &Connection, trimmed: usize, recompressed: bool) -> rusqlite::R
         let mut rows = stmt.query([])?;
         while rows.next()?.is_some() {}
     }
-    conn.query_row("PRAGMA wal_checkpoint(TRUNCATE)", [], |_| Ok(()))
+    Ok(())
 }
