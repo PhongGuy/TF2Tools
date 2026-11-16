@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 
+use super::packed::{CROSSHAIR_ZIP, ItemSource};
 use super::{
     CrosshairId, IoFailure, Library, Provenance, create_dir_all, first_free_number, folder_name,
     game_custom_dir, gb_id_column, import_db, install_db, io_at, is_plain_name, library_db, new_id,
@@ -302,10 +303,36 @@ impl StockScripts {
     }
 }
 
-/// A crosshair's texture and optional VMT to copy in as `<ref>.vtf` and `<ref>.vmt`.
-struct CrosshairFiles {
-    vtf: PathBuf,
-    vmt: Option<PathBuf>,
+/// A crosshair's texture and optional VMT to copy in as `<ref>.vtf` and `<ref>.vmt`: a
+/// builtin's own paths, or names within a library copy that may be loose or packed.
+enum CrosshairFiles {
+    Builtin {
+        vtf: PathBuf,
+        vmt: Option<PathBuf>,
+    },
+    Library {
+        source: ItemSource,
+        vtf: PathBuf,
+        vmt: Option<PathBuf>,
+    },
+}
+
+impl CrosshairFiles {
+    /// The VTF's bytes.
+    fn vtf(&self) -> Result<Vec<u8>, IoFailure> {
+        match self {
+            Self::Builtin { vtf, .. } => std::fs::read(vtf).map_err(io_at(vtf)),
+            Self::Library { source, vtf, .. } => source.read(vtf),
+        }
+    }
+
+    /// The VMT's bytes, `None` when the crosshair has none.
+    fn vmt(&self) -> Option<Result<Vec<u8>, IoFailure>> {
+        match self {
+            Self::Builtin { vmt, .. } => vmt.as_ref().map(|p| std::fs::read(p).map_err(io_at(p))),
+            Self::Library { source, vmt, .. } => vmt.as_ref().map(|rel| source.read(rel)),
+        }
+    }
 }
 
 fn crosshair_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<CrosshairEntry> {
@@ -499,6 +526,12 @@ impl Library {
     /// 64x64, else the VTF (also 32x32 or 64x64) with `recovered` set. `NotFound` for an
     /// unknown id, `NotPainted` for another format, `Unreadable` when neither file serves.
     pub fn painted_source(&self, id: &CrosshairId) -> Result<PaintedSource, PaintError> {
+        let _copies = self.copies_read();
+        self.painted_source_locked(id)
+    }
+
+    /// `painted_source` for a caller that holds the copies lock.
+    fn painted_source_locked(&self, id: &CrosshairId) -> Result<PaintedSource, PaintError> {
         let row: Option<(String, String)> = self
             .db
             .read(|conn| {
@@ -520,10 +553,12 @@ impl Library {
         if !is_plain_name(&folder) {
             return Err(unreadable());
         }
-        // Any read or decode failure of source.png falls back to the VTF, never to an error.
+        // Any read or decode failure of source.png falls back to the VTF, never to an error; a
+        // zip that does not open serves neither.
         let dir = self.dir.library_dir(LibraryKind::Crosshairs).join(&folder);
-        let from_png = std::fs::read(dir.join("source.png"))
-            .ok()
+        let source = ItemSource::open(&dir, CROSSHAIR_ZIP).ok();
+        let read = |rel: &str| source.as_ref()?.read(Path::new(rel)).ok();
+        let from_png = read("source.png")
             .and_then(|bytes| {
                 image::load_from_memory_with_format(&bytes, image::ImageFormat::Png).ok()
             })
@@ -539,8 +574,7 @@ impl Library {
                 recovered: false,
             });
         }
-        let drawing = std::fs::read(self.crosshair_vtf(&folder))
-            .ok()
+        let drawing = read(&format!("{folder}.vtf"))
             .and_then(|bytes| decode_vtf(&bytes).ok())
             .filter(is_canvas_size)
             .ok_or_else(unreadable)?;
@@ -719,18 +753,29 @@ impl Library {
         crosshair: &CrosshairRef,
         builtins: &BuiltinCrosshairs,
     ) -> Result<RgbaImage, LibraryError> {
+        let _copies = self.copies_read();
         // Any painted-source failure falls back to the VTF, whose read maps errors properly.
         if let CrosshairRef::Library(id) = crosshair
-            && let Ok(source) = self.painted_source(id)
+            && let Ok(source) = self.painted_source_locked(id)
         {
             return Ok(source.drawing().clone());
         }
-        self.crosshair_preview(crosshair, builtins)
+        self.crosshair_preview_locked(crosshair, builtins)
     }
 
     /// Decodes the VTF of a builtin crosshair (from `builtins`) or a library crosshair.
     /// An unknown crosshair or a missing VTF is `NotFound`.
     pub fn crosshair_preview(
+        &self,
+        crosshair: &CrosshairRef,
+        builtins: &BuiltinCrosshairs,
+    ) -> Result<RgbaImage, LibraryError> {
+        let _copies = self.copies_read();
+        self.crosshair_preview_locked(crosshair, builtins)
+    }
+
+    /// `crosshair_preview` for a caller that holds the copies lock.
+    fn crosshair_preview_locked(
         &self,
         crosshair: &CrosshairRef,
         builtins: &BuiltinCrosshairs,
@@ -741,24 +786,26 @@ impl Library {
                 CrosshairRef::Library(id) => format!("the VTF of crosshair {id}"),
             },
         };
-        let vtf_path = match crosshair {
-            CrosshairRef::Builtin(name) => builtins
-                .get(name)
-                .ok_or_else(not_found)?
-                .vtf_path()
-                .to_path_buf(),
+        let read = match crosshair {
+            CrosshairRef::Builtin(name) => {
+                let path = builtins.get(name).ok_or_else(not_found)?.vtf_path();
+                std::fs::read(path).map_err(io_at(path))
+            }
             CrosshairRef::Library(id) => {
                 let folder = self.crosshair_folder(id)?;
                 if !is_plain_name(&folder) {
                     return Err(not_found());
                 }
-                self.crosshair_vtf(&folder)
+                let dir = self.dir.library_dir(LibraryKind::Crosshairs).join(&folder);
+                ItemSource::open(&dir, CROSSHAIR_ZIP)?.read(Path::new(&format!("{folder}.vtf")))
             }
         };
-        let bytes = match std::fs::read(&vtf_path) {
+        let bytes = match read {
             Ok(bytes) => bytes,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(not_found()),
-            Err(e) => return Err(io_at(&vtf_path)(e).into()),
+            Err(failure) if failure.source.kind() == std::io::ErrorKind::NotFound => {
+                return Err(not_found());
+            }
+            Err(failure) => return Err(failure.into()),
         };
         Ok(decode_vtf(&bytes)?)
     }
@@ -902,6 +949,7 @@ impl Library {
         tf2: &Tf2Install,
         builtins: &BuiltinCrosshairs,
     ) -> Result<Vec<String>, LibraryError> {
+        let _copies = self.copies_read();
         let rows: Vec<(String, String, String)> = self
             .db
             .read(|conn| {
@@ -973,6 +1021,7 @@ impl Library {
         tf2: &Tf2Install,
         builtins: &BuiltinCrosshairs,
     ) -> Result<ApplyReport, InstallError> {
+        let _copies = self.copies_read();
         let rows: Vec<(String, String, String)> = self
             .db
             .read(|conn| {
@@ -999,7 +1048,7 @@ impl Library {
                 match source.as_str() {
                     SOURCE_BUILTIN => builtins
                         .get(&reference)
-                        .map(|b| CrosshairFiles {
+                        .map(|b| CrosshairFiles::Builtin {
                             vtf: b.vtf_path().to_path_buf(),
                             vmt: b.vmt_path().map(Path::to_path_buf),
                         })
@@ -1042,14 +1091,13 @@ impl Library {
                 // the template instead.
                 let name = templates::texture_name(reference);
                 let vtf = materials.join(format!("{name}.vtf"));
-                let bytes = std::fs::read(&found.vtf).map_err(io_at(&found.vtf))?;
-                std::fs::write(&vtf, crosshair_for_game(bytes)).map_err(io_at(&vtf))?;
+                std::fs::write(&vtf, crosshair_for_game(found.vtf()?)).map_err(io_at(&vtf))?;
                 let vmt = materials.join(format!("{name}.vmt"));
-                match &found.vmt {
-                    Some(src) if name == reference.as_str() => std::fs::copy(src, &vmt).map(drop),
-                    _ => std::fs::write(&vmt, templates::vmt(reference)),
-                }
-                .map_err(io_at(&vmt))?;
+                let text = match found.vmt().filter(|_| name == reference.as_str()) {
+                    Some(own) => own?,
+                    None => templates::vmt(reference).into_bytes(),
+                };
+                std::fs::write(&vmt, text).map_err(io_at(&vmt))?;
             }
             for (weapon_script, text) in &applied {
                 let script = scripts.join(format!("{weapon_script}.txt"));
@@ -1171,25 +1219,37 @@ impl Library {
         })
     }
 
-    /// A library crosshair's files by folder name, as v5's import names them; `None` when
-    /// the name is unsafe or the VTF is gone. A missing VMT gets the template on apply.
+    /// A library crosshair's files by folder name, as v5's import names them, loose or packed;
+    /// `None` when the name is unsafe, the zip does not open or the VTF is gone. A missing VMT
+    /// gets the template on apply. The caller holds the copies lock.
     fn library_crosshair_files(&self, folder: &str) -> Option<CrosshairFiles> {
         if !is_plain_name(folder) {
             return None;
         }
-        let vtf = self.crosshair_vtf(folder);
-        if !vtf.is_file() {
+        let dir = self.dir.library_dir(LibraryKind::Crosshairs).join(folder);
+        let source = ItemSource::open(&dir, CROSSHAIR_ZIP)
+            .inspect_err(|failure| {
+                tracing::warn!(
+                    path = %failure.path.display(),
+                    error = %failure.source,
+                    "crosshair copy could not be read"
+                );
+            })
+            .ok()?;
+        let vtf = PathBuf::from(format!("{folder}.vtf"));
+        if !source.has(&vtf) {
             return None;
         }
         let vmt = vtf.with_extension("vmt");
-        Some(CrosshairFiles {
-            vmt: vmt.is_file().then_some(vmt),
+        Some(CrosshairFiles::Library {
+            vmt: source.has(&vmt).then_some(vmt),
             vtf,
+            source,
         })
     }
 
     /// A crosshair's folder name, or `NotFound` for an unknown id.
-    fn crosshair_folder(&self, id: &CrosshairId) -> Result<String, LibraryError> {
+    pub(super) fn crosshair_folder(&self, id: &CrosshairId) -> Result<String, LibraryError> {
         self.db
             .read(|conn| {
                 conn.query_row(
@@ -1201,14 +1261,6 @@ impl Library {
             })
             .map_err(library_db)?
             .ok_or_else(|| crosshair_not_found(id))
-    }
-
-    /// `library/crosshairs/<folder>/<folder>.vtf`; the caller checks `folder` is plain.
-    fn crosshair_vtf(&self, folder: &str) -> PathBuf {
-        self.dir
-            .library_dir(LibraryKind::Crosshairs)
-            .join(folder)
-            .join(format!("{folder}.vtf"))
     }
 }
 

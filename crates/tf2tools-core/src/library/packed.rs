@@ -20,6 +20,9 @@ pub(crate) const HUD_ZIP: &str = ".tf2tools/files.zip";
 /// Where a packed GameBanana add-on keeps its slot tree, relative to its library folder.
 pub(crate) const GB_ZIP: &str = "copy.zip";
 
+/// Where a packed library crosshair keeps its files, relative to its library folder.
+pub(crate) const CROSSHAIR_ZIP: &str = "copy.zip";
+
 /// How many times a refused rename is tried again, and how long to wait between tries.
 const RENAME_RETRIES: u32 = 5;
 const RENAME_PAUSE: Duration = Duration::from_millis(200);
@@ -107,6 +110,15 @@ impl ItemSource {
             ItemSource::Packed(packed) => {
                 Ok(packed.kept(skip).map(|e| (e.rel.clone(), e.size)).collect())
             }
+        }
+    }
+
+    /// Whether the file at `rel` is there: a loose one as `Path::is_file` sees it, a packed
+    /// one when the zip holds it as a regular file.
+    pub(crate) fn has(&self, rel: &Path) -> bool {
+        match self {
+            ItemSource::Loose(dir) => dir.join(rel).is_file(),
+            ItemSource::Packed(packed) => packed.name_of(rel).is_ok(),
         }
     }
 
