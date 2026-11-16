@@ -7,6 +7,7 @@ use tf2tools_core::{
     TfClass,
 };
 
+use crate::i18n::format;
 use crate::logs_sync::SyncProgress;
 
 /// logs.tf's front page, which the page's credit opens.
@@ -279,12 +280,8 @@ pub fn summary_text(range: LogsRange, logs: usize, newest: Option<i64>, now: i64
 
 // A day on this computer's clock as a player writes it: "13 Dec 2022".
 fn day_text(unix: i64) -> String {
-    chrono::DateTime::from_timestamp(unix, 0)
-        .map(|t| {
-            t.with_timezone(&chrono::Local)
-                .format("%-d %b %Y")
-                .to_string()
-        })
+    local_time(unix)
+        .map(|t| format::day_month_year(t.date()).to_string())
         .unwrap_or_default()
 }
 
@@ -332,24 +329,21 @@ pub fn duration_text(seconds: u32) -> String {
 
 /// An upload time as a date and minute on this computer's clock: "2026-10-17 20:56".
 pub fn date_time_text(unix: i64) -> String {
-    chrono::DateTime::from_timestamp(unix, 0)
-        .map(|t| {
-            t.with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M")
-                .to_string()
-        })
+    local_time(unix)
+        .map(|t| format::date_time(t, false).to_string())
         .unwrap_or_default()
 }
 
 /// An upload time as a date on this computer's clock: "2026-10-17".
 pub fn date_text(unix: i64) -> String {
-    chrono::DateTime::from_timestamp(unix, 0)
-        .map(|t| {
-            t.with_timezone(&chrono::Local)
-                .format("%Y-%m-%d")
-                .to_string()
-        })
+    local_time(unix)
+        .map(|t| format::numeric_date(t.date()).to_string())
         .unwrap_or_default()
+}
+
+// An upload time on this computer's wall clock, or None when it is out of chrono's range.
+fn local_time(unix: i64) -> Option<chrono::NaiveDateTime> {
+    chrono::DateTime::from_timestamp(unix, 0).map(|t| t.with_timezone(&chrono::Local).naive_local())
 }
 
 /// `part` as a whole percent of `whole`, rounded to nearest: "47%"; a whole of 0 reads "0%".

@@ -141,3 +141,41 @@ fn english_reads_the_same_after_a_switch_to_russian_and_back() {
     let [a, b, c, d, e] = english;
     assert_eq!(before, (a, b, c, d, e));
 }
+
+/// Unix seconds for a wall-clock time on this computer.
+pub fn local_unix(y: i32, mo: u32, d: u32, h: u32, mi: u32, s: u32) -> i64 {
+    use chrono::TimeZone as _;
+    chrono::Local
+        .with_ymd_and_hms(y, mo, d, h, mi, s)
+        .unwrap()
+        .timestamp()
+}
+
+#[test]
+fn shown_dates_read_day_first_in_russian() {
+    use chrono::TimeZone as _;
+    use tf2tools_app::pages::hud_store::bodies::added_text;
+    use tf2tools_app::pages::logs_tf::text::{date_text, date_time_text};
+    use tf2tools_app::pages::maps::model::last_played_label;
+    use tf2tools_app::pages::settings::format_synced;
+    let _guard = LocaleGuard::switch("ru");
+    let unix = local_unix(2026, 11, 12, 20, 56, 30);
+    assert_eq!(date_time_text(unix), "12.11.2026 20:56");
+    assert_eq!(date_text(unix), "12.11.2026");
+    let stamp = "2026-10-17T18:56:00Z";
+    let local = chrono::DateTime::parse_from_rfc3339(stamp)
+        .unwrap()
+        .with_timezone(&chrono::Local)
+        .format("%d.%m.%Y %H:%M")
+        .to_string();
+    assert_eq!(format_synced(Some(stamp)), local);
+    let added = chrono::Utc
+        .with_ymd_and_hms(2026, 5, 3, 12, 0, 0)
+        .unwrap()
+        .timestamp();
+    let added = added_text(added).unwrap();
+    assert_eq!(added, "Добавлено 3 мая 2026\u{a0}г.");
+    assert_ru(&added);
+    assert_eq!(last_played_label(Some("2026-11-01")), "01.11.2026");
+    assert_eq!(last_played_label(Some("a while ago")), "a while ago");
+}

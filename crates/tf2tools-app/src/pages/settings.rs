@@ -892,7 +892,7 @@ impl SettingsPage {
 }
 
 /// v5's `formatDate`: "Never" without a sync, "Unknown" for a time that does not parse, else
-/// the local time as "%Y-%m-%d %H:%M".
+/// the local time as a numeric date and clock time: "2026-10-17 20:56" in English.
 pub fn format_synced(rfc3339: Option<&str>) -> String {
     let Some(text) = rfc3339 else {
         return tr!("settings.sync.never").to_string();
@@ -900,8 +900,7 @@ pub fn format_synced(rfc3339: Option<&str>) -> String {
     chrono::DateTime::parse_from_rfc3339(text).map_or_else(
         |_| tr!("settings.sync.unknown").to_string(),
         |t| {
-            t.with_timezone(&chrono::Local)
-                .format("%Y-%m-%d %H:%M")
+            i18n::format::date_time(t.with_timezone(&chrono::Local).naive_local(), false)
                 .to_string()
         },
     )

@@ -5,13 +5,14 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, h_flex, v_flex};
 use gpui_kit::{
-    App, Div, InteractiveElement as _, IntoElement, ParentElement as _, Styled as _,
+    App, Div, InteractiveElement as _, IntoElement, ParentElement as _, SharedString, Styled as _,
     TestSupportExt as _, div, px, transparent_black,
 };
 use tf2tools_core::{StoreItem, StoreItemId};
 
 use super::curated::CuratedHud;
 use crate::counts::count_stat;
+use crate::i18n::{format, tr};
 use crate::ids;
 use crate::links::gamebanana_page;
 use crate::pages::common::badge_of;
@@ -61,11 +62,9 @@ pub fn curated_body() -> DetailBody {
 /// A GameBanana HUD: added date, likes and views, tags, and its GameBanana button beside the name.
 pub fn gamebanana_body() -> DetailBody {
     DetailBody::new(|item: &StoreItem, _, cx: &mut App| {
-        let added = chrono::DateTime::from_timestamp(item.date_added(), 0)
-            .map(|d| format!("Added {}", d.format("%b %-d, %Y")));
         v_flex()
             .gap_3()
-            .children(added.map(|a| text_row(cx, a)))
+            .children(added_text(item.date_added()).map(|a| text_row(cx, a.to_string())))
             // v5's Stats row: the like and view counts as icon stats.
             .child(
                 h_flex()
@@ -93,6 +92,16 @@ pub fn gamebanana_body() -> DetailBody {
         (!url.is_empty()).then(|| {
             link_button("gamebanana", "GameBanana", gamebanana_page(url, *id)).into_any_element()
         })
+    })
+}
+
+/// "Added May 3, 2026" for a GameBanana upload time (UTC date), or None when it does not parse.
+pub fn added_text(unix: i64) -> Option<SharedString> {
+    chrono::DateTime::from_timestamp(unix, 0).map(|d| {
+        tr!(
+            "hud_store.added",
+            date = format::month_day_year(d.date_naive())
+        )
     })
 }
 

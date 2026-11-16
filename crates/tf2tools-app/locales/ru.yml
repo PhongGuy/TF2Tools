@@ -157,6 +157,9 @@ common:
     month_day_year: "%{day} %{month} %{year}\u00A0г."
     month: { jan: "янв.", feb: "февр.", mar: "мар.", apr: "апр.", may: "мая", jun: "июн.", jul: "июл.", aug: "авг.", sep: "сент.", oct: "окт.", nov: "нояб.", dec: "дек." }
 
+hud_store:
+  added: "Добавлено %{date}"
+
 messages:
   shared:
     no_tf2_title: "TF2 не найдена"

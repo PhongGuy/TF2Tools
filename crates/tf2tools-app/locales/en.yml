@@ -159,6 +159,9 @@ common:
     month_day_year: "%{month} %{day}, %{year}"
     month: { jan: "Jan", feb: "Feb", mar: "Mar", apr: "Apr", may: "May", jun: "Jun", jul: "Jul", aug: "Aug", sep: "Sep", oct: "Oct", nov: "Nov", dec: "Dec" }
 
+hud_store:
+  added: "Added %{date}"
+
 messages:
   shared:
     no_tf2_title: "TF2 not found"
