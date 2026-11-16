@@ -189,3 +189,46 @@ fn the_library_line_reads_in_russian() {
         "Библиотека занимает 392.9 МБ на диске (2.0 ГБ без сжатия)."
     );
 }
+
+#[gpui_kit::test]
+fn the_keep_rows_are_renamed_after_a_language_switch(cx: &mut TestAppContext) {
+    use gpui_kit::test::TestWindowExt as _;
+    use gpui_kit::{AppContext as _, ScrollDelta, point};
+    use tf2tools_app::logs_trim::LogsTrim;
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let _page = open_settings(cx, &s);
+    // The first pass lands before the switch, so no later pass can retitle the rows instead.
+    support::wait_real(cx, "the first trim pass", |cx| {
+        cx.update(|cx| {
+            let trim = LogsTrim::global(cx).read(cx);
+            trim.passes() >= 1 && !trim.is_running()
+        })
+    });
+    pick(cx, s.win, "ru");
+    // Wheel the page until the keep select is in view, then open it.
+    for _ in 0..120 {
+        let page = support::bounds_of(cx, s.win, ids::page(Page::Settings)).unwrap();
+        let b = support::bounds_of(cx, s.win, ids::SETTINGS_LOG_KEEP).unwrap();
+        if b.top() >= page.top() && b.bottom() <= page.bottom() {
+            break;
+        }
+        let step = if b.top() < page.top() { 1. } else { -1. };
+        let turn = ScrollDelta::Lines(point(0., step));
+        cx.update_window(s.win, |_, w, cx| {
+            w.scroll(ids::page(Page::Settings), turn, cx)
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+    }
+    support::click_id(cx, s.win, ids::SETTINGS_LOG_KEEP);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::settings_log_keep("3d")).as_deref(),
+        Some("3 дня")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::settings_log_keep("forever")).as_deref(),
+        Some("Всегда")
+    );
+}

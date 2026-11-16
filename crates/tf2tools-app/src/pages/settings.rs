@@ -132,6 +132,7 @@ impl SearchableListItem for KeepRow {
     fn render(&self, _: &mut Window, _: &mut App) -> impl IntoElement {
         div()
             .id(ids::settings_log_keep(&self.key))
+            .aria_label(self.title.clone())
             .test_support()
             .child(self.title.clone())
     }
