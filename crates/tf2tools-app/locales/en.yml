@@ -133,6 +133,18 @@ common:
   list:
     separator: ", "
     last: "%{rest} and %{last}"
+  number:
+    decimal: "."
+    group: ","
+  count:
+    thousand: "%{number}K"
+    million: "%{number}M"
+  size:
+    b: "%{size} B"
+    kb: "%{size} KB"
+    mb: "%{size} MB"
+    gb: "%{size} GB"
+    tb: "%{size} TB"
 
 messages:
   shared:

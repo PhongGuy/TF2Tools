@@ -131,6 +131,18 @@ common:
   list:
     separator: ", "
     last: "%{rest} и %{last}"
+  number:
+    decimal: ","
+    group: "\u00A0"
+  count:
+    thousand: "%{number}\u00A0тыс."
+    million: "%{number}\u00A0млн"
+  size:
+    b: "%{size}\u00A0Б"
+    kb: "%{size}\u00A0КБ"
+    mb: "%{size}\u00A0МБ"
+    gb: "%{size}\u00A0ГБ"
+    tb: "%{size}\u00A0ТБ"
 
 messages:
   shared:
