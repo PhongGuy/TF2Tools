@@ -88,7 +88,7 @@ impl LogsTrim {
         .detach();
     }
 
-    // A failed pass keeps the old figures and is only logged, as a background job has no window.
+    // A failed pass keeps the old figures, is logged and flags `failed` for Settings; it never toasts.
     // The choice it carried waits again for the next pass, unless a newer one replaced it.
     fn land(
         &mut self,
