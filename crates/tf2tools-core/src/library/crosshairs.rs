@@ -457,19 +457,27 @@ impl Library {
             let _ = remove_dir_if_present(&dest);
             return Err(import_db(e));
         }
-        // The copy is packed once its row stands; a failed pack leaves it loose, which every
-        // reader takes and the next conversion pass retries.
+        self.pack_imported(&dest, &entry.folder_name);
+        Ok(entry)
+    }
+
+    /// Packs the just-recorded copy at `dest` under the copies write guard; a failed pack
+    /// leaves it loose, which every reader takes and the next conversion pass retries.
+    fn pack_imported(&self, dest: &Path, folder: &str) {
         let _copies = self.copies_write();
-        if let Err(IoFailure { path, source }) = self.pack_folder(&dest, CROSSHAIR_ZIP) {
-            let placed = ItemSource::open(&dest, CROSSHAIR_ZIP).is_ok_and(|s| s.is_packed());
+        // A conversion pass may have packed it after the row committed; that zip stands.
+        if ItemSource::open(dest, CROSSHAIR_ZIP).is_ok_and(|s| s.is_packed()) {
+            return;
+        }
+        if let Err(IoFailure { path, source }) = self.pack_folder(dest, CROSSHAIR_ZIP) {
+            let placed = ItemSource::open(dest, CROSSHAIR_ZIP).is_ok_and(|s| s.is_packed());
             let message = if placed {
                 "imported crosshair packed, but its loose files could not be removed"
             } else {
                 "imported crosshair left loose: it could not be packed"
             };
-            tracing::warn!(folder = %entry.folder_name, path = %path.display(), error = %source, "{message}");
+            tracing::warn!(folder, path = %path.display(), error = %source, "{message}");
         }
-        Ok(entry)
     }
 
     /// Validates the drawing (32x32 or 64x64) and the trimmed name (not blank, not another
@@ -1515,6 +1523,22 @@ mod tests {
                 [id, &format!("f-{id}"), name, source_type],
             )
             .unwrap();
+    }
+
+    // A conversion pass can pack the copy between the row commit and import's own pack.
+    #[test]
+    fn packing_an_import_that_is_already_packed_keeps_its_zip() {
+        let (_tmp, dir, lib) = library();
+        let dest = dir.library_dir(LibraryKind::Crosshairs).join("a");
+        std::fs::create_dir_all(&dest).unwrap();
+        std::fs::write(dest.join("a.vtf"), b"vtf").unwrap();
+        std::fs::write(dest.join("a.vmt"), b"vmt").unwrap();
+        lib.pack_imported(&dest, "a");
+        lib.pack_imported(&dest, "a");
+        let source = ItemSource::open(&dest, CROSSHAIR_ZIP).unwrap();
+        assert!(source.is_packed());
+        assert_eq!(source.read(Path::new("a.vtf")).unwrap(), b"vtf");
+        assert_eq!(source.read(Path::new("a.vmt")).unwrap(), b"vmt");
     }
 
     // A rival save that lands after the early check is still caught inside the write.

@@ -368,12 +368,16 @@ impl Library {
 
     /// Packs the loose item at `live` into `live/zip_rel`, leaving out `zip_rel`'s first
     /// component and its `.tmp`, then clears the loose files; returns the zip's length. A zip
-    /// that does not read back is removed (best effort), leaving the loose tree.
+    /// that does not read back is removed (best effort), leaving the loose tree. A folder that
+    /// already holds the zip is refused with `AlreadyExists` and left as it is.
     pub(super) fn pack_folder(&self, live: &Path, zip_rel: &str) -> Result<u64, IoFailure> {
         let top = top_of(zip_rel);
         let tmp = tmp_of(Path::new(zip_rel));
         let left_out = |rel: &Path| rel == top || rel == tmp;
         let zip = live.join(zip_rel);
+        if std::fs::symlink_metadata(&zip).is_ok() {
+            return Err(io_at(&zip)(io::ErrorKind::AlreadyExists.into()));
+        }
         let mut rename = self.pack_rename;
         let after = pack_with(live, &left_out, &zip, &mut rename)?;
         if let Err(failure) = require_packed(live, zip_rel) {
@@ -492,6 +496,27 @@ fn clear_read_only(path: &Path) -> Result<(), IoFailure> {
 #[cfg(test)]
 mod tests {
     use super::clear_read_only;
+    use crate::db::Database;
+    use crate::library::Library;
+    use crate::library::packed::{CROSSHAIR_ZIP, ItemSource};
+    use crate::paths::DataDir;
+    use std::path::Path;
+
+    // Packing over a placed zip would zip an empty folder; the zip that is there wins.
+    #[test]
+    fn a_folder_that_already_holds_its_zip_is_not_packed_again() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = DataDir::at(tmp.path().join("data"));
+        let lib = Library::new(Database::open(&dir).unwrap(), dir.clone());
+        let live = tmp.path().join("item");
+        std::fs::create_dir_all(&live).unwrap();
+        std::fs::write(live.join("a.vtf"), b"vtf").unwrap();
+        lib.pack_folder(&live, CROSSHAIR_ZIP).unwrap();
+        let failure = lib.pack_folder(&live, CROSSHAIR_ZIP).unwrap_err();
+        assert_eq!(failure.source.kind(), std::io::ErrorKind::AlreadyExists);
+        let source = ItemSource::open(&live, CROSSHAIR_ZIP).unwrap();
+        assert_eq!(source.read(Path::new("a.vtf")).unwrap(), b"vtf");
+    }
 
     #[test]
     fn a_read_only_file_is_made_writable() {

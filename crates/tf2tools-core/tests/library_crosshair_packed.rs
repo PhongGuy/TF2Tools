@@ -422,3 +422,39 @@ fn a_crosshair_row_naming_the_parent_folder_is_not_packed() {
 fn s(text: &str) -> String {
     text.to_owned()
 }
+
+#[test]
+fn apply_copies_the_vmt_from_the_zip() {
+    let env = crosshair_env();
+    let dot = import_png_as(&env, "Dot", Provenance::Local);
+    let folder = dot.folder_name();
+    let (vtf, vmt) = (format!("{folder}.vtf"), format!("{folder}.vmt"));
+    let texture = crosshair_zip_files(&env.dir, folder)
+        .into_iter()
+        .find(|(name, _)| *name == vtf)
+        .unwrap()
+        .1;
+    // A hand-edited VMT, so the applied copy can only have come from the zip.
+    let edited = format!(
+        "\"UnlitGeneric\" {{ \"$basetexture\" \"vgui/replay/thumbnails/{folder}\" \"$edited\" 1 }}"
+    );
+    write_file(
+        &dir_of(&env, &dot).join("copy.zip"),
+        &zip_bytes(&[
+            (vtf.as_str(), texture.as_slice()),
+            (vmt.as_str(), edited.as_bytes()),
+        ]),
+    );
+    env.lib
+        .assign("tf_weapon_scattergun", &library(&dot))
+        .unwrap();
+    env.lib
+        .apply_crosshairs(&env.tf2, &builtin_catalog())
+        .unwrap();
+    let applied: Vec<Vec<u8>> = managed(&env)
+        .into_iter()
+        .filter(|(rel, _)| rel.ends_with(".vmt"))
+        .map(|(_, bytes)| bytes)
+        .collect();
+    assert_eq!(applied, [edited.into_bytes()]);
+}
