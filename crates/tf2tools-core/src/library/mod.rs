@@ -97,9 +97,6 @@ pub struct Library {
     /// Held for the whole of a made HUD's save and a copy's update, so a save that checks the
     /// copy's base never interleaves with an update rewriting it.
     writes: Arc<Mutex<()>>,
-    /// Read by every entry point that reads a HUD copy, written by any that replaces one, so a
-    /// copy is never repacked under a reader. Taken after `writes` and the swap lock, never before.
-    copies: Arc<RwLock<()>>,
 }
 
 impl Library {
@@ -111,7 +108,6 @@ impl Library {
             free_space: crate::disk::free_bytes,
             hud_schemas: Arc::new(HudSchemas::bundled()),
             writes: Arc::new(Mutex::new(())),
-            copies: Arc::new(RwLock::new(())),
         }
     }
 
@@ -123,19 +119,19 @@ impl Library {
     }
 
     /// Takes the copies lock for reading. Not reentrant: code under it calls the `_locked` forms.
-    pub(crate) fn copies_read(&self) -> CopiesGuard<'_> {
-        mark_copies_held();
-        CopiesGuard {
-            _held: CopiesHeld::Read(self.copies.read().unwrap_or_else(PoisonError::into_inner)),
-        }
+    pub(crate) fn copies_read(&self) -> CopiesGuard {
+        assert_copies_free_to_take();
+        let held = CopiesHeld::Read(COPIES.read().unwrap_or_else(PoisonError::into_inner));
+        COPIES_HELD.with(|flag| flag.set(true));
+        CopiesGuard { _held: held }
     }
 
     /// Takes the copies lock for writing, waiting out every reader. Not reentrant.
-    pub(crate) fn copies_write(&self) -> CopiesGuard<'_> {
-        mark_copies_held();
-        CopiesGuard {
-            _held: CopiesHeld::Write(self.copies.write().unwrap_or_else(PoisonError::into_inner)),
-        }
+    pub(crate) fn copies_write(&self) -> CopiesGuard {
+        assert_copies_free_to_take();
+        let held = CopiesHeld::Write(COPIES.write().unwrap_or_else(PoisonError::into_inner));
+        COPIES_HELD.with(|flag| flag.set(true));
+        CopiesGuard { _held: held }
     }
 
     /// Replaces the schemas copies are read with; the bundled set is the default.
@@ -608,37 +604,44 @@ pub(crate) fn remove_dir_if_present(dir: &Path) -> Result<(), IoFailure> {
     }
 }
 
+/// The copies lock, process-wide like the swap lock, so every `Library` over the data dir
+/// (the app's and each download's) excludes the others. Read by every entry point that reads a
+/// HUD copy, written by any that replaces one; taken after `writes` and the swap lock.
+static COPIES: RwLock<()> = RwLock::new(());
+
 thread_local! {
     /// Whether this thread holds the copies lock; debug builds check nesting and order with it.
     static COPIES_HELD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// A held copies lock, read or write. Dropping it frees the thread for the next guard.
-pub(crate) struct CopiesGuard<'a> {
-    _held: CopiesHeld<'a>,
+pub(crate) struct CopiesGuard {
+    _held: CopiesHeld,
 }
 
 /// The std guard behind a `CopiesGuard`; held only for its drop.
-enum CopiesHeld<'a> {
-    Read(#[expect(dead_code, reason = "held for its drop")] std::sync::RwLockReadGuard<'a, ()>),
-    Write(#[expect(dead_code, reason = "held for its drop")] std::sync::RwLockWriteGuard<'a, ()>),
+enum CopiesHeld {
+    Read(
+        #[expect(dead_code, reason = "held for its drop")] std::sync::RwLockReadGuard<'static, ()>,
+    ),
+    Write(
+        #[expect(dead_code, reason = "held for its drop")] std::sync::RwLockWriteGuard<'static, ()>,
+    ),
 }
 
-impl Drop for CopiesGuard<'_> {
+impl Drop for CopiesGuard {
     fn drop(&mut self) {
         COPIES_HELD.with(|held| held.set(false));
     }
 }
 
-/// Marks the thread before it blocks, so a nested guard panics instead of deadlocking.
-fn mark_copies_held() {
-    COPIES_HELD.with(|held| {
-        debug_assert!(
-            !held.get(),
-            "the library copies lock is not reentrant; call the _locked form"
-        );
-        held.set(true);
-    });
+/// Checked before blocking, so a nested guard panics instead of deadlocking; the flag itself
+/// is set only once the lock is held, so a failed take never leaves the thread marked.
+fn assert_copies_free_to_take() {
+    debug_assert!(
+        !COPIES_HELD.with(std::cell::Cell::get),
+        "the library copies lock is not reentrant; call the _locked form"
+    );
 }
 
 /// `lock_writes` and `hud_swap_lock` come before the copies lock, never after it.
@@ -705,6 +708,28 @@ mod copies_lock_tests {
         let (_tmp, lib) = library();
         let _copies = lib.copies_read();
         let _writes = lib.lock_writes();
+    }
+
+    #[test]
+    fn a_write_guard_on_one_library_blocks_a_reader_on_another() {
+        let (tmp, writer) = library();
+        let dir = DataDir::at(tmp.path().join("data"));
+        let reader = Library::new(Database::open(&dir).unwrap(), dir);
+        let held = writer.copies_write();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let waiter = std::thread::spawn(move || {
+            let _copies = reader.copies_read();
+            tx.send(()).unwrap();
+        });
+        let waiting = std::time::Duration::from_millis(300);
+        assert!(
+            rx.recv_timeout(waiting).is_err(),
+            "the reader got in under a writer"
+        );
+        drop(held);
+        rx.recv_timeout(std::time::Duration::from_secs(10))
+            .expect("the reader runs once the writer is gone");
+        waiter.join().unwrap();
     }
 
     #[test]
