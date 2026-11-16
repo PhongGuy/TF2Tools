@@ -267,3 +267,28 @@ fn a_conversion_whose_zip_does_not_read_back_leaves_the_hud_loose() {
     assert_eq!(library_files(&env, &hud), before);
     assert_eq!(loose_files(&env, &hud).len(), before.len());
 }
+
+#[test]
+fn an_item_that_keeps_failing_is_new_only_the_first_time() {
+    use tf2tools_core::{Database, Library};
+    let env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    let key = format!("huds/{}", hud.folder_name());
+    std::fs::create_dir_all(zip_path(&env, &hud)).unwrap();
+    let first = convert(&env);
+    assert_eq!(first.huds().failed(), 1);
+    assert_eq!(first.new_failures(), std::slice::from_ref(&key));
+    let second = convert(&env);
+    assert_eq!(second.huds().failed(), 1);
+    assert!(second.new_failures().is_empty());
+    // The memory outlives the process: a fresh Library over the same data is quiet too.
+    let restarted = Library::new(Database::open(&env.dir).unwrap(), env.dir.clone());
+    assert!(restarted.convert_library().new_failures().is_empty());
+    // Once it packs, a later break is new again.
+    std::fs::remove_dir(zip_path(&env, &hud)).unwrap();
+    let healed = convert(&env);
+    assert_eq!((healed.huds().packed(), healed.huds().failed()), (1, 0));
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
+    std::fs::create_dir_all(zip_path(&env, &hud)).unwrap();
+    assert_eq!(convert(&env).new_failures(), [key]);
+}

@@ -7,8 +7,8 @@ use super::gb_addons::slots_survive_packing;
 use super::made_huds::{MAKER_FILE, old_folder};
 use super::packed::{GB_ZIP, HUD_ZIP, ItemSource, pack_with};
 use super::{
-    GbId, HudId, IoFailure, Library, METADATA_DIR, io_at, library_db, remove_dir_if_present,
-    remove_file_if_present,
+    GbId, HudId, IoFailure, Library, METADATA_DIR, io_at, library_db, read_setting,
+    remove_dir_if_present, remove_file_if_present, save_setting,
 };
 use crate::error::LibraryError;
 use crate::paths::LibraryKind;
@@ -19,6 +19,7 @@ use crate::paths::LibraryKind;
 pub struct ConvertReport {
     huds: KindConverted,
     gb_addons: KindConverted,
+    new_failures: Vec<String>,
 }
 
 impl ConvertReport {
@@ -30,6 +31,41 @@ impl ConvertReport {
     /// The GameBanana add-on copies' tally.
     pub fn gb_addons(&self) -> &KindConverted {
         &self.gb_addons
+    }
+
+    /// The items that failed this pass but not the one before (`huds/<folder>`,
+    /// `gb-addons/<id>`), in pass order; these are the ones logged at `warn`.
+    pub fn new_failures(&self) -> &[String] {
+        &self.new_failures
+    }
+}
+
+/// The `settings` key holding the item keys that failed the last pass, as a JSON array.
+const FAILED_KEY: &str = "library_pack_failed";
+
+/// The failed item keys remembered from the last pass, and this pass's as it goes.
+struct Failures {
+    previous: Vec<String>,
+    current: Vec<String>,
+    new: Vec<String>,
+}
+
+impl Failures {
+    /// Records `key` as failed this pass; true when it did not fail the pass before.
+    fn note(&mut self, key: String) -> bool {
+        let new = !self.previous.contains(&key);
+        if new {
+            self.new.push(key.clone());
+        }
+        self.current.push(key);
+        new
+    }
+
+    /// Carries over the remembered keys under `prefix` for a kind this pass could not list,
+    /// since it saw none of its items.
+    fn keep_kind(&mut self, prefix: &str) {
+        let kept = self.previous.iter().filter(|k| k.starts_with(prefix));
+        self.current.extend(kept.cloned());
     }
 }
 
@@ -101,9 +137,11 @@ impl Library {
     /// Packs every loose, non-made library HUD into `.tf2tools/files.zip` and every GameBanana
     /// add-on copy into `copy.zip`, and clears leftovers beside existing zips. Each item is its
     /// own step; a failure leaves that item loose, is logged and counted, and the pass moves on.
-    /// A failed listing of one kind is logged and skips only that kind.
+    /// A failed listing of one kind is logged and skips only that kind. An item that failed the
+    /// pass before too is logged at `debug` only; the failed keys persist in `settings`.
     pub fn convert_library(&self) -> ConvertReport {
         let mut report = ConvertReport::default();
+        let mut failures = self.read_failures();
         match self.list_huds() {
             Ok(huds) => {
                 let root = self.dir.library_dir(LibraryKind::Huds);
@@ -113,17 +151,22 @@ impl Library {
                 for hud in huds {
                     let live = root.join(hud.folder_name());
                     let result = self.convert_item(&live, HUD_ZIP, &keep_made);
-                    if let Some(IoFailure { path, source }) = report.huds.add(result) {
-                        tracing::warn!(
-                            folder = hud.folder_name(),
-                            path = %path.display(),
-                            error = %source,
-                            "HUD left loose: it could not be packed"
-                        );
+                    let Some(IoFailure { path, source }) = report.huds.add(result) else {
+                        continue;
+                    };
+                    let (folder, path) = (hud.folder_name(), path.display());
+                    let message = "HUD left loose: it could not be packed";
+                    if failures.note(format!("huds/{folder}")) {
+                        tracing::warn!(folder, %path, error = %source, "{message}");
+                    } else {
+                        tracing::debug!(folder, %path, error = %source, "{message}");
                     }
                 }
             }
-            Err(error) => tracing::warn!(%error, "library conversion could not list HUDs"),
+            Err(error) => {
+                tracing::warn!(%error, "library conversion could not list HUDs");
+                failures.keep_kind("huds/");
+            }
         }
         match self.list_gb_addons(None) {
             Ok(addons) => {
@@ -134,19 +177,51 @@ impl Library {
                     let gb_id = addon.gb_id();
                     let live = root.join(gb_id.to_string());
                     let result = self.convert_item(&live, GB_ZIP, &keep);
-                    if let Some(IoFailure { path, source }) = report.gb_addons.add(result) {
-                        tracing::warn!(
-                            %gb_id,
-                            path = %path.display(),
-                            error = %source,
-                            "add-on copy left loose: it could not be packed"
-                        );
+                    let Some(IoFailure { path, source }) = report.gb_addons.add(result) else {
+                        continue;
+                    };
+                    let path = path.display();
+                    let message = "add-on copy left loose: it could not be packed";
+                    if failures.note(format!("gb-addons/{gb_id}")) {
+                        tracing::warn!(%gb_id, %path, error = %source, "{message}");
+                    } else {
+                        tracing::debug!(%gb_id, %path, error = %source, "{message}");
                     }
                 }
             }
-            Err(error) => tracing::warn!(%error, "library conversion could not list add-ons"),
+            Err(error) => {
+                tracing::warn!(%error, "library conversion could not list add-ons");
+                failures.keep_kind("gb-addons/");
+            }
         }
+        self.save_failures(&failures);
+        report.new_failures = failures.new;
         report
+    }
+
+    /// The keys that failed the last pass; an unset, unreadable or damaged value is none.
+    fn read_failures(&self) -> Failures {
+        let text = self.db.read(|conn| read_setting(conn, FAILED_KEY));
+        let previous = (text.ok().flatten())
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or_default();
+        Failures {
+            previous,
+            current: Vec::new(),
+            new: Vec::new(),
+        }
+    }
+
+    /// Stores this pass's failed keys when they differ from the last; a failed write only
+    /// means the next pass may warn again, so it is logged at `debug`.
+    fn save_failures(&self, failures: &Failures) {
+        if failures.current == failures.previous {
+            return;
+        }
+        let text = serde_json::to_string(&failures.current).unwrap_or_default();
+        if let Err(error) = (self.db).write(|conn| save_setting(conn, FAILED_KEY, &text)) {
+            tracing::debug!(%error, "library conversion could not remember its failures");
+        }
     }
 
     /// Extracts the packed HUD `id` back into its folder and removes its zip, so a test can

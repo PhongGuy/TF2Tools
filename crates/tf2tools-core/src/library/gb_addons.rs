@@ -327,12 +327,13 @@ impl Library {
         if slots_survive_packing(&library_copy)
             && let Err(IoFailure { path, source }) = self.pack_folder(&library_copy, GB_ZIP)
         {
-            tracing::warn!(
-                gb_id = %gb_id,
-                path = %path.display(),
-                error = %source,
-                "installed add-on copy left loose: it could not be packed"
-            );
+            // A failure clearing the loose files comes after the zip is placed; readers take it.
+            let placed = ItemSource::open(&library_copy, GB_ZIP).is_ok_and(|s| s.is_packed());
+            let message = match placed {
+                true => "installed add-on copy packed, but its loose files could not be removed",
+                false => "installed add-on copy left loose: it could not be packed",
+            };
+            tracing::warn!(gb_id = %gb_id, path = %path.display(), error = %source, "{message}");
         }
         Ok(entry)
     }

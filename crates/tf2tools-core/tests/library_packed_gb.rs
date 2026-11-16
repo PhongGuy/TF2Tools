@@ -275,3 +275,36 @@ async fn an_update_over_a_packed_copy_replaces_it_whole() {
     assert_eq!(gb_loose(&s.env.dir, 9), Vec::<String>::new());
     assert_eq!(common::tree(&s.tf2.custom_dir()), ["tf2tools-gb-9-new.vpk"]);
 }
+
+#[tokio::test]
+async fn a_failing_addon_copy_is_named_by_its_id() {
+    let s = setup().await;
+    two_payloads(&s).await;
+    std::fs::create_dir_all(gb_zip(&s.env.dir, 7)).unwrap();
+    let report = s.env.lib.convert_library();
+    assert_eq!(report.new_failures(), ["gb-addons/7"]);
+    assert!(s.env.lib.convert_library().new_failures().is_empty());
+}
+
+#[tokio::test]
+async fn a_kind_that_cannot_be_listed_keeps_its_remembered_failures() {
+    let s = setup().await;
+    two_payloads(&s).await;
+    std::fs::create_dir_all(gb_zip(&s.env.dir, 7)).unwrap();
+    assert_eq!(s.env.lib.convert_library().new_failures(), ["gb-addons/7"]);
+    // A row with a negative id makes the add-on listing fail for one pass.
+    let insert_bad_row = "INSERT INTO library_gb_addons (gb_id, section, name, author, file_id,
+        file_date, latest_file_date, checked_at, payloads, files, installed, gone)
+        VALUES (-1, 'Skins', 'bad', 'vex', 1, 0, 0, 0, '[]', '[]', 0, 0)";
+    common::sql(&s.env.dir).execute(insert_bad_row, []).unwrap();
+    let unlisted = s.env.lib.convert_library();
+    assert_eq!(unlisted.gb_addons().failed(), 0);
+    assert!(unlisted.new_failures().is_empty());
+    common::sql(&s.env.dir)
+        .execute("DELETE FROM library_gb_addons WHERE gb_id = -1", [])
+        .unwrap();
+    // The failure was not forgotten while unlisted, so it is still not new.
+    let listed = s.env.lib.convert_library();
+    assert_eq!(listed.gb_addons().failed(), 1);
+    assert!(listed.new_failures().is_empty());
+}
