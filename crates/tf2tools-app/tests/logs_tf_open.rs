@@ -297,6 +297,32 @@ fn a_trimmed_log_shows_its_stats_and_downloads_again_when_opened(cx: &mut TestAp
 }
 
 #[gpui_kit::test]
+fn a_log_trimmed_after_the_list_was_read_downloads_again_when_opened(cx: &mut TestAppContext) {
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    // A trim pass lands between the list read and the click; the row still shows downloaded.
+    support::sql(&env)
+        .execute(
+            "UPDATE logstf_logs SET body = NULL, state = 3 WHERE id = 3",
+            [],
+        )
+        .unwrap();
+    assert_eq!(state_of(cx, &page), Some(LogState::Ready));
+    let asked = requests_to(&server, "/json/3");
+    to_end(cx, &page);
+    support::click_id(cx, s.win, ids::logstf_log(3));
+    support::wait_real(cx, "the downloaded log", |cx| {
+        cx.update(|cx| page.read(cx).detail().is_some())
+    });
+    assert_eq!(requests_to(&server, "/json/3"), asked + 1);
+    assert_eq!(expanded(cx, &page), Some(3));
+}
+
+#[gpui_kit::test]
 fn opening_a_stored_log_stamps_it_opened(cx: &mut TestAppContext) {
     let env = support::env();
     let server = support::StoreServer::start();
