@@ -1,7 +1,8 @@
-//! Numbers and sizes in the current language: its decimal point, digit grouping and units.
-//! The digit work is pure and takes the separators; the public functions read them from
-//! the catalogue.
+//! Numbers, sizes, dates and durations in the current language: its decimal point, digit
+//! grouping, units, month names and date shapes. The digit work is pure and takes the
+//! separators; the public functions read them from the catalogue.
 
+use chrono::{Datelike as _, NaiveDate, NaiveDateTime, Timelike as _};
 use gpui_kit::SharedString;
 
 use super::tr;
@@ -45,6 +46,105 @@ pub fn bytes(n: u64) -> SharedString {
         2 => tr!("common.size.mb", size = size),
         3 => tr!("common.size.gb", size = size),
         _ => tr!("common.size.tb", size = size),
+    }
+}
+
+/// A date as digits, padded: "2026-03-05" in English, "05.03.2026" in Russian.
+pub fn numeric_date(d: NaiveDate) -> SharedString {
+    tr!(
+        "common.date.numeric",
+        year = d.year(),
+        month = format!("{:02}", d.month()),
+        day = format!("{:02}", d.day())
+    )
+}
+
+/// A numeric date and a 24-hour clock time, with the seconds when `seconds` is set.
+pub fn date_time(dt: NaiveDateTime, seconds: bool) -> SharedString {
+    let time = if seconds {
+        format!("{:02}:{:02}:{:02}", dt.hour(), dt.minute(), dt.second())
+    } else {
+        format!("{:02}:{:02}", dt.hour(), dt.minute())
+    };
+    tr!(
+        "common.date.date_time",
+        date = numeric_date(dt.date()),
+        time = time
+    )
+}
+
+/// A date with a short month name and an unpadded day: "13 Dec 2022".
+pub fn day_month_year(d: NaiveDate) -> SharedString {
+    tr!(
+        "common.date.day_month_year",
+        day = d.day(),
+        month = month_name(d.month()),
+        year = d.year()
+    )
+}
+
+/// A date led by its short month name in English: "Nov 16, 2026".
+pub fn month_day_year(d: NaiveDate) -> SharedString {
+    tr!(
+        "common.date.month_day_year",
+        day = d.day(),
+        month = month_name(d.month()),
+        year = d.year()
+    )
+}
+
+/// Time played, in compact units: "45m", "1h 30m".
+pub fn hours_minutes(total_minutes: u64) -> SharedString {
+    let (hours, minutes) = (total_minutes / 60, total_minutes % 60);
+    if hours == 0 {
+        tr!("common.duration.played_minutes", minutes = minutes)
+    } else {
+        tr!(
+            "common.duration.played_hours_minutes",
+            hours = hours,
+            minutes = minutes
+        )
+    }
+}
+
+/// Time remaining, dropping a zero part: "40 min", "2 h", "2 h 40 min".
+pub fn time_left(total_minutes: u64) -> SharedString {
+    match (total_minutes / 60, total_minutes % 60) {
+        (0, minutes) => tr!("common.duration.minutes", minutes = minutes),
+        (hours, 0) => tr!("common.duration.hours", hours = hours),
+        (hours, minutes) => tr!(
+            "common.duration.hours_minutes",
+            hours = hours,
+            minutes = minutes
+        ),
+    }
+}
+
+/// Whole seconds: "58 s".
+pub fn seconds(n: u64) -> SharedString {
+    tr!("common.duration.seconds", seconds = n)
+}
+
+/// Seconds the caller already rounded to tenths with an English point: "6.5" -> "6.5 s".
+pub fn tenths(rounded: &str) -> SharedString {
+    tr!("common.duration.seconds", seconds = decimal_point(rounded))
+}
+
+// The short name of `month` (1 to 12); each arm names its key so the catalogue scans see it.
+fn month_name(month: u32) -> SharedString {
+    match month {
+        1 => tr!("common.date.month.jan"),
+        2 => tr!("common.date.month.feb"),
+        3 => tr!("common.date.month.mar"),
+        4 => tr!("common.date.month.apr"),
+        5 => tr!("common.date.month.may"),
+        6 => tr!("common.date.month.jun"),
+        7 => tr!("common.date.month.jul"),
+        8 => tr!("common.date.month.aug"),
+        9 => tr!("common.date.month.sep"),
+        10 => tr!("common.date.month.oct"),
+        11 => tr!("common.date.month.nov"),
+        _ => tr!("common.date.month.dec"),
     }
 }
 
@@ -102,10 +202,17 @@ fn scale_bytes(bytes: u64) -> (String, usize) {
 
 #[cfg(test)]
 mod tests {
+    use chrono::NaiveDate;
+
     use super::{
-        Scale, bytes, compact_count, compact_parts, decimal_point, group_with, grouped,
-        scale_bytes, with_point,
+        Scale, bytes, compact_count, compact_parts, date_time, day_month_year, decimal_point,
+        group_with, grouped, hours_minutes, month_day_year, month_name, numeric_date, scale_bytes,
+        seconds, tenths, time_left, with_point,
     };
+
+    fn day(y: i32, m: u32, d: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
 
     #[test]
     fn digits_group_in_threes_with_either_separator() {
@@ -166,5 +273,36 @@ mod tests {
         assert_eq!(bytes(512), "512 B");
         assert_eq!(bytes(1_536), "1.5 KB");
         assert_eq!(bytes(3 << 40), "3.0 TB");
+    }
+
+    #[test]
+    fn the_month_table_names_all_twelve() {
+        let names: Vec<String> = (1..=12).map(|m| month_name(m).to_string()).collect();
+        assert_eq!(
+            names,
+            [
+                "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+            ]
+        );
+    }
+
+    #[test]
+    fn english_dates_and_durations_are_todays() {
+        assert_eq!(numeric_date(day(2026, 3, 5)), "2026-03-05");
+        let at = day(2026, 10, 17).and_hms_opt(20, 56, 9).unwrap();
+        assert_eq!(date_time(at, false), "2026-10-17 20:56");
+        assert_eq!(date_time(at, true), "2026-10-17 20:56:09");
+        assert_eq!(day_month_year(day(2022, 12, 13)), "13 Dec 2022");
+        assert_eq!(day_month_year(day(2022, 5, 3)), "3 May 2022");
+        assert_eq!(month_day_year(day(2026, 11, 16)), "Nov 16, 2026");
+        assert_eq!(hours_minutes(0), "0m");
+        assert_eq!(hours_minutes(45), "45m");
+        assert_eq!(hours_minutes(60), "1h 0m");
+        assert_eq!(hours_minutes(90), "1h 30m");
+        assert_eq!(time_left(160), "2 h 40 min");
+        assert_eq!(time_left(60), "1 h");
+        assert_eq!(time_left(12), "12 min");
+        assert_eq!(seconds(58), "58 s");
+        assert_eq!(tenths("6.5"), "6.5 s");
     }
 }

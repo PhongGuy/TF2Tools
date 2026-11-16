@@ -143,6 +143,19 @@ common:
     mb: "%{size}\u00A0МБ"
     gb: "%{size}\u00A0ГБ"
     tb: "%{size}\u00A0ТБ"
+  duration:
+    played_minutes: "%{minutes}\u00A0мин"
+    played_hours_minutes: "%{hours}\u00A0ч %{minutes}\u00A0мин"
+    minutes: "%{minutes}\u00A0мин"
+    hours: "%{hours}\u00A0ч"
+    hours_minutes: "%{hours}\u00A0ч %{minutes}\u00A0мин"
+    seconds: "%{seconds}\u00A0с"
+  date:
+    numeric: "%{day}.%{month}.%{year}"
+    date_time: "%{date} %{time}"
+    day_month_year: "%{day} %{month} %{year}\u00A0г."
+    month_day_year: "%{day} %{month} %{year}\u00A0г."
+    month: { jan: "янв.", feb: "февр.", mar: "мар.", apr: "апр.", may: "мая", jun: "июн.", jul: "июл.", aug: "авг.", sep: "сент.", oct: "окт.", nov: "нояб.", dec: "дек." }
 
 messages:
   shared:

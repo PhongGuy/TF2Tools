@@ -1,6 +1,7 @@
 //! Dates, numbers, sizes, durations and counted sentences in Russian.
 
-use tf2tools_app::i18n::{counted_plural, format};
+use chrono::NaiveDate;
+use tf2tools_app::i18n::{self, counted_plural, format};
 
 use crate::LocaleGuard;
 use crate::messages::assert_russian;
@@ -65,4 +66,78 @@ fn counted_plurals_take_the_formatted_count_and_other_variables() {
     let text = counted_plural("settings.sync.items", 1_400, "1\u{a0}400", &[]);
     assert_eq!(text, "1\u{a0}400 элементов в кэше");
     assert_ru(&text);
+}
+
+fn day(y: i32, m: u32, d: u32) -> NaiveDate {
+    NaiveDate::from_ymd_opt(y, m, d).unwrap()
+}
+
+#[test]
+fn dates_read_day_first_with_cldr_months() {
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(format::numeric_date(day(2026, 10, 17)), "17.10.2026");
+    assert_eq!(format::numeric_date(day(2026, 3, 5)), "05.03.2026");
+    let at = day(2026, 10, 17).and_hms_opt(20, 56, 9).unwrap();
+    assert_eq!(format::date_time(at, false), "17.10.2026 20:56");
+    assert_eq!(format::date_time(at, true), "17.10.2026 20:56:09");
+    assert_eq!(
+        format::day_month_year(day(2022, 12, 13)),
+        "13 дек. 2022\u{a0}г."
+    );
+    assert_eq!(
+        format::month_day_year(day(2026, 11, 16)),
+        "16 нояб. 2026\u{a0}г."
+    );
+    let months = [
+        "янв.",
+        "февр.",
+        "мар.",
+        "апр.",
+        "мая",
+        "июн.",
+        "июл.",
+        "авг.",
+        "сент.",
+        "окт.",
+        "нояб.",
+        "дек.",
+    ];
+    for (m, name) in (1..=12).zip(months) {
+        let expected = format!("3 {name} 2026\u{a0}г.");
+        assert_eq!(format::day_month_year(day(2026, m, 3)), expected.as_str());
+    }
+}
+
+#[test]
+fn durations_read_in_russian_units() {
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(format::hours_minutes(45), "45\u{a0}мин");
+    assert_eq!(format::hours_minutes(90), "1\u{a0}ч 30\u{a0}мин");
+    assert_eq!(format::time_left(160), "2\u{a0}ч 40\u{a0}мин");
+    assert_eq!(format::time_left(40), "40\u{a0}мин");
+    assert_eq!(format::time_left(120), "2\u{a0}ч");
+    assert_eq!(format::seconds(58), "58\u{a0}с");
+    assert_eq!(format::tenths("6.5"), "6,5\u{a0}с");
+}
+
+#[test]
+fn english_reads_the_same_after_a_switch_to_russian_and_back() {
+    let _guard = LocaleGuard::hold();
+    let read = || {
+        (
+            format::grouped(4_812),
+            format::bytes(1_536).to_string(),
+            format::compact_count(1_250),
+            format::day_month_year(day(2022, 12, 13)).to_string(),
+            format::time_left(160).to_string(),
+        )
+    };
+    let before = read();
+    i18n::apply("ru");
+    assert_ne!(read(), before);
+    i18n::apply("en");
+    assert_eq!(read(), before);
+    let english = ["4,812", "1.5 KB", "1.3K", "13 Dec 2022", "2 h 40 min"].map(str::to_owned);
+    let [a, b, c, d, e] = english;
+    assert_eq!(before, (a, b, c, d, e));
 }

@@ -98,6 +98,7 @@ Rules for the files:
 - Keep every `%{name}` exactly as it is; the tests fail a translation that drops or renames one.
 - Plural keys end in `one`, `few`, `many` or `other`, and a file has exactly the forms its language uses: English `one` and `other`, Russian `one`, `few` and `many`.
 - A string literal shaped like a catalogue key (for example "settings.json") fails the key-existence test, so section names must not collide with ordinary dotted text.
+- Dates, numbers and sizes come from the keys under `common.date`, `common.number` and `common.size`. Reorder `%{day}`, `%{month}` and `%{year}` instead of writing a date pattern, and write a no-break space as `"\u00A0"` inside double quotes.
 
 A language stays "(preview)" in the picker until a native speaker has reviewed it.
 

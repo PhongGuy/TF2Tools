@@ -145,6 +145,19 @@ common:
     mb: "%{size} MB"
     gb: "%{size} GB"
     tb: "%{size} TB"
+  duration:
+    played_minutes: "%{minutes}m"
+    played_hours_minutes: "%{hours}h %{minutes}m"
+    minutes: "%{minutes} min"
+    hours: "%{hours} h"
+    hours_minutes: "%{hours} h %{minutes} min"
+    seconds: "%{seconds} s"
+  date:
+    numeric: "%{year}-%{month}-%{day}"
+    date_time: "%{date} %{time}"
+    day_month_year: "%{day} %{month} %{year}"
+    month_day_year: "%{month} %{day}, %{year}"
+    month: { jan: "Jan", feb: "Feb", mar: "Mar", apr: "Apr", may: "May", jun: "Jun", jul: "Jul", aug: "Aug", sep: "Sep", oct: "Oct", nov: "Nov", dec: "Dec" }
 
 messages:
   shared:
