@@ -97,3 +97,35 @@ fn a_new_keep_choice_is_taken_at_once_saved_and_applied(cx: &mut TestAppContext)
         .unwrap();
     assert_eq!(saved, KeepFullLogs::Days30);
 }
+
+#[gpui_kit::test]
+fn a_keep_choice_whose_save_fails_is_saved_by_the_next_pass(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let trim = trim_job(cx);
+    let before = settled_passes(cx, &trim);
+    // A full disk refuses the keep choice's write for one pass.
+    support::sql(&env)
+        .execute_batch(
+            "CREATE TRIGGER no_keep BEFORE INSERT ON settings
+             WHEN NEW.key = 'logstf_keep_full_logs'
+             BEGIN SELECT RAISE(ABORT, 'disk full'); END;",
+        )
+        .unwrap();
+    trim.update(cx, |trim, cx| trim.set_keep(KeepFullLogs::Days30, cx));
+    wait_pass_after(cx, &trim, before);
+    let failed = cx.update(|cx| trim.read(cx).passes());
+    support::sql(&env)
+        .execute_batch("DROP TRIGGER no_keep")
+        .unwrap();
+    trim.update(cx, |trim, cx| trim.request(cx));
+    wait_pass_after(cx, &trim, failed);
+    assert_eq!(
+        cx.update(|cx| trim.read(cx).keep()),
+        Some(KeepFullLogs::Days30)
+    );
+    let saved = LogsCache::new(s.services.db.clone())
+        .keep_full_logs()
+        .unwrap();
+    assert_eq!(saved, KeepFullLogs::Days30);
+}

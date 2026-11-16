@@ -82,13 +82,19 @@ impl LogsTrim {
         });
         cx.spawn(async move |trim, cx| {
             let landed = pass.await;
-            let _ = trim.update(cx, |trim, cx| trim.land(landed, cx));
+            let _ = trim.update(cx, |trim, cx| trim.land(landed, pending, cx));
         })
         .detach();
     }
 
     // A failed pass keeps the old figures and is only logged, as a background job has no window.
-    fn land(&mut self, landed: Result<(KeepFullLogs, LogsSpace), OpError>, cx: &mut Context<Self>) {
+    // The choice it carried waits again for the next pass, unless a newer one replaced it.
+    fn land(
+        &mut self,
+        landed: Result<(KeepFullLogs, LogsSpace), OpError>,
+        carried: Option<KeepFullLogs>,
+        cx: &mut Context<Self>,
+    ) {
         match landed {
             Ok((keep, space)) => {
                 // A choice made during the pass is newer than the one the pass read.
@@ -97,7 +103,10 @@ impl LogsTrim {
                 }
                 self.space = Some(space);
             }
-            Err(err) => tracing::warn!("the logs cache could not be trimmed: {err}"),
+            Err(err) => {
+                tracing::warn!("the logs cache could not be trimmed: {err}");
+                self.pending = self.pending.or(carried);
+            }
         }
         self.running = false;
         self.passes += 1;
