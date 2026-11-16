@@ -3,6 +3,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::crosshairs::{CrosshairFormat, PAINTED_SOURCE};
 use super::gb_addons::slots_survive_packing;
 use super::made_huds::{MAKER_FILE, old_folder};
 use super::packed::{CROSSHAIR_ZIP, GB_ZIP, HUD_ZIP, ItemSource, pack_with};
@@ -19,6 +20,7 @@ use crate::paths::LibraryKind;
 pub struct ConvertReport {
     huds: KindConverted,
     gb_addons: KindConverted,
+    crosshairs: KindConverted,
     new_failures: Vec<String>,
 }
 
@@ -33,8 +35,14 @@ impl ConvertReport {
         &self.gb_addons
     }
 
+    /// The library crosshairs' tally.
+    pub fn crosshairs(&self) -> &KindConverted {
+        &self.crosshairs
+    }
+
     /// The items that failed this pass but not the one before (`huds/<folder>`,
-    /// `gb-addons/<id>`), in pass order; these are the ones logged at `warn`.
+    /// `gb-addons/<id>`, `crosshairs/<folder>`), in pass order; these are the ones logged at
+    /// `warn`.
     pub fn new_failures(&self) -> &[String] {
         &self.new_failures
     }
@@ -134,11 +142,12 @@ enum Converted {
 }
 
 impl Library {
-    /// Packs every loose, non-made library HUD into `.tf2tools/files.zip` and every GameBanana
-    /// add-on copy into `copy.zip`, and clears leftovers beside existing zips. Each item is its
-    /// own step; a failure leaves that item loose, is logged and counted, and the pass moves on.
-    /// A failed listing of one kind is logged and skips only that kind. An item that failed the
-    /// pass before too is logged at `debug` only; the failed keys persist in `settings`.
+    /// Packs every loose, non-made library HUD into `.tf2tools/files.zip`, every GameBanana
+    /// add-on copy and every non-painted crosshair into `copy.zip`, and clears leftovers beside
+    /// existing zips. Each item is its own step; a failure leaves that item loose, is logged and
+    /// counted, and the pass moves on. A failed listing of one kind is logged and skips only
+    /// that kind. An item that failed the pass before too is logged at `debug` only; the failed
+    /// keys persist in `settings`.
     pub fn convert_library(&self) -> ConvertReport {
         let mut report = ConvertReport::default();
         let mut failures = self.read_failures();
@@ -199,6 +208,39 @@ impl Library {
             Err(error) => {
                 tracing::warn!(%error, "library conversion could not list add-ons");
                 failures.keep_kind("gb-addons/");
+            }
+        }
+        match self.list_crosshairs() {
+            Ok(crosshairs) => {
+                let root = self.dir.library_dir(LibraryKind::Crosshairs);
+                for crosshair in crosshairs {
+                    let folder = crosshair.folder_name();
+                    if !is_plain_name(folder) {
+                        tracing::warn!(
+                            folder,
+                            "crosshair not packed: its folder name is not plain"
+                        );
+                        continue;
+                    }
+                    // Painted crosshairs are resaved in place, so they stay loose like made HUDs.
+                    let painted = crosshair.format() == CrosshairFormat::Painted;
+                    let keep = |dir: &Path| painted || dir.join(PAINTED_SOURCE).exists();
+                    let result = self.convert_item(&root.join(folder), CROSSHAIR_ZIP, &keep);
+                    let Some(IoFailure { path, source }) = report.crosshairs.add(result) else {
+                        continue;
+                    };
+                    let path = path.display();
+                    let message = "crosshair left loose: it could not be packed";
+                    if failures.note(format!("crosshairs/{folder}")) {
+                        tracing::warn!(folder, %path, error = %source, "{message}");
+                    } else {
+                        tracing::debug!(folder, %path, error = %source, "{message}");
+                    }
+                }
+            }
+            Err(error) => {
+                tracing::warn!(%error, "library conversion could not list crosshairs");
+                failures.keep_kind("crosshairs/");
             }
         }
         self.save_failures(&failures);

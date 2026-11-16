@@ -1,5 +1,5 @@
-//! Measures what each library kind takes: items are imported into a fresh library (HUDs and
-//! GameBanana add-ons are stored packed), then one row per kind prints the item count, the
+//! Measures what each library kind takes: items are imported into a fresh library (HUDs,
+//! crosshairs and GameBanana add-ons are stored packed), then one row per kind prints the item count, the
 //! unpacked bytes and the bytes on disk, and for the plain kinds what a zstd-3 zip of each
 //! item would take.
 //!
@@ -26,9 +26,10 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 const USAGE: &str = "usage: library_compress_sizes --data <dir> --game <dir> [--hud <zip>]... \
     [--sound <file>]... [--crosshair <file>]... [--addon <vpk>]... [--gb-addon <archive>]...";
-/// Where a packed HUD and a packed add-on copy keep their files, under the item folder.
+/// Where a packed HUD, add-on copy and crosshair keep their files, under the item folder.
 const HUD_ZIP: &str = ".tf2tools/files.zip";
 const GB_ZIP: &str = "copy.zip";
+const CROSSHAIR_ZIP: &str = "copy.zip";
 /// The add-on ids the mock GameBanana serves, one per archive in argument order.
 const FIRST_GB_ID: u64 = 900_001;
 
@@ -279,8 +280,8 @@ async fn run(args: &Args) -> Result<(), Box<dyn Error>> {
         (
             "crosshairs",
             dir.library_dir(LibraryKind::Crosshairs),
-            None,
-            true,
+            Some(CROSSHAIR_ZIP),
+            false,
         ),
         ("addons", dir.library_dir(LibraryKind::Addons), None, true),
         (

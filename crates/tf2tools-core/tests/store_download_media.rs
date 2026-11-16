@@ -292,6 +292,14 @@ async fn a_downloaded_crosshair_is_kept_packed() {
         .library_dir(LibraryKind::Crosshairs)
         .join(crosshair.folder_name());
     assert_eq!(tree(&folder), ["copy.zip"]);
+    // The zip carries the downloaded VTF byte for byte under the folder's own stem.
+    let packed = common::packed::crosshair_zip_files(&env.dir, crosshair.folder_name());
+    let vtf_name = format!("{}.vtf", crosshair.folder_name());
+    let stored = packed.iter().find(|(name, _)| *name == vtf_name);
+    assert_eq!(
+        stored.map(|(_, bytes)| bytes.as_slice()),
+        Some(vtf().as_slice())
+    );
 }
 
 #[tokio::test]

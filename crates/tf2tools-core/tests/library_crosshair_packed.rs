@@ -292,6 +292,133 @@ fn deleting_a_packed_crosshair_removes_its_folder() {
     assert!(env.lib.list_crosshairs().unwrap().is_empty());
 }
 
+/// The loose files of `entry`'s folder with their bytes, sorted.
+fn loose_files(env: &LibraryEnv, entry: &CrosshairEntry) -> Vec<(String, Vec<u8>)> {
+    let dir = dir_of(env, entry);
+    tree(&dir)
+        .into_iter()
+        .map(|rel| {
+            let bytes = fs::read(dir.join(&rel)).unwrap();
+            (rel, bytes)
+        })
+        .collect()
+}
+
+#[test]
+fn a_pass_packs_loose_crosshairs_and_counts_their_bytes() {
+    let env = crosshair_env();
+    let brackets = import_vtf(&env, "Brackets");
+    let dot = import_png_as(&env, "Dot", Provenance::Local);
+    loose(&env, &brackets);
+    loose(&env, &dot);
+    let before = [loose_files(&env, &brackets), loose_files(&env, &dot)];
+    let report = env.lib.convert_library();
+    let c = report.crosshairs();
+    assert_eq!((c.packed(), c.failed(), c.cleaned()), (2, 0, 0));
+    let mut zips = 0;
+    let mut bytes = 0;
+    for (entry, files) in [&brackets, &dot].into_iter().zip(&before) {
+        assert_eq!(tree(&dir_of(&env, entry)), ["copy.zip"]);
+        assert_eq!(&crosshair_zip_files(&env.dir, entry.folder_name()), files);
+        zips += fs::metadata(dir_of(&env, entry).join("copy.zip"))
+            .unwrap()
+            .len();
+        bytes += files.iter().map(|(_, b)| b.len() as u64).sum::<u64>();
+    }
+    assert_eq!((c.bytes_before(), c.bytes_after()), (bytes, zips));
+    let again = env.lib.convert_library();
+    assert_eq!(again.crosshairs().packed(), 0);
+}
+
+#[test]
+fn a_painted_crosshair_stays_loose_through_a_pass_and_resaves() {
+    let env = crosshair_env();
+    let mine = painted(&env, "Mine");
+    // A row whose format is not painted but whose folder holds a drawing stays loose too.
+    let drawn = import_png_as(&env, "Drawn", Provenance::Local);
+    loose(&env, &drawn);
+    write_file(&dir_of(&env, &drawn).join("source.png"), b"drawing");
+    let before = (loose_files(&env, &mine), loose_files(&env, &drawn));
+    let report = env.lib.convert_library();
+    assert_eq!(report.crosshairs().packed(), 0);
+    assert_eq!(
+        (loose_files(&env, &mine), loose_files(&env, &drawn)),
+        before
+    );
+    let drawing = RgbaImage::from_pixels(32, 32, vec![200; 32 * 32 * 4]).unwrap();
+    env.lib
+        .save_painted_crosshair(&PaintTarget::Existing(mine.id().clone()), "Mine", &drawing)
+        .unwrap();
+    assert!(!dir_of(&env, &mine).join("copy.zip").exists());
+    assert_eq!(
+        env.lib.painted_source(mine.id()).unwrap().drawing(),
+        &drawing
+    );
+}
+
+#[test]
+fn a_crosshair_that_fails_to_pack_stays_loose_works_and_warns_once() {
+    let mut env = crosshair_env();
+    let builtins = builtin_catalog();
+    let dot = import_png_as(&env, "Dot", Provenance::Local);
+    loose(&env, &dot);
+    env.lib.set_pack_rename(common::packed::rename_then_damage);
+    let key = format!("crosshairs/{}", dot.folder_name());
+    let first = env.lib.convert_library();
+    assert_eq!(
+        (first.crosshairs().packed(), first.crosshairs().failed()),
+        (0, 1)
+    );
+    assert_eq!(first.new_failures(), std::slice::from_ref(&key));
+    assert!(!dir_of(&env, &dot).join("copy.zip").exists());
+    assert!(env.lib.crosshair_preview(&library(&dot), &builtins).is_ok());
+    env.lib
+        .assign("tf_weapon_scattergun", &library(&dot))
+        .unwrap();
+    let applied = env.lib.apply_crosshairs(&env.tf2, &builtins).unwrap();
+    assert_eq!(applied.applied().len(), 1);
+    let second = env.lib.convert_library();
+    assert_eq!(second.crosshairs().failed(), 1);
+    assert!(second.new_failures().is_empty());
+}
+
+#[test]
+fn leftovers_beside_a_crosshair_zip_are_cleaned() {
+    let env = crosshair_env();
+    let dot = import_png_as(&env, "Dot", Provenance::Local);
+    let packed = crosshair_zip_files(&env.dir, dot.folder_name());
+    write_file(&dir_of(&env, &dot).join("preview.png"), b"stale");
+    write_file(&dir_of(&env, &dot).join("copy.zip.tmp"), b"half a zip");
+    let report = env.lib.convert_library();
+    assert_eq!(
+        (report.crosshairs().cleaned(), report.crosshairs().packed()),
+        (1, 0)
+    );
+    assert_eq!(tree(&dir_of(&env, &dot)), ["copy.zip"]);
+    assert_eq!(crosshair_zip_files(&env.dir, dot.folder_name()), packed);
+}
+
+#[test]
+fn a_crosshair_row_naming_the_parent_folder_is_not_packed() {
+    let env = crosshair_env();
+    let dot = import_png_as(&env, "Dot", Provenance::Local);
+    let library = env.dir.library_dir(LibraryKind::Crosshairs);
+    let before = tree(library.parent().unwrap());
+    common::sql(&env.dir)
+        .execute(
+            "UPDATE library_crosshairs SET folder_name = '..' WHERE id = ?1",
+            [dot.id().to_string()],
+        )
+        .unwrap();
+    let report = env.lib.convert_library();
+    assert_eq!(
+        (report.crosshairs().packed(), report.crosshairs().failed()),
+        (0, 0)
+    );
+    assert_eq!(tree(library.parent().unwrap()), before);
+    assert!(!library.join("copy.zip").exists());
+}
+
 fn s(text: &str) -> String {
     text.to_owned()
 }

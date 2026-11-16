@@ -27,6 +27,8 @@ pub(super) const SOURCE_LIBRARY: &str = "library";
 
 /// The folder under `tf/custom` that holds every applied crosshair, as v5.
 const MANAGED_DIR: &str = "tf2tools-crosshairs";
+/// A painted crosshair's editable drawing, kept beside its VTF.
+pub(super) const PAINTED_SOURCE: &str = "source.png";
 /// Where TF2 looks for the textures a weapon script names, under the managed folder.
 const MATERIALS_DIR: &str = "materials/vgui/replay/thumbnails";
 
@@ -511,7 +513,7 @@ impl Library {
         let folder = folder_name(name, &id);
         let dest = self.dir.library_dir(LibraryKind::Crosshairs).join(&folder);
         let written = write_crosshair_files(&dest, &folder, &vtf, Some(&source)).and_then(|()| {
-            let path = dest.join("source.png");
+            let path = dest.join(PAINTED_SOURCE);
             std::fs::write(&path, &source).map_err(io_at(&path))
         });
         if let Err(failure) = written {
@@ -571,7 +573,7 @@ impl Library {
         let dir = self.dir.library_dir(LibraryKind::Crosshairs).join(&folder);
         let source = ItemSource::open(&dir, CROSSHAIR_ZIP).ok();
         let read = |rel: &str| source.as_ref()?.read(Path::new(rel)).ok();
-        let from_png = read("source.png")
+        let from_png = read(PAINTED_SOURCE)
             .and_then(|bytes| {
                 image::load_from_memory_with_format(&bytes, image::ImageFormat::Png).ok()
             })
@@ -646,7 +648,7 @@ impl Library {
         // The VTF goes last, so the texture TF2 reads changes only once everything else has.
         let dir = self.dir.library_dir(LibraryKind::Crosshairs).join(&folder);
         replace_files(&[
-            (dir.join("source.png"), &source),
+            (dir.join(PAINTED_SOURCE), &source),
             (dir.join("preview.png"), &source),
             (dir.join(format!("{folder}.vmt")), vmt.as_bytes()),
             (dir.join(format!("{folder}.vtf")), &vtf),
