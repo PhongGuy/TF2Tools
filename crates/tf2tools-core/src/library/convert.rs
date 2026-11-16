@@ -148,10 +148,8 @@ impl Library {
         tmp.push(".tmp");
         remove_file_if_present(Path::new(&tmp))?;
         if std::fs::symlink_metadata(&zip).is_ok() {
-            // A crash between placing the zip and clearing the loose tree leaves both; the
-            // loose files go only once the zip reads back as the item, never for a link.
-            require_packed(live)?;
-            let removed = remove_loose(live)?;
+            // A crash between placing the zip and clearing the loose tree leaves both.
+            let removed = drop_loose_tree(live)?;
             return Ok(if removed {
                 Converted::Cleaned
             } else {
@@ -161,10 +159,16 @@ impl Library {
         let before = ItemSource::Loose(live.to_path_buf()).unpacked_bytes()?;
         let top_metadata = |rel: &Path| rel == Path::new(METADATA_DIR);
         let after = pack(live, &top_metadata, &zip)?;
-        require_packed(live)?;
-        remove_loose(live)?;
+        drop_loose_tree(live)?;
         Ok(Converted::Packed { before, after })
     }
+}
+
+/// Removes the loose files beside `live`'s zip once the zip reads back as the item, never for
+/// a link or a damaged zip; true when anything went.
+pub(super) fn drop_loose_tree(live: &Path) -> Result<bool, IoFailure> {
+    require_packed(live)?;
+    remove_loose(live)
 }
 
 /// Fails unless readers would take `live` as packed: its zip a regular file whose central

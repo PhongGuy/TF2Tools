@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 use rusqlite::{OptionalExtension, params};
 use walkdir::WalkDir;
 
-use super::packed::{HUD_ZIP, ItemSource};
+use super::packed::{HUD_ZIP, ItemSource, pack};
 use super::{
-    HudId, IoFailure, Library, METADATA_DIR, Provenance, copy_dir_excluding_metadata,
+    HudId, IoFailure, Library, METADATA_DIR, Provenance, convert, copy_dir_excluding_metadata,
     create_dir_all, first_free_number, game_custom_dir, gb_id_column, hud_folder, hud_lowercase,
     hud_print, import_db, install_db, io_at, is_plain_name, library_db, live_link, made_huds,
     new_id, now, read_setting, remove_dir_if_present, save_setting, walk_failure,
@@ -23,6 +23,14 @@ use crate::tf2::Tf2Install;
 
 /// The setting beside `installed_hud_folder` that fingerprints what the install put there.
 const PRINT_KEY: &str = "installed_hud_fingerprint";
+
+/// Packs the loose HUD at `dest` into its zip, leaving the top-level `.tf2tools` out, and
+/// clears the loose files once the zip reads back.
+fn pack_folder(dest: &Path) -> Result<(), IoFailure> {
+    let top_metadata = |rel: &Path| rel == Path::new(METADATA_DIR);
+    pack(dest, &top_metadata, &dest.join(HUD_ZIP))?;
+    convert::drop_loose_tree(dest).map(|_| ())
+}
 
 /// How a HUD folder in `tf/custom` stands against the library.
 enum Standing {
@@ -369,8 +377,10 @@ impl Library {
         Ok((format!("{folder}-{number}"), Some(rename)))
     }
 
-    /// Copies the HUD at `root` to `library/huds/<folder_name>`, replacing what is there, and
-    /// records it, under `rename`'s name when given. A failure leaves no folder behind.
+    /// Copies the HUD at `root` to `library/huds/<folder_name>`, replacing what is there,
+    /// records it under `rename`'s name when given, makes its card picture, then packs it.
+    /// The caller holds the copies write guard. A failure before the row leaves no folder
+    /// behind; a failed pack is logged and leaves the HUD loose.
     fn add_hud_folder(
         &self,
         root: &Path,
@@ -387,13 +397,24 @@ impl Library {
             return Err(failure.into());
         }
 
-        match self.record_hud(folder_name, provenance, rename) {
-            Ok(entry) => Ok(self.refresh_hud_thumbnail(entry)),
+        let entry = match self.record_hud(folder_name, provenance, rename) {
+            Ok(entry) => entry,
             Err(failure) => {
                 let _ = remove_dir_if_present(&dest);
-                Err(failure)
+                return Err(failure);
             }
+        };
+        // The picture is read from the loose tree, so it is made before the tree is packed.
+        let entry = self.refresh_hud_thumbnail(entry);
+        if let Err(IoFailure { path, source }) = pack_folder(&dest) {
+            tracing::warn!(
+                folder = folder_name,
+                path = %path.display(),
+                error = %source,
+                "imported HUD left loose: it could not be packed"
+            );
         }
+        Ok(entry)
     }
 
     /// Writes the `library_huds` row for a freshly copied folder, taking the display name
