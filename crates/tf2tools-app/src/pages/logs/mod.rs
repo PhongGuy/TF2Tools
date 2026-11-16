@@ -23,6 +23,7 @@ use gpui_kit::{
 use tf2tools_core::{LogEntry, LogLevel, LogQuery};
 
 use super::common::{YELLOW_500, badge_of};
+use crate::i18n::tr;
 use crate::ids;
 use crate::local_messages::describe_log;
 use crate::services::run_blocking;
@@ -201,7 +202,7 @@ impl LogsPage {
         let loading = run_blocking(cx, move |s| {
             s.activity
                 .query(&query)
-                .map_err(|e| describe_log(&e).into_op("Failed to load more logs"))
+                .map_err(|e| describe_log(&e).into_op(tr!("messages.action.load_more_logs")))
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {
@@ -252,7 +253,7 @@ impl LogsPage {
                 run_blocking(cx, |s| {
                     s.activity
                         .clear()
-                        .map_err(|e| describe_log(&e).into_op("Failed to clear logs"))
+                        .map_err(|e| describe_log(&e).into_op(tr!("messages.action.clear_logs")))
                 })
             }) else {
                 return;
@@ -292,7 +293,7 @@ impl LogsPage {
         let loading = run_blocking(cx, move |s| {
             s.activity
                 .query(&query)
-                .map_err(|e| describe_log(&e).into_op("Failed to load logs"))
+                .map_err(|e| describe_log(&e).into_op(tr!("messages.action.load_logs")))
         });
         cx.spawn(async move |page, cx| {
             let loaded = loading.await;

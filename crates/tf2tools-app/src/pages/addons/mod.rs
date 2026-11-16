@@ -27,6 +27,7 @@ use tf2tools_core::{
 use crate::activity;
 use crate::addon_updates::AddonUpdates;
 use crate::gb_addon_installs::GbAddonInstalls;
+use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_library, describe_tf2_install};
@@ -210,9 +211,9 @@ impl AddonsPage {
                 if name.is_null_movement() {
                     jobs::refuse_while_running(&*probe)?;
                 }
-                s.library
-                    .uninstall_addon(&name, &tf2)
-                    .map_err(|e| describe_tf2_install(&e).into_op("Failed to uninstall addon"))?;
+                s.library.uninstall_addon(&name, &tf2).map_err(|e| {
+                    describe_tf2_install(&e).into_op(tr!("messages.action.uninstall_addon"))
+                })?;
                 let message = format!("Uninstalled addon: {display}");
                 activity::write(
                     s,
@@ -251,9 +252,9 @@ impl AddonsPage {
                         if restores {
                             jobs::refuse_while_running(&*probe)?;
                         }
-                        s.library
-                            .delete_addon(&name, tf2.as_ref())
-                            .map_err(|e| describe_library(&e).into_op("Failed to delete addon"))?;
+                        s.library.delete_addon(&name, tf2.as_ref()).map_err(|e| {
+                            describe_library(&e).into_op(tr!("messages.action.delete_addon"))
+                        })?;
                         let message = format!("Deleted addon from library: {display}");
                         let entry = NewLogEntry::new(LogLevel::Info, "addon", "delete", message);
                         activity::write(s, &entry);
@@ -302,7 +303,7 @@ impl AddonsPage {
             }
             s.library
                 .list_addons(tf2.as_ref())
-                .map_err(|e| describe_library(&e).into_op("Failed to load addons"))
+                .map_err(|e| describe_library(&e).into_op(tr!("messages.action.load_addons")))
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {
@@ -454,7 +455,7 @@ fn copy_job(
         let movement = s
             .library
             .install_addon(&name, &tf2)
-            .map_err(|e| describe_tf2_install(&e).into_op("Failed to install addon"))?;
+            .map_err(|e| describe_tf2_install(&e).into_op(tr!("messages.action.install_addon")))?;
         let message = format!("Installed addon: {display}");
         activity::write(
             s,

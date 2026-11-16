@@ -36,6 +36,7 @@ use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, no_tf2_warning
 use super::hud_store::bodies::{curated_body, gamebanana_body};
 use crate::activity;
 use crate::font_check::active_hud;
+use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_apply_profile, describe_profile};
@@ -189,7 +190,7 @@ impl ProfilesPage {
         let profile = match cx.global::<Services>().library.profile(&id) {
             Ok(profile) => profile,
             Err(e) => {
-                let err = describe_profile(&e).into_op("Failed to open the profile");
+                let err = describe_profile(&e).into_op(tr!("messages.action.open_profile"));
                 return toast_error(window, cx, &err);
             }
         };
@@ -329,7 +330,9 @@ impl ProfilesPage {
             View::Grid => None,
         };
         let loading = run_blocking(cx, |s| {
-            let failed = |e: ProfileError| describe_profile(&e).into_op("Failed to load profiles");
+            let failed = |e: ProfileError| {
+                describe_profile(&e).into_op(tr!("messages.action.load_profiles"))
+            };
             let profiles = s.library.profiles().map_err(failed)?;
             let active = s.library.active_profile().map_err(failed)?;
             Ok((profiles, active))
@@ -423,7 +426,9 @@ impl ProfilesPage {
                 Some(tf2) => s.library.save_current_profile(name, tf2),
                 None => s.library.create_profile(&ProfileDraft::new(name)),
             };
-            let failed = |e: ProfileError| describe_profile(&e).into_op("Failed to create profile");
+            let failed = |e: ProfileError| {
+                describe_profile(&e).into_op(tr!("messages.action.create_profile"))
+            };
             let profile = match create(&name) {
                 Err(ProfileError::NameTaken { .. }) => {
                     let all = s.library.profiles().map_err(failed)?;
@@ -511,9 +516,9 @@ impl ProfilesPage {
             let _ = page.update(cx, |page, cx| {
                 page.run(
                     move |s| {
-                        s.library
-                            .delete_profile(&id)
-                            .map_err(|e| describe_profile(&e).into_op("Failed to delete"))?;
+                        s.library.delete_profile(&id).map_err(|e| {
+                            describe_profile(&e).into_op(tr!("messages.action.delete_failed"))
+                        })?;
                         // The id is internal; the player's row names the profile instead.
                         let entry = NewLogEntry::new(LogLevel::Info, "profile", "delete", message);
                         activity::write(s, &entry);
@@ -566,12 +571,14 @@ fn apply_job(
     skip_missing: bool,
     plan: &ExternalPlan,
 ) -> Result<Activation, OpError> {
-    const FAILED: &str = "Failed to activate profile";
+    fn failed() -> SharedString {
+        tr!("messages.action.activate_profile")
+    }
     let profile = s
         .library
         .profile(id)
-        .map_err(|e| describe_profile(&e).into_op(FAILED))?;
-    let discard = plan.prepare(s, tf2, FAILED)?;
+        .map_err(|e| describe_profile(&e).into_op(failed()))?;
+    let discard = plan.prepare(s, tf2, failed())?;
     let applied = s
         .library
         .apply_profile_discarding(id, tf2, &s.builtins, skip_missing, discard);
@@ -581,7 +588,7 @@ fn apply_job(
             return Ok(Activation::Missing { profile, items });
         }
         Err(ApplyProfileError::ExternalHuds(huds)) => return Ok(Activation::External(huds)),
-        Err(e) => return Err(describe_apply_profile(&e).into_op(FAILED)),
+        Err(e) => return Err(describe_apply_profile(&e).into_op(failed())),
     };
     let skipped: Vec<&str> = report.skipped().iter().map(MissingItem::name).collect();
     let details = model::report_details(report.applied(), &skipped, report.failed());

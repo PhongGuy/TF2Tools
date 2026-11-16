@@ -20,6 +20,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{Choices, MastercomfigRelease, MastercomfigStatus, ModuleCatalog, Preset};
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::local_messages::describe_store_status;
 use crate::pages::common::{card_frame, no_tf2_warning};
@@ -31,7 +32,7 @@ use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
-use jobs::{ModulesFailure, SAVE_FAILED};
+use jobs::{ModulesFailure, save_failed};
 use model::{
     OWN_MODULES_CFG_KEPT, SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove,
     describe_take_over, detail, dropped_note, foreign_modules_cfg, headline, preset_description,
@@ -208,9 +209,9 @@ impl GraphicsPage {
             Err(err) => return toast_error(window, cx, &err),
         };
         let action = if update {
-            "Failed to update mastercomfig"
+            tr!("messages.action.update_mastercomfig")
         } else {
-            "Failed to install mastercomfig"
+            tr!("messages.action.install_mastercomfig")
         };
         let job = jobs::install_base(tf2, action, cx);
         self.running = Some(Job::Install);
@@ -261,7 +262,7 @@ impl GraphicsPage {
         self.run(
             move |s| {
                 s.library.take_over_mastercomfig(&tf2).map_err(|e| {
-                    describe_take_over(&e).into_op("Failed to take over mastercomfig")
+                    describe_take_over(&e).into_op(tr!("messages.action.take_over_mastercomfig"))
                 })?;
                 let text = "TF2Tools now looks after mastercomfig.";
                 Ok(("mastercomfig taken over".into(), text.into()))
@@ -291,7 +292,7 @@ impl GraphicsPage {
                     move |s| {
                         jobs::refuse_while_running(&*probe)?;
                         let restored = s.library.remove_mastercomfig(&tf2).map_err(|e| {
-                            describe_remove(&e).into_op("Failed to remove mastercomfig")
+                            describe_remove(&e).into_op(tr!("messages.action.remove_mastercomfig"))
                         })?;
                         let mut text = "mastercomfig is no longer in TF2.".to_owned();
                         if restored {
@@ -320,7 +321,7 @@ impl GraphicsPage {
             move |s| {
                 s.library
                     .apply_preset(&tf2, preset)
-                    .map_err(|e| describe_apply(&e).into_op("Failed to apply the preset"))?;
+                    .map_err(|e| describe_apply(&e).into_op(tr!("messages.action.apply_preset")))?;
                 let text = format!("{} applies the next time TF2 starts.", preset_label(preset));
                 Ok(("Preset applied".into(), text.into()))
             },
@@ -384,7 +385,7 @@ impl GraphicsPage {
                         (ToastKind::Warning, title.into(), text.into())
                     })),
                     Err(ModulesFailure::Foreign) => Err(OpError::Core {
-                        action: SAVE_FAILED.into(),
+                        action: save_failed(),
                         message: foreign_modules_cfg(),
                     }),
                     Err(ModulesFailure::Op(err)) => Err(err),

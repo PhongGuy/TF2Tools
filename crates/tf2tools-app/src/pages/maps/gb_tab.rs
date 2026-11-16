@@ -23,6 +23,7 @@ use tf2tools_core::{
 
 use crate::addon_detail::open_addon_detail;
 use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer};
+use crate::i18n::tr;
 use crate::ids;
 use crate::maps_sync::{MapsSync, MapsSyncEvent, maps_sync};
 use crate::mature::MatureAddons;
@@ -460,7 +461,7 @@ impl GbMapsTab {
         let reading = run_blocking(cx, move |s| {
             s.store
                 .gb_map_cards(&query)
-                .map_err(|e| OpError::core("load the maps", e))
+                .map_err(|e| OpError::core(tr!("messages.action.load_gb_maps"), e))
         });
         cx.spawn(async move |tab, cx| {
             let page = reading.await;
@@ -562,7 +563,7 @@ impl GbMapsTab {
                 };
                 s.store
                     .gb_map_cards(&page)
-                    .map_err(|e| OpError::core("load the maps", e))
+                    .map_err(|e| OpError::core(tr!("messages.action.load_gb_maps"), e))
             })
         });
         cx.spawn(async move |tab, cx| {
@@ -627,7 +628,7 @@ impl GbMapsTab {
         let reading = run_blocking(cx, |s| {
             s.store
                 .gb_map_gamemodes()
-                .map_err(|e| OpError::core("load the gamemodes", e))
+                .map_err(|e| OpError::core(tr!("messages.action.load_gamemodes"), e))
         });
         cx.spawn_in(window, async move |tab, cx| {
             let gamemodes = match reading.await {

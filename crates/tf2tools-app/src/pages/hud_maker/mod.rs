@@ -67,6 +67,7 @@ use tf2tools_core::{
 
 use crate::activity;
 use crate::hud_textures::{Decoded, crop, decode_texture};
+use crate::i18n::tr;
 use crate::ids;
 use crate::keymap::{
     CancelHudDrag, HUD_MAKER_CONTEXT, HideHudPart, NUDGE_FAR, NudgeDown, NudgeDownFar, NudgeLeft,
@@ -79,7 +80,7 @@ use crate::local_messages::{
     hud_base_changed, hud_files, hud_options_unreadable, left_out, reopen_notice,
 };
 use crate::pages::crosshair_maker::model::{REDO_TIP, UNDO_TIP, hsla_of_rgba, rgb_of};
-use crate::pages::huds::{INSTALL_FAILED, install_job, install_toast};
+use crate::pages::huds::{install_failed, install_job, install_toast};
 use crate::picker::PickKind;
 use crate::previews::to_render_image;
 use crate::services::{OpError, Services, require_tf2, run_blocking};
@@ -98,7 +99,9 @@ use view::{CanvasFit, Panel, PanelMode, PanelPlace, Places, Zoom};
 const LOADING: &str = "Loading the default HUD...";
 const ADD_REFUSED: &str = "That part can't be added here.";
 const DETACH_FIRST: &str = "Detach the parts attached to it first.";
-const SAVE_FAILED: &str = "Failed to save HUD";
+fn save_failed() -> SharedString {
+    tr!("messages.action.save_hud")
+}
 const NOT_A_FONT: &str = "That file isn't a font TF2Tools can read.";
 const FONT_BAD_NAME: &str = "TF2Tools can't use a font with that name in a HUD.";
 const FONT_HUD_FULL: &str = "This HUD can't take another font file.";
@@ -700,12 +703,13 @@ impl HudMakerPage {
         let stored_panel = run_blocking(cx, |s| {
             s.db.settings()
                 .map(|st| st.hud_maker_panel().and_then(Places::from_setting))
-                .map_err(|e| describe_settings(&e).into_op("Load the side panel's place"))
+                .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.load_panel_place")))
         });
         let job = run_blocking(cx, move |_| {
             let tf_dir = tf2?.tf_dir();
             let failed = |e: HudFilesError| {
-                LocalFailure::new(hud_files(), e.to_string()).into_op("Load the default HUD")
+                LocalFailure::new(hud_files(), e.to_string())
+                    .into_op(tr!("messages.action.load_default_hud"))
             };
             let files = HudFiles::open_game(&tf_dir).map_err(failed)?;
             let platform = Platform::current().unwrap_or(Platform::Linux);
@@ -2046,7 +2050,7 @@ impl HudMakerPage {
                 let save = cx.update(|cx| {
                     run_blocking(cx, move |s| {
                         s.db.set_hud_maker_panel(&text).map_err(|e| {
-                            describe_settings(&e).into_op("Save the side panel's place")
+                            describe_settings(&e).into_op(tr!("messages.action.save_panel_place"))
                         })
                     })
                 });
@@ -2864,7 +2868,7 @@ impl HudMakerPage {
             // The raw error goes to the log; the player reads one plain sentence.
             let failed = |e: HudFilesError| {
                 LocalFailure::new(hud_options_unreadable(), e.to_string())
-                    .into_op("Failed to change the HUD's options")
+                    .into_op(tr!("messages.action.change_hud_options"))
             };
             let shown = (options.switch(&files, &choices))
                 .map_err(failed)?
@@ -3235,7 +3239,7 @@ impl HudMakerPage {
                 None,
                 tf2.clone(),
                 win,
-                INSTALL_FAILED,
+                install_failed(),
                 cx,
             );
             let Some(plan) = checking.await else {
@@ -4189,7 +4193,7 @@ fn save_job(
         Ok(saved) => saved,
         Err(MakeHudError::NameTaken { name }) => return Ok(Saved::NameTaken(name)),
         Err(e @ MakeHudError::NotFound { .. }) => {
-            return Ok(Saved::Gone(describe_make_hud(&e).into_op(SAVE_FAILED)));
+            return Ok(Saved::Gone(describe_make_hud(&e).into_op(save_failed())));
         }
         // The sentence is the whole toast; the editor keeps its changes.
         Err(MakeHudError::BaseChanged) => {
@@ -4198,7 +4202,7 @@ fn save_job(
                 message: SharedString::default(),
             });
         }
-        Err(e) => return Err(describe_make_hud(&e).into_op(SAVE_FAILED)),
+        Err(e) => return Err(describe_make_hud(&e).into_op(save_failed())),
     };
     let entry = saved.entry();
     let row = NewLogEntry::new(

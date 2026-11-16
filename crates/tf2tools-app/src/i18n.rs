@@ -511,4 +511,10 @@ mod tests {
         let found = literal_titles(|rel| !rel.starts_with("pages/"));
         assert!(found.is_empty(), "literal action titles: {found:?}");
     }
+
+    #[test]
+    fn no_page_action_title_is_a_literal() {
+        let found = literal_titles(|rel| rel.starts_with("pages/"));
+        assert!(found.is_empty(), "literal action titles: {found:?}");
+    }
 }

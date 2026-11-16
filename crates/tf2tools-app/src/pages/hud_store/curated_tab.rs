@@ -25,6 +25,7 @@ use tf2tools_core::{Provenance, StoreItemId, StoreKind};
 use super::bodies::curated_body;
 use super::curated::{CuratedFilter, CuratedHud, Facet, Os, count_label, facets};
 use crate::gb_card::OpenCard;
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::{
     SkeletonTop, badge_rows, card_frame, empty_state_card, skeleton_cards, tag_badge,
@@ -217,11 +218,11 @@ impl CuratedTab {
             let items = s
                 .store
                 .store_items(KIND)
-                .map_err(|e| OpError::core("Failed to load the store", e))?;
+                .map_err(|e| OpError::core(tr!("messages.action.load_the_store"), e))?;
             let library = s
                 .library
                 .list_huds()
-                .map_err(|e| OpError::core("Failed to load the store", e))?;
+                .map_err(|e| OpError::core(tr!("messages.action.load_the_store"), e))?;
             let huds: Vec<CuratedHud> = items.iter().filter_map(CuratedHud::from_item).collect();
             let downloaded: HashSet<String> = library
                 .iter()

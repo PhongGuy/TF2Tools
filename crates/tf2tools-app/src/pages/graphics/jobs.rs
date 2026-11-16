@@ -55,7 +55,7 @@ pub struct Installed {
 /// only logged. Failures are OpErrors titled `action`, except the refusal, titled `close_tf2()`.
 pub fn install_base(
     tf2: Tf2Install,
-    action: &'static str,
+    action: SharedString,
     cx: &mut App,
 ) -> impl Future<Output = Result<Installed, OpError>> + 'static + use<> {
     let store = cx.global::<Services>().store.clone();
@@ -66,16 +66,17 @@ pub fn install_base(
     }
     // The sync and the install each take core's download lock, so they run one after the
     // other; a forced sync covers a fresh cache that predates the release table.
+    let died = action.clone();
     let job = tokio_bridge::spawn(cx, async move {
         tokio::task::spawn_blocking(move || refuse_while_running(&*probe))
             .await
-            .map_err(|e| OpError::core(action, e))??;
+            .map_err(|e| OpError::core(action.clone(), e))??;
         let known = store
             .mastercomfig_release()
-            .map_err(|e| describe_store_status(&e).into_op(action))?
+            .map_err(|e| describe_store_status(&e).into_op(action.clone()))?
             .is_some();
         if !known {
-            force_sync(&store, action).await?;
+            force_sync(&store, &action).await?;
         }
         let version = store
             .install_mastercomfig(&tf2, &|_, _| {})
@@ -88,7 +89,7 @@ pub fn install_base(
             own_file_kept,
         })
     });
-    async move { job.await.map_err(|e| OpError::core(action, e))? }
+    async move { job.await.map_err(|e| OpError::core(died, e))? }
 }
 
 // Applies the saved module choices (if any) against `version`'s catalog and returns the names it
@@ -136,7 +137,9 @@ async fn reapply_choices(
 }
 
 /// The title of a setting that could not be saved.
-pub const SAVE_FAILED: &str = "Couldn't save the setting";
+pub fn save_failed() -> SharedString {
+    tr!("messages.action.save_setting")
+}
 
 /// Why `apply_modules` changed nothing.
 #[derive(Debug)]
@@ -147,7 +150,7 @@ pub enum ModulesFailure {
 }
 
 /// Applies `choices` through core on the tokio bridge. With `guard_tf2` it first refuses while
-/// TF2 runs (`close_tf2()`). Resolves to the dropped module names. Errors are titled SAVE_FAILED.
+/// TF2 runs (`close_tf2()`). Resolves to the dropped module names. Errors are titled `save_failed()`.
 pub fn apply_modules(
     tf2: Tf2Install,
     catalog: Arc<ModuleCatalog>,
@@ -161,7 +164,7 @@ pub fn apply_modules(
     if !tokio_bridge::is_running(cx) {
         tokio_bridge::init(cx);
     }
-    let died = |e: tokio::task::JoinError| ModulesFailure::Op(OpError::core(SAVE_FAILED, e));
+    let died = |e: tokio::task::JoinError| ModulesFailure::Op(OpError::core(save_failed(), e));
     let job = tokio_bridge::spawn(cx, async move {
         if guard_tf2 {
             tokio::task::spawn_blocking(move || refuse_while_running(&*probe))
@@ -176,13 +179,13 @@ pub fn apply_modules(
                 if let ApplyModulesError::ForeignModulesCfg { .. } = e {
                     ModulesFailure::Foreign
                 } else {
-                    ModulesFailure::Op(describe_apply_modules(&e).into_op(SAVE_FAILED))
+                    ModulesFailure::Op(describe_apply_modules(&e).into_op(save_failed()))
                 }
             })
     });
     async move {
         job.await
-            .map_err(|e| ModulesFailure::Op(OpError::core(SAVE_FAILED, e)))?
+            .map_err(|e| ModulesFailure::Op(OpError::core(save_failed(), e)))?
     }
 }
 
@@ -211,7 +214,7 @@ pub async fn ask_and_install_base(
     if !answer.recv().await.unwrap_or(false) {
         return false;
     }
-    let job = cx.update(|cx| install_base(tf2, "Failed to install mastercomfig", cx));
+    let job = cx.update(|cx| install_base(tf2, tr!("messages.action.install_mastercomfig"), cx));
     match job.await {
         Ok(_) => true,
         Err(err) => {
@@ -226,13 +229,14 @@ pub async fn ask_and_install_base(
 pub fn check_for_updates(
     cx: &mut App,
 ) -> impl Future<Output = Result<(), OpError>> + 'static + use<> {
-    const ACTION: &str = "Couldn't check for updates";
+    let action = tr!("messages.action.check_updates");
+    let died = action.clone();
     let store = cx.global::<Services>().store.clone();
     if !tokio_bridge::is_running(cx) {
         tokio_bridge::init(cx);
     }
-    let job = tokio_bridge::spawn(cx, async move { force_sync(&store, ACTION).await });
-    async move { job.await.map_err(|e| OpError::core(ACTION, e))? }
+    let job = tokio_bridge::spawn(cx, async move { force_sync(&store, &action).await });
+    async move { job.await.map_err(|e| OpError::core(died, e))? }
 }
 
 /// The catalog of `tag` through the store (disk, else GitHub) on the tokio bridge. A failure
@@ -256,7 +260,7 @@ pub fn fetch_catalog(
 
 // Runs the addon-store sync even on a fresh cache; the player sees the sync's own message and
 // the log keeps its raw detail.
-async fn force_sync(store: &StoreClient, action: &'static str) -> Result<(), OpError> {
+async fn force_sync(store: &StoreClient, action: &SharedString) -> Result<(), OpError> {
     store
         .sync(StoreKind::Addons, true, &|_| {})
         .await
@@ -265,7 +269,7 @@ async fn force_sync(store: &StoreClient, action: &'static str) -> Result<(), OpE
             let failure = describe_sync(StoreKind::Addons, &e);
             tracing::warn!("{action}: {}", failure.detail);
             OpError::Core {
-                action: action.into(),
+                action: action.clone(),
                 message: failure.message.into(),
             }
         })

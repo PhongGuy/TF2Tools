@@ -357,7 +357,7 @@ impl LogsTfPage {
             s.logs
                 .cache()
                 .class_weapons(active, range, class)
-                .map_err(|e| OpError::core("Failed to read class weapons", e))
+                .map_err(|e| OpError::core(tr!("messages.action.read_class_weapons"), e))
         });
         cx.spawn(async move |page, cx| {
             let read = reading.await;
@@ -395,10 +395,9 @@ impl LogsTfPage {
             loop {
                 let Ok(batch) = page.update(cx, |_, cx| {
                     run_blocking(cx, |s| {
-                        s.logs
-                            .cache()
-                            .count_weapons(WEAPON_BATCH)
-                            .map_err(|e| OpError::core("Failed to count logs.tf weapon stats", e))
+                        s.logs.cache().count_weapons(WEAPON_BATCH).map_err(|e| {
+                            OpError::core(tr!("messages.action.count_weapon_stats"), e)
+                        })
                     })
                 }) else {
                     break;
@@ -424,7 +423,7 @@ impl LogsTfPage {
                         s.logs
                             .cache()
                             .fill_damage_taken(WEAPON_BATCH)
-                            .map_err(|e| OpError::core("Failed to fill logs.tf damage taken", e))
+                            .map_err(|e| OpError::core(tr!("messages.action.fill_damage_taken"), e))
                     })
                 }) else {
                     break;
@@ -490,7 +489,7 @@ impl LogsTfPage {
         let saving = run_blocking(cx, move |s| {
             s.logs.cache().set_range(range).map_err(|error| {
                 tracing::warn!(%error, "saving the logs.tf history range failed");
-                OpError::core("Failed to change the history range", save_failed())
+                OpError::core(tr!("messages.action.change_history_range"), save_failed())
             })
         });
         cx.spawn_in(window, async move |page, cx| {
@@ -651,7 +650,7 @@ impl LogsTfPage {
     // the open one, and its row remeasures to fit the panel.
     fn read_detail(&mut self, id: u64, cx: &mut Context<Self>) {
         let reading = run_blocking(cx, move |s| {
-            let failed = |e| OpError::core("Failed to read a logs.tf log", e);
+            let failed = |e| OpError::core(tr!("messages.action.read_logs_tf_log"), e);
             let opened = s
                 .logs
                 .cache()
@@ -795,7 +794,7 @@ impl LogsTfPage {
         let saving = run_blocking(cx, move |s| {
             s.logs.cache().set_active_player(id).map_err(|error| {
                 tracing::warn!(%error, "saving the active logs.tf player failed");
-                OpError::core("Failed to switch player", save_failed())
+                OpError::core(tr!("messages.action.switch_player"), save_failed())
             })
         });
         self.after_write(saving, window, cx);
@@ -832,7 +831,7 @@ impl LogsTfPage {
                 run_blocking(cx, move |s| {
                     s.logs.cache().remove_player(id).map_err(|error| {
                         tracing::warn!(%error, "removing a logs.tf player failed");
-                        OpError::core("Failed to stop tracking", save_failed())
+                        OpError::core(tr!("messages.action.stop_tracking"), save_failed())
                     })
                 })
             }) else {
@@ -1025,7 +1024,7 @@ impl LogsTfPage {
                 .set_nickname(id, Some(&nickname))
                 .map_err(|error| {
                     tracing::warn!(%error, "saving a logs.tf nickname failed");
-                    OpError::core("Failed to save the nickname", save_failed())
+                    OpError::core(tr!("messages.action.save_nickname"), save_failed())
                 })
         });
         self.after_write(saving, window, cx);
@@ -1156,7 +1155,7 @@ impl LogsTfPage {
                             s.logs
                                 .cache()
                                 .add_player(&player)
-                                .map_err(|e| OpError::core("Failed to add player", e))
+                                .map_err(|e| OpError::core(tr!("messages.action.add_player"), e))
                         })
                     });
                     match saving {
@@ -1235,7 +1234,7 @@ impl LogsTfPage {
         let selected = self.selected_class;
         let loading = run_blocking(cx, move |s| {
             let cache = s.logs.cache();
-            let read = |e| OpError::core("Failed to load logs.tf players", e);
+            let read = |e| OpError::core(tr!("messages.action.load_logs_tf_players"), e);
             let players = cache.players().map_err(read)?;
             let active = cache.active_player().map_err(read)?;
             let range = cache.range().map_err(read)?;

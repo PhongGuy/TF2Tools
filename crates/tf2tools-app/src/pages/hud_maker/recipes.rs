@@ -14,8 +14,8 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     Anchor, AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
-    StatefulInteractiveElement as _, Styled as _, Task, TestSupportExt as _, Window, div, point,
-    px,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Task, TestSupportExt as _, Window,
+    div, point, px,
 };
 use tf2tools_core::{PresetEntry, PresetError, Recipe, StartingPoint, read_recipe_file};
 
@@ -26,6 +26,7 @@ use super::borrow::BorrowNote;
 use super::tip::tipped;
 use super::view::{Panel, PanelPlace};
 use super::{FontBytes, HudMakerPage, colour_view, register_font};
+use crate::i18n::tr;
 use crate::ids;
 use crate::picker::{PickKind, file_name_for, with_extension};
 use crate::services::{OpError, Services, run_blocking};
@@ -35,9 +36,6 @@ use crate::widgets::labelled;
 const NAME_BLANK: &str = "Give the preset a name.";
 const NAME_TAKEN: &str = "A preset with that name already exists.";
 const NO_OPTIONS: &str = "Choose some options first, then save them as a preset.";
-const SAVE_FAILED: &str = "Couldn't save the preset.";
-const DELETE_FAILED: &str = "Couldn't delete the preset.";
-const LIST_FAILED: &str = "Couldn't read your presets.";
 const PRESET_UNREADABLE: &str = "That file isn't a preset TF2Tools can read.";
 const RECIPE_UNREADABLE: &str = "That file isn't a recipe TF2Tools can read.";
 const RECIPE_SAVE_FAILED: &str = "Couldn't save the recipe.";
@@ -93,11 +91,11 @@ enum PresetWork {
 }
 
 impl PresetWork {
-    fn failed(self) -> &'static str {
+    fn failed(self) -> SharedString {
         match self {
-            PresetWork::List => LIST_FAILED,
-            PresetWork::Save => SAVE_FAILED,
-            PresetWork::Delete => DELETE_FAILED,
+            PresetWork::List => tr!("messages.action.list_presets"),
+            PresetWork::Save => tr!("messages.action.save_preset"),
+            PresetWork::Delete => tr!("messages.action.delete_preset"),
         }
     }
 }
@@ -718,7 +716,10 @@ impl HudMakerPage {
                                     cx.notify();
                                 }
                                 done.map_err(|e| {
-                                    (preset_message(&e).unwrap_or(failed), e.to_string())
+                                    (
+                                        preset_message(&e).map_or(failed, SharedString::from),
+                                        e.to_string(),
+                                    )
                                 })
                             }
                             Err(err) => Err((failed, err.to_string())),
@@ -874,7 +875,7 @@ mod tests {
     #[test]
     fn a_failed_list_read_never_says_a_save_failed() {
         assert_eq!(PresetWork::List.failed(), "Couldn't read your presets.");
-        assert_eq!(PresetWork::Save.failed(), SAVE_FAILED);
-        assert_eq!(PresetWork::Delete.failed(), DELETE_FAILED);
+        assert_eq!(PresetWork::Save.failed(), "Couldn't save the preset.");
+        assert_eq!(PresetWork::Delete.failed(), "Couldn't delete the preset.");
     }
 }

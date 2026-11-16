@@ -76,10 +76,16 @@ const STORE_NOTE_HEIGHT: Pixels = px(48.);
 /// Edit's tooltip while another HUD action runs.
 const EDIT_WAIT: &str = "Wait for TF2Tools to finish, then edit";
 /// The title of a failed install's toast.
-pub(crate) const INSTALL_FAILED: &str = "Failed to install HUD";
-const UNINSTALL_FAILED: &str = "Failed to uninstall HUD";
+pub(crate) fn install_failed() -> SharedString {
+    tr!("messages.action.install_hud")
+}
+fn uninstall_failed() -> SharedString {
+    tr!("messages.action.uninstall_hud")
+}
 /// Added to the update toast when the installed copy could not follow the update.
-const UPDATE_FAILED: &str = "Failed to update HUD";
+fn update_failed() -> SharedString {
+    tr!("messages.action.update_hud")
+}
 fn download_gone() -> SharedString {
     tr!("messages.huds.download_gone")
 }
@@ -291,7 +297,8 @@ impl HudsPage {
         let tf2 = tf2_state(cx).read(cx).install().cloned();
         let tf2_for_fonts = tf2.clone();
         let loading = run_blocking(cx, move |s| {
-            let failed = |e: LibraryError| describe_library(&e).into_op("Failed to load HUDs");
+            let failed =
+                |e: LibraryError| describe_library(&e).into_op(tr!("messages.action.load_huds"));
             let huds = s.library.list_huds().map_err(failed)?;
             let status = tf2
                 .map(|t| s.library.hud_status(&t).map(|st| (t.custom_dir(), st)))
@@ -453,7 +460,8 @@ impl HudsPage {
         }
         let due = run_blocking(cx, move |s| {
             let now = chrono::Utc::now().timestamp();
-            let failed = |e: LibraryError| describe_library(&e).into_op("Couldn't list HUDs");
+            let failed =
+                |e: LibraryError| describe_library(&e).into_op(tr!("messages.action.list_huds"));
             s.library.ensure_gb_hud_checks(&ids).map_err(failed)?;
             s.library.gb_huds_due_for_check(now).map_err(failed)
         });
@@ -558,7 +566,7 @@ impl HudsPage {
     fn run_guarded(
         &mut self,
         busy: Busy,
-        (action, only, title, tf2): (HudAction, Option<String>, &'static str, Tf2Install),
+        (action, only, title, tf2): (HudAction, Option<String>, SharedString, Tf2Install),
         op: impl FnOnce(&Services, ExternalPlan) -> Result<Done, OpError> + Send + 'static,
         cx: &mut Context<Self>,
         after: Option<AfterRun>,
@@ -599,7 +607,9 @@ impl HudsPage {
                         let hud = s
                             .library
                             .import_hud(&path, Provenance::Local)
-                            .map_err(|e| describe_import(&e).into_op("Failed to import HUD"))?;
+                            .map_err(|e| {
+                                describe_import(&e).into_op(tr!("messages.action.import_hud"))
+                            })?;
                         let message = format!("Imported HUD: {}", hud.name());
                         // The source path is developer detail, so it goes to tracing only.
                         tracing::info!(source = %path.display(), "imported a HUD");
@@ -640,7 +650,7 @@ impl HudsPage {
         });
         self.run_guarded(
             busy,
-            (HudAction::Install, None, INSTALL_FAILED, tf2.clone()),
+            (HudAction::Install, None, install_failed(), tf2.clone()),
             move |s, plan| {
                 let done = install_job(s, &id, &tf2, &plan)?;
                 if let Ok(mut slot) = installed.lock() {
@@ -668,14 +678,14 @@ impl HudsPage {
         let scope = only.clone();
         self.run_guarded(
             busy,
-            (HudAction::Uninstall, scope, UNINSTALL_FAILED, tf2.clone()),
+            (HudAction::Uninstall, scope, uninstall_failed(), tf2.clone()),
             move |s, plan| {
-                let discard = plan.prepare(s, &tf2, UNINSTALL_FAILED)?;
+                let discard = plan.prepare(s, &tf2, uninstall_failed())?;
                 let removed = match &only {
                     Some(folder) => s.library.uninstall_one_hud(&tf2, folder, discard),
                     None => s.library.uninstall_hud_discarding(&tf2, discard),
                 };
-                removed.map_err(|e| describe_tf2_install(&e).into_op(UNINSTALL_FAILED))?;
+                removed.map_err(|e| describe_tf2_install(&e).into_op(uninstall_failed()))?;
                 plan.log_discarded(s);
                 let message = format!("Uninstalled HUD(s): {name}");
                 activity::write(
@@ -710,9 +720,9 @@ impl HudsPage {
                 page.run(
                     busy,
                     move |s| {
-                        s.library
-                            .delete_hud(&id)
-                            .map_err(|e| describe_library(&e).into_op("Failed to delete HUD"))?;
+                        s.library.delete_hud(&id).map_err(|e| {
+                            describe_library(&e).into_op(tr!("messages.action.delete_hud"))
+                        })?;
                         let message = format!("Deleted HUD from library: {name}");
                         let entry = NewLogEntry::new(LogLevel::Info, "hud", "delete", message);
                         activity::write(s, &entry);
@@ -735,7 +745,9 @@ impl HudsPage {
         let (hud_id, name) = (hud.id().clone(), hud.name().to_owned());
         let busy = Busy::AddToProfile(hud.folder_name().to_owned());
         let op = move |s: &Services| {
-            let failed = |e: ProfileError| describe_profile(&e).into_op("Couldn't add to profile");
+            let failed = |e: ProfileError| {
+                describe_profile(&e).into_op(tr!("messages.action.add_to_profile"))
+            };
             let before = s.library.profile(&id).map_err(failed)?;
             let draft = ProfileDraft::from_profile(&before).with_hud(DraftSlot::Item(hud_id));
             let update = s.library.update_profile(&id, &draft).map_err(failed)?;
@@ -789,7 +801,7 @@ impl HudsPage {
                 let copy = s
                     .library
                     .copy_hud(&id)
-                    .map_err(|e| describe_copy_hud(&e).into_op("Failed to copy HUD"))?;
+                    .map_err(|e| describe_copy_hud(&e).into_op(tr!("messages.action.copy_hud")))?;
                 let message = format!("Copied HUD: {}", copy.name());
                 activity::write(s, &NewLogEntry::new(LogLevel::Info, "hud", "copy", message));
                 if let Ok(mut slot) = made.lock() {
@@ -830,7 +842,9 @@ impl HudsPage {
                 let updated = s
                     .library
                     .update_copy(&id, &from, &tf2.tf_dir(), platform)
-                    .map_err(|e| describe_update_copy(&e).into_op("Failed to update HUD"))?;
+                    .map_err(|e| {
+                        describe_update_copy(&e).into_op(tr!("messages.action.update_hud"))
+                    })?;
                 let name = updated.entry().name();
                 let message = format!("Updated HUD copy: {name}");
                 activity::write(
@@ -906,7 +920,7 @@ impl HudsPage {
                         Err(failure.message)
                     });
                     file.map_err(|message| OpError::Core {
-                        action: UPDATE_FAILED.into(),
+                        action: update_failed(),
                         message: message.into(),
                     })
                 }
@@ -1047,7 +1061,7 @@ impl HudsPage {
                 failed => {
                     let message = failed.err().unwrap_or_else(|| download_gone().to_string());
                     let err = OpError::Core {
-                        action: UPDATE_FAILED.into(),
+                        action: update_failed(),
                         message: message.into(),
                     };
                     page.busy = None;
@@ -1072,7 +1086,7 @@ fn swap_download(
     was_installed: bool,
 ) -> Result<Done, OpError> {
     let listed =
-        (s.library.list_huds()).map_err(|e| describe_library(&e).into_op(UPDATE_FAILED))?;
+        (s.library.list_huds()).map_err(|e| describe_library(&e).into_op(update_failed()))?;
     let old_exists = listed.iter().any(|h| h.id() == old);
     let updated = format!("{name} is now up to date");
     let mut done: Done = (ToastKind::Success, "HUD updated".into(), updated.into());
@@ -1089,7 +1103,7 @@ fn swap_download(
     if old_exists && old != new {
         s.library
             .delete_hud(old)
-            .map_err(|e| describe_library(&e).into_op(UPDATE_FAILED))?;
+            .map_err(|e| describe_library(&e).into_op(update_failed()))?;
     }
     let message = format!("Updated HUD: {name}");
     activity::write(
@@ -1359,7 +1373,8 @@ fn conflict_box(cx: &App) -> AnyElement {
 /// library), and refreshes the library views when any were made.
 pub fn make_missing_thumbnails(cx: &mut App) {
     let making = run_blocking(cx, |s| {
-        (s.library.make_missing_hud_thumbnails()).map_err(|e| OpError::core("Make HUD pictures", e))
+        (s.library.make_missing_hud_thumbnails())
+            .map_err(|e| OpError::core(tr!("messages.action.make_hud_pictures"), e))
     });
     cx.spawn(async move |cx| match making.await {
         Ok(0) => {}
@@ -2105,11 +2120,11 @@ pub(crate) fn install_job(
     tf2: &Tf2Install,
     plan: &ExternalPlan,
 ) -> Result<HudInstall, OpError> {
-    let discard = plan.prepare(s, tf2, INSTALL_FAILED)?;
+    let discard = plan.prepare(s, tf2, install_failed())?;
     let installed = s
         .library
         .install_hud_discarding(id, tf2, discard)
-        .map_err(|e| describe_tf2_install(&e).into_op(INSTALL_FAILED))?;
+        .map_err(|e| describe_tf2_install(&e).into_op(install_failed()))?;
     plan.log_discarded(s);
     // The player's log names the HUD; the folder it landed in is developer detail.
     let target = tf2.custom_dir().join(installed.folder());

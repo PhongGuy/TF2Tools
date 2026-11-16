@@ -312,7 +312,7 @@ impl MapsPage {
                 .map(|entries| entries.iter().map(MapRow::from).collect::<Vec<_>>())
                 .map_err(|e| {
                     tracing::warn!(error = %e, "reading the map list failed");
-                    OpError::core("Failed to load maps", tr!("messages.maps.read"))
+                    OpError::core(tr!("messages.action.load_maps"), tr!("messages.maps.read"))
                 })
         });
         cx.spawn(async move |page, cx| {
@@ -480,7 +480,10 @@ impl MapsPage {
             let removing = page.update(cx, |_, cx| {
                 run_blocking(cx, move |s| {
                     s.store.remove_map(&install, &map).map_err(|e| {
-                        OpError::core("Remove failed", describe_map_remove(&e).message)
+                        OpError::core(
+                            tr!("messages.action.remove_failed"),
+                            describe_map_remove(&e).message,
+                        )
                     })
                 })
             });

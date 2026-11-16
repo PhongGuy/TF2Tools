@@ -36,6 +36,7 @@ use tf2tools_core::{
 
 use crate::activity;
 use crate::assets::BACKGROUNDS;
+use crate::i18n::tr;
 use crate::ids;
 use crate::keymap::{
     FitGrid, MAKER_CONTEXT, RedoDrawing, UndoDrawing, UseCircle, UseEraser, UseFill, UseLine,
@@ -73,10 +74,18 @@ const NARROW_PADDING: Pixels = px(16.);
 const DIVIDER_LEAD: Pixels = px(13.);
 /// The preview box, as on the Crosshairs page; the texture inside is drawn at its 64 px.
 const PREVIEW_SIZE: Pixels = px(128.);
-const SAVE_FAILED: &str = "Failed to save crosshair";
-const OPEN_FAILED: &str = "Failed to open crosshair";
-const COPY_FAILED: &str = "Failed to copy crosshair";
-const PNG_IMPORT_FAILED: &str = "Failed to import PNG";
+fn save_failed() -> SharedString {
+    tr!("messages.action.save_crosshair")
+}
+fn open_failed() -> SharedString {
+    tr!("messages.action.open_crosshair")
+}
+fn copy_failed() -> SharedString {
+    tr!("messages.action.copy_crosshair")
+}
+fn png_import_failed() -> SharedString {
+    tr!("messages.action.import_png")
+}
 /// The toast for a picture (starter, copy or PNG) that arrives while a save or open runs.
 pub const BUSY: &str = "Wait for the Crosshair Maker to finish, then try again.";
 /// Shown when the files dropped on the maker hold no PNG.
@@ -220,7 +229,7 @@ impl CrosshairMakerPage {
         let stored = run_blocking(cx, |s| {
             s.db.settings()
                 .map(|st| st.maker_grid_lines())
-                .map_err(|e| describe_settings(&e).into_op("Load grid lines"))
+                .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.load_grid_lines")))
         });
         cx.spawn(async move |page, cx| {
             if let Ok(on) = stored.await {
@@ -289,7 +298,7 @@ impl CrosshairMakerPage {
         let on = self.grid_lines;
         let save = run_blocking(cx, move |s| {
             s.db.set_maker_grid_lines(on)
-                .map_err(|e| describe_settings(&e).into_op("Save grid lines"))
+                .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.save_grid_lines")))
         });
         cx.spawn_in(window, async move |_, cx| {
             if let Err(err) = save.await {
@@ -538,7 +547,7 @@ impl CrosshairMakerPage {
         let loading = run_blocking(cx, move |_| {
             read_png(&path)
                 .map(fit_to_maker)
-                .map_err(|e| describe_png_read(&e).into_op(PNG_IMPORT_FAILED))
+                .map_err(|e| describe_png_read(&e).into_op(png_import_failed()))
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {
@@ -1624,9 +1633,9 @@ fn save_job(
         Ok(entry) => entry,
         Err(PaintError::NameTaken { name }) => return Ok(Saved::NameTaken(name)),
         Err(e @ PaintError::NotFound { .. }) if open.is_some() => {
-            return Ok(Saved::Gone(describe_paint(&e, step).into_op(SAVE_FAILED)));
+            return Ok(Saved::Gone(describe_paint(&e, step).into_op(save_failed())));
         }
-        Err(e) => return Err(describe_paint(&e, step).into_op(SAVE_FAILED)),
+        Err(e) => return Err(describe_paint(&e, step).into_op(save_failed())),
     };
     let row = NewLogEntry::new(
         LogLevel::Info,
@@ -1651,12 +1660,12 @@ fn save_job(
 // The background half of `open`: the drawing, its library name, and whether the drawing was
 // rebuilt from the VTF.
 fn open_job(s: &Services, id: CrosshairId) -> Result<(Editor, bool), OpError> {
-    let failed = |e: PaintError| describe_paint(&e, PaintStep::Open).into_op(OPEN_FAILED);
+    let failed = |e: PaintError| describe_paint(&e, PaintStep::Open).into_op(open_failed());
     let source = s.library.painted_source(&id).map_err(failed)?;
     let library = s
         .library
         .list_crosshairs()
-        .map_err(|e| describe_library(&e).into_op(OPEN_FAILED))?;
+        .map_err(|e| describe_library(&e).into_op(open_failed()))?;
     let gone = || PaintError::NotFound { id: id.to_string() };
     let name = library
         .iter()
@@ -1674,7 +1683,7 @@ fn copy_job(s: &Services, crosshair: CrosshairRef) -> Result<(RgbaImage, FitChan
     let drawing = s
         .library
         .crosshair_drawing(&crosshair, &s.builtins)
-        .map_err(|e| describe_library(&e).into_op(COPY_FAILED))?;
+        .map_err(|e| describe_library(&e).into_op(copy_failed()))?;
     Ok(fit_to_maker(drawing))
 }
 

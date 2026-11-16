@@ -301,3 +301,9 @@ fn mastercomfig_failures_read_in_russian() {
         assert_russian(&failure.message);
     }
 }
+
+#[test]
+fn page_action_titles_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    assert_russian(&jobs::save_failed());
+}

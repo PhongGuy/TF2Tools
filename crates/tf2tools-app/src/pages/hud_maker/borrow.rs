@@ -11,7 +11,8 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     AnyElement, Context, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
-    Styled as _, TestSupportExt as _, UniformListScrollHandle, Window, div, px, uniform_list,
+    SharedString, Styled as _, TestSupportExt as _, UniformListScrollHandle, Window, div, px,
+    uniform_list,
 };
 use tf2tools_core::{
     BoardMode, BorrowRefused, BorrowSource, Borrowed, Brings, HudEntry, HudFiles, HudId, HudModel,
@@ -20,6 +21,7 @@ use tf2tools_core::{
 
 use super::tip::tipped;
 use super::{HudMakerPage, Load, parts, recipes::PreviewNote};
+use crate::i18n::tr;
 use crate::ids;
 use crate::services::{OpError, Services, require_tf2, run_blocking};
 use crate::shell::toast::{ToastKind, toast};
@@ -27,7 +29,9 @@ use crate::widgets::labelled;
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 
 const HUD_UNREADABLE: &str = "Couldn't read that HUD.";
-const LIST_FAILED: &str = "Couldn't read your HUDs library.";
+fn list_failed() -> SharedString {
+    tr!("messages.action.list_hud_library")
+}
 const NOTHING_TO_BORROW: &str =
     "No other HUD in your library has parts to borrow. Download one from the HUD store first.";
 const PART_UNREADABLE: &str = "That HUD's file for this part can't be read.";
@@ -306,7 +310,7 @@ impl HudMakerPage {
         let job = run_blocking(cx, move |s: &Services| {
             s.library
                 .list_borrowable(except.as_ref())
-                .map_err(|e| OpError::core("List the HUDs to borrow from", e))
+                .map_err(|e| OpError::core(tr!("messages.action.list_borrowable_huds"), e))
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {
@@ -321,7 +325,7 @@ impl HudMakerPage {
                             Ok(huds) => huds,
                             Err(e) => {
                                 tracing::debug!(error = %e, "the borrowable HUDs didn't list");
-                                toast(window, cx, ToastKind::Error, LIST_FAILED, "");
+                                toast(window, cx, ToastKind::Error, list_failed(), "");
                                 Vec::new()
                             }
                         };
