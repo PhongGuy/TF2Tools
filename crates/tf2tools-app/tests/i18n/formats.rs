@@ -379,3 +379,38 @@ fn crosshair_and_font_sentences_read_in_russian() {
         "Пропущено 5 шрифтов для fonthud; подробности в журнале действий."
     );
 }
+
+#[test]
+fn hud_maker_counts_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let time = [("time", "27.10.2026 21:04:09")];
+    let when = |n: u64| counted_plural("hud_maker.history.when", n, &n.to_string(), &time);
+    assert_eq!(when(1), "27.10.2026 21:04:09, 1 изменение");
+    assert_eq!(when(22), "27.10.2026 21:04:09, 22 изменения");
+    assert_eq!(when(11), "27.10.2026 21:04:09, 11 изменений");
+    let plural = tf2tools_app::i18n::plural;
+    assert_eq!(
+        plural("hud_maker.screens.problems", 21),
+        "21 часть с проблемой"
+    );
+    let misfits = plural("hud_maker.options.misfits", 2);
+    assert_eq!(misfits, "2 настройки не подходят к этой версии HUD.");
+    assert_eq!(
+        plural("hud_maker.recipes.fonts_left_out", 5),
+        "5 шрифтов пропущено."
+    );
+    let commands = plural("hud_maker.borrow.animations", 3);
+    assert_eq!(commands, "Анимации: пропущены 3 консольные команды.");
+    for key in [
+        "hud_maker.recipes.changes_dont_fit",
+        "hud_maker.recipes.no_longer_fit",
+        "hud_maker.borrow.code_keys",
+        "hud_maker.borrow.unresolved_pins",
+    ] {
+        for n in [1, 2, 5] {
+            let text = plural(key, n);
+            assert_ru(&text);
+            assert!(text.contains(&n.to_string()), "{key} {n}: {text}");
+        }
+    }
+}

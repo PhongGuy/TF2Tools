@@ -21,7 +21,7 @@ use tf2tools_core::{
 
 use super::tip::tipped;
 use super::{HudMakerPage, Load, parts, recipes::PreviewNote};
-use crate::i18n::tr;
+use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::services::{OpError, Services, require_tf2, run_blocking};
 use crate::shell::toast::{ToastKind, toast};
@@ -158,18 +158,16 @@ fn brings_line(brings: &Brings) -> String {
     }
 }
 
-fn plural(n: usize, one: &str, many: &str) -> String {
-    format!("{n} {}", if n == 1 { one } else { many })
+// A left-behind count as the catalogue's plural count.
+fn count(n: usize) -> u64 {
+    u64::try_from(n).unwrap_or(u64::MAX)
 }
 
 // The section's line for one thing left behind, and the bar's sentence for its kind.
 fn left_behind_line(left: &LeftBehind) -> (String, Option<&'static str>) {
     match left {
         LeftBehind::Animations(n) => (
-            format!(
-                "Animations: {} left out.",
-                plural(*n, "console command", "console commands")
-            ),
+            plural("hud_maker.borrow.animations", count(*n)).to_string(),
             None,
         ),
         LeftBehind::MissingFont(family) => (
@@ -183,14 +181,11 @@ fn left_behind_line(left: &LeftBehind) -> (String, Option<&'static str>) {
             Some("Some of its pictures are missing from that HUD."),
         ),
         LeftBehind::CodeKeys(n) => (
-            format!("The game sets {n} of this part's settings itself."),
+            plural("hud_maker.borrow.code_keys", count(*n)).to_string(),
             Some("The game sets some of its settings itself."),
         ),
         LeftBehind::UnresolvedPins(n) => (
-            format!(
-                "{} that aren't coming along, so it may sit in a different place.",
-                plural(*n, "link to a part", "links to parts")
-            ),
+            plural("hud_maker.borrow.unresolved_pins", count(*n)).to_string(),
             Some("It may sit in a different place."),
         ),
         _ => (
@@ -632,7 +627,40 @@ impl HudMakerPage {
 
 #[cfg(test)]
 mod tests {
-    use super::added_text;
+    use super::{added_text, left_behind_line};
+
+    #[test]
+    fn left_behind_lines_count_what_stayed() {
+        use tf2tools_core::LeftBehind;
+        let line = |left: LeftBehind| left_behind_line(&left).0;
+        let commands = "console command";
+        assert_eq!(
+            line(LeftBehind::Animations(1)),
+            format!("Animations: 1 {commands} left out.")
+        );
+        assert_eq!(
+            line(LeftBehind::Animations(2)),
+            format!("Animations: 2 {commands}s left out.")
+        );
+        let sets = "of this part's settings itself.";
+        assert_eq!(
+            line(LeftBehind::CodeKeys(1)),
+            format!("The game sets 1 {sets}")
+        );
+        assert_eq!(
+            line(LeftBehind::CodeKeys(2)),
+            format!("The game sets 2 {sets}")
+        );
+        let away = "coming along, so it may sit in a different place.";
+        assert_eq!(
+            line(LeftBehind::UnresolvedPins(1)),
+            format!("1 link to a part that isn't {away}")
+        );
+        assert_eq!(
+            line(LeftBehind::UnresolvedPins(3)),
+            format!("3 links to parts that aren't {away}")
+        );
+    }
 
     #[test]
     fn the_apply_toast_says_when_some_of_the_borrow_was_not_added() {

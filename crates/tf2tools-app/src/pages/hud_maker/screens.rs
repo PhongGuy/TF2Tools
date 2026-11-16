@@ -15,6 +15,7 @@ use tf2tools_core::ScreenCheck;
 use super::checks::FlagLabels;
 use super::view::CanvasFit;
 use super::{HudMakerPage, Load, SCREEN_LABELS};
+use crate::i18n::{plural, tr};
 use crate::ids;
 
 /// The space around the grid and between its tiles.
@@ -271,12 +272,35 @@ fn edge_arrow(r: Bounds<Pixels>, screen: Size<Pixels>) -> Option<(Point<Pixels>,
 /// "16:9, 1920x1080: No problems" and so on.
 fn caption(index: usize, check: &ScreenCheck, flagged: usize) -> String {
     let shape = check.screen();
-    let count = match flagged {
-        _ if check.too_crowded() => "Too many overlaps to list here".to_owned(),
-        0 => "No problems".to_owned(),
-        1 => "1 part has a problem".to_owned(),
-        n => format!("{n} parts have problems"),
+    let count = if check.too_crowded() {
+        "Too many overlaps to list here".to_owned()
+    } else {
+        problems_text(flagged)
     };
     let ratio = SCREEN_LABELS.get(index).copied().unwrap_or_default();
     format!("{ratio}, {}x{}: {count}", shape.wide(), shape.tall())
+}
+
+// "No problems", "1 part has a problem", "3 parts have problems".
+fn problems_text(flagged: usize) -> String {
+    match flagged {
+        0 => tr!("hud_maker.screens.no_problems").to_string(),
+        n => plural(
+            "hud_maker.screens.problems",
+            u64::try_from(n).unwrap_or(u64::MAX),
+        )
+        .to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::problems_text;
+
+    #[test]
+    fn a_screen_counts_its_parts_with_problems() {
+        assert_eq!(problems_text(0), "No problems");
+        assert_eq!(problems_text(1), "1 part has a problem");
+        assert_eq!(problems_text(3), "3 parts have problems");
+    }
 }

@@ -208,6 +208,23 @@ font_check:
   installed_some: { one: "Installed %{installed} of %{count} font for %{folder}; see the Activity Log. Restart TF2 to use them.", other: "Installed %{installed} of %{count} fonts for %{folder}; see the Activity Log. Restart TF2 to use them." }
   skipped: { one: "Skipped %{count} font for %{folder}; see the Activity Log.", other: "Skipped %{count} fonts for %{folder}; see the Activity Log." }
 
+hud_maker:
+  history:
+    when: { one: "%{time}, %{count} change", other: "%{time}, %{count} changes" }
+  screens:
+    no_problems: "No problems"
+    problems: { one: "%{count} part has a problem", other: "%{count} parts have problems" }
+  options:
+    misfits: { one: "%{count} option doesn't fit this version of the HUD.", other: "%{count} options don't fit this version of the HUD." }
+  recipes:
+    changes_dont_fit: { one: "%{count} change doesn't fit this HUD.", other: "%{count} changes don't fit this HUD." }
+    no_longer_fit: { one: "%{count} of your changes no longer fit and were left out.", other: "%{count} of your changes no longer fit and were left out." }
+    fonts_left_out: { one: "%{count} font was left out.", other: "%{count} fonts were left out." }
+  borrow:
+    animations: { one: "Animations: %{count} console command left out.", other: "Animations: %{count} console commands left out." }
+    code_keys: { one: "The game sets %{count} of this part's settings itself.", other: "The game sets %{count} of this part's settings itself." }
+    unresolved_pins: { one: "%{count} link to a part that isn't coming along, so it may sit in a different place.", other: "%{count} links to parts that aren't coming along, so it may sit in a different place." }
+
 messages:
   shared:
     no_tf2_title: "TF2 not found"
