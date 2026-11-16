@@ -49,8 +49,8 @@ impl Library {
         if !root.is_dir() {
             return Ok(space);
         }
-        // Sound and crosshair writes skip the copies guard, so a file that vanishes
-        // mid-walk is skipped rather than failing the count.
+        // Sound writes and painted crosshair saves skip the copies guard, so a file that
+        // vanishes mid-walk is skipped rather than failing the count.
         for entry in WalkDir::new(&root).min_depth(1) {
             let entry = match entry {
                 Ok(entry) => entry,

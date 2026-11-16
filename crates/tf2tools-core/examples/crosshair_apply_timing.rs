@@ -53,12 +53,12 @@ fn parse_args(mut args: impl Iterator<Item = String>) -> Result<Args, String> {
     })
 }
 
-/// The median of every run but the first, which pays for a cold cache.
 /// A duration in milliseconds with its fraction, since an apply takes only a few of them.
 fn millis(took: Duration) -> f64 {
     took.as_secs_f64() * 1000.0
 }
 
+/// The median of every run but the first, which pays for a cold cache.
 fn median_after_warm_up(runs: &[Duration]) -> Duration {
     let mut warm = runs.get(1..).unwrap_or_default().to_vec();
     warm.sort();
