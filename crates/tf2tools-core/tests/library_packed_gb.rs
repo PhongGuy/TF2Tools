@@ -308,3 +308,21 @@ async fn a_kind_that_cannot_be_listed_keeps_its_remembered_failures() {
     assert_eq!(listed.gb_addons().failed(), 1);
     assert!(listed.new_failures().is_empty());
 }
+
+// A conversion pass that got in between the row save and the pack would pack first and
+// leave the install warning that a packed copy was "left loose".
+#[tokio::test]
+async fn an_install_packs_where_no_conversion_pass_can_reach_it() {
+    let mut s = setup().await;
+    s.env
+        .lib
+        .set_pack_rename(common::packed::rename_noting_copies);
+    let d = download(&s, 9, "Raced", "raced.vpk", vpk(b"r"), 100).await;
+    s.env
+        .lib
+        .install_gb_addon(d, &chosen(&["raced.vpk"]), &s.tf2, &no)
+        .unwrap();
+    assert!(common::packed::packed_under_copies_lock(&gb_zip(
+        &s.env.dir, 9
+    )));
+}

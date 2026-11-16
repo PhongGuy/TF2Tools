@@ -153,3 +153,21 @@ fn an_import_whose_zip_does_not_read_back_stays_loose() {
         ["darhud/info.vdf", "darhud/resource/a.res"]
     );
 }
+
+// A conversion pass that got in between the row commit and the pack would pack first and
+// leave the import warning that a packed HUD was "left loose".
+#[test]
+fn an_import_packs_where_no_conversion_pass_can_reach_it() {
+    let mut env = library_env();
+    env.lib
+        .set_pack_rename(common::packed::rename_noting_copies);
+    let hud = import(
+        &env,
+        "raced",
+        &[("info.vdf", b"\"a\" {}")],
+        Provenance::Local,
+    );
+    assert!(common::packed::packed_under_copies_lock(&zip_path(
+        &env, &hud
+    )));
+}

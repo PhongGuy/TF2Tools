@@ -149,6 +149,13 @@ impl Library {
         f()
     }
 
+    /// Whether a conversion pass on another thread would have to wait for the copies lock
+    /// right now, so a test can check that a pack runs where no pass can reach it.
+    #[doc(hidden)]
+    pub fn copies_busy_for_tests() -> bool {
+        std::thread::scope(|s| s.spawn(|| COPIES.try_write().is_err()).join()).unwrap_or(false)
+    }
+
     /// Replaces the schemas copies are read with; the bundled set is the default.
     pub fn set_hud_schemas(&mut self, schemas: HudSchemas) {
         self.hud_schemas = Arc::new(schemas);

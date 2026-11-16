@@ -3,9 +3,10 @@
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use tf2tools_core::{ConvertReport, DataDir, HudEntry, LibraryKind, Provenance};
+use tf2tools_core::{ConvertReport, DataDir, HudEntry, Library, LibraryKind, Provenance};
 
 use super::{LibraryEnv, tree, write_file, zip_bytes};
 
@@ -124,6 +125,30 @@ pub fn convert(env: &LibraryEnv) -> ConvertReport {
 pub fn rename_then_damage(from: &Path, to: &Path) -> std::io::Result<()> {
     std::fs::rename(from, to)?;
     std::fs::write(to, b"not a zip")
+}
+
+/// Each zip `rename_noting_copies` placed, with whether a conversion pass could have taken
+/// the copies lock at that moment.
+pub static PACKS_SEEN: Mutex<Vec<(PathBuf, bool)>> = Mutex::new(Vec::new());
+
+/// A pack rename that notes, in `PACKS_SEEN`, whether the copies lock was free as it placed
+/// the zip, so a test can tell whether a conversion pass could have raced the pack.
+pub fn rename_noting_copies(from: &Path, to: &Path) -> std::io::Result<()> {
+    let free = !Library::copies_busy_for_tests();
+    PACKS_SEEN.lock().unwrap().push((to.to_path_buf(), free));
+    std::fs::rename(from, to)
+}
+
+/// Whether the zip at `zip` was placed by `rename_noting_copies` and only ever while the
+/// copies lock was held.
+pub fn packed_under_copies_lock(zip: &Path) -> bool {
+    let seen = PACKS_SEEN.lock().unwrap();
+    let mine: Vec<bool> = seen
+        .iter()
+        .filter(|(p, _)| p == zip)
+        .map(|(_, f)| *f)
+        .collect();
+    !mine.is_empty() && !mine.contains(&true)
 }
 
 /// Where add-on `gb_id`'s zip is when its copy is packed.
