@@ -101,7 +101,7 @@ Rules for the files:
 
 A language stays "(preview)" in the picker until a native speaker has reviewed it.
 
-After a language switch, some text, such as an open list or a toast already on screen, changes the next time it opens.
+After a language switch, some text, such as an open list, changes the next time it opens. A message already on screen stays in the language it was shown in until it closes.
 
 ## Layout
 

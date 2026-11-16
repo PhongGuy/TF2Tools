@@ -3,6 +3,7 @@
 
 use gpui_kit::{App, AppContext as _, Context, Entity, Global};
 
+use crate::i18n::tr;
 use crate::local_messages::describe_settings;
 use crate::services::run_blocking;
 
@@ -31,7 +32,7 @@ impl LogNicknames {
         let load = run_blocking(cx, |s| {
             s.db.settings()
                 .map(|settings| settings.show_log_nicknames())
-                .map_err(|e| describe_settings(&e).into_op("Load settings"))
+                .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.load_settings")))
         });
         let weak = nicknames.downgrade();
         cx.spawn(async move |cx| {
@@ -72,8 +73,9 @@ impl LogNicknames {
         self.known = true;
         cx.notify();
         let save = run_blocking(cx, move |s| {
-            s.db.set_show_log_nicknames(on)
-                .map_err(|e| describe_settings(&e).into_op("Save log nicknames"))
+            s.db.set_show_log_nicknames(on).map_err(|e| {
+                describe_settings(&e).into_op(tr!("messages.action.save_log_nicknames"))
+            })
         });
         cx.spawn(async move |_, _| {
             if let Err(err) = save.await {

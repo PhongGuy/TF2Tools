@@ -22,6 +22,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{MapState, StoreClient};
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::map_messages::{
     describe_map_download, describe_map_remove, describe_map_sync, map_stopped,
@@ -33,7 +34,7 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_download::format_bytes;
-use crate::store_messages::{BUSY_TEXT, BUSY_TITLE};
+use crate::store_messages::{busy_text, busy_title};
 use crate::tokio_bridge;
 use crate::widgets::label_option::LabelOption;
 use crate::widgets::scroll::scroll_beside;
@@ -42,7 +43,6 @@ use crate::widgets::{Named as _, labelled};
 use gb_tab::GbMapsTab;
 use model::{MapRow, MapSort, SORTS, count_label, last_played_label, visible};
 
-const MAP_READ: &str = "TF2Tools couldn't read its map list. Restart TF2Tools and try again.";
 const ROW_HEIGHT: f32 = 44.;
 const PLAYED_WIDTH: f32 = 96.;
 const LAST_WIDTH: f32 = 112.;
@@ -312,7 +312,7 @@ impl MapsPage {
                 .map(|entries| entries.iter().map(MapRow::from).collect::<Vec<_>>())
                 .map_err(|e| {
                     tracing::warn!(error = %e, "reading the map list failed");
-                    OpError::core("Failed to load maps", MAP_READ)
+                    OpError::core(tr!("messages.action.load_maps"), tr!("messages.maps.read"))
                 })
         });
         cx.spawn(async move |page, cx| {
@@ -323,7 +323,7 @@ impl MapsPage {
                 }
                 match loaded {
                     Ok(rows) => page.rows = rows,
-                    Err(err) => page.error = Some(err.description().to_owned()),
+                    Err(err) => page.error = Some(err.description().to_string()),
                 }
                 page.loaded = true;
                 page.refilter(cx);
@@ -378,7 +378,7 @@ impl MapsPage {
     /// Downloads `name` into the game's maps folder, one at a time, then toasts and reloads.
     pub fn download(&mut self, name: &str, window: &mut Window, cx: &mut Context<Self>) {
         if self.downloading.is_some() {
-            toast(window, cx, ToastKind::Info, BUSY_TITLE, BUSY_TEXT);
+            toast(window, cx, ToastKind::Info, busy_title(), busy_text());
             return;
         }
         let install = match require_tf2(cx) {
@@ -480,7 +480,10 @@ impl MapsPage {
             let removing = page.update(cx, |_, cx| {
                 run_blocking(cx, move |s| {
                     s.store.remove_map(&install, &map).map_err(|e| {
-                        OpError::core("Remove failed", describe_map_remove(&e).message)
+                        OpError::core(
+                            tr!("messages.action.remove_failed"),
+                            describe_map_remove(&e).message,
+                        )
                     })
                 })
             });

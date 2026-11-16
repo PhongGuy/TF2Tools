@@ -59,7 +59,7 @@ fn set_slider(
 fn click_save(cx: &mut TestAppContext, s: &ShellWindow) {
     support::settle(cx, s.win);
     cx.update_window(s.win, |_, w, cx| {
-        let down = ScrollDelta::Pixels(point(px(0.), px(-2000.)));
+        let down = ScrollDelta::Pixels(point(px(0.), px(-4000.)));
         w.scroll(ids::page(Page::Settings), down, cx)
     })
     .unwrap();

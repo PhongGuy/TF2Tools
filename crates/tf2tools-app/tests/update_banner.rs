@@ -6,7 +6,7 @@ use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::leave;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::updater::backend::describe_download;
-use tf2tools_app::updater::{AfterInstall, REOPEN, UpdateState, Updater};
+use tf2tools_app::updater::{AfterInstall, UpdateState, Updater, reopen};
 use tf2tools_core::UpdateDownloadError;
 
 use crate::support;
@@ -242,7 +242,7 @@ fn an_update_that_did_not_relaunch_asks_to_reopen(cx: &mut TestAppContext) {
     });
     assert_eq!(
         label(cx, &b, ids::UPDATE_BANNER_TEXT).as_deref(),
-        Some(REOPEN)
+        Some(reopen().as_str())
     );
     assert!(!support::present(cx, b.s.win, ids::UPDATE_BANNER_ACTION));
 }

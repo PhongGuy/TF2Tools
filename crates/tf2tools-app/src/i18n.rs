@@ -101,6 +101,20 @@ macro_rules! tr {
 }
 pub(crate) use tr;
 
+/// The items joined as a list in the current language ("a", "a and b", "a, b and c").
+pub fn list(items: &[impl AsRef<str>]) -> SharedString {
+    // All but the last item share the plain separator; the language's own joiner adds the last.
+    match items {
+        [] => SharedString::from(""),
+        [only] => only.as_ref().to_owned().into(),
+        [rest @ .., last] => {
+            let rest: Vec<&str> = rest.iter().map(AsRef::as_ref).collect();
+            let rest = rest.join(&*tr!("common.list.separator"));
+            tr!("common.list.last", rest = rest, last = last.as_ref())
+        }
+    }
+}
+
 /// Serialises tests that switch the process-wide locale; a panicked holder does not wedge it.
 #[doc(hidden)]
 pub fn test_lock() -> MutexGuard<'static, ()> {
@@ -113,7 +127,7 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::path::{Path, PathBuf};
 
-    use super::{LANGUAGES, PluralForm, current, plural_form};
+    use super::{LANGUAGES, PluralForm, current, list, plural_form};
 
     const FORMS: [&str; 4] = ["one", "few", "many", "other"];
 
@@ -161,23 +175,97 @@ mod tests {
             .collect()
     }
 
-    // Every literal "<surface>.<key>" in `source` whose body is key-shaped up to its closing quote.
-    fn key_literals(source: &str, surfaces: &BTreeSet<String>) -> Vec<String> {
+    // Every literal "<surface>.<key>" in `source` whose body is key-shaped up to its closing
+    // quote, with the byte offset of its opening quote.
+    fn key_sites(source: &str, surfaces: &BTreeSet<String>) -> Vec<(usize, String)> {
         let mut found = Vec::new();
         for surface in surfaces {
             let opener = format!("\"{surface}.");
-            let mut rest = source;
-            while let Some(at) = rest.find(&opener) {
-                let body = &rest[at + 1..];
+            let mut from = 0;
+            while let Some(at) = source[from..].find(&opener) {
+                let quote = from + at;
+                let body = &source[quote + 1..];
                 let len = body
                     .find(|c: char| {
                         !(c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '.')
                     })
                     .unwrap_or(body.len());
                 if body[len..].starts_with('"') {
-                    found.push(body[..len].to_owned());
+                    found.push((quote, body[..len].to_owned()));
                 }
-                rest = &body[len..];
+                from = quote + 1 + len;
+            }
+        }
+        found
+    }
+
+    fn key_literals(source: &str, surfaces: &BTreeSet<String>) -> Vec<String> {
+        key_sites(source, surfaces)
+            .into_iter()
+            .map(|(_, key)| key)
+            .collect()
+    }
+
+    // A file's shipped code: everything before its test module.
+    fn shipped_part(source: &str) -> &str {
+        source
+            .find("#[cfg(test)]")
+            .map_or(source, |at| &source[..at])
+    }
+
+    // True when the literal whose opening quote is at `quote` is the first argument of
+    // `tr!(` or `plural(`, whitespace and line breaks allowed between.
+    fn inside_tr_or_plural(code: &str, quote: usize) -> bool {
+        let before = code[..quote].trim_end();
+        before.ends_with("tr!(") || before.ends_with("plural(")
+    }
+
+    fn src_files() -> Vec<PathBuf> {
+        let mut files = Vec::new();
+        rust_files(
+            &Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+            &mut files,
+        );
+        files
+    }
+
+    // The catalogue sections whose keys live in messages the code builds.
+    fn message_surfaces() -> BTreeSet<String> {
+        ["messages", "common", "updater"].map(str::to_owned).into()
+    }
+
+    // The 1-based lines of `code` where an OpError action title is a string literal: the first
+    // argument of `into_op(` or `OpError::core(`, or an `action: ` field. Comment lines are skipped.
+    fn literal_title_lines(code: &str) -> Vec<usize> {
+        let mut lines = Vec::new();
+        for opener in ["into_op(", "OpError::core(", "action: "] {
+            for (at, _) in code.match_indices(opener) {
+                let line_start = code[..at].rfind('\n').map_or(0, |n| n + 1);
+                let comment = code[line_start..at].trim_start().starts_with("//");
+                if !comment && code[at + opener.len()..].trim_start().starts_with('"') {
+                    lines.push(code[..at].matches('\n').count() + 1);
+                }
+            }
+        }
+        lines.sort_unstable();
+        lines
+    }
+
+    // "<path under src>:<line>" for each literal title in the shipped code of files `include` keeps.
+    fn literal_titles(include: impl Fn(&str) -> bool) -> Vec<String> {
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut found = Vec::new();
+        for file in src_files() {
+            let rel = file
+                .strip_prefix(&src)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            if include(&rel) {
+                let source = std::fs::read_to_string(&file).unwrap();
+                for line in literal_title_lines(shipped_part(&source)) {
+                    found.push(format!("{rel}:{line}"));
+                }
             }
         }
         found
@@ -343,5 +431,90 @@ mod tests {
             }
         }
         assert!(missing.is_empty(), "keys missing from en.yml: {missing:?}");
+    }
+
+    #[test]
+    fn english_lists_read_a_b_and_c() {
+        let none: [&str; 0] = [];
+        assert_eq!(list(&none), "");
+        assert_eq!(list(&["a"]), "a");
+        assert_eq!(list(&["a", "b"]), "a and b");
+        assert_eq!(list(&["a", "b", "c"]), "a, b and c");
+        assert_eq!(list(&[String::from("x"), String::from("y")]), "x and y");
+    }
+
+    #[test]
+    fn the_travel_check_passes_only_keys_directly_inside_tr_or_plural() {
+        let sample = r#"tr!("demo.a"); i18n::plural(
+                "demo.b", n); const K: &str = "demo.c"; f("demo.d"); tr!("x", v = "demo.e");
+            #[cfg(test)]
+            mod tests { const T: &str = "demo.f"; }"#;
+        let surfaces = BTreeSet::from(["demo".to_owned()]);
+        let code = shipped_part(sample);
+        let travelling: Vec<String> = key_sites(code, &surfaces)
+            .into_iter()
+            .filter(|(quote, _)| !inside_tr_or_plural(code, *quote))
+            .map(|(_, key)| key)
+            .collect();
+        assert_eq!(travelling, ["demo.c", "demo.d", "demo.e"]);
+    }
+
+    #[test]
+    fn message_keys_never_travel_outside_tr_or_plural() {
+        let surfaces = message_surfaces();
+        let mut travelling = Vec::new();
+        for file in src_files() {
+            let source = std::fs::read_to_string(&file).unwrap();
+            let code = shipped_part(&source);
+            for (quote, key) in key_sites(code, &surfaces) {
+                if !inside_tr_or_plural(code, quote) {
+                    travelling.push(format!("{}: {key}", file.display()));
+                }
+            }
+        }
+        assert!(
+            travelling.is_empty(),
+            "keys outside tr!( or plural(: {travelling:?}"
+        );
+    }
+
+    #[test]
+    fn every_message_key_is_named_in_the_code() {
+        let surfaces = message_surfaces();
+        let mut named = BTreeSet::new();
+        for file in src_files() {
+            named.extend(key_literals(
+                &std::fs::read_to_string(&file).unwrap(),
+                &surfaces,
+            ));
+        }
+        let en = messages("en");
+        let orphans: BTreeSet<&str> = en
+            .keys()
+            .filter(|k| k.split('.').next().is_some_and(|s| surfaces.contains(s)))
+            .map(|k| plural_part(k).map_or(k.as_str(), |(base, _)| base))
+            .filter(|k| !named.contains(*k))
+            .collect();
+        assert!(orphans.is_empty(), "keys no code names: {orphans:?}");
+    }
+
+    #[test]
+    fn the_title_scan_finds_only_literal_titles() {
+        let sample = "e.into_op(\"Load\");\nOpError::core(\n    \"Save\", e);\n\
+            OpError::Core { action: \"Go\", message };\n// OpError::core(\"Doc\", e)\n\
+            e.into_op(tr!(\"demo.load\"));\nOpError::core(save_failed(), e);\nfn f(action: &str) {}\n";
+        assert_eq!(literal_title_lines(sample), [1, 2, 4]);
+    }
+
+    #[test]
+    fn no_action_title_outside_the_pages_is_a_literal() {
+        let found = literal_titles(|rel| !rel.starts_with("pages/"));
+        assert!(found.is_empty(), "literal action titles: {found:?}");
+    }
+
+    #[test]
+    fn no_page_action_title_is_a_literal() {
+        let found = literal_titles(|rel| rel.starts_with("pages/"));
+        assert!(found.is_empty(), "literal action titles: {found:?}");
     }
 }

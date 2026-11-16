@@ -26,6 +26,7 @@ use tf2tools_core::{
 use super::common::{SM_ICON_PX, YELLOW_500, badge_of, card_frame, needs_tf2, no_tf2_notice};
 use crate::activity;
 use crate::audio::player::{NowPlaying, Player, sound_player};
+use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
@@ -159,7 +160,8 @@ impl SoundsPage {
         let generation = self.load_generation;
         let tf2 = tf2_state(cx).read(cx).install().cloned();
         let loading = run_blocking(cx, move |s| {
-            let failed = |e: LibraryError| describe_library(&e).into_op("Failed to load sounds");
+            let failed =
+                |e: LibraryError| describe_library(&e).into_op(tr!("messages.action.load_sounds"));
             let sounds = s.library.list_sounds().map_err(failed)?;
             let installed = tf2
                 .map(|t| s.library.installed_sounds(&t))
@@ -238,8 +240,14 @@ impl SoundsPage {
             Err(err) => return toast_error(window, cx, &err),
         };
         let (done, failed) = match kind {
-            SoundKind::Hitsound => ("Hitsound uninstalled", "Failed to uninstall hitsound"),
-            SoundKind::Killsound | _ => ("Killsound uninstalled", "Failed to uninstall killsound"),
+            SoundKind::Hitsound => (
+                "Hitsound uninstalled",
+                tr!("messages.action.uninstall_hitsound"),
+            ),
+            SoundKind::Killsound | _ => (
+                "Killsound uninstalled",
+                tr!("messages.action.uninstall_killsound"),
+            ),
         };
         self.run(
             Busy::Uninstall(kind),
@@ -276,7 +284,9 @@ impl SoundsPage {
                         let sound = s
                             .library
                             .import_sound(&path, &name, Provenance::Local)
-                            .map_err(|e| describe_import(&e).into_op("Failed to import sound"))?;
+                            .map_err(|e| {
+                                describe_import(&e).into_op(tr!("messages.action.import_sound"))
+                            })?;
                         // The picked file is developer detail; the player's row keeps the format.
                         tracing::info!(source = %path.display(), "imported a sound");
                         let (_, format) = format_texts(sound.format());
@@ -310,8 +320,14 @@ impl SoundsPage {
             Err(err) => return toast_error(window, cx, &err),
         };
         let (done, failed) = match kind {
-            SoundKind::Hitsound => ("Hitsound installed", "Failed to install hitsound"),
-            SoundKind::Killsound | _ => ("Killsound installed", "Failed to install killsound"),
+            SoundKind::Hitsound => (
+                "Hitsound installed",
+                tr!("messages.action.install_hitsound"),
+            ),
+            SoundKind::Killsound | _ => (
+                "Killsound installed",
+                tr!("messages.action.install_killsound"),
+            ),
         };
         let id = sound.id().clone();
         let name = sound.name().to_owned();
@@ -346,8 +362,9 @@ impl SoundsPage {
         self.run(
             busy,
             move |s| {
-                let failed =
-                    |e: ProfileError| describe_profile(&e).into_op("Couldn't add to profile");
+                let failed = |e: ProfileError| {
+                    describe_profile(&e).into_op(tr!("messages.action.add_to_profile"))
+                };
                 let before = s.library.profile(&id).map_err(failed)?;
                 let draft = ProfileDraft::from_profile(&before);
                 let slot = DraftSlot::Item(sound_id);
@@ -399,9 +416,9 @@ impl SoundsPage {
                 page.run(
                     busy,
                     move |s| {
-                        s.library
-                            .delete_sound(&id, tf2.as_ref())
-                            .map_err(|e| describe_library(&e).into_op("Failed to delete sound"))?;
+                        s.library.delete_sound(&id, tf2.as_ref()).map_err(|e| {
+                            describe_library(&e).into_op(tr!("messages.action.delete_sound"))
+                        })?;
                         let message = format!("Deleted sound: {name}");
                         let entry = NewLogEntry::new(LogLevel::Info, "sound", "delete", message);
                         activity::write(s, &entry);
@@ -427,9 +444,9 @@ impl SoundsPage {
                 player.toggle(
                     now,
                     move |s| {
-                        s.library
-                            .sound_bytes(&id)
-                            .map_err(|e| describe_library(&e).into_op("Failed to play sound"))
+                        s.library.sound_bytes(&id).map_err(|e| {
+                            describe_library(&e).into_op(tr!("messages.action.play_sound"))
+                        })
                     },
                     cx,
                 )
@@ -459,9 +476,9 @@ impl SoundsPage {
                 player.toggle(
                     now,
                     move |s| {
-                        s.library
-                            .installed_sound_bytes(kind, &tf2)
-                            .map_err(|e| describe_library(&e).into_op("Failed to play sound"))
+                        s.library.installed_sound_bytes(kind, &tf2).map_err(|e| {
+                            describe_library(&e).into_op(tr!("messages.action.play_sound"))
+                        })
                     },
                     cx,
                 )

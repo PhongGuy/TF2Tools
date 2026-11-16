@@ -476,7 +476,7 @@ impl SettingsPage {
     fn load(&self, first: bool, cx: &mut Context<Self>) {
         let reading = run_blocking(cx, |s| {
             s.db.settings()
-                .map_err(|e| describe_settings(&e).into_op("Load settings"))
+                .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.load_settings")))
         });
         let win = self.window;
         cx.spawn(async move |page, cx| {
@@ -528,9 +528,9 @@ impl SettingsPage {
         self.sync_generation += 1;
         let generation = self.sync_generation;
         let reading = run_blocking(cx, |s| {
-            s.store
-                .sync_status()
-                .map_err(|e| describe_store_status(&e).into_op("Failed to read store status"))
+            s.store.sync_status().map_err(|e| {
+                describe_store_status(&e).into_op(tr!("messages.action.read_store_status"))
+            })
         });
         cx.spawn_in(window, async move |page, cx| {
             let read = reading.await;
@@ -652,7 +652,8 @@ impl SettingsPage {
     // several, a select lists them all. Nothing is saved until Save.
     fn detect(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let detecting = run_blocking(cx, |s| {
-            (s.detector)().map_err(|e| describe_detect(&e).into_op("Auto-detect failed"))
+            (s.detector)()
+                .map_err(|e| describe_detect(&e).into_op(tr!("messages.action.auto_detect")))
         });
         self.busy = Some(Busy::Detect);
         cx.notify();
@@ -782,7 +783,7 @@ impl SettingsPage {
         self.refresh_keep(window, cx);
         let save = run_blocking(cx, move |s| {
             s.db.set_language(applied)
-                .map_err(|e| describe_settings(&e).into_op("Save language"))
+                .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.save_language")))
         });
         cx.spawn(async move |_, _| {
             if let Err(err) = save.await {
@@ -823,18 +824,26 @@ impl SettingsPage {
         let path = typed.trim().to_owned();
         let hours = whole(&self.cache_hours, cx).clamp(1, 720);
         let saving = run_blocking(cx, move |s| {
-            let failed = |e: SettingsError| describe_settings(&e).into_op("Failed to save");
+            let failed = |e: SettingsError| {
+                describe_settings(&e).into_op(tr!("messages.action.save_failed"))
+            };
             let install = if path.is_empty() {
                 None
             } else {
-                let install = Tf2Install::from_path(Path::new(&path))
-                    .map_err(|e| describe_tf2_folder(&e).into_op("Failed to save"))?;
+                let install = Tf2Install::from_path(Path::new(&path)).map_err(|e| {
+                    describe_tf2_folder(&e).into_op(tr!("messages.action.save_failed"))
+                })?;
                 s.db.set_tf2_path(Some(install.game_dir()))
                     .map_err(failed)?;
                 Some(install)
             };
             s.db.set_sync_cache_hours(hours).map_err(failed)?;
-            let entry = NewLogEntry::new(LogLevel::Info, "settings", "update", "Settings updated");
+            let entry = NewLogEntry::new(
+                LogLevel::Info,
+                "settings",
+                "update",
+                tr!("settings.activity.updated").to_string(),
+            );
             activity::write(s, &entry);
             Ok(install)
         });

@@ -10,11 +10,13 @@ use gpui_kit::component::{
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _,
-    StatefulInteractiveElement as _, Styled as _, Task, TestSupportExt as _, Window, div,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Task, TestSupportExt as _, Window,
+    div,
 };
 use tf2tools_core::{ChangeTarget, HistoryError, HudId, HudSnapshot, SnapshotEntry};
 
 use super::{FontBytes, HudMakerPage, register_font};
+use crate::i18n::tr;
 use crate::ids;
 use crate::local_messages::left_out;
 use crate::services::{OpError, Services, run_blocking};
@@ -557,11 +559,11 @@ impl HudMakerPage {
 }
 
 impl SnapshotWork {
-    fn failed(self) -> &'static str {
+    fn failed(self) -> SharedString {
         match self {
-            SnapshotWork::List => LIST_FAILED,
-            SnapshotWork::Save => SAVE_FAILED,
-            SnapshotWork::Delete => DELETE_FAILED,
+            SnapshotWork::List => tr!("messages.action.list_snapshots"),
+            SnapshotWork::Save => tr!("messages.action.save_snapshot"),
+            SnapshotWork::Delete => tr!("messages.action.delete_snapshot"),
         }
     }
 }

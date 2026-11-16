@@ -13,6 +13,9 @@ mod support;
 #[path = "i18n/apply.rs"]
 mod apply;
 
+#[path = "i18n/messages.rs"]
+mod messages;
+
 #[path = "i18n/settings.rs"]
 mod settings;
 

@@ -2,7 +2,7 @@ use std::sync::{Arc, OnceLock};
 
 use gpui_kit::TestAppContext;
 use tf2tools_app::audio::RecordingAudio;
-use tf2tools_app::local_messages::INTERNAL;
+use tf2tools_app::local_messages::internal;
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::{
     OpError, Services, Tf2Detector, Tf2State, install_tf2_state, require_tf2, resolve_tf2,
@@ -124,15 +124,12 @@ fn a_detection_hit_survives_a_failed_save() {
         Tf2State::Found(Tf2Install::from_path(&env.game).unwrap())
     );
     assert_eq!(
-        error.as_ref().map(OpError::description),
+        error.as_ref().map(OpError::description).as_deref(),
         Some("TF2Tools couldn't read or save its settings. Restart TF2Tools and try again.")
     );
     assert!(matches!(
         error,
-        Some(OpError::Core {
-            action: "Save TF2 path",
-            ..
-        })
+        Some(OpError::Core { ref action, .. }) if action == "Save TF2 path"
     ));
 }
 
@@ -147,13 +144,16 @@ fn op_errors_read_as_a_toast_title_and_description() {
         OpError::NoTf2.to_string(),
         "TF2 not found: Set the TF2 folder in Settings, then try again."
     );
-    let e = OpError::core("Install HUD", "disk full");
-    assert_eq!((e.title(), e.description()), ("Install HUD", "disk full"));
+    let e = OpError::core("Install HUD".into(), "disk full");
+    assert_eq!(
+        (e.title().as_str(), e.description().as_str()),
+        ("Install HUD", "disk full")
+    );
     assert_eq!(e.to_string(), "Install HUD: disk full");
     let p = OpError::Internal("boom".into());
     assert_eq!(
-        (p.title(), p.description()),
-        ("Something went wrong", INTERNAL)
+        (p.title().as_str(), p.description().as_str()),
+        ("Something went wrong", internal().as_str())
     );
     assert_eq!(p.to_string(), "Something went wrong: boom");
 }

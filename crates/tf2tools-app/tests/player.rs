@@ -197,7 +197,12 @@ fn a_failed_load_toasts_and_plays_nothing(cx: &mut TestAppContext) {
         h.player.update(cx, |p, cx| {
             p.toggle(
                 now,
-                |_| Err(OpError::core("Failed to play sound", "sound x not found")),
+                |_| {
+                    Err(OpError::core(
+                        "Failed to play sound".into(),
+                        "sound x not found",
+                    ))
+                },
                 cx,
             )
             .detach()

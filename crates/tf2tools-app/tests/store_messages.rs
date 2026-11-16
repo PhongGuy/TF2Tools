@@ -415,11 +415,11 @@ const READ: &str = "TF2Tools couldn't read the store. Restart TF2Tools and try a
 fn a_failed_store_read_reads_as_player_advice() {
     for err in [
         OpError::core(
-            "load the store",
+            "load the store".into(),
             "store database error: no such table: store_crosshairs",
         ),
         OpError::core(
-            "Failed to load the store",
+            "Failed to load the store".into(),
             "library database error: disk I/O error",
         ),
         OpError::Internal("index out of bounds at src/store_grid/mod.rs:3".into()),

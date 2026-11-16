@@ -5,6 +5,7 @@
 use gpui_kit::{App, AppContext as _, Context, Entity, EventEmitter, Global};
 use tf2tools_core::{KeepFullLogs, LogsSpace};
 
+use crate::i18n::tr;
 use crate::logs_sync::{LogsSyncEvent, logs_sync};
 use crate::services::{OpError, run_blocking};
 
@@ -71,7 +72,7 @@ impl LogsTrim {
         let pending = self.pending.take();
         let pass = run_blocking(cx, move |s| {
             let cache = s.logs.cache();
-            let fail = |e| OpError::core("Trim the logs cache", e);
+            let fail = |e| OpError::core(tr!("messages.action.trim_logs"), e);
             if let Some(keep) = pending {
                 cache.set_keep_full_logs(keep).map_err(fail)?;
             }

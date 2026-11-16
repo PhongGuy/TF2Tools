@@ -33,7 +33,7 @@ pub fn offer(version: &str, installable: bool) -> Offer {
 
 pub fn failure(message: &str, use_release_page: bool) -> Failure {
     Failure {
-        message: message.to_owned(),
+        message: message.into(),
         use_release_page,
     }
 }

@@ -67,6 +67,7 @@ use tf2tools_core::{
 
 use crate::activity;
 use crate::hud_textures::{Decoded, crop, decode_texture};
+use crate::i18n::tr;
 use crate::ids;
 use crate::keymap::{
     CancelHudDrag, HUD_MAKER_CONTEXT, HideHudPart, NUDGE_FAR, NudgeDown, NudgeDownFar, NudgeLeft,
@@ -75,11 +76,11 @@ use crate::keymap::{
 };
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
-    HUD_BASE_CHANGED, HUD_FILES, HUD_OPTIONS_UNREADABLE, LocalFailure, ReopenNotice,
-    describe_hud_load, describe_make_hud, describe_settings, left_out, reopen_notice,
+    LocalFailure, ReopenNotice, describe_hud_load, describe_make_hud, describe_settings,
+    hud_base_changed, hud_files, hud_options_unreadable, left_out, reopen_notice,
 };
 use crate::pages::crosshair_maker::model::{REDO_TIP, UNDO_TIP, hsla_of_rgba, rgb_of};
-use crate::pages::huds::{INSTALL_FAILED, install_job, install_toast};
+use crate::pages::huds::{install_failed, install_job, install_toast};
 use crate::picker::PickKind;
 use crate::previews::to_render_image;
 use crate::services::{OpError, Services, require_tf2, run_blocking};
@@ -98,7 +99,9 @@ use view::{CanvasFit, Panel, PanelMode, PanelPlace, Places, Zoom};
 const LOADING: &str = "Loading the default HUD...";
 const ADD_REFUSED: &str = "That part can't be added here.";
 const DETACH_FIRST: &str = "Detach the parts attached to it first.";
-const SAVE_FAILED: &str = "Failed to save HUD";
+fn save_failed() -> SharedString {
+    tr!("messages.action.save_hud")
+}
 const NOT_A_FONT: &str = "That file isn't a font TF2Tools can read.";
 const FONT_BAD_NAME: &str = "TF2Tools can't use a font with that name in a HUD.";
 const FONT_HUD_FULL: &str = "This HUD can't take another font file.";
@@ -700,12 +703,13 @@ impl HudMakerPage {
         let stored_panel = run_blocking(cx, |s| {
             s.db.settings()
                 .map(|st| st.hud_maker_panel().and_then(Places::from_setting))
-                .map_err(|e| describe_settings(&e).into_op("Load the side panel's place"))
+                .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.load_panel_place")))
         });
         let job = run_blocking(cx, move |_| {
             let tf_dir = tf2?.tf_dir();
             let failed = |e: HudFilesError| {
-                LocalFailure::new(HUD_FILES, e.to_string()).into_op("Load the default HUD")
+                LocalFailure::new(hud_files(), e.to_string())
+                    .into_op(tr!("messages.action.load_default_hud"))
             };
             let files = HudFiles::open_game(&tf_dir).map_err(failed)?;
             let platform = Platform::current().unwrap_or(Platform::Linux);
@@ -976,24 +980,24 @@ impl HudMakerPage {
     pub fn open(&mut self, id: HudId, cx: &mut Context<Self>) {
         let tf2 = require_tf2(cx);
         let job = run_blocking(cx, move |s| {
-            let action = "Failed to open HUD";
+            let action = tr!("messages.action.open_hud");
             let tf_dir = tf2?.tf_dir();
             let load_failed = |e: HudLoadError| {
                 let failure = describe_hud_load(&e);
-                failure.log(action);
-                failure.message
+                failure.log(&action);
+                failure.message.to_string()
             };
             // A copy reads its own layers over the game's; any other made HUD the game's.
             let files = match s.library.made_hud_files(&id, &tf_dir) {
                 Ok(files) => files,
-                Err(HudLoadError::Files(e)) => return Err(OpError::core(action, e)),
+                Err(HudLoadError::Files(e)) => return Err(OpError::core(action.clone(), e)),
                 Err(e) => return Ok(Err(load_failed(e))),
             };
             let copy_tf = (s.library.copy_base(&id).ok().flatten()).map(|_| tf_dir.clone());
             let platform = Platform::current().unwrap_or(Platform::Linux);
             let made = match s.library.open_made_hud(&id, &files, platform) {
                 Ok(made) => made,
-                Err(HudLoadError::Files(e)) => return Err(OpError::core(action, e)),
+                Err(HudLoadError::Files(e)) => return Err(OpError::core(action.clone(), e)),
                 Err(e) => return Ok(Err(load_failed(e))),
             };
             // Everything drawn reads the switched files; saves start from the files on disk.
@@ -2046,7 +2050,7 @@ impl HudMakerPage {
                 let save = cx.update(|cx| {
                     run_blocking(cx, move |s| {
                         s.db.set_hud_maker_panel(&text).map_err(|e| {
-                            describe_settings(&e).into_op("Save the side panel's place")
+                            describe_settings(&e).into_op(tr!("messages.action.save_panel_place"))
                         })
                     })
                 });
@@ -2863,8 +2867,8 @@ impl HudMakerPage {
         let job = run_blocking(cx, move |_| {
             // The raw error goes to the log; the player reads one plain sentence.
             let failed = |e: HudFilesError| {
-                LocalFailure::new(HUD_OPTIONS_UNREADABLE, e.to_string())
-                    .into_op("Failed to change the HUD's options")
+                LocalFailure::new(hud_options_unreadable(), e.to_string())
+                    .into_op(tr!("messages.action.change_hud_options"))
             };
             let shown = (options.switch(&files, &choices))
                 .map_err(failed)?
@@ -3098,7 +3102,8 @@ impl HudMakerPage {
                             let err = MakeHudError::NameTaken {
                                 name: taken.clone(),
                             };
-                            page.name_error = Some((taken, describe_make_hud(&err).message));
+                            page.name_error =
+                                Some((taken, describe_make_hud(&err).message.to_string()));
                             None
                         }
                         Ok(Saved::Gone(err)) => {
@@ -3234,7 +3239,7 @@ impl HudMakerPage {
                 None,
                 tf2.clone(),
                 win,
-                INSTALL_FAILED,
+                install_failed(),
                 cx,
             );
             let Some(plan) = checking.await else {
@@ -3277,7 +3282,7 @@ impl HudMakerPage {
             .child(labelled(
                 div().text_color(cx.theme().muted_foreground),
                 ids::HUD_MAKER_NO_GAME,
-                HUD_FILES,
+                hud_files(),
             ))
             .child(
                 Button::new(ids::HUD_MAKER_OPEN_SETTINGS)
@@ -4188,16 +4193,16 @@ fn save_job(
         Ok(saved) => saved,
         Err(MakeHudError::NameTaken { name }) => return Ok(Saved::NameTaken(name)),
         Err(e @ MakeHudError::NotFound { .. }) => {
-            return Ok(Saved::Gone(describe_make_hud(&e).into_op(SAVE_FAILED)));
+            return Ok(Saved::Gone(describe_make_hud(&e).into_op(save_failed())));
         }
         // The sentence is the whole toast; the editor keeps its changes.
         Err(MakeHudError::BaseChanged) => {
             return Err(OpError::Core {
-                action: HUD_BASE_CHANGED,
-                message: String::new(),
+                action: hud_base_changed(),
+                message: SharedString::default(),
             });
         }
-        Err(e) => return Err(describe_make_hud(&e).into_op(SAVE_FAILED)),
+        Err(e) => return Err(describe_make_hud(&e).into_op(save_failed())),
     };
     let entry = saved.entry();
     let row = NewLogEntry::new(

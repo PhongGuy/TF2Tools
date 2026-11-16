@@ -6,6 +6,7 @@ use gpui_kit::component::slider::{SliderEvent, SliderState};
 use gpui_kit::{App, AppContext as _, Context, Entity, Global, Subscription, Task, Window};
 use tf2tools_core::Volume;
 
+use crate::i18n::tr;
 use crate::local_messages::describe_settings;
 use crate::services::{OpError, Services, run_blocking};
 use crate::shell::toast::toast_error;
@@ -136,7 +137,7 @@ impl SharedVolume {
         let waiting = std::mem::take(&mut self.waiting);
         let writing = run_blocking(cx, move |s| {
             s.db.set_volume(volume)
-                .map_err(|e| describe_settings(&e).into_op("Failed to save"))
+                .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.save_failed")))
         });
         cx.spawn(async move |shared, cx| {
             let written = writing.await;

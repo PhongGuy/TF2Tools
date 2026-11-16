@@ -5,7 +5,8 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use gpui_kit::{
-    AnyWindowHandle, App, AppContext as _, AsyncApp, Context, Entity, Global, Task, WeakEntity,
+    AnyWindowHandle, App, AppContext as _, AsyncApp, Context, Entity, Global, SharedString, Task,
+    WeakEntity,
 };
 use tf2tools_core::{
     AddonProfile, AddonSection, BrowseError, DownloadProgress, GbAddonCheck, GbAddonDownload,
@@ -13,10 +14,11 @@ use tf2tools_core::{
     StoreClient, Tf2Install,
 };
 
+use crate::i18n::tr;
 use crate::library_events::LibraryEvents;
 use crate::local_messages::{
-    LocalFailure, MAP_RESTART, MAP_SKIPPED, already_have, describe_library, gb_install_op,
-    gb_map_install_op, gb_map_remove_op,
+    LocalFailure, already_have, describe_library, gb_install_op, gb_map_install_op,
+    gb_map_remove_op, map_restart, map_skipped,
 };
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::payload_checklist::{ChecklistItem, open_map_checklist, open_payload_checklist};
@@ -92,48 +94,60 @@ impl GbAddonOffer {
 
 /// The toast titles of one kind of operation, on success and on failure, and whether it
 /// updates an install (a map update refuses while TF2 runs).
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Titles {
-    done: &'static str,
-    failed: &'static str,
+    done: SharedString,
+    failed: SharedString,
     update: bool,
 }
 
-const INSTALL: Titles = Titles {
-    done: "Add-on installed",
-    failed: "Couldn't install the add-on",
-    update: false,
-};
+fn install() -> Titles {
+    Titles {
+        done: tr!("messages.action.addon_installed"),
+        failed: tr!("messages.action.addon_install_failed"),
+        update: false,
+    }
+}
 
-const UPDATE: Titles = Titles {
-    done: "Add-on updated",
-    failed: "Couldn't update the add-on",
-    update: true,
-};
+fn update() -> Titles {
+    Titles {
+        done: tr!("messages.action.addon_updated"),
+        failed: tr!("messages.action.addon_update_failed"),
+        update: true,
+    }
+}
 
-const MAP_INSTALL: Titles = Titles {
-    done: "Map installed",
-    failed: "Couldn't install the map",
-    update: false,
-};
+fn map_install() -> Titles {
+    Titles {
+        done: tr!("messages.action.map_installed"),
+        failed: tr!("messages.action.map_install_failed"),
+        update: false,
+    }
+}
 
-const MAP_UPDATE: Titles = Titles {
-    done: "Map updated",
-    failed: "Couldn't update the map",
-    update: true,
-};
+fn map_update() -> Titles {
+    Titles {
+        done: tr!("messages.action.map_updated"),
+        failed: tr!("messages.action.map_update_failed"),
+        update: true,
+    }
+}
 
-const MAP_REMOVE: Titles = Titles {
-    done: "Map removed",
-    failed: "Couldn't remove the map",
-    update: false,
-};
+fn map_remove() -> Titles {
+    Titles {
+        done: tr!("messages.action.map_removed"),
+        failed: tr!("messages.action.map_remove_failed"),
+        update: false,
+    }
+}
 
-const REMOVE: Titles = Titles {
-    done: "Add-on removed",
-    failed: "Couldn't remove the add-on",
-    update: false,
-};
+fn remove() -> Titles {
+    Titles {
+        done: tr!("messages.action.addon_removed"),
+        failed: tr!("messages.action.addon_remove_failed"),
+        update: false,
+    }
+}
 
 /// One download-choose-install run: what to fetch, the payloads chosen last time, where to
 /// install, and the window that asked.
@@ -233,9 +247,9 @@ impl GbAddonInstalls {
             return false;
         };
         let titles = if section == AddonSection::MAPS {
-            MAP_INSTALL
+            map_install()
         } else {
-            INSTALL
+            install()
         };
         self.task = Some(cx.spawn(async move |this, cx| {
             let run = Run {
@@ -243,7 +257,7 @@ impl GbAddonInstalls {
                 profile,
                 previous: Vec::new(),
                 tf2,
-                titles,
+                titles: titles.clone(),
                 win,
             };
             let outcome = fetch_and_install(&this, cx, run).await;
@@ -265,15 +279,15 @@ impl GbAddonInstalls {
             return false;
         };
         let map = is_map(&entry);
-        let titles = if map { MAP_UPDATE } else { UPDATE };
+        let titles = if map { map_update() } else { update() };
         let probe = Tf2Probe::get(cx);
         self.task = Some(cx.spawn(async move |this, cx| {
             // Core refuses a map update while TF2 runs, so ask first rather than download for nothing.
             let outcome = if map && cx.background_spawn(async move { probe() }).await {
                 let refused = GbMapInstallError::Tf2Running;
-                Outcome::Failed(gb_map_install_op(&refused, titles.failed))
+                Outcome::Failed(gb_map_install_op(&refused, titles.failed.clone()))
             } else {
-                refetch(&this, cx, entry, tf2, win, titles, None).await
+                refetch(&this, cx, entry, tf2, win, titles.clone(), None).await
             };
             let _ = this.update(cx, |me, cx| me.finish(outcome, titles, win, cx));
         }));
@@ -301,7 +315,7 @@ impl GbAddonInstalls {
             match s.library.reinstall_gb_addon(id, &copy_tf2, &*probe) {
                 Ok(entry) => Ok(Some(entry)),
                 Err(GbAddonInstallError::NotInLibrary { .. }) => Ok(None),
-                Err(e) => Err(gb_install_op(&e, INSTALL.failed)),
+                Err(e) => Err(gb_install_op(&e, install().failed)),
             }
         });
         self.task = Some(cx.spawn(async move |this, cx| {
@@ -310,12 +324,12 @@ impl GbAddonInstalls {
                 Ok(None) => {
                     tracing::info!("add-on {id}'s library copy is incomplete; downloading it");
                     let _ = this.update(cx, |me, cx| me.set_stage(DOWNLOADING, cx));
-                    let gone = Some(REINSTALL_GONE);
-                    refetch(&this, cx, entry, tf2, win, INSTALL, gone).await
+                    let gone = Some(tr!("messages.addon_install.reinstall_gone"));
+                    refetch(&this, cx, entry, tf2, win, install(), gone).await
                 }
                 Err(err) => Outcome::Failed(err),
             };
-            let _ = this.update(cx, |me, cx| me.finish(outcome, INSTALL, win, cx));
+            let _ = this.update(cx, |me, cx| me.finish(outcome, install(), win, cx));
         }));
         cx.notify();
         true
@@ -333,9 +347,9 @@ impl GbAddonInstalls {
             return false;
         };
         self.task = Some(cx.spawn(async move |this, cx| {
-            let gone = Some(MAP_REINSTALL_GONE);
-            let outcome = refetch(&this, cx, entry, tf2, win, MAP_INSTALL, gone).await;
-            let _ = this.update(cx, |me, cx| me.finish(outcome, MAP_INSTALL, win, cx));
+            let gone = Some(tr!("messages.addon_install.map_reinstall_gone"));
+            let outcome = refetch(&this, cx, entry, tf2, win, map_install(), gone).await;
+            let _ = this.update(cx, |me, cx| me.finish(outcome, map_install(), win, cx));
         }));
         cx.notify();
         true
@@ -359,14 +373,14 @@ impl GbAddonInstalls {
         let job = run_blocking(cx, move |s: &Services| {
             s.library
                 .remove_gb_addon(id, &tf2, &*probe)
-                .map_err(|e| gb_install_op(&e, REMOVE.failed))
+                .map_err(|e| gb_install_op(&e, remove().failed))
         });
         self.task = Some(cx.spawn(async move |this, cx| {
             let outcome = match job.await {
                 Ok(()) => Outcome::Removed { id, name },
                 Err(err) => Outcome::Failed(err),
             };
-            let _ = this.update(cx, |me, cx| me.finish(outcome, REMOVE, win, cx));
+            let _ = this.update(cx, |me, cx| me.finish(outcome, remove(), win, cx));
         }));
         cx.notify();
         true
@@ -387,14 +401,14 @@ impl GbAddonInstalls {
         let job = run_blocking(cx, move |s: &Services| {
             s.library
                 .remove_gb_map(id, &tf2, &*probe)
-                .map_err(|e| gb_map_remove_op(&e, MAP_REMOVE.failed))
+                .map_err(|e| gb_map_remove_op(&e, map_remove().failed))
         });
         self.task = Some(cx.spawn(async move |this, cx| {
             let outcome = match job.await {
                 Ok(()) => Outcome::Removed { id, name },
                 Err(err) => Outcome::Failed(err),
             };
-            let _ = this.update(cx, |me, cx| me.finish(outcome, MAP_REMOVE, win, cx));
+            let _ = this.update(cx, |me, cx| me.finish(outcome, map_remove(), win, cx));
         }));
         cx.notify();
         true
@@ -411,7 +425,7 @@ impl GbAddonInstalls {
         let due = run_blocking(cx, |s: &Services| {
             s.library
                 .gb_addons_due_for_check(unix_now())
-                .map_err(|e| describe_library(&e).into_op("Couldn't list add-ons"))
+                .map_err(|e| describe_library(&e).into_op(tr!("messages.action.list_addons")))
         });
         self.check_task = Some(cx.spawn(async move |this, cx| {
             if !due.await.is_ok_and(|due| !due.is_empty()) {
@@ -464,7 +478,7 @@ impl GbAddonInstalls {
         let list = run_blocking(cx, move |s: &Services| {
             s.library
                 .list_gb_addons(tf2.as_ref())
-                .map_err(|e| describe_library(&e).into_op("Couldn't list add-ons"))
+                .map_err(|e| describe_library(&e).into_op(tr!("messages.action.list_addons")))
         });
         self.reload_task = Some(cx.spawn(async move |this, cx| {
             // A failed listing is already logged; the list on screen stays as it was.
@@ -491,7 +505,7 @@ impl GbAddonInstalls {
             Outcome::Installed(entry) => {
                 let name = entry.name().to_owned();
                 self.put(entry);
-                Some((ToastKind::Success, titles.done.to_owned(), name))
+                Some((ToastKind::Success, titles.done.to_string(), name))
             }
             Outcome::MapInstalled {
                 entry,
@@ -500,13 +514,17 @@ impl GbAddonInstalls {
             } => {
                 let name = entry.name();
                 let description = if skipped {
-                    format!("{name}. {MAP_SKIPPED}")
+                    format!("{name}. {}", map_skipped())
                 } else {
                     name.to_owned()
                 };
                 self.put(entry);
-                let title = if restart { MAP_RESTART } else { titles.done };
-                Some((ToastKind::Success, title.to_owned(), description))
+                let title = if restart {
+                    map_restart().to_string()
+                } else {
+                    titles.done.to_string()
+                };
+                Some((ToastKind::Success, title, description))
             }
             Outcome::Removed { id, name } => {
                 self.entries = self
@@ -515,12 +533,12 @@ impl GbAddonInstalls {
                     .filter(|e| e.gb_id() != id)
                     .cloned()
                     .collect();
-                Some((ToastKind::Success, titles.done.to_owned(), name))
+                Some((ToastKind::Success, titles.done.to_string(), name))
             }
             Outcome::Failed(err) => Some((
                 ToastKind::Error,
-                err.title().to_owned(),
-                err.description().to_owned(),
+                err.title().to_string(),
+                err.description().to_string(),
             )),
             Outcome::Cancelled => None,
         };
@@ -578,7 +596,7 @@ async fn refetch(
     tf2: Tf2Install,
     win: AnyWindowHandle,
     titles: Titles,
-    gone: Option<&'static str>,
+    gone: Option<SharedString>,
 ) -> Outcome {
     let id = entry.gb_id();
     let store = cx.update(|cx| cx.global::<Services>().store.clone());
@@ -590,7 +608,10 @@ async fn refetch(
             let Some(section) = AddonSection::by_key(entry.section()) else {
                 // Only a tampered row names a section this build does not know.
                 tracing::warn!("add-on {id} has an unknown section {:?}", entry.section());
-                return Outcome::Failed(OpError::core(titles.failed, UPDATE_UNKNOWN_SECTION));
+                return Outcome::Failed(OpError::core(
+                    titles.failed,
+                    tr!("messages.addon_install.unknown_section"),
+                ));
             };
             let run = Run {
                 section,
@@ -612,27 +633,16 @@ async fn refetch(
     if is_gone {
         mark_gone(this, cx, id, tf2).await;
         if let Some(gone) = gone {
-            failure.message = gone.to_owned();
+            failure.message = gone.into();
         }
     }
     Outcome::Failed(OpError::core(titles.failed, failure.message))
 }
 
-/// The player words for Install again when the library copy is incomplete and GameBanana no
-/// longer has the item to download.
-const REINSTALL_GONE: &str = "This add-on is no longer on GameBanana and its copy in your library is incomplete, so it can't be installed again. Remove it.";
-
-/// The player words for Install again on a map GameBanana no longer has.
-const MAP_REINSTALL_GONE: &str =
-    "This map is no longer on GameBanana, so it can't be installed again. Remove it.";
-
 /// Whether `entry` is a map item, which installs, updates and removes through core's map path.
 fn is_map(entry: &GbAddonEntry) -> bool {
     entry.section() == AddonSection::MAPS.key()
 }
-
-/// The player words for an update whose recorded section this build does not know.
-const UPDATE_UNKNOWN_SECTION: &str = "TF2Tools can't tell where this add-on goes. Remove it, then install it again from the Addon Store.";
 
 /// Records `id` as gone from GameBanana and puts the listed result into `this`, so the
 /// list shows it before busy ends. A failed write is logged and the list stays as it was.
@@ -645,7 +655,7 @@ async fn mark_gone(
     let job = cx.update(|cx| {
         run_blocking(cx, move |s: &Services| {
             let fail = |e: &tf2tools_core::LibraryError| {
-                describe_library(e).into_op("Couldn't record the add-on as gone")
+                describe_library(e).into_op(tr!("messages.action.record_addon_gone"))
             };
             s.library
                 .record_gb_addon_check(id, GbAddonCheck::Gone, unix_now())

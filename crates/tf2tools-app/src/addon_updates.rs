@@ -3,28 +3,33 @@
 
 use std::collections::{HashMap, HashSet};
 
-use gpui_kit::{AnyWindowHandle, App, AppContext as _, Context, Entity, EventEmitter, Global};
+use gpui_kit::{
+    AnyWindowHandle, App, AppContext as _, Context, Entity, EventEmitter, Global, SharedString,
+};
 use tf2tools_core::{
     AddonName, FilesError, LogLevel, NewLogEntry, StoreFile, StoreItemId, StoreKind,
 };
 
 use crate::activity;
+use crate::i18n::tr;
 use crate::library_events::LibraryEvents;
 use crate::services::{OpError, Services, Tf2Global, run_blocking};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::store_download::{DownloadEvent, DownloadTarget, StoreDownloads};
 use crate::store_messages::{
-    BUSY_TEXT, BUSY_TITLE, StoreFailure, describe_files, describe_install, listing_stopped, no_tf2,
+    StoreFailure, busy_text, busy_title, describe_files, describe_install, listing_stopped, no_tf2,
     release_has_no_file,
 };
 use crate::tokio_bridge::{self, JoinError};
 
-const INSTALL_FAILED: &str = "Failed to install addon";
+fn install_failed_title() -> SharedString {
+    tr!("messages.action.install_addon")
+}
 
 // Logs a failed reinstall's raw error and keeps only the player words for the toast.
 fn install_failed(failure: StoreFailure) -> OpError {
     failure.log("addon update");
-    OpError::core(INSTALL_FAILED, failure.message)
+    OpError::core(install_failed_title(), failure.message)
 }
 
 /// How an addon download ended for the pages that show it.
@@ -145,7 +150,7 @@ impl AddonUpdates {
                     Ok(Ok(_)) => release_has_no_file(),
                 };
                 failure.log("addon update");
-                let err = OpError::core("Failed to download addon", failure.message);
+                let err = OpError::core(tr!("messages.action.download_addon"), failure.message);
                 let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
                 self.settle(&name, cx);
                 return;
@@ -166,7 +171,7 @@ impl AddonUpdates {
                 cx.notify();
             } else {
                 let _ = win.update(cx, |_, window, cx| {
-                    toast(window, cx, ToastKind::Info, BUSY_TITLE, BUSY_TEXT)
+                    toast(window, cx, ToastKind::Info, busy_title(), busy_text())
                 });
                 self.settle(&name, cx);
             }

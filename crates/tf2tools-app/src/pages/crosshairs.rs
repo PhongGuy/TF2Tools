@@ -33,6 +33,7 @@ use super::common::{SM_ICON_PX, YELLOW_500, needs_tf2, no_tf2_notice};
 use crate::activity;
 use crate::assets::BACKGROUNDS;
 use crate::crosshair_sync::{CrosshairSync, SyncStatus};
+use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::loadout::{BoardTarget, CellState, Loadout, SLOTS};
@@ -73,7 +74,9 @@ const BOARD_COLUMNS: Pixels = px(560.);
 const HEADER_WIDTH: Pixels = px(84.);
 const CELL_HEIGHT: Pixels = px(68.);
 /// Every Export PNG failure toasts under this action.
-const EXPORT_FAILED: &str = "Failed to export PNG";
+fn export_failed() -> SharedString {
+    tr!("messages.action.export_png")
+}
 
 /// The action in flight: its button spins and the other mutating controls disable.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -383,8 +386,9 @@ impl CrosshairsPage {
         let generation = self.load_generation;
         let tf2 = tf2_state(cx).read(cx).install().cloned();
         let loading = run_blocking(cx, move |s| {
-            let failed =
-                |e: LibraryError| describe_library(&e).into_op("Failed to load crosshairs");
+            let failed = |e: LibraryError| {
+                describe_library(&e).into_op(tr!("messages.action.load_crosshairs"))
+            };
             let library = s.library.list_crosshairs().map_err(failed)?;
             let assignments = s.library.assignments().map_err(failed)?;
             let installed = tf2
@@ -518,7 +522,7 @@ impl CrosshairsPage {
                             .library
                             .import_crosshair(&path, &name, Provenance::Local)
                             .map_err(|e| {
-                                describe_import(&e).into_op("Failed to import crosshair")
+                                describe_import(&e).into_op(tr!("messages.action.import_crosshair"))
                             })?;
                         // The source path is developer detail, so it goes to tracing only.
                         tracing::info!(source = %path.display(), "imported a crosshair");
@@ -579,9 +583,9 @@ impl CrosshairsPage {
                         let drawing = s
                             .library
                             .crosshair_drawing(&crosshair, &s.builtins)
-                            .map_err(|e| describe_library(&e).into_op(EXPORT_FAILED))?;
+                            .map_err(|e| describe_library(&e).into_op(export_failed()))?;
                         write_png(&target, &drawing)
-                            .map_err(|e| describe_png_write(&e).into_op(EXPORT_FAILED))?;
+                            .map_err(|e| describe_png_write(&e).into_op(export_failed()))?;
                         Ok(Some((
                             ToastKind::Success,
                             "PNG exported".into(),
@@ -606,7 +610,7 @@ impl CrosshairsPage {
             Busy::Uninstall,
             move |s| {
                 s.library.remove_crosshairs(&tf2).map_err(|e| {
-                    describe_tf2_install(&e).into_op("Failed to uninstall crosshairs")
+                    describe_tf2_install(&e).into_op(tr!("messages.action.uninstall_crosshairs"))
                 })?;
                 let entry = NewLogEntry::new(
                     LogLevel::Info,
@@ -652,15 +656,17 @@ impl CrosshairsPage {
                 page.run(
                     Busy::Delete,
                     move |s| {
-                        const FAILED: &str = "Failed to delete crosshair";
+                        fn failed() -> SharedString {
+                            tr!("messages.action.delete_crosshair")
+                        }
                         if let Some(tf2) = tf2 {
                             s.library
                                 .uninstall_crosshair(&id, &tf2)
-                                .map_err(|e| describe_tf2_install(&e).into_op(FAILED))?;
+                                .map_err(|e| describe_tf2_install(&e).into_op(failed()))?;
                         }
                         s.library
                             .delete_crosshair(&id)
-                            .map_err(|e| describe_library(&e).into_op(FAILED))?;
+                            .map_err(|e| describe_library(&e).into_op(failed()))?;
                         let message = format!("Deleted crosshair from library: {name}");
                         let entry =
                             NewLogEntry::new(LogLevel::Info, "crosshair", "delete", message);
@@ -687,9 +693,9 @@ impl CrosshairsPage {
         self.run(
             Busy::Assign(script),
             move |s| {
-                s.library
-                    .assign(script, &crosshair)
-                    .map_err(|e| describe_library(&e).into_op("Failed to assign crosshair"))?;
+                s.library.assign(script, &crosshair).map_err(|e| {
+                    describe_library(&e).into_op(tr!("messages.action.assign_crosshair"))
+                })?;
                 Ok(None)
             },
             cx,
@@ -716,9 +722,9 @@ impl CrosshairsPage {
         self.run(
             Busy::Board(target),
             move |s| {
-                s.library
-                    .assign_many(&scripts, &crosshair)
-                    .map_err(|e| describe_library(&e).into_op("Failed to assign crosshairs"))?;
+                s.library.assign_many(&scripts, &crosshair).map_err(|e| {
+                    describe_library(&e).into_op(tr!("messages.action.assign_crosshairs"))
+                })?;
                 Ok(None)
             },
             cx,
@@ -734,9 +740,9 @@ impl CrosshairsPage {
         self.run(
             Busy::Reset(target),
             move |s| {
-                s.library
-                    .unassign_many(&scripts)
-                    .map_err(|e| describe_library(&e).into_op("Failed to reset crosshairs"))?;
+                s.library.unassign_many(&scripts).map_err(|e| {
+                    describe_library(&e).into_op(tr!("messages.action.reset_crosshairs"))
+                })?;
                 Ok(None)
             },
             cx,

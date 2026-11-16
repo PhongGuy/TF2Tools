@@ -30,7 +30,7 @@ fn an_op_error_toast_shows_the_action_and_the_core_message(cx: &mut TestAppConte
     support::init(cx);
     let win = support::blank_window(cx);
     cx.update_window(win, |_, w, cx| {
-        toast_error(w, cx, &OpError::core("Install HUD", "disk full"))
+        toast_error(w, cx, &OpError::core("Install HUD".into(), "disk full"))
     })
     .unwrap();
     assert_eq!(

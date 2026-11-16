@@ -4,6 +4,7 @@
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
+use gpui_kit::SharedString;
 use tf2tools_core::{
     Applied, InstallTarget, StagedUpdate, UpdateApplyError, UpdateCheckError, UpdateClient,
     UpdateDownloadError, UpdateOffer, apply,
@@ -12,33 +13,22 @@ use tf2tools_core::{
 use super::{
     AfterInstall, CheckFuture, DownloadFuture, DownloadSink, Failure, Offer, UpdateBackend,
 };
+use crate::i18n::tr;
 
-const OFFLINE: &str =
-    "Couldn't reach the update server. Check your internet connection and try again.";
-const UNREADABLE: &str = "The update information couldn't be read. Try again later.";
-const UNVERIFIED: &str = "Update check failed: the update could not be verified. Try again later.";
-pub(super) const UNAVAILABLE: &str =
-    "Automatic updates aren't available in this version. Get new versions from the release page.";
-const STOPPED: &str = "The download stopped. Check your internet connection and try again.";
-const UNSERVED: &str = "The update couldn't be downloaded right now. Try again later, or get it from the release page.";
-// A server error is usually brief, so the player tries again in the app.
-const BUSY: &str = "The update server is busy right now. Try again in a few minutes.";
-const DAMAGED: &str = "The download was damaged. Try again.";
-const DISK: &str = "Couldn't save the update. Make sure your disk has free space, then try again.";
-const USE_PAGE: &str = "TF2Tools can't update itself where it's installed. Download the new version from the release page instead.";
-const INSTALL_IO: &str =
-    "Couldn't install the update. Try again, or download the new version from the release page.";
-const INSTALLER: &str =
-    "Couldn't start the installer. Try again, or download the new version from the release page.";
-// A fresh download replaces the staged installer or AppImage, so trying again can help.
-const CHANGED: &str = "The update changed before it could be installed. Try again.";
-pub(super) const UNKNOWN: &str = "Something went wrong with the update. Try again later.";
-const CHECK_SLOW: &str =
-    "Checking for updates took too long. Check your internet connection and try again.";
-const DOWNLOAD_SLOW: &str =
-    "The download took too long. Check your internet connection and try again.";
-const CHECK_FIRST: &str = "Check for updates first.";
-const DOWNLOAD_FIRST: &str = "Download the update first.";
+/// The release page is the way to update when this build cannot update itself.
+pub(super) fn unavailable() -> SharedString {
+    tr!("updater.status.unavailable")
+}
+
+/// The catch-all for an update failure nothing else describes.
+pub(super) fn unknown() -> SharedString {
+    tr!("updater.failure.unknown")
+}
+
+/// The title of the toast that reports a failed download or install.
+pub fn failure_title() -> SharedString {
+    tr!("updater.failure.title")
+}
 
 /// Total time allowed for one check and one download, on top of core's per-read timeouts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,9 +46,9 @@ impl Default for Deadlines {
     }
 }
 
-fn says(message: &str, use_release_page: bool) -> Failure {
+fn says(message: SharedString, use_release_page: bool) -> Failure {
     Failure {
-        message: message.to_owned(),
+        message,
         use_release_page,
     }
 }
@@ -67,33 +57,34 @@ fn says(message: &str, use_release_page: bool) -> Failure {
 /// since the manifest is missing for everyone before the first release.
 pub fn describe_check(err: &UpdateCheckError) -> Failure {
     match err {
-        UpdateCheckError::Network { .. } => says(OFFLINE, false),
+        UpdateCheckError::Network { .. } => says(tr!("updater.failure.offline"), false),
         UpdateCheckError::Status { .. }
         | UpdateCheckError::TooLarge { .. }
-        | UpdateCheckError::Malformed { .. } => says(UNREADABLE, false),
-        UpdateCheckError::BadSignature => says(UNVERIFIED, false),
-        UpdateCheckError::BadKey { .. } => says(UNAVAILABLE, true),
-        _ => says(UNKNOWN, false),
+        | UpdateCheckError::Malformed { .. } => says(tr!("updater.failure.unreadable"), false),
+        UpdateCheckError::BadSignature => says(tr!("updater.failure.unverified"), false),
+        UpdateCheckError::BadKey { .. } => says(unavailable(), true),
+        _ => says(unknown(), false),
     }
 }
 
 /// A failed download in player words; installs that cannot update in place go to the release page.
 pub fn describe_download(err: &UpdateDownloadError) -> Failure {
     match err {
-        UpdateDownloadError::Network { .. } => says(STOPPED, false),
+        UpdateDownloadError::Network { .. } => says(tr!("updater.failure.stopped"), false),
+        // A server error is usually brief, so the player tries again in the app.
         UpdateDownloadError::Status {
             status: 500..=599, ..
-        } => says(BUSY, false),
+        } => says(tr!("updater.failure.busy"), false),
         // The server could not find the download, so the release page is the way.
-        UpdateDownloadError::Status { .. } => says(UNSERVED, true),
+        UpdateDownloadError::Status { .. } => says(tr!("updater.failure.unserved"), true),
         UpdateDownloadError::SizeMismatch { .. } | UpdateDownloadError::HashMismatch { .. } => {
-            says(DAMAGED, false)
+            says(tr!("updater.failure.damaged"), false)
         }
-        UpdateDownloadError::Io { .. } => says(DISK, false),
+        UpdateDownloadError::Io { .. } => says(tr!("updater.failure.disk"), false),
         UpdateDownloadError::NotWritable { .. }
         | UpdateDownloadError::NoAsset
-        | UpdateDownloadError::Unsupported => says(USE_PAGE, true),
-        _ => says(UNKNOWN, false),
+        | UpdateDownloadError::Unsupported => says(tr!("updater.failure.use_page"), true),
+        _ => says(unknown(), false),
     }
 }
 
@@ -101,12 +92,13 @@ pub fn describe_download(err: &UpdateDownloadError) -> Failure {
 pub fn describe_apply(err: &UpdateApplyError) -> Failure {
     match err {
         UpdateApplyError::NotWritable { .. } | UpdateApplyError::Unsupported { .. } => {
-            says(USE_PAGE, true)
+            says(tr!("updater.failure.use_page"), true)
         }
-        UpdateApplyError::Io { .. } => says(INSTALL_IO, false),
-        UpdateApplyError::Spawn { .. } => says(INSTALLER, false),
-        UpdateApplyError::Changed { .. } => says(CHANGED, false),
-        _ => says(UNKNOWN, false),
+        UpdateApplyError::Io { .. } => says(tr!("updater.failure.install_io"), false),
+        UpdateApplyError::Spawn { .. } => says(tr!("updater.failure.installer"), false),
+        // A fresh download replaces the staged installer or AppImage, so trying again can help.
+        UpdateApplyError::Changed { .. } => says(tr!("updater.failure.changed"), false),
+        _ => says(unknown(), false),
     }
 }
 
@@ -141,7 +133,7 @@ pub fn core_backend(
                     {
                         Err(_) => {
                             tracing::warn!(deadline = ?deadlines.check, "update check timed out");
-                            return Err(says(CHECK_SLOW, false));
+                            return Err(says(tr!("updater.failure.check_slow"), false));
                         }
                         Ok(Err(err)) => {
                             tracing::warn!(error = %err, "update check failed");
@@ -172,7 +164,7 @@ pub fn core_backend(
             let wanted = lock(&offer).clone();
             Box::pin(async move {
                 let Some(wanted) = wanted else {
-                    return Err(says(CHECK_FIRST, false));
+                    return Err(says(tr!("updater.failure.check_first"), false));
                 };
                 let fetch = client.download(&wanted, &target, |received, total| {
                     sink.report(received, total)
@@ -180,7 +172,7 @@ pub fn core_backend(
                 match tokio::time::timeout(deadlines.download, fetch).await {
                     Err(_) => {
                         tracing::warn!(deadline = ?deadlines.download, "update download timed out");
-                        Err(says(DOWNLOAD_SLOW, false))
+                        Err(says(tr!("updater.failure.download_slow"), false))
                     }
                     Ok(Err(err)) => {
                         tracing::warn!(error = %err, "update download failed");
@@ -197,14 +189,14 @@ pub fn core_backend(
 
     let apply_staged = Arc::new(move || {
         let Some(update) = lock(&staged).take() else {
-            return Err(says(DOWNLOAD_FIRST, false));
+            return Err(says(tr!("updater.failure.download_first"), false));
         };
         match apply(update) {
             Ok(Applied::Replaced { relaunch }) => Ok(AfterInstall::Relaunch(relaunch)),
             Ok(Applied::InstallerStarted) => Ok(AfterInstall::Quit),
             Ok(other) => {
                 tracing::warn!(applied = ?other, "update applied in an unexpected way");
-                Err(says(UNKNOWN, false))
+                Err(says(unknown(), false))
             }
             Err(err) => {
                 tracing::warn!(error = %err, "update install failed");

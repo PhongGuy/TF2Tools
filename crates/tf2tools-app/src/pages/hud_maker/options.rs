@@ -27,6 +27,7 @@ use tf2tools_core::{
 
 use super::HudMakerPage;
 use super::tip::tipped;
+use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::LibraryEvents;
 use crate::local_messages::describe_tf2_install;
@@ -306,10 +307,12 @@ impl HudMakerPage {
                     return Ok(Toggled::NeedsBase);
                 }
                 let done = match on {
-                    true => (s.library.install_addon(&name, &tf2).map(drop))
-                        .map_err(|e| describe_tf2_install(&e).into_op("Failed to install addon")),
-                    false => (s.library.uninstall_addon(&name, &tf2).map(drop))
-                        .map_err(|e| describe_tf2_install(&e).into_op("Failed to uninstall addon")),
+                    true => (s.library.install_addon(&name, &tf2).map(drop)).map_err(|e| {
+                        describe_tf2_install(&e).into_op(tr!("messages.action.install_addon"))
+                    }),
+                    false => (s.library.uninstall_addon(&name, &tf2).map(drop)).map_err(|e| {
+                        describe_tf2_install(&e).into_op(tr!("messages.action.uninstall_addon"))
+                    }),
                 };
                 Ok(Toggled::Done(done, viewmodels_state(s, Some(&tf2))))
             })

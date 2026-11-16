@@ -127,7 +127,7 @@ pub fn toast(
 
 /// The label `toast_error` gives `err`'s toast, so a caller can tell a repeat failure.
 pub fn error_label(err: &OpError) -> SharedString {
-    label(err.title(), err.description())
+    label(&err.title(), &err.description())
 }
 
 // "{title}. {description}", or the title alone when the description is empty. A title
@@ -144,11 +144,5 @@ fn label(title: &str, description: &str) -> SharedString {
 
 /// The error toast for a failed page action: its title and description.
 pub fn toast_error(window: &mut Window, cx: &mut App, err: &OpError) {
-    toast(
-        window,
-        cx,
-        ToastKind::Error,
-        err.title().to_owned(),
-        err.description().to_owned(),
-    );
+    toast(window, cx, ToastKind::Error, err.title(), err.description());
 }

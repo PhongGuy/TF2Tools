@@ -5,11 +5,15 @@ use gpui_kit::{App, Entity, SharedString, Task};
 use tf2tools_core::{GbId, StoreItemId, StoreKind};
 
 use crate::audio::player::{NowPlaying, Player};
+use crate::i18n::tr;
 use crate::services::{OpError, Services, run_blocking};
 use crate::store_messages::{StoreFailure, describe_preview, preview_gone, preview_unavailable};
 use crate::tokio_bridge;
 
-const FAILED: &str = "Could not play preview";
+fn failed_title() -> SharedString {
+    tr!("messages.action.play_preview")
+}
+
 const KEY_PREFIX: &str = "store-sound:";
 
 /// The player key of a store sound's preview: "store-sound:{id}".
@@ -24,7 +28,7 @@ pub fn parse_preview_key(key: &str) -> Option<GbId> {
 
 /// Reads the store row with `run_blocking`, then fetches `preview_audio` through `tokio_bridge::spawn`.
 /// Every failure (row gone, no preview, untrusted URL, HTTP error, join error) is
-/// `OpError::core("Could not play preview", ..)` with a plain message; the raw error is logged.
+/// an `OpError` titled by `failed_title` with a plain message; the raw error is logged.
 pub fn load_preview(id: GbId, cx: &App) -> Task<Result<Vec<u8>, OpError>> {
     let read = run_blocking(cx, move |s| {
         s.store
@@ -48,7 +52,7 @@ pub fn load_preview(id: GbId, cx: &App) -> Task<Result<Vec<u8>, OpError>> {
 // The player reads only the plain message; the raw error goes to the developer log.
 fn failed(failure: StoreFailure) -> OpError {
     failure.log("store preview");
-    OpError::core(FAILED, failure.message)
+    OpError::core(failed_title(), failure.message)
 }
 
 /// Toggles `player` on this sound's preview, showing `name` and "by {author}"; detaches the play.

@@ -26,7 +26,7 @@ const CHANGED: &str = "The update changed before it could be installed. Try agai
 
 fn says(message: &str, use_release_page: bool) -> Failure {
     Failure {
-        message: message.to_owned(),
+        message: message.into(),
         use_release_page,
     }
 }

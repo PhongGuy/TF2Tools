@@ -23,6 +23,7 @@ use gpui_kit::{
 use tf2tools_core::{AddonEntry, AddonName, AddonSection, StoreItem, StoreItemId, StoreKind};
 
 use crate::addon_updates::{AddonEvent, AddonUpdates};
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::{
     SkeletonTop, badge_of, card_frame, empty_state_card, no_tf2_warning, skeleton_cards, steady,
@@ -301,11 +302,11 @@ impl AddonStorePage {
             let items = s
                 .store
                 .store_items(KIND)
-                .map_err(|e| OpError::core("Failed to load the store", e))?;
+                .map_err(|e| OpError::core(tr!("messages.action.load_the_store"), e))?;
             let library = s
                 .library
                 .list_addons(tf2.as_ref())
-                .map_err(|e| OpError::core("Failed to load the store", e))?;
+                .map_err(|e| OpError::core(tr!("messages.action.load_the_store"), e))?;
             let library = library.into_iter().map(|e| (e.name().clone(), e)).collect();
             Ok((ordered(items), library))
         });
