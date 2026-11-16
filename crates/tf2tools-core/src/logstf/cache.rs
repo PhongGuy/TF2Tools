@@ -15,7 +15,7 @@ use super::{
     LOG_BODY_LIMIT, LogDetail, LogsRange, PROVISIONAL_SECS, SteamId, logstf_class,
     logstf_class_name, parse_log,
 };
-use crate::db::Database;
+use crate::db::{Database, read_setting, save_setting};
 use crate::error::LogsCacheError;
 use crate::weapons::TfClass;
 
@@ -286,10 +286,7 @@ impl LogsCache {
                         params![id, player.nickname],
                     )?;
                 }
-                tx.execute(
-                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-                    params![ACTIVE_KEY, placeholder],
-                )?;
+                save_setting(&tx, ACTIVE_KEY, &placeholder)?;
                 tx.commit()
             })
             .map_err(db_error)
@@ -351,13 +348,7 @@ impl LogsCache {
     /// Selects `id`'s chip; the setting is kept even if `id` is not tracked.
     pub fn set_active_player(&self, id: SteamId) -> Result<(), LogsCacheError> {
         self.db
-            .write(|conn| {
-                conn.execute(
-                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-                    params![ACTIVE_KEY, id.to_string()],
-                )
-            })
-            .map(drop)
+            .write(|conn| save_setting(conn, ACTIVE_KEY, &id.to_string()))
             .map_err(db_error)
     }
 
@@ -365,14 +356,7 @@ impl LogsCache {
     pub fn range(&self) -> Result<LogsRange, LogsCacheError> {
         let key = self
             .db
-            .read(|conn| {
-                conn.query_row(
-                    "SELECT value FROM settings WHERE key = ?1",
-                    [RANGE_KEY],
-                    |row| row.get::<_, String>(0),
-                )
-                .optional()
-            })
+            .read(|conn| read_setting(conn, RANGE_KEY))
             .map_err(db_error)?;
         Ok(key
             .as_deref()
@@ -383,13 +367,7 @@ impl LogsCache {
     /// Stores `range` as the chosen history range.
     pub fn set_range(&self, range: LogsRange) -> Result<(), LogsCacheError> {
         self.db
-            .write(|conn| {
-                conn.execute(
-                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-                    params![RANGE_KEY, range.key()],
-                )
-            })
-            .map(drop)
+            .write(|conn| save_setting(conn, RANGE_KEY, range.key()))
             .map_err(db_error)
     }
 
@@ -936,14 +914,7 @@ impl LogsCache {
     pub(crate) fn listed_range(&self, player: SteamId) -> Result<LogsRange, LogsCacheError> {
         let key = self
             .db
-            .read(|conn| {
-                conn.query_row(
-                    "SELECT value FROM settings WHERE key = ?1",
-                    [format!("{LISTED_RANGE_PREFIX}{}", player.id64())],
-                    |row| row.get::<_, String>(0),
-                )
-                .optional()
-            })
+            .read(|conn| read_setting(conn, &format!("{LISTED_RANGE_PREFIX}{}", player.id64())))
             .map_err(db_error)?;
         Ok(key
             .as_deref()
@@ -959,15 +930,12 @@ impl LogsCache {
     ) -> Result<(), LogsCacheError> {
         self.db
             .write(|conn| {
-                conn.execute(
-                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-                    params![
-                        format!("{LISTED_RANGE_PREFIX}{}", player.id64()),
-                        range.key()
-                    ],
+                save_setting(
+                    conn,
+                    &format!("{LISTED_RANGE_PREFIX}{}", player.id64()),
+                    range.key(),
                 )
             })
-            .map(drop)
             .map_err(db_error)
     }
 

@@ -3,9 +3,9 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use rusqlite::{OptionalExtension, params};
+use rusqlite::params;
 
-use crate::db::Database;
+use crate::db::{Database, read_setting, save_setting};
 use crate::error::SettingsError;
 
 const DEFAULT_THEME: &str = "dark";
@@ -319,37 +319,19 @@ impl Database {
             all.insert(hud_folder.to_owned(), fingerprint.to_vec());
             let text = serde_json::to_string(&all)
                 .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
-            tx.execute(
-                "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-                params![FONT_CHECK_DISMISSED, text],
-            )?;
+            save_setting(&tx, FONT_CHECK_DISMISSED, &text)?;
             tx.commit()
         })
         .map_err(db_error)
     }
 
     fn save_setting(&self, key: &str, value: &str) -> Result<(), SettingsError> {
-        self.write(|conn| {
-            conn.execute(
-                "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-                params![key, value],
-            )
-        })
-        .map(drop)
-        .map_err(db_error)
+        self.write(|conn| save_setting(conn, key, value))
+            .map_err(db_error)
     }
 }
 
 const FONT_CHECK_DISMISSED: &str = "font_check_dismissed";
-
-fn read_setting(conn: &rusqlite::Connection, key: &str) -> rusqlite::Result<Option<String>> {
-    conn.query_row(
-        "SELECT value FROM settings WHERE key = ?1",
-        params![key],
-        |r| r.get(0),
-    )
-    .optional()
-}
 
 /// The per-HUD dismissal lists, empty when the stored value is missing or malformed.
 fn parse_dismissals(stored: Option<&str>) -> BTreeMap<String, Vec<String>> {

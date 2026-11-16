@@ -5,6 +5,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use super::cache::{BodyRead, STATE_TRIMMED, db_error, deflate};
 use super::{KeepFullLogs, LogsCache, PROVISIONAL_SECS};
+use crate::db::{read_setting, save_setting};
 use crate::error::LogsCacheError;
 
 /// The `settings` key holding the chosen keep choice's key.
@@ -159,14 +160,7 @@ impl LogsCache {
     pub fn keep_full_logs(&self) -> Result<KeepFullLogs, LogsCacheError> {
         let key = self
             .db
-            .read(|conn| {
-                conn.query_row(
-                    "SELECT value FROM settings WHERE key = ?1",
-                    [KEEP_KEY],
-                    |row| row.get::<_, String>(0),
-                )
-                .optional()
-            })
+            .read(|conn| read_setting(conn, KEEP_KEY))
             .map_err(db_error)?;
         Ok(key
             .as_deref()
@@ -177,13 +171,7 @@ impl LogsCache {
     /// Stores `keep` as the chosen keep choice.
     pub fn set_keep_full_logs(&self, keep: KeepFullLogs) -> Result<(), LogsCacheError> {
         self.db
-            .write(|conn| {
-                conn.execute(
-                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-                    params![KEEP_KEY, keep.key()],
-                )
-            })
-            .map(drop)
+            .write(|conn| save_setting(conn, KEEP_KEY, keep.key()))
             .map_err(db_error)
     }
 
@@ -359,21 +347,11 @@ fn compact(conn: &Connection, trimmed: usize, recompressed: bool) -> rusqlite::R
 
 // Counts the pass's trims and rewrites the file or frees its pages in place.
 fn vacuum(conn: &Connection, trimmed: usize, free: i64) -> rusqlite::Result<()> {
-    let counted: i64 = conn
-        .query_row(
-            "SELECT CAST(value AS INTEGER) FROM settings WHERE key = ?1",
-            [TRIMS_KEY],
-            |r| r.get(0),
-        )
-        .optional()?
+    let counted: i64 = read_setting(conn, TRIMS_KEY)?
+        .and_then(|n| n.parse().ok())
         .unwrap_or(0);
     let since = counted.saturating_add(i64::try_from(trimmed).unwrap_or(i64::MAX));
-    let store = |n: i64| {
-        conn.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-            params![TRIMS_KEY, n.to_string()],
-        )
-    };
+    let store = |n: i64| save_setting(conn, TRIMS_KEY, &n.to_string());
     if trimmed > 0 {
         store(since)?;
     }

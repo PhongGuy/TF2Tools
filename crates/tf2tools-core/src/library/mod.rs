@@ -33,11 +33,11 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock};
 
-use rusqlite::OptionalExtension;
 use walkdir::WalkDir;
 
 use crate::archive::VPK_MAGIC;
 use crate::db::Database;
+pub(crate) use crate::db::{read_setting, save_setting};
 use crate::error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, GbAddonFetchError,
     GbAddonInstallError, HistoryError, HudFilesError, HudLoadError, ImportError, InstallError,
@@ -546,30 +546,6 @@ pub(crate) fn install_db(e: rusqlite::Error) -> InstallError {
     InstallError::Database {
         message: e.to_string(),
     }
-}
-
-/// Writes one v5 `settings` key inside the caller's transaction.
-pub(crate) fn save_setting(
-    conn: &rusqlite::Connection,
-    key: &str,
-    value: &str,
-) -> rusqlite::Result<()> {
-    conn.execute(
-        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
-        [key, value],
-    )?;
-    Ok(())
-}
-
-/// Reads one v5 `settings` key; an unset key is `None`.
-pub(crate) fn read_setting(
-    conn: &rusqlite::Connection,
-    key: &str,
-) -> rusqlite::Result<Option<String>> {
-    conn.query_row("SELECT value FROM settings WHERE key = ?1", [key], |r| {
-        r.get(0)
-    })
-    .optional()
 }
 
 pub(crate) fn paint_db(e: rusqlite::Error) -> PaintError {
