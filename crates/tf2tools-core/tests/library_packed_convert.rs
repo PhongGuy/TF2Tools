@@ -379,3 +379,38 @@ fn unpacking_a_hud_row_naming_the_parent_folder_is_refused() {
     tamper_folder(&env, &hud, "..");
     assert!(env.lib.unpack_hud_for_tests(hud.id()).is_err());
 }
+
+/// Marks `path` read-only, as a kept external HUD's files can be on Windows.
+fn set_read_only(path: &std::path::Path) {
+    let mut perms = std::fs::metadata(path).unwrap().permissions();
+    perms.set_readonly(true);
+    std::fs::set_permissions(path, perms).unwrap();
+}
+
+#[test]
+fn read_only_loose_files_are_removed_after_packing() {
+    let env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    let before = library_files(&env, &hud);
+    let dir = hud_dir(&env, &hud);
+    set_read_only(&dir.join("info.vdf"));
+    set_read_only(&dir.join("resource/clientscheme.res"));
+    let report = convert(&env);
+    assert_eq!((report.huds().packed(), report.huds().failed()), (1, 0));
+    assert_eq!(loose_files(&env, &hud), Vec::<String>::new());
+    assert!(zip_path(&env, &hud).is_file());
+    assert_eq!(packed_files(&env, &hud), before);
+}
+
+#[test]
+fn read_only_leftovers_beside_a_zip_are_cleaned() {
+    let env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    convert(&env);
+    let stale = write_file(&hud_dir(&env, &hud).join("stale.txt"), b"stale");
+    set_read_only(&stale);
+    let report = convert(&env);
+    assert_eq!((report.huds().cleaned(), report.huds().failed()), (1, 0));
+    assert!(!stale.exists());
+    assert!(zip_path(&env, &hud).is_file());
+}

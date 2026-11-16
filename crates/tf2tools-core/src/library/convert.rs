@@ -374,9 +374,47 @@ fn remove_loose(dir: &Path, keep: &Path) -> Result<bool, IoFailure> {
         if kind.is_dir() {
             remove_dir_if_present(&path)?;
         } else {
+            if kind.is_file() {
+                clear_read_only(&path)?;
+            }
             remove_file_if_present(&path)?;
         }
         removed = true;
     }
     Ok(removed)
+}
+
+/// Makes the regular file at `path` writable, since Windows refuses to remove a read-only one.
+/// On Unix only the owner's write bit is added, never anyone else's.
+fn clear_read_only(path: &Path) -> Result<(), IoFailure> {
+    let mut perms = std::fs::metadata(path).map_err(io_at(path))?.permissions();
+    if !perms.readonly() {
+        return Ok(());
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        perms.set_mode(perms.mode() | 0o200);
+    }
+    #[cfg(not(unix))]
+    #[allow(clippy::permissions_set_readonly_false)]
+    perms.set_readonly(false);
+    std::fs::set_permissions(path, perms).map_err(io_at(path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clear_read_only;
+
+    #[test]
+    fn a_read_only_file_is_made_writable() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file = tmp.path().join("info.vdf");
+        std::fs::write(&file, b"x").unwrap();
+        let mut perms = std::fs::metadata(&file).unwrap().permissions();
+        perms.set_readonly(true);
+        std::fs::set_permissions(&file, perms).unwrap();
+        clear_read_only(&file).unwrap();
+        assert!(!std::fs::metadata(&file).unwrap().permissions().readonly());
+    }
 }
