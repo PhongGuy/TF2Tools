@@ -307,3 +307,24 @@ fn page_action_titles_read_in_russian() {
     let _guard = LocaleGuard::switch("ru");
     assert_russian(&jobs::save_failed());
 }
+
+#[test]
+fn sync_and_update_failure_titles_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let kinds = [
+        StoreKind::CuratedHuds,
+        StoreKind::GameBananaHuds,
+        StoreKind::Sounds,
+        StoreKind::Crosshairs,
+        StoreKind::Addons,
+    ];
+    for kind in kinds {
+        assert_russian(&sync::sync_failed_title(kind));
+    }
+    assert_russian(&tf2tools_app::updater::backend::failure_title());
+    i18n::apply("en");
+    assert_eq!(
+        sync::sync_failed_title(StoreKind::Sounds),
+        "Failed to sync Sounds"
+    );
+}

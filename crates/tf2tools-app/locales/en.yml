@@ -110,6 +110,7 @@ updater:
     restart: "Restart"
     close: "Close"
   failure:
+    title: "Update failed"
     offline: "Couldn't reach the update server. Check your internet connection and try again."
     unreadable: "The update information couldn't be read. Try again later."
     unverified: "Update check failed: the update could not be verified. Try again later."
@@ -373,6 +374,13 @@ messages:
     database: "TF2Tools couldn't update its store data. Restart TF2Tools and try again."
     unknown: "Something went wrong while syncing. Try again later."
     throttled: "GameBanana is busy, try again in a minute."
+    failed_title:
+      curated_huds: "Failed to sync Curated HUDs"
+      gamebanana_huds: "Failed to sync GameBanana HUDs"
+      sounds: "Failed to sync Sounds"
+      crosshairs: "Failed to sync Crosshairs"
+      addons: "Failed to sync Addons"
+      store: "Failed to sync Store"
   action:
     load_settings: "Load settings"
     save_tf2_path: "Save TF2 path"

@@ -46,7 +46,9 @@ use crate::pages::settings::SettingsPage;
 use crate::pages::sound_store::SoundStorePage;
 use crate::pages::sounds::SoundsPage;
 use crate::services::{recheck_tf2, run_blocking, tf2_state};
-use crate::sync::{SyncEvent, store_name, sync_hub};
+use crate::sync::{SyncEvent, sync_hub};
+use crate::sync_messages::sync_failed_title;
+use crate::updater::backend::failure_title;
 use crate::updater::{UpdateEvent, updater, view as update_view};
 use route::{NavigateTo, Page};
 use toast::ToastKind;
@@ -145,7 +147,7 @@ impl Shell {
                             window,
                             cx,
                             ToastKind::Error,
-                            format!("Failed to sync {}", store_name(*kind)),
+                            sync_failed_title(*kind),
                             failure.message.clone(),
                         );
                     }
@@ -166,7 +168,7 @@ impl Shell {
                         window,
                         cx,
                         ToastKind::Error,
-                        "Update failed",
+                        failure_title(),
                         failure.message.clone(),
                     );
                 }),

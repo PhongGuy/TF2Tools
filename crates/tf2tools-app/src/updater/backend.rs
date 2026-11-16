@@ -25,6 +25,11 @@ pub(super) fn unknown() -> SharedString {
     tr!("updater.failure.unknown")
 }
 
+/// The title of the toast that reports a failed download or install.
+pub fn failure_title() -> SharedString {
+    tr!("updater.failure.title")
+}
+
 /// Total time allowed for one check and one download, on top of core's per-read timeouts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Deadlines {

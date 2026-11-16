@@ -50,6 +50,18 @@ pub fn describe_sync(kind: StoreKind, err: &SyncError) -> SyncFailure {
     SyncFailure::new(message, err.to_string())
 }
 
+/// The title of a failed sync's toast, one whole sentence per store so each language words it its own way.
+pub fn sync_failed_title(kind: StoreKind) -> SharedString {
+    match kind {
+        StoreKind::CuratedHuds => tr!("messages.sync.failed_title.curated_huds"),
+        StoreKind::GameBananaHuds => tr!("messages.sync.failed_title.gamebanana_huds"),
+        StoreKind::Sounds => tr!("messages.sync.failed_title.sounds"),
+        StoreKind::Crosshairs => tr!("messages.sync.failed_title.crosshairs"),
+        StoreKind::Addons => tr!("messages.sync.failed_title.addons"),
+        _ => tr!("messages.sync.failed_title.store"),
+    }
+}
+
 /// A sync whose task ended without an outcome, keeping `detail` for the log.
 pub fn sync_stopped(detail: String) -> SyncFailure {
     SyncFailure::new(tr!("messages.sync.stopped"), detail)
