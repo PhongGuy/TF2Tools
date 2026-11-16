@@ -179,3 +179,38 @@ fn shown_dates_read_day_first_in_russian() {
     assert_eq!(last_played_label(Some("2026-11-01")), "01.11.2026");
     assert_eq!(last_played_label(Some("a while ago")), "a while ago");
 }
+
+#[test]
+fn store_sizes_and_counts_read_in_russian() {
+    use tf2tools_app::counts::format_count;
+    use tf2tools_app::pages::addon_store::model::downloads_label;
+    use tf2tools_app::store_download::{Progress, format_bytes, progress_label};
+    use tf2tools_core::DownloadPhase;
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(format_bytes(1_536), "1,5\u{a0}КБ");
+    assert_eq!(progress_label(None), "Загрузка...");
+    let p = Progress {
+        phase: DownloadPhase::Downloading,
+        downloaded: 1_048_576,
+        total: Some(2_097_152),
+    };
+    assert_eq!(
+        progress_label(Some(p)),
+        "Загрузка... 1,0\u{a0}МБ / 2,0\u{a0}МБ"
+    );
+    let unsized_ = Progress { total: None, ..p };
+    assert_eq!(progress_label(Some(unsized_)), "Загрузка... 1,0\u{a0}МБ");
+    let importing = Progress {
+        phase: DownloadPhase::Importing,
+        ..p
+    };
+    assert_eq!(progress_label(Some(importing)), "Распаковка...");
+    assert_eq!(format_count(999), "999");
+    assert_eq!(format_count(1_250), "1,3\u{a0}тыс.");
+    assert_eq!(format_count(999_950), "1000,0\u{a0}тыс.");
+    assert_eq!(format_count(1_240_000), "1,2\u{a0}млн");
+    assert_eq!(downloads_label(1), "1 загрузка");
+    assert_eq!(downloads_label(22), "22 загрузки");
+    assert_eq!(downloads_label(40_838), "40\u{a0}838 загрузок");
+    assert_ru(&downloads_label(40_838));
+}

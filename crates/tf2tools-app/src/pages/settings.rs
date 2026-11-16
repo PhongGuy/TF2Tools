@@ -30,7 +30,7 @@ use tf2tools_core::{
 
 use crate::activity;
 use crate::audio::volume::{bind_slider, shared_volume};
-use crate::i18n::{self, plural, tr};
+use crate::i18n::{self, format, plural, tr};
 use crate::ids;
 use crate::library_pack::LibraryPack;
 use crate::links;
@@ -46,7 +46,6 @@ use crate::services::{Services, Tf2State, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::route::Page;
 use crate::shell::toast::{ToastKind, error_label, toast, toast_error};
-use crate::store_download::scaled_bytes;
 use crate::sync::{SyncEvent, SyncHub, sync_hub};
 use crate::updater::{self, updater};
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
@@ -153,16 +152,9 @@ fn keep_rows(space: Option<&LogsSpace>) -> Vec<KeepRow> {
         .collect()
 }
 
-/// A byte count in the app's one size format (see `scaled_bytes`), with translated units.
+/// A byte count in the app's one size format, in the current language.
 pub fn size_text(bytes: u64) -> SharedString {
-    let (size, unit) = scaled_bytes(bytes);
-    match unit {
-        0 => tr!("settings.logs_tf.size_b", size = size),
-        1 => tr!("settings.logs_tf.size_kb", size = size),
-        2 => tr!("settings.logs_tf.size_mb", size = size),
-        3 => tr!("settings.logs_tf.size_gb", size = size),
-        _ => tr!("settings.logs_tf.size_tb", size = size),
-    }
+    format::bytes(bytes)
 }
 
 /// A keep choice's title, naming what it frees when that is more than nothing.

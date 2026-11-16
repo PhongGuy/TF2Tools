@@ -19,6 +19,7 @@ use tf2tools_core::{
     StoreItemId, StoreKind,
 };
 
+use crate::i18n::{format, tr};
 use crate::ids;
 use crate::library_events::LibraryEvents;
 use crate::services::Services;
@@ -48,44 +49,28 @@ impl From<DownloadProgress> for Progress {
 
 /// A byte count in binary units: whole bytes below 1 KB, else one decimal ("1.5 KB", "2.0 GB").
 pub fn format_bytes(bytes: u64) -> String {
-    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
-    let (value, unit) = scaled_bytes(bytes);
-    format!("{value} {}", UNITS[unit])
-}
-
-/// The app's one size format: `bytes` as the number to show and its unit's power of 1024
-/// (0 bytes, 1 KB, up to 4 TB). Whole bytes below 1 KB, else one decimal.
-pub fn scaled_bytes(bytes: u64) -> (String, usize) {
-    if bytes < 1024 {
-        return (bytes.to_string(), 0);
-    }
-    // Step up while the value would print as 1024.0 or more (judged on the one-decimal
-    // rounding the label shows), stopping at TB.
-    let mut value = bytes as f64 / 1024.0;
-    let mut unit = 1;
-    while (value * 10.0).round() / 10.0 >= 1024.0 && unit < 4 {
-        value /= 1024.0;
-        unit += 1;
-    }
-    (format!("{value:.1}"), unit)
+    format::bytes(bytes).to_string()
 }
 
 /// None or Downloading: "Downloading..." plus " {done} / {total}" or " {done}"; Importing: "Extracting...".
 pub fn progress_label(p: Option<Progress>) -> String {
     let Some(p) = p else {
-        return "Downloading...".to_string();
+        return tr!("common.size.downloading").to_string();
     };
     match p.phase {
-        DownloadPhase::Importing => "Extracting...".to_string(),
+        DownloadPhase::Importing => tr!("common.size.extracting").to_string(),
         DownloadPhase::Downloading | _ => match p.total {
-            Some(total) => {
-                format!(
-                    "Downloading... {} / {}",
-                    format_bytes(p.downloaded),
-                    format_bytes(total)
-                )
-            }
-            None => format!("Downloading... {}", format_bytes(p.downloaded)),
+            Some(total) => tr!(
+                "common.size.progress",
+                done = format_bytes(p.downloaded),
+                total = format_bytes(total)
+            )
+            .to_string(),
+            None => tr!(
+                "common.size.progress_no_total",
+                done = format_bytes(p.downloaded)
+            )
+            .to_string(),
         },
     }
 }

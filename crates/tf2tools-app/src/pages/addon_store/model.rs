@@ -2,6 +2,8 @@
 
 use tf2tools_core::{AddonEntry, StoreItem};
 
+use crate::i18n::{counted_plural, format};
+
 /// What an addon card offers: a Download or Update button, or an In Library or Installed badge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddonState {
@@ -38,18 +40,9 @@ pub fn addon_state(entry: Option<&AddonEntry>) -> AddonState {
     }
 }
 
-/// v5's "{n.toLocaleString()} downloads": "40,838 downloads".
+/// v5's "{n.toLocaleString()} downloads": "40,838 downloads", "1 download".
 pub fn downloads_label(count: u64) -> String {
-    // Group the digits in threes from the right, as the en-US locale does.
-    let digits = count.to_string();
-    let mut grouped = String::with_capacity(digits.len() + digits.len() / 3);
-    for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            grouped.push(',');
-        }
-        grouped.push(c);
-    }
-    format!("{grouped} downloads")
+    counted_plural("addon_store.downloads", count, &format::grouped(count), &[]).to_string()
 }
 
 /// The store's addons by display name, ignoring case.

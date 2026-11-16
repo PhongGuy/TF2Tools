@@ -49,11 +49,6 @@ settings:
     full_logs: { one: "%{count} full log uses", other: "%{count} full logs use" }
     measuring: "Measuring..."
     unmeasured: "The logs cache size could not be measured."
-    size_tb: "%{size} TB"
-    size_gb: "%{size} GB"
-    size_mb: "%{size} MB"
-    size_kb: "%{size} KB"
-    size_b: "%{size} B"
   sync:
     items: { one: "%{count} item cached", other: "%{count} items cached" }
     last_synced: "Last synced: %{when}"
@@ -145,6 +140,10 @@ common:
     mb: "%{size} MB"
     gb: "%{size} GB"
     tb: "%{size} TB"
+    downloading: "Downloading..."
+    extracting: "Extracting..."
+    progress: "Downloading... %{done} / %{total}"
+    progress_no_total: "Downloading... %{done}"
   duration:
     played_minutes: "%{minutes}m"
     played_hours_minutes: "%{hours}h %{minutes}m"
@@ -158,6 +157,9 @@ common:
     day_month_year: "%{day} %{month} %{year}"
     month_day_year: "%{month} %{day}, %{year}"
     month: { jan: "Jan", feb: "Feb", mar: "Mar", apr: "Apr", may: "May", jun: "Jun", jul: "Jul", aug: "Aug", sep: "Sep", oct: "Oct", nov: "Nov", dec: "Dec" }
+
+addon_store:
+  downloads: { one: "%{count} download", other: "%{count} downloads" }
 
 hud_store:
   added: "Added %{date}"

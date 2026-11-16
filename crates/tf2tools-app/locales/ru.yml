@@ -47,11 +47,6 @@ settings:
     full_logs: { one: "%{count} полный лог занимает", few: "%{count} полных лога занимают", many: "%{count} полных логов занимают" }
     measuring: "Измерение..."
     unmeasured: "Не удалось измерить размер кэша логов."
-    size_tb: "%{size} ТБ"
-    size_gb: "%{size} ГБ"
-    size_mb: "%{size} МБ"
-    size_kb: "%{size} КБ"
-    size_b: "%{size} Б"
   sync:
     items: { one: "%{count} элемент в кэше", few: "%{count} элемента в кэше", many: "%{count} элементов в кэше" }
     last_synced: "Последняя синхронизация: %{when}"
@@ -143,6 +138,10 @@ common:
     mb: "%{size}\u00A0МБ"
     gb: "%{size}\u00A0ГБ"
     tb: "%{size}\u00A0ТБ"
+    downloading: "Загрузка..."
+    extracting: "Распаковка..."
+    progress: "Загрузка... %{done} / %{total}"
+    progress_no_total: "Загрузка... %{done}"
   duration:
     played_minutes: "%{minutes}\u00A0мин"
     played_hours_minutes: "%{hours}\u00A0ч %{minutes}\u00A0мин"
@@ -156,6 +155,9 @@ common:
     day_month_year: "%{day} %{month} %{year}\u00A0г."
     month_day_year: "%{day} %{month} %{year}\u00A0г."
     month: { jan: "янв.", feb: "февр.", mar: "мар.", apr: "апр.", may: "мая", jun: "июн.", jul: "июл.", aug: "авг.", sep: "сент.", oct: "окт.", nov: "нояб.", dec: "дек." }
+
+addon_store:
+  downloads: { one: "%{count} загрузка", few: "%{count} загрузки", many: "%{count} загрузок" }
 
 hud_store:
   added: "Добавлено %{date}"
