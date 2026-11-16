@@ -9,7 +9,8 @@ use common::{
     LibraryEnv, builtin_catalog, crosshair_env, import_png_as, tree, write_file, zip_bytes,
 };
 use tf2tools_core::{
-    CrosshairEntry, CrosshairRef, LibraryKind, PaintTarget, Provenance, RgbaImage, SkipReason,
+    CrosshairEntry, CrosshairRef, InstallError, LibraryError, LibraryKind, PaintTarget, Provenance,
+    RgbaImage, SkipReason,
 };
 
 fn bundled_vtf() -> PathBuf {
@@ -155,7 +156,7 @@ fn a_packed_crosshair_without_its_vtf_is_skipped_as_missing() {
     assert!(
         env.lib
             .crosshair_preview(&library(&dot), &builtins)
-            .is_err_and(|e| matches!(e, tf2tools_core::LibraryError::NotFound { .. }))
+            .is_err_and(|e| matches!(e, LibraryError::NotFound { .. }))
     );
 }
 
@@ -168,4 +169,36 @@ fn a_hand_packed_painted_crosshair_still_opens_in_the_maker() {
     let packed = env.lib.painted_source(entry.id()).unwrap();
     assert_eq!(packed, loose);
     assert!(!packed.recovered());
+}
+
+/// A packed crosshair assigned to the scattergun whose `copy.zip` is then overwritten with junk.
+fn damaged(env: &LibraryEnv) -> PathBuf {
+    let dot = import_png_as(env, "Dot", Provenance::Local);
+    env.lib
+        .assign("tf_weapon_scattergun", &library(&dot))
+        .unwrap();
+    pack(env, &dot);
+    write_file(&dir_of(env, &dot).join("copy.zip"), b"not a zip at all")
+}
+
+#[test]
+fn applying_a_damaged_zip_is_an_io_error_naming_it() {
+    let env = crosshair_env();
+    let zip = damaged(&env);
+    let result = env.lib.apply_crosshairs(&env.tf2, &builtin_catalog());
+    assert!(
+        matches!(&result, Err(InstallError::Io { path, .. }) if *path == zip),
+        "{result:?}"
+    );
+}
+
+#[test]
+fn the_scan_reports_a_damaged_zip_as_an_io_error() {
+    let env = crosshair_env();
+    let zip = damaged(&env);
+    let result = env.lib.crosshairs_not_in_game(&env.tf2, &builtin_catalog());
+    assert!(
+        matches!(&result, Err(LibraryError::Io { path, .. }) if *path == zip),
+        "{result:?}"
+    );
 }

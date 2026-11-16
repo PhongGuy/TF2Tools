@@ -973,7 +973,7 @@ impl Library {
             let resolvable = is_weapon_script(&weapon_script)
                 && match source.as_str() {
                     SOURCE_BUILTIN => builtins.get(&reference).is_some(),
-                    SOURCE_LIBRARY => self.library_crosshair_files(&reference).is_some(),
+                    SOURCE_LIBRARY => self.library_crosshair_files(&reference)?.is_some(),
                     _ => false,
                 };
             let Some(script) = resolvable
@@ -1054,7 +1054,7 @@ impl Library {
                         })
                         .ok_or(SkipReason::UnknownBuiltin),
                     SOURCE_LIBRARY => self
-                        .library_crosshair_files(&reference)
+                        .library_crosshair_files(&reference)?
                         .ok_or(SkipReason::MissingLibraryCrosshair),
                     // A source v5 never wrote, as `assignments` leaves it out.
                     _ => continue,
@@ -1093,7 +1093,8 @@ impl Library {
                 let vtf = materials.join(format!("{name}.vtf"));
                 std::fs::write(&vtf, crosshair_for_game(found.vtf()?)).map_err(io_at(&vtf))?;
                 let vmt = materials.join(format!("{name}.vmt"));
-                let text = match found.vmt().filter(|_| name == reference.as_str()) {
+                let own = (name == reference.as_str()).then(|| found.vmt()).flatten();
+                let text = match own {
                     Some(own) => own?,
                     None => templates::vmt(reference).into_bytes(),
                 };
@@ -1220,32 +1221,24 @@ impl Library {
     }
 
     /// A library crosshair's files by folder name, as v5's import names them, loose or packed;
-    /// `None` when the name is unsafe, the zip does not open or the VTF is gone. A missing VMT
-    /// gets the template on apply. The caller holds the copies lock.
-    fn library_crosshair_files(&self, folder: &str) -> Option<CrosshairFiles> {
+    /// `None` when the name is unsafe or the VTF is gone, an error when the zip does not open.
+    /// A missing VMT gets the template on apply. The caller holds the copies lock.
+    fn library_crosshair_files(&self, folder: &str) -> Result<Option<CrosshairFiles>, IoFailure> {
         if !is_plain_name(folder) {
-            return None;
+            return Ok(None);
         }
         let dir = self.dir.library_dir(LibraryKind::Crosshairs).join(folder);
-        let source = ItemSource::open(&dir, CROSSHAIR_ZIP)
-            .inspect_err(|failure| {
-                tracing::warn!(
-                    path = %failure.path.display(),
-                    error = %failure.source,
-                    "crosshair copy could not be read"
-                );
-            })
-            .ok()?;
+        let source = ItemSource::open(&dir, CROSSHAIR_ZIP)?;
         let vtf = PathBuf::from(format!("{folder}.vtf"));
         if !source.has(&vtf) {
-            return None;
+            return Ok(None);
         }
         let vmt = vtf.with_extension("vmt");
-        Some(CrosshairFiles::Library {
+        Ok(Some(CrosshairFiles::Library {
             vmt: source.has(&vmt).then_some(vmt),
             vtf,
             source,
-        })
+        }))
     }
 
     /// A crosshair's folder name, or `NotFound` for an unknown id.
