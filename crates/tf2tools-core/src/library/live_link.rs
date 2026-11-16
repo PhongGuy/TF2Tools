@@ -8,9 +8,10 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rusqlite::OptionalExtension;
 
+use super::packed::{HUD_ZIP, ItemSource};
 use super::{
-    HudId, HudStatus, IoFailure, Library, copy_dir_excluding_metadata, create_dir_all,
-    game_custom_dir, hud_lowercase, is_plain_name, made_huds, remove_dir_if_present,
+    HudId, HudStatus, IoFailure, Library, METADATA_DIR, create_dir_all, game_custom_dir,
+    hud_lowercase, is_plain_name, made_huds, remove_dir_if_present,
 };
 use crate::error::{LibraryError, ReinstallError};
 use crate::hud_maker::is_device_name;
@@ -99,8 +100,10 @@ impl Library {
         // Staged one level down, so no scan of `tf/custom` takes the copy for a HUD.
         let staging = custom.join(STAGING_DIR);
         let fresh = staging.join("new").join(&folder);
-        let staged = copy_dir_excluding_metadata(&src, &fresh)
-            .and_then(|()| {
+        let any_metadata = |rel: &Path| rel.components().any(|c| c.as_os_str() == METADATA_DIR);
+        let staged = ItemSource::open(&src, HUD_ZIP)
+            .and_then(|source| source.extract_into(&fresh, &any_metadata))
+            .and_then(|_| {
                 if hud_lowercase::lowercases(&folder) {
                     hud_lowercase::lowercase_tree(&fresh, &folder)
                 } else {

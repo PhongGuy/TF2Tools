@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{OptionalExtension, params};
 use walkdir::WalkDir;
 
+use super::packed::{HUD_ZIP, ItemSource};
 use super::{
     HudId, IoFailure, Library, METADATA_DIR, Provenance, copy_dir_excluding_metadata,
     create_dir_all, first_free_number, game_custom_dir, gb_id_column, hud_folder, hud_lowercase,
@@ -557,11 +558,13 @@ impl Library {
         } else {
             made_huds::stranded_save(&live).ok_or_else(not_in_library)?
         };
+        // Opened first, so a damaged zip fails the install before anything changes.
+        let source = ItemSource::open(&src, HUD_ZIP)?;
 
         let custom = game_custom_dir(tf2)?;
         self.refuse_unnamed_huds(&custom, discard, None)?;
         // Scan before touching tf/custom, so a failed scan leaves the old install in place.
-        let mut target = self.install_name(&src, store_hud_id, store_gb_id, &folder)?;
+        let mut target = self.install_name(&src, &source, store_hud_id, store_gb_id, &folder)?;
         // TF2 on Linux ignores a HUD with capitals in its folder or file names.
         let lower = |name: &str| {
             if hud_lowercase::LOWERCASE_INSTALLS {
@@ -597,7 +600,8 @@ impl Library {
         // The target was free, so a half copy is ours to clear; left behind it would hold the
         // name against the retry.
         let dest = custom.join(&target);
-        let copied = copy_dir_excluding_metadata(&src, &dest).and_then(|()| {
+        let any_metadata = |rel: &Path| rel.components().any(|c| c.as_os_str() == METADATA_DIR);
+        let copied = source.extract_into(&dest, &any_metadata).and_then(|_| {
             if hud_lowercase::lowercases(&target) {
                 hud_lowercase::lowercase_tree(&dest, &target)
             } else {
@@ -629,12 +633,13 @@ impl Library {
         })
     }
 
-    /// The `tf/custom` folder a HUD's files at `src` want: the name they reference most,
-    /// else a curated HUD's repo name, else a copy's recorded install folder, else its
-    /// library `folder`.
+    /// The `tf/custom` folder the HUD's files in `src` want: the name they reference most,
+    /// else a curated HUD's repo name, else the recorded install folder in `dir`'s
+    /// `.tf2tools/maker.json`, else its library `folder`.
     pub(super) fn install_name(
         &self,
-        src: &Path,
+        dir: &Path,
+        src: &ItemSource,
         store_hud_id: Option<String>,
         store_gb_id: Option<i64>,
         folder: &str,
@@ -648,7 +653,7 @@ impl Library {
         {
             return Ok(name);
         }
-        Ok(recorded_install_folder(src).unwrap_or_else(|| folder.to_owned()))
+        Ok(recorded_install_folder(dir).unwrap_or_else(|| folder.to_owned()))
     }
 
     /// A curated HUD's fallback install folder: its store repo's name, else its library
@@ -883,13 +888,16 @@ impl Library {
             }
             // A lowercased install differs from its library copy by case, so it is compared
             // with the library as lowercased; one made before lowercasing matches as it is.
-            _ => match name.filter(|name| hud_lowercase::lowercases(name)) {
-                Some(name) => {
-                    hud_print::same_files(path, &src)?
-                        || hud_print::same_lowercased(path, &src, name)?
+            _ => {
+                let source = ItemSource::open(&src, HUD_ZIP)?;
+                match name.filter(|name| hud_lowercase::lowercases(name)) {
+                    Some(name) => {
+                        hud_print::same_files(path, &source)?
+                            || hud_print::same_lowercased(path, &source, name)?
+                    }
+                    None => hud_print::same_files(path, &source)?,
                 }
-                None => hud_print::same_files(path, &src)?,
-            },
+            }
         };
         Ok(if same {
             Standing::PutBack

@@ -4,9 +4,8 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use walkdir::WalkDir;
-
-use super::{IoFailure, METADATA_DIR, io_at, walk_failure};
+use super::packed::ItemSource;
+use super::{IoFailure, METADATA_DIR};
 use crate::hud_maker::check_hud_path;
 
 /// Text files the game reads, the only ones whose references count.
@@ -35,29 +34,21 @@ const RESERVED: [&str; 11] = [
     "tf",
 ];
 
-/// The `custom/<name>/` folder most often referenced by the HUD's text files under
-/// `hud_dir` (ties go to the byte-wise smallest name), or `None` when nothing qualifies.
+/// The `custom/<name>/` folder most often referenced by the text files of the HUD `src`
+/// (ties go to the byte-wise smallest name), or `None` when nothing qualifies.
 /// The name comes from untrusted files, so it is always a single safe path segment.
-pub(super) fn referenced_folder(hud_dir: &Path) -> Result<Option<String>, IoFailure> {
+pub(super) fn referenced_folder(src: &ItemSource) -> Result<Option<String>, IoFailure> {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
-    let walk = WalkDir::new(hud_dir)
-        .min_depth(1)
-        .into_iter()
-        .filter_entry(|e| e.file_name() != METADATA_DIR);
-    for entry in walk {
-        let entry = entry.map_err(|e| walk_failure(hud_dir, e))?;
-        let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
-        if !entry.file_type().is_file() || !TEXT_EXTENSIONS.iter().any(|ext| name.ends_with(ext)) {
+    let any_metadata = |rel: &Path| rel.components().any(|c| c.as_os_str() == METADATA_DIR);
+    for (rel, len) in src.files(&any_metadata)? {
+        let name = rel
+            .file_name()
+            .map(|n| n.to_string_lossy().to_ascii_lowercase())
+            .unwrap_or_default();
+        if len > MAX_SCANNED_BYTES || !TEXT_EXTENSIONS.iter().any(|ext| name.ends_with(ext)) {
             continue;
         }
-        let len = entry
-            .metadata()
-            .map_err(|e| walk_failure(hud_dir, e))?
-            .len();
-        if len > MAX_SCANNED_BYTES {
-            continue;
-        }
-        let bytes = std::fs::read(entry.path()).map_err(io_at(entry.path()))?;
+        let bytes = src.read(&rel)?;
         for found in references(&String::from_utf8_lossy(&bytes)) {
             *counts.entry(found.to_owned()).or_default() += 1;
         }

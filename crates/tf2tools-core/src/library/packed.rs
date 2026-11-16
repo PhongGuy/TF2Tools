@@ -72,7 +72,6 @@ impl ItemSource {
 
     /// Folders and regular files, relative, in walk order; a packed item's folders are the
     /// ancestors of its files. `skip` as `tree_copy::entries` takes it.
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 3"))]
     pub(crate) fn entries(
         &self,
         skip: &dyn Fn(&Path) -> bool,
@@ -96,7 +95,6 @@ impl ItemSource {
     }
 
     /// Regular files with their (uncompressed) sizes, in walk order.
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 3"))]
     pub(crate) fn files(
         &self,
         skip: &dyn Fn(&Path) -> bool,
@@ -110,7 +108,6 @@ impl ItemSource {
     }
 
     /// The bytes of the file at `rel`.
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 3"))]
     pub(crate) fn read(&self, rel: &Path) -> Result<Vec<u8>, IoFailure> {
         match self {
             ItemSource::Loose(dir) => {
@@ -129,7 +126,6 @@ impl ItemSource {
     }
 
     /// SHA-256 hex of the file at `rel`.
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 3"))]
     pub(crate) fn sha256(&self, rel: &Path) -> Result<String, IoFailure> {
         match self {
             ItemSource::Loose(dir) => sha256_file(&dir.join(rel)),
@@ -177,7 +173,6 @@ impl ItemSource {
     }
 
     /// Whether `dir` holds exactly these files (both sides filtered by `skip`) with the same bytes.
-    #[cfg_attr(not(test), expect(dead_code, reason = "first used in Task 3"))]
     pub(crate) fn same_as(
         &self,
         dir: &Path,

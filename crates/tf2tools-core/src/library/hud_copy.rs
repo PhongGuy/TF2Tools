@@ -13,6 +13,7 @@ use super::made_huds::{
     prune_pictures, read_adding, read_capped, read_row, readable_folder, recover_swap,
     replay_with_kept_copies, roll_back, write_build, write_copy_in_place,
 };
+use super::packed::{HUD_ZIP, ItemSource};
 use super::{
     GbId, HudEntry, HudId, IoFailure, Library, METADATA_DIR, Provenance, create_dir_all,
     folder_name, io_at, is_plain_name, library_db, new_id, now, tree_copy,
@@ -255,6 +256,7 @@ impl Library {
         let install = self
             .install_name(
                 src,
+                &ItemSource::open(src, HUD_ZIP)?,
                 row.store_hud_id.clone(),
                 row.store_gb_id,
                 entry.folder_name(),
