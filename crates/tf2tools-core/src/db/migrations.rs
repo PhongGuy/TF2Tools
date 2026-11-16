@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 20;
+pub(crate) const SCHEMA_VERSION: u32 = 21;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -138,6 +138,12 @@ const STEPS: &[Step] = &[
         version: 20,
         sql: STEP_20_SQL,
         add_columns: &[],
+    },
+    // v6 step 21: when the player last opened a log; NULL until the detail view opens it.
+    Step {
+        version: 21,
+        sql: "",
+        add_columns: &[("logstf_logs", "opened_at", "INTEGER")],
     },
 ];
 

@@ -193,3 +193,15 @@ fn a_boot_without_auto_sync_leaves_the_maps_sync_idle(cx: &mut TestAppContext) {
         assert!(!sync.is_running() && sync.last().is_none() && sync.error().is_none());
     });
 }
+
+#[gpui_kit::test]
+fn startup_trims_the_logs_cache_after_the_first_frame(cx: &mut TestAppContext) {
+    let env = support::env();
+    let _win = started(cx, boot(&env, false));
+    support::wait_real(cx, "the startup trim", |cx| {
+        cx.update(|cx| {
+            tf2tools_app::logs_trim::LogsTrim::try_global(cx)
+                .is_some_and(|trim| trim.read(cx).passes() >= 1)
+        })
+    });
+}

@@ -471,3 +471,20 @@ fn the_readme_tells_players_they_can_pick_a_language() {
         "{settings}"
     );
 }
+
+#[test]
+fn the_logs_section_says_unopened_full_logs_are_cleared() {
+    let readme = repo_file("README.md");
+    let (_, logs) = readme
+        .split_once("### logs.tf stats")
+        .expect("a logs.tf section");
+    let (logs, _) = logs.split_once("\n### ").expect("a section after it");
+    assert!(
+        logs.contains("cleared to save space") && logs.contains("downloads again when you open it"),
+        "logs.tf section: {logs}"
+    );
+    assert!(
+        !logs.contains("keeps them, so the page works offline"),
+        "the old promise is gone: {logs}"
+    );
+}

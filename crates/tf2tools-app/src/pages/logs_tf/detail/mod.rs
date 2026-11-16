@@ -148,7 +148,7 @@ pub(super) fn panel(
             log_body(open, log, tracked, sort, matrix, page, cx).into_any_element()
         }
         OpenState::Loading => status(LOG_LOADING),
-        OpenState::Failed(why) if row.state() == LogState::Pending => {
+        OpenState::Failed(why) if matches!(row.state(), LogState::Pending | LogState::Trimmed) => {
             let on_retry = move |_: &mut Window, cx: &mut App| {
                 let _ = page.update(cx, |page, cx| page.retry(id, cx));
             };

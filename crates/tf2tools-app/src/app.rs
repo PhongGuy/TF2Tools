@@ -200,6 +200,8 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                         detect_tf2(win, cx);
                         tokio_bridge::init(cx);
                         updates.update(cx, |updates, cx| updates.check(cx));
+                        // Trimming is local, so it runs whatever auto_sync says.
+                        crate::logs_trim::LogsTrim::global(cx);
                         if auto_sync && let Some(hub) = sync_hub(cx) {
                             hub.update(cx, |hub, cx| hub.start_all(cx));
                         }

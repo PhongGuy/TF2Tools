@@ -24,7 +24,8 @@ use gpui_kit::{
 };
 
 use tf2tools_core::{
-    LogLevel, NewLogEntry, Settings, SettingsError, StoreKind, StoreSyncStatus, Tf2Install,
+    KeepFullLogs, LogLevel, LogsSpace, NewLogEntry, Settings, SettingsError, StoreKind,
+    StoreSyncStatus, Tf2Install,
 };
 
 use crate::activity;
@@ -36,6 +37,7 @@ use crate::local_messages::{
     describe_detect, describe_settings, describe_store_status, describe_tf2_folder,
 };
 use crate::log_nicknames::LogNicknames;
+use crate::logs_trim::LogsTrim;
 use crate::mature::MatureAddons;
 use crate::notices::{self, Notice};
 use crate::picker::PickKind;
@@ -111,6 +113,82 @@ impl SearchableListItem for LanguageRow {
     }
 }
 
+/// One "Keep full logs for" choice, titled with what it would free now.
+#[derive(Debug, Clone)]
+struct KeepRow {
+    key: SharedString,
+    title: SharedString,
+}
+
+impl SearchableListItem for KeepRow {
+    type Value = SharedString;
+
+    fn title(&self) -> SharedString {
+        self.title.clone()
+    }
+
+    fn render(&self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        div()
+            .id(ids::settings_log_keep(&self.key))
+            .test_support()
+            .child(self.title.clone())
+    }
+
+    fn value(&self) -> &SharedString {
+        &self.key
+    }
+}
+
+// Every keep choice; before the first figures land no row names what it frees.
+fn keep_rows(space: Option<&LogsSpace>) -> Vec<KeepRow> {
+    KeepFullLogs::ALL
+        .into_iter()
+        .map(|keep| KeepRow {
+            key: keep.key().into(),
+            title: keep_text(keep, space.map_or(0, |s| s.frees(keep))),
+        })
+        .collect()
+}
+
+/// A byte count in decimal units: whole KB under a megabyte, else MB to one decimal.
+pub fn size_text(bytes: u64) -> SharedString {
+    if bytes < 1_000_000 {
+        tr!(
+            "settings.logs_tf.size_kb",
+            size = bytes.saturating_add(500) / 1000
+        )
+    } else {
+        let mb = format!("{:.1}", bytes as f64 / 1_000_000.);
+        tr!("settings.logs_tf.size_mb", size = mb)
+    }
+}
+
+/// A keep choice's title, naming what it frees when that is more than nothing.
+pub fn keep_text(keep: KeepFullLogs, frees: u64) -> SharedString {
+    let option = match keep.days() {
+        Some(days) => plural("settings.logs_tf.keep.days", days.unsigned_abs()),
+        None => tr!("settings.logs_tf.keep.forever"),
+    };
+    if frees == 0 {
+        return option;
+    }
+    tr!(
+        "settings.logs_tf.keep.frees",
+        option = option,
+        size = size_text(frees)
+    )
+}
+
+/// The line saying what the whole logs cache takes and what its full logs take.
+pub fn usage_text(cache_bytes: u64, full_logs: u64, full_bytes: u64) -> SharedString {
+    tr!(
+        "settings.logs_tf.usage",
+        cache = size_text(cache_bytes),
+        logs = plural("settings.logs_tf.full_logs", full_logs),
+        full = size_text(full_bytes)
+    )
+}
+
 /// The Settings form. The shell keeps it across visits, so unsaved edits stay until Save; it
 /// loads the saved settings on creation and rereads them each time it shows again.
 pub struct SettingsPage {
@@ -124,6 +202,8 @@ pub struct SettingsPage {
     /// The install select, present only after Auto-detect found several installs.
     candidates: Option<Candidates>,
     language: Entity<SelectState<Vec<LanguageRow>>>,
+    trim: Entity<LogsTrim>,
+    keep: Entity<SelectState<Vec<KeepRow>>>,
     loaded: bool,
     busy: Option<Busy>,
     /// Each store's cached count and last sync, absent until the first read lands or if it failed.
@@ -295,6 +375,7 @@ impl SettingsPage {
             })
             .unwrap_or_default();
         let language = Self::language_select(window, cx);
+        let (trim, keep) = Self::keep_select(window, cx);
         // The App Updates card draws the updater's state, so every change redraws the page.
         let updates = updater(cx).map(|u| cx.observe(&u, |_, _, cx| cx.notify()));
         let mut page = Self {
@@ -306,6 +387,8 @@ impl SettingsPage {
             saved_hours: 0,
             candidates: None,
             language,
+            trim,
+            keep,
             loaded: false,
             busy: None,
             sync_status: None,
@@ -618,6 +701,57 @@ impl SettingsPage {
         select
     }
 
+    // The keep select over the trim job's figures. Every landed pass retitles the rows and
+    // shows the saved choice; a confirmed row goes to the job at once, outside "Save Settings".
+    fn keep_select(
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> (Entity<LogsTrim>, Entity<SelectState<Vec<KeepRow>>>) {
+        let trim = LogsTrim::global(cx);
+        let rows = keep_rows(trim.read(cx).space());
+        let chosen = trim
+            .read(cx)
+            .keep()
+            .and_then(|keep| KeepFullLogs::ALL.iter().position(|k| *k == keep));
+        let select = cx.new(|cx| {
+            SelectState::new(
+                rows,
+                chosen.map(|i| IndexPath::default().row(i)),
+                window,
+                cx,
+            )
+        });
+        cx.subscribe_in(&select, window, |page, _, event, _, cx| {
+            if let SelectEvent::Confirm(Some(key)) = event
+                && let Some(keep) = KeepFullLogs::from_key(key)
+            {
+                page.trim.update(cx, |trim, cx| trim.set_keep(keep, cx));
+            }
+        })
+        .detach();
+        cx.observe_in(&trim, window, |page, _, window, cx| {
+            page.refresh_keep(window, cx)
+        })
+        .detach();
+        (trim, select)
+    }
+
+    // Retitles the keep rows in the current language and selects the job's choice.
+    fn refresh_keep(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let trim = self.trim.read(cx);
+        let rows = keep_rows(trim.space());
+        let chosen: Option<SharedString> = trim.keep().map(|keep| keep.key().into());
+        self.keep.update(cx, |select, cx| {
+            select.set_items(rows, window, cx);
+            if let Some(key) = chosen
+                && select.selected_value() != Some(&key)
+            {
+                select.set_selected_value(&key, window, cx);
+            }
+        });
+        cx.notify();
+    }
+
     // Switches the whole app at once and saves the choice in the background, as the
     // mature add-ons switch does; a failed save only logs, the switch already happened.
     // The path input keeps its placeholder text, so it takes the new language's by hand.
@@ -626,6 +760,7 @@ impl SettingsPage {
         self.path.update(cx, |input, cx| {
             input.set_placeholder(tr!("settings.tf2.placeholder"), window, cx)
         });
+        self.refresh_keep(window, cx);
         let save = run_blocking(cx, move |s| {
             s.db.set_language(applied)
                 .map_err(|e| describe_settings(&e).into_op("Save language"))
@@ -990,6 +1125,34 @@ impl Render for SettingsPage {
                 ids::SETTINGS_LANGUAGE_NOTE,
                 tr!("settings.language.note"),
             )));
+        // A failed pass keeps earlier figures; with none yet, the line says so instead of waiting.
+        let trim = self.trim.read(cx);
+        let usage = match trim.space() {
+            Some(s) => usage_text(s.cache_bytes(), s.full_logs(), s.full_bytes()),
+            None if trim.failed() => tr!("settings.logs_tf.unmeasured"),
+            None => tr!("settings.logs_tf.measuring"),
+        };
+        let logs_tf = v_flex()
+            .gap_3()
+            .child(nicknames_switch(cx))
+            .child(div().text_sm().child(tr!("settings.logs_tf.keep.label")))
+            .child(
+                div()
+                    .id(ids::SETTINGS_LOG_KEEP)
+                    .test_support()
+                    .child(Select::new(&self.keep)),
+            )
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(muted)
+                    .child(tr!("settings.logs_tf.cost")),
+            )
+            .child(
+                div()
+                    .text_sm()
+                    .child(labelled(ids::SETTINGS_LOG_SPACE, usage)),
+            );
         let installation = v_flex()
             .gap_3()
             .child(
@@ -1116,7 +1279,7 @@ impl Render for SettingsPage {
                     .child(card(
                         tr!("settings.logs_tf.title"),
                         tr!("settings.logs_tf.description"),
-                        Some(nicknames_switch(cx)),
+                        Some(logs_tf.into_any_element()),
                         cx,
                     ))
                     // v5 shows the store cards only once their status has been read.

@@ -159,6 +159,7 @@ mod logs_tf_sort;
 mod logs_tf_sync;
 mod logs_tf_text;
 mod logs_tf_weapons;
+mod logs_trim;
 mod maps;
 mod maps_gamebanana;
 mod maps_gamebanana_installs;

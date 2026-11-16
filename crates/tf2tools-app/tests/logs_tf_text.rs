@@ -820,3 +820,20 @@ fn rows_with_one_shown_name_merge_into_the_first() {
     assert_eq!(rocket.raw, "deflect_rocket", "the first by kills");
     assert_eq!(rocket.accuracy, "67%", "4 of 6 shots over both sides");
 }
+
+#[test]
+fn a_full_log_logs_tf_no_longer_has_gets_its_own_line() {
+    use tf2tools_app::pages::logs_tf::text::{FULL_LOG_GONE, TRIMMED_OFFLINE};
+    assert_eq!(
+        fetch_message(&tf2tools_core::LogsFetchError::FullLogGone),
+        Some(FULL_LOG_GONE)
+    );
+    assert_eq!(
+        FULL_LOG_GONE,
+        "logs.tf no longer has the full log; its stats stay."
+    );
+    assert_eq!(
+        TRIMMED_OFFLINE,
+        "This full log was cleared to save space. Connect to the internet to open it."
+    );
+}

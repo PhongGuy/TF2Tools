@@ -152,3 +152,27 @@ fn a_language_saved_last_time_applies_at_startup(cx: &mut TestAppContext) {
         note(cx, win).as_deref() == Some(NOTE_RU)
     });
 }
+
+#[test]
+fn the_logs_cache_lines_read_in_russian() {
+    use tf2tools_app::pages::settings::{keep_text, size_text, usage_text};
+    use tf2tools_core::KeepFullLogs;
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(keep_text(KeepFullLogs::Day1, 0), "1 день");
+    assert_eq!(keep_text(KeepFullLogs::Days3, 0), "3 дня");
+    assert_eq!(keep_text(KeepFullLogs::Days7, 0), "7 дней");
+    assert_eq!(keep_text(KeepFullLogs::Forever, 0), "Всегда");
+    assert_eq!(
+        keep_text(KeepFullLogs::Days3, 12_345_678),
+        "3 дня, освободит около 12.3 МБ"
+    );
+    assert_eq!(size_text(10_300), "10 КБ");
+    assert_eq!(
+        usage_text(25_000_000, 21, 216_300),
+        "Кэш логов занимает около 25.0 МБ; 21 полный лог занимает около 216 КБ."
+    );
+    assert_eq!(
+        usage_text(25_000_000, 3, 30_900),
+        "Кэш логов занимает около 25.0 МБ; 3 полных лога занимают около 31 КБ."
+    );
+}

@@ -267,3 +267,41 @@ pub async fn remove_on_download(
         .mount(server)
         .await;
 }
+
+/// Log `id` stored for Arie as a sync stores it: the 6v6 fixture's body compressed, uploaded at
+/// `date`, fetched at `fetched_at`, both backfills counted, with one class row and one weapon row.
+pub fn seed_stored(dir: &tf2tools_core::DataDir, id: i64, date: i64, fetched_at: i64) {
+    use std::io::Write;
+    let mut zlib = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::new(6));
+    zlib.write_all(logstf_fixture("log-4137103-6v6.json").as_bytes())
+        .unwrap();
+    let body = zlib.finish().unwrap();
+    let steam = i64::try_from(ARIE).unwrap();
+    let conn = super::sql(dir);
+    conn.execute(
+        "INSERT INTO logstf_logs (id, title, map, date, length, body, fetched_at, state,
+             weapons_counted, dt_counted)
+         VALUES (?1, 't', 'm', ?2, 1714, ?3, ?4, 0, 1, 1)",
+        rusqlite::params![id, date, body, fetched_at],
+    )
+    .unwrap();
+    conn.execute_batch(&format!(
+        "INSERT INTO logstf_player_logs (steam_id, log_id) VALUES ({steam}, {id});
+         INSERT INTO logstf_class_rows (log_id, steam_id, class, seconds, kills, deaths, assists,
+             dmg, dt)
+             VALUES ({id}, {steam}, 'scout', 600, 5, 2, 3, 2000, 1500);
+         INSERT INTO logstf_weapon_rows (log_id, steam_id, class, weapon, kills, dmg, shots, hits)
+             VALUES ({id}, {steam}, 'scout', 'scattergun', 5, 1800, 40, 20);"
+    ))
+    .unwrap();
+}
+
+/// Marks log `id` trimmed by hand, as a trim pass leaves it: no body, state 3.
+pub fn trim_by_hand(dir: &tf2tools_core::DataDir, id: i64) {
+    super::sql(dir)
+        .execute(
+            "UPDATE logstf_logs SET body = NULL, state = 3 WHERE id = ?1",
+            [id],
+        )
+        .unwrap();
+}

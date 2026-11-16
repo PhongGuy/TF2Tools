@@ -4,9 +4,11 @@ mod averages;
 mod cache;
 mod client;
 mod detail;
+mod keep;
 mod range;
 mod steam_id;
 mod steam_xml;
+mod trim;
 mod weapons;
 
 use std::time::Duration;
@@ -21,8 +23,10 @@ pub use detail::{
     MatrixRow, MedicLine, Medigun, PlayerLine, RoundEvent, RoundLine, RoundPlayer, RoundTeam,
     TeamTotals, WeaponLine, parse_log,
 };
+pub use keep::KeepFullLogs;
 pub use range::{LogsRange, window_start};
 pub use steam_id::{PlayerInput, SteamId, parse_player_input};
+pub use trim::{LogsSpace, OpenedBody, TrimReport};
 pub use weapons::{ClassWeapons, WeaponBackfill, WeaponSum};
 
 /// The SteamID64 of account number 0 in the public universe.

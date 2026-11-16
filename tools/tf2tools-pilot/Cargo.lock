@@ -7919,6 +7919,7 @@ dependencies = [
  "image",
  "rodio",
  "rust-embed",
+ "rust-i18n",
  "serde_json",
  "tempfile",
  "tf2tools-core",

@@ -233,7 +233,10 @@ fn log_item(
     let theme = cx.theme();
     let id = row.id();
     let open = state.expanded() == Some(id);
-    let opens = matches!(row.state(), LogState::Ready | LogState::Pending);
+    let opens = matches!(
+        row.state(),
+        LogState::Ready | LogState::Pending | LogState::Trimmed
+    );
     let chevron = div().w(CHEVRON).flex_none().children(opens.then(|| {
         Icon::new(if open {
             IconName::ChevronDown
@@ -280,7 +283,7 @@ fn log_item(
             el.child(map_cell(div().w(MAP).flex_none(), id, row.map()))
         });
     line = match row.state() {
-        LogState::Ready => line.children(stats(row, fit, cx)),
+        LogState::Ready | LogState::Trimmed => line.children(stats(row, fit, cx)),
         state @ (LogState::Pending | LogState::Gone | LogState::Unreadable | _) => {
             line.child(note(id, state, fit, cx))
         }

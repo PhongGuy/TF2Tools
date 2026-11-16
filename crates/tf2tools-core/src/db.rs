@@ -70,6 +70,18 @@ impl Database {
         writer
             .pragma_update(None, "foreign_keys", true)
             .map_err(|e| sqlite_error(&path, e))?;
+        // Only a brand-new file can take incremental vacuum here, and only before WAL is set;
+        // an existing file converts when the logs.tf trim compacts it.
+        if found == 0 {
+            let tables: i64 = writer
+                .query_row("SELECT COUNT(*) FROM sqlite_schema", [], |r| r.get(0))
+                .map_err(|e| sqlite_error(&path, e))?;
+            if tables == 0 {
+                writer
+                    .pragma_update(None, "auto_vacuum", "INCREMENTAL")
+                    .map_err(|e| sqlite_error(&path, e))?;
+            }
+        }
         writer
             .pragma_update_and_check(None, "journal_mode", "WAL", |r| r.get::<_, String>(0))
             .map_err(|e| sqlite_error(&path, e))?;
