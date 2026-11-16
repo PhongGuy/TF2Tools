@@ -16,6 +16,7 @@ use gpui_kit::{
 
 use super::AudioOut;
 use super::volume::{SharedVolume, bind_slider, shared_volume};
+use crate::i18n::tr;
 use crate::ids;
 use crate::local_messages::{describe_audio, describe_settings};
 use crate::services::{OpError, Services, run_blocking};
@@ -144,7 +145,7 @@ impl Player {
                     .ended()
                     .await
                     .err()
-                    .map(|err| describe_audio(&err).into_op("Failed to play sound")),
+                    .map(|err| describe_audio(&err).into_op(tr!("messages.action.play_sound"))),
                 Ok(Some(Err(err))) => Some(err),
                 Ok(None) | Err(_) => return,
             };
@@ -184,7 +185,7 @@ impl Player {
         }
         let reading = run_blocking(cx, |s| {
             s.db.settings()
-                .map_err(|e| describe_settings(&e).into_op("Load settings"))
+                .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.load_settings")))
         });
         let (win, shared) = (self.win, self.shared.clone());
         cx.spawn(async move |player, cx| {

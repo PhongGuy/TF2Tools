@@ -21,6 +21,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{StoreCard, StoreKind, StoreQuery, StoreSort};
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::pages::common::{
@@ -465,7 +466,7 @@ impl StoreGrid {
             let count = |q: &StoreQuery| {
                 s.store
                     .store_count(kind, q)
-                    .map_err(|e| OpError::core("load the store", e))
+                    .map_err(|e| OpError::core(tr!("messages.action.load_store"), e))
             };
             Ok((count(&shown)?, count(&total)?))
         });
@@ -502,7 +503,7 @@ impl StoreGrid {
         let reading = run_blocking(cx, move |s| {
             s.store
                 .store_cards(kind, &query)
-                .map_err(|e| OpError::core("load the store", e))
+                .map_err(|e| OpError::core(tr!("messages.action.load_store"), e))
         });
         cx.spawn(async move |grid, cx| {
             let page = reading.await;
@@ -614,7 +615,7 @@ impl StoreGrid {
                 };
                 s.store
                     .store_cards(kind, &query)
-                    .map_err(|e| OpError::core("load the store", e))
+                    .map_err(|e| OpError::core(tr!("messages.action.load_store"), e))
             })
         });
         cx.spawn(async move |grid, cx| {

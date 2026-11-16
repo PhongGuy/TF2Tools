@@ -3,12 +3,15 @@
 
 use std::collections::{HashMap, HashSet};
 
-use gpui_kit::{AnyWindowHandle, App, AppContext as _, Context, Entity, EventEmitter, Global};
+use gpui_kit::{
+    AnyWindowHandle, App, AppContext as _, Context, Entity, EventEmitter, Global, SharedString,
+};
 use tf2tools_core::{
     AddonName, FilesError, LogLevel, NewLogEntry, StoreFile, StoreItemId, StoreKind,
 };
 
 use crate::activity;
+use crate::i18n::tr;
 use crate::library_events::LibraryEvents;
 use crate::services::{OpError, Services, Tf2Global, run_blocking};
 use crate::shell::toast::{ToastKind, toast, toast_error};
@@ -19,12 +22,14 @@ use crate::store_messages::{
 };
 use crate::tokio_bridge::{self, JoinError};
 
-const INSTALL_FAILED: &str = "Failed to install addon";
+fn install_failed_title() -> SharedString {
+    tr!("messages.action.install_addon")
+}
 
 // Logs a failed reinstall's raw error and keeps only the player words for the toast.
 fn install_failed(failure: StoreFailure) -> OpError {
     failure.log("addon update");
-    OpError::core(INSTALL_FAILED, failure.message)
+    OpError::core(install_failed_title(), failure.message)
 }
 
 /// How an addon download ended for the pages that show it.
@@ -145,7 +150,7 @@ impl AddonUpdates {
                     Ok(Ok(_)) => release_has_no_file(),
                 };
                 failure.log("addon update");
-                let err = OpError::core("Failed to download addon", failure.message);
+                let err = OpError::core(tr!("messages.action.download_addon"), failure.message);
                 let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
                 self.settle(&name, cx);
                 return;

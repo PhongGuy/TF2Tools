@@ -2,10 +2,13 @@
 //! which runs off the UI thread with at most one in flight and one rerun queued behind it.
 //! Without TF2 the change waits and applies once the game is found. A failure toasts once.
 
-use gpui_kit::{AnyWindowHandle, App, AppContext as _, Context, Entity, Global, Subscription};
+use gpui_kit::{
+    AnyWindowHandle, App, AppContext as _, Context, Entity, Global, SharedString, Subscription,
+};
 use tf2tools_core::{LogLevel, NewLogEntry};
 
 use crate::activity;
+use crate::i18n::tr;
 use crate::local_messages::describe_tf2_install;
 use crate::pages::crosshairs::skipped_description;
 use crate::pages::profiles::probe::Tf2Probe;
@@ -13,7 +16,9 @@ use crate::services::{Tf2State, run_blocking, tf2_state};
 use crate::shell::toast::toast_error;
 
 /// Every failed apply toasts under this action.
-const FAILED: &str = "Couldn't save your crosshairs to TF2";
+fn failed() -> SharedString {
+    tr!("messages.action.save_crosshairs")
+}
 
 /// Where the last change stands.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -168,7 +173,7 @@ impl CrosshairSync {
             let report = s
                 .library
                 .apply_crosshairs(&tf2, &s.builtins)
-                .map_err(|e| describe_tf2_install(&e).into_op(FAILED))?;
+                .map_err(|e| describe_tf2_install(&e).into_op(failed()))?;
             if !report.applied().is_empty() {
                 let entry = NewLogEntry::new(
                     LogLevel::Info,

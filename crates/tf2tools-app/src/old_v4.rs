@@ -14,6 +14,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{OldV4, Settings};
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::local_messages::describe_settings;
 use crate::services::{Services, run_blocking};
@@ -96,7 +97,7 @@ impl OldV4Notice {
         cx.notify();
         let save = run_blocking(cx, |s| {
             s.db.set_old_v4_asked()
-                .map_err(|e| describe_settings(&e).into_op("Save your answer"))
+                .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.save_answer")))
         });
         cx.spawn_in(window, async move |_, cx| {
             if let Err(err) = save.await {

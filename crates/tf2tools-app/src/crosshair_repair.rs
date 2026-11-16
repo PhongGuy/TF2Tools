@@ -6,14 +6,20 @@ use gpui_kit::{AnyWindowHandle, App, Global, SharedString};
 use tf2tools_core::{LogLevel, NewLogEntry, Tf2Install, crosshair_scripts_need_repair};
 
 use crate::activity;
+use crate::i18n::tr;
 use crate::library_events::LibraryEvents;
 use crate::local_messages::describe_tf2_install;
 use crate::pages::crosshairs::skipped_description;
 use crate::services::{Tf2State, run_blocking, tf2_state};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 
-const FIXED: &str = "Fixed your crosshairs for the latest TF2 update";
-const FAILED: &str = "Couldn't fix your crosshairs for the latest TF2 update";
+fn fixed() -> SharedString {
+    tr!("messages.action.crosshairs_fixed")
+}
+
+fn failed() -> SharedString {
+    tr!("messages.action.fix_crosshairs_failed")
+}
 
 // Set once the check has run this start, so a later find of the game never checks again.
 struct Checked;
@@ -50,7 +56,7 @@ fn check(win: AnyWindowHandle, tf2: Tf2Install, cx: &mut App) {
         let report = s
             .library
             .apply_crosshairs(&tf2, &s.builtins)
-            .map_err(|e| describe_tf2_install(&e).into_op(FAILED))?;
+            .map_err(|e| describe_tf2_install(&e).into_op(failed()))?;
         let entry = NewLogEntry::new(
             LogLevel::Info,
             "crosshair",
@@ -69,12 +75,12 @@ fn check(win: AnyWindowHandle, tf2: Tf2Install, cx: &mut App) {
             let repaired = matches!(done, Ok(Some(_)));
             let _ = win.update(cx, |_, window, cx| match done {
                 Ok(None) => {}
-                Ok(Some(None)) => toast(window, cx, ToastKind::Success, FIXED, ""),
+                Ok(Some(None)) => toast(window, cx, ToastKind::Success, fixed(), ""),
                 Ok(Some(Some(skipped))) => toast(
                     window,
                     cx,
                     ToastKind::Warning,
-                    FIXED,
+                    fixed(),
                     SharedString::from(skipped),
                 ),
                 Err(err) => toast_error(window, cx, &err),

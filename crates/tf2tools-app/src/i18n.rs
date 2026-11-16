@@ -234,6 +234,43 @@ mod tests {
         ["messages", "common", "updater"].map(str::to_owned).into()
     }
 
+    // The 1-based lines of `code` where an OpError action title is a string literal: the first
+    // argument of `into_op(` or `OpError::core(`, or an `action: ` field. Comment lines are skipped.
+    fn literal_title_lines(code: &str) -> Vec<usize> {
+        let mut lines = Vec::new();
+        for opener in ["into_op(", "OpError::core(", "action: "] {
+            for (at, _) in code.match_indices(opener) {
+                let line_start = code[..at].rfind('\n').map_or(0, |n| n + 1);
+                let comment = code[line_start..at].trim_start().starts_with("//");
+                if !comment && code[at + opener.len()..].trim_start().starts_with('"') {
+                    lines.push(code[..at].matches('\n').count() + 1);
+                }
+            }
+        }
+        lines.sort_unstable();
+        lines
+    }
+
+    // "<path under src>:<line>" for each literal title in the shipped code of files `include` keeps.
+    fn literal_titles(include: impl Fn(&str) -> bool) -> Vec<String> {
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut found = Vec::new();
+        for file in src_files() {
+            let rel = file
+                .strip_prefix(&src)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            if include(&rel) {
+                let source = std::fs::read_to_string(&file).unwrap();
+                for line in literal_title_lines(shipped_part(&source)) {
+                    found.push(format!("{rel}:{line}"));
+                }
+            }
+        }
+        found
+    }
+
     fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
         for entry in std::fs::read_dir(dir).unwrap() {
             let path = entry.unwrap().path();
@@ -459,5 +496,19 @@ mod tests {
             .filter(|k| !named.contains(*k))
             .collect();
         assert!(orphans.is_empty(), "keys no code names: {orphans:?}");
+    }
+
+    #[test]
+    fn the_title_scan_finds_only_literal_titles() {
+        let sample = "e.into_op(\"Load\");\nOpError::core(\n    \"Save\", e);\n\
+            OpError::Core { action: \"Go\", message };\n// OpError::core(\"Doc\", e)\n\
+            e.into_op(tr!(\"demo.load\"));\nOpError::core(save_failed(), e);\nfn f(action: &str) {}\n";
+        assert_eq!(literal_title_lines(sample), [1, 2, 4]);
+    }
+
+    #[test]
+    fn no_action_title_outside_the_pages_is_a_literal() {
+        let found = literal_titles(|rel| !rel.starts_with("pages/"));
+        assert!(found.is_empty(), "literal action titles: {found:?}");
     }
 }

@@ -24,6 +24,7 @@ use gpui_kit::{
 use tf2tools_core::{CrosshairId, CrosshairRef, HudEntry, HudId, ProfileId};
 
 use crate::audio::player::show_idle;
+use crate::i18n::tr;
 use crate::keymap::ToggleSidebar;
 use crate::local_messages::describe_settings;
 use crate::logs_sync::logs_sync;
@@ -449,7 +450,7 @@ impl Shell {
         let collapsed = self.collapsed;
         let save = run_blocking(cx, move |s| {
             s.db.set_sidebar_collapsed(collapsed)
-                .map_err(|e| describe_settings(&e).into_op("Save sidebar state"))
+                .map_err(|e| describe_settings(&e).into_op(tr!("messages.action.save_sidebar")))
         });
         cx.spawn_in(window, async move |_, cx| {
             if let Err(err) = save.await {

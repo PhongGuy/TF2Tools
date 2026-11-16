@@ -234,7 +234,8 @@ pub fn resolve_tf2(services: &Services) -> (Tf2State, Option<OpError>) {
     let settings = match services.db.settings() {
         Ok(settings) => settings,
         Err(e) => {
-            let error = local_messages::describe_settings(&e).into_op("Load settings");
+            let error =
+                local_messages::describe_settings(&e).into_op(tr!("messages.action.load_settings"));
             return (Tf2State::Missing { saved: None }, Some(error));
         }
     };
@@ -249,12 +250,18 @@ pub fn resolve_tf2(services: &Services) -> (Tf2State, Option<OpError>) {
                 Ok(settings) => (saved_state(settings.tf2_path()), None),
                 Err(e) => (
                     Tf2State::Missing { saved: None },
-                    Some(local_messages::describe_settings(&e).into_op("Load settings")),
+                    Some(
+                        local_messages::describe_settings(&e)
+                            .into_op(tr!("messages.action.load_settings")),
+                    ),
                 ),
             },
             Err(e) => (
                 Tf2State::Found(install),
-                Some(local_messages::describe_settings(&e).into_op("Save TF2 path")),
+                Some(
+                    local_messages::describe_settings(&e)
+                        .into_op(tr!("messages.action.save_tf2_path")),
+                ),
             ),
         },
         Ok(None) | Err(_) => (Tf2State::Missing { saved: None }, None),

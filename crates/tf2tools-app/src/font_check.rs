@@ -12,6 +12,7 @@ use tf2tools_core::{
 };
 
 use crate::activity;
+use crate::i18n::tr;
 use crate::local_messages::{describe_font_install, describe_settings};
 use crate::services::{OpError, Services};
 use crate::shell::toast::ToastKind;
@@ -178,7 +179,7 @@ pub fn install_job(s: &Services, prompt: &FontPrompt) -> Result<FontToast, OpErr
             let message = format!("Failed to install fonts for HUD: {folder}");
             let entry = row(LogLevel::Error, message, err.to_string());
             (
-                Err(describe_font_install(&err).into_op("Failed to install fonts")),
+                Err(describe_font_install(&err).into_op(tr!("messages.action.install_fonts"))),
                 entry,
             )
         }
@@ -264,7 +265,7 @@ fn fonts(count: usize) -> &'static str {
 /// a failed save toasts "Failed to save the font choice" in player words.
 pub fn dismiss_job(s: &Services, prompt: &FontPrompt) -> Result<(), OpError> {
     s.db.set_font_check_dismissed(&prompt.folder, &prompt.check.fingerprint())
-        .map_err(|err| describe_settings(&err).into_op("Failed to save the font choice"))
+        .map_err(|err| describe_settings(&err).into_op(tr!("messages.action.save_font_choice")))
 }
 
 /// One Linux font issue in plain words.
