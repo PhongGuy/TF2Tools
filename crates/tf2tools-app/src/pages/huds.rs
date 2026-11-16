@@ -86,6 +86,7 @@ fn uninstall_failed() -> SharedString {
 fn update_failed() -> SharedString {
     tr!("messages.action.update_hud")
 }
+/// Why a HUD could not be downloaded again: the store no longer lists it.
 fn download_gone() -> SharedString {
     tr!("messages.huds.download_gone")
 }

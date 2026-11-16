@@ -10,10 +10,7 @@ use gpui_kit::SharedString;
 
 use crate::i18n::tr;
 use crate::services::OpError;
-use crate::sync_messages::{source_name, throttled};
-
-// Add-ons, maps and previews outside the sync stores always come from GameBanana.
-const GAMEBANANA: &str = "GameBanana";
+use crate::sync_messages::{GAMEBANANA, source_name, throttled};
 
 pub(crate) fn library_update() -> SharedString {
     tr!("messages.shared.library_update")

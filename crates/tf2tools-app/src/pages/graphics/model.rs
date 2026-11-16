@@ -20,14 +20,17 @@ use crate::store_messages::library_update;
 /// The site mastercomfig's releases come from, named in the shared source sentences.
 const GITHUB: &str = "GitHub";
 
+/// GitHub could not be reached while fetching mastercomfig.
 fn github_down() -> SharedString {
     tr!("messages.shared.source_unreachable", source = GITHUB)
 }
 
+/// GitHub rate-limited the mastercomfig fetch.
 fn github_busy() -> SharedString {
     tr!("messages.shared.source_busy", source = GITHUB)
 }
 
+/// GitHub answered with something the mastercomfig parser could not read.
 fn github_unreadable() -> SharedString {
     tr!("messages.shared.source_unreadable", source = GITHUB)
 }
@@ -40,6 +43,7 @@ pub(crate) fn foreign_modules_cfg() -> SharedString {
 /// Added to the install or update toast when a player's own modules.cfg kept the saved settings out.
 pub const OWN_MODULES_CFG_KEPT: &str = "Your own modules.cfg was kept, so the settings below aren't in use. Change one to use them instead.";
 
+/// mastercomfig changed after the Graphics page loaded, so the action must be retried.
 fn stale_page() -> SharedString {
     tr!("messages.mastercomfig.stale_page")
 }

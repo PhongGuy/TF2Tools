@@ -187,11 +187,15 @@ impl OpError {
 impl fmt::Display for OpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.title())?;
-        let description = match self {
-            Self::Internal(raw) => raw.as_str().into(),
-            Self::NoTf2 | Self::Core { .. } => self.description(),
+        let shown;
+        let description: &str = match self {
+            Self::Internal(raw) => raw,
+            Self::NoTf2 | Self::Core { .. } => {
+                shown = self.description();
+                &shown
+            }
         };
-        match &*description {
+        match description {
             "" => Ok(()),
             description => write!(f, ": {description}"),
         }

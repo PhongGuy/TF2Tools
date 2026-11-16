@@ -55,10 +55,13 @@ pub fn sync_stopped(detail: String) -> SyncFailure {
     SyncFailure::new(tr!("messages.sync.stopped"), detail)
 }
 
+// Add-ons, maps and previews outside the sync stores always come from GameBanana.
+pub(crate) const GAMEBANANA: &str = "GameBanana";
+
 // The site a player knows each store by: hud-db and mastercomfig are both fetched from GitHub.
 pub(crate) fn source_name(kind: StoreKind) -> &'static str {
     match kind {
         StoreKind::CuratedHuds | StoreKind::Addons => "GitHub",
-        StoreKind::GameBananaHuds | StoreKind::Sounds | StoreKind::Crosshairs | _ => "GameBanana",
+        StoreKind::GameBananaHuds | StoreKind::Sounds | StoreKind::Crosshairs | _ => GAMEBANANA,
     }
 }
