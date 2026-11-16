@@ -220,6 +220,7 @@ mod logstf_resolve;
 mod logstf_resume;
 mod logstf_sync;
 mod logstf_sync_failures;
+mod logstf_trimmed;
 mod logstf_weapons;
 mod logstf_window;
 mod map_payloads;

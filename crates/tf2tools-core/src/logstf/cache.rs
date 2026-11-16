@@ -37,6 +37,8 @@ const PRUNE_SQL: &str = "DELETE FROM logstf_logs WHERE id NOT IN (
 pub(super) const STATE_GONE: i64 = 1;
 /// `logstf_logs.state` for a log whose body could not be read.
 pub(super) const STATE_UNREADABLE: i64 = 2;
+/// `logstf_logs.state` for a log whose full body was dropped while its stats were kept.
+pub(super) const STATE_TRIMMED: i64 = 3;
 
 /// A player on the logs page's chip row.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,6 +105,8 @@ pub enum LogState {
     Gone,
     /// Its body could not be read as a log.
     Unreadable,
+    /// Its full body was dropped to save space; its stats are kept and it downloads again on open.
+    Trimmed,
 }
 
 /// One log in a player's list, with that player's line from it.
@@ -413,6 +417,7 @@ impl LogsCache {
                         let state = match (row.get::<_, i64>(5)?, row.get::<_, bool>(6)?) {
                             (STATE_GONE, _) => LogState::Gone,
                             (STATE_UNREADABLE, _) => LogState::Unreadable,
+                            (STATE_TRIMMED, _) => LogState::Trimmed,
                             (_, true) => LogState::Ready,
                             (_, false) => LogState::Pending,
                         };
@@ -437,7 +442,7 @@ impl LogsCache {
                     let Some(class) = class.as_deref().and_then(logstf_class) else {
                         continue;
                     };
-                    if log.state != LogState::Ready {
+                    if !matches!(log.state, LogState::Ready | LogState::Trimmed) {
                         continue;
                     }
                     let stat = |i| row.get::<_, i64>(i).map(clamp_u32);

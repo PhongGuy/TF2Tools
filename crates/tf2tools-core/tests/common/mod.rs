@@ -230,6 +230,9 @@ const M18_COLUMNS: &str = "
 /// The column migration 19 adds, as the schema should hold it.
 const M19_COLUMNS: &str = "ALTER TABLE logstf_players ADD COLUMN nickname TEXT;";
 
+/// The column migration 21 adds, as the schema should hold it.
+const M21_COLUMNS: &str = "ALTER TABLE logstf_logs ADD COLUMN opened_at INTEGER;";
+
 /// The GameBanana map tables and indexes migration 20 adds, as the schema should hold them.
 const M20_TABLES: &str = "
     CREATE TABLE IF NOT EXISTS store_gb_maps (
@@ -279,6 +282,7 @@ pub fn current_shape() -> SchemaShape {
     conn.execute_batch(M18_COLUMNS).unwrap();
     conn.execute_batch(M19_COLUMNS).unwrap();
     conn.execute_batch(M20_TABLES).unwrap();
+    conn.execute_batch(M21_COLUMNS).unwrap();
     let mut shape = schema_shape(&conn);
     for (name, table) in M10_INDEXES {
         shape
