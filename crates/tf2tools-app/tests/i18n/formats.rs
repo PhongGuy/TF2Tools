@@ -272,7 +272,7 @@ fn logs_tf_sentences_read_in_russian() {
         "Поиск логов: 2\u{a0}000 из 4\u{a0}812"
     );
     let at = |secs| progress_text(120, 4_812, Duration::from_secs(secs));
-    let line = "Загрузка логов: 120 из 4\u{a0}812";
+    let line = "Скачивание логов: 120 из 4\u{a0}812";
     assert_eq!(
         at(9_600),
         format!("{line}, осталось около 2\u{a0}ч 40\u{a0}мин")

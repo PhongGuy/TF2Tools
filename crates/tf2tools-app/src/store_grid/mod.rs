@@ -70,7 +70,7 @@ pub fn count_text(kind: StoreKind, shown: usize, total: usize) -> SharedString {
     }
 }
 
-/// What a store grid shows: which store, its noun for the count, and its card shape.
+/// What a store grid shows: which store, its noun for search and empty text, and its card shape.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StoreGridConfig {
     pub kind: StoreKind,

@@ -170,8 +170,8 @@ hud_store:
 logs_tf:
   progress:
     finding: "Поиск логов: %{listed} из %{total}"
-    downloading: "Загрузка логов: %{done} из %{total}"
-    downloading_left: "Загрузка логов: %{done} из %{total}, осталось около %{time}"
+    downloading: "Скачивание логов: %{done} из %{total}"
+    downloading_left: "Скачивание логов: %{done} из %{total}, осталось около %{time}"
   summary:
     all: "Все логи: %{count}"
     last_month: { one: "За последний месяц: %{count} лог", few: "За последний месяц: %{count} лога", many: "За последний месяц: %{count} логов" }
