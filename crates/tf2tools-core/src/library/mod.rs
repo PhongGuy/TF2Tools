@@ -285,11 +285,15 @@ impl fmt::Display for GbId {
     }
 }
 
-/// True when `name` is a single path component that cannot climb out of its parent; a `:`
-/// is refused since Windows reads `C:` as a drive. Folder names read from a v5 database pass
-/// this before they are joined into a path.
+/// True when `name` is a single path component that cannot climb out of its parent; on
+/// Windows a `:` is refused too, since `C:` reads as a drive. Folder names read from a v5
+/// database pass this before they are joined into a path.
 pub(crate) fn is_plain_name(name: &str) -> bool {
-    !name.is_empty() && name != "." && name != ".." && !name.contains(['/', '\\', '\0', ':'])
+    !name.is_empty()
+        && name != "."
+        && name != ".."
+        && !name.contains(['/', '\\', '\0'])
+        && !(cfg!(windows) && name.contains(':'))
 }
 
 /// v5's `<slug>-<first 8 chars of id>` folder name for sounds and crosshairs.
@@ -768,9 +772,9 @@ mod tests {
     use super::is_plain_name;
 
     #[test]
-    fn a_name_with_a_colon_is_not_plain() {
+    fn a_name_with_a_colon_is_plain_only_off_windows() {
         assert!(is_plain_name("rayshud"));
-        assert!(!is_plain_name("C:"));
-        assert!(!is_plain_name("a:b"));
+        assert_eq!(is_plain_name("C:"), !cfg!(windows));
+        assert_eq!(is_plain_name("a:b"), !cfg!(windows));
     }
 }
