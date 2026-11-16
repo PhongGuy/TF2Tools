@@ -973,7 +973,21 @@ impl Library {
             let resolvable = is_weapon_script(&weapon_script)
                 && match source.as_str() {
                     SOURCE_BUILTIN => builtins.get(&reference).is_some(),
-                    SOURCE_LIBRARY => self.library_crosshair_files(&reference)?.is_some(),
+                    // A zip that does not open is not in the game as the library has it, so
+                    // its row waits; apply then reports the I/O error.
+                    SOURCE_LIBRARY => match self.library_crosshair_files(&reference) {
+                        Ok(found) => found.is_some(),
+                        Err(failure) => {
+                            tracing::warn!(
+                                path = %failure.path.display(),
+                                error = %failure.source,
+                                "crosshair copy could not be read"
+                            );
+                            waiting.push(weapon_script.clone());
+                            written.insert(weapon_script);
+                            continue;
+                        }
+                    },
                     _ => false,
                 };
             let Some(script) = resolvable

@@ -193,12 +193,23 @@ fn applying_a_damaged_zip_is_an_io_error_naming_it() {
 }
 
 #[test]
-fn the_scan_reports_a_damaged_zip_as_an_io_error() {
+fn the_scan_counts_a_crosshair_with_a_damaged_zip_as_waiting() {
     let env = crosshair_env();
-    let zip = damaged(&env);
-    let result = env.lib.crosshairs_not_in_game(&env.tf2, &builtin_catalog());
-    assert!(
-        matches!(&result, Err(LibraryError::Io { path, .. }) if *path == zip),
-        "{result:?}"
+    let builtins = builtin_catalog();
+    let dot = import_png_as(&env, "Dot", Provenance::Local);
+    env.lib
+        .assign("tf_weapon_scattergun", &library(&dot))
+        .unwrap();
+    pack(&env, &dot);
+    env.lib.apply_crosshairs(&env.tf2, &builtins).unwrap();
+    assert_eq!(
+        env.lib.crosshairs_not_in_game(&env.tf2, &builtins).unwrap(),
+        Vec::<String>::new()
+    );
+    // The game still has the crosshair, but the library copy no longer matches it.
+    write_file(&dir_of(&env, &dot).join("copy.zip"), b"not a zip at all");
+    assert_eq!(
+        env.lib.crosshairs_not_in_game(&env.tf2, &builtins).unwrap(),
+        ["tf_weapon_scattergun"]
     );
 }
