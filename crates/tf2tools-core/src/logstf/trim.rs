@@ -7,6 +7,8 @@ use super::cache::{STATE_TRIMMED, db_error, deflate};
 use super::{KeepFullLogs, LogsCache, PROVISIONAL_SECS};
 use crate::error::LogsCacheError;
 
+/// The `settings` key holding the chosen keep choice's key.
+const KEEP_KEY: &str = "logstf_keep_full_logs";
 /// The `settings` key counting logs trimmed since the file was last rewritten.
 const TRIMS_KEY: &str = "logstf_trimmed_since_vacuum";
 /// Trimmed logs that leave about a MiB of near-empty pages, when the file is rewritten.
@@ -57,7 +59,127 @@ impl TrimReport {
     }
 }
 
+/// What the logs.tf cache takes on disk, and what each keep choice would free.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct LogsSpace {
+    cache_bytes: u64,
+    full_bytes: u64,
+    full_logs: u64,
+    frees: [u64; 7],
+}
+
+impl LogsSpace {
+    /// Bytes of every logs.tf table and index.
+    pub fn cache_bytes(&self) -> u64 {
+        self.cache_bytes
+    }
+
+    /// Bytes of the table holding the full logs.
+    pub fn full_bytes(&self) -> u64 {
+        self.full_bytes
+    }
+
+    /// Logs whose full body is stored.
+    pub fn full_logs(&self) -> u64 {
+        self.full_logs
+    }
+
+    /// Bytes a trim with `keep` would free now, as a share of `full_bytes`.
+    pub fn frees(&self, keep: KeepFullLogs) -> u64 {
+        KeepFullLogs::ALL
+            .iter()
+            .position(|k| *k == keep)
+            .map_or(0, |i| self.frees[i])
+    }
+}
+
 impl LogsCache {
+    /// The chosen keep choice; a missing or unknown setting reads as the default, a week.
+    pub fn keep_full_logs(&self) -> Result<KeepFullLogs, LogsCacheError> {
+        let key = self
+            .db
+            .read(|conn| {
+                conn.query_row(
+                    "SELECT value FROM settings WHERE key = ?1",
+                    [KEEP_KEY],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+            })
+            .map_err(db_error)?;
+        Ok(key
+            .as_deref()
+            .and_then(KeepFullLogs::from_key)
+            .unwrap_or_default())
+    }
+
+    /// Stores `keep` as the chosen keep choice.
+    pub fn set_keep_full_logs(&self, keep: KeepFullLogs) -> Result<(), LogsCacheError> {
+        self.db
+            .write(|conn| {
+                conn.execute(
+                    "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+                    params![KEEP_KEY, keep.key()],
+                )
+            })
+            .map(drop)
+            .map_err(db_error)
+    }
+
+    /// Measures the cache at `now`. Each choice's figure is its trimmable bodies' share of the
+    /// full-log table, so pages a body shares with its row are counted fairly.
+    pub fn space(&self, now: i64) -> Result<LogsSpace, LogsCacheError> {
+        self.db
+            .read(|conn| {
+                // One read transaction, so a pass committing between statements cannot make
+                // the figures disagree.
+                let tx = conn.unchecked_transaction()?;
+                let cache_bytes: i64 = tx.query_row(
+                    r"SELECT COALESCE(SUM(d.pgsize), 0) FROM dbstat d
+                      JOIN sqlite_schema s ON s.name = d.name
+                      WHERE s.tbl_name LIKE 'logstf\_%' ESCAPE '\'",
+                    [],
+                    |r| r.get(0),
+                )?;
+                let full_bytes: i64 = tx.query_row(
+                    "SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name = 'logstf_logs'",
+                    [],
+                    |r| r.get(0),
+                )?;
+                let (full_logs, total): (i64, i64) = tx.query_row(
+                    "SELECT COUNT(*), COALESCE(SUM(octet_length(body)), 0) FROM logstf_logs
+                     WHERE body IS NOT NULL",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )?;
+                let mut frees = [0_u64; 7];
+                for (slot, keep) in frees.iter_mut().zip(KeepFullLogs::ALL) {
+                    let Some(days) = keep.days() else { continue };
+                    let picked: i64 = tx.query_row(
+                        concat!(
+                            "SELECT COALESCE(SUM(octet_length(body)), 0) FROM logstf_logs WHERE ",
+                            trimmable!()
+                        ),
+                        params![PROVISIONAL_SECS, now - days * 86_400],
+                        |r| r.get(0),
+                    )?;
+                    if total > 0 {
+                        let share = i128::from(full_bytes) * i128::from(picked) / i128::from(total);
+                        *slot = u64::try_from(share).unwrap_or(0);
+                    }
+                }
+                let unsigned = |n: i64| u64::try_from(n).unwrap_or(0);
+                Ok(LogsSpace {
+                    cache_bytes: unsigned(cache_bytes),
+                    full_bytes: unsigned(full_bytes),
+                    full_logs: unsigned(full_logs),
+                    frees,
+                })
+            })
+            .map_err(db_error)
+    }
+
     /// Drops the body of every counted, settled log not opened (or fetched) within `keep`'s
     /// days of `now`, compresses plain bodies left by earlier builds, and returns free pages to
     /// the file system. A failed compaction is logged and retried on the next pass.
