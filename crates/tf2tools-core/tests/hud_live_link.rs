@@ -41,6 +41,7 @@ fn scheme(env: &LibraryEnv, folder: &str) -> String {
 fn a_reinstall_updates_the_installed_copy_and_nothing_else() {
     let env = library_env();
     let hud = import(&env, "rayshud");
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
     env.lib.install_hud(hud.id(), &env.tf2).unwrap();
     set_setting(&env.dir, "active_profile_id", "p1");
     let custom = env.tf2.custom_dir();
@@ -90,6 +91,7 @@ fn a_reinstall_updates_the_installed_copy_and_nothing_else() {
 fn a_file_removed_from_the_library_goes_from_the_installed_copy() {
     let env = library_env();
     let hud = import(&env, "rayshud");
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
     env.lib.install_hud(hud.id(), &env.tf2).unwrap();
     fs::remove_file(library_file(&env, "rayshud", "resource/clientscheme.res")).unwrap();
     env.lib.reinstall_hud(hud.id(), &env.tf2).unwrap();
@@ -160,6 +162,7 @@ fn set_mode(path: &std::path::Path, mode: u32) {
 fn a_copy_that_fails_leaves_the_installed_copy() {
     let env = library_env();
     let hud = import(&env, "rayshud");
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
     env.lib.install_hud(hud.id(), &env.tf2).unwrap();
     let unreadable = library_file(&env, "rayshud", "resource/clientscheme.res");
     fs::write(&unreadable, "edited").unwrap();
@@ -178,6 +181,7 @@ fn a_copy_that_fails_leaves_the_installed_copy() {
 fn an_installed_folder_that_cannot_move_is_left_in_place() {
     let env = library_env();
     let hud = import(&env, "rayshud");
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
     env.lib.install_hud(hud.id(), &env.tf2).unwrap();
     fs::write(
         library_file(&env, "rayshud", "resource/clientscheme.res"),
@@ -210,6 +214,7 @@ fn an_installed_folder_that_cannot_move_is_left_in_place() {
 fn a_reinstall_first_puts_back_what_a_crash_left() {
     let env = library_env();
     let hud = import(&env, "rayshud");
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
     env.lib.install_hud(hud.id(), &env.tf2).unwrap();
     let custom = env.tf2.custom_dir();
     // A crash between the two renames: the installed copy sits aside, nothing in its place.

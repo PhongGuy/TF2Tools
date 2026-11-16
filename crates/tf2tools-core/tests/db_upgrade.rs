@@ -25,7 +25,7 @@ const V1_SCHEMA: &str = "
     PRAGMA user_version = 1;";
 
 #[test]
-fn v5_database_upgrades_to_v21_without_loss() {
+fn v5_database_upgrades_to_v22_without_loss() {
     let (_tmp, dir) = common::temp_data_dir();
     common::write_v5_database(&dir);
     let before = common::dump_tables(&Connection::open(dir.db_path()).unwrap());
@@ -34,14 +34,14 @@ fn v5_database_upgrades_to_v21_without_loss() {
         "seed fills every table"
     );
     let db = Database::open(&dir).expect("open v5 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     drop(db);
     let after = Connection::open(dir.db_path()).unwrap();
     assert_eq!(common::schema_shape(&after), common::current_shape());
     let version: u32 = after
         .pragma_query_value(None, "user_version", |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 21);
+    assert_eq!(version, 22);
     // The v5 rows must survive unchanged; the new HUD column is the only addition.
     after
         .execute_batch("ALTER TABLE library_huds DROP COLUMN gb_file_date")
@@ -92,12 +92,12 @@ fn v5_database_upgrades_to_v21_without_loss() {
         assert!(sql.ends_with("WHERE store_gb_id IS NOT NULL"), "{sql}");
     }
     drop(after);
-    let db = Database::open(&dir).expect("reopen at v21");
-    assert_eq!(db.schema_version(), 21);
+    let db = Database::open(&dir).expect("reopen at v22");
+    assert_eq!(db.schema_version(), 22);
 }
 
 #[test]
-fn v1_database_upgrades_to_v21() {
+fn v1_database_upgrades_to_v22() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -113,7 +113,7 @@ fn v1_database_upgrades_to_v21() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v1 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     drop(db);
 
     let conn = Connection::open(dir.db_path()).unwrap();
@@ -141,7 +141,7 @@ fn newer_schema_is_refused_and_left_untouched() {
     let (_tmp, dir) = common::temp_data_dir();
     std::fs::create_dir_all(dir.root()).unwrap();
     let conn = Connection::open(dir.db_path()).unwrap();
-    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 22;")
+    conn.execute_batch("CREATE TABLE future (x); PRAGMA user_version = 23;")
         .unwrap();
     drop(conn);
     let before = std::fs::read(dir.db_path()).unwrap();
@@ -151,7 +151,7 @@ fn newer_schema_is_refused_and_left_untouched() {
 
     let err = Database::open(&dir).expect_err("a newer schema must be refused");
     assert!(
-        matches!(&err, OpenError::NewerSchema { path, found: 22, supported: 21 } if *path == dir.db_path()),
+        matches!(&err, OpenError::NewerSchema { path, found: 23, supported: 22 } if *path == dir.db_path()),
         "{err:?}"
     );
     assert_eq!(std::fs::read(dir.db_path()).unwrap(), before);
@@ -258,7 +258,7 @@ fn v10_database_marks_the_gamebanana_mod_stores_stale_and_keeps_their_rows() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v10 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     drop(db);
     let conn = Connection::open(dir.db_path()).unwrap();
     let keys: Vec<String> = conn
@@ -293,7 +293,7 @@ fn v11_database_gains_the_map_tables() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v11 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     drop(db);
     assert_eq!(common::count(&dir, "store_maps"), 0);
     assert_eq!(common::count(&dir, "downloaded_maps"), 0);
@@ -334,7 +334,7 @@ fn v12_database_gains_the_mastercomfig_tables_and_drops_override_addons() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v12 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     drop(db);
     assert_eq!(
         asset_names(&dir, "library_addons"),
@@ -393,7 +393,7 @@ fn v14_database_gains_the_logstf_tables() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v14 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     drop(db);
     for table in [
         "logstf_players",
@@ -421,7 +421,7 @@ fn v15_database_gains_weapon_rows_and_the_counted_marker() {
     drop(conn);
 
     let db = Database::open(&dir).expect("open v15 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     drop(db);
     assert_eq!(common::count(&dir, "logstf_weapon_rows"), 0);
     let conn = common::sql(&dir);
@@ -457,7 +457,7 @@ fn v16_database_gains_gb_hud_checks_seeded_once_per_item() {
     .unwrap();
     drop(conn);
     let db = Database::open(&dir).expect("open v16 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     drop(db);
     let conn = common::sql(&dir);
     let rows: Vec<(i64, Option<i64>, Option<i64>, i64)> = conn
@@ -498,7 +498,7 @@ fn v17_database_keeps_its_class_rows_with_no_damage_taken() {
     .unwrap();
     drop(conn);
     let db = Database::open(&dir).expect("open v17 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     drop(db);
     let conn = common::sql(&dir);
     let row: (i64, Option<i64>) = conn
@@ -539,7 +539,7 @@ fn v18_database_gains_the_nickname_column_and_keeps_its_players() {
     .unwrap();
     drop(conn);
     let db = Database::open(&dir).expect("open v18 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     let players = tf2tools_core::LogsCache::new(db).players().unwrap();
     assert_eq!(players.len(), 1);
     assert_eq!(players[0].name(), "Arie");
@@ -559,7 +559,7 @@ fn v19_database_gains_the_gamebanana_map_tables() {
     .unwrap();
     drop(conn);
     let db = Database::open(&dir).expect("open v19 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     drop(db);
     assert_eq!(common::count(&dir, "store_gb_maps"), 0);
     assert_eq!(common::count(&dir, "store_gb_map_categories"), 0);
@@ -585,7 +585,7 @@ fn v20_database_gains_opened_at_and_keeps_its_logs() {
     .unwrap();
     drop(conn);
     let db = Database::open(&dir).expect("open v20 database");
-    assert_eq!(db.schema_version(), 21);
+    assert_eq!(db.schema_version(), 22);
     drop(db);
     let conn = common::sql(&dir);
     let row: (i64, Option<i64>, i64, i64, i64) = conn

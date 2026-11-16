@@ -12,6 +12,7 @@ use super::options::CfgPlace;
 use crate::error::HudFilesError;
 use crate::fonts::Platform;
 use crate::fonts::keyvalues::{self, KvPair, KvSource, KvValue};
+use crate::library::{HUD_ZIP, ItemSource, read_packed_entry};
 use crate::pak;
 
 /// Entries larger than this are refused before they are read.
@@ -61,6 +62,12 @@ enum Item {
     Vpk {
         pak: Arc<PathBuf>,
         entry: vpk::entry::VPKEntry,
+    },
+    /// An entry of a packed library HUD's zip, looked up by name each time it is read.
+    Packed {
+        zip: Arc<PathBuf>,
+        rel: String,
+        len: u64,
     },
 }
 
@@ -161,7 +168,7 @@ impl HudFiles {
     /// skipped. Nothing is ever written to the folder.
     pub fn open_hud(tf_dir: &Path, hud_dir: &Path) -> Result<HudFiles, HudFilesError> {
         refuse_link(hud_dir)?;
-        Self::open_over(tf_dir, vec![loose_hud(hud_dir)])
+        Self::open_over(tf_dir, vec![library_hud(hud_dir)?])
     }
 
     /// The library HUD folder `hud_dir` alone, without the game beneath it, indexed as
@@ -169,7 +176,7 @@ impl HudFiles {
     pub(crate) fn open_folder(hud_dir: &Path) -> Result<HudFiles, HudFilesError> {
         refuse_link(hud_dir)?;
         let mut files = HudFiles::empty();
-        files.push_layer(loose_hud(hud_dir).into_iter());
+        files.push_layer(library_hud(hud_dir)?.into_iter());
         Ok(files)
     }
 
@@ -675,11 +682,38 @@ fn read_item(name: &str, item: &Item) -> Result<Vec<u8>, HudFilesError> {
                 path: root.join(rel),
                 source,
             };
-            let file = checked_hud_file(root, rel).map_err(io)?;
-            match crate::fonts::read_regular_capped(&file, MAX_HUD_FILE_BYTES).map_err(io)? {
-                Some(bytes) => bytes,
-                None => return Err(too_large(MAX_HUD_FILE_BYTES + 1)),
+            match checked_hud_file(root, rel) {
+                Ok(file) => {
+                    match crate::fonts::read_regular_capped(&file, MAX_HUD_FILE_BYTES)
+                        .map_err(io)?
+                    {
+                        Some(bytes) => bytes,
+                        None => return Err(too_large(MAX_HUD_FILE_BYTES + 1)),
+                    }
+                }
+                // A folder packed since it was indexed holds the file in its zip now; a zip
+                // that is missing too leaves the loose read's own failure.
+                Err(gone) if gone.kind() == std::io::ErrorKind::NotFound => {
+                    let zip = root.join(HUD_ZIP);
+                    read_packed_entry(&zip, rel, MAX_HUD_FILE_BYTES).map_err(|source| {
+                        if source.kind() == std::io::ErrorKind::NotFound {
+                            io(gone)
+                        } else {
+                            HudFilesError::Io { path: zip, source }
+                        }
+                    })?
+                }
+                Err(e) => return Err(io(e)),
             }
+        }
+        Item::Packed { zip, rel, len } => {
+            if *len > MAX_HUD_FILE_BYTES {
+                return Err(too_large(*len));
+            }
+            read_packed_entry(zip, rel, MAX_HUD_FILE_BYTES).map_err(|source| HudFilesError::Io {
+                path: zip.join(rel),
+                source,
+            })?
         }
         Item::Vpk { pak, entry } => {
             let len =
@@ -1022,6 +1056,30 @@ fn loose_fonts(resource_dir: &Path) -> Vec<(String, Item)> {
 /// Largest file `open_hud` indexes from a library HUD folder.
 const MAX_HUD_FILE_BYTES: u64 = 32 * 1024 * 1024;
 
+/// A library HUD's files: the entries of its zip when it is packed (any loose files beside
+/// it are leftovers and stay out), else its loose files; the same caps apply to both.
+fn library_hud(hud_dir: &Path) -> Result<Vec<(String, Item)>, HudFilesError> {
+    let source = ItemSource::open(hud_dir, HUD_ZIP)?;
+    if !source.is_packed() {
+        return Ok(loose_hud(hud_dir));
+    }
+    let zip = Arc::new(hud_dir.join(HUD_ZIP));
+    let top_meta = |rel: &Path| rel == Path::new(".tf2tools");
+    Ok((source.files(&top_meta)?.into_iter())
+        .filter(|(_, len)| *len <= MAX_HUD_FILE_BYTES)
+        .filter_map(|(rel, len)| {
+            let parts: Option<Vec<&str>> = rel.iter().map(|p| p.to_str()).collect();
+            let rel = parts?.join("/");
+            let item = Item::Packed {
+                zip: Arc::clone(&zip),
+                rel: rel.clone(),
+                len,
+            };
+            indexable_name(&rel).then_some((rel, item))
+        })
+        .collect())
+}
+
 /// The regular files of a HUD folder, named relative to it with `/`; the app's own
 /// `.tf2tools/` metadata, symlinks and oversized files stay out.
 fn loose_hud(hud_dir: &Path) -> Vec<(String, Item)> {
@@ -1149,6 +1207,7 @@ fn item_len(item: &Item) -> u64 {
         Item::Memory(bytes) => bytes.len() as u64,
         Item::Loose(file) => std::fs::metadata(file).map_or(0, |m| m.len()),
         Item::Hud { root, rel } => std::fs::metadata(root.join(rel)).map_or(0, |m| m.len()),
+        Item::Packed { len, .. } => *len,
         Item::Vpk { entry, .. } => {
             u64::from(entry.dir_entry.preload_length) + u64::from(entry.dir_entry.file_length)
         }

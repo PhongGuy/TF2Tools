@@ -705,7 +705,8 @@ fn an_install_that_ends_after_leaving_still_announces_the_change(cx: &mut TestAp
 fn an_install_logs_the_huds_name_not_its_folder(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
-    seed(&s.services, &env, "m0rehud-abc1234", Provenance::Local);
+    let hud = seed(&s.services, &env, "m0rehud-abc1234", Provenance::Local);
+    s.services.library.unpack_hud_for_tests(hud.id()).unwrap();
     std::fs::write(
         env.data
             .library_dir(LibraryKind::Huds)
@@ -736,7 +737,8 @@ fn an_install_logs_the_huds_name_not_its_folder(cx: &mut TestAppContext) {
 fn an_install_blocked_by_a_players_folder_says_so(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
-    seed(&s.services, &env, "m0rehud-abc1234", Provenance::Local);
+    let hud = seed(&s.services, &env, "m0rehud-abc1234", Provenance::Local);
+    s.services.library.unpack_hud_for_tests(hud.id()).unwrap();
     std::fs::write(
         env.data
             .library_dir(LibraryKind::Huds)

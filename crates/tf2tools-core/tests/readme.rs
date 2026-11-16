@@ -488,3 +488,30 @@ fn the_logs_section_says_unopened_full_logs_are_cleared() {
         "the old promise is gone: {logs}"
     );
 }
+
+#[test]
+fn the_settings_section_says_the_library_is_stored_compressed() {
+    let readme = repo_file("README.md");
+    let players = player_part(&readme);
+    let at = players
+        .find("\n### Settings\n")
+        .expect("a Settings section");
+    let settings = &players[at..];
+    let settings = &settings[..settings[1..]
+        .find("\n## ")
+        .map_or(settings.len(), |end| end + 1)];
+    assert!(settings.contains("**Library**"), "{settings}");
+    assert!(settings.contains("compressed"), "{settings}");
+}
+
+#[test]
+fn the_readme_says_tf2tools_5_cannot_read_a_compressed_library() {
+    let readme = repo_file("README.md");
+    let players = player_part(&readme);
+    let v5 = players
+        .lines()
+        .find(|line| line.starts_with("- **TF2Tools 5:**"))
+        .expect("a TF2Tools 5 bullet");
+    assert!(v5.contains("carry over"), "{v5}");
+    assert!(v5.contains("TF2Tools 5 can't read it"), "{v5}");
+}

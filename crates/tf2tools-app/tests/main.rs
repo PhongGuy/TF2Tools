@@ -143,6 +143,7 @@ mod ids;
 mod kept_pages;
 mod kill_icons;
 mod library_events;
+mod library_pack;
 mod loadout;
 mod local_log;
 mod local_messages;

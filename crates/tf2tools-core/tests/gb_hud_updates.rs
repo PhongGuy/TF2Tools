@@ -1,6 +1,7 @@
 //! GameBanana HUDs: file dates, the daily check, version marks and replacing downloads.
 
 use crate::common::hud_copy::{game_for, import_stock_hud};
+use crate::common::packed::library_files_in;
 use crate::common::{self, StoreEnv, sql, store_env, zip_bytes};
 use crate::common::{LibraryEnv, library_env};
 
@@ -533,6 +534,7 @@ async fn a_replacing_download_into_the_same_folder_replaces_the_row() {
     let old = download_hud(&env, &files[1]).await;
     let new = replacing(&env, &files[0], old.id()).await;
     assert_ne!(new.id(), old.id());
+    assert_eq!(new.folder_name(), "darhud");
     let ids: Vec<HudId> = env
         .lib
         .list_huds()
@@ -542,11 +544,11 @@ async fn a_replacing_download_into_the_same_folder_replaces_the_row() {
         .collect();
     assert_eq!(ids, [new.id().clone()]);
     assert_eq!(file_date(&env.dir, new.id()), Some(300));
-    let layout = env
-        .dir
-        .library_dir(LibraryKind::Huds)
-        .join("darhud/resource/ui/hudlayout.res");
-    assert_eq!(std::fs::read_to_string(layout).unwrap(), "v2");
+    let files = library_files_in(&env.dir, &new);
+    let layout = files
+        .iter()
+        .find(|(rel, _)| rel == "resource/ui/hudlayout.res");
+    assert_eq!(layout.map(|(_, bytes)| bytes.as_slice()), Some(&b"v2"[..]));
 }
 
 #[tokio::test]

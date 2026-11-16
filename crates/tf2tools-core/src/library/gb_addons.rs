@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use rusqlite::OptionalExtension;
 use walkdir::WalkDir;
 
+use super::packed::{GB_ZIP, ItemSource};
 use super::{
     GbId, IoFailure, Library, create_dir_all, game_custom_dir, io_at, is_plain_name, library_db,
     remove_dir_if_present, remove_file_if_present, slug, walk_failure,
@@ -204,7 +205,8 @@ impl Library {
 
     /// Installs `chosen` (payload names of `download`) as add-on `download.gb_id()`,
     /// replacing any earlier install of it, and returns its row. `tf2_running` is asked
-    /// once, before anything changes, when a VPK would be written or deleted.
+    /// once, before anything changes, when a VPK would be written or deleted. The library
+    /// copy is then stored packed in `copy.zip`, or left loose when a zip cannot hold it.
     ///
     /// # Errors
     /// [`GbAddonInstallError`]: a refusal before anything changed, or an I/O or database
@@ -287,6 +289,8 @@ impl Library {
 
         // From the clear on, a failure keeps the pending row with installed = 0 so the page
         // offers to install it again from the library copy, which deletes old leftovers.
+        // Copies stay locked through the pack, so a conversion pass never meets a half swap.
+        let _copies = self.copies_write();
         let library_copy = root.join(gb_id.to_string());
         let mut copied = Vec::new();
         let swapped = (|| {
@@ -297,7 +301,8 @@ impl Library {
             }
             remove_dir_if_present(&library_copy)?;
             std::fs::rename(&staging, &library_copy).map_err(io_at(&library_copy))?;
-            copy_into_game(&library_copy, &custom, &staged, &mut copied)
+            let source = ItemSource::Loose(library_copy.clone());
+            copy_into_game(&source, &custom, &staged, &mut copied)
         })();
         if let Err(e) = swapped {
             for path in &copied {
@@ -317,6 +322,20 @@ impl Library {
         entry.installed = true;
         entry.present = true;
         self.save_gb_addon(&entry, download.file_id)?;
+        // The copy is packed only once the install stands; a failed pack leaves it loose,
+        // which reinstall reads just as well.
+        if slots_survive_packing(&library_copy)
+            && let Err(IoFailure { path, source }) = self.pack_folder(&library_copy, GB_ZIP)
+        {
+            // A failure clearing the loose files comes after the zip is placed; readers take it.
+            let placed = ItemSource::open(&library_copy, GB_ZIP).is_ok_and(|s| s.is_packed());
+            let message = if placed {
+                "installed add-on copy packed, but its loose files could not be removed"
+            } else {
+                "installed add-on copy left loose: it could not be packed"
+            };
+            tracing::warn!(gb_id = %gb_id, path = %path.display(), error = %source, "{message}");
+        }
         Ok(entry)
     }
 
@@ -334,11 +353,12 @@ impl Library {
         tf2_running: &dyn Fn() -> bool,
     ) -> Result<(), GbAddonInstallError> {
         let _writes = self.lock_writes();
+        let _copies = self.copies_write();
         self.remove_gb_addon_locked(gb_id, tf2, tf2_running)
     }
 
     /// [`remove_gb_addon`](Self::remove_gb_addon)'s body, for a caller already holding the
-    /// write lock.
+    /// write lock and the copies write guard.
     pub(super) fn remove_gb_addon_locked(
         &self,
         gb_id: GbId,
@@ -373,7 +393,8 @@ impl Library {
     /// Copies add-on `gb_id`'s library copy back into `tf/custom` and marks it installed with
     /// exactly the files copied. Recorded files no payload of the row's name produces are
     /// leftovers of a failed update and are deleted. `NotInLibrary` without a row, or when a
-    /// payload slot or a file the row names for it is missing from the copy.
+    /// payload slot or a file the row names for it is missing from the copy, or when its
+    /// `copy.zip` does not open.
     ///
     /// # Errors
     /// [`GbAddonInstallError::NotInLibrary`], `Tf2Running` when a recorded file is a VPK and
@@ -385,15 +406,25 @@ impl Library {
         tf2_running: &dyn Fn() -> bool,
     ) -> Result<GbAddonEntry, GbAddonInstallError> {
         let _writes = self.lock_writes();
+        let _copies = self.copies_read();
         let not_in_library = || GbAddonInstallError::NotInLibrary { gb_id };
         let mut entry = self.gb_addon_row(gb_id)?.ok_or_else(not_in_library)?;
         let library_copy = self.dir.gb_addon_dir().join(gb_id.to_string());
+        // A zip that does not open counts as no copy, so a fresh download heals it.
+        let source = ItemSource::open(&library_copy, GB_ZIP).map_err(|failure| {
+            tracing::warn!(
+                path = %failure.path.display(),
+                error = %failure.source,
+                "add-on copy could not be read"
+            );
+            not_in_library()
+        })?;
         let custom = game_custom_dir(tf2)?;
         // Each payload slot owns the files named after its installed base; every one of them
         // must be in that slot of the copy, or the copy is refused whole. A recorded file no
         // slot owns is a leftover, such as an old name a failed update could not delete.
         let tf = tf2.tf_dir();
-        let slots = copy_slots(&library_copy);
+        let slots = copy_slots(&source);
         let base = installed_base(gb_id, &entry.name);
         let mut wanted: Vec<(usize, Vec<String>)> = Vec::new();
         let mut leftovers = Vec::new();
@@ -406,13 +437,15 @@ impl Library {
                 leftovers.push(file.clone());
                 continue;
             };
+            // The copy's own name is what gets copied, so no path from the row reaches a read.
             let in_copy = slots
                 .iter()
-                .any(|(slot, names)| *slot == n && names.iter().any(|x| x == name));
-            if !in_copy {
+                .filter(|(slot, _)| *slot == n)
+                .find_map(|(_, names)| names.iter().find(|x| *x == name));
+            let Some(name) = in_copy else {
                 return Err(not_in_library());
-            }
-            wanted.push((n, vec![name.to_owned()]));
+            };
+            wanted.push((n, vec![name.clone()]));
         }
         let served = (1..=entry.payloads.len()).all(|n| wanted.iter().any(|(w, _)| *w == n));
         if entry.payloads.is_empty() || !served {
@@ -428,7 +461,7 @@ impl Library {
             }
         }
         let mut copied = Vec::new();
-        if let Err(e) = copy_into_game(&library_copy, &custom, &wanted, &mut copied) {
+        if let Err(e) = copy_into_game(&source, &custom, &wanted, &mut copied) {
             for path in &copied {
                 let _ = remove_entry(path);
             }
@@ -709,7 +742,7 @@ fn copy_without_vpks(src: &Path, skip: &[PathBuf], dst: &Path) -> Result<(), IoF
 /// Copies each slot's named entries from the library copy into `custom`, replacing what is
 /// there, and records every target it touched in `copied` so a failure can undo them.
 fn copy_into_game(
-    library_copy: &Path,
+    source: &ItemSource,
     custom: &Path,
     slots: &[(usize, Vec<String>)],
     copied: &mut Vec<PathBuf>,
@@ -720,15 +753,28 @@ fn copy_into_game(
             let target = custom.join(name);
             remove_entry(&target)?;
             copied.push(target.clone());
-            copy_entry(&library_copy.join(n.to_string()).join(name), &target)?;
+            let entry = Path::new(&n.to_string()).join(name);
+            match source {
+                ItemSource::Loose(dir) => copy_entry(&dir.join(entry), &target)?,
+                ItemSource::Packed(_) => {
+                    source.extract_under(&entry, &target)?;
+                }
+            }
         }
     }
     Ok(())
 }
 
 /// The numbered slots of a library copy with the names each holds; empty when the copy is
-/// missing or unreadable.
-fn copy_slots(library_copy: &Path) -> Vec<(usize, Vec<String>)> {
+/// missing or unreadable. A packed copy lists only what its zip holds, never loose leftovers.
+fn copy_slots(source: &ItemSource) -> Vec<(usize, Vec<String>)> {
+    let library_copy = match source {
+        ItemSource::Loose(dir) => dir,
+        ItemSource::Packed(_) => {
+            let files = source.files(&|_| false).unwrap_or_default();
+            return slot_groups(files.iter().map(|(rel, _)| rel.as_path()));
+        }
+    };
     let names = |dir: &Path| -> Vec<String> {
         std::fs::read_dir(dir)
             .into_iter()
@@ -739,9 +785,48 @@ fn copy_slots(library_copy: &Path) -> Vec<(usize, Vec<String>)> {
     };
     names(library_copy)
         .into_iter()
-        .filter_map(|slot| slot.parse::<usize>().ok().filter(|n| n.to_string() == slot))
+        .filter_map(canonical_slot)
         .map(|n| (n, names(&library_copy.join(n.to_string()))))
         .collect()
+}
+
+/// The slot number a top-level name stands for, only in its canonical spelling.
+fn canonical_slot(slot: String) -> Option<usize> {
+    slot.parse::<usize>().ok().filter(|n| n.to_string() == slot)
+}
+
+/// Groups relative file paths `<n>/<name>/...` into each slot's distinct names, sorted;
+/// a path without a name below a canonical slot number is no slot's.
+fn slot_groups<'a>(rels: impl Iterator<Item = &'a Path>) -> Vec<(usize, Vec<String>)> {
+    let mut groups = std::collections::BTreeMap::<usize, std::collections::BTreeSet<String>>::new();
+    for rel in rels {
+        let mut parts = rel.components().map(|c| c.as_os_str().to_string_lossy());
+        let (Some(slot), Some(name)) = (parts.next(), parts.next()) else {
+            continue;
+        };
+        if let Some(n) = canonical_slot(slot.into_owned()) {
+            groups.entry(n).or_default().insert(name.into_owned());
+        }
+    }
+    groups
+        .into_iter()
+        .map(|(n, names)| (n, names.into_iter().collect()))
+        .collect()
+}
+
+/// Whether every `<n>/<name>` the loose copy at `live` holds would still be listed once packed.
+/// A zip keeps files only, so a slot entry with no file at any depth would be lost.
+pub(super) fn slots_survive_packing(live: &Path) -> bool {
+    let loose = ItemSource::Loose(live.to_path_buf());
+    let Ok(files) = loose.files(&|_| false) else {
+        return false;
+    };
+    let mut listed = copy_slots(&loose);
+    for (_, names) in &mut listed {
+        names.sort();
+    }
+    listed.sort();
+    listed == slot_groups(files.iter().map(|(rel, _)| rel.as_path()))
 }
 
 /// Copies a library-copy file or folder into the game.

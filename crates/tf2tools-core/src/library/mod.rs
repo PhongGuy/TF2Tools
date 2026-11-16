@@ -4,6 +4,7 @@
 
 mod addons;
 mod borrow;
+mod convert;
 mod crosshairs;
 mod gb_addons;
 mod gb_huds;
@@ -22,13 +23,15 @@ mod made_huds;
 mod mastercomfig;
 mod mastercomfig_modules;
 mod movement;
+mod packed;
 mod sounds;
+mod space;
 mod tree_copy;
 
 use std::fmt;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock};
 
 use rusqlite::OptionalExtension;
 use walkdir::WalkDir;
@@ -37,7 +40,7 @@ use crate::archive::VPK_MAGIC;
 use crate::db::Database;
 use crate::error::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, ArchiveError, GbAddonFetchError,
-    GbAddonInstallError, HistoryError, HudLoadError, ImportError, InstallError,
+    GbAddonInstallError, HistoryError, HudFilesError, HudLoadError, ImportError, InstallError,
     InstallMastercomfigError, KeepHudError, LibraryError, MakeHudError, PaintError, PresetError,
     ProfileError, ReinstallError, RemoveMastercomfigError, RestoreMastercomfigError,
 };
@@ -48,6 +51,7 @@ use crate::tf2::Tf2Install;
 
 pub use addons::{AddonEntry, AddonName};
 pub(crate) use addons::{display_info, is_override};
+pub use convert::{ConvertReport, KindConverted};
 pub use crosshairs::{
     ApplyReport, Assignment, CrosshairEntry, CrosshairFormat, CrosshairRef, InstalledCrosshairs,
     PaintTarget, PaintedSource, SkipReason, SkippedAssignment, crosshair_scripts_need_repair,
@@ -72,6 +76,7 @@ pub(crate) use movement::NULL_MOVEMENT;
 #[cfg(test)]
 pub(crate) use movement::movement_keys;
 pub use movement::{MoveDirection, MovementKeys};
+pub(crate) use packed::{HUD_ZIP, ItemSource, read_packed_entry};
 pub use profiles::{
     ApplyProfileReport, ApplyStep, DraftCrosshair, DraftSlot, MissingItem, MissingKind, Profile,
     ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, ProfileId, ProfileItem, ProfileUpdate,
@@ -79,6 +84,7 @@ pub use profiles::{
 pub use sounds::{
     InstalledSound, InstalledSounds, SoundConflict, SoundEntry, SoundFormat, SoundKind,
 };
+pub use space::LibrarySpace;
 
 /// v5's per-item metadata folder; it belongs to the app and is never installed.
 const METADATA_DIR: &str = ".tf2tools";
@@ -91,6 +97,8 @@ pub struct Library {
     dir: DataDir,
     /// Free bytes on the disk holding a path; replaced in tests to simulate a full disk.
     free_space: fn(&Path) -> io::Result<u64>,
+    /// Moves a written zip into place; replaced in tests to damage it after the move.
+    pack_rename: fn(&Path, &Path) -> io::Result<()>,
     /// The HUD option schemas a copy's options are read with, matched by its base's repo.
     hud_schemas: Arc<HudSchemas>,
     /// Held for the whole of a made HUD's save and a copy's update, so a save that checks the
@@ -105,6 +113,7 @@ impl Library {
             db,
             dir,
             free_space: crate::disk::free_bytes,
+            pack_rename: |from, to| std::fs::rename(from, to),
             hud_schemas: Arc::new(HudSchemas::bundled()),
             writes: Arc::new(Mutex::new(())),
         }
@@ -113,7 +122,31 @@ impl Library {
     /// Takes the library write lock; a writer that panicked leaves nothing it guards half done
     /// that the next writer relies on, so a poisoned lock is taken as is.
     pub(crate) fn lock_writes(&self) -> MutexGuard<'_, ()> {
+        assert_copies_free();
         self.writes.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Takes the copies lock for reading. Not reentrant: code under it calls the `_locked` forms.
+    pub(crate) fn copies_read(&self) -> CopiesGuard {
+        assert_copies_free_to_take();
+        let held = CopiesHeld::Read(COPIES.read().unwrap_or_else(PoisonError::into_inner));
+        COPIES_HELD.with(|flag| flag.set(true));
+        CopiesGuard { _held: held }
+    }
+
+    /// Takes the copies lock for writing, waiting out every reader. Not reentrant.
+    pub(crate) fn copies_write(&self) -> CopiesGuard {
+        assert_copies_free_to_take();
+        let held = CopiesHeld::Write(COPIES.write().unwrap_or_else(PoisonError::into_inner));
+        COPIES_HELD.with(|flag| flag.set(true));
+        CopiesGuard { _held: held }
+    }
+
+    /// Runs `f` holding the copies lock for reading, so a test can make a writer wait.
+    #[doc(hidden)]
+    pub fn with_copies_read<R>(&self, f: impl FnOnce() -> R) -> R {
+        let _copies = self.copies_read();
+        f()
     }
 
     /// Replaces the schemas copies are read with; the bundled set is the default.
@@ -252,10 +285,15 @@ impl fmt::Display for GbId {
     }
 }
 
-/// True when `name` is a single path component that cannot climb out of its parent.
-/// Folder names read from a v5 database pass this before they are joined into a path.
+/// True when `name` is a single path component that cannot climb out of its parent; on
+/// Windows a `:` is refused too, since `C:` reads as a drive. Folder names read from a v5
+/// database pass this before they are joined into a path.
 pub(crate) fn is_plain_name(name: &str) -> bool {
-    !name.is_empty() && name != "." && name != ".." && !name.contains(['/', '\\', '\0'])
+    !name.is_empty()
+        && name != "."
+        && name != ".."
+        && !name.contains(['/', '\\', '\0'])
+        && !(cfg!(windows) && name.contains(':'))
 }
 
 /// v5's `<slug>-<first 8 chars of id>` folder name for sounds and crosshairs.
@@ -357,6 +395,12 @@ impl From<IoFailure> for PaintError {
 }
 
 impl From<IoFailure> for MakeHudError {
+    fn from(IoFailure { path, source }: IoFailure) -> Self {
+        Self::Io { path, source }
+    }
+}
+
+impl From<IoFailure> for HudFilesError {
     fn from(IoFailure { path, source }: IoFailure) -> Self {
         Self::Io { path, source }
     }
@@ -586,6 +630,54 @@ pub(crate) fn remove_dir_if_present(dir: &Path) -> Result<(), IoFailure> {
     }
 }
 
+/// The copies lock, process-wide like the swap lock, so every `Library` over the data dir
+/// (the app's and each download's) excludes the others. Read by every entry point that reads a
+/// HUD copy, written by any that replaces one; taken after `writes` and the swap lock.
+static COPIES: RwLock<()> = RwLock::new(());
+
+thread_local! {
+    /// Whether this thread holds the copies lock; debug builds check nesting and order with it.
+    static COPIES_HELD: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// A held copies lock, read or write. Dropping it frees the thread for the next guard.
+pub(crate) struct CopiesGuard {
+    _held: CopiesHeld,
+}
+
+/// The std guard behind a `CopiesGuard`; held only for its drop.
+enum CopiesHeld {
+    Read(
+        #[expect(dead_code, reason = "held for its drop")] std::sync::RwLockReadGuard<'static, ()>,
+    ),
+    Write(
+        #[expect(dead_code, reason = "held for its drop")] std::sync::RwLockWriteGuard<'static, ()>,
+    ),
+}
+
+impl Drop for CopiesGuard {
+    fn drop(&mut self) {
+        COPIES_HELD.with(|held| held.set(false));
+    }
+}
+
+/// Checked before blocking, so a nested guard panics instead of deadlocking; the flag itself
+/// is set only once the lock is held, so a failed take never leaves the thread marked.
+fn assert_copies_free_to_take() {
+    debug_assert!(
+        !COPIES_HELD.with(std::cell::Cell::get),
+        "the library copies lock is not reentrant; call the _locked form"
+    );
+}
+
+/// `lock_writes` and `hud_swap_lock` come before the copies lock, never after it.
+pub(crate) fn assert_copies_free() {
+    debug_assert!(
+        !COPIES_HELD.with(std::cell::Cell::get),
+        "lock order: lock_writes, hud_swap_lock, then copies"
+    );
+}
+
 /// v5 checked only the four magic bytes; a file shorter than that is not a VPK either.
 pub(crate) fn check_vpk_magic(path: &Path) -> Result<(), ImportError> {
     let mut head = Vec::with_capacity(VPK_MAGIC.len());
@@ -606,5 +698,83 @@ pub(crate) fn remove_file_if_present(path: &Path) -> Result<(), IoFailure> {
         Ok(()) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(e) => Err(io_at(path)(e)),
+    }
+}
+
+#[cfg(all(test, debug_assertions))]
+mod copies_lock_tests {
+    use super::*;
+    use crate::db::Database;
+
+    fn library() -> (tempfile::TempDir, Library) {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = DataDir::at(tmp.path().join("data"));
+        (tmp, Library::new(Database::open(&dir).unwrap(), dir))
+    }
+
+    #[test]
+    #[should_panic(expected = "not reentrant")]
+    fn a_nested_copies_guard_panics() {
+        let (_tmp, lib) = library();
+        let _outer = lib.copies_read();
+        let _inner = lib.copies_read();
+    }
+
+    #[test]
+    #[should_panic(expected = "lock order")]
+    fn the_swap_lock_under_the_copies_lock_panics() {
+        let (_tmp, lib) = library();
+        let _copies = lib.copies_write();
+        let _swap = live_link::hud_swap_lock();
+    }
+
+    #[test]
+    #[should_panic(expected = "lock order")]
+    fn the_write_lock_under_the_copies_lock_panics() {
+        let (_tmp, lib) = library();
+        let _copies = lib.copies_read();
+        let _writes = lib.lock_writes();
+    }
+
+    #[test]
+    fn a_write_guard_on_one_library_blocks_a_reader_on_another() {
+        let (tmp, writer) = library();
+        let dir = DataDir::at(tmp.path().join("data"));
+        let reader = Library::new(Database::open(&dir).unwrap(), dir);
+        let held = writer.copies_write();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let waiter = std::thread::spawn(move || {
+            let _copies = reader.copies_read();
+            tx.send(()).unwrap();
+        });
+        let waiting = std::time::Duration::from_millis(300);
+        assert!(
+            rx.recv_timeout(waiting).is_err(),
+            "the reader got in under a writer"
+        );
+        drop(held);
+        rx.recv_timeout(std::time::Duration::from_secs(10))
+            .expect("the reader runs once the writer is gone");
+        waiter.join().unwrap();
+    }
+
+    #[test]
+    fn a_dropped_guard_frees_the_thread() {
+        let (_tmp, lib) = library();
+        drop(lib.copies_read());
+        drop(lib.copies_write());
+        let _swap = live_link::hud_swap_lock();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_plain_name;
+
+    #[test]
+    fn a_name_with_a_colon_is_plain_only_off_windows() {
+        assert!(is_plain_name("rayshud"));
+        assert_eq!(is_plain_name("C:"), !cfg!(windows));
+        assert_eq!(is_plain_name("a:b"), !cfg!(windows));
     }
 }

@@ -13,6 +13,7 @@ use super::made_huds::{
     prune_pictures, read_adding, read_capped, read_row, readable_folder, recover_swap,
     replay_with_kept_copies, roll_back, write_build, write_copy_in_place,
 };
+use super::packed::{HUD_ZIP, ItemSource, tree_hash_of, tree_line};
 use super::{
     GbId, HudEntry, HudId, IoFailure, Library, METADATA_DIR, Provenance, create_dir_all,
     folder_name, io_at, is_plain_name, library_db, new_id, now, tree_copy,
@@ -57,6 +58,7 @@ impl Library {
     /// is written, `NameTaken` past "(copy 99)", `Io` or `Database` when writing fails; a
     /// failure leaves no folder, no row and nothing in the library tmp dir.
     pub fn copy_hud(&self, base: &HudId) -> Result<HudEntry, CopyHudError> {
+        let _copies = self.copies_read();
         let row = self.base_row(base)?.ok_or_else(|| CopyHudError::NotFound {
             id: base.as_str().to_owned(),
         })?;
@@ -72,8 +74,10 @@ impl Library {
                 id: base.as_str().to_owned(),
             });
         }
+        // A packed base is read through its zip and copied out loose, as a copy is edited.
+        let source = ItemSource::open(&src, HUD_ZIP)?;
         let skip = |rel: &Path| rel == Path::new(METADATA_DIR);
-        let bytes = tree_copy::tree_bytes(&src, &skip)?;
+        let bytes = source.unpacked_bytes()?;
         self.check_space(bytes)
             .map_err(|(needed, free)| CopyHudError::NoSpace { needed, free })?;
 
@@ -85,7 +89,7 @@ impl Library {
             .ok_or_else(|| CopyHudError::NameTaken {
                 name: base_name.clone(),
             })?;
-        let record = self.copy_record(&row, &src)?;
+        let record = self.copy_record(&row, &src, &source)?;
 
         // Built under the tmp dir, whose guard removes it on every early return.
         let tmp = self.dir.tmp_dir();
@@ -97,7 +101,7 @@ impl Library {
         let short: String = first.chars().take(MAX_SLUG_CHARS).collect();
         let folder = folder_name(&short, &id);
         let build = scratch.path().join(&folder);
-        tree_copy::copy_tree(&src, &build, &skip)?;
+        source.extract_into(&build, &skip)?;
         let maker =
             MakerFile::new(Default::default(), Vec::new()).with_base(MakerBase::Copy(record));
         let maker_path = build.join(METADATA_DIR).join(MAKER_FILE);
@@ -201,8 +205,13 @@ impl Library {
         Ok(row.filter(|r| is_plain_name(r.entry.folder_name())))
     }
 
-    /// What a copy of `row` (files at `src`) records about its base.
-    fn copy_record(&self, row: &BaseRow, src: &Path) -> Result<CopyBase, CopyHudError> {
+    /// What a copy of `row` (files at `src`, read through `source`) records about its base.
+    fn copy_record(
+        &self,
+        row: &BaseRow,
+        src: &Path,
+        source: &ItemSource,
+    ) -> Result<CopyBase, CopyHudError> {
         let entry = &row.entry;
         let (store_id, origin, repo, hash) = match entry.provenance() {
             Provenance::Curated { hud_id } => {
@@ -241,7 +250,7 @@ impl Library {
             ),
         };
         // Deleting a HUD takes no write lock, so its row can vanish between reads.
-        let tree = self.hud_tree_hash(entry.id()).map_err(|e| match e {
+        let tree = self.hud_tree_hash_locked(entry.id()).map_err(|e| match e {
             LibraryError::Io { path, source } => CopyHudError::Io { path, source },
             LibraryError::NotFound { .. } => CopyHudError::NotFound {
                 id: entry.id().as_str().to_owned(),
@@ -254,6 +263,7 @@ impl Library {
         let install = self
             .install_name(
                 src,
+                source,
                 row.store_hud_id.clone(),
                 row.store_gb_id,
                 entry.folder_name(),
@@ -573,6 +583,7 @@ impl Library {
     /// # Errors
     /// `NotFound` for no such row; `Io` or `Database` when reading fails.
     pub fn copy_update(&self, id: &HudId) -> Result<CopyUpdate, LibraryError> {
+        let _copies = self.copies_read();
         let Some(base) = self.copy_base(id)? else {
             return Ok(CopyUpdate::UpToDate);
         };
@@ -639,12 +650,19 @@ impl Library {
         })
     }
 
-    /// The tree hash of library HUD `id`'s folder: regular files outside `.tf2tools/`, links
-    /// skipped. Files whose size and modified time match the cache are not read again.
+    /// The tree hash of library HUD `id`'s files, the same for its loose and packed forms:
+    /// regular files outside `.tf2tools/`, links skipped. Files whose size and modified time
+    /// (a packed file's: its zip's) match the cache are not read again.
     ///
     /// # Errors
     /// `NotFound` for no such row; `Io` when a file cannot be read; `Database`.
     pub fn hud_tree_hash(&self, id: &HudId) -> Result<TreeHash, LibraryError> {
+        let _copies = self.copies_read();
+        self.hud_tree_hash_locked(id)
+    }
+
+    /// `hud_tree_hash` for a caller already holding a copies guard.
+    pub(crate) fn hud_tree_hash_locked(&self, id: &HudId) -> Result<TreeHash, LibraryError> {
         let folder =
             self.hud_folder(id)
                 .map_err(library_db)?
@@ -662,33 +680,54 @@ impl Library {
             .map(|(_, f)| f.clone())
             .unwrap_or_default();
 
+        // A packed entry is keyed by its size and the zip's modified time, so a rewritten
+        // zip is hashed again; a loose file by its own size and modified time.
+        let source = ItemSource::open(&dir, HUD_ZIP)?;
+        let zip_stamp = source.zip_mtime_ns()?;
         let skip = |rel: &Path| rel == Path::new(METADATA_DIR);
         let mut fresh = BTreeMap::new();
-        let mut lines = Vec::new();
-        let mut files_read = 0;
-        for rel in tree_copy::tree_files(&dir, &skip)? {
-            let path = dir.join(&rel);
-            let meta = std::fs::symlink_metadata(&path).map_err(io_at(&path))?;
-            let mtime_ns = mtime_ns(&meta);
+        let mut missed = Vec::new();
+        for (rel, size) in source.files(&skip)? {
+            let mtime_ns = match zip_stamp {
+                Some(stamp) => stamp,
+                None => {
+                    let path = dir.join(&rel);
+                    mtime_ns(&std::fs::symlink_metadata(&path).map_err(io_at(&path))?)
+                }
+            };
             let key = rel
                 .to_string_lossy()
                 .replace(std::path::MAIN_SEPARATOR, "/");
-            let file = match cached.get(&key) {
-                Some(hit) if hit.size == meta.len() && hit.mtime_ns == mtime_ns => hit.clone(),
-                _ => {
-                    files_read += 1;
-                    CachedFile {
-                        size: meta.len(),
-                        mtime_ns,
-                        sha: sha256_file(&path)?,
-                    }
+            match cached.get(&key) {
+                Some(hit) if hit.size == size && hit.mtime_ns == mtime_ns => {
+                    fresh.insert(key, hit.clone());
                 }
-            };
-            lines.push(format!("{}\0{}\n", key.to_lowercase(), file.sha));
-            fresh.insert(key, file);
+                _ => missed.push((rel, key, size, mtime_ns)),
+            }
         }
-        lines.sort();
-        let hash = sha256_hex(lines.concat().as_bytes());
+        // The misses are hashed in one pass, so a packed HUD's zip is opened once for them all.
+        let files_read = missed.len();
+        let rels: Vec<&Path> = missed.iter().map(|(rel, ..)| rel.as_path()).collect();
+        let mut shas = Vec::with_capacity(files_read);
+        source.visit(rels, &mut |_, file| {
+            shas.push(file.sha256()?);
+            Ok(true)
+        })?;
+        for ((_, key, size, mtime_ns), sha) in missed.into_iter().zip(shas) {
+            fresh.insert(
+                key,
+                CachedFile {
+                    size,
+                    mtime_ns,
+                    sha,
+                },
+            );
+        }
+        let lines = fresh
+            .iter()
+            .map(|(key, file)| tree_line(key, &file.sha))
+            .collect();
+        let hash = tree_hash_of(lines);
 
         cache.folders.insert(folder.clone(), (0, fresh));
         cache.touch(&folder);
@@ -724,7 +763,7 @@ impl Library {
             && let (Some(theirs), Some(ours)) =
                 (self.hud_gb_mark(candidate)?, self.copy_mark(id, copy)?)
             && theirs > ours
-            && self.hud_tree_hash(candidate.id())?.hash() != copy.tree()
+            && self.hud_tree_hash_locked(candidate.id())?.hash() != copy.tree()
         {
             return Ok(true);
         }
@@ -738,14 +777,15 @@ impl Library {
             && !commits_match(&current, copy.hash())
         {
             // With no recorded commit, the download is newer only when its bytes differ.
-            if !copy.hash().is_empty() || self.hud_tree_hash(candidate.id())?.hash() != copy.tree()
+            if !copy.hash().is_empty()
+                || self.hud_tree_hash_locked(candidate.id())?.hash() != copy.tree()
             {
                 return Ok(true);
             }
         }
         let reinstall = candidate.folder_name() == copy.base_folder()
             && candidate.updated_at() > copy.base_updated_at();
-        Ok(reinstall && self.hud_tree_hash(candidate.id())?.hash() != copy.tree())
+        Ok(reinstall && self.hud_tree_hash_locked(candidate.id())?.hash() != copy.tree())
     }
 
     /// The version mark of copy `id`'s GameBanana base: the number its record holds, or for
@@ -828,7 +868,10 @@ impl Library {
             let same_hud = matches!(candidate.provenance(), Provenance::Curated { hud_id } if hud_id == store_hud);
             let at_current =
                 commit_suffix(candidate.folder_name()).is_some_and(|c| commits_match(current, c));
-            if same_hud && at_current && self.hud_tree_hash(candidate.id())?.hash() == base.tree() {
+            if same_hud
+                && at_current
+                && self.hud_tree_hash_locked(candidate.id())?.hash() == base.tree()
+            {
                 return Ok(true);
             }
         }
@@ -888,11 +931,19 @@ fn commits_match(a: &str, b: &str) -> bool {
 }
 
 pub(super) fn sha256_file(path: &Path) -> Result<String, IoFailure> {
-    let mut file = std::fs::File::open(path).map_err(io_at(path))?;
+    let file = std::fs::File::open(path).map_err(io_at(path))?;
+    sha256_reader(path, file)
+}
+
+/// SHA-256 hex of everything `reader` yields; a read failure is reported at `path`.
+pub(super) fn sha256_reader(
+    path: &Path,
+    mut reader: impl std::io::Read,
+) -> Result<String, IoFailure> {
     let mut hasher = Sha256::new();
     let mut buf = vec![0u8; 64 * 1024];
     loop {
-        let n = std::io::Read::read(&mut file, &mut buf).map_err(io_at(path))?;
+        let n = reader.read(&mut buf).map_err(io_at(path))?;
         if n == 0 {
             break;
         }
@@ -973,6 +1024,7 @@ impl Library {
     ) -> Result<CopyUpdated, UpdateCopyError> {
         // Held from the first read, so a save checking this copy's base waits for the new one.
         let _writes = self.lock_writes();
+        let _copies = self.copies_read();
         let text = |id: &HudId| id.as_str().to_owned();
         let folder = (self.hud_folder(id).map_err(save_db)?)
             .ok_or_else(|| UpdateCopyError::NotFound { id: text(id) })?;
@@ -1001,15 +1053,16 @@ impl Library {
         if !std::fs::symlink_metadata(&src).is_ok_and(|m| m.is_dir()) {
             return Err(UpdateCopyError::SourceGone { id: text(from) });
         }
+        let source = ItemSource::open(&src, HUD_ZIP).map_err(MakeHudError::from)?;
         let skip_meta = |rel: &Path| rel == Path::new(METADATA_DIR);
-        let bytes = tree_copy::tree_bytes(&src, &skip_meta).map_err(MakeHudError::from)?;
+        let bytes = source.unpacked_bytes().map_err(MakeHudError::from)?;
         self.check_space(bytes)
             .map_err(|(needed, free)| UpdateCopyError::NoSpace { needed, free })?;
 
         let live = huds.join(&folder);
         let previous =
             read_maker(&live)?.ok_or_else(|| UpdateCopyError::NotACopy { id: text(id) })?;
-        let record = self.copy_record(&row, &src).map_err(save_copy)?;
+        let record = self.copy_record(&row, &src, &source).map_err(save_copy)?;
         // The copy's base as it reads now, to tell which kept changes the update also touched.
         // Both bases are switched by the same choices, so a switch's own effect never reads as
         // a change the update made.
@@ -1028,7 +1081,9 @@ impl Library {
             .map_err(io_at(&tmp))
             .map_err(MakeHudError::from)?;
         let stage = scratch.path().join(&folder);
-        tree_copy::copy_tree(&src, &stage, &skip_meta).map_err(MakeHudError::from)?;
+        source
+            .extract_into(&stage, &skip_meta)
+            .map_err(MakeHudError::from)?;
         let skip_originals = |rel: &Path| rel == Path::new(ORIGINAL_DIR);
         let live_meta = live.join(METADATA_DIR);
         if std::fs::symlink_metadata(&live_meta).is_ok_and(|m| m.is_dir()) {
@@ -1169,6 +1224,7 @@ mod tests {
         save_library,
     };
     use crate::db::Database;
+    use crate::library::packed::{HUD_ZIP, ItemSource, packed_fixture, zip_opens};
     use crate::paths::{DataDir, LibraryKind};
 
     /// A library holding one local HUD `hud-1` in folder `somehud`.
@@ -1193,13 +1249,29 @@ mod tests {
     }
 
     #[test]
+    fn a_packed_tree_hash_opens_its_zip_a_fixed_number_of_times() {
+        let (_tmp, lib) = library_with_hud();
+        let folder = lib.dir.library_dir(LibraryKind::Huds).join("somehud");
+        packed_fixture(&folder, 2000, |i| format!("resource/ui/f{i:04}.res"));
+        let before = zip_opens();
+        let hash = lib.hud_tree_hash(&HudId::new("hud-1")).unwrap();
+        assert_eq!(hash.files_read(), 2001);
+        assert!(
+            zip_opens() - before <= 2,
+            "opened {} times",
+            zip_opens() - before
+        );
+    }
+
+    #[test]
     fn a_hud_deleted_mid_copy_is_not_found() {
         let (_tmp, lib) = library_with_hud();
         let id = HudId::new("hud-1");
         let row = lib.base_row(&id).unwrap().unwrap();
         lib.delete_hud(&id).unwrap();
         let src = lib.dir.library_dir(LibraryKind::Huds).join("somehud");
-        let err = lib.copy_record(&row, &src).unwrap_err();
+        let source = ItemSource::open(&src, HUD_ZIP).unwrap();
+        let err = lib.copy_record(&row, &src, &source).unwrap_err();
         assert!(
             matches!(&err, CopyHudError::NotFound { id } if id == "hud-1"),
             "{err:?}"

@@ -1186,6 +1186,9 @@ impl Library {
         // Asked before any step, so a refused apply leaves sounds and crosshairs alone too.
         // A skipped HUD removes nothing, so there is nothing to ask about.
         let skipped = |kind: MissingKind| resolved.missing.iter().any(|m| m.kind == kind);
+        // Held from the external check through the HUD step, so no copy changes between them.
+        let hud_guards = (!skipped(MissingKind::Hud))
+            .then(|| (super::live_link::hud_swap_lock(), self.copies_read()));
         if !skipped(MissingKind::Hud) {
             let unnamed =
                 self.unnamed_huds(&game_custom_dir(tf2)?, discard)
@@ -1221,13 +1224,16 @@ impl Library {
         let mut hud_blocked_name = None;
         if !skipped(MissingKind::Hud) {
             let hud = match &resolved.hud {
-                Some(hud) => self.install_hud_discarding(hud, tf2, discard).map(|done| {
-                    hud_blocked_name = done.blocked_name().map(str::to_owned);
-                }),
-                None => self.uninstall_hud_discarding(tf2, discard),
+                Some(hud) => self
+                    .install_hud_discarding_locked(hud, tf2, discard)
+                    .map(|done| {
+                        hud_blocked_name = done.blocked_name().map(str::to_owned);
+                    }),
+                None => self.uninstall_hud_discarding_locked(tf2, discard),
             };
             record(ApplyStep::Hud, hud.map_err(|e| e.to_string()));
         }
+        drop(hud_guards);
         for (step, kind, missing, sound) in [
             (
                 ApplyStep::Hitsound,

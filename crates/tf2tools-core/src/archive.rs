@@ -244,7 +244,7 @@ fn rar_error(archive: &Path, error: &rars::Error) -> ArchiveError {
 /// Accepts an entry name of any format only if, with `\` read as a separator, every
 /// component is a plain name or `.` and the first is not a drive prefix (`C:`), so it
 /// cannot climb out of or replace `dest` on any platform.
-fn check_entry_name(archive: &Path, name: &str) -> Result<(), ArchiveError> {
+pub(crate) fn check_entry_name(archive: &Path, name: &str) -> Result<(), ArchiveError> {
     let normalized = name.replace('\\', "/");
     let first = normalized.split('/').next().unwrap_or_default().as_bytes();
     let drive = first.len() >= 2 && first[0].is_ascii_alphabetic() && first[1] == b':';

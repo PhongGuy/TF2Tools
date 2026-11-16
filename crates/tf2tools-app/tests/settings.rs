@@ -749,3 +749,88 @@ fn the_logs_tf_card_says_when_the_cache_size_could_not_be_measured(cx: &mut Test
         Some("The logs cache size could not be measured.")
     );
 }
+
+#[test]
+fn the_library_line_reads_on_disk_and_unpacked() {
+    use tf2tools_app::pages::settings::{library_text, size_text};
+    assert_eq!(size_text(999_949_999), "999.9 MB");
+    assert_eq!(size_text(999_950_000), "1.0 GB");
+    assert_eq!(size_text(2_100_000_000), "2.1 GB");
+    assert_eq!(
+        library_text(412_000_000, 2_100_000_000),
+        "Your library uses 412.0 MB on disk (2.1 GB unpacked)."
+    );
+}
+
+#[gpui_kit::test]
+fn the_library_card_says_what_the_library_uses(cx: &mut TestAppContext) {
+    use tf2tools_app::library_pack::LibraryPack;
+    use tf2tools_app::pages::settings::library_text;
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let archive = env.tmp.path().join("rayshud.zip");
+    std::fs::write(&archive, support::hud_zip_bytes("rayshud")).unwrap();
+    s.services
+        .library
+        .import_hud(&archive, tf2tools_core::Provenance::Local)
+        .unwrap();
+    let _page = open_settings(cx, &s);
+    support::wait_real(cx, "the library figures", |cx| {
+        cx.update(|cx| {
+            let pack = LibraryPack::global(cx).read(cx);
+            pack.passes() > 0 && !pack.is_running()
+        })
+    });
+    support::settle(cx, s.win);
+    scroll_settings_to(cx, &s, ids::SETTINGS_LIBRARY_SPACE.into());
+    let space = s.services.library.space().unwrap();
+    let want = library_text(space.on_disk(), space.unpacked());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::SETTINGS_LIBRARY_SPACE).as_deref(),
+        Some(want.as_ref())
+    );
+}
+
+// Folder permissions that refuse a listing are a Unix feature.
+#[cfg(unix)]
+#[gpui_kit::test]
+fn the_library_card_says_when_the_size_could_not_be_measured(cx: &mut TestAppContext) {
+    use std::os::unix::fs::PermissionsExt as _;
+    use std::path::PathBuf;
+    use tf2tools_app::library_pack::LibraryPack;
+
+    // Gives the folder its permissions back however the test ends, so the temp dir can go.
+    struct Unlock(PathBuf);
+    impl Drop for Unlock {
+        fn drop(&mut self) {
+            let _ = std::fs::set_permissions(&self.0, std::fs::Permissions::from_mode(0o755));
+        }
+    }
+
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let locked = env.data.library_dir(tf2tools_core::LibraryKind::Huds);
+    std::fs::create_dir_all(locked.join("x")).unwrap();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let unlock = Unlock(locked.clone());
+    // Root reads any folder, so there is nothing to refuse; the test cannot run that way.
+    if std::fs::read_dir(&locked).is_ok() {
+        eprintln!("skipped: this user can list a folder with no permissions");
+        return;
+    }
+    let _page = open_settings(cx, &s);
+    support::wait_real(cx, "the failed measure", |cx| {
+        cx.update(|cx| {
+            let pack = LibraryPack::global(cx).read(cx);
+            pack.passes() > 0 && !pack.is_running()
+        })
+    });
+    drop(unlock);
+    assert!(cx.update(|cx| LibraryPack::global(cx).read(cx).failed()));
+    support::settle(cx, s.win);
+    scroll_settings_to(cx, &s, ids::SETTINGS_LIBRARY_SPACE.into());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::SETTINGS_LIBRARY_SPACE).as_deref(),
+        Some("The library size could not be measured.")
+    );
+}

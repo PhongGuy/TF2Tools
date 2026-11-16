@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{OptionalExtension, params};
 use walkdir::WalkDir;
 
+use super::packed::{HUD_ZIP, ItemSource};
 use super::{
     HudId, IoFailure, Library, METADATA_DIR, Provenance, copy_dir_excluding_metadata,
     create_dir_all, first_free_number, game_custom_dir, gb_id_column, hud_folder, hud_lowercase,
@@ -262,6 +263,7 @@ impl Library {
         archive: &Path,
         provenance: Provenance,
     ) -> Result<HudEntry, ImportError> {
+        let _copies = self.copies_write();
         // The scratch dir is removed when the guard drops, on every return path.
         let tmp = self.dir.tmp_dir();
         create_dir_all(&tmp)?;
@@ -367,8 +369,10 @@ impl Library {
         Ok((format!("{folder}-{number}"), Some(rename)))
     }
 
-    /// Copies the HUD at `root` to `library/huds/<folder_name>`, replacing what is there, and
-    /// records it, under `rename`'s name when given. A failure leaves no folder behind.
+    /// Copies the HUD at `root` to `library/huds/<folder_name>`, replacing what is there,
+    /// records it under `rename`'s name when given, makes its card picture, then packs it.
+    /// The caller holds the copies write guard. A failure before the row leaves no folder
+    /// behind; a failed pack is logged and leaves the HUD loose.
     fn add_hud_folder(
         &self,
         root: &Path,
@@ -385,13 +389,24 @@ impl Library {
             return Err(failure.into());
         }
 
-        match self.record_hud(folder_name, provenance, rename) {
-            Ok(entry) => Ok(self.refresh_hud_thumbnail(entry)),
+        let entry = match self.record_hud(folder_name, provenance, rename) {
+            Ok(entry) => entry,
             Err(failure) => {
                 let _ = remove_dir_if_present(&dest);
-                Err(failure)
+                return Err(failure);
             }
+        };
+        // The picture is read from the loose tree, so it is made before the tree is packed.
+        let entry = self.refresh_hud_thumbnail(entry);
+        if let Err(IoFailure { path, source }) = self.pack_folder(&dest, HUD_ZIP) {
+            tracing::warn!(
+                folder = folder_name,
+                path = %path.display(),
+                error = %source,
+                "imported HUD left loose: it could not be packed"
+            );
         }
+        Ok(entry)
     }
 
     /// Writes the `library_huds` row for a freshly copied folder, taking the display name
@@ -466,6 +481,7 @@ impl Library {
     /// previous save stranded as `<folder>.old` by an interrupted re-save goes too. A row
     /// whose folder name is not a plain name has no files, so only the row goes.
     pub fn delete_hud(&self, id: &HudId) -> Result<(), LibraryError> {
+        let _copies = self.copies_write();
         let folder: Option<String> = self
             .db
             .read(|conn| {
@@ -504,7 +520,9 @@ impl Library {
     /// so an unknown or vanished HUD leaves the installed one. Fails with `ExternalHuds` and
     /// changes nothing when a HUD the library cannot put back is in `tf/custom`.
     pub fn install_hud(&self, id: &HudId, tf2: &Tf2Install) -> Result<HudInstall, InstallError> {
-        self.install_hud_discarding(id, tf2, &[])
+        let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_read();
+        self.install_hud_discarding_locked(id, tf2, &[])
     }
 
     /// `install_hud`, except that it may remove the HUDs in `discard`. It fails with
@@ -517,6 +535,17 @@ impl Library {
         discard: &[ExternalHud],
     ) -> Result<HudInstall, InstallError> {
         let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_read();
+        self.install_hud_discarding_locked(id, tf2, discard)
+    }
+
+    /// `install_hud_discarding` for a caller already holding the swap lock and a copies guard.
+    pub(super) fn install_hud_discarding_locked(
+        &self,
+        id: &HudId,
+        tf2: &Tf2Install,
+        discard: &[ExternalHud],
+    ) -> Result<HudInstall, InstallError> {
         let not_in_library = || InstallError::NotInLibrary {
             what: format!("HUD {id}"),
         };
@@ -542,11 +571,13 @@ impl Library {
         } else {
             made_huds::stranded_save(&live).ok_or_else(not_in_library)?
         };
+        // Opened first, so a damaged zip fails the install before anything changes.
+        let source = ItemSource::open(&src, HUD_ZIP)?;
 
         let custom = game_custom_dir(tf2)?;
         self.refuse_unnamed_huds(&custom, discard, None)?;
         // Scan before touching tf/custom, so a failed scan leaves the old install in place.
-        let mut target = self.install_name(&src, store_hud_id, store_gb_id, &folder)?;
+        let mut target = self.install_name(&src, &source, store_hud_id, store_gb_id, &folder)?;
         // TF2 on Linux ignores a HUD with capitals in its folder or file names.
         let lower = |name: &str| {
             if hud_lowercase::LOWERCASE_INSTALLS {
@@ -582,7 +613,8 @@ impl Library {
         // The target was free, so a half copy is ours to clear; left behind it would hold the
         // name against the retry.
         let dest = custom.join(&target);
-        let copied = copy_dir_excluding_metadata(&src, &dest).and_then(|()| {
+        let any_metadata = |rel: &Path| rel.components().any(|c| c.as_os_str() == METADATA_DIR);
+        let copied = source.extract_into(&dest, &any_metadata).and_then(|_| {
             if hud_lowercase::lowercases(&target) {
                 hud_lowercase::lowercase_tree(&dest, &target)
             } else {
@@ -614,12 +646,13 @@ impl Library {
         })
     }
 
-    /// The `tf/custom` folder a HUD's files at `src` want: the name they reference most,
-    /// else a curated HUD's repo name, else a copy's recorded install folder, else its
-    /// library `folder`.
+    /// The `tf/custom` folder the HUD's files in `src` want: the name they reference most,
+    /// else a curated HUD's repo name, else the recorded install folder in `dir`'s
+    /// `.tf2tools/maker.json`, else its library `folder`.
     pub(super) fn install_name(
         &self,
-        src: &Path,
+        dir: &Path,
+        src: &ItemSource,
         store_hud_id: Option<String>,
         store_gb_id: Option<i64>,
         folder: &str,
@@ -633,7 +666,7 @@ impl Library {
         {
             return Ok(name);
         }
-        Ok(recorded_install_folder(src).unwrap_or_else(|| folder.to_owned()))
+        Ok(recorded_install_folder(dir).unwrap_or_else(|| folder.to_owned()))
     }
 
     /// A curated HUD's fallback install folder: its store repo's name, else its library
@@ -659,7 +692,9 @@ impl Library {
     /// Removes every installed HUD from `tf/custom` and clears v5's install settings. Fails
     /// with `ExternalHuds` and changes nothing when one is a HUD the library cannot put back.
     pub fn uninstall_hud(&self, tf2: &Tf2Install) -> Result<(), InstallError> {
-        self.uninstall_hud_discarding(tf2, &[])
+        let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_read();
+        self.uninstall_hud_discarding_locked(tf2, &[])
     }
 
     /// `uninstall_hud`, except that it may remove the HUDs in `discard`. It fails with
@@ -671,6 +706,16 @@ impl Library {
         discard: &[ExternalHud],
     ) -> Result<(), InstallError> {
         let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_read();
+        self.uninstall_hud_discarding_locked(tf2, discard)
+    }
+
+    /// `uninstall_hud_discarding` for a caller already holding the swap lock and a copies guard.
+    pub(super) fn uninstall_hud_discarding_locked(
+        &self,
+        tf2: &Tf2Install,
+        discard: &[ExternalHud],
+    ) -> Result<(), InstallError> {
         let custom = game_custom_dir(tf2)?;
         self.refuse_unnamed_huds(&custom, discard, None)?;
         live_link::clear_staging(&custom)?;
@@ -691,6 +736,7 @@ impl Library {
         discard: &[ExternalHud],
     ) -> Result<(), InstallError> {
         let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_read();
         let custom = game_custom_dir(tf2)?;
         // Only what the scan found can go, so no name reaches outside tf/custom.
         let found = scan_hud_folders(&custom)?;
@@ -737,6 +783,7 @@ impl Library {
     /// The HUD folders in `tf/custom` that installing or uninstalling would lose for good,
     /// because the library cannot put them back; sorted.
     pub fn external_huds(&self, tf2: &Tf2Install) -> Result<Vec<ExternalHud>, LibraryError> {
+        let _copies = self.copies_read();
         self.external_in(&tf2.custom_dir())
     }
 
@@ -750,6 +797,7 @@ impl Library {
         tf2: &Tf2Install,
     ) -> Result<Vec<HudEntry>, KeepHudError> {
         let _swap = live_link::hud_swap_lock();
+        let _copies = self.copies_write();
         let custom = tf2.custom_dir();
         let present = self.external_in(&custom).map_err(keep_library)?;
         let mut kept = Vec::new();
@@ -853,13 +901,16 @@ impl Library {
             }
             // A lowercased install differs from its library copy by case, so it is compared
             // with the library as lowercased; one made before lowercasing matches as it is.
-            _ => match name.filter(|name| hud_lowercase::lowercases(name)) {
-                Some(name) => {
-                    hud_print::same_files(path, &src)?
-                        || hud_print::same_lowercased(path, &src, name)?
+            _ => {
+                let source = ItemSource::open(&src, HUD_ZIP)?;
+                match name.filter(|name| hud_lowercase::lowercases(name)) {
+                    Some(name) => {
+                        hud_print::same_files(path, &source)?
+                            || hud_print::same_lowercased(path, &source, name)?
+                    }
+                    None => hud_print::same_files(path, &source)?,
                 }
-                None => hud_print::same_files(path, &src)?,
-            },
+            }
         };
         Ok(if same {
             Standing::PutBack

@@ -25,7 +25,9 @@ fn import(env: &LibraryEnv, root: &str, files: &[(&str, &str)]) -> HudEntry {
     env.lib.import_hud(&archive, Provenance::Local).unwrap()
 }
 
+/// Writes `maker` as the HUD's `maker.json`, on its loose tree as a copy's folder holds it.
 fn record(env: &LibraryEnv, hud: &HudEntry, maker: &[u8]) {
+    env.lib.unpack_hud_for_tests(hud.id()).unwrap();
     let dir = env
         .dir
         .library_dir(LibraryKind::Huds)

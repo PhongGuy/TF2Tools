@@ -461,6 +461,12 @@ fn install_again_from_a_broken_library_copy_downloads_it_with_the_same_parts(
         std::fs::remove_file(custom.join(name)).unwrap();
     }
     // A copy missing a slot, as a crash part-way through an update leaves it.
+    cx.update(|cx| {
+        cx.global::<Services>()
+            .library
+            .unpack_gb_addon_for_tests(GbId::new(26))
+    })
+    .unwrap();
     std::fs::remove_dir_all(env.data.gb_addon_dir().join("26/2")).unwrap();
     act(cx, &w, |i, win, cx| i.reinstall(GbId::new(26), win, cx));
     toast_is(cx, w.win, "Add-on installed. Pack");

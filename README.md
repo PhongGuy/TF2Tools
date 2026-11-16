@@ -86,7 +86,7 @@ You can also add a HUD or a sound to a profile from its card with **Add to profi
 
 ### Settings
 
-Point TF2Tools at your game if it didn't find it, set the preview volume and refresh the stores. The Activity Log (**Logs** in the sidebar) lists what TF2Tools did, and TF2Tools checks for new versions of itself (see [Updates](#updates)). Choose the language TF2Tools speaks under **Language**: English, or Russian in preview. Want TF2Tools in your language? See [Translations](CONTRIBUTING.md#translations).
+Point TF2Tools at your game if it didn't find it, set the preview volume and refresh the stores. The Activity Log (**Logs** in the sidebar) lists what TF2Tools did, and TF2Tools checks for new versions of itself (see [Updates](#updates)). Choose the language TF2Tools speaks under **Language**: English, or Russian in preview. Want TF2Tools in your language? See [Translations](CONTRIBUTING.md#translations). **Library** shows how much space your library uses: TF2Tools keeps HUDs and GameBanana add-ons compressed there, in a fraction of the space, while your game still gets plain files.
 
 ![The Settings page: the preview volume, how often the stores refresh, and each store's last sync](.github/readme/settings.webp)
 
@@ -130,7 +130,7 @@ TF2 reads its HUD, sounds and crosshairs when it starts, so restart the game to 
 
 ## Coming from an older version
 
-- **TF2Tools 5:** your library, profiles and settings carry over. TF2Tools 6 uses the same library and upgrades it the first time it opens.
+- **TF2Tools 5:** your library, profiles and settings carry over. TF2Tools 6 uses the same library and upgrades it the first time it opens. Once TF2Tools 6 has compressed your library, TF2Tools 5 can't read it any more.
 - **TF2Tools 4:** TF2Tools 6 starts with an empty library, since it can't read TF2Tools 4's list. What TF2Tools 4 put in your game stays there until you replace it, and installing a HUD from TF2Tools 6 takes out the HUD you have now. On Windows, TF2Tools 6 installs next to TF2Tools 4 and takes over the desktop shortcut. Once you're happy, remove the old one in Windows **Settings > Apps > Installed apps**: it's the TF2Tools entry with version 4.8.0.
 - **Still want TF2Tools 4?** Its downloads stay on the [Releases page](https://github.com/PhongGuy/TF2Tools/releases) up to v4.8.0, and its code is on the [v4 branch](https://github.com/PhongGuy/TF2Tools/tree/v4).
 

@@ -61,6 +61,7 @@ impl Library {
             // A made HUD's save swaps its folder under this lock, so the picture never lands
             // in a folder about to be replaced.
             let _writes = self.lock_writes();
+            let _copies = self.copies_read();
             let dir = huds.join(folder);
             if dir.is_dir() && write_thumbnail(&dir) {
                 self.set_thumbnail_flag(id, true)?;

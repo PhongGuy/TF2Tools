@@ -28,6 +28,11 @@ settings:
     title: "Дополнения"
     description: "Скины, эффекты, интерфейсы, текстуры и игровые файлы с GameBanana"
     mature: "Показывать дополнения для взрослых"
+  library:
+    title: "Библиотека"
+    description: "Где TF2Tools хранит ваши HUD, звуки, прицелы и дополнения"
+    usage: "Библиотека занимает %{disk} на диске (%{unpacked} без сжатия)."
+    unmeasured: "Не удалось измерить размер библиотеки."
   logs_tf:
     title: "logs.tf"
     description: "Как открытые логи матчей называют игроков и сколько хранятся полные логи"
@@ -42,6 +47,7 @@ settings:
     full_logs: { one: "%{count} полный лог занимает", few: "%{count} полных лога занимают", many: "%{count} полных логов занимают" }
     measuring: "Измерение..."
     unmeasured: "Не удалось измерить размер кэша логов."
+    size_gb: "%{size} ГБ"
     size_mb: "%{size} МБ"
     size_kb: "%{size} КБ"
   sync:

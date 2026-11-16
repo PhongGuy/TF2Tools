@@ -155,6 +155,7 @@ fn a_copy_and_its_saves_carry_the_picture() {
     let tf = game_for(&env, &[]);
     // The stock helper takes text, so the texture is written into the base afterwards.
     let base = import_stock_hud(&env, "somehud", &[], Provenance::Local);
+    env.lib.unpack_hud_for_tests(base.id()).unwrap();
     let base_dir = env
         .dir
         .library_dir(LibraryKind::Huds)

@@ -3,7 +3,7 @@
 use rusqlite::Connection;
 
 /// The newest schema this build understands. v5 stopped at 9; v6 steps start at 10.
-pub(crate) const SCHEMA_VERSION: u32 = 21;
+pub(crate) const SCHEMA_VERSION: u32 = 22;
 
 /// One migration step: SQL to run, then columns to add when missing.
 struct Step {
@@ -144,6 +144,12 @@ const STEPS: &[Step] = &[
         version: 21,
         sql: "",
         add_columns: &[("logstf_logs", "opened_at", "INTEGER")],
+    },
+    // v6 step 22: changes no table; HUD copies may now be packed, so an older build refuses them.
+    Step {
+        version: 22,
+        sql: "",
+        add_columns: &[],
     },
 ];
 

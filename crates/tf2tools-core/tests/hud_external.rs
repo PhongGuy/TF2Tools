@@ -6,6 +6,7 @@ use crate::common;
 use std::fs;
 use std::path::Path;
 
+use common::packed::library_files;
 use common::{
     LibraryEnv, builtin_catalog, import_hud_as, library_env, set_setting, setting, tree, write_file,
 };
@@ -71,6 +72,7 @@ fn only_folders_the_library_cannot_put_back_are_external() {
 fn a_hud_installed_under_another_name_is_not_external() {
     let env = library_env();
     let installed = hud(&env, "rayshud");
+    env.lib.unpack_hud_for_tests(installed.id()).unwrap();
     let folder = env.dir.library_dir(LibraryKind::Huds).join("rayshud");
     write_file(
         &folder.join("resource/clientscheme.res"),
@@ -150,8 +152,7 @@ fn keeping_a_copy_adds_it_and_then_the_install_goes_through() {
 
     env.lib.install_hud(next.id(), &env.tf2).unwrap();
     assert!(!custom.join("manual").exists());
-    let library = env.dir.library_dir(LibraryKind::Huds).join("manual");
-    assert_eq!(snapshot(&library), original);
+    assert_eq!(library_files(&env, &kept[0]), original);
 
     // The kept HUD installs like any other, and nothing has to be asked again.
     env.lib.install_hud(kept[0].id(), &env.tf2).unwrap();
@@ -380,6 +381,7 @@ fn an_install_whose_times_moved_but_bytes_did_not_is_no_change() {
         .unwrap();
 
     assert!(env.lib.external_huds(&env.tf2).unwrap().is_empty());
+    env.lib.unpack_hud_for_tests(installed.id()).unwrap();
     change_library_file(&env, "rayshud", b"saved");
     assert_eq!(
         names(&env.lib.external_huds(&env.tf2).unwrap()),
@@ -436,6 +438,7 @@ fn a_cache_the_game_writes_is_not_a_change() {
 fn a_library_newer_than_the_install_is_not_a_change() {
     let env = library_env();
     let installed = hud(&env, "rayshud");
+    env.lib.unpack_hud_for_tests(installed.id()).unwrap();
     env.lib.install_hud(installed.id(), &env.tf2).unwrap();
     write_file(
         &env.dir
@@ -536,9 +539,13 @@ fn keeping_changes_takes_a_new_name_and_leaves_the_original() {
         .unwrap();
 
     assert_eq!(snapshot(&library.join("rayshud")), original);
+    let copy = library_files(&env, &kept[0]);
+    let scheme = copy
+        .iter()
+        .find(|(rel, _)| rel == "resource/clientscheme.res");
     assert_eq!(
-        fs::read(library.join("rayshud-2/resource/clientscheme.res")).unwrap(),
-        b"tweaked"
+        scheme.map(|(_, bytes)| bytes.as_slice()),
+        Some(&b"tweaked"[..])
     );
     assert!(!custom.join("rayshud").exists());
 }
@@ -560,6 +567,7 @@ fn a_failed_install_copy_leaves_nothing_for_the_retry_to_trip_on() {
     use std::os::unix::fs::PermissionsExt;
     let env = library_env();
     let next = hud(&env, "rayshud");
+    env.lib.unpack_hud_for_tests(next.id()).unwrap();
     // A texture, since the name scan reads text files and would fail before the copy starts.
     let file = write_file(
         &env.dir
@@ -700,6 +708,7 @@ fn change_library_file(env: &LibraryEnv, folder: &str, bytes: &[u8]) {
 fn reinstall_updates_its_own_install_again_and_again() {
     let env = library_env();
     let installed = hud(&env, "rayshud");
+    env.lib.unpack_hud_for_tests(installed.id()).unwrap();
     env.lib.install_hud(installed.id(), &env.tf2).unwrap();
     let file = env
         .tf2
@@ -718,6 +727,7 @@ fn reinstall_updates_its_own_install_again_and_again() {
 fn reinstall_leaves_an_edited_install_alone() {
     let env = library_env();
     let installed = hud(&env, "rayshud");
+    env.lib.unpack_hud_for_tests(installed.id()).unwrap();
     env.lib.install_hud(installed.id(), &env.tf2).unwrap();
     let custom = env.tf2.custom_dir();
     write_file(

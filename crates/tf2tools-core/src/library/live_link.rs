@@ -8,9 +8,10 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use rusqlite::OptionalExtension;
 
+use super::packed::{HUD_ZIP, ItemSource};
 use super::{
-    HudId, HudStatus, IoFailure, Library, copy_dir_excluding_metadata, create_dir_all,
-    game_custom_dir, hud_lowercase, is_plain_name, made_huds, remove_dir_if_present,
+    HudId, HudStatus, IoFailure, Library, METADATA_DIR, create_dir_all, game_custom_dir,
+    hud_lowercase, is_plain_name, made_huds, remove_dir_if_present,
 };
 use crate::error::{LibraryError, ReinstallError};
 use crate::hud_maker::is_device_name;
@@ -29,6 +30,7 @@ static HUD_SWAP: Mutex<()> = Mutex::new(());
 /// Takes the swap lock; a panic in another holder leaves nothing half-locked, so a
 /// poisoned lock is taken anyway.
 pub(super) fn hud_swap_lock() -> MutexGuard<'static, ()> {
+    super::assert_copies_free();
     HUD_SWAP.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
@@ -74,6 +76,7 @@ impl Library {
     /// copy's fingerprint.
     pub fn reinstall_hud(&self, id: &HudId, tf2: &Tf2Install) -> Result<Reinstall, ReinstallError> {
         let _swap = hud_swap_lock();
+        let _copies = self.copies_read();
         let custom = game_custom_dir(tf2)?;
         // A crash's leftover goes first, so the status below sees the HUD where it belongs.
         recover_in(&custom, &mut std_rename)?;
@@ -97,8 +100,10 @@ impl Library {
         // Staged one level down, so no scan of `tf/custom` takes the copy for a HUD.
         let staging = custom.join(STAGING_DIR);
         let fresh = staging.join("new").join(&folder);
-        let staged = copy_dir_excluding_metadata(&src, &fresh)
-            .and_then(|()| {
+        let any_metadata = |rel: &Path| rel.components().any(|c| c.as_os_str() == METADATA_DIR);
+        let staged = ItemSource::open(&src, HUD_ZIP)
+            .and_then(|source| source.extract_into(&fresh, &any_metadata))
+            .and_then(|_| {
                 if hud_lowercase::lowercases(&folder) {
                     hud_lowercase::lowercase_tree(&fresh, &folder)
                 } else {

@@ -83,7 +83,7 @@ async fn a_vpk_payload_installs_under_its_tf2tools_name_and_is_recorded() {
     assert_eq!((entry.file_date(), entry.latest_file_date()), (200, 200));
     assert!(entry.is_installed() && !entry.has_update() && !entry.is_gone());
     assert_eq!(
-        common::tree(&s.env.dir.gb_addon_dir()),
+        common::packed::gb_tree(&s.env.dir),
         ["7/1/tf2tools-gb-7-toon-fx.vpk"]
     );
     assert!(
@@ -216,7 +216,7 @@ async fn unknown_or_no_payloads_are_refused_before_anything_changes() {
         "{err:?}"
     );
     assert!(custom(&s).is_empty());
-    assert!(common::tree(&s.env.dir.gb_addon_dir()).is_empty());
+    assert!(common::packed::gb_tree(&s.env.dir).is_empty());
 }
 
 #[tokio::test]
@@ -315,7 +315,7 @@ async fn a_failed_clear_keeps_the_library_copy_matching_the_row() {
         .unwrap_err();
     assert!(matches!(err, GbAddonInstallError::Io { .. }), "{err:?}");
     assert_eq!(
-        common::tree(&s.env.dir.gb_addon_dir()),
+        common::packed::gb_tree(&s.env.dir),
         ["30/1/tf2tools-gb-30-new.vpk"],
         "the library copy holds the new files the row names"
     );
@@ -351,12 +351,7 @@ async fn while_tf2_runs_an_update_that_removes_a_vpk_is_refused() {
         .lib
         .install_gb_addon(d, &chosen(&["crit.vpk"]), &s.tf2, &no)
         .unwrap();
-    let library = s.env.dir.gb_addon_dir();
-    let copy_before = common::tree(&library);
-    let bytes_before: Vec<Vec<u8>> = copy_before
-        .iter()
-        .map(|f| std::fs::read(library.join(f)).unwrap())
-        .collect();
+    let copy_before = common::packed::gb_files(&s.env.dir);
     let body = common::zip_bytes(&[("crit/materials/a.vmt", b"a")]);
     let d = download(&s, 13, "Crit", "crit.zip", body, 200).await;
     let err = s
@@ -370,15 +365,10 @@ async fn while_tf2_runs_an_update_that_removes_a_vpk_is_refused() {
     assert!(row.is_installed());
     assert_eq!(row.file_date(), 100);
     assert_eq!(
-        common::tree(&library),
+        common::packed::gb_files(&s.env.dir),
         copy_before,
         "the library copy is untouched"
     );
-    let bytes_after: Vec<Vec<u8>> = copy_before
-        .iter()
-        .map(|f| std::fs::read(library.join(f)).unwrap())
-        .collect();
-    assert_eq!(bytes_after, bytes_before);
 }
 
 #[tokio::test]
@@ -398,7 +388,7 @@ async fn an_update_replaces_the_old_files_and_keeps_one_row() {
         .unwrap();
     assert_eq!(custom(&s), ["tf2tools-gb-15-pack.vpk"]);
     assert_eq!(
-        common::tree(&s.env.dir.gb_addon_dir()),
+        common::packed::gb_tree(&s.env.dir),
         ["15/1/tf2tools-gb-15-pack.vpk"]
     );
     assert_eq!(entry.file_date(), 200);
@@ -422,7 +412,7 @@ async fn a_failed_copy_into_the_game_leaves_a_row_to_install_again() {
     assert_eq!(list.len(), 1);
     assert!(!list[0].is_installed());
     assert_eq!(
-        common::tree(&s.env.dir.gb_addon_dir()),
+        common::packed::gb_tree(&s.env.dir),
         ["17/1/tf2tools-gb-17-a.vpk"]
     );
 }
@@ -440,7 +430,7 @@ async fn a_stale_staging_dir_is_cleared_first() {
         .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
         .unwrap();
     assert_eq!(
-        common::tree(&s.env.dir.gb_addon_dir()),
+        common::packed::gb_tree(&s.env.dir),
         ["18/1/tf2tools-gb-18-a.vpk"]
     );
 }
@@ -455,7 +445,7 @@ async fn a_stale_staging_file_is_cleared_first() {
         .install_gb_addon(d, &chosen(&["a.vpk"]), &s.tf2, &no)
         .unwrap();
     assert_eq!(
-        common::tree(&s.env.dir.gb_addon_dir()),
+        common::packed::gb_tree(&s.env.dir),
         ["27/1/tf2tools-gb-27-a.vpk"]
     );
 }
@@ -471,7 +461,6 @@ async fn a_failed_staging_copy_changes_nothing() {
     let d = download(&s, 19, "A", "a.vpk", vpk(b"v2"), 200).await;
     // The download's extracted files vanishing makes the staging copy fail part-way.
     std::fs::remove_dir_all(s.env.dir.tmp_dir()).unwrap();
-    let root = s.env.dir.gb_addon_dir();
     let result = s
         .env
         .lib
@@ -484,7 +473,10 @@ async fn a_failed_staging_copy_changes_nothing() {
     assert!(list[0].is_installed());
     assert_eq!(list[0].file_date(), 100);
     assert_eq!(custom(&s), ["tf2tools-gb-19-a.vpk"]);
-    assert_eq!(common::tree(&root), ["19/1/tf2tools-gb-19-a.vpk"]);
+    assert_eq!(
+        common::packed::gb_tree(&s.env.dir),
+        ["19/1/tf2tools-gb-19-a.vpk"]
+    );
 }
 
 #[tokio::test]
@@ -741,6 +733,7 @@ async fn install_again_from_a_partial_library_copy_is_not_in_library() {
         let _ = std::fs::remove_file(s.tf2.custom_dir().join(&top));
     }
     // A copy that lost one slot, as a half-replaced copy would, must not install partly.
+    s.env.lib.unpack_gb_addon_for_tests(GbId::new(26)).unwrap();
     std::fs::remove_dir_all(s.env.dir.gb_addon_dir().join("26/2")).unwrap();
     let err = s
         .env
@@ -842,7 +835,7 @@ async fn remove_also_deletes_a_leftover_staging_dir() {
         .remove_gb_addon(GbId::new(34), &s.tf2, &no)
         .unwrap();
     assert_eq!(
-        common::tree(&s.env.dir.gb_addon_dir()),
+        common::packed::gb_tree(&s.env.dir),
         [".staging-340/1/x"],
         "only this add-on's staging goes"
     );

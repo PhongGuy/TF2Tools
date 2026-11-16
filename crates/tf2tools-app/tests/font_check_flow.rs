@@ -357,7 +357,8 @@ fn a_check_dropped_behind_another_dialog_asks_again_later(cx: &mut TestAppContex
 fn an_install_under_its_expected_folder_checks_that_folder(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window_fonts(cx, &env, found(&env), host(&env, &[]));
-    seed(&s, &env, "fonthud-abc1234");
+    let hud = seed(&s, &env, "fonthud-abc1234");
+    s.services.library.unpack_hud_for_tests(hud.id()).unwrap();
     let extra = env
         .data
         .library_dir(LibraryKind::Huds)

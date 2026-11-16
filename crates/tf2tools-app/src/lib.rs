@@ -26,6 +26,7 @@ pub mod ids;
 pub mod keymap;
 pub mod kill_icons;
 pub mod library_events;
+pub mod library_pack;
 pub mod links;
 pub mod loadout;
 pub mod local_messages;

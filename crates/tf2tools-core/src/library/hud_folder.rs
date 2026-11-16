@@ -4,9 +4,8 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use walkdir::WalkDir;
-
-use super::{IoFailure, METADATA_DIR, io_at, walk_failure};
+use super::packed::ItemSource;
+use super::{IoFailure, METADATA_DIR};
 use crate::hud_maker::check_hud_path;
 
 /// Text files the game reads, the only ones whose references count.
@@ -35,33 +34,26 @@ const RESERVED: [&str; 11] = [
     "tf",
 ];
 
-/// The `custom/<name>/` folder most often referenced by the HUD's text files under
-/// `hud_dir` (ties go to the byte-wise smallest name), or `None` when nothing qualifies.
+/// The `custom/<name>/` folder most often referenced by the text files of the HUD `src`
+/// (ties go to the byte-wise smallest name), or `None` when nothing qualifies.
 /// The name comes from untrusted files, so it is always a single safe path segment.
-pub(super) fn referenced_folder(hud_dir: &Path) -> Result<Option<String>, IoFailure> {
+pub(super) fn referenced_folder(src: &ItemSource) -> Result<Option<String>, IoFailure> {
     let mut counts: BTreeMap<String, usize> = BTreeMap::new();
-    let walk = WalkDir::new(hud_dir)
-        .min_depth(1)
-        .into_iter()
-        .filter_entry(|e| e.file_name() != METADATA_DIR);
-    for entry in walk {
-        let entry = entry.map_err(|e| walk_failure(hud_dir, e))?;
-        let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
-        if !entry.file_type().is_file() || !TEXT_EXTENSIONS.iter().any(|ext| name.ends_with(ext)) {
-            continue;
-        }
-        let len = entry
-            .metadata()
-            .map_err(|e| walk_failure(hud_dir, e))?
-            .len();
-        if len > MAX_SCANNED_BYTES {
-            continue;
-        }
-        let bytes = std::fs::read(entry.path()).map_err(io_at(entry.path()))?;
-        for found in references(&String::from_utf8_lossy(&bytes)) {
+    let any_metadata = |rel: &Path| rel.components().any(|c| c.as_os_str() == METADATA_DIR);
+    let files = src.files(&any_metadata)?;
+    let scanned = files.iter().filter(|(rel, len)| {
+        let name = rel
+            .file_name()
+            .map(|n| n.to_string_lossy().to_ascii_lowercase())
+            .unwrap_or_default();
+        *len <= MAX_SCANNED_BYTES && TEXT_EXTENSIONS.iter().any(|ext| name.ends_with(ext))
+    });
+    src.visit(scanned.map(|(rel, _)| rel.as_path()), &mut |_, file| {
+        for found in references(&String::from_utf8_lossy(&file.bytes()?)) {
             *counts.entry(found.to_owned()).or_default() += 1;
         }
-    }
+        Ok(true)
+    })?;
     // `max_by_key` keeps the last maximum, so walk in reverse to keep the smallest name.
     Ok(counts
         .into_iter()
@@ -134,4 +126,25 @@ pub(super) fn strip_commit_hash(folder: &str) -> Option<String> {
     let (rest, hash) = folder.rsplit_once('-')?;
     let is_hash = (7..=40).contains(&hash.len()) && hash.bytes().all(|b| b.is_ascii_hexdigit());
     (is_hash && is_safe_folder(rest)).then(|| rest.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::library::packed::{HUD_ZIP, packed_fixture, zip_opens};
+
+    #[test]
+    fn the_reference_scan_opens_the_zip_a_fixed_number_of_times() {
+        let t = tempfile::tempdir().unwrap();
+        let hud = t.path().join("hud");
+        packed_fixture(&hud, 2000, |i| format!("resource/ui/f{i:04}.res"));
+        let src = ItemSource::open(&hud, HUD_ZIP).unwrap();
+        let before = zip_opens();
+        assert_eq!(referenced_folder(&src).unwrap(), None);
+        assert!(
+            zip_opens() - before <= 1,
+            "opened {} times",
+            zip_opens() - before
+        );
+    }
 }

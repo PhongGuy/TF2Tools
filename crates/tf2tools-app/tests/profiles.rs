@@ -977,6 +977,7 @@ fn a_profile_whose_hud_name_is_taken_warns(cx: &mut TestAppContext) {
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let hud = seed_hud(&s, &env, "m0rehud-abc1234", Provenance::Local);
+    s.services.library.unpack_hud_for_tests(hud.id()).unwrap();
     std::fs::write(
         env.data
             .library_dir(LibraryKind::Huds)
