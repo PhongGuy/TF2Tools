@@ -86,6 +86,23 @@ Its launch reads these variables:
 
 The seed's Arena profile names a store HUD that is not in the library, for checking Missing Items.
 
+## Translations
+
+The text TF2Tools shows lives in `crates/tf2tools-app/locales/`, one file per language. `en.yml` is the source and the fallback: a key a language lacks shows in English.
+
+To add a language, copy `en.yml` to `<code>.yml` and translate the values, never the keys. Then add the code and its native name with " (preview)" to `LANGUAGES` in `crates/tf2tools-app/src/i18n.rs`, add its plural rule to `plural_form` in the same file if it counts differently from English, run `cargo test -p tf2tools-app --lib i18n::` and open a PR.
+
+Rules for the files:
+
+- Wrap every value in double quotes, because YAML reads a bare `Yes`, `No` or `Off` as true or false.
+- Keep every `%{name}` exactly as it is; the tests fail a translation that drops or renames one.
+- Plural keys end in `one`, `few`, `many` or `other`, and a file has exactly the forms its language uses: English `one` and `other`, Russian `one`, `few` and `many`.
+- A string literal shaped like a catalogue key (for example "settings.json") fails the key-existence test, so section names must not collide with ordinary dotted text.
+
+A language stays "(preview)" in the picker until a native speaker has reviewed it.
+
+After a language switch, some text, such as an open list or a toast already on screen, changes the next time it opens.
+
 ## Layout
 
 - `crates/tf2tools-core`: the UI-free core (library, installs, file formats, store clients, sync).

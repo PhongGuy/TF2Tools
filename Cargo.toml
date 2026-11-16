@@ -69,6 +69,8 @@ embed-resource = "=3.0.12"
 gpui-kit = "=0.9.1"
 gpui-component = "=0.9.1"
 gpui-base = "=0.9.1"
+# Already locked through the kit; the app's generated translation code names `rust_i18n::`.
+rust-i18n = "=4.2.4"
 rust-embed = { version = "=8.13.0", features = ["debug-embed"] }
 anyhow = "1"
 async-channel = "2.5"

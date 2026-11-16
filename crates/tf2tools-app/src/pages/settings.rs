@@ -29,6 +29,7 @@ use tf2tools_core::{
 
 use crate::activity;
 use crate::audio::volume::{bind_slider, shared_volume};
+use crate::i18n::{self, plural, tr};
 use crate::ids;
 use crate::links;
 use crate::local_messages::{
@@ -83,6 +84,33 @@ impl SearchableListItem for Tf2Candidate {
 
 type Candidates = Entity<SelectState<Vec<Tf2Candidate>>>;
 
+/// One offered language, as a row of the Language select.
+#[derive(Debug, Clone)]
+struct LanguageRow {
+    code: SharedString,
+    name: SharedString,
+}
+
+impl SearchableListItem for LanguageRow {
+    type Value = SharedString;
+
+    fn title(&self) -> SharedString {
+        self.name.clone()
+    }
+
+    // Like the install rows, each row draws its own test id.
+    fn render(&self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        div()
+            .id(ids::settings_language(&self.code))
+            .test_support()
+            .child(self.name.clone())
+    }
+
+    fn value(&self) -> &SharedString {
+        &self.code
+    }
+}
+
 /// The Settings form. The shell keeps it across visits, so unsaved edits stay until Save; it
 /// loads the saved settings on creation and rereads them each time it shows again.
 pub struct SettingsPage {
@@ -95,6 +123,7 @@ pub struct SettingsPage {
     saved_hours: u32,
     /// The install select, present only after Auto-detect found several installs.
     candidates: Option<Candidates>,
+    language: Entity<SelectState<Vec<LanguageRow>>>,
     loaded: bool,
     busy: Option<Busy>,
     /// Each store's cached count and last sync, absent until the first read lands or if it failed.
@@ -151,32 +180,32 @@ fn hub_drawn(hub: &SyncHub) -> Vec<HubDrawn> {
         .collect()
 }
 
-/// The sync cards in v5's order, with v5's titles and descriptions.
+/// The sync cards in v5's order, as the catalogue keys of v5's titles and descriptions.
 pub const SYNC_CARDS: [(StoreKind, &str, &str); 5] = [
     (
         StoreKind::Sounds,
-        "Sound Store",
-        "GameBanana hitsounds and killsounds",
+        "settings.sync.sounds.title",
+        "settings.sync.sounds.description",
     ),
     (
         StoreKind::Crosshairs,
-        "Crosshair Store",
-        "GameBanana crosshair mods",
+        "settings.sync.crosshairs.title",
+        "settings.sync.crosshairs.description",
     ),
     (
         StoreKind::GameBananaHuds,
-        "GameBanana HUD Store",
-        "GameBanana HUD mods",
+        "settings.sync.gamebanana_huds.title",
+        "settings.sync.gamebanana_huds.description",
     ),
     (
         StoreKind::CuratedHuds,
-        "Curated HUD Store",
-        "Curated HUDs from mastercomfig",
+        "settings.sync.curated_huds.title",
+        "settings.sync.curated_huds.description",
     ),
     (
         StoreKind::Addons,
-        "Addon Store",
-        "Mastercomfig performance and QoL addons",
+        "settings.sync.addons.title",
+        "settings.sync.addons.description",
     ),
 ];
 
@@ -224,7 +253,8 @@ impl SettingsPage {
 
     /// Needs the `Services` global. Starts the settings load off the UI thread.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let path = cx.new(|cx| InputState::new(window, cx).placeholder("/path/to/Team Fortress 2"));
+        let path =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("settings.tf2.placeholder")));
         let percent = f32::from(shared_volume(cx).read(cx).get().get());
         let volume = cx.new(|_| {
             SliderState::new()
@@ -264,6 +294,7 @@ impl SettingsPage {
                 ]
             })
             .unwrap_or_default();
+        let language = Self::language_select(window, cx);
         // The App Updates card draws the updater's state, so every change redraws the page.
         let updates = updater(cx).map(|u| cx.observe(&u, |_, _, cx| cx.notify()));
         let mut page = Self {
@@ -274,6 +305,7 @@ impl SettingsPage {
             saved_path: SharedString::default(),
             saved_hours: 0,
             candidates: None,
+            language,
             loaded: false,
             busy: None,
             sync_status: None,
@@ -446,9 +478,14 @@ impl SettingsPage {
                 (hub.is_running(kind), hub.failure(kind).map(str::to_owned))
             })
             .unwrap_or((false, None));
-        let mut label = format!("{count} items cached. Last synced: {when}");
-        if let Some(error) = &failure {
-            label.push_str(&format!(". Sync failed: {error}"));
+        let (items, synced) = (
+            plural("settings.sync.items", count),
+            tr!("settings.sync.last_synced", when = when),
+        );
+        let failed = failure.map(|error| tr!("settings.sync.failed", error = error));
+        let mut label = format!("{items}. {synced}");
+        if let Some(failed) = &failed {
+            label.push_str(&format!(". {failed}"));
         }
         // The lines take the rest of the row and wrap, so a long failure never pushes Resync out.
         let lines = v_flex()
@@ -459,21 +496,17 @@ impl SettingsPage {
             .min_w_0()
             .gap_1()
             .text_sm()
-            .child(format!("{count} items cached"))
-            .child(
-                div()
-                    .text_color(theme.muted_foreground)
-                    .child(format!("Last synced: {when}")),
-            )
-            .children(failure.map(|error| {
-                div()
-                    .text_color(theme.danger)
-                    .child(format!("Sync failed: {error}"))
-            }));
+            .child(items)
+            .child(div().text_color(theme.muted_foreground).child(synced))
+            .children(failed.map(|failed| div().text_color(theme.danger).child(failed)));
         let resync = Button::new(ids::settings_resync(kind))
             .flex_none()
             .outline()
-            .label(if running { "Syncing..." } else { "Resync" })
+            .label(if running {
+                tr!("settings.sync.syncing")
+            } else {
+                tr!("settings.sync.resync")
+            })
             .disabled(running || hub.is_none())
             .on_click(cx.listener(move |_, _, _, cx| {
                 if let Some(hub) = sync_hub(cx) {
@@ -485,7 +518,12 @@ impl SettingsPage {
             .justify_between()
             .child(lines)
             .child(resync);
-        card(title, description, Some(content.into_any_element()), cx)
+        card(
+            tr!(title),
+            tr!(description),
+            Some(content.into_any_element()),
+            cx,
+        )
     }
 
     // Asks for a folder and puts it in the input; a cancel leaves the input as it was.
@@ -531,22 +569,74 @@ impl SettingsPage {
                     .map(|i| i.game_dir().display().to_string().into())
                     .collect();
                 let Some(first) = paths.first().cloned() else {
-                    let manual = "Select your TF2 folder manually";
-                    return toast(window, cx, ToastKind::Warning, "TF2 not found", manual);
+                    let (title, manual) = (
+                        tr!("settings.toast.not_found"),
+                        tr!("settings.toast.manual"),
+                    );
+                    return toast(window, cx, ToastKind::Warning, title, manual);
                 };
                 page.path
                     .update(cx, |input, cx| input.set_value(first.clone(), window, cx));
                 let description = if paths.len() == 1 {
-                    first.to_string()
+                    first
                 } else {
-                    let count = paths.len();
+                    let count = paths.len() as u64;
                     page.candidates = Some(page.candidate_select(paths, window, cx));
-                    format!("{count} installs found; choose one below")
+                    plural("settings.toast.installs", count)
                 };
-                toast(window, cx, ToastKind::Success, "TF2 found", description);
+                let found = tr!("settings.toast.found");
+                toast(window, cx, ToastKind::Success, found, description);
             });
         })
         .detach();
+    }
+
+    // The Language select with the current language chosen; confirming a row switches to it.
+    fn language_select(
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Entity<SelectState<Vec<LanguageRow>>> {
+        let rows: Vec<LanguageRow> = i18n::LANGUAGES
+            .iter()
+            .map(|l| LanguageRow {
+                code: l.code.into(),
+                name: l.name.into(),
+            })
+            .collect();
+        let chosen = rows
+            .iter()
+            .position(|r| r.code == i18n::current())
+            .unwrap_or_default();
+        let select =
+            cx.new(|cx| SelectState::new(rows, Some(IndexPath::default().row(chosen)), window, cx));
+        cx.subscribe_in(&select, window, |page, _, event, window, cx| {
+            if let SelectEvent::Confirm(Some(code)) = event {
+                page.pick_language(code, window, cx);
+            }
+        })
+        .detach();
+        select
+    }
+
+    // Switches the whole app at once and saves the choice in the background, as the
+    // mature add-ons switch does; a failed save only logs, the switch already happened.
+    // The path input keeps its placeholder text, so it takes the new language's by hand.
+    fn pick_language(&mut self, code: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let applied = i18n::apply(code);
+        self.path.update(cx, |input, cx| {
+            input.set_placeholder(tr!("settings.tf2.placeholder"), window, cx)
+        });
+        let save = run_blocking(cx, move |s| {
+            s.db.set_language(applied)
+                .map_err(|e| describe_settings(&e).into_op("Save language"))
+        });
+        cx.spawn(async move |_, _| {
+            if let Err(err) = save.await {
+                tracing::warn!("the language setting could not be saved: {err}");
+            }
+        })
+        .detach();
+        cx.refresh_windows();
     }
 
     // A select over `paths` with the first chosen; confirming a row puts its path in the input.
@@ -618,7 +708,10 @@ impl SettingsPage {
                     });
                 }
                 let _ = win.update(cx, |_, window, cx| match &saved {
-                    Ok(_) => toast(window, cx, ToastKind::Success, "Settings saved", ""),
+                    Ok(_) => {
+                        let saved = tr!("settings.toast.saved");
+                        toast(window, cx, ToastKind::Success, saved, "")
+                    }
                     Err(err) => toast_error(window, cx, err),
                 });
             });
@@ -639,10 +732,10 @@ impl SettingsPage {
 /// the local time as "%Y-%m-%d %H:%M".
 pub fn format_synced(rfc3339: Option<&str>) -> String {
     let Some(text) = rfc3339 else {
-        return "Never".to_owned();
+        return tr!("settings.sync.never").to_string();
     };
     chrono::DateTime::parse_from_rfc3339(text).map_or_else(
-        |_| "Unknown".to_owned(),
+        |_| tr!("settings.sync.unknown").to_string(),
         |t| {
             t.with_timezone(&chrono::Local)
                 .format("%Y-%m-%d %H:%M")
@@ -653,15 +746,14 @@ pub fn format_synced(rfc3339: Option<&str>) -> String {
 
 /// v5's `formatHours`: "1 hour", "5 hours", "1 day", "7 days", "1d 1h".
 pub fn format_hours(hours: u32) -> String {
-    let plural = |n: u32| if n == 1 { "" } else { "s" };
     if hours < 24 {
-        return format!("{hours} hour{}", plural(hours));
+        return plural("settings.cache.hours", hours.into()).to_string();
     }
     let (days, rest) = (hours / 24, hours % 24);
     if rest == 0 {
-        format!("{days} day{}", plural(days))
+        plural("settings.cache.days", days.into()).to_string()
     } else {
-        format!("{days}d {rest}h")
+        tr!("settings.cache.days_hours", days = days, hours = rest).to_string()
     }
 }
 
@@ -670,7 +762,7 @@ fn nicknames_switch(cx: &mut App) -> AnyElement {
     let nicknames = LogNicknames::global(cx);
     Switch::new(ids::SETTINGS_LOG_NICKNAMES)
         .checked(nicknames.read(cx).show())
-        .label("Show nicknames in match logs")
+        .label(tr!("settings.logs_tf.nicknames"))
         .on_click(move |&on, _, cx| nicknames.update(cx, |n, cx| n.set(on, cx)))
         .into_any_element()
 }
@@ -680,7 +772,7 @@ fn mature_switch(cx: &mut App) -> AnyElement {
     let mature = MatureAddons::global(cx);
     Switch::new(ids::SETTINGS_MATURE_ADDONS)
         .checked(mature.read(cx).show())
-        .label("Show mature add-ons")
+        .label(tr!("settings.addons.mature"))
         .on_click(move |&on, _, cx| mature.update(cx, |m, cx| m.set(on, cx)))
         .into_any_element()
 }
@@ -743,9 +835,9 @@ fn notices_content(page: &SettingsPage, cx: &mut Context<SettingsPage>) -> AnyEl
                     .outline()
                     .px_3()
                     .label(if shown {
-                        "Hide notices"
+                        tr!("settings.licences.hide")
                     } else {
-                        "Show notices"
+                        tr!("settings.licences.show")
                     })
                     .on_click(cx.listener(|page, _, _, cx| {
                         page.show_notices = !page.show_notices;
@@ -795,11 +887,11 @@ fn notice_row(row: &NoticeRow, muted: Hsla) -> AnyElement {
 
 // The Help and feedback card's two links, opened in the player's browser.
 fn help_content() -> AnyElement {
-    let link = |id: &'static str, text: &'static str, url: &'static str| {
+    let link = |id: &'static str, text: SharedString, url: &'static str| {
         Button::new(id)
             .outline()
             .px_3()
-            .label(text)
+            .label(text.clone())
             .accessibility_label(text)
             .on_click(move |_, _, cx| cx.open_url(url))
     };
@@ -808,10 +900,14 @@ fn help_content() -> AnyElement {
         .flex_wrap()
         .child(link(
             ids::SETTINGS_REPORT_PROBLEM,
-            "Report a problem",
+            tr!("settings.help.report"),
             links::REPORT_PROBLEM_URL,
         ))
-        .child(link(ids::SETTINGS_HELP, "Help", links::HELP_URL))
+        .child(link(
+            ids::SETTINGS_HELP,
+            tr!("settings.help.open"),
+            links::HELP_URL,
+        ))
         .into_any_element()
 }
 
@@ -822,7 +918,7 @@ fn whole(slider: &Entity<SliderState>, cx: &App) -> u32 {
 
 // v5's shadcn Card: a bordered, rounded panel with a title, a muted description and content.
 fn card(
-    title: &'static str,
+    title: impl Into<SharedString>,
     description: impl IntoElement,
     content: Option<AnyElement>,
     cx: &App,
@@ -843,7 +939,7 @@ fn card(
                     div()
                         .font_weight(FontWeight::SEMIBOLD)
                         .line_height(relative(1.))
-                        .child(title),
+                        .child(title.into()),
                 )
                 .child(
                     div()
@@ -877,8 +973,23 @@ impl Render for SettingsPage {
 
         let version = labelled(
             ids::SETTINGS_VERSION,
-            format!("Current version: v{}", env!("CARGO_PKG_VERSION")),
+            tr!(
+                "settings.app_updates.version",
+                version = env!("CARGO_PKG_VERSION")
+            ),
         );
+        let language = v_flex()
+            .gap_3()
+            .child(
+                div()
+                    .id(ids::SETTINGS_LANGUAGE)
+                    .test_support()
+                    .child(Select::new(&self.language)),
+            )
+            .child(div().text_xs().text_color(muted).child(labelled(
+                ids::SETTINGS_LANGUAGE_NOTE,
+                tr!("settings.language.note"),
+            )));
         let installation = v_flex()
             .gap_3()
             .child(
@@ -895,7 +1006,7 @@ impl Render for SettingsPage {
                         Button::new(ids::SETTINGS_BROWSE)
                             .outline()
                             .px_3()
-                            .label("Browse")
+                            .label(tr!("settings.tf2.browse"))
                             .loading(self.busy == Some(Busy::Browse))
                             .disabled(busy)
                             .on_click(cx.listener(|page, _, window, cx| page.browse(window, cx))),
@@ -907,7 +1018,7 @@ impl Render for SettingsPage {
                     Button::new(ids::SETTINGS_DETECT)
                         .secondary()
                         .px_3()
-                        .label("Auto-detect")
+                        .label(tr!("settings.tf2.detect"))
                         .loading(self.busy == Some(Busy::Detect))
                         .disabled(busy)
                         .on_click(cx.listener(|page, _, window, cx| page.detect(window, cx))),
@@ -924,7 +1035,7 @@ impl Render for SettingsPage {
             .text_sm()
             .child(labelled(
                 ids::SETTINGS_VOLUME_LABEL,
-                format!("Volume: {volume}%"),
+                tr!("settings.audio.volume", percent = volume),
             ))
             .child(
                 div()
@@ -937,7 +1048,7 @@ impl Render for SettingsPage {
             .text_sm()
             .child(labelled(
                 ids::SETTINGS_CACHE_LABEL,
-                format!("Cache duration: {}", format_hours(hours)),
+                tr!("settings.cache.duration", duration = format_hours(hours)),
             ))
             .child(
                 div()
@@ -949,7 +1060,7 @@ impl Render for SettingsPage {
                 div()
                     .text_xs()
                     .text_color(muted)
-                    .child("Stores will re-sync automatically when cache expires. Default: 7 days (168 hours)."),
+                    .child(tr!("settings.cache.hint")),
             );
 
         let content = v_flex()
@@ -967,38 +1078,44 @@ impl Render for SettingsPage {
                     .px_6()
                     .gap_6()
                     .child(card(
-                        "App Updates",
+                        tr!("settings.app_updates.title"),
                         version,
                         updater::view::settings_content(cx),
                         cx,
                     ))
                     .child(card(
-                        "TF2 Installation",
-                        "Path to your Team Fortress 2 installation folder",
+                        tr!("settings.language.title"),
+                        tr!("settings.language.description"),
+                        Some(language.into_any_element()),
+                        cx,
+                    ))
+                    .child(card(
+                        tr!("settings.tf2.title"),
+                        tr!("settings.tf2.description"),
                         Some(installation.into_any_element()),
                         cx,
                     ))
                     .child(card(
-                        "Audio",
-                        "Preview volume for hitsounds and killsounds",
+                        tr!("settings.audio.title"),
+                        tr!("settings.audio.description"),
                         Some(audio.into_any_element()),
                         cx,
                     ))
                     .child(card(
-                        "Store Cache",
-                        "How often to re-sync store data",
+                        tr!("settings.cache.title"),
+                        tr!("settings.cache.description"),
                         Some(cache.into_any_element()),
                         cx,
                     ))
                     .child(card(
-                        "Add-ons",
-                        "GameBanana skins, effects, GUIs, textures and game files",
+                        tr!("settings.addons.title"),
+                        tr!("settings.addons.description"),
                         Some(mature_switch(cx)),
                         cx,
                     ))
                     .child(card(
-                        "logs.tf",
-                        "How opened match logs name the players you track",
+                        tr!("settings.logs_tf.title"),
+                        tr!("settings.logs_tf.description"),
                         Some(nicknames_switch(cx)),
                         cx,
                     ))
@@ -1017,21 +1134,21 @@ impl Render for SettingsPage {
                                 .primary()
                                 .h_9()
                                 .px_4()
-                                .label("Save Settings")
+                                .label(tr!("settings.save"))
                                 .loading(self.busy == Some(Busy::Save))
                                 .disabled(busy)
                                 .on_click(cx.listener(|page, _, window, cx| page.save(window, cx))),
                         ),
                     )
                     .child(card(
-                        "Licences",
-                        "TF2Tools uses work and content made by others. These are their licences and credits.",
+                        tr!("settings.licences.title"),
+                        tr!("settings.licences.description"),
                         Some(notices_content(self, cx)),
                         cx,
                     ))
                     .child(card(
-                        "Help and feedback",
-                        "Stuck, or found something broken? Read the help or tell us about it.",
+                        tr!("settings.help.title"),
+                        tr!("settings.help.description"),
                         Some(help_content()),
                         cx,
                     )),

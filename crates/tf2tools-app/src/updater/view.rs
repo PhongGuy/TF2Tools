@@ -8,11 +8,11 @@ use gpui_kit::component::progress::Progress;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, App, Entity, FontFeatures, InteractiveElement as _, IntoElement,
-    ParentElement as _, Pixels, Styled as _, TestSupportExt as _, Window, div, px,
+    ParentElement as _, Pixels, SharedString, Styled as _, TestSupportExt as _, Window, div, px,
 };
 
-use super::backend::UNAVAILABLE;
 use super::{REOPEN, UpdateState, Updater, updater};
+use crate::i18n::tr;
 use crate::ids;
 use crate::shell::leave;
 use crate::widgets::Named as _;
@@ -174,42 +174,41 @@ pub fn settings_content(cx: &App) -> Option<AnyElement> {
     let theme = cx.theme();
     // Each state's line, its colour, and which of check, install and restart it offers; the
     // install slot opens the release page whenever this copy cannot update itself.
-    let (text, color, buttons): (String, _, [bool; 3]) = match &state {
-        UpdateState::Unavailable => (UNAVAILABLE.into(), None, [false, true, false]),
+    let (text, color, buttons): (SharedString, _, [bool; 3]) = match &state {
+        UpdateState::Unavailable => (
+            tr!("updater.status.unavailable"),
+            None,
+            [false, true, false],
+        ),
         UpdateState::Idle | UpdateState::UpToDate => {
-            ("Up to date".into(), None, [true, false, false])
+            (tr!("updater.status.up_to_date"), None, [true, false, false])
         }
         UpdateState::Checking => (
-            "Checking for updates...".into(),
+            tr!("updater.status.checking"),
             Some(theme.muted_foreground),
             [false; 3],
         ),
         UpdateState::Available(offer) if offer.installable => (
-            format!("v{} available", offer.version),
+            tr!("updater.status.available", version = offer.version),
             None,
             [true, true, false],
         ),
         UpdateState::Available(offer) => (
-            format!(
-                "v{} available. Download it from the release page.",
-                offer.version
-            ),
+            tr!("updater.status.available_page", version = offer.version),
             None,
             [true, true, false],
         ),
-        UpdateState::Downloading { percent, .. } => {
-            (format!("Downloading... {percent}%"), None, [false; 3])
-        }
-        UpdateState::Ready(_) => (
-            "Update ready — restart to apply".into(),
+        UpdateState::Downloading { percent, .. } => (
+            tr!("updater.status.downloading", percent = percent),
             None,
-            [false, false, true],
+            [false; 3],
         ),
-        UpdateState::Installing(_) => ("Installing update...".into(), None, [false; 3]),
+        UpdateState::Ready(_) => (tr!("updater.status.ready"), None, [false, false, true]),
+        UpdateState::Installing(_) => (tr!("updater.status.installing"), None, [false; 3]),
         // The relaunch never quit the app, so the player reopens it by hand; nothing to click.
-        UpdateState::Updated(_) => (REOPEN.into(), None, [false; 3]),
+        UpdateState::Updated(_) => (tr!("updater.status.reopen"), None, [false; 3]),
         UpdateState::Failed(failure) => (
-            failure.message.clone(),
+            failure.message.clone().into(),
             Some(theme.danger),
             [true, false, false],
         ),
@@ -220,7 +219,7 @@ pub fn settings_content(cx: &App) -> Option<AnyElement> {
         card_button(
             &u,
             ids::SETTINGS_UPDATE_CHECK,
-            "Check for Updates",
+            tr!("updater.button.check"),
             |u, _, cx| {
                 u.update(cx, |u, cx| u.check(cx));
             },
@@ -231,7 +230,7 @@ pub fn settings_content(cx: &App) -> Option<AnyElement> {
             card_button(
                 &u,
                 ids::SETTINGS_UPDATE_INSTALL,
-                "Download & Install",
+                tr!("updater.button.install"),
                 |u, _, cx| {
                     u.update(cx, |u, cx| u.download(cx));
                 },
@@ -240,7 +239,7 @@ pub fn settings_content(cx: &App) -> Option<AnyElement> {
             card_button(
                 &u,
                 ids::SETTINGS_UPDATE_INSTALL,
-                "Open release page",
+                tr!("updater.button.release_page"),
                 |u, _, cx| u.read(cx).open_release_page(cx),
             )
         }
@@ -249,7 +248,7 @@ pub fn settings_content(cx: &App) -> Option<AnyElement> {
         card_button(
             &u,
             ids::SETTINGS_UPDATE_RESTART,
-            "Restart Now",
+            tr!("updater.button.restart"),
             ask_then_restart,
         )
     });
@@ -287,7 +286,7 @@ const STACK_AFTER: usize = 36;
 fn card_button(
     u: &Entity<Updater>,
     id: &'static str,
-    label: &'static str,
+    label: SharedString,
     run: impl Fn(&Entity<Updater>, &mut Window, &mut App) + 'static,
 ) -> AnyElement {
     let u = u.clone();
@@ -297,4 +296,21 @@ fn card_button(
         .label(label)
         .on_click(move |_, window, cx| run(&u, window, cx))
         .into_any_element()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::updater::REOPEN;
+    use crate::updater::backend::UNAVAILABLE;
+
+    // The banner still shows the constants, so the card's English must not drift from them.
+    #[test]
+    fn the_card_says_what_the_banner_says() {
+        let en = |key: &str| crate::_rust_i18n_try_translate("en", key).map(|t| t.into_owned());
+        assert_eq!(
+            en("updater.status.unavailable").as_deref(),
+            Some(UNAVAILABLE)
+        );
+        assert_eq!(en("updater.status.reopen").as_deref(), Some(REOPEN));
+    }
 }

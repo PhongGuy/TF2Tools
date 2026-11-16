@@ -1,0 +1,83 @@
+# English: the source text and the fallback for every other language.
+# To translate, copy this file to <code>.yml; see CONTRIBUTING.md, Translations.
+settings:
+  language:
+    title: "Language"
+    description: "The language TF2Tools shows its text in"
+    note: "Parts of TF2Tools not yet translated stay in English."
+  app_updates:
+    title: "App Updates"
+    version: "Current version: v%{version}"
+  tf2:
+    title: "TF2 Installation"
+    description: "Path to your Team Fortress 2 installation folder"
+    placeholder: "/path/to/Team Fortress 2"
+    browse: "Browse"
+    detect: "Auto-detect"
+  audio:
+    title: "Audio"
+    description: "Preview volume for hitsounds and killsounds"
+    volume: "Volume: %{percent}%"
+  cache:
+    title: "Store Cache"
+    description: "How often to re-sync store data"
+    duration: "Cache duration: %{duration}"
+    hint: "Stores will re-sync automatically when cache expires. Default: 7 days (168 hours)."
+    hours: { one: "%{count} hour", other: "%{count} hours" }
+    days: { one: "%{count} day", other: "%{count} days" }
+    days_hours: "%{days}d %{hours}h"
+  addons:
+    title: "Add-ons"
+    description: "GameBanana skins, effects, GUIs, textures and game files"
+    mature: "Show mature add-ons"
+  logs_tf:
+    title: "logs.tf"
+    description: "How opened match logs name the players you track"
+    nicknames: "Show nicknames in match logs"
+  sync:
+    items: { one: "%{count} item cached", other: "%{count} items cached" }
+    last_synced: "Last synced: %{when}"
+    failed: "Sync failed: %{error}"
+    never: "Never"
+    unknown: "Unknown"
+    resync: "Resync"
+    syncing: "Syncing..."
+    sounds: { title: "Sound Store", description: "GameBanana hitsounds and killsounds" }
+    crosshairs: { title: "Crosshair Store", description: "GameBanana crosshair mods" }
+    gamebanana_huds: { title: "GameBanana HUD Store", description: "GameBanana HUD mods" }
+    curated_huds: { title: "Curated HUD Store", description: "Curated HUDs from mastercomfig" }
+    addons: { title: "Addon Store", description: "Mastercomfig performance and QoL addons" }
+  save: "Save Settings"
+  licences:
+    title: "Licences"
+    description: "TF2Tools uses work and content made by others. These are their licences and credits."
+    show: "Show notices"
+    hide: "Hide notices"
+  help:
+    title: "Help and feedback"
+    description: "Stuck, or found something broken? Read the help or tell us about it."
+    report: "Report a problem"
+    open: "Help"
+  toast:
+    saved: "Settings saved"
+    found: "TF2 found"
+    not_found: "TF2 not found"
+    manual: "Select your TF2 folder manually"
+    installs: { one: "%{count} install found; choose one below", other: "%{count} installs found; choose one below" }
+
+updater:
+  status:
+    up_to_date: "Up to date"
+    checking: "Checking for updates..."
+    available: "v%{version} available"
+    available_page: "v%{version} available. Download it from the release page."
+    downloading: "Downloading... %{percent}%"
+    ready: "Update ready — restart to apply"
+    installing: "Installing update..."
+    unavailable: "Automatic updates aren't available in this version. Get new versions from the release page."
+    reopen: "TF2Tools has been updated. Close and reopen it to finish."
+  button:
+    check: "Check for Updates"
+    install: "Download & Install"
+    release_page: "Open release page"
+    restart: "Restart Now"

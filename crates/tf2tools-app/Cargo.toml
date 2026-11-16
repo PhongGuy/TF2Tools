@@ -40,6 +40,7 @@ serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 tempfile.workspace = true
+rust-i18n.workspace = true
 
 [build-dependencies]
 embed-resource.workspace = true
@@ -63,6 +64,11 @@ gpui-pre-wgpu = "=0.3.12"
 [[test]]
 name = "integration"
 path = "tests/main.rs"
+
+# Tests that switch the process-wide locale, kept apart from the English suite.
+[[test]]
+name = "i18n"
+path = "tests/i18n.rs"
 
 [[example]]
 name = "app_timing"

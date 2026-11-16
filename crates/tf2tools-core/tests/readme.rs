@@ -424,3 +424,50 @@ fn the_profiles_section_mentions_add_to_profile() {
         "Profiles section: {profiles}"
     );
 }
+
+#[test]
+fn contributing_explains_how_to_translate() {
+    let guide = repo_file("CONTRIBUTING.md");
+    let at = guide
+        .find("\n## Translations\n")
+        .expect("a Translations section");
+    let rest = &guide[at + 1..];
+    let section = rest.find("\n## ").map_or(rest, |end| &rest[..end]);
+    for needle in [
+        "crates/tf2tools-app/locales/",
+        "en.yml",
+        "LANGUAGES",
+        "double quotes",
+        "%{",
+        "`one`",
+        "`few`",
+        "`many`",
+        "`other`",
+        "(preview)",
+        "next time it opens",
+    ] {
+        assert!(
+            section.contains(needle),
+            "the Translations section lacks {needle:?}"
+        );
+    }
+}
+
+#[test]
+fn the_readme_tells_players_they_can_pick_a_language() {
+    let readme = repo_file("README.md");
+    let players = player_part(&readme);
+    let at = players
+        .find("\n### Settings\n")
+        .expect("a Settings section");
+    let settings = &players[at..];
+    let settings = &settings[..settings[1..]
+        .find("\n## ")
+        .map_or(settings.len(), |end| end + 1)];
+    assert!(settings.contains("**Language**"), "{settings}");
+    assert!(settings.contains("Russian"), "{settings}");
+    assert!(
+        settings.contains("](CONTRIBUTING.md#translations)"),
+        "{settings}"
+    );
+}

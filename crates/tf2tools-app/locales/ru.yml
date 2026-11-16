@@ -1,0 +1,81 @@
+settings:
+  language:
+    title: "Язык"
+    description: "Язык, на котором TF2Tools показывает текст"
+    note: "Ещё не переведённые части TF2Tools остаются на английском."
+  app_updates:
+    title: "Обновления приложения"
+    version: "Текущая версия: v%{version}"
+  tf2:
+    title: "Установка TF2"
+    description: "Путь к папке, в которую установлена Team Fortress 2"
+    placeholder: "/путь/к/Team Fortress 2"
+    browse: "Обзор"
+    detect: "Найти автоматически"
+  audio:
+    title: "Звук"
+    description: "Громкость предпрослушивания хитсаундов и килсаундов"
+    volume: "Громкость: %{percent}%"
+  cache:
+    title: "Кэш магазинов"
+    description: "Как часто заново синхронизировать данные магазинов"
+    duration: "Срок хранения кэша: %{duration}"
+    hint: "Магазины синхронизируются заново, когда истекает срок кэша. По умолчанию: 7 дней (168 часов)."
+    hours: { one: "%{count} час", few: "%{count} часа", many: "%{count} часов" }
+    days: { one: "%{count} день", few: "%{count} дня", many: "%{count} дней" }
+    days_hours: "%{days} д %{hours} ч"
+  addons:
+    title: "Дополнения"
+    description: "Скины, эффекты, интерфейсы, текстуры и игровые файлы с GameBanana"
+    mature: "Показывать дополнения для взрослых"
+  logs_tf:
+    title: "logs.tf"
+    description: "Как открытые логи матчей называют игроков, которых вы отслеживаете"
+    nicknames: "Показывать никнеймы в логах матчей"
+  sync:
+    items: { one: "%{count} элемент в кэше", few: "%{count} элемента в кэше", many: "%{count} элементов в кэше" }
+    last_synced: "Последняя синхронизация: %{when}"
+    failed: "Ошибка синхронизации: %{error}"
+    never: "Никогда"
+    unknown: "Неизвестно"
+    resync: "Синхронизировать"
+    syncing: "Синхронизация..."
+    sounds: { title: "Магазин звуков", description: "Хитсаунды и килсаунды с GameBanana" }
+    crosshairs: { title: "Магазин прицелов", description: "Моды прицелов с GameBanana" }
+    gamebanana_huds: { title: "Магазин HUD с GameBanana", description: "Моды HUD с GameBanana" }
+    curated_huds: { title: "Подборка HUD", description: "HUD, отобранные mastercomfig" }
+    addons: { title: "Магазин дополнений", description: "Дополнения mastercomfig для производительности и удобства" }
+  save: "Сохранить настройки"
+  licences:
+    title: "Лицензии"
+    description: "TF2Tools использует работы и материалы других авторов. Здесь их лицензии и благодарности."
+    show: "Показать лицензии"
+    hide: "Скрыть лицензии"
+  help:
+    title: "Помощь и обратная связь"
+    description: "Что-то не получается или сломалось? Загляните в справку или расскажите нам."
+    report: "Сообщить о проблеме"
+    open: "Справка"
+  toast:
+    saved: "Настройки сохранены"
+    found: "TF2 найдена"
+    not_found: "TF2 не найдена"
+    manual: "Укажите папку TF2 вручную"
+    installs: { one: "Найдена %{count} установка; выберите нужную ниже", few: "Найдено %{count} установки; выберите нужную ниже", many: "Найдено %{count} установок; выберите нужную ниже" }
+
+updater:
+  status:
+    up_to_date: "Установлена последняя версия"
+    checking: "Проверка обновлений..."
+    available: "Доступна версия v%{version}"
+    available_page: "Доступна версия v%{version}. Скачайте её со страницы релиза."
+    downloading: "Загрузка... %{percent}%"
+    ready: "Обновление готово — перезапустите, чтобы применить"
+    installing: "Установка обновления..."
+    unavailable: "В этой версии автоматические обновления недоступны. Новые версии есть на странице релизов."
+    reopen: "TF2Tools обновлена. Закройте и снова откройте её, чтобы завершить."
+  button:
+    check: "Проверить обновления"
+    install: "Скачать и установить"
+    release_page: "Открыть страницу релиза"
+    restart: "Перезапустить"

@@ -1,6 +1,9 @@
 //! The TF2Tools desktop app: a GPUI window over `tf2tools-core` in v5's zinc dark look.
 #![forbid(unsafe_code)]
 
+// Compiles locales/*.yml into the crate; rust-i18n requires the call at the crate root.
+rust_i18n::i18n!("locales", fallback = "en");
+
 pub mod activity;
 pub mod addon_detail;
 pub mod addon_feed;
@@ -18,6 +21,7 @@ pub mod font_check;
 pub mod gb_addon_installs;
 pub mod gb_card;
 pub(crate) mod hud_textures;
+pub mod i18n;
 pub mod ids;
 pub mod keymap;
 pub mod kill_icons;
