@@ -32,6 +32,7 @@ use tf2tools_core::{
     OpenedBody, SteamId, TfClass, TrackedPlayer, WeaponNames, parse_log, parse_player_input,
 };
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::kill_icons::{KillIconImages, LoadedKillIcons};
 use crate::log_nicknames::LogNicknames;
@@ -55,6 +56,12 @@ use text::{
     REMOVING, SAVE_FAILED, STEAM_UNREACHABLE, TRIMMED_OFFLINE, WRITE_FAILED, download_reason,
     fetch_message, profile_url, progress_line, resolve_message,
 };
+
+// The toast text for a logs.tf change that couldn't be saved; the page lines keep text's
+// SAVE_FAILED until they are translated too.
+fn save_failed() -> SharedString {
+    tr!("messages.logs_tf.save_failed")
+}
 
 // Logs counted per backfill batch: small enough that one batch's transaction stays short.
 const WEAPON_BATCH: usize = 50;
@@ -483,7 +490,7 @@ impl LogsTfPage {
         let saving = run_blocking(cx, move |s| {
             s.logs.cache().set_range(range).map_err(|error| {
                 tracing::warn!(%error, "saving the logs.tf history range failed");
-                OpError::core("Failed to change the history range", SAVE_FAILED)
+                OpError::core("Failed to change the history range", save_failed())
             })
         });
         cx.spawn_in(window, async move |page, cx| {
@@ -788,7 +795,7 @@ impl LogsTfPage {
         let saving = run_blocking(cx, move |s| {
             s.logs.cache().set_active_player(id).map_err(|error| {
                 tracing::warn!(%error, "saving the active logs.tf player failed");
-                OpError::core("Failed to switch player", SAVE_FAILED)
+                OpError::core("Failed to switch player", save_failed())
             })
         });
         self.after_write(saving, window, cx);
@@ -825,7 +832,7 @@ impl LogsTfPage {
                 run_blocking(cx, move |s| {
                     s.logs.cache().remove_player(id).map_err(|error| {
                         tracing::warn!(%error, "removing a logs.tf player failed");
-                        OpError::core("Failed to stop tracking", SAVE_FAILED)
+                        OpError::core("Failed to stop tracking", save_failed())
                     })
                 })
             }) else {
@@ -1018,7 +1025,7 @@ impl LogsTfPage {
                 .set_nickname(id, Some(&nickname))
                 .map_err(|error| {
                     tracing::warn!(%error, "saving a logs.tf nickname failed");
-                    OpError::core("Failed to save the nickname", SAVE_FAILED)
+                    OpError::core("Failed to save the nickname", save_failed())
                 })
         });
         self.after_write(saving, window, cx);

@@ -22,6 +22,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{MapState, StoreClient};
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::map_messages::{
     describe_map_download, describe_map_remove, describe_map_sync, map_stopped,
@@ -42,7 +43,6 @@ use crate::widgets::{Named as _, labelled};
 use gb_tab::GbMapsTab;
 use model::{MapRow, MapSort, SORTS, count_label, last_played_label, visible};
 
-const MAP_READ: &str = "TF2Tools couldn't read its map list. Restart TF2Tools and try again.";
 const ROW_HEIGHT: f32 = 44.;
 const PLAYED_WIDTH: f32 = 96.;
 const LAST_WIDTH: f32 = 112.;
@@ -312,7 +312,7 @@ impl MapsPage {
                 .map(|entries| entries.iter().map(MapRow::from).collect::<Vec<_>>())
                 .map_err(|e| {
                     tracing::warn!(error = %e, "reading the map list failed");
-                    OpError::core("Failed to load maps", MAP_READ)
+                    OpError::core("Failed to load maps", tr!("messages.maps.read"))
                 })
         });
         cx.spawn(async move |page, cx| {

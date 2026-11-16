@@ -5,7 +5,8 @@ use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use gpui_kit::{
-    AnyWindowHandle, App, AppContext as _, AsyncApp, Context, Entity, Global, Task, WeakEntity,
+    AnyWindowHandle, App, AppContext as _, AsyncApp, Context, Entity, Global, SharedString, Task,
+    WeakEntity,
 };
 use tf2tools_core::{
     AddonProfile, AddonSection, BrowseError, DownloadProgress, GbAddonCheck, GbAddonDownload,
@@ -13,6 +14,7 @@ use tf2tools_core::{
     StoreClient, Tf2Install,
 };
 
+use crate::i18n::tr;
 use crate::library_events::LibraryEvents;
 use crate::local_messages::{
     LocalFailure, already_have, describe_library, gb_install_op, gb_map_install_op,
@@ -310,7 +312,7 @@ impl GbAddonInstalls {
                 Ok(None) => {
                     tracing::info!("add-on {id}'s library copy is incomplete; downloading it");
                     let _ = this.update(cx, |me, cx| me.set_stage(DOWNLOADING, cx));
-                    let gone = Some(REINSTALL_GONE);
+                    let gone = Some(tr!("messages.addon_install.reinstall_gone"));
                     refetch(&this, cx, entry, tf2, win, INSTALL, gone).await
                 }
                 Err(err) => Outcome::Failed(err),
@@ -333,7 +335,7 @@ impl GbAddonInstalls {
             return false;
         };
         self.task = Some(cx.spawn(async move |this, cx| {
-            let gone = Some(MAP_REINSTALL_GONE);
+            let gone = Some(tr!("messages.addon_install.map_reinstall_gone"));
             let outcome = refetch(&this, cx, entry, tf2, win, MAP_INSTALL, gone).await;
             let _ = this.update(cx, |me, cx| me.finish(outcome, MAP_INSTALL, win, cx));
         }));
@@ -582,7 +584,7 @@ async fn refetch(
     tf2: Tf2Install,
     win: AnyWindowHandle,
     titles: Titles,
-    gone: Option<&'static str>,
+    gone: Option<SharedString>,
 ) -> Outcome {
     let id = entry.gb_id();
     let store = cx.update(|cx| cx.global::<Services>().store.clone());
@@ -594,7 +596,10 @@ async fn refetch(
             let Some(section) = AddonSection::by_key(entry.section()) else {
                 // Only a tampered row names a section this build does not know.
                 tracing::warn!("add-on {id} has an unknown section {:?}", entry.section());
-                return Outcome::Failed(OpError::core(titles.failed, UPDATE_UNKNOWN_SECTION));
+                return Outcome::Failed(OpError::core(
+                    titles.failed,
+                    tr!("messages.addon_install.unknown_section"),
+                ));
             };
             let run = Run {
                 section,
@@ -616,27 +621,16 @@ async fn refetch(
     if is_gone {
         mark_gone(this, cx, id, tf2).await;
         if let Some(gone) = gone {
-            failure.message = gone.to_owned();
+            failure.message = gone.into();
         }
     }
     Outcome::Failed(OpError::core(titles.failed, failure.message))
 }
 
-/// The player words for Install again when the library copy is incomplete and GameBanana no
-/// longer has the item to download.
-const REINSTALL_GONE: &str = "This add-on is no longer on GameBanana and its copy in your library is incomplete, so it can't be installed again. Remove it.";
-
-/// The player words for Install again on a map GameBanana no longer has.
-const MAP_REINSTALL_GONE: &str =
-    "This map is no longer on GameBanana, so it can't be installed again. Remove it.";
-
 /// Whether `entry` is a map item, which installs, updates and removes through core's map path.
 fn is_map(entry: &GbAddonEntry) -> bool {
     entry.section() == AddonSection::MAPS.key()
 }
-
-/// The player words for an update whose recorded section this build does not know.
-const UPDATE_UNKNOWN_SECTION: &str = "TF2Tools can't tell where this add-on goes. Remove it, then install it again from the Addon Store.";
 
 /// Records `id` as gone from GameBanana and puts the listed result into `this`, so the
 /// list shows it before busy ends. A failed write is logged and the list stays as it was.

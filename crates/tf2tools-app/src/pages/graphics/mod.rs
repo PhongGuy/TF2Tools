@@ -33,9 +33,9 @@ use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
 use jobs::{ModulesFailure, SAVE_FAILED};
 use model::{
-    FOREIGN_MODULES_CFG, OWN_MODULES_CFG_KEPT, SettingsNote, StatusCard, ValueOption,
-    describe_apply, describe_remove, describe_take_over, detail, dropped_note, headline,
-    preset_description, preset_label, shown_choice, status_card, update_to, value_options,
+    OWN_MODULES_CFG_KEPT, SettingsNote, StatusCard, ValueOption, describe_apply, describe_remove,
+    describe_take_over, detail, dropped_note, foreign_modules_cfg, headline, preset_description,
+    preset_label, shown_choice, status_card, update_to, value_options,
 };
 
 const CREDIT: &str = "mastercomfig is made by the mastercomfig team and shared under the MIT licence. Preset descriptions come from comfig-app.";
@@ -385,7 +385,7 @@ impl GraphicsPage {
                     })),
                     Err(ModulesFailure::Foreign) => Err(OpError::Core {
                         action: SAVE_FAILED.into(),
-                        message: FOREIGN_MODULES_CFG.into(),
+                        message: foreign_modules_cfg(),
                     }),
                     Err(ModulesFailure::Op(err)) => Err(err),
                 }

@@ -26,6 +26,7 @@ use super::ProfilesPage;
 use super::editor_model::{Edit, Slot, SlotState, crosshair_labels, slot_state, slot_text};
 use super::model;
 use crate::audio::player::{NowPlaying, Player, sound_player};
+use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{describe_library, describe_profile};
@@ -490,7 +491,7 @@ impl ProfileEditor {
                             .ok_or_else(|| {
                                 OpError::core(
                                     "Failed to play sound",
-                                    "That sound is no longer in your library",
+                                    tr!("messages.profiles.sound_gone"),
                                 )
                             })?;
                         s.library.sound_bytes(sound.id()).map_err(failed)
@@ -666,13 +667,13 @@ impl ProfileEditor {
             }
             // The picked item left the library since the gallery loaded.
             Ok(Done::Saved(Edit::SetHud(_), Err(ProfileError::ItemNotFound { .. }))) => {
-                self.item_gone("That HUD is no longer in your library", window, cx);
+                self.item_gone(tr!("messages.profiles.hud_gone"), window, cx);
             }
             Ok(Done::Saved(Edit::SetSound(..), Err(ProfileError::ItemNotFound { .. }))) => {
-                self.item_gone("That sound is no longer in your library", window, cx);
+                self.item_gone(tr!("messages.profiles.sound_gone"), window, cx);
             }
             Ok(Done::Saved(Edit::Assign { .. }, Err(ProfileError::ItemNotFound { .. }))) => {
-                self.item_gone("That crosshair is no longer in your library", window, cx);
+                self.item_gone(tr!("messages.profiles.crosshair_gone"), window, cx);
             }
             Ok(Done::Saved(edit, Err(e))) => {
                 if let Edit::Rename(sent) = &edit {
@@ -718,7 +719,7 @@ impl ProfileEditor {
     }
 
     // The picked item is gone: say so, and reload the galleries and the missing marks.
-    fn item_gone(&mut self, title: &str, window: &mut Window, cx: &mut Context<Self>) {
+    fn item_gone(&mut self, title: SharedString, window: &mut Window, cx: &mut Context<Self>) {
         toast(window, cx, ToastKind::Error, title, "");
         self.load_galleries(cx);
         self.queue_refresh();

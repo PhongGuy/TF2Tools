@@ -33,6 +33,7 @@ use tf2tools_core::{
 use super::common::{ORANGE_500, SM_ICON_PX, badge_of, card_frame, needs_tf2, no_tf2_notice};
 use crate::activity;
 use crate::font_check::FontCheckSession;
+use crate::i18n::tr;
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
@@ -79,7 +80,9 @@ pub(crate) const INSTALL_FAILED: &str = "Failed to install HUD";
 const UNINSTALL_FAILED: &str = "Failed to uninstall HUD";
 /// Added to the update toast when the installed copy could not follow the update.
 const UPDATE_FAILED: &str = "Failed to update HUD";
-const DOWNLOAD_GONE: &str = "This HUD is no longer in the HUD Store.";
+fn download_gone() -> SharedString {
+    tr!("messages.huds.download_gone")
+}
 const NOT_REINSTALLED: &str =
     "Updated, but couldn't update the installed copy. Close TF2 and install it again from HUDs.";
 
@@ -892,7 +895,7 @@ impl HudsPage {
                             let files = (store.item_files(kind, &item).await)
                                 .map_err(|e| describe_files(kind, &e).message)?;
                             match files.is_empty() {
-                                true => Err(DOWNLOAD_GONE.to_owned()),
+                                true => Err(download_gone().to_string()),
                                 false => Ok(files),
                             }
                         })
@@ -1042,7 +1045,7 @@ impl HudsPage {
                     None,
                 ),
                 failed => {
-                    let message = failed.err().unwrap_or(DOWNLOAD_GONE.to_owned());
+                    let message = failed.err().unwrap_or_else(|| download_gone().to_string());
                     let err = OpError::Core {
                         action: UPDATE_FAILED.into(),
                         message: message.into(),

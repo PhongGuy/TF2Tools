@@ -12,22 +12,37 @@ use tf2tools_core::{
     Preset, RemoveMastercomfigError, TakeOverError, readable_name,
 };
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::local_messages::{LocalFailure, game_moved, library_open, tf2_write};
 use crate::store_messages::library_update;
 
-const GITHUB_DOWN: &str = "Couldn't reach GitHub. Check your internet connection and try again.";
-const GITHUB_BUSY: &str = "GitHub is busy right now. Wait a few minutes, then try again.";
-const GITHUB_UNREADABLE: &str = "GitHub sent something TF2Tools couldn't read. Try again later.";
-const NO_RELEASE: &str =
-    "GitHub has no mastercomfig release TF2Tools can install right now. Try again later.";
+/// The site mastercomfig's releases come from, named in the shared source sentences.
+const GITHUB: &str = "GitHub";
+
+fn github_down() -> SharedString {
+    tr!("messages.shared.source_unreachable", source = GITHUB)
+}
+
+fn github_busy() -> SharedString {
+    tr!("messages.shared.source_busy", source = GITHUB)
+}
+
+fn github_unreadable() -> SharedString {
+    tr!("messages.shared.source_unreadable", source = GITHUB)
+}
+
 /// A modules.cfg the player wrote, which TF2Tools does not overwrite unasked.
-pub(crate) const FOREIGN_MODULES_CFG: &str =
-    "TF2 has a modules.cfg that TF2Tools didn't write, so TF2Tools left it alone.";
+pub(crate) fn foreign_modules_cfg() -> SharedString {
+    tr!("messages.mastercomfig.foreign_modules_cfg")
+}
+
 /// Added to the install or update toast when a player's own modules.cfg kept the saved settings out.
 pub const OWN_MODULES_CFG_KEPT: &str = "Your own modules.cfg was kept, so the settings below aren't in use. Change one to use them instead.";
-const STALE_PAGE: &str =
-    "mastercomfig changed since this page opened. Open the Graphics page again and try once more.";
+
+fn stale_page() -> SharedString {
+    tr!("messages.mastercomfig.stale_page")
+}
 
 /// What the status card shows.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -145,16 +160,16 @@ pub fn describe_status(err: &MastercomfigStatusError) -> LocalFailure {
 /// A failed install or update of mastercomfig in player words.
 pub fn describe_install(err: &InstallMastercomfigError) -> LocalFailure {
     let message = match err {
-        InstallMastercomfigError::NoRelease => SharedString::from(NO_RELEASE),
+        InstallMastercomfigError::NoRelease => tr!("messages.mastercomfig.no_release"),
         InstallMastercomfigError::GameMissing { .. } => game_moved(),
-        InstallMastercomfigError::RateLimited { .. } => SharedString::from(GITHUB_BUSY),
-        InstallMastercomfigError::Network { .. } => SharedString::from(GITHUB_DOWN),
+        InstallMastercomfigError::RateLimited { .. } => github_busy(),
+        InstallMastercomfigError::Network { .. } => github_down(),
         InstallMastercomfigError::Io { .. } => tf2_write(),
         InstallMastercomfigError::Database { .. } => library_update(),
         InstallMastercomfigError::NotAVpk { .. }
         | InstallMastercomfigError::Http { .. }
         | InstallMastercomfigError::TooLarge { .. }
-        | _ => SharedString::from(GITHUB_UNREADABLE),
+        | _ => github_unreadable(),
     };
     LocalFailure::new(message, err.to_string())
 }
@@ -162,7 +177,7 @@ pub fn describe_install(err: &InstallMastercomfigError) -> LocalFailure {
 /// A failed Remove in player words.
 pub fn describe_remove(err: &RemoveMastercomfigError) -> LocalFailure {
     let message = match err {
-        RemoveMastercomfigError::NotManaged => SharedString::from(STALE_PAGE),
+        RemoveMastercomfigError::NotManaged => stale_page(),
         RemoveMastercomfigError::GameMissing { .. } => game_moved(),
         RemoveMastercomfigError::Io { .. } => tf2_write(),
         RemoveMastercomfigError::Database { .. } | _ => library_update(),
@@ -173,7 +188,7 @@ pub fn describe_remove(err: &RemoveMastercomfigError) -> LocalFailure {
 /// A preset that could not be applied, in player words.
 pub fn describe_apply(err: &ApplyPresetError) -> LocalFailure {
     let message = match err {
-        ApplyPresetError::NotManaged => SharedString::from(STALE_PAGE),
+        ApplyPresetError::NotManaged => stale_page(),
         ApplyPresetError::GameMissing { .. } => game_moved(),
         ApplyPresetError::Io { .. } => tf2_write(),
         ApplyPresetError::Database { .. } | _ => library_update(),
@@ -184,23 +199,19 @@ pub fn describe_apply(err: &ApplyPresetError) -> LocalFailure {
 /// A setting that could not be saved, in player words.
 pub fn describe_apply_modules(err: &ApplyModulesError) -> LocalFailure {
     let message = match err {
-        ApplyModulesError::NotManaged => SharedString::from(STALE_PAGE),
-        ApplyModulesError::ForeignModulesCfg { .. } => SharedString::from(FOREIGN_MODULES_CFG),
+        ApplyModulesError::NotManaged => stale_page(),
+        ApplyModulesError::ForeignModulesCfg { .. } => foreign_modules_cfg(),
         ApplyModulesError::GameMissing { .. } => game_moved(),
         ApplyModulesError::Io { .. } => tf2_write(),
         ApplyModulesError::Database { .. } => library_update(),
-        ApplyModulesError::RateLimited { .. } => SharedString::from(GITHUB_BUSY),
-        ApplyModulesError::Network { .. } => SharedString::from(GITHUB_DOWN),
-        ApplyModulesError::NoRelease => SharedString::from(
-            "TF2Tools doesn't know where to download this setting's file yet. Use Check for updates, then try again.",
-        ),
-        ApplyModulesError::UpdateWaiting { .. } => SharedString::from(
-            "A mastercomfig update is waiting. Update mastercomfig first, then pick this again.",
-        ),
+        ApplyModulesError::RateLimited { .. } => github_busy(),
+        ApplyModulesError::Network { .. } => github_down(),
+        ApplyModulesError::NoRelease => tr!("messages.mastercomfig.no_module_url"),
+        ApplyModulesError::UpdateWaiting { .. } => tr!("messages.mastercomfig.update_waiting"),
         ApplyModulesError::NotAVpk { .. }
         | ApplyModulesError::Http { .. }
         | ApplyModulesError::TooLarge { .. }
-        | _ => SharedString::from(GITHUB_UNREADABLE),
+        | _ => github_unreadable(),
     };
     LocalFailure::new(message, err.to_string())
 }
@@ -209,9 +220,7 @@ pub fn describe_apply_modules(err: &ApplyModulesError) -> LocalFailure {
 pub fn describe_take_over(err: &TakeOverError) -> LocalFailure {
     let message = match err {
         // The page was showing an install that has since gone or changed hands.
-        TakeOverError::NotInstalled | TakeOverError::AlreadyManaged => {
-            SharedString::from(STALE_PAGE)
-        }
+        TakeOverError::NotInstalled | TakeOverError::AlreadyManaged => stale_page(),
         TakeOverError::Database { .. } | _ => library_update(),
     };
     LocalFailure::new(message, err.to_string())

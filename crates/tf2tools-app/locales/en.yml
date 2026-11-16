@@ -257,6 +257,25 @@ messages:
       newer_database: "Your library was saved by a newer TF2Tools. Install the latest TF2Tools from the release page to open it."
   profiles:
     name_taken: "You already have a profile called %{name}. Pick another name."
+    hud_gone: "That HUD is no longer in your library"
+    sound_gone: "That sound is no longer in your library"
+    crosshair_gone: "That crosshair is no longer in your library"
+  mastercomfig:
+    no_release: "GitHub has no mastercomfig release TF2Tools can install right now. Try again later."
+    foreign_modules_cfg: "TF2 has a modules.cfg that TF2Tools didn't write, so TF2Tools left it alone."
+    stale_page: "mastercomfig changed since this page opened. Open the Graphics page again and try once more."
+    no_module_url: "TF2Tools doesn't know where to download this setting's file yet. Use Check for updates, then try again."
+    update_waiting: "A mastercomfig update is waiting. Update mastercomfig first, then pick this again."
+  addon_install:
+    reinstall_gone: "This add-on is no longer on GameBanana and its copy in your library is incomplete, so it can't be installed again. Remove it."
+    map_reinstall_gone: "This map is no longer on GameBanana, so it can't be installed again. Remove it."
+    unknown_section: "TF2Tools can't tell where this add-on goes. Remove it, then install it again from the Addon Store."
+  huds:
+    download_gone: "This HUD is no longer in the HUD Store."
+  maps:
+    read: "TF2Tools couldn't read its map list. Restart TF2Tools and try again."
+  logs_tf:
+    save_failed: "Couldn't save logs.tf data on this computer."
   store:
     details_failed_title: "Failed to load details"
     busy_title: "Another download is running"

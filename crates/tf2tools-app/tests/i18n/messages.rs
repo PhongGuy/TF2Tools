@@ -5,15 +5,17 @@ use tf2tools_app::audio::AudioError;
 use tf2tools_app::i18n::{self, list};
 use tf2tools_app::local_messages::{self as local, LocalFailure, PaintStep, SpaceFor};
 use tf2tools_app::pages::graphics::jobs;
+use tf2tools_app::pages::graphics::model as gfx;
 use tf2tools_app::services::{OpError, StartupError};
 use tf2tools_app::{map_messages as map, store_messages as store, sync_messages as sync};
 use tf2tools_core::{
-    ApplyProfileError, BrowseError, CopyHudError, DetectError, DownloadError, FilesError,
-    FontInstallError, GbAddonFetchError, GbAddonInstallError, GbId, GbMapInstallError,
-    GbMapRemoveError, HudLoadError, ImportError, InstallError, KeepHudError, LibraryError,
-    LogError, MakeHudError, MapDownloadError, MapRemoveError, PaintError, PngReadError,
-    PngWriteError, PreviewError, ProfileError, QueryError, SettingsError, StoreKind, SyncError,
-    UpdateCopyError,
+    ApplyModulesError, ApplyPresetError, ApplyProfileError, BrowseError, CopyHudError, DetectError,
+    DownloadError, FilesError, FontInstallError, GbAddonFetchError, GbAddonInstallError, GbId,
+    GbMapInstallError, GbMapRemoveError, HudLoadError, ImportError, InstallError,
+    InstallMastercomfigError, KeepHudError, LibraryError, LogError, MakeHudError, MapDownloadError,
+    MapRemoveError, MastercomfigStatusError, PaintError, PngReadError, PngWriteError, PreviewError,
+    ProfileError, QueryError, RemoveMastercomfigError, SettingsError, StoreKind, SyncError,
+    TakeOverError, UpdateCopyError,
 };
 
 use crate::LocaleGuard;
@@ -279,4 +281,23 @@ fn store_map_and_sync_failures_read_in_russian() {
     let busy = sync::describe_sync(kind, &SyncError::RateLimited { url: "u".into() }).message;
     assert_russian(&busy);
     assert!(busy.contains("GameBanana"), "{busy}");
+}
+
+#[test]
+fn mastercomfig_failures_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let failures = [
+        gfx::describe_status(&MastercomfigStatusError::Database {
+            message: "x".into(),
+        }),
+        gfx::describe_install(&InstallMastercomfigError::NoRelease),
+        gfx::describe_remove(&RemoveMastercomfigError::NotManaged),
+        gfx::describe_apply(&ApplyPresetError::NotManaged),
+        gfx::describe_apply_modules(&ApplyModulesError::ForeignModulesCfg { path: path() }),
+        gfx::describe_apply_modules(&ApplyModulesError::NoRelease),
+        gfx::describe_take_over(&TakeOverError::NotInstalled),
+    ];
+    for failure in &failures {
+        assert_russian(&failure.message);
+    }
 }
