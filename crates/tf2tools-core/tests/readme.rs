@@ -502,6 +502,10 @@ fn the_settings_section_says_the_library_is_stored_compressed() {
         .map_or(settings.len(), |end| end + 1)];
     assert!(settings.contains("**Library**"), "{settings}");
     assert!(settings.contains("compressed"), "{settings}");
+    // The Library sentence names every kind kept compressed, crosshairs among them.
+    let library = &settings[settings.find("**Library**").expect("a Library sentence")..];
+    let library = &library[..library.find('\n').unwrap_or(library.len())];
+    assert!(library.contains("crosshairs"), "{library}");
 }
 
 #[test]
