@@ -320,7 +320,7 @@ impl ItemSource {
     }
 
     /// The zip's length, or the loose files' lengths outside the top-level `.tf2tools`.
-    #[cfg_attr(not(test), expect(dead_code, reason = "Library::space in plan 2"))]
+    #[cfg(test)]
     pub(crate) fn packed_bytes(&self) -> Result<u64, IoFailure> {
         match self {
             ItemSource::Loose(dir) => loose_bytes(dir),
