@@ -99,3 +99,8 @@ updater:
     install: "Скачать и установить"
     release_page: "Открыть страницу релиза"
     restart: "Перезапустить"
+
+common:
+  list:
+    separator: ", "
+    last: "%{rest} и %{last}"

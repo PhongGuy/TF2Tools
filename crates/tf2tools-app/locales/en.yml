@@ -101,3 +101,8 @@ updater:
     install: "Download & Install"
     release_page: "Open release page"
     restart: "Restart Now"
+
+common:
+  list:
+    separator: ", "
+    last: "%{rest} and %{last}"
