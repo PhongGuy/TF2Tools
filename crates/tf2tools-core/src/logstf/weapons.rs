@@ -183,7 +183,7 @@ impl WeaponSum {
 
     /// hits / shots; `None` when shots is 0.
     pub fn accuracy(&self) -> Option<f64> {
-        (self.shots > 0).then(|| self.hits as f64 / self.shots as f64)
+        (self.shots > 0).then_some(self.hits as f64 / self.shots as f64)
     }
 }
 
