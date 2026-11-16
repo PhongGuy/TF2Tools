@@ -461,8 +461,8 @@ impl LogsClient {
     }
 
     /// Downloads one log the player opened, at interactive priority and without waiting for
-    /// a running sync, and stores it as the sync would. Callers read the stored body first
-    /// (`LogsCache::log_body`) and call this only for a log without one.
+    /// a running sync, and stores it as the sync would. Callers open the stored body first
+    /// (`LogsCache::open_body`) and call this only for a log without one.
     ///
     /// A gone, unreadable or oversized log is marked like the sync marks it, except a trimmed
     /// one, which keeps its stats and returns `FullLogGone`; a failed request changes nothing.

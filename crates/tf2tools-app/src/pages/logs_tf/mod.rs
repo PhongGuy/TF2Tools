@@ -655,9 +655,8 @@ impl LogsTfPage {
                     .map(Some)
                     .map_err(|e| failed(e.to_string())),
                 OpenedBody::Trimmed => Ok(None),
-                OpenedBody::Missing | OpenedBody::Damaged | _ => {
-                    Err(failed("no stored body".into()))
-                }
+                OpenedBody::Damaged => Err(failed("the stored body is damaged".into())),
+                OpenedBody::Missing | _ => Err(failed("no stored body".into())),
             }
         });
         cx.spawn(async move |page, cx| {
