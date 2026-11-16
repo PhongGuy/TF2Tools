@@ -721,3 +721,31 @@ fn the_logs_tf_card_keeps_full_logs_for_the_chosen_days_and_saves_at_once(cx: &m
             == KeepFullLogs::Days30
     });
 }
+
+#[gpui_kit::test]
+fn the_logs_tf_card_says_when_the_cache_size_could_not_be_measured(cx: &mut TestAppContext) {
+    use tf2tools_app::logs_trim::LogsTrim;
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    // A plain body the pass must recompress, and a full disk that refuses the write.
+    support::sql(&env)
+        .execute_batch(
+            "INSERT INTO logstf_logs (id, title, map, date, body) VALUES (1, 't', 'm', 0, 'plain');
+             CREATE TRIGGER no_write BEFORE UPDATE ON logstf_logs
+             BEGIN SELECT RAISE(ABORT, 'disk full'); END;",
+        )
+        .unwrap();
+    let _page = open_settings(cx, &s);
+    support::wait_real(cx, "the failed pass", |cx| {
+        cx.update(|cx| {
+            let trim = LogsTrim::global(cx).read(cx);
+            trim.passes() > 0 && !trim.is_running()
+        })
+    });
+    support::settle(cx, s.win);
+    scroll_settings_to(cx, &s, ids::SETTINGS_LOG_SPACE.into());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::SETTINGS_LOG_SPACE).as_deref(),
+        Some("The logs cache size could not be measured.")
+    );
+}

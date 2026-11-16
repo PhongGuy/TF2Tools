@@ -41,6 +41,7 @@ settings:
     usage: "Кэш логов занимает около %{cache}; %{logs} около %{full}."
     full_logs: { one: "%{count} полный лог занимает", few: "%{count} полных лога занимают", many: "%{count} полных логов занимают" }
     measuring: "Измерение..."
+    unmeasured: "Не удалось измерить размер кэша логов."
     size_mb: "%{size} МБ"
     size_kb: "%{size} КБ"
   sync:

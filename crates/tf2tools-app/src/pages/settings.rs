@@ -1125,10 +1125,13 @@ impl Render for SettingsPage {
                 ids::SETTINGS_LANGUAGE_NOTE,
                 tr!("settings.language.note"),
             )));
-        let usage = self.trim.read(cx).space().map_or_else(
-            || tr!("settings.logs_tf.measuring"),
-            |s| usage_text(s.cache_bytes(), s.full_logs(), s.full_bytes()),
-        );
+        // A failed pass keeps earlier figures; with none yet, the line says so instead of waiting.
+        let trim = self.trim.read(cx);
+        let usage = match trim.space() {
+            Some(s) => usage_text(s.cache_bytes(), s.full_logs(), s.full_bytes()),
+            None if trim.failed() => tr!("settings.logs_tf.unmeasured"),
+            None => tr!("settings.logs_tf.measuring"),
+        };
         let logs_tf = v_flex()
             .gap_3()
             .child(nicknames_switch(cx))

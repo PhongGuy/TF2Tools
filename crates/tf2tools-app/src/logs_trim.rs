@@ -25,6 +25,7 @@ pub struct LogsTrim {
     // A choice the player made that the next pass saves before it trims.
     pending: Option<KeepFullLogs>,
     passes: u64,
+    failed: bool,
 }
 
 struct LogsTrimGlobal(Entity<LogsTrim>);
@@ -102,9 +103,11 @@ impl LogsTrim {
                     self.keep = Some(keep);
                 }
                 self.space = Some(space);
+                self.failed = false;
             }
             Err(err) => {
                 tracing::warn!("the logs cache could not be trimmed: {err}");
+                self.failed = true;
                 self.pending = self.pending.or(carried);
             }
         }
@@ -138,6 +141,11 @@ impl LogsTrim {
     /// How many passes have landed, failed ones included.
     pub fn passes(&self) -> u64 {
         self.passes
+    }
+
+    /// Whether the last pass that landed failed; a later pass that succeeds clears it.
+    pub fn failed(&self) -> bool {
+        self.failed
     }
 
     /// Whether a pass is running now.

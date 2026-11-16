@@ -43,6 +43,7 @@ settings:
     usage: "The logs cache uses about %{cache}; %{logs} about %{full}."
     full_logs: { one: "%{count} full log uses", other: "%{count} full logs use" }
     measuring: "Measuring..."
+    unmeasured: "The logs cache size could not be measured."
     size_mb: "%{size} MB"
     size_kb: "%{size} KB"
   sync:
