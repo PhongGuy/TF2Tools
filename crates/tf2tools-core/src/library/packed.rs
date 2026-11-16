@@ -55,10 +55,7 @@ impl ItemSource {
         for i in 0..archive.len() {
             let entry = archive.by_index(i).map_err(damaged(&zip))?;
             let name = entry.name().map_err(damaged(&zip))?.into_owned();
-            check_entry_name(&zip, &name).map_err(|e| invalid(&zip, e))?;
-            let Some(rel) = entry.enclosed_name() else {
-                return Err(invalid(&zip, format!("unsafe entry name {name:?}")));
-            };
+            let rel = checked_rel(&zip, &name, entry.enclosed_name())?;
             if entry.is_file() {
                 let size = entry.size();
                 entries.push(Entry { rel, name, size });
@@ -272,7 +269,7 @@ impl Packed {
 }
 
 /// Packs `src` (regular files `skip` keeps, `Path` order) into `dest_zip` through `<dest_zip>.tmp`:
-/// zstd level 3, synced, read back (entry count and every entry's CRC), then renamed over.
+/// zstd level 3, synced, read back (entry count, every entry's CRC and name), then renamed over.
 /// Returns the zip's length. A failure removes the `.tmp` and leaves any old zip as it was.
 pub(crate) fn pack(
     src: &Path,
@@ -346,9 +343,19 @@ fn check_zip(tmp: &Path, count: usize) -> Result<(), IoFailure> {
     }
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i).map_err(damaged(tmp))?;
+        let name = entry.name().map_err(damaged(tmp))?.into_owned();
+        checked_rel(tmp, &name, entry.enclosed_name())?;
         io::copy(&mut entry, &mut io::sink()).map_err(io_at(tmp))?;
     }
     Ok(())
+}
+
+/// The relative path of the entry `name`, when `open` accepts it: `check_entry_name` passes
+/// and the zip crate found it enclosed. `pack` checks the same, so it never places a zip
+/// `open` would refuse.
+fn checked_rel(zip: &Path, name: &str, enclosed: Option<PathBuf>) -> Result<PathBuf, IoFailure> {
+    check_entry_name(zip, name).map_err(|e| invalid(zip, e))?;
+    enclosed.ok_or_else(|| invalid(zip, format!("unsafe entry name {name:?}")))
 }
 
 /// Renames `tmp` over `dest`, trying again while something (an antivirus scan, an open
@@ -657,6 +664,19 @@ mod tests {
         zip.write_all(b"x").unwrap();
         zip.finish().unwrap();
         assert!(ItemSource::open(&dir, HUD_ZIP).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_name_open_would_refuse_is_never_packed() {
+        let t = tempfile::tempdir().unwrap();
+        let dir = hud(t.path());
+        write(&dir.join("a:b/c.res"), b"\"c\" {}");
+        let zip = dir.join(HUD_ZIP);
+        let err = pack(&dir, &top_meta, &zip).unwrap_err();
+        assert_eq!(err.source.kind(), io::ErrorKind::InvalidData);
+        assert!(!zip.exists());
+        assert!(!dir.join(".tf2tools/files.zip.tmp").exists());
     }
 
     #[test]

@@ -1,5 +1,6 @@
 //! Converting loose library HUDs to packed zips, one item at a time under the copies write lock.
 
+use std::io;
 use std::path::Path;
 
 use super::made_huds::{MAKER_FILE, old_folder};
@@ -146,8 +147,10 @@ impl Library {
         let mut tmp = zip.as_os_str().to_owned();
         tmp.push(".tmp");
         remove_file_if_present(Path::new(&tmp))?;
-        if zip.is_file() {
-            // A crash between placing the zip and clearing the loose tree leaves both.
+        if std::fs::symlink_metadata(&zip).is_ok() {
+            // A crash between placing the zip and clearing the loose tree leaves both; the
+            // loose files go only once the zip reads back as the item, never for a link.
+            require_packed(live)?;
             let removed = remove_loose(live)?;
             return Ok(if removed {
                 Converted::Cleaned
@@ -158,9 +161,21 @@ impl Library {
         let before = ItemSource::Loose(live.to_path_buf()).unpacked_bytes()?;
         let top_metadata = |rel: &Path| rel == Path::new(METADATA_DIR);
         let after = pack(live, &top_metadata, &zip)?;
+        require_packed(live)?;
         remove_loose(live)?;
         Ok(Converted::Packed { before, after })
     }
+}
+
+/// Fails unless readers would take `live` as packed: its zip a regular file whose central
+/// directory parses with every name accepted. Guards every removal of loose files.
+fn require_packed(live: &Path) -> Result<(), IoFailure> {
+    if ItemSource::open(live, HUD_ZIP)?.is_packed() {
+        return Ok(());
+    }
+    let path = live.join(HUD_ZIP);
+    let source = io::Error::new(io::ErrorKind::InvalidData, "the zip is not a regular file");
+    Err(IoFailure { path, source })
 }
 
 /// Removes everything at the top of `dir` but `.tf2tools`, links included and never followed;

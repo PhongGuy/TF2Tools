@@ -208,3 +208,49 @@ fn entry_points_finish_while_a_conversion_waits() {
     holder.join().unwrap();
     assert_eq!(pass.join().unwrap().huds().failed(), 0);
 }
+
+/// Converts once and checks the HUD failed and kept every loose file as it was.
+fn assert_fails_and_stays_loose(env: &common::LibraryEnv, hud: &tf2tools_core::HudEntry) {
+    let before = loose_files(env, hud);
+    let report = convert(env);
+    let tally = (report.huds().packed(), report.huds().failed());
+    assert_eq!(tally, (0, 1), "the HUD must count as failed, not packed");
+    assert_eq!(
+        loose_files(env, hud),
+        before,
+        "no loose file may be removed"
+    );
+    let tmp = hud_dir(env, hud).join(".tf2tools/files.zip.tmp");
+    assert!(!tmp.exists(), "a failed pack must leave no tmp zip");
+}
+
+#[cfg(unix)]
+#[test]
+fn a_file_under_a_drive_like_folder_is_never_packed() {
+    let env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    write_file(&hud_dir(&env, &hud).join("a:b/c.res"), b"\"c\" {}");
+    assert_fails_and_stays_loose(&env, &hud);
+    assert!(!zip_path(&env, &hud).exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_linked_zip_does_not_clear_the_loose_tree() {
+    let env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    let elsewhere = write_file(
+        &env.tmp.path().join("elsewhere/files.zip"),
+        &zip_bytes(&[("info.vdf", b"\"x\" {}".as_slice())]),
+    );
+    std::os::unix::fs::symlink(&elsewhere, zip_path(&env, &hud)).unwrap();
+    assert_fails_and_stays_loose(&env, &hud);
+}
+
+#[test]
+fn a_damaged_zip_does_not_clear_the_loose_tree() {
+    let env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    write_file(&zip_path(&env, &hud), b"not a zip at all");
+    assert_fails_and_stays_loose(&env, &hud);
+}
