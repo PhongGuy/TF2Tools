@@ -445,6 +445,7 @@ fn contributing_explains_how_to_translate() {
         "`other`",
         "(preview)",
         "next time it opens",
+        "stays in the language it was shown in",
     ] {
         assert!(
             section.contains(needle),

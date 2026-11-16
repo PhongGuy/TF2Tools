@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
+use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AnyWindowHandle, Entity, TestAppContext};
+use gpui_kit::{AppContext as _, ScrollDelta, point, px};
 use tf2tools_app::app::{Boot, start};
 use tf2tools_app::audio::RecordingAudio;
 use tf2tools_app::i18n;
@@ -231,4 +233,22 @@ fn the_keep_rows_are_renamed_after_a_language_switch(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::settings_log_keep("forever")).as_deref(),
         Some("Всегда")
     );
+}
+
+#[gpui_kit::test]
+fn the_settings_saved_entry_is_written_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    open_settings(cx, &s);
+    cx.update_window(s.win, |_, w, cx| {
+        let down = ScrollDelta::Pixels(point(px(0.), px(-4000.)));
+        w.scroll(ids::page(Page::Settings), down, cx)
+    })
+    .unwrap();
+    support::click_id(cx, s.win, ids::SETTINGS_SAVE);
+    support::wait_real(cx, "the row", |_| support::log_rows(&s.services).len() == 1);
+    let row = &support::log_rows(&s.services)[0];
+    assert_eq!((row.category(), row.action()), ("settings", "update"));
+    crate::messages::assert_russian(row.message());
 }

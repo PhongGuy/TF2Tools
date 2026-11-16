@@ -838,7 +838,12 @@ impl SettingsPage {
                 Some(install)
             };
             s.db.set_sync_cache_hours(hours).map_err(failed)?;
-            let entry = NewLogEntry::new(LogLevel::Info, "settings", "update", "Settings updated");
+            let entry = NewLogEntry::new(
+                LogLevel::Info,
+                "settings",
+                "update",
+                tr!("settings.activity.updated").to_string(),
+            );
             activity::write(s, &entry);
             Ok(install)
         });

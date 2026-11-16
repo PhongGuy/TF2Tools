@@ -17,7 +17,7 @@ const USE_PAGE: &str = "TF2Tools can't update itself where it's installed. Downl
 
 fn says(message: &str, use_release_page: bool) -> Failure {
     Failure {
-        message: message.to_owned(),
+        message: message.into(),
         use_release_page,
     }
 }

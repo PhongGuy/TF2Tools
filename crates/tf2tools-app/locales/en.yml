@@ -84,6 +84,8 @@ settings:
     not_found: "TF2 not found"
     manual: "Select your TF2 folder manually"
     installs: { one: "%{count} install found; choose one below", other: "%{count} installs found; choose one below" }
+  activity:
+    updated: "Settings updated"
 
 updater:
   status:
@@ -101,6 +103,30 @@ updater:
     install: "Download & Install"
     release_page: "Open release page"
     restart: "Restart Now"
+  banner:
+    update: "Update"
+    available: "Update v%{version} available"
+    downloading: "Downloading..."
+    restart: "Restart"
+    close: "Close"
+  failure:
+    offline: "Couldn't reach the update server. Check your internet connection and try again."
+    unreadable: "The update information couldn't be read. Try again later."
+    unverified: "Update check failed: the update could not be verified. Try again later."
+    stopped: "The download stopped. Check your internet connection and try again."
+    unserved: "The update couldn't be downloaded right now. Try again later, or get it from the release page."
+    busy: "The update server is busy right now. Try again in a few minutes."
+    damaged: "The download was damaged. Try again."
+    disk: "Couldn't save the update. Make sure your disk has free space, then try again."
+    use_page: "TF2Tools can't update itself where it's installed. Download the new version from the release page instead."
+    install_io: "Couldn't install the update. Try again, or download the new version from the release page."
+    installer: "Couldn't start the installer. Try again, or download the new version from the release page."
+    changed: "The update changed before it could be installed. Try again."
+    unknown: "Something went wrong with the update. Try again later."
+    check_slow: "Checking for updates took too long. Check your internet connection and try again."
+    download_slow: "The download took too long. Check your internet connection and try again."
+    check_first: "Check for updates first."
+    download_first: "Download the update first."
 
 common:
   list:

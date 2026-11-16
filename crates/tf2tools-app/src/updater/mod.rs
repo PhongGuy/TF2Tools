@@ -12,10 +12,11 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
-use gpui_kit::{App, AppContext, Context, Entity, EventEmitter, Global, Task};
+use gpui_kit::{App, AppContext, Context, Entity, EventEmitter, Global, SharedString, Task};
 use tf2tools_core::{LogLevel, NewLogEntry};
 use tokio::sync::watch;
 
+use crate::i18n::tr;
 use crate::services::Services;
 use crate::sync::REPAINT_INTERVAL;
 use crate::{activity, tokio_bridge};
@@ -32,7 +33,7 @@ pub struct Offer {
 /// trying again in the app will not help.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Failure {
-    pub message: String,
+    pub message: SharedString,
     pub use_release_page: bool,
 }
 
@@ -94,7 +95,9 @@ pub enum UpdateBoot {
 }
 
 /// What the player reads when the update is installed but the app did not relaunch.
-pub const REOPEN: &str = "TF2Tools has been updated. Close and reopen it to finish.";
+pub fn reopen() -> SharedString {
+    tr!("updater.status.reopen")
+}
 
 /// How long the app may keep running after the Restart hook before it asks the player to reopen it.
 pub const RESTART_GRACE: Duration = Duration::from_secs(10);
@@ -115,7 +118,7 @@ pub enum UpdateState {
     },
     Ready(Offer),
     Installing(Offer),
-    /// Installed, but the relaunch never quit the app: the player closes and reopens it (`REOPEN`).
+    /// Installed, but the relaunch never quit the app: the player closes and reopens it (`reopen`).
     Updated(Offer),
     Failed(Failure),
 }
@@ -420,7 +423,12 @@ impl Updater {
         tracing::warn!("the app is still running after the update relaunch");
         activity::record(
             cx,
-            NewLogEntry::new(LogLevel::Warning, "settings", "update-restart", REOPEN),
+            NewLogEntry::new(
+                LogLevel::Warning,
+                "settings",
+                "update-restart",
+                reopen().to_string(),
+            ),
         );
         self.state = UpdateState::Updated(offer.clone());
         self.task = None;
@@ -439,7 +447,12 @@ impl Updater {
         offer.installable &= !failure.use_release_page;
         activity::record(
             cx,
-            NewLogEntry::new(LogLevel::Error, "settings", action, failure.message.clone()),
+            NewLogEntry::new(
+                LogLevel::Error,
+                "settings",
+                action,
+                failure.message.to_string(),
+            ),
         );
         self.state = UpdateState::Available(offer);
         cx.emit(event(failure));
@@ -451,7 +464,7 @@ impl Updater {
 fn stopped<T>(what: &str, error: &tokio_bridge::JoinError) -> Result<T, Failure> {
     tracing::warn!(%error, "{what} stopped");
     Err(Failure {
-        message: backend::UNKNOWN.to_owned(),
+        message: backend::unknown(),
         use_release_page: false,
     })
 }

@@ -5,7 +5,7 @@ use tf2tools_app::ids;
 use tf2tools_app::pages::settings::SettingsPage;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
-use tf2tools_app::updater::{AfterInstall, REOPEN, UpdateState, Updater};
+use tf2tools_app::updater::{AfterInstall, UpdateState, Updater, reopen};
 
 use crate::support;
 use support::ShellWindow;
@@ -194,7 +194,7 @@ fn an_update_that_did_not_relaunch_asks_to_reopen(cx: &mut TestAppContext) {
     wait_state(cx, &c.u, "Updated", |s| {
         matches!(s, UpdateState::Updated(_))
     });
-    assert_eq!(status(cx, &c), some(REOPEN));
+    assert_eq!(status(cx, &c), some(&reopen()));
     assert_eq!(buttons(cx, &c), [None, None, None]);
 }
 

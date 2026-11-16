@@ -11,7 +11,7 @@ use gpui_kit::{
     ParentElement as _, Pixels, SharedString, Styled as _, TestSupportExt as _, Window, div, px,
 };
 
-use super::{REOPEN, UpdateState, Updater, updater};
+use super::{UpdateState, Updater, reopen, updater};
 use crate::i18n::tr;
 use crate::ids;
 use crate::shell::leave;
@@ -32,26 +32,28 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
     let (icon, text, action) = match &state {
         UpdateState::Available(offer) => {
             let action = if offer.installable {
-                action_button(&u, "Update", |u, _, cx| {
+                action_button(&u, tr!("updater.banner.update"), |u, _, cx| {
                     u.update(cx, |u, cx| u.download(cx));
                 })
             } else {
-                action_button(&u, "Open release page", |u, _, cx| {
+                action_button(&u, tr!("updater.button.release_page"), |u, _, cx| {
                     u.read(cx).open_release_page(cx)
                 })
             };
-            let text = format!("Update v{} available", offer.version);
+            let text = tr!("updater.banner.available", version = offer.version);
             (IconName::Download, text, Some(action))
         }
-        UpdateState::Downloading { .. } => (IconName::Download, "Downloading...".into(), None),
+        UpdateState::Downloading { .. } => {
+            (IconName::Download, tr!("updater.banner.downloading"), None)
+        }
         UpdateState::Ready(_) => {
-            let action = action_button(&u, "Restart", ask_then_restart);
-            let text = "Update ready — restart to apply".into();
+            let action = action_button(&u, tr!("updater.banner.restart"), ask_then_restart);
+            let text = tr!("updater.status.ready");
             (IconName::RotateCw, text, Some(action))
         }
-        UpdateState::Installing(_) => (IconName::RotateCw, "Installing update...".into(), None),
+        UpdateState::Installing(_) => (IconName::RotateCw, tr!("updater.status.installing"), None),
         // The relaunch never quit the app, so the player reopens it by hand; nothing to click.
-        UpdateState::Updated(_) => (IconName::RotateCw, REOPEN.into(), None),
+        UpdateState::Updated(_) => (IconName::RotateCw, reopen(), None),
         UpdateState::Unavailable
         | UpdateState::Idle
         | UpdateState::Checking
@@ -104,7 +106,7 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
         Button::new(ids::UPDATE_BANNER_DISMISS)
             .ghost()
             .icon(IconName::X)
-            .named("Close")
+            .named(tr!("updater.banner.close"))
             // Small draws v5's 14 px X in a 24 px button.
             .small()
             .flex_none()
@@ -154,7 +156,7 @@ pub(crate) const BANNER_HEIGHT: Pixels = px(41.);
 
 fn action_button(
     u: &Entity<Updater>,
-    label: &'static str,
+    label: SharedString,
     run: impl Fn(&Entity<Updater>, &mut Window, &mut App) + 'static,
 ) -> AnyElement {
     let u = u.clone();
@@ -208,7 +210,7 @@ pub fn settings_content(cx: &App) -> Option<AnyElement> {
         // The relaunch never quit the app, so the player reopens it by hand; nothing to click.
         UpdateState::Updated(_) => (tr!("updater.status.reopen"), None, [false; 3]),
         UpdateState::Failed(failure) => (
-            failure.message.clone().into(),
+            failure.message.clone(),
             Some(theme.danger),
             [true, false, false],
         ),
@@ -300,17 +302,19 @@ fn card_button(
 
 #[cfg(test)]
 mod tests {
-    use crate::updater::REOPEN;
-    use crate::updater::backend::UNAVAILABLE;
-
-    // The banner still shows the constants, so the card's English must not drift from them.
+    // The banner, the card and the activity log share these keys, so their English must not drift.
     #[test]
     fn the_card_says_what_the_banner_says() {
         let en = |key: &str| crate::_rust_i18n_try_translate("en", key).map(|t| t.into_owned());
         assert_eq!(
             en("updater.status.unavailable").as_deref(),
-            Some(UNAVAILABLE)
+            Some(
+                "Automatic updates aren't available in this version. Get new versions from the release page."
+            )
         );
-        assert_eq!(en("updater.status.reopen").as_deref(), Some(REOPEN));
+        assert_eq!(
+            en("updater.status.reopen").as_deref(),
+            Some("TF2Tools has been updated. Close and reopen it to finish.")
+        );
     }
 }
