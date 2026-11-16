@@ -292,3 +292,21 @@ fn an_item_that_keeps_failing_is_new_only_the_first_time() {
     std::fs::create_dir_all(zip_path(&env, &hud)).unwrap();
     assert_eq!(convert(&env).new_failures(), [key]);
 }
+
+#[test]
+fn a_damaged_failure_memory_counts_as_empty() {
+    let env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    let key = format!("huds/{}", hud.folder_name());
+    common::set_setting(&env.dir, "library_pack_failed", "[not json");
+    std::fs::create_dir_all(zip_path(&env, &hud)).unwrap();
+    assert_eq!(convert(&env).new_failures(), std::slice::from_ref(&key));
+    // Conversion still packs once the item heals, and rewrites the memory as valid JSON.
+    std::fs::remove_dir(zip_path(&env, &hud)).unwrap();
+    let healed = convert(&env);
+    assert_eq!((healed.huds().packed(), healed.huds().failed()), (1, 0));
+    assert_eq!(
+        common::setting(&env.dir, "library_pack_failed").as_deref(),
+        Some("[]")
+    );
+}

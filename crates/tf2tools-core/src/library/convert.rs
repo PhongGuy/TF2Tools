@@ -202,7 +202,9 @@ impl Library {
     /// The keys that failed the last pass; an unset, unreadable or damaged value is none.
     fn read_failures(&self) -> Failures {
         let text = self.db.read(|conn| read_setting(conn, FAILED_KEY));
-        let previous = (text.ok().flatten())
+        let previous = text
+            .ok()
+            .flatten()
             .and_then(|t| serde_json::from_str(&t).ok())
             .unwrap_or_default();
         Failures {
@@ -219,7 +221,7 @@ impl Library {
             return;
         }
         let text = serde_json::to_string(&failures.current).unwrap_or_default();
-        if let Err(error) = (self.db).write(|conn| save_setting(conn, FAILED_KEY, &text)) {
+        if let Err(error) = self.db.write(|conn| save_setting(conn, FAILED_KEY, &text)) {
             tracing::debug!(%error, "library conversion could not remember its failures");
         }
     }
