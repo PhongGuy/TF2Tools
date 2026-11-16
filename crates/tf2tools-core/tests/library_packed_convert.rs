@@ -310,3 +310,72 @@ fn a_damaged_failure_memory_counts_as_empty() {
         Some("[]")
     );
 }
+
+/// Points the HUD's row at `folder`, as a damaged or tampered database might.
+fn tamper_folder(env: &common::LibraryEnv, hud: &tf2tools_core::HudEntry, folder: &str) {
+    common::sql(&env.dir)
+        .execute(
+            "UPDATE library_huds SET folder_name = ?1 WHERE id = ?2",
+            [folder, hud.id().as_str()],
+        )
+        .unwrap();
+}
+
+/// Writes one file into every sibling of `library/huds`, returning the library tree.
+fn seed_siblings(env: &common::LibraryEnv) -> Vec<String> {
+    let library = env.dir.library_dir(tf2tools_core::LibraryKind::Huds);
+    let library = library.parent().unwrap();
+    for kind in ["sounds", "crosshairs", "gb-addons"] {
+        write_file(&library.join(kind).join("keep/file.bin"), b"keep");
+    }
+    common::tree(library)
+}
+
+#[test]
+fn a_hud_row_naming_the_parent_folder_is_skipped() {
+    let env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    let before = seed_siblings(&env);
+    tamper_folder(&env, &hud, "..");
+    let report = convert(&env);
+    assert_eq!((report.huds().packed(), report.huds().failed()), (0, 0));
+    let library = env.dir.library_dir(tf2tools_core::LibraryKind::Huds);
+    let library = library.parent().unwrap();
+    assert_eq!(common::tree(library), before);
+    assert!(!library.join(".tf2tools").exists());
+}
+
+#[test]
+fn a_hud_row_with_an_empty_folder_is_skipped() {
+    let env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    let before = seed_siblings(&env);
+    tamper_folder(&env, &hud, "");
+    let report = convert(&env);
+    assert_eq!((report.huds().packed(), report.huds().failed()), (0, 0));
+    let huds = env.dir.library_dir(tf2tools_core::LibraryKind::Huds);
+    assert_eq!(common::tree(huds.parent().unwrap()), before);
+    assert!(!huds.join(".tf2tools").exists());
+}
+
+#[test]
+fn a_hud_row_with_an_absolute_folder_touches_nothing_outside() {
+    let env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    let outside = env.tmp.path().join("outside");
+    write_file(&outside.join("resource/clientscheme.res"), b"mine");
+    let before = common::tree(&outside);
+    tamper_folder(&env, &hud, outside.to_str().unwrap());
+    let report = convert(&env);
+    assert_eq!((report.huds().packed(), report.huds().failed()), (0, 0));
+    assert_eq!(common::tree(&outside), before);
+    assert!(!outside.join(".tf2tools").exists());
+}
+
+#[test]
+fn unpacking_a_hud_row_naming_the_parent_folder_is_refused() {
+    let env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    tamper_folder(&env, &hud, "..");
+    assert!(env.lib.unpack_hud_for_tests(hud.id()).is_err());
+}

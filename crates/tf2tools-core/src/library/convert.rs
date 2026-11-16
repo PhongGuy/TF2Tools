@@ -7,7 +7,7 @@ use super::gb_addons::slots_survive_packing;
 use super::made_huds::{MAKER_FILE, old_folder};
 use super::packed::{GB_ZIP, HUD_ZIP, ItemSource, pack_with};
 use super::{
-    GbId, HudId, IoFailure, Library, METADATA_DIR, io_at, library_db, read_setting,
+    GbId, HudId, IoFailure, Library, METADATA_DIR, io_at, is_plain_name, library_db, read_setting,
     remove_dir_if_present, remove_file_if_present, save_setting,
 };
 use crate::error::LibraryError;
@@ -149,7 +149,14 @@ impl Library {
                 let made = |dir: &Path| dir.join(METADATA_DIR).join(MAKER_FILE).is_file();
                 let keep_made = |live: &Path| made(live) || made(&old_folder(live));
                 for hud in huds {
-                    let live = root.join(hud.folder_name());
+                    // A tampered row could name `..`, nothing or an absolute path, and packing
+                    // clears the folder, so only a plain name is ever converted.
+                    let folder = hud.folder_name();
+                    if !is_plain_name(folder) {
+                        tracing::warn!(folder, "HUD not packed: its folder name is not plain");
+                        continue;
+                    }
+                    let live = root.join(folder);
                     let result = self.convert_item(&live, HUD_ZIP, &keep_made);
                     let Some(IoFailure { path, source }) = report.huds.add(result) else {
                         continue;
