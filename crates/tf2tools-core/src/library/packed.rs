@@ -346,6 +346,8 @@ impl Packed {
 /// Packs `src` (regular files `skip` keeps, `Path` order) into `dest_zip` through `<dest_zip>.tmp`:
 /// zstd level 3, synced, read back (entry count, every entry's CRC and name), then renamed over.
 /// Returns the zip's length. A failure removes the `.tmp` and leaves any old zip as it was.
+/// The library packs through `pack_with` and its own rename, so this form serves tests.
+#[cfg(test)]
 pub(crate) fn pack(
     src: &Path,
     skip: &dyn Fn(&Path) -> bool,

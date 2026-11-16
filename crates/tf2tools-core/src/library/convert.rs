@@ -4,7 +4,7 @@ use std::io;
 use std::path::Path;
 
 use super::made_huds::{MAKER_FILE, old_folder};
-use super::packed::{HUD_ZIP, ItemSource, pack};
+use super::packed::{HUD_ZIP, ItemSource, pack_with};
 use super::{
     HudId, IoFailure, Library, METADATA_DIR, io_at, library_db, remove_dir_if_present,
     remove_file_if_present,
@@ -134,6 +134,28 @@ impl Library {
         Ok(())
     }
 
+    /// Replaces how a written zip is moved into place; tests use it to make the read-back fail.
+    #[doc(hidden)]
+    pub fn set_pack_rename(&mut self, rename: fn(&Path, &Path) -> io::Result<()>) {
+        self.pack_rename = rename;
+    }
+
+    /// Packs the loose HUD at `live` into its zip, leaving the top-level `.tf2tools` out, and
+    /// clears the loose files; returns the zip's length. A zip that does not read back is
+    /// removed (best effort), so the untouched loose tree is what readers see.
+    pub(super) fn pack_hud_folder(&self, live: &Path) -> Result<u64, IoFailure> {
+        let top_metadata = |rel: &Path| rel == Path::new(METADATA_DIR);
+        let zip = live.join(HUD_ZIP);
+        let mut rename = self.pack_rename;
+        let after = pack_with(live, &top_metadata, &zip, &mut rename)?;
+        if let Err(failure) = require_packed(live) {
+            let _ = remove_file_if_present(&zip);
+            return Err(failure);
+        }
+        remove_loose(live)?;
+        Ok(after)
+    }
+
     /// Converts one HUD folder under the write guard. A folder that is gone (a save moved it)
     /// or made by the Maker stays as it is; made HUDs are edited in place, so they stay loose.
     fn convert_hud(&self, live: &Path) -> Result<Converted, IoFailure> {
@@ -157,16 +179,14 @@ impl Library {
             });
         }
         let before = ItemSource::Loose(live.to_path_buf()).unpacked_bytes()?;
-        let top_metadata = |rel: &Path| rel == Path::new(METADATA_DIR);
-        let after = pack(live, &top_metadata, &zip)?;
-        drop_loose_tree(live)?;
+        let after = self.pack_hud_folder(live)?;
         Ok(Converted::Packed { before, after })
     }
 }
 
 /// Removes the loose files beside `live`'s zip once the zip reads back as the item, never for
 /// a link or a damaged zip; true when anything went.
-pub(super) fn drop_loose_tree(live: &Path) -> Result<bool, IoFailure> {
+fn drop_loose_tree(live: &Path) -> Result<bool, IoFailure> {
     require_packed(live)?;
     remove_loose(live)
 }

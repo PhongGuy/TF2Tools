@@ -254,3 +254,16 @@ fn a_damaged_zip_does_not_clear_the_loose_tree() {
     write_file(&zip_path(&env, &hud), b"not a zip at all");
     assert_fails_and_stays_loose(&env, &hud);
 }
+
+#[test]
+fn a_conversion_whose_zip_does_not_read_back_leaves_the_hud_loose() {
+    let mut env = library_env();
+    let hud = loose_hud(&env, "rayshud", FILES, Provenance::Local);
+    let before = library_files(&env, &hud);
+    env.lib.set_pack_rename(common::packed::rename_then_damage);
+    let report = convert(&env);
+    assert_eq!((report.huds().packed(), report.huds().failed()), (0, 1));
+    assert!(!zip_path(&env, &hud).exists());
+    assert_eq!(library_files(&env, &hud), before);
+    assert_eq!(loose_files(&env, &hud).len(), before.len());
+}

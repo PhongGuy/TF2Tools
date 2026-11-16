@@ -8,9 +8,9 @@ use std::path::{Path, PathBuf};
 use rusqlite::{OptionalExtension, params};
 use walkdir::WalkDir;
 
-use super::packed::{HUD_ZIP, ItemSource, pack};
+use super::packed::{HUD_ZIP, ItemSource};
 use super::{
-    HudId, IoFailure, Library, METADATA_DIR, Provenance, convert, copy_dir_excluding_metadata,
+    HudId, IoFailure, Library, METADATA_DIR, Provenance, copy_dir_excluding_metadata,
     create_dir_all, first_free_number, game_custom_dir, gb_id_column, hud_folder, hud_lowercase,
     hud_print, import_db, install_db, io_at, is_plain_name, library_db, live_link, made_huds,
     new_id, now, read_setting, remove_dir_if_present, save_setting, walk_failure,
@@ -23,14 +23,6 @@ use crate::tf2::Tf2Install;
 
 /// The setting beside `installed_hud_folder` that fingerprints what the install put there.
 const PRINT_KEY: &str = "installed_hud_fingerprint";
-
-/// Packs the loose HUD at `dest` into its zip, leaving the top-level `.tf2tools` out, and
-/// clears the loose files once the zip reads back.
-fn pack_folder(dest: &Path) -> Result<(), IoFailure> {
-    let top_metadata = |rel: &Path| rel == Path::new(METADATA_DIR);
-    pack(dest, &top_metadata, &dest.join(HUD_ZIP))?;
-    convert::drop_loose_tree(dest).map(|_| ())
-}
 
 /// How a HUD folder in `tf/custom` stands against the library.
 enum Standing {
@@ -406,7 +398,7 @@ impl Library {
         };
         // The picture is read from the loose tree, so it is made before the tree is packed.
         let entry = self.refresh_hud_thumbnail(entry);
-        if let Err(IoFailure { path, source }) = pack_folder(&dest) {
+        if let Err(IoFailure { path, source }) = self.pack_hud_folder(&dest) {
             tracing::warn!(
                 folder = folder_name,
                 path = %path.display(),

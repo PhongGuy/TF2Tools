@@ -95,6 +95,8 @@ pub struct Library {
     dir: DataDir,
     /// Free bytes on the disk holding a path; replaced in tests to simulate a full disk.
     free_space: fn(&Path) -> io::Result<u64>,
+    /// Moves a written zip into place; replaced in tests to damage it after the move.
+    pack_rename: fn(&Path, &Path) -> io::Result<()>,
     /// The HUD option schemas a copy's options are read with, matched by its base's repo.
     hud_schemas: Arc<HudSchemas>,
     /// Held for the whole of a made HUD's save and a copy's update, so a save that checks the
@@ -109,6 +111,7 @@ impl Library {
             db,
             dir,
             free_space: crate::disk::free_bytes,
+            pack_rename: |from, to| std::fs::rename(from, to),
             hud_schemas: Arc::new(HudSchemas::bundled()),
             writes: Arc::new(Mutex::new(())),
         }

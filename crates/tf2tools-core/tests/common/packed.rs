@@ -117,3 +117,10 @@ pub fn loose_hud(
 pub fn convert(env: &LibraryEnv) -> ConvertReport {
     env.lib.convert_library()
 }
+
+/// A pack rename that places the zip and then damages it, so the read-back after a
+/// successful pack fails.
+pub fn rename_then_damage(from: &Path, to: &Path) -> std::io::Result<()> {
+    std::fs::rename(from, to)?;
+    std::fs::write(to, b"not a zip")
+}

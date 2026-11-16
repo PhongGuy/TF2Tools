@@ -134,3 +134,22 @@ fn deleting_a_packed_hud_removes_its_folder() {
     env.lib.delete_hud(hud.id()).unwrap();
     assert!(!hud_dir(&env, &hud).exists());
 }
+
+#[test]
+fn an_import_whose_zip_does_not_read_back_stays_loose() {
+    let mut env = library_env();
+    env.lib.set_pack_rename(common::packed::rename_then_damage);
+    let files: &[(&str, &[u8])] = &[("info.vdf", b"\"a\" {}"), ("resource/a.res", b"a")];
+    let hud = import(&env, "a", files, Provenance::Local);
+    assert!(!zip_path(&env, &hud).exists());
+    let loose: Vec<(String, Vec<u8>)> = files
+        .iter()
+        .map(|(rel, bytes)| ((*rel).to_owned(), bytes.to_vec()))
+        .collect();
+    assert_eq!(common::packed::library_files(&env, &hud), loose);
+    env.lib.install_hud(hud.id(), &env.tf2).unwrap();
+    assert_eq!(
+        tree(&env.tf2.custom_dir()),
+        ["darhud/info.vdf", "darhud/resource/a.res"]
+    );
+}
