@@ -25,7 +25,7 @@ const V1_SCHEMA: &str = "
     PRAGMA user_version = 1;";
 
 #[test]
-fn v5_database_upgrades_to_v20_without_loss() {
+fn v5_database_upgrades_to_v21_without_loss() {
     let (_tmp, dir) = common::temp_data_dir();
     common::write_v5_database(&dir);
     let before = common::dump_tables(&Connection::open(dir.db_path()).unwrap());

@@ -207,7 +207,7 @@ pub(crate) struct ListedLog {
 /// The logs.tf tables of the library database.
 #[derive(Debug, Clone)]
 pub struct LogsCache {
-    db: Database,
+    pub(super) db: Database,
 }
 
 impl LogsCache {
@@ -1094,7 +1094,7 @@ pub(super) enum BodyRead {
 }
 
 /// A body compressed for storage: zlib at level 6.
-fn deflate(body: &str) -> Result<Vec<u8>, LogsCacheError> {
+pub(super) fn deflate(body: &str) -> Result<Vec<u8>, LogsCacheError> {
     let mut encoder = flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::new(6));
     encoder
         .write_all(body.as_bytes())
@@ -1124,7 +1124,7 @@ fn damaged(log_id: i64) -> LogsCacheError {
     }
 }
 
-fn db_error(e: rusqlite::Error) -> LogsCacheError {
+pub(super) fn db_error(e: rusqlite::Error) -> LogsCacheError {
     LogsCacheError::Database {
         message: e.to_string(),
     }
