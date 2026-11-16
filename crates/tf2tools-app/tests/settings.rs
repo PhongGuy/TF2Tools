@@ -642,25 +642,25 @@ fn the_logs_tf_card_toggles_nicknames_in_match_logs_and_saves_at_once(cx: &mut T
 fn log_space_reads_in_kilobytes_or_megabytes() {
     use tf2tools_app::pages::settings::{keep_text, size_text, usage_text};
     use tf2tools_core::KeepFullLogs;
-    assert_eq!(size_text(0), "0 KB");
-    assert_eq!(size_text(10_300), "10 KB");
-    assert_eq!(size_text(640_499), "640 KB");
-    assert_eq!(size_text(1_000_000), "1.0 MB");
-    assert_eq!(size_text(12_345_678), "12.3 MB");
+    assert_eq!(size_text(0), "0 B");
+    assert_eq!(size_text(10_300), "10.1 KB");
+    assert_eq!(size_text(640_499), "625.5 KB");
+    assert_eq!(size_text(1_048_576), "1.0 MB");
+    assert_eq!(size_text(12_345_678), "11.8 MB");
     assert_eq!(keep_text(KeepFullLogs::Day1, 0), "1 day");
     assert_eq!(keep_text(KeepFullLogs::Days7, 0), "7 days");
     assert_eq!(
         keep_text(KeepFullLogs::Days3, 12_345_678),
-        "3 days, frees about 12.3 MB"
+        "3 days, frees about 11.8 MB"
     );
     assert_eq!(keep_text(KeepFullLogs::Forever, 0), "Forever");
     assert_eq!(
         usage_text(25_000_000, 1, 10_300),
-        "The logs cache uses about 25.0 MB; 1 full log uses about 10 KB."
+        "The logs cache uses about 23.8 MB; 1 full log uses about 10.1 KB."
     );
     assert_eq!(
         usage_text(25_000_000, 21, 216_300),
-        "The logs cache uses about 25.0 MB; 21 full logs use about 216 KB."
+        "The logs cache uses about 23.8 MB; 21 full logs use about 211.2 KB."
     );
 }
 
@@ -753,13 +753,28 @@ fn the_logs_tf_card_says_when_the_cache_size_could_not_be_measured(cx: &mut Test
 #[test]
 fn the_library_line_reads_on_disk_and_unpacked() {
     use tf2tools_app::pages::settings::{library_text, size_text};
-    assert_eq!(size_text(999_949_999), "999.9 MB");
-    assert_eq!(size_text(999_950_000), "1.0 GB");
-    assert_eq!(size_text(2_100_000_000), "2.1 GB");
+    assert_eq!(size_text(1_073_689_395), "1023.9 MB");
+    assert_eq!(size_text(1_073_689_396), "1.0 GB");
+    assert_eq!(size_text(2_100_000_000), "2.0 GB");
     assert_eq!(
         library_text(412_000_000, 2_100_000_000),
-        "Your library uses 412.0 MB on disk (2.1 GB unpacked)."
+        "Your library uses 392.9 MB on disk (2.0 GB unpacked)."
     );
+}
+
+#[test]
+fn settings_sizes_read_like_store_sizes() {
+    use tf2tools_app::pages::settings::size_text;
+    use tf2tools_app::store_download::format_bytes;
+    let mut bytes = 0_u64;
+    while bytes < 1 << 42 {
+        assert_eq!(
+            size_text(bytes),
+            format_bytes(bytes).as_str(),
+            "{bytes} bytes"
+        );
+        bytes = bytes * 3 / 2 + 7;
+    }
 }
 
 #[gpui_kit::test]

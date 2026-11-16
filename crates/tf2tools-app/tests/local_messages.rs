@@ -878,7 +878,7 @@ fn a_full_disk_says_how_much_room_is_needed() {
     use tf2tools_app::local_messages::no_space_text;
     assert_eq!(
         no_space_text("copy", 557_000_001),
-        "There isn't enough free disk space to copy this HUD. It needs about 558 MB."
+        "There isn't enough free disk space to copy this HUD. It needs about 532 MB."
     );
 }
 
@@ -993,7 +993,7 @@ fn every_update_failure_reads_in_player_words() {
             needed: 1_100_000_000,
             free: 0
         }),
-        "There isn't enough free disk space to update this HUD. It needs about 1100 MB."
+        "There isn't enough free disk space to update this HUD. It needs about 1050 MB."
     );
     assert_eq!(
         says(E::Load(HudLoadError::Newer)),

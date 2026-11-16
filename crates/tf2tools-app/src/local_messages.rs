@@ -290,9 +290,9 @@ fn terms_note(author: &str) -> String {
 }
 
 /// A refused copy, save or update for want of disk room; `verb` names the action and the
-/// size is shown in whole megabytes, rounded up.
+/// size is shown in whole 1024-based megabytes, rounded up.
 pub fn no_space_text(verb: &str, needed_bytes: u64) -> String {
-    let mb = needed_bytes.div_ceil(1_000_000);
+    let mb = needed_bytes.div_ceil(1024 * 1024);
     format!("There isn't enough free disk space to {verb} this HUD. It needs about {mb} MB.")
 }
 
