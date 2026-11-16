@@ -57,17 +57,9 @@ pub const LOGS_TF_DOWN: &str = "logs.tf isn't responding right now. Try again la
 /// Why logs.tf turned a request away after every retry, in player words.
 pub const LOGS_TF_BUSY: &str = "logs.tf is busy. Try again in a few minutes.";
 
-/// A count with thousands separators: "4,812".
+/// A count with thousands separators in the player's language: "4,812".
 pub fn count_text(n: usize) -> String {
-    let digits = n.to_string();
-    let mut out = String::with_capacity(digits.len() + digits.len() / 3);
-    for (i, c) in digits.chars().enumerate() {
-        if i > 0 && (digits.len() - i).is_multiple_of(3) {
-            out.push(',');
-        }
-        out.push(c);
-    }
-    out
+    format::grouped(u64::try_from(n).unwrap_or(u64::MAX))
 }
 
 /// The progress line while a sync reads the player's list: "Finding logs: 2,000 of 4,812".
@@ -186,15 +178,16 @@ pub fn fetch_message(error: &LogsFetchError) -> Option<&'static str> {
 
 /// Time on a class, rounded down to whole minutes: "45m", "1h 30m", "0m".
 pub fn time_played_text(seconds: u64) -> String {
-    let minutes = seconds / 60;
-    match minutes / 60 {
-        0 => format!("{minutes}m"),
-        hours => format!("{hours}h {}m", minutes % 60),
-    }
+    format::hours_minutes(seconds / 60).to_string()
 }
 
 /// A rate with one decimal, half rounding up as on logs.tf: "0.6", 0.25 reads "0.3".
 pub fn one_decimal(value: f64) -> String {
+    format::decimal_point(&half_up(value))
+}
+
+// One decimal with an English point, half rounding up; the one rounding rule for tenths.
+fn half_up(value: f64) -> String {
     format!("{:.1}", (value * 10.).round() / 10.)
 }
 
@@ -229,10 +222,13 @@ pub fn known_text(n: Option<u32>) -> String {
 /// A number logs.tf shows whole, cut down as logs.tf does: 154.9 reads "154". These counts
 /// are never negative, so anything below zero, -0.0 included, reads "0".
 pub fn floored(value: f64) -> String {
-    // The cast saturates, so a negative or NaN value lands on 0 rather than printing "-0".
-    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    let whole = value.floor().max(0.0) as u64;
-    whole.to_string()
+    floor_whole(value).to_string()
+}
+
+// The cast saturates, so a negative or NaN value lands on 0 rather than printing "-0".
+#[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn floor_whole(value: f64) -> u64 {
+    value.floor().max(0.0) as u64
 }
 
 /// A history range's stop label under the slider: "1 month" up to "All".
@@ -378,7 +374,7 @@ fn percent(part: u32, whole: u32) -> u64 {
 
 /// Whether a players table cell reads zero, whole or to one decimal, so it can be muted.
 pub fn reads_zero(cell: &str) -> bool {
-    matches!(cell, "0" | "0.0")
+    cell == "0" || cell == format::decimal_point("0.0")
 }
 
 /// The Show Killstreaks button's words with the log's count: "Show Killstreaks (13)".
@@ -429,12 +425,12 @@ pub fn charge_text(medigun: &Medigun, n: u32, total: u32) -> String {
 
 /// A time in whole seconds, cut down as logs.tf shows it: 58.9 reads "58 s".
 pub fn seconds_text(secs: f64) -> String {
-    format!("{} s", floored(secs))
+    format::seconds(floor_whole(secs)).to_string()
 }
 
 /// A time to a tenth of a second: "6.5 s".
 pub fn tenths_text(secs: f64) -> String {
-    format!("{} s", one_decimal(secs))
+    format::tenths(&half_up(secs)).to_string()
 }
 
 /// (Type, Description) for one round event, players named through `name_of`. A charge names

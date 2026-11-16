@@ -155,6 +155,11 @@ common:
     day_month_year: "%{day} %{month} %{year}\u00A0г."
     month_day_year: "%{day} %{month} %{year}\u00A0г."
     month: { jan: "янв.", feb: "февр.", mar: "мар.", apr: "апр.", may: "мая", jun: "июн.", jul: "июл.", aug: "авг.", sep: "сент.", oct: "окт.", nov: "нояб.", dec: "дек." }
+  time:
+    just_now: "Только что"
+    minutes_ago: { one: "%{count} минуту назад", few: "%{count} минуты назад", many: "%{count} минут назад" }
+    hours_ago: { one: "%{count} час назад", few: "%{count} часа назад", many: "%{count} часов назад" }
+    days_ago: { one: "%{count} день назад", few: "%{count} дня назад", many: "%{count} дней назад" }
 
 addon_store:
   downloads: { one: "%{count} загрузка", few: "%{count} загрузки", many: "%{count} загрузок" }

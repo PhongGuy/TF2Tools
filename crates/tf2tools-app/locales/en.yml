@@ -157,6 +157,11 @@ common:
     day_month_year: "%{day} %{month} %{year}"
     month_day_year: "%{month} %{day}, %{year}"
     month: { jan: "Jan", feb: "Feb", mar: "Mar", apr: "Apr", may: "May", jun: "Jun", jul: "Jul", aug: "Aug", sep: "Sep", oct: "Oct", nov: "Nov", dec: "Dec" }
+  time:
+    just_now: "Just now"
+    minutes_ago: { one: "%{count} minute ago", other: "%{count} minutes ago" }
+    hours_ago: { one: "%{count} hour ago", other: "%{count} hours ago" }
+    days_ago: { one: "%{count} day ago", other: "%{count} days ago" }
 
 addon_store:
   downloads: { one: "%{count} download", other: "%{count} downloads" }

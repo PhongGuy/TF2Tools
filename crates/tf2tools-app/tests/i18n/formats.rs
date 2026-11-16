@@ -214,3 +214,47 @@ fn store_sizes_and_counts_read_in_russian() {
     assert_eq!(downloads_label(40_838), "40\u{a0}838 загрузок");
     assert_ru(&downloads_label(40_838));
 }
+
+#[test]
+fn relative_times_take_russian_forms() {
+    use chrono::{DateTime, Duration, Utc};
+    use tf2tools_app::pages::logs::model::relative_time;
+    let _guard = LocaleGuard::switch("ru");
+    let now = DateTime::parse_from_rfc3339("2026-10-17T12:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
+    let ago = |d: Duration| relative_time(&(now - d).to_rfc3339(), now);
+    assert_eq!(ago(Duration::seconds(30)), "Только что");
+    let cases = [
+        (1, "1 минуту", "1 час", "1 день"),
+        (2, "2 минуты", "2 часа", "2 дня"),
+        (5, "5 минут", "5 часов", "5 дней"),
+        (11, "11 минут", "11 часов", "11 дней"),
+        (21, "21 минуту", "21 час", "21 день"),
+        (22, "22 минуты", "22 часа", "22 дня"),
+    ];
+    for (n, minutes, hours, days) in cases {
+        assert_eq!(ago(Duration::minutes(n)), format!("{minutes} назад"));
+        assert_eq!(ago(Duration::hours(n)), format!("{hours} назад"));
+        assert_eq!(ago(Duration::days(n)), format!("{days} назад"));
+    }
+    assert_eq!(relative_time("yesterday-ish", now), "yesterday-ish");
+}
+
+#[test]
+fn logs_tf_numbers_read_in_russian() {
+    use tf2tools_app::pages::logs_tf::text::{
+        count_text, kapd_text, one_decimal, reads_zero, seconds_text, tenths_text, time_played_text,
+    };
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(count_text(4_812), "4\u{a0}812");
+    assert_eq!(one_decimal(0.25), "0,3");
+    assert_eq!(kapd_text(3, 2, 2), "2,5");
+    assert!(reads_zero("0"));
+    assert!(reads_zero("0,0"));
+    assert!(!reads_zero("0,4"));
+    assert_eq!(time_played_text(5_400), "1\u{a0}ч 30\u{a0}мин");
+    assert_eq!(time_played_text(1_559), "25\u{a0}мин");
+    assert_eq!(seconds_text(58.9), "58\u{a0}с");
+    assert_eq!(tenths_text(6.66), "6,7\u{a0}с");
+}
