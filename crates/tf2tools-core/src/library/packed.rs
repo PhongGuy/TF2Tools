@@ -17,6 +17,10 @@ use crate::archive::check_entry_name;
 /// Where a packed HUD keeps its tree, relative to its library folder.
 pub(crate) const HUD_ZIP: &str = ".tf2tools/files.zip";
 
+/// Where a packed GameBanana add-on keeps its slot tree, relative to its library folder.
+#[cfg_attr(not(test), expect(dead_code, reason = "GameBanana copies in Task 2"))]
+pub(crate) const GB_ZIP: &str = "copy.zip";
+
 /// How many times a refused rename is tried again, and how long to wait between tries.
 const RENAME_RETRIES: u32 = 5;
 const RENAME_PAUSE: Duration = Duration::from_millis(200);
@@ -201,18 +205,49 @@ impl ItemSource {
             if let Some(parent) = target.parent() {
                 create_dir_all(parent)?;
             }
-            let mut from = archive.by_name(&entry.name).map_err(damaged(&packed.zip))?;
-            let mut to = File::create(&target).map_err(io_at(&target))?;
-            // A read failure (a CRC mismatch among them) is the zip's; a write failure the target's.
-            let mut buf = vec![0u8; 64 * 1024];
-            loop {
-                let n = from.read(&mut buf).map_err(io_at(&packed.zip))?;
-                if n == 0 {
-                    break;
-                }
-                to.write_all(&buf[..n]).map_err(io_at(&target))?;
-                written = written.saturating_add(n as u64);
+            let from = archive.by_name(&entry.name).map_err(damaged(&packed.zip))?;
+            written = written.saturating_add(copy_entry(&packed.zip, from, &target)?);
+        }
+        Ok(written)
+    }
+
+    /// Writes the file or folder at `prefix` (a relative path in the item) to `dest`: a file
+    /// to `dest` itself, a folder's files under `dest` keeping their paths below `prefix`.
+    /// Matches by whole components. `NotFound` when nothing is at `prefix`. Returns bytes written.
+    #[cfg_attr(not(test), expect(dead_code, reason = "GameBanana copies in Task 2"))]
+    pub(crate) fn extract_under(&self, prefix: &Path, dest: &Path) -> Result<u64, IoFailure> {
+        let packed = match self {
+            ItemSource::Loose(dir) => return extract_loose(&dir.join(prefix), dest),
+            ItemSource::Packed(packed) => packed,
+        };
+        // `Path::strip_prefix` compares whole components, so `a` never claims `ab/x`.
+        let mut archive = None;
+        let mut written = 0u64;
+        for entry in packed.kept(&|_| false) {
+            let Ok(below) = entry.rel.strip_prefix(prefix) else {
+                continue;
+            };
+            let archive = match &mut archive {
+                Some(archive) => archive,
+                None => archive.insert(open_zip(&packed.zip)?),
+            };
+            // A file at `prefix` itself is written to `dest`, not into a folder of that name.
+            let target = if below.as_os_str().is_empty() {
+                dest.to_path_buf()
+            } else {
+                dest.join(below)
+            };
+            if let Some(parent) = target.parent() {
+                create_dir_all(parent)?;
             }
+            let from = archive.by_name(&entry.name).map_err(damaged(&packed.zip))?;
+            written = written.saturating_add(copy_entry(&packed.zip, from, &target)?);
+        }
+        if archive.is_none() {
+            return Err(IoFailure {
+                path: packed.zip.join(prefix),
+                source: io::Error::from(io::ErrorKind::NotFound),
+            });
         }
         Ok(written)
     }
@@ -295,6 +330,39 @@ impl ItemSource {
                 .fold(0u64, |sum, e| sum.saturating_add(e.size))),
         }
     }
+}
+
+/// Writes one zip entry to `target`; returns its length. A read failure (a CRC mismatch among
+/// them) is the zip's, a write failure the target's.
+fn copy_entry(zip: &Path, mut from: impl Read, target: &Path) -> Result<u64, IoFailure> {
+    let mut to = File::create(target).map_err(io_at(target))?;
+    let mut written = 0u64;
+    let mut buf = vec![0u8; 64 * 1024];
+    loop {
+        let n = from.read(&mut buf).map_err(io_at(zip))?;
+        if n == 0 {
+            return Ok(written);
+        }
+        to.write_all(&buf[..n]).map_err(io_at(target))?;
+        written = written.saturating_add(n as u64);
+    }
+}
+
+/// Copies the loose file or folder at `src` to `dest`, never following a link at `src`
+/// itself; `NotFound` when nothing (or a link) is there.
+#[cfg_attr(not(test), expect(dead_code, reason = "GameBanana copies in Task 2"))]
+fn extract_loose(src: &Path, dest: &Path) -> Result<u64, IoFailure> {
+    let meta = std::fs::symlink_metadata(src).map_err(io_at(src))?;
+    if meta.is_dir() {
+        return tree_copy::copy_tree(src, dest, &|_| false);
+    }
+    if !meta.is_file() {
+        return Err(io_at(src)(io::Error::from(io::ErrorKind::NotFound)));
+    }
+    if let Some(parent) = dest.parent() {
+        create_dir_all(parent)?;
+    }
+    std::fs::copy(src, dest).map_err(io_at(dest))
 }
 
 /// One file handed out by [`ItemSource::visit`]; a read failure names the loose file or
@@ -848,5 +916,44 @@ mod tests {
         let zip = dir.join(".tf2tools/other.zip");
         assert!(pack(&dir, &top_meta, &zip).is_err());
         assert!(!zip.exists() && !dir.join(".tf2tools/other.zip.tmp").exists());
+    }
+
+    #[test]
+    fn a_file_or_a_folder_extracts_under_a_new_name_in_either_form() {
+        let t = tempfile::tempdir().unwrap();
+        let dir = t.path().join("7");
+        write(&dir.join("1/tf2tools-gb-7-a.vpk"), b"vpk bytes");
+        write(&dir.join("2/tf2tools-gb-7-a-2/materials/a.vmt"), b"vmt");
+        write(&dir.join("2/tf2tools-gb-7-a-2/x.txt"), b"x");
+        let loose = ItemSource::open(&dir, GB_ZIP).unwrap();
+        assert!(!loose.is_packed());
+        pack(&dir, &nothing, &dir.join(GB_ZIP)).unwrap();
+        let packed = ItemSource::open(&dir, GB_ZIP).unwrap();
+        assert!(packed.is_packed());
+        for (source, out) in [(&loose, "l"), (&packed, "p")] {
+            let out = t.path().join(out);
+            let vpk = out.join("tf2tools-gb-7-a.vpk");
+            let written = source
+                .extract_under(Path::new("1/tf2tools-gb-7-a.vpk"), &vpk)
+                .unwrap();
+            assert_eq!(written, 9);
+            assert_eq!(std::fs::read(&vpk).unwrap(), b"vpk bytes");
+            let folder = out.join("tf2tools-gb-7-a-2");
+            source
+                .extract_under(Path::new("2/tf2tools-gb-7-a-2"), &folder)
+                .unwrap();
+            assert_eq!(
+                std::fs::read(folder.join("materials/a.vmt")).unwrap(),
+                b"vmt"
+            );
+            assert_eq!(std::fs::read(folder.join("x.txt")).unwrap(), b"x");
+            // Whole components only: a name that is a prefix of another is not that one.
+            for missing in ["2/tf2tools-gb-7-a", "3/none"] {
+                let err = source
+                    .extract_under(Path::new(missing), &out.join("none"))
+                    .unwrap_err();
+                assert_eq!(err.source.kind(), io::ErrorKind::NotFound, "{missing}");
+            }
+        }
     }
 }

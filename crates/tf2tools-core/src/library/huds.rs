@@ -398,7 +398,7 @@ impl Library {
         };
         // The picture is read from the loose tree, so it is made before the tree is packed.
         let entry = self.refresh_hud_thumbnail(entry);
-        if let Err(IoFailure { path, source }) = self.pack_hud_folder(&dest) {
+        if let Err(IoFailure { path, source }) = self.pack_folder(&dest, HUD_ZIP) {
             tracing::warn!(
                 folder = folder_name,
                 path = %path.display(),

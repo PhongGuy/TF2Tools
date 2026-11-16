@@ -1,7 +1,7 @@
-//! Converting loose library HUDs to packed zips, one item at a time under the copies write lock.
+//! Converting loose library items to packed zips, one item at a time under the copies write lock.
 
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::made_huds::{MAKER_FILE, old_folder};
 use super::packed::{HUD_ZIP, ItemSource, pack_with};
@@ -65,7 +65,7 @@ impl KindConverted {
     }
 }
 
-/// What converting one HUD folder came to.
+/// What converting one item folder came to.
 enum Converted {
     Untouched,
     Packed { before: u64, after: u64 },
@@ -86,10 +86,13 @@ impl Library {
             }
         };
         let root = self.dir.library_dir(LibraryKind::Huds);
+        // Made HUDs are edited in place, so they stay loose; so does one whose save is mid-swap.
+        let made = |dir: &Path| dir.join(METADATA_DIR).join(MAKER_FILE).is_file();
+        let keep_made = |live: &Path| made(live) || made(&old_folder(live));
         for hud in huds {
             let live = root.join(hud.folder_name());
             let tally = &mut report.huds;
-            match self.convert_hud(&live) {
+            match self.convert_item(&live, HUD_ZIP, &keep_made) {
                 Ok(Converted::Untouched) => {}
                 Ok(Converted::Packed { before, after }) => {
                     tally.packed += 1;
@@ -140,38 +143,42 @@ impl Library {
         self.pack_rename = rename;
     }
 
-    /// Packs the loose HUD at `live` into its zip, leaving the top-level `.tf2tools` out, and
-    /// clears the loose files; returns the zip's length. A zip that does not read back is
-    /// removed (best effort), so the untouched loose tree is what readers see.
-    pub(super) fn pack_hud_folder(&self, live: &Path) -> Result<u64, IoFailure> {
-        let top_metadata = |rel: &Path| rel == Path::new(METADATA_DIR);
-        let zip = live.join(HUD_ZIP);
+    /// Packs the loose item at `live` into `live/zip_rel`, leaving out `zip_rel`'s first
+    /// component and its `.tmp`, then clears the loose files; returns the zip's length. A zip
+    /// that does not read back is removed (best effort), leaving the loose tree.
+    pub(super) fn pack_folder(&self, live: &Path, zip_rel: &str) -> Result<u64, IoFailure> {
+        let top = top_of(zip_rel);
+        let tmp = tmp_of(Path::new(zip_rel));
+        let left_out = |rel: &Path| rel == top || rel == tmp;
+        let zip = live.join(zip_rel);
         let mut rename = self.pack_rename;
-        let after = pack_with(live, &top_metadata, &zip, &mut rename)?;
-        if let Err(failure) = require_packed(live) {
+        let after = pack_with(live, &left_out, &zip, &mut rename)?;
+        if let Err(failure) = require_packed(live, zip_rel) {
             let _ = remove_file_if_present(&zip);
             return Err(failure);
         }
-        remove_loose(live)?;
+        remove_loose(live, top)?;
         Ok(after)
     }
 
-    /// Converts one HUD folder under the write guard. A folder that is gone (a save moved it)
-    /// or made by the Maker stays as it is; made HUDs are edited in place, so they stay loose.
-    fn convert_hud(&self, live: &Path) -> Result<Converted, IoFailure> {
+    /// Converts one item folder under the write guard; `keep_loose(live)` is asked where the
+    /// made-HUD check is today. A folder that is gone (a save moved it) stays as it is.
+    fn convert_item(
+        &self,
+        live: &Path,
+        zip_rel: &str,
+        keep_loose: &dyn Fn(&Path) -> bool,
+    ) -> Result<Converted, IoFailure> {
         let _copies = self.copies_write();
         let is_dir = |dir: &Path| std::fs::symlink_metadata(dir).is_ok_and(|m| m.is_dir());
-        let made = |dir: &Path| dir.join(METADATA_DIR).join(MAKER_FILE).is_file();
-        if !is_dir(live) || made(live) || made(&old_folder(live)) {
+        if !is_dir(live) || keep_loose(live) {
             return Ok(Converted::Untouched);
         }
-        let zip = live.join(HUD_ZIP);
-        let mut tmp = zip.as_os_str().to_owned();
-        tmp.push(".tmp");
-        remove_file_if_present(Path::new(&tmp))?;
+        let zip = live.join(zip_rel);
+        remove_file_if_present(&tmp_of(&zip))?;
         if std::fs::symlink_metadata(&zip).is_ok() {
             // A crash between placing the zip and clearing the loose tree leaves both.
-            let removed = drop_loose_tree(live)?;
+            let removed = drop_loose_tree(live, zip_rel)?;
             return Ok(if removed {
                 Converted::Cleaned
             } else {
@@ -179,36 +186,51 @@ impl Library {
             });
         }
         let before = ItemSource::Loose(live.to_path_buf()).unpacked_bytes()?;
-        let after = self.pack_hud_folder(live)?;
+        let after = self.pack_folder(live, zip_rel)?;
         Ok(Converted::Packed { before, after })
     }
 }
 
+/// The top-level entry of an item folder that holds its zip and is never the item's own.
+fn top_of(zip_rel: &str) -> &Path {
+    Path::new(zip_rel)
+        .components()
+        .next()
+        .map_or(Path::new(zip_rel), |c| Path::new(c.as_os_str()))
+}
+
+/// The `.tmp` path `pack_with` writes beside `zip`.
+fn tmp_of(zip: &Path) -> PathBuf {
+    let mut tmp = zip.as_os_str().to_owned();
+    tmp.push(".tmp");
+    PathBuf::from(tmp)
+}
+
 /// Removes the loose files beside `live`'s zip once the zip reads back as the item, never for
 /// a link or a damaged zip; true when anything went.
-fn drop_loose_tree(live: &Path) -> Result<bool, IoFailure> {
-    require_packed(live)?;
-    remove_loose(live)
+fn drop_loose_tree(live: &Path, zip_rel: &str) -> Result<bool, IoFailure> {
+    require_packed(live, zip_rel)?;
+    remove_loose(live, top_of(zip_rel))
 }
 
 /// Fails unless readers would take `live` as packed: its zip a regular file whose central
 /// directory parses with every name accepted. Guards every removal of loose files.
-fn require_packed(live: &Path) -> Result<(), IoFailure> {
-    if ItemSource::open(live, HUD_ZIP)?.is_packed() {
+fn require_packed(live: &Path, zip_rel: &str) -> Result<(), IoFailure> {
+    if ItemSource::open(live, zip_rel)?.is_packed() {
         return Ok(());
     }
-    let path = live.join(HUD_ZIP);
+    let path = live.join(zip_rel);
     let source = io::Error::new(io::ErrorKind::InvalidData, "the zip is not a regular file");
     Err(IoFailure { path, source })
 }
 
-/// Removes everything at the top of `dir` but `.tf2tools`, links included and never followed;
-/// true when anything went.
-fn remove_loose(dir: &Path) -> Result<bool, IoFailure> {
+/// Removes everything at the top of `dir` but `keep` (the zip's top entry), links included
+/// and never followed; true when anything went.
+fn remove_loose(dir: &Path, keep: &Path) -> Result<bool, IoFailure> {
     let mut removed = false;
     for entry in std::fs::read_dir(dir).map_err(io_at(dir))? {
         let entry = entry.map_err(io_at(dir))?;
-        if entry.file_name() == METADATA_DIR {
+        if entry.file_name() == keep.as_os_str() {
             continue;
         }
         let path = entry.path();
