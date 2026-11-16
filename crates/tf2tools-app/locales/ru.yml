@@ -167,6 +167,19 @@ addon_store:
 hud_store:
   added: "Добавлено %{date}"
 
+logs_tf:
+  progress:
+    finding: "Поиск логов: %{listed} из %{total}"
+    downloading: "Загрузка логов: %{done} из %{total}"
+    downloading_left: "Загрузка логов: %{done} из %{total}, осталось около %{time}"
+  summary:
+    all: "Все логи: %{count}"
+    last_month: { one: "За последний месяц: %{count} лог", few: "За последний месяц: %{count} лога", many: "За последний месяц: %{count} логов" }
+    last_year: { one: "За последний год: %{count} лог", few: "За последний год: %{count} лога", many: "За последний год: %{count} логов" }
+    last: { one: "За последние %{span}: %{count} лог", few: "За последние %{span}: %{count} лога", many: "За последние %{span}: %{count} логов" }
+    up_to: { one: "%{range} до %{date}: %{count} лог", few: "%{range} до %{date}: %{count} лога", many: "%{range} до %{date}: %{count} логов" }
+  weapons_title: { one: "Оружие: %{class} · %{range} · %{count} лог", few: "Оружие: %{class} · %{range} · %{count} лога", many: "Оружие: %{class} · %{range} · %{count} логов" }
+
 messages:
   shared:
     no_tf2_title: "TF2 не найдена"

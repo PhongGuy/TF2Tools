@@ -7,7 +7,7 @@ use tf2tools_core::{
     TfClass,
 };
 
-use crate::i18n::format;
+use crate::i18n::{counted_plural, format, tr};
 use crate::logs_sync::SyncProgress;
 
 /// logs.tf's front page, which the page's credit opens.
@@ -64,30 +64,30 @@ pub fn count_text(n: usize) -> String {
 
 /// The progress line while a sync reads the player's list: "Finding logs: 2,000 of 4,812".
 pub fn finding_text(listed: usize, total: usize) -> String {
-    format!(
-        "Finding logs: {} of {}",
-        count_text(listed),
-        count_text(total)
+    tr!(
+        "logs_tf.progress.finding",
+        listed = count_text(listed),
+        total = count_text(total)
     )
+    .to_string()
 }
 
 /// The progress line while a sync downloads logs, with the time left once it is a minute
 /// or more: "Downloading logs: 120 of 4,812, about 2 h 40 min left".
 pub fn progress_text(done: usize, total: usize, left: Duration) -> String {
-    let line = format!(
-        "Downloading logs: {} of {}",
-        count_text(done),
-        count_text(total)
-    );
+    let (done, total) = (count_text(done), count_text(total));
+    if left.as_secs() < 60 {
+        return tr!("logs_tf.progress.downloading", done = done, total = total).to_string();
+    }
     // Minutes round to the nearest, so 89 s reads "1 min" and 90 s "2 min".
     let minutes = (left.as_secs() + 30) / 60;
-    let estimate = match (left.as_secs() < 60, minutes / 60, minutes % 60) {
-        (true, ..) => return line,
-        (false, 0, m) => format!("{m} min"),
-        (false, h, 0) => format!("{h} h"),
-        (false, h, m) => format!("{h} h {m} min"),
-    };
-    format!("{line}, about {estimate} left")
+    tr!(
+        "logs_tf.progress.downloading_left",
+        done = done,
+        total = total,
+        time = format::time_left(minutes)
+    )
+    .to_string()
 }
 
 /// The header ring's tooltip, worded like the store rings: counts once logs download, and a
@@ -251,27 +251,31 @@ pub fn summary_text(range: LogsRange, logs: usize, newest: Option<i64>, now: i64
     const RECENT: i64 = 7 * 86_400;
     let count = count_text(logs);
     if range == LogsRange::All {
-        return format!("All logs, {count}");
+        return tr!("logs_tf.summary.all", count = count).to_string();
     }
-    let noun = if logs == 1 { "log" } else { "logs" };
-    match newest.filter(|&newest| now - newest > RECENT) {
-        Some(newest) => format!(
-            "{} up to {}, {count} {noun}",
-            range_label(range),
-            day_text(newest)
+    let n = u64::try_from(logs).unwrap_or(u64::MAX);
+    let text = match newest.filter(|&newest| now - newest > RECENT) {
+        Some(newest) => counted_plural(
+            "logs_tf.summary.up_to",
+            n,
+            &count,
+            &[("range", range_label(range)), ("date", &day_text(newest))],
         ),
-        None => {
-            // "Last month" and "Last year" drop the stop label's "1".
-            let span = match range {
-                LogsRange::Month1 => "month",
-                LogsRange::Year1 => "year",
-                other @ (LogsRange::Months3 | LogsRange::Months6 | LogsRange::Years2 | _) => {
-                    range_label(other)
-                }
-            };
-            format!("Last {span}, {count} {noun}")
-        }
-    }
+        // "Last month" and "Last year" drop the stop label's "1", so each has its own key.
+        None => match range {
+            LogsRange::Month1 => counted_plural("logs_tf.summary.last_month", n, &count, &[]),
+            LogsRange::Year1 => counted_plural("logs_tf.summary.last_year", n, &count, &[]),
+            other @ (LogsRange::Months3 | LogsRange::Months6 | LogsRange::Years2 | _) => {
+                counted_plural(
+                    "logs_tf.summary.last",
+                    n,
+                    &count,
+                    &[("span", range_label(other))],
+                )
+            }
+        },
+    };
+    text.to_string()
 }
 
 // A day on this computer's clock as a player writes it: "13 Dec 2022".
@@ -286,13 +290,13 @@ pub const NO_WEAPONS_TEXT: &str = "No weapon stats in these logs";
 
 /// The class weapons block's title: "Scout weapons · 3 months · 1 log", "All" for every log.
 pub fn weapons_title(class: TfClass, range: LogsRange, logs: u32) -> String {
-    let noun = if logs == 1 { "log" } else { "logs" };
-    let count = count_text(usize::try_from(logs).unwrap_or(usize::MAX));
-    format!(
-        "{} weapons · {} · {count} {noun}",
-        class.name(),
-        range_label(range)
+    counted_plural(
+        "logs_tf.weapons_title",
+        u64::from(logs),
+        &format::grouped(u64::from(logs)),
+        &[("class", class.name()), ("range", range_label(range))],
     )
+    .to_string()
 }
 
 /// The class weapons block's note while older logs still wait for their weapons counted.

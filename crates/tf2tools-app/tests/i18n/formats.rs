@@ -258,3 +258,66 @@ fn logs_tf_numbers_read_in_russian() {
     assert_eq!(seconds_text(58.9), "58\u{a0}с");
     assert_eq!(tenths_text(6.66), "6,7\u{a0}с");
 }
+
+#[test]
+fn logs_tf_sentences_read_in_russian() {
+    use std::time::Duration;
+    use tf2tools_app::pages::logs_tf::text::{
+        finding_text, progress_text, summary_text, weapons_title,
+    };
+    use tf2tools_core::{LogsRange, TfClass};
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(
+        finding_text(2_000, 4_812),
+        "Поиск логов: 2\u{a0}000 из 4\u{a0}812"
+    );
+    let at = |secs| progress_text(120, 4_812, Duration::from_secs(secs));
+    let line = "Загрузка логов: 120 из 4\u{a0}812";
+    assert_eq!(
+        at(9_600),
+        format!("{line}, осталось около 2\u{a0}ч 40\u{a0}мин")
+    );
+    assert_eq!(at(3_600), format!("{line}, осталось около 1\u{a0}ч"));
+    assert_eq!(at(720), format!("{line}, осталось около 12\u{a0}мин"));
+    assert_eq!(at(59), line);
+    let now = local_unix(2026, 11, 11, 12, 0, 0);
+    let recent = Some(now - 86_400);
+    let logs = [
+        (1, "1 лог"),
+        (2, "2 лога"),
+        (5, "5 логов"),
+        (11, "11 логов"),
+        (21, "21 лог"),
+        (22, "22 лога"),
+    ];
+    for (n, text) in logs {
+        assert_eq!(
+            summary_text(LogsRange::Month1, n, recent, now),
+            format!("За последний месяц: {text}")
+        );
+    }
+    assert_eq!(
+        summary_text(LogsRange::Year1, 1_400, recent, now),
+        "За последний год: 1\u{a0}400 логов"
+    );
+    assert_eq!(
+        summary_text(LogsRange::Months3, 87, recent, now),
+        "За последние 3 months: 87 логов"
+    );
+    assert_eq!(
+        summary_text(LogsRange::All, 4_812, recent, now),
+        "Все логи: 4\u{a0}812"
+    );
+    let old = Some(local_unix(2022, 12, 13, 12, 0, 0));
+    let up_to = summary_text(LogsRange::Year1, 274, old, now);
+    assert_eq!(up_to, "1 year до 13 дек. 2022\u{a0}г.: 274 лога");
+    assert_ru(&up_to);
+    assert_eq!(
+        weapons_title(TfClass::Scout, LogsRange::Months3, 1),
+        "Оружие: Scout · 3 months · 1 лог"
+    );
+    assert_eq!(
+        weapons_title(TfClass::Heavy, LogsRange::All, 1234),
+        "Оружие: Heavy · All · 1\u{a0}234 лога"
+    );
+}

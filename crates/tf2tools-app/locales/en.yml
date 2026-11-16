@@ -169,6 +169,19 @@ addon_store:
 hud_store:
   added: "Added %{date}"
 
+logs_tf:
+  progress:
+    finding: "Finding logs: %{listed} of %{total}"
+    downloading: "Downloading logs: %{done} of %{total}"
+    downloading_left: "Downloading logs: %{done} of %{total}, about %{time} left"
+  summary:
+    all: "All logs, %{count}"
+    last_month: { one: "Last month, %{count} log", other: "Last month, %{count} logs" }
+    last_year: { one: "Last year, %{count} log", other: "Last year, %{count} logs" }
+    last: { one: "Last %{span}, %{count} log", other: "Last %{span}, %{count} logs" }
+    up_to: { one: "%{range} up to %{date}, %{count} log", other: "%{range} up to %{date}, %{count} logs" }
+  weapons_title: { one: "%{class} weapons · %{range} · %{count} log", other: "%{class} weapons · %{range} · %{count} logs" }
+
 messages:
   shared:
     no_tf2_title: "TF2 not found"
