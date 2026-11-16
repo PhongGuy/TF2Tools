@@ -811,6 +811,8 @@ pub const SETTINGS_LOG_NICKNAMES: &str = "settings-log-nicknames";
 pub const SETTINGS_LOG_KEEP: &str = "settings-log-keep";
 /// The Settings line saying what the logs cache and its full logs take, labelled with its text.
 pub const SETTINGS_LOG_SPACE: &str = "settings-log-space";
+/// The Settings line saying what the library takes on disk and unpacked, labelled with its text.
+pub const SETTINGS_LIBRARY_SPACE: &str = "settings-library-space";
 /// Wraps the Activity Log's category select.
 pub const LOGS_CATEGORY: &str = "logs-category";
 /// Wraps the Activity Log's level select.

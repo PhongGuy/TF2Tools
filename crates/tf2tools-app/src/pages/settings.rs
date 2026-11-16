@@ -1,7 +1,7 @@
 //! v5's Settings page: the app version with update status and actions, the TF2 path with Browse and
-//! Auto-detect, the preview volume, the store cache duration, one sync card per store with Resync, and Save.
-//! Below them, a Licences card shows the third-party notices the app carries, and a Help and
-//! feedback card links to the help page and the place to report a problem.
+//! Auto-detect, the preview volume, the store cache duration, the library's size, one sync card per
+//! store with Resync, and Save. Below them, a Licences card shows the third-party notices the app
+//! carries, and a Help and feedback card links to the help page and the place to report a problem.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -32,6 +32,7 @@ use crate::activity;
 use crate::audio::volume::{bind_slider, shared_volume};
 use crate::i18n::{self, plural, tr};
 use crate::ids;
+use crate::library_pack::LibraryPack;
 use crate::links;
 use crate::local_messages::{
     describe_detect, describe_settings, describe_store_status, describe_tf2_folder,
@@ -150,13 +151,17 @@ fn keep_rows(space: Option<&LogsSpace>) -> Vec<KeepRow> {
         .collect()
 }
 
-/// A byte count in decimal units: whole KB under a megabyte, else MB to one decimal.
+/// A byte count in decimal units: whole KB under a megabyte, MB to one decimal, and GB to one
+/// decimal from the point MB would round to 1000.0.
 pub fn size_text(bytes: u64) -> SharedString {
     if bytes < 1_000_000 {
         tr!(
             "settings.logs_tf.size_kb",
             size = bytes.saturating_add(500) / 1000
         )
+    } else if bytes >= 999_950_000 {
+        let gb = format!("{:.1}", bytes as f64 / 1_000_000_000.);
+        tr!("settings.logs_tf.size_gb", size = gb)
     } else {
         let mb = format!("{:.1}", bytes as f64 / 1_000_000.);
         tr!("settings.logs_tf.size_mb", size = mb)
@@ -189,6 +194,15 @@ pub fn usage_text(cache_bytes: u64, full_logs: u64, full_bytes: u64) -> SharedSt
     )
 }
 
+/// The Library card's line: what the library takes on disk and unpacked.
+pub fn library_text(on_disk: u64, unpacked: u64) -> SharedString {
+    tr!(
+        "settings.library.usage",
+        disk = size_text(on_disk),
+        unpacked = size_text(unpacked)
+    )
+}
+
 /// The Settings form. The shell keeps it across visits, so unsaved edits stay until Save; it
 /// loads the saved settings on creation and rereads them each time it shows again.
 pub struct SettingsPage {
@@ -204,6 +218,8 @@ pub struct SettingsPage {
     language: Entity<SelectState<Vec<LanguageRow>>>,
     trim: Entity<LogsTrim>,
     keep: Entity<SelectState<Vec<KeepRow>>>,
+    /// The library job, whose figures the Library card draws.
+    pack: Entity<LibraryPack>,
     loaded: bool,
     busy: Option<Busy>,
     /// Each store's cached count and last sync, absent until the first read lands or if it failed.
@@ -376,6 +392,9 @@ impl SettingsPage {
             .unwrap_or_default();
         let language = Self::language_select(window, cx);
         let (trim, keep) = Self::keep_select(window, cx);
+        // Every landed pass may bring new library figures, so it redraws the Library card.
+        let pack = LibraryPack::global(cx);
+        cx.observe(&pack, |_, _, cx| cx.notify()).detach();
         // The App Updates card draws the updater's state, so every change redraws the page.
         let updates = updater(cx).map(|u| cx.observe(&u, |_, _, cx| cx.notify()));
         let mut page = Self {
@@ -389,6 +408,7 @@ impl SettingsPage {
             language,
             trim,
             keep,
+            pack,
             loaded: false,
             busy: None,
             sync_status: None,
@@ -409,6 +429,7 @@ impl SettingsPage {
         };
         page.load(true, cx);
         page.load_sync(window, cx);
+        page.pack.update(cx, |pack, cx| pack.measure(cx));
         page
     }
 
@@ -449,6 +470,7 @@ impl SettingsPage {
     pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
         if !hidden {
             self.load(false, cx);
+            self.pack.update(cx, |pack, cx| pack.measure(cx));
         }
     }
 
@@ -1132,6 +1154,12 @@ impl Render for SettingsPage {
             None if trim.failed() => tr!("settings.logs_tf.unmeasured"),
             None => tr!("settings.logs_tf.measuring"),
         };
+        let pack = self.pack.read(cx);
+        let library = match pack.space() {
+            Some(s) => library_text(s.on_disk(), s.unpacked()),
+            None if pack.failed() => tr!("settings.library.unmeasured"),
+            None => tr!("settings.logs_tf.measuring"),
+        };
         let logs_tf = v_flex()
             .gap_3()
             .child(nicknames_switch(cx))
@@ -1268,6 +1296,17 @@ impl Render for SettingsPage {
                         tr!("settings.cache.title"),
                         tr!("settings.cache.description"),
                         Some(cache.into_any_element()),
+                        cx,
+                    ))
+                    .child(card(
+                        tr!("settings.library.title"),
+                        tr!("settings.library.description"),
+                        Some(
+                            div()
+                                .text_sm()
+                                .child(labelled(ids::SETTINGS_LIBRARY_SPACE, library))
+                                .into_any_element(),
+                        ),
                         cx,
                     ))
                     .child(card(

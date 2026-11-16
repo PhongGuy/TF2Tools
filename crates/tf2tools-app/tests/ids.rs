@@ -802,3 +802,8 @@ fn log_keep_rows_are_keyed_by_choice() {
     assert_eq!(ids::SETTINGS_LOG_KEEP, "settings-log-keep");
     assert_eq!(ids::SETTINGS_LOG_SPACE, "settings-log-space");
 }
+
+#[test]
+fn the_library_space_line_has_a_stable_id() {
+    assert_eq!(ids::SETTINGS_LIBRARY_SPACE, "settings-library-space");
+}

@@ -176,3 +176,14 @@ fn the_logs_cache_lines_read_in_russian() {
         "Кэш логов занимает около 25.0 МБ; 3 полных лога занимают около 31 КБ."
     );
 }
+
+#[test]
+fn the_library_line_reads_in_russian() {
+    use tf2tools_app::pages::settings::{library_text, size_text};
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(size_text(2_100_000_000), "2.1 ГБ");
+    assert_eq!(
+        library_text(412_000_000, 2_100_000_000),
+        "Библиотека занимает 412.0 МБ на диске (2.1 ГБ без сжатия)."
+    );
+}

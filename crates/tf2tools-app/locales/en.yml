@@ -30,6 +30,11 @@ settings:
     title: "Add-ons"
     description: "GameBanana skins, effects, GUIs, textures and game files"
     mature: "Show mature add-ons"
+  library:
+    title: "Library"
+    description: "Where TF2Tools keeps your HUDs, sounds, crosshairs and add-ons"
+    usage: "Your library uses %{disk} on disk (%{unpacked} unpacked)."
+    unmeasured: "The library size could not be measured."
   logs_tf:
     title: "logs.tf"
     description: "How opened match logs name players, and how long full logs are kept"
@@ -44,6 +49,7 @@ settings:
     full_logs: { one: "%{count} full log uses", other: "%{count} full logs use" }
     measuring: "Measuring..."
     unmeasured: "The logs cache size could not be measured."
+    size_gb: "%{size} GB"
     size_mb: "%{size} MB"
     size_kb: "%{size} KB"
   sync:
