@@ -5,9 +5,12 @@ use std::path::{Path, PathBuf};
 
 use gpui_kit::{AppContext as _, Entity, SharedString, TestAppContext};
 use tf2tools_app::crosshair_sync::installed_text;
+use tf2tools_app::gb_addon_installs::GbAddonOffer;
 use tf2tools_app::i18n::names::addon_section_name;
 use tf2tools_app::i18n::{self, names};
 use tf2tools_app::ids;
+use tf2tools_app::mature::MatureAddons;
+use tf2tools_app::pages::addon_store::card::CardBadge;
 use tf2tools_app::pages::addons::AddonsPage;
 use tf2tools_app::pages::addons::model::{movement_off, movement_on_text};
 use tf2tools_app::pages::crosshairs::CrosshairsPage;
@@ -25,7 +28,7 @@ use tf2tools_app::widgets::class_icon::class_short_name;
 use tf2tools_app::widgets::profile_menu::added_title;
 use tf2tools_app::widgets::sync_banner::maps_banner_text;
 use tf2tools_core::{
-    AddonSection, ProfileDraft, Provenance, SoundKind, Tf2Install, TfClass, WeaponSlot,
+    AddonSection, GbId, ProfileDraft, Provenance, SoundKind, Tf2Install, TfClass, WeaponSlot,
 };
 
 use crate::LocaleGuard;
@@ -422,6 +425,53 @@ fn the_profiles_page_reads_in_russian(cx: &mut TestAppContext) {
     toast_is(cx, &s, "Профиль удалён");
 }
 
+// At the 800x600 minimum the editor's Crosshairs picker keeps every Russian bulk button inside
+// it, for the class with the longest Russian name too.
+#[gpui_kit::test]
+fn the_russian_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Competitive"))
+        .unwrap();
+    let page = open_profiles(cx, &s);
+    let id = comp.id().clone();
+    cx.update_window(s.win, |_, window, cx| {
+        page.update(cx, |p, cx| p.open_editor(id, window, cx))
+    })
+    .unwrap();
+    let editor = cx.update(|cx| page.read(cx).editor()).expect("an editor");
+    support::wait_real(cx, "the editor's queue", |cx| {
+        cx.update(|cx| editor.read(cx).is_idle())
+    });
+    support::click_id(cx, s.win, ids::profile_slot("crosshairs"));
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(800.), gpui_kit::px(600.)),
+    );
+    support::settle(cx, s.win);
+    for class in [TfClass::Scout, TfClass::Heavy] {
+        support::click_id(cx, s.win, ids::class_tab(&class.name().to_lowercase()));
+        support::settle(cx, s.win);
+        let picker = support::bounds_of(cx, s.win, ids::profile_picker("crosshairs")).unwrap();
+        for bulk in [
+            ids::CROSSHAIRS_BULK_ALL,
+            ids::CROSSHAIRS_BULK_PRIMARY,
+            ids::CROSSHAIRS_BULK_SECONDARY,
+            ids::CROSSHAIRS_BULK_MELEE,
+        ] {
+            let b = support::bounds_of(cx, s.win, bulk).unwrap();
+            assert!(
+                b.left() >= picker.left() && b.right() <= picker.right(),
+                "{class:?}: {bulk} {b:?} runs past the picker {picker:?}"
+            );
+        }
+    }
+}
+
 #[test]
 fn profile_texts_read_in_russian() {
     let _guard = LocaleGuard::switch("ru");
@@ -575,6 +625,49 @@ fn the_maps_page_reads_in_russian(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::STORE_EMPTY_HINT).as_deref(),
         Some("Карты появятся здесь после синхронизации с GameBanana.")
     );
+}
+
+// A GameBanana map card's outdated badge and the Addon Store's install badges read in Russian.
+#[gpui_kit::test]
+fn the_card_badges_read_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = support::maps::maps_shell_found(cx, &env, &server);
+    support::maps::seed_maps(&env);
+    support::sql(&env)
+        .execute_batch(
+            "UPDATE store_gb_maps SET obsolete = 1 WHERE gb_id = 10;
+             UPDATE store_gb_maps SET mature = 1 WHERE gb_id = 11;",
+        )
+        .unwrap();
+    cx.update(|cx| {
+        let m = MatureAddons::global(cx);
+        m.update(cx, |m, cx| m.set(true, cx))
+    });
+    let page = support::maps::open_maps(cx, &s);
+    let _tab = support::maps::open_gamebanana(cx, &s, &page);
+    assert_eq!(
+        support::label_of(
+            cx,
+            s.win,
+            ids::addon_gb_card_outdated("maps", GbId::new(10))
+        )
+        .as_deref(),
+        Some("Устарело")
+    );
+    // The cover carries no accessible label; the scan of card.rs keeps its text keyed.
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::addon_gb_card_reveal("maps", GbId::new(11))
+    ));
+    let badge = |offer| CardBadge::of_offer(offer).map(|b| b.text.to_string());
+    assert_eq!(badge(GbAddonOffer::Update).as_deref(), Some("Обновление"));
+    assert_eq!(
+        badge(GbAddonOffer::Installed).as_deref(),
+        Some("Установлено")
+    );
+    assert_eq!(badge(GbAddonOffer::Install), None);
 }
 
 #[test]

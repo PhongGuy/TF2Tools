@@ -754,6 +754,7 @@ mod tests {
         "pages/maps/gb_tab.rs",
         "widgets/sync_banner.rs",
         "widgets/store_error.rs",
+        "pages/addon_store/card.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).

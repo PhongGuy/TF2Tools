@@ -634,7 +634,6 @@ pub(crate) fn preview_image(preview: Preview, size: Pixels) -> Option<impl IntoE
     }
 }
 
-// A group header row, labelled with its text and count.
 // The built-in group's heading and chip, with its count.
 fn builtin_label(count: usize) -> String {
     tr!("widgets.crosshair_picker.builtin", count = count).to_string()
@@ -645,6 +644,7 @@ fn library_label(count: usize) -> String {
     tr!("widgets.crosshair_picker.library", count = count).to_string()
 }
 
+// A group header row, labelled with its text and count.
 fn header(id: &'static str, text: String, cx: &App) -> AnyElement {
     labelled(
         div()

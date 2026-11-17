@@ -19,7 +19,7 @@ use gpui_kit::{
 
 use tf2tools_core::{CrosshairRef, TfClass, Weapon, WeaponSlot, weapons};
 
-use crate::i18n::names::{class_compact_name, class_name, slot_name};
+use crate::i18n::names::{class_compact_name, class_name, slot_name, slot_short_name};
 use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::ORANGE_500;
@@ -270,12 +270,12 @@ impl WeaponAssigner {
             (
                 ids::CROSSHAIRS_BULK_SECONDARY,
                 Some(WeaponSlot::Secondary),
-                slot_name(WeaponSlot::Secondary),
+                slot_short_name(WeaponSlot::Secondary),
             ),
             (
                 ids::CROSSHAIRS_BULK_MELEE,
                 Some(WeaponSlot::Melee),
-                slot_name(WeaponSlot::Melee),
+                slot_short_name(WeaponSlot::Melee),
             ),
         ]
         .into_iter()

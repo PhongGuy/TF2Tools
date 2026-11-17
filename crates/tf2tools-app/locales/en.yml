@@ -228,6 +228,12 @@ common:
 
 addon_store:
   downloads: { one: "%{count} download", other: "%{count} downloads" }
+  card:
+    mature: "Mature"
+    outdated: "Outdated"
+  badge:
+    update: "Update"
+    installed: "Installed"
 
 hud_store:
   added: "Added %{date}"

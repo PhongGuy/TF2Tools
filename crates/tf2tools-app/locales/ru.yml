@@ -226,6 +226,12 @@ common:
 
 addon_store:
   downloads: { one: "%{count} загрузка", few: "%{count} загрузки", many: "%{count} загрузок" }
+  card:
+    mature: "Для взрослых"
+    outdated: "Устарело"
+  badge:
+    update: "Обновление"
+    installed: "Установлено"
 
 hud_store:
   added: "Добавлено %{date}"
@@ -267,7 +273,7 @@ maps:
   badge:
     downloaded: "Скачана"
     in_game: "В игре"
-    gone: "Больше нет на GameBanana"
+    gone: "Нет на GameBanana"
     not_installed: "Не установлена"
     update: "Обновление"
     installed: "Установлена"
@@ -294,7 +300,7 @@ maps:
       newest: "Новые"
     show:
       all: "Все карты"
-      installed: "Установленные"
+      installed: "Установлены"
     hint:
       search: "Попробуйте другой запрос."
       gamemode: "Попробуйте другой режим."
@@ -329,7 +335,7 @@ profiles:
     edit: "Изменить профиль"
     delete: "Удалить профиль"
     new: "Новый профиль"
-    start_empty: "Пустой профиль"
+    start_empty: "Создать пустой"
     more_ways: "Другие способы создать профиль"
   card:
     empty: "Пустой профиль"
@@ -370,14 +376,14 @@ profiles:
       no_match: "Ничего не найдено"
   toast:
     created_from_setup: "Профиль создан из текущей сборки"
-    created_empty: "Пустой профиль создан"
+    created_empty: "Создан пустой профиль"
     deleted: "Профиль удалён"
     activated: "Профиль «%{name}» включён"
     applied: "Профиль «%{name}» применён"
     cleared: "Все HUD, звуки и прицелы убраны"
     installed: "Установлено: %{list}"
     nothing_new: "Ничего нового не установлено"
-    kept: "%{lead}. Оставлено прежнее для: %{list} (нет в вашей библиотеке)"
+    kept: "%{lead}. Без изменений: %{list} (нет в библиотеке)"
     failed_steps: "Не удалось установить: %{steps}. Убедитесь, что TF2 закрыт и TF2Tools может записывать в папку TF2, затем попробуйте снова."
     activate_failed: "Не удалось включить профиль"
     missing: "Некоторые элементы отсутствуют"
@@ -435,7 +441,7 @@ crosshairs_page:
     hint: "Выберите прицел в галерее, чтобы увидеть его в игровом размере"
   preview:
     none: "Нет прицела"
-    on: "%{name} на фоне %{background}"
+    on: "%{name}, фон: %{background}"
   background:
     dark: "Тёмный"
   board:
@@ -648,8 +654,8 @@ sounds:
   conflict:
     title: "Обнаружены конфликты"
     aria: "Обнаружены конфликты. %{lines}"
-    hitsound: "В «%{folder}» найден хитсаунд — он может заменить ваш"
-    killsound: "В «%{folder}» найден килсаунд — он может заменить ваш"
+    hitsound: "В «%{folder}» найден хитсаунд — может перекрыть ваш хитсаунд"
+    killsound: "В «%{folder}» найден килсаунд — может перекрыть ваш килсаунд"
   empty:
     title: "В библиотеке пока нет звуков"
     hint: "Нажмите «Добавить звук», чтобы импортировать файл WAV или VPK"
@@ -698,7 +704,7 @@ addons:
     browse: "В магазин дополнений"
     update: "Обновить"
     install: "Установить"
-    install_again: "Переустановить"
+    install_again: "Заново"
     uninstall: "Убрать"
     delete: "Удалить из библиотеки"
     remove: "Удалить"
@@ -706,14 +712,14 @@ addons:
     installing: "Установка..."
     removing: "Удаление..."
   badge:
-    gone: "Больше нет на GameBanana"
+    gone: "Нет на GameBanana"
     update_available: "Доступно обновление"
     not_installed: "Не установлено"
   card:
     by: "автор: %{author}"
   toast:
     installed_title: "Дополнение установлено"
-    installed: "%{name} теперь активно"
+    installed: "%{name} включено"
     uninstalled_title: "Дополнение убрано"
     uninstalled: "%{name} убрано из TF2"
     removed_title: "Дополнение удалено"

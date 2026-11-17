@@ -14,6 +14,7 @@ use tf2tools_core::AddonCard;
 
 use crate::counts::count_stat;
 use crate::gb_addon_installs::GbAddonOffer;
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::{badge_of, card_frame};
 use crate::remote_images::RemoteImage;
@@ -39,10 +40,16 @@ pub struct CardBadge {
 }
 
 impl CardBadge {
-    /// The offer's badge as `GbAddonOffer::badge` words it: "Update" in the accent, or "Installed".
+    /// The offer's badge in the current language, for the offers `GbAddonOffer::badge` names:
+    /// "Update" in the accent, or "Installed".
     pub fn of_offer(offer: GbAddonOffer) -> Option<Self> {
-        offer.badge().map(|text| CardBadge {
-            text: text.into(),
+        let text = match offer {
+            GbAddonOffer::Update => tr!("addon_store.badge.update"),
+            GbAddonOffer::Installed => tr!("addon_store.badge.installed"),
+            GbAddonOffer::Install | GbAddonOffer::InstallAgain => return None,
+        };
+        Some(CardBadge {
+            text,
             accent: offer == GbAddonOffer::Update,
         })
     }
@@ -105,7 +112,7 @@ pub fn gb_addon_card(
                 reveal(window, cx);
             })
             .child(Icon::new(IconName::EyeOff))
-            .child("Mature")
+            .child(tr!("addon_store.card.mature"))
     });
     let shot = shot.children(cover);
     // One status badge at most, so the name keeps its room on a narrow card; the install
@@ -115,7 +122,7 @@ pub fn gb_addon_card(
             ids::addon_gb_card_outdated(section, card.id),
             Tag::secondary(),
             transparent_black(),
-            "Outdated",
+            tr!("addon_store.card.outdated"),
         ))
     });
     // An update waiting is the one state worth the accent colour; installed stays quiet.
