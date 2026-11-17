@@ -263,6 +263,7 @@ mod tests {
             "hud_store",
             "addon_store",
             "store_grid",
+            "store_download",
             "confirm",
             "font_check",
         ]
@@ -758,6 +759,12 @@ mod tests {
         "store_grid/mod.rs",
         "store_grid/feed.rs",
         "pages/crosshair_store.rs",
+        "pages/hud_store/bodies.rs",
+        "pages/hud_store/curated.rs",
+        "pages/hud_store/curated_tab.rs",
+        "pages/hud_store/gamebanana_tab.rs",
+        "pages/hud_store/mod.rs",
+        "gb_card.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -797,9 +804,23 @@ mod tests {
             "GameBanana",
             "a proper noun, the source button",
         ),
+        ("pages/hud_store/curated.rs", "Windows", OS_NAME),
+        ("pages/hud_store/curated.rs", "Mac", OS_NAME),
+        ("pages/hud_store/curated.rs", "Linux", OS_NAME),
+        (
+            "pages/hud_store/mod.rs",
+            "GameBanana",
+            "a proper noun, the source tab",
+        ),
+        (
+            "pages/hud_store/bodies.rs",
+            "GameBanana",
+            "a proper noun, the link button",
+        ),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
+    const OS_NAME: &str = "a proper noun, the OS filter's label";
 
     #[test]
     fn library_pages_show_no_english_literal() {

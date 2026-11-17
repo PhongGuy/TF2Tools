@@ -238,6 +238,36 @@ addon_store:
 
 hud_store:
   added: "Added %{date}"
+  tab:
+    curated: "Curated"
+  curated:
+    source: "Curated HUDs from hud-db."
+    unloaded: "Could not load store"
+  filter:
+    os: "OS:"
+    os_tooltip: "HUDs that work on %{os}"
+    hide_prereleases: "Hide prereleases"
+    clear: "Clear filters"
+    more: "More filters"
+    less: "Less filters"
+    features: "Features"
+    tags: "Tags"
+    gamemode: "Gamemode"
+    resolution: "Resolution"
+  card:
+    visit: "Visit the HUD's page"
+  detail:
+    released: "Released %{date}"
+    os: "OS"
+    gamemodes: "Gamemodes"
+    resolutions: "Resolutions"
+    repository: "Repository"
+
+store_download:
+  button:
+    download: "Download"
+    in_library: "In Library"
+    redownload: "Re-download"
 
 logs_tf:
   progress:

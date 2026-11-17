@@ -14,6 +14,7 @@ use gpui_kit::{
 use tf2tools_core::{StoreCard, StoreKind};
 
 use crate::counts::count_stat;
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::{badge_rows, card_frame, tag_badge};
 use crate::remote_images::RemoteImage;
@@ -41,7 +42,7 @@ pub type OpenCard = Rc<dyn Fn(&mut Window, &mut App)>;
 
 /// A GameBanana store card as v5's HUD and crosshair stores draw it: the 16:9 thumbnail (else a
 /// muted area with `placeholder`), the name with a check when `in_library`, "by {author}", up to
-/// three tags, likes and views, and `download_button(kind, id, "In Library" | "Download", ..)`.
+/// three tags, likes and views, and `download_button` reading In Library or Download.
 /// The button and a click on the card call `open`.
 pub fn gamebanana_card(
     kind: StoreKind,
@@ -75,13 +76,17 @@ pub fn gamebanana_card(
                 .text_color(theme.muted_foreground),
         ),
     };
-    let label = if in_library { "In Library" } else { "Download" };
+    let label = if in_library {
+        tr!("store_download.button.in_library")
+    } else {
+        tr!("store_download.button.download")
+    };
     let button = {
         let open = Rc::clone(&open);
         download_button(
             kind,
             &card.id,
-            label.into(),
+            label,
             in_library,
             false,
             move |window, cx| {
@@ -141,7 +146,7 @@ pub fn gamebanana_card(
                                 .text_sm()
                                 .line_height(px(20.))
                                 .text_color(theme.muted_foreground)
-                                .child(format!("by {}", card.author)),
+                                .child(tr!("addon_store.card.by", author = card.author)),
                         ),
                 )
                 // v5's CardContent: the wrapped tags (left out when there are none), then mt-2

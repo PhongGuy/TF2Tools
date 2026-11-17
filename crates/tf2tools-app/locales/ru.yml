@@ -236,6 +236,36 @@ addon_store:
 
 hud_store:
   added: "Добавлено %{date}"
+  tab:
+    curated: "Подборка"
+  curated:
+    source: "Подборка HUD из hud-db."
+    unloaded: "Не удалось загрузить магазин"
+  filter:
+    os: "ОС:"
+    os_tooltip: "HUD для %{os}"
+    hide_prereleases: "Без пререлизов"
+    clear: "Сбросить"
+    more: "Ещё фильтры"
+    less: "Скрыть фильтры"
+    features: "Функции"
+    tags: "Теги"
+    gamemode: "Режим"
+    resolution: "Разрешение"
+  card:
+    visit: "Открыть страницу HUD"
+  detail:
+    released: "Выпущен %{date}"
+    os: "ОС"
+    gamemodes: "Режимы"
+    resolutions: "Разрешения"
+    repository: "Репозиторий"
+
+store_download:
+  button:
+    download: "Скачать"
+    in_library: "В библиотеке"
+    redownload: "Скачать снова"
 
 logs_tf:
   progress:
@@ -341,10 +371,10 @@ store_grid:
       crosshairs: "Нет прицелов по этому запросу"
       items: "Ничего не найдено по этому запросу"
     filters:
-      huds: "Нет HUD под эти фильтры"
-      sounds: "Нет звуков под эти фильтры"
-      crosshairs: "Нет прицелов под эти фильтры"
-      items: "Ничего не найдено под эти фильтры"
+      huds: "Нет HUD по этим фильтрам"
+      sounds: "Нет звуков по этим фильтрам"
+      crosshairs: "Нет прицелов по этим фильтрам"
+      items: "Ничего не найдено по этим фильтрам"
   hint:
     offline: "Проверьте подключение к интернету и попробуйте снова."
     search: "Попробуйте изменить запрос."
