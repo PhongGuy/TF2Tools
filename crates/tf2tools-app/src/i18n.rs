@@ -634,4 +634,35 @@ mod tests {
             "log labels that may be translated: {found:?}"
         );
     }
+
+    #[test]
+    fn russian_says_each_idea_one_way() {
+        let ru = messages("ru");
+        let banned = [
+            "попробуйте ещё раз",
+            "попробуйте еще раз",
+            "попробуйте сохранить ещё раз",
+            "предпрослуш",
+            "никнейм",
+        ];
+        let found: Vec<String> = ru
+            .iter()
+            .filter(|(_, v)| {
+                let v = v.to_lowercase();
+                banned.iter().any(|b| v.contains(b))
+            })
+            .map(|(k, v)| format!("{k}: {v}"))
+            .collect();
+        assert!(found.is_empty(), "a second wording for one idea: {found:?}");
+        let damaged = [
+            "updater.failure.damaged",
+            "messages.store.download.damaged",
+            "messages.store.gb_fetch.damaged",
+        ]
+        .map(|k| ru.get(k).map(String::as_str));
+        assert_eq!(
+            damaged,
+            [Some("Скачанный файл повреждён. Попробуйте снова."); 3]
+        );
+    }
 }
