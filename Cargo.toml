@@ -100,7 +100,8 @@ lto = "thin"
 codegen-units = 1
 strip = true
 
-# One-line fixes, see the README in each vendor/ directory.
+# Small fixes, see the README in each vendor/ directory.
 [patch.crates-io]
 gpui-pre-linux = { path = "vendor/gpui-pre-linux" }
 gpui-pre-scheduler = { path = "vendor/gpui-pre-scheduler" }
+vpk = { path = "vendor/vpk" }

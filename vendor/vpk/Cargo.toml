@@ -1,0 +1,18 @@
+[package]
+edition = "2018"
+rust-version = "1.66"
+name = "vpk"
+version = "0.3.0"
+authors = [
+    "Roman Shishkin <spark@uwtech.org>",
+    "Robin Appelman <robin@icewind.nl>",
+]
+description = "Valve Pak format parser for Rust"
+license = "MIT"
+repository = "https://github.com/roman901/vpk-rs"
+
+[dependencies.ahash]
+version = "0.8.11"
+
+[dependencies.thiserror]
+version = "2.0.12"
