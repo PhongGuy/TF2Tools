@@ -73,7 +73,9 @@ const SORTS: [(&str, AddonSort); 2] = [
 fn sort_label(sort: AddonSort) -> SharedString {
     match sort {
         AddonSort::MostDownloaded => tr!("addon_store.sort.most_downloaded"),
-        AddonSort::Newest | _ => tr!("addon_store.sort.newest"),
+        AddonSort::Newest => tr!("addon_store.sort.newest"),
+        // AddonSort is non_exhaustive; a sort added later reads as Newest until it gets a key.
+        _ => tr!("addon_store.sort.newest"),
     }
 }
 

@@ -325,7 +325,7 @@ store_detail:
 
 addon_detail:
   mature: "Для взрослых: %{reasons}"
-  credits: "Авторы"
+  credits: "Участники"
   files: "Файлы"
   maps: "Установленные карты"
   map_unlisted: "%{name} (нет в списке «Создать сервер»; введите map %{name} в консоли)"

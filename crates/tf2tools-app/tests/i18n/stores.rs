@@ -506,6 +506,65 @@ fn the_addon_tab_follows_a_language_switch(cx: &mut TestAppContext) {
     );
 }
 
+// Retitling the "All" rows rebuilds both Selects, so the chosen class and weapon and the
+// served rows must survive the switch, not reset to an empty list.
+#[gpui_kit::test]
+fn the_addon_tab_keeps_its_class_and_weapon_across_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_categories(7951, &[(7962, "The Scout"), (27900, "Packs")]);
+    server.mount_gb_categories(7962, &[(7972, "Scattergun")]);
+    for (category, id) in [(7951, 1), (7962, 2), (7972, 3)] {
+        let listing = support::gb_listing(vec![support::gb_addon(id, 7951, None)], true);
+        server.mount_gb_index(category, MD, 1, listing);
+    }
+    let w = addon_store(cx, &env, &server);
+    let tab = open_addon_tab(cx, &w, "skins");
+    support::wait_real(cx, "the classes", |cx| {
+        cx.update(|cx| tab.read(cx).categories().len() == 2)
+    });
+    support::click_id(cx, w.win, ids::ADDON_CATEGORY);
+    support::click_id(cx, w.win, ids::select_option(ids::ADDON_CATEGORY, "7962"));
+    support::wait_real(cx, "the weapon list", |cx| {
+        cx.update(|cx| tab.read(cx).weapons().len() == 1)
+            && support::present(cx, w.win, ids::ADDON_WEAPON)
+    });
+    support::click_id(cx, w.win, ids::ADDON_WEAPON);
+    support::click_id(cx, w.win, ids::select_option(ids::ADDON_WEAPON, "7972"));
+    support::wait_real(cx, "the scattergun step", |cx| {
+        cx.update(|cx| tab.read(cx).cards().first().map(|c| c.id.get()) == Some(3))
+    });
+    tf2tools_app::i18n::apply("ru");
+    cx.update(|cx| cx.refresh_windows());
+    let chosen = |cx: &mut TestAppContext| {
+        [ids::ADDON_CATEGORY, ids::ADDON_WEAPON].map(|id| shown_text(cx, w.win, id))
+    };
+    let some = |t: [&str; 2]| t.map(|t| Some(t.to_owned()));
+    assert_eq!(chosen(cx), some(["The Scout", "Scattergun"]));
+    cx.update(|cx| {
+        assert_eq!(tab.read(cx).category(), Some(7962));
+        assert_eq!(tab.read(cx).weapon(), Some(7972));
+    });
+    // Each Select still lists its served rows under a Russian "All" row.
+    let rows = [
+        (ids::ADDON_CATEGORY, ["7962", "27900"].as_slice(), "Все"),
+        (ids::ADDON_WEAPON, ["7972"].as_slice(), "Всё оружие"),
+    ];
+    for (select, served, all) in rows {
+        support::click_id(cx, w.win, select);
+        let all_row = support::label_of(cx, w.win, ids::select_option(select, "all"));
+        assert_eq!(all_row.as_deref(), Some(all), "{select}");
+        for value in served {
+            let row = ids::select_option(select, value);
+            assert!(
+                support::present(cx, w.win, row),
+                "{select} lost row {value}"
+            );
+        }
+        support::click_id(cx, w.win, select);
+    }
+}
+
 #[gpui_kit::test]
 fn the_details_window_reads_in_russian(cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch("ru");
