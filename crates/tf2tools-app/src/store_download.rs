@@ -89,25 +89,29 @@ pub fn progress_percent(p: Option<Progress>) -> f32 {
     }
 }
 
-/// The lowercase noun for a store's items, as toasts use it mid-sentence.
-pub fn kind_noun(kind: StoreKind) -> &'static str {
+/// The success toast's title for a download from `kind`'s store.
+pub fn downloaded_title(kind: StoreKind) -> SharedString {
     match kind {
-        StoreKind::CuratedHuds | StoreKind::GameBananaHuds => "HUD",
-        StoreKind::Sounds => "sound",
-        StoreKind::Crosshairs => "crosshair",
-        StoreKind::Addons => "addon",
-        _ => "item",
+        StoreKind::CuratedHuds | StoreKind::GameBananaHuds => {
+            tr!("store_download.toast.downloaded.huds")
+        }
+        StoreKind::Sounds => tr!("store_download.toast.downloaded.sounds"),
+        StoreKind::Crosshairs => tr!("store_download.toast.downloaded.crosshairs"),
+        StoreKind::Addons => tr!("store_download.toast.downloaded.addons"),
+        _ => tr!("store_download.toast.downloaded.items"),
     }
 }
 
-/// The capitalized noun for a store's items, as toast titles use it.
-pub fn kind_title(kind: StoreKind) -> &'static str {
+/// The failure toast's title for a download from `kind`'s store.
+pub fn download_failed_title(kind: StoreKind) -> SharedString {
     match kind {
-        StoreKind::CuratedHuds | StoreKind::GameBananaHuds => "HUD",
-        StoreKind::Sounds => "Sound",
-        StoreKind::Crosshairs => "Crosshair",
-        StoreKind::Addons => "Addon",
-        _ => "Item",
+        StoreKind::CuratedHuds | StoreKind::GameBananaHuds => {
+            tr!("store_download.toast.failed.huds")
+        }
+        StoreKind::Sounds => tr!("store_download.toast.failed.sounds"),
+        StoreKind::Crosshairs => tr!("store_download.toast.failed.crosshairs"),
+        StoreKind::Addons => tr!("store_download.toast.failed.addons"),
+        _ => tr!("store_download.toast.failed.items"),
     }
 }
 
@@ -116,7 +120,9 @@ pub fn stayed_description(message: &str, stayed: &[String]) -> String {
     if stayed.is_empty() {
         message.to_string()
     } else {
-        format!("{message} Still in your library: {}.", stayed.join(", "))
+        // The plain separator, not `i18n::list`, so the names read "a, b" in every language.
+        let items = stayed.join(&*tr!("common.list.separator"));
+        tr!("store_download.stayed", message = message, items = items).to_string()
     }
 }
 
@@ -357,12 +363,14 @@ impl StoreDownloads {
         let (kind, title, description) = match &failure {
             None => (
                 ToastKind::Success,
-                format!("{} downloaded", kind_title(target.kind)),
-                added.unwrap_or_else(|| format!("{} added to your library", target.name)),
+                downloaded_title(target.kind),
+                added.unwrap_or_else(|| {
+                    tr!("store_download.toast.added", name = target.name).to_string()
+                }),
             ),
             Some(message) => (
                 ToastKind::Error,
-                format!("Failed to download {}", kind_noun(target.kind)),
+                download_failed_title(target.kind),
                 message.clone(),
             ),
         };
@@ -414,7 +422,7 @@ fn entry_name(entry: &LibraryEntry) -> String {
         LibraryEntry::Sound(e) => e.name().to_string(),
         LibraryEntry::Crosshair(e) => e.name().to_string(),
         LibraryEntry::Addon(e) => e.name().as_str().to_string(),
-        _ => "an item".to_string(),
+        _ => tr!("store_download.unknown_item").to_string(),
     }
 }
 

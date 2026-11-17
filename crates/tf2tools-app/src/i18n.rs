@@ -265,6 +265,7 @@ mod tests {
             "store_grid",
             "store_download",
             "sound_store",
+            "store_detail",
             "confirm",
             "font_check",
         ]
@@ -775,6 +776,10 @@ mod tests {
         "pages/addon_store/model.rs",
         "pages/addon_store/gamebanana_tab.rs",
         "gb_addon_installs.rs",
+        "./store_detail.rs",
+        "./store_download.rs",
+        "store_messages.rs",
+        "widgets/detail_header.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -841,6 +846,31 @@ mod tests {
             "pages/hud_store/bodies.rs",
             "GameBanana",
             "a proper noun, the link button",
+        ),
+        (
+            "./store_detail.rs",
+            "the file listing task stopped unexpectedly",
+            "developer detail of a stopped listing",
+        ),
+        (
+            "./store_download.rs",
+            "the download task stopped unexpectedly",
+            "developer detail of a stopped download",
+        ),
+        (
+            "./store_download.rs",
+            "dropping the subscriptions stops the grid redraws and the In Library flip",
+            "developer detail: a must_use note for the compiler",
+        ),
+        (
+            "store_messages.rs",
+            "sound {} is no longer in the store",
+            "developer detail of a missing preview",
+        ),
+        (
+            "store_messages.rs",
+            "the release has no file",
+            "developer detail of an empty release",
         ),
     ];
 

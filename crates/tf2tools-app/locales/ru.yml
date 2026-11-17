@@ -297,6 +297,31 @@ store_download:
     download: "Скачать"
     in_library: "В библиотеке"
     redownload: "Скачать снова"
+  toast:
+    downloaded:
+      huds: "HUD скачан"
+      sounds: "Звук скачан"
+      crosshairs: "Прицел скачан"
+      addons: "Дополнение скачано"
+      items: "Элемент скачан"
+    failed:
+      huds: "Не удалось скачать HUD"
+      sounds: "Не удалось скачать звук"
+      crosshairs: "Не удалось скачать прицел"
+      addons: "Не удалось скачать дополнение"
+      items: "Не удалось скачать элемент"
+    added: "%{name}: добавлено в библиотеку"
+  stayed: "%{message} Всё ещё в библиотеке: %{items}."
+  unknown_item: "элемент"
+
+store_detail:
+  button:
+    update_with: "Обновить этим файлом"
+  files:
+    loading: "Загрузка файлов..."
+    none: "Нет файлов для скачивания"
+  badge:
+    downloaded: "Скачано"
 
 sound_store:
   source: "Хитсаунды и килсаунды с GameBanana."

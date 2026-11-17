@@ -299,6 +299,31 @@ store_download:
     download: "Download"
     in_library: "In Library"
     redownload: "Re-download"
+  toast:
+    downloaded:
+      huds: "HUD downloaded"
+      sounds: "Sound downloaded"
+      crosshairs: "Crosshair downloaded"
+      addons: "Addon downloaded"
+      items: "Item downloaded"
+    failed:
+      huds: "Failed to download HUD"
+      sounds: "Failed to download sound"
+      crosshairs: "Failed to download crosshair"
+      addons: "Failed to download addon"
+      items: "Failed to download item"
+    added: "%{name} added to your library"
+  stayed: "%{message} Still in your library: %{items}."
+  unknown_item: "an item"
+
+store_detail:
+  button:
+    update_with: "Update with this file"
+  files:
+    loading: "Loading files..."
+    none: "No files to download"
+  badge:
+    downloaded: "Downloaded"
 
 sound_store:
   source: "Hitsounds and killsounds from GameBanana."

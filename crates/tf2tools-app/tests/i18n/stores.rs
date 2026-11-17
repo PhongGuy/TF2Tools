@@ -1,5 +1,9 @@
 //! The stores, their details windows, the download toasts and the update banner, in Russian.
 
+use std::time::Duration;
+
+// `update_window` is a trait method on the test context.
+use gpui_kit::AppContext as _;
 use gpui_kit::TestAppContext;
 use tf2tools_app::gb_addon_installs::GbAddonOffer;
 use tf2tools_app::ids;
@@ -7,9 +11,12 @@ use tf2tools_app::pages::addon_store::gamebanana_tab::{AddonTab, search_placehol
 use tf2tools_app::pages::addon_store::model::AddonState;
 use tf2tools_app::pages::addon_store::{InfoLink, info_text};
 use tf2tools_app::pages::hud_store::HudStorePage;
+use tf2tools_app::pages::hud_store::bodies::{curated_body, gamebanana_body};
 use tf2tools_app::pages::sound_store::model::{Category, category_label};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
+use tf2tools_app::store_detail::{DetailItem, open_detail};
+use tf2tools_app::store_download::{download_failed_title, downloaded_title, stayed_description};
 use tf2tools_app::store_grid::{SEARCH_DEBOUNCE, StoreGridConfig, sort_label};
 use tf2tools_core::{AddonSection, GbId, StoreItemId, StoreKind, StoreSort, Tf2Install};
 
@@ -494,5 +501,129 @@ fn the_addon_tab_follows_a_language_switch(cx: &mut TestAppContext) {
     assert_eq!(
         cx.update(|cx| tab.read(cx).sort()),
         tf2tools_core::AddonSort::Newest
+    );
+}
+
+#[gpui_kit::test]
+fn the_details_window_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_files(
+        7,
+        &[("flawhud.zip", support::hud_zip_bytes("flawhud"))],
+        Duration::ZERO,
+    );
+    let (win, _) = support::store_window(
+        cx,
+        &env,
+        &server,
+        |env| {
+            support::seed_gb_huds(env, &[(7, "FlawHUD")]);
+            // The GameBanana header button shows only for a row that has a profile page.
+            rusqlite::Connection::open(env.data.db_path())
+                .unwrap()
+                .execute(
+                    "UPDATE store_huds_gb SET profile_url = 'https://gamebanana.com/mods/7' WHERE gb_id = 7",
+                    (),
+                )
+                .unwrap();
+        },
+        |_, _| support::Blank,
+    );
+    let item = DetailItem {
+        kind: StoreKind::GameBananaHuds,
+        id: gb(7),
+        name: "FlawHUD".into(),
+        in_library: false,
+    };
+    cx.update_window(win, |_, window, cx| {
+        open_detail(item, gamebanana_body(), window, cx)
+    })
+    .unwrap();
+    support::wait_real(cx, "the files and the link", |cx| {
+        support::present(cx, win, ids::store_file(0))
+            && support::present(cx, win, ids::store_detail_link("gamebanana"))
+    });
+    assert_eq!(
+        support::label_of(cx, win, ids::store_file(0)).as_deref(),
+        Some("Скачать")
+    );
+    assert_eq!(
+        support::label_of(cx, win, ids::store_detail_link("gamebanana")).as_deref(),
+        Some("GameBanana")
+    );
+}
+
+#[gpui_kit::test]
+fn a_curated_detail_in_the_library_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let repo = server.mount_curated("rayshud", support::hud_zip_bytes("rayshud"), Duration::ZERO);
+    let json = r#"{"flags":["minmode"],"traits":{"os":["linux"]},"resources":["banner"]}"#;
+    let (win, _) = support::store_window(
+        cx,
+        &env,
+        &server,
+        move |env| support::seed_curated(env, "rayshud", "rayshud", "raysfire", Some(&repo), json),
+        |_, _| support::Blank,
+    );
+    let item = DetailItem {
+        kind: StoreKind::CuratedHuds,
+        id: StoreItemId::Curated("rayshud".into()),
+        name: "rayshud".into(),
+        in_library: true,
+    };
+    cx.update_window(win, |_, window, cx| {
+        open_detail(item, curated_body(), window, cx)
+    })
+    .unwrap();
+    support::wait_real(cx, "the archive and the link", |cx| {
+        support::present(cx, win, ids::store_file(0))
+            && support::present(cx, win, ids::store_detail_link("repo"))
+    });
+    assert_eq!(
+        support::label_of(cx, win, ids::STORE_DETAIL_BADGE).as_deref(),
+        Some("Скачано")
+    );
+    assert_eq!(
+        support::label_of(cx, win, ids::store_file(0)).as_deref(),
+        Some("Скачать снова")
+    );
+    assert_eq!(
+        support::label_of(cx, win, ids::store_detail_link("repo")).as_deref(),
+        Some("Репозиторий")
+    );
+}
+
+#[test]
+fn download_toasts_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let kinds = [
+        StoreKind::GameBananaHuds,
+        StoreKind::Sounds,
+        StoreKind::Crosshairs,
+        StoreKind::Addons,
+    ];
+    assert_eq!(
+        kinds.map(|k| downloaded_title(k).to_string()),
+        [
+            "HUD скачан",
+            "Звук скачан",
+            "Прицел скачан",
+            "Дополнение скачано"
+        ]
+    );
+    assert_eq!(
+        kinds.map(|k| download_failed_title(k).to_string()),
+        [
+            "Не удалось скачать HUD",
+            "Не удалось скачать звук",
+            "Не удалось скачать прицел",
+            "Не удалось скачать дополнение"
+        ]
+    );
+    assert_eq!(
+        stayed_description("Попробуйте снова.", &["a".into(), "b".into()]),
+        "Попробуйте снова. Всё ещё в библиотеке: a, b."
     );
 }
