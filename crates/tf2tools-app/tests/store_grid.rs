@@ -19,12 +19,7 @@ fn open(
     env: &support::Env,
     seed: impl FnOnce(&support::Env),
 ) -> (AnyWindowHandle, Entity<StoreGrid>) {
-    support::store_grid_window(
-        cx,
-        env,
-        StoreGridConfig::new(StoreKind::Crosshairs, "crosshairs"),
-        seed,
-    )
+    support::store_grid_window(cx, env, StoreGridConfig::new(StoreKind::Crosshairs), seed)
 }
 
 fn card_id(id: u64) -> gpui_kit::ElementId {
@@ -193,7 +188,7 @@ fn gated_images(cx: &mut TestAppContext) -> (Arc<Mutex<Vec<String>>>, Arc<tokio:
 }
 
 fn image_grid() -> StoreGridConfig {
-    StoreGridConfig::new(StoreKind::Crosshairs, "crosshairs").image_card(gpui_kit::px(40.))
+    StoreGridConfig::new(StoreKind::Crosshairs).image_card(gpui_kit::px(40.))
 }
 
 fn wait_asked(
@@ -345,22 +340,17 @@ fn retry_after_a_failed_page_alone_asks_only_for_the_page(cx: &mut TestAppContex
 }
 
 fn sound_grid(cx: &mut TestAppContext, env: &support::Env) -> (AnyWindowHandle, Entity<StoreGrid>) {
-    support::store_grid_window(
-        cx,
-        env,
-        StoreGridConfig::new(StoreKind::Sounds, "sounds"),
-        |env| {
-            support::seed_sounds(
-                env,
-                &[
-                    (1, "Ding", "hitsound", None),
-                    (2, "Boom", "killsound", None),
-                    (3, "Blip", "hitsound", None),
-                    (4, "Hum", "sound", None),
-                ],
-            )
-        },
-    )
+    support::store_grid_window(cx, env, StoreGridConfig::new(StoreKind::Sounds), |env| {
+        support::seed_sounds(
+            env,
+            &[
+                (1, "Ding", "hitsound", None),
+                (2, "Boom", "killsound", None),
+                (3, "Blip", "hitsound", None),
+                (4, "Hum", "sound", None),
+            ],
+        )
+    })
 }
 
 fn ids_of(cx: &mut TestAppContext, grid: &Entity<StoreGrid>) -> Vec<u64> {
@@ -520,7 +510,7 @@ fn an_external_toolbar_grid_draws_no_toolbar(cx: &mut TestAppContext) {
     let (win, grid) = support::store_grid_window(
         cx,
         &env,
-        StoreGridConfig::new(StoreKind::Crosshairs, "crosshairs").external_toolbar(),
+        StoreGridConfig::new(StoreKind::Crosshairs).external_toolbar(),
         |env| support::seed_crosshairs(env, 1..=3, 0, false),
     );
     loaded(cx, win, &grid);

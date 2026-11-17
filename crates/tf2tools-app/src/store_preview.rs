@@ -60,7 +60,7 @@ pub fn play_preview(player: &Entity<Player>, id: GbId, name: &str, author: &str,
     let now = NowPlaying {
         key: preview_key(id),
         name: name.to_owned().into(),
-        subtitle: format!("by {author}").into(),
+        subtitle: tr!("addon_store.card.by", author = author),
     };
     player.update(cx, |player, cx| {
         player

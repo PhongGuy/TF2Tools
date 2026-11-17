@@ -17,12 +17,14 @@ use gpui_kit::component::{
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, EventEmitter, FontWeight, HighlightStyle,
     InteractiveElement as _, InteractiveText, IntoElement, ParentElement as _, Pixels, Render,
-    ScrollHandle, StatefulInteractiveElement as _, Styled as _, StyledText, Subscription, Task,
-    TestSupportExt as _, UnderlineStyle, WeakEntity, Window, div, px, transparent_black,
+    ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _, StyledText,
+    Subscription, Task, TestSupportExt as _, UnderlineStyle, WeakEntity, Window, div, px,
+    transparent_black,
 };
 use tf2tools_core::{AddonEntry, AddonName, AddonSection, StoreItem, StoreItemId, StoreKind};
 
 use crate::addon_updates::{AddonEvent, AddonUpdates};
+use crate::i18n::names::addon_section_name;
 use crate::i18n::tr;
 use crate::ids;
 use crate::local_messages::{describe_library, describe_store_status};
@@ -46,9 +48,10 @@ const KIND: StoreKind = StoreKind::Addons;
 /// v5's placeholder cards while the store loads or a sync fills it.
 const SKELETON_CARDS: usize = 6;
 
-/// The info box's sentence and its two underlined link words, in order.
-const INFO_TEXT: &str = "These addons work best with a mastercomfig preset installed. Download \
-                         addons to your library, then install them from the Addons page.";
+/// The info box's sentence, in the player's language; it holds both underlined link words.
+pub fn info_text() -> SharedString {
+    tr!("addon_store.info")
+}
 
 /// An underlined word in the Addon Store's info box.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,11 +71,12 @@ impl InfoLink {
         }
     }
 
-    // The word the link underlines in `INFO_TEXT`.
-    fn word(self) -> &'static str {
+    /// The word the link underlines in `info_text`: the Addons page is named as the sidebar
+    /// names it.
+    pub fn word(self) -> SharedString {
         match self {
-            Self::Mastercomfig => "mastercomfig",
-            Self::Addons => "Addons",
+            Self::Mastercomfig => "mastercomfig".into(),
+            Self::Addons => tr!("nav.addons"),
         }
     }
 }
@@ -93,10 +97,11 @@ impl AddonStoreTab {
         }
     }
 
-    fn title(self) -> &'static str {
+    /// The tab's label: "mastercomfig", else the section's name in the player's language.
+    pub fn title(self) -> SharedString {
         match self {
-            Self::Mastercomfig => "mastercomfig",
-            Self::GameBanana(section) => section.title(),
+            Self::Mastercomfig => "mastercomfig".into(),
+            Self::GameBanana(section) => addon_section_name(section),
         }
     }
 }
@@ -348,13 +353,7 @@ impl AddonStorePage {
     // v5's warning while TF2 is not found; a detection still in flight shows nothing yet.
     fn no_tf2(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let missing = matches!(tf2_state(cx).read(cx), Tf2State::Missing { .. });
-        missing.then(|| {
-            no_tf2_warning(
-                ids::ADDON_STORE_NO_TF2,
-                "Set the TF2 folder in Settings to install addons.",
-                cx,
-            )
-        })
+        missing.then(|| no_tf2_warning(ids::ADDON_STORE_NO_TF2, tr!("addon_store.no_tf2"), cx))
     }
 
     // Release badge and subtitle on the left, Refresh on the right; the top bar names the page.
@@ -382,14 +381,18 @@ impl AddonStorePage {
                         div()
                             .text_sm()
                             .text_color(theme.muted_foreground)
-                            .child("Mastercomfig performance and quality-of-life addons"),
+                            .child(tr!("addon_store.heading")),
                     ),
             )
             .child(
                 Button::new(ids::STORE_REFRESH)
                     .outline()
                     .icon(IconName::RefreshCw)
-                    .label(if syncing { "Syncing..." } else { "Refresh" })
+                    .label(if syncing {
+                        tr!("addon_store.button.syncing")
+                    } else {
+                        tr!("addon_store.button.refresh")
+                    })
                     .loading(syncing)
                     .loading_icon(IconName::RefreshCw)
                     .disabled(syncing)
@@ -401,11 +404,13 @@ impl AddonStorePage {
         let theme = cx.theme();
         // The link words are underlined ranges of one wrapping text; a click on either follows it.
         // A word missing from the text just goes without its link.
+        let info = info_text();
         let (links, ranges): (Vec<_>, Vec<_>) = [InfoLink::Mastercomfig, InfoLink::Addons]
             .into_iter()
             .filter_map(|link| {
-                let start = INFO_TEXT.find(link.word())?;
-                Some((link, start..start + link.word().len()))
+                let word = link.word();
+                let start = info.find(&*word)?;
+                Some((link, start..start + word.len()))
             })
             .unzip();
         let underline = HighlightStyle {
@@ -415,7 +420,7 @@ impl AddonStorePage {
             }),
             ..HighlightStyle::default()
         };
-        let text = StyledText::new(INFO_TEXT)
+        let text = StyledText::new(info)
             .with_highlights(ranges.iter().map(|range| (range.clone(), underline)));
         let page = cx.entity().downgrade();
         let text = InteractiveText::new(ids::ADDON_STORE_INFO_TEXT, text).on_click(
@@ -466,11 +471,11 @@ impl AddonStorePage {
         let skeletons =
             |id, label| skeleton_cards(id, label, SKELETON_CARDS, columns, SkeletonTop::None, cx);
         if !self.loaded {
-            return Some(skeletons(ids::STORE_LOADING, "Loading..."));
+            return Some(skeletons(ids::STORE_LOADING, tr!("store_grid.loading")));
         }
         if self.items.is_empty() {
             if self.is_syncing() {
-                return Some(skeletons(ids::STORE_SYNCING, "Syncing addons..."));
+                return Some(skeletons(ids::STORE_SYNCING, tr!("addon_store.syncing")));
             }
             if self.error.is_some() {
                 return None;
@@ -478,9 +483,9 @@ impl AddonStorePage {
             return Some(empty_state_card(
                 ids::STORE_EMPTY,
                 IconName::WifiOff,
-                "Could not load addons",
+                tr!("addon_store.unloaded"),
                 None,
-                "Check your internet connection and try again.",
+                tr!("store_grid.hint.offline"),
                 cx,
             ));
         }
@@ -570,7 +575,7 @@ fn addon_card(
     let footer = if installing {
         Button::new(ids::store_download(KIND, &id))
             .primary()
-            .label("Installing...")
+            .label(tr!("addon_store.button.installing"))
             .loading(true)
             .disabled(true)
             .into_any_element()
@@ -579,7 +584,7 @@ fn addon_card(
         let click = move |window: &mut Window, cx: &mut App| {
             let _ = page.update(cx, |page, cx| page.download(&name, window, cx));
         };
-        download_button(KIND, &id, state.label().into(), false, blocked, click, cx)
+        download_button(KIND, &id, state.label(), false, blocked, click, cx)
     } else {
         let icon = match state {
             AddonState::Installed => IconName::CircleCheck,

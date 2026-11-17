@@ -235,9 +235,124 @@ addon_store:
   badge:
     update: "Update"
     installed: "Installed"
+  info: "These addons work best with a mastercomfig preset installed. Download addons to your library, then install them from the Addons page."
+  heading: "Mastercomfig performance and quality-of-life addons"
+  no_tf2: "Set the TF2 folder in Settings to install addons."
+  syncing: "Syncing addons..."
+  unloaded: "Could not load addons"
+  empty: "No add-ons found"
+  button:
+    refresh: "Refresh"
+    syncing: "Syncing..."
+    installing: "Installing..."
+    update: "Update"
+    load_more: "Load more"
+  offer:
+    install: "Install"
+    install_again: "Install again"
+  sort:
+    most_downloaded: "Most downloaded"
+    newest: "Newest"
+  category:
+    all: "All"
+    all_weapons: "All weapons"
+  hint:
+    category: "Try another category."
+    search: "Try another search."
+  search:
+    skins: "Search Skins..."
+    effects: "Search Effects..."
+    guis: "Search GUIs..."
+    textures: "Search Textures..."
+    gamefiles: "Search Game files..."
+    items: "Search add-ons..."
 
 hud_store:
   added: "Added %{date}"
+  tab:
+    curated: "Curated"
+  curated:
+    source: "Curated HUDs from hud-db."
+    unloaded: "Could not load store"
+  filter:
+    os: "OS:"
+    os_tooltip: "HUDs that work on %{os}"
+    hide_prereleases: "Hide prereleases"
+    clear: "Clear filters"
+    more: "More filters"
+    less: "Less filters"
+    features: "Features"
+    tags: "Tags"
+    gamemode: "Gamemode"
+    resolution: "Resolution"
+  card:
+    visit: "Visit the HUD's page"
+  detail:
+    released: "Released %{date}"
+    os: "OS"
+    gamemodes: "Gamemodes"
+    resolutions: "Resolutions"
+    repository: "Repository"
+
+store_download:
+  button:
+    download: "Download"
+    in_library: "In Library"
+    redownload: "Re-download"
+  toast:
+    downloaded:
+      huds: "HUD downloaded"
+      sounds: "Sound downloaded"
+      crosshairs: "Crosshair downloaded"
+      addons: "Addon downloaded"
+      items: "Item downloaded"
+    failed:
+      huds: "Failed to download HUD"
+      sounds: "Failed to download sound"
+      crosshairs: "Failed to download crosshair"
+      addons: "Failed to download addon"
+      items: "Failed to download item"
+    added: "%{name} added to your library"
+  stayed: "%{message} Still in your library: %{items}."
+  unknown_item: "an item"
+
+store_detail:
+  button:
+    update_with: "Update with this file"
+  files:
+    loading: "Loading files..."
+    none: "No files to download"
+  badge:
+    downloaded: "Downloaded"
+
+addon_detail:
+  mature: "Mature content: %{reasons}"
+  credits: "Credits"
+  files: "Files"
+  maps: "Installed maps"
+  map_unlisted: "%{name} (not listed in Create Server; type map %{name} in the console)"
+  loading: "Loading details..."
+  waiting: "Waiting for GameBanana..."
+  open: "Open on GameBanana"
+  button:
+    remove: "Remove"
+    removing: "Removing..."
+  activity:
+    installed: "Installed addon: %{name}"
+  toast:
+    installed: "Addon installed"
+
+sound_store:
+  source: "Hitsounds and killsounds from GameBanana."
+  category:
+    title: "Category:"
+    all: "All"
+    hitsounds: "Hitsounds"
+    killsounds: "Killsounds"
+    sound: "Sound"
+  preview:
+    play: "Play Preview"
+    stop: "Stop Preview"
 
 logs_tf:
   progress:
@@ -316,6 +431,41 @@ store_grid:
     huds: { one: "%{shown} of %{count} HUD", other: "%{shown} of %{count} HUDs" }
     sounds: { one: "%{shown} of %{count} sound", other: "%{shown} of %{count} sounds" }
     crosshairs: { one: "%{shown} of %{count} crosshair", other: "%{shown} of %{count} crosshairs" }
+  loading: "Loading..."
+  sort:
+    most_liked: "Most Liked"
+    most_viewed: "Most Viewed"
+    newest: "Newest"
+  search:
+    huds: "Search HUDs..."
+    sounds: "Search sounds..."
+    crosshairs: "Search crosshairs..."
+    items: "Search items..."
+  syncing:
+    huds: "Syncing HUDs..."
+    sounds: "Syncing sounds..."
+    crosshairs: "Syncing crosshairs..."
+    items: "Syncing items..."
+  unloaded:
+    huds: "Could not load HUDs"
+    sounds: "Could not load sounds"
+    crosshairs: "Could not load crosshairs"
+    items: "Could not load items"
+  no_match:
+    search:
+      huds: "No HUDs match your search"
+      sounds: "No sounds match your search"
+      crosshairs: "No crosshairs match your search"
+      items: "No items match your search"
+    filters:
+      huds: "No HUDs match your filters"
+      sounds: "No sounds match your filters"
+      crosshairs: "No crosshairs match your filters"
+      items: "No items match your filters"
+  hint:
+    offline: "Check your internet connection and try again."
+    search: "Try adjusting your search criteria."
+    filters: "Try adjusting your search or filter criteria."
 
 profiles:
   crosshairs: { one: "%{count} crosshair", other: "%{count} crosshairs" }

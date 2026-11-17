@@ -18,6 +18,7 @@ use tf2tools_core::{AddonCard, AddonFile, AddonProfile, AddonSection, BrowseErro
 use crate::gb_addon_installs::{
     GbAddonInstalls, GbAddonOffer as Offer, GbAddonStage, install_blocker, map_install_blocker,
 };
+use crate::i18n::tr;
 use crate::ids;
 use crate::links::gamebanana_page;
 use crate::pages::addon_store::model::downloads_label;
@@ -191,8 +192,8 @@ impl AddonDetail {
             return (None, Some(line.into_any_element()));
         }
         let label = match stage {
-            Some(GbAddonStage::Removing) => "Removing...",
-            Some(_) => "Installing...",
+            Some(GbAddonStage::Removing) => tr!("addon_detail.button.removing"),
+            Some(_) => tr!("addon_store.button.installing"),
             None => offer.label(),
         };
         let button = Button::new(ids::ADDON_DETAIL_INSTALL)
@@ -220,7 +221,7 @@ impl AddonDetail {
         let button = Button::new(ids::ADDON_DETAIL_REMOVE)
             .outline()
             .icon(IconName::Trash)
-            .label("Remove")
+            .label(tr!("addon_detail.button.remove"))
             .disabled(installs.is_busy())
             .on_click(cx.listener(|this, _, window, cx| this.remove(window, cx)));
         let has_tf2 = tf2_state(cx).read(cx).install().is_some();
@@ -265,7 +266,7 @@ impl AddonDetail {
                 .child(labelled(
                     div().text_sm().font_weight(FontWeight::SEMIBOLD),
                     ids::ADDON_DETAIL_MAPS,
-                    "Installed maps",
+                    tr!("addon_detail.maps"),
                 ))
                 .children(rows)
                 .into_any_element(),
@@ -287,7 +288,7 @@ impl AddonDetail {
         // Until the first byte the download may still be queued behind other GameBanana
         // requests, so a byte count of 0 would read as a stalled download.
         let label = if downloaded == 0 {
-            SharedString::from("Waiting for GameBanana...")
+            tr!("addon_detail.waiting")
         } else {
             SharedString::from(progress_label(progress))
         };
@@ -319,7 +320,7 @@ impl AddonDetail {
     // The ratings, images, downloads, description, credits and files, in that order.
     fn ready_body(&self, profile: &AddonProfile, cx: &App) -> Vec<AnyElement> {
         let muted = cx.theme().muted_foreground;
-        let heading = |text: &'static str| {
+        let heading = |text: SharedString| {
             div()
                 .text_sm()
                 .font_weight(FontWeight::SEMIBOLD)
@@ -328,7 +329,10 @@ impl AddonDetail {
         };
         let mut body = Vec::new();
         if !profile.ratings().is_empty() {
-            let text = format!("Mature content: {}", profile.ratings().join(", "));
+            let text = tr!(
+                "addon_detail.mature",
+                reasons = profile.ratings().join(", ")
+            );
             body.push(
                 labelled(
                     div().text_sm().text_color(cx.theme().warning),
@@ -366,7 +370,7 @@ impl AddonDetail {
             );
         }
         if !profile.credits().is_empty() {
-            let mut credits = v_flex().gap_2().child(heading("Credits"));
+            let mut credits = v_flex().gap_2().child(heading(tr!("addon_detail.credits")));
             for (g, group) in profile.credits().iter().enumerate() {
                 let rows = group.credits().iter().enumerate().map(|(i, credit)| {
                     let text = if credit.role().is_empty() {
@@ -396,7 +400,7 @@ impl AddonDetail {
             body.push(
                 v_flex()
                     .gap_1()
-                    .child(heading("Files"))
+                    .child(heading(tr!("addon_detail.files")))
                     .children(rows)
                     .into_any_element(),
             );
@@ -423,7 +427,7 @@ fn file_line(name: &str, size: Option<u64>, date_added: i64) -> String {
 // An installed map's row; TF2's Create Server leaves out a map whose name has a dot.
 fn map_line(name: &str) -> String {
     if name.contains('.') {
-        format!("{name} (not listed in Create Server; type map {name} in the console)")
+        tr!("addon_detail.map_unlisted", name = name).to_string()
     } else {
         name.to_owned()
     }
@@ -434,7 +438,7 @@ fn file_text(file: &AddonFile) -> String {
 }
 
 // v5's header link: an outline button with the ExternalLink icon, opening `url` in the browser.
-fn link_button(key: &str, label: &'static str, url: String) -> Button {
+fn link_button(key: &str, label: impl Into<SharedString>, url: String) -> Button {
     Button::new(ids::store_detail_link(key))
         .outline()
         .icon(IconName::ExternalLink)
@@ -457,7 +461,7 @@ impl Render for AddonDetail {
                 ids::ADDON_DETAIL_OUTDATED,
                 Tag::secondary(),
                 transparent_black(),
-                "Outdated",
+                tr!("addon_store.card.outdated"),
             )
         });
         let body: Vec<AnyElement> = match &self.profile {
@@ -465,7 +469,7 @@ impl Render for AddonDetail {
                 div()
                     .text_sm()
                     .text_color(muted)
-                    .child("Loading details...")
+                    .child(tr!("addon_detail.loading"))
                     .into_any_element(),
             ],
             ProfileState::Failed(message) => vec![
@@ -505,7 +509,7 @@ impl Render for AddonDetail {
             .children(body);
         let link = link_button(
             "gamebanana",
-            "Open on GameBanana",
+            tr!("addon_detail.open"),
             gamebanana_page(&self.card.profile_url, self.card.id),
         );
         let actions = control
@@ -516,7 +520,7 @@ impl Render for AddonDetail {
         let author = div()
             .text_sm()
             .text_color(muted)
-            .child(format!("by {author}"))
+            .child(tr!("addon_store.card.by", author = author))
             .into_any_element();
         v_flex()
             .id(ids::ADDON_DETAIL)

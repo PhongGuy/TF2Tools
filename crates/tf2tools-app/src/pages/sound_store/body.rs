@@ -10,6 +10,7 @@ use tf2tools_core::{StoreItem, StoreItemId};
 use super::model::category_label;
 use crate::audio::player::Player;
 use crate::counts::count_stat;
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::badge_of;
 use crate::store_detail::DetailBody;
@@ -89,9 +90,9 @@ fn preview_button(player: &WeakEntity<Player>, item: &StoreItem, cx: &App) -> Op
             IconName::Play
         })
         .label(if playing {
-            "Stop Preview"
+            tr!("sound_store.preview.stop")
         } else {
-            "Play Preview"
+            tr!("sound_store.preview.play")
         })
         .on_click(move |_, _, cx| {
             if let Some(player) = player.upgrade() {

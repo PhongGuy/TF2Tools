@@ -21,7 +21,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{StoreCard, StoreKind, StoreQuery, StoreSort};
 
-use crate::i18n::{counted_plural, tr};
+use crate::i18n::{self, counted_plural, tr};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::describe_store_status;
@@ -71,11 +71,10 @@ pub fn count_text(kind: StoreKind, shown: usize, total: usize) -> SharedString {
     }
 }
 
-/// What a store grid shows: which store, its noun for search and empty text, and its card shape.
+/// What a store grid shows: which store, which names its search and empty texts, and its card shape.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StoreGridConfig {
     pub kind: StoreKind,
-    pub noun: &'static str,
     pub max_columns: usize,
     pub card: CardSize,
     pub search: bool,
@@ -86,10 +85,9 @@ pub struct StoreGridConfig {
 
 impl StoreGridConfig {
     /// Up to 4 columns of 120 px cards.
-    pub fn new(kind: StoreKind, noun: &'static str) -> Self {
+    pub fn new(kind: StoreKind) -> Self {
         Self {
             kind,
-            noun,
             max_columns: 4,
             card: CardSize::Fixed(px(120.)),
             search: true,
@@ -144,11 +142,73 @@ const SKELETON_CARDS: usize = 8;
 /// How long typing must pause before the search runs.
 pub const SEARCH_DEBOUNCE: Duration = Duration::from_millis(400);
 
+/// The sort Select's values, in menu order; `sort_label` names each.
 const SORTS: [(&str, StoreSort); 3] = [
     ("Most Liked", StoreSort::MostLiked),
     ("Most Viewed", StoreSort::MostViewed),
     ("Newest", StoreSort::Newest),
 ];
+
+/// The sort row's label for `sort`, in the player's language.
+pub fn sort_label(sort: StoreSort) -> SharedString {
+    match sort {
+        StoreSort::MostLiked => tr!("store_grid.sort.most_liked"),
+        StoreSort::MostViewed => tr!("store_grid.sort.most_viewed"),
+        StoreSort::Newest | _ => tr!("store_grid.sort.newest"),
+    }
+}
+
+// The sort Select's rows, titled in the current language; each keeps its value as its id.
+fn sort_rows() -> Vec<LabelOption> {
+    LabelOption::keyed(ids::STORE_SORT, SORTS.map(|(v, s)| (v, sort_label(s))))
+}
+
+// Each store's texts are whole sentences per kind, so a language can inflect the noun; the
+// Addon Store and any later kind read the generic "items" wording.
+fn search_placeholder(kind: StoreKind) -> SharedString {
+    match kind {
+        StoreKind::CuratedHuds | StoreKind::GameBananaHuds => tr!("store_grid.search.huds"),
+        StoreKind::Sounds => tr!("store_grid.search.sounds"),
+        StoreKind::Crosshairs => tr!("store_grid.search.crosshairs"),
+        StoreKind::Addons | _ => tr!("store_grid.search.items"),
+    }
+}
+
+fn syncing_text(kind: StoreKind) -> SharedString {
+    match kind {
+        StoreKind::CuratedHuds | StoreKind::GameBananaHuds => tr!("store_grid.syncing.huds"),
+        StoreKind::Sounds => tr!("store_grid.syncing.sounds"),
+        StoreKind::Crosshairs => tr!("store_grid.syncing.crosshairs"),
+        StoreKind::Addons | _ => tr!("store_grid.syncing.items"),
+    }
+}
+
+fn unloaded_text(kind: StoreKind) -> SharedString {
+    match kind {
+        StoreKind::CuratedHuds | StoreKind::GameBananaHuds => tr!("store_grid.unloaded.huds"),
+        StoreKind::Sounds => tr!("store_grid.unloaded.sounds"),
+        StoreKind::Crosshairs => tr!("store_grid.unloaded.crosshairs"),
+        StoreKind::Addons | _ => tr!("store_grid.unloaded.items"),
+    }
+}
+
+// v5's wording: a store with filters speaks of them, a search-only store of the search.
+fn no_match_text(kind: StoreKind, filters: bool) -> SharedString {
+    match (kind, filters) {
+        (StoreKind::CuratedHuds | StoreKind::GameBananaHuds, false) => {
+            tr!("store_grid.no_match.search.huds")
+        }
+        (StoreKind::CuratedHuds | StoreKind::GameBananaHuds, true) => {
+            tr!("store_grid.no_match.filters.huds")
+        }
+        (StoreKind::Sounds, false) => tr!("store_grid.no_match.search.sounds"),
+        (StoreKind::Sounds, true) => tr!("store_grid.no_match.filters.sounds"),
+        (StoreKind::Crosshairs, false) => tr!("store_grid.no_match.search.crosshairs"),
+        (StoreKind::Crosshairs, true) => tr!("store_grid.no_match.filters.crosshairs"),
+        (_, false) => tr!("store_grid.no_match.search.items"),
+        (_, true) => tr!("store_grid.no_match.filters.items"),
+    }
+}
 
 /// One store's searchable, sortable card grid. Every query change starts a new `Feed`
 /// generation, so pages and counts of an older query that land late are dropped.
@@ -159,6 +219,8 @@ pub struct StoreGrid {
     grid: CardGrid,
     search_input: Entity<InputState>,
     sort_select: Entity<SelectState<Vec<LabelOption>>>,
+    /// The language the search box and the sort rows were titled in.
+    language: &'static str,
     search: String,
     sort: StoreSort,
     category: Option<String>,
@@ -203,11 +265,10 @@ impl StoreGrid {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let placeholder = format!("Search {}...", config.noun);
+        let placeholder = search_placeholder(config.kind);
         let search_input = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder));
-        let labels = LabelOption::all(ids::STORE_SORT, SORTS.iter().map(|(label, _)| *label));
         let sort_select =
-            cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
+            cx.new(|cx| SelectState::new(sort_rows(), Some(IndexPath::default()), window, cx));
         let mut subscriptions = vec![
             cx.subscribe(&search_input, |grid, input, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -218,10 +279,10 @@ impl StoreGrid {
             cx.subscribe(
                 &sort_select,
                 |grid, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
-                    let SelectEvent::Confirm(Some(label)) = event else {
+                    let SelectEvent::Confirm(Some(value)) = event else {
                         return;
                     };
-                    if let Some((_, sort)) = SORTS.iter().find(|(l, _)| l == label) {
+                    if let Some((_, sort)) = SORTS.iter().find(|(v, _)| v == value) {
                         grid.set_sort(*sort, cx);
                     }
                 },
@@ -272,6 +333,7 @@ impl StoreGrid {
             grid,
             search_input,
             sort_select,
+            language: i18n::current(),
             search: String::new(),
             sort: StoreSort::MostLiked,
             category: None,
@@ -779,7 +841,7 @@ impl StoreGrid {
                     .font_weight(FontWeight::MEDIUM)
                     .text_color(cx.theme().muted_foreground),
                 ids::STORE_SORT_LABEL,
-                "Sort:",
+                tr!("maps.sort.title"),
             ))
             .child(
                 div()
@@ -812,6 +874,21 @@ impl StoreGrid {
             .gap_4()
             .child(left)
             .child(right)
+    }
+
+    /// Retitles the search placeholder and the sort rows when the language changed since they
+    /// were titled; the chosen sort stays, as the Select keeps its value across new rows.
+    pub fn follow_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.language == i18n::current() {
+            return;
+        }
+        self.language = i18n::current();
+        let placeholder = search_placeholder(self.config.kind);
+        self.search_input.update(cx, |input, cx| {
+            input.set_placeholder(placeholder, window, cx)
+        });
+        self.sort_select
+            .update(cx, |select, cx| select.set_items(sort_rows(), window, cx));
     }
 
     fn error_line(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
@@ -851,19 +928,18 @@ impl StoreGrid {
             CardSize::Image { .. } => SkeletonTop::Image,
             CardSize::Fixed(_) => SkeletonTop::Icon,
         };
-        let noun = self.config.noun;
+        let kind = self.config.kind;
         let skeletons =
             |id, label: SharedString| skeleton_cards(id, label, SKELETON_CARDS, columns, top, cx);
         if !self.loaded || self.total.is_none() {
-            return skeletons(ids::STORE_LOADING, "Loading...".into());
+            return skeletons(ids::STORE_LOADING, tr!("store_grid.loading"));
         }
         if self.syncing || self.is_loading() || self.feed.is_reloading() {
-            return skeletons(ids::STORE_SYNCING, format!("Syncing {noun}...").into());
+            return skeletons(ids::STORE_SYNCING, syncing_text(kind));
         }
-        let kind = self.config.kind;
         let retry = Button::new(ids::STORE_UNLOADED_RETRY)
             .outline()
-            .label("Retry")
+            .label(tr!("widgets.store_error.retry"))
             .on_click(move |_, _, cx| {
                 if let Some(hub) = sync_hub(cx) {
                     hub.update(cx, |hub, cx| hub.start(kind, false, cx));
@@ -872,25 +948,24 @@ impl StoreGrid {
         empty_state_with_action(
             ids::STORE_UNLOADED,
             IconName::WifiOff,
-            format!("Could not load {noun}"),
+            unloaded_text(kind),
             None,
-            "Check your internet connection and try again.",
+            tr!("store_grid.hint.offline"),
             Some(retry.into_any_element()),
             cx,
         )
     }
 
-    // v5's wording: a store with filters speaks of them, a search-only store of the search.
     fn no_match_card(&self, cx: &App) -> AnyElement {
-        let (subject, hint) = if self.config.filters {
-            ("filters", "Try adjusting your search or filter criteria.")
+        let hint = if self.config.filters {
+            tr!("store_grid.hint.filters")
         } else {
-            ("search", "Try adjusting your search criteria.")
+            tr!("store_grid.hint.search")
         };
         empty_state_card(
             ids::STORE_EMPTY,
             IconName::Store,
-            format!("No {} match your {subject}", self.config.noun),
+            no_match_text(self.config.kind, self.config.filters),
             Some(ids::STORE_EMPTY_HINT),
             hint,
             cx,
@@ -951,6 +1026,7 @@ fn query_for(sort: StoreSort, search: &str, category: Option<&str>, limit: u32) 
 
 impl Render for StoreGrid {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.follow_language(window, cx);
         // v5's `flex flex-col gap-6`: the first card row sits 24 px under the toolbar.
         v_flex()
             .size_full()

@@ -263,6 +263,10 @@ mod tests {
             "hud_store",
             "addon_store",
             "store_grid",
+            "store_download",
+            "sound_store",
+            "store_detail",
+            "addon_detail",
             "confirm",
             "font_check",
         ]
@@ -755,6 +759,34 @@ mod tests {
         "widgets/sync_banner.rs",
         "widgets/store_error.rs",
         "pages/addon_store/card.rs",
+        "store_grid/mod.rs",
+        "store_grid/feed.rs",
+        "pages/crosshair_store.rs",
+        "pages/hud_store/bodies.rs",
+        "pages/hud_store/curated.rs",
+        "pages/hud_store/curated_tab.rs",
+        "pages/hud_store/gamebanana_tab.rs",
+        "pages/hud_store/mod.rs",
+        "gb_card.rs",
+        "pages/sound_store/body.rs",
+        "pages/sound_store/card.rs",
+        "pages/sound_store/model.rs",
+        "pages/sound_store/mod.rs",
+        "store_preview.rs",
+        "pages/addon_store/mod.rs",
+        "pages/addon_store/model.rs",
+        "pages/addon_store/gamebanana_tab.rs",
+        "gb_addon_installs.rs",
+        "./store_detail.rs",
+        "./store_download.rs",
+        "store_messages.rs",
+        "widgets/detail_header.rs",
+        "./addon_detail.rs",
+        "addon_updates.rs",
+        "updater/mod.rs",
+        "updater/view.rs",
+        "updater/backend.rs",
+        "updater/keys.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -786,14 +818,90 @@ mod tests {
         ("pages/maps/gb_tab.rs", "Newest", SELECT_VALUE),
         ("pages/maps/gb_tab.rs", "All maps", SELECT_VALUE),
         ("pages/maps/gb_tab.rs", "Installed", SELECT_VALUE),
+        ("store_grid/mod.rs", "Most Liked", SELECT_VALUE),
+        ("store_grid/mod.rs", "Most Viewed", SELECT_VALUE),
+        ("store_grid/mod.rs", "Newest", SELECT_VALUE),
+        (
+            "pages/addon_store/gamebanana_tab.rs",
+            "Most downloaded",
+            SELECT_VALUE,
+        ),
+        (
+            "pages/addon_store/gamebanana_tab.rs",
+            "Newest",
+            SELECT_VALUE,
+        ),
+        (
+            "pages/addon_store/gamebanana_tab.rs",
+            "the add-on listing task stopped unexpectedly",
+            "developer detail of a stopped listing",
+        ),
         (
             "pages/maps/mod.rs",
             "GameBanana",
             "a proper noun, the source button",
         ),
+        ("pages/hud_store/curated.rs", "Windows", OS_NAME),
+        ("pages/hud_store/curated.rs", "Mac", OS_NAME),
+        ("pages/hud_store/curated.rs", "Linux", OS_NAME),
+        (
+            "pages/hud_store/mod.rs",
+            "GameBanana",
+            "a proper noun, the source tab",
+        ),
+        (
+            "pages/hud_store/bodies.rs",
+            "GameBanana",
+            "a proper noun, the link button",
+        ),
+        (
+            "./store_detail.rs",
+            "the file listing task stopped unexpectedly",
+            "developer detail of a stopped listing",
+        ),
+        (
+            "./store_download.rs",
+            "the download task stopped unexpectedly",
+            "developer detail of a stopped download",
+        ),
+        (
+            "./store_download.rs",
+            "dropping the subscriptions stops the grid redraws and the In Library flip",
+            "developer detail: a must_use note for the compiler",
+        ),
+        (
+            "store_messages.rs",
+            "sound {} is no longer in the store",
+            "developer detail of a missing preview",
+        ),
+        (
+            "store_messages.rs",
+            "the release has no file",
+            "developer detail of an empty release",
+        ),
+        (
+            "./addon_detail.rs",
+            "the add-on profile task stopped unexpectedly",
+            "developer detail of a stopped profile read",
+        ),
+        ("updater/mod.rs", "update check", STOPPED_LABEL),
+        ("updater/mod.rs", "update download", STOPPED_LABEL),
+        ("updater/mod.rs", "update install", STOPPED_LABEL),
+        (
+            "updater/keys.rs",
+            "the update-test-key feature must never be in a release build",
+            "developer detail: a build guard",
+        ),
+        (
+            "updater/keys.rs",
+            "{}/PhongGuy/TF2Tools/releases/latest",
+            "developer detail: the release URL",
+        ),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
+    const OS_NAME: &str = "a proper noun, the OS filter's label";
+    const STOPPED_LABEL: &str = "developer detail: a stopped task's log label";
 
     #[test]
     fn library_pages_show_no_english_literal() {

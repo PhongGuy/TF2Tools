@@ -277,7 +277,7 @@ fn the_huds_page_reads_in_russian(cx: &mut TestAppContext) {
 }
 
 // `text` shaped in the theme font at `size` rems and `weight`, as the window lays it out.
-fn text_width(
+pub fn text_width(
     cx: &mut TestAppContext,
     win: AnyWindowHandle,
     text: &str,
@@ -882,7 +882,11 @@ fn the_maps_page_reads_in_russian(cx: &mut TestAppContext) {
 }
 
 // The text a wrapped search box or Select shows: its placeholder, else its shown value.
-fn shown_text(cx: &mut TestAppContext, win: AnyWindowHandle, id: &'static str) -> Option<String> {
+pub fn shown_text(
+    cx: &mut TestAppContext,
+    win: AnyWindowHandle,
+    id: &'static str,
+) -> Option<String> {
     support::settle(cx, win);
     cx.update_window(win, |_, w, _| {
         w.within(id)

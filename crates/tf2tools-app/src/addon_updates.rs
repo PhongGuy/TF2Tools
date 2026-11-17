@@ -221,7 +221,7 @@ impl AddonUpdates {
                     .library
                     .install_addon(&name, &tf2)
                     .map_err(|e| install_failed(describe_install(&e)))?;
-                let message = format!("Installed addon: {display}");
+                let message = tr!("addon_detail.activity.installed", name = display).to_string();
                 let entry = NewLogEntry::new(LogLevel::Info, "addon_store", "install", message);
                 activity::write(services, &entry);
                 Ok(())
@@ -232,7 +232,13 @@ impl AddonUpdates {
             let _ = this.update(cx, |u, cx| {
                 u.installing.remove(&name);
                 let _ = win.update(cx, |_, window, cx| match &result {
-                    Ok(()) => toast(window, cx, ToastKind::Success, "Addon installed", display),
+                    Ok(()) => toast(
+                        window,
+                        cx,
+                        ToastKind::Success,
+                        tr!("addon_detail.toast.installed"),
+                        display,
+                    ),
                     Err(err) => toast_error(window, cx, err),
                 });
                 // Outside the window update, so a closed window still signals the change.
