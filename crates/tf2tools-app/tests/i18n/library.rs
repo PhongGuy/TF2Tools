@@ -7,9 +7,12 @@ use gpui_kit::{Entity, SharedString, TestAppContext};
 use tf2tools_app::i18n::{self, names};
 use tf2tools_app::ids;
 use tf2tools_app::pages::huds::HudsPage;
+use tf2tools_app::pages::sounds::SoundsPage;
 use tf2tools_app::services::Tf2State;
+use tf2tools_app::shell::confirm::Confirm;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::widgets::class_icon::class_short_name;
+use tf2tools_app::widgets::profile_menu::added_title;
 use tf2tools_core::{Provenance, SoundKind, Tf2Install, TfClass, WeaponSlot};
 
 use crate::LocaleGuard;
@@ -29,6 +32,32 @@ fn open_huds(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<HudsPa
     });
     support::settle(cx, s.win);
     page
+}
+
+// The Sounds page, once its load and the saved volume are in.
+fn open_sounds(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<SoundsPage> {
+    support::click_id(cx, s.win, ids::nav(Page::Sounds));
+    let page = cx
+        .update(|cx| s.shell.read(cx).sounds_page())
+        .expect("a Sounds page");
+    support::wait_real(cx, "Sounds to load", |cx| {
+        cx.update(|cx| {
+            let page = page.read(cx);
+            page.is_loaded() && page.player().read(cx).is_ready()
+        })
+    });
+    support::settle(cx, s.win);
+    page
+}
+
+// A confirm dialog's four texts, in reading order.
+fn texts(c: &Confirm) -> [&str; 4] {
+    [
+        c.title.as_ref(),
+        c.description.as_ref(),
+        c.confirm_label.as_ref(),
+        c.cancel_label.as_ref(),
+    ]
 }
 
 // A minimal HUD archive, `<name>/info.vdf` plus a layout file, written into `dir`.
@@ -190,4 +219,46 @@ fn hud_counts_read_in_russian() {
     for n in [1, 2, 5, 21] {
         assert_eq!(more(n), format!("a, b и ещё {n}"));
     }
+}
+
+#[gpui_kit::test]
+fn the_sounds_page_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let _page = open_sounds(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HEADER_TITLE).as_deref(),
+        Some("Звуки")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::SOUNDS_EMPTY).as_deref(),
+        Some("В библиотеке пока нет звуков")
+    );
+    let hit = SoundKind::Hitsound;
+    assert_eq!(
+        support::label_of(cx, s.win, ids::sound_slot_status(hit)).as_deref(),
+        Some("Нет")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::sound_slot_name(hit)).as_deref(),
+        Some("Хитсаунд не установлен")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::sound_slot_name(SoundKind::Killsound)).as_deref(),
+        Some("Килсаунд не установлен")
+    );
+    assert_eq!(
+        texts(&Confirm::delete_sound()),
+        [
+            "Удалить звук",
+            "Удалить этот звук из библиотеки? Это действие нельзя отменить.",
+            "Удалить",
+            "Отмена"
+        ]
+    );
+    assert_eq!(
+        added_title("Ding", "Comp", Some(hit), Some("Old")),
+        "Добавлено в профиль Comp как хитсаунд: Ding (вместо Old)"
+    );
 }

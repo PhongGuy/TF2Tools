@@ -254,6 +254,9 @@ confirm:
   delete_hud:
     title: "Delete HUD"
     body: "Are you sure you want to delete %{name} from your library?"
+  delete_sound:
+    title: "Delete Sound"
+    body: "Are you sure you want to delete this sound from your library?"
   crosshair_used: { one: "It is used by %{count} weapon. It goes back to the default crosshair.", other: "It is used by %{count} weapons. They go back to the default crosshair." }
 
 font_check:
@@ -361,6 +364,62 @@ huds:
     updated: "Updated HUD: %{name}"
     installed: "Installed HUD: %{name}"
 
+sounds:
+  search: "Search sounds..."
+  no_tf2: "Set the TF2 folder in Settings to install sounds."
+  heading:
+    library: "Your Library"
+  slot:
+    none_hitsound: "No hitsound installed"
+    none_killsound: "No killsound installed"
+    outside: "A sound added outside TF2Tools"
+    playing_hitsound: "Installed hitsound"
+    playing_killsound: "Installed killsound"
+  badge:
+    installed: "Installed"
+    none: "None"
+  button:
+    play: "Play"
+    stop: "Stop"
+    uninstall: "Uninstall"
+    removing: "Removing..."
+    delete: "Delete from library"
+    hit: "Hit"
+    kill: "Kill"
+    add_to_profile: "Add to profile"
+    add: "Add Sound"
+    importing: "Importing..."
+  menu:
+    hitsound_in: "Hitsound in"
+    killsound_in: "Killsound in"
+  conflict:
+    title: "Conflicts Detected"
+    aria: "Conflicts Detected. %{lines}"
+    hitsound: "Hitsound found in '%{folder}' — may override your hitsound"
+    killsound: "Killsound found in '%{folder}' — may override your killsound"
+  empty:
+    title: "No sounds in your library yet"
+    hint: "Click \"Add Sound\" to import a WAV or VPK file"
+    no_match: "No sounds match your search"
+  format:
+    vpk: "VPK sound pack"
+  toast:
+    imported: "Sound imported"
+    added: "%{name} added to your library"
+    deleted: "Sound deleted"
+    installed_hitsound: "Hitsound installed"
+    installed_killsound: "Killsound installed"
+    uninstalled_hitsound: "Hitsound uninstalled"
+    uninstalled_killsound: "Killsound uninstalled"
+  activity:
+    imported: "Imported sound: %{name}"
+    format: "Format: %{format}"
+    deleted: "Deleted sound: %{name}"
+    installed_hitsound: "Installed hitsound: %{name}"
+    installed_killsound: "Installed killsound: %{name}"
+    uninstalled_hitsound: "Uninstalled hitsound"
+    uninstalled_killsound: "Uninstalled killsound"
+
 external_huds:
   names_more: { one: "%{names} and %{count} more", other: "%{names} and %{count} more" }
   activity:
@@ -396,6 +455,15 @@ widgets:
     unavailable: "Screenshot unavailable"
     previous: "Previous image"
     next: "Next image"
+  profile_menu:
+    added: "Added %{item} to %{profile}"
+    added_hitsound: "Added %{item} to %{profile} as its hitsound"
+    added_killsound: "Added %{item} to %{profile} as its killsound"
+    replaced: "(replaced %{name})"
+    empty: "No profiles yet"
+    unreadable: "Couldn't read your profiles"
+  player:
+    stop: "Stop"
 
 hud_maker:
   history:

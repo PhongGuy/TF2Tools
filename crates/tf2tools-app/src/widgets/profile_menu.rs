@@ -5,25 +5,42 @@ use std::rc::Rc;
 
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::{App, Context, ElementId, SharedString, Window, div};
-use tf2tools_core::{Profile, ProfileError, ProfileId};
+use tf2tools_core::{Profile, ProfileError, ProfileId, SoundKind};
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::services::Services;
 use crate::widgets::labelled;
 
 /// The success toast's title for `item` put in `profile`, naming its slot `role` when the item
-/// type has several ("hitsound") and the item it replaced, if any.
+/// type has several (a hitsound) and the item it replaced, if any.
 pub fn added_title(
     item: &str,
     profile: &str,
-    role: Option<&str>,
+    role: Option<SoundKind>,
     replaced: Option<&str>,
 ) -> String {
-    let role = role.map(|r| format!(" as its {r}")).unwrap_or_default();
-    let replaced = replaced
-        .map(|r| format!(" (replaced {r})"))
-        .unwrap_or_default();
-    format!("Added {item} to {profile}{role}{replaced}")
+    // Each role is a whole sentence, so a language can place the slot name where it reads best.
+    let added = match role {
+        None => tr!("widgets.profile_menu.added", item = item, profile = profile),
+        Some(SoundKind::Hitsound) => tr!(
+            "widgets.profile_menu.added_hitsound",
+            item = item,
+            profile = profile
+        ),
+        Some(SoundKind::Killsound | _) => tr!(
+            "widgets.profile_menu.added_killsound",
+            item = item,
+            profile = profile
+        ),
+    };
+    match replaced {
+        Some(name) => format!(
+            "{added} {}",
+            tr!("widgets.profile_menu.replaced", name = name)
+        ),
+        None => added.to_string(),
+    }
 }
 
 /// Called with the picked profile's id.
@@ -49,19 +66,22 @@ fn profile_items(
     profiles: &Result<Vec<Profile>, ProfileError>,
     sections: &[Section],
 ) -> PopupMenu {
-    let note = |id: &'static str, text: &'static str| {
-        PopupMenuItem::element(move |_, _| labelled(div(), id, text)).disabled(true)
+    let note = |id: &'static str, text: SharedString| {
+        PopupMenuItem::element(move |_, _| labelled(div(), id, text.clone())).disabled(true)
     };
     let profiles = match profiles {
         Ok(profiles) if profiles.is_empty() => {
-            return menu.item(note(ids::PROFILE_MENU_EMPTY, "No profiles yet"));
+            return menu.item(note(
+                ids::PROFILE_MENU_EMPTY,
+                tr!("widgets.profile_menu.empty"),
+            ));
         }
         Ok(profiles) => profiles,
         Err(e) => {
             tracing::warn!(error = %e, "could not read profiles for the menu");
             return menu.item(note(
                 ids::PROFILE_MENU_UNREADABLE,
-                "Couldn't read your profiles",
+                tr!("widgets.profile_menu.unreadable"),
             ));
         }
     };

@@ -252,6 +252,9 @@ confirm:
   delete_hud:
     title: "Удалить HUD"
     body: "Удалить %{name} из библиотеки?"
+  delete_sound:
+    title: "Удалить звук"
+    body: "Удалить этот звук из библиотеки?"
   crosshair_used: { one: "Его использует %{count} оружие. После удаления там будет прицел по умолчанию.", few: "Его используют %{count} оружия. Они вернутся к прицелу по умолчанию.", many: "Его используют %{count} оружий. Они вернутся к прицелу по умолчанию." }
 
 font_check:
@@ -359,6 +362,62 @@ huds:
     updated: "HUD обновлён: %{name}"
     installed: "HUD установлен: %{name}"
 
+sounds:
+  search: "Поиск звуков..."
+  no_tf2: "Укажите папку TF2 в настройках, чтобы устанавливать звуки."
+  heading:
+    library: "Ваша библиотека"
+  slot:
+    none_hitsound: "Хитсаунд не установлен"
+    none_killsound: "Килсаунд не установлен"
+    outside: "Звук, добавленный не через TF2Tools"
+    playing_hitsound: "Установленный хитсаунд"
+    playing_killsound: "Установленный килсаунд"
+  badge:
+    installed: "Установлен"
+    none: "Нет"
+  button:
+    play: "Воспроизвести"
+    stop: "Остановить"
+    uninstall: "Убрать"
+    removing: "Удаление..."
+    delete: "Удалить из библиотеки"
+    hit: "Хит"
+    kill: "Кил"
+    add_to_profile: "Добавить в профиль"
+    add: "Добавить звук"
+    importing: "Импорт..."
+  menu:
+    hitsound_in: "Как хитсаунд"
+    killsound_in: "Как килсаунд"
+  conflict:
+    title: "Обнаружены конфликты"
+    aria: "Обнаружены конфликты. %{lines}"
+    hitsound: "В «%{folder}» найден хитсаунд — он может заменить ваш"
+    killsound: "В «%{folder}» найден килсаунд — он может заменить ваш"
+  empty:
+    title: "В библиотеке пока нет звуков"
+    hint: "Нажмите «Добавить звук», чтобы импортировать файл WAV или VPK"
+    no_match: "Нет звуков по вашему запросу"
+  format:
+    vpk: "Звуковой пакет VPK"
+  toast:
+    imported: "Звук импортирован"
+    added: "%{name} добавлен в вашу библиотеку"
+    deleted: "Звук удалён"
+    installed_hitsound: "Хитсаунд установлен"
+    installed_killsound: "Килсаунд установлен"
+    uninstalled_hitsound: "Хитсаунд убран"
+    uninstalled_killsound: "Килсаунд убран"
+  activity:
+    imported: "Звук импортирован: %{name}"
+    format: "Формат: %{format}"
+    deleted: "Звук удалён из библиотеки: %{name}"
+    installed_hitsound: "Хитсаунд установлен: %{name}"
+    installed_killsound: "Килсаунд установлен: %{name}"
+    uninstalled_hitsound: "Хитсаунд убран из TF2"
+    uninstalled_killsound: "Килсаунд убран из TF2"
+
 external_huds:
   names_more: { one: "%{names} и ещё %{count}", few: "%{names} и ещё %{count}", many: "%{names} и ещё %{count}" }
   activity:
@@ -394,6 +453,15 @@ widgets:
     unavailable: "Скриншот недоступен"
     previous: "Предыдущее изображение"
     next: "Следующее изображение"
+  profile_menu:
+    added: "Добавлено в профиль %{profile}: %{item}"
+    added_hitsound: "Добавлено в профиль %{profile} как хитсаунд: %{item}"
+    added_killsound: "Добавлено в профиль %{profile} как килсаунд: %{item}"
+    replaced: "(вместо %{name})"
+    empty: "Профилей пока нет"
+    unreadable: "Не удалось прочитать ваши профили"
+  player:
+    stop: "Остановить"
 
 hud_maker:
   history:

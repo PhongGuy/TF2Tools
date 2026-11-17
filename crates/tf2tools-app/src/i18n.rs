@@ -734,6 +734,9 @@ mod tests {
         "./font_check.rs",
         "shell/font_check.rs",
         "widgets/carousel.rs",
+        "pages/sounds.rs",
+        "audio/player.rs",
+        "widgets/profile_menu.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -747,6 +750,11 @@ mod tests {
             "./font_check.rs",
             "no font host on this system",
             "developer detail: FontInstallError::Host reason, shown only in the row's details",
+        ),
+        (
+            "pages/sounds.rs",
+            "16-bit PCM, 44100Hz, Stereo",
+            "technical format spec in the import row's details; no words to translate",
         ),
     ];
 

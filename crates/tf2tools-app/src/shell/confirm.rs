@@ -85,12 +85,15 @@ impl Confirm {
     /// v5's sounds page delete prompt.
     pub fn delete_sound() -> Self {
         Self {
-            title: "Delete Sound".into(),
-            description:
-                "Are you sure you want to delete this sound from your library? This cannot be undone."
-                    .into(),
-            confirm_label: "Delete".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.delete_sound.title"),
+            description: format!(
+                "{} {}",
+                tr!("confirm.delete_sound.body"),
+                tr!("confirm.cannot_undo")
+            )
+            .into(),
+            confirm_label: tr!("confirm.delete"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
