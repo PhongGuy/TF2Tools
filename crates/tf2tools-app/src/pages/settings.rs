@@ -618,7 +618,7 @@ impl SettingsPage {
         .detach();
     }
 
-    // One store's row: its name and source over v5's two status lines, an outline Resync right.
+    // One store's row: its name and source over one status line, an outline Resync right.
     // The status block carries the whole status as its label, with the failure while it has one.
     fn sync_row(
         &self,
