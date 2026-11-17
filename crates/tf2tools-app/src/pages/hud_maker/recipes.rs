@@ -26,7 +26,7 @@ use super::borrow::BorrowNote;
 use super::tip::tipped;
 use super::view::{Panel, PanelPlace};
 use super::{FontBytes, HudMakerPage, colour_view, register_font};
-use crate::i18n::tr;
+use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::picker::{PickKind, file_name_for, with_extension};
 use crate::services::{OpError, Services, run_blocking};
@@ -785,27 +785,22 @@ fn write_recipe(picked: PathBuf, recipe: &Recipe) -> std::io::Result<Option<Stri
 
 // "1 change doesn't fit this HUD." and the like, or nothing for none.
 fn changes_dont_fit(n: usize) -> Option<String> {
-    match n {
-        0 => None,
-        1 => Some("1 change doesn't fit this HUD.".to_owned()),
-        n => Some(format!("{n} changes don't fit this HUD.")),
-    }
+    let n = u64::try_from(n).unwrap_or(u64::MAX);
+    (n > 0).then(|| plural("hud_maker.recipes.changes_dont_fit", n).to_string())
 }
 
 // The warning after an apply that left changes out.
 fn no_longer_fit(n: usize) -> Option<String> {
-    (n > 0).then(|| format!("{n} of your changes no longer fit and were left out."))
+    let n = u64::try_from(n).unwrap_or(u64::MAX);
+    (n > 0).then(|| plural("hud_maker.recipes.no_longer_fit", n).to_string())
 }
 
 const PICTURES_LEFT_OUT: &str =
     "Pictures aren't included in shared recipes yet, so parts that use them were left out.";
 
 fn fonts_left_out(n: usize) -> Option<String> {
-    match n {
-        0 => None,
-        1 => Some("1 font was left out.".to_owned()),
-        n => Some(format!("{n} fonts were left out.")),
-    }
+    let n = u64::try_from(n).unwrap_or(u64::MAX);
+    (n > 0).then(|| plural("hud_maker.recipes.fonts_left_out", n).to_string())
 }
 
 // The player's line for a refusal they can fix; `None` for a read or write failure.
@@ -821,6 +816,26 @@ fn preset_message(err: &PresetError) -> Option<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_left_out_lines_count_changes_and_fonts() {
+        assert_eq!(changes_dont_fit(0), None);
+        assert_eq!(
+            changes_dont_fit(1).as_deref(),
+            Some("1 change doesn't fit this HUD.")
+        );
+        assert_eq!(
+            changes_dont_fit(2).as_deref(),
+            Some("2 changes don't fit this HUD.")
+        );
+        assert_eq!(no_longer_fit(0), None);
+        let left = "of your changes no longer fit and were left out.";
+        assert_eq!(no_longer_fit(1), Some(format!("1 {left}")));
+        assert_eq!(no_longer_fit(2), Some(format!("2 {left}")));
+        assert_eq!(fonts_left_out(0), None);
+        assert_eq!(fonts_left_out(1).as_deref(), Some("1 font was left out."));
+        assert_eq!(fonts_left_out(3).as_deref(), Some("3 fonts were left out."));
+    }
 
     // The folder's file names, sorted.
     fn names(dir: &std::path::Path) -> Vec<String> {

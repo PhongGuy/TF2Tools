@@ -21,7 +21,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{StoreCard, StoreKind, StoreQuery, StoreSort};
 
-use crate::i18n::tr;
+use crate::i18n::{counted_plural, tr};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::pages::common::{
@@ -55,7 +55,22 @@ pub enum CardSize {
     },
 }
 
-/// What a store grid shows: which store, its noun for the count, and its card shape.
+/// The count line over a store grid: "11 of 150 crosshairs" while a search hides some.
+pub fn count_text(kind: StoreKind, shown: usize, total: usize) -> SharedString {
+    // Counts stay ungrouped, as the grid has always shown them.
+    let n = u64::try_from(total).unwrap_or(u64::MAX);
+    let (count, shown) = (total.to_string(), shown.to_string());
+    let vars = [("shown", shown.as_str())];
+    match kind {
+        StoreKind::Sounds => counted_plural("store_grid.count.sounds", n, &count, &vars),
+        StoreKind::Crosshairs => counted_plural("store_grid.count.crosshairs", n, &count, &vars),
+        StoreKind::CuratedHuds | StoreKind::GameBananaHuds | _ => {
+            counted_plural("store_grid.count.huds", n, &count, &vars)
+        }
+    }
+}
+
+/// What a store grid shows: which store, its noun for search and empty text, and its card shape.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StoreGridConfig {
     pub kind: StoreKind,
@@ -714,8 +729,11 @@ impl StoreGrid {
 
     fn count_label(&self, cx: &App) -> impl IntoElement {
         let count = match (self.shown, self.total) {
-            (Some(shown), Some(total)) => format!("{shown} of {total} {}", self.config.noun),
-            _ => String::new(),
+            (Some(shown), Some(total)) => {
+                let size = |n: u64| usize::try_from(n).unwrap_or(usize::MAX);
+                count_text(self.config.kind, size(shown), size(total))
+            }
+            _ => SharedString::default(),
         };
         labelled(
             div().text_sm().text_color(cx.theme().muted_foreground),

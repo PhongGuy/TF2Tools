@@ -70,17 +70,27 @@ pub fn visible(rows: &[MapRow], query: &str, sort: MapSort) -> Vec<usize> {
     shown
 }
 
-/// The Last played cell: the date, or "Never".
+/// The Last played cell: a "%Y-%m-%d" date in the player's language, other text as it is,
+/// or "Never".
 pub fn last_played_label(last: Option<&str>) -> String {
-    last.unwrap_or("Never").to_owned()
+    let Some(last) = last else {
+        return "Never".to_owned();
+    };
+    chrono::NaiveDate::parse_from_str(last, "%Y-%m-%d").map_or_else(
+        |_| last.to_owned(),
+        |d| crate::i18n::format::numeric_date(d).to_string(),
+    )
 }
 
 /// "1 map", "4368 maps", or "2 of 4368 maps" while a search hides some.
 pub fn count_label(shown: usize, total: usize) -> String {
-    let noun = if total == 1 { "map" } else { "maps" };
+    let n = u64::try_from(total).unwrap_or(u64::MAX);
+    let count = total.to_string();
     if shown == total {
-        format!("{total} {noun}")
+        crate::i18n::counted_plural("maps.count", n, &count, &[]).to_string()
     } else {
-        format!("{shown} of {total} {noun}")
+        let shown = shown.to_string();
+        let vars = [("shown", shown.as_str())];
+        crate::i18n::counted_plural("maps.count_of", n, &count, &vars).to_string()
     }
 }

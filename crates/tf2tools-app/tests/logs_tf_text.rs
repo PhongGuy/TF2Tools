@@ -837,3 +837,15 @@ fn a_full_log_logs_tf_no_longer_has_gets_its_own_line() {
         "This full log was cleared to save space. Connect to the internet to open it."
     );
 }
+
+#[test]
+fn a_banner_date_reads_as_the_day_alone() {
+    use chrono::TimeZone as _;
+    use tf2tools_app::pages::logs_tf::text::date_text;
+    let unix = chrono::Local
+        .with_ymd_and_hms(2026, 3, 5, 20, 56, 30)
+        .unwrap()
+        .timestamp();
+    assert_eq!(date_text(unix), "2026-03-05");
+    assert_eq!(date_time_text(unix), "2026-03-05 20:56");
+}

@@ -94,3 +94,9 @@ fn row_texts_read_as_plain_words() {
     assert_eq!(count_label(1, 1), "1 map");
     assert_eq!(count_label(2, 4368), "2 of 4368 maps");
 }
+
+#[test]
+fn a_last_played_cell_that_is_no_date_reads_as_it_is() {
+    assert_eq!(last_played_label(Some("2026-03-05")), "2026-03-05");
+    assert_eq!(last_played_label(Some("a while ago")), "a while ago");
+}

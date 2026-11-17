@@ -4,6 +4,8 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use gpui_kit::SharedString;
 
+pub mod format;
+
 /// A language the app offers, by its catalogue code and its name in that language.
 #[derive(Clone, Copy, Debug)]
 pub struct Language {
@@ -84,13 +86,24 @@ pub fn plural_form(code: &str, n: u64) -> PluralForm {
 /// The text of plural `key` for count `n` in the current language, with `%{count}` filled.
 /// A missing form falls back to the key's `other` text, then to English.
 pub fn plural(key: &str, n: u64) -> SharedString {
+    counted_plural(key, n, &n.to_string(), &[])
+}
+
+/// Plural `key` chosen by `n`, with `%{count}` filled by `count` (the caller's formatted
+/// number) and every other `%{name}` from `vars`.
+pub fn counted_plural(key: &str, n: u64, count: &str, vars: &[(&str, &str)]) -> SharedString {
     let code = current();
     let form = format!("{key}.{}", plural_form(code, n).suffix());
     let other = format!("{key}.other");
     let text = crate::_rust_i18n_try_translate(code, &form)
         .or_else(|| crate::_rust_i18n_try_translate(code, &other))
         .map_or(other.clone(), |t| t.into_owned());
-    rust_i18n::replace_patterns(&text, &["count"], &[n.to_string()]).into()
+    // One pass over the text, so a value that itself holds `%{` is never expanded again.
+    let (names, values): (Vec<&str>, Vec<String>) = std::iter::once(("count", count))
+        .chain(vars.iter().copied())
+        .map(|(name, value)| (name, value.to_owned()))
+        .unzip();
+    rust_i18n::replace_patterns(&text, &names, &values).into()
 }
 
 /// `rust_i18n::t!` as a `SharedString`; takes the same arguments, e.g. `tr!("k", percent = 70)`.
@@ -127,7 +140,7 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::path::{Path, PathBuf};
 
-    use super::{LANGUAGES, PluralForm, current, list, plural_form};
+    use super::{LANGUAGES, PluralForm, counted_plural, current, list, plural_form};
 
     const FORMS: [&str; 4] = ["one", "few", "many", "other"];
 
@@ -229,9 +242,62 @@ mod tests {
         files
     }
 
-    // The catalogue sections whose keys live in messages the code builds.
+    // The catalogue sections whose keys live in text the code builds.
     fn message_surfaces() -> BTreeSet<String> {
-        ["messages", "common", "updater"].map(str::to_owned).into()
+        [
+            "messages",
+            "common",
+            "updater",
+            "maps",
+            "logs_tf",
+            "profiles",
+            "crosshairs_page",
+            "hud_maker",
+            "hud_store",
+            "addon_store",
+            "store_grid",
+            "confirm",
+            "font_check",
+        ]
+        .map(str::to_owned)
+        .into()
+    }
+
+    #[test]
+    fn counted_plural_fills_the_given_count_and_the_other_variables() {
+        assert_eq!(
+            counted_plural("settings.sync.items", 1_400, "1,400", &[]),
+            "1,400 items cached"
+        );
+        assert_eq!(
+            counted_plural("settings.sync.items", 1, "1", &[]),
+            "1 item cached"
+        );
+        assert_eq!(
+            counted_plural(
+                "messages.local.copy_updated.no_longer_fit",
+                2,
+                "2",
+                &[("list", "a and b")]
+            ),
+            "2 of your changes no longer fit: a and b."
+        );
+        assert_eq!(super::plural("settings.sync.items", 3), "3 items cached");
+    }
+
+    #[test]
+    fn the_travel_check_passes_keys_inside_counted_plural() {
+        let sample = r#"i18n::counted_plural("demo.a", n, &c, &[]); counted_plural(
+                "demo.b", n, &c, &[("x", "y")]);"#;
+        let surfaces = BTreeSet::from(["demo".to_owned()]);
+        let code = shipped_part(sample);
+        let sites = key_sites(code, &surfaces);
+        assert_eq!(sites.len(), 2);
+        assert!(
+            sites
+                .iter()
+                .all(|(quote, _)| inside_tr_or_plural(code, *quote))
+        );
     }
 
     // The 1-based lines of `code` where an OpError action title is a string literal: the first

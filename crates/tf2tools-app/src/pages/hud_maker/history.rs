@@ -16,7 +16,7 @@ use gpui_kit::{
 use tf2tools_core::{ChangeTarget, HistoryError, HudId, HudSnapshot, SnapshotEntry};
 
 use super::{FontBytes, HudMakerPage, register_font};
-use crate::i18n::tr;
+use crate::i18n::{counted_plural, format, tr};
 use crate::ids;
 use crate::local_messages::left_out;
 use crate::services::{OpError, Services, run_blocking};
@@ -594,14 +594,36 @@ fn save_message(why: &HistoryError) -> String {
 // "2026-10-27 21:04:09, 3 changes": the local time with seconds, so two snapshots taken in the
 // same minute never read alike.
 fn when_line(snap: &SnapshotEntry) -> String {
-    let time = chrono::DateTime::parse_from_rfc3339(snap.at())
+    when_text(snap.at(), snap.changes())
+}
+
+// The line for a snapshot stamped `at` (RFC 3339) holding `changes`; "Unknown" for a bad stamp.
+fn when_text(at: &str, changes: usize) -> String {
+    let time = chrono::DateTime::parse_from_rfc3339(at)
         .map(|at| {
             let local = at.with_timezone(&chrono::Local);
-            local.format("%Y-%m-%d %H:%M:%S").to_string()
+            format::date_time(local.naive_local(), true).to_string()
         })
         .unwrap_or_else(|_| "Unknown".to_owned());
-    match snap.changes() {
-        1 => format!("{time}, 1 change"),
-        n => format!("{time}, {n} changes"),
+    let n = u64::try_from(changes).unwrap_or(u64::MAX);
+    let vars = [("time", time.as_str())];
+    counted_plural("hud_maker.history.when", n, &n.to_string(), &vars).to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::when_text;
+
+    #[test]
+    fn a_snapshot_reads_its_local_time_with_seconds_and_its_changes() {
+        let at = "2026-10-27T21:04:09Z";
+        let local = chrono::DateTime::parse_from_rfc3339(at)
+            .unwrap()
+            .with_timezone(&chrono::Local)
+            .format("%Y-%m-%d %H:%M:%S")
+            .to_string();
+        assert_eq!(when_text(at, 1), format!("{local}, 1 change"));
+        assert_eq!(when_text(at, 3), format!("{local}, 3 changes"));
+        assert_eq!(when_text("not a time", 0), "Unknown, 0 changes");
     }
 }

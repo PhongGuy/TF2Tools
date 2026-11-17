@@ -11,11 +11,7 @@ pub const NOT_APPLIED: &str = "Changes not applied yet";
 
 /// The crosshair badge: "1 crosshair", "N crosshairs".
 pub fn crosshair_count(n: usize) -> String {
-    if n == 1 {
-        "1 crosshair".to_owned()
-    } else {
-        format!("{n} crosshairs")
-    }
+    crate::i18n::plural("profiles.crosshairs", u64::try_from(n).unwrap_or(u64::MAX)).to_string()
 }
 
 /// No HUD, no sounds and no crosshairs.

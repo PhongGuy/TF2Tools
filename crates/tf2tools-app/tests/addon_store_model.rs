@@ -84,3 +84,9 @@ fn the_store_lists_by_name_with_the_first_release_as_the_header_tag() {
     assert_eq!(names, ["flat Mouse", "Low Memory", "No Tutorial"]);
     assert_eq!(store_release(&items), Some("9.100.1"));
 }
+
+#[test]
+fn one_download_reads_singular() {
+    assert_eq!(downloads_label(1), "1 download");
+    assert_eq!(downloads_label(2), "2 downloads");
+}

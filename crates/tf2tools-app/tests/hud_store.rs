@@ -937,3 +937,19 @@ fn curated_names_hud_db_as_its_source(cx: &mut TestAppContext) {
         Some("Curated HUDs from hud-db.")
     );
 }
+
+#[test]
+fn a_gamebanana_hud_reads_its_added_date_month_first() {
+    use chrono::TimeZone as _;
+    use tf2tools_app::pages::hud_store::bodies::added_text;
+    let unix = chrono::Utc
+        .with_ymd_and_hms(2026, 5, 3, 12, 0, 0)
+        .unwrap()
+        .timestamp();
+    assert_eq!(added_text(unix).as_deref(), Some("Added May 3, 2026"));
+    let unix = chrono::Utc
+        .with_ymd_and_hms(2026, 11, 16, 23, 30, 0)
+        .unwrap()
+        .timestamp();
+    assert_eq!(added_text(unix).as_deref(), Some("Added Nov 16, 2026"));
+}

@@ -446,6 +446,8 @@ fn contributing_explains_how_to_translate() {
         "(preview)",
         "next time it opens",
         "stays in the language it was shown in",
+        "common.date",
+        "\\u00A0",
     ] {
         assert!(
             section.contains(needle),

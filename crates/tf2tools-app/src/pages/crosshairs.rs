@@ -33,7 +33,7 @@ use super::common::{SM_ICON_PX, YELLOW_500, needs_tf2, no_tf2_notice};
 use crate::activity;
 use crate::assets::BACKGROUNDS;
 use crate::crosshair_sync::{CrosshairSync, SyncStatus};
-use crate::i18n::tr;
+use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::loadout::{BoardTarget, CellState, Loadout, SLOTS};
@@ -1005,12 +1005,7 @@ impl CrosshairsPage {
                     .iter()
                     .filter(|a| a.crosshair() == selected)
                     .count();
-                let detail = match used {
-                    0 => "Not on any weapon yet".to_owned(),
-                    1 => "On 1 weapon".to_owned(),
-                    n => format!("On {n} weapons"),
-                };
-                (self.assigned_name(selected, cx), detail)
+                (self.assigned_name(selected, cx), weapons_detail(used))
             }
             None => (
                 "No crosshair picked".to_owned(),
@@ -1596,5 +1591,17 @@ impl Render for CrosshairsPage {
             .child(div().relative().w_full().child(watch).child(main))
             .children(details);
         scroll_area(ids::page_scrollbar(Page::Crosshairs), &self.scroll, content).size_full()
+    }
+}
+
+/// The detail line under the picked crosshair: how many weapons it is on.
+pub fn weapons_detail(used: usize) -> String {
+    match used {
+        0 => tr!("crosshairs_page.no_weapon").to_string(),
+        n => plural(
+            "crosshairs_page.on_weapons",
+            u64::try_from(n).unwrap_or(u64::MAX),
+        )
+        .to_string(),
     }
 }

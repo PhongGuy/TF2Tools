@@ -1099,3 +1099,11 @@ fn the_background_rows_carry_ids_and_pick_the_background(cx: &mut TestAppContext
         Some("process")
     );
 }
+
+#[test]
+fn the_detail_line_counts_the_weapons_a_crosshair_is_on() {
+    use tf2tools_app::pages::crosshairs::weapons_detail;
+    assert_eq!(weapons_detail(0), "Not on any weapon yet");
+    assert_eq!(weapons_detail(1), "On 1 weapon");
+    assert_eq!(weapons_detail(3), "On 3 weapons");
+}

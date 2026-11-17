@@ -405,14 +405,14 @@ impl AddonDetail {
     }
 }
 
-// A file row's text: "{name} · {size} · {YYYY-MM-DD}", leaving out an unknown size or date.
-// GameBanana's missing date reads as 0, which is no upload date.
+// A file row's text: "{name} · {size} · {date}" with a numeric UTC date, leaving out an
+// unknown size or date. GameBanana's missing date reads as 0, which is no upload date.
 fn file_line(name: &str, size: Option<u64>, date_added: i64) -> String {
     let size = size.map(format_bytes);
     let date = (date_added > 0)
         .then(|| chrono::DateTime::from_timestamp(date_added, 0))
         .flatten()
-        .map(|at| at.format("%Y-%m-%d").to_string());
+        .map(|at| crate::i18n::format::numeric_date(at.date_naive()).to_string());
     std::iter::once(name.to_owned())
         .chain(size)
         .chain(date)

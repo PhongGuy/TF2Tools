@@ -4,6 +4,8 @@
 use chrono::{DateTime, Utc};
 use tf2tools_core::LogLevel;
 
+use crate::i18n::{plural, tr};
+
 /// Rows fetched per query; the next page's `before` is the last row's id.
 pub const PAGE_SIZE: u32 = 100;
 
@@ -64,7 +66,7 @@ fn spaced(name: &str) -> String {
 }
 
 /// v5's `formatRelativeTime` between an RFC 3339 `timestamp` and `now`: "Just now" under a
-/// minute (and for a future time), else "N minute(s)/hour(s)/day(s) ago", singular at 1.
+/// minute (and for a future time), else "N minutes/hours/days ago" in the player's language.
 /// An unparseable timestamp is returned as it is.
 pub fn relative_time(timestamp: &str, now: DateTime<Utc>) -> String {
     let Ok(then) = DateTime::parse_from_rfc3339(timestamp) else {
@@ -72,14 +74,13 @@ pub fn relative_time(timestamp: &str, now: DateTime<Utc>) -> String {
     };
     // Whole seconds, floored like v5's Math.floor; a future stamp counts as now.
     let seconds = (now - then.with_timezone(&Utc)).num_seconds();
-    let (n, unit) = match seconds {
-        ..60 => return "Just now".to_owned(),
-        60..3600 => (seconds / 60, "minute"),
-        3600..86400 => (seconds / 3600, "hour"),
-        _ => (seconds / 86400, "day"),
+    let text = match seconds {
+        ..60 => return tr!("common.time.just_now").to_string(),
+        60..3600 => plural("common.time.minutes_ago", (seconds / 60).unsigned_abs()),
+        3600..86400 => plural("common.time.hours_ago", (seconds / 3600).unsigned_abs()),
+        _ => plural("common.time.days_ago", (seconds / 86400).unsigned_abs()),
     };
-    let plural = if n == 1 { "" } else { "s" };
-    format!("{n} {unit}{plural} ago")
+    text.to_string()
 }
 
 /// v5's level name: "info", "warning", "error".

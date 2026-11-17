@@ -167,11 +167,7 @@ pub fn slot_text(state: &SlotState, slot: Slot) -> String {
 
 /// "1 weapon", "N weapons".
 pub fn weapon_count(n: usize) -> String {
-    if n == 1 {
-        "1 weapon".to_owned()
-    } else {
-        format!("{n} weapons")
-    }
+    crate::i18n::plural("profiles.weapons", u64::try_from(n).unwrap_or(u64::MAX)).to_string()
 }
 
 /// A kept crosshair's label: the builtin's display name, the library crosshair's name by

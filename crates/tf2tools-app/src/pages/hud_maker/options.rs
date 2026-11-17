@@ -27,7 +27,7 @@ use tf2tools_core::{
 
 use super::HudMakerPage;
 use super::tip::tipped;
-use crate::i18n::tr;
+use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::library_events::LibraryEvents;
 use crate::local_messages::describe_tf2_install;
@@ -692,11 +692,7 @@ impl HudMakerPage {
         }
         let theme = cx.theme();
         let (muted, foreground) = (theme.muted_foreground, theme.foreground);
-        let misfit_line = match misfits {
-            0 => None,
-            1 => Some("1 option doesn't fit this version of the HUD.".to_owned()),
-            n => Some(format!("{n} options don't fit this version of the HUD.")),
-        };
+        let misfit_line = misfit_line(misfits);
         let mut section = v_flex()
             .id(ids::HUD_MAKER_HUD_OPTIONS)
             .test_support()
@@ -1103,4 +1099,30 @@ fn viewmodels_state(s: &Services, tf2: Option<&Tf2Install>) -> Viewmodels {
 // Whether the built-in options include the HUD crosshair group, which carries its own note.
 fn groups_have_crosshair(options: &[&OptionSpec]) -> bool {
     options.iter().any(|s| s.group() == HUD_CROSSHAIR_GROUP)
+}
+
+// The line over a copy's options naming how many of its saved ones no longer fit; `None` for none.
+fn misfit_line(misfits: usize) -> Option<String> {
+    let n = u64::try_from(misfits).unwrap_or(u64::MAX);
+    (n > 0).then(|| plural("hud_maker.options.misfits", n).to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::misfit_line;
+
+    #[test]
+    fn the_misfit_line_counts_the_options_that_do_not_fit() {
+        assert_eq!(misfit_line(0), None);
+        let one = misfit_line(1);
+        assert_eq!(
+            one.as_deref(),
+            Some("1 option doesn't fit this version of the HUD.")
+        );
+        let four = misfit_line(4);
+        assert_eq!(
+            four.as_deref(),
+            Some("4 options don't fit this version of the HUD.")
+        );
+    }
 }

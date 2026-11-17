@@ -49,11 +49,6 @@ settings:
     full_logs: { one: "%{count} full log uses", other: "%{count} full logs use" }
     measuring: "Measuring..."
     unmeasured: "The logs cache size could not be measured."
-    size_tb: "%{size} TB"
-    size_gb: "%{size} GB"
-    size_mb: "%{size} MB"
-    size_kb: "%{size} KB"
-    size_b: "%{size} B"
   sync:
     items: { one: "%{count} item cached", other: "%{count} items cached" }
     last_synced: "Last synced: %{when}"
@@ -133,6 +128,102 @@ common:
   list:
     separator: ", "
     last: "%{rest} and %{last}"
+  number:
+    decimal: "."
+    group: ","
+  count:
+    thousand: "%{number}K"
+    million: "%{number}M"
+  size:
+    b: "%{size} B"
+    kb: "%{size} KB"
+    mb: "%{size} MB"
+    gb: "%{size} GB"
+    tb: "%{size} TB"
+    downloading: "Downloading..."
+    extracting: "Extracting..."
+    progress: "Downloading... %{done} / %{total}"
+    progress_no_total: "Downloading... %{done}"
+  duration:
+    played_minutes: "%{minutes}m"
+    played_hours_minutes: "%{hours}h %{minutes}m"
+    minutes: "%{minutes} min"
+    hours: "%{hours} h"
+    hours_minutes: "%{hours} h %{minutes} min"
+    seconds: "%{seconds} s"
+  date:
+    numeric: "%{year}-%{month}-%{day}"
+    date_time: "%{date} %{time}"
+    day_month_year: "%{day} %{month} %{year}"
+    month_day_year: "%{month} %{day}, %{year}"
+    month: { jan: "Jan", feb: "Feb", mar: "Mar", apr: "Apr", may: "May", jun: "Jun", jul: "Jul", aug: "Aug", sep: "Sep", oct: "Oct", nov: "Nov", dec: "Dec" }
+  time:
+    just_now: "Just now"
+    minutes_ago: { one: "%{count} minute ago", other: "%{count} minutes ago" }
+    hours_ago: { one: "%{count} hour ago", other: "%{count} hours ago" }
+    days_ago: { one: "%{count} day ago", other: "%{count} days ago" }
+
+addon_store:
+  downloads: { one: "%{count} download", other: "%{count} downloads" }
+
+hud_store:
+  added: "Added %{date}"
+
+logs_tf:
+  progress:
+    finding: "Finding logs: %{listed} of %{total}"
+    downloading: "Downloading logs: %{done} of %{total}"
+    downloading_left: "Downloading logs: %{done} of %{total}, about %{time} left"
+  summary:
+    all: "All logs, %{count}"
+    last_month: { one: "Last month, %{count} log", other: "Last month, %{count} logs" }
+    last_year: { one: "Last year, %{count} log", other: "Last year, %{count} logs" }
+    last: { one: "Last %{span}, %{count} log", other: "Last %{span}, %{count} logs" }
+    up_to: { one: "%{range} up to %{date}, %{count} log", other: "%{range} up to %{date}, %{count} logs" }
+  weapons_title: { one: "%{class} weapons · %{range} · %{count} log", other: "%{class} weapons · %{range} · %{count} logs" }
+
+maps:
+  count: { one: "%{count} map", other: "%{count} maps" }
+  count_of: { one: "%{shown} of %{count} map", other: "%{shown} of %{count} maps" }
+
+store_grid:
+  count:
+    huds: { one: "%{shown} of %{count} HUD", other: "%{shown} of %{count} HUDs" }
+    sounds: { one: "%{shown} of %{count} sound", other: "%{shown} of %{count} sounds" }
+    crosshairs: { one: "%{shown} of %{count} crosshair", other: "%{shown} of %{count} crosshairs" }
+
+profiles:
+  crosshairs: { one: "%{count} crosshair", other: "%{count} crosshairs" }
+  weapons: { one: "%{count} weapon", other: "%{count} weapons" }
+
+crosshairs_page:
+  no_weapon: "Not on any weapon yet"
+  on_weapons: { one: "On %{count} weapon", other: "On %{count} weapons" }
+
+confirm:
+  crosshair_used: { one: "It is used by %{count} weapon. It goes back to the default crosshair.", other: "It is used by %{count} weapons. They go back to the default crosshair." }
+
+font_check:
+  installed: { one: "Installed %{count} font for %{folder}. Restart TF2 to use them.", other: "Installed %{count} fonts for %{folder}. Restart TF2 to use them." }
+  installed_some: { one: "Installed %{installed} of %{count} font for %{folder}; see the Activity Log. Restart TF2 to use them.", other: "Installed %{installed} of %{count} fonts for %{folder}; see the Activity Log. Restart TF2 to use them." }
+  skipped: { one: "Skipped %{count} font for %{folder}; see the Activity Log.", other: "Skipped %{count} fonts for %{folder}; see the Activity Log." }
+
+hud_maker:
+  history:
+    when: { one: "%{time}, %{count} change", other: "%{time}, %{count} changes" }
+  screens:
+    no_problems: "No problems"
+    problems: { one: "%{count} part has a problem", other: "%{count} parts have problems" }
+  options:
+    misfits: { one: "%{count} option doesn't fit this version of the HUD.", other: "%{count} options don't fit this version of the HUD." }
+  recipes:
+    changes_dont_fit: { one: "%{count} change doesn't fit this HUD.", other: "%{count} changes don't fit this HUD." }
+    no_longer_fit: { one: "%{count} of your changes no longer fit and were left out.", other: "%{count} of your changes no longer fit and were left out." }
+    fonts_left_out: { one: "%{count} font was left out.", other: "%{count} fonts were left out." }
+  borrow:
+    animations: { one: "Animations: %{count} console command left out.", other: "Animations: %{count} console commands left out." }
+    code_keys: { one: "The game sets %{count} of this part's settings itself.", other: "The game sets %{count} of this part's settings itself." }
+    unresolved_pins: { one: "%{count} link to a part that isn't coming along, so it may sit in a different place.", other: "%{count} links to parts that aren't coming along, so it may sit in a different place." }
 
 messages:
   shared:
