@@ -229,6 +229,7 @@ common:
 addon_store:
   downloads: { one: "%{count} download", other: "%{count} downloads" }
   card:
+    by: "by %{author}"
     mature: "Mature"
     outdated: "Outdated"
   badge:

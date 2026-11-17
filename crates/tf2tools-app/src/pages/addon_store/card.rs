@@ -181,14 +181,15 @@ pub fn gb_addon_card(
                                 .children(outdated)
                                 .children(installed),
                         )
-                        .child(
+                        .child(labelled(
                             div()
                                 .truncate()
                                 .text_sm()
                                 .line_height(px(20.))
-                                .text_color(theme.muted_foreground)
-                                .child(format!("by {}", card.author)),
-                        ),
+                                .text_color(theme.muted_foreground),
+                            ids::addon_gb_card_author(section, card.id),
+                            tr!("addon_store.card.by", author = card.author),
+                        )),
                 )
                 .child(
                     h_flex()

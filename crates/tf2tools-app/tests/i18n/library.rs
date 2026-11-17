@@ -661,6 +661,10 @@ fn the_card_badges_read_in_russian(cx: &mut TestAppContext) {
         s.win,
         ids::addon_gb_card_reveal("maps", GbId::new(11))
     ));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::addon_gb_card_author("maps", GbId::new(10))).as_deref(),
+        Some("автор: vex")
+    );
     let badge = |offer| CardBadge::of_offer(offer).map(|b| b.text.to_string());
     assert_eq!(badge(GbAddonOffer::Update).as_deref(), Some("Обновление"));
     assert_eq!(

@@ -227,6 +227,7 @@ common:
 addon_store:
   downloads: { one: "%{count} загрузка", few: "%{count} загрузки", many: "%{count} загрузок" }
   card:
+    by: "автор: %{author}"
     mature: "Для взрослых"
     outdated: "Устарело"
   badge:

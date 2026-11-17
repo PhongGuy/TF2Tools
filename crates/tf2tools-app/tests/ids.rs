@@ -778,6 +778,10 @@ fn addon_store_tab_and_card_ids_are_keyed_by_section_and_item() {
         name(ids::addon_gb_card_badge("skins", GbId::new(5))),
         "addon-gb-card-badge:skins:5"
     );
+    assert_eq!(
+        name(ids::addon_gb_card_author("skins", GbId::new(5))),
+        "addon-gb-card-author:skins:5"
+    );
 }
 
 #[test]
