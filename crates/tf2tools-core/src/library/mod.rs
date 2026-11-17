@@ -26,6 +26,7 @@ mod movement;
 mod packed;
 mod sounds;
 mod space;
+mod storage;
 mod tree_copy;
 
 use std::fmt;
@@ -85,6 +86,7 @@ pub use sounds::{
     InstalledSound, InstalledSounds, SoundConflict, SoundEntry, SoundFormat, SoundKind,
 };
 pub use space::LibrarySpace;
+pub use storage::{StorageKind, StorageUse};
 
 /// v5's per-item metadata folder; it belongs to the app and is never installed.
 const METADATA_DIR: &str = ".tf2tools";

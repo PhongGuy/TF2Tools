@@ -5,7 +5,7 @@ use std::path::Path;
 use walkdir::WalkDir;
 
 use super::packed::{CROSSHAIR_ZIP, GB_ZIP, HUD_ZIP, ItemSource};
-use super::{Library, walk_failure};
+use super::{IoFailure, Library, walk_failure};
 use crate::error::LibraryError;
 
 /// What the library takes: file lengths on disk, and the same with every packed item counted
@@ -44,35 +44,55 @@ impl Library {
     /// `LibraryError::Io` when a folder cannot be walked; an entry removed mid-walk is skipped.
     pub fn space(&self) -> Result<LibrarySpace, LibraryError> {
         let _copies = self.copies_read();
-        let root = self.dir.root().join("library");
         let mut space = LibrarySpace::default();
-        if !root.is_dir() {
-            return Ok(space);
-        }
-        // Sound writes and painted crosshair saves skip the copies guard, so a file that
-        // vanishes mid-walk is skipped rather than failing the count.
-        for entry in WalkDir::new(&root).min_depth(1) {
-            let entry = match entry {
-                Ok(entry) => entry,
-                Err(e) if vanished(&e) => continue,
-                Err(e) => return Err(walk_failure(&root, e).into()),
-            };
-            if !entry.file_type().is_file() {
-                continue;
-            }
-            let len = match entry.metadata() {
-                Ok(meta) => meta.len(),
-                Err(e) if vanished(&e) => continue,
-                Err(e) => return Err(walk_failure(&root, e).into()),
-            };
-            let rel = entry.path().strip_prefix(&root).unwrap_or(entry.path());
-            space.on_disk = space.on_disk.saturating_add(len);
-            space.unpacked = space
-                .unpacked
-                .saturating_add(item_zip_size(&root, rel).unwrap_or(len));
-        }
+        walk_files(
+            &self.dir.root().join("library"),
+            true,
+            |_, len, unpacked| {
+                space.on_disk = space.on_disk.saturating_add(len);
+                space.unpacked = space.unpacked.saturating_add(unpacked);
+            },
+        )?;
         Ok(space)
     }
+}
+
+/// Hands `each` every file under `root` as its relative path, length and unpacked size; the
+/// unpacked size differs only for an item zip when `item_zips` is set. Links are not followed
+/// and a missing `root` is empty.
+pub(super) fn walk_files(
+    root: &Path,
+    item_zips: bool,
+    mut each: impl FnMut(&Path, u64, u64),
+) -> Result<(), IoFailure> {
+    if !root.is_dir() {
+        return Ok(());
+    }
+    // Sound writes and painted crosshair saves skip the copies guard, so a file that
+    // vanishes mid-walk is skipped rather than failing the count.
+    for entry in WalkDir::new(root).min_depth(1) {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(e) if vanished(&e) => continue,
+            Err(e) => return Err(walk_failure(root, e)),
+        };
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        let len = match entry.metadata() {
+            Ok(meta) => meta.len(),
+            Err(e) if vanished(&e) => continue,
+            Err(e) => return Err(walk_failure(root, e)),
+        };
+        let rel = entry.path().strip_prefix(root).unwrap_or(entry.path());
+        let unpacked = if item_zips {
+            item_zip_size(root, rel).unwrap_or(len)
+        } else {
+            len
+        };
+        each(rel, len, unpacked);
+    }
+    Ok(())
 }
 
 /// Whether a walk error means the entry was removed after it was listed.

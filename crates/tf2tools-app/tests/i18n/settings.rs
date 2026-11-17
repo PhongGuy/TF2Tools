@@ -181,14 +181,38 @@ fn the_logs_cache_lines_read_in_russian() {
 }
 
 #[test]
-fn the_library_line_reads_in_russian() {
-    use tf2tools_app::pages::settings::{library_text, size_text};
+fn the_storage_rows_read_in_russian() {
+    use tf2tools_app::pages::settings::{
+        size_text, storage_name, storage_row_label, storage_total_label,
+    };
+    use tf2tools_core::StorageKind;
     let _guard = LocaleGuard::switch("ru");
     assert_eq!(size_text(2_100_000_000), "2,0\u{a0}ГБ");
     assert_eq!(size_text(3 << 40), "3,0\u{a0}ТБ");
+    let names: Vec<String> = StorageKind::ALL
+        .iter()
+        .map(|k| storage_name(*k).to_string())
+        .collect();
     assert_eq!(
-        library_text(412_000_000, 2_100_000_000),
-        "Библиотека занимает 392,9\u{a0}МБ на диске (2,0\u{a0}ГБ без сжатия)."
+        names,
+        [
+            "HUD",
+            "Звуки",
+            "Прицелы",
+            "Дополнения",
+            "Кэш logs.tf",
+            "Данные магазинов",
+            "Кэш изображений"
+        ]
+    );
+    assert_eq!(
+        storage_row_label(&storage_name(StorageKind::Huds), 412_000_000, 2_100_000_000),
+        "HUD: 392,9\u{a0}МБ. 2,0\u{a0}ГБ без сжатия"
+    );
+    assert_eq!(storage_total_label(2_100_000_000), "Всего: 2,0\u{a0}ГБ");
+    assert_eq!(
+        tf2tools_app::_rust_i18n_try_translate("ru", "settings.storage.unmeasured").as_deref(),
+        Some("Не удалось измерить занятое место.")
     );
 }
 
@@ -251,4 +275,86 @@ fn the_settings_saved_entry_is_written_in_russian(cx: &mut TestAppContext) {
     let row = &support::log_rows(&s.services)[0];
     assert_eq!((row.category(), row.action()), ("settings", "update"));
     crate::messages::assert_russian(row.message());
+}
+
+#[test]
+fn the_stores_card_reads_in_russian() {
+    let ru = |key: &str| tf2tools_app::_rust_i18n_try_translate("ru", key).map(|t| t.into_owned());
+    assert_eq!(ru("settings.stores.title").as_deref(), Some("Магазины"));
+    assert_eq!(
+        ru("settings.stores.resync_all").as_deref(),
+        Some("Обновить все")
+    );
+    // The per-store button stays about as short as the English, so each row keeps its text room.
+    assert_eq!(ru("settings.sync.resync").as_deref(), Some("Обновить"));
+    assert_eq!(
+        ru("settings.sync.syncing").as_deref(),
+        Some("Обновление...")
+    );
+    assert_eq!(
+        ru("settings.sync.curated_huds.description").as_deref(),
+        Some("HUD, отобранные hud-db")
+    );
+}
+
+// Every control of the Storage and Stores cards lies inside the page column; the store lines
+// end left of a one-line Resync.
+fn assert_settings_fit(cx: &mut TestAppContext, win: AnyWindowHandle, lang: &str) {
+    use tf2tools_app::widgets::scroll::BAR_WIDTH;
+    use tf2tools_core::{StorageKind, StoreKind};
+    let page = support::bounds_of(cx, win, ids::page(Page::Settings)).unwrap();
+    let mut inside: Vec<gpui_kit::ElementId> = vec![
+        ids::SETTINGS_STORAGE.into(),
+        ids::SETTINGS_STORAGE_TOTAL.into(),
+        ids::SETTINGS_RESYNC_ALL.into(),
+        ids::SETTINGS_CACHE.into(),
+        ids::SETTINGS_CACHE_LABEL.into(),
+        ids::SETTINGS_MATURE_ADDONS.into(),
+        ids::SETTINGS_LOG_KEEP.into(),
+        ids::SETTINGS_LOG_SPACE.into(),
+        ids::SETTINGS_SAVE.into(),
+    ];
+    inside.extend(StorageKind::ALL.iter().map(|k| ids::settings_storage(*k)));
+    for id in inside {
+        let b = support::bounds_of(cx, win, id.clone())
+            .unwrap_or_else(|| panic!("{lang}: {id:?} not drawn"));
+        assert!(
+            b.left() >= page.left() && b.right() <= page.right() - BAR_WIDTH,
+            "{lang}: {id:?} {b:?} runs past {page:?}"
+        );
+    }
+    for kind in StoreKind::ALL {
+        let lines = support::bounds_of(cx, win, ids::settings_sync(kind)).unwrap();
+        let resync = support::bounds_of(cx, win, ids::settings_resync(kind)).unwrap();
+        assert!(
+            lines.right() <= resync.left(),
+            "{lang}: {kind:?} {lines:?} runs under {resync:?}"
+        );
+        assert!(
+            resync.right() <= page.right() - BAR_WIDTH,
+            "{lang}: {kind:?} {resync:?}"
+        );
+        assert_eq!(resync.size.height, px(32.), "{lang}: {kind:?} Resync wraps");
+    }
+}
+
+#[gpui_kit::test]
+fn the_settings_cards_fit_at_800_by_600_in_english_and_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    let page = open_settings(cx, &s);
+    support::wait_real(cx, "the store status and the storage figures", |cx| {
+        cx.update(|cx| {
+            let pack = tf2tools_app::library_pack::LibraryPack::global(cx);
+            let pack = pack.read(cx);
+            page.read(cx).is_sync_loaded() && pack.space().is_some() && !pack.is_running()
+        })
+    });
+    support::settle(cx, s.win);
+    assert_settings_fit(cx, s.win, "en");
+    pick(cx, s.win, "ru");
+    assert_settings_fit(cx, s.win, "ru");
 }

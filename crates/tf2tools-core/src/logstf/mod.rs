@@ -26,6 +26,7 @@ pub use detail::{
 pub use keep::KeepFullLogs;
 pub use range::{LogsRange, window_start};
 pub use steam_id::{PlayerInput, SteamId, parse_player_input};
+pub(crate) use trim::logs_cache_bytes;
 pub use trim::{LogsSpace, OpenedBody, TrimReport};
 pub use weapons::{ClassWeapons, WeaponBackfill, WeaponSum};
 
