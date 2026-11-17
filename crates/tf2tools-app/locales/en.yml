@@ -369,6 +369,8 @@ messages:
       closed: "Sound playback stopped working. Restart TF2Tools to play sounds again."
     log:
       database: "TF2Tools couldn't open the activity log. Restart TF2Tools and try again."
+    logs_cache:
+      database: "TF2Tools couldn't read or save its logs.tf data. Restart TF2Tools and try again."
     startup:
       no_assets: "TF2Tools is missing some of its own files. Reinstall TF2Tools from the release page."
       database: "TF2Tools couldn't open your saved library. Restart your computer and try again. If it keeps happening, ask for help on the TF2Tools GitHub page."
@@ -394,6 +396,7 @@ messages:
     read: "TF2Tools couldn't read its map list. Restart TF2Tools and try again."
   logs_tf:
     save_failed: "Couldn't save logs.tf data on this computer."
+    log_unreadable: "This log couldn't be read."
   store:
     details_failed_title: "Failed to load details"
     busy_title: "Another download is running"

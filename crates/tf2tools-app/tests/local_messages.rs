@@ -7,16 +7,18 @@ use tf2tools_app::assets::AssetRoot;
 use tf2tools_app::audio::AudioError;
 use tf2tools_app::local_messages::{
     LocalFailure, PaintStep, describe_apply_profile, describe_audio, describe_detect,
-    describe_font_install, describe_hud_load, describe_import, describe_library, describe_log,
-    describe_make_hud, describe_paint, describe_png_read, describe_png_write, describe_profile,
-    describe_settings, describe_startup, describe_store_status, describe_tf2_folder,
-    describe_tf2_install, internal, left_out, reopen_notice,
+    describe_font_install, describe_hud_load, describe_import, describe_join, describe_library,
+    describe_log, describe_logs_cache, describe_make_hud, describe_paint, describe_png_read,
+    describe_png_write, describe_profile, describe_settings, describe_startup,
+    describe_store_status, describe_tf2_folder, describe_tf2_install, internal, left_out,
+    reopen_notice,
 };
 use tf2tools_app::services::{OpError, StartupError};
 use tf2tools_core::{
     ApplyProfileError, ArchiveError, DetectError, FontInstallError, HudLoadError, ImportError,
-    InstallError, LibraryError, LogError, MakeHudError, PaintError, PngReadError, PngWriteError,
-    ProfileError, QueryError, SettingsError, VpkError, VtfError, WavError, inspect_wav,
+    InstallError, LibraryError, LogError, LogsCacheError, MakeHudError, PaintError, PngReadError,
+    PngWriteError, ProfileError, QueryError, SettingsError, VpkError, VtfError, WavError,
+    inspect_wav,
 };
 
 #[test]
@@ -1165,4 +1167,23 @@ fn a_map_list_reads_a_b_and_c() {
         already_have(&names, false),
         "You already have cp_a, cp_b and cp_c."
     );
+}
+
+#[test]
+fn logs_cache_and_stopped_job_failures_hide_the_raw_error() {
+    let cache = describe_logs_cache(&LogsCacheError::Database {
+        message: "disk I/O error".into(),
+    });
+    assert_eq!(
+        cache,
+        LocalFailure::new(
+            "TF2Tools couldn't read or save its logs.tf data. Restart TF2Tools and try again.",
+            "the logs.tf cache could not be read or written: disk I/O error",
+        )
+    );
+    support::assert_plain(&cache.message);
+    let join = support::cancelled_join();
+    let stopped = describe_join(&join);
+    assert_eq!(stopped, LocalFailure::new(internal(), join.to_string()));
+    assert!(!stopped.message.contains(&join.to_string()), "{stopped:?}");
 }

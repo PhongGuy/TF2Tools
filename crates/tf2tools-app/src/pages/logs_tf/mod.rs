@@ -28,13 +28,15 @@ use gpui_kit::{
     div, px,
 };
 use tf2tools_core::{
-    ClassAverage, ClassWeapons, LogDetail, LogRow, LogState, LogsFetchError, LogsRange, MatrixKind,
-    OpenedBody, SteamId, TfClass, TrackedPlayer, WeaponNames, parse_log, parse_player_input,
+    ClassAverage, ClassWeapons, LogDetail, LogRow, LogState, LogsCacheError, LogsFetchError,
+    LogsRange, MatrixKind, OpenedBody, SteamId, TfClass, TrackedPlayer, WeaponNames, parse_log,
+    parse_player_input,
 };
 
 use crate::i18n::tr;
 use crate::ids;
 use crate::kill_icons::{KillIconImages, LoadedKillIcons};
+use crate::local_messages::{LocalFailure, describe_logs_cache};
 use crate::log_nicknames::LogNicknames;
 use crate::logs_sync::{LogsSync, LogsSyncEvent, SyncProgress, logs_sync};
 use crate::logs_trim::{LogsTrim, LogsTrimEvent};
@@ -357,7 +359,9 @@ impl LogsTfPage {
             s.logs
                 .cache()
                 .class_weapons(active, range, class)
-                .map_err(|e| OpError::core(tr!("messages.action.read_class_weapons"), e))
+                .map_err(|e| {
+                    describe_logs_cache(&e).into_op(tr!("messages.action.read_class_weapons"))
+                })
         });
         cx.spawn(async move |page, cx| {
             let read = reading.await;
@@ -396,7 +400,8 @@ impl LogsTfPage {
                 let Ok(batch) = page.update(cx, |_, cx| {
                     run_blocking(cx, |s| {
                         s.logs.cache().count_weapons(WEAPON_BATCH).map_err(|e| {
-                            OpError::core(tr!("messages.action.count_weapon_stats"), e)
+                            describe_logs_cache(&e)
+                                .into_op(tr!("messages.action.count_weapon_stats"))
                         })
                     })
                 }) else {
@@ -420,10 +425,10 @@ impl LogsTfPage {
             loop {
                 let Ok(batch) = page.update(cx, |_, cx| {
                     run_blocking(cx, |s| {
-                        s.logs
-                            .cache()
-                            .fill_damage_taken(WEAPON_BATCH)
-                            .map_err(|e| OpError::core(tr!("messages.action.fill_damage_taken"), e))
+                        s.logs.cache().fill_damage_taken(WEAPON_BATCH).map_err(|e| {
+                            describe_logs_cache(&e)
+                                .into_op(tr!("messages.action.fill_damage_taken"))
+                        })
                     })
                 }) else {
                     break;
@@ -650,19 +655,22 @@ impl LogsTfPage {
     // the open one, and its row remeasures to fit the panel.
     fn read_detail(&mut self, id: u64, cx: &mut Context<Self>) {
         let reading = run_blocking(cx, move |s| {
-            let failed = |e| OpError::core(tr!("messages.action.read_logs_tf_log"), e);
+            let title = || tr!("messages.action.read_logs_tf_log");
+            let unreadable = |detail: String| {
+                LocalFailure::new(tr!("messages.logs_tf.log_unreadable"), detail).into_op(title())
+            };
             let opened = s
                 .logs
                 .cache()
                 .open_body(id, chrono::Utc::now().timestamp())
-                .map_err(|e| failed(e.to_string()))?;
+                .map_err(|e| describe_logs_cache(&e).into_op(title()))?;
             match opened {
                 OpenedBody::Body(body) => parse_log(&body)
                     .map(Some)
-                    .map_err(|e| failed(e.to_string())),
+                    .map_err(|e| unreadable(e.to_string())),
                 OpenedBody::Trimmed => Ok(None),
-                OpenedBody::Damaged => Err(failed("the stored body is damaged".into())),
-                OpenedBody::Missing | _ => Err(failed("no stored body".into())),
+                OpenedBody::Damaged => Err(unreadable("the stored body is damaged".into())),
+                OpenedBody::Missing | _ => Err(unreadable("no stored body".into())),
             }
         });
         cx.spawn(async move |page, cx| {
@@ -1152,10 +1160,9 @@ impl LogsTfPage {
                     let player = player.with_nickname(Some(&nickname));
                     let saving = page.update(cx, |_, cx| {
                         run_blocking(cx, move |s| {
-                            s.logs
-                                .cache()
-                                .add_player(&player)
-                                .map_err(|e| OpError::core(tr!("messages.action.add_player"), e))
+                            s.logs.cache().add_player(&player).map_err(|e| {
+                                describe_logs_cache(&e).into_op(tr!("messages.action.add_player"))
+                            })
                         })
                     });
                     match saving {
@@ -1234,7 +1241,9 @@ impl LogsTfPage {
         let selected = self.selected_class;
         let loading = run_blocking(cx, move |s| {
             let cache = s.logs.cache();
-            let read = |e| OpError::core(tr!("messages.action.load_logs_tf_players"), e);
+            let read = |e: LogsCacheError| {
+                describe_logs_cache(&e).into_op(tr!("messages.action.load_logs_tf_players"))
+            };
             let players = cache.players().map_err(read)?;
             let active = cache.active_player().map_err(read)?;
             let range = cache.range().map_err(read)?;

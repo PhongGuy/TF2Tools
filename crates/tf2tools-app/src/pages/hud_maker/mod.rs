@@ -990,14 +990,22 @@ impl HudMakerPage {
             // A copy reads its own layers over the game's; any other made HUD the game's.
             let files = match s.library.made_hud_files(&id, &tf_dir) {
                 Ok(files) => files,
-                Err(HudLoadError::Files(e)) => return Err(OpError::core(action.clone(), e)),
+                Err(HudLoadError::Files(e)) => {
+                    return Err(
+                        LocalFailure::new(hud_files(), e.to_string()).into_op(action.clone())
+                    );
+                }
                 Err(e) => return Ok(Err(load_failed(e))),
             };
             let copy_tf = (s.library.copy_base(&id).ok().flatten()).map(|_| tf_dir.clone());
             let platform = Platform::current().unwrap_or(Platform::Linux);
             let made = match s.library.open_made_hud(&id, &files, platform) {
                 Ok(made) => made,
-                Err(HudLoadError::Files(e)) => return Err(OpError::core(action.clone(), e)),
+                Err(HudLoadError::Files(e)) => {
+                    return Err(
+                        LocalFailure::new(hud_files(), e.to_string()).into_op(action.clone())
+                    );
+                }
                 Err(e) => return Ok(Err(load_failed(e))),
             };
             // Everything drawn reads the switched files; saves start from the files on disk.

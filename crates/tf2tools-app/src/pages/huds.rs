@@ -1375,7 +1375,7 @@ fn conflict_box(cx: &App) -> AnyElement {
 pub fn make_missing_thumbnails(cx: &mut App) {
     let making = run_blocking(cx, |s| {
         (s.library.make_missing_hud_thumbnails())
-            .map_err(|e| OpError::core(tr!("messages.action.make_hud_pictures"), e))
+            .map_err(|e| describe_library(&e).into_op(tr!("messages.action.make_hud_pictures")))
     });
     cx.spawn(async move |cx| match making.await {
         Ok(0) => {}

@@ -23,7 +23,8 @@ use super::tip::tipped;
 use super::{HudMakerPage, Load, parts, recipes::PreviewNote};
 use crate::i18n::{plural, tr};
 use crate::ids;
-use crate::services::{OpError, Services, require_tf2, run_blocking};
+use crate::local_messages::describe_library;
+use crate::services::{Services, require_tf2, run_blocking};
 use crate::shell::toast::{ToastKind, toast};
 use crate::widgets::labelled;
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
@@ -303,9 +304,9 @@ impl HudMakerPage {
         let except = self.saved_hud.clone();
         let (reads, load) = (self.borrow.reads, self.loads);
         let job = run_blocking(cx, move |s: &Services| {
-            s.library
-                .list_borrowable(except.as_ref())
-                .map_err(|e| OpError::core(tr!("messages.action.list_borrowable_huds"), e))
+            s.library.list_borrowable(except.as_ref()).map_err(|e| {
+                describe_library(&e).into_op(tr!("messages.action.list_borrowable_huds"))
+            })
         });
         let win = self.win;
         cx.spawn(async move |page, cx| {

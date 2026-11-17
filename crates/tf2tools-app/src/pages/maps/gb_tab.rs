@@ -25,13 +25,14 @@ use crate::addon_detail::open_addon_detail;
 use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer};
 use crate::i18n::tr;
 use crate::ids;
+use crate::local_messages::describe_store_status;
 use crate::maps_sync::{MapsSync, MapsSyncEvent, maps_sync};
 use crate::mature::MatureAddons;
 use crate::pages::addon_store::card::{OpenAddon, card_height, gb_addon_card};
 use crate::pages::addon_store::gamebanana_tab::CategoryOption;
 use crate::pages::common::{SkeletonTop, empty_state_with_action, skeleton_cards};
 use crate::remote_images::{ImageKey, RemoteImages};
-use crate::services::{OpError, run_blocking};
+use crate::services::run_blocking;
 use crate::store_grid::feed::{
     Feed, FeedItem, Gate, PAGE, REQUERY_INTERVAL, Throttle, anchored_scroll, first_visible, reload,
 };
@@ -461,7 +462,7 @@ impl GbMapsTab {
         let reading = run_blocking(cx, move |s| {
             s.store
                 .gb_map_cards(&query)
-                .map_err(|e| OpError::core(tr!("messages.action.load_gb_maps"), e))
+                .map_err(|e| describe_store_status(&e).into_op(tr!("messages.action.load_gb_maps")))
         });
         cx.spawn(async move |tab, cx| {
             let page = reading.await;
@@ -561,9 +562,9 @@ impl GbMapsTab {
                     Some(cursor) => page.with_after(cursor),
                     None => page,
                 };
-                s.store
-                    .gb_map_cards(&page)
-                    .map_err(|e| OpError::core(tr!("messages.action.load_gb_maps"), e))
+                s.store.gb_map_cards(&page).map_err(|e| {
+                    describe_store_status(&e).into_op(tr!("messages.action.load_gb_maps"))
+                })
             })
         });
         cx.spawn(async move |tab, cx| {
@@ -626,9 +627,9 @@ impl GbMapsTab {
     // Fills the gamemode Select from the stored tree; a failure leaves it at "All gamemodes".
     fn load_gamemodes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let reading = run_blocking(cx, |s| {
-            s.store
-                .gb_map_gamemodes()
-                .map_err(|e| OpError::core(tr!("messages.action.load_gamemodes"), e))
+            s.store.gb_map_gamemodes().map_err(|e| {
+                describe_store_status(&e).into_op(tr!("messages.action.load_gamemodes"))
+            })
         });
         cx.spawn_in(window, async move |tab, cx| {
             let gamemodes = match reading.await {

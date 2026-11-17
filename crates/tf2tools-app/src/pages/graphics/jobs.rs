@@ -11,7 +11,7 @@ use tf2tools_core::{
 
 use super::model::{SettingsNote, catalog_note, describe_apply_modules, describe_install};
 use crate::i18n::tr;
-use crate::local_messages::describe_store_status;
+use crate::local_messages::{describe_join, describe_store_status};
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::services::{OpError, Services};
 use crate::shell::confirm::{Confirm, confirm};
@@ -70,7 +70,7 @@ pub fn install_base(
     let job = tokio_bridge::spawn(cx, async move {
         tokio::task::spawn_blocking(move || refuse_while_running(&*probe))
             .await
-            .map_err(|e| OpError::core(action.clone(), e))??;
+            .map_err(|e| describe_join(&e).into_op(action.clone()))??;
         let known = store
             .mastercomfig_release()
             .map_err(|e| describe_store_status(&e).into_op(action.clone()))?
@@ -89,7 +89,7 @@ pub fn install_base(
             own_file_kept,
         })
     });
-    async move { job.await.map_err(|e| OpError::core(died, e))? }
+    async move { job.await.map_err(|e| describe_join(&e).into_op(died))? }
 }
 
 // Applies the saved module choices (if any) against `version`'s catalog and returns the names it
@@ -164,7 +164,8 @@ pub fn apply_modules(
     if !tokio_bridge::is_running(cx) {
         tokio_bridge::init(cx);
     }
-    let died = |e: tokio::task::JoinError| ModulesFailure::Op(OpError::core(save_failed(), e));
+    let died =
+        |e: tokio::task::JoinError| ModulesFailure::Op(describe_join(&e).into_op(save_failed()));
     let job = tokio_bridge::spawn(cx, async move {
         if guard_tf2 {
             tokio::task::spawn_blocking(move || refuse_while_running(&*probe))
@@ -185,7 +186,7 @@ pub fn apply_modules(
     });
     async move {
         job.await
-            .map_err(|e| ModulesFailure::Op(OpError::core(save_failed(), e)))?
+            .map_err(|e| ModulesFailure::Op(describe_join(&e).into_op(save_failed())))?
     }
 }
 
@@ -236,7 +237,7 @@ pub fn check_for_updates(
         tokio_bridge::init(cx);
     }
     let job = tokio_bridge::spawn(cx, async move { force_sync(&store, &action).await });
-    async move { job.await.map_err(|e| OpError::core(died, e))? }
+    async move { job.await.map_err(|e| describe_join(&e).into_op(died))? }
 }
 
 /// The catalog of `tag` through the store (disk, else GitHub) on the tokio bridge. A failure

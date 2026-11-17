@@ -4,8 +4,8 @@
 use tf2tools_core::{
     ApplyProfileError, CopyHudError, DetectError, FontInstallError, GbAddonInstallError,
     GbMapInstallError, GbMapRemoveError, HudLoadError, ImportError, InstallError, KeepHudError,
-    LibraryError, LogError, MakeHudError, PaintError, PngReadError, PngWriteError, ProfileError,
-    QueryError, SettingsError, UpdateCopyError, WavError,
+    LibraryError, LogError, LogsCacheError, MakeHudError, PaintError, PngReadError, PngWriteError,
+    ProfileError, QueryError, SettingsError, UpdateCopyError, WavError,
 };
 
 use gpui_kit::SharedString;
@@ -678,6 +678,20 @@ pub fn describe_log(err: &LogError) -> LocalFailure {
         _ => unknown(),
     };
     LocalFailure::new(message, err.to_string())
+}
+
+/// A failed read or write of the logs.tf cache; `detail` is the error's own text.
+pub fn describe_logs_cache(err: &LogsCacheError) -> LocalFailure {
+    let message = match err {
+        LogsCacheError::Database { .. } => tr!("messages.local.logs_cache.database"),
+        _ => unknown(),
+    };
+    LocalFailure::new(message, err.to_string())
+}
+
+/// A background job that panicked or was cancelled; `detail` is the JoinError's text.
+pub fn describe_join(err: &tokio::task::JoinError) -> LocalFailure {
+    LocalFailure::new(internal(), err.to_string())
 }
 
 /// Why the app could not start, in player words; `detail` is the error's own text.

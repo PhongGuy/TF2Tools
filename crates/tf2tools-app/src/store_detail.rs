@@ -18,8 +18,9 @@ use tf2tools_core::{StoreFile, StoreItem, StoreItemId, StoreKind};
 
 use crate::i18n::tr;
 use crate::ids;
+use crate::local_messages::describe_store_status;
 use crate::pages::common::badge_of;
-use crate::services::{OpError, Services, run_blocking};
+use crate::services::{Services, run_blocking};
 use crate::shell::toast::{ToastKind, toast};
 use crate::store_download::{
     DownloadEvent, DownloadTarget, StoreDownloads, format_bytes, progress_label, progress_percent,
@@ -161,7 +162,7 @@ impl StoreDetail {
         let read = run_blocking(cx, move |s| {
             s.store
                 .store_item(kind, &id)
-                .map_err(|e| OpError::core(tr!("messages.action.read_store"), e))
+                .map_err(|e| describe_store_status(&e).into_op(tr!("messages.action.read_store")))
         });
         // A missing row silently leaves the carousel and body empty; an unreadable one also toasts.
         let item_task = cx.spawn(async move |this, cx| match read.await {

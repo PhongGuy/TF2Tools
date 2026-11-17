@@ -1981,3 +1981,13 @@ pub fn icon_png(env: &Env) -> PathBuf {
 pub fn sql(env: &Env) -> rusqlite::Connection {
     rusqlite::Connection::open(env.data.db_path()).unwrap()
 }
+
+/// A real `JoinError`: a task aborted before it finished.
+pub fn cancelled_join() -> tokio::task::JoinError {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .build()
+        .unwrap();
+    let task = rt.spawn(std::future::pending::<()>());
+    task.abort();
+    rt.block_on(task).unwrap_err()
+}

@@ -27,11 +27,12 @@ use super::curated::{CuratedFilter, CuratedHud, Facet, Os, count_label, facets};
 use crate::gb_card::OpenCard;
 use crate::i18n::tr;
 use crate::ids;
+use crate::local_messages::{describe_library, describe_store_status};
 use crate::pages::common::{
     SkeletonTop, badge_rows, card_frame, empty_state_card, skeleton_cards, tag_badge,
 };
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
-use crate::services::{OpError, run_blocking};
+use crate::services::run_blocking;
 use crate::store_detail::{DetailItem, open_detail};
 use crate::store_download::{DownloadEvent, StoreDownloads, download_button};
 use crate::store_messages::read_failed;
@@ -215,14 +216,13 @@ impl CuratedTab {
             return;
         }
         let read = run_blocking(cx, |s| {
-            let items = s
-                .store
-                .store_items(KIND)
-                .map_err(|e| OpError::core(tr!("messages.action.load_the_store"), e))?;
+            let items = s.store.store_items(KIND).map_err(|e| {
+                describe_store_status(&e).into_op(tr!("messages.action.load_the_store"))
+            })?;
             let library = s
                 .library
                 .list_huds()
-                .map_err(|e| OpError::core(tr!("messages.action.load_the_store"), e))?;
+                .map_err(|e| describe_library(&e).into_op(tr!("messages.action.load_the_store")))?;
             let huds: Vec<CuratedHud> = items.iter().filter_map(CuratedHud::from_item).collect();
             let downloaded: HashSet<String> = library
                 .iter()

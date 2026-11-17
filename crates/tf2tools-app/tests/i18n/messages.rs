@@ -12,10 +12,10 @@ use tf2tools_core::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, BrowseError, CopyHudError, DetectError,
     DownloadError, FilesError, FontInstallError, GbAddonFetchError, GbAddonInstallError, GbId,
     GbMapInstallError, GbMapRemoveError, HudLoadError, ImportError, InstallError,
-    InstallMastercomfigError, KeepHudError, LibraryError, LogError, MakeHudError, MapDownloadError,
-    MapRemoveError, MastercomfigStatusError, PaintError, PngReadError, PngWriteError, PreviewError,
-    ProfileError, QueryError, RemoveMastercomfigError, SettingsError, StoreKind, SyncError,
-    TakeOverError, UpdateCopyError,
+    InstallMastercomfigError, KeepHudError, LibraryError, LogError, LogsCacheError, MakeHudError,
+    MapDownloadError, MapRemoveError, MastercomfigStatusError, PaintError, PngReadError,
+    PngWriteError, PreviewError, ProfileError, QueryError, RemoveMastercomfigError, SettingsError,
+    StoreKind, SyncError, TakeOverError, UpdateCopyError,
 };
 
 use crate::LocaleGuard;
@@ -326,5 +326,26 @@ fn sync_and_update_failure_titles_read_in_russian() {
     assert_eq!(
         sync::sync_failed_title(StoreKind::Sounds),
         "Failed to sync Sounds"
+    );
+}
+
+#[test]
+fn logs_cache_and_stopped_job_failures_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let cache = local::describe_logs_cache(&LogsCacheError::Database {
+        message: "disk I/O error".into(),
+    });
+    assert_russian(&cache.message);
+    assert!(!cache.message.contains("disk I/O"), "{}", cache.message);
+    let stopped = local::describe_join(&crate::support::cancelled_join());
+    assert_russian(&stopped.message);
+    let store = local::describe_store_status(&QueryError::Database {
+        message: "no such table".into(),
+    });
+    assert_russian(&store.message);
+    assert!(
+        !store.message.contains("no such table"),
+        "{}",
+        store.message
     );
 }
