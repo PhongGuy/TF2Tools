@@ -2,6 +2,7 @@
 //! first time any thread hits it, so a sibling test without a subscriber would silence this one.
 
 use crate::support;
+use crate::support::update_fake::{act, failure, fake_updater, offer, reach_available, wait_state};
 
 use std::sync::{Arc, Mutex};
 
@@ -10,6 +11,7 @@ use tf2tools_app::local_messages::{LocalFailure, gb_install_op, hud_files, inter
 use tf2tools_app::pages::graphics::jobs::save_failed;
 use tf2tools_app::services::{OpError, run_blocking};
 use tf2tools_app::store_messages::no_tf2;
+use tf2tools_app::updater::UpdateState;
 use tf2tools_core::GbAddonInstallError;
 
 struct Capture(Arc<Mutex<Vec<u8>>>);
@@ -117,4 +119,30 @@ fn the_developer_log_stays_english_for_a_russian_player() {
         log.contains("store download failed: no TF2 folder is set"),
         "{log}"
     );
+}
+
+// A Russian player's failed update writes the player's message to the activity row only;
+// the developer warning names the action in English.
+#[gpui_kit::test]
+fn the_update_failure_warning_stays_english(cx: &mut TestAppContext) {
+    if !support::in_own_process("local_log::the_update_failure_warning_stays_english") {
+        return;
+    }
+    let buf = capture_log();
+    tf2tools_app::i18n::apply("ru");
+    let (u, fake) = fake_updater(cx, true);
+    reach_available(cx, &u, &fake, offer("6.0.1", true));
+    act(cx, &u, |u, cx| u.download(cx));
+    let (sink, reply) = fake.next_download(cx);
+    drop(sink);
+    reply
+        .send(Err(failure("Загруженный файл повреждён.", false)))
+        .unwrap();
+    wait_state(cx, &u, "Available again", |s| {
+        matches!(s, UpdateState::Available(_))
+    });
+    let log = logged(&buf);
+    assert!(log.contains("update failed"), "{log}");
+    assert!(log.contains("update-download"), "{log}");
+    assert!(!log.chars().any(cyrillic), "{log}");
 }

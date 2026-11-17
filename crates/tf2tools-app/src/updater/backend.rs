@@ -164,6 +164,7 @@ pub fn core_backend(
             let wanted = lock(&offer).clone();
             Box::pin(async move {
                 let Some(wanted) = wanted else {
+                    tracing::warn!("update download asked for before a check found an offer");
                     return Err(says(tr!("updater.failure.check_first"), false));
                 };
                 let fetch = client.download(&wanted, &target, |received, total| {
@@ -189,6 +190,7 @@ pub fn core_backend(
 
     let apply_staged = Arc::new(move || {
         let Some(update) = lock(&staged).take() else {
+            tracing::warn!("update install asked for before a download was staged");
             return Err(says(tr!("updater.failure.download_first"), false));
         };
         match apply(update) {

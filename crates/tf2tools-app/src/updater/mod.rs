@@ -450,7 +450,8 @@ impl Updater {
         failure: Failure,
         cx: &mut Context<Self>,
     ) {
-        tracing::warn!(message = %failure.message, action, "update failed");
+        // The player's message is translated; the backend already logged the English cause.
+        tracing::warn!(action, "update failed");
         offer.installable &= !failure.use_release_page;
         activity::record(
             cx,
