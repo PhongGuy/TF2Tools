@@ -1346,3 +1346,20 @@ messages:
     uninstall_hitsound: "Не удалось удалить хитсаунд из игры"
     install_killsound: "Не удалось установить килсаунд"
     uninstall_killsound: "Не удалось удалить килсаунд из игры"
+header:
+  sidebar_toggle: "Свернуть или развернуть боковую панель"
+  shortcuts:
+    tooltip: "Сочетания клавиш (?)"
+    name: "Сочетания клавиш"
+  play: "Играть в TF2"
+  tf2_running: "TF2 уже запущена"
+  badge:
+    connected: "TF2 подключена"
+    missing: "TF2 не найдена"
+  sync:
+    curated: "Синхронизация HUD из подборки..."
+    progress:
+      sounds: "Синхронизация звуков: %{done} / %{total}"
+      crosshairs: "Синхронизация прицелов: %{done} / %{total}"
+      gamebanana_huds: "Синхронизация HUD с GameBanana: %{done} / %{total}"
+      store: "Синхронизация магазина: %{done} / %{total}"

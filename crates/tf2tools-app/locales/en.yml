@@ -1348,3 +1348,20 @@ messages:
     uninstall_hitsound: "Failed to uninstall hitsound"
     install_killsound: "Failed to install killsound"
     uninstall_killsound: "Failed to uninstall killsound"
+header:
+  sidebar_toggle: "Toggle Sidebar"
+  shortcuts:
+    tooltip: "Keyboard shortcuts (?)"
+    name: "Keyboard shortcuts"
+  play: "Play TF2"
+  tf2_running: "TF2 is already running"
+  badge:
+    connected: "TF2 Connected"
+    missing: "TF2 Not Found"
+  sync:
+    curated: "Syncing Curated HUDs..."
+    progress:
+      sounds: "Syncing Sounds: %{done} / %{total}"
+      crosshairs: "Syncing Crosshairs: %{done} / %{total}"
+      gamebanana_huds: "Syncing GameBanana HUDs: %{done} / %{total}"
+      store: "Syncing Store: %{done} / %{total}"

@@ -10,8 +10,8 @@ use gpui_kit::component::{
 };
 use gpui_kit::{
     App, Context, Div, ElementId, FontWeight, InteractiveElement as _, IntoElement, MouseButton,
-    ParentElement as _, Pixels, Role, Stateful, StatefulInteractiveElement as _, Styled as _,
-    TestSupportExt as _, div, px, transparent_black,
+    ParentElement as _, Pixels, Role, SharedString, Stateful, StatefulInteractiveElement as _,
+    Styled as _, TestSupportExt as _, div, px, transparent_black,
 };
 
 use tf2tools_core::StoreKind;
@@ -20,11 +20,12 @@ use super::leave::should_close;
 use super::route::Page;
 use super::sidebar::icon as nav_icon;
 use super::{HEADER_HEIGHT, Shell};
+use crate::i18n::tr;
 use crate::ids;
 use crate::logs_sync::{ring_fill, try_logs_sync};
 use crate::pages::logs_tf::text::ring_label;
 use crate::services::{Tf2State, tf2_state};
-use crate::sync::{store_name, store_slug, sync_hub};
+use crate::sync::{store_slug, sync_hub};
 use crate::widgets::Named as _;
 use crate::widgets::sync_ring::{RingColors, SyncRing};
 
@@ -96,7 +97,7 @@ fn content(
                         .icon(IconName::PanelLeft)
                         // v5's `size-7` trigger around a 16 px icon: medium icon, 28 px box.
                         .size(px(28.))
-                        .named("Toggle Sidebar")
+                        .named(tr!("header.sidebar_toggle"))
                         .on_click(
                             cx.listener(|shell, _, window, cx| shell.toggle_sidebar(window, cx)),
                         ),
@@ -137,8 +138,8 @@ fn shortcuts_button(cx: &mut Context<Shell>) -> impl IntoElement + use<> {
                 .ghost()
                 .small()
                 .icon(IconName::CircleQuestionMark)
-                .tooltip("Keyboard shortcuts (?)")
-                .accessibility_label("Keyboard shortcuts")
+                .tooltip(tr!("header.shortcuts.tooltip"))
+                .accessibility_label(tr!("header.shortcuts.name"))
                 .on_click(cx.listener(|shell, _, window, cx| {
                     if let Some(page) = shell.hud_maker_page() {
                         page.update(cx, |page, cx| page.show_shortcuts(window, cx));
@@ -154,23 +155,20 @@ const COMPACT_BELOW: Pixels = px(1024.);
 // Starts TF2 through Steam; only while TF2 is found, and waiting while it already runs.
 fn play_button(tf2_running: bool, compact: bool, cx: &App) -> Option<impl IntoElement + use<>> {
     tf2_state(cx).read(cx).install()?;
+    let play = tr!("header.play");
     let button = Button::new(ids::PLAY_TF2)
         .primary()
         .small()
         .icon(IconName::Play)
-        .accessibility_label("Play TF2")
+        .accessibility_label(play.clone())
         .disabled(tf2_running)
         .on_click(|_, _, cx| cx.open_url(PLAY_TF2_URL));
     let button = match (tf2_running, compact) {
-        (true, _) => button.tooltip("TF2 is already running"),
-        (false, true) => button.tooltip("Play TF2"),
+        (true, _) => button.tooltip(tr!("header.tf2_running")),
+        (false, true) => button.tooltip(play.clone()),
         (false, false) => button,
     };
-    let button = if compact {
-        button
-    } else {
-        button.label("Play TF2")
-    };
+    let button = if compact { button } else { button.label(play) };
     // Like the sidebar toggle, a press on the button must not start a window move.
     Some(
         div()
@@ -189,15 +187,15 @@ fn tf2_badge(cx: &App) -> Option<impl IntoElement + use<>> {
         Tf2State::Detecting => return None,
         Tf2State::Found(_) => (
             Tag::secondary().min_w(TF2_BADGE_MIN_WIDTH).justify_center(),
-            "TF2 Connected",
+            tr!("header.badge.connected"),
         ),
-        Tf2State::Missing { .. } => (Tag::danger(), "TF2 Not Found"),
+        Tf2State::Missing { .. } => (Tag::danger(), tr!("header.badge.missing")),
     };
     Some(
         div()
             .id(ids::TF2_BADGE)
             .role(Role::Status)
-            .aria_label(text)
+            .aria_label(text.clone())
             .test_support()
             // shadcn's Badge: a borderless pill, `px-2 py-0.5 text-xs font-medium`.
             .child(
@@ -244,14 +242,9 @@ fn sync_rings(cx: &App) -> Vec<impl IntoElement + use<>> {
             let tick = hub.progress(kind)?;
             let curated = kind == StoreKind::CuratedHuds;
             let label = if curated {
-                "Syncing Curated HUDs...".to_owned()
+                tr!("header.sync.curated")
             } else {
-                format!(
-                    "Syncing {}: {} / {}",
-                    store_name(kind),
-                    tick.fetched,
-                    tick.total
-                )
+                store_ring_label(kind, tick.fetched, tick.total)
             };
             let value = if tick.total == 0 {
                 0.
@@ -276,6 +269,32 @@ fn sync_rings(cx: &App) -> Vec<impl IntoElement + use<>> {
         .collect()
 }
 
+// One whole sentence per ringed store, so each language words its own store name; the counts
+// stay plain digits to match the logs.tf ring.
+fn store_ring_label(kind: StoreKind, done: u32, total: u32) -> SharedString {
+    let (done, total) = (done.to_string(), total.to_string());
+    match kind {
+        StoreKind::Sounds => tr!("header.sync.progress.sounds", done = done, total = total),
+        StoreKind::Crosshairs => {
+            tr!(
+                "header.sync.progress.crosshairs",
+                done = done,
+                total = total
+            )
+        }
+        StoreKind::GameBananaHuds => {
+            tr!(
+                "header.sync.progress.gamebanana_huds",
+                done = done,
+                total = total
+            )
+        }
+        StoreKind::CuratedHuds | StoreKind::Addons | _ => {
+            tr!("header.sync.progress.store", done = done, total = total)
+        }
+    }
+}
+
 // The logs.tf sync's ring after the store rings: counts while logs download, spinning while
 // the list is read. Unlike the store rings it opens its page, through the shell's leave guard.
 fn logs_ring(cx: &mut Context<Shell>) -> Option<impl IntoElement + use<>> {
@@ -288,7 +307,7 @@ fn logs_ring(cx: &mut Context<Shell>) -> Option<impl IntoElement + use<>> {
         Ring {
             id: ids::logstf_sync_ring(),
             slug: "logs-tf",
-            label: ring_label(progress),
+            label: ring_label(progress).into(),
             value: fill.unwrap_or_default(),
             spinning: fill.is_none(),
             icon: nav_icon(Page::LogsTf),
@@ -310,7 +329,7 @@ fn logs_ring(cx: &mut Context<Shell>) -> Option<impl IntoElement + use<>> {
 struct Ring {
     id: ElementId,
     slug: &'static str,
-    label: String,
+    label: SharedString,
     value: f32,
     spinning: bool,
     icon: IconName,

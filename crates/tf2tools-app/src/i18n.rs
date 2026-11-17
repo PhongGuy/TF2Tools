@@ -269,6 +269,7 @@ mod tests {
             "addon_detail",
             "confirm",
             "font_check",
+            "header",
         ]
         .map(str::to_owned)
         .into()
@@ -787,6 +788,15 @@ mod tests {
         "updater/view.rs",
         "updater/backend.rs",
         "updater/keys.rs",
+        "shell/header.rs",
+        "sync.rs",
+        "widgets/sync_ring.rs",
+        "widgets/dialog_frame.rs",
+        "widgets/tip.rs",
+        "widgets/card_grid.rs",
+        "widgets/scroll.rs",
+        "shell/toast.rs",
+        "shell/mod.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -897,11 +907,24 @@ mod tests {
             "{}/PhongGuy/TF2Tools/releases/latest",
             "developer detail: the release URL",
         ),
+        (
+            "sync.rs",
+            "the sync stopped: {e}",
+            "developer detail of a stopped sync",
+        ),
+        ("sync.rs", "Curated HUDs", STORE_FIELD),
+        ("sync.rs", "GameBanana HUDs", STORE_FIELD),
+        ("sync.rs", "Sounds", STORE_FIELD),
+        ("sync.rs", "Crosshairs", STORE_FIELD),
+        ("sync.rs", "Addons", STORE_FIELD),
+        ("sync.rs", "Store", STORE_FIELD),
+        ("shell/mod.rs", "Shell", "developer detail: a key context"),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
     const OS_NAME: &str = "a proper noun, the OS filter's label";
     const STOPPED_LABEL: &str = "developer detail: a stopped task's log label";
+    const STORE_FIELD: &str = "developer detail: the store's tracing field";
 
     #[test]
     fn library_pages_show_no_english_literal() {
