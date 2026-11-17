@@ -269,6 +269,18 @@ store_download:
     in_library: "In Library"
     redownload: "Re-download"
 
+sound_store:
+  source: "Hitsounds and killsounds from GameBanana."
+  category:
+    title: "Category:"
+    all: "All"
+    hitsounds: "Hitsounds"
+    killsounds: "Killsounds"
+    sound: "Sound"
+  preview:
+    play: "Play Preview"
+    stop: "Stop Preview"
+
 logs_tf:
   progress:
     finding: "Finding logs: %{listed} of %{total}"

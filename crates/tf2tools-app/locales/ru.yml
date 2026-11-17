@@ -267,6 +267,18 @@ store_download:
     in_library: "В библиотеке"
     redownload: "Скачать снова"
 
+sound_store:
+  source: "Хитсаунды и килсаунды с GameBanana."
+  category:
+    title: "Категория:"
+    all: "Все"
+    hitsounds: "Хитсаунды"
+    killsounds: "Килсаунды"
+    sound: "Звук"
+  preview:
+    play: "Воспроизвести"
+    stop: "Остановить"
+
 logs_tf:
   progress:
     finding: "Поиск логов: %{listed} из %{total}"

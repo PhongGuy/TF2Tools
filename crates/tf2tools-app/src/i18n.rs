@@ -264,6 +264,7 @@ mod tests {
             "addon_store",
             "store_grid",
             "store_download",
+            "sound_store",
             "confirm",
             "font_check",
         ]
@@ -765,6 +766,11 @@ mod tests {
         "pages/hud_store/gamebanana_tab.rs",
         "pages/hud_store/mod.rs",
         "gb_card.rs",
+        "pages/sound_store/body.rs",
+        "pages/sound_store/card.rs",
+        "pages/sound_store/model.rs",
+        "pages/sound_store/mod.rs",
+        "store_preview.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).

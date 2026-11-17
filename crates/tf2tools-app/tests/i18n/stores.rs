@@ -3,6 +3,7 @@
 use gpui_kit::TestAppContext;
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_store::HudStorePage;
+use tf2tools_app::pages::sound_store::model::{Category, category_label};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::store_grid::{SEARCH_DEBOUNCE, StoreGridConfig, sort_label};
@@ -259,4 +260,56 @@ fn the_curated_search_follows_a_language_switch(cx: &mut TestAppContext) {
         shown_text(cx, win, ids::STORE_SEARCH).as_deref(),
         Some("Поиск HUD...")
     );
+}
+
+#[gpui_kit::test]
+fn the_sound_store_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, missing());
+    support::seed_sounds(
+        &env,
+        &[(1, "Ding", "hitsound", Some("https://x.invalid/1.mp3"))],
+    );
+    support::click_id(cx, s.win, ids::nav(Page::SoundStore));
+    let page = cx
+        .update(|cx| s.shell.read(cx).sound_store_page())
+        .expect("the Sound Store");
+    let grid = cx.update(|cx| page.read(cx).grid().clone());
+    support::wait_real(cx, "the grid", |cx| {
+        cx.update(|cx| grid.read(cx).is_loaded())
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HEADER_TITLE).as_deref(),
+        Some("Магазин звуков")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::SOUND_STORE_SOURCE).as_deref(),
+        Some("Хитсаунды и килсаунды с GameBanana.")
+    );
+    assert_eq!(
+        shown_text(cx, s.win, ids::STORE_SEARCH).as_deref(),
+        Some("Поиск звуков...")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::store_download(StoreKind::Sounds, &gb(1))).as_deref(),
+        Some("Скачать")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::store_play(StoreKind::Sounds, &gb(1))).as_deref(),
+        Some("Воспроизвести")
+    );
+}
+
+#[test]
+fn sound_store_labels_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let pills: Vec<String> = Category::ALL
+        .iter()
+        .map(|c| c.label().to_string())
+        .collect();
+    assert_eq!(pills, ["Все", "Хитсаунды", "Килсаунды"]);
+    assert_eq!(category_label(Some("hitsound")), "Хитсаунд");
+    assert_eq!(category_label(Some("killsound")), "Килсаунд");
+    assert_eq!(category_label(None), "Звук");
 }

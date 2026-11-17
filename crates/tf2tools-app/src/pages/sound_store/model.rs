@@ -1,8 +1,10 @@
 //! The Sound Store's pure view model: category pills, the card badge and counts, and the
 //! sync banner's text, count and percentage.
 
-use tf2tools_core::StoreKind;
+use gpui_kit::SharedString;
+use tf2tools_core::{SoundKind, StoreKind};
 
+use crate::i18n::{names, tr};
 use crate::widgets::sync_banner;
 pub use crate::widgets::sync_banner::{banner_count, banner_percent};
 
@@ -19,11 +21,11 @@ impl Category {
     pub const ALL: [Category; 3] = [Category::All, Category::Hitsounds, Category::Killsounds];
 
     /// The pill's text.
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> SharedString {
         match self {
-            Category::All => "All",
-            Category::Hitsounds => "Hitsounds",
-            Category::Killsounds => "Killsounds",
+            Category::All => tr!("sound_store.category.all"),
+            Category::Hitsounds => tr!("sound_store.category.hitsounds"),
+            Category::Killsounds => tr!("sound_store.category.killsounds"),
         }
     }
 
@@ -42,12 +44,12 @@ impl Category {
     }
 }
 
-/// v5's `categoryLabel`: "Hitsound", "Killsound", else "Sound".
-pub fn category_label(category: Option<&str>) -> &'static str {
+/// v5's `categoryLabel`: "Hitsound", "Killsound", else "Sound", in the player's language.
+pub fn category_label(category: Option<&str>) -> SharedString {
     match category {
-        Some("hitsound") => "Hitsound",
-        Some("killsound") => "Killsound",
-        _ => "Sound",
+        Some("hitsound") => names::sound_kind_name(SoundKind::Hitsound),
+        Some("killsound") => names::sound_kind_name(SoundKind::Killsound),
+        _ => tr!("sound_store.category.sound"),
     }
 }
 

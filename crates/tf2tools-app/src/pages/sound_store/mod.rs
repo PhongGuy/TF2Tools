@@ -15,6 +15,7 @@ use gpui_kit::{
 use tf2tools_core::{GbId, StoreCard, StoreItemId, StoreKind};
 
 use crate::audio::player::{Player, sound_player};
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::filter_badge;
 use crate::shell::CONTENT_PADDING;
@@ -155,7 +156,7 @@ impl SoundStorePage {
             .text_sm()
             .font_weight(FontWeight::MEDIUM)
             .text_color(cx.theme().muted_foreground)
-            .child("Category:");
+            .child(tr!("sound_store.category.title"));
         let mut pill = |category: Category| {
             filter_badge(
                 ids::store_category(category.slug()),
@@ -214,7 +215,7 @@ impl Render for SoundStorePage {
             .child(labelled(
                 div().text_sm().text_color(cx.theme().muted_foreground),
                 ids::SOUND_STORE_SOURCE,
-                "Hitsounds and killsounds from GameBanana.",
+                tr!("sound_store.source"),
             ))
             .child(self.grid.read(cx).search_row(cx))
             .child(self.filter_row(window, cx))
