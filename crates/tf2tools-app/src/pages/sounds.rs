@@ -886,12 +886,12 @@ fn add_to_profile_button(
         .disabled(busy.is_some())
         .dropdown_menu(profile_menu(vec![
             Section {
-                heading: Some("Hitsound in"),
+                heading: Some("Hitsound in".into()),
                 item_id: ids::sound_hit_pick,
                 on_pick: pick(SoundKind::Hitsound),
             },
             Section {
-                heading: Some("Killsound in"),
+                heading: Some("Killsound in".into()),
                 item_id: ids::sound_kill_pick,
                 on_pick: pick(SoundKind::Killsound),
             },

@@ -40,7 +40,7 @@ fn graphics_follows_addons_in_the_tools_group_with_the_gauge_icon() {
     assert_eq!(Page::ALL[at + 1], Page::HudStore);
     let page = Page::Graphics;
     assert_eq!(
-        (page.slug(), page.label(), page.title()),
+        (page.slug(), page.label().as_ref(), page.title().as_ref()),
         ("graphics", "Graphics", "Graphics")
     );
     assert_eq!(nav_icon(page), IconName::Gauge);

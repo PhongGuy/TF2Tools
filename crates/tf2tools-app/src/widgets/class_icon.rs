@@ -4,17 +4,20 @@
 use std::path::Path;
 
 use gpui_kit::{
-    AnyElement, IntoElement as _, ObjectFit, ParentElement as _, Pixels, Styled as _,
+    AnyElement, IntoElement as _, ObjectFit, ParentElement as _, Pixels, SharedString, Styled as _,
     StyledImage as _, div, img,
 };
 use tf2tools_core::TfClass;
 
-/// The short name shown when the icon is missing.
-pub fn class_short_name(class: TfClass) -> &'static str {
+use crate::i18n::names::class_name;
+use crate::i18n::tr;
+
+/// The short name shown when the icon is missing, in the current language.
+pub fn class_short_name(class: TfClass) -> SharedString {
     // The players' own short names for the two long ones, as the loadout board's narrow headers.
     match class {
-        TfClass::Demoman => "Demo",
-        TfClass::Engineer => "Engie",
+        TfClass::Demoman => tr!("common.class_short.demoman"),
+        TfClass::Engineer => tr!("common.class_short.engineer"),
         TfClass::Scout
         | TfClass::Soldier
         | TfClass::Pyro
@@ -22,7 +25,7 @@ pub fn class_short_name(class: TfClass) -> &'static str {
         | TfClass::Medic
         | TfClass::Sniper
         | TfClass::Spy
-        | _ => class.name(),
+        | _ => class_name(class),
     }
 }
 

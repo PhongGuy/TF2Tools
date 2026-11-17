@@ -126,7 +126,50 @@ updater:
     installed: "Установлено обновление TF2Tools v%{version}"
     installer_started: "Запущен установщик TF2Tools v%{version}"
 
+nav:
+  huds: "HUD"
+  sounds: "Звуки"
+  crosshairs: "Прицелы"
+  crosshair_maker: "Редактор прицелов"
+  hud_maker: "Редактор HUD"
+  profiles: "Профили"
+  addons: "Дополнения"
+  graphics: "Графика"
+  hud_store: "Магазин HUD"
+  sound_store: "Магазин звуков"
+  crosshair_store: "Магазин прицелов"
+  addon_store: "Магазин дополнений"
+  maps: "Карты"
+  logs_tf: "logs.tf"
+  settings: "Настройки"
+  logs: "Журнал"
+  activity_log: "Журнал действий"
+
 common:
+  class:
+    scout: "Разведчик"
+    soldier: "Солдат"
+    pyro: "Поджигатель"
+    demoman: "Подрывник"
+    heavy: "Пулемётчик"
+    engineer: "Инженер"
+    medic: "Медик"
+    sniper: "Снайпер"
+    spy: "Шпион"
+  class_short:
+    demoman: "Подрыв."
+    engineer: "Инж."
+  slot:
+    primary: "Основное"
+    secondary: "Дополнительное"
+    melee: "Ближний бой"
+  sound_kind:
+    hitsound: "Хитсаунд"
+    killsound: "Килсаунд"
+  tf2_missing:
+    title: "TF2 не найден"
+    open_settings: "Открыть настройки"
+    needs_tf2: "Сначала укажите папку TF2 в настройках"
   list:
     separator: ", "
     last: "%{rest} и %{last}"

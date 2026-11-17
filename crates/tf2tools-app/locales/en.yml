@@ -128,7 +128,50 @@ updater:
     installed: "Installed TF2Tools v%{version}"
     installer_started: "Started the TF2Tools v%{version} installer"
 
+nav:
+  huds: "HUDs"
+  sounds: "Sounds"
+  crosshairs: "Crosshairs"
+  crosshair_maker: "Crosshair Maker"
+  hud_maker: "HUD Maker"
+  profiles: "Profiles"
+  addons: "Addons"
+  graphics: "Graphics"
+  hud_store: "HUD Store"
+  sound_store: "Sound Store"
+  crosshair_store: "Crosshair Store"
+  addon_store: "Addon Store"
+  maps: "Maps"
+  logs_tf: "logs.tf"
+  settings: "Settings"
+  logs: "Logs"
+  activity_log: "Activity Log"
+
 common:
+  class:
+    scout: "Scout"
+    soldier: "Soldier"
+    pyro: "Pyro"
+    demoman: "Demoman"
+    heavy: "Heavy"
+    engineer: "Engineer"
+    medic: "Medic"
+    sniper: "Sniper"
+    spy: "Spy"
+  class_short:
+    demoman: "Demo"
+    engineer: "Engie"
+  slot:
+    primary: "Primary"
+    secondary: "Secondary"
+    melee: "Melee"
+  sound_kind:
+    hitsound: "Hitsound"
+    killsound: "Killsound"
+  tf2_missing:
+    title: "TF2 not found"
+    open_settings: "Open Settings"
+    needs_tf2: "Set the TF2 folder in Settings first"
   list:
     separator: ", "
     last: "%{rest} and %{last}"

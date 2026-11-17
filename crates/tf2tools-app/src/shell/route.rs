@@ -1,5 +1,9 @@
 //! The pages the sidebar routes between.
 
+use gpui_kit::SharedString;
+
+use crate::i18n::tr;
+
 /// One sidebar destination.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Page {
@@ -64,32 +68,32 @@ impl Page {
         }
     }
 
-    /// The sidebar text, as v5's AppSidebar has it.
-    pub fn label(self) -> &'static str {
+    /// The sidebar text, as v5's AppSidebar has it, in the current language.
+    pub fn label(self) -> SharedString {
         match self {
-            Page::Huds => "HUDs",
-            Page::Sounds => "Sounds",
-            Page::Crosshairs => "Crosshairs",
-            Page::CrosshairMaker => "Crosshair Maker",
-            Page::HudMaker => "HUD Maker",
-            Page::Profiles => "Profiles",
-            Page::Addons => "Addons",
-            Page::Graphics => "Graphics",
-            Page::HudStore => "HUD Store",
-            Page::SoundStore => "Sound Store",
-            Page::CrosshairStore => "Crosshair Store",
-            Page::AddonStore => "Addon Store",
-            Page::Maps => "Maps",
-            Page::LogsTf => "logs.tf",
-            Page::Settings => "Settings",
-            Page::Logs => "Logs",
+            Page::Huds => tr!("nav.huds"),
+            Page::Sounds => tr!("nav.sounds"),
+            Page::Crosshairs => tr!("nav.crosshairs"),
+            Page::CrosshairMaker => tr!("nav.crosshair_maker"),
+            Page::HudMaker => tr!("nav.hud_maker"),
+            Page::Profiles => tr!("nav.profiles"),
+            Page::Addons => tr!("nav.addons"),
+            Page::Graphics => tr!("nav.graphics"),
+            Page::HudStore => tr!("nav.hud_store"),
+            Page::SoundStore => tr!("nav.sound_store"),
+            Page::CrosshairStore => tr!("nav.crosshair_store"),
+            Page::AddonStore => tr!("nav.addon_store"),
+            Page::Maps => tr!("nav.maps"),
+            Page::LogsTf => tr!("nav.logs_tf"),
+            Page::Settings => tr!("nav.settings"),
+            Page::Logs => tr!("nav.logs"),
         }
     }
 
     /// The header text, as v5's Header has it; only Logs differs from its label.
-    pub fn title(self) -> &'static str {
+    pub fn title(self) -> SharedString {
         match self {
-            Page::Logs => "Activity Log",
+            Page::Logs => tr!("nav.activity_log"),
             other @ Page::Huds
             | other @ Page::Sounds
             | other @ Page::Crosshairs

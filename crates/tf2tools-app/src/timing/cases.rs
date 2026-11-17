@@ -324,7 +324,7 @@ impl Runner {
                 } else if self.started.elapsed() > self.config.load_timeout {
                     return Some(Err(format!(
                         "the {} page did not load within {:?}",
-                        home.label(),
+                        home.slug(),
                         self.config.load_timeout
                     )));
                 }
@@ -350,7 +350,7 @@ impl Runner {
                     };
                     return Some(Err(format!(
                         "the {} {view} did not reach its end within {:?}",
-                        home.label(),
+                        home.slug(),
                         self.config.load_timeout
                     )));
                 } else if let Some(handle) = scroll_handle(self.case, &self.shell, cx) {

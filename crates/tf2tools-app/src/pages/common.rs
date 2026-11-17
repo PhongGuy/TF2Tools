@@ -15,6 +15,7 @@ use gpui_kit::{
     transparent_black,
 };
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::shell::route::{NavigateTo, Page};
 use crate::widgets::labelled;
@@ -164,25 +165,25 @@ fn pill(tag: Tag, border: Hsla, text: SharedString, truncate: bool) -> Div {
     })
 }
 
-/// The hover reason on an action that writes into the game while no TF2 folder is known.
-pub(crate) const NEEDS_TF2: &str = "Set the TF2 folder in Settings first";
-
 /// Shuts `button`, an action that writes into the game, while `has_tf2` is false and says why
 /// on hover. Call it after the button's own `disabled`, which it would otherwise lose to.
 pub(crate) fn needs_tf2(button: Button, has_tf2: bool) -> Button {
     if has_tf2 {
         button
     } else {
-        button.disabled(true).tooltip(NEEDS_TF2)
+        button
+            .disabled(true)
+            .tooltip(tr!("common.tf2_missing.needs_tf2"))
     }
 }
 
-/// The orange alert's title; it fits a folder never set and a saved folder that moved away.
-const NO_TF2_TITLE: &str = "TF2 not found";
-
 /// v5's orange "TF2 not found" alert with `body` below the title; the caller decides when.
-pub(crate) fn no_tf2_warning(id: &'static str, body: &'static str, cx: &App) -> AnyElement {
-    tf2_alert(id, body, None, cx)
+pub(crate) fn no_tf2_warning(
+    id: &'static str,
+    body: impl Into<SharedString>,
+    cx: &App,
+) -> AnyElement {
+    tf2_alert(id, body.into(), None, cx)
 }
 
 /// `no_tf2_warning` with an "Open Settings" button (`settings_id`) that asks the shell for
@@ -190,29 +191,31 @@ pub(crate) fn no_tf2_warning(id: &'static str, body: &'static str, cx: &App) -> 
 pub(crate) fn no_tf2_notice<T: EventEmitter<NavigateTo>>(
     id: &'static str,
     settings_id: &'static str,
-    body: &'static str,
+    body: impl Into<SharedString>,
     cx: &mut Context<T>,
 ) -> AnyElement {
     let settings = Button::new(settings_id)
         .outline()
         .small()
-        .label("Open Settings")
+        .label(tr!("common.tf2_missing.open_settings"))
         .on_click(cx.listener(|_, _, _, cx| cx.emit(NavigateTo(Page::Settings))));
-    tf2_alert(id, body, Some(settings.into_any_element()), cx)
+    tf2_alert(id, body.into(), Some(settings.into_any_element()), cx)
 }
 
+// The orange alert; its title fits a folder never set and a saved folder that moved away.
 fn tf2_alert(
     id: &'static str,
-    body: &'static str,
+    body: SharedString,
     action: Option<AnyElement>,
     cx: &App,
 ) -> AnyElement {
     let orange: Hsla = rgb(ORANGE_500).into();
     let muted = cx.theme().muted_foreground;
+    let title = tr!("common.tf2_missing.title");
     h_flex()
         .id(id)
         .role(Role::Alert)
-        .aria_label(NO_TF2_TITLE)
+        .aria_label(title.clone())
         .test_support()
         .items_start()
         .gap_3()
@@ -234,7 +237,7 @@ fn tf2_alert(
                     div()
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(orange)
-                        .child(NO_TF2_TITLE),
+                        .child(title),
                 )
                 .child(div().text_sm().text_color(muted).child(body))
                 .children(action.map(|action| div().mt_3().child(action))),
@@ -249,7 +252,7 @@ pub(crate) fn empty_state_card(
     icon: IconName,
     title: impl Into<SharedString>,
     description_id: Option<&'static str>,
-    description: &'static str,
+    description: impl Into<SharedString>,
     cx: &App,
 ) -> AnyElement {
     empty_state_with_action(title_id, icon, title, description_id, description, None, cx)
@@ -261,11 +264,12 @@ pub(crate) fn empty_state_with_action(
     icon: IconName,
     title: impl Into<SharedString>,
     description_id: Option<&'static str>,
-    description: &'static str,
+    description: impl Into<SharedString>,
     action: Option<AnyElement>,
     cx: &App,
 ) -> AnyElement {
     let muted = cx.theme().muted_foreground;
+    let description = description.into();
     let text = div()
         .mt_1()
         .max_w(px(384.))

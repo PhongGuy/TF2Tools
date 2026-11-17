@@ -4,7 +4,7 @@
 use std::rc::Rc;
 
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
-use gpui_kit::{App, Context, ElementId, Window, div};
+use gpui_kit::{App, Context, ElementId, SharedString, Window, div};
 use tf2tools_core::{Profile, ProfileError, ProfileId};
 
 use crate::ids;
@@ -37,7 +37,7 @@ pub fn read_profiles(cx: &App) -> Result<Vec<Profile>, ProfileError> {
 /// One run of profiles in the menu: an optional heading over them, each item's id, and what a
 /// pick does.
 pub struct Section {
-    pub heading: Option<&'static str>,
+    pub heading: Option<SharedString>,
     pub item_id: fn(&ProfileId) -> ElementId,
     pub on_pick: OnPick,
 }
@@ -66,7 +66,7 @@ fn profile_items(
         }
     };
     sections.iter().fold(menu, |menu, section| {
-        let menu = match section.heading {
+        let menu = match section.heading.clone() {
             Some(heading) => menu.label(heading),
             None => menu,
         };

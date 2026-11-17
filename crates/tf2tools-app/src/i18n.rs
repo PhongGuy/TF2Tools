@@ -5,6 +5,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use gpui_kit::SharedString;
 
 pub mod format;
+pub mod names;
 
 /// A language the app offers, by its catalogue code and its name in that language.
 #[derive(Clone, Copy, Debug)]
@@ -247,6 +248,12 @@ mod tests {
         [
             "messages",
             "common",
+            "nav",
+            "huds",
+            "sounds",
+            "addons",
+            "external_huds",
+            "widgets",
             "updater",
             "maps",
             "logs_tf",
@@ -717,7 +724,11 @@ mod tests {
     }
 
     // Files whose shipped code shows no English; each page task appends its own.
-    const SCANNED: &[&str] = &["widgets/label_option.rs"];
+    const SCANNED: &[&str] = &[
+        "widgets/label_option.rs",
+        "shell/route.rs",
+        "widgets/class_icon.rs",
+    ];
 
     // (file under src, exact literal, why it is not translated).
     const ALLOWED: &[(&str, &str, &str)] = &[];
