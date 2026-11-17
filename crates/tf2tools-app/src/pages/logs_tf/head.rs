@@ -10,6 +10,8 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
 
+use crate::i18n::tr;
+
 // The arrow row's height, an xsmall icon's.
 const ARROW: Pixels = px(12.);
 
@@ -28,9 +30,9 @@ pub(super) fn sortable(button: Button, arrow: ElementId, sorted: Option<bool>) -
 // The direction as a small chevron, said in words for readers.
 fn sort_arrow(id: ElementId, descending: bool) -> impl IntoElement {
     let (icon, words) = if descending {
-        (IconName::ChevronDown, "high to low")
+        (IconName::ChevronDown, tr!("logs_tf.sort.descending"))
     } else {
-        (IconName::ChevronUp, "low to high")
+        (IconName::ChevronUp, tr!("logs_tf.sort.ascending"))
     };
     div()
         .id(id)

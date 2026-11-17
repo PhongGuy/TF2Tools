@@ -17,6 +17,7 @@ use super::LogsTfPage;
 use super::head::sortable;
 use super::sort::{ClassSort, ClassStat, sort_classes};
 use super::text::{one_decimal, range_label, summary_text, time_played_text, whole};
+use crate::i18n::{names, tr};
 use crate::ids;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
@@ -27,17 +28,18 @@ const ICON_SIZE: f32 = 20.;
 const ROW_PAD: Pixels = px(12.);
 const GAP: Pixels = px(10.);
 // The class column grows to fill the box but keeps room for "Demoman" beside its icon; each
-// number column fits its title and widest value on one line, so the table fits a 1200 px window.
+// number column fits its title, in English or Russian, and widest value on one line, so the
+// table fits a 1200 px window.
 const CLASS_MIN: Pixels = px(120.);
 const COLUMNS: [(ClassStat, Pixels); 9] = [
     (ClassStat::Played, px(72.)),
     (ClassStat::Logs, px(44.)),
-    (ClassStat::KillsPerMin, px(64.)),
+    (ClassStat::KillsPerMin, px(80.)),
     (ClassStat::AssistsPerMin, px(76.)),
     (ClassStat::DeathsPerMin, px(76.)),
     (ClassStat::DmgPerMin, px(60.)),
     (ClassStat::Kad, px(44.)),
-    (ClassStat::HealsPerMin, px(68.)),
+    (ClassStat::HealsPerMin, px(72.)),
     (ClassStat::UbersPer10Min, px(84.)),
 ];
 
@@ -120,7 +122,7 @@ fn range_picker(slider: &Entity<SliderState>, page: WeakEntity<LogsTfPage>) -> i
         .child(
             div()
                 .id(ids::LOGSTF_RANGE)
-                .aria_label("History range")
+                .aria_label(tr!("logs_tf.range_name"))
                 .test_support()
                 .px(px(STOP_CELL / 2.))
                 .child(Slider::new(slider)),
@@ -153,7 +155,7 @@ fn class_table(
     // Every title is a button that sorts by its column, or flips it when it leads.
     // They keep no padding so each title stays flush with its column's values or icons.
     let title = |stat: ClassStat, end: bool| {
-        let label = stat.title();
+        let (id, label) = (stat.title(), stat.label());
         let page = page.clone();
         let sorted = sort.filter(|s| s.column == stat);
         // The kit centres a button's label, so the title is a child in a row that fills it,
@@ -164,11 +166,11 @@ fn class_table(
             .when(end, |row| row.justify_end())
             .child(
                 div()
-                    .id(ids::logstf_class_title(label))
+                    .id(ids::logstf_class_title(id))
                     .test_support()
-                    .child(label),
+                    .child(label.clone()),
             );
-        let button = Button::new(ids::logstf_class_head(label))
+        let button = Button::new(ids::logstf_class_head(id))
             .ghost()
             .xsmall()
             .accessibility_label(label)
@@ -181,7 +183,7 @@ fn class_table(
             });
         sortable(
             button,
-            ids::logstf_class_arrow(label),
+            ids::logstf_class_arrow(id),
             sorted.map(|s| s.descending),
         )
     };
@@ -264,18 +266,17 @@ fn class_row(
         .into_iter()
         .zip(values)
         .map(|((stat, width), value)| {
-            let label = stat.title();
             let cell = h_flex().w(width).flex_none().justify_end();
             match value {
                 Some(value) => cell.child(labelled(
                     div(),
-                    ids::logstf_class_value(class, label),
+                    ids::logstf_class_value(class, stat.title()),
                     value,
                 )),
-                None if label == "Played" && !average.played() => cell.child(labelled(
+                None if stat == ClassStat::Played && !average.played() => cell.child(labelled(
                     div(),
                     ids::logstf_class_unplayed(class),
-                    "Not played",
+                    tr!("logs_tf.not_played"),
                 )),
                 None => cell,
             }
@@ -285,10 +286,14 @@ fn class_row(
         .min_w(CLASS_MIN)
         .gap_2()
         .child(class_icon(class, icon.as_deref(), px(ICON_SIZE)))
-        .child(div().font_weight(FontWeight::SEMIBOLD).child(class.name()));
+        .child(
+            div()
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(names::class_name(class)),
+        );
     let row = line()
         .id(id.clone())
-        .aria_label(class.name())
+        .aria_label(names::class_name(class))
         .test_support()
         .child(name)
         .children(cells);

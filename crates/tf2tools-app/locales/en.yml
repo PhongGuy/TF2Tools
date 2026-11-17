@@ -400,10 +400,38 @@ logs_tf:
   weapons:
     none: "No weapon stats in these logs"
     counting: "Counting older logs, %{left} left"
+    weapon: "Weapon"
+    kills: "Kills"
+    damage: "Damage"
+    accuracy: "Accuracy"
   list:
     no_logs: "No logs on logs.tf for this player yet."
     gone: "This log was removed from logs.tf"
     unreadable: "This log couldn't be read"
+    date: "Date"
+    title: "Title"
+    map: "Map"
+    length: "Length"
+    class: "Class"
+    open_profile: "Open profile on logs.tf"
+    open_log: "Open on logs.tf"
+  column:
+    team: "Team"
+    name: "Name"
+  stat:
+    played: "Played"
+    logs: "Logs"
+    kills_min: "Kills/min"
+    assists_min: "Assists/min"
+    deaths_min: "Deaths/min"
+    dmg_min: "Dmg/min"
+    heals_min: "Heals/min"
+    ubers_10min: "Ubers/10 min"
+  sort:
+    descending: "high to low"
+    ascending: "low to high"
+  range_name: "History range"
+  not_played: "Not played"
   streaks: "Show Killstreaks (%{count})"
   nickname_note: "This is your nickname for this player. Their name in this log is %{name}. You can turn this off in Settings."
   event:

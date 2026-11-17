@@ -817,6 +817,11 @@ mod tests {
         "log_nicknames.rs",
         "logs_sync.rs",
         "logs_trim.rs",
+        "pages/logs_tf/list.rs",
+        "pages/logs_tf/sort.rs",
+        "pages/logs_tf/head.rs",
+        "pages/logs_tf/grid.rs",
+        "pages/logs_tf/class_weapons.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1030,6 +1035,22 @@ mod tests {
         ("pages/logs_tf/text.rs", "Quick-Fix", WEAPON_NAME),
         ("pages/logs_tf/text.rs", "Vaccinator", WEAPON_NAME),
         ("pages/logs_tf/text.rs", "Medigun", WEAPON_NAME),
+        ("pages/logs_tf/sort.rs", "Team", ID_VALUE),
+        ("pages/logs_tf/sort.rs", "Name", ID_VALUE),
+        (
+            "pages/logs_tf/sort.rs",
+            "every class is in TfClass::ALL",
+            "developer detail: an invariant's message",
+        ),
+        ("pages/logs_tf/sort.rs", "Class", ID_VALUE),
+        ("pages/logs_tf/sort.rs", "Played", ID_VALUE),
+        ("pages/logs_tf/sort.rs", "Logs", ID_VALUE),
+        ("pages/logs_tf/sort.rs", "Kills/min", ID_VALUE),
+        ("pages/logs_tf/sort.rs", "Assists/min", ID_VALUE),
+        ("pages/logs_tf/sort.rs", "Deaths/min", ID_VALUE),
+        ("pages/logs_tf/sort.rs", "Dmg/min", ID_VALUE),
+        ("pages/logs_tf/sort.rs", "Heals/min", ID_VALUE),
+        ("pages/logs_tf/sort.rs", "Ubers/10 min", ID_VALUE),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
@@ -1037,6 +1058,7 @@ mod tests {
     const WEAPON_NAME: &str = "weapon name, as the game and logs.tf write it";
     const STOPPED_LABEL: &str = "developer detail: a stopped task's log label";
     const STORE_FIELD: &str = "developer detail: the store's tracing field";
+    const ID_VALUE: &str = "element id value; its label is keyed";
     const DIALOG_ELSEWHERE: &str = "dialog of an untranslated page";
     const STARTUP_DETAIL: &str =
         "developer detail: StartupError's log text; the view reads describe_startup";

@@ -4,7 +4,10 @@
 
 use std::cmp::Ordering;
 
+use gpui_kit::SharedString;
 use tf2tools_core::{ClassAverage, LogColumns, MatrixRow, PlayerLine, Team, TfClass};
+
+use crate::i18n::tr;
 
 /// One players table column, in logs.tf's order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -70,6 +73,29 @@ impl PlayerColumn {
             Self::Headshots => "HS",
             Self::Airshots => "AS",
             Self::Caps => "CAP",
+        }
+    }
+
+    /// The header the page shows; logs.tf's abbreviations read the same in every language.
+    pub fn label(self) -> SharedString {
+        match self {
+            Self::Team => tr!("logs_tf.column.team"),
+            Self::Name => tr!("logs_tf.column.name"),
+            Self::Class
+            | Self::Kills
+            | Self::Assists
+            | Self::Deaths
+            | Self::Damage
+            | Self::DamagePerMin
+            | Self::KaPerD
+            | Self::KPerD
+            | Self::DamageTaken
+            | Self::DamageTakenPerMin
+            | Self::Medkits
+            | Self::Backstabs
+            | Self::Headshots
+            | Self::Airshots
+            | Self::Caps => self.title().into(),
         }
     }
 
@@ -295,7 +321,7 @@ impl ClassStat {
         Self::UbersPer10Min,
     ];
 
-    /// The column's title.
+    /// The column's title in English, which its element ids carry.
     pub fn title(self) -> &'static str {
         match self {
             Self::Class => "Class",
@@ -308,6 +334,22 @@ impl ClassStat {
             Self::Kad => "KA/D",
             Self::HealsPerMin => "Heals/min",
             Self::UbersPer10Min => "Ubers/10 min",
+        }
+    }
+
+    /// The title the page shows; KA/D reads the same in every language.
+    pub fn label(self) -> SharedString {
+        match self {
+            Self::Class => tr!("logs_tf.list.class"),
+            Self::Played => tr!("logs_tf.stat.played"),
+            Self::Logs => tr!("logs_tf.stat.logs"),
+            Self::KillsPerMin => tr!("logs_tf.stat.kills_min"),
+            Self::AssistsPerMin => tr!("logs_tf.stat.assists_min"),
+            Self::DeathsPerMin => tr!("logs_tf.stat.deaths_min"),
+            Self::DmgPerMin => tr!("logs_tf.stat.dmg_min"),
+            Self::Kad => self.title().into(),
+            Self::HealsPerMin => tr!("logs_tf.stat.heals_min"),
+            Self::UbersPer10Min => tr!("logs_tf.stat.ubers_10min"),
         }
     }
 

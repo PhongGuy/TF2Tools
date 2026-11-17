@@ -10,6 +10,7 @@ use tf2tools_core::{ClassWeapons, LogsRange, TfClass, WeaponNames};
 
 use super::tables::{WeaponRow, class_weapon_rows};
 use super::text::{counting_text, no_weapons_text, weapons_title};
+use crate::i18n::tr;
 use crate::ids;
 use crate::kill_icons::{ICON_SLOT, KillIconImages, SLOT_GAP, icon_slot, weapon_icon};
 use crate::widgets::labelled;
@@ -100,10 +101,15 @@ fn weapon_table(
         .whitespace_nowrap()
         .text_color(cx.theme().muted_foreground)
         .font_weight(FontWeight::MEDIUM)
-        .child(div().flex_1().min_w(name_min).child("Weapon"))
-        .child(cell(KILLS).child("Kills"))
-        .child(cell(DAMAGE).child("Damage"))
-        .child(cell(ACCURACY).child("Accuracy"));
+        .child(
+            div()
+                .flex_1()
+                .min_w(name_min)
+                .child(tr!("logs_tf.weapons.weapon")),
+        )
+        .child(cell(KILLS).child(tr!("logs_tf.weapons.kills")))
+        .child(cell(DAMAGE).child(tr!("logs_tf.weapons.damage")))
+        .child(cell(ACCURACY).child(tr!("logs_tf.weapons.accuracy")));
     let rows = rows.into_iter().map(|(w, image)| {
         let kills = format!("{} ({})", w.kills, w.kill_share);
         let dmg = format!("{} ({})", w.dmg, w.dmg_share);

@@ -24,6 +24,7 @@ use tf2tools_core::{GbId, LogLevel, NewLogEntry, StoreItemId, StoreKind};
 use crate::LocaleGuard;
 use crate::library::{shown_text, text_width};
 use crate::support;
+use crate::support::logstf::{ARIE, SIXES, day_ago, list_body, open_page, shell};
 
 // The kit's medium Select trigger around its title: borders, padding, gap and caret.
 const SELECT_CHROME: Pixels = px(42.);
@@ -361,5 +362,36 @@ fn the_logs_tf_texts_read_in_russian() {
     assert_eq!(
         empty_text(),
         "Отслеживайте игрока, чтобы видеть его средние показатели по классам и логи с logs.tf."
+    );
+}
+
+// The class table's titles read Russian while their ids keep the English title.
+#[gpui_kit::test]
+fn the_russian_class_table_keeps_its_english_ids(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_bytes("/json/3", SIXES.as_bytes().to_vec());
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let _page = open_page(cx, &s);
+    let heads = [
+        ("Played", "Сыграно"),
+        ("Logs", "Логи"),
+        ("Kills/min", "Убийства/мин"),
+        ("Dmg/min", "Урон/мин"),
+        ("KA/D", "KA/D"),
+        ("Ubers/10 min", "Убер/10 мин"),
+    ];
+    for (id, russian) in heads {
+        assert_eq!(
+            support::label_of(cx, s.win, ids::logstf_class_head(id)).as_deref(),
+            Some(russian),
+            "{id}"
+        );
+    }
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_RANGE).as_deref(),
+        Some("Период истории")
     );
 }
