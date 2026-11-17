@@ -99,6 +99,7 @@ fn settings_draws_every_id_and_loads_the_saved_values(cx: &mut TestAppContext) {
         ids::SETTINGS_VOLUME_LABEL,
         ids::SETTINGS_CACHE,
         ids::SETTINGS_CACHE_LABEL,
+        ids::SETTINGS_STORAGE,
         ids::SETTINGS_SAVE,
     ] {
         assert!(support::present(cx, s.win, id), "missing {id}");
@@ -583,14 +584,7 @@ fn the_add_ons_card_toggles_mature_add_ons_and_saves_at_once(cx: &mut TestAppCon
         support::checked_of(cx, s.win, ids::SETTINGS_MATURE_ADDONS),
         Some(false)
     );
-    cx.update_window(s.win, |_, w, cx| {
-        w.scroll(
-            ids::page(Page::Settings),
-            ScrollDelta::Pixels(point(px(0.), px(-600.))),
-            cx,
-        )
-    })
-    .unwrap();
+    scroll_settings_to(cx, &s, ids::SETTINGS_MATURE_ADDONS.into());
     support::click_id(cx, s.win, ids::SETTINGS_MATURE_ADDONS);
     support::wait_real(cx, "the save", |_| {
         s.services.db.settings().unwrap().show_mature_addons()
@@ -620,14 +614,7 @@ fn the_logs_tf_card_toggles_nicknames_in_match_logs_and_saves_at_once(cx: &mut T
         support::checked_of(cx, s.win, ids::SETTINGS_LOG_NICKNAMES),
         Some(true)
     );
-    cx.update_window(s.win, |_, w, cx| {
-        w.scroll(
-            ids::page(Page::Settings),
-            ScrollDelta::Pixels(point(px(0.), px(-800.))),
-            cx,
-        )
-    })
-    .unwrap();
+    scroll_settings_to(cx, &s, ids::SETTINGS_LOG_NICKNAMES.into());
     support::click_id(cx, s.win, ids::SETTINGS_LOG_NICKNAMES);
     support::wait_real(cx, "the save", |_| {
         !s.services.db.settings().unwrap().show_log_nicknames()
@@ -842,15 +829,49 @@ fn the_logs_tf_card_says_when_the_cache_size_could_not_be_measured(cx: &mut Test
 }
 
 #[test]
-fn the_library_line_reads_on_disk_and_unpacked() {
-    use tf2tools_app::pages::settings::{library_text, size_text};
+fn the_storage_rows_read_their_size_and_any_unpacked_size() {
+    use tf2tools_app::pages::settings::{
+        size_text, storage_name, storage_row_label, storage_total_label,
+    };
+    use tf2tools_core::StorageKind;
     assert_eq!(size_text(1_073_689_395), "1023.9 MB");
     assert_eq!(size_text(1_073_689_396), "1.0 GB");
-    assert_eq!(size_text(2_100_000_000), "2.0 GB");
+    let names: Vec<String> = StorageKind::ALL
+        .iter()
+        .map(|k| storage_name(*k).to_string())
+        .collect();
     assert_eq!(
-        library_text(412_000_000, 2_100_000_000),
-        "Your library uses 392.9 MB on disk (2.0 GB unpacked)."
+        names,
+        [
+            "HUDs",
+            "Sounds",
+            "Crosshairs",
+            "Add-ons",
+            "logs.tf cache",
+            "Store data",
+            "Image cache"
+        ]
     );
+    assert_eq!(
+        storage_row_label("HUDs", 412_000_000, 2_100_000_000),
+        "HUDs: 392.9 MB. 2.0 GB unpacked"
+    );
+    assert_eq!(
+        storage_row_label("Sounds", 1_048_576, 1_048_576),
+        "Sounds: 1.0 MB"
+    );
+    assert_eq!(storage_total_label(2_100_000_000), "Total: 2.0 GB");
+}
+
+#[test]
+fn every_storage_kind_has_its_own_colour() {
+    use tf2tools_app::pages::settings::STORAGE_ROWS;
+    let kinds: Vec<_> = STORAGE_ROWS.iter().map(|r| r.0).collect();
+    assert_eq!(kinds, tf2tools_core::StorageKind::ALL);
+    let mut colours: Vec<u32> = STORAGE_ROWS.iter().map(|r| r.2).collect();
+    colours.sort_unstable();
+    colours.dedup();
+    assert_eq!(colours.len(), 7, "{colours:x?}");
 }
 
 #[test]
@@ -869,9 +890,10 @@ fn settings_sizes_read_like_store_sizes() {
 }
 
 #[gpui_kit::test]
-fn the_library_card_says_what_the_library_uses(cx: &mut TestAppContext) {
+fn the_storage_card_lists_every_kind_with_its_size(cx: &mut TestAppContext) {
     use tf2tools_app::library_pack::LibraryPack;
-    use tf2tools_app::pages::settings::library_text;
+    use tf2tools_app::pages::settings::{storage_name, storage_row_label, storage_total_label};
+    use tf2tools_core::StorageKind;
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     let archive = env.tmp.path().join("rayshud.zip");
@@ -881,38 +903,84 @@ fn the_library_card_says_what_the_library_uses(cx: &mut TestAppContext) {
         .import_hud(&archive, tf2tools_core::Provenance::Local)
         .unwrap();
     let _page = open_settings(cx, &s);
-    support::wait_real(cx, "the library figures", |cx| {
-        cx.update(|cx| {
-            let pack = LibraryPack::global(cx).read(cx);
-            pack.passes() > 0 && !pack.is_running()
-        })
-    });
+    jobs_idle(cx);
     support::settle(cx, s.win);
-    scroll_settings_to(cx, &s, ids::SETTINGS_LIBRARY_SPACE.into());
-    let space = s.services.library.space().unwrap();
-    let want = library_text(space.on_disk(), space.unpacked());
+    scroll_settings_to(cx, &s, ids::SETTINGS_STORAGE.into());
+    let landed = cx
+        .update(|cx| LibraryPack::global(cx).read(cx).space())
+        .expect("figures");
+    for kind in StorageKind::ALL {
+        let want = storage_row_label(
+            &storage_name(kind),
+            landed.bytes(kind),
+            landed.unpacked(kind),
+        );
+        assert_eq!(
+            support::label_of(cx, s.win, ids::settings_storage(kind)).as_deref(),
+            Some(want.as_str()),
+            "{kind:?}"
+        );
+    }
+    let total = storage_total_label(landed.total());
     assert_eq!(
-        support::label_of(cx, s.win, ids::SETTINGS_LIBRARY_SPACE).as_deref(),
-        Some(want.as_ref())
+        support::label_of(cx, s.win, ids::SETTINGS_STORAGE_TOTAL).as_deref(),
+        Some(total.as_str())
     );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::SETTINGS_STORAGE).as_deref(),
+        Some(total.as_str())
+    );
+    let huds = support::label_of(cx, s.win, ids::settings_storage(StorageKind::Huds)).unwrap();
+    assert!(
+        huds.ends_with(" unpacked"),
+        "an imported HUD is packed: {huds}"
+    );
+    assert_eq!(
+        landed.bytes(StorageKind::Huds),
+        s.services
+            .library
+            .storage()
+            .unwrap()
+            .bytes(StorageKind::Huds)
+    );
+}
+
+#[gpui_kit::test]
+fn a_kind_that_takes_nothing_keeps_its_row_but_gets_no_slice(cx: &mut TestAppContext) {
+    use tf2tools_app::library_pack::LibraryPack;
+    use tf2tools_app::pages::settings::{storage_name, storage_row_label, storage_slices};
+    use tf2tools_core::StorageKind;
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let _page = open_settings(cx, &s);
+    jobs_idle(cx);
+    support::settle(cx, s.win);
+    scroll_settings_to(cx, &s, ids::SETTINGS_STORAGE.into());
+    let landed = cx
+        .update(|cx| LibraryPack::global(cx).read(cx).space())
+        .expect("figures");
+    // A fresh data dir holds no sounds, so that kind measures nothing.
+    assert_eq!(landed.bytes(StorageKind::Sounds), 0);
+    let want = storage_row_label(&storage_name(StorageKind::Sounds), 0, 0);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::settings_storage(StorageKind::Sounds)).as_deref(),
+        Some(want.as_str())
+    );
+    let sliced: Vec<StorageKind> = storage_slices(&landed).iter().map(|d| d.0).collect();
+    assert!(!sliced.contains(&StorageKind::Sounds), "{sliced:?}");
+    let nonzero: Vec<StorageKind> = StorageKind::ALL
+        .into_iter()
+        .filter(|k| landed.bytes(*k) > 0)
+        .collect();
+    assert_eq!(sliced, nonzero);
 }
 
 // Folder permissions that refuse a listing are a Unix feature.
 #[cfg(unix)]
 #[gpui_kit::test]
-fn the_library_card_says_when_the_size_could_not_be_measured(cx: &mut TestAppContext) {
+fn the_storage_card_says_when_storage_could_not_be_measured(cx: &mut TestAppContext) {
     use std::os::unix::fs::PermissionsExt as _;
-    use std::path::PathBuf;
     use tf2tools_app::library_pack::LibraryPack;
-
-    // Gives the folder its permissions back however the test ends, so the temp dir can go.
-    struct Unlock(PathBuf);
-    impl Drop for Unlock {
-        fn drop(&mut self) {
-            let _ = std::fs::set_permissions(&self.0, std::fs::Permissions::from_mode(0o755));
-        }
-    }
-
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     let locked = env.data.library_dir(tf2tools_core::LibraryKind::Huds);
@@ -925,18 +993,79 @@ fn the_library_card_says_when_the_size_could_not_be_measured(cx: &mut TestAppCon
         return;
     }
     let _page = open_settings(cx, &s);
-    support::wait_real(cx, "the failed measure", |cx| {
-        cx.update(|cx| {
-            let pack = LibraryPack::global(cx).read(cx);
-            pack.passes() > 0 && !pack.is_running()
-        })
-    });
+    jobs_idle(cx);
     drop(unlock);
     assert!(cx.update(|cx| LibraryPack::global(cx).read(cx).failed()));
     support::settle(cx, s.win);
-    scroll_settings_to(cx, &s, ids::SETTINGS_LIBRARY_SPACE.into());
+    scroll_settings_to(cx, &s, ids::SETTINGS_STORAGE.into());
     assert_eq!(
-        support::label_of(cx, s.win, ids::SETTINGS_LIBRARY_SPACE).as_deref(),
-        Some("The library size could not be measured.")
+        support::label_of(cx, s.win, ids::SETTINGS_STORAGE).as_deref(),
+        Some("Storage use could not be measured.")
     );
+    assert!(!support::present(cx, s.win, ids::SETTINGS_STORAGE_TOTAL));
+}
+
+// Folder permissions that refuse a listing are a Unix feature.
+#[cfg(unix)]
+#[gpui_kit::test]
+fn a_failed_later_measure_keeps_the_last_figures_on_the_storage_rows(cx: &mut TestAppContext) {
+    use std::os::unix::fs::PermissionsExt as _;
+    use tf2tools_app::library_pack::LibraryPack;
+    use tf2tools_app::pages::settings::{storage_name, storage_row_label, storage_total_label};
+    use tf2tools_core::StorageKind;
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let _page = open_settings(cx, &s);
+    let before = jobs_idle(cx);
+    let landed = cx
+        .update(|cx| LibraryPack::global(cx).read(cx).space())
+        .expect("figures");
+    let locked = env.data.library_dir(tf2tools_core::LibraryKind::Huds);
+    std::fs::create_dir_all(locked.join("x")).unwrap();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+    let _unlock = Unlock(locked.clone());
+    // Root reads any folder, so there is nothing to refuse; the test cannot run that way.
+    if std::fs::read_dir(&locked).is_ok() {
+        eprintln!("skipped: this user can list a folder with no permissions");
+        return;
+    }
+    cx.update(|cx| LibraryPack::global(cx).update(cx, |job, cx| job.measure(cx)));
+    support::wait_real(cx, "the failed re-measure", |cx| {
+        cx.update(|cx| {
+            let pack = LibraryPack::global(cx).read(cx);
+            pack.passes() > before && !pack.is_running()
+        })
+    });
+    assert!(cx.update(|cx| LibraryPack::global(cx).read(cx).failed()));
+    support::settle(cx, s.win);
+    scroll_settings_to(cx, &s, ids::SETTINGS_STORAGE.into());
+    for kind in StorageKind::ALL {
+        let want = storage_row_label(
+            &storage_name(kind),
+            landed.bytes(kind),
+            landed.unpacked(kind),
+        );
+        assert_eq!(
+            support::label_of(cx, s.win, ids::settings_storage(kind)).as_deref(),
+            Some(want.as_str()),
+            "{kind:?}"
+        );
+    }
+    let total = storage_total_label(landed.total());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::SETTINGS_STORAGE).as_deref(),
+        Some(total.as_str())
+    );
+}
+
+// Gives a locked folder its permissions back however a test ends, so the temp dir can go.
+#[cfg(unix)]
+struct Unlock(std::path::PathBuf);
+
+#[cfg(unix)]
+impl Drop for Unlock {
+    fn drop(&mut self) {
+        use std::os::unix::fs::PermissionsExt as _;
+        let _ = std::fs::set_permissions(&self.0, std::fs::Permissions::from_mode(0o755));
+    }
 }

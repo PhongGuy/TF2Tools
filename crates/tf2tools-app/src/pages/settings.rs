@@ -1,6 +1,6 @@
 //! v5's Settings page: the app version with update status and actions, the TF2 path with Browse and
-//! Auto-detect, the preview volume, the store cache duration, the library's size, one sync card per
-//! store with Resync, and Save. Below them, a Licences card shows the third-party notices the app
+//! Auto-detect, the preview volume, the store cache duration, what TF2Tools keeps on disk, one sync
+//! card per store with Resync, and Save. Below them, a Licences card shows the third-party notices the app
 //! carries, and a Help and feedback card links to the help page and the place to report a problem.
 
 use std::cell::RefCell;
@@ -10,6 +10,7 @@ use std::rc::Rc;
 
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::chart::PieChart;
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::searchable_list::SearchableListItem;
 use gpui_kit::component::select::{Select, SelectEvent, SelectState};
@@ -183,13 +184,64 @@ pub fn usage_text(cache_bytes: u64, full_logs: u64, full_bytes: u64) -> SharedSt
     )
 }
 
-/// The Library card's line: what the library takes on disk and unpacked.
-pub fn library_text(on_disk: u64, unpacked: u64) -> SharedString {
-    tr!(
-        "settings.library.usage",
-        disk = size_text(on_disk),
-        unpacked = size_text(unpacked)
-    )
+/// Each kind of stored data in `StorageKind::ALL` order: its name's catalogue key and its colour.
+/// The first five are v5's dark chart colours; sky and lime extend them.
+pub const STORAGE_ROWS: [(StorageKind, &str, u32); 7] = [
+    (StorageKind::Huds, "settings.storage.huds", 0x1447e6),
+    (StorageKind::Sounds, "settings.storage.sounds", 0x00bc7d),
+    (
+        StorageKind::Crosshairs,
+        "settings.storage.crosshairs",
+        0xfe9a00,
+    ),
+    (StorageKind::Addons, "settings.storage.addons", 0xad46ff),
+    (StorageKind::LogsTf, "settings.storage.logs_tf", 0xff2056),
+    (
+        StorageKind::StoreData,
+        "settings.storage.store_data",
+        0x38bdf8,
+    ),
+    (
+        StorageKind::ImageCache,
+        "settings.storage.image_cache",
+        0xa3e635,
+    ),
+];
+
+/// A kind's name on the Storage card, in the current language.
+pub fn storage_name(kind: StorageKind) -> SharedString {
+    STORAGE_ROWS
+        .iter()
+        .find(|row| row.0 == kind)
+        .map_or_else(|| SharedString::from(format!("{kind:?}")), |row| tr!(row.1))
+}
+
+// The muted line under a row whose files are packed, or nothing when nothing is packed.
+fn unpacked_line(bytes: u64, unpacked: u64) -> Option<SharedString> {
+    (unpacked != bytes).then(|| tr!("settings.storage.unpacked", size = size_text(unpacked)))
+}
+
+/// A Storage row's label: its name and size, then its unpacked size when that differs.
+pub fn storage_row_label(name: &str, bytes: u64, unpacked: u64) -> String {
+    let size = size_text(bytes);
+    match unpacked_line(bytes, unpacked) {
+        Some(line) => format!("{name}: {size}. {line}"),
+        None => format!("{name}: {size}"),
+    }
+}
+
+/// The Storage card's total, as the donut's centre and the card's label read it.
+pub fn storage_total_label(total: u64) -> String {
+    format!("{}: {}", tr!("settings.storage.total"), size_text(total))
+}
+
+/// The donut's slices: each kind that takes any bytes, with its size and colour, in row order.
+pub fn storage_slices(space: &StorageUse) -> Vec<(StorageKind, u64, u32)> {
+    STORAGE_ROWS
+        .iter()
+        .map(|(kind, _, colour)| (*kind, space.bytes(*kind), *colour))
+        .filter(|slice| slice.1 > 0)
+        .collect()
 }
 
 /// The Settings form. The shell keeps it across visits, so unsaved edits stay until Save; it
@@ -1131,6 +1183,122 @@ fn labelled(id: &'static str, text: impl Into<SharedString>) -> impl IntoElement
         .child(text)
 }
 
+// The Storage card: a donut of the kinds with the total in its middle, beside one row per kind.
+// Before the first measure lands, the list is one line saying it is measuring or that it failed.
+fn storage_content(pack: &LibraryPack, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    let muted = theme.muted_foreground;
+    let space = pack.space();
+    let label: SharedString = match space {
+        Some(s) => storage_total_label(s.total()).into(),
+        None if pack.failed() => tr!("settings.storage.unmeasured"),
+        None => tr!("settings.logs_tf.measuring"),
+    };
+    // A zero total still draws a ring, one muted slice, so the card keeps its shape.
+    let mut slices: Vec<(f32, Hsla)> = space
+        .map(|s| storage_slices(&s))
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(_, bytes, colour)| (bytes as f32, Hsla::from(gpui_kit::rgb(colour))))
+        .collect();
+    if slices.is_empty() {
+        slices.push((1., theme.muted));
+    }
+    let chart = PieChart::new(slices)
+        .value(|d| d.0)
+        .color(|d| d.1)
+        .outer_radius(56.)
+        .inner_radius(40.)
+        .interactive(false)
+        .appear(false);
+    let centre = space.map(|s| {
+        v_flex()
+            .id(ids::SETTINGS_STORAGE_TOTAL)
+            .aria_label(storage_total_label(s.total()))
+            .test_support()
+            .absolute()
+            .inset_0()
+            .items_center()
+            .justify_center()
+            .child(
+                div()
+                    .text_sm()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(size_text(s.total())),
+            )
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(muted)
+                    .child(tr!("settings.storage.total")),
+            )
+    });
+    let donut = div()
+        .flex_none()
+        .relative()
+        .size(px(112.))
+        .child(chart)
+        .children(centre);
+    let list = v_flex().flex_1().min_w_0().gap_2().text_sm();
+    let list = match space {
+        Some(s) => list.children(STORAGE_ROWS.iter().map(|(kind, _, colour)| {
+            storage_row(*kind, s.bytes(*kind), s.unpacked(*kind), *colour, muted)
+        })),
+        None => list.child(label.clone()),
+    };
+    h_flex()
+        .id(ids::SETTINGS_STORAGE)
+        .aria_label(label)
+        .test_support()
+        .gap_4()
+        .items_center()
+        .child(donut)
+        .child(list)
+        .into_any_element()
+}
+
+// One Storage row: a dot in the kind's colour, its name left and size right, then any unpacked size.
+fn storage_row(
+    kind: StorageKind,
+    bytes: u64,
+    unpacked: u64,
+    colour: u32,
+    muted: Hsla,
+) -> AnyElement {
+    let name = storage_name(kind);
+    h_flex()
+        .id(ids::settings_storage(kind))
+        .aria_label(storage_row_label(&name, bytes, unpacked))
+        .test_support()
+        .gap_2()
+        .items_start()
+        .child(
+            div()
+                .flex_none()
+                .mt(px(6.))
+                .size(px(8.))
+                .rounded_full()
+                .bg(gpui_kit::rgb(colour)),
+        )
+        .child(
+            v_flex()
+                .flex_1()
+                .min_w_0()
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .justify_between()
+                        .child(div().min_w_0().child(name))
+                        .child(div().flex_none().child(size_text(bytes))),
+                )
+                .children(
+                    unpacked_line(bytes, unpacked)
+                        .map(|line| div().text_xs().text_color(muted).child(line)),
+                ),
+        )
+        .into_any_element()
+}
+
 impl Render for SettingsPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.split_notices(window);
@@ -1166,24 +1334,7 @@ impl Render for SettingsPage {
             None if trim.failed() => tr!("settings.logs_tf.unmeasured"),
             None => tr!("settings.logs_tf.measuring"),
         };
-        let pack = self.pack.read(cx);
-        let library = match pack.space() {
-            // Until the Storage card lands, the Library line sums the four library kinds.
-            Some(s) => {
-                let library = [
-                    StorageKind::Huds,
-                    StorageKind::Sounds,
-                    StorageKind::Crosshairs,
-                    StorageKind::Addons,
-                ];
-                let sum = |f: fn(&StorageUse, StorageKind) -> u64| -> u64 {
-                    library.iter().map(|k| f(&s, *k)).sum()
-                };
-                library_text(sum(StorageUse::bytes), sum(StorageUse::unpacked))
-            }
-            None if pack.failed() => tr!("settings.library.unmeasured"),
-            None => tr!("settings.logs_tf.measuring"),
-        };
+        let storage = storage_content(self.pack.read(cx), cx);
         let logs_tf = v_flex()
             .gap_3()
             .child(nicknames_switch(cx))
@@ -1323,14 +1474,9 @@ impl Render for SettingsPage {
                         cx,
                     ))
                     .child(card(
-                        tr!("settings.library.title"),
-                        tr!("settings.library.description"),
-                        Some(
-                            div()
-                                .text_sm()
-                                .child(labelled(ids::SETTINGS_LIBRARY_SPACE, library))
-                                .into_any_element(),
-                        ),
+                        tr!("settings.storage.title"),
+                        tr!("settings.storage.description"),
+                        Some(storage),
                         cx,
                     ))
                     .child(card(

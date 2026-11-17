@@ -5,7 +5,7 @@ use gpui_kit::ElementId;
 use tf2tools_core::{
     AddonName, BoardMode, GbId, HudId, LogsRange, MatrixKind, MeterKind, ModuleChoice, NewPart,
     PartKey, PinCorner, Preset, ProfileId, Scene, SceneRule, Screen, SituationSwitch, SoundKind,
-    SteamId, StoreItemId, StoreKind, Team, TfClass, WeaponKind, WeaponSlot,
+    SteamId, StorageKind, StoreItemId, StoreKind, Team, TfClass, WeaponKind, WeaponSlot,
 };
 
 use crate::shell::route::Page;
@@ -811,8 +811,10 @@ pub const SETTINGS_LOG_NICKNAMES: &str = "settings-log-nicknames";
 pub const SETTINGS_LOG_KEEP: &str = "settings-log-keep";
 /// The Settings line saying what the logs cache and its full logs take, labelled with its text.
 pub const SETTINGS_LOG_SPACE: &str = "settings-log-space";
-/// The Settings line saying what the library takes on disk and unpacked, labelled with its text.
-pub const SETTINGS_LIBRARY_SPACE: &str = "settings-library-space";
+/// The Settings Storage card's content, labelled with the total or the line shown before a measure.
+pub const SETTINGS_STORAGE: &str = "settings-storage";
+/// The total in the middle of the Storage donut, labelled with it; drawn once figures exist.
+pub const SETTINGS_STORAGE_TOTAL: &str = "settings-storage-total";
 /// Wraps the Activity Log's category select.
 pub const LOGS_CATEGORY: &str = "logs-category";
 /// Wraps the Activity Log's level select.
@@ -3283,4 +3285,23 @@ pub const PAYLOAD_CANCEL: &str = "payload-cancel";
 /// One part's checkbox in the checklist, by row: "payload-check:<i>".
 pub fn payload_check(index: usize) -> ElementId {
     keyed("payload-check", &index.to_string())
+}
+
+/// A kind of stored data in ids, following `sync::store_slug`.
+pub fn storage_slug(kind: StorageKind) -> &'static str {
+    match kind {
+        StorageKind::Huds => "huds",
+        StorageKind::Sounds => "sounds",
+        StorageKind::Crosshairs => "crosshairs",
+        StorageKind::Addons => "addons",
+        StorageKind::LogsTf => "logs-tf",
+        StorageKind::StoreData => "store-data",
+        StorageKind::ImageCache => "image-cache",
+        _ => "other",
+    }
+}
+
+/// One Storage card row, labelled with its name and size.
+pub fn settings_storage(kind: StorageKind) -> ElementId {
+    keyed("settings-storage", storage_slug(kind))
 }

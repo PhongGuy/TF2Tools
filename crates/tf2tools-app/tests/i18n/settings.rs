@@ -181,14 +181,38 @@ fn the_logs_cache_lines_read_in_russian() {
 }
 
 #[test]
-fn the_library_line_reads_in_russian() {
-    use tf2tools_app::pages::settings::{library_text, size_text};
+fn the_storage_rows_read_in_russian() {
+    use tf2tools_app::pages::settings::{
+        size_text, storage_name, storage_row_label, storage_total_label,
+    };
+    use tf2tools_core::StorageKind;
     let _guard = LocaleGuard::switch("ru");
     assert_eq!(size_text(2_100_000_000), "2,0\u{a0}ГБ");
     assert_eq!(size_text(3 << 40), "3,0\u{a0}ТБ");
+    let names: Vec<String> = StorageKind::ALL
+        .iter()
+        .map(|k| storage_name(*k).to_string())
+        .collect();
     assert_eq!(
-        library_text(412_000_000, 2_100_000_000),
-        "Библиотека занимает 392,9\u{a0}МБ на диске (2,0\u{a0}ГБ без сжатия)."
+        names,
+        [
+            "HUD",
+            "Звуки",
+            "Прицелы",
+            "Дополнения",
+            "Кэш logs.tf",
+            "Данные магазинов",
+            "Кэш изображений"
+        ]
+    );
+    assert_eq!(
+        storage_row_label(&storage_name(StorageKind::Huds), 412_000_000, 2_100_000_000),
+        "HUD: 392,9\u{a0}МБ. 2,0\u{a0}ГБ без сжатия"
+    );
+    assert_eq!(storage_total_label(2_100_000_000), "Всего: 2,0\u{a0}ГБ");
+    assert_eq!(
+        tf2tools_app::_rust_i18n_try_translate("ru", "settings.storage.unmeasured").as_deref(),
+        Some("Не удалось измерить занятое место.")
     );
 }
 
