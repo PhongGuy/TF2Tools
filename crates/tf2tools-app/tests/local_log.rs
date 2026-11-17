@@ -146,3 +146,22 @@ fn the_update_failure_warning_stays_english(cx: &mut TestAppContext) {
     assert!(log.contains("update-download"), "{log}");
     assert!(!log.chars().any(cyrillic), "{log}");
 }
+
+// A Russian player's failed check shows Russian in Settings but logs only English.
+#[gpui_kit::test]
+fn the_failed_check_warning_stays_english(cx: &mut TestAppContext) {
+    if !support::in_own_process("local_log::the_failed_check_warning_stays_english") {
+        return;
+    }
+    let buf = capture_log();
+    tf2tools_app::i18n::apply("ru");
+    let (u, fake) = fake_updater(cx, true);
+    assert!(act(cx, &u, |u, cx| u.check(cx)), "the check starts");
+    fake.next_check(cx)
+        .send(Err(failure("Не удалось связаться с сервером.", false)))
+        .unwrap();
+    wait_state(cx, &u, "Failed", |s| matches!(s, UpdateState::Failed(_)));
+    let log = logged(&buf);
+    assert!(log.contains("update check failed"), "{log}");
+    assert!(!log.chars().any(cyrillic), "{log}");
+}

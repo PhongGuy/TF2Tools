@@ -358,7 +358,8 @@ impl Updater {
             Ok(Some(offer)) => UpdateState::Available(offer),
             Ok(None) => UpdateState::UpToDate,
             Err(failure) => {
-                tracing::warn!(message = %failure.message, "update check failed");
+                // The message is translated; the backend already logged the English cause.
+                tracing::warn!("update check failed");
                 UpdateState::Failed(failure)
             }
         };
