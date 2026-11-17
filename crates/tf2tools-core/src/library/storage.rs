@@ -113,8 +113,8 @@ impl Library {
             })
             .map_err(io_error)?;
         }
-        // Read the file lengths inside the same transaction as the logs.tf pages, so a
-        // commit between the two cannot leave the store data share off.
+        // Read the file lengths inside the same transaction as the logs.tf pages, which narrows
+        // how far a commit between the two can skew the store data share.
         let db_path = self.dir.db_path();
         let (logs, files) = self
             .db

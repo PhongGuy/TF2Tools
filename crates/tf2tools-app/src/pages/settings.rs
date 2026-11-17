@@ -1,7 +1,8 @@
-//! v5's Settings page: the app version with update status and actions, the TF2 path with Browse and
-//! Auto-detect, the preview volume, the store cache duration, what TF2Tools keeps on disk, one sync
-//! card per store with Resync, and Save. Below them, a Licences card shows the third-party notices the app
-//! carries, and a Help and feedback card links to the help page and the place to report a problem.
+//! v5's Settings page: the app version with update status and actions, the language, the TF2 path
+//! with Browse and Auto-detect, the preview volume, a Storage card of what TF2Tools keeps on disk,
+//! the logs.tf options, one Stores card with each store's Resync, the cache duration and the mature
+//! switch, and Save. Below them, a Licences card shows the third-party notices the app carries, and
+//! a Help and feedback card links to the help page and the place to report a problem.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -259,7 +260,7 @@ pub struct SettingsPage {
     language: Entity<SelectState<Vec<LanguageRow>>>,
     trim: Entity<LogsTrim>,
     keep: Entity<SelectState<Vec<KeepRow>>>,
-    /// The library job, whose figures the Library card draws.
+    /// The library job, whose figures the Storage card draws.
     pack: Entity<LibraryPack>,
     /// Whether the shell hides the page; a hidden page asks for no measures.
     hidden: bool,
@@ -439,7 +440,7 @@ impl SettingsPage {
         // A landed trim may have compacted the database, so the figures are taken again.
         cx.subscribe(&trim, |page, _, _: &LogsTrimEvent, cx| page.measure(cx))
             .detach();
-        // Every landed pass may bring new library figures, so it redraws the Library card.
+        // Every landed pass may bring new storage figures, so it redraws the Storage card.
         let pack = LibraryPack::global(cx);
         cx.observe(&pack, |_, _, cx| cx.notify()).detach();
         // The App Updates card draws the updater's state, so every change redraws the page.
@@ -1301,7 +1302,8 @@ fn storage_content(pack: &LibraryPack, cx: &App) -> AnyElement {
         .into_any_element()
 }
 
-// One Storage row: a dot in the kind's colour, its name left and size right, then any unpacked size.
+// One Storage row: a dot in the kind's colour, its name left and size right, then any
+// unpacked size.
 fn storage_row(
     kind: StorageKind,
     bytes: u64,
