@@ -1,6 +1,7 @@
 //! The app-wide services global, the panic-safe bridge to blocking core calls, and TF2 state.
 
 use std::fmt;
+use std::panic::Location;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -141,28 +142,65 @@ pub enum StartupError {
     Catalog { path: PathBuf, message: String },
 }
 
-/// A failed page action, shaped as a toast's title and description. `Core` holds text already
-/// in the player's language; `NoTf2` and `Internal` read the catalogue when shown.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// A failed page action, shaped as a toast's title and description. `Core` holds the player's
+/// text, the raw `detail` and the place it was built; `NoTf2` and `Internal` read the catalogue
+/// when shown. `Display` is the English developer line for the log.
+#[derive(Debug, Clone)]
 pub enum OpError {
     NoTf2,
     Core {
         action: SharedString,
         message: SharedString,
+        detail: String,
+        at: &'static Location<'static>,
     },
     Internal(String),
 }
 
+// Two failures are the same failure wherever they were built, so `at` is left out.
+impl PartialEq for OpError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::NoTf2, Self::NoTf2) => true,
+            (
+                Self::Core {
+                    action,
+                    message,
+                    detail,
+                    ..
+                },
+                Self::Core {
+                    action: other_action,
+                    message: other_message,
+                    detail: other_detail,
+                    ..
+                },
+            ) => action == other_action && message == other_message && detail == other_detail,
+            (Self::Internal(raw), Self::Internal(other_raw)) => raw == other_raw,
+            (Self::NoTf2 | Self::Core { .. } | Self::Internal(_), _) => false,
+        }
+    }
+}
+
+impl Eq for OpError {}
+
 impl OpError {
-    /// A core error, titled by the action that failed.
+    /// A failure titled by the action that failed, with player text and no raw detail.
     /// A title is text already in the player's language, so a bare literal does not compile:
     /// ```compile_fail
     /// tf2tools_app::services::OpError::core("Install HUD", "disk full");
     /// ```
-    pub fn core(action: SharedString, err: impl fmt::Display) -> Self {
+    /// A core error is not text, so it does not compile either; describe it first:
+    /// ```compile_fail
+    /// tf2tools_app::services::OpError::core("Load".into(), std::io::Error::other("raw"));
+    /// ```
+    #[track_caller]
+    pub fn core(action: SharedString, message: impl Into<SharedString>) -> Self {
         Self::Core {
             action,
-            message: err.to_string().into(),
+            message: message.into(),
+            detail: String::new(),
+            at: Location::caller(),
         }
     }
 
@@ -183,21 +221,17 @@ impl OpError {
     }
 }
 
-// A panic shows the player fixed words, but its own text stays in `Display` for the log.
+// The developer log reads English whatever the player's language: the place a failure was
+// built and its raw detail, never the translated title or message.
 impl fmt::Display for OpError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.title())?;
-        let shown;
-        let description: &str = match self {
-            Self::Internal(raw) => raw,
-            Self::NoTf2 | Self::Core { .. } => {
-                shown = self.description();
-                &shown
+        match self {
+            Self::NoTf2 => f.write_str("no TF2 folder is set"),
+            Self::Core { detail, at, .. } if detail.is_empty() => {
+                write!(f, "{}:{}", at.file(), at.line())
             }
-        };
-        match description {
-            "" => Ok(()),
-            description => write!(f, ": {description}"),
+            Self::Core { detail, at, .. } => write!(f, "{}:{}: {detail}", at.file(), at.line()),
+            Self::Internal(raw) => write!(f, "unexpected error: {raw}"),
         }
     }
 }

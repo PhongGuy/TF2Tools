@@ -384,10 +384,9 @@ impl GraphicsPage {
                         let title = "Some settings went back to the preset";
                         (ToastKind::Warning, title.into(), text.into())
                     })),
-                    Err(ModulesFailure::Foreign) => Err(OpError::Core {
-                        action: save_failed(),
-                        message: foreign_modules_cfg(),
-                    }),
+                    Err(ModulesFailure::Foreign) => {
+                        Err(OpError::core(save_failed(), foreign_modules_cfg()))
+                    }
                     Err(ModulesFailure::Op(err)) => Err(err),
                 }
             },

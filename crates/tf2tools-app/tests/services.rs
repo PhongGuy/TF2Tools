@@ -140,22 +140,20 @@ fn op_errors_read_as_a_toast_title_and_description() {
         OpError::NoTf2.description(),
         "Set the TF2 folder in Settings, then try again."
     );
-    assert_eq!(
-        OpError::NoTf2.to_string(),
-        "TF2 not found: Set the TF2 folder in Settings, then try again."
-    );
+    assert_eq!(OpError::NoTf2.to_string(), "no TF2 folder is set");
+    let line = line!() + 1;
     let e = OpError::core("Install HUD".into(), "disk full");
     assert_eq!(
         (e.title().as_str(), e.description().as_str()),
         ("Install HUD", "disk full")
     );
-    assert_eq!(e.to_string(), "Install HUD: disk full");
+    assert_eq!(e.to_string(), format!("{}:{line}", file!()));
     let p = OpError::Internal("boom".into());
     assert_eq!(
         (p.title().as_str(), p.description().as_str()),
         ("Something went wrong", internal().as_str())
     );
-    assert_eq!(p.to_string(), "Something went wrong: boom");
+    assert_eq!(p.to_string(), "unexpected error: boom");
 }
 
 #[gpui_kit::test]

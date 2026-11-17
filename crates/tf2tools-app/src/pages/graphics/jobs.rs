@@ -11,7 +11,7 @@ use tf2tools_core::{
 
 use super::model::{SettingsNote, catalog_note, describe_apply_modules, describe_install};
 use crate::i18n::tr;
-use crate::local_messages::{describe_join, describe_store_status};
+use crate::local_messages::{LocalFailure, describe_join, describe_store_status};
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::services::{OpError, Services};
 use crate::shell::confirm::{Confirm, confirm};
@@ -28,14 +28,12 @@ pub fn close_tf2_text() -> SharedString {
     tr!("messages.shared.close_tf2_text")
 }
 
-/// Err(OpError::Core { action: close_tf2(), message: close_tf2_text() }) when `probe` says TF2
-/// runs. Blocking: call off the UI thread.
+/// The "Close TF2 first" failure, placed at the caller, when `probe` says TF2 runs.
+/// Blocking: call off the UI thread.
+#[track_caller]
 pub fn refuse_while_running(probe: &(dyn Fn() -> bool + Send + Sync)) -> Result<(), OpError> {
     if probe() {
-        return Err(OpError::Core {
-            action: close_tf2(),
-            message: close_tf2_text(),
-        });
+        return Err(OpError::core(close_tf2(), close_tf2_text()));
     }
     Ok(())
 }
@@ -268,10 +266,6 @@ async fn force_sync(store: &StoreClient, action: &SharedString) -> Result<(), Op
         .map(|_| ())
         .map_err(|e| {
             let failure = describe_sync(StoreKind::Addons, &e);
-            tracing::warn!("{action}: {}", failure.detail);
-            OpError::Core {
-                action: action.clone(),
-                message: failure.message.into(),
-            }
+            LocalFailure::new(failure.message, failure.detail).into_op(action.clone())
         })
 }

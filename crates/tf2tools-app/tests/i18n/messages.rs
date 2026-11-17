@@ -83,11 +83,17 @@ fn op_errors_read_in_russian() {
     for err in [OpError::NoTf2, OpError::Internal("boom".into())] {
         assert_russian(&err.title());
         assert_russian(&err.description());
-        assert_russian(&err.to_string());
     }
-    let op = LocalFailure::new(local::hud_files(), "x").into_op(SharedString::from("Худ"));
+    assert_eq!(OpError::NoTf2.to_string(), "no TF2 folder is set");
+    assert_eq!(
+        OpError::Internal("boom".into()).to_string(),
+        "unexpected error: boom"
+    );
+    let failure = LocalFailure::new(local::hud_files(), "x");
+    let line = line!() + 1;
+    let op = failure.into_op(SharedString::from("Худ"));
     assert_russian(&op.description());
-    assert_russian(&op.to_string());
+    assert_eq!(op.to_string(), format!("{}:{line}: x", file!()));
 }
 
 #[test]

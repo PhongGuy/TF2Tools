@@ -4205,10 +4205,7 @@ fn save_job(
         }
         // The sentence is the whole toast; the editor keeps its changes.
         Err(MakeHudError::BaseChanged) => {
-            return Err(OpError::Core {
-                action: hud_base_changed(),
-                message: SharedString::default(),
-            });
+            return Err(OpError::core(hud_base_changed(), ""));
         }
         Err(e) => return Err(describe_make_hud(&e).into_op(save_failed())),
     };

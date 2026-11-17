@@ -79,13 +79,17 @@ impl LocalFailure {
         tracing::warn!("{what}: {}", self.detail);
     }
 
-    /// Logs the raw detail under `action`, then returns the toast the player reads.
+    /// The toast the player reads under `action`; logs its English developer line first.
+    #[track_caller]
     pub fn into_op(self, action: SharedString) -> OpError {
-        self.log(&action);
-        OpError::Core {
+        let op = OpError::Core {
             action,
             message: self.message,
-        }
+            detail: self.detail,
+            at: std::panic::Location::caller(),
+        };
+        tracing::warn!("{op}");
+        op
     }
 }
 
@@ -105,6 +109,7 @@ pub fn describe_gb_install(err: &GbAddonInstallError) -> LocalFailure {
 }
 
 /// The toast for a failed add-on operation titled `action`: "Close TF2 first" when TF2 runs.
+#[track_caller]
 pub fn gb_install_op(err: &GbAddonInstallError, action: SharedString) -> OpError {
     let action = if matches!(err, GbAddonInstallError::Tf2Running) {
         close_tf2()
@@ -138,6 +143,7 @@ pub fn describe_gb_map_install(err: &GbMapInstallError) -> LocalFailure {
 }
 
 /// The toast for a failed map operation titled `action`: "Close TF2 first" when TF2 runs.
+#[track_caller]
 pub fn gb_map_install_op(err: &GbMapInstallError, action: SharedString) -> OpError {
     let action = if matches!(err, GbMapInstallError::Tf2Running) {
         close_tf2()
@@ -162,6 +168,7 @@ pub fn describe_gb_map_remove(err: &GbMapRemoveError) -> LocalFailure {
 }
 
 /// The toast for a failed map remove titled `action`: "Close TF2 first" when TF2 runs.
+#[track_caller]
 pub fn gb_map_remove_op(err: &GbMapRemoveError, action: SharedString) -> OpError {
     let action = if matches!(err, GbMapRemoveError::Tf2Running) {
         close_tf2()
