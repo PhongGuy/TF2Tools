@@ -29,7 +29,8 @@ use tf2tools_app::widgets::class_icon::class_short_name;
 use tf2tools_app::widgets::profile_menu::added_title;
 use tf2tools_app::widgets::sync_banner::maps_banner_text;
 use tf2tools_core::{
-    AddonSection, GbId, ProfileDraft, Provenance, SoundKind, Tf2Install, TfClass, WeaponSlot,
+    AddonSection, DraftSlot, GbId, ProfileDraft, Provenance, SoundKind, Tf2Install, TfClass,
+    WeaponSlot,
 };
 
 use crate::LocaleGuard;
@@ -322,6 +323,54 @@ fn assert_inside(
     );
 }
 
+// A HUDs page at 800x600 with budhud, a local HUD, in the library.
+fn huds_with_budhud(cx: &mut TestAppContext, env: &support::Env) -> support::ShellWindow {
+    let s = support::shell_window(cx, env, found(env));
+    let archive = hud_zip(env.tmp.path(), "budhud");
+    s.services
+        .library
+        .import_hud(&archive, Provenance::Local)
+        .unwrap();
+    resize_800(cx, &s);
+    support::click_id(cx, s.win, ids::nav(Page::Settings));
+    support::click_id(cx, s.win, ids::nav(Page::Huds));
+    open_huds(cx, &s);
+    s
+}
+
+// An icon-only button is a 32 px square; a labelled one is wider.
+fn icon_only(cx: &mut TestAppContext, win: AnyWindowHandle, id: gpui_kit::ElementId) -> bool {
+    support::bounds_of(cx, win, id).unwrap().size.width <= gpui_kit::px(32.)
+}
+
+// English keeps the card's Install label; the longer Russian one leaves the icon, named
+// "Установить" for its tooltip and screen readers.
+#[gpui_kit::test]
+fn the_hud_card_install_keeps_its_label_in_english(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let s = huds_with_budhud(cx, &env);
+    let install = ids::hud_install("budhud");
+    assert_eq!(
+        support::label_of(cx, s.win, install.clone()).as_deref(),
+        Some("Install")
+    );
+    assert!(!icon_only(cx, s.win, install));
+}
+
+#[gpui_kit::test]
+fn the_russian_hud_card_install_is_a_named_icon(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = huds_with_budhud(cx, &env);
+    let install = ids::hud_install("budhud");
+    assert_eq!(
+        support::label_of(cx, s.win, install.clone()).as_deref(),
+        Some("Установить")
+    );
+    assert!(icon_only(cx, s.win, install));
+}
+
 // At 800x600 a Russian library card keeps its action row inside the card and room for the
 // HUD's name, and the search box shows its whole placeholder.
 #[gpui_kit::test]
@@ -366,6 +415,62 @@ fn the_russian_hud_card_fits_at_800(cx: &mut TestAppContext) {
     assert!(
         text + gpui_kit::px(44.) <= search.size.width,
         "{placeholder} needs {text:?} in {search:?}"
+    );
+}
+
+// At 800x600 a Russian profile card keeps Activate, Edit and Delete inside the card, and
+// Activate, icon-only there, keeps its name.
+#[gpui_kit::test]
+fn the_russian_profile_card_fits_at_800(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let comp = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Competitive"))
+        .unwrap();
+    resize_800(cx, &s);
+    let _page = open_profiles(cx, &s);
+    let id = comp.id();
+    let card = support::bounds_of(cx, s.win, ids::profile_card(id)).unwrap();
+    for button in [
+        ids::profile_activate(id),
+        ids::profile_edit(id),
+        ids::profile_delete(id),
+    ] {
+        let b = support::bounds_of(cx, s.win, button.clone()).unwrap();
+        assert_inside(&format!("{button:?}"), b, card);
+    }
+    assert_eq!(
+        support::label_of(cx, s.win, ids::profile_activate(id)).as_deref(),
+        Some("Включить")
+    );
+}
+
+// The Missing Items dialog calls a local import "Свой", as the HUD card's badge does.
+#[gpui_kit::test]
+fn a_missing_local_item_reads_as_the_badge_does(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let archive = hud_zip(env.tmp.path(), "budhud");
+    let hud = s
+        .services
+        .library
+        .import_hud(&archive, Provenance::Local)
+        .unwrap();
+    let draft = ProfileDraft::new("Comp").with_hud(DraftSlot::Item(hud.id().clone()));
+    let comp = s.services.library.create_profile(&draft).unwrap();
+    s.services.library.delete_hud(hud.id()).unwrap();
+    let _page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::profile_activate(comp.id()));
+    support::wait_real(cx, "the Missing Items dialog", |cx| {
+        support::present(cx, s.win, ids::PROFILES_MISSING_DIALOG)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::missing_local(0)).as_deref(),
+        Some("Свой файл — скачать снова нельзя")
     );
 }
 

@@ -52,11 +52,13 @@ use crate::store_detail::{DetailItem, open_detail};
 use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
-use crate::widgets::labelled;
 use crate::widgets::scroll::{scroll_area, scroll_beside};
+use crate::widgets::{label_or_named, labelled};
 
 /// A card's height: the name row, two wrapped rows of badges and the button footer.
 const CARD_HEIGHT: Pixels = px(196.);
+// The Activate label's room beside Edit and Delete on a two-column card at 800 px.
+const ACTIVATE_LABEL_BUDGET: Pixels = px(60.);
 // The grid never gets shorter than one card row; a short window scrolls the page.
 const LIBRARY_MIN_HEIGHT: Pixels = CARD_HEIGHT;
 // Narrower than this, the search box wraps onto its own row instead of shrinking.
@@ -1022,16 +1024,23 @@ fn empty_state(
         .into_any_element()
 }
 
+// What every card's buttons wait on: a TF2 folder for Activate, and no other profile action.
+#[derive(Clone, Copy)]
+struct Gates {
+    has_tf2: bool,
+    busy: bool,
+}
+
 // v5's ProfileCard: the name (and "Active"), its item badges or "Empty profile", then
 // Activate, Edit (opens the editor) and Delete. A click on the body also opens the editor; the
 // buttons stop their clicks so they never reach it.
 fn profile_card(
     profile: &Profile,
     active: bool,
-    has_tf2: bool,
-    busy: bool,
+    Gates { has_tf2, busy }: Gates,
     activating: Option<&ProfileId>,
     page: &WeakEntity<ProfilesPage>,
+    window: &Window,
     cx: &App,
 ) -> AnyElement {
     let theme = cx.theme();
@@ -1044,10 +1053,22 @@ fn profile_card(
         }
     };
     let this_one = activating == Some(id);
-    let activate_label = match (this_one, active) {
-        (true, _) => tr!("profiles.button.activating"),
-        (false, true) => tr!("profiles.badge.active"),
-        (false, false) => tr!("profiles.button.activate"),
+    let activate = Button::new(ids::profile_activate(id))
+        .primary()
+        .px(SM_ICON_PX)
+        .icon(IconName::Play);
+    // Only the idle label goes icon-only when it outgrows its room; the busy and active
+    // labels keep their text as before.
+    let activate = match (this_one, active) {
+        (true, _) => activate.label(tr!("profiles.button.activating")),
+        (false, true) => activate.label(tr!("profiles.badge.active")),
+        (false, false) => label_or_named(
+            activate,
+            tr!("profiles.button.activate"),
+            ACTIVATE_LABEL_BUDGET,
+            window,
+            cx,
+        ),
     };
     let on_edit = {
         let (page, id) = (page.clone(), id.clone());
@@ -1151,11 +1172,7 @@ fn profile_card(
                 .mt_auto()
                 .gap_2()
                 .child(
-                    Button::new(ids::profile_activate(id))
-                        .primary()
-                        .px(SM_ICON_PX)
-                        .icon(IconName::Play)
-                        .label(activate_label)
+                    activate
                         .loading(this_one)
                         .disabled(active || !has_tf2 || busy)
                         .on_click(on_activate),
@@ -1234,16 +1251,16 @@ impl ProfilesPage {
             let page = cx.entity().downgrade();
             Some(
                 self.grid
-                    .render(shown.len(), CARD_HEIGHT, move |ix, _, cx| {
+                    .render(shown.len(), CARD_HEIGHT, move |ix, window, cx| {
                         let profile = &profiles[shown[ix]];
                         let is_active = active.as_ref() == Some(profile.id());
                         profile_card(
                             profile,
                             is_active,
-                            has_tf2,
-                            busy,
+                            Gates { has_tf2, busy },
                             activating.as_ref(),
                             &page,
+                            window,
                             cx,
                         )
                     }),

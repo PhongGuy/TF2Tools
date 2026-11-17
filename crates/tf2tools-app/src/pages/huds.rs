@@ -62,17 +62,17 @@ use crate::tokio_bridge;
 use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::carousel::open_lightbox;
-use crate::widgets::labelled;
 use crate::widgets::profile_menu::{Section, added_title, profile_menu};
 use crate::widgets::scroll::scroll_area;
+use crate::widgets::{label_or_named, labelled};
 
 /// The card's text and buttons below a store HUD's 16:9 screenshot, and a local card's height.
 const CARD_TEXT_HEIGHT: Pixels = px(136.);
 // The grid never gets shorter than one row of local cards, as on Profiles, so a common window
 // fits the page and only the grid scrolls; a short window still scrolls the page.
 const LIBRARY_MIN_HEIGHT: Pixels = CARD_TEXT_HEIGHT;
-// The longest Install label the card's action row holds beside Copy and Delete.
-const INSTALL_LABEL_CHARS: usize = 8;
+// The Install label's room beside Copy and Delete on a two-column card at 800 px.
+const INSTALL_LABEL_BUDGET: Pixels = px(60.);
 // Room for up to three lines of the note that a copy's newer version is in the HUD Store.
 const STORE_NOTE_HEIGHT: Pixels = px(48.);
 /// Edit's tooltip while another HUD action runs.
@@ -1587,6 +1587,7 @@ fn hud_card(
     state: CardState<'_>,
     busy: Option<&Busy>,
     page: &WeakEntity<HudsPage>,
+    window: &Window,
     cx: &App,
 ) -> AnyElement {
     let CardState {
@@ -1790,7 +1791,7 @@ fn hud_card(
                         .on_click(on_page(HudsPage::delete)),
                 )
                 .child(needs_tf2(
-                    install_button(folder)
+                    install_button(folder, window, cx)
                         .loading(installing)
                         .disabled(busy.is_some() && !installing)
                         .on_click(on_page(HudsPage::install)),
@@ -1800,19 +1801,19 @@ fn hud_card(
         .into_any_element()
 }
 
-// The card's Install button. A label longer than English's would push the action row past
-// the left edge of a two-column card at 800 px, so it keeps only the icon, named by its tooltip.
-fn install_button(folder: &str) -> Button {
-    let label = tr!("huds.button.install");
+// The card's Install button, icon-only when the label outgrows its room.
+fn install_button(folder: &str, window: &Window, cx: &App) -> Button {
     let button = Button::new(ids::hud_install(folder))
         .primary()
         .px(SM_ICON_PX)
         .icon(IconName::Download);
-    if label.chars().count() <= INSTALL_LABEL_CHARS {
-        button.label(label)
-    } else {
-        button.tooltip(label.clone()).accessibility_label(label)
-    }
+    label_or_named(
+        button,
+        tr!("huds.button.install"),
+        INSTALL_LABEL_BUDGET,
+        window,
+        cx,
+    )
 }
 
 // The card's "Add to profile" menu. A pick saves through the page, so it waits behind any
@@ -1927,7 +1928,7 @@ impl HudsPage {
             );
             Some(
                 self.grid
-                    .render_sized(shown.len(), height, move |ix, _, cx| {
+                    .render_sized(shown.len(), height, move |ix, window, cx| {
                         let hud = &huds[shown[ix]];
                         let folder = hud.folder_name();
                         let state = CardState {
@@ -1939,7 +1940,7 @@ impl HudsPage {
                             behind_store: behind.contains(folder),
                             page_url: pages.get(folder).map(String::as_str),
                         };
-                        hud_card(hud, state, busy.as_ref(), &page, cx)
+                        hud_card(hud, state, busy.as_ref(), &page, window, cx)
                     }),
             )
         };
