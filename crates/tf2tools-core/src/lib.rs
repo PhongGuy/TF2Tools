@@ -51,7 +51,7 @@ pub use error::{
     MapDownloadError, MapRemoveError, MastercomfigStatusError, ModuleCatalogError, OpenError,
     PaintError, PlayerInputError, PngReadError, PngWriteError, PresetError, PreviewError,
     ProfileError, QueryError, RecipeError, ReinstallError, RemoveMastercomfigError, ResolveError,
-    RestoreMastercomfigError, SchemaError, SettingsError, SyncError, TakeOverError,
+    RestoreMastercomfigError, SchemaError, SettingsError, StorageError, SyncError, TakeOverError,
     UpdateApplyError, UpdateCheckError, UpdateCopyError, UpdateDownloadError, VpkError, VtfError,
     WavError, WeaponIconsError, WeaponNamesError,
 };
@@ -107,7 +107,7 @@ pub use library::{
 pub use library::{
     Choices, ComfigModule, ModuleCatalog, ModuleCategory, ModuleChoice, ModuleValue, readable_name,
 };
-pub use library::{ConvertReport, KindConverted, LibrarySpace};
+pub use library::{ConvertReport, KindConverted, LibrarySpace, StorageKind, StorageUse};
 pub use library::{CopyUpdate, CopyUpdated, DownloadUpdate, TreeHash};
 pub use library::{HudSnapshot, MAX_SNAPSHOTS, SnapshotEntry};
 pub use logstf::{

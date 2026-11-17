@@ -211,6 +211,7 @@ mod library_packed_write;
 mod library_painted;
 mod library_sounds;
 mod library_space;
+mod library_storage;
 mod license;
 mod logstf_averages;
 mod logstf_body;
