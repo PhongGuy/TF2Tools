@@ -9,7 +9,7 @@ use common::logstf::{days_ago, now, seed_stored};
 use common::packed::{gb_zip, packed_files, zip_path};
 use common::{library_env, tree, write_file, zip_bytes};
 use tf2tools_core::{
-    AddonName, Database, LibraryKind, LogsCache, Provenance, StorageError, StorageKind, StorageUse,
+    AddonName, Database, LibraryKind, LogsCache, Provenance, StorageKind, StorageUse,
 };
 
 /// Every file length under `root`; a missing folder is 0.
@@ -224,6 +224,7 @@ fn store_data_is_the_database_files_less_the_logs_cache() {
 #[test]
 fn a_folder_that_cannot_be_read_fails_the_measure() {
     use std::os::unix::fs::PermissionsExt as _;
+    use tf2tools_core::StorageError;
     struct Unlock(std::path::PathBuf);
     impl Drop for Unlock {
         fn drop(&mut self) {
