@@ -121,6 +121,10 @@ updater:
     download_slow: "Загрузка заняла слишком много времени. Проверьте подключение к интернету и попробуйте ещё раз."
     check_first: "Сначала проверьте наличие обновлений."
     download_first: "Сначала скачайте обновление."
+  activity:
+    downloaded: "Скачано обновление TF2Tools v%{version}"
+    installed: "Установлено обновление TF2Tools v%{version}"
+    installer_started: "Запущен установщик TF2Tools v%{version}"
 
 common:
   list:

@@ -9,8 +9,11 @@ use crate::messages::assert_russian;
 use crate::settings::open_settings;
 use crate::support::{
     self,
-    update_fake::{fake_updater, offer, reach_available},
+    update_fake::{
+        act, fake_updater, offer, reach_available, reach_ready, update_rows, with_services,
+    },
 };
+use tf2tools_app::updater::AfterInstall;
 
 #[gpui_kit::test]
 fn the_app_updates_card_speaks_russian(cx: &mut TestAppContext) {
@@ -83,4 +86,40 @@ fn the_update_banner_speaks_russian(cx: &mut TestAppContext) {
     let text = support::label_of(cx, s.win, ids::UPDATE_BANNER_TEXT).unwrap();
     assert_russian(&text);
     assert!(text.contains("6.0.1"), "{text}");
+}
+
+// Restarts into a staged 6.0.1 update and returns the settings rows once both are written.
+fn rows_after_restart(cx: &mut TestAppContext, after: AfterInstall) -> Vec<String> {
+    let env = support::env();
+    let services = with_services(cx, &env);
+    let (u, fake) = fake_updater(cx, true);
+    *fake.apply_result.lock().unwrap() = Ok(after);
+    reach_ready(cx, &u, &fake, offer("6.0.1", true));
+    assert!(act(cx, &u, |u, cx| u.restart(cx)), "the restart starts");
+    support::wait_real(cx, "both rows", |_| update_rows(&services).len() == 2);
+    update_rows(&services)
+        .into_iter()
+        .map(|(_, _, text)| text)
+        .collect()
+}
+
+#[gpui_kit::test]
+fn update_rows_are_written_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let rows = rows_after_restart(cx, AfterInstall::Relaunch("/tmp/TF2Tools.AppImage".into()));
+    for text in &rows {
+        assert_russian(text);
+        assert!(text.contains("v6.0.1"), "{text}");
+    }
+}
+
+#[gpui_kit::test]
+fn an_installer_row_is_written_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let rows = rows_after_restart(cx, AfterInstall::Quit);
+    assert!(rows.iter().any(|t| t.contains("установщик")), "{rows:?}");
+    for text in &rows {
+        assert_russian(text);
+        assert!(text.contains("v6.0.1"), "{text}");
+    }
 }

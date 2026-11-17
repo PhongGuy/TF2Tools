@@ -123,6 +123,10 @@ updater:
     download_slow: "The download took too long. Check your internet connection and try again."
     check_first: "Check for updates first."
     download_first: "Download the update first."
+  activity:
+    downloaded: "Downloaded TF2Tools v%{version}"
+    installed: "Installed TF2Tools v%{version}"
+    installer_started: "Started the TF2Tools v%{version} installer"
 
 common:
   list:
