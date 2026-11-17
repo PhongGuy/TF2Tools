@@ -481,7 +481,7 @@ impl StoreGrid {
         let counting = run_blocking(cx, move |s| {
             let count = |q: &StoreQuery| {
                 s.store.store_count(kind, q).map_err(|e| {
-                    describe_store_status(&e).into_op(tr!("messages.action.load_store"))
+                    describe_store_status(&e).into_op(tr!("messages.action.load_the_store"))
                 })
             };
             Ok((count(&shown)?, count(&total)?))
@@ -517,9 +517,9 @@ impl StoreGrid {
             None => self.query(),
         };
         let reading = run_blocking(cx, move |s| {
-            s.store
-                .store_cards(kind, &query)
-                .map_err(|e| describe_store_status(&e).into_op(tr!("messages.action.load_store")))
+            s.store.store_cards(kind, &query).map_err(|e| {
+                describe_store_status(&e).into_op(tr!("messages.action.load_the_store"))
+            })
         });
         cx.spawn(async move |grid, cx| {
             let page = reading.await;
@@ -630,7 +630,7 @@ impl StoreGrid {
                     None => query,
                 };
                 s.store.store_cards(kind, &query).map_err(|e| {
-                    describe_store_status(&e).into_op(tr!("messages.action.load_store"))
+                    describe_store_status(&e).into_op(tr!("messages.action.load_the_store"))
                 })
             })
         });

@@ -889,8 +889,8 @@ mod tests {
 
     #[test]
     fn a_failed_list_read_never_says_a_save_failed() {
-        assert_eq!(PresetWork::List.failed(), "Couldn't read your presets.");
-        assert_eq!(PresetWork::Save.failed(), "Couldn't save the preset.");
-        assert_eq!(PresetWork::Delete.failed(), "Couldn't delete the preset.");
+        assert_eq!(PresetWork::List.failed(), "Couldn't read your presets");
+        assert_eq!(PresetWork::Save.failed(), "Couldn't save the preset");
+        assert_eq!(PresetWork::Delete.failed(), "Couldn't delete the preset");
     }
 }

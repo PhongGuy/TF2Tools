@@ -129,7 +129,7 @@ fn a_detection_hit_survives_a_failed_save() {
     );
     assert!(matches!(
         error,
-        Some(OpError::Core { ref action, .. }) if action == "Save TF2 path"
+        Some(OpError::Core { ref action, .. }) if action == "Couldn't save the TF2 path"
     ));
 }
 

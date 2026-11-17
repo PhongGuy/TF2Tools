@@ -462,7 +462,7 @@ impl GbMapsTab {
         let reading = run_blocking(cx, move |s| {
             s.store
                 .gb_map_cards(&query)
-                .map_err(|e| describe_store_status(&e).into_op(tr!("messages.action.load_gb_maps")))
+                .map_err(|e| describe_store_status(&e).into_op(tr!("messages.action.load_maps")))
         });
         cx.spawn(async move |tab, cx| {
             let page = reading.await;
@@ -563,7 +563,7 @@ impl GbMapsTab {
                     None => page,
                 };
                 s.store.gb_map_cards(&page).map_err(|e| {
-                    describe_store_status(&e).into_op(tr!("messages.action.load_gb_maps"))
+                    describe_store_status(&e).into_op(tr!("messages.action.load_maps"))
                 })
             })
         });

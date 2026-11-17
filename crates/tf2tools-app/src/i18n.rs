@@ -665,4 +665,25 @@ mod tests {
             [Some("Скачанный файл повреждён. Попробуйте снова."); 3]
         );
     }
+
+    #[test]
+    fn english_action_titles_read_as_a_failure_or_an_outcome() {
+        let en = messages("en");
+        let bare = ["Load ", "Save ", "List ", "Make ", "Measure ", "Trim "];
+        let found: Vec<String> = en
+            .iter()
+            // Matched by segments so the key scans never read this prefix as a key.
+            .filter(|(k, _)| k.split('.').take(2).eq(["messages", "action"]))
+            .filter(|(_, v)| {
+                v.starts_with(char::is_lowercase)
+                    || v.ends_with('.')
+                    || bare.iter().any(|b| v.starts_with(b))
+            })
+            .map(|(k, v)| format!("{k}: {v}"))
+            .collect();
+        assert!(
+            found.is_empty(),
+            "titles that don't read as a failure: {found:?}"
+        );
+    }
 }
