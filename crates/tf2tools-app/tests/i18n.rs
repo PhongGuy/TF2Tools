@@ -25,6 +25,9 @@ mod messages;
 #[path = "i18n/settings.rs"]
 mod settings;
 
+#[path = "i18n/stores.rs"]
+mod stores;
+
 #[path = "i18n/updater.rs"]
 mod updater;
 

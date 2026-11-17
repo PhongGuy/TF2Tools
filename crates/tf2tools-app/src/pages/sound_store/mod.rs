@@ -49,7 +49,7 @@ pub struct SoundStorePage {
 }
 
 impl SoundStorePage {
-    /// Needs the `Services` global; the grid is `StoreGridConfig::new(Sounds, "sounds")` with 382 px cards.
+    /// Needs the `Services` global; the grid is `StoreGridConfig::new(Sounds)` with 382 px cards.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // The player comes first so each card can read what plays and start its preview.
         let player = sound_player(window, cx);
@@ -67,9 +67,7 @@ impl SoundStorePage {
         };
         let config = StoreGridConfig {
             card: CardSize::Fixed(px(CARD_HEIGHT)),
-            ..StoreGridConfig::new(KIND, "sounds")
-                .external_toolbar()
-                .with_filters()
+            ..StoreGridConfig::new(KIND).external_toolbar().with_filters()
         };
         let grid = cx.new(|cx| StoreGrid::new(config, render, window, cx));
         // The banner follows the hub's sounds progress; without a hub there is no banner.

@@ -314,6 +314,41 @@ store_grid:
     huds: { one: "%{shown} из %{count} HUD", few: "%{shown} из %{count} HUD", many: "%{shown} из %{count} HUD" }
     sounds: { one: "%{shown} из %{count} звука", few: "%{shown} из %{count} звуков", many: "%{shown} из %{count} звуков" }
     crosshairs: { one: "%{shown} из %{count} прицела", few: "%{shown} из %{count} прицелов", many: "%{shown} из %{count} прицелов" }
+  loading: "Загрузка..."
+  sort:
+    most_liked: "Лайки"
+    most_viewed: "Просмотры"
+    newest: "Новые"
+  search:
+    huds: "Поиск HUD..."
+    sounds: "Поиск звуков..."
+    crosshairs: "Поиск прицелов..."
+    items: "Поиск..."
+  syncing:
+    huds: "Синхронизация HUD..."
+    sounds: "Синхронизация звуков..."
+    crosshairs: "Синхронизация прицелов..."
+    items: "Синхронизация..."
+  unloaded:
+    huds: "Не удалось загрузить HUD"
+    sounds: "Не удалось загрузить звуки"
+    crosshairs: "Не удалось загрузить прицелы"
+    items: "Не удалось загрузить элементы"
+  no_match:
+    search:
+      huds: "Нет HUD по этому запросу"
+      sounds: "Нет звуков по этому запросу"
+      crosshairs: "Нет прицелов по этому запросу"
+      items: "Ничего не найдено по этому запросу"
+    filters:
+      huds: "Нет HUD под эти фильтры"
+      sounds: "Нет звуков под эти фильтры"
+      crosshairs: "Нет прицелов под эти фильтры"
+      items: "Ничего не найдено под эти фильтры"
+  hint:
+    offline: "Проверьте подключение к интернету и попробуйте снова."
+    search: "Попробуйте изменить запрос."
+    filters: "Попробуйте изменить запрос или фильтры."
 
 profiles:
   crosshairs: { one: "%{count} прицел", few: "%{count} прицела", many: "%{count} прицелов" }

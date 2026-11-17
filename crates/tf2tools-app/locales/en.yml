@@ -316,6 +316,41 @@ store_grid:
     huds: { one: "%{shown} of %{count} HUD", other: "%{shown} of %{count} HUDs" }
     sounds: { one: "%{shown} of %{count} sound", other: "%{shown} of %{count} sounds" }
     crosshairs: { one: "%{shown} of %{count} crosshair", other: "%{shown} of %{count} crosshairs" }
+  loading: "Loading..."
+  sort:
+    most_liked: "Most Liked"
+    most_viewed: "Most Viewed"
+    newest: "Newest"
+  search:
+    huds: "Search HUDs..."
+    sounds: "Search sounds..."
+    crosshairs: "Search crosshairs..."
+    items: "Search items..."
+  syncing:
+    huds: "Syncing HUDs..."
+    sounds: "Syncing sounds..."
+    crosshairs: "Syncing crosshairs..."
+    items: "Syncing items..."
+  unloaded:
+    huds: "Could not load HUDs"
+    sounds: "Could not load sounds"
+    crosshairs: "Could not load crosshairs"
+    items: "Could not load items"
+  no_match:
+    search:
+      huds: "No HUDs match your search"
+      sounds: "No sounds match your search"
+      crosshairs: "No crosshairs match your search"
+      items: "No items match your search"
+    filters:
+      huds: "No HUDs match your filters"
+      sounds: "No sounds match your filters"
+      crosshairs: "No crosshairs match your filters"
+      items: "No items match your filters"
+  hint:
+    offline: "Check your internet connection and try again."
+    search: "Try adjusting your search criteria."
+    filters: "Try adjusting your search or filter criteria."
 
 profiles:
   crosshairs: { one: "%{count} crosshair", other: "%{count} crosshairs" }

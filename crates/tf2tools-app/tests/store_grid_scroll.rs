@@ -23,7 +23,7 @@ fn open(
     let images = cx.update(|cx| {
         RemoteImages::install_with(cx, support::thumbnail_fetch(), SMOKE_BUDGET, decode_image)
     });
-    let config = StoreGridConfig::new(StoreKind::Crosshairs, "crosshairs").image_card(px(64.));
+    let config = StoreGridConfig::new(StoreKind::Crosshairs).image_card(px(64.));
     let (win, grid) = support::store_grid_window(cx, env, config, |env| {
         support::seed_crosshairs(env, 1..=ROWS, 0, true)
     });

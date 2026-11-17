@@ -755,6 +755,9 @@ mod tests {
         "widgets/sync_banner.rs",
         "widgets/store_error.rs",
         "pages/addon_store/card.rs",
+        "store_grid/mod.rs",
+        "store_grid/feed.rs",
+        "pages/crosshair_store.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -786,6 +789,9 @@ mod tests {
         ("pages/maps/gb_tab.rs", "Newest", SELECT_VALUE),
         ("pages/maps/gb_tab.rs", "All maps", SELECT_VALUE),
         ("pages/maps/gb_tab.rs", "Installed", SELECT_VALUE),
+        ("store_grid/mod.rs", "Most Liked", SELECT_VALUE),
+        ("store_grid/mod.rs", "Most Viewed", SELECT_VALUE),
+        ("store_grid/mod.rs", "Newest", SELECT_VALUE),
         (
             "pages/maps/mod.rs",
             "GameBanana",
