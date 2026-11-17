@@ -686,4 +686,282 @@ mod tests {
             "titles that don't read as a failure: {found:?}"
         );
     }
+
+    #[test]
+    fn the_english_scan_skips_comments_developer_text_and_non_prose() {
+        let sample = r##"// "Not code" in a comment
+    /* a "block" /* nested "one" */ still "comment" */
+    let a = "Delete HUD"; let b = 'x'; let q = '"'; let e = '\''; let u = '\u{a0}';
+    fn f<'a>(s: &'a str) -> &'a str { s }
+    let k = tr!("demo.card.title", name = "Plain Name");
+    tracing::warn!("Could not save {}", path.display());
+    self.log(&format!("Install HUD {name}"));
+    debug_assert!(ok, "Never shown here");
+    let raw = r#"Raw "quoted" text"#; let bytes = b"Byte text";
+    let id = "huds-card-install"; let caps = "HUD"; let many = "HUDs"; let dir = "tf2tools-sounds";
+    let word = "Dark"; let lower = "installed"; let esc = "Say \"Hello there\"";
+    let allowed = "GameBanana"; let n = plural("demo.count", 2);
+    match x { Some(v) => unreachable!("Bad {v}, {}", f("Still developer")), None => {} }
+    let last = "Two words";"##;
+        assert_eq!(
+            english_literals(sample),
+            [
+                (3, "Delete HUD"),
+                (5, "Plain Name"),
+                (11, "Dark"),
+                (11, r#"Say \"Hello there\""#),
+                (12, "GameBanana"),
+                (14, "Two words"),
+            ]
+        );
+    }
+
+    // Files whose shipped code shows no English; each page task appends its own.
+    const SCANNED: &[&str] = &["widgets/label_option.rs"];
+
+    // (file under src, exact literal, why it is not translated).
+    const ALLOWED: &[(&str, &str, &str)] = &[];
+
+    #[test]
+    fn library_pages_show_no_english_literal() {
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut used = vec![false; ALLOWED.len()];
+        let mut found = Vec::new();
+        for rel in SCANNED {
+            let source = std::fs::read_to_string(src.join(rel)).unwrap();
+            for (line, text) in english_literals(shipped_part(&source)) {
+                match ALLOWED.iter().position(|(f, t, _)| f == rel && *t == text) {
+                    Some(at) => used[at] = true,
+                    None => found.push(format!("{rel}:{line}: {text:?}")),
+                }
+            }
+        }
+        assert!(found.is_empty(), "English on the library pages: {found:#?}");
+        let stale: Vec<_> = ALLOWED
+            .iter()
+            .zip(used)
+            .filter(|(_, u)| !u)
+            .map(|(a, _)| a)
+            .collect();
+        assert!(
+            stale.is_empty(),
+            "allowlist entries no file needs: {stale:?}"
+        );
+    }
+
+    // A token of Rust source, as far as the English scan needs one.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum Tok<'a> {
+        // A plain string literal: its opening quote's byte offset and the text between the quotes.
+        Str(usize, &'a str),
+        Ident(&'a str),
+        Open(u8),
+        Close(u8),
+        Punct(u8),
+    }
+
+    // The tokens of `code`. Comments, char literals, lifetimes, byte, C and raw strings leave no
+    // token, so a quote inside one of them never opens a string.
+    fn tokens(code: &str) -> Vec<Tok<'_>> {
+        let b = code.as_bytes();
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < b.len() {
+            let c = b[i];
+            match c {
+                b'/' if b.get(i + 1) == Some(&b'/') => {
+                    i = code[i..].find('\n').map_or(b.len(), |n| i + n);
+                }
+                b'/' if b.get(i + 1) == Some(&b'*') => i = block_comment_end(b, i),
+                b'"' => {
+                    let end = string_end(b, i + 1);
+                    out.push(Tok::Str(i, &code[i + 1..end]));
+                    i = end + 1;
+                }
+                b'\'' => i = after_quote(code, i),
+                b'(' | b'[' | b'{' => {
+                    out.push(Tok::Open(c));
+                    i += 1;
+                }
+                b')' | b']' | b'}' => {
+                    out.push(Tok::Close(c));
+                    i += 1;
+                }
+                _ if c.is_ascii_alphanumeric() || c == b'_' => {
+                    let end = b[i..]
+                        .iter()
+                        .position(|x| !(x.is_ascii_alphanumeric() || *x == b'_'))
+                        .map_or(b.len(), |n| i + n);
+                    let word = &code[i..end];
+                    i = match (word, b.get(end)) {
+                        ("b" | "c", Some(b'"')) => string_end(b, end + 1) + 1,
+                        ("b", Some(b'\'')) => after_quote(code, end),
+                        ("r" | "br" | "cr", Some(b'"' | b'#')) => raw_string_end(code, end),
+                        _ => {
+                            out.push(Tok::Ident(word));
+                            end
+                        }
+                    };
+                }
+                _ if c.is_ascii_whitespace() => i += 1,
+                _ => {
+                    out.push(Tok::Punct(c));
+                    i += 1;
+                }
+            }
+        }
+        out
+    }
+
+    // The offset of the quote closing a string whose text starts at `i`; escapes never close it.
+    fn string_end(b: &[u8], mut i: usize) -> usize {
+        while i < b.len() && b[i] != b'"' {
+            i += if b[i] == b'\\' { 2 } else { 1 };
+        }
+        i.min(b.len())
+    }
+
+    // Past the block comment opening at `i`; Rust block comments nest.
+    fn block_comment_end(b: &[u8], mut i: usize) -> usize {
+        let mut depth = 0usize;
+        while i < b.len() {
+            if b[i..].starts_with(b"/*") {
+                depth += 1;
+                i += 2;
+            } else if b[i..].starts_with(b"*/") {
+                depth -= 1;
+                i += 2;
+                if depth == 0 {
+                    return i;
+                }
+            } else {
+                i += 1;
+            }
+        }
+        i
+    }
+
+    // Past the char literal whose quote is at `i`, or past the quote alone for a lifetime or label.
+    fn after_quote(code: &str, i: usize) -> usize {
+        let rest = &code[i + 1..];
+        if rest.starts_with('\\') {
+            // An escape ('\n', '\'', '\u{a0}') closes at the first quote after its first two chars.
+            return rest[2..].find('\'').map_or(code.len(), |n| i + 4 + n);
+        }
+        let mut chars = rest.chars();
+        match (chars.next(), chars.next()) {
+            (Some(c), Some('\'')) => i + 2 + c.len_utf8(),
+            _ => i + 1,
+        }
+    }
+
+    // Past the raw string whose hashes or quote start at `at`; a raw identifier stops at its name.
+    fn raw_string_end(code: &str, at: usize) -> usize {
+        let hashes = code[at..].bytes().take_while(|c| *c == b'#').count();
+        let open = at + hashes;
+        if code.as_bytes().get(open) != Some(&b'"') {
+            return open;
+        }
+        let close = format!("\"{}", "#".repeat(hashes));
+        code[open + 1..]
+            .find(&close)
+            .map_or(code.len(), |n| open + 1 + n + close.len())
+    }
+
+    // Macros whose text is for developers: tracing lines, invariants and panics.
+    const DEVELOPER_MACROS: [&str; 10] = [
+        "trace",
+        "debug",
+        "info",
+        "warn",
+        "error",
+        "unreachable",
+        "panic",
+        "debug_assert",
+        "debug_assert_eq",
+        "debug_assert_ne",
+    ];
+
+    // The index of the token closing the bracket opened at `open`.
+    fn closing(toks: &[Tok<'_>], open: usize) -> usize {
+        let mut depth = 0usize;
+        for (at, tok) in toks.iter().enumerate().skip(open) {
+            match tok {
+                Tok::Open(_) => depth += 1,
+                Tok::Close(_) => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return at;
+                    }
+                }
+                Tok::Str(..) | Tok::Ident(_) | Tok::Punct(_) => {}
+            }
+        }
+        toks.len()
+    }
+
+    // For each token, whether it sits inside a developer macro or a `.log(` call, matched by brackets.
+    fn developer_text(toks: &[Tok<'_>]) -> Vec<bool> {
+        let mut dev = vec![false; toks.len()];
+        for at in 0..toks.len() {
+            let open = match toks[at..] {
+                [Tok::Ident(name), Tok::Punct(b'!'), Tok::Open(_), ..]
+                    if DEVELOPER_MACROS.contains(&name) =>
+                {
+                    at + 2
+                }
+                [Tok::Punct(b'.'), Tok::Ident("log"), Tok::Open(b'('), ..] => at + 2,
+                _ => continue,
+            };
+            let close = closing(toks, open);
+            for flag in &mut dev[open..close] {
+                *flag = true;
+            }
+        }
+        dev
+    }
+
+    // Whether `text` reads as player prose: two ASCII words one space apart, or a word that opens
+    // with an uppercase letter and a lowercase one. "HUD", "HUDs" and "tf2tools-sounds" do not.
+    fn looks_like_prose(text: &str) -> bool {
+        let b = text.as_bytes();
+        let mut words = Vec::new();
+        let mut i = 0;
+        while i < b.len() {
+            if b[i].is_ascii_alphabetic() {
+                let end = b[i..]
+                    .iter()
+                    .position(|c| !c.is_ascii_alphabetic())
+                    .map_or(b.len(), |n| i + n);
+                words.push((i, end));
+                i = end;
+            } else {
+                i += 1;
+            }
+        }
+        let adjacent = words
+            .windows(2)
+            .any(|w| w[1].0 == w[0].1 + 1 && b[w[0].1] == b' ');
+        let capitalised = words.iter().any(|&(s, e)| {
+            e - s >= 2 && b[s].is_ascii_uppercase() && b[s + 1].is_ascii_lowercase()
+        });
+        adjacent || capitalised
+    }
+
+    // The literals of `code` that read as player prose, as (1-based line, text), outside
+    // developer text.
+    fn english_literals(code: &str) -> Vec<(usize, &str)> {
+        let toks = tokens(code);
+        let dev = developer_text(&toks);
+        let mut found = Vec::new();
+        for (at, tok) in toks.iter().enumerate() {
+            if let Tok::Str(quote, text) = *tok
+                && !dev[at]
+                && looks_like_prose(text)
+            {
+                found.push((code[..quote].matches('\n').count() + 1, text));
+            }
+        }
+        found
+    }
 }
