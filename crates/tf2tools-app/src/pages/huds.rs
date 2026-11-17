@@ -71,6 +71,8 @@ const CARD_TEXT_HEIGHT: Pixels = px(136.);
 // The grid never gets shorter than one row of local cards, as on Profiles, so a common window
 // fits the page and only the grid scrolls; a short window still scrolls the page.
 const LIBRARY_MIN_HEIGHT: Pixels = CARD_TEXT_HEIGHT;
+// The longest Install label the card's action row holds beside Copy and Delete.
+const INSTALL_LABEL_CHARS: usize = 8;
 // Room for up to three lines of the note that a copy's newer version is in the HUD Store.
 const STORE_NOTE_HEIGHT: Pixels = px(48.);
 /// Edit's tooltip while another HUD action runs.
@@ -1788,11 +1790,7 @@ fn hud_card(
                         .on_click(on_page(HudsPage::delete)),
                 )
                 .child(needs_tf2(
-                    Button::new(ids::hud_install(folder))
-                        .primary()
-                        .px(SM_ICON_PX)
-                        .icon(IconName::Download)
-                        .label(tr!("huds.button.install"))
+                    install_button(folder)
                         .loading(installing)
                         .disabled(busy.is_some() && !installing)
                         .on_click(on_page(HudsPage::install)),
@@ -1800,6 +1798,21 @@ fn hud_card(
                 )),
         )
         .into_any_element()
+}
+
+// The card's Install button. A label longer than English's would push the action row past
+// the left edge of a two-column card at 800 px, so it keeps only the icon, named by its tooltip.
+fn install_button(folder: &str) -> Button {
+    let label = tr!("huds.button.install");
+    let button = Button::new(ids::hud_install(folder))
+        .primary()
+        .px(SM_ICON_PX)
+        .icon(IconName::Download);
+    if label.chars().count() <= INSTALL_LABEL_CHARS {
+        button.label(label)
+    } else {
+        button.tooltip(label.clone()).accessibility_label(label)
+    }
 }
 
 // The card's "Add to profile" menu. A pick saves through the page, so it waits behind any

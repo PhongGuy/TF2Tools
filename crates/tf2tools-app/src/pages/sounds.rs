@@ -648,6 +648,7 @@ impl SoundsPage {
                     .child(
                         h_flex()
                             .px_6()
+                            .gap_1()
                             .justify_between()
                             .child(
                                 h_flex()

@@ -629,8 +629,13 @@ impl MapsPage {
         } else {
             tr!("maps.empty.no_match")
         };
+        // A line longer than the column wraps, centred, rather than spilling past it.
         h_flex().justify_center().py_12().child(labelled(
-            div().text_sm().text_color(cx.theme().muted_foreground),
+            div()
+                .min_w_0()
+                .text_center()
+                .text_sm()
+                .text_color(cx.theme().muted_foreground),
             ids::MAPS_EMPTY,
             text,
         ))

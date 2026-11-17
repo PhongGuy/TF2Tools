@@ -556,7 +556,7 @@ font_check:
     install: "Установить"
 
 huds:
-  search: "Поиск HUD..."
+  search: "Поиск"
   edit_wait: "Дождитесь, пока TF2Tools закончит, затем редактируйте"
   not_reinstalled: "Обновлено, но установленную копию обновить не удалось. Закройте TF2 и установите HUD заново на странице HUD."
   no_tf2: "Укажите папку TF2 в настройках, чтобы устанавливать HUD."
@@ -573,7 +573,7 @@ huds:
     managed: "Управляемый"
     external: "Сторонний"
     store: "Магазин"
-    local: "Локальный"
+    local: "Свой"
   button:
     add: "Добавить HUD"
     importing: "Импорт..."
@@ -636,7 +636,7 @@ sounds:
     playing_hitsound: "Установленный хитсаунд"
     playing_killsound: "Установленный килсаунд"
   badge:
-    installed: "Установлен"
+    installed: "В игре"
     none: "Нет"
   button:
     play: "Воспроизвести"

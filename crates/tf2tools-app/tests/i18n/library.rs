@@ -262,7 +262,7 @@ fn the_huds_page_reads_in_russian(cx: &mut TestAppContext) {
     let _page = open_huds(cx, &s);
     assert_eq!(
         support::label_of(cx, s.win, ids::hud_badge("budhud")).as_deref(),
-        Some("Локальный")
+        Some("Свой")
     );
     support::click_id(cx, s.win, ids::hud_delete("budhud"));
     assert_eq!(
@@ -273,6 +273,154 @@ fn the_huds_page_reads_in_russian(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
         Some("Удалить budhud из библиотеки? Это действие нельзя отменить.")
     );
+}
+
+// `text` shaped in the theme font at `size` rems and `weight`, as the window lays it out.
+fn text_width(
+    cx: &mut TestAppContext,
+    win: AnyWindowHandle,
+    text: &str,
+    size: f32,
+    weight: gpui_kit::FontWeight,
+) -> gpui_kit::Pixels {
+    use gpui_kit::component::ActiveTheme as _;
+    cx.update_window(win, |_, w, cx| {
+        let font = gpui_kit::Font {
+            weight,
+            ..gpui_kit::font(cx.theme().font_family.clone())
+        };
+        let run = gpui_kit::TextRun {
+            len: text.len(),
+            font,
+            ..Default::default()
+        };
+        let size = gpui_kit::rems(size).to_pixels(w.rem_size());
+        w.text_system()
+            .shape_line(text.to_owned().into(), size, &[run], None)
+            .width
+    })
+    .unwrap()
+}
+
+fn resize_800(cx: &mut TestAppContext, s: &support::ShellWindow) {
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(800.), gpui_kit::px(600.)),
+    );
+    support::settle(cx, s.win);
+}
+
+// `inner` lies within `outer`, left and right.
+fn assert_inside(
+    what: &str,
+    inner: gpui_kit::Bounds<gpui_kit::Pixels>,
+    outer: gpui_kit::Bounds<gpui_kit::Pixels>,
+) {
+    assert!(
+        inner.left() >= outer.left() && inner.right() <= outer.right(),
+        "{what} {inner:?} runs past {outer:?}"
+    );
+}
+
+// At 800x600 a Russian library card keeps its action row inside the card and room for the
+// HUD's name, and the search box shows its whole placeholder.
+#[gpui_kit::test]
+fn the_russian_hud_card_fits_at_800(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let archive = hud_zip(env.tmp.path(), "budhud");
+    s.services
+        .library
+        .import_hud(&archive, Provenance::Local)
+        .unwrap();
+    resize_800(cx, &s);
+    support::click_id(cx, s.win, ids::nav(Page::Settings));
+    support::click_id(cx, s.win, ids::nav(Page::Huds));
+    let page = open_huds(cx, &s);
+    let card = support::bounds_of(cx, s.win, ids::hud_card("budhud")).unwrap();
+    for id in [
+        ids::hud_copy("budhud"),
+        ids::hud_delete("budhud"),
+        ids::hud_install("budhud"),
+    ] {
+        let b = support::bounds_of(cx, s.win, id.clone()).unwrap();
+        assert_inside(&format!("{id:?}"), b, card);
+    }
+    // The name starts after the card's 24 px padding and keeps 8 px before the badge group.
+    let menu = support::bounds_of(cx, s.win, ids::hud_add_to_profile("budhud")).unwrap();
+    let room = menu.left() - card.left() - gpui_kit::px(32.);
+    let name = text_width(cx, s.win, "budhud", 1.0, gpui_kit::FontWeight::SEMIBOLD);
+    assert!(name <= room, "budhud needs {name:?}, has {room:?}");
+    // The box's search icon and paddings take 44 px of its width.
+    let placeholder = cx.update(|cx| {
+        page.read(cx)
+            .search_input()
+            .read(cx)
+            .presentation()
+            .placeholder()
+            .to_string()
+    });
+    let text = text_width(cx, s.win, &placeholder, 0.875, gpui_kit::FontWeight::NORMAL);
+    let search = support::bounds_of(cx, s.win, ids::HUDS_SEARCH).unwrap();
+    assert!(
+        text + gpui_kit::px(44.) <= search.size.width,
+        "{placeholder} needs {text:?} in {search:?}"
+    );
+}
+
+// At 800x600 both Russian sound slots keep their status badge inside the card, apart from
+// the slot's title.
+#[gpui_kit::test]
+fn the_russian_sound_slots_fit_at_800(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let dir = env.game.join("tf/custom/tf2tools-sounds/sound/ui");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("hitsound.wav"), support::wav_bytes()).unwrap();
+    std::fs::write(dir.join("killsound.wav"), support::wav_bytes()).unwrap();
+    resize_800(cx, &s);
+    let _page = open_sounds(cx, &s);
+    for kind in [SoundKind::Hitsound, SoundKind::Killsound] {
+        let card = support::bounds_of(cx, s.win, ids::sound_slot(kind)).unwrap();
+        let badge = support::bounds_of(cx, s.win, ids::sound_slot_status(kind)).unwrap();
+        // The badge ends inside the card's 24 px padding.
+        let inner = gpui_kit::Bounds::from_corners(
+            gpui_kit::point(card.left() + gpui_kit::px(24.), card.top()),
+            gpui_kit::point(card.right() - gpui_kit::px(24.), card.bottom()),
+        );
+        assert_inside(&format!("{kind:?} badge"), badge, inner);
+        // Icon (16) and its 8 px gap, then the title, then at least 4 px before the badge.
+        let title = names::sound_kind_name(kind).to_string();
+        let title_w = text_width(cx, s.win, &title, 1.0, gpui_kit::FontWeight::SEMIBOLD);
+        assert!(
+            inner.left() + gpui_kit::px(24.) + title_w + gpui_kit::px(4.) <= badge.left(),
+            "{title} {title_w:?} touches the badge {badge:?}"
+        );
+    }
+}
+
+// The Russian "no maps yet" line wraps inside the Maps column at 800x600.
+#[gpui_kit::test]
+fn the_russian_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    resize_800(cx, &s);
+    support::click_id(cx, s.win, ids::nav(Page::Maps));
+    let page = cx.update(|cx| s.shell.read(cx).maps_page()).unwrap();
+    support::wait_real(cx, "the cached list", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    let tabs = support::bounds_of(cx, s.win, ids::MAPS_SOURCE_TABS).unwrap();
+    let shell = support::bounds_of(cx, s.win, ids::page(Page::Maps)).unwrap();
+    let column = gpui_kit::Bounds::from_corners(
+        gpui_kit::point(tabs.left(), tabs.top()),
+        gpui_kit::point(shell.right() - (tabs.left() - shell.left()), shell.bottom()),
+    );
+    let empty = support::bounds_of(cx, s.win, ids::MAPS_EMPTY).unwrap();
+    assert_inside("maps-empty", empty, column);
 }
 
 #[test]
