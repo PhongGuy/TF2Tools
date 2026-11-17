@@ -664,6 +664,97 @@ fn log_space_reads_in_kilobytes_or_megabytes() {
     );
 }
 
+/// Waits until the library and trim jobs both rest, then returns the library job's passes.
+fn jobs_idle(cx: &mut TestAppContext) -> u64 {
+    use tf2tools_app::library_pack::LibraryPack;
+    use tf2tools_app::logs_trim::LogsTrim;
+    support::wait_real(cx, "the library and trim jobs to rest", |cx| {
+        cx.update(|cx| {
+            let (pack, trim) = (LibraryPack::global(cx), LogsTrim::global(cx));
+            let (pack, trim) = (pack.read(cx), trim.read(cx));
+            pack.passes() > 0 && !pack.is_running() && trim.passes() > 0 && !trim.is_running()
+        })
+    });
+    cx.update(|cx| {
+        tf2tools_app::library_pack::LibraryPack::global(cx)
+            .read(cx)
+            .passes()
+    })
+}
+
+fn pack_passes(cx: &mut TestAppContext) -> u64 {
+    cx.update(|cx| {
+        tf2tools_app::library_pack::LibraryPack::global(cx)
+            .read(cx)
+            .passes()
+    })
+}
+
+fn request_trim(cx: &mut TestAppContext) -> u64 {
+    use tf2tools_app::logs_trim::LogsTrim;
+    cx.update(|cx| {
+        let trim = LogsTrim::global(cx);
+        let before = trim.read(cx).passes();
+        trim.update(cx, |t, cx| t.request(cx));
+        before
+    })
+}
+
+#[gpui_kit::test]
+fn storage_is_measured_again_when_a_trim_lands_or_a_sync_ends(cx: &mut TestAppContext) {
+    use tf2tools_app::sync::SyncSummary;
+    let env = support::env();
+    let (hub, runs) = support::fake_hub(cx);
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let _page = open_settings(cx, &s);
+    let before = jobs_idle(cx);
+    request_trim(cx);
+    support::wait_real(cx, "a measure after the trim", |cx| {
+        pack_passes(cx) > before
+    });
+    let before = jobs_idle(cx);
+    assert!(cx.update(|cx| hub.update(cx, |h, cx| h.start(
+        tf2tools_core::StoreKind::Sounds,
+        false,
+        cx
+    ))));
+    runs.try_recv().unwrap().finish(Ok(SyncSummary::default()));
+    support::wait_hub(cx, "a measure after the sync", |cx| {
+        pack_passes(cx) > before
+    });
+}
+
+#[gpui_kit::test]
+fn a_hidden_settings_page_measures_nothing_on_a_trim_or_a_sync(cx: &mut TestAppContext) {
+    use tf2tools_app::logs_trim::LogsTrim;
+    use tf2tools_app::sync::SyncSummary;
+    let env = support::env();
+    let (hub, runs) = support::fake_hub(cx);
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let _page = open_settings(cx, &s);
+    support::click_id(cx, s.win, ids::nav(Page::Huds));
+    let before = jobs_idle(cx);
+    let trims = request_trim(cx);
+    support::wait_real(cx, "the trim to land", |cx| {
+        cx.update(|cx| {
+            let trim = LogsTrim::global(cx);
+            let trim = trim.read(cx);
+            trim.passes() > trims && !trim.is_running()
+        })
+    });
+    assert!(cx.update(|cx| hub.update(cx, |h, cx| h.start(
+        tf2tools_core::StoreKind::Sounds,
+        false,
+        cx
+    ))));
+    runs.try_recv().unwrap().finish(Ok(SyncSummary::default()));
+    support::wait_hub(cx, "the sync to end", |cx| {
+        cx.update(|cx| !hub.read(cx).is_running(tf2tools_core::StoreKind::Sounds))
+    });
+    support::settle(cx, s.win);
+    assert_eq!(pack_passes(cx), before, "a hidden page asks for no measure");
+}
+
 // Wheels the Settings page a notch at a time until all of `id` lies inside it.
 fn scroll_settings_to(cx: &mut TestAppContext, s: &support::ShellWindow, id: ElementId) {
     for _ in 0..120 {

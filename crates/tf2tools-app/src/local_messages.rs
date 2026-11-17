@@ -5,7 +5,7 @@ use tf2tools_core::{
     ApplyProfileError, CopyHudError, DetectError, FontInstallError, GbAddonInstallError,
     GbMapInstallError, GbMapRemoveError, HudLoadError, ImportError, InstallError, KeepHudError,
     LibraryError, LogError, LogsCacheError, MakeHudError, PaintError, PngReadError, PngWriteError,
-    ProfileError, QueryError, SettingsError, UpdateCopyError, WavError,
+    ProfileError, QueryError, SettingsError, StorageError, UpdateCopyError, WavError,
 };
 
 use gpui_kit::SharedString;
@@ -204,6 +204,16 @@ pub fn describe_library(err: &LibraryError) -> LocalFailure {
             tr!("messages.local.library.vtf")
         }
         LibraryError::Database { .. } => library_open(),
+        _ => unknown(),
+    };
+    LocalFailure::new(message, err.to_string())
+}
+
+/// A failed storage measure in player words; `detail` is the error's own text.
+pub fn describe_storage(err: &StorageError) -> LocalFailure {
+    let message = match err {
+        StorageError::Io { .. } => library_disk(),
+        StorageError::Database { .. } => library_open(),
         _ => unknown(),
     };
     LocalFailure::new(message, err.to_string())

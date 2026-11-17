@@ -24,8 +24,8 @@ use gpui_kit::{
 };
 
 use tf2tools_core::{
-    KeepFullLogs, LogLevel, LogsSpace, NewLogEntry, Settings, SettingsError, StoreKind,
-    StoreSyncStatus, Tf2Install,
+    KeepFullLogs, LogLevel, LogsSpace, NewLogEntry, Settings, SettingsError, StorageKind,
+    StorageUse, StoreKind, StoreSyncStatus, Tf2Install,
 };
 
 use crate::activity;
@@ -38,7 +38,7 @@ use crate::local_messages::{
     describe_detect, describe_settings, describe_store_status, describe_tf2_folder,
 };
 use crate::log_nicknames::LogNicknames;
-use crate::logs_trim::LogsTrim;
+use crate::logs_trim::{LogsTrim, LogsTrimEvent};
 use crate::mature::MatureAddons;
 use crate::notices::{self, Notice};
 use crate::picker::PickKind;
@@ -209,6 +209,8 @@ pub struct SettingsPage {
     keep: Entity<SelectState<Vec<KeepRow>>>,
     /// The library job, whose figures the Library card draws.
     pack: Entity<LibraryPack>,
+    /// Whether the shell hides the page; a hidden page asks for no measures.
+    hidden: bool,
     loaded: bool,
     busy: Option<Busy>,
     /// Each store's cached count and last sync, absent until the first read lands or if it failed.
@@ -359,7 +361,7 @@ impl SettingsPage {
         cx.observe(&nicknames, |_, _, cx| cx.notify()).detach();
         // The Resync buttons follow the hub's running kinds and failures, so only a change
         // there redraws; every ended run may have written a new stamp, so the statuses are
-        // read again. With no hub, Resync stays off.
+        // read again, and storage measured again while shown. With no hub, Resync stays off.
         let hub_drawn_now = sync_hub(cx)
             .map(|hub| hub_drawn(hub.read(cx)))
             .unwrap_or_default();
@@ -374,13 +376,17 @@ impl SettingsPage {
                         }
                     }),
                     cx.subscribe_in(&hub, window, |page, _, _: &SyncEvent, window, cx| {
-                        page.load_sync(window, cx)
+                        page.load_sync(window, cx);
+                        page.measure(cx);
                     }),
                 ]
             })
             .unwrap_or_default();
         let language = Self::language_select(window, cx);
         let (trim, keep) = Self::keep_select(window, cx);
+        // A landed trim may have compacted the database, so the figures are taken again.
+        cx.subscribe(&trim, |page, _, _: &LogsTrimEvent, cx| page.measure(cx))
+            .detach();
         // Every landed pass may bring new library figures, so it redraws the Library card.
         let pack = LibraryPack::global(cx);
         cx.observe(&pack, |_, _, cx| cx.notify()).detach();
@@ -398,6 +404,7 @@ impl SettingsPage {
             trim,
             keep,
             pack,
+            hidden: false,
             loaded: false,
             busy: None,
             sync_status: None,
@@ -455,10 +462,18 @@ impl SettingsPage {
     }
 
     /// Rereads the saved settings on return, so a field left untouched shows what changed
-    /// while the page was hidden; an edited field keeps its edit.
+    /// while the page was hidden; an edited field keeps its edit. A hidden page measures nothing.
     pub fn set_hidden(&mut self, hidden: bool, cx: &mut Context<Self>) {
+        self.hidden = hidden;
         if !hidden {
             self.load(false, cx);
+            self.pack.update(cx, |pack, cx| pack.measure(cx));
+        }
+    }
+
+    // Asks the library job for fresh figures, but only while the page shows them.
+    fn measure(&self, cx: &mut Context<Self>) {
+        if !self.hidden {
             self.pack.update(cx, |pack, cx| pack.measure(cx));
         }
     }
@@ -1153,7 +1168,19 @@ impl Render for SettingsPage {
         };
         let pack = self.pack.read(cx);
         let library = match pack.space() {
-            Some(s) => library_text(s.on_disk(), s.unpacked()),
+            // Until the Storage card lands, the Library line sums the four library kinds.
+            Some(s) => {
+                let library = [
+                    StorageKind::Huds,
+                    StorageKind::Sounds,
+                    StorageKind::Crosshairs,
+                    StorageKind::Addons,
+                ];
+                let sum = |f: fn(&StorageUse, StorageKind) -> u64| -> u64 {
+                    library.iter().map(|k| f(&s, *k)).sum()
+                };
+                library_text(sum(StorageUse::bytes), sum(StorageUse::unpacked))
+            }
             None if pack.failed() => tr!("settings.library.unmeasured"),
             None => tr!("settings.logs_tf.measuring"),
         };
