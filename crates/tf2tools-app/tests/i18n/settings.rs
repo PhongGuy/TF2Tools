@@ -32,8 +32,8 @@ pub fn open_settings(cx: &mut TestAppContext, s: &ShellWindow) -> Entity<Setting
     page
 }
 
-// Opens the Language select and confirms the row for `code`.
-fn pick(cx: &mut TestAppContext, win: AnyWindowHandle, code: &str) {
+/// Opens the Language select and confirms the row for `code`.
+pub fn pick(cx: &mut TestAppContext, win: AnyWindowHandle, code: &str) {
     support::click_id(cx, win, ids::SETTINGS_LANGUAGE);
     support::click_id(cx, win, ids::settings_language(code));
     support::settle(cx, win);

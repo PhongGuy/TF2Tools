@@ -23,7 +23,7 @@ use tf2tools_core::{
 
 use crate::addon_detail::open_addon_detail;
 use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer};
-use crate::i18n::tr;
+use crate::i18n::{self, tr};
 use crate::ids;
 use crate::local_messages::describe_store_status;
 use crate::maps_sync::{MapsSync, MapsSyncEvent, maps_sync};
@@ -106,6 +106,41 @@ impl FeedItem for GbMapCard {
     }
 }
 
+// The sort Select's rows, titled in the current language.
+fn sort_rows() -> Vec<LabelOption> {
+    LabelOption::keyed(
+        ids::MAPS_GB_SORT,
+        SORTS
+            .iter()
+            .map(|(value, sort)| (*value, gb_sort_label(*sort))),
+    )
+}
+
+// The Show Select's rows, titled in the current language.
+fn show_rows() -> Vec<LabelOption> {
+    LabelOption::keyed(
+        ids::MAPS_GB_SHOW,
+        SHOWS
+            .iter()
+            .map(|(value, show)| (*value, gb_show_label(*show))),
+    )
+}
+
+// The gamemode Select's rows: "All gamemodes" in the current language, then `gamemodes`.
+fn gamemode_rows(gamemodes: &[GbMapGamemode]) -> Vec<CategoryOption> {
+    std::iter::once(CategoryOption::new(
+        ids::MAPS_GB_GAMEMODE,
+        None,
+        tr!("maps.gb.all_gamemodes"),
+    ))
+    .chain(
+        gamemodes
+            .iter()
+            .map(|g| CategoryOption::new(ids::MAPS_GB_GAMEMODE, Some(g.id), g.name.clone())),
+    )
+    .collect()
+}
+
 /// The synced GameBanana maps grid. Pages are read off the UI thread; the grid asks for the
 /// next one near its end.
 pub struct GbMapsTab {
@@ -145,6 +180,8 @@ pub struct GbMapsTab {
     viewer: String,
     visible: Range<usize>,
     hidden: bool,
+    /// The language the search box and Selects were titled in.
+    language: &'static str,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -186,29 +223,13 @@ impl GbMapsTab {
             let _ = this.update(cx, |tab, cx| tab.next_page(cx));
         });
         let search_input = cx.new(|cx| InputState::new(window, cx).placeholder(tr!("maps.search")));
-        let labels = LabelOption::keyed(
-            ids::MAPS_GB_SORT,
-            SORTS
-                .iter()
-                .map(|(value, sort)| (*value, gb_sort_label(*sort))),
-        );
         let sort_select =
-            cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
-        let rows = vec![CategoryOption::new(
-            ids::MAPS_GB_GAMEMODE,
-            None,
-            tr!("maps.gb.all_gamemodes"),
-        )];
+            cx.new(|cx| SelectState::new(sort_rows(), Some(IndexPath::default()), window, cx));
+        let rows = gamemode_rows(&[]);
         let gamemode_select =
             cx.new(|cx| SelectState::new(rows, Some(IndexPath::default()), window, cx));
-        let labels = LabelOption::keyed(
-            ids::MAPS_GB_SHOW,
-            SHOWS
-                .iter()
-                .map(|(value, show)| (*value, gb_show_label(*show))),
-        );
         let show_select =
-            cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
+            cx.new(|cx| SelectState::new(show_rows(), Some(IndexPath::default()), window, cx));
         subscriptions.extend([
             cx.subscribe(&search_input, |tab, input, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
@@ -295,6 +316,7 @@ impl GbMapsTab {
             viewer,
             visible: 0..0,
             hidden: false,
+            language: i18n::current(),
             _subscriptions: subscriptions,
         };
         tab.load_gamemodes(window, cx);
@@ -650,6 +672,25 @@ impl GbMapsTab {
         })
     }
 
+    // The tab is kept while other pages show, so a language switched meanwhile retitles the
+    // search box and the Selects here; each Select keeps its chosen value.
+    fn follow_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.language == i18n::current() {
+            return;
+        }
+        self.language = i18n::current();
+        self.search_input.update(cx, |input, cx| {
+            input.set_placeholder(tr!("maps.search"), window, cx)
+        });
+        self.sort_select
+            .update(cx, |select, cx| select.set_items(sort_rows(), window, cx));
+        self.show_select
+            .update(cx, |select, cx| select.set_items(show_rows(), window, cx));
+        let rows = gamemode_rows(&self.gamemodes);
+        self.gamemode_select
+            .update(cx, |select, cx| select.set_items(rows, window, cx));
+    }
+
     // Fills the gamemode Select from the stored tree; a failure leaves it at "All gamemodes".
     fn load_gamemodes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let reading = run_blocking(cx, |s| {
@@ -666,15 +707,7 @@ impl GbMapsTab {
                 }
             };
             let _ = tab.update_in(cx, |tab, window, cx| {
-                let rows = std::iter::once(CategoryOption::new(
-                    ids::MAPS_GB_GAMEMODE,
-                    None,
-                    tr!("maps.gb.all_gamemodes"),
-                ))
-                .chain(gamemodes.iter().map(|g| {
-                    CategoryOption::new(ids::MAPS_GB_GAMEMODE, Some(g.id), g.name.clone())
-                }))
-                .collect();
+                let rows = gamemode_rows(&gamemodes);
                 // A chosen gamemode the new tree no longer has falls back to every map.
                 let gone = tab
                     .gamemode
@@ -945,6 +978,7 @@ fn start_maps_sync(cx: &mut App) {
 
 impl Render for GbMapsTab {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.follow_language(window, cx);
         // A failed read's message sits above the grid, or alone before the first card.
         let error = self.error.clone().map(|message| {
             let this = cx.entity().downgrade();

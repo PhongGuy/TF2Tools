@@ -3,7 +3,8 @@
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use gpui_kit::{AppContext as _, Entity, SharedString, TestAppContext};
+use gpui_kit::test::TestWindowExt as _;
+use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, SharedString, TestAppContext};
 use tf2tools_app::crosshair_sync::installed_text;
 use tf2tools_app::gb_addon_installs::GbAddonOffer;
 use tf2tools_app::i18n::names::addon_section_name;
@@ -624,6 +625,63 @@ fn the_maps_page_reads_in_russian(cx: &mut TestAppContext) {
     assert_eq!(
         support::label_of(cx, s.win, ids::STORE_EMPTY_HINT).as_deref(),
         Some("Карты появятся здесь после синхронизации с GameBanana.")
+    );
+}
+
+// The text a wrapped search box or Select shows: its placeholder, else its shown value.
+fn shown_text(cx: &mut TestAppContext, win: AnyWindowHandle, id: &'static str) -> Option<String> {
+    support::settle(cx, win);
+    cx.update_window(win, |_, w, _| {
+        w.within(id)
+            .elements()
+            .iter()
+            .find_map(|e| e.placeholder().or(e.value()).map(str::to_owned))
+    })
+    .unwrap()
+}
+
+// Maps is kept while another page shows, so its search boxes and Selects must take the new
+// language when the player switches in Settings and comes back.
+#[gpui_kit::test]
+fn the_kept_maps_page_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = support::maps::maps_shell(cx, &env, &server);
+    let page = support::maps::open_maps(cx, &s);
+    let _tab = support::maps::open_gamebanana(cx, &s, &page);
+    let gb = [
+        ids::MAPS_GB_SEARCH,
+        ids::MAPS_GB_SORT,
+        ids::MAPS_GB_GAMEMODE,
+        ids::MAPS_GB_SHOW,
+    ];
+    let read = |cx: &mut TestAppContext, ids: &[&'static str]| -> Vec<Option<String>> {
+        ids.iter().map(|id| shown_text(cx, s.win, id)).collect()
+    };
+    let some = |texts: &[&str]| -> Vec<Option<String>> {
+        texts.iter().map(|t| Some((*t).to_owned())).collect()
+    };
+    assert_eq!(
+        read(cx, &gb),
+        some(&[
+            "Search maps...",
+            "Most downloaded",
+            "All gamemodes",
+            "All maps"
+        ])
+    );
+
+    crate::settings::open_settings(cx, &s);
+    crate::settings::pick(cx, s.win, "ru");
+    support::click_id(cx, s.win, ids::nav(Page::Maps));
+    assert_eq!(
+        read(cx, &gb),
+        some(&["Поиск карт...", "Популярные", "Все режимы", "Все карты"])
+    );
+    support::click_id(cx, s.win, ids::maps_source("serveme"));
+    assert_eq!(
+        read(cx, &[ids::MAPS_SEARCH, ids::MAPS_SORT]),
+        some(&["Поиск карт...", "Название"])
     );
 }
 

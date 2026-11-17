@@ -22,7 +22,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{MapState, StoreClient};
 
-use crate::i18n::tr;
+use crate::i18n::{self, tr};
 use crate::ids;
 use crate::map_messages::{
     describe_map_download, describe_map_remove, describe_map_sync, map_stopped,
@@ -126,20 +126,26 @@ pub struct MapsPage {
     /// GameBanana's map tab, built the first time that source shows.
     gamebanana: Option<Entity<GbMapsTab>>,
     hidden: bool,
+    /// The language the search box and sort Select were titled in.
+    language: &'static str,
     _subscriptions: Vec<Subscription>,
+}
+
+// The sort Select's rows, titled in the current language.
+fn sort_rows() -> Vec<LabelOption> {
+    LabelOption::keyed(
+        ids::MAPS_SORT,
+        SORTS
+            .iter()
+            .map(|(value, sort)| (*value, sort_label(*sort))),
+    )
 }
 
 impl MapsPage {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).placeholder(tr!("maps.search")));
-        let labels = LabelOption::keyed(
-            ids::MAPS_SORT,
-            SORTS
-                .iter()
-                .map(|(value, sort)| (*value, sort_label(*sort))),
-        );
         let sort_select =
-            cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
+            cx.new(|cx| SelectState::new(sort_rows(), Some(IndexPath::default()), window, cx));
         let subscriptions = vec![
             // A TF2 folder found or moved changes which maps the game already has.
             cx.observe(&tf2_state(cx), |page, _, cx| page.reload(cx)),
@@ -177,6 +183,7 @@ impl MapsPage {
             source: MapsSource::Serveme,
             gamebanana: None,
             hidden: false,
+            language: i18n::current(),
             _subscriptions: subscriptions,
         };
         page.reload(cx);
@@ -243,6 +250,20 @@ impl MapsPage {
             self.reload(cx);
         }
         self.sync_tab_hidden(cx);
+    }
+
+    // The page is kept while other pages show, so a language switched meanwhile retitles the
+    // search box and the sort Select here; the Select keeps its chosen sort.
+    fn follow_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.language == i18n::current() {
+            return;
+        }
+        self.language = i18n::current();
+        self.search.update(cx, |input, cx| {
+            input.set_placeholder(tr!("maps.search"), window, cx)
+        });
+        self.sort_select
+            .update(cx, |select, cx| select.set_items(sort_rows(), window, cx));
     }
 
     /// The source showing; serveme.tf when the page is made.
@@ -759,6 +780,7 @@ fn map_row(
 
 impl Render for MapsPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.follow_language(window, cx);
         let page = v_flex()
             .id(ids::page(Page::Maps))
             .test_support()
