@@ -13,8 +13,8 @@ use gpui_kit::component::select::{Select, SelectEvent, SelectState};
 use gpui_kit::component::{ActiveTheme as _, Icon, IndexPath, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _,
-    IntoElement, ParentElement as _, Render, Styled as _, Subscription, Task, TestSupportExt as _,
-    WeakEntity, Window, div, point, px,
+    IntoElement, ParentElement as _, Render, SharedString, Styled as _, Subscription, Task,
+    TestSupportExt as _, WeakEntity, Window, div, point, px,
 };
 use tf2tools_core::{
     AddonSection, GbAddonEntry, GbId, GbMapCard, GbMapCursor, GbMapGamemode, GbMapQuery, GbMapShow,
@@ -28,7 +28,7 @@ use crate::ids;
 use crate::local_messages::describe_store_status;
 use crate::maps_sync::{MapsSync, MapsSyncEvent, maps_sync};
 use crate::mature::MatureAddons;
-use crate::pages::addon_store::card::{OpenAddon, card_height, gb_addon_card};
+use crate::pages::addon_store::card::{CardBadge, OpenAddon, card_height, gb_addon_card};
 use crate::pages::addon_store::gamebanana_tab::CategoryOption;
 use crate::pages::common::{SkeletonTop, empty_state_with_action, skeleton_cards};
 use crate::remote_images::{ImageKey, RemoteImages};
@@ -52,7 +52,7 @@ const SKELETON_CARDS: usize = 8;
 /// Fits "Most downloaded" whole beside the kit's caret and padding, on a 4 px step.
 const SORT_WIDTH: f32 = 172.;
 
-/// The sort Select's labels, in menu order.
+/// The sort Select's values, in menu order; `gb_sort_label` names each.
 const SORTS: [(&str, GbMapSort); 2] = [
     ("Most downloaded", GbMapSort::MostDownloaded),
     ("Newest", GbMapSort::Newest),
@@ -61,11 +61,27 @@ const SORTS: [(&str, GbMapSort); 2] = [
 /// Fits "All maps" whole beside the kit's caret and padding.
 const SHOW_WIDTH: f32 = 144.;
 
-/// The Show Select's labels, in menu order.
+/// The Show Select's values, in menu order; `gb_show_label` names each.
 const SHOWS: [(&str, GbMapShow); 2] = [
     ("All maps", GbMapShow::All),
     ("Installed", GbMapShow::Installed),
 ];
+
+// The sort Select's label for `sort`, in the player's language.
+fn gb_sort_label(sort: GbMapSort) -> SharedString {
+    match sort {
+        GbMapSort::MostDownloaded => tr!("maps.gb.sort.most_downloaded"),
+        GbMapSort::Newest | _ => tr!("maps.gb.sort.newest"),
+    }
+}
+
+// The Show Select's label for `show`, in the player's language.
+fn gb_show_label(show: GbMapShow) -> SharedString {
+    match show {
+        GbMapShow::All => tr!("maps.gb.show.all"),
+        GbMapShow::Installed | _ => tr!("maps.gb.show.installed"),
+    }
+}
 
 /// What a library entry shows on its card, so only a change to it relists the Installed view.
 type EntryState = (GbId, bool, bool, bool);
@@ -169,18 +185,28 @@ impl GbMapsTab {
         grid.on_near_end(move |cx| {
             let _ = this.update(cx, |tab, cx| tab.next_page(cx));
         });
-        let search_input = cx.new(|cx| InputState::new(window, cx).placeholder("Search maps..."));
-        let labels = LabelOption::all(ids::MAPS_GB_SORT, SORTS.iter().map(|(label, _)| *label));
+        let search_input = cx.new(|cx| InputState::new(window, cx).placeholder(tr!("maps.search")));
+        let labels = LabelOption::keyed(
+            ids::MAPS_GB_SORT,
+            SORTS
+                .iter()
+                .map(|(value, sort)| (*value, gb_sort_label(*sort))),
+        );
         let sort_select =
             cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
         let rows = vec![CategoryOption::new(
             ids::MAPS_GB_GAMEMODE,
             None,
-            "All gamemodes",
+            tr!("maps.gb.all_gamemodes"),
         )];
         let gamemode_select =
             cx.new(|cx| SelectState::new(rows, Some(IndexPath::default()), window, cx));
-        let labels = LabelOption::all(ids::MAPS_GB_SHOW, SHOWS.iter().map(|(label, _)| *label));
+        let labels = LabelOption::keyed(
+            ids::MAPS_GB_SHOW,
+            SHOWS
+                .iter()
+                .map(|(value, show)| (*value, gb_show_label(*show))),
+        );
         let show_select =
             cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
         subscriptions.extend([
@@ -193,8 +219,8 @@ impl GbMapsTab {
             cx.subscribe(
                 &sort_select,
                 |tab, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
-                    if let SelectEvent::Confirm(Some(label)) = event
-                        && let Some((_, sort)) = SORTS.iter().find(|(l, _)| l == label)
+                    if let SelectEvent::Confirm(Some(value)) = event
+                        && let Some((_, sort)) = SORTS.iter().find(|(v, _)| v == value)
                         && *sort != tab.sort
                     {
                         tab.sort = *sort;
@@ -205,8 +231,8 @@ impl GbMapsTab {
             cx.subscribe(
                 &show_select,
                 |tab, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
-                    if let SelectEvent::Confirm(Some(label)) = event
-                        && let Some((_, show)) = SHOWS.iter().find(|(l, _)| l == label)
+                    if let SelectEvent::Confirm(Some(value)) = event
+                        && let Some((_, show)) = SHOWS.iter().find(|(v, _)| v == value)
                         && *show != tab.show
                     {
                         tab.show = *show;
@@ -643,7 +669,7 @@ impl GbMapsTab {
                 let rows = std::iter::once(CategoryOption::new(
                     ids::MAPS_GB_GAMEMODE,
                     None,
-                    "All gamemodes",
+                    tr!("maps.gb.all_gamemodes"),
                 ))
                 .chain(gamemodes.iter().map(|g| {
                     CategoryOption::new(ids::MAPS_GB_GAMEMODE, Some(g.id), g.name.clone())
@@ -733,7 +759,7 @@ impl GbMapsTab {
                             .text_sm()
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(muted)
-                            .child("Sort:"),
+                            .child(tr!("maps.sort.title")),
                     )
                     .child(select(
                         ids::MAPS_GB_SORT,
@@ -767,7 +793,7 @@ impl GbMapsTab {
             );
             return Some(skeleton_cards(
                 ids::MAPS_GB_LOADING,
-                "Loading...",
+                tr!("maps.gb.loading"),
                 SKELETON_CARDS,
                 columns,
                 SkeletonTop::Image,
@@ -783,9 +809,9 @@ impl GbMapsTab {
             return Some(empty_state_with_action(
                 ids::MAPS_GB_EMPTY,
                 IconName::Store,
-                "No maps installed",
+                tr!("maps.gb.installed_empty"),
                 Some(ids::STORE_EMPTY_HINT),
-                "Install a map from All maps.",
+                tr!("maps.gb.installed_hint"),
                 None,
                 cx,
             ));
@@ -814,24 +840,24 @@ impl GbMapsTab {
         }
         // The hint names what narrowed the grid; with nothing narrowing it, the catalogue is empty.
         let hint = if !self.search.trim().is_empty() {
-            "Try another search."
+            tr!("maps.gb.hint.search")
         } else if self.gamemode.is_some() {
-            "Try another gamemode."
+            tr!("maps.gb.hint.gamemode")
         } else {
-            "Maps appear here after a sync with GameBanana."
+            tr!("maps.gb.hint.sync")
         };
         // An empty catalogue with an idle sync (auto-sync off) offers the sync itself.
         let sync = (all && unfiltered && maps_sync(cx).is_some()).then(|| {
             Button::new(ids::MAPS_GB_SYNC)
                 .outline()
-                .label("Sync")
+                .label(tr!("maps.gb.button.sync"))
                 .on_click(|_, _, cx| start_maps_sync(cx))
                 .into_any_element()
         });
         Some(empty_state_with_action(
             ids::MAPS_GB_EMPTY,
             IconName::Store,
-            "No maps found",
+            tr!("maps.gb.empty"),
             Some(ids::STORE_EMPTY_HINT),
             hint,
             sync,
@@ -891,14 +917,22 @@ impl GbMapsTab {
 
 // A map card's badge from its library entry, in `GbAddonOffer::of_map`'s order; an item gone
 // from GameBanana says so first.
-fn map_badge(entry: Option<&GbAddonEntry>) -> Option<&'static str> {
+fn map_badge(entry: Option<&GbAddonEntry>) -> Option<CardBadge> {
+    let quiet = |text| CardBadge {
+        text,
+        accent: false,
+    };
     if entry?.is_gone() {
-        return Some("No longer on GameBanana");
+        return Some(quiet(tr!("maps.badge.gone")));
     }
     match GbAddonOffer::of_map(entry) {
         GbAddonOffer::Install => None,
-        GbAddonOffer::InstallAgain => Some("Not installed"),
-        offer @ (GbAddonOffer::Update | GbAddonOffer::Installed) => Some(offer.label()),
+        GbAddonOffer::InstallAgain => Some(quiet(tr!("maps.badge.not_installed"))),
+        GbAddonOffer::Update => Some(CardBadge {
+            text: tr!("maps.badge.update"),
+            accent: true,
+        }),
+        GbAddonOffer::Installed => Some(quiet(tr!("maps.badge.installed"))),
     }
 }
 

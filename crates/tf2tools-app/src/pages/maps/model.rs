@@ -2,7 +2,10 @@
 
 use std::cmp::Reverse;
 
+use gpui_kit::SharedString;
 use tf2tools_core::{MapEntry, MapState};
+
+use crate::i18n::tr;
 
 /// One listed map as the page draws it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,12 +39,21 @@ pub enum MapSort {
     LastPlayed,
 }
 
-/// The sort menu: label, then the sort. The first is the default.
+/// The sort menu: the Select value, then the sort. The first is the default.
 pub const SORTS: [(&str, MapSort); 3] = [
     ("Name", MapSort::Name),
     ("Most played", MapSort::MostPlayed),
     ("Recently played", MapSort::LastPlayed),
 ];
+
+/// The sort menu's label for `sort`, in the player's language.
+pub fn sort_label(sort: MapSort) -> SharedString {
+    match sort {
+        MapSort::Name => tr!("maps.sort.name"),
+        MapSort::MostPlayed => tr!("maps.sort.most_played"),
+        MapSort::LastPlayed => tr!("maps.sort.recently_played"),
+    }
+}
 
 /// The indexes of the rows whose name holds `query` (trimmed, any case), in `sort` order.
 /// Ties fall back to the name, so the order never depends on the cache's.
@@ -74,7 +86,7 @@ pub fn visible(rows: &[MapRow], query: &str, sort: MapSort) -> Vec<usize> {
 /// or "Never".
 pub fn last_played_label(last: Option<&str>) -> String {
     let Some(last) = last else {
-        return "Never".to_owned();
+        return tr!("maps.table.never").to_string();
     };
     chrono::NaiveDate::parse_from_str(last, "%Y-%m-%d").map_or_else(
         |_| last.to_owned(),

@@ -12,6 +12,7 @@ use tf2tools_app::pages::addons::AddonsPage;
 use tf2tools_app::pages::addons::model::{movement_off, movement_on_text};
 use tf2tools_app::pages::crosshairs::CrosshairsPage;
 use tf2tools_app::pages::huds::HudsPage;
+use tf2tools_app::pages::maps::model::{SORTS, last_played_label, sort_label};
 use tf2tools_app::pages::profiles::ProfilesPage;
 use tf2tools_app::pages::profiles::editor_model::{Slot, SlotState, next_profile_name, slot_text};
 use tf2tools_app::pages::profiles::model::{crosshair_count, not_applied};
@@ -22,6 +23,7 @@ use tf2tools_app::shell::confirm::Confirm;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::widgets::class_icon::class_short_name;
 use tf2tools_app::widgets::profile_menu::added_title;
+use tf2tools_app::widgets::sync_banner::maps_banner_text;
 use tf2tools_core::{
     AddonSection, ProfileDraft, Provenance, SoundKind, Tf2Install, TfClass, WeaponSlot,
 };
@@ -548,4 +550,52 @@ fn addon_texts_read_in_russian() {
     );
     assert_eq!(addon_section_name(AddonSection::MAPS), "Карты");
     assert_eq!(texts(&Confirm::delete_addon())[0], "Удалить дополнение");
+}
+
+#[gpui_kit::test]
+fn the_maps_page_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = support::maps::maps_shell(cx, &env, &server);
+    let page = support::maps::open_maps(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HEADER_TITLE).as_deref(),
+        Some("Карты")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::MAPS_COUNT).as_deref(),
+        Some("5 карт")
+    );
+    let _tab = support::maps::open_gamebanana(cx, &s, &page);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::MAPS_GB_EMPTY).as_deref(),
+        Some("Карты не найдены")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::STORE_EMPTY_HINT).as_deref(),
+        Some("Карты появятся здесь после синхронизации с GameBanana.")
+    );
+}
+
+#[test]
+fn map_texts_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let sorts: Vec<String> = SORTS
+        .iter()
+        .map(|(_, s)| sort_label(*s).to_string())
+        .collect();
+    assert_eq!(sorts, ["Название", "Чаще всего", "Недавние"]);
+    assert_eq!(last_played_label(None), "Никогда");
+    assert_eq!(
+        maps_banner_text(true),
+        "Синхронизация карт с GameBanana... Загружены ещё не все элементы."
+    );
+    assert_eq!(
+        texts(&Confirm::remove_map("cp_alpha"))[..3],
+        [
+            "Удалить карту?",
+            "cp_alpha будет удалена из TF2. Её можно скачать снова позже.",
+            "Удалить"
+        ]
+    );
 }

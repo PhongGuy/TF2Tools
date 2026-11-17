@@ -6,6 +6,7 @@ use gpui_kit::{
     App, ElementId, IntoElement, ParentElement as _, SharedString, Styled as _, Window, div,
 };
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::widgets::labelled;
 
@@ -37,7 +38,7 @@ pub fn error_line(
         .child(
             Button::new(retry_id)
                 .outline()
-                .label("Retry")
+                .label(tr!("widgets.store_error.retry"))
                 .on_click(move |_, window, cx| on_retry(window, cx)),
         )
 }

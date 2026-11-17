@@ -749,6 +749,11 @@ mod tests {
         "pages/addons/mod.rs",
         "pages/addons/model.rs",
         "pages/addons/gamebanana.rs",
+        "pages/maps/mod.rs",
+        "pages/maps/model.rs",
+        "pages/maps/gb_tab.rs",
+        "widgets/sync_banner.rs",
+        "widgets/store_error.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -773,7 +778,21 @@ mod tests {
             "Dark",
             "the plain backdrop's Select value and row id; its label is crosshairs_page.background.dark",
         ),
+        ("pages/maps/model.rs", "Name", SELECT_VALUE),
+        ("pages/maps/model.rs", "Most played", SELECT_VALUE),
+        ("pages/maps/model.rs", "Recently played", SELECT_VALUE),
+        ("pages/maps/gb_tab.rs", "Most downloaded", SELECT_VALUE),
+        ("pages/maps/gb_tab.rs", "Newest", SELECT_VALUE),
+        ("pages/maps/gb_tab.rs", "All maps", SELECT_VALUE),
+        ("pages/maps/gb_tab.rs", "Installed", SELECT_VALUE),
+        (
+            "pages/maps/mod.rs",
+            "GameBanana",
+            "a proper noun, the source button",
+        ),
     ];
+
+    const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
 
     #[test]
     fn library_pages_show_no_english_literal() {

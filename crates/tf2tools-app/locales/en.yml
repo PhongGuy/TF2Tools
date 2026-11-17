@@ -248,6 +248,61 @@ logs_tf:
 maps:
   count: { one: "%{count} map", other: "%{count} maps" }
   count_of: { one: "%{shown} of %{count} map", other: "%{shown} of %{count} maps" }
+  search: "Search maps..."
+  no_tf2: "Set the TF2 folder in Settings to download maps."
+  serveme_info: "Community maps hosted by serveme.tf. Downloads go into TF2's maps folder."
+  sort:
+    title: "Sort:"
+    name: "Name"
+    most_played: "Most played"
+    recently_played: "Recently played"
+  table:
+    map: "Map"
+    times_played: "Times played"
+    last_played: "Last played"
+    size: "Size"
+    never: "Never"
+  empty:
+    loading: "Getting the map list..."
+    none: "No maps yet. Press Refresh to get the list from serveme.tf."
+    no_match: "No maps match your search"
+  badge:
+    downloaded: "Downloaded"
+    in_game: "In game"
+    gone: "No longer on GameBanana"
+    not_installed: "Not installed"
+    update: "Update"
+    installed: "Installed"
+  button:
+    refresh: "Refresh"
+    refreshing: "Refreshing..."
+    download: "Download"
+    remove: "Remove"
+  toast:
+    downloaded_title: "Map downloaded"
+    downloaded: "%{name} is ready to play in TF2."
+    download_failed: "Download failed"
+    removed_title: "Map removed"
+    removed: "%{name} was deleted from TF2."
+  gb:
+    info: "Community maps from GameBanana. Open a map to see it there."
+    all_gamemodes: "All gamemodes"
+    loading: "Loading..."
+    installed_empty: "No maps installed"
+    installed_hint: "Install a map from All maps."
+    empty: "No maps found"
+    sort:
+      most_downloaded: "Most downloaded"
+      newest: "Newest"
+    show:
+      all: "All maps"
+      installed: "Installed"
+    hint:
+      search: "Try another search."
+      gamemode: "Try another gamemode."
+      sync: "Maps appear here after a sync with GameBanana."
+    button:
+      sync: "Sync"
 
 store_grid:
   count:
@@ -445,6 +500,12 @@ confirm:
   delete_addon:
     title: "Delete Addon"
     body: "Are you sure you want to remove this addon from your library? If installed, it will also be removed from TF2."
+  remove_gb_map:
+    title: "Remove Map"
+    body: "Are you sure you want to remove %{name}? It will be removed from TF2."
+  remove_map:
+    title: "Remove map?"
+    body: "%{name} will be deleted from TF2. You can download it again later."
   remove_gb_addon:
     title: "Remove Add-on"
     body: "Are you sure you want to remove %{name}? It will be removed from TF2 and from your library."
@@ -735,6 +796,15 @@ widgets:
     builtin: "Built-in (%{count})"
     library: "My Crosshairs (%{count})"
     no_match: "No crosshairs match your search"
+  sync_banner:
+    sounds: "Syncing sounds from GameBanana..."
+    crosshairs: "Syncing crosshairs from GameBanana..."
+    huds: "Syncing HUDs from GameBanana..."
+    items: "Syncing items from GameBanana..."
+    maps: "Syncing maps from GameBanana..."
+    partial: "Not all items loaded yet."
+  store_error:
+    retry: "Retry"
 
 hud_maker:
   history:

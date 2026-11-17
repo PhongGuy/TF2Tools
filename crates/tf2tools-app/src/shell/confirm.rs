@@ -184,13 +184,20 @@ impl Confirm {
     /// The prompt before removing the GameBanana map called `name` from TF2.
     pub fn remove_gb_map(name: &str) -> Self {
         Self {
-            title: "Remove Map".into(),
-            description: format!(
-                "Are you sure you want to remove {name}? It will be removed from TF2."
-            )
-            .into(),
-            confirm_label: "Remove".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.remove_gb_map.title"),
+            description: tr!("confirm.remove_gb_map.body", name = name),
+            confirm_label: tr!("confirm.remove"),
+            cancel_label: tr!("confirm.cancel"),
+        }
+    }
+
+    /// The prompt before deleting the downloaded serveme.tf map `name` from TF2.
+    pub fn remove_map(name: &str) -> Self {
+        Self {
+            title: tr!("confirm.remove_map.title"),
+            description: tr!("confirm.remove_map.body", name = name),
+            confirm_label: tr!("confirm.remove"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 

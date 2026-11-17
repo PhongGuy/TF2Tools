@@ -7,8 +7,8 @@ use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, App, FontWeight, InteractiveElement as _, IntoElement, ObjectFit,
-    ParentElement as _, Pixels, StatefulInteractiveElement as _, Styled as _, StyledImage as _,
-    TestSupportExt as _, Window, div, img, px, transparent_black,
+    ParentElement as _, Pixels, SharedString, StatefulInteractiveElement as _, Styled as _,
+    StyledImage as _, TestSupportExt as _, Window, div, img, px, transparent_black,
 };
 use tf2tools_core::AddonCard;
 
@@ -31,6 +31,23 @@ pub fn card_height(width: Pixels) -> Pixels {
 /// What a click on the card does.
 pub type OpenAddon = Rc<dyn Fn(&mut Window, &mut App)>;
 
+/// A card's install badge: its text, and whether it takes the accent colour (an update waits).
+#[derive(Debug, Clone)]
+pub struct CardBadge {
+    pub text: SharedString,
+    pub accent: bool,
+}
+
+impl CardBadge {
+    /// The offer's badge as `GbAddonOffer::badge` words it: "Update" in the accent, or "Installed".
+    pub fn of_offer(offer: GbAddonOffer) -> Option<Self> {
+        offer.badge().map(|text| CardBadge {
+            text: text.into(),
+            accent: offer == GbAddonOffer::Update,
+        })
+    }
+}
+
 /// A GameBanana add-on card: thumbnail, name (tagged with `badge`, "Installed" or "Update",
 /// when given, else "Outdated" when obsolete), author and likes. A click calls `open`;
 /// with `reveal`, a "Mature" cover hides the thumbnail and a click on the cover calls
@@ -39,7 +56,7 @@ pub fn gb_addon_card(
     section: &str,
     card: &AddonCard,
     image: Option<RemoteImage>,
-    badge: Option<&'static str>,
+    badge: Option<CardBadge>,
     open: OpenAddon,
     reveal: Option<OpenAddon>,
     cx: &App,
@@ -102,8 +119,8 @@ pub fn gb_addon_card(
         ))
     });
     // An update waiting is the one state worth the accent colour; installed stays quiet.
-    let installed = badge.map(|text| {
-        let tag = if text == GbAddonOffer::Update.label() {
+    let installed = badge.map(|badge| {
+        let tag = if badge.accent {
             Tag::primary()
         } else {
             Tag::secondary()
@@ -112,7 +129,7 @@ pub fn gb_addon_card(
             ids::addon_gb_card_badge(section, card.id),
             tag,
             transparent_black(),
-            text,
+            badge.text,
         ))
     });
     card_frame(cx)

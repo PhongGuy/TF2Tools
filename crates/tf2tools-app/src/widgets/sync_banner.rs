@@ -3,35 +3,39 @@
 
 use gpui_kit::component::progress::Progress;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
-use gpui_kit::{AnyElement, App, IntoElement, ParentElement as _, Styled as _, div};
+use gpui_kit::{AnyElement, App, IntoElement, ParentElement as _, SharedString, Styled as _, div};
 use tf2tools_core::StoreKind;
 
 use super::labelled;
+use crate::i18n::tr;
 use crate::ids;
 use crate::maps_sync::maps_sync;
 use crate::sync::{SyncTick, sync_hub};
 
 /// "Syncing {noun} from GameBanana..." plus " Not all items loaded yet." when the store has rows.
-/// The noun is `sounds`, `crosshairs` or `HUDs`, and `items` for any other kind.
+/// Sounds, crosshairs and HUDs are named; any other kind syncs "items".
 pub fn banner_text(kind: StoreKind, has_rows: bool) -> String {
-    let noun = match kind {
-        StoreKind::Sounds => "sounds",
-        StoreKind::Crosshairs => "crosshairs",
-        StoreKind::GameBananaHuds => "HUDs",
-        StoreKind::CuratedHuds | StoreKind::Addons | _ => "items",
+    let syncing = match kind {
+        StoreKind::Sounds => tr!("widgets.sync_banner.sounds"),
+        StoreKind::Crosshairs => tr!("widgets.sync_banner.crosshairs"),
+        StoreKind::GameBananaHuds => tr!("widgets.sync_banner.huds"),
+        StoreKind::CuratedHuds | StoreKind::Addons | _ => tr!("widgets.sync_banner.items"),
     };
-    noun_text(noun, has_rows)
+    with_partial(syncing, has_rows)
 }
 
-/// The maps catalogue's banner text, worded as a store's with the noun `maps`.
+/// The maps catalogue's banner text, worded as a store's.
 pub fn maps_banner_text(has_rows: bool) -> String {
-    noun_text("maps", has_rows)
+    with_partial(tr!("widgets.sync_banner.maps"), has_rows)
 }
 
-fn noun_text(noun: &str, has_rows: bool) -> String {
-    let mut text = format!("Syncing {noun} from GameBanana...");
+// Each kind is its own whole sentence, so a language inflects its noun freely; the partial
+// note follows as a second sentence.
+fn with_partial(syncing: SharedString, has_rows: bool) -> String {
+    let mut text = syncing.to_string();
     if has_rows {
-        text.push_str(" Not all items loaded yet.");
+        text.push(' ');
+        text.push_str(&tr!("widgets.sync_banner.partial"));
     }
     text
 }

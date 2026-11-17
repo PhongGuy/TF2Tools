@@ -246,6 +246,61 @@ logs_tf:
 maps:
   count: { one: "%{count} карта", few: "%{count} карты", many: "%{count} карт" }
   count_of: { one: "%{shown} из %{count} карты", few: "%{shown} из %{count} карт", many: "%{shown} из %{count} карт" }
+  search: "Поиск карт..."
+  no_tf2: "Укажите папку TF2 в настройках, чтобы скачивать карты."
+  serveme_info: "Карты сообщества с serveme.tf. Скачанные карты попадают в папку maps в TF2."
+  sort:
+    title: "Сортировка:"
+    name: "Название"
+    most_played: "Чаще всего"
+    recently_played: "Недавние"
+  table:
+    map: "Карта"
+    times_played: "Сыграно"
+    last_played: "Последняя игра"
+    size: "Размер"
+    never: "Никогда"
+  empty:
+    loading: "Загрузка списка карт..."
+    none: "Карт пока нет. Нажмите «Обновить», чтобы получить список с serveme.tf."
+    no_match: "Нет карт по вашему запросу"
+  badge:
+    downloaded: "Скачана"
+    in_game: "В игре"
+    gone: "Больше нет на GameBanana"
+    not_installed: "Не установлена"
+    update: "Обновление"
+    installed: "Установлена"
+  button:
+    refresh: "Обновить"
+    refreshing: "Обновление..."
+    download: "Скачать"
+    remove: "Удалить"
+  toast:
+    downloaded_title: "Карта скачана"
+    downloaded: "%{name} готова к игре в TF2."
+    download_failed: "Не удалось скачать"
+    removed_title: "Карта удалена"
+    removed: "%{name} удалена из TF2."
+  gb:
+    info: "Карты сообщества с GameBanana. Откройте карту, чтобы посмотреть её там."
+    all_gamemodes: "Все режимы"
+    loading: "Загрузка..."
+    installed_empty: "Нет установленных карт"
+    installed_hint: "Установите карту из раздела «Все карты»."
+    empty: "Карты не найдены"
+    sort:
+      most_downloaded: "Популярные"
+      newest: "Новые"
+    show:
+      all: "Все карты"
+      installed: "Установленные"
+    hint:
+      search: "Попробуйте другой запрос."
+      gamemode: "Попробуйте другой режим."
+      sync: "Карты появятся здесь после синхронизации с GameBanana."
+    button:
+      sync: "Синхронизировать"
 
 store_grid:
   count:
@@ -443,6 +498,12 @@ confirm:
   delete_addon:
     title: "Удалить дополнение"
     body: "Удалить это дополнение из библиотеки? Если оно установлено, оно также будет удалено из TF2."
+  remove_gb_map:
+    title: "Удалить карту"
+    body: "Удалить %{name}? Она будет удалена из TF2."
+  remove_map:
+    title: "Удалить карту?"
+    body: "%{name} будет удалена из TF2. Её можно скачать снова позже."
   remove_gb_addon:
     title: "Удалить дополнение"
     body: "Удалить %{name}? Оно будет удалено из TF2 и из вашей библиотеки."
@@ -733,6 +794,15 @@ widgets:
     builtin: "Встроенные (%{count})"
     library: "Мои прицелы (%{count})"
     no_match: "Нет прицелов по вашему запросу"
+  sync_banner:
+    sounds: "Синхронизация звуков с GameBanana..."
+    crosshairs: "Синхронизация прицелов с GameBanana..."
+    huds: "Синхронизация HUD с GameBanana..."
+    items: "Синхронизация элементов с GameBanana..."
+    maps: "Синхронизация карт с GameBanana..."
+    partial: "Загружены ещё не все элементы."
+  store_error:
+    retry: "Повторить"
 
 hud_maker:
   history:
