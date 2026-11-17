@@ -1,13 +1,14 @@
 //! The Activity Log page, the rows sync and downloads write, and the logs.tf page, in Russian.
 
 use gpui_kit::component::select::SelectItem as _;
-use gpui_kit::{AnyWindowHandle, Entity, FontWeight, Pixels, TestAppContext, px};
+use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, FontWeight, Pixels, TestAppContext, px};
 use tf2tools_app::activity::{self, download_entry, sync_entry};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs::LogsPage;
 use tf2tools_app::pages::logs::model::{
     action_label, category_label, category_options, level_options,
 };
+use tf2tools_app::pages::logs_tf::LogsTfPage;
 use tf2tools_app::pages::logs_tf::text::{
     counting_text, download_reason, empty_text, event_text, medigun_name, player_input_error,
     range_label, resolve_message, ring_label, streaks_label, summary_text, weapons_title,
@@ -470,5 +471,107 @@ fn an_open_russian_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
     assert_eq!(
         support::label_of(cx, s.win, ids::logstf_download(3)).as_deref(),
         Some("Скачать лог")
+    );
+}
+
+fn type_into_add(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    page: &Entity<LogsTfPage>,
+    text: &str,
+) {
+    let input = cx.update(|cx| page.read(cx).add_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        input.update(cx, |st, cx| st.set_value(text, window, cx))
+    })
+    .unwrap();
+    support::settle(cx, s.win);
+}
+
+#[gpui_kit::test]
+fn the_logs_tf_page_and_its_dialogs_read_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[]));
+    let s = shell(cx, &env, &server.uri(), &[(1, "a"), (2, "b")]);
+    let page = open_page(cx, &s);
+    let shown = [ids::LOGSTF_CREDIT, ids::LOGSTF_REFRESH, ids::LOGSTF_ADD]
+        .map(|id| support::label_of(cx, s.win, id));
+    let want = ["Статистика с logs.tf", "Обновить", "+ Добавить игрока"];
+    assert_eq!(shown, want.map(|t| Some(t.to_owned())));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_chip_rename(sid(2))).as_deref(),
+        Some("Ник для b")
+    );
+    support::click_id(cx, s.win, ids::logstf_chip_remove(sid(2)));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref(),
+        Some("Перестать отслеживать b?")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_OK).as_deref(),
+        Some("Перестать отслеживать")
+    );
+    support::click_id(cx, s.win, ids::CONFIRM_CANCEL);
+
+    support::click_id(cx, s.win, ids::LOGSTF_ADD);
+    assert_eq!(
+        shown_text(cx, s.win, ids::LOGSTF_ADD_INPUT).as_deref(),
+        Some("Ссылка на профиль или Steam ID")
+    );
+    type_into_add(cx, &s, &page, "has space");
+    support::click_id(cx, s.win, ids::LOGSTF_ADD_CONFIRM);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_ADD_ERROR).as_deref(),
+        Some("Это не похоже на ссылку на профиль Steam или Steam ID.")
+    );
+}
+
+// logs.tf is kept while Settings shows, so its add fields retitle after a switch and keep
+// what the player typed.
+#[gpui_kit::test]
+fn the_kept_logs_tf_page_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[]));
+    let s = shell(cx, &env, &server.uri(), &[(1, "a")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::LOGSTF_ADD);
+    type_into_add(cx, &s, &page, "gaben");
+    assert_eq!(
+        shown_text(cx, s.win, ids::LOGSTF_ADD_NICKNAME).as_deref(),
+        Some("Nickname (optional)")
+    );
+    support::click_id(cx, s.win, ids::LOGSTF_ADD_CANCEL);
+    crate::settings::open_settings(cx, &s);
+    crate::settings::pick(cx, s.win, "ru");
+    let _page = open_page(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_ADD).as_deref(),
+        Some("+ Добавить игрока")
+    );
+    support::click_id(cx, s.win, ids::LOGSTF_ADD);
+    let placeholders =
+        [ids::LOGSTF_ADD_INPUT, ids::LOGSTF_ADD_NICKNAME].map(|id| shown_text(cx, s.win, id));
+    assert_eq!(
+        placeholders,
+        [
+            Some("Ссылка на профиль или Steam ID".to_owned()),
+            Some("Ник (по желанию)".to_owned())
+        ]
+    );
+    assert_eq!(
+        cx.update(|cx| page.read(cx).add_input().read(cx).value().to_string()),
+        "gaben"
+    );
+    support::click_id(cx, s.win, ids::LOGSTF_ADD_CANCEL);
+    // The rename field was built in English before the switch; a has no nickname, so it shows
+    // its placeholder.
+    support::click_id(cx, s.win, ids::logstf_chip_rename(sid(1)));
+    assert_eq!(
+        shown_text(cx, s.win, ids::LOGSTF_RENAME_INPUT).as_deref(),
+        Some("Ник")
     );
 }

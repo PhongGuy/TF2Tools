@@ -434,6 +434,24 @@ logs_tf:
   streaks: "Show Killstreaks (%{count})"
   nickname_note: "This is your nickname for this player. Their name in this log is %{name}. You can turn this off in Settings."
   nickname: "Nickname"
+  add:
+    placeholder: "Steam profile link or Steam ID"
+    nickname: "Nickname (optional)"
+    title: "Add player"
+    ok: "Add"
+    chip: "+ Add player"
+  stop:
+    title: "Stop tracking %{name}?"
+    body: "%{name}'s chip goes away. You can add them again later."
+    ok: "Stop tracking"
+    name: "Stop tracking %{name}"
+  rename:
+    title: "Nickname for %{name}"
+    hint: "Leave it empty to use their Steam name."
+    save: "Save"
+  refresh: "Refresh"
+  refreshing: "Refreshing..."
+  credit: "Stats from logs.tf"
   detail:
     charges: "Charges"
     drops: "Drops"

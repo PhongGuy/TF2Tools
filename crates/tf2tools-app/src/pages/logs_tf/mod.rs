@@ -33,7 +33,7 @@ use tf2tools_core::{
     parse_player_input,
 };
 
-use crate::i18n::tr;
+use crate::i18n::{self, tr};
 use crate::ids;
 use crate::kill_icons::{KillIconImages, LoadedKillIcons};
 use crate::local_messages::{LocalFailure, describe_logs_cache};
@@ -143,16 +143,19 @@ pub struct LogsTfPage {
     nicknames: Entity<LogNicknames>,
     names: Entity<LoadedWeaponNames>,
     icons: Entity<LoadedKillIcons>,
+    // The language the three fields' placeholders were titled in.
+    language: &'static str,
     _subscriptions: Vec<Subscription>,
 }
 
 impl LogsTfPage {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let add_input =
-            cx.new(|cx| InputState::new(window, cx).placeholder("Steam profile link or Steam ID"));
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("logs_tf.add.placeholder")));
         let add_nickname =
-            cx.new(|cx| InputState::new(window, cx).placeholder("Nickname (optional)"));
-        let rename_input = cx.new(|cx| InputState::new(window, cx).placeholder("Nickname"));
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("logs_tf.add.nickname")));
+        let rename_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("logs_tf.nickname")));
         // gpui-kit owns InputEvent; Enter in either add field adds like the Add button, and
         // in the rename field saves like Save.
         let mut entered = Vec::new();
@@ -255,6 +258,7 @@ impl LogsTfPage {
             rename_input,
             renaming: None,
             nicknames,
+            language: i18n::current(),
             _subscriptions: entered
                 .into_iter()
                 .chain([heard, redraw, released, named, iconed, nicknamed, trimmed])
@@ -807,11 +811,10 @@ impl LogsTfPage {
     fn remove(&mut self, id: SteamId, name: &str, window: &mut Window, cx: &mut Context<Self>) {
         let answer = confirm(
             Confirm {
-                title: format!("Stop tracking {name}?").into(),
-                description: format!("{name}'s chip goes away. You can add them again later.")
-                    .into(),
-                confirm_label: "Stop tracking".into(),
-                cancel_label: "Cancel".into(),
+                title: tr!("logs_tf.stop.title", name = name),
+                description: tr!("logs_tf.stop.body", name = name),
+                confirm_label: tr!("logs_tf.stop.ok"),
+                cancel_label: tr!("confirm.cancel"),
             },
             window,
             cx,
@@ -870,7 +873,7 @@ impl LogsTfPage {
                         div()
                             .text_lg()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child("Add player"),
+                            .child(tr!("logs_tf.add.title")),
                     )
                     .child(
                         h_flex()
@@ -906,7 +909,7 @@ impl LogsTfPage {
                             .child(
                                 Button::new(ids::LOGSTF_ADD_CANCEL)
                                     .outline()
-                                    .label("Cancel")
+                                    .label(tr!("confirm.cancel"))
                                     .on_click(|_, window, cx| window.close_dialog(cx)),
                             )
                             .child(
@@ -915,7 +918,7 @@ impl LogsTfPage {
                                     .label(if this.adding {
                                         looking_up()
                                     } else {
-                                        "Add".into()
+                                        tr!("logs_tf.add.ok")
                                     })
                                     .loading(this.adding)
                                     .disabled(blank || this.adding)
@@ -948,7 +951,7 @@ impl LogsTfPage {
         let Some(player) = self.players.iter().find(|p| p.steam_id() == id) else {
             return;
         };
-        let title = format!("Nickname for {}", player.name());
+        let title = tr!("logs_tf.rename.title", name = player.name());
         let current = player.nickname().unwrap_or_default().to_owned();
         self.rename_input
             .update(cx, |state, cx| state.set_value(current, window, cx));
@@ -975,7 +978,7 @@ impl LogsTfPage {
                         div()
                             .text_sm()
                             .text_color(cx.theme().muted_foreground)
-                            .child("Leave it empty to use their Steam name."),
+                            .child(tr!("logs_tf.rename.hint")),
                     )
                     .child(
                         div()
@@ -990,13 +993,13 @@ impl LogsTfPage {
                             .child(
                                 Button::new(ids::LOGSTF_RENAME_CANCEL)
                                     .outline()
-                                    .label("Cancel")
+                                    .label(tr!("confirm.cancel"))
                                     .on_click(|_, window, cx| window.close_dialog(cx)),
                             )
                             .child(
                                 Button::new(ids::LOGSTF_RENAME_SAVE)
                                     .primary()
-                                    .label("Save")
+                                    .label(tr!("logs_tf.rename.save"))
                                     .on_click({
                                         let entity = entity.clone();
                                         move |_, window, cx| {
@@ -1414,6 +1417,25 @@ impl LogsTfPage {
         .detach();
     }
 
+    // The page is kept while other pages show, so a language switched meanwhile retitles the
+    // three fields' placeholders; what the player typed stays. The dialogs read theirs on open.
+    fn follow_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.language == i18n::current() {
+            return;
+        }
+        self.language = i18n::current();
+        let fields = [
+            (&self.add_input, tr!("logs_tf.add.placeholder")),
+            (&self.add_nickname, tr!("logs_tf.add.nickname")),
+            (&self.rename_input, tr!("logs_tf.nickname")),
+        ];
+        for (field, placeholder) in fields {
+            field.update(cx, |input, cx| {
+                input.set_placeholder(placeholder, window, cx)
+            });
+        }
+    }
+
     // Refresh and the active player's logs.tf profile, beside the chips.
     fn actions(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let syncing = self.is_syncing(cx);
@@ -1424,7 +1446,11 @@ impl LogsTfPage {
                 Button::new(ids::LOGSTF_REFRESH)
                     .outline()
                     .icon(IconName::RefreshCw)
-                    .label(if syncing { "Refreshing..." } else { "Refresh" })
+                    .label(if syncing {
+                        tr!("logs_tf.refreshing")
+                    } else {
+                        tr!("logs_tf.refresh")
+                    })
                     .loading(syncing)
                     .loading_icon(IconName::RefreshCw)
                     .disabled(syncing)
@@ -1434,7 +1460,7 @@ impl LogsTfPage {
                 Button::new(ids::LOGSTF_PROFILE)
                     .ghost()
                     .icon(IconName::ExternalLink)
-                    .label("Open profile on logs.tf")
+                    .label(tr!("logs_tf.list.open_profile"))
                     .on_click(move |_, _, cx| cx.open_url(&profile_url(id)))
             }))
     }
@@ -1494,7 +1520,7 @@ impl LogsTfPage {
                 .ghost()
                 .xsmall()
                 .icon(IconName::X)
-                .named(format!("Stop tracking {name}"))
+                .named(tr!("logs_tf.stop.name", name = name))
                 .disabled(removing)
                 .on_click(cx.listener(move |page, _, window, cx| {
                     page.remove(id, &name, window, cx);
@@ -1503,7 +1529,7 @@ impl LogsTfPage {
                 .ghost()
                 .xsmall()
                 .icon(IconName::Pencil)
-                .named(format!("Nickname for {}", player.name()))
+                .named(tr!("logs_tf.rename.title", name = player.name()))
                 .disabled(removing)
                 .on_click(cx.listener(move |page, _, window, cx| {
                     page.open_rename(id, window, cx);
@@ -1511,7 +1537,7 @@ impl LogsTfPage {
             row = row.child(h_flex().gap_0p5().child(chip).child(rename).child(remove));
         }
         row.child(
-            filter_badge(ids::LOGSTF_ADD, false, "+ Add player", window, cx)
+            filter_badge(ids::LOGSTF_ADD, false, tr!("logs_tf.add.chip"), window, cx)
                 .on_click(cx.listener(|page, _, window, cx| page.open_add(window, cx))),
         )
     }
@@ -1543,7 +1569,7 @@ impl LogsTfPage {
                     Button::new(ids::LOGSTF_CREDIT)
                         .ghost()
                         .icon(IconName::ExternalLink)
-                        .label("Stats from logs.tf")
+                        .label(tr!("logs_tf.credit"))
                         .on_click(|_, _, cx| cx.open_url(LOGS_TF_URL)),
                 ),
             )
@@ -1611,7 +1637,7 @@ impl LogsTfPage {
                 Button::new(ids::LOGSTF_EMPTY_ADD)
                     .primary()
                     .icon(IconName::Plus)
-                    .label("Add player")
+                    .label(tr!("logs_tf.add.title"))
                     .on_click(cx.listener(|page, _, window, cx| page.open_add(window, cx))),
             )
     }
@@ -1619,6 +1645,7 @@ impl LogsTfPage {
 
 impl Render for LogsTfPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.follow_language(window, cx);
         self.fit = list::fit(&self.list);
         // A cache read has no window to move the slider with, so the frame after it does.
         self.move_slider(window, cx);

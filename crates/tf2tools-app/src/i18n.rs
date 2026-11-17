@@ -830,6 +830,7 @@ mod tests {
         "pages/logs_tf/detail/players.rs",
         "pages/logs_tf/detail/popover.rs",
         "pages/logs_tf/detail/rounds.rs",
+        "pages/logs_tf/mod.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1133,6 +1134,16 @@ mod tests {
             "pages/logs_tf/detail/rounds.rs",
             "RED DA",
             LOGS_TF_ABBREVIATION,
+        ),
+        (
+            "pages/logs_tf/mod.rs",
+            "the stored body is damaged",
+            "developer detail of an unreadable stored log",
+        ),
+        (
+            "pages/logs_tf/mod.rs",
+            "no stored body",
+            "developer detail of an unreadable stored log",
         ),
     ];
 
