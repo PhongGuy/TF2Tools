@@ -158,6 +158,16 @@ common:
     medic: "Medic"
     sniper: "Sniper"
     spy: "Spy"
+  class_compact:
+    scout: "Scout"
+    soldier: "Soldier"
+    pyro: "Pyro"
+    demoman: "Demoman"
+    heavy: "Heavy"
+    engineer: "Engineer"
+    medic: "Medic"
+    sniper: "Sniper"
+    spy: "Spy"
   class_short:
     scout: "Scout"
     pyro: "Pyro"

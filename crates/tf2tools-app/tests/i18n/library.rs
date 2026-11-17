@@ -112,6 +112,10 @@ fn class_slot_and_sound_names_read_in_both_languages() {
     let _guard = LocaleGuard::hold();
     assert_eq!(names::class_name(TfClass::Heavy), "Heavy");
     assert_eq!(class_short_name(TfClass::Engineer), "Engie");
+    assert_eq!(
+        classes(names::class_compact_name),
+        classes(names::class_name)
+    );
     assert_eq!(names::slot_name(WeaponSlot::Melee), "Melee");
     assert_eq!(names::sound_kind_name(SoundKind::Killsound), "Killsound");
     i18n::apply("ru");
@@ -138,6 +142,20 @@ fn class_slot_and_sound_names_read_in_both_languages() {
             "Подрыв.",
             "Пулем.",
             "Инж.",
+            "Медик",
+            "Снайпер",
+            "Шпион"
+        ]
+    );
+    assert_eq!(
+        classes(names::class_compact_name),
+        [
+            "Развед.",
+            "Солдат",
+            "Поджиг.",
+            "Подрыв.",
+            "Пулем.",
+            "Инженер",
             "Медик",
             "Снайпер",
             "Шпион"

@@ -22,6 +22,23 @@ pub fn class_name(class: TfClass) -> SharedString {
     }
 }
 
+/// The class's name for a header or tab about as wide as the English: English keeps the full
+/// name, and a language whose full name is longer shortens it.
+pub fn class_compact_name(class: TfClass) -> SharedString {
+    match class {
+        TfClass::Scout => tr!("common.class_compact.scout"),
+        TfClass::Soldier => tr!("common.class_compact.soldier"),
+        TfClass::Pyro => tr!("common.class_compact.pyro"),
+        TfClass::Demoman => tr!("common.class_compact.demoman"),
+        TfClass::Heavy => tr!("common.class_compact.heavy"),
+        TfClass::Engineer => tr!("common.class_compact.engineer"),
+        TfClass::Medic => tr!("common.class_compact.medic"),
+        TfClass::Sniper => tr!("common.class_compact.sniper"),
+        TfClass::Spy => tr!("common.class_compact.spy"),
+        _ => class.name().into(),
+    }
+}
+
 /// The weapon slot's name, such as "Melee".
 pub fn slot_name(slot: WeaponSlot) -> SharedString {
     match slot {

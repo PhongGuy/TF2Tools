@@ -156,6 +156,16 @@ common:
     medic: "Медик"
     sniper: "Снайпер"
     spy: "Шпион"
+  class_compact:
+    scout: "Развед."
+    soldier: "Солдат"
+    pyro: "Поджиг."
+    demoman: "Подрыв."
+    heavy: "Пулем."
+    engineer: "Инженер"
+    medic: "Медик"
+    sniper: "Снайпер"
+    spy: "Шпион"
   class_short:
     scout: "Развед."
     pyro: "Поджиг."

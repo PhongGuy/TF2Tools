@@ -33,7 +33,7 @@ use super::common::{SM_ICON_PX, YELLOW_500, needs_tf2, no_tf2_notice};
 use crate::activity;
 use crate::assets::BACKGROUNDS;
 use crate::crosshair_sync::{CrosshairSync, SyncStatus};
-use crate::i18n::names::{class_name, slot_name, slot_short_name};
+use crate::i18n::names::{class_compact_name, class_name, slot_name, slot_short_name};
 use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
@@ -1083,13 +1083,14 @@ impl CrosshairsPage {
             cx,
         );
         let primary = cx.theme().primary;
-        // Players' own short names keep narrow class columns readable.
+        // Players' own short names keep narrow class columns readable; elsewhere the compact
+        // names fit the header without changing English.
         let short_names = !turned && self.width.get() < px(1100.);
         let class_header = |page: &Self, class: TfClass, size, cx: &mut Context<Self>| {
             let shown = if short_names {
                 class_short_name(class)
             } else {
-                class_name(class)
+                class_compact_name(class)
             };
             page.header(
                 ids::loadout_class(class),

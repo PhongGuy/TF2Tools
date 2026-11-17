@@ -19,7 +19,7 @@ use gpui_kit::{
 
 use tf2tools_core::{CrosshairRef, TfClass, Weapon, WeaponSlot, weapons};
 
-use crate::i18n::names::{class_name, slot_name};
+use crate::i18n::names::{class_compact_name, class_name, slot_name};
 use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::ORANGE_500;
@@ -239,7 +239,7 @@ impl WeaponAssigner {
             Button::new(ids::class_tab(&class.name().to_lowercase()))
                 .ghost()
                 .small()
-                .label(class_name(class))
+                .label(class_compact_name(class))
                 .selected(active)
                 .h(px(29.))
                 .border_1()
