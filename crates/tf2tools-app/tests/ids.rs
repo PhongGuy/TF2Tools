@@ -73,7 +73,11 @@ fn keyed_ids_carry_the_stable_key() {
 
 #[test]
 fn labels_and_titles_match_v5() {
-    let table: Vec<_> = Page::ALL.iter().map(|p| (p.label(), p.title())).collect();
+    let names: Vec<_> = Page::ALL.iter().map(|p| (p.label(), p.title())).collect();
+    let table: Vec<(&str, &str)> = names
+        .iter()
+        .map(|(l, t)| (l.as_ref(), t.as_ref()))
+        .collect();
     assert_eq!(
         table,
         [
@@ -773,6 +777,10 @@ fn addon_store_tab_and_card_ids_are_keyed_by_section_and_item() {
     assert_eq!(
         name(ids::addon_gb_card_badge("skins", GbId::new(5))),
         "addon-gb-card-badge:skins:5"
+    );
+    assert_eq!(
+        name(ids::addon_gb_card_author("skins", GbId::new(5))),
+        "addon-gb-card-author:skins:5"
     );
 }
 

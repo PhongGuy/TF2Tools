@@ -191,7 +191,7 @@ impl ProfileEditor {
         }));
         // The galleries filter from the search value at render; re-arm the grid so a new filter
         // asks for its cards' pictures.
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search HUDs..."));
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder(tr!("huds.search")));
         subscriptions.push(cx.subscribe(&search, |editor, _, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
                 editor.grid.rearm();
@@ -310,9 +310,9 @@ impl ProfileEditor {
         });
         let (win, search) = (self.win, self.search.clone());
         let placeholder = match slot {
-            Slot::Hud => "Search HUDs...",
-            Slot::Hitsound | Slot::Killsound => "Search sounds...",
-            Slot::Crosshairs => "Search crosshairs...",
+            Slot::Hud => tr!("huds.search"),
+            Slot::Hitsound | Slot::Killsound => tr!("sounds.search"),
+            Slot::Crosshairs => tr!("widgets.crosshair_picker.search"),
         };
         // Setting an input's text needs the window, which a click handler's caller holds.
         cx.defer(move |cx| {
@@ -869,7 +869,7 @@ impl ProfileEditor {
                 ids::PROFILE_EDITOR_ACTIVE_BADGE,
                 Tag::primary(),
                 transparent_black(),
-                "Active",
+                tr!("profiles.badge.active"),
             )
             .into_any_element()
         } else {
@@ -882,9 +882,9 @@ impl ProfileEditor {
             .px(SM_ICON_PX)
             .icon(IconName::Play)
             .label(if activating {
-                "Activating..."
+                tr!("profiles.button.activating")
             } else {
-                "Activate"
+                tr!("profiles.button.activate")
             })
             .loading(activating)
             .disabled(!has_tf2 || busy)
@@ -899,7 +899,7 @@ impl ProfileEditor {
                 Button::new(ids::PROFILE_EDITOR_BACK)
                     .ghost()
                     .icon(IconName::ArrowLeft)
-                    .named("Back to profiles")
+                    .named(tr!("profiles.editor.back"))
                     .on_click(cx.listener(|editor, _, window, cx| {
                         editor.leave(AfterIdle::Back, window, cx)
                     })),
@@ -925,7 +925,7 @@ impl ProfileEditor {
                         labelled(
                             div().text_xs().text_color(cx.theme().muted_foreground),
                             ids::PROFILE_EDITOR_NOT_APPLIED,
-                            super::model::NOT_APPLIED,
+                            super::model::not_applied(),
                         )
                     })),
             )
@@ -934,7 +934,7 @@ impl ProfileEditor {
                 Button::new(ids::PROFILE_EDITOR_DELETE)
                     .outline()
                     .icon(IconName::Trash)
-                    .named("Delete profile")
+                    .named(tr!("profiles.button.delete"))
                     .disabled(busy)
                     .on_click(cx.listener(|editor, _, window, cx| {
                         editor.leave(AfterIdle::Delete, window, cx)
@@ -1000,7 +1000,7 @@ impl ProfileEditor {
                 .ghost()
                 .px(SM_ICON_PX)
                 .icon(IconName::X)
-                .named("Clear")
+                .named(tr!("profiles.editor.clear"))
                 .disabled(locked)
                 .on_click(cx.listener(move |editor, _, window, cx| {
                     cx.stop_propagation();
@@ -1087,15 +1087,15 @@ impl ProfileEditor {
             Slot::Hud => (
                 galleries.huds.is_empty(),
                 self.shown_huds(cx).is_empty(),
-                "No HUDs in your library yet",
-                "Browse the HUD Store",
+                tr!("profiles.editor.empty.huds"),
+                tr!("profiles.editor.empty.browse_huds"),
                 Page::HudStore,
             ),
             Slot::Hitsound | Slot::Killsound => (
                 galleries.sounds.is_empty(),
                 self.shown_sounds(cx).is_empty(),
-                "No sounds in your library yet",
-                "Browse the Sound Store",
+                tr!("profiles.editor.empty.sounds"),
+                tr!("profiles.editor.empty.browse_sounds"),
                 Page::SoundStore,
             ),
             Slot::Crosshairs => return None,
@@ -1127,7 +1127,7 @@ impl ProfileEditor {
                 .child(labelled(
                     div().text_color(cx.theme().muted_foreground),
                     ids::profile_picker_no_match(key),
-                    "No matches",
+                    tr!("profiles.editor.empty.no_match"),
                 ))
                 .into_any_element()
         } else if slot == Slot::Hud {

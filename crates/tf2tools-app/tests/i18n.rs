@@ -16,6 +16,9 @@ mod apply;
 #[path = "i18n/formats.rs"]
 mod formats;
 
+#[path = "i18n/library.rs"]
+mod library;
+
 #[path = "i18n/messages.rs"]
 mod messages;
 

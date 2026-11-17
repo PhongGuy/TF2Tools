@@ -24,7 +24,7 @@ fn logs_tf_sits_under_maps_and_starts_empty(cx: &mut TestAppContext) {
     let at = Page::ALL.iter().position(|p| *p == Page::LogsTf).unwrap();
     assert_eq!(Page::ALL[at - 1], Page::Maps);
     assert_eq!(
-        (Page::LogsTf.slug(), Page::LogsTf.label()),
+        (Page::LogsTf.slug(), Page::LogsTf.label().as_ref()),
         ("logs-tf", "logs.tf")
     );
 

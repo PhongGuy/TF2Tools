@@ -8,7 +8,7 @@ use gpui_kit::{
 use tf2tools_core::{LogLevel, NewLogEntry};
 
 use crate::activity;
-use crate::i18n::tr;
+use crate::i18n::{plural, tr};
 use crate::local_messages::describe_tf2_install;
 use crate::pages::crosshairs::skipped_description;
 use crate::pages::profiles::probe::Tf2Probe;
@@ -47,22 +47,27 @@ impl SyncStatus {
     /// `waiting` how many weapons an apply would change, both read when nothing applied yet.
     pub fn line(&self, assigned: bool, waiting: usize) -> String {
         match self {
-            SyncStatus::Saving => "Saving to TF2...".into(),
-            SyncStatus::InGame => "In TF2".into(),
-            SyncStatus::InGameWhileRunning => {
-                "Saved. TF2 is running, so it takes effect next time TF2 starts".into()
-            }
-            SyncStatus::Skipped(skipped) => format!("In TF2. {skipped}"),
-            SyncStatus::WaitingForTf2 => "Saved. It goes into TF2 once TF2 is found".into(),
-            SyncStatus::Removed => "Removed from TF2. Your next change puts them back".into(),
-            SyncStatus::Failed => "Couldn't save to TF2".into(),
-            SyncStatus::Idle if waiting > 0 => {
-                "Not in TF2 yet. Your next change puts them in".into()
-            }
-            SyncStatus::Idle if !assigned => "TF2 is using its own crosshairs".into(),
-            SyncStatus::Idle => "In TF2".into(),
+            SyncStatus::Saving => tr!("crosshairs_page.sync.saving"),
+            SyncStatus::InGame => tr!("crosshairs_page.sync.in_game"),
+            SyncStatus::InGameWhileRunning => tr!("crosshairs_page.sync.while_running"),
+            SyncStatus::Skipped(skipped) => tr!("crosshairs_page.sync.skipped", skipped = skipped),
+            SyncStatus::WaitingForTf2 => tr!("crosshairs_page.sync.waiting"),
+            SyncStatus::Removed => tr!("crosshairs_page.sync.removed"),
+            SyncStatus::Failed => tr!("crosshairs_page.sync.failed"),
+            SyncStatus::Idle if waiting > 0 => tr!("crosshairs_page.sync.not_yet"),
+            SyncStatus::Idle if !assigned => tr!("crosshairs_page.sync.own"),
+            SyncStatus::Idle => tr!("crosshairs_page.sync.in_game"),
         }
+        .to_string()
     }
+}
+
+/// The activity row an apply writes for `n` installed assignments.
+pub fn installed_text(n: usize) -> SharedString {
+    plural(
+        "crosshairs_page.activity.installed",
+        u64::try_from(n).unwrap_or(u64::MAX),
+    )
 }
 
 /// The app's one crosshair apply queue.
@@ -179,7 +184,7 @@ impl CrosshairSync {
                     LogLevel::Info,
                     "crosshair",
                     "install",
-                    format!("Installed {} crosshair assignments", report.applied().len()),
+                    installed_text(report.applied().len()),
                 );
                 activity::write(s, &entry);
             }

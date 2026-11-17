@@ -689,3 +689,14 @@ fn the_words_follow_the_count(cx: &mut TestAppContext) {
         "h00, h01, h02, h03, h04, h05, h06, h07, h08, h09 and 3 more"
     );
 }
+
+#[gpui_kit::test]
+fn one_hud_past_the_cut_is_counted(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let names: Vec<String> = (0..11).map(|n| format!("h{n:02}")).collect();
+    assert_eq!(
+        names_text(&scanned(&s, &env, &names)),
+        "h00, h01, h02, h03, h04, h05, h06, h07, h08, h09 and 1 more"
+    );
+}

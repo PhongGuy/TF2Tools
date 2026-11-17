@@ -4,25 +4,24 @@
 use std::path::Path;
 
 use gpui_kit::{
-    AnyElement, IntoElement as _, ObjectFit, ParentElement as _, Pixels, Styled as _,
+    AnyElement, IntoElement as _, ObjectFit, ParentElement as _, Pixels, SharedString, Styled as _,
     StyledImage as _, div, img,
 };
 use tf2tools_core::TfClass;
 
-/// The short name shown when the icon is missing.
-pub fn class_short_name(class: TfClass) -> &'static str {
-    // The players' own short names for the two long ones, as the loadout board's narrow headers.
+use crate::i18n::names::class_name;
+use crate::i18n::tr;
+
+/// The short name shown when the icon is missing, in the current language.
+pub fn class_short_name(class: TfClass) -> SharedString {
+    // Short names for the loadout board's narrow headers; English shortens only Demoman and Engineer.
     match class {
-        TfClass::Demoman => "Demo",
-        TfClass::Engineer => "Engie",
-        TfClass::Scout
-        | TfClass::Soldier
-        | TfClass::Pyro
-        | TfClass::Heavy
-        | TfClass::Medic
-        | TfClass::Sniper
-        | TfClass::Spy
-        | _ => class.name(),
+        TfClass::Scout => tr!("common.class_short.scout"),
+        TfClass::Pyro => tr!("common.class_short.pyro"),
+        TfClass::Demoman => tr!("common.class_short.demoman"),
+        TfClass::Heavy => tr!("common.class_short.heavy"),
+        TfClass::Engineer => tr!("common.class_short.engineer"),
+        TfClass::Soldier | TfClass::Medic | TfClass::Sniper | TfClass::Spy | _ => class_name(class),
     }
 }
 

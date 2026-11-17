@@ -105,7 +105,7 @@ fn content(
         .child(
             div()
                 .id(ids::HEADER_TITLE)
-                .aria_label(title)
+                .aria_label(title.clone())
                 .test_support()
                 .min_w_0()
                 .truncate()

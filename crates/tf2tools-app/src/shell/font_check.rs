@@ -20,6 +20,7 @@ use tf2tools_core::Tf2Install;
 use crate::font_check::{
     FontCheckSession, FontPrompt, dismiss_job, install_job, issue_text, prompt_job,
 };
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::ORANGE_500;
 use crate::services::run_blocking;
@@ -104,12 +105,7 @@ pub fn font_check_dialog(
 ) -> async_channel::Receiver<FontAnswer> {
     // A one-slot channel and try_send: the first answer wins, any later one drops.
     let (tx, rx) = async_channel::bounded(1);
-    let description: SharedString = format!(
-        "{} uses fonts that are not installed, so TF2 would show its default fonts instead. \
-         Restart TF2 after installing them.",
-        prompt.folder
-    )
-    .into();
+    let description = tr!("font_check.dialog.body", folder = prompt.folder);
     // Font rows read missing fonts first, then protected names the install never touches.
     let fonts: Rc<[SharedString]> = prompt
         .check
@@ -128,7 +124,7 @@ pub fn font_check_dialog(
                 .check
                 .protected()
                 .iter()
-                .map(|name| format!("{name}: not installed, system font name").into()),
+                .map(|name| tr!("font_check.dialog.protected", name = name)),
         )
         .collect();
     let issues: Rc<[SharedString]> = prompt
@@ -187,11 +183,11 @@ pub fn font_check_dialog(
                                     .child(
                                         div()
                                             .id(ids::HUD_FONTS_TITLE)
-                                            .aria_label("HUD fonts")
+                                            .aria_label(tr!("font_check.dialog.title"))
                                             .test_support()
                                             .text_lg()
                                             .font_weight(FontWeight::SEMIBOLD)
-                                            .child("HUD fonts"),
+                                            .child(tr!("font_check.dialog.title")),
                                     )
                                     .child(
                                         div()
@@ -225,18 +221,18 @@ pub fn font_check_dialog(
                                     .child(
                                         button(ids::HUD_FONTS_DONT_ASK, FontAnswer::DontAsk)
                                             .ghost()
-                                            .label("Don't ask again for this HUD"),
+                                            .label(tr!("font_check.dialog.dont_ask")),
                                     )
                                     .child(
                                         button(ids::HUD_FONTS_SKIP, FontAnswer::Skip)
                                             .outline()
-                                            .label("Skip"),
+                                            .label(tr!("font_check.dialog.skip")),
                                     )
                                     .when(can_install, |row| {
                                         row.child(
                                             button(ids::HUD_FONTS_INSTALL, FontAnswer::Install)
                                                 .primary()
-                                                .label("Install fonts"),
+                                                .label(tr!("font_check.dialog.install")),
                                         )
                                     }),
                             ),

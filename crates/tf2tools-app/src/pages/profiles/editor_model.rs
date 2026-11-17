@@ -1,10 +1,13 @@
 //! The profile editor's pure rules: its slots, the draft each click saves and the name a new
 //! profile starts with.
 
+use gpui_kit::SharedString;
 use tf2tools_core::{
     BuiltinCrosshairs, CrosshairEntry, CrosshairRef, DraftCrosshair, DraftSlot, HudId, MissingItem,
     MissingKind, Profile, ProfileCrosshair, ProfileCrosshairRef, ProfileDraft, SoundId, SoundKind,
 };
+
+use crate::i18n::{names, tr};
 
 /// One of the editor's four slots, in page order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -29,12 +32,12 @@ impl Slot {
     }
 
     /// "HUD", "Hitsound", "Killsound", "Crosshairs".
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> SharedString {
         match self {
-            Self::Hud => "HUD",
-            Self::Hitsound => "Hitsound",
-            Self::Killsound => "Killsound",
-            Self::Crosshairs => "Crosshairs",
+            Self::Hud => "HUD".into(),
+            Self::Hitsound => names::sound_kind_name(SoundKind::Hitsound),
+            Self::Killsound => names::sound_kind_name(SoundKind::Killsound),
+            Self::Crosshairs => tr!("profiles.part.crosshairs"),
         }
     }
 }
@@ -112,14 +115,14 @@ impl Edit {
     }
 }
 
-/// "Profile N" for the lowest N >= 1 that no profile's name equals, ignoring case.
+/// "Profile N" in the player's language for the lowest N >= 1 that no profile's name equals,
+/// ignoring case.
 pub fn next_profile_name(profiles: &[Profile]) -> String {
     let taken: Vec<String> = profiles.iter().map(|p| p.name().to_lowercase()).collect();
-    let mut n = 1;
-    while taken.contains(&format!("profile {n}")) {
-        n += 1;
-    }
-    format!("Profile {n}")
+    (1..)
+        .map(|n: u64| tr!("profiles.default_name", n = n).to_string())
+        .find(|name| !taken.contains(&name.to_lowercase()))
+        .unwrap_or_default()
 }
 
 /// What a slot shows: nothing, its item, or an item the library no longer has.
@@ -158,10 +161,12 @@ pub fn slot_state(profile: &Profile, slot: Slot, missing: &[MissingItem]) -> Slo
 /// Empty: "None" ("Default crosshairs" for Crosshairs); Set: the text; Missing: "Missing: <name>".
 pub fn slot_text(state: &SlotState, slot: Slot) -> String {
     match state {
-        SlotState::Empty if slot == Slot::Crosshairs => "Default crosshairs".to_owned(),
-        SlotState::Empty => "None".to_owned(),
+        SlotState::Empty if slot == Slot::Crosshairs => {
+            tr!("profiles.editor.slot.default_crosshairs").into()
+        }
+        SlotState::Empty => tr!("profiles.editor.slot.none").into(),
         SlotState::Set(text) => text.clone(),
-        SlotState::Missing(name) => format!("Missing: {name}"),
+        SlotState::Missing(name) => tr!("profiles.editor.slot.missing", name = name).into(),
     }
 }
 
@@ -181,14 +186,19 @@ pub fn keep_label(
         ProfileCrosshairRef::Builtin(name) => builtins
             .get(name)
             .map(|b| b.display_name().to_owned())
-            .unwrap_or_else(|| format!("{name} (missing)")),
+            .unwrap_or_else(|| missing(name)),
         ProfileCrosshairRef::Library { folder_name } => library
             .iter()
             .find(|c| c.folder_name() == folder_name)
             .map(|c| c.name().to_owned())
-            .unwrap_or_else(|| format!("{folder_name} (missing)")),
-        _ => "Unknown (missing)".to_owned(),
+            .unwrap_or_else(|| missing(folder_name)),
+        _ => missing(&tr!("profiles.editor.unknown")),
     }
+}
+
+// "<name> (missing)" for a kept crosshair the game or library no longer has.
+fn missing(name: &str) -> String {
+    tr!("profiles.editor.missing_crosshair", name = name).into()
 }
 
 /// (weapon script, keep_label) for each saved crosshair, in the profile's order.

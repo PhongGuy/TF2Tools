@@ -208,7 +208,8 @@ fn clearing_a_weapon_drops_only_that_entry() {
 
 #[test]
 fn slots_have_stable_keys_and_labels() {
-    let keys: Vec<_> = Slot::ALL.iter().map(|s| (s.key(), s.label())).collect();
+    let labels: Vec<_> = Slot::ALL.iter().map(|s| (s.key(), s.label())).collect();
+    let keys: Vec<_> = labels.iter().map(|(k, l)| (*k, l.as_ref())).collect();
     assert_eq!(
         keys,
         [

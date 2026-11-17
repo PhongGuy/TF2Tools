@@ -16,13 +16,13 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, FontWeight, Global, InteractiveElement as _,
-    IntoElement, ListAlignment, ListState, ParentElement as _, Pixels, Render,
+    IntoElement, ListAlignment, ListState, ParentElement as _, Pixels, Render, SharedString,
     StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
     Window, div, list, px,
 };
 use tf2tools_core::{MapState, StoreClient};
 
-use crate::i18n::tr;
+use crate::i18n::{self, tr};
 use crate::ids;
 use crate::map_messages::{
     describe_map_download, describe_map_remove, describe_map_sync, map_stopped,
@@ -41,7 +41,7 @@ use crate::widgets::scroll::scroll_beside;
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 use gb_tab::GbMapsTab;
-use model::{MapRow, MapSort, SORTS, count_label, last_played_label, visible};
+use model::{MapRow, MapSort, SORTS, count_label, last_played_label, sort_label, visible};
 
 const ROW_HEIGHT: f32 = 44.;
 const PLAYED_WIDTH: f32 = 96.;
@@ -126,15 +126,26 @@ pub struct MapsPage {
     /// GameBanana's map tab, built the first time that source shows.
     gamebanana: Option<Entity<GbMapsTab>>,
     hidden: bool,
+    /// The language the search box and sort Select were titled in.
+    language: &'static str,
     _subscriptions: Vec<Subscription>,
+}
+
+// The sort Select's rows, titled in the current language.
+fn sort_rows() -> Vec<LabelOption> {
+    LabelOption::keyed(
+        ids::MAPS_SORT,
+        SORTS
+            .iter()
+            .map(|(value, sort)| (*value, sort_label(*sort))),
+    )
 }
 
 impl MapsPage {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search maps..."));
-        let labels = LabelOption::all(ids::MAPS_SORT, SORTS.iter().map(|(l, _)| *l));
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder(tr!("maps.search")));
         let sort_select =
-            cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
+            cx.new(|cx| SelectState::new(sort_rows(), Some(IndexPath::default()), window, cx));
         let subscriptions = vec![
             // A TF2 folder found or moved changes which maps the game already has.
             cx.observe(&tf2_state(cx), |page, _, cx| page.reload(cx)),
@@ -146,8 +157,8 @@ impl MapsPage {
             cx.subscribe(
                 &sort_select,
                 |page, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
-                    if let SelectEvent::Confirm(Some(label)) = event
-                        && let Some((_, sort)) = SORTS.iter().find(|(l, _)| l == label)
+                    if let SelectEvent::Confirm(Some(value)) = event
+                        && let Some((_, sort)) = SORTS.iter().find(|(v, _)| v == value)
                     {
                         page.set_sort(*sort, cx);
                     }
@@ -172,6 +183,7 @@ impl MapsPage {
             source: MapsSource::Serveme,
             gamebanana: None,
             hidden: false,
+            language: i18n::current(),
             _subscriptions: subscriptions,
         };
         page.reload(cx);
@@ -238,6 +250,20 @@ impl MapsPage {
             self.reload(cx);
         }
         self.sync_tab_hidden(cx);
+    }
+
+    // The page is kept while other pages show, so a language switched meanwhile retitles the
+    // search box and the sort Select here; the Select keeps its chosen sort.
+    fn follow_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.language == i18n::current() {
+            return;
+        }
+        self.language = i18n::current();
+        self.search.update(cx, |input, cx| {
+            input.set_placeholder(tr!("maps.search"), window, cx)
+        });
+        self.sort_select
+            .update(cx, |select, cx| select.set_items(sort_rows(), window, cx));
     }
 
     /// The source showing; serveme.tf when the page is made.
@@ -424,8 +450,8 @@ impl MapsPage {
                         window,
                         cx,
                         ToastKind::Success,
-                        "Map downloaded",
-                        format!("{name} is ready to play in TF2."),
+                        tr!("maps.toast.downloaded_title"),
+                        tr!("maps.toast.downloaded", name = name),
                     ),
                     Ok(Err(e)) => {
                         let failure = describe_map_download(&e);
@@ -434,7 +460,7 @@ impl MapsPage {
                             window,
                             cx,
                             ToastKind::Error,
-                            "Download failed",
+                            tr!("maps.toast.download_failed"),
                             failure.message,
                         );
                     }
@@ -442,7 +468,7 @@ impl MapsPage {
                         window,
                         cx,
                         ToastKind::Error,
-                        "Download failed",
+                        tr!("maps.toast.download_failed"),
                         map_stopped(e.to_string()).message,
                     ),
                 }
@@ -458,19 +484,7 @@ impl MapsPage {
             Ok(install) => install,
             Err(err) => return toast_error(window, cx, &err),
         };
-        let answer = confirm(
-            Confirm {
-                title: "Remove map?".into(),
-                description: format!(
-                    "{name} will be deleted from TF2. You can download it again later."
-                )
-                .into(),
-                confirm_label: "Remove".into(),
-                cancel_label: "Cancel".into(),
-            },
-            window,
-            cx,
-        );
+        let answer = confirm(Confirm::remove_map(name), window, cx);
         let name = name.to_owned();
         cx.spawn_in(window, async move |page, cx| {
             if answer.recv().await != Ok(true) {
@@ -497,8 +511,8 @@ impl MapsPage {
                         window,
                         cx,
                         ToastKind::Success,
-                        "Map removed",
-                        format!("{name} was deleted from TF2."),
+                        tr!("maps.toast.removed_title"),
+                        tr!("maps.toast.removed", name = name),
                     ),
                     Err(err) => toast_error(window, cx, &err),
                 }
@@ -544,7 +558,7 @@ impl MapsPage {
                             .text_sm()
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(muted)
-                            .child("Sort:"),
+                            .child(tr!("maps.sort.title")),
                     )
                     .child(
                         div()
@@ -558,7 +572,11 @@ impl MapsPage {
                 Button::new(ids::MAPS_REFRESH)
                     .outline()
                     .icon(IconName::RefreshCw)
-                    .label(if syncing { "Refreshing..." } else { "Refresh" })
+                    .label(if syncing {
+                        tr!("maps.button.refreshing")
+                    } else {
+                        tr!("maps.button.refresh")
+                    })
                     .loading(syncing)
                     .loading_icon(IconName::RefreshCw)
                     .disabled(syncing || !cx.has_global::<MapListSource>())
@@ -582,7 +600,7 @@ impl MapsPage {
     }
 
     fn column_titles(compact: bool, cx: &App) -> impl IntoElement {
-        let cell = |width: f32, text: &'static str| {
+        let cell = |width: f32, text: SharedString| {
             div().w(px(width)).flex_none().text_right().child(text)
         };
         h_flex()
@@ -594,25 +612,30 @@ impl MapsPage {
             .text_xs()
             .font_weight(FontWeight::MEDIUM)
             .text_color(cx.theme().muted_foreground)
-            .child(div().flex_1().min_w_0().child("Map"))
+            .child(div().flex_1().min_w_0().child(tr!("maps.table.map")))
             .when(!compact, |row| {
-                row.child(cell(PLAYED_WIDTH, "Times played"))
-                    .child(cell(LAST_WIDTH, "Last played"))
+                row.child(cell(PLAYED_WIDTH, tr!("maps.table.times_played")))
+                    .child(cell(LAST_WIDTH, tr!("maps.table.last_played")))
             })
-            .child(cell(SIZE_WIDTH, "Size"))
+            .child(cell(SIZE_WIDTH, tr!("maps.table.size")))
             .child(div().w(px(ACTION_WIDTH)).flex_none())
     }
 
     fn empty_state(&self, cx: &App) -> impl IntoElement {
         let text = if self.rows.is_empty() && (self.syncing || !self.loaded) {
-            "Getting the map list..."
+            tr!("maps.empty.loading")
         } else if self.rows.is_empty() {
-            "No maps yet. Press Refresh to get the list from serveme.tf."
+            tr!("maps.empty.none")
         } else {
-            "No maps match your search"
+            tr!("maps.empty.no_match")
         };
+        // A line longer than the column wraps, centred, rather than spilling past it.
         h_flex().justify_center().py_12().child(labelled(
-            div().text_sm().text_color(cx.theme().muted_foreground),
+            div()
+                .min_w_0()
+                .text_center()
+                .text_sm()
+                .text_color(cx.theme().muted_foreground),
             ids::MAPS_EMPTY,
             text,
         ))
@@ -662,7 +685,7 @@ fn map_row(
             .text_color(muted)
             .child(text)
     };
-    let state_label = |text: &'static str| {
+    let state_label = |text: SharedString| {
         labelled(
             div().text_sm().text_color(muted),
             ids::map_state(&map.name),
@@ -681,13 +704,13 @@ fn map_row(
                         .size_4()
                         .text_color(theme.success),
                 )
-                .child(state_label("Downloaded"))
+                .child(state_label(tr!("maps.badge.downloaded")))
                 .child(
                     Button::new(ids::map_remove(&map.name))
                         .ghost()
                         .small()
                         .icon(IconName::Trash)
-                        .named("Remove")
+                        .named(tr!("maps.button.remove"))
                         .on_click(move |_, window, cx| {
                             let _ =
                                 page.update(cx, |page, cx| page.remove(&remove_name, window, cx));
@@ -695,7 +718,7 @@ fn map_row(
                 )
                 .into_any_element()
         }
-        MapState::InGame => state_label("In game").into_any_element(),
+        MapState::InGame => state_label(tr!("maps.badge.in_game")).into_any_element(),
         MapState::Available | _ => {
             let this_one = running.filter(|r| r.name == map.name);
             let label = match this_one {
@@ -704,8 +727,8 @@ fn map_row(
                     total: Some(total),
                     ..
                 }) if *total > 0 => format!("{}%", (done * 100 / total).min(100)),
-                Some(_) => "Downloading...".to_owned(),
-                None => "Download".to_owned(),
+                Some(_) => tr!("common.size.downloading").to_string(),
+                None => tr!("maps.button.download").to_string(),
             };
             let download_name = name.clone();
             Button::new(ids::map_download(&map.name))
@@ -762,6 +785,7 @@ fn map_row(
 
 impl Render for MapsPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.follow_language(window, cx);
         let page = v_flex()
             .id(ids::page(Page::Maps))
             .test_support()
@@ -778,7 +802,7 @@ impl Render for MapsPage {
                         .test_support()
                         .text_sm()
                         .text_color(cx.theme().muted_foreground)
-                        .child("Community maps from GameBanana. Open a map to see it there."),
+                        .child(tr!("maps.gb.info")),
                 )
                 .child(div().flex_1().min_h_0().children(self.gamebanana.clone()));
         }
@@ -795,20 +819,14 @@ impl Render for MapsPage {
         };
         page.child(self.toolbar(cx))
             .when(missing, |page| {
-                page.child(no_tf2_warning(
-                    ids::MAPS_NO_TF2,
-                    "Set the TF2 folder in Settings to download maps.",
-                    cx,
-                ))
+                page.child(no_tf2_warning(ids::MAPS_NO_TF2, tr!("maps.no_tf2"), cx))
             })
             .children(self.error_line(cx))
             .child(
                 div()
                     .text_sm()
                     .text_color(cx.theme().muted_foreground)
-                    .child(
-                        "Community maps hosted by serveme.tf. Downloads go into TF2's maps folder.",
-                    ),
+                    .child(tr!("maps.serveme_info")),
             )
             .child(
                 v_flex()

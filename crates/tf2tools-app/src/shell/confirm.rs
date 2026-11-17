@@ -8,7 +8,7 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window, div,
 };
 
-use crate::i18n::plural;
+use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 
@@ -70,25 +70,30 @@ impl Confirm {
     /// v5's HudCard delete prompt for the HUD called `name`.
     pub fn delete_hud(name: &str) -> Self {
         Self {
-            title: "Delete HUD".into(),
+            title: tr!("confirm.delete_hud.title"),
             description: format!(
-                "Are you sure you want to delete {name} from your library? This cannot be undone."
+                "{} {}",
+                tr!("confirm.delete_hud.body", name = name),
+                tr!("confirm.cannot_undo")
             )
             .into(),
-            confirm_label: "Delete".into(),
-            cancel_label: "Cancel".into(),
+            confirm_label: tr!("confirm.delete"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
     /// v5's sounds page delete prompt.
     pub fn delete_sound() -> Self {
         Self {
-            title: "Delete Sound".into(),
-            description:
-                "Are you sure you want to delete this sound from your library? This cannot be undone."
-                    .into(),
-            confirm_label: "Delete".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.delete_sound.title"),
+            description: format!(
+                "{} {}",
+                tr!("confirm.delete_sound.body"),
+                tr!("confirm.cannot_undo")
+            )
+            .into(),
+            confirm_label: tr!("confirm.delete"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
@@ -106,18 +111,20 @@ impl Confirm {
             ),
         };
         let game = if installed {
-            " It is also removed from TF2."
+            format!(" {}", tr!("confirm.delete_crosshair.in_tf2"))
         } else {
-            ""
+            String::new()
         };
         Self {
-            title: "Delete Crosshair".into(),
+            title: tr!("confirm.delete_crosshair.title"),
             description: format!(
-                "Are you sure you want to delete {name} from your library?{used}{game} This cannot be undone."
+                "{}{used}{game} {}",
+                tr!("confirm.delete_crosshair.body", name = name),
+                tr!("confirm.cannot_undo")
             )
             .into(),
-            confirm_label: "Delete".into(),
-            cancel_label: "Cancel".into(),
+            confirm_label: tr!("confirm.delete"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
@@ -157,71 +164,75 @@ impl Confirm {
     /// v5's confirm before removing an addon from the library, and from tf/custom if installed.
     pub fn delete_addon() -> Self {
         Self {
-            title: "Delete Addon".into(),
-            description: "Are you sure you want to remove this addon from your library? If installed, it will also be removed from TF2."
-                .into(),
-            confirm_label: "Delete".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.delete_addon.title"),
+            description: tr!("confirm.delete_addon.body"),
+            confirm_label: tr!("confirm.delete"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
     /// The prompt before removing the GameBanana add-on called `name` from TF2 and the library.
     pub fn remove_gb_addon(name: &str) -> Self {
         Self {
-            title: "Remove Add-on".into(),
-            description: format!(
-                "Are you sure you want to remove {name}? It will be removed from TF2 and from your library."
-            )
-            .into(),
-            confirm_label: "Remove".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.remove_gb_addon.title"),
+            description: tr!("confirm.remove_gb_addon.body", name = name),
+            confirm_label: tr!("confirm.remove"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
     /// The prompt before removing the GameBanana map called `name` from TF2.
     pub fn remove_gb_map(name: &str) -> Self {
         Self {
-            title: "Remove Map".into(),
-            description: format!(
-                "Are you sure you want to remove {name}? It will be removed from TF2."
-            )
-            .into(),
-            confirm_label: "Remove".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.remove_gb_map.title"),
+            description: tr!("confirm.remove_gb_map.body", name = name),
+            confirm_label: tr!("confirm.remove"),
+            cancel_label: tr!("confirm.cancel"),
+        }
+    }
+
+    /// The prompt before deleting the downloaded serveme.tf map `name` from TF2.
+    pub fn remove_map(name: &str) -> Self {
+        Self {
+            title: tr!("confirm.remove_map.title"),
+            description: tr!("confirm.remove_map.body", name = name),
+            confirm_label: tr!("confirm.remove"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
     /// v5's ProfileCard delete prompt for the profile called `name`.
     pub fn delete_profile(name: &str) -> Self {
         Self {
-            title: "Delete Profile".into(),
+            title: tr!("confirm.delete_profile.title"),
             description: format!(
-                "Are you sure you want to delete \"{name}\"? This cannot be undone."
+                "{} {}",
+                tr!("confirm.delete_profile.body", name = name),
+                tr!("confirm.cannot_undo")
             )
             .into(),
-            confirm_label: "Delete".into(),
-            cancel_label: "Cancel".into(),
+            confirm_label: tr!("confirm.delete"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
     /// The prompt before removing every crosshair from a profile.
     pub fn clear_profile_crosshairs() -> Self {
         Self {
-            title: "Clear Crosshairs".into(),
-            description: "Remove all crosshairs from this profile?".into(),
-            confirm_label: "Clear all".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.clear_profile_crosshairs.title"),
+            description: tr!("confirm.clear_profile_crosshairs.body"),
+            confirm_label: tr!("confirm.clear_profile_crosshairs.ok"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
     /// v5's prompt before activating a profile with no HUD, sounds or crosshairs.
     pub fn activate_empty() -> Self {
         Self {
-            title: "Activate Empty Profile".into(),
-            description: "This profile has no customizations. Activating it will remove all installed HUDs, sounds, and crosshairs."
-                .into(),
-            confirm_label: "Activate Anyway".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.activate_empty.title"),
+            description: tr!("confirm.activate_empty.body"),
+            confirm_label: tr!("confirm.activate_empty.ok"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
@@ -250,20 +261,20 @@ impl Confirm {
     /// The prompt before installing an addon into a TF2 without mastercomfig's base.
     pub fn addon_needs_mastercomfig() -> Self {
         Self {
-            title: "mastercomfig needed".into(),
-            description: "This addon needs mastercomfig. Install both?".into(),
-            confirm_label: "Install both".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.addon_needs_mastercomfig.title"),
+            description: tr!("confirm.addon_needs_mastercomfig.body"),
+            confirm_label: tr!("confirm.addon_needs_mastercomfig.ok"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
     /// The prompt before activating a profile while TF2 runs.
     pub fn tf2_running() -> Self {
         Self {
-            title: "TF2 is running".into(),
-            description: "TF2 is running; changes take effect after a restart.".into(),
-            confirm_label: "Continue".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.tf2_running.title"),
+            description: tr!("confirm.tf2_running.body"),
+            confirm_label: tr!("confirm.tf2_running.ok"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 }

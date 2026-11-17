@@ -128,7 +128,66 @@ updater:
     installed: "Installed TF2Tools v%{version}"
     installer_started: "Started the TF2Tools v%{version} installer"
 
+nav:
+  huds: "HUDs"
+  sounds: "Sounds"
+  crosshairs: "Crosshairs"
+  crosshair_maker: "Crosshair Maker"
+  hud_maker: "HUD Maker"
+  profiles: "Profiles"
+  addons: "Addons"
+  graphics: "Graphics"
+  hud_store: "HUD Store"
+  sound_store: "Sound Store"
+  crosshair_store: "Crosshair Store"
+  addon_store: "Addon Store"
+  maps: "Maps"
+  logs_tf: "logs.tf"
+  settings: "Settings"
+  logs: "Logs"
+  activity_log: "Activity Log"
+
 common:
+  class:
+    scout: "Scout"
+    soldier: "Soldier"
+    pyro: "Pyro"
+    demoman: "Demoman"
+    heavy: "Heavy"
+    engineer: "Engineer"
+    medic: "Medic"
+    sniper: "Sniper"
+    spy: "Spy"
+  class_compact:
+    scout: "Scout"
+    soldier: "Soldier"
+    pyro: "Pyro"
+    demoman: "Demoman"
+    heavy: "Heavy"
+    engineer: "Engineer"
+    medic: "Medic"
+    sniper: "Sniper"
+    spy: "Spy"
+  class_short:
+    scout: "Scout"
+    pyro: "Pyro"
+    demoman: "Demo"
+    heavy: "Heavy"
+    engineer: "Engie"
+  slot:
+    primary: "Primary"
+    secondary: "Secondary"
+    melee: "Melee"
+  slot_short:
+    secondary: "Secondary"
+    melee: "Melee"
+  sound_kind:
+    hitsound: "Hitsound"
+    killsound: "Killsound"
+  tf2_missing:
+    title: "TF2 not found"
+    open_settings: "Open Settings"
+    needs_tf2: "Set the TF2 folder in Settings first"
   list:
     separator: ", "
     last: "%{rest} and %{last}"
@@ -169,6 +228,13 @@ common:
 
 addon_store:
   downloads: { one: "%{count} download", other: "%{count} downloads" }
+  card:
+    by: "by %{author}"
+    mature: "Mature"
+    outdated: "Outdated"
+  badge:
+    update: "Update"
+    installed: "Installed"
 
 hud_store:
   added: "Added %{date}"
@@ -189,6 +255,61 @@ logs_tf:
 maps:
   count: { one: "%{count} map", other: "%{count} maps" }
   count_of: { one: "%{shown} of %{count} map", other: "%{shown} of %{count} maps" }
+  search: "Search maps..."
+  no_tf2: "Set the TF2 folder in Settings to download maps."
+  serveme_info: "Community maps hosted by serveme.tf. Downloads go into TF2's maps folder."
+  sort:
+    title: "Sort:"
+    name: "Name"
+    most_played: "Most played"
+    recently_played: "Recently played"
+  table:
+    map: "Map"
+    times_played: "Times played"
+    last_played: "Last played"
+    size: "Size"
+    never: "Never"
+  empty:
+    loading: "Getting the map list..."
+    none: "No maps yet. Press Refresh to get the list from serveme.tf."
+    no_match: "No maps match your search"
+  badge:
+    downloaded: "Downloaded"
+    in_game: "In game"
+    gone: "No longer on GameBanana"
+    not_installed: "Not installed"
+    update: "Update"
+    installed: "Installed"
+  button:
+    refresh: "Refresh"
+    refreshing: "Refreshing..."
+    download: "Download"
+    remove: "Remove"
+  toast:
+    downloaded_title: "Map downloaded"
+    downloaded: "%{name} is ready to play in TF2."
+    download_failed: "Download failed"
+    removed_title: "Map removed"
+    removed: "%{name} was deleted from TF2."
+  gb:
+    info: "Community maps from GameBanana. Open a map to see it there."
+    all_gamemodes: "All gamemodes"
+    loading: "Loading..."
+    installed_empty: "No maps installed"
+    installed_hint: "Install a map from All maps."
+    empty: "No maps found"
+    sort:
+      most_downloaded: "Most downloaded"
+      newest: "Newest"
+    show:
+      all: "All maps"
+      installed: "Installed"
+    hint:
+      search: "Try another search."
+      gamemode: "Try another gamemode."
+      sync: "Maps appear here after a sync with GameBanana."
+    button:
+      sync: "Sync"
 
 store_grid:
   count:
@@ -199,18 +320,498 @@ store_grid:
 profiles:
   crosshairs: { one: "%{count} crosshair", other: "%{count} crosshairs" }
   weapons: { one: "%{count} weapon", other: "%{count} weapons" }
+  search: "Search profiles..."
+  not_applied: "Changes not applied yet"
+  default_name: "Profile %{n}"
+  no_tf2: "Set the TF2 folder in Settings to activate profiles."
+  part:
+    crosshairs: "Crosshairs"
+    item: "Item"
+  heading:
+    active: "Active Profile"
+    library: "Your Profiles"
+  badge:
+    active: "Active"
+  button:
+    activate: "Activate"
+    activating: "Activating..."
+    edit: "Edit profile"
+    delete: "Delete profile"
+    new: "New profile"
+    start_empty: "Start empty"
+    more_ways: "More ways to make a profile"
+  card:
+    empty: "Empty profile"
+    empty_vanilla: "Empty profile (vanilla)"
+  empty:
+    title: "No profiles yet"
+    body: "Save your current setup as a profile to quickly switch between configurations."
+    no_match_title: "No profiles found"
+    no_match_body: "Try a different search term."
+  no_active:
+    title: "No active profile"
+    body: "Activate a profile to apply a saved collection of customizations."
+  missing:
+    title: "Missing Items"
+    body: "Some items in \"%{name}\" are no longer in your library."
+    install: "Install Anyway (skip missing)"
+    redownload: "Re-download"
+    local: "Local import — can't re-download"
+    kind:
+      hitsound: "HITSOUND"
+      killsound: "KILLSOUND"
+      crosshair: "CROSSHAIR"
+      item: "ITEM"
+  editor:
+    back: "Back to profiles"
+    clear: "Clear"
+    unknown: "Unknown"
+    missing_crosshair: "%{name} (missing)"
+    slot:
+      none: "None"
+      default_crosshairs: "Default crosshairs"
+      missing: "Missing: %{name}"
+    empty:
+      huds: "No HUDs in your library yet"
+      browse_huds: "Browse the HUD Store"
+      sounds: "No sounds in your library yet"
+      browse_sounds: "Browse the Sound Store"
+      no_match: "No matches"
+  toast:
+    created_from_setup: "Profile created from your current setup"
+    created_empty: "Empty profile created"
+    deleted: "Profile deleted"
+    activated: "Profile \"%{name}\" activated"
+    applied: "Profile \"%{name}\" applied"
+    cleared: "All customizations cleared"
+    installed: "Installed: %{list}"
+    nothing_new: "Nothing new installed"
+    kept: "%{lead}. Kept what you had for: %{list} (missing from your library)"
+    failed_steps: "Couldn't put these in place: %{steps}. Make sure TF2 is closed and TF2Tools can write to your TF2 folder, then try again."
+    activate_failed: "Failed to activate profile"
+    missing: "Some items are missing"
+  activity:
+    saved_current: "Saved current setup as profile: %{name}"
+    created: "Created profile: %{name}"
+    deleted: "Deleted profile: %{name}"
+    failed: "Failed to activate profile: %{name}"
+    activated: "Activated profile: %{name}"
+    applied: "Applied profile: %{name}"
+    details:
+      applied: "Applied: %{list}"
+      skipped: "Skipped: %{list}"
+      failed: "Failed: %{list}"
+      nothing: "Applied: nothing"
 
 crosshairs_page:
   no_weapon: "Not on any weapon yet"
   on_weapons: { one: "On %{count} weapon", other: "On %{count} weapons" }
+  no_tf2: "Set the TF2 folder in Settings to install crosshairs."
+  gallery_hint: "Click or drag one onto the board"
+  sync:
+    saving: "Saving to TF2..."
+    in_game: "In TF2"
+    while_running: "Saved. TF2 is running, so it takes effect next time TF2 starts"
+    skipped: "In TF2. %{skipped}"
+    waiting: "Saved. It goes into TF2 once TF2 is found"
+    removed: "Removed from TF2. Your next change puts them back"
+    failed: "Couldn't save to TF2"
+    not_yet: "Not in TF2 yet. Your next change puts them in"
+    own: "TF2 is using its own crosshairs"
+  skip:
+    line: "Skipped %{count}: %{list}"
+    unknown_builtin: "unknown builtin %{name}"
+    missing: "missing crosshair %{name}"
+    invalid_script: "invalid weapon script %{name}"
+    no_stock_script: "game script unreadable %{name}"
+    unknown: "skipped %{name}"
+  button:
+    remove: "Remove from TF2"
+    removing: "Removing..."
+    import: "Import"
+    importing: "Importing..."
+    edit: "Edit"
+    delete: "Delete"
+    deleting: "Deleting..."
+    copy_to_maker: "Copy to Crosshair Maker"
+    add_to_profile: "Add to profile"
+    export: "Export PNG"
+    exporting: "Exporting..."
+    reset: "Reset to default"
+    close: "Close"
+  selection:
+    none: "No crosshair picked"
+    hint: "Pick one from the gallery to see it at its in-game size"
+  preview:
+    none: "No crosshair"
+    on: "%{name} on %{background}"
+  background:
+    dark: "Dark"
+  board:
+    everything: "Everything"
+    default: "Default"
+    mixed: "Mixed"
+  details:
+    title: "%{class} %{slot} weapons"
+    hint: "Click a weapon to give it the picked crosshair"
+  conflict:
+    title: "Conflicts Detected"
+    line: ": Crosshair scripts found in '%{folder}' — may override your assignments"
+  toast:
+    imported: "Crosshair imported"
+    added: "%{name} added to your library"
+    added_as: "Added to your library as %{name}"
+    file_exists: "A file named %{name} is already there. Pick another name."
+    exported: "PNG exported"
+    uninstalled: "Crosshairs uninstalled from TF2"
+    deleted: "%{name} has been deleted from your library"
+    removed: "Crosshair removed"
+    pick_first: "Pick a crosshair first"
+  activity:
+    imported: "Imported crosshair: %{name}"
+    uninstalled: "Uninstalled crosshair assignments"
+    deleted: "Deleted crosshair from library: %{name}"
+    installed: { one: "Installed %{count} crosshair assignment", other: "Installed %{count} crosshair assignments" }
 
 confirm:
+  cancel: "Cancel"
+  delete: "Delete"
+  cannot_undo: "This cannot be undone."
+  delete_profile:
+    title: "Delete Profile"
+    body: "Are you sure you want to delete \"%{name}\"?"
+  clear_profile_crosshairs:
+    title: "Clear Crosshairs"
+    body: "Remove all crosshairs from this profile?"
+    ok: "Clear all"
+  activate_empty:
+    title: "Activate Empty Profile"
+    body: "This profile has no customizations. Activating it will remove all installed HUDs, sounds, and crosshairs."
+    ok: "Activate Anyway"
+  tf2_running:
+    title: "TF2 is running"
+    body: "TF2 is running; changes take effect after a restart."
+    ok: "Continue"
+  delete_hud:
+    title: "Delete HUD"
+    body: "Are you sure you want to delete %{name} from your library?"
+  delete_sound:
+    title: "Delete Sound"
+    body: "Are you sure you want to delete this sound from your library?"
+  delete_crosshair:
+    title: "Delete Crosshair"
+    body: "Are you sure you want to delete %{name} from your library?"
+    in_tf2: "It is also removed from TF2."
   crosshair_used: { one: "It is used by %{count} weapon. It goes back to the default crosshair.", other: "It is used by %{count} weapons. They go back to the default crosshair." }
+  remove: "Remove"
+  delete_addon:
+    title: "Delete Addon"
+    body: "Are you sure you want to remove this addon from your library? If installed, it will also be removed from TF2."
+  remove_gb_map:
+    title: "Remove Map"
+    body: "Are you sure you want to remove %{name}? It will be removed from TF2."
+  remove_map:
+    title: "Remove map?"
+    body: "%{name} will be deleted from TF2. You can download it again later."
+  remove_gb_addon:
+    title: "Remove Add-on"
+    body: "Are you sure you want to remove %{name}? It will be removed from TF2 and from your library."
+  addon_needs_mastercomfig:
+    title: "mastercomfig needed"
+    body: "This addon needs mastercomfig. Install both?"
+    ok: "Install both"
 
 font_check:
   installed: { one: "Installed %{count} font for %{folder}. Restart TF2 to use them.", other: "Installed %{count} fonts for %{folder}. Restart TF2 to use them." }
   installed_some: { one: "Installed %{installed} of %{count} font for %{folder}; see the Activity Log. Restart TF2 to use them.", other: "Installed %{installed} of %{count} fonts for %{folder}; see the Activity Log. Restart TF2 to use them." }
   skipped: { one: "Skipped %{count} font for %{folder}; see the Activity Log.", other: "Skipped %{count} fonts for %{folder}; see the Activity Log." }
+  activity:
+    copied: "Copied fonts for HUD: %{folder}"
+    failed: "Failed to install fonts for HUD: %{folder}"
+    none: "No fonts installed for HUD: %{folder}"
+    installed: { one: "Installed %{count} font for HUD: %{folder}", other: "Installed %{count} fonts for HUD: %{folder}" }
+    installed_list: "Installed: %{fonts}"
+    skipped_list: "Skipped: %{fonts}"
+  toast:
+    copied_title: "Fonts copied"
+    copied: "Log out and back in for TF2 to see the new fonts."
+    installed_title: "Fonts installed"
+    some_title: "Some fonts were not installed"
+    none_title: "No fonts installed"
+  issue:
+    case: "The HUD asks for %{declared} but ships %{file}; Linux file names are case-sensitive, so TF2 may not find it."
+    uppercase: "%{file} has capital letters in its file name, which TF2 on Linux may fail to load."
+    vpk: "%{declared} is packed in %{vpk}, and TF2 does not load fonts from VPK files."
+    unknown: "A font file in this HUD may not load in TF2."
+  skip:
+    protected: "it carries a system font name"
+    exists: "a different file with that name is already installed"
+    outside: "it is outside the HUD folder"
+    unnamed: "its font name cannot be read"
+    failed: "it could not be installed"
+  dialog:
+    title: "HUD fonts"
+    body: "%{folder} uses fonts that are not installed, so TF2 would show its default fonts instead. Restart TF2 after installing them."
+    protected: "%{name}: not installed, system font name"
+    dont_ask: "Don't ask again for this HUD"
+    skip: "Skip"
+    install: "Install fonts"
+
+huds:
+  search: "Search HUDs..."
+  edit_wait: "Wait for TF2Tools to finish, then edit"
+  not_reinstalled: "Updated, but couldn't update the installed copy. Close TF2 and install it again from HUDs."
+  no_tf2: "Set the TF2 folder in Settings to install HUDs."
+  heading:
+    library: "Your Library"
+    installed_one: "Installed HUD"
+    installed_many: "Installed HUDs"
+  installed:
+    empty: "No HUD installed"
+    empty_body: "Install a HUD from your library to customize your in-game interface."
+    active: "Active in TF2."
+    external: "Added to TF2 outside TF2Tools."
+  badge:
+    managed: "Managed"
+    external: "External"
+    store: "Store"
+    local: "Local"
+  button:
+    add: "Add HUD"
+    importing: "Importing..."
+    edit: "Edit"
+    edit_in_maker: "Edit in HUD Maker"
+    edit_copy: "Edit a copy"
+    uninstall: "Uninstall"
+    uninstall_named: "Uninstall %{name}"
+    update: "Update"
+    visit: "Visit page"
+    delete: "Delete from library"
+    install: "Install"
+    add_to_profile: "Add to profile"
+  card:
+    update_available: "Update available"
+    copy_of: "Copy of %{base}"
+    by: "by %{author}"
+  conflict:
+    title: "HUD Conflicts Detected"
+    body: "TF2 can only use one HUD at a time. Uninstall the ones you don't want until one is left."
+  empty:
+    title: "Your library is empty"
+    body: "Add a HUD from a ZIP file or browse the store to download one."
+    no_match_title: "No HUDs found"
+    no_match_body: "Try a different search term."
+  toast:
+    imported: "HUD imported"
+    added: "%{name} added to your library"
+    added_as: "Added to your library as %{name}"
+    uninstalled: "HUD uninstalled"
+    removed_yours: "Your HUD has been removed from TF2"
+    removed: "%{name} has been removed from TF2"
+    deleted_title: "HUD removed"
+    deleted: "%{name} has been deleted from your library"
+    copy_made: "Copy made"
+    updated_title: "HUD updated"
+    updated: "%{name} is now up to date"
+    installed_title: "HUD installed"
+    installed: "%{name} installed"
+    active: "%{name} is now active"
+    blocked: "A folder named %{blocked} is already in your custom folder, so parts of this HUD may not show. Move or rename that folder and install again."
+  activity:
+    imported: "Imported HUD: %{name}"
+    uninstalled: "Uninstalled HUD(s): %{name}"
+    deleted: "Deleted HUD from library: %{name}"
+    copied: "Copied HUD: %{name}"
+    updated_copy: "Updated HUD copy: %{name}"
+    updated: "Updated HUD: %{name}"
+    installed: "Installed HUD: %{name}"
+
+sounds:
+  search: "Search sounds..."
+  no_tf2: "Set the TF2 folder in Settings to install sounds."
+  heading:
+    library: "Your Library"
+  slot:
+    none_hitsound: "No hitsound installed"
+    none_killsound: "No killsound installed"
+    outside: "A sound added outside TF2Tools"
+    playing_hitsound: "Installed hitsound"
+    playing_killsound: "Installed killsound"
+  badge:
+    installed: "Installed"
+    none: "None"
+  button:
+    play: "Play"
+    stop: "Stop"
+    uninstall: "Uninstall"
+    removing: "Removing..."
+    delete: "Delete from library"
+    hit: "Hit"
+    kill: "Kill"
+    add_to_profile: "Add to profile"
+    add: "Add Sound"
+    importing: "Importing..."
+  menu:
+    hitsound_in: "Hitsound in"
+    killsound_in: "Killsound in"
+  conflict:
+    title: "Conflicts Detected"
+    aria: "Conflicts Detected. %{lines}"
+    hitsound: "Hitsound found in '%{folder}' — may override your hitsound"
+    killsound: "Killsound found in '%{folder}' — may override your killsound"
+  empty:
+    title: "No sounds in your library yet"
+    hint: "Click \"Add Sound\" to import a WAV or VPK file"
+    no_match: "No sounds match your search"
+  format:
+    vpk: "VPK sound pack"
+  toast:
+    imported: "Sound imported"
+    added: "%{name} added to your library"
+    deleted: "Sound deleted"
+    installed_hitsound: "Hitsound installed"
+    installed_killsound: "Killsound installed"
+    uninstalled_hitsound: "Hitsound uninstalled"
+    uninstalled_killsound: "Killsound uninstalled"
+  activity:
+    imported: "Imported sound: %{name}"
+    format: "Format: %{format}"
+    deleted: "Deleted sound: %{name}"
+    installed_hitsound: "Installed hitsound: %{name}"
+    installed_killsound: "Installed killsound: %{name}"
+    uninstalled_hitsound: "Uninstalled hitsound"
+    uninstalled_killsound: "Uninstalled killsound"
+
+addons:
+  no_tf2: "Set the TF2 folder in Settings to manage addons."
+  count:
+    none: "No addons in library"
+    some: "%{library} in library, %{installed} installed"
+  heading:
+    installed: "Installed Addons"
+    library: "Your Library"
+    gamebanana: "GameBanana add-ons"
+  section:
+    skins: "Skins"
+    effects: "Effects"
+    guis: "GUIs"
+    textures: "Textures"
+    gamefiles: "Game files"
+    maps: "Maps"
+  empty:
+    installed_title: "No addons installed"
+    installed_body: "Install addons from your library below or browse the Addon Store."
+    library_title: "No addons in your library"
+    library_body: "Browse the Addon Store to find performance and quality-of-life addons for TF2."
+  button:
+    browse: "Browse Addon Store"
+    update: "Update"
+    install: "Install"
+    install_again: "Install again"
+    uninstall: "Uninstall"
+    delete: "Remove from library"
+    remove: "Remove"
+    open_gamebanana: "Open on GameBanana"
+    installing: "Installing..."
+    removing: "Removing..."
+  badge:
+    gone: "No longer on GameBanana"
+    update_available: "Update available"
+    not_installed: "Not installed"
+  card:
+    by: "by %{author}"
+  toast:
+    installed_title: "Addon installed"
+    installed: "%{name} is now active"
+    uninstalled_title: "Addon uninstalled"
+    uninstalled: "%{name} has been removed"
+    removed_title: "Addon removed"
+    removed: "%{name} removed from library"
+  activity:
+    installed: "Installed addon: %{name}"
+    uninstalled: "Uninstalled addon: %{name}"
+    deleted: "Deleted addon from library: %{name}"
+  movement:
+    keys: "Your %{keys} keys now use it."
+    unbound: "No key moves you %{directions}, so set one in TF2."
+    restart: "It starts next time TF2 opens."
+    none: "No movement keys were found in your TF2 settings, so it has nothing to use yet."
+    normal: "Your movement keys are back to normal."
+    or: " or "
+    direction:
+      forward: "forward"
+      left: "left"
+      back: "back"
+      right: "right"
+    arrow:
+      up: "Up arrow"
+      down: "Down arrow"
+      left: "Left arrow"
+      right: "Right arrow"
+
+external_huds:
+  names_more: { one: "%{names} and %{count} more", other: "%{names} and %{count} more" }
+  activity:
+    kept: "Kept HUD in library: %{name}"
+    removed: "Removed without keeping: %{names}"
+  note:
+    kept: "A copy of %{names} is in your library."
+    removed: "Removed without a copy: %{names}."
+  dialog:
+    keep_one: "Keep %{name}?"
+    keep_one_changes: "Keep your changes to %{name}?"
+    keep_many: "Keep these HUDs?"
+    keep_many_changes: "Keep your changes?"
+    install:
+      changes: "Installing this HUD removes %{names} from TF2. Your changes can't be brought back unless you keep a copy."
+      single: "Installing this HUD removes %{names} from TF2. TF2Tools has no copy of it, so it can't come back unless you keep one."
+      several: "Installing this HUD removes %{names} from TF2. TF2Tools has no copy of them, so they can't come back unless you keep one."
+    uninstall:
+      changes: "Uninstalling removes %{names} from TF2. Your changes can't be brought back unless you keep a copy."
+      single: "Uninstalling removes %{names} from TF2. TF2Tools has no copy of it, so it can't come back unless you keep one."
+      several: "Uninstalling removes %{names} from TF2. TF2Tools has no copy of them, so they can't come back unless you keep one."
+    activate:
+      changes: "Activating this profile removes %{names} from TF2. Your changes can't be brought back unless you keep a copy."
+      single: "Activating this profile removes %{names} from TF2. TF2Tools has no copy of it, so it can't come back unless you keep one."
+      several: "Activating this profile removes %{names} from TF2. TF2Tools has no copy of them, so they can't come back unless you keep one."
+    remove: "Remove without keeping"
+    replace: "Replace without keeping"
+    keep: "Keep a copy in my library"
+
+widgets:
+  carousel:
+    empty: "No screenshots"
+    unavailable: "Screenshot unavailable"
+    previous: "Previous image"
+    next: "Next image"
+  profile_menu:
+    added: "Added %{item} to %{profile}"
+    added_hitsound: "Added %{item} to %{profile} as its hitsound"
+    added_killsound: "Added %{item} to %{profile} as its killsound"
+    replaced: "(replaced %{name})"
+    empty: "No profiles yet"
+    unreadable: "Couldn't read your profiles"
+  player:
+    stop: "Stop"
+  weapon_assigner:
+    all: "All %{class}"
+    none: "None"
+    clear: "Clear crosshair"
+  crosshair_picker:
+    search: "Search crosshairs..."
+    all: "All"
+    builtin: "Built-in (%{count})"
+    library: "My Crosshairs (%{count})"
+    no_match: "No crosshairs match your search"
+  sync_banner:
+    sounds: "Syncing sounds from GameBanana..."
+    crosshairs: "Syncing crosshairs from GameBanana..."
+    huds: "Syncing HUDs from GameBanana..."
+    items: "Syncing items from GameBanana..."
+    maps: "Syncing maps from GameBanana..."
+    partial: "Not all items loaded yet."
+  store_error:
+    retry: "Retry"
 
 hud_maker:
   history:

@@ -10,6 +10,7 @@ use gpui_kit::{
     TestSupportExt as _, Window, div, img, px,
 };
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
 use crate::widgets::Named as _;
@@ -118,7 +119,7 @@ impl Render for Carousel {
                     .text_sm()
                     .text_color(muted_foreground),
                 ids::CAROUSEL_EMPTY,
-                "No screenshots",
+                tr!("widgets.carousel.empty"),
             )
             .into_any_element();
         };
@@ -143,7 +144,7 @@ impl Render for Carousel {
                 .justify_center()
                 .text_sm()
                 .text_color(muted_foreground)
-                .child("Screenshot unavailable"),
+                .child(tr!("widgets.carousel.unavailable")),
             _ => area,
         };
         // The controls float over the image's edges, and only when there is somewhere to go.
@@ -159,14 +160,14 @@ impl Render for Carousel {
                     .child(
                         Button::new(ids::CAROUSEL_PREV)
                             .icon(IconName::ChevronLeft)
-                            .named("Previous image")
+                            .named(tr!("widgets.carousel.previous"))
                             .outline()
                             .on_click(cx.listener(|this, _, _, cx| this.prev(cx))),
                     )
                     .child(
                         Button::new(ids::CAROUSEL_NEXT)
                             .icon(IconName::ChevronRight)
-                            .named("Next image")
+                            .named(tr!("widgets.carousel.next"))
                             .outline()
                             .on_click(cx.listener(|this, _, _, cx| this.next(cx))),
                     ),

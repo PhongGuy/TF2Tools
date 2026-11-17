@@ -126,7 +126,66 @@ updater:
     installed: "Установлено обновление TF2Tools v%{version}"
     installer_started: "Запущен установщик TF2Tools v%{version}"
 
+nav:
+  huds: "HUD"
+  sounds: "Звуки"
+  crosshairs: "Прицелы"
+  crosshair_maker: "Редактор прицелов"
+  hud_maker: "Редактор HUD"
+  profiles: "Профили"
+  addons: "Дополнения"
+  graphics: "Графика"
+  hud_store: "Магазин HUD"
+  sound_store: "Магазин звуков"
+  crosshair_store: "Магазин прицелов"
+  addon_store: "Магазин дополнений"
+  maps: "Карты"
+  logs_tf: "logs.tf"
+  settings: "Настройки"
+  logs: "Журнал"
+  activity_log: "Журнал действий"
+
 common:
+  class:
+    scout: "Разведчик"
+    soldier: "Солдат"
+    pyro: "Поджигатель"
+    demoman: "Подрывник"
+    heavy: "Пулемётчик"
+    engineer: "Инженер"
+    medic: "Медик"
+    sniper: "Снайпер"
+    spy: "Шпион"
+  class_compact:
+    scout: "Развед."
+    soldier: "Солдат"
+    pyro: "Поджиг."
+    demoman: "Подрыв."
+    heavy: "Пулем."
+    engineer: "Инженер"
+    medic: "Медик"
+    sniper: "Снайпер"
+    spy: "Шпион"
+  class_short:
+    scout: "Развед."
+    pyro: "Поджиг."
+    demoman: "Подрыв."
+    heavy: "Пулем."
+    engineer: "Инж."
+  slot:
+    primary: "Основное"
+    secondary: "Дополнительное"
+    melee: "Ближний бой"
+  slot_short:
+    secondary: "Дополн."
+    melee: "Ближний"
+  sound_kind:
+    hitsound: "Хитсаунд"
+    killsound: "Килсаунд"
+  tf2_missing:
+    title: "TF2 не найден"
+    open_settings: "Открыть настройки"
+    needs_tf2: "Сначала укажите папку TF2 в настройках"
   list:
     separator: ", "
     last: "%{rest} и %{last}"
@@ -167,6 +226,13 @@ common:
 
 addon_store:
   downloads: { one: "%{count} загрузка", few: "%{count} загрузки", many: "%{count} загрузок" }
+  card:
+    by: "автор: %{author}"
+    mature: "Для взрослых"
+    outdated: "Устарело"
+  badge:
+    update: "Обновление"
+    installed: "Установлено"
 
 hud_store:
   added: "Добавлено %{date}"
@@ -187,6 +253,61 @@ logs_tf:
 maps:
   count: { one: "%{count} карта", few: "%{count} карты", many: "%{count} карт" }
   count_of: { one: "%{shown} из %{count} карты", few: "%{shown} из %{count} карт", many: "%{shown} из %{count} карт" }
+  search: "Поиск карт..."
+  no_tf2: "Укажите папку TF2 в настройках, чтобы скачивать карты."
+  serveme_info: "Карты сообщества с serveme.tf. Скачанные карты попадают в папку maps в TF2."
+  sort:
+    title: "Сортировка:"
+    name: "Название"
+    most_played: "Чаще всего"
+    recently_played: "Недавние"
+  table:
+    map: "Карта"
+    times_played: "Сыграно"
+    last_played: "Последняя игра"
+    size: "Размер"
+    never: "Никогда"
+  empty:
+    loading: "Загрузка списка карт..."
+    none: "Карт пока нет. Нажмите «Обновить», чтобы получить список с serveme.tf."
+    no_match: "Нет карт по вашему запросу"
+  badge:
+    downloaded: "Скачана"
+    in_game: "В игре"
+    gone: "Нет на GameBanana"
+    not_installed: "Не установлена"
+    update: "Обновление"
+    installed: "Установлена"
+  button:
+    refresh: "Обновить"
+    refreshing: "Обновление..."
+    download: "Скачать"
+    remove: "Удалить"
+  toast:
+    downloaded_title: "Карта скачана"
+    downloaded: "%{name} готова к игре в TF2."
+    download_failed: "Не удалось скачать"
+    removed_title: "Карта удалена"
+    removed: "%{name} удалена из TF2."
+  gb:
+    info: "Карты сообщества с GameBanana. Откройте карту, чтобы посмотреть её там."
+    all_gamemodes: "Все режимы"
+    loading: "Загрузка..."
+    installed_empty: "Нет установленных карт"
+    installed_hint: "Установите карту из раздела «Все карты»."
+    empty: "Карты не найдены"
+    sort:
+      most_downloaded: "Популярные"
+      newest: "Новые"
+    show:
+      all: "Все карты"
+      installed: "Установлены"
+    hint:
+      search: "Попробуйте другой запрос."
+      gamemode: "Попробуйте другой режим."
+      sync: "Карты появятся здесь после синхронизации с GameBanana."
+    button:
+      sync: "Синхронизировать"
 
 store_grid:
   count:
@@ -197,18 +318,498 @@ store_grid:
 profiles:
   crosshairs: { one: "%{count} прицел", few: "%{count} прицела", many: "%{count} прицелов" }
   weapons: { one: "%{count} оружие", few: "%{count} оружия", many: "%{count} оружий" }
+  search: "Поиск профилей..."
+  not_applied: "Изменения ещё не применены"
+  default_name: "Профиль %{n}"
+  no_tf2: "Укажите папку TF2 в настройках, чтобы включать профили."
+  part:
+    crosshairs: "Прицелы"
+    item: "Элемент"
+  heading:
+    active: "Активный профиль"
+    library: "Ваши профили"
+  badge:
+    active: "Активен"
+  button:
+    activate: "Включить"
+    activating: "Включение..."
+    edit: "Изменить профиль"
+    delete: "Удалить профиль"
+    new: "Новый профиль"
+    start_empty: "Создать пустой"
+    more_ways: "Другие способы создать профиль"
+  card:
+    empty: "Пустой профиль"
+    empty_vanilla: "Пустой профиль (стандартная игра)"
+  empty:
+    title: "Профилей пока нет"
+    body: "Сохраните текущую сборку как профиль, чтобы быстро переключаться между настройками."
+    no_match_title: "Профили не найдены"
+    no_match_body: "Попробуйте другой запрос."
+  no_active:
+    title: "Нет активного профиля"
+    body: "Включите профиль, чтобы применить сохранённый набор HUD, звуков и прицелов."
+  missing:
+    title: "Отсутствующие элементы"
+    body: "Некоторых элементов из «%{name}» больше нет в вашей библиотеке."
+    install: "Установить без них"
+    redownload: "Скачать снова"
+    local: "Свой файл — скачать снова нельзя"
+    kind:
+      hitsound: "ХИТСАУНД"
+      killsound: "КИЛСАУНД"
+      crosshair: "ПРИЦЕЛ"
+      item: "ЭЛЕМЕНТ"
+  editor:
+    back: "Назад к профилям"
+    clear: "Очистить"
+    unknown: "Неизвестный"
+    missing_crosshair: "%{name} (отсутствует)"
+    slot:
+      none: "Нет"
+      default_crosshairs: "Стандартные прицелы"
+      missing: "Отсутствует: %{name}"
+    empty:
+      huds: "В библиотеке пока нет HUD"
+      browse_huds: "Открыть магазин HUD"
+      sounds: "В библиотеке пока нет звуков"
+      browse_sounds: "Открыть магазин звуков"
+      no_match: "Ничего не найдено"
+  toast:
+    created_from_setup: "Профиль создан из текущей сборки"
+    created_empty: "Создан пустой профиль"
+    deleted: "Профиль удалён"
+    activated: "Профиль «%{name}» включён"
+    applied: "Профиль «%{name}» применён"
+    cleared: "Все HUD, звуки и прицелы убраны"
+    installed: "Установлено: %{list}"
+    nothing_new: "Ничего нового не установлено"
+    kept: "%{lead}. Без изменений: %{list} (нет в библиотеке)"
+    failed_steps: "Не удалось установить: %{steps}. Убедитесь, что TF2 закрыт и TF2Tools может записывать в папку TF2, затем попробуйте снова."
+    activate_failed: "Не удалось включить профиль"
+    missing: "Некоторые элементы отсутствуют"
+  activity:
+    saved_current: "Текущая сборка сохранена как профиль: %{name}"
+    created: "Профиль создан: %{name}"
+    deleted: "Профиль удалён: %{name}"
+    failed: "Не удалось включить профиль: %{name}"
+    activated: "Профиль включён: %{name}"
+    applied: "Профиль применён: %{name}"
+    details:
+      applied: "Применено: %{list}"
+      skipped: "Пропущено: %{list}"
+      failed: "Ошибка: %{list}"
+      nothing: "Применено: ничего"
 
 crosshairs_page:
   no_weapon: "Пока не назначен ни на одно оружие"
   on_weapons: { one: "Назначен на %{count} оружие", few: "Назначен на %{count} оружия", many: "Назначен на %{count} оружий" }
+  no_tf2: "Укажите папку TF2 в настройках, чтобы устанавливать прицелы."
+  gallery_hint: "Нажмите на прицел или перетащите его в таблицу"
+  sync:
+    saving: "Сохранение в TF2..."
+    in_game: "В TF2"
+    while_running: "Сохранено. TF2 запущена, изменения вступят в силу при её следующем запуске"
+    skipped: "В TF2. %{skipped}"
+    waiting: "Сохранено. Попадёт в TF2, как только TF2 будет найдена"
+    removed: "Убрано из TF2. Следующее изменение вернёт прицелы"
+    failed: "Не удалось сохранить в TF2"
+    not_yet: "Ещё не в TF2. Следующее изменение добавит прицелы"
+    own: "TF2 использует свои прицелы"
+  skip:
+    line: "Пропущено (%{count}): %{list}"
+    unknown_builtin: "неизвестный встроенный прицел %{name}"
+    missing: "прицел %{name} не найден"
+    invalid_script: "неверный скрипт оружия %{name}"
+    no_stock_script: "не удалось прочитать скрипт игры %{name}"
+    unknown: "пропущено: %{name}"
+  button:
+    remove: "Убрать из TF2"
+    removing: "Удаление..."
+    import: "Импорт"
+    importing: "Импорт..."
+    edit: "Изменить"
+    delete: "Удалить"
+    deleting: "Удаление..."
+    copy_to_maker: "Копировать в редактор прицелов"
+    add_to_profile: "Добавить в профиль"
+    export: "Экспорт PNG"
+    exporting: "Экспорт..."
+    reset: "Сбросить"
+    close: "Закрыть"
+  selection:
+    none: "Прицел не выбран"
+    hint: "Выберите прицел в галерее, чтобы увидеть его в игровом размере"
+  preview:
+    none: "Нет прицела"
+    on: "%{name}, фон: %{background}"
+  background:
+    dark: "Тёмный"
+  board:
+    everything: "Всё оружие"
+    default: "Игровой"
+    mixed: "Разные"
+  details:
+    title: "%{class}: %{slot}"
+    hint: "Нажмите на оружие, чтобы назначить ему выбранный прицел"
+  conflict:
+    title: "Обнаружены конфликты"
+    line: ": в «%{folder}» найдены скрипты прицелов — они могут заменить ваши назначения"
+  toast:
+    imported: "Прицел импортирован"
+    added: "%{name} добавлен в вашу библиотеку"
+    added_as: "Добавлен в вашу библиотеку как %{name}"
+    file_exists: "Файл %{name} уже существует. Выберите другое имя."
+    exported: "PNG экспортирован"
+    uninstalled: "Прицелы убраны из TF2"
+    deleted: "%{name} удалён из вашей библиотеки"
+    removed: "Прицел удалён"
+    pick_first: "Сначала выберите прицел"
+  activity:
+    imported: "Импортирован прицел: %{name}"
+    uninstalled: "Назначения прицелов убраны"
+    deleted: "Прицел удалён из библиотеки: %{name}"
+    installed: { one: "Установлено %{count} назначение прицела", few: "Установлено %{count} назначения прицелов", many: "Установлено %{count} назначений прицелов" }
 
 confirm:
+  cancel: "Отмена"
+  delete: "Удалить"
+  cannot_undo: "Это действие нельзя отменить."
+  delete_profile:
+    title: "Удалить профиль"
+    body: "Удалить «%{name}»?"
+  clear_profile_crosshairs:
+    title: "Очистить прицелы"
+    body: "Убрать все прицелы из этого профиля?"
+    ok: "Очистить все"
+  activate_empty:
+    title: "Включить пустой профиль"
+    body: "В этом профиле ничего нет. Если его включить, все установленные HUD, звуки и прицелы будут убраны."
+    ok: "Всё равно включить"
+  tf2_running:
+    title: "TF2 запущен"
+    body: "TF2 запущен; изменения вступят в силу после перезапуска."
+    ok: "Продолжить"
+  delete_hud:
+    title: "Удалить HUD"
+    body: "Удалить %{name} из библиотеки?"
+  delete_sound:
+    title: "Удалить звук"
+    body: "Удалить этот звук из библиотеки?"
+  delete_crosshair:
+    title: "Удалить прицел"
+    body: "Удалить %{name} из библиотеки?"
+    in_tf2: "Он также будет удалён из TF2."
   crosshair_used: { one: "Его использует %{count} оружие. После удаления там будет прицел по умолчанию.", few: "Его используют %{count} оружия. Они вернутся к прицелу по умолчанию.", many: "Его используют %{count} оружий. Они вернутся к прицелу по умолчанию." }
+  remove: "Удалить"
+  delete_addon:
+    title: "Удалить дополнение"
+    body: "Удалить это дополнение из библиотеки? Если оно установлено, оно также будет удалено из TF2."
+  remove_gb_map:
+    title: "Удалить карту"
+    body: "Удалить %{name}? Она будет удалена из TF2."
+  remove_map:
+    title: "Удалить карту?"
+    body: "%{name} будет удалена из TF2. Её можно скачать снова позже."
+  remove_gb_addon:
+    title: "Удалить дополнение"
+    body: "Удалить %{name}? Оно будет удалено из TF2 и из вашей библиотеки."
+  addon_needs_mastercomfig:
+    title: "Нужен mastercomfig"
+    body: "Этому дополнению нужен mastercomfig. Установить оба?"
+    ok: "Установить оба"
 
 font_check:
   installed: { one: "Установлен %{count} шрифт для %{folder}. Перезапустите TF2, чтобы изменения вступили в силу.", few: "Установлено %{count} шрифта для %{folder}. Перезапустите TF2, чтобы применить их.", many: "Установлено %{count} шрифтов для %{folder}. Перезапустите TF2, чтобы применить их." }
   installed_some: { one: "Установлено %{installed} из %{count} шрифта для %{folder}; подробности в журнале действий. Перезапустите TF2, чтобы применить их.", few: "Установлено %{installed} из %{count} шрифтов для %{folder}; подробности в журнале действий. Перезапустите TF2, чтобы применить их.", many: "Установлено %{installed} из %{count} шрифтов для %{folder}; подробности в журнале действий. Перезапустите TF2, чтобы применить их." }
   skipped: { one: "Пропущен %{count} шрифт для %{folder}; подробности в журнале действий.", few: "Пропущено %{count} шрифта для %{folder}; подробности в журнале действий.", many: "Пропущено %{count} шрифтов для %{folder}; подробности в журнале действий." }
+  activity:
+    copied: "Шрифты скопированы для HUD: %{folder}"
+    failed: "Не удалось установить шрифты для HUD: %{folder}"
+    none: "Шрифты не установлены для HUD: %{folder}"
+    installed: { one: "Установлен %{count} шрифт для HUD: %{folder}", few: "Установлено %{count} шрифта для HUD: %{folder}", many: "Установлено %{count} шрифтов для HUD: %{folder}" }
+    installed_list: "Установлены: %{fonts}"
+    skipped_list: "Пропущены: %{fonts}"
+  toast:
+    copied_title: "Шрифты скопированы"
+    copied: "Выйдите из системы и войдите снова, чтобы TF2 увидела новые шрифты."
+    installed_title: "Шрифты установлены"
+    some_title: "Установлены не все шрифты"
+    none_title: "Шрифты не установлены"
+  issue:
+    case: "HUD ищет %{declared}, но содержит %{file}; в Linux имена файлов чувствительны к регистру, поэтому TF2 может его не найти."
+    uppercase: "В имени файла %{file} есть заглавные буквы, и TF2 в Linux может его не загрузить."
+    vpk: "%{declared} упакован в %{vpk}, а TF2 не загружает шрифты из VPK-файлов."
+    unknown: "Шрифт из этого HUD может не загрузиться в TF2."
+  skip:
+    protected: "у него имя системного шрифта"
+    exists: "уже установлен другой файл с таким именем"
+    outside: "он находится вне папки HUD"
+    unnamed: "не удаётся прочитать имя шрифта"
+    failed: "его не удалось установить"
+  dialog:
+    title: "Шрифты HUD"
+    body: "%{folder} использует шрифты, которые не установлены, поэтому TF2 покажет вместо них стандартные. Перезапустите TF2 после их установки."
+    protected: "%{name}: не установлен, имя системного шрифта"
+    dont_ask: "Больше не спрашивать"
+    skip: "Пропустить"
+    install: "Установить"
+
+huds:
+  search: "Поиск"
+  edit_wait: "Дождитесь, пока TF2Tools закончит, затем редактируйте"
+  not_reinstalled: "Обновлено, но установленную копию обновить не удалось. Закройте TF2 и установите HUD заново на странице HUD."
+  no_tf2: "Укажите папку TF2 в настройках, чтобы устанавливать HUD."
+  heading:
+    library: "Ваша библиотека"
+    installed_one: "Установленный HUD"
+    installed_many: "Установленные HUD"
+  installed:
+    empty: "HUD не установлен"
+    empty_body: "Установите HUD из библиотеки, чтобы изменить интерфейс в игре."
+    active: "Активен в TF2."
+    external: "Добавлен в TF2 не через TF2Tools."
+  badge:
+    managed: "Управляемый"
+    external: "Сторонний"
+    store: "Магазин"
+    local: "Свой"
+  button:
+    add: "Добавить HUD"
+    importing: "Импорт..."
+    edit: "Изменить"
+    edit_in_maker: "Открыть в редакторе HUD"
+    edit_copy: "Редактировать копию"
+    uninstall: "Убрать"
+    uninstall_named: "Убрать %{name}"
+    update: "Обновить"
+    visit: "Открыть страницу"
+    delete: "Удалить из библиотеки"
+    install: "Установить"
+    add_to_profile: "Добавить в профиль"
+  card:
+    update_available: "Доступно обновление"
+    copy_of: "Копия %{base}"
+    by: "автор: %{author}"
+  conflict:
+    title: "Обнаружен конфликт HUD"
+    body: "TF2 может использовать только один HUD. Уберите лишние, пока не останется один."
+  empty:
+    title: "Ваша библиотека пуста"
+    body: "Добавьте HUD из ZIP-файла или скачайте его в магазине."
+    no_match_title: "HUD не найдены"
+    no_match_body: "Попробуйте другой запрос."
+  toast:
+    imported: "HUD импортирован"
+    added: "%{name} добавлен в вашу библиотеку"
+    added_as: "Добавлен в вашу библиотеку как %{name}"
+    uninstalled: "HUD убран"
+    removed_yours: "Ваш HUD убран из TF2"
+    removed: "%{name} убран из TF2"
+    deleted_title: "HUD удалён"
+    deleted: "%{name} удалён из вашей библиотеки"
+    copy_made: "Копия создана"
+    updated_title: "HUD обновлён"
+    updated: "%{name} обновлён до последней версии"
+    installed_title: "HUD установлен"
+    installed: "%{name} установлен"
+    active: "%{name} теперь активен"
+    blocked: "В вашей папке custom уже есть папка %{blocked}, поэтому части этого HUD могут не отображаться. Переместите или переименуйте ту папку и установите HUD снова."
+  activity:
+    imported: "HUD импортирован: %{name}"
+    uninstalled: "HUD убран из TF2: %{name}"
+    deleted: "HUD удалён из библиотеки: %{name}"
+    copied: "HUD скопирован: %{name}"
+    updated_copy: "Копия HUD обновлена: %{name}"
+    updated: "HUD обновлён: %{name}"
+    installed: "HUD установлен: %{name}"
+
+sounds:
+  search: "Поиск звуков..."
+  no_tf2: "Укажите папку TF2 в настройках, чтобы устанавливать звуки."
+  heading:
+    library: "Ваша библиотека"
+  slot:
+    none_hitsound: "Хитсаунд не установлен"
+    none_killsound: "Килсаунд не установлен"
+    outside: "Звук, добавленный не через TF2Tools"
+    playing_hitsound: "Установленный хитсаунд"
+    playing_killsound: "Установленный килсаунд"
+  badge:
+    installed: "В игре"
+    none: "Нет"
+  button:
+    play: "Воспроизвести"
+    stop: "Остановить"
+    uninstall: "Убрать"
+    removing: "Удаление..."
+    delete: "Удалить из библиотеки"
+    hit: "Хит"
+    kill: "Кил"
+    add_to_profile: "Добавить в профиль"
+    add: "Добавить звук"
+    importing: "Импорт..."
+  menu:
+    hitsound_in: "Как хитсаунд"
+    killsound_in: "Как килсаунд"
+  conflict:
+    title: "Обнаружены конфликты"
+    aria: "Обнаружены конфликты. %{lines}"
+    hitsound: "В «%{folder}» найден хитсаунд — может перекрыть ваш хитсаунд"
+    killsound: "В «%{folder}» найден килсаунд — может перекрыть ваш килсаунд"
+  empty:
+    title: "В библиотеке пока нет звуков"
+    hint: "Нажмите «Добавить звук», чтобы импортировать файл WAV или VPK"
+    no_match: "Нет звуков по вашему запросу"
+  format:
+    vpk: "Звуковой пакет VPK"
+  toast:
+    imported: "Звук импортирован"
+    added: "%{name} добавлен в вашу библиотеку"
+    deleted: "Звук удалён"
+    installed_hitsound: "Хитсаунд установлен"
+    installed_killsound: "Килсаунд установлен"
+    uninstalled_hitsound: "Хитсаунд убран"
+    uninstalled_killsound: "Килсаунд убран"
+  activity:
+    imported: "Звук импортирован: %{name}"
+    format: "Формат: %{format}"
+    deleted: "Звук удалён из библиотеки: %{name}"
+    installed_hitsound: "Хитсаунд установлен: %{name}"
+    installed_killsound: "Килсаунд установлен: %{name}"
+    uninstalled_hitsound: "Хитсаунд убран из TF2"
+    uninstalled_killsound: "Килсаунд убран из TF2"
+
+addons:
+  no_tf2: "Укажите папку TF2 в настройках, чтобы управлять дополнениями."
+  count:
+    none: "В библиотеке нет дополнений"
+    some: "В библиотеке: %{library}, установлено: %{installed}"
+  heading:
+    installed: "Установленные дополнения"
+    library: "Ваша библиотека"
+    gamebanana: "Дополнения с GameBanana"
+  section:
+    skins: "Скины"
+    effects: "Эффекты"
+    guis: "Интерфейсы"
+    textures: "Текстуры"
+    gamefiles: "Файлы игры"
+    maps: "Карты"
+  empty:
+    installed_title: "Нет установленных дополнений"
+    installed_body: "Установите дополнения из библиотеки ниже или загляните в магазин дополнений."
+    library_title: "В вашей библиотеке нет дополнений"
+    library_body: "В магазине дополнений есть дополнения для производительности и удобства в TF2."
+  button:
+    browse: "В магазин дополнений"
+    update: "Обновить"
+    install: "Установить"
+    install_again: "Заново"
+    uninstall: "Убрать"
+    delete: "Удалить из библиотеки"
+    remove: "Удалить"
+    open_gamebanana: "Открыть на GameBanana"
+    installing: "Установка..."
+    removing: "Удаление..."
+  badge:
+    gone: "Нет на GameBanana"
+    update_available: "Доступно обновление"
+    not_installed: "Не установлено"
+  card:
+    by: "автор: %{author}"
+  toast:
+    installed_title: "Дополнение установлено"
+    installed: "%{name} включено"
+    uninstalled_title: "Дополнение убрано"
+    uninstalled: "%{name} убрано из TF2"
+    removed_title: "Дополнение удалено"
+    removed: "%{name} удалено из библиотеки"
+  activity:
+    installed: "Дополнение установлено: %{name}"
+    uninstalled: "Дополнение убрано из TF2: %{name}"
+    deleted: "Дополнение удалено из библиотеки: %{name}"
+  movement:
+    keys: "Теперь его используют клавиши: %{keys}."
+    unbound: "Ни одна клавиша не двигает вас %{directions}; назначьте её в TF2."
+    restart: "Оно заработает при следующем запуске TF2."
+    none: "В настройках TF2 не нашлось клавиш движения, так что ему пока нечего использовать."
+    normal: "Клавиши движения снова работают как обычно."
+    or: " или "
+    direction:
+      forward: "вперёд"
+      left: "влево"
+      back: "назад"
+      right: "вправо"
+    arrow:
+      up: "стрелка вверх"
+      down: "стрелка вниз"
+      left: "стрелка влево"
+      right: "стрелка вправо"
+
+external_huds:
+  names_more: { one: "%{names} и ещё %{count}", few: "%{names} и ещё %{count}", many: "%{names} и ещё %{count}" }
+  activity:
+    kept: "HUD сохранён в библиотеке: %{name}"
+    removed: "Удалено без копии: %{names}"
+  note:
+    kept: "Копия %{names} есть в вашей библиотеке."
+    removed: "Удалено без копии: %{names}."
+  dialog:
+    keep_one: "Сохранить %{name}?"
+    keep_one_changes: "Сохранить ваши изменения в %{name}?"
+    keep_many: "Сохранить эти HUD?"
+    keep_many_changes: "Сохранить ваши изменения?"
+    install:
+      changes: "Установка этого HUD удалит %{names} из TF2. Ваши изменения нельзя будет вернуть, если не сохранить копию."
+      single: "Установка этого HUD удалит %{names} из TF2. У TF2Tools нет его копии, поэтому вернуть его можно, только если сохранить копию."
+      several: "Установка этого HUD удалит %{names} из TF2. У TF2Tools нет их копий, поэтому вернуть их можно, только если сохранить копию."
+    uninstall:
+      changes: "Если убрать HUD, из TF2 будет удалено: %{names}. Ваши изменения нельзя будет вернуть, если не сохранить копию."
+      single: "Если убрать HUD, из TF2 будет удалено: %{names}. У TF2Tools нет его копии, поэтому вернуть его можно, только если сохранить копию."
+      several: "Если убрать HUD, из TF2 будет удалено: %{names}. У TF2Tools нет их копий, поэтому вернуть их можно, только если сохранить копию."
+    activate:
+      changes: "Включение этого профиля удалит %{names} из TF2. Ваши изменения нельзя будет вернуть, если не сохранить копию."
+      single: "Включение этого профиля удалит %{names} из TF2. У TF2Tools нет его копии, поэтому вернуть его можно, только если сохранить копию."
+      several: "Включение этого профиля удалит %{names} из TF2. У TF2Tools нет их копий, поэтому вернуть их можно, только если сохранить копию."
+    remove: "Удалить без копии"
+    replace: "Заменить без копии"
+    keep: "Сохранить копию в библиотеке"
+
+widgets:
+  carousel:
+    empty: "Нет скриншотов"
+    unavailable: "Скриншот недоступен"
+    previous: "Предыдущее изображение"
+    next: "Следующее изображение"
+  profile_menu:
+    added: "Добавлено в профиль %{profile}: %{item}"
+    added_hitsound: "Добавлено в профиль %{profile} как хитсаунд: %{item}"
+    added_killsound: "Добавлено в профиль %{profile} как килсаунд: %{item}"
+    replaced: "(вместо %{name})"
+    empty: "Профилей пока нет"
+    unreadable: "Не удалось прочитать ваши профили"
+  player:
+    stop: "Остановить"
+  weapon_assigner:
+    all: "%{class}: все"
+    none: "Нет"
+    clear: "Убрать прицел"
+  crosshair_picker:
+    search: "Поиск прицелов..."
+    all: "Все"
+    builtin: "Встроенные (%{count})"
+    library: "Мои прицелы (%{count})"
+    no_match: "Нет прицелов по вашему запросу"
+  sync_banner:
+    sounds: "Синхронизация звуков с GameBanana..."
+    crosshairs: "Синхронизация прицелов с GameBanana..."
+    huds: "Синхронизация HUD с GameBanana..."
+    items: "Синхронизация элементов с GameBanana..."
+    maps: "Синхронизация карт с GameBanana..."
+    partial: "Загружены ещё не все элементы."
+  store_error:
+    retry: "Повторить"
 
 hud_maker:
   history:

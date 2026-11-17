@@ -158,7 +158,7 @@ fn nav_item(
         .id(ids::nav(page))
         .accessibility_id(ids::nav(page).to_string())
         .role(Role::Button)
-        .aria_label(label)
+        .aria_label(label.clone())
         .test_support()
         .flex()
         .items_center()
@@ -176,9 +176,9 @@ fn nav_item(
         })
         .hover(move |item| item.bg(accent).text_color(accent_fg))
         .child(Icon::new(icon(page)).with_size(Size::Size(px(16.))))
-        .when(!collapsed, |item| item.child(label))
+        .when(!collapsed, |item| item.child(label.clone()))
         .when(collapsed, |item| {
-            item.tooltip(move |window, cx| Tooltip::new(label).build(window, cx))
+            item.tooltip(move |window, cx| Tooltip::new(label.clone()).build(window, cx))
         })
         .on_click(cx.listener(move |shell, _, window, cx| shell.request_navigate(page, window, cx)))
 }

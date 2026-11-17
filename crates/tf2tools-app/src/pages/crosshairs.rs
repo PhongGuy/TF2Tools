@@ -33,6 +33,7 @@ use super::common::{SM_ICON_PX, YELLOW_500, needs_tf2, no_tf2_notice};
 use crate::activity;
 use crate::assets::BACKGROUNDS;
 use crate::crosshair_sync::{CrosshairSync, SyncStatus};
+use crate::i18n::names::{class_compact_name, class_name, slot_name, slot_short_name};
 use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
@@ -47,6 +48,7 @@ use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
+use crate::widgets::class_icon::class_short_name;
 use crate::widgets::crosshair_picker::{
     CrosshairPicker, DraggedCrosshair, IN_GAME_SIZE, preview_image,
 };
@@ -229,9 +231,11 @@ impl CrosshairsPage {
             (picker.search_input().clone(), picker.scroll())
         };
         // Read at render, so a background change needs no subscription.
-        let backgrounds = LabelOption::all(
+        let backgrounds = LabelOption::keyed(
             ids::CROSSHAIRS_BACKGROUND,
-            std::iter::once(PLAIN).chain(BACKGROUNDS),
+            std::iter::once(PLAIN)
+                .chain(BACKGROUNDS)
+                .map(|value| (value, background_label(value))),
         );
         let background =
             cx.new(|cx| SelectState::new(backgrounds, Some(IndexPath::default()), window, cx));
@@ -530,13 +534,13 @@ impl CrosshairsPage {
                             LogLevel::Info,
                             "crosshair",
                             "import",
-                            format!("Imported crosshair: {}", crosshair.name()),
+                            tr!("crosshairs_page.activity.imported", name = crosshair.name()),
                         );
                         activity::write(s, &entry);
                         let added = added_message(&crosshair);
                         Ok(Some((
                             ToastKind::Success,
-                            "Crosshair imported".into(),
+                            tr!("crosshairs_page.toast.imported"),
                             added.into(),
                         )))
                     },
@@ -575,8 +579,7 @@ impl CrosshairsPage {
                             let name = target.file_name().unwrap_or_default().to_string_lossy();
                             return Ok(Some((
                                 ToastKind::Warning,
-                                format!("A file named {name} is already there. Pick another name.")
-                                    .into(),
+                                tr!("crosshairs_page.toast.file_exists", name = name),
                                 SharedString::default(),
                             )));
                         }
@@ -588,7 +591,7 @@ impl CrosshairsPage {
                             .map_err(|e| describe_png_write(&e).into_op(export_failed()))?;
                         Ok(Some((
                             ToastKind::Success,
-                            "PNG exported".into(),
+                            tr!("crosshairs_page.toast.exported"),
                             SharedString::default(),
                         )))
                     },
@@ -616,15 +619,11 @@ impl CrosshairsPage {
                     LogLevel::Info,
                     "crosshair",
                     "uninstall",
-                    "Uninstalled crosshair assignments",
+                    tr!("crosshairs_page.activity.uninstalled"),
                 );
                 activity::write(s, &entry);
-                let done = "Crosshairs uninstalled from TF2";
-                Ok(Some((
-                    ToastKind::Success,
-                    done.into(),
-                    SharedString::default(),
-                )))
+                let done = tr!("crosshairs_page.toast.uninstalled");
+                Ok(Some((ToastKind::Success, done, SharedString::default())))
             },
             cx,
         );
@@ -667,15 +666,15 @@ impl CrosshairsPage {
                         s.library
                             .delete_crosshair(&id)
                             .map_err(|e| describe_library(&e).into_op(failed()))?;
-                        let message = format!("Deleted crosshair from library: {name}");
+                        let message = tr!("crosshairs_page.activity.deleted", name = name);
                         let entry =
                             NewLogEntry::new(LogLevel::Info, "crosshair", "delete", message);
                         activity::write(s, &entry);
-                        let deleted = format!("{name} has been deleted from your library");
+                        let deleted = tr!("crosshairs_page.toast.deleted", name = name);
                         Ok(Some((
                             ToastKind::Success,
-                            "Crosshair removed".into(),
-                            deleted.into(),
+                            tr!("crosshairs_page.toast.removed"),
+                            deleted,
                         )))
                     },
                     cx,
@@ -715,7 +714,7 @@ impl CrosshairsPage {
             return;
         }
         let Some(crosshair) = crosshair.or_else(|| self.selected.clone()) else {
-            let none = "Pick a crosshair first";
+            let none = tr!("crosshairs_page.toast.pick_first");
             return toast(window, cx, ToastKind::Error, none, SharedString::default());
         };
         let scripts = target.scripts();
@@ -779,11 +778,19 @@ impl CrosshairsPage {
                         .child(image)
                         .into_any_element()
                 });
-                (format!("{name} on {background}"), centre)
+                (
+                    tr!(
+                        "crosshairs_page.preview.on",
+                        name = name,
+                        background = background_label(background)
+                    ),
+                    centre,
+                )
             }
             None => {
-                let none = div().text_xs().text_color(muted_fg).child("No crosshair");
-                ("No crosshair".to_owned(), Some(none.into_any_element()))
+                let label = tr!("crosshairs_page.preview.none");
+                let none = div().text_xs().text_color(muted_fg).child(label.clone());
+                (label, Some(none.into_any_element()))
             }
         };
         let backdrop = (background != PLAIN).then(|| {
@@ -863,9 +870,9 @@ impl CrosshairsPage {
                     .small()
                     .icon(IconName::Unplug)
                     .label(if removing {
-                        "Removing..."
+                        tr!("crosshairs_page.button.removing")
                     } else {
-                        "Remove from TF2"
+                        tr!("crosshairs_page.button.remove")
                     })
                     .loading(removing)
                     .disabled((self.busy.is_some() || saving) && !removing)
@@ -892,14 +899,18 @@ impl CrosshairsPage {
                             .truncate()
                             .text_xs()
                             .text_color(muted)
-                            .child("Click or drag one onto the board"),
+                            .child(tr!("crosshairs_page.gallery_hint")),
                     )
                     .child(
                         Button::new(ids::CROSSHAIRS_IMPORT)
                             .outline()
                             .small()
                             .icon(IconName::Upload)
-                            .label(if importing { "Importing..." } else { "Import" })
+                            .label(if importing {
+                                tr!("crosshairs_page.button.importing")
+                            } else {
+                                tr!("crosshairs_page.button.import")
+                            })
                             .loading(importing)
                             .disabled(self.busy.is_some() && !importing)
                             .on_click(cx.listener(|page, _, _, cx| page.import(cx))),
@@ -926,7 +937,7 @@ impl CrosshairsPage {
                 .small()
                 .px(SM_ICON_PX)
                 .icon(IconName::Pencil)
-                .label("Edit")
+                .label(tr!("crosshairs_page.button.edit"))
                 .on_click(cx.listener(move |_, _, _, cx| cx.emit(EditPainted(id.clone()))))
         });
         let deleting = self.busy == Some(Busy::Delete);
@@ -942,7 +953,11 @@ impl CrosshairsPage {
                     .small()
                     .px(SM_ICON_PX)
                     .icon(IconName::Trash)
-                    .label(if deleting { "Deleting..." } else { "Delete" })
+                    .label(if deleting {
+                        tr!("crosshairs_page.button.deleting")
+                    } else {
+                        tr!("crosshairs_page.button.delete")
+                    })
                     .loading(deleting)
                     .disabled(self.busy.is_some() && !deleting)
                     .on_click(
@@ -956,7 +971,7 @@ impl CrosshairsPage {
                 .small()
                 .px(SM_ICON_PX)
                 .icon(IconName::Copy)
-                .label("Copy to Crosshair Maker")
+                .label(tr!("crosshairs_page.button.copy_to_maker"))
                 .disabled(self.busy.is_some())
                 .on_click(cx.listener(move |_, _, _, cx| cx.emit(CopyToMaker(selected.clone()))))
         });
@@ -973,7 +988,7 @@ impl CrosshairsPage {
                 .small()
                 .px(SM_ICON_PX)
                 .icon(IconName::LayersPlus)
-                .label("Add to profile")
+                .label(tr!("crosshairs_page.button.add_to_profile"))
                 .disabled(self.busy.is_some())
                 .dropdown_menu(profile_menu(vec![Section {
                     heading: None,
@@ -989,9 +1004,9 @@ impl CrosshairsPage {
                 .px(SM_ICON_PX)
                 .icon(IconName::ImageDown)
                 .label(if exporting {
-                    "Exporting..."
+                    tr!("crosshairs_page.button.exporting")
                 } else {
-                    "Export PNG"
+                    tr!("crosshairs_page.button.export")
                 })
                 .loading(exporting)
                 .disabled(self.busy.is_some() && !exporting)
@@ -1008,8 +1023,8 @@ impl CrosshairsPage {
                 (self.assigned_name(selected, cx), weapons_detail(used))
             }
             None => (
-                "No crosshair picked".to_owned(),
-                "Pick one from the gallery to see it at its in-game size".to_owned(),
+                tr!("crosshairs_page.selection.none").to_string(),
+                tr!("crosshairs_page.selection.hint").to_string(),
             ),
         };
         h_flex()
@@ -1033,7 +1048,7 @@ impl CrosshairsPage {
                     .child(
                         div()
                             .id(ids::CROSSHAIRS_BACKGROUND)
-                            .aria_label(background)
+                            .aria_label(background_label(background))
                             .test_support()
                             .w(px(180.))
                             .child(Select::new(&self.background).small()),
@@ -1058,33 +1073,28 @@ impl CrosshairsPage {
         let short = px(32.);
         let everything = self.header(
             ids::CROSSHAIRS_BOARD_EVERYTHING.into(),
-            ("Everything".into(), "Everything".into()),
+            (
+                tr!("crosshairs_page.board.everything"),
+                tr!("crosshairs_page.board.everything"),
+            ),
             None,
             BoardTarget::Everything,
             (Some(HEADER_WIDTH), short),
             cx,
         );
         let primary = cx.theme().primary;
-        // Players' own short names keep narrow class columns readable.
+        // Players' own short names keep narrow class columns readable; elsewhere the compact
+        // names fit the header without changing English.
         let short_names = !turned && self.width.get() < px(1100.);
         let class_header = |page: &Self, class: TfClass, size, cx: &mut Context<Self>| {
-            let shown = match class {
-                TfClass::Demoman if short_names => "Demo",
-                TfClass::Engineer if short_names => "Engie",
-                TfClass::Scout
-                | TfClass::Soldier
-                | TfClass::Pyro
-                | TfClass::Demoman
-                | TfClass::Heavy
-                | TfClass::Engineer
-                | TfClass::Medic
-                | TfClass::Sniper
-                | TfClass::Spy
-                | _ => class.name(),
+            let shown = if short_names {
+                class_short_name(class)
+            } else {
+                class_compact_name(class)
             };
             page.header(
                 ids::loadout_class(class),
-                (class.name().into(), shown.into()),
+                (class_name(class), shown),
                 None,
                 BoardTarget::Class(class),
                 size,
@@ -1094,7 +1104,7 @@ impl CrosshairsPage {
         let slot_header = |page: &Self, slot: WeaponSlot, size, cx: &mut Context<Self>| {
             page.header(
                 ids::loadout_slot(slot),
-                (slot.name().into(), slot.name().into()),
+                (slot_name(slot), slot_short_name(slot)),
                 Some(slot_colour(slot, primary)),
                 BoardTarget::Slot(slot),
                 size,
@@ -1208,8 +1218,8 @@ impl CrosshairsPage {
     fn cell(&self, class: TfClass, slot: WeaponSlot, cx: &mut Context<Self>) -> AnyElement {
         let state = self.loadout.cell(class, slot);
         let label = match &state {
-            CellState::Default => "Default".to_owned(),
-            CellState::Mixed => "Mixed".to_owned(),
+            CellState::Default => tr!("crosshairs_page.board.default").to_string(),
+            CellState::Mixed => tr!("crosshairs_page.board.mixed").to_string(),
             CellState::Single(crosshair) => self.assigned_name(crosshair, cx),
         };
         let drawing = match &state {
@@ -1246,11 +1256,7 @@ impl CrosshairsPage {
         let running = matches!(self.busy, Some(Busy::Board(t) | Busy::Reset(t)) if t == target);
         let menu = div()
             .id(ids::loadout_cell_menu(class, slot))
-            .aria_label(format!(
-                "{} {} weapons",
-                class.name(),
-                slot.name().to_lowercase()
-            ))
+            .aria_label(weapons_title(class, slot))
             .test_support()
             .absolute()
             .top(px(2.))
@@ -1340,13 +1346,13 @@ impl CrosshairsPage {
     fn details(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let (class, slot) = self.focus?;
         let target = BoardTarget::Cell(class, slot);
-        let title = format!("{} {} weapons", class.name(), slot.name().to_lowercase());
+        let title = weapons_title(class, slot);
         let resetting = self.busy == Some(Busy::Reset(target));
         let theme = cx.theme();
         Some(
             v_flex()
                 .id(ids::CROSSHAIRS_DETAILS)
-                .aria_label(SharedString::from(title.clone()))
+                .aria_label(title.clone())
                 .test_support()
                 .gap_3()
                 .p_4()
@@ -1370,7 +1376,7 @@ impl CrosshairsPage {
                                     div()
                                         .text_xs()
                                         .text_color(theme.muted_foreground)
-                                        .child("Click a weapon to give it the picked crosshair"),
+                                        .child(tr!("crosshairs_page.details.hint")),
                                 ),
                         )
                         .child(
@@ -1378,7 +1384,7 @@ impl CrosshairsPage {
                                 .outline()
                                 .small()
                                 .icon(IconName::RotateCcw)
-                                .label("Reset to default")
+                                .label(tr!("crosshairs_page.button.reset"))
                                 .loading(resetting)
                                 .disabled(self.busy.is_some() && !resetting)
                                 .on_click(
@@ -1390,7 +1396,7 @@ impl CrosshairsPage {
                                 .ghost()
                                 .small()
                                 .icon(IconName::X)
-                                .label("Close")
+                                .label(tr!("crosshairs_page.button.close"))
                                 .on_click(cx.listener(|page, _, _, cx| {
                                     page.focus = None;
                                     cx.notify();
@@ -1407,8 +1413,8 @@ impl CrosshairsPage {
 /// took when another library crosshair already had the one it wanted.
 pub(crate) fn added_message(crosshair: &CrosshairEntry) -> String {
     match crosshair.wanted_name() {
-        Some(_) => format!("Added to your library as {}", crosshair.name()),
-        None => format!("{} added to your library", crosshair.name()),
+        Some(_) => tr!("crosshairs_page.toast.added_as", name = crosshair.name()).to_string(),
+        None => tr!("crosshairs_page.toast.added", name = crosshair.name()).to_string(),
     }
 }
 
@@ -1421,17 +1427,33 @@ pub(crate) fn skipped_description(report: &ApplyReport) -> Option<String> {
     let lines: Vec<String> = skipped
         .iter()
         .map(|skip| {
+            let name = skip.reference().to_string();
             let reason = match skip.reason() {
-                SkipReason::UnknownBuiltin => "unknown builtin",
-                SkipReason::MissingLibraryCrosshair => "missing crosshair",
-                SkipReason::InvalidWeaponScript => "invalid weapon script",
-                SkipReason::NoStockScript => "game script unreadable",
-                _ => "skipped",
+                SkipReason::UnknownBuiltin => {
+                    tr!("crosshairs_page.skip.unknown_builtin", name = name)
+                }
+                SkipReason::MissingLibraryCrosshair => {
+                    tr!("crosshairs_page.skip.missing", name = name)
+                }
+                SkipReason::InvalidWeaponScript => {
+                    tr!("crosshairs_page.skip.invalid_script", name = name)
+                }
+                SkipReason::NoStockScript => {
+                    tr!("crosshairs_page.skip.no_stock_script", name = name)
+                }
+                _ => tr!("crosshairs_page.skip.unknown", name = name),
             };
-            format!("{} ({reason} {})", skip.weapon_script(), skip.reference())
+            format!("{} ({reason})", skip.weapon_script())
         })
         .collect();
-    Some(format!("Skipped {}: {}", skipped.len(), lines.join(", ")))
+    Some(
+        tr!(
+            "crosshairs_page.skip.line",
+            count = skipped.len(),
+            list = lines.join(", ")
+        )
+        .to_string(),
+    )
 }
 
 // v5's compact yellow-500 box: the icon beside a column of the title and one line per
@@ -1443,8 +1465,7 @@ fn conflict_box(folders: &[String], cx: &App) -> Option<AnyElement> {
     let yellow: Hsla = rgb(YELLOW_500).into();
     let muted = cx.theme().muted_foreground;
     let lines = folders.iter().map(|folder| {
-        let rest =
-            format!(": Crosshair scripts found in '{folder}' — may override your assignments");
+        let rest = tr!("crosshairs_page.conflict.line", folder = folder);
         h_flex()
             .id(ids::crosshair_conflict(folder))
             .aria_label(format!("{folder}{rest}"))
@@ -1458,7 +1479,7 @@ fn conflict_box(folders: &[String], cx: &App) -> Option<AnyElement> {
         v_flex()
             .id(ids::CROSSHAIRS_CONFLICTS)
             .role(Role::Alert)
-            .aria_label("Conflicts Detected")
+            .aria_label(tr!("crosshairs_page.conflict.title"))
             .test_support()
             .flex_row()
             .items_start()
@@ -1481,12 +1502,21 @@ fn conflict_box(folders: &[String], cx: &App) -> Option<AnyElement> {
                         div()
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(yellow)
-                            .child("Conflicts Detected"),
+                            .child(tr!("crosshairs_page.conflict.title")),
                     )
                     .child(v_flex().mt_1().gap(px(2.)).children(lines)),
             )
             .into_any_element(),
     )
+}
+
+// The backdrop's shown name: the plain one is translated, a map keeps its asset name.
+fn background_label(value: &'static str) -> SharedString {
+    if value == PLAIN {
+        tr!("crosshairs_page.background.dark")
+    } else {
+        value.into()
+    }
 }
 
 impl Render for CrosshairsPage {
@@ -1511,7 +1541,7 @@ impl Render for CrosshairsPage {
             no_tf2_notice(
                 ids::CROSSHAIRS_NO_TF2,
                 ids::CROSSHAIRS_NO_TF2_SETTINGS,
-                "Set the TF2 folder in Settings to install crosshairs.",
+                tr!("crosshairs_page.no_tf2"),
                 cx,
             )
         });
@@ -1592,6 +1622,15 @@ impl Render for CrosshairsPage {
             .children(details);
         scroll_area(ids::page_scrollbar(Page::Crosshairs), &self.scroll, content).size_full()
     }
+}
+
+// The open cell's title, such as "Heavy primary weapons".
+fn weapons_title(class: TfClass, slot: WeaponSlot) -> SharedString {
+    tr!(
+        "crosshairs_page.details.title",
+        class = class_name(class),
+        slot = slot_name(slot).to_lowercase()
+    )
 }
 
 /// The detail line under the picked crosshair: how many weapons it is on.

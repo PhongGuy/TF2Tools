@@ -297,7 +297,7 @@ impl GraphicsPage {
                         let mut text = "mastercomfig is no longer in TF2.".to_owned();
                         if restored {
                             text.push(' ');
-                            text.push_str(crate::pages::addons::model::MOVEMENT_OFF);
+                            text.push_str(&crate::pages::addons::model::movement_off());
                         }
                         Ok(("mastercomfig removed".into(), text.into()))
                     },

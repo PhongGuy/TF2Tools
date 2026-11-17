@@ -26,7 +26,7 @@ fn the_shell_shows_every_shell_id_and_opens_on_huds(cx: &mut TestAppContext) {
         );
         assert_eq!(
             support::label_of(cx, s.win, ids::nav(page)).as_deref(),
-            Some(page.label())
+            Some(page.label().as_ref())
         );
     }
     assert!(support::present(cx, s.win, ids::page(Page::Huds)));
@@ -49,7 +49,7 @@ fn every_nav_item_opens_its_page_and_title(cx: &mut TestAppContext) {
         );
         assert_eq!(
             support::label_of(cx, s.win, ids::HEADER_TITLE).as_deref(),
-            Some(page.title())
+            Some(page.title().as_ref())
         );
         if page.is_placeholder() {
             assert_eq!(

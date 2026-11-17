@@ -11,6 +11,7 @@ use gpui_kit::{
 use tf2tools_core::{ExternalHud, LogLevel, NewLogEntry, Tf2Install};
 
 use crate::activity;
+use crate::i18n::{self, counted_plural, tr};
 use crate::ids;
 use crate::local_messages::{describe_keep_hud, describe_library};
 use crate::services::{OpError, Services, run_blocking};
@@ -67,7 +68,8 @@ impl ExternalPlan {
                 .keep_external_huds(&self.huds, tf2)
                 .map_err(|e| describe_keep_hud(&e).into_op(action))?;
             for hud in kept {
-                let message = format!("Kept HUD in library: {}", hud.folder_name());
+                let message =
+                    tr!("external_huds.activity.kept", name = hud.folder_name()).to_string();
                 let entry = NewLogEntry::new(LogLevel::Info, "hud", "import", message);
                 activity::write(s, &entry);
             }
@@ -78,7 +80,8 @@ impl ExternalPlan {
     /// Writes the activity row for HUDs the finished action removed without a copy.
     pub fn log_discarded(&self, s: &Services) {
         if !self.keep && !self.huds.is_empty() {
-            let message = format!("Removed without keeping: {}", names_text(&self.huds));
+            let names = names_text(&self.huds);
+            let message = tr!("external_huds.activity.removed", names = names).to_string();
             let entry = NewLogEntry::new(LogLevel::Warning, "hud", "remove", message);
             activity::write(s, &entry);
         }
@@ -90,65 +93,75 @@ impl ExternalPlan {
             return None;
         }
         let names = names_text(&self.huds);
-        Some(if self.keep {
-            format!("A copy of {names} is in your library.")
+        let note = if self.keep {
+            tr!("external_huds.note.kept", names = names)
         } else {
-            format!("Removed without a copy: {names}.")
-        })
+            tr!("external_huds.note.removed", names = names)
+        };
+        Some(note.to_string())
     }
 }
 
 /// `huds`' names as a sentence would list them, cut short after `MOST_NAMES`.
 pub fn names_text(huds: &[ExternalHud]) -> String {
     let names: Vec<&str> = huds.iter().map(ExternalHud::folder_name).collect();
-    match names.as_slice() {
-        [] => String::new(),
-        [one] => (*one).to_owned(),
-        [start @ .., last] if names.len() <= MOST_NAMES => {
-            format!("{} and {last}", start.join(", "))
-        }
-        all => format!(
-            "{} and {} more",
-            all[..MOST_NAMES].join(", "),
-            all.len() - MOST_NAMES
-        ),
+    if names.len() <= MOST_NAMES {
+        return i18n::list(&names).to_string();
     }
+    // Past the cut the shown names share the list separator, and the rest are counted.
+    let shown = names[..MOST_NAMES].join(&*tr!("common.list.separator"));
+    let more = names.len() - MOST_NAMES;
+    let n = u64::try_from(more).unwrap_or(u64::MAX);
+    let vars = [("names", shown.as_str())];
+    counted_plural("external_huds.names_more", n, &more.to_string(), &vars).to_string()
 }
 
 /// The dialog's texts for `action`: title, description and destructive button's label.
-pub fn dialog_text(action: HudAction, huds: &[ExternalHud]) -> (String, String, &'static str) {
+pub fn dialog_text(action: HudAction, huds: &[ExternalHud]) -> (String, String, SharedString) {
     let names = names_text(huds);
     let changes = huds.iter().any(ExternalHud::has_changes);
     let title = match huds {
-        [one] if changes => format!("Keep your changes to {}?", one.folder_name()),
-        [one] => format!("Keep {}?", one.folder_name()),
-        _ if changes => "Keep your changes?".to_owned(),
-        _ => "Keep these HUDs?".to_owned(),
-    };
-    let doing = match action {
-        HudAction::Install => "Installing this HUD",
-        HudAction::Uninstall => "Uninstalling",
-        HudAction::ActivateProfile => "Activating this profile",
+        [one] if changes => {
+            tr!(
+                "external_huds.dialog.keep_one_changes",
+                name = one.folder_name()
+            )
+        }
+        [one] => tr!("external_huds.dialog.keep_one", name = one.folder_name()),
+        _ if changes => tr!("external_huds.dialog.keep_many_changes"),
+        _ => tr!("external_huds.dialog.keep_many"),
     };
     let label = match action {
-        HudAction::Uninstall => "Remove without keeping",
-        HudAction::Install | HudAction::ActivateProfile => "Replace without keeping",
+        HudAction::Uninstall => tr!("external_huds.dialog.remove"),
+        HudAction::Install | HudAction::ActivateProfile => tr!("external_huds.dialog.replace"),
     };
-    let description = match huds {
-        _ if changes => format!(
-            "{doing} removes {names} from TF2. Your changes can't be brought back unless you \
-             keep a copy."
-        ),
-        [_] => format!(
-            "{doing} removes {names} from TF2. TF2Tools has no copy of it, so it can't come \
-             back unless you keep one."
-        ),
-        _ => format!(
-            "{doing} removes {names} from TF2. TF2Tools has no copy of them, so they can't \
-             come back unless you keep one."
-        ),
+    // Each action, and whether the HUDs hold changes or are one or several, is its own sentence.
+    let description = match (action, huds) {
+        (HudAction::Install, _) if changes => {
+            tr!("external_huds.dialog.install.changes", names = names)
+        }
+        (HudAction::Install, [_]) => tr!("external_huds.dialog.install.single", names = names),
+        (HudAction::Install, _) => tr!("external_huds.dialog.install.several", names = names),
+        (HudAction::Uninstall, _) if changes => {
+            tr!("external_huds.dialog.uninstall.changes", names = names)
+        }
+        (HudAction::Uninstall, [_]) => {
+            tr!("external_huds.dialog.uninstall.single", names = names)
+        }
+        (HudAction::Uninstall, _) => {
+            tr!("external_huds.dialog.uninstall.several", names = names)
+        }
+        (HudAction::ActivateProfile, _) if changes => {
+            tr!("external_huds.dialog.activate.changes", names = names)
+        }
+        (HudAction::ActivateProfile, [_]) => {
+            tr!("external_huds.dialog.activate.single", names = names)
+        }
+        (HudAction::ActivateProfile, _) => {
+            tr!("external_huds.dialog.activate.several", names = names)
+        }
     };
-    (title, description, label)
+    (title.to_string(), description.to_string(), label)
 }
 
 /// Finds the HUDs `action` would lose and asks about them; with `only`, it touches that one
@@ -272,17 +285,17 @@ fn external_huds_dialog(
                                     .child(
                                         button(ids::EXTERNAL_HUDS_CANCEL, ExternalAnswer::Cancel)
                                             .outline()
-                                            .label("Cancel"),
+                                            .label(tr!("confirm.cancel")),
                                     )
                                     .child(
                                         button(ids::EXTERNAL_HUDS_DISCARD, ExternalAnswer::Discard)
                                             .danger()
-                                            .label(discard_label),
+                                            .label(discard_label.clone()),
                                     )
                                     .child(
                                         button(ids::EXTERNAL_HUDS_KEEP, ExternalAnswer::Keep)
                                             .primary()
-                                            .label("Keep a copy in my library"),
+                                            .label(tr!("external_huds.dialog.keep")),
                                     ),
                             ),
                     ),

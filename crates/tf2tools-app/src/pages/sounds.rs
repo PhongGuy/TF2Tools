@@ -26,13 +26,13 @@ use tf2tools_core::{
 use super::common::{SM_ICON_PX, YELLOW_500, badge_of, card_frame, needs_tf2, no_tf2_notice};
 use crate::activity;
 use crate::audio::player::{NowPlaying, Player, sound_player};
-use crate::i18n::tr;
+use crate::i18n::{names, tr};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
     describe_import, describe_library, describe_profile, describe_tf2_install,
 };
-use crate::pages::profiles::model::NOT_APPLIED;
+use crate::pages::profiles::model::not_applied;
 use crate::picker::PickKind;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
@@ -100,7 +100,7 @@ impl SoundsPage {
         let player = sound_player(window, cx);
         // The slot play icons read the player's sound, so redraw when it starts or ends.
         let observe_player = cx.observe(&player, |_, _, cx| cx.notify());
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search sounds..."));
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder(tr!("sounds.search")));
         // The grid filters from the input's value at render, so each edit just redraws.
         let search_changed = cx.subscribe(&search, |_, _, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
@@ -239,14 +239,16 @@ impl SoundsPage {
             Ok(tf2) => tf2,
             Err(err) => return toast_error(window, cx, &err),
         };
-        let (done, failed) = match kind {
+        let (done, failed, message) = match kind {
             SoundKind::Hitsound => (
-                "Hitsound uninstalled",
+                tr!("sounds.toast.uninstalled_hitsound"),
                 tr!("messages.action.uninstall_hitsound"),
+                tr!("sounds.activity.uninstalled_hitsound"),
             ),
             SoundKind::Killsound | _ => (
-                "Killsound uninstalled",
+                tr!("sounds.toast.uninstalled_killsound"),
                 tr!("messages.action.uninstall_killsound"),
+                tr!("sounds.activity.uninstalled_killsound"),
             ),
         };
         self.run(
@@ -255,12 +257,11 @@ impl SoundsPage {
                 s.library
                     .uninstall_sound(kind, &tf2)
                     .map_err(|e| describe_tf2_install(&e).into_op(failed))?;
-                let message = format!("Uninstalled {}", kind.name());
                 activity::write(
                     s,
                     &NewLogEntry::new(LogLevel::Info, "sound", "uninstall", message),
                 );
-                Ok((done.into(), SharedString::default()))
+                Ok((done, SharedString::default()))
             },
             cx,
         );
@@ -290,12 +291,12 @@ impl SoundsPage {
                         // The picked file is developer detail; the player's row keeps the format.
                         tracing::info!(source = %path.display(), "imported a sound");
                         let (_, format) = format_texts(sound.format());
-                        let message = format!("Imported sound: {}", sound.name());
+                        let message = tr!("sounds.activity.imported", name = sound.name());
                         let entry = NewLogEntry::new(LogLevel::Info, "sound", "import", message)
-                            .with_details(format!("Format: {format}"));
+                            .with_details(tr!("sounds.activity.format", format = format));
                         activity::write(s, &entry);
-                        let added = format!("{} added to your library", sound.name());
-                        Ok(("Sound imported".into(), added.into()))
+                        let added = tr!("sounds.toast.added", name = sound.name());
+                        Ok((tr!("sounds.toast.imported"), added))
                     },
                     cx,
                 ),
@@ -319,30 +320,31 @@ impl SoundsPage {
             Ok(tf2) => tf2,
             Err(err) => return toast_error(window, cx, &err),
         };
-        let (done, failed) = match kind {
+        let name = sound.name().to_owned();
+        let (done, failed, message) = match kind {
             SoundKind::Hitsound => (
-                "Hitsound installed",
+                tr!("sounds.toast.installed_hitsound"),
                 tr!("messages.action.install_hitsound"),
+                tr!("sounds.activity.installed_hitsound", name = name),
             ),
             SoundKind::Killsound | _ => (
-                "Killsound installed",
+                tr!("sounds.toast.installed_killsound"),
                 tr!("messages.action.install_killsound"),
+                tr!("sounds.activity.installed_killsound", name = name),
             ),
         };
         let id = sound.id().clone();
-        let name = sound.name().to_owned();
         self.run(
             Busy::Install(sound.folder_name().to_owned(), kind),
             move |s| {
                 s.library
                     .install_sound(&id, kind, &tf2)
                     .map_err(|e| describe_tf2_install(&e).into_op(failed))?;
-                let message = format!("Installed {}: {name}", kind.name());
                 activity::write(
                     s,
                     &NewLogEntry::new(LogLevel::Info, "sound", "install", message),
                 );
-                Ok((done.into(), SharedString::default()))
+                Ok((done, SharedString::default()))
             },
             cx,
         );
@@ -380,14 +382,14 @@ impl SoundsPage {
                 let replaced = old
                     .filter(|old| Some(old.folder_name()) != after.map(|a| a.folder_name()))
                     .map(|old| old.name());
-                let role = Some(kind.name());
+                let role = Some(kind);
                 let title = added_title(&name, update.profile().name(), role, replaced);
                 let note = if update.deactivated() {
-                    NOT_APPLIED
+                    not_applied()
                 } else {
-                    ""
+                    SharedString::default()
                 };
-                Ok((title.into(), note.into()))
+                Ok((title.into(), note))
             },
             cx,
         );
@@ -419,10 +421,10 @@ impl SoundsPage {
                         s.library.delete_sound(&id, tf2.as_ref()).map_err(|e| {
                             describe_library(&e).into_op(tr!("messages.action.delete_sound"))
                         })?;
-                        let message = format!("Deleted sound: {name}");
+                        let message = tr!("sounds.activity.deleted", name = name);
                         let entry = NewLogEntry::new(LogLevel::Info, "sound", "delete", message);
                         activity::write(s, &entry);
-                        Ok(("Sound deleted".into(), SharedString::default()))
+                        Ok((tr!("sounds.toast.deleted"), SharedString::default()))
                     },
                     cx,
                 );
@@ -469,7 +471,10 @@ impl SoundsPage {
         let now = NowPlaying {
             key: slot_key(kind),
             name: name.into(),
-            subtitle: format!("Installed {}", kind.name()).into(),
+            subtitle: match kind {
+                SoundKind::Hitsound => tr!("sounds.slot.playing_hitsound"),
+                SoundKind::Killsound | _ => tr!("sounds.slot.playing_killsound"),
+            },
         };
         self.player
             .update(cx, |player, cx| {
@@ -497,11 +502,8 @@ pub(crate) fn sound_key(folder: &str) -> SharedString {
     format!("sound:{folder}").into()
 }
 
-fn slot_title(kind: SoundKind) -> &'static str {
-    match kind {
-        SoundKind::Hitsound => "Hitsound",
-        SoundKind::Killsound | _ => "Killsound",
-    }
+fn slot_title(kind: SoundKind) -> SharedString {
+    names::sound_kind_name(kind)
 }
 
 /// What a slot card shows when its kind is installed.
@@ -520,7 +522,7 @@ impl SoundsPage {
             .managed()
             .and_then(|id| self.sounds.iter().find(|s| s.id() == id))
             .map_or_else(
-                || "A sound added outside TF2Tools".to_owned(),
+                || tr!("sounds.slot.outside").to_string(),
                 |s| s.name().to_owned(),
             );
         Some(Slot { name, vpk })
@@ -544,7 +546,7 @@ impl SoundsPage {
                     ids::sound_slot_status(kind),
                     Tag::primary(),
                     transparent_black(),
-                    "Installed",
+                    tr!("sounds.badge.installed"),
                 ))
                 .children(slot.vpk.then(|| {
                     badge_of(
@@ -558,7 +560,7 @@ impl SoundsPage {
                 ids::sound_slot_status(kind),
                 Tag::secondary().outline().text_color(theme.foreground),
                 theme.border,
-                "None",
+                tr!("sounds.badge.none"),
             )),
         };
         let body = match slot {
@@ -589,7 +591,11 @@ impl SoundsPage {
                                         IconName::Play
                                     })
                                     .size(px(32.))
-                                    .named(if playing { "Stop" } else { "Play" })
+                                    .named(if playing {
+                                        tr!("sounds.button.stop")
+                                    } else {
+                                        tr!("sounds.button.play")
+                                    })
                                     .on_click(cx.listener(move |page, _, window, cx| {
                                         page.play_slot(kind, name.clone(), window, cx)
                                     })),
@@ -607,9 +613,9 @@ impl SoundsPage {
                             .px(SM_ICON_PX)
                             .icon(IconName::Unplug)
                             .label(if uninstalling {
-                                "Removing..."
+                                tr!("sounds.button.removing")
                             } else {
-                                "Uninstall"
+                                tr!("sounds.button.uninstall")
                             })
                             .loading(uninstalling)
                             .disabled(self.busy.is_some() && !uninstalling)
@@ -623,7 +629,10 @@ impl SoundsPage {
             None => labelled(
                 div().text_sm().text_color(muted),
                 ids::sound_slot_name(kind),
-                format!("No {} installed", kind.name()),
+                match kind {
+                    SoundKind::Hitsound => tr!("sounds.slot.none_hitsound"),
+                    SoundKind::Killsound | _ => tr!("sounds.slot.none_killsound"),
+                },
             )
             .into_any_element(),
         };
@@ -639,6 +648,7 @@ impl SoundsPage {
                     .child(
                         h_flex()
                             .px_6()
+                            .gap_1()
                             .justify_between()
                             .child(
                                 h_flex()
@@ -668,11 +678,12 @@ fn conflict_box(installed: &InstalledSounds, cx: &App) -> Option<AnyElement> {
     let lines: Vec<(String, String)> = conflicts
         .iter()
         .map(|c| {
-            let kind = c.kind().name();
-            let title = slot_title(c.kind());
             let folder = c.folder_name().to_owned();
-            let message = format!("{title} found in '{folder}' — may override your {kind}");
-            (folder, message)
+            let message = match c.kind() {
+                SoundKind::Hitsound => tr!("sounds.conflict.hitsound", folder = folder),
+                SoundKind::Killsound | _ => tr!("sounds.conflict.killsound", folder = folder),
+            };
+            (folder, message.to_string())
         })
         .collect();
     let label = lines
@@ -685,7 +696,7 @@ fn conflict_box(installed: &InstalledSounds, cx: &App) -> Option<AnyElement> {
         v_flex()
             .id(ids::SOUNDS_CONFLICTS)
             .role(Role::Alert)
-            .aria_label(format!("Conflicts Detected. {label}"))
+            .aria_label(tr!("sounds.conflict.aria", lines = label))
             .test_support()
             .gap_3()
             .p_6()
@@ -705,7 +716,7 @@ fn conflict_box(installed: &InstalledSounds, cx: &App) -> Option<AnyElement> {
                         div()
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(yellow)
-                            .child("Conflicts Detected"),
+                            .child(tr!("sounds.conflict.title")),
                     ),
             )
             .child(
@@ -768,7 +779,11 @@ pub(crate) fn play_button(id: impl Into<ElementId>, playing: bool) -> Button {
         } else {
             IconName::Play
         })
-        .named(if playing { "Stop" } else { "Play" })
+        .named(if playing {
+            tr!("sounds.button.stop")
+        } else {
+            tr!("sounds.button.play")
+        })
 }
 
 // v5's library sound card: the name with its VPK badge, then play and delete at the bottom
@@ -783,7 +798,7 @@ fn sound_card(
     let folder = sound.folder_name();
     let deleting = busy == Some(&Busy::Delete(folder.to_owned()));
     let has_tf2 = tf2_state(cx).read(cx).install().is_some();
-    let install = |id: ElementId, kind: SoundKind, icon: IconName, label: &'static str| {
+    let install = |id: ElementId, kind: SoundKind, icon: IconName, label: SharedString| {
         let installing = busy == Some(&Busy::Install(folder.to_owned(), kind));
         let button = Button::new(id)
             .outline()
@@ -837,7 +852,7 @@ fn sound_card(
                                 .ghost()
                                 .px(SM_ICON_PX)
                                 .icon(IconName::Trash)
-                                .named("Delete from library")
+                                .named(tr!("sounds.button.delete"))
                                 .loading(deleting)
                                 .disabled(busy.is_some() && !deleting)
                                 .on_click(on_card(page, sound, SoundsPage::delete)),
@@ -850,13 +865,13 @@ fn sound_card(
                             ids::sound_hit(folder),
                             SoundKind::Hitsound,
                             IconName::Crosshair,
-                            "Hit",
+                            tr!("sounds.button.hit"),
                         ))
                         .child(install(
                             ids::sound_kill(folder),
                             SoundKind::Killsound,
                             IconName::Target,
-                            "Kill",
+                            tr!("sounds.button.kill"),
                         )),
                 ),
         )
@@ -881,17 +896,17 @@ fn add_to_profile_button(
         .ghost()
         .px(SM_ICON_PX)
         .icon(IconName::LayersPlus)
-        .named("Add to profile")
+        .named(tr!("sounds.button.add_to_profile"))
         .loading(adding)
         .disabled(busy.is_some())
         .dropdown_menu(profile_menu(vec![
             Section {
-                heading: Some("Hitsound in"),
+                heading: Some(tr!("sounds.menu.hitsound_in")),
                 item_id: ids::sound_hit_pick,
                 on_pick: pick(SoundKind::Hitsound),
             },
             Section {
-                heading: Some("Killsound in"),
+                heading: Some(tr!("sounds.menu.killsound_in")),
                 item_id: ids::sound_kill_pick,
                 on_pick: pick(SoundKind::Killsound),
             },
@@ -903,9 +918,9 @@ fn add_to_profile_button(
 fn empty_library(searching: bool, cx: &App) -> AnyElement {
     let muted = cx.theme().muted_foreground;
     let (id, title) = if searching {
-        (ids::SOUNDS_NO_MATCH, "No sounds match your search")
+        (ids::SOUNDS_NO_MATCH, tr!("sounds.empty.no_match"))
     } else {
-        (ids::SOUNDS_EMPTY, "No sounds in your library yet")
+        (ids::SOUNDS_EMPTY, tr!("sounds.empty.title"))
     };
     v_flex()
         .items_center()
@@ -923,7 +938,7 @@ fn empty_library(searching: bool, cx: &App) -> AnyElement {
                 .mt_1()
                 .text_sm()
                 .text_color(muted)
-                .child("Click \"Add Sound\" to import a WAV or VPK file")
+                .child(tr!("sounds.empty.hint"))
         }))
         .into_any_element()
 }
@@ -971,7 +986,7 @@ impl SoundsPage {
                         div()
                             .text_lg()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child("Your Library"),
+                            .child(tr!("sounds.heading.library")),
                     )
                     .child(
                         Button::new(ids::SOUNDS_ADD)
@@ -980,9 +995,9 @@ impl SoundsPage {
                             .px_3()
                             .icon(IconName::Plus)
                             .label(if importing {
-                                "Importing..."
+                                tr!("sounds.button.importing")
                             } else {
-                                "Add Sound"
+                                tr!("sounds.button.add")
                             })
                             .loading(importing)
                             .disabled(self.busy.is_some() && !importing)
@@ -1025,7 +1040,7 @@ impl Render for SoundsPage {
             no_tf2_notice(
                 ids::SOUNDS_NO_TF2,
                 ids::SOUNDS_NO_TF2_SETTINGS,
-                "Set the TF2 folder in Settings to install sounds.",
+                tr!("sounds.no_tf2"),
                 cx,
             )
         });
@@ -1048,9 +1063,9 @@ impl Render for SoundsPage {
 
 /// v5's format texts in the log rows: the install row's lower-case tag, then the import row's
 /// description. Core's own `as_str` is private.
-fn format_texts(format: SoundFormat) -> (&'static str, &'static str) {
+fn format_texts(format: SoundFormat) -> (&'static str, SharedString) {
     match format {
-        SoundFormat::Vpk => ("vpk", "VPK sound pack"),
-        SoundFormat::Wav | _ => ("wav", "16-bit PCM, 44100Hz, Stereo"),
+        SoundFormat::Vpk => ("vpk", tr!("sounds.format.vpk")),
+        SoundFormat::Wav | _ => ("wav", "16-bit PCM, 44100Hz, Stereo".into()),
     }
 }

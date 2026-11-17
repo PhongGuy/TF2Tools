@@ -300,7 +300,7 @@ impl Render for Player {
                         .ghost()
                         .icon(IconName::Square)
                         .size(px(32.))
-                        .named("Stop")
+                        .named(tr!("widgets.player.stop"))
                         .on_click(cx.listener(|player, _, _, cx| player.stop(cx))),
                 )
                 .child(

@@ -44,7 +44,7 @@ use crate::local_messages::{
 use crate::pages::graphics::jobs::refuse_while_running;
 use crate::pages::hud_maker::live::{Live, live_job};
 use crate::pages::hud_store::bodies::gamebanana_body;
-use crate::pages::profiles::model::NOT_APPLIED;
+use crate::pages::profiles::model::not_applied;
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::picker::PickKind;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages, local_image_url};
@@ -62,19 +62,23 @@ use crate::tokio_bridge;
 use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::carousel::open_lightbox;
-use crate::widgets::labelled;
 use crate::widgets::profile_menu::{Section, added_title, profile_menu};
 use crate::widgets::scroll::scroll_area;
+use crate::widgets::{label_or_named, labelled};
 
 /// The card's text and buttons below a store HUD's 16:9 screenshot, and a local card's height.
 const CARD_TEXT_HEIGHT: Pixels = px(136.);
 // The grid never gets shorter than one row of local cards, as on Profiles, so a common window
 // fits the page and only the grid scrolls; a short window still scrolls the page.
 const LIBRARY_MIN_HEIGHT: Pixels = CARD_TEXT_HEIGHT;
+// The Install label's room beside Copy and Delete on a two-column card at 800 px.
+const INSTALL_LABEL_BUDGET: Pixels = px(60.);
 // Room for up to three lines of the note that a copy's newer version is in the HUD Store.
 const STORE_NOTE_HEIGHT: Pixels = px(48.);
 /// Edit's tooltip while another HUD action runs.
-const EDIT_WAIT: &str = "Wait for TF2Tools to finish, then edit";
+fn edit_wait() -> SharedString {
+    tr!("huds.edit_wait")
+}
 /// The title of a failed install's toast.
 pub(crate) fn install_failed() -> SharedString {
     tr!("messages.action.install_hud")
@@ -90,8 +94,9 @@ fn update_failed() -> SharedString {
 fn download_gone() -> SharedString {
     tr!("messages.huds.download_gone")
 }
-const NOT_REINSTALLED: &str =
-    "Updated, but couldn't update the installed copy. Close TF2 and install it again from HUDs.";
+fn not_reinstalled() -> SharedString {
+    tr!("huds.not_reinstalled")
+}
 
 /// The action in flight; its button spins and every other mutating button is disabled.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -201,7 +206,7 @@ impl HudsPage {
         let tf2 = cx.observe(&tf2_state(cx), |page, _, cx| page.reload(cx));
         let events = LibraryEvents::global(cx);
         let library = cx.subscribe(&events, |page, _, _: &LibraryChanged, cx| page.reload(cx));
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search HUDs..."));
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder(tr!("huds.search")));
         // The grid filters from the input's value at render, so each edit just redraws.
         // A new filter can keep the count and range while changing the cards, so re-arm the
         // grid's visible hook to ask for the new cards' screenshots.
@@ -611,13 +616,13 @@ impl HudsPage {
                             .map_err(|e| {
                                 describe_import(&e).into_op(tr!("messages.action.import_hud"))
                             })?;
-                        let message = format!("Imported HUD: {}", hud.name());
+                        let message = tr!("huds.activity.imported", name = hud.name()).to_string();
                         // The source path is developer detail, so it goes to tracing only.
                         tracing::info!(source = %path.display(), "imported a HUD");
                         let entry = NewLogEntry::new(LogLevel::Info, "hud", "import", message);
                         activity::write(s, &entry);
                         let added = added_message(&hud);
-                        Ok((ToastKind::Success, "HUD imported".into(), added.into()))
+                        Ok((ToastKind::Success, tr!("huds.toast.imported"), added.into()))
                     },
                     cx,
                     None,
@@ -688,19 +693,23 @@ impl HudsPage {
                 };
                 removed.map_err(|e| describe_tf2_install(&e).into_op(uninstall_failed()))?;
                 plan.log_discarded(s);
-                let message = format!("Uninstalled HUD(s): {name}");
+                let message = tr!("huds.activity.uninstalled", name = name).to_string();
                 activity::write(
                     s,
                     &NewLogEntry::new(LogLevel::Info, "hud", "uninstall", message),
                 );
                 let mut removed = match name.as_str() {
-                    "" => "Your HUD has been removed from TF2".to_owned(),
-                    name => format!("{name} has been removed from TF2"),
+                    "" => tr!("huds.toast.removed_yours").to_string(),
+                    name => tr!("huds.toast.removed", name = name).to_string(),
                 };
                 if let Some(note) = plan.note() {
                     removed = format!("{removed}. {note}");
                 }
-                Ok((ToastKind::Success, "HUD uninstalled".into(), removed.into()))
+                Ok((
+                    ToastKind::Success,
+                    tr!("huds.toast.uninstalled"),
+                    removed.into(),
+                ))
             },
             cx,
             None,
@@ -724,11 +733,11 @@ impl HudsPage {
                         s.library.delete_hud(&id).map_err(|e| {
                             describe_library(&e).into_op(tr!("messages.action.delete_hud"))
                         })?;
-                        let message = format!("Deleted HUD from library: {name}");
+                        let message = tr!("huds.activity.deleted", name = name).to_string();
                         let entry = NewLogEntry::new(LogLevel::Info, "hud", "delete", message);
                         activity::write(s, &entry);
-                        let deleted = format!("{name} has been deleted from your library");
-                        Ok((ToastKind::Success, "HUD removed".into(), deleted.into()))
+                        let deleted = tr!("huds.toast.deleted", name = name);
+                        Ok((ToastKind::Success, tr!("huds.toast.deleted_title"), deleted))
                     },
                     cx,
                     None,
@@ -758,11 +767,11 @@ impl HudsPage {
                 .map(|old| old.name());
             let title = added_title(&name, update.profile().name(), None, replaced);
             let note = if update.deactivated() {
-                NOT_APPLIED
+                not_applied()
             } else {
-                ""
+                SharedString::default()
             };
-            Ok((ToastKind::Success, title.into(), note.into()))
+            Ok((ToastKind::Success, title.into(), note))
         };
         self.run(busy, op, cx, None);
     }
@@ -803,7 +812,7 @@ impl HudsPage {
                     .library
                     .copy_hud(&id)
                     .map_err(|e| describe_copy_hud(&e).into_op(tr!("messages.action.copy_hud")))?;
-                let message = format!("Copied HUD: {}", copy.name());
+                let message = tr!("huds.activity.copied", name = copy.name()).to_string();
                 activity::write(s, &NewLogEntry::new(LogLevel::Info, "hud", "copy", message));
                 if let Ok(mut slot) = made.lock() {
                     *slot = Some(copy.id().clone());
@@ -812,7 +821,7 @@ impl HudsPage {
                     true => editing_copy_text(&base, &author),
                     false => copy_made_text(copy.name(), &author),
                 };
-                Ok((ToastKind::Success, "Copy made".into(), text.into()))
+                Ok((ToastKind::Success, tr!("huds.toast.copy_made"), text.into()))
             },
             cx,
             Some(open),
@@ -847,7 +856,7 @@ impl HudsPage {
                         describe_update_copy(&e).into_op(tr!("messages.action.update_hud"))
                     })?;
                 let name = updated.entry().name();
-                let message = format!("Updated HUD copy: {name}");
+                let message = tr!("huds.activity.updated_copy", name = name).to_string();
                 activity::write(
                     s,
                     &NewLogEntry::new(LogLevel::Info, "hud", "update", message),
@@ -862,7 +871,7 @@ impl HudsPage {
                 };
                 if let Live::Failed(_) = live_job(s, &id, name, &tf2) {
                     kind = ToastKind::Warning;
-                    text = format!("{text} {NOT_REINSTALLED}");
+                    text = format!("{text} {}", not_reinstalled());
                 }
                 Ok((kind, notice.title, text.into()))
             },
@@ -1083,15 +1092,15 @@ fn swap_download(
     let listed =
         (s.library.list_huds()).map_err(|e| describe_library(&e).into_op(update_failed()))?;
     let old_exists = listed.iter().any(|h| h.id() == old);
-    let updated = format!("{name} is now up to date");
-    let mut done: Done = (ToastKind::Success, "HUD updated".into(), updated.into());
+    let updated = tr!("huds.toast.updated", name = name);
+    let mut done: Done = (ToastKind::Success, tr!("huds.toast.updated_title"), updated);
     if let (true, Some(tf2)) = (was_installed, tf2) {
         match install_job(s, new, tf2, &ExternalPlan::default()) {
             Ok(_) => {}
             Err(err) if old_exists => return Err(err),
             Err(_) => {
                 done.0 = ToastKind::Warning;
-                done.2 = format!("{} {NOT_REINSTALLED}", done.2).into();
+                done.2 = format!("{} {}", done.2, not_reinstalled()).into();
             }
         }
     }
@@ -1100,7 +1109,7 @@ fn swap_download(
             .delete_hud(old)
             .map_err(|e| describe_library(&e).into_op(update_failed()))?;
     }
-    let message = format!("Updated HUD: {name}");
+    let message = tr!("huds.activity.updated", name = name).to_string();
     activity::write(
         s,
         &NewLogEntry::new(LogLevel::Info, "hud", "update", message),
@@ -1179,7 +1188,7 @@ fn empty_card(cx: &App) -> AnyElement {
                 .child(labelled(
                     div().text_lg().font_weight(FontWeight::SEMIBOLD),
                     ids::HUDS_INSTALLED_EMPTY,
-                    "No HUD installed",
+                    tr!("huds.installed.empty"),
                 ))
                 .child(
                     div()
@@ -1188,9 +1197,7 @@ fn empty_card(cx: &App) -> AnyElement {
                         .text_sm()
                         .text_center()
                         .text_color(muted)
-                        .child(
-                            "Install a HUD from your library to customize your in-game interface.",
-                        ),
+                        .child(tr!("huds.installed.empty_body")),
                 ),
         )
         .into_any_element()
@@ -1207,12 +1214,17 @@ fn installed_card(
     let theme = cx.theme();
     // Managed is shadcn's borderless secondary badge; External is its outline badge.
     let (badge, border, text, place) = if hud.managed {
-        let place = "Active in TF2.";
-        (Tag::secondary(), transparent_black(), "Managed", place)
+        let place = tr!("huds.installed.active");
+        (
+            Tag::secondary(),
+            transparent_black(),
+            tr!("huds.badge.managed"),
+            place,
+        )
     } else {
         let outline = Tag::secondary().outline().text_color(theme.foreground);
-        let place = "Added to TF2 outside TF2Tools.";
-        (outline, theme.border, "External", place)
+        let place = tr!("huds.installed.external");
+        (outline, theme.border, tr!("huds.badge.external"), place)
     };
     // Edit is a library action, so it stays enabled without TF2; it waits out any other action.
     let edit = hud.entry.map(|(entry, made)| {
@@ -1221,10 +1233,10 @@ fn installed_card(
             .outline()
             .px(SM_ICON_PX)
             .icon(IconName::Pencil)
-            .label("Edit")
+            .label(tr!("huds.button.edit"))
             .tooltip(match busy {
-                Some(_) if !copying => EDIT_WAIT,
-                _ => "Edit in HUD Maker",
+                Some(_) if !copying => edit_wait(),
+                _ => tr!("huds.button.edit_in_maker"),
             })
             .loading(copying)
             .disabled(busy.is_some() && !copying)
@@ -1259,7 +1271,7 @@ fn installed_card(
                                     .outline()
                                     .px(SM_ICON_PX)
                                     .icon(IconName::Unplug)
-                                    .label("Uninstall")
+                                    .label(tr!("huds.button.uninstall"))
                                     .loading(busy == Some(&Busy::Uninstall))
                                     .disabled(busy.is_some_and(|b| *b != Busy::Uninstall))
                                     .on_click(cx.listener(|page, _, window, cx| {
@@ -1293,8 +1305,8 @@ fn conflict_card(
             .outline()
             .px(SM_ICON_PX)
             .icon(IconName::Unplug)
-            .label("Uninstall")
-            .accessibility_label(format!("Uninstall {name}"))
+            .label(tr!("huds.button.uninstall"))
+            .accessibility_label(tr!("huds.button.uninstall_named", name = name))
             .loading(busy == Some(&removing))
             .disabled(busy.is_some_and(|b| *b != removing));
         let button = needs_tf2(button, has_tf2);
@@ -1324,12 +1336,11 @@ fn conflict_card(
 // v5's orange-500 warning box; the card above it names the HUDs.
 fn conflict_box(cx: &App) -> AnyElement {
     let orange: Hsla = rgb(ORANGE_500).into();
-    let message =
-        "TF2 can only use one HUD at a time. Uninstall the ones you don't want until one is left.";
+    let (title, message) = (tr!("huds.conflict.title"), tr!("huds.conflict.body"));
     h_flex()
         .id(ids::HUDS_CONFLICTS)
         .role(Role::Alert)
-        .aria_label(format!("HUD Conflicts Detected. {message}"))
+        .aria_label(format!("{title}. {message}"))
         .test_support()
         .items_start()
         .gap_3()
@@ -1351,7 +1362,7 @@ fn conflict_box(cx: &App) -> AnyElement {
                     div()
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(orange)
-                        .child("HUD Conflicts Detected"),
+                        .child(title),
                 )
                 .child(
                     div()
@@ -1383,8 +1394,8 @@ pub fn make_missing_thumbnails(cx: &mut App) {
 /// when another library HUD already had the one it wanted.
 pub(crate) fn added_message(hud: &HudEntry) -> String {
     match hud.wanted_name() {
-        Some(_) => format!("Added to your library as {}", hud.name()),
-        None => format!("{} added to your library", hud.name()),
+        Some(_) => tr!("huds.toast.added_as", name = hud.name()).to_string(),
+        None => tr!("huds.toast.added", name = hud.name()).to_string(),
     }
 }
 
@@ -1576,6 +1587,7 @@ fn hud_card(
     state: CardState<'_>,
     busy: Option<&Busy>,
     page: &WeakEntity<HudsPage>,
+    window: &Window,
     cx: &App,
 ) -> AnyElement {
     let CardState {
@@ -1611,7 +1623,7 @@ fn hud_card(
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(theme.primary),
             ids::hud_update_mark(folder),
-            "Update available",
+            tr!("huds.card.update_available"),
         )
     });
     // The card buttons call back into the page through a weak handle and a clone of the entry.
@@ -1628,8 +1640,8 @@ fn hud_card(
                 Button::new(ids::hud_update(folder))
                     .ghost()
                     .icon(IconName::RefreshCw)
-                    .tooltip("Update")
-                    .accessibility_label("Update")
+                    .tooltip(tr!("huds.button.update"))
+                    .accessibility_label(tr!("huds.button.update"))
                     .loading(updating)
                     .disabled(busy.is_some() && !updating)
                     .on_click(move |_, window, cx| {
@@ -1643,8 +1655,8 @@ fn hud_card(
             Button::new(ids::hud_update(folder))
                 .ghost()
                 .icon(IconName::RefreshCw)
-                .tooltip("Update")
-                .accessibility_label("Update")
+                .tooltip(tr!("huds.button.update"))
+                .accessibility_label(tr!("huds.button.update"))
                 .loading(updating)
                 .disabled(busy.is_some() && !updating)
                 .on_click(on_page(HudsPage::open_copy_store)),
@@ -1653,8 +1665,8 @@ fn hud_card(
             Button::new(ids::hud_update(folder))
                 .ghost()
                 .icon(IconName::RefreshCw)
-                .tooltip("Update")
-                .accessibility_label("Update")
+                .tooltip(tr!("huds.button.update"))
+                .accessibility_label(tr!("huds.button.update"))
                 .loading(updating)
                 .disabled(busy.is_some() && !updating)
                 .on_click(on_page(HudsPage::update_download)),
@@ -1662,9 +1674,9 @@ fn hud_card(
         _ => None,
     };
     let (badge, text) = if is_store(hud) {
-        (Tag::primary(), "Store")
+        (Tag::primary(), tr!("huds.badge.store"))
     } else {
-        (Tag::secondary(), "Local")
+        (Tag::secondary(), tr!("huds.badge.local"))
     };
     // A copy names the HUD it came from in place of its author.
     let byline = div()
@@ -1675,13 +1687,13 @@ fn hud_card(
         Some((base, _)) => Some(labelled(
             byline,
             ids::hud_copy_of(folder),
-            format!("Copy of {base}"),
+            tr!("huds.card.copy_of", base = base),
         )),
         None => (!hud.author().is_empty()).then(|| {
             labelled(
                 byline,
                 ids::hud_author(folder),
-                format!("by {}", hud.author()),
+                tr!("huds.card.by", author = hud.author()),
             )
         }),
     };
@@ -1722,7 +1734,7 @@ fn hud_card(
                                 .ghost()
                                 .xsmall()
                                 .icon(IconName::ExternalLink)
-                                .named("Visit page")
+                                .named(tr!("huds.button.visit"))
                                 .on_click(move |_, _, cx| cx.open_url(&url))
                         }))
                         .child(add_to_profile_button(hud, busy, page))
@@ -1745,14 +1757,14 @@ fn hud_card(
                     let (page, id) = (page.clone(), hud.id().clone());
                     // Opening a copy mid-update would edit files about to be swapped out.
                     let tip = match busy {
-                        Some(_) => EDIT_WAIT,
-                        None => "Edit in HUD Maker",
+                        Some(_) => edit_wait(),
+                        None => tr!("huds.button.edit_in_maker"),
                     };
                     Button::new(ids::hud_edit(folder))
                         .ghost()
                         .icon(IconName::Pencil)
                         .tooltip(tip)
-                        .accessibility_label("Edit in HUD Maker")
+                        .accessibility_label(tr!("huds.button.edit_in_maker"))
                         .disabled(busy.is_some())
                         .on_click(move |_, _, cx| {
                             let _ = page.update(cx, |_, cx| cx.emit(EditInHudMaker(id.clone())));
@@ -1763,8 +1775,8 @@ fn hud_card(
                     Button::new(ids::hud_copy(folder))
                         .ghost()
                         .icon(IconName::Copy)
-                        .tooltip("Edit a copy")
-                        .accessibility_label("Edit a copy")
+                        .tooltip(tr!("huds.button.edit_copy"))
+                        .accessibility_label(tr!("huds.button.edit_copy"))
                         .loading(copying)
                         .disabled(busy.is_some() && !copying)
                         .on_click(on_page(HudsPage::copy))
@@ -1773,17 +1785,13 @@ fn hud_card(
                     Button::new(ids::hud_delete(folder))
                         .ghost()
                         .icon(IconName::Trash)
-                        .named("Delete from library")
+                        .named(tr!("huds.button.delete"))
                         .loading(deleting)
                         .disabled(busy.is_some() && !deleting)
                         .on_click(on_page(HudsPage::delete)),
                 )
                 .child(needs_tf2(
-                    Button::new(ids::hud_install(folder))
-                        .primary()
-                        .px(SM_ICON_PX)
-                        .icon(IconName::Download)
-                        .label("Install")
+                    install_button(folder, window, cx)
                         .loading(installing)
                         .disabled(busy.is_some() && !installing)
                         .on_click(on_page(HudsPage::install)),
@@ -1791,6 +1799,21 @@ fn hud_card(
                 )),
         )
         .into_any_element()
+}
+
+// The card's Install button, icon-only when the label outgrows its room.
+fn install_button(folder: &str, window: &Window, cx: &App) -> Button {
+    let button = Button::new(ids::hud_install(folder))
+        .primary()
+        .px(SM_ICON_PX)
+        .icon(IconName::Download);
+    label_or_named(
+        button,
+        tr!("huds.button.install"),
+        INSTALL_LABEL_BUDGET,
+        window,
+        cx,
+    )
 }
 
 // The card's "Add to profile" menu. A pick saves through the page, so it waits behind any
@@ -1807,7 +1830,7 @@ fn add_to_profile_button(
     Button::new(ids::hud_add_to_profile(hud.folder_name()))
         .ghost()
         .icon(IconName::LayersPlus)
-        .named("Add to profile")
+        .named(tr!("huds.button.add_to_profile"))
         .loading(busy == Some(&Busy::AddToProfile(hud.folder_name().to_owned())))
         .disabled(busy.is_some())
         .dropdown_menu(profile_menu(vec![Section {
@@ -1822,14 +1845,14 @@ fn empty_library(searching: bool, cx: &App) -> AnyElement {
     let (id, title, description) = if searching {
         (
             ids::HUDS_NO_MATCH,
-            "No HUDs found",
-            "Try a different search term.",
+            tr!("huds.empty.no_match_title"),
+            tr!("huds.empty.no_match_body"),
         )
     } else {
         (
             ids::HUDS_EMPTY,
-            "Your library is empty",
-            "Add a HUD from a ZIP file or browse the store to download one.",
+            tr!("huds.empty.title"),
+            tr!("huds.empty.body"),
         )
     };
     let muted = cx.theme().muted_foreground;
@@ -1905,7 +1928,7 @@ impl HudsPage {
             );
             Some(
                 self.grid
-                    .render_sized(shown.len(), height, move |ix, _, cx| {
+                    .render_sized(shown.len(), height, move |ix, window, cx| {
                         let hud = &huds[shown[ix]];
                         let folder = hud.folder_name();
                         let state = CardState {
@@ -1917,7 +1940,7 @@ impl HudsPage {
                             behind_store: behind.contains(folder),
                             page_url: pages.get(folder).map(String::as_str),
                         };
-                        hud_card(hud, state, busy.as_ref(), &page, cx)
+                        hud_card(hud, state, busy.as_ref(), &page, window, cx)
                     }),
             )
         };
@@ -1936,7 +1959,7 @@ impl HudsPage {
                             .flex_none()
                             .text_lg()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child("Your Library"),
+                            .child(tr!("huds.heading.library")),
                     )
                     .child(
                         h_flex()
@@ -1964,7 +1987,11 @@ impl HudsPage {
                                     .h_9()
                                     .px_3()
                                     .icon(IconName::Plus)
-                                    .label(if importing { "Importing..." } else { "Add HUD" })
+                                    .label(if importing {
+                                        tr!("huds.button.importing")
+                                    } else {
+                                        tr!("huds.button.add")
+                                    })
                                     .loading(importing)
                                     .disabled(self.busy.is_some() && !importing)
                                     .on_click(cx.listener(|page, _, _, cx| page.add(cx))),
@@ -1998,7 +2025,7 @@ impl Render for HudsPage {
             no_tf2_notice(
                 ids::HUDS_NO_TF2,
                 ids::HUDS_NO_TF2_SETTINGS,
-                "Set the TF2 folder in Settings to install HUDs.",
+                tr!("huds.no_tf2"),
                 cx,
             )
         });
@@ -2018,9 +2045,9 @@ impl Render for HudsPage {
                         .gap_3()
                         .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child(
                             if conflicted {
-                                "Installed HUDs"
+                                tr!("huds.heading.installed_many")
                             } else {
-                                "Installed HUD"
+                                tr!("huds.heading.installed_one")
                             },
                         ))
                         .child(installed),
@@ -2073,14 +2100,14 @@ pub(crate) fn install_toast(name: &str, done: &HudInstall, plan: &ExternalPlan) 
     let note = plan.note();
     match done.blocked_name() {
         None => {
-            let active = format!("{name} is now active");
+            let active = tr!("huds.toast.active", name = name).to_string();
             let description = match note {
                 Some(note) => format!("{active}. {note}"),
                 None => active,
             };
             (
                 ToastKind::Success,
-                "HUD installed".into(),
+                tr!("huds.toast.installed_title"),
                 description.into(),
             )
         }
@@ -2088,7 +2115,7 @@ pub(crate) fn install_toast(name: &str, done: &HudInstall, plan: &ExternalPlan) 
             let description = blocked_description(blocked);
             (
                 ToastKind::Warning,
-                format!("{name} installed").into(),
+                tr!("huds.toast.installed", name = name),
                 match note {
                     Some(note) => format!("{description} {note}").into(),
                     None => description.into(),
@@ -2101,10 +2128,7 @@ pub(crate) fn install_toast(name: &str, done: &HudInstall, plan: &ExternalPlan) 
 /// The warning text for a HUD that went under its library folder because the player's own
 /// folder or file held `blocked`, the name it expects.
 pub(crate) fn blocked_description(blocked: &str) -> String {
-    format!(
-        "A folder named {blocked} is already in your custom folder, so parts of this HUD may \
-         not show. Move or rename that folder and install again."
-    )
+    tr!("huds.toast.blocked", blocked = blocked).to_string()
 }
 
 /// Carries out `plan`, installs library HUD `id` into `tf2`, writes the activity row naming the
@@ -2133,7 +2157,7 @@ pub(crate) fn install_job(
         LogLevel::Info,
         "hud",
         "install",
-        format!("Installed HUD: {name}"),
+        tr!("huds.activity.installed", name = name).to_string(),
     );
     activity::write(s, &entry);
     Ok(installed)

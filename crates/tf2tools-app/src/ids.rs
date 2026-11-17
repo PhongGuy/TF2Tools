@@ -3199,6 +3199,11 @@ pub fn addon_gb_card_badge(section: &str, id: GbId) -> ElementId {
     keyed("addon-gb-card-badge", &format!("{section}:{id}"))
 }
 
+/// A GameBanana add-on card's author line: "addon-gb-card-author:<section>:<id>".
+pub fn addon_gb_card_author(section: &str, id: GbId) -> ElementId {
+    keyed("addon-gb-card-author", &format!("{section}:{id}"))
+}
+
 /// A GameBanana add-on card's like count: "addon-gb-card-likes:<section>:<id>".
 pub fn addon_gb_card_likes(section: &str, id: GbId) -> ElementId {
     keyed("addon-gb-card-likes", &format!("{section}:{id}"))

@@ -7,12 +7,15 @@ use gpui_kit::component::tag::Tag;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Icon, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, App, Context, Entity, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement, StatefulInteractiveElement as _, Styled, TestSupportExt as _, Window, div, px,
+    ParentElement, SharedString, StatefulInteractiveElement as _, Styled, TestSupportExt as _,
+    Window, div, px,
 };
 use tf2tools_core::{AddonSection, GbAddonEntry, GbId};
 
 use super::{AddonsPage, section};
 use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer, GbAddonStage};
+use crate::i18n::names::addon_section_name;
+use crate::i18n::tr;
 use crate::ids;
 use crate::links::gamebanana_page;
 use crate::pages::common::{badge_of, card_frame};
@@ -25,13 +28,13 @@ use crate::widgets::Named as _;
 use crate::widgets::card_grid::stretch_rows;
 
 /// The tag a card shows, if any: gone wins over an update, which wins over not installed.
-fn tag_text(entry: &GbAddonEntry) -> Option<&'static str> {
+fn tag_text(entry: &GbAddonEntry) -> Option<SharedString> {
     if entry.is_gone() {
-        Some("No longer on GameBanana")
+        Some(tr!("addons.badge.gone"))
     } else if entry.has_update() {
-        Some("Update available")
+        Some(tr!("addons.badge.update_available"))
     } else if !entry.is_installed() {
-        Some("Not installed")
+        Some(tr!("addons.badge.not_installed"))
     } else {
         None
     }
@@ -97,7 +100,7 @@ pub(super) fn gb_section(
     }
     section(
         ids::ADDONS_GB,
-        "GameBanana add-ons",
+        tr!("addons.heading.gamebanana"),
         v_flex().gap_6().children(groups).into_any_element(),
     )
     .into_any_element()
@@ -111,7 +114,7 @@ fn labelled_group(kind: AddonSection, cx: &App) -> impl IntoElement {
             .font_weight(FontWeight::MEDIUM)
             .text_color(cx.theme().muted_foreground),
         ids::addons_gb_group(kind.key()),
-        kind.title(),
+        addon_section_name(kind),
     )
 }
 
@@ -157,11 +160,11 @@ fn has_vpk(entry: &GbAddonEntry) -> bool {
 }
 
 // The words on a running operation's footer.
-fn busy_label(stage: GbAddonStage) -> &'static str {
+fn busy_label(stage: GbAddonStage) -> SharedString {
     match stage {
-        GbAddonStage::Downloading { .. } => "Downloading...",
-        GbAddonStage::Choosing | GbAddonStage::Installing => "Installing...",
-        GbAddonStage::Removing => "Removing...",
+        GbAddonStage::Downloading { .. } => tr!("common.size.downloading"),
+        GbAddonStage::Choosing | GbAddonStage::Installing => tr!("addons.button.installing"),
+        GbAddonStage::Removing => tr!("addons.button.removing"),
     }
 }
 
@@ -203,12 +206,12 @@ fn gb_card(
                 let (button, label, icon) = match main {
                     Main::Update => (
                         Button::new(ids::addons_gb_update(id)),
-                        "Update",
+                        tr!("addons.button.update"),
                         IconName::RefreshCw,
                     ),
                     Main::Reinstall => (
                         Button::new(ids::addons_gb_reinstall(id)),
-                        "Install again",
+                        tr!("addons.button.install_again"),
                         IconName::Download,
                     ),
                 };
@@ -239,16 +242,16 @@ fn gb_card(
                         cx.listener(move |_, _, window, cx| remove(id, name.clone(), window, cx)),
                     );
                 if main.is_some() {
-                    button.named("Remove")
+                    button.named(tr!("addons.button.remove"))
                 } else {
-                    button.flex_1().label("Remove")
+                    button.flex_1().label(tr!("addons.button.remove"))
                 }
             };
             let url = gamebanana_page("", id);
             let open = Button::new(ids::addons_gb_open(id))
                 .ghost()
                 .icon(IconName::ExternalLink)
-                .named("Open on GameBanana")
+                .named(tr!("addons.button.open_gamebanana"))
                 .on_click(move |_, _, cx| cx.open_url(&url));
             main_button
                 .into_iter()
@@ -298,7 +301,7 @@ fn gb_card(
                         .text_sm()
                         .text_color(muted)
                         .truncate()
-                        .child(format!("by {}", entry.author()))
+                        .child(tr!("addons.card.by", author = entry.author()))
                 }))
                 .children(tag),
         )

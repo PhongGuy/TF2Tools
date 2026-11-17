@@ -22,7 +22,7 @@ use tf2tools_core::{
     BrowseError, GbId,
 };
 
-use super::card::{OpenAddon, card_height, gb_addon_card};
+use super::card::{CardBadge, OpenAddon, card_height, gb_addon_card};
 use crate::addon_detail::open_addon_detail;
 use crate::addon_feed::{AddonFeed, Keyed, StepAfter};
 use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer};
@@ -784,7 +784,7 @@ impl AddonTab {
                 let id = card.id;
                 let badge = installs
                     .upgrade()
-                    .and_then(|i| GbAddonOffer::of(i.read(cx).entry(id)).badge());
+                    .and_then(|i| CardBadge::of_offer(GbAddonOffer::of(i.read(cx).entry(id))));
                 let opened = card.clone();
                 let open: OpenAddon = Rc::new(move |window, cx: &mut App| {
                     open_addon_detail(gb_section, &opened, window, cx);

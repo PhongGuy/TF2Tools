@@ -44,7 +44,7 @@ use crate::widgets::Named as _;
 use crate::widgets::card_grid::{SHELL_CHROME_WIDTH, columns_for, stretch_rows};
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_area;
-use model::{AddonAction, MOVEMENT_OFF, actions, count_line, movement_on_text, needs_tf2};
+use model::{AddonAction, actions, count_line, movement_off, movement_on_text, needs_tf2};
 
 /// The Addons page. Built fresh on each visit; it reloads when TF2's state or the library changes.
 pub struct AddonsPage {
@@ -214,13 +214,14 @@ impl AddonsPage {
                 s.library.uninstall_addon(&name, &tf2).map_err(|e| {
                     describe_tf2_install(&e).into_op(tr!("messages.action.uninstall_addon"))
                 })?;
-                let message = format!("Uninstalled addon: {display}");
+                let message = tr!("addons.activity.uninstalled", name = display).to_string();
                 activity::write(
                     s,
                     &NewLogEntry::new(LogLevel::Info, "addon_store", "uninstall", message),
                 );
-                let removed = with_movement_off(&name, format!("{display} has been removed"));
-                Ok(("Addon uninstalled".into(), removed.into()))
+                let removed = tr!("addons.toast.uninstalled", name = display).to_string();
+                let removed = with_movement_off(&name, removed);
+                Ok((tr!("addons.toast.uninstalled_title"), removed.into()))
             },
             cx,
         );
@@ -255,14 +256,14 @@ impl AddonsPage {
                         s.library.delete_addon(&name, tf2.as_ref()).map_err(|e| {
                             describe_library(&e).into_op(tr!("messages.action.delete_addon"))
                         })?;
-                        let message = format!("Deleted addon from library: {display}");
+                        let message = tr!("addons.activity.deleted", name = display).to_string();
                         let entry = NewLogEntry::new(LogLevel::Info, "addon", "delete", message);
                         activity::write(s, &entry);
-                        let mut removed = format!("{display} removed from library");
+                        let mut removed = tr!("addons.toast.removed", name = display).to_string();
                         if restores {
                             removed = with_movement_off(&name, removed);
                         }
-                        Ok(("Addon removed".into(), removed.into()))
+                        Ok((tr!("addons.toast.removed_title"), removed.into()))
                     },
                     cx,
                 );
@@ -350,7 +351,7 @@ impl AddonsPage {
                 Button::new(ids::ADDONS_BROWSE)
                     .outline()
                     .icon(IconName::Store)
-                    .label("Browse Addon Store")
+                    .label(tr!("addons.button.browse"))
                     .on_click(cx.listener(|_, _, _, cx| cx.emit(NavigateTo(Page::AddonStore)))),
             )
     }
@@ -387,8 +388,8 @@ impl AddonsPage {
         let installed_body = if installed.is_empty() {
             empty_card(
                 ids::ADDONS_INSTALLED_EMPTY,
-                "No addons installed",
-                "Install addons from your library below or browse the Addon Store.",
+                tr!("addons.empty.installed_title"),
+                tr!("addons.empty.installed_body"),
                 cx,
             )
             .py_8()
@@ -400,13 +401,13 @@ impl AddonsPage {
             .gap_6()
             .child(section(
                 ids::ADDONS_INSTALLED,
-                "Installed Addons",
+                tr!("addons.heading.installed"),
                 installed_body,
             ))
             .children((!library.is_empty()).then(|| {
                 section(
                     ids::ADDONS_LIBRARY,
-                    "Your Library",
+                    tr!("addons.heading.library"),
                     rows(&library, columns, &state, cx),
                 )
             }))
@@ -417,8 +418,8 @@ impl AddonsPage {
     fn empty_library(&self, cx: &mut Context<Self>) -> AnyElement {
         empty_card(
             ids::ADDONS_EMPTY,
-            "No addons in your library",
-            "Browse the Addon Store to find performance and quality-of-life addons for TF2.",
+            tr!("addons.empty.library_title"),
+            tr!("addons.empty.library_body"),
             cx,
         )
         .py_12()
@@ -427,7 +428,7 @@ impl AddonsPage {
                 Button::new(ids::ADDONS_EMPTY_BROWSE)
                     .primary()
                     .icon(IconName::Store)
-                    .label("Browse Addon Store")
+                    .label(tr!("addons.button.browse"))
                     .on_click(cx.listener(|_, _, _, cx| cx.emit(NavigateTo(Page::AddonStore)))),
             ),
         )
@@ -456,16 +457,16 @@ fn copy_job(
             .library
             .install_addon(&name, &tf2)
             .map_err(|e| describe_tf2_install(&e).into_op(tr!("messages.action.install_addon")))?;
-        let message = format!("Installed addon: {display}");
+        let message = tr!("addons.activity.installed", name = display).to_string();
         activity::write(
             s,
             &NewLogEntry::new(LogLevel::Info, "addon_store", "install", message),
         );
-        let mut text = format!("{display} is now active");
+        let mut text = tr!("addons.toast.installed", name = display).to_string();
         if let Some(keys) = movement {
             text = format!("{text}. {}", movement_line(&keys, probe()));
         }
-        Ok(("Addon installed".into(), text.into()))
+        Ok((tr!("addons.toast.installed_title"), text.into()))
     }
 }
 
@@ -492,7 +493,7 @@ fn movement_line(keys: &MovementKeys, running: bool) -> String {
 // `text` followed by the movement-keys line when `name` is Null-Canceling Movement.
 fn with_movement_off(name: &AddonName, text: String) -> String {
     match name.is_null_movement() {
-        true => format!("{text}. {MOVEMENT_OFF}"),
+        true => format!("{text}. {}", movement_off()),
         false => text,
     }
 }
@@ -527,13 +528,7 @@ fn announce(
 impl Render for AddonsPage {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let missing = matches!(tf2_state(cx).read(cx), Tf2State::Missing { .. });
-        let warning = missing.then(|| {
-            no_tf2_warning(
-                ids::ADDONS_NO_TF2,
-                "Set the TF2 folder in Settings to manage addons.",
-                cx,
-            )
-        });
+        let warning = missing.then(|| no_tf2_warning(ids::ADDONS_NO_TF2, tr!("addons.no_tf2"), cx));
         let body = self.loaded.then(|| {
             if self.addons.is_empty()
                 && gamebanana::shown(self.gb.read(cx).entries())
@@ -562,7 +557,11 @@ impl Render for AddonsPage {
 }
 
 // A titled section, its heading labelled for the tests and the pilot.
-fn section(id: impl Into<ElementId>, title: &'static str, body: AnyElement) -> impl IntoElement {
+fn section(
+    id: impl Into<ElementId>,
+    title: impl Into<SharedString>,
+    body: AnyElement,
+) -> impl IntoElement {
     v_flex()
         .gap_3()
         .child(labelled(
@@ -576,8 +575,8 @@ fn section(id: impl Into<ElementId>, title: &'static str, body: AnyElement) -> i
 // v5's EmptyState inside a Card: a Puzzle icon, the title and a muted description.
 fn empty_card(
     id: &'static str,
-    title: &'static str,
-    description: &'static str,
+    title: impl Into<SharedString>,
+    description: impl Into<SharedString>,
     cx: &App,
 ) -> impl IntoElement + ParentElement + Styled {
     let muted = cx.theme().muted_foreground;
@@ -596,7 +595,7 @@ fn empty_card(
                 div()
                     .text_lg()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .child(title),
+                    .child(title.into()),
             )
             .child(
                 div()
@@ -605,7 +604,7 @@ fn empty_card(
                     .text_sm()
                     .text_center()
                     .text_color(muted)
-                    .child(description),
+                    .child(description.into()),
             ),
     )
 }
@@ -638,17 +637,17 @@ struct CardState {
 impl CardState {
     // The busy footer's label for `name`: its reinstall or this page's install reads
     // "Installing...", its download (or a reinstall waiting on one) "Downloading...".
-    fn busy_label(&self, name: &AddonName, cx: &App) -> Option<&'static str> {
+    fn busy_label(&self, name: &AddonName, cx: &App) -> Option<SharedString> {
         let updates = self.updates.read(cx);
         if self.installing.as_ref() == Some(name) || updates.is_installing(name) {
-            return Some("Installing...");
+            return Some(tr!("addons.button.installing"));
         }
         let item = StoreItemId::Addon(name.clone());
         let downloading = self
             .downloads
             .as_ref()
             .is_some_and(|d| d.read(cx).is_downloading(StoreKind::Addons, &item));
-        (downloading || updates.is_pending(name)).then_some("Downloading...")
+        (downloading || updates.is_pending(name)).then(|| tr!("common.size.downloading"))
     }
 }
 
@@ -703,7 +702,7 @@ fn addon_card(addon: &AddonEntry, state: &CardState, cx: &mut Context<AddonsPage
                     .primary()
                     .flex_1()
                     .icon(IconName::RefreshCw)
-                    .label("Update")
+                    .label(tr!("addons.button.update"))
                     .disabled(disabled(action))
                     .on_click(on(action))
                     .into_any_element(),
@@ -711,7 +710,7 @@ fn addon_card(addon: &AddonEntry, state: &CardState, cx: &mut Context<AddonsPage
                     let button = Button::new(ids::addon_install(name))
                         .flex_1()
                         .icon(IconName::Download)
-                        .label("Install")
+                        .label(tr!("addons.button.install"))
                         .disabled(disabled(action))
                         .on_click(on(action));
                     // Install is the card's primary action unless Update takes that place.
@@ -729,15 +728,18 @@ fn addon_card(addon: &AddonEntry, state: &CardState, cx: &mut Context<AddonsPage
                         .disabled(disabled(action))
                         .on_click(on(action));
                     if beside_update {
-                        button.named("Uninstall").into_any_element()
+                        button
+                            .named(tr!("addons.button.uninstall"))
+                            .into_any_element()
                     } else {
-                        button.flex_1().label("Uninstall").into_any_element()
+                        let label = tr!("addons.button.uninstall");
+                        button.flex_1().label(label).into_any_element()
                     }
                 }
                 AddonAction::Delete => Button::new(ids::addon_delete(name))
                     .ghost()
                     .icon(Icon::new(IconName::Trash).text_color(danger))
-                    .named("Remove from library")
+                    .named(tr!("addons.button.delete"))
                     .disabled(disabled(action))
                     .on_click(on(action))
                     .into_any_element(),
