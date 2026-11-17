@@ -56,7 +56,7 @@ impl GameBananaTab {
                 )
             })
         };
-        let config = StoreGridConfig::new(KIND, "HUDs").image_card(px(317.));
+        let config = StoreGridConfig::new(KIND).image_card(px(317.));
         let grid = cx.new(|cx| StoreGrid::new(config, render, window, cx));
         // The banner follows the hub's progress for this store and the grid's rows for its
         // suffix, so the page redraws when either changes.

@@ -31,16 +31,16 @@ pub fn curated_body() -> DetailBody {
             .map(|(key, url)| (key.clone(), capitalize(key), url.clone()))
             .collect();
         let traits = [
-            ("OS", &hud.os),
-            ("Gamemodes", &hud.gamemodes),
-            ("Resolutions", &hud.resolutions),
+            (tr!("hud_store.detail.os"), &hud.os),
+            (tr!("hud_store.detail.gamemodes"), &hud.gamemodes),
+            (tr!("hud_store.detail.resolutions"), &hud.resolutions),
         ];
         v_flex()
             .gap_3()
             .children(
                 hud.release_date
                     .as_ref()
-                    .map(|d| text_row(cx, format!("Released {d}"))),
+                    .map(|d| text_row(cx, tr!("hud_store.detail.released", date = d))),
             )
             .children(tag_row("flags", &hud.flags, false, cx))
             .children(
@@ -55,7 +55,7 @@ pub fn curated_body() -> DetailBody {
     })
     .with_action(|item, _, _| {
         let repo = CuratedHud::from_item(item)?.repo?;
-        Some(link_button("repo", "Repository", repo).into_any_element())
+        Some(link_button("repo", tr!("hud_store.detail.repository"), repo).into_any_element())
     })
 }
 
@@ -105,15 +105,15 @@ pub fn added_text(unix: i64) -> Option<SharedString> {
     })
 }
 
-fn text_row(cx: &App, text: String) -> Div {
+fn text_row(cx: &App, text: impl Into<SharedString>) -> Div {
     div()
         .text_sm()
         .text_color(cx.theme().muted_foreground)
-        .child(text)
+        .child(text.into())
 }
 
 // v5's header link: an outline button with the ExternalLink icon, opening `url` in the browser.
-fn link_button(key: &str, label: &'static str, url: String) -> Button {
+fn link_button(key: &str, label: impl Into<SharedString>, url: String) -> Button {
     Button::new(ids::store_detail_link(key))
         .outline()
         .icon(IconName::ExternalLink)

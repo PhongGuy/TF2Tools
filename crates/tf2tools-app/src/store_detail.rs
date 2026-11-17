@@ -296,10 +296,10 @@ impl StoreDetail {
         let muted = cx.theme().muted_foreground;
         let button = if let Some(pick) = self.body.update.clone() {
             // Update mode picks the file that replaces the library HUD, owned or not.
-            let label = "Update with this file";
+            let label = tr!("store_detail.button.update_with");
             let file = file.clone();
             Button::new(ids::store_file(index))
-                .label(label)
+                .label(label.clone())
                 .accessibility_label(label)
                 .primary()
                 .disabled(busy)
@@ -311,12 +311,12 @@ impl StoreDetail {
             let curated = self.item.kind == StoreKind::CuratedHuds;
             // Curated re-downloads replace the HUD in place; a GameBanana item is owned once.
             let (label, owned_gb) = match (self.item.in_library, curated) {
-                (true, true) => ("Re-download", false),
-                (true, false) => ("In Library", true),
-                _ => ("Download", false),
+                (true, true) => (tr!("store_download.button.redownload"), false),
+                (true, false) => (tr!("store_download.button.in_library"), true),
+                _ => (tr!("store_download.button.download"), false),
             };
             let button = Button::new(ids::store_file(index))
-                .label(label)
+                .label(label.clone())
                 .accessibility_label(label)
                 .disabled(busy || owned_gb)
                 .on_click(cx.listener(move |this, _, _, cx| {
@@ -354,7 +354,7 @@ impl StoreDetail {
                 .min_h(FILES_STATUS_HEIGHT)
                 .text_sm()
                 .text_color(muted)
-                .child("Loading files...")
+                .child(tr!("store_detail.files.loading"))
                 .into_any_element(),
             FilesState::Failed(message) => v_flex()
                 .gap_2()
@@ -367,14 +367,14 @@ impl StoreDetail {
                 .child(
                     Button::new(ids::STORE_FILES_RETRY)
                         .outline()
-                        .label("Retry")
+                        .label(tr!("widgets.store_error.retry"))
                         .on_click(cx.listener(|this, _, _, cx| this.retry_files(cx))),
                 )
                 .into_any_element(),
             FilesState::Ready(files) if files.is_empty() => div()
                 .text_sm()
                 .text_color(muted)
-                .child("No files to download")
+                .child(tr!("store_detail.files.none"))
                 .into_any_element(),
             FilesState::Ready(files) => v_flex()
                 .gap_2()
@@ -403,9 +403,9 @@ impl Render for StoreDetail {
             None => (false, false, None),
         };
         let badge_text = if self.item.kind == StoreKind::CuratedHuds {
-            "Downloaded"
+            tr!("store_detail.badge.downloaded")
         } else {
-            "In Library"
+            tr!("store_download.button.in_library")
         };
         // Update mode is about replacing the library copy, so it shows no ownership badge.
         let owned = self.item.in_library && self.body.update.is_none();
@@ -426,7 +426,7 @@ impl Render for StoreDetail {
                 div()
                     .text_sm()
                     .text_color(cx.theme().muted_foreground)
-                    .child(format!("by {a}"))
+                    .child(tr!("addon_store.card.by", author = a))
             });
         let progress_el = mine.then(|| {
             let label = SharedString::from(progress_label(progress));

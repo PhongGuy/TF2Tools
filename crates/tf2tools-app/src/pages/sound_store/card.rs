@@ -15,6 +15,7 @@ use super::body::sound_body;
 use super::model::category_label;
 use crate::audio::player::Player;
 use crate::counts::count_stat;
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::{badge_rows, card_frame, tag_badge};
 use crate::store_detail::{DetailItem, open_detail};
@@ -56,14 +57,14 @@ pub(super) fn sound_card(
     let button = {
         let (item, player) = (item.clone(), player.clone());
         let label = if state.in_library {
-            "In Library"
+            tr!("store_download.button.in_library")
         } else {
-            "Download"
+            tr!("store_download.button.download")
         };
         download_button(
             StoreKind::Sounds,
             &card.id,
-            label.into(),
+            label,
             state.in_library,
             false,
             move |window, cx| {
@@ -157,7 +158,7 @@ pub(super) fn sound_card(
                                         .text_sm()
                                         .line_height(px(20.))
                                         .text_color(theme.muted_foreground)
-                                        .child(format!("by {}", card.author)),
+                                        .child(tr!("addon_store.card.by", author = card.author)),
                                 ),
                         )
                         .children(play),
@@ -224,16 +225,16 @@ fn play_button(card: &StoreCard, state: CardState, player: &WeakEntity<Player>) 
     let (player, name, author) = (player.clone(), card.name.clone(), card.author.clone());
     // The icon-only button names its action, so a screen reader and a test hear Play or Stop.
     let (icon, action) = if state.playing {
-        (IconName::Square, "Stop")
+        (IconName::Square, tr!("sounds.button.stop"))
     } else {
-        (IconName::Play, "Play")
+        (IconName::Play, tr!("sounds.button.play"))
     };
     let button = Button::new(ids::store_play(StoreKind::Sounds, &card.id))
         .ghost()
         .flex_none()
         .icon(icon)
         .size(px(36.))
-        .tooltip(action)
+        .tooltip(action.clone())
         .accessibility_label(action)
         .on_click(move |_, _, cx| {
             // The card itself opens the detail, so the click stops here.

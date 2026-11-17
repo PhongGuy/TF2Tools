@@ -13,6 +13,7 @@ use gpui_kit::{
     Window, px,
 };
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::shell::CONTENT_PADDING;
 use crate::shell::route::Page;
@@ -109,8 +110,8 @@ impl HudStorePage {
 
     fn tab_button(&self, tab: HudStoreTab, cx: &mut Context<Self>) -> Button {
         let (id, label) = match tab {
-            HudStoreTab::Curated => (ids::HUD_STORE_TAB_CURATED, "Curated"),
-            HudStoreTab::GameBanana => (ids::HUD_STORE_TAB_GAMEBANANA, "GameBanana"),
+            HudStoreTab::Curated => (ids::HUD_STORE_TAB_CURATED, tr!("hud_store.tab.curated")),
+            HudStoreTab::GameBanana => (ids::HUD_STORE_TAB_GAMEBANANA, "GameBanana".into()),
         };
         // v5's TabsList is h-9, so the strip and every row under it sit where v5's do.
         Button::new(id)

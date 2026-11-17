@@ -25,7 +25,7 @@ use tf2tools_core::{Provenance, StoreItemId, StoreKind};
 use super::bodies::curated_body;
 use super::curated::{CuratedFilter, CuratedHud, Facet, Os, count_label, facets};
 use crate::gb_card::OpenCard;
-use crate::i18n::tr;
+use crate::i18n::{self, tr};
 use crate::ids;
 use crate::local_messages::{describe_library, describe_store_status};
 use crate::pages::common::{
@@ -53,12 +53,17 @@ const CARD_FLAGS: usize = 4;
 /// The flags wrap onto at most this many rows; a flag past them is hidden whole.
 const FLAG_ROWS: usize = 2;
 /// The "More filters" chip rows, in v5's order.
-const FACET_ROWS: [(Facet, &str); 4] = [
-    (Facet::Flag, "Features"),
-    (Facet::Tag, "Tags"),
-    (Facet::Gamemode, "Gamemode"),
-    (Facet::Resolution, "Resolution"),
-];
+const FACET_ROWS: [Facet; 4] = [Facet::Flag, Facet::Tag, Facet::Gamemode, Facet::Resolution];
+
+// A "More filters" row's title, in the player's language.
+fn facet_title(facet: Facet) -> SharedString {
+    match facet {
+        Facet::Flag => tr!("hud_store.filter.features"),
+        Facet::Tag => tr!("hud_store.filter.tags"),
+        Facet::Gamemode => tr!("hud_store.filter.gamemode"),
+        Facet::Resolution => tr!("hud_store.filter.resolution"),
+    }
+}
 
 /// The Curated tab. Filters apply in memory, so every change redraws at once.
 pub struct CuratedTab {
@@ -76,6 +81,8 @@ pub struct CuratedTab {
     sync_reload_pending: bool,
     more: bool,
     search: Entity<InputState>,
+    /// The language the search placeholder was titled in.
+    language: &'static str,
     grid: CardGrid,
     /// The grid's last drawn range, as indices into `shown`.
     visible: Range<usize>,
@@ -89,7 +96,8 @@ pub struct CuratedTab {
 impl CuratedTab {
     /// Needs the `Services` global. Presets the OS filter to the running OS, then loads.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search HUDs..."));
+        let search =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("store_grid.search.huds")));
         let mut subscriptions = vec![cx.subscribe(&search, |tab, input, event, cx| {
             if matches!(event, InputEvent::Change) {
                 let text = input.read(cx).value().to_string();
@@ -145,6 +153,7 @@ impl CuratedTab {
             sync_reload_pending: false,
             more: false,
             search,
+            language: i18n::current(),
             grid,
             visible: 0..0,
             viewer,
@@ -238,8 +247,7 @@ impl CuratedTab {
             let _ = tab.update(cx, |tab, cx| {
                 match read {
                     Ok((huds, downloaded)) => {
-                        tab.facet_values =
-                            FACET_ROWS.iter().map(|(f, _)| facets(&huds, *f)).collect();
+                        tab.facet_values = FACET_ROWS.iter().map(|f| facets(&huds, *f)).collect();
                         tab.huds = huds.into();
                         tab.downloaded = Rc::new(downloaded);
                         tab.error = None;
@@ -307,7 +315,7 @@ impl CuratedTab {
                 Toggle::new(ids::store_filter_os(os.key()))
                     .label(os.label())
                     // The kit's toggle reads its name from the tooltip, not the label.
-                    .tooltip(format!("HUDs that work on {}", os.label()))
+                    .tooltip(tr!("hud_store.filter.os_tooltip", os = os.label()))
                     .checked(self.filter.os.contains(&os))
                     .px_3()
                     .font_weight(FontWeight::MEDIUM)
@@ -369,7 +377,7 @@ impl CuratedTab {
                                             .font_weight(FontWeight::MEDIUM)
                                             .text_color(muted),
                                         ids::STORE_FILTER_OS_LABEL,
-                                        "OS:",
+                                        tr!("hud_store.filter.os"),
                                     ))
                                     .child(
                                         div()
@@ -380,7 +388,7 @@ impl CuratedTab {
                             )
                             .child(
                                 Checkbox::new(ids::STORE_FILTER_PRERELEASE)
-                                    .label("Hide prereleases")
+                                    .label(tr!("hud_store.filter.hide_prereleases"))
                                     .checked(self.filter.hide_prerelease)
                                     .on_click(cx.listener(|tab, checked: &bool, _, cx| {
                                         let checked = *checked;
@@ -396,7 +404,7 @@ impl CuratedTab {
                                         Button::new(ids::STORE_FILTER_CLEAR)
                                             .ghost()
                                             .icon(IconName::X)
-                                            .label("Clear filters")
+                                            .label(tr!("hud_store.filter.clear"))
                                             .on_click(cx.listener(|tab, _, window, cx| {
                                                 tab.clear(window, cx)
                                             }))
@@ -410,9 +418,9 @@ impl CuratedTab {
                                                 IconName::ChevronDown
                                             })
                                             .label(if self.more {
-                                                "Less filters"
+                                                tr!("hud_store.filter.less")
                                             } else {
-                                                "More filters"
+                                                tr!("hud_store.filter.more")
                                             })
                                             .on_click(cx.listener(|tab, _, _, cx| {
                                                 tab.more = !tab.more;
@@ -432,12 +440,18 @@ impl CuratedTab {
             .iter()
             .zip(&self.facet_values)
             .filter(|(_, values)| !values.is_empty())
-            .map(|(&(facet, title), values)| {
+            .map(|(&facet, values)| {
                 let selected = self.filter.selected(facet);
                 h_flex()
                     .gap_2()
                     .flex_wrap()
-                    .child(div().w(px(96.)).text_sm().text_color(muted).child(title))
+                    .child(
+                        div()
+                            .w(px(96.))
+                            .text_sm()
+                            .text_color(muted)
+                            .child(facet_title(facet)),
+                    )
                     .children(values.iter().map(|value| {
                         let owned = value.clone();
                         chip(
@@ -452,6 +466,18 @@ impl CuratedTab {
             })
             .collect::<Vec<_>>();
         v_flex().gap_2().children(rows)
+    }
+
+    // The tab is kept while the page lives, so a language switch retitles its search box.
+    fn follow_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.language == i18n::current() {
+            return;
+        }
+        self.language = i18n::current();
+        let placeholder = tr!("store_grid.search.huds");
+        self.search.update(cx, |input, cx| {
+            input.set_placeholder(placeholder, window, cx)
+        });
     }
 
     fn error_line(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
@@ -474,28 +500,31 @@ impl CuratedTab {
         let skeletons =
             |id, label| skeleton_cards(id, label, SKELETON_CARDS, columns, SkeletonTop::Image, cx);
         if !self.loaded {
-            return Some(skeletons(ids::STORE_LOADING, "Loading..."));
+            return Some(skeletons(ids::STORE_LOADING, tr!("store_grid.loading")));
         }
         if self.shown.is_empty() {
             if self.huds.is_empty() {
                 if self.is_syncing(cx) {
-                    return Some(skeletons(ids::STORE_SYNCING, "Syncing HUDs..."));
+                    return Some(skeletons(
+                        ids::STORE_SYNCING,
+                        tr!("store_grid.syncing.huds"),
+                    ));
                 }
                 return Some(empty_state_card(
                     ids::STORE_UNLOADED,
                     IconName::WifiOff,
-                    "Could not load store",
+                    tr!("hud_store.curated.unloaded"),
                     None,
-                    "Check your internet connection and try again.",
+                    tr!("store_grid.hint.offline"),
                     cx,
                 ));
             }
             return Some(empty_state_card(
                 ids::STORE_EMPTY,
                 IconName::Store,
-                "No HUDs match your filters",
+                tr!("store_grid.no_match.filters.huds"),
                 Some(ids::STORE_EMPTY_HINT),
-                "Try adjusting your search or filter criteria.",
+                tr!("store_grid.hint.filters"),
                 cx,
             ));
         }
@@ -561,9 +590,9 @@ fn curated_card(hud: &CuratedHud, downloaded: bool, cx: &App) -> AnyElement {
         _ => shot,
     };
     let label = if downloaded {
-        "Re-download"
+        tr!("store_download.button.redownload")
     } else {
-        "Download"
+        tr!("store_download.button.download")
     };
     // v5 opens the detail from a click anywhere on the card, the button included.
     let open: OpenCard = Rc::new(move |window, cx| {
@@ -574,7 +603,7 @@ fn curated_card(hud: &CuratedHud, downloaded: bool, cx: &App) -> AnyElement {
         download_button(
             KIND,
             &id,
-            label.into(),
+            label,
             downloaded,
             false,
             move |window, cx| {
@@ -591,7 +620,7 @@ fn curated_card(hud: &CuratedHud, downloaded: bool, cx: &App) -> AnyElement {
             .ghost()
             .flex_none()
             .icon(IconName::ExternalLink)
-            .named("Visit the HUD's page")
+            .named(tr!("hud_store.card.visit"))
             .size(px(36.))
             .on_click(move |_, _, cx| {
                 // The card itself opens the detail, so the click stops here.
@@ -657,7 +686,7 @@ fn curated_card(hud: &CuratedHud, downloaded: bool, cx: &App) -> AnyElement {
                                         .text_sm()
                                         .line_height(px(20.))
                                         .text_color(theme.muted_foreground)
-                                        .child(format!("by {}", hud.author)),
+                                        .child(tr!("addon_store.card.by", author = hud.author)),
                                 ),
                         )
                         .children(repo),
@@ -694,6 +723,7 @@ fn curated_card(hud: &CuratedHud, downloaded: bool, cx: &App) -> AnyElement {
 
 impl Render for CuratedTab {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.follow_language(window, cx);
         // v5's `flex flex-col gap-6`: the first card row sits 24 px under the toolbar.
         let viewport_width = window.viewport_size().width;
         // The grid never gets shorter than one card row; open filters scroll the page instead.
@@ -703,7 +733,7 @@ impl Render for CuratedTab {
             .child(labelled(
                 div().text_sm().text_color(cx.theme().muted_foreground),
                 ids::HUD_STORE_CURATED_SOURCE,
-                "Curated HUDs from hud-db.",
+                tr!("hud_store.curated.source"),
             ))
             .child(self.toolbar(cx))
             .children(self.error_line(cx))

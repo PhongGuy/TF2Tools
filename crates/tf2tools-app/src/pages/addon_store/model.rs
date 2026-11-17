@@ -1,8 +1,9 @@
 //! The Addon Store's pure model: each addon's button state, its labels and the card order.
 
+use gpui_kit::SharedString;
 use tf2tools_core::{AddonEntry, StoreItem};
 
-use crate::i18n::{counted_plural, format};
+use crate::i18n::{counted_plural, format, tr};
 
 /// What an addon card offers: a Download or Update button, or an In Library or Installed badge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -14,13 +15,13 @@ pub enum AddonState {
 }
 
 impl AddonState {
-    /// The text v5 shows on the button or badge.
-    pub fn label(self) -> &'static str {
+    /// The text v5 shows on the button or badge, in the player's language.
+    pub fn label(self) -> SharedString {
         match self {
-            Self::Download => "Download",
-            Self::InLibrary => "In Library",
-            Self::Installed => "Installed",
-            Self::Update => "Update",
+            Self::Download => tr!("store_download.button.download"),
+            Self::InLibrary => tr!("store_download.button.in_library"),
+            Self::Installed => tr!("addon_store.badge.installed"),
+            Self::Update => tr!("addon_store.button.update"),
         }
     }
 

@@ -48,7 +48,7 @@ impl CrosshairStorePage {
                 gamebanana_card(KIND, card, image, in_library, IconName::Crosshair, open, cx)
             })
         };
-        let config = StoreGridConfig::new(KIND, "crosshairs")
+        let config = StoreGridConfig::new(KIND)
             .image_card(px(268.5))
             .without_search();
         let grid = cx.new(|cx| StoreGrid::new(config, render, window, cx));

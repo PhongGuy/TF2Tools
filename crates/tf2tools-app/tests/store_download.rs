@@ -15,8 +15,8 @@ use tf2tools_app::store_download::{
     DownloadEvent, DownloadTarget, StoreDownloads, download_button, download_variant,
 };
 use tf2tools_app::store_download::{
-    Progress, format_bytes, kind_noun, kind_title, progress_label, progress_percent,
-    stayed_description,
+    Progress, download_failed_title, downloaded_title, format_bytes, progress_label,
+    progress_percent, stayed_description,
 };
 use tf2tools_app::tokio_bridge;
 use tf2tools_core::{DownloadPhase, GbId, StoreItemId, StoreKind};
@@ -60,14 +60,28 @@ fn the_label_and_bar_follow_the_phase() {
 }
 
 #[test]
-fn nouns_and_what_stayed() {
-    assert_eq!(kind_noun(StoreKind::CuratedHuds), "HUD");
-    assert_eq!(kind_noun(StoreKind::GameBananaHuds), "HUD");
-    assert_eq!(kind_noun(StoreKind::Sounds), "sound");
-    assert_eq!(kind_noun(StoreKind::Crosshairs), "crosshair");
-    assert_eq!(kind_noun(StoreKind::Addons), "addon");
-    assert_eq!(kind_title(StoreKind::Sounds), "Sound");
-    assert_eq!(kind_title(StoreKind::GameBananaHuds), "HUD");
+fn toast_titles_and_what_stayed() {
+    assert_eq!(downloaded_title(StoreKind::Sounds), "Sound downloaded");
+    assert_eq!(
+        downloaded_title(StoreKind::GameBananaHuds),
+        "HUD downloaded"
+    );
+    assert_eq!(
+        download_failed_title(StoreKind::CuratedHuds),
+        "Failed to download HUD"
+    );
+    assert_eq!(
+        download_failed_title(StoreKind::Sounds),
+        "Failed to download sound"
+    );
+    assert_eq!(
+        download_failed_title(StoreKind::Crosshairs),
+        "Failed to download crosshair"
+    );
+    assert_eq!(
+        download_failed_title(StoreKind::Addons),
+        "Failed to download addon"
+    );
     assert_eq!(stayed_description("Try again.", &[]), "Try again.");
     assert_eq!(
         stayed_description("Try again.", &["a".into(), "b".into()]),

@@ -19,7 +19,7 @@ fn card(id: u64) -> gpui_kit::ElementId {
 fn sync_progress_requeries_once_a_second_and_keeps_the_first_visible_card(cx: &mut TestAppContext) {
     let env = support::env();
     let (hub, runs) = support::fake_hub(cx);
-    let config = StoreGridConfig::new(StoreKind::Crosshairs, "crosshairs");
+    let config = StoreGridConfig::new(StoreKind::Crosshairs);
     let (win, grid) = support::store_grid_window(cx, &env, config, |env| {
         support::seed_crosshairs(env, 1..=150, 0, false)
     });
@@ -91,7 +91,7 @@ fn sync_progress_requeries_once_a_second_and_keeps_the_first_visible_card(cx: &m
 fn a_new_query_drops_the_trailing_requery_without_stalling_the_next(cx: &mut TestAppContext) {
     let env = support::env();
     let (hub, runs) = support::fake_hub(cx);
-    let config = StoreGridConfig::new(StoreKind::Crosshairs, "crosshairs");
+    let config = StoreGridConfig::new(StoreKind::Crosshairs);
     let (_win, grid) = support::store_grid_window(cx, &env, config, |env| {
         support::seed_crosshairs(env, 1..=10, 0, false)
     });

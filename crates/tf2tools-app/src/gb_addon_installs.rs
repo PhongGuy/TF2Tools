@@ -72,18 +72,22 @@ impl GbAddonOffer {
     }
 
     /// The control's label.
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> SharedString {
         match self {
-            Self::Install => "Install",
-            Self::Update => "Update",
-            Self::InstallAgain => "Install again",
-            Self::Installed => "Installed",
+            Self::Install => tr!("addon_store.offer.install"),
+            Self::Update => tr!("addon_store.button.update"),
+            Self::InstallAgain => tr!("addon_store.offer.install_again"),
+            Self::Installed => tr!("addon_store.badge.installed"),
         }
     }
 
-    /// The card's badge: "Update" or "Installed", none otherwise.
-    pub fn badge(self) -> Option<&'static str> {
-        matches!(self, Self::Update | Self::Installed).then(|| self.label())
+    /// The card's badge: "Update" or "Installed", none otherwise; the same words as `CardBadge`.
+    pub fn badge(self) -> Option<SharedString> {
+        match self {
+            Self::Update => Some(tr!("addon_store.badge.update")),
+            Self::Installed => Some(tr!("addon_store.badge.installed")),
+            Self::Install | Self::InstallAgain => None,
+        }
     }
 
     /// Whether the offer downloads GameBanana's newest file; the rest use the library copy.

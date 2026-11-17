@@ -522,7 +522,7 @@ fn a_gone_addon_with_a_newer_file_on_record_offers_no_update(cx: &mut TestAppCon
     });
     let offer = GbAddonOffer::of(entry(cx, 30).as_ref());
     assert_eq!(offer, GbAddonOffer::Installed);
-    assert_eq!(offer.badge(), Some("Installed"));
+    assert_eq!(offer.badge().as_deref(), Some("Installed"));
 }
 
 #[gpui_kit::test]
