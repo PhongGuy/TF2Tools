@@ -90,7 +90,7 @@ fn the_shell_dialogs_read_in_russian() {
             "Несохранённые изменения",
             "Есть несохранённые изменения. Отбросить их?",
             "Отбросить",
-            "Продолжить правку"
+            "Продолжить редактирование"
         ]
     );
     assert_eq!(
@@ -241,7 +241,7 @@ fn the_map_checklist_says_what_was_skipped_in_russian(cx: &mut TestAppContext) {
     assert_eq!(
         support::label_of(cx, win, ids::PAYLOAD_CHECKLIST_DESCRIPTION).as_deref(),
         Some(
-            "В Pack несколько карт. Выберите, какие установить. Некоторые лишние файлы из загрузки пропущены."
+            "В Pack несколько карт. Выберите, какие установить. Часть дополнительных файлов из этой загрузки пропущена."
         )
     );
 }

@@ -353,7 +353,7 @@ fn the_logs_tf_texts_read_in_russian() {
         "На logs.tf больше нет этого лога."
     );
     assert_eq!(ring_label(None), "Синхронизация logs.tf...");
-    assert_eq!(streaks_label(13), "Показать серии (13)");
+    assert_eq!(streaks_label(13), "Серии убийств (13)");
     assert_eq!(counting_text(3), "Подсчёт старых логов, осталось: 3");
     assert_eq!(
         event_text(&EventKind::RoundWin { team: Team::Red }, &|_| String::new()),
@@ -386,7 +386,7 @@ fn the_russian_class_table_keeps_its_english_ids(cx: &mut TestAppContext) {
         ("Assists/min", "Помощь/мин"),
         ("Dmg/min", "Урон/мин"),
         ("KA/D", "KA/D"),
-        ("Heals/min", "Хил/мин"),
+        ("Heals/min", "Леч./мин"),
         ("Ubers/10 min", "Убер/10 мин"),
     ];
     for (id, russian) in heads {
@@ -435,7 +435,7 @@ fn an_open_russian_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
         ("Damage", "Урон"),
         ("Charges", "Заряды"),
         ("Drops", "Потери"),
-        ("Caps", "Захваты"),
+        ("Caps", "Захв."),
         ("Midfights", "Мидфайты"),
     ];
     for (column, russian) in headers {
@@ -448,9 +448,9 @@ fn an_open_russian_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
             cell.size.width
         );
     }
-    // The Team column carries no id; its width is banner.rs's 48 px. The rounds table's
+    // The Team column carries no id; its width is banner.rs's 40 px. The rounds table's
     // Length header reads "Время" in its 52 px column.
-    assert!(text_width(cx, s.win, "Ком.", 0.75, FontWeight::MEDIUM) <= px(48.));
+    assert!(text_width(cx, s.win, "Ком.", 0.75, FontWeight::MEDIUM) <= px(40.));
     assert!(text_width(cx, s.win, "Время", 0.75, FontWeight::MEDIUM) <= px(52.));
     let rahmed = sid(175_790_976);
     scroll_to_in_log(cx, &s, &page, 3, ids::logstf_medic(rahmed));

@@ -230,7 +230,7 @@ fn the_sidebar_header_and_tf2_notice_read_in_russian(cx: &mut TestAppContext) {
     });
     assert_eq!(
         label(cx, ids::HUDS_NO_TF2.into()).as_deref(),
-        Some("TF2 не найден")
+        Some("TF2 не найдена")
     );
     support::click_id(cx, s.win, ids::nav(Page::Logs));
     assert_eq!(
@@ -737,8 +737,8 @@ fn profile_texts_read_in_russian() {
     assert_eq!(
         texts(&Confirm::tf2_running())[..3],
         [
-            "TF2 запущен",
-            "TF2 запущен; изменения вступят в силу после перезапуска.",
+            "TF2 запущена",
+            "TF2 запущена; изменения вступят в силу после перезапуска.",
             "Продолжить"
         ]
     );

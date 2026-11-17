@@ -30,7 +30,7 @@ const COLUMNS: [Column; 6] = [
     (
         "Kills",
         || tr!("logs_tf.detail.kills_short"),
-        56.,
+        48.,
         TeamTotals::kills,
     ),
     (
@@ -51,7 +51,7 @@ const COLUMNS: [Column; 6] = [
         48.,
         TeamTotals::drops,
     ),
-    ("Caps", || tr!("logs_tf.detail.caps"), 56., TeamTotals::caps),
+    ("Caps", || tr!("logs_tf.detail.caps"), 48., TeamTotals::caps),
     (
         "Midfights",
         || tr!("logs_tf.detail.midfights"),
@@ -61,7 +61,7 @@ const COLUMNS: [Column; 6] = [
 ];
 
 // The Team column, wide enough for its header and for "BLU".
-const TEAM: f32 = 48.;
+const TEAM: f32 = 40.;
 
 /// The score banner of log `id`: BLU's half on the left, RED's on the right, each score
 /// beside the centre line, labelled "BLU 2, RED 3".

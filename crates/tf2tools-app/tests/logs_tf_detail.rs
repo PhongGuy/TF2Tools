@@ -1054,6 +1054,31 @@ fn the_team_table_fits_the_smallest_window(cx: &mut TestAppContext) {
     }
 }
 
+// The team table keeps its English column widths in every language; Russian fits by
+// abbreviating its headers, not by widening the table.
+#[gpui_kit::test]
+fn the_team_table_keeps_its_column_widths(cx: &mut TestAppContext) {
+    use tf2tools_core::Team;
+    let (_env, _server, s, _page) = opened_at(cx, 3, 800., 600., ids::LOGSTF_TEAMS_SCROLL);
+    let cell = |cx: &mut TestAppContext, title| {
+        support::bounds_of(cx, s.win, ids::logstf_team_cell(Team::Blue, title)).expect(title)
+    };
+    let widths = [
+        ("Kills", 48.),
+        ("Damage", 56.),
+        ("Charges", 56.),
+        ("Drops", 48.),
+        ("Caps", 48.),
+        ("Midfights", 72.),
+    ];
+    for (title, width) in widths {
+        assert_eq!(f32::from(cell(cx, title).size.width), width, "{title}");
+    }
+    // The Team column has no id; the table's 40 px of it plus the 4 px gap sit before Kills.
+    let table = support::bounds_of(cx, s.win, ids::LOGSTF_TEAMS_SCROLL).unwrap();
+    assert_eq!(f32::from(cell(cx, "Kills").left() - table.left()), 44.);
+}
+
 #[gpui_kit::test]
 fn the_matrix_total_header_lines_up_with_the_class_icons(cx: &mut TestAppContext) {
     let (_env, _server, s, _page) = opened_at(cx, 3, 1280., 800., ids::LOGSTF_MATRIX_SCROLL);

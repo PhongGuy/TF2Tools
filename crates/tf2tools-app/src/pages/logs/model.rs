@@ -12,8 +12,8 @@ use crate::widgets::label_option::LabelOption;
 /// Rows fetched per query; the next page's `before` is the last row's id.
 pub const PAGE_SIZE: u32 = 100;
 
-/// The category select: English label (the row's value and id), then the filter (`None` is every category). v5's order, then
-/// Profiles and Addons.
+/// The category select: English label (the row's value and id), then the filter (`None` is
+/// every category). v5's order, then Profiles and Addons.
 pub const CATEGORIES: [(&str, Option<&str>); 9] = [
     ("All categories", None),
     ("HUDs", Some("hud")),
@@ -46,7 +46,9 @@ pub fn category_options() -> Vec<LabelOption> {
         "System" => tr!("activity_log.category.system"),
         "Profiles" => tr!("nav.profiles"),
         "Addons" => tr!("nav.addons"),
-        _ => tr!("activity_log.filter.all_categories"),
+        "All categories" => tr!("activity_log.filter.all_categories"),
+        // A row added without its own arm shows its English label rather than another row's.
+        other => SharedString::from(other.to_owned()),
     };
     LabelOption::keyed(
         ids::LOGS_CATEGORY,
