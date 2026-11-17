@@ -746,6 +746,9 @@ mod tests {
         "pages/profiles/probe.rs",
         "pages/profiles/editor.rs",
         "pages/profiles/editor_model.rs",
+        "pages/addons/mod.rs",
+        "pages/addons/model.rs",
+        "pages/addons/gamebanana.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).

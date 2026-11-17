@@ -439,6 +439,17 @@ confirm:
     body: "Удалить %{name} из библиотеки?"
     in_tf2: "Он также будет удалён из TF2."
   crosshair_used: { one: "Его использует %{count} оружие. После удаления там будет прицел по умолчанию.", few: "Его используют %{count} оружия. Они вернутся к прицелу по умолчанию.", many: "Его используют %{count} оружий. Они вернутся к прицелу по умолчанию." }
+  remove: "Удалить"
+  delete_addon:
+    title: "Удалить дополнение"
+    body: "Удалить это дополнение из библиотеки? Если оно установлено, оно также будет удалено из TF2."
+  remove_gb_addon:
+    title: "Удалить дополнение"
+    body: "Удалить %{name}? Оно будет удалено из TF2 и из вашей библиотеки."
+  addon_needs_mastercomfig:
+    title: "Нужен mastercomfig"
+    body: "Этому дополнению нужен mastercomfig. Установить оба?"
+    ok: "Установить оба"
 
 font_check:
   installed: { one: "Установлен %{count} шрифт для %{folder}. Перезапустите TF2, чтобы изменения вступили в силу.", few: "Установлено %{count} шрифта для %{folder}. Перезапустите TF2, чтобы применить их.", many: "Установлено %{count} шрифтов для %{folder}. Перезапустите TF2, чтобы применить их." }
@@ -600,6 +611,73 @@ sounds:
     installed_killsound: "Килсаунд установлен: %{name}"
     uninstalled_hitsound: "Хитсаунд убран из TF2"
     uninstalled_killsound: "Килсаунд убран из TF2"
+
+addons:
+  no_tf2: "Укажите папку TF2 в настройках, чтобы управлять дополнениями."
+  count:
+    none: "В библиотеке нет дополнений"
+    some: "В библиотеке: %{library}, установлено: %{installed}"
+  heading:
+    installed: "Установленные дополнения"
+    library: "Ваша библиотека"
+    gamebanana: "Дополнения с GameBanana"
+  section:
+    skins: "Скины"
+    effects: "Эффекты"
+    guis: "Интерфейсы"
+    textures: "Текстуры"
+    gamefiles: "Файлы игры"
+    maps: "Карты"
+  empty:
+    installed_title: "Нет установленных дополнений"
+    installed_body: "Установите дополнения из библиотеки ниже или загляните в магазин дополнений."
+    library_title: "В вашей библиотеке нет дополнений"
+    library_body: "В магазине дополнений есть дополнения для производительности и удобства в TF2."
+  button:
+    browse: "В магазин дополнений"
+    update: "Обновить"
+    install: "Установить"
+    install_again: "Переустановить"
+    uninstall: "Убрать"
+    delete: "Удалить из библиотеки"
+    remove: "Удалить"
+    open_gamebanana: "Открыть на GameBanana"
+    installing: "Установка..."
+    removing: "Удаление..."
+  badge:
+    gone: "Больше нет на GameBanana"
+    update_available: "Доступно обновление"
+    not_installed: "Не установлено"
+  card:
+    by: "автор: %{author}"
+  toast:
+    installed_title: "Дополнение установлено"
+    installed: "%{name} теперь активно"
+    uninstalled_title: "Дополнение убрано"
+    uninstalled: "%{name} убрано из TF2"
+    removed_title: "Дополнение удалено"
+    removed: "%{name} удалено из библиотеки"
+  activity:
+    installed: "Дополнение установлено: %{name}"
+    uninstalled: "Дополнение убрано из TF2: %{name}"
+    deleted: "Дополнение удалено из библиотеки: %{name}"
+  movement:
+    keys: "Теперь его используют клавиши: %{keys}."
+    unbound: "Ни одна клавиша не двигает вас %{directions}; назначьте её в TF2."
+    restart: "Оно заработает при следующем запуске TF2."
+    none: "В настройках TF2 не нашлось клавиш движения, так что ему пока нечего использовать."
+    normal: "Клавиши движения снова работают как обычно."
+    or: " или "
+    direction:
+      forward: "вперёд"
+      left: "влево"
+      back: "назад"
+      right: "вправо"
+    arrow:
+      up: "стрелка вверх"
+      down: "стрелка вниз"
+      left: "стрелка влево"
+      right: "стрелка вправо"
 
 external_huds:
   names_more: { one: "%{names} и ещё %{count}", few: "%{names} и ещё %{count}", many: "%{names} и ещё %{count}" }

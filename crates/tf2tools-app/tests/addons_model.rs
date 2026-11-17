@@ -1,5 +1,5 @@
 use tf2tools_app::pages::addons::model::{
-    AddonAction, MOVEMENT_OFF, actions, count_line, movement_on_text, needs_tf2,
+    AddonAction, actions, count_line, movement_off, movement_on_text, needs_tf2,
 };
 
 #[test]
@@ -75,5 +75,5 @@ fn with_tf2_running_it_starts_next_time() {
 
 #[test]
 fn turning_it_off_reads_plainly() {
-    assert_eq!(MOVEMENT_OFF, "Your movement keys are back to normal.");
+    assert_eq!(movement_off(), "Your movement keys are back to normal.");
 }

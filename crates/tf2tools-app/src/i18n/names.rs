@@ -1,7 +1,8 @@
-//! The names of the game's classes, weapon slots and sound kinds in the current language.
+//! The names of the game's classes, weapon slots, sound kinds and add-on sections in the
+//! current language.
 
 use gpui_kit::SharedString;
-use tf2tools_core::{SoundKind, TfClass, WeaponSlot};
+use tf2tools_core::{AddonSection, SoundKind, TfClass, WeaponSlot};
 
 use super::tr;
 
@@ -64,5 +65,18 @@ pub fn sound_kind_name(kind: SoundKind) -> SharedString {
         SoundKind::Hitsound => tr!("common.sound_kind.hitsound"),
         SoundKind::Killsound => tr!("common.sound_kind.killsound"),
         _ => kind.name().into(),
+    }
+}
+
+/// The add-on section's name, such as "Skins"; a section core adds later keeps core's title.
+pub fn addon_section_name(section: AddonSection) -> SharedString {
+    match section.key() {
+        "skins" => tr!("addons.section.skins"),
+        "effects" => tr!("addons.section.effects"),
+        "guis" => tr!("addons.section.guis"),
+        "textures" => tr!("addons.section.textures"),
+        "gamefiles" => tr!("addons.section.gamefiles"),
+        "maps" => tr!("addons.section.maps"),
+        _ => section.title().into(),
     }
 }

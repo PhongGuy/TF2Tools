@@ -1,5 +1,9 @@
 //! The Addons page's pure rules: v5's card actions, their TF2 gating and the count line.
 
+use gpui_kit::SharedString;
+
+use crate::i18n::tr;
+
 /// One button in an addon card's footer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AddonAction {
@@ -34,46 +38,60 @@ pub fn needs_tf2(action: AddonAction, installed: bool) -> bool {
 /// v5's count line: "No addons in library" or "{library} in library, {installed} installed".
 pub fn count_line(library: usize, installed: usize) -> String {
     if library == 0 {
-        "No addons in library".to_owned()
+        tr!("addons.count.none").to_string()
     } else {
-        format!("{library} in library, {installed} installed")
+        tr!(
+            "addons.count.some",
+            library = library,
+            installed = installed
+        )
+        .to_string()
     }
 }
 
 /// The toast line when Null-Canceling Movement is turned off.
-pub const MOVEMENT_OFF: &str = "Your movement keys are back to normal.";
+pub fn movement_off() -> SharedString {
+    tr!("addons.movement.normal")
+}
 
 /// The toast line when Null-Canceling Movement is turned on: the keys now on it (in W, A, S,
-/// D order), the directions with no key, and whether TF2 must restart first.
+/// D order), the directions with no key ("forward", "left", "back", "right"), and whether TF2
+/// must restart first.
 pub fn movement_on_text(keys: &[String], missing: &[&str], running: bool) -> String {
-    let mut text = if keys.is_empty() {
-        "No movement keys were found in your TF2 settings, so it has nothing to use yet.".to_owned()
-    } else {
-        let names: Vec<String> = keys.iter().map(|k| key_label(k)).collect();
-        let mut text = format!("Your {} keys now use it.", names.join(", "));
-        if !missing.is_empty() {
-            let directions = missing.join(" or ");
-            text.push_str(&format!(
-                " No key moves you {directions}, so set one in TF2."
-            ));
-        }
-        text
-    };
-    if running && !keys.is_empty() {
-        text.push_str(" It starts next time TF2 opens.");
+    if keys.is_empty() {
+        return tr!("addons.movement.none").to_string();
     }
-    text
+    let names: Vec<String> = keys.iter().map(|k| key_label(k)).collect();
+    let mut sentences = vec![tr!("addons.movement.keys", keys = names.join(", ")).to_string()];
+    if !missing.is_empty() {
+        let words: Vec<String> = missing.iter().map(|id| direction(id).to_string()).collect();
+        let directions = words.join(tr!("addons.movement.or").as_ref());
+        sentences.push(tr!("addons.movement.unbound", directions = directions).to_string());
+    }
+    if running {
+        sentences.push(tr!("addons.movement.restart").to_string());
+    }
+    sentences.join(" ")
+}
+
+// A direction id as the sentence names it; an unknown id passes through as it is.
+fn direction(id: &str) -> SharedString {
+    match id {
+        "forward" => tr!("addons.movement.direction.forward"),
+        "left" => tr!("addons.movement.direction.left"),
+        "back" => tr!("addons.movement.direction.back"),
+        "right" => tr!("addons.movement.direction.right"),
+        other => SharedString::from(other.to_owned()),
+    }
 }
 
 // A key as a player reads it: letters in capitals, arrow keys spelled out.
 fn key_label(key: &str) -> String {
-    let lower = key.to_ascii_lowercase();
-    match lower.strip_suffix("arrow") {
-        Some(way @ ("up" | "down" | "left" | "right")) => {
-            let mut chars = way.chars();
-            let first = chars.next().map(|c| c.to_ascii_uppercase());
-            format!("{}{} arrow", first.unwrap_or_default(), chars.as_str())
-        }
+    match key.to_ascii_lowercase().strip_suffix("arrow") {
+        Some("up") => tr!("addons.movement.arrow.up").to_string(),
+        Some("down") => tr!("addons.movement.arrow.down").to_string(),
+        Some("left") => tr!("addons.movement.arrow.left").to_string(),
+        Some("right") => tr!("addons.movement.arrow.right").to_string(),
         _ => key.to_ascii_uppercase(),
     }
 }

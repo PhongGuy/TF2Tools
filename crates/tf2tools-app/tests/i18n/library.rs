@@ -5,8 +5,11 @@ use std::path::{Path, PathBuf};
 
 use gpui_kit::{AppContext as _, Entity, SharedString, TestAppContext};
 use tf2tools_app::crosshair_sync::installed_text;
+use tf2tools_app::i18n::names::addon_section_name;
 use tf2tools_app::i18n::{self, names};
 use tf2tools_app::ids;
+use tf2tools_app::pages::addons::AddonsPage;
+use tf2tools_app::pages::addons::model::{movement_off, movement_on_text};
 use tf2tools_app::pages::crosshairs::CrosshairsPage;
 use tf2tools_app::pages::huds::HudsPage;
 use tf2tools_app::pages::profiles::ProfilesPage;
@@ -19,7 +22,9 @@ use tf2tools_app::shell::confirm::Confirm;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::widgets::class_icon::class_short_name;
 use tf2tools_app::widgets::profile_menu::added_title;
-use tf2tools_core::{ProfileDraft, Provenance, SoundKind, Tf2Install, TfClass, WeaponSlot};
+use tf2tools_core::{
+    AddonSection, ProfileDraft, Provenance, SoundKind, Tf2Install, TfClass, WeaponSlot,
+};
 
 use crate::LocaleGuard;
 use crate::support;
@@ -463,4 +468,84 @@ fn profile_texts_read_in_russian() {
             "Очистить все"
         ]
     );
+}
+
+fn open_addons(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<AddonsPage> {
+    support::click_id(cx, s.win, ids::nav(Page::Addons));
+    let page = cx
+        .update(|cx| s.shell.read(cx).addons_page())
+        .expect("an Addons page");
+    support::wait_real(cx, "Addons to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+    page
+}
+
+#[gpui_kit::test]
+fn the_addons_page_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let _page = open_addons(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HEADER_TITLE).as_deref(),
+        Some("Дополнения")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::ADDONS_COUNT).as_deref(),
+        Some("В библиотеке нет дополнений")
+    );
+    let vpk = support::vpk_bytes(&[("cfg/addons/x.cfg", b"x".as_slice())]);
+    support::seed_library_addon(
+        &s.services,
+        &env,
+        "mastercomfig-addon-no-pyroland.vpk",
+        "9.0.0",
+        &vpk,
+        false,
+    );
+    support::click_id(cx, s.win, ids::nav(Page::Settings));
+    let _page = open_addons(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::ADDONS_COUNT).as_deref(),
+        Some("В библиотеке: 1, установлено: 0")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::ADDONS_INSTALLED).as_deref(),
+        Some("Установленные дополнения")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::ADDONS_LIBRARY).as_deref(),
+        Some("Ваша библиотека")
+    );
+}
+
+#[test]
+fn addon_texts_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let keys = |k: &[&str]| k.iter().map(|k| (*k).to_owned()).collect::<Vec<_>>();
+    assert_eq!(
+        movement_on_text(&keys(&["w", "s"]), &["left", "right"], true),
+        "Теперь его используют клавиши: W, S. Ни одна клавиша не двигает вас влево или вправо; \
+         назначьте её в TF2. Оно заработает при следующем запуске TF2."
+    );
+    assert_eq!(
+        movement_on_text(&keys(&["UPARROW"]), &[], false),
+        "Теперь его используют клавиши: стрелка вверх."
+    );
+    assert_eq!(
+        movement_off(),
+        "Клавиши движения снова работают как обычно."
+    );
+    let sections: Vec<String> = AddonSection::ALL
+        .iter()
+        .map(|s| addon_section_name(*s).to_string())
+        .collect();
+    assert_eq!(
+        sections,
+        ["Скины", "Эффекты", "Интерфейсы", "Текстуры", "Файлы игры"]
+    );
+    assert_eq!(addon_section_name(AddonSection::MAPS), "Карты");
+    assert_eq!(texts(&Confirm::delete_addon())[0], "Удалить дополнение");
 }

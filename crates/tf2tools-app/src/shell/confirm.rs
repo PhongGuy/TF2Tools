@@ -164,24 +164,20 @@ impl Confirm {
     /// v5's confirm before removing an addon from the library, and from tf/custom if installed.
     pub fn delete_addon() -> Self {
         Self {
-            title: "Delete Addon".into(),
-            description: "Are you sure you want to remove this addon from your library? If installed, it will also be removed from TF2."
-                .into(),
-            confirm_label: "Delete".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.delete_addon.title"),
+            description: tr!("confirm.delete_addon.body"),
+            confirm_label: tr!("confirm.delete"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
     /// The prompt before removing the GameBanana add-on called `name` from TF2 and the library.
     pub fn remove_gb_addon(name: &str) -> Self {
         Self {
-            title: "Remove Add-on".into(),
-            description: format!(
-                "Are you sure you want to remove {name}? It will be removed from TF2 and from your library."
-            )
-            .into(),
-            confirm_label: "Remove".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.remove_gb_addon.title"),
+            description: tr!("confirm.remove_gb_addon.body", name = name),
+            confirm_label: tr!("confirm.remove"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
@@ -258,10 +254,10 @@ impl Confirm {
     /// The prompt before installing an addon into a TF2 without mastercomfig's base.
     pub fn addon_needs_mastercomfig() -> Self {
         Self {
-            title: "mastercomfig needed".into(),
-            description: "This addon needs mastercomfig. Install both?".into(),
-            confirm_label: "Install both".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.addon_needs_mastercomfig.title"),
+            description: tr!("confirm.addon_needs_mastercomfig.body"),
+            confirm_label: tr!("confirm.addon_needs_mastercomfig.ok"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 

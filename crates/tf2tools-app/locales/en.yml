@@ -441,6 +441,17 @@ confirm:
     body: "Are you sure you want to delete %{name} from your library?"
     in_tf2: "It is also removed from TF2."
   crosshair_used: { one: "It is used by %{count} weapon. It goes back to the default crosshair.", other: "It is used by %{count} weapons. They go back to the default crosshair." }
+  remove: "Remove"
+  delete_addon:
+    title: "Delete Addon"
+    body: "Are you sure you want to remove this addon from your library? If installed, it will also be removed from TF2."
+  remove_gb_addon:
+    title: "Remove Add-on"
+    body: "Are you sure you want to remove %{name}? It will be removed from TF2 and from your library."
+  addon_needs_mastercomfig:
+    title: "mastercomfig needed"
+    body: "This addon needs mastercomfig. Install both?"
+    ok: "Install both"
 
 font_check:
   installed: { one: "Installed %{count} font for %{folder}. Restart TF2 to use them.", other: "Installed %{count} fonts for %{folder}. Restart TF2 to use them." }
@@ -602,6 +613,73 @@ sounds:
     installed_killsound: "Installed killsound: %{name}"
     uninstalled_hitsound: "Uninstalled hitsound"
     uninstalled_killsound: "Uninstalled killsound"
+
+addons:
+  no_tf2: "Set the TF2 folder in Settings to manage addons."
+  count:
+    none: "No addons in library"
+    some: "%{library} in library, %{installed} installed"
+  heading:
+    installed: "Installed Addons"
+    library: "Your Library"
+    gamebanana: "GameBanana add-ons"
+  section:
+    skins: "Skins"
+    effects: "Effects"
+    guis: "GUIs"
+    textures: "Textures"
+    gamefiles: "Game files"
+    maps: "Maps"
+  empty:
+    installed_title: "No addons installed"
+    installed_body: "Install addons from your library below or browse the Addon Store."
+    library_title: "No addons in your library"
+    library_body: "Browse the Addon Store to find performance and quality-of-life addons for TF2."
+  button:
+    browse: "Browse Addon Store"
+    update: "Update"
+    install: "Install"
+    install_again: "Install again"
+    uninstall: "Uninstall"
+    delete: "Remove from library"
+    remove: "Remove"
+    open_gamebanana: "Open on GameBanana"
+    installing: "Installing..."
+    removing: "Removing..."
+  badge:
+    gone: "No longer on GameBanana"
+    update_available: "Update available"
+    not_installed: "Not installed"
+  card:
+    by: "by %{author}"
+  toast:
+    installed_title: "Addon installed"
+    installed: "%{name} is now active"
+    uninstalled_title: "Addon uninstalled"
+    uninstalled: "%{name} has been removed"
+    removed_title: "Addon removed"
+    removed: "%{name} removed from library"
+  activity:
+    installed: "Installed addon: %{name}"
+    uninstalled: "Uninstalled addon: %{name}"
+    deleted: "Deleted addon from library: %{name}"
+  movement:
+    keys: "Your %{keys} keys now use it."
+    unbound: "No key moves you %{directions}, so set one in TF2."
+    restart: "It starts next time TF2 opens."
+    none: "No movement keys were found in your TF2 settings, so it has nothing to use yet."
+    normal: "Your movement keys are back to normal."
+    or: " or "
+    direction:
+      forward: "forward"
+      left: "left"
+      back: "back"
+      right: "right"
+    arrow:
+      up: "Up arrow"
+      down: "Down arrow"
+      left: "Left arrow"
+      right: "Right arrow"
 
 external_huds:
   names_more: { one: "%{names} and %{count} more", other: "%{names} and %{count} more" }
