@@ -323,6 +323,23 @@ store_detail:
   badge:
     downloaded: "Скачано"
 
+addon_detail:
+  mature: "Для взрослых: %{reasons}"
+  credits: "Авторы"
+  files: "Файлы"
+  maps: "Установленные карты"
+  map_unlisted: "%{name} (нет в списке «Создать сервер»; введите map %{name} в консоли)"
+  loading: "Загрузка сведений..."
+  waiting: "Ожидание GameBanana..."
+  open: "Открыть на GameBanana"
+  button:
+    remove: "Удалить"
+    removing: "Удаление..."
+  activity:
+    installed: "Установлено дополнение: %{name}"
+  toast:
+    installed: "Дополнение установлено"
+
 sound_store:
   source: "Хитсаунды и килсаунды с GameBanana."
   category:

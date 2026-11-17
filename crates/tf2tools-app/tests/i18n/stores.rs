@@ -18,11 +18,13 @@ use tf2tools_app::shell::route::Page;
 use tf2tools_app::store_detail::{DetailItem, open_detail};
 use tf2tools_app::store_download::{download_failed_title, downloaded_title, stayed_description};
 use tf2tools_app::store_grid::{SEARCH_DEBOUNCE, StoreGridConfig, sort_label};
+use tf2tools_app::updater::UpdateState;
 use tf2tools_core::{AddonSection, GbId, StoreItemId, StoreKind, StoreSort, Tf2Install};
 
 use crate::LocaleGuard;
 use crate::library::{shown_text, text_width};
 use crate::support;
+use crate::support::update_fake::{fake_updater, offer, reach_available, wait_state};
 
 // The kit's medium Select trigger around its title: two 1 px borders, 10 px padding a side,
 // a 4 px gap and the 16 px caret.
@@ -625,5 +627,86 @@ fn download_toasts_read_in_russian() {
     assert_eq!(
         stayed_description("Попробуйте снова.", &["a".into(), "b".into()]),
         "Попробуйте снова. Всё ещё в библиотеке: a, b."
+    );
+}
+
+#[gpui_kit::test]
+fn the_addon_detail_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_index(
+        587,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(8, 587, None)], true),
+    );
+    server.mount_gb_profile(
+        8,
+        serde_json::json!({
+            "_idRow": 8, "_sName": "Addon 8", "_sText": "<p>Hello</p>", "_nDownloadCount": 12, "_bIsObsolete": true,
+            "_aSubmitter": {"_sName": "vex"}, "_sProfileUrl": "https://gamebanana.com/mods/8",
+            "_aContentRatings": {"sa": "Skimpy Attire"},
+            "_aFiles": [{"_idRow": 2, "_sFile": "new.zip", "_nFilesize": 2048, "_tsDateAdded": 200, "_sAvResult": "clean", "_sDownloadUrl": "https://gamebanana.com/dl/2"}]
+        }),
+    );
+    let w = addon_store(cx, &env, &server);
+    cx.update(|cx| tf2tools_app::pages::profiles::probe::Tf2Probe::install(cx, || false));
+    let _tab = open_addon_tab(cx, &w, "textures");
+    support::click_id(cx, w.win, ids::addon_gb_card("textures", GbId::new(8)));
+    support::wait_real(cx, "the profile", |cx| {
+        support::present(cx, w.win, ids::ADDON_DETAIL_DOWNLOADS)
+    });
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_RATINGS).as_deref(),
+        Some("Для взрослых: Skimpy Attire")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_OUTDATED).as_deref(),
+        Some("Устарело")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_INSTALL).as_deref(),
+        Some("Установить")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::store_detail_link("gamebanana")).as_deref(),
+        Some("Открыть на GameBanana")
+    );
+}
+
+#[gpui_kit::test]
+fn the_update_banner_states_read_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let (u, fake) = fake_updater(cx, true);
+    let s = support::shell_window(cx, &env, missing());
+    let label = |cx: &mut TestAppContext, id: &'static str| support::label_of(cx, s.win, id);
+    reach_available(cx, &u, &fake, offer("6.0.1", true));
+    assert_eq!(
+        label(cx, ids::UPDATE_BANNER_TEXT).as_deref(),
+        Some("Доступно обновление v6.0.1")
+    );
+    assert_eq!(
+        label(cx, ids::UPDATE_BANNER_ACTION).as_deref(),
+        Some("Обновить")
+    );
+    support::click_id(cx, s.win, ids::UPDATE_BANNER_ACTION);
+    let (sink, reply) = fake.next_download(cx);
+    sink.report(42, 100);
+    support::next_repaint(cx);
+    assert_eq!(
+        label(cx, ids::UPDATE_BANNER_TEXT).as_deref(),
+        Some("Загрузка...")
+    );
+    drop(sink);
+    reply.send(Ok(())).unwrap();
+    wait_state(cx, &u, "Ready", |st| matches!(st, UpdateState::Ready(_)));
+    assert_eq!(
+        label(cx, ids::UPDATE_BANNER_TEXT).as_deref(),
+        Some("Обновление готово — перезапустите, чтобы применить")
+    );
+    assert_eq!(
+        label(cx, ids::UPDATE_BANNER_ACTION).as_deref(),
+        Some("Перезапустить")
     );
 }

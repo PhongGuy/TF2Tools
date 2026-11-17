@@ -266,6 +266,7 @@ mod tests {
             "store_download",
             "sound_store",
             "store_detail",
+            "addon_detail",
             "confirm",
             "font_check",
         ]
@@ -780,6 +781,12 @@ mod tests {
         "./store_download.rs",
         "store_messages.rs",
         "widgets/detail_header.rs",
+        "./addon_detail.rs",
+        "addon_updates.rs",
+        "updater/mod.rs",
+        "updater/view.rs",
+        "updater/backend.rs",
+        "updater/keys.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -872,10 +879,29 @@ mod tests {
             "the release has no file",
             "developer detail of an empty release",
         ),
+        (
+            "./addon_detail.rs",
+            "the add-on profile task stopped unexpectedly",
+            "developer detail of a stopped profile read",
+        ),
+        ("updater/mod.rs", "update check", STOPPED_LABEL),
+        ("updater/mod.rs", "update download", STOPPED_LABEL),
+        ("updater/mod.rs", "update install", STOPPED_LABEL),
+        (
+            "updater/keys.rs",
+            "the update-test-key feature must never be in a release build",
+            "developer detail: a build guard",
+        ),
+        (
+            "updater/keys.rs",
+            "{}/PhongGuy/TF2Tools/releases/latest",
+            "developer detail: the release URL",
+        ),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
     const OS_NAME: &str = "a proper noun, the OS filter's label";
+    const STOPPED_LABEL: &str = "developer detail: a stopped task's log label";
 
     #[test]
     fn library_pages_show_no_english_literal() {

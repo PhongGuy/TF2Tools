@@ -325,6 +325,23 @@ store_detail:
   badge:
     downloaded: "Downloaded"
 
+addon_detail:
+  mature: "Mature content: %{reasons}"
+  credits: "Credits"
+  files: "Files"
+  maps: "Installed maps"
+  map_unlisted: "%{name} (not listed in Create Server; type map %{name} in the console)"
+  loading: "Loading details..."
+  waiting: "Waiting for GameBanana..."
+  open: "Open on GameBanana"
+  button:
+    remove: "Remove"
+    removing: "Removing..."
+  activity:
+    installed: "Installed addon: %{name}"
+  toast:
+    installed: "Addon installed"
+
 sound_store:
   source: "Hitsounds and killsounds from GameBanana."
   category:
