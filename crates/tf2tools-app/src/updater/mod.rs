@@ -272,7 +272,13 @@ impl Updater {
         let offer = offer.clone();
         let apply = Arc::clone(&backend.apply);
         let services = cx.try_global::<Services>().cloned();
-        let version = offer.version.clone();
+        // Both row texts are translated here on the UI thread, so the worker never reads the locale.
+        let installed_row =
+            String::from(tr!("updater.activity.installed", version = offer.version));
+        let started_row = String::from(tr!(
+            "updater.activity.installer_started",
+            version = offer.version
+        ));
         if !tokio_bridge::is_running(cx) {
             tokio_bridge::init(cx);
         }
@@ -284,8 +290,8 @@ impl Updater {
                 crate::crash::marked(move || {
                     let after = apply()?;
                     let installed = match after {
-                        AfterInstall::Relaunch(_) => format!("Installed TF2Tools v{version}"),
-                        AfterInstall::Quit => format!("Started the TF2Tools v{version} installer"),
+                        AfterInstall::Relaunch(_) => installed_row,
+                        AfterInstall::Quit => started_row,
                     };
                     match &services {
                         Some(services) => activity::write(
@@ -352,7 +358,8 @@ impl Updater {
             Ok(Some(offer)) => UpdateState::Available(offer),
             Ok(None) => UpdateState::UpToDate,
             Err(failure) => {
-                tracing::warn!(message = %failure.message, "update check failed");
+                // The message is translated; the backend already logged the English cause.
+                tracing::warn!("update check failed");
                 UpdateState::Failed(failure)
             }
         };
@@ -374,7 +381,8 @@ impl Updater {
         self.task = None;
         match outcome {
             Ok(()) => {
-                let message = format!("Downloaded TF2Tools v{}", offer.version);
+                let message =
+                    String::from(tr!("updater.activity.downloaded", version = offer.version));
                 activity::record(
                     cx,
                     NewLogEntry::new(LogLevel::Info, "settings", "update-download", message),
@@ -443,7 +451,8 @@ impl Updater {
         failure: Failure,
         cx: &mut Context<Self>,
     ) {
-        tracing::warn!(message = %failure.message, action, "update failed");
+        // The player's message is translated; the backend already logged the English cause.
+        tracing::warn!(action, "update failed");
         offer.installable &= !failure.use_release_page;
         activity::record(
             cx,

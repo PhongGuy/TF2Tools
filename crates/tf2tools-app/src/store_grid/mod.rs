@@ -24,11 +24,12 @@ use tf2tools_core::{StoreCard, StoreKind, StoreQuery, StoreSort};
 use crate::i18n::{counted_plural, tr};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
+use crate::local_messages::describe_store_status;
 use crate::pages::common::{
     SkeletonTop, empty_state_card, empty_state_with_action, skeleton_cards,
 };
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages};
-use crate::services::{OpError, run_blocking};
+use crate::services::run_blocking;
 use crate::store_download::SessionDownloads;
 use crate::store_messages::read_failed;
 use crate::sync::{SyncEvent, SyncHub, sync_hub};
@@ -479,9 +480,9 @@ impl StoreGrid {
         self.counting = true;
         let counting = run_blocking(cx, move |s| {
             let count = |q: &StoreQuery| {
-                s.store
-                    .store_count(kind, q)
-                    .map_err(|e| OpError::core(tr!("messages.action.load_store"), e))
+                s.store.store_count(kind, q).map_err(|e| {
+                    describe_store_status(&e).into_op(tr!("messages.action.load_the_store"))
+                })
             };
             Ok((count(&shown)?, count(&total)?))
         });
@@ -516,9 +517,9 @@ impl StoreGrid {
             None => self.query(),
         };
         let reading = run_blocking(cx, move |s| {
-            s.store
-                .store_cards(kind, &query)
-                .map_err(|e| OpError::core(tr!("messages.action.load_store"), e))
+            s.store.store_cards(kind, &query).map_err(|e| {
+                describe_store_status(&e).into_op(tr!("messages.action.load_the_store"))
+            })
         });
         cx.spawn(async move |grid, cx| {
             let page = reading.await;
@@ -628,9 +629,9 @@ impl StoreGrid {
                     Some(cursor) => query.with_after(cursor),
                     None => query,
                 };
-                s.store
-                    .store_cards(kind, &query)
-                    .map_err(|e| OpError::core(tr!("messages.action.load_store"), e))
+                s.store.store_cards(kind, &query).map_err(|e| {
+                    describe_store_status(&e).into_op(tr!("messages.action.load_the_store"))
+                })
             })
         });
         cx.spawn(async move |grid, cx| {

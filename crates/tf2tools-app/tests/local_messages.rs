@@ -7,27 +7,86 @@ use tf2tools_app::assets::AssetRoot;
 use tf2tools_app::audio::AudioError;
 use tf2tools_app::local_messages::{
     LocalFailure, PaintStep, describe_apply_profile, describe_audio, describe_detect,
-    describe_font_install, describe_hud_load, describe_import, describe_library, describe_log,
-    describe_make_hud, describe_paint, describe_png_read, describe_png_write, describe_profile,
-    describe_settings, describe_startup, describe_store_status, describe_tf2_folder,
-    describe_tf2_install, internal, left_out, reopen_notice,
+    describe_font_install, describe_hud_load, describe_import, describe_join, describe_library,
+    describe_log, describe_logs_cache, describe_make_hud, describe_paint, describe_png_read,
+    describe_png_write, describe_profile, describe_settings, describe_startup,
+    describe_store_status, describe_tf2_folder, describe_tf2_install, internal, left_out,
+    reopen_notice,
 };
 use tf2tools_app::services::{OpError, StartupError};
 use tf2tools_core::{
     ApplyProfileError, ArchiveError, DetectError, FontInstallError, HudLoadError, ImportError,
-    InstallError, LibraryError, LogError, MakeHudError, PaintError, PngReadError, PngWriteError,
-    ProfileError, QueryError, SettingsError, VpkError, VtfError, WavError, inspect_wav,
+    InstallError, LibraryError, LogError, LogsCacheError, MakeHudError, PaintError, PngReadError,
+    PngWriteError, ProfileError, QueryError, SettingsError, VpkError, VtfError, WavError,
+    inspect_wav,
 };
 
 #[test]
 fn a_local_failure_toasts_its_plain_message_under_its_action() {
     let failure = LocalFailure::new("Try again.", "library database error: locked");
+    let line = line!() + 1;
+    let op = failure.into_op("Failed to load HUDs".into());
+    let OpError::Core {
+        action,
+        message,
+        detail,
+        at,
+    } = &op
+    else {
+        panic!("not a core error: {op:?}");
+    };
     assert_eq!(
-        failure.into_op("Failed to load HUDs".into()),
-        OpError::Core {
-            action: "Failed to load HUDs".into(),
-            message: "Try again.".into()
-        }
+        (action.as_str(), message.as_str(), detail.as_str()),
+        (
+            "Failed to load HUDs",
+            "Try again.",
+            "library database error: locked"
+        )
+    );
+    assert_eq!((at.file(), at.line()), (file!(), line));
+    assert_eq!(
+        op.to_string(),
+        format!("{}:{line}: library database error: locked", file!())
+    );
+}
+
+#[test]
+fn op_errors_compare_without_the_line_that_built_them() {
+    let here = OpError::core("Save".into(), "x");
+    let there = OpError::core("Save".into(), "x");
+    assert_eq!(here, there);
+    assert_ne!(here, OpError::core("Save".into(), "y"));
+    let a = LocalFailure::new("x", "a");
+    let b = LocalFailure::new("x", "b");
+    assert_ne!(a.into_op("Save".into()), b.into_op("Save".into()));
+}
+
+#[test]
+fn op_errors_name_the_line_that_built_them_through_helpers() {
+    use tf2tools_app::local_messages::{gb_install_op, gb_map_install_op, gb_map_remove_op};
+    use tf2tools_app::pages::graphics::jobs::refuse_while_running;
+    use tf2tools_core::{GbAddonInstallError, GbMapInstallError, GbMapRemoveError};
+    let at = |line: u32| format!("{}:{line}", file!());
+    let line = line!() + 1;
+    let refused = refuse_while_running(&|| true).unwrap_err();
+    assert_eq!(refused.to_string(), at(line));
+    let line = line!() + 1;
+    let install = gb_install_op(&GbAddonInstallError::Tf2Running, "Install".into());
+    assert!(
+        install.to_string().starts_with(&format!("{}: ", at(line))),
+        "{install}"
+    );
+    let line = line!() + 1;
+    let map = gb_map_install_op(&GbMapInstallError::Tf2Running, "Install".into());
+    assert!(
+        map.to_string().starts_with(&format!("{}: ", at(line))),
+        "{map}"
+    );
+    let line = line!() + 1;
+    let removed = gb_map_remove_op(&GbMapRemoveError::Tf2Running, "Remove".into());
+    assert!(
+        removed.to_string().starts_with(&format!("{}: ", at(line))),
+        "{removed}"
     );
 }
 
@@ -42,7 +101,7 @@ fn a_panic_reads_as_player_advice_and_keeps_its_text_for_the_log() {
     assert_eq!(err.description(), internal());
     assert_eq!(
         err.to_string(),
-        "Something went wrong: index out of bounds at src/pages/huds.rs:9"
+        "unexpected error: index out of bounds at src/pages/huds.rs:9"
     );
     support::assert_plain(&internal());
 }
@@ -1057,7 +1116,7 @@ fn addon_install_failures_read_as_plain_words() {
     }
     assert!(matches!(
         gb_install_op(&GbAddonInstallError::Tf2Running, "Couldn't install the add-on".into()),
-        OpError::Core { action, ref message } if action == close_tf2() && *message == close_tf2_text()
+        OpError::Core { action, ref message, .. } if action == close_tf2() && *message == close_tf2_text()
     ));
     assert!(matches!(
         gb_install_op(
@@ -1102,7 +1161,7 @@ fn map_install_failures_read_as_plain_words() {
     }
     assert!(matches!(
         gb_map_install_op(&GbMapInstallError::Tf2Running, "Couldn't update the map".into()),
-        OpError::Core { action, ref message } if action == close_tf2() && *message == close_tf2_text()
+        OpError::Core { action, ref message, .. } if action == close_tf2() && *message == close_tf2_text()
     ));
     let names = |n: &[&str]| n.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
     assert_eq!(
@@ -1165,4 +1224,23 @@ fn a_map_list_reads_a_b_and_c() {
         already_have(&names, false),
         "You already have cp_a, cp_b and cp_c."
     );
+}
+
+#[test]
+fn logs_cache_and_stopped_job_failures_hide_the_raw_error() {
+    let cache = describe_logs_cache(&LogsCacheError::Database {
+        message: "disk I/O error".into(),
+    });
+    assert_eq!(
+        cache,
+        LocalFailure::new(
+            "TF2Tools couldn't read or save its logs.tf data. Restart TF2Tools and try again.",
+            "the logs.tf cache could not be read or written: disk I/O error",
+        )
+    );
+    support::assert_plain(&cache.message);
+    let join = support::cancelled_join();
+    let stopped = describe_join(&join);
+    assert_eq!(stopped, LocalFailure::new(internal(), join.to_string()));
+    assert!(!stopped.message.contains(&join.to_string()), "{stopped:?}");
 }

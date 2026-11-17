@@ -415,7 +415,7 @@ const READ: &str = "TF2Tools couldn't read the store. Restart TF2Tools and try a
 fn a_failed_store_read_reads_as_player_advice() {
     for err in [
         OpError::core(
-            "load the store".into(),
+            "Failed to load the store".into(),
             "store database error: no such table: store_crosshairs",
         ),
         OpError::core(
@@ -476,7 +476,7 @@ fn addon_update_errors_read_as_player_advice() {
         no_tf2(),
         StoreFailure::new(
             "Set your TF2 folder in Settings, then try again.",
-            "TF2 not found: Set the TF2 folder in Settings, then try again."
+            "no TF2 folder is set"
         )
     );
     assert_eq!(

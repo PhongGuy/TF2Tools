@@ -984,20 +984,28 @@ impl HudMakerPage {
             let tf_dir = tf2?.tf_dir();
             let load_failed = |e: HudLoadError| {
                 let failure = describe_hud_load(&e);
-                failure.log(&action);
+                failure.log("HUD Maker load");
                 failure.message.to_string()
             };
             // A copy reads its own layers over the game's; any other made HUD the game's.
             let files = match s.library.made_hud_files(&id, &tf_dir) {
                 Ok(files) => files,
-                Err(HudLoadError::Files(e)) => return Err(OpError::core(action.clone(), e)),
+                Err(HudLoadError::Files(e)) => {
+                    return Err(
+                        LocalFailure::new(hud_files(), e.to_string()).into_op(action.clone())
+                    );
+                }
                 Err(e) => return Ok(Err(load_failed(e))),
             };
             let copy_tf = (s.library.copy_base(&id).ok().flatten()).map(|_| tf_dir.clone());
             let platform = Platform::current().unwrap_or(Platform::Linux);
             let made = match s.library.open_made_hud(&id, &files, platform) {
                 Ok(made) => made,
-                Err(HudLoadError::Files(e)) => return Err(OpError::core(action.clone(), e)),
+                Err(HudLoadError::Files(e)) => {
+                    return Err(
+                        LocalFailure::new(hud_files(), e.to_string()).into_op(action.clone())
+                    );
+                }
                 Err(e) => return Ok(Err(load_failed(e))),
             };
             // Everything drawn reads the switched files; saves start from the files on disk.
@@ -4197,10 +4205,7 @@ fn save_job(
         }
         // The sentence is the whole toast; the editor keeps its changes.
         Err(MakeHudError::BaseChanged) => {
-            return Err(OpError::Core {
-                action: hud_base_changed(),
-                message: SharedString::default(),
-            });
+            return Err(OpError::core(hud_base_changed(), ""));
         }
         Err(e) => return Err(describe_make_hud(&e).into_op(save_failed())),
     };

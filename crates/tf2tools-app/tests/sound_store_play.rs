@@ -68,7 +68,7 @@ fn a_failed_preview_toasts_and_clears_the_player(cx: &mut TestAppContext) {
         support::present(cx, w.win, ids::TOAST)
     });
     let toast = support::label_of(cx, w.win, ids::TOAST).unwrap();
-    assert!(toast.starts_with("Could not play preview."), "{toast}");
+    assert!(toast.starts_with("Couldn't play the preview."), "{toast}");
     assert_eq!(cx.update(|cx| w.page.read(cx).playing(cx)), None);
     assert!(w.audio.plays().is_empty());
 }

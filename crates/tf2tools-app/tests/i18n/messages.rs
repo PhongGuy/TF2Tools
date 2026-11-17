@@ -12,10 +12,10 @@ use tf2tools_core::{
     ApplyModulesError, ApplyPresetError, ApplyProfileError, BrowseError, CopyHudError, DetectError,
     DownloadError, FilesError, FontInstallError, GbAddonFetchError, GbAddonInstallError, GbId,
     GbMapInstallError, GbMapRemoveError, HudLoadError, ImportError, InstallError,
-    InstallMastercomfigError, KeepHudError, LibraryError, LogError, MakeHudError, MapDownloadError,
-    MapRemoveError, MastercomfigStatusError, PaintError, PngReadError, PngWriteError, PreviewError,
-    ProfileError, QueryError, RemoveMastercomfigError, SettingsError, StoreKind, SyncError,
-    TakeOverError, UpdateCopyError,
+    InstallMastercomfigError, KeepHudError, LibraryError, LogError, LogsCacheError, MakeHudError,
+    MapDownloadError, MapRemoveError, MastercomfigStatusError, PaintError, PngReadError,
+    PngWriteError, PreviewError, ProfileError, QueryError, RemoveMastercomfigError, SettingsError,
+    StoreKind, SyncError, TakeOverError, UpdateCopyError,
 };
 
 use crate::LocaleGuard;
@@ -83,11 +83,17 @@ fn op_errors_read_in_russian() {
     for err in [OpError::NoTf2, OpError::Internal("boom".into())] {
         assert_russian(&err.title());
         assert_russian(&err.description());
-        assert_russian(&err.to_string());
     }
-    let op = LocalFailure::new(local::hud_files(), "x").into_op(SharedString::from("Худ"));
+    assert_eq!(OpError::NoTf2.to_string(), "no TF2 folder is set");
+    assert_eq!(
+        OpError::Internal("boom".into()).to_string(),
+        "unexpected error: boom"
+    );
+    let failure = LocalFailure::new(local::hud_files(), "x");
+    let line = line!() + 1;
+    let op = failure.into_op(SharedString::from("Худ"));
     assert_russian(&op.description());
-    assert_russian(&op.to_string());
+    assert_eq!(op.to_string(), format!("{}:{line}: x", file!()));
 }
 
 #[test]
@@ -326,5 +332,26 @@ fn sync_and_update_failure_titles_read_in_russian() {
     assert_eq!(
         sync::sync_failed_title(StoreKind::Sounds),
         "Failed to sync Sounds"
+    );
+}
+
+#[test]
+fn logs_cache_and_stopped_job_failures_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let cache = local::describe_logs_cache(&LogsCacheError::Database {
+        message: "disk I/O error".into(),
+    });
+    assert_russian(&cache.message);
+    assert!(!cache.message.contains("disk I/O"), "{}", cache.message);
+    let stopped = local::describe_join(&crate::support::cancelled_join());
+    assert_russian(&stopped.message);
+    let store = local::describe_store_status(&QueryError::Database {
+        message: "no such table".into(),
+    });
+    assert_russian(&store.message);
+    assert!(
+        !store.message.contains("no such table"),
+        "{}",
+        store.message
     );
 }

@@ -583,4 +583,107 @@ mod tests {
         let found = literal_titles(|rel| rel.starts_with("pages/"));
         assert!(found.is_empty(), "literal action titles: {found:?}");
     }
+
+    // The 1-based lines of `code` where a developer-log label could be translated text: a
+    // `.log(` argument that is no literal, or a tracing line that opens with `{action}` or `{title}`.
+    fn translated_log_label_lines(code: &str) -> Vec<usize> {
+        let mut lines = Vec::new();
+        for (at, _) in code.match_indices(".log(") {
+            let arg = code[at + ".log(".len()..].trim_start();
+            if !(arg.starts_with('"') || arg.starts_with("&format!(\"")) {
+                lines.push(code[..at].matches('\n').count() + 1);
+            }
+        }
+        for opener in ["warn!(", "info!(", "error!(", "debug!(", "trace!("] {
+            for (at, _) in code.match_indices(opener) {
+                let arg = code[at + opener.len()..].trim_start();
+                if arg.starts_with("\"{action}") || arg.starts_with("\"{title}") {
+                    lines.push(code[..at].matches('\n').count() + 1);
+                }
+            }
+        }
+        lines.sort_unstable();
+        lines
+    }
+
+    #[test]
+    fn the_log_label_scan_finds_only_labels_that_may_be_translated() {
+        let sample = "f.log(\"HUD update\");\nf.log(&action);\nf.log(&format!(\"start {x}\"));\n\
+            tracing::warn!(\"{action}: {}\", d);\ntracing::warn!(\"save: {action}\");\n\
+            let m = format!(\"{title} found\");\nerror!(\"{title}: x\");\n";
+        assert_eq!(translated_log_label_lines(sample), [2, 4, 7]);
+    }
+
+    #[test]
+    fn no_developer_log_label_is_translated_text() {
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut found = Vec::new();
+        for file in src_files() {
+            let source = std::fs::read_to_string(&file).unwrap();
+            for line in translated_log_label_lines(shipped_part(&source)) {
+                let rel = file
+                    .strip_prefix(&src)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                found.push(format!("{rel}:{line}"));
+            }
+        }
+        assert!(
+            found.is_empty(),
+            "log labels that may be translated: {found:?}"
+        );
+    }
+
+    #[test]
+    fn russian_says_each_idea_one_way() {
+        let ru = messages("ru");
+        let banned = [
+            "попробуйте ещё раз",
+            "попробуйте еще раз",
+            "попробуйте сохранить ещё раз",
+            "предпрослуш",
+            "никнейм",
+        ];
+        let found: Vec<String> = ru
+            .iter()
+            .filter(|(_, v)| {
+                let v = v.to_lowercase();
+                banned.iter().any(|b| v.contains(b))
+            })
+            .map(|(k, v)| format!("{k}: {v}"))
+            .collect();
+        assert!(found.is_empty(), "a second wording for one idea: {found:?}");
+        let damaged = [
+            "updater.failure.damaged",
+            "messages.store.download.damaged",
+            "messages.store.gb_fetch.damaged",
+        ]
+        .map(|k| ru.get(k).map(String::as_str));
+        assert_eq!(
+            damaged,
+            [Some("Скачанный файл повреждён. Попробуйте снова."); 3]
+        );
+    }
+
+    #[test]
+    fn english_action_titles_read_as_a_failure_or_an_outcome() {
+        let en = messages("en");
+        let bare = ["Load ", "Save ", "List ", "Make ", "Measure ", "Trim "];
+        let found: Vec<String> = en
+            .iter()
+            // Matched by segments so the key scans never read this prefix as a key.
+            .filter(|(k, _)| k.split('.').take(2).eq(["messages", "action"]))
+            .filter(|(_, v)| {
+                v.starts_with(char::is_lowercase)
+                    || v.ends_with('.')
+                    || bare.iter().any(|b| v.starts_with(b))
+            })
+            .map(|(k, v)| format!("{k}: {v}"))
+            .collect();
+        assert!(
+            found.is_empty(),
+            "titles that don't read as a failure: {found:?}"
+        );
+    }
 }

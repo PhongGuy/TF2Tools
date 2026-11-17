@@ -4,8 +4,8 @@
 use tf2tools_core::{
     ApplyProfileError, CopyHudError, DetectError, FontInstallError, GbAddonInstallError,
     GbMapInstallError, GbMapRemoveError, HudLoadError, ImportError, InstallError, KeepHudError,
-    LibraryError, LogError, MakeHudError, PaintError, PngReadError, PngWriteError, ProfileError,
-    QueryError, SettingsError, UpdateCopyError, WavError,
+    LibraryError, LogError, LogsCacheError, MakeHudError, PaintError, PngReadError, PngWriteError,
+    ProfileError, QueryError, SettingsError, UpdateCopyError, WavError,
 };
 
 use gpui_kit::SharedString;
@@ -79,13 +79,17 @@ impl LocalFailure {
         tracing::warn!("{what}: {}", self.detail);
     }
 
-    /// Logs the raw detail under `action`, then returns the toast the player reads.
+    /// The toast the player reads under `action`; logs its English developer line first.
+    #[track_caller]
     pub fn into_op(self, action: SharedString) -> OpError {
-        self.log(&action);
-        OpError::Core {
+        let op = OpError::Core {
             action,
             message: self.message,
-        }
+            detail: self.detail,
+            at: std::panic::Location::caller(),
+        };
+        tracing::warn!("{op}");
+        op
     }
 }
 
@@ -105,6 +109,7 @@ pub fn describe_gb_install(err: &GbAddonInstallError) -> LocalFailure {
 }
 
 /// The toast for a failed add-on operation titled `action`: "Close TF2 first" when TF2 runs.
+#[track_caller]
 pub fn gb_install_op(err: &GbAddonInstallError, action: SharedString) -> OpError {
     let action = if matches!(err, GbAddonInstallError::Tf2Running) {
         close_tf2()
@@ -138,6 +143,7 @@ pub fn describe_gb_map_install(err: &GbMapInstallError) -> LocalFailure {
 }
 
 /// The toast for a failed map operation titled `action`: "Close TF2 first" when TF2 runs.
+#[track_caller]
 pub fn gb_map_install_op(err: &GbMapInstallError, action: SharedString) -> OpError {
     let action = if matches!(err, GbMapInstallError::Tf2Running) {
         close_tf2()
@@ -162,6 +168,7 @@ pub fn describe_gb_map_remove(err: &GbMapRemoveError) -> LocalFailure {
 }
 
 /// The toast for a failed map remove titled `action`: "Close TF2 first" when TF2 runs.
+#[track_caller]
 pub fn gb_map_remove_op(err: &GbMapRemoveError, action: SharedString) -> OpError {
     let action = if matches!(err, GbMapRemoveError::Tf2Running) {
         close_tf2()
@@ -678,6 +685,20 @@ pub fn describe_log(err: &LogError) -> LocalFailure {
         _ => unknown(),
     };
     LocalFailure::new(message, err.to_string())
+}
+
+/// A failed read or write of the logs.tf cache; `detail` is the error's own text.
+pub fn describe_logs_cache(err: &LogsCacheError) -> LocalFailure {
+    let message = match err {
+        LogsCacheError::Database { .. } => tr!("messages.local.logs_cache.database"),
+        _ => unknown(),
+    };
+    LocalFailure::new(message, err.to_string())
+}
+
+/// A background job that panicked or was cancelled; `detail` is the JoinError's text.
+pub fn describe_join(err: &tokio::task::JoinError) -> LocalFailure {
+    LocalFailure::new(internal(), err.to_string())
 }
 
 /// Why the app could not start, in player words; `detail` is the error's own text.

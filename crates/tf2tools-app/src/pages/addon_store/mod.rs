@@ -25,10 +25,11 @@ use tf2tools_core::{AddonEntry, AddonName, AddonSection, StoreItem, StoreItemId,
 use crate::addon_updates::{AddonEvent, AddonUpdates};
 use crate::i18n::tr;
 use crate::ids;
+use crate::local_messages::{describe_library, describe_store_status};
 use crate::pages::common::{
     SkeletonTop, badge_of, card_frame, empty_state_card, no_tf2_warning, skeleton_cards, steady,
 };
-use crate::services::{OpError, Tf2State, run_blocking, tf2_state};
+use crate::services::{Tf2State, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
 use crate::shell::route::{NavigateTo, Page};
 use crate::store_download::{StoreDownloads, download_button, format_bytes};
@@ -299,14 +300,13 @@ impl AddonStorePage {
         }
         let tf2 = tf2_state(cx).read(cx).install().cloned();
         let read = run_blocking(cx, move |s| {
-            let items = s
-                .store
-                .store_items(KIND)
-                .map_err(|e| OpError::core(tr!("messages.action.load_the_store"), e))?;
+            let items = s.store.store_items(KIND).map_err(|e| {
+                describe_store_status(&e).into_op(tr!("messages.action.load_the_store"))
+            })?;
             let library = s
                 .library
                 .list_addons(tf2.as_ref())
-                .map_err(|e| OpError::core(tr!("messages.action.load_the_store"), e))?;
+                .map_err(|e| describe_library(&e).into_op(tr!("messages.action.load_the_store")))?;
             let library = library.into_iter().map(|e| (e.name().clone(), e)).collect();
             Ok((ordered(items), library))
         });

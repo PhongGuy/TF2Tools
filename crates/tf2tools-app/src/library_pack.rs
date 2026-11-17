@@ -5,6 +5,7 @@ use gpui_kit::{App, AppContext as _, Context, Entity, EventEmitter, Global};
 use tf2tools_core::{ConvertReport, LibrarySpace};
 
 use crate::i18n::tr;
+use crate::local_messages::describe_library;
 use crate::services::{OpError, run_blocking};
 
 /// What observers hear from the library job.
@@ -80,7 +81,7 @@ impl LibraryPack {
             }
             s.library
                 .space()
-                .map_err(|e| OpError::core(tr!("messages.action.measure_library"), e))
+                .map_err(|e| describe_library(&e).into_op(tr!("messages.action.measure_library")))
         });
         cx.spawn(async move |job, cx| {
             let landed = pass.await;

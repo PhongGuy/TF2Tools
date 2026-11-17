@@ -920,10 +920,7 @@ impl HudsPage {
                         failure.log("HUD update");
                         Err(failure.message)
                     });
-                    file.map_err(|message| OpError::Core {
-                        action: update_failed(),
-                        message: message.into(),
-                    })
+                    file.map_err(|message| OpError::core(update_failed(), message))
                 }
             };
             let _ = page.update(cx, |page, cx| match listed {
@@ -1061,10 +1058,7 @@ impl HudsPage {
                 ),
                 failed => {
                     let message = failed.err().unwrap_or_else(|| download_gone().to_string());
-                    let err = OpError::Core {
-                        action: update_failed(),
-                        message: message.into(),
-                    };
+                    let err = OpError::core(update_failed(), message);
                     page.busy = None;
                     cx.notify();
                     let _ = win.update(cx, |_, window, cx| toast_error(window, cx, &err));
@@ -1375,7 +1369,7 @@ fn conflict_box(cx: &App) -> AnyElement {
 pub fn make_missing_thumbnails(cx: &mut App) {
     let making = run_blocking(cx, |s| {
         (s.library.make_missing_hud_thumbnails())
-            .map_err(|e| OpError::core(tr!("messages.action.make_hud_pictures"), e))
+            .map_err(|e| describe_library(&e).into_op(tr!("messages.action.make_hud_pictures")))
     });
     cx.spawn(async move |cx| match making.await {
         Ok(0) => {}
