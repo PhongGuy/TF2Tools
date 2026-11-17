@@ -111,18 +111,20 @@ impl Confirm {
             ),
         };
         let game = if installed {
-            " It is also removed from TF2."
+            format!(" {}", tr!("confirm.delete_crosshair.in_tf2"))
         } else {
-            ""
+            String::new()
         };
         Self {
-            title: "Delete Crosshair".into(),
+            title: tr!("confirm.delete_crosshair.title"),
             description: format!(
-                "Are you sure you want to delete {name} from your library?{used}{game} This cannot be undone."
+                "{}{used}{game} {}",
+                tr!("confirm.delete_crosshair.body", name = name),
+                tr!("confirm.cannot_undo")
             )
             .into(),
-            confirm_label: "Delete".into(),
-            cancel_label: "Cancel".into(),
+            confirm_label: tr!("confirm.delete"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 

@@ -14,18 +14,14 @@ use crate::i18n::tr;
 
 /// The short name shown when the icon is missing, in the current language.
 pub fn class_short_name(class: TfClass) -> SharedString {
-    // The players' own short names for the two long ones, as the loadout board's narrow headers.
+    // Short names for the loadout board's narrow headers; English shortens only Demoman and Engineer.
     match class {
+        TfClass::Scout => tr!("common.class_short.scout"),
+        TfClass::Pyro => tr!("common.class_short.pyro"),
         TfClass::Demoman => tr!("common.class_short.demoman"),
+        TfClass::Heavy => tr!("common.class_short.heavy"),
         TfClass::Engineer => tr!("common.class_short.engineer"),
-        TfClass::Scout
-        | TfClass::Soldier
-        | TfClass::Pyro
-        | TfClass::Heavy
-        | TfClass::Medic
-        | TfClass::Sniper
-        | TfClass::Spy
-        | _ => class_name(class),
+        TfClass::Soldier | TfClass::Medic | TfClass::Sniper | TfClass::Spy | _ => class_name(class),
     }
 }
 

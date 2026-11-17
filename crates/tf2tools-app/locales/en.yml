@@ -159,10 +159,16 @@ common:
     sniper: "Sniper"
     spy: "Spy"
   class_short:
+    scout: "Scout"
+    pyro: "Pyro"
     demoman: "Demo"
+    heavy: "Heavy"
     engineer: "Engie"
   slot:
     primary: "Primary"
+    secondary: "Secondary"
+    melee: "Melee"
+  slot_short:
     secondary: "Secondary"
     melee: "Melee"
   sound_kind:
@@ -246,6 +252,72 @@ profiles:
 crosshairs_page:
   no_weapon: "Not on any weapon yet"
   on_weapons: { one: "On %{count} weapon", other: "On %{count} weapons" }
+  no_tf2: "Set the TF2 folder in Settings to install crosshairs."
+  gallery_hint: "Click or drag one onto the board"
+  sync:
+    saving: "Saving to TF2..."
+    in_game: "In TF2"
+    while_running: "Saved. TF2 is running, so it takes effect next time TF2 starts"
+    skipped: "In TF2. %{skipped}"
+    waiting: "Saved. It goes into TF2 once TF2 is found"
+    removed: "Removed from TF2. Your next change puts them back"
+    failed: "Couldn't save to TF2"
+    not_yet: "Not in TF2 yet. Your next change puts them in"
+    own: "TF2 is using its own crosshairs"
+  skip:
+    line: "Skipped %{count}: %{list}"
+    unknown_builtin: "unknown builtin %{name}"
+    missing: "missing crosshair %{name}"
+    invalid_script: "invalid weapon script %{name}"
+    no_stock_script: "game script unreadable %{name}"
+    unknown: "skipped %{name}"
+  button:
+    remove: "Remove from TF2"
+    removing: "Removing..."
+    import: "Import"
+    importing: "Importing..."
+    edit: "Edit"
+    delete: "Delete"
+    deleting: "Deleting..."
+    copy_to_maker: "Copy to Crosshair Maker"
+    add_to_profile: "Add to profile"
+    export: "Export PNG"
+    exporting: "Exporting..."
+    reset: "Reset to default"
+    close: "Close"
+  selection:
+    none: "No crosshair picked"
+    hint: "Pick one from the gallery to see it at its in-game size"
+  preview:
+    none: "No crosshair"
+    on: "%{name} on %{background}"
+  background:
+    dark: "Dark"
+  board:
+    everything: "Everything"
+    default: "Default"
+    mixed: "Mixed"
+  details:
+    title: "%{class} %{slot} weapons"
+    hint: "Click a weapon to give it the picked crosshair"
+  conflict:
+    title: "Conflicts Detected"
+    line: ": Crosshair scripts found in '%{folder}' — may override your assignments"
+  toast:
+    imported: "Crosshair imported"
+    added: "%{name} added to your library"
+    added_as: "Added to your library as %{name}"
+    file_exists: "A file named %{name} is already there. Pick another name."
+    exported: "PNG exported"
+    uninstalled: "Crosshairs uninstalled from TF2"
+    deleted: "%{name} has been deleted from your library"
+    removed: "Crosshair removed"
+    pick_first: "Pick a crosshair first"
+  activity:
+    imported: "Imported crosshair: %{name}"
+    uninstalled: "Uninstalled crosshair assignments"
+    deleted: "Deleted crosshair from library: %{name}"
+    installed: { one: "Installed %{count} crosshair assignment", other: "Installed %{count} crosshair assignments" }
 
 confirm:
   cancel: "Cancel"
@@ -257,6 +329,10 @@ confirm:
   delete_sound:
     title: "Delete Sound"
     body: "Are you sure you want to delete this sound from your library?"
+  delete_crosshair:
+    title: "Delete Crosshair"
+    body: "Are you sure you want to delete %{name} from your library?"
+    in_tf2: "It is also removed from TF2."
   crosshair_used: { one: "It is used by %{count} weapon. It goes back to the default crosshair.", other: "It is used by %{count} weapons. They go back to the default crosshair." }
 
 font_check:
@@ -464,6 +540,16 @@ widgets:
     unreadable: "Couldn't read your profiles"
   player:
     stop: "Stop"
+  weapon_assigner:
+    all: "All %{class}"
+    none: "None"
+    clear: "Clear crosshair"
+  crosshair_picker:
+    search: "Search crosshairs..."
+    all: "All"
+    builtin: "Built-in (%{count})"
+    library: "My Crosshairs (%{count})"
+    no_match: "No crosshairs match your search"
 
 hud_maker:
   history:

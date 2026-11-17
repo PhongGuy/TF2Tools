@@ -157,12 +157,18 @@ common:
     sniper: "Снайпер"
     spy: "Шпион"
   class_short:
+    scout: "Развед."
+    pyro: "Поджиг."
     demoman: "Подрыв."
+    heavy: "Пулем."
     engineer: "Инж."
   slot:
     primary: "Основное"
     secondary: "Дополнительное"
     melee: "Ближний бой"
+  slot_short:
+    secondary: "Дополн."
+    melee: "Ближний"
   sound_kind:
     hitsound: "Хитсаунд"
     killsound: "Килсаунд"
@@ -244,6 +250,72 @@ profiles:
 crosshairs_page:
   no_weapon: "Пока не назначен ни на одно оружие"
   on_weapons: { one: "Назначен на %{count} оружие", few: "Назначен на %{count} оружия", many: "Назначен на %{count} оружий" }
+  no_tf2: "Укажите папку TF2 в настройках, чтобы устанавливать прицелы."
+  gallery_hint: "Нажмите на прицел или перетащите его в таблицу"
+  sync:
+    saving: "Сохранение в TF2..."
+    in_game: "В TF2"
+    while_running: "Сохранено. TF2 запущена, изменения вступят в силу при её следующем запуске"
+    skipped: "В TF2. %{skipped}"
+    waiting: "Сохранено. Попадёт в TF2, как только TF2 будет найдена"
+    removed: "Убрано из TF2. Следующее изменение вернёт прицелы"
+    failed: "Не удалось сохранить в TF2"
+    not_yet: "Ещё не в TF2. Следующее изменение добавит прицелы"
+    own: "TF2 использует свои прицелы"
+  skip:
+    line: "Пропущено (%{count}): %{list}"
+    unknown_builtin: "неизвестный встроенный прицел %{name}"
+    missing: "прицел %{name} не найден"
+    invalid_script: "неверный скрипт оружия %{name}"
+    no_stock_script: "не удалось прочитать скрипт игры %{name}"
+    unknown: "пропущено: %{name}"
+  button:
+    remove: "Убрать из TF2"
+    removing: "Удаление..."
+    import: "Импорт"
+    importing: "Импорт..."
+    edit: "Изменить"
+    delete: "Удалить"
+    deleting: "Удаление..."
+    copy_to_maker: "Копировать в редактор прицелов"
+    add_to_profile: "Добавить в профиль"
+    export: "Экспорт PNG"
+    exporting: "Экспорт..."
+    reset: "Сбросить"
+    close: "Закрыть"
+  selection:
+    none: "Прицел не выбран"
+    hint: "Выберите прицел в галерее, чтобы увидеть его в игровом размере"
+  preview:
+    none: "Нет прицела"
+    on: "%{name} на фоне %{background}"
+  background:
+    dark: "Тёмный"
+  board:
+    everything: "Всё оружие"
+    default: "Игровой"
+    mixed: "Разные"
+  details:
+    title: "%{class}: %{slot}"
+    hint: "Нажмите на оружие, чтобы назначить ему выбранный прицел"
+  conflict:
+    title: "Обнаружены конфликты"
+    line: ": в «%{folder}» найдены скрипты прицелов — они могут заменить ваши назначения"
+  toast:
+    imported: "Прицел импортирован"
+    added: "%{name} добавлен в вашу библиотеку"
+    added_as: "Добавлен в вашу библиотеку как %{name}"
+    file_exists: "Файл %{name} уже существует. Выберите другое имя."
+    exported: "PNG экспортирован"
+    uninstalled: "Прицелы убраны из TF2"
+    deleted: "%{name} удалён из вашей библиотеки"
+    removed: "Прицел удалён"
+    pick_first: "Сначала выберите прицел"
+  activity:
+    imported: "Импортирован прицел: %{name}"
+    uninstalled: "Назначения прицелов убраны"
+    deleted: "Прицел удалён из библиотеки: %{name}"
+    installed: { one: "Установлено %{count} назначение прицела", few: "Установлено %{count} назначения прицелов", many: "Установлено %{count} назначений прицелов" }
 
 confirm:
   cancel: "Отмена"
@@ -255,6 +327,10 @@ confirm:
   delete_sound:
     title: "Удалить звук"
     body: "Удалить этот звук из библиотеки?"
+  delete_crosshair:
+    title: "Удалить прицел"
+    body: "Удалить %{name} из библиотеки?"
+    in_tf2: "Он также будет удалён из TF2."
   crosshair_used: { one: "Его использует %{count} оружие. После удаления там будет прицел по умолчанию.", few: "Его используют %{count} оружия. Они вернутся к прицелу по умолчанию.", many: "Его используют %{count} оружий. Они вернутся к прицелу по умолчанию." }
 
 font_check:
@@ -462,6 +538,16 @@ widgets:
     unreadable: "Не удалось прочитать ваши профили"
   player:
     stop: "Остановить"
+  weapon_assigner:
+    all: "%{class}: все"
+    none: "Нет"
+    clear: "Убрать прицел"
+  crosshair_picker:
+    search: "Поиск прицелов..."
+    all: "Все"
+    builtin: "Встроенные (%{count})"
+    library: "Мои прицелы (%{count})"
+    no_match: "Нет прицелов по вашему запросу"
 
 hud_maker:
   history:

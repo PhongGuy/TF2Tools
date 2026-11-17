@@ -20,6 +20,7 @@ use gpui_kit::{
 
 use tf2tools_core::{BuiltinCrosshairs, CrosshairEntry, CrosshairFormat, CrosshairRef};
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::previews::{CrosshairPreviews, Preview};
 use crate::services::Services;
@@ -111,7 +112,9 @@ impl CrosshairPicker {
         // Rows draw whatever the cache holds, so each landed decode batch redraws them.
         let previews = CrosshairPreviews::global(cx);
         let observe_previews = cx.observe(&previews, |_, _, cx| cx.notify());
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search crosshairs..."));
+        let search = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(tr!("widgets.crosshair_picker.search"))
+        });
         let search_changed = cx.subscribe(&search, |_, _, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
                 cx.notify();
@@ -268,13 +271,11 @@ impl CrosshairPicker {
             range
                 .map(|ix| match rows[ix] {
                     Row::BuiltinHeader(n) => {
-                        header(ids::CROSSHAIRS_GROUP_BUILTIN, format!("Built-in ({n})"), cx)
+                        header(ids::CROSSHAIRS_GROUP_BUILTIN, builtin_label(n), cx)
                     }
-                    Row::LibraryHeader(n) => header(
-                        ids::CROSSHAIRS_GROUP_LIBRARY,
-                        format!("My Crosshairs ({n})"),
-                        cx,
-                    ),
+                    Row::LibraryHeader(n) => {
+                        header(ids::CROSSHAIRS_GROUP_LIBRARY, library_label(n), cx)
+                    }
                     Row::Builtin(i) => {
                         let b = &builtins.all()[i];
                         let crosshair = CrosshairRef::Builtin(b.name().to_owned());
@@ -396,18 +397,23 @@ impl CrosshairPicker {
         let query = self.search.read(cx).value().to_lowercase();
         let (tiles, builtins, library) = self.tiles(&query);
         let mut chips = vec![
-            self.chip(ids::CROSSHAIRS_GROUP_ALL, "All".into(), Source::All, cx)
-                .into_any_element(),
+            self.chip(
+                ids::CROSSHAIRS_GROUP_ALL,
+                tr!("widgets.crosshair_picker.all").to_string(),
+                Source::All,
+                cx,
+            )
+            .into_any_element(),
         ];
         if builtins > 0 {
-            let label = format!("Built-in ({builtins})");
+            let label = builtin_label(builtins);
             chips.push(
                 self.chip(ids::CROSSHAIRS_GROUP_BUILTIN, label, Source::Builtin, cx)
                     .into_any_element(),
             );
         }
         if library > 0 {
-            let label = format!("My Crosshairs ({library})");
+            let label = library_label(library);
             chips.push(
                 self.chip(ids::CROSSHAIRS_GROUP_LIBRARY, label, Source::Library, cx)
                     .into_any_element(),
@@ -421,7 +427,7 @@ impl CrosshairPicker {
                 .child(labelled(
                     div().text_sm().text_color(muted),
                     ids::CROSSHAIRS_NO_MATCH,
-                    "No crosshairs match your search",
+                    tr!("widgets.crosshair_picker.no_match"),
                 ))
                 .into_any_element()
         } else {
@@ -589,7 +595,7 @@ impl Render for CrosshairPicker {
                 .child(labelled(
                     div().text_sm().text_color(muted),
                     ids::CROSSHAIRS_NO_MATCH,
-                    "No crosshairs match your search",
+                    tr!("widgets.crosshair_picker.no_match"),
                 ))
                 .into_any_element()
         } else {
@@ -629,6 +635,16 @@ pub(crate) fn preview_image(preview: Preview, size: Pixels) -> Option<impl IntoE
 }
 
 // A group header row, labelled with its text and count.
+// The built-in group's heading and chip, with its count.
+fn builtin_label(count: usize) -> String {
+    tr!("widgets.crosshair_picker.builtin", count = count).to_string()
+}
+
+// The library group's heading and chip, with its count.
+fn library_label(count: usize) -> String {
+    tr!("widgets.crosshair_picker.library", count = count).to_string()
+}
+
 fn header(id: &'static str, text: String, cx: &App) -> AnyElement {
     labelled(
         div()

@@ -735,7 +735,7 @@ fn crosshair_operations_write_v5s_rows(cx: &mut TestAppContext) {
         got,
         [
             ("crosshair", "import", "Imported crosshair: Ring"),
-            ("crosshair", "install", "Installed 1 crosshair assignments"),
+            ("crosshair", "install", "Installed 1 crosshair assignment"),
             (
                 "crosshair",
                 "uninstall",
@@ -1106,4 +1106,11 @@ fn the_detail_line_counts_the_weapons_a_crosshair_is_on() {
     assert_eq!(weapons_detail(0), "Not on any weapon yet");
     assert_eq!(weapons_detail(1), "On 1 weapon");
     assert_eq!(weapons_detail(3), "On 3 weapons");
+}
+
+#[test]
+fn the_install_row_counts_one_assignment() {
+    use tf2tools_app::crosshair_sync::installed_text;
+    assert_eq!(installed_text(1), "Installed 1 crosshair assignment");
+    assert_eq!(installed_text(3), "Installed 3 crosshair assignments");
 }

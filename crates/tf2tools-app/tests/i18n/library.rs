@@ -3,9 +3,11 @@
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use gpui_kit::{Entity, SharedString, TestAppContext};
+use gpui_kit::{AppContext as _, Entity, SharedString, TestAppContext};
+use tf2tools_app::crosshair_sync::installed_text;
 use tf2tools_app::i18n::{self, names};
 use tf2tools_app::ids;
+use tf2tools_app::pages::crosshairs::CrosshairsPage;
 use tf2tools_app::pages::huds::HudsPage;
 use tf2tools_app::pages::sounds::SoundsPage;
 use tf2tools_app::services::Tf2State;
@@ -48,6 +50,33 @@ fn open_sounds(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<Soun
     });
     support::settle(cx, s.win);
     page
+}
+
+// The Crosshairs page, once its first load is done.
+fn open_crosshairs(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<CrosshairsPage> {
+    support::click_id(cx, s.win, ids::nav(Page::Crosshairs));
+    let page = cx
+        .update(|cx| s.shell.read(cx).crosshairs_page())
+        .expect("a Crosshairs page");
+    support::wait_real(cx, "Crosshairs to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+    page
+}
+
+fn search(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+    page: &Entity<CrosshairsPage>,
+    text: &str,
+) {
+    let input = cx.update(|cx| page.read(cx).search_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        input.update(cx, |st, cx| st.set_value(text, window, cx))
+    })
+    .unwrap();
+    support::settle(cx, s.win);
 }
 
 // A confirm dialog's four texts, in reading order.
@@ -103,11 +132,11 @@ fn class_slot_and_sound_names_read_in_both_languages() {
     assert_eq!(
         classes(class_short_name),
         [
-            "Разведчик",
+            "Развед.",
             "Солдат",
-            "Поджигатель",
+            "Поджиг.",
             "Подрыв.",
-            "Пулемётчик",
+            "Пулем.",
             "Инж.",
             "Медик",
             "Снайпер",
@@ -261,4 +290,47 @@ fn the_sounds_page_reads_in_russian(cx: &mut TestAppContext) {
         added_title("Ding", "Comp", Some(hit), Some("Old")),
         "Добавлено в профиль Comp как хитсаунд: Ding (вместо Old)"
     );
+}
+
+#[gpui_kit::test]
+fn the_crosshairs_page_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    support::seed_crosshair(&s.services, &env, "Zebra Dot");
+    let page = open_crosshairs(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CROSSHAIRS_WAITING).as_deref(),
+        Some("TF2 использует свои прицелы")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CROSSHAIRS_PREVIEW).as_deref(),
+        Some("Нет прицела")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CROSSHAIRS_BACKGROUND).as_deref(),
+        Some("Тёмный")
+    );
+    search(cx, &s, &page, "zebra");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CROSSHAIRS_GROUP_LIBRARY).as_deref(),
+        Some("Мои прицелы (1)")
+    );
+    search(cx, &s, &page, "zzzz");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CROSSHAIRS_NO_MATCH).as_deref(),
+        Some("Нет прицелов по вашему запросу")
+    );
+    assert_eq!(
+        texts(&Confirm::delete_crosshair("Zebra Dot", 2, true))[..2],
+        [
+            "Удалить прицел",
+            "Удалить Zebra Dot из библиотеки? Его используют 2 оружия. Они вернутся к прицелу по умолчанию. \
+             Он также будет удалён из TF2. Это действие нельзя отменить."
+        ]
+    );
+    assert_eq!(installed_text(1), "Установлено 1 назначение прицела");
+    assert_eq!(installed_text(2), "Установлено 2 назначения прицелов");
+    assert_eq!(installed_text(5), "Установлено 5 назначений прицелов");
+    assert_eq!(installed_text(21), "Установлено 21 назначение прицела");
 }

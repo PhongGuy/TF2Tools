@@ -737,6 +737,10 @@ mod tests {
         "pages/sounds.rs",
         "audio/player.rs",
         "widgets/profile_menu.rs",
+        "pages/crosshairs.rs",
+        "crosshair_sync.rs",
+        "widgets/weapon_assigner.rs",
+        "widgets/crosshair_picker.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -755,6 +759,11 @@ mod tests {
             "pages/sounds.rs",
             "16-bit PCM, 44100Hz, Stereo",
             "technical format spec in the import row's details; no words to translate",
+        ),
+        (
+            "pages/crosshairs.rs",
+            "Dark",
+            "the plain backdrop's Select value and row id; its label is crosshairs_page.background.dark",
         ),
     ];
 

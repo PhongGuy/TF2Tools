@@ -19,6 +19,8 @@ use gpui_kit::{
 
 use tf2tools_core::{CrosshairRef, TfClass, Weapon, WeaponSlot, weapons};
 
+use crate::i18n::names::{class_name, slot_name};
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::common::ORANGE_500;
 use crate::previews::CrosshairPreviews;
@@ -237,7 +239,7 @@ impl WeaponAssigner {
             Button::new(ids::class_tab(&class.name().to_lowercase()))
                 .ghost()
                 .small()
-                .label(class.name())
+                .label(class_name(class))
                 .selected(active)
                 .h(px(29.))
                 .border_1()
@@ -255,22 +257,25 @@ impl WeaponAssigner {
             (
                 ids::CROSSHAIRS_BULK_ALL,
                 None,
-                format!("All {}", self.class.name()),
+                tr!(
+                    "widgets.weapon_assigner.all",
+                    class = class_name(self.class)
+                ),
             ),
             (
                 ids::CROSSHAIRS_BULK_PRIMARY,
                 Some(WeaponSlot::Primary),
-                "Primary".into(),
+                slot_name(WeaponSlot::Primary),
             ),
             (
                 ids::CROSSHAIRS_BULK_SECONDARY,
                 Some(WeaponSlot::Secondary),
-                "Secondary".into(),
+                slot_name(WeaponSlot::Secondary),
             ),
             (
                 ids::CROSSHAIRS_BULK_MELEE,
                 Some(WeaponSlot::Melee),
-                "Melee".into(),
+                slot_name(WeaponSlot::Melee),
             ),
         ]
         .into_iter()
@@ -365,7 +370,10 @@ impl WeaponAssigner {
         let (muted, primary, hover) = (theme.muted_foreground, theme.primary, theme.accent);
         let script = weapon.script_name();
         let cell = self.cells.iter().find(|c| c.script == script);
-        let label = cell.map_or("None", |c| c.label.as_str()).to_owned();
+        let label = cell.map_or_else(
+            || tr!("widgets.weapon_assigner.none").to_string(),
+            |c| c.label.clone(),
+        );
         let preview = cell
             .and_then(|c| c.crosshair.as_ref())
             .filter(|_| !self.compact)
@@ -402,7 +410,7 @@ impl WeaponAssigner {
                 .ghost()
                 .xsmall()
                 .icon(IconName::X)
-                .named("Clear crosshair")
+                .named(tr!("widgets.weapon_assigner.clear"))
                 .disabled(self.state.busy)
                 .on_click(cx.listener(move |_, _, _, cx| {
                     cx.stop_propagation();

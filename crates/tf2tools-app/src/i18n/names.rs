@@ -32,6 +32,15 @@ pub fn slot_name(slot: WeaponSlot) -> SharedString {
     }
 }
 
+/// The weapon slot's name for a narrow header; only the longer Russian names shorten.
+pub fn slot_short_name(slot: WeaponSlot) -> SharedString {
+    match slot {
+        WeaponSlot::Secondary => tr!("common.slot_short.secondary"),
+        WeaponSlot::Melee => tr!("common.slot_short.melee"),
+        WeaponSlot::Primary | _ => slot_name(slot),
+    }
+}
+
 /// The sound kind's name, such as "Killsound".
 pub fn sound_kind_name(kind: SoundKind) -> SharedString {
     match kind {
