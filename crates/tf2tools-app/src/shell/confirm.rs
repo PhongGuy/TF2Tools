@@ -8,7 +8,7 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window, div,
 };
 
-use crate::i18n::plural;
+use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 
@@ -70,13 +70,15 @@ impl Confirm {
     /// v5's HudCard delete prompt for the HUD called `name`.
     pub fn delete_hud(name: &str) -> Self {
         Self {
-            title: "Delete HUD".into(),
+            title: tr!("confirm.delete_hud.title"),
             description: format!(
-                "Are you sure you want to delete {name} from your library? This cannot be undone."
+                "{} {}",
+                tr!("confirm.delete_hud.body", name = name),
+                tr!("confirm.cannot_undo")
             )
             .into(),
-            confirm_label: "Delete".into(),
-            cancel_label: "Cancel".into(),
+            confirm_label: tr!("confirm.delete"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 

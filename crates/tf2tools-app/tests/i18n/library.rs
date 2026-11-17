@@ -1,15 +1,49 @@
 //! The library pages, the names they share and the navigation, in Russian.
 
-use gpui_kit::{SharedString, TestAppContext};
+use std::io::Write as _;
+use std::path::{Path, PathBuf};
+
+use gpui_kit::{Entity, SharedString, TestAppContext};
 use tf2tools_app::i18n::{self, names};
 use tf2tools_app::ids;
+use tf2tools_app::pages::huds::HudsPage;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::widgets::class_icon::class_short_name;
-use tf2tools_core::{SoundKind, TfClass, WeaponSlot};
+use tf2tools_core::{Provenance, SoundKind, Tf2Install, TfClass, WeaponSlot};
 
 use crate::LocaleGuard;
 use crate::support;
+
+fn found(env: &support::Env) -> Tf2State {
+    Tf2State::Found(Tf2Install::from_path(&env.game).unwrap())
+}
+
+// The HUDs page, the shell's start page, once its first load is done.
+fn open_huds(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<HudsPage> {
+    let page = cx
+        .update(|cx| s.shell.read(cx).huds_page())
+        .expect("a HUDs page");
+    support::wait_real(cx, "HUDs to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+    page
+}
+
+// A minimal HUD archive, `<name>/info.vdf` plus a layout file, written into `dir`.
+fn hud_zip(dir: &Path, name: &str) -> PathBuf {
+    let path = dir.join(format!("{name}.zip"));
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+    let options = zip::write::SimpleFileOptions::default();
+    zip.start_file(format!("{name}/info.vdf"), options).unwrap();
+    write!(zip, "\"{name}\"\n{{\n\t\"ui_version\"\t\"3\"\n}}\n").unwrap();
+    zip.start_file(format!("{name}/resource/ui/hudlayout.res"), options)
+        .unwrap();
+    write!(zip, "\"Resource/HudLayout.res\"\n{{\n}}\n").unwrap();
+    zip.finish().unwrap();
+    path
+}
 
 fn classes(name: fn(TfClass) -> SharedString) -> Vec<String> {
     TfClass::ALL.iter().map(|c| name(*c).to_string()).collect()
@@ -91,4 +125,69 @@ fn the_sidebar_header_and_tf2_notice_read_in_russian(cx: &mut TestAppContext) {
         label(cx, ids::HEADER_TITLE.into()).as_deref(),
         Some("Журнал действий")
     );
+}
+
+#[gpui_kit::test]
+fn the_huds_page_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let _page = open_huds(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUDS_INSTALLED_EMPTY).as_deref(),
+        Some("HUD не установлен")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUDS_EMPTY).as_deref(),
+        Some("Ваша библиотека пуста")
+    );
+    let archive = hud_zip(env.tmp.path(), "budhud");
+    s.services
+        .library
+        .import_hud(&archive, Provenance::Local)
+        .unwrap();
+    support::click_id(cx, s.win, ids::nav(Page::Settings));
+    support::click_id(cx, s.win, ids::nav(Page::Huds));
+    let _page = open_huds(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::hud_badge("budhud")).as_deref(),
+        Some("Локальный")
+    );
+    support::click_id(cx, s.win, ids::hud_delete("budhud"));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref(),
+        Some("Удалить HUD")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
+        Some("Удалить budhud из библиотеки? Это действие нельзя отменить.")
+    );
+}
+
+#[test]
+fn hud_counts_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let fonts = |n: u64| {
+        i18n::counted_plural(
+            "font_check.activity.installed",
+            n,
+            &n.to_string(),
+            &[("folder", "budhud")],
+        )
+    };
+    assert_eq!(fonts(1), "Установлен 1 шрифт для HUD: budhud");
+    assert_eq!(fonts(2), "Установлено 2 шрифта для HUD: budhud");
+    assert_eq!(fonts(5), "Установлено 5 шрифтов для HUD: budhud");
+    assert_eq!(fonts(21), "Установлен 21 шрифт для HUD: budhud");
+    let more = |n: u64| {
+        i18n::counted_plural(
+            "external_huds.names_more",
+            n,
+            &n.to_string(),
+            &[("names", "a, b")],
+        )
+    };
+    for n in [1, 2, 5, 21] {
+        assert_eq!(more(n), format!("a, b и ещё {n}"));
+    }
 }

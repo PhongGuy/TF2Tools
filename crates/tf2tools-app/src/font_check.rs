@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use gpui_kit::{App, Global};
+use gpui_kit::{App, Global, SharedString};
 
 use tf2tools_core::{
     FontCheck, FontInstallError, FontInstallReport, FontIssue, FontSkipReason, HudStatus, LogLevel,
@@ -169,14 +169,14 @@ pub fn install_job(s: &Services, prompt: &FontPrompt) -> Result<FontToast, OpErr
         Err(err @ FontInstallError::Refresh { .. }) => {
             let toast = FontToast {
                 kind: ToastKind::Warning,
-                title: "Fonts copied".to_owned(),
-                description: "Log out and back in for TF2 to see the new fonts.".to_owned(),
+                title: tr!("font_check.toast.copied_title").to_string(),
+                description: tr!("font_check.toast.copied").to_string(),
             };
-            let message = format!("Copied fonts for HUD: {folder}");
+            let message = tr!("font_check.activity.copied", folder = folder).to_string();
             (Ok(toast), row(LogLevel::Warning, message, err.to_string()))
         }
         Err(err) => {
-            let message = format!("Failed to install fonts for HUD: {folder}");
+            let message = tr!("font_check.activity.failed", folder = folder).to_string();
             let entry = row(LogLevel::Error, message, err.to_string());
             (
                 Err(describe_font_install(&err).into_op(tr!("messages.action.install_fonts"))),
@@ -196,7 +196,8 @@ fn installed(
     let (n, k) = (report.installed().len(), report.skipped().len());
     let mut lines = Vec::new();
     if n > 0 {
-        lines.push(format!("Installed: {}", report.installed().join(", ")));
+        let fonts = report.installed().join(", ");
+        lines.push(tr!("font_check.activity.installed_list", fonts = fonts).to_string());
     }
     if k > 0 {
         let skipped: Vec<String> = report
@@ -204,19 +205,27 @@ fn installed(
             .iter()
             .map(|(path, reason)| format!("{path} ({})", skip_text(reason)))
             .collect();
-        lines.push(format!("Skipped: {}", skipped.join(", ")));
+        let fonts = skipped.join(", ");
+        lines.push(tr!("font_check.activity.skipped_list", fonts = fonts).to_string());
     }
     let message = if n == 0 {
-        format!("No fonts installed for HUD: {folder}")
+        tr!("font_check.activity.none", folder = folder)
     } else {
-        format!("Installed {n} {} for HUD: {folder}", fonts(n))
+        let wide = u64::try_from(n).unwrap_or(u64::MAX);
+        let folder = [("folder", folder)];
+        counted_plural(
+            "font_check.activity.installed",
+            wide,
+            &n.to_string(),
+            &folder,
+        )
     };
     let (kind, title) = if k == 0 {
-        (ToastKind::Success, "Fonts installed")
+        (ToastKind::Success, tr!("font_check.toast.installed_title"))
     } else if n > 0 {
-        (ToastKind::Warning, "Some fonts were not installed")
+        (ToastKind::Warning, tr!("font_check.toast.some_title"))
     } else {
-        (ToastKind::Warning, "No fonts installed")
+        (ToastKind::Warning, tr!("font_check.toast.none_title"))
     };
     let description = installed_text(folder, n, k);
     let level = if k == 0 {
@@ -226,10 +235,10 @@ fn installed(
     };
     let toast = FontToast {
         kind,
-        title: title.to_owned(),
+        title: title.to_string(),
         description,
     };
-    (Ok(toast), row(level, message, lines.join("\n")))
+    (Ok(toast), row(level, message.to_string(), lines.join("\n")))
 }
 
 /// The install toast's description for `installed` fonts copied and `skipped` left out.
@@ -264,10 +273,6 @@ fn row(level: LogLevel, message: String, details: String) -> NewLogEntry {
     NewLogEntry::new(level, "hud", "install_fonts", message).with_details(details)
 }
 
-fn fonts(count: usize) -> &'static str {
-    if count == 1 { "font" } else { "fonts" }
-}
-
 /// Blocking. Stores `prompt.check.fingerprint()` for `prompt.folder`;
 /// a failed save toasts "Failed to save the font choice" in player words.
 pub fn dismiss_job(s: &Services, prompt: &FontPrompt) -> Result<(), OpError> {
@@ -278,30 +283,30 @@ pub fn dismiss_job(s: &Services, prompt: &FontPrompt) -> Result<(), OpError> {
 /// One Linux font issue in plain words.
 pub fn issue_text(issue: &FontIssue) -> String {
     match issue {
-        FontIssue::PathCaseMismatch { declared, on_disk } => format!(
-            "The HUD asks for {declared} but ships {}; Linux file names are case-sensitive, so \
-             TF2 may not find it.",
-            on_disk.display()
-        ),
-        FontIssue::UppercaseFileName { file } => format!(
-            "{} has capital letters in its file name, which TF2 on Linux may fail to load.",
-            file.display()
-        ),
-        FontIssue::InsideVpk { declared, vpk } => format!(
-            "{declared} is packed in {}, and TF2 does not load fonts from VPK files.",
-            vpk.display()
-        ),
-        _ => "A font file in this HUD may not load in TF2.".to_owned(),
+        FontIssue::PathCaseMismatch { declared, on_disk } => {
+            let file = on_disk.display().to_string();
+            tr!("font_check.issue.case", declared = declared, file = file)
+        }
+        FontIssue::UppercaseFileName { file } => {
+            let file = file.display().to_string();
+            tr!("font_check.issue.uppercase", file = file)
+        }
+        FontIssue::InsideVpk { declared, vpk } => {
+            let vpk = vpk.display().to_string();
+            tr!("font_check.issue.vpk", declared = declared, vpk = vpk)
+        }
+        _ => tr!("font_check.issue.unknown"),
     }
+    .to_string()
 }
 
 /// Why a font file was skipped, in words that follow "path (".
-pub fn skip_text(reason: &FontSkipReason) -> &'static str {
+pub fn skip_text(reason: &FontSkipReason) -> SharedString {
     match reason {
-        FontSkipReason::ProtectedName => "it carries a system font name",
-        FontSkipReason::FileExists => "a different file with that name is already installed",
-        FontSkipReason::OutsideHud => "it is outside the HUD folder",
-        FontSkipReason::Unnamed => "its font name cannot be read",
-        _ => "it could not be installed",
+        FontSkipReason::ProtectedName => tr!("font_check.skip.protected"),
+        FontSkipReason::FileExists => tr!("font_check.skip.exists"),
+        FontSkipReason::OutsideHud => tr!("font_check.skip.outside"),
+        FontSkipReason::Unnamed => tr!("font_check.skip.unnamed"),
+        _ => tr!("font_check.skip.failed"),
     }
 }

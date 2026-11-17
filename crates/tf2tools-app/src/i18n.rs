@@ -728,10 +728,27 @@ mod tests {
         "widgets/label_option.rs",
         "shell/route.rs",
         "widgets/class_icon.rs",
+        "pages/huds.rs",
+        "shell/external_huds.rs",
+        // "./" keeps the key scan from reading this path as a `font_check` key.
+        "./font_check.rs",
+        "shell/font_check.rs",
+        "widgets/carousel.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
-    const ALLOWED: &[(&str, &str, &str)] = &[];
+    const ALLOWED: &[(&str, &str, &str)] = &[
+        (
+            "pages/huds.rs",
+            "the HUD update task stopped unexpectedly",
+            "developer detail of a stopped download",
+        ),
+        (
+            "./font_check.rs",
+            "no font host on this system",
+            "developer detail: FontInstallError::Host reason, shown only in the row's details",
+        ),
+    ];
 
     #[test]
     fn library_pages_show_no_english_literal() {

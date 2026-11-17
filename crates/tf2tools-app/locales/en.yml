@@ -248,12 +248,154 @@ crosshairs_page:
   on_weapons: { one: "On %{count} weapon", other: "On %{count} weapons" }
 
 confirm:
+  cancel: "Cancel"
+  delete: "Delete"
+  cannot_undo: "This cannot be undone."
+  delete_hud:
+    title: "Delete HUD"
+    body: "Are you sure you want to delete %{name} from your library?"
   crosshair_used: { one: "It is used by %{count} weapon. It goes back to the default crosshair.", other: "It is used by %{count} weapons. They go back to the default crosshair." }
 
 font_check:
   installed: { one: "Installed %{count} font for %{folder}. Restart TF2 to use them.", other: "Installed %{count} fonts for %{folder}. Restart TF2 to use them." }
   installed_some: { one: "Installed %{installed} of %{count} font for %{folder}; see the Activity Log. Restart TF2 to use them.", other: "Installed %{installed} of %{count} fonts for %{folder}; see the Activity Log. Restart TF2 to use them." }
   skipped: { one: "Skipped %{count} font for %{folder}; see the Activity Log.", other: "Skipped %{count} fonts for %{folder}; see the Activity Log." }
+  activity:
+    copied: "Copied fonts for HUD: %{folder}"
+    failed: "Failed to install fonts for HUD: %{folder}"
+    none: "No fonts installed for HUD: %{folder}"
+    installed: { one: "Installed %{count} font for HUD: %{folder}", other: "Installed %{count} fonts for HUD: %{folder}" }
+    installed_list: "Installed: %{fonts}"
+    skipped_list: "Skipped: %{fonts}"
+  toast:
+    copied_title: "Fonts copied"
+    copied: "Log out and back in for TF2 to see the new fonts."
+    installed_title: "Fonts installed"
+    some_title: "Some fonts were not installed"
+    none_title: "No fonts installed"
+  issue:
+    case: "The HUD asks for %{declared} but ships %{file}; Linux file names are case-sensitive, so TF2 may not find it."
+    uppercase: "%{file} has capital letters in its file name, which TF2 on Linux may fail to load."
+    vpk: "%{declared} is packed in %{vpk}, and TF2 does not load fonts from VPK files."
+    unknown: "A font file in this HUD may not load in TF2."
+  skip:
+    protected: "it carries a system font name"
+    exists: "a different file with that name is already installed"
+    outside: "it is outside the HUD folder"
+    unnamed: "its font name cannot be read"
+    failed: "it could not be installed"
+  dialog:
+    title: "HUD fonts"
+    body: "%{folder} uses fonts that are not installed, so TF2 would show its default fonts instead. Restart TF2 after installing them."
+    protected: "%{name}: not installed, system font name"
+    dont_ask: "Don't ask again for this HUD"
+    skip: "Skip"
+    install: "Install fonts"
+
+huds:
+  search: "Search HUDs..."
+  edit_wait: "Wait for TF2Tools to finish, then edit"
+  not_reinstalled: "Updated, but couldn't update the installed copy. Close TF2 and install it again from HUDs."
+  no_tf2: "Set the TF2 folder in Settings to install HUDs."
+  heading:
+    library: "Your Library"
+    installed_one: "Installed HUD"
+    installed_many: "Installed HUDs"
+  installed:
+    empty: "No HUD installed"
+    empty_body: "Install a HUD from your library to customize your in-game interface."
+    active: "Active in TF2."
+    external: "Added to TF2 outside TF2Tools."
+  badge:
+    managed: "Managed"
+    external: "External"
+    store: "Store"
+    local: "Local"
+  button:
+    add: "Add HUD"
+    importing: "Importing..."
+    edit: "Edit"
+    edit_in_maker: "Edit in HUD Maker"
+    edit_copy: "Edit a copy"
+    uninstall: "Uninstall"
+    uninstall_named: "Uninstall %{name}"
+    update: "Update"
+    visit: "Visit page"
+    delete: "Delete from library"
+    install: "Install"
+    add_to_profile: "Add to profile"
+  card:
+    update_available: "Update available"
+    copy_of: "Copy of %{base}"
+    by: "by %{author}"
+  conflict:
+    title: "HUD Conflicts Detected"
+    body: "TF2 can only use one HUD at a time. Uninstall the ones you don't want until one is left."
+  empty:
+    title: "Your library is empty"
+    body: "Add a HUD from a ZIP file or browse the store to download one."
+    no_match_title: "No HUDs found"
+    no_match_body: "Try a different search term."
+  toast:
+    imported: "HUD imported"
+    added: "%{name} added to your library"
+    added_as: "Added to your library as %{name}"
+    uninstalled: "HUD uninstalled"
+    removed_yours: "Your HUD has been removed from TF2"
+    removed: "%{name} has been removed from TF2"
+    deleted_title: "HUD removed"
+    deleted: "%{name} has been deleted from your library"
+    copy_made: "Copy made"
+    updated_title: "HUD updated"
+    updated: "%{name} is now up to date"
+    installed_title: "HUD installed"
+    installed: "%{name} installed"
+    active: "%{name} is now active"
+    blocked: "A folder named %{blocked} is already in your custom folder, so parts of this HUD may not show. Move or rename that folder and install again."
+  activity:
+    imported: "Imported HUD: %{name}"
+    uninstalled: "Uninstalled HUD(s): %{name}"
+    deleted: "Deleted HUD from library: %{name}"
+    copied: "Copied HUD: %{name}"
+    updated_copy: "Updated HUD copy: %{name}"
+    updated: "Updated HUD: %{name}"
+    installed: "Installed HUD: %{name}"
+
+external_huds:
+  names_more: { one: "%{names} and %{count} more", other: "%{names} and %{count} more" }
+  activity:
+    kept: "Kept HUD in library: %{name}"
+    removed: "Removed without keeping: %{names}"
+  note:
+    kept: "A copy of %{names} is in your library."
+    removed: "Removed without a copy: %{names}."
+  dialog:
+    keep_one: "Keep %{name}?"
+    keep_one_changes: "Keep your changes to %{name}?"
+    keep_many: "Keep these HUDs?"
+    keep_many_changes: "Keep your changes?"
+    install:
+      changes: "Installing this HUD removes %{names} from TF2. Your changes can't be brought back unless you keep a copy."
+      single: "Installing this HUD removes %{names} from TF2. TF2Tools has no copy of it, so it can't come back unless you keep one."
+      several: "Installing this HUD removes %{names} from TF2. TF2Tools has no copy of them, so they can't come back unless you keep one."
+    uninstall:
+      changes: "Uninstalling removes %{names} from TF2. Your changes can't be brought back unless you keep a copy."
+      single: "Uninstalling removes %{names} from TF2. TF2Tools has no copy of it, so it can't come back unless you keep one."
+      several: "Uninstalling removes %{names} from TF2. TF2Tools has no copy of them, so they can't come back unless you keep one."
+    activate:
+      changes: "Activating this profile removes %{names} from TF2. Your changes can't be brought back unless you keep a copy."
+      single: "Activating this profile removes %{names} from TF2. TF2Tools has no copy of it, so it can't come back unless you keep one."
+      several: "Activating this profile removes %{names} from TF2. TF2Tools has no copy of them, so they can't come back unless you keep one."
+    remove: "Remove without keeping"
+    replace: "Replace without keeping"
+    keep: "Keep a copy in my library"
+
+widgets:
+  carousel:
+    empty: "No screenshots"
+    unavailable: "Screenshot unavailable"
+    previous: "Previous image"
+    next: "Next image"
 
 hud_maker:
   history:
