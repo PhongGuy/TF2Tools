@@ -1,12 +1,16 @@
 use crate::support;
 
-use gpui_kit::TestAppContext;
+use gpui_kit::{SharedString, TestAppContext};
 use tf2tools_app::pages::profiles::model::{
     activated_description, crosshair_count, failed_description, kept_parts, kind_label,
     load_closes_editor, matches, redownload_target, report_details, step_label, success_title,
 };
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_core::{ApplyStep, GbId, MissingKind, ProfileId, Provenance, StoreItemId, StoreKind};
+
+fn parts(names: &[&'static str]) -> Vec<SharedString> {
+    names.iter().map(|&n| n.into()).collect()
+}
 
 fn gb(id: u64) -> Provenance {
     Provenance::GameBanana {
@@ -48,7 +52,7 @@ fn steps_and_kinds_have_v5_s_labels() {
 #[test]
 fn the_activated_toast_reads_like_v5() {
     assert_eq!(
-        activated_description(&["HUD", "Hitsound", "Killsound", "Crosshairs"], &[]),
+        activated_description(&parts(&["HUD", "Hitsound", "Killsound", "Crosshairs"]), &[]),
         "Installed: HUD, Hitsound, Killsound, Crosshairs"
     );
     assert_eq!(
@@ -60,11 +64,11 @@ fn the_activated_toast_reads_like_v5() {
 #[test]
 fn an_apply_with_skips_names_what_it_kept() {
     assert_eq!(
-        activated_description(&["Hitsound"], &["HUD"]),
+        activated_description(&parts(&["Hitsound"]), &parts(&["HUD"])),
         "Installed: Hitsound. Kept what you had for: HUD (missing from your library)"
     );
     assert_eq!(
-        activated_description(&[], &["HUD", "Crosshairs"]),
+        activated_description(&[], &parts(&["HUD", "Crosshairs"])),
         "Nothing new installed. Kept what you had for: HUD, Crosshairs (missing from your library)"
     );
 }

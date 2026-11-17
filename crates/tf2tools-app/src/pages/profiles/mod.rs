@@ -96,7 +96,7 @@ impl ProfilesPage {
         let tf2 = cx.observe(&tf2_state(cx), |page, _, cx| page.reload(cx));
         let events = LibraryEvents::global(cx);
         let library = cx.subscribe(&events, |page, _, _: &LibraryChanged, cx| page.reload(cx));
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search profiles..."));
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder(tr!("profiles.search")));
         // The grid filters from the input's value at render, so each edit just redraws.
         let search_changed = cx.subscribe(&search, |_, _, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Change) {
@@ -441,9 +441,9 @@ impl ProfilesPage {
             let (action, message) = match tf2 {
                 Some(_) => (
                     "save_current",
-                    format!("Saved current setup as profile: {name}"),
+                    tr!("profiles.activity.saved_current", name = name),
                 ),
-                None => ("create", format!("Created profile: {name}")),
+                None => ("create", tr!("profiles.activity.created", name = name)),
             };
             let entry = NewLogEntry::new(LogLevel::Info, "profile", action, message);
             activity::write(s, &entry);
@@ -459,9 +459,9 @@ impl ProfilesPage {
                         Err(err) => return toast_error(window, cx, &err),
                     };
                     let title = if from_installed {
-                        "Profile created from your current setup"
+                        tr!("profiles.toast.created_from_setup")
                     } else {
-                        "Empty profile created"
+                        tr!("profiles.toast.created_empty")
                     };
                     toast(
                         window,
@@ -508,7 +508,7 @@ impl ProfilesPage {
             return;
         }
         let answer = confirm(Confirm::delete_profile(name), window, cx);
-        let message = format!("Deleted profile: {name}");
+        let message = tr!("profiles.activity.deleted", name = name).to_string();
         cx.spawn(async move |page, cx| {
             if !answer.recv().await.unwrap_or(false) {
                 return;
@@ -522,7 +522,7 @@ impl ProfilesPage {
                         // The id is internal; the player's row names the profile instead.
                         let entry = NewLogEntry::new(LogLevel::Info, "profile", "delete", message);
                         activity::write(s, &entry);
-                        Ok(("Profile deleted".into(), SharedString::default()))
+                        Ok((tr!("profiles.toast.deleted"), SharedString::default()))
                     },
                     cx,
                 );
@@ -596,13 +596,19 @@ fn apply_job(
     let (level, message) = if !report.failed().is_empty() {
         (
             LogLevel::Error,
-            format!("Failed to activate profile: {name}"),
+            tr!("profiles.activity.failed", name = name),
         )
     } else if skipped.is_empty() {
-        (LogLevel::Info, format!("Activated profile: {name}"))
+        (
+            LogLevel::Info,
+            tr!("profiles.activity.activated", name = name),
+        )
     } else {
         // Missing items were left as they were, so the profile is applied, not active.
-        (LogLevel::Info, format!("Applied profile: {name}"))
+        (
+            LogLevel::Info,
+            tr!("profiles.activity.applied", name = name),
+        )
     };
     let entry = NewLogEntry::new(level, "profile", "activate", message).with_details(details);
     activity::write(s, &entry);
@@ -667,7 +673,7 @@ fn announce(done: Result<Activation, OpError>, tf2: Tf2Install, window: &mut Win
                 window,
                 cx,
                 ToastKind::Error,
-                "Failed to activate profile",
+                tr!("profiles.toast.activate_failed"),
                 description,
             );
             LibraryEvents::changed(cx);
@@ -677,8 +683,8 @@ fn announce(done: Result<Activation, OpError>, tf2: Tf2Install, window: &mut Win
             window,
             cx,
             ToastKind::Error,
-            "Failed to activate profile",
-            "Some items are missing",
+            tr!("profiles.toast.activate_failed"),
+            tr!("profiles.toast.missing"),
         ),
         Err(err) => toast_error(window, cx, &err),
     }
@@ -703,8 +709,7 @@ fn missing_items_dialog(
     cx: &mut App,
 ) -> async_channel::Receiver<MissingAnswer> {
     let (tx, rx) = async_channel::bounded(1);
-    let description: SharedString =
-        format!("Some items in \"{profile_name}\" are no longer in your library.").into();
+    let description: SharedString = tr!("profiles.missing.body", name = profile_name);
     let items: Rc<[MissingItem]> = items.into();
     // The list's scroll position outlives the builder, which runs every frame.
     let list_scroll = ScrollHandle::new();
@@ -750,11 +755,11 @@ fn missing_items_dialog(
                                     .child(
                                         div()
                                             .id(ids::PROFILES_MISSING_TITLE)
-                                            .aria_label("Missing Items")
+                                            .aria_label(tr!("profiles.missing.title"))
                                             .test_support()
                                             .text_lg()
                                             .font_weight(FontWeight::SEMIBOLD)
-                                            .child("Missing Items"),
+                                            .child(tr!("profiles.missing.title")),
                                     )
                                     .child(
                                         div()
@@ -786,7 +791,7 @@ fn missing_items_dialog(
                                     .child(
                                         button(ids::PROFILES_MISSING_CANCEL, MissingAnswer::Cancel)
                                             .outline()
-                                            .label("Cancel"),
+                                            .label(tr!("confirm.cancel")),
                                     )
                                     .child(
                                         button(
@@ -794,7 +799,7 @@ fn missing_items_dialog(
                                             MissingAnswer::InstallAnyway,
                                         )
                                         .primary()
-                                        .label("Install Anyway (skip missing)"),
+                                        .label(tr!("profiles.missing.install")),
                                     ),
                             ),
                     ),
@@ -826,21 +831,21 @@ fn missing_row(ix: usize, item: &MissingItem, cx: &App) -> AnyElement {
             Button::new(ids::missing_redownload(ix))
                 .outline()
                 .icon(IconName::Download)
-                .label("Re-download")
+                .label(tr!("profiles.missing.redownload"))
                 .on_click(move |_, window, cx| {
                     open_detail(detail.clone(), body(), window, cx);
                 })
                 .into_any_element()
         }
         None => {
-            const LOCAL: &str = "Local import \u{2014} can't re-download";
+            let local = tr!("profiles.missing.local");
             div()
                 .id(ids::missing_local(ix))
-                .aria_label(LOCAL)
+                .aria_label(local.clone())
                 .test_support()
                 .text_xs()
                 .text_color(muted)
-                .child(LOCAL)
+                .child(local)
                 .into_any_element()
         }
     };
@@ -901,7 +906,7 @@ fn active_card(profile: &Profile, cx: &App) -> AnyElement {
         badges = badges.child(labelled(
             div().text_sm().text_color(muted),
             ids::PROFILES_ACTIVE_EMPTY,
-            "Empty profile (vanilla)",
+            tr!("profiles.card.empty_vanilla"),
         ));
     } else {
         let slots = [
@@ -963,7 +968,7 @@ fn active_card(profile: &Profile, cx: &App) -> AnyElement {
                             ids::PROFILES_ACTIVE_BADGE,
                             Tag::primary(),
                             transparent_black(),
-                            "Active",
+                            tr!("profiles.badge.active"),
                         )),
                 )
                 .child(badges),
@@ -975,15 +980,16 @@ fn active_card(profile: &Profile, cx: &App) -> AnyElement {
 fn empty_state(
     id: &'static str,
     icon: IconName,
-    title: &'static str,
-    description: &'static str,
+    title: impl Into<SharedString>,
+    description: impl Into<SharedString>,
     actions: Option<AnyElement>,
     cx: &App,
 ) -> AnyElement {
+    let (title, description) = (title.into(), description.into());
     let muted = cx.theme().muted_foreground;
     card_frame(cx)
         .id(id)
-        .aria_label(title)
+        .aria_label(title.clone())
         .test_support()
         .child(
             v_flex()
@@ -1039,9 +1045,9 @@ fn profile_card(
     };
     let this_one = activating == Some(id);
     let activate_label = match (this_one, active) {
-        (true, _) => "Activating...",
-        (false, true) => "Active",
-        (false, false) => "Activate",
+        (true, _) => tr!("profiles.button.activating"),
+        (false, true) => tr!("profiles.badge.active"),
+        (false, false) => tr!("profiles.button.activate"),
     };
     let on_edit = {
         let (page, id) = (page.clone(), id.clone());
@@ -1063,7 +1069,7 @@ fn profile_card(
         badges = badges.child(labelled(
             div().text_xs().text_color(theme.muted_foreground),
             ids::profile_empty(id),
-            "Empty profile",
+            tr!("profiles.card.empty"),
         ));
     } else {
         let slots = [
@@ -1135,7 +1141,7 @@ fn profile_card(
                         ids::profile_active_badge(id),
                         Tag::primary(),
                         transparent_black(),
-                        "Active",
+                        tr!("profiles.badge.active"),
                     )
                 })),
         )
@@ -1158,7 +1164,7 @@ fn profile_card(
                     Button::new(ids::profile_edit(id))
                         .outline()
                         .icon(IconName::Pencil)
-                        .named("Edit profile")
+                        .named(tr!("profiles.button.edit"))
                         .disabled(busy)
                         .on_click(on_edit),
                 )
@@ -1166,7 +1172,7 @@ fn profile_card(
                     Button::new(ids::profile_delete(id))
                         .outline()
                         .icon(IconName::Trash)
-                        .named("Delete profile")
+                        .named(tr!("profiles.button.delete"))
                         .disabled(busy)
                         .on_click(on_delete),
                 ),
@@ -1188,7 +1194,7 @@ impl ProfilesPage {
                         .primary()
                         .px(SM_ICON_PX)
                         .icon(IconName::Plus)
-                        .label("New profile")
+                        .label(tr!("profiles.button.new"))
                         .disabled(!has_tf2 || busy)
                         .on_click(
                             cx.listener(|page, _, window, cx| page.new_profile(true, window, cx)),
@@ -1198,7 +1204,7 @@ impl ProfilesPage {
                     Button::new(ids::PROFILES_EMPTY_START_EMPTY)
                         .outline()
                         .px(SM_ICON_PX)
-                        .label("Start empty")
+                        .label(tr!("profiles.button.start_empty"))
                         .disabled(busy)
                         .on_click(
                             cx.listener(|page, _, window, cx| page.new_profile(false, window, cx)),
@@ -1208,8 +1214,8 @@ impl ProfilesPage {
             Some(empty_state(
                 ids::PROFILES_EMPTY,
                 IconName::PackageOpen,
-                "No profiles yet",
-                "Save your current setup as a profile to quickly switch between configurations.",
+                tr!("profiles.empty.title"),
+                tr!("profiles.empty.body"),
                 Some(actions),
                 cx,
             ))
@@ -1217,8 +1223,8 @@ impl ProfilesPage {
             Some(empty_state(
                 ids::PROFILES_NO_MATCH,
                 IconName::Search,
-                "No profiles found",
-                "Try a different search term.",
+                tr!("profiles.empty.no_match_title"),
+                tr!("profiles.empty.no_match_body"),
                 None,
                 cx,
             ))
@@ -1257,15 +1263,15 @@ impl ProfilesPage {
                         Button::new(ids::PROFILES_NEW)
                             .px(SM_ICON_PX)
                             .icon(IconName::Plus)
-                            .label("New profile")
+                            .label(tr!("profiles.button.new"))
                             .disabled(!has_tf2)
-                            .when(!has_tf2, |b| b.tooltip("TF2 not found"))
+                            .when(!has_tf2, |b| b.tooltip(tr!("common.tf2_missing.title")))
                             .on_click(cx.listener(|page, _, window, cx| {
                                 page.new_profile(true, window, cx)
                             })),
                     )
                     .primary()
-                    .menu_accessibility_label("More ways to make a profile")
+                    .menu_accessibility_label(tr!("profiles.button.more_ways"))
                     .disabled(busy)
                     .dropdown_menu({
                         let page = cx.entity().downgrade();
@@ -1276,7 +1282,7 @@ impl ProfilesPage {
                                     div()
                                         .id(ids::PROFILES_NEW_EMPTY)
                                         .test_support()
-                                        .child("Start empty")
+                                        .child(tr!("profiles.button.start_empty"))
                                 })
                                 .on_click(move |_, window, cx| {
                                     let _ =
@@ -1299,7 +1305,7 @@ impl ProfilesPage {
                             .flex_none()
                             .text_lg()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child("Your Profiles"),
+                            .child(tr!("profiles.heading.library")),
                     )
                     .child(
                         h_flex()
@@ -1339,13 +1345,8 @@ impl Render for ProfilesPage {
         let has_tf2 = state.install().is_some();
         let missing = matches!(state, Tf2State::Missing { .. });
         let busy = self.is_busy();
-        let warning = missing.then(|| {
-            no_tf2_warning(
-                ids::PROFILES_NO_TF2,
-                "Set the TF2 folder in Settings to activate profiles.",
-                cx,
-            )
-        });
+        let warning =
+            missing.then(|| no_tf2_warning(ids::PROFILES_NO_TF2, tr!("profiles.no_tf2"), cx));
         let content = v_flex()
             .id(ids::page(Page::Profiles))
             .test_support()
@@ -1373,8 +1374,8 @@ impl ProfilesPage {
             None => empty_state(
                 ids::PROFILES_NO_ACTIVE,
                 IconName::Layers,
-                "No active profile",
-                "Activate a profile to apply a saved collection of customizations.",
+                tr!("profiles.no_active.title"),
+                tr!("profiles.no_active.body"),
                 None,
                 cx,
             ),
@@ -1387,7 +1388,7 @@ impl ProfilesPage {
                     div()
                         .text_lg()
                         .font_weight(FontWeight::SEMIBOLD)
-                        .child("Active Profile"),
+                        .child(tr!("profiles.heading.active")),
                 )
                 .child(active)
                 .into_any_element(),

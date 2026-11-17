@@ -44,7 +44,7 @@ use crate::local_messages::{
 use crate::pages::graphics::jobs::refuse_while_running;
 use crate::pages::hud_maker::live::{Live, live_job};
 use crate::pages::hud_store::bodies::gamebanana_body;
-use crate::pages::profiles::model::NOT_APPLIED;
+use crate::pages::profiles::model::not_applied;
 use crate::pages::profiles::probe::Tf2Probe;
 use crate::picker::PickKind;
 use crate::remote_images::{ImageKey, RemoteImage, RemoteImages, local_image_url};
@@ -765,11 +765,11 @@ impl HudsPage {
                 .map(|old| old.name());
             let title = added_title(&name, update.profile().name(), None, replaced);
             let note = if update.deactivated() {
-                NOT_APPLIED
+                not_applied()
             } else {
-                ""
+                SharedString::default()
             };
-            Ok((ToastKind::Success, title.into(), note.into()))
+            Ok((ToastKind::Success, title.into(), note))
         };
         self.run(busy, op, cx, None);
     }

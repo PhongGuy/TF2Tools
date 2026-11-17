@@ -258,6 +258,88 @@ store_grid:
 profiles:
   crosshairs: { one: "%{count} crosshair", other: "%{count} crosshairs" }
   weapons: { one: "%{count} weapon", other: "%{count} weapons" }
+  search: "Search profiles..."
+  not_applied: "Changes not applied yet"
+  default_name: "Profile %{n}"
+  no_tf2: "Set the TF2 folder in Settings to activate profiles."
+  part:
+    crosshairs: "Crosshairs"
+    item: "Item"
+  heading:
+    active: "Active Profile"
+    library: "Your Profiles"
+  badge:
+    active: "Active"
+  button:
+    activate: "Activate"
+    activating: "Activating..."
+    edit: "Edit profile"
+    delete: "Delete profile"
+    new: "New profile"
+    start_empty: "Start empty"
+    more_ways: "More ways to make a profile"
+  card:
+    empty: "Empty profile"
+    empty_vanilla: "Empty profile (vanilla)"
+  empty:
+    title: "No profiles yet"
+    body: "Save your current setup as a profile to quickly switch between configurations."
+    no_match_title: "No profiles found"
+    no_match_body: "Try a different search term."
+  no_active:
+    title: "No active profile"
+    body: "Activate a profile to apply a saved collection of customizations."
+  missing:
+    title: "Missing Items"
+    body: "Some items in \"%{name}\" are no longer in your library."
+    install: "Install Anyway (skip missing)"
+    redownload: "Re-download"
+    local: "Local import — can't re-download"
+    kind:
+      hitsound: "HITSOUND"
+      killsound: "KILLSOUND"
+      crosshair: "CROSSHAIR"
+      item: "ITEM"
+  editor:
+    back: "Back to profiles"
+    clear: "Clear"
+    unknown: "Unknown"
+    missing_crosshair: "%{name} (missing)"
+    slot:
+      none: "None"
+      default_crosshairs: "Default crosshairs"
+      missing: "Missing: %{name}"
+    empty:
+      huds: "No HUDs in your library yet"
+      browse_huds: "Browse the HUD Store"
+      sounds: "No sounds in your library yet"
+      browse_sounds: "Browse the Sound Store"
+      no_match: "No matches"
+  toast:
+    created_from_setup: "Profile created from your current setup"
+    created_empty: "Empty profile created"
+    deleted: "Profile deleted"
+    activated: "Profile \"%{name}\" activated"
+    applied: "Profile \"%{name}\" applied"
+    cleared: "All customizations cleared"
+    installed: "Installed: %{list}"
+    nothing_new: "Nothing new installed"
+    kept: "%{lead}. Kept what you had for: %{list} (missing from your library)"
+    failed_steps: "Couldn't put these in place: %{steps}. Make sure TF2 is closed and TF2Tools can write to your TF2 folder, then try again."
+    activate_failed: "Failed to activate profile"
+    missing: "Some items are missing"
+  activity:
+    saved_current: "Saved current setup as profile: %{name}"
+    created: "Created profile: %{name}"
+    deleted: "Deleted profile: %{name}"
+    failed: "Failed to activate profile: %{name}"
+    activated: "Activated profile: %{name}"
+    applied: "Applied profile: %{name}"
+    details:
+      applied: "Applied: %{list}"
+      skipped: "Skipped: %{list}"
+      failed: "Failed: %{list}"
+      nothing: "Applied: nothing"
 
 crosshairs_page:
   no_weapon: "Not on any weapon yet"
@@ -333,6 +415,21 @@ confirm:
   cancel: "Cancel"
   delete: "Delete"
   cannot_undo: "This cannot be undone."
+  delete_profile:
+    title: "Delete Profile"
+    body: "Are you sure you want to delete \"%{name}\"?"
+  clear_profile_crosshairs:
+    title: "Clear Crosshairs"
+    body: "Remove all crosshairs from this profile?"
+    ok: "Clear all"
+  activate_empty:
+    title: "Activate Empty Profile"
+    body: "This profile has no customizations. Activating it will remove all installed HUDs, sounds, and crosshairs."
+    ok: "Activate Anyway"
+  tf2_running:
+    title: "TF2 is running"
+    body: "TF2 is running; changes take effect after a restart."
+    ok: "Continue"
   delete_hud:
     title: "Delete HUD"
     body: "Are you sure you want to delete %{name} from your library?"

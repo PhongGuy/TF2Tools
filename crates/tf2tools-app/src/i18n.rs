@@ -741,6 +741,11 @@ mod tests {
         "crosshair_sync.rs",
         "widgets/weapon_assigner.rs",
         "widgets/crosshair_picker.rs",
+        "pages/profiles/mod.rs",
+        "pages/profiles/model.rs",
+        "pages/profiles/probe.rs",
+        "pages/profiles/editor.rs",
+        "pages/profiles/editor_model.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).

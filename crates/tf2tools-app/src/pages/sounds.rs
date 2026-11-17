@@ -32,7 +32,7 @@ use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
     describe_import, describe_library, describe_profile, describe_tf2_install,
 };
-use crate::pages::profiles::model::NOT_APPLIED;
+use crate::pages::profiles::model::not_applied;
 use crate::picker::PickKind;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
 use crate::shell::CONTENT_PADDING;
@@ -385,11 +385,11 @@ impl SoundsPage {
                 let role = Some(kind);
                 let title = added_title(&name, update.profile().name(), role, replaced);
                 let note = if update.deactivated() {
-                    NOT_APPLIED
+                    not_applied()
                 } else {
-                    ""
+                    SharedString::default()
                 };
-                Ok((title.into(), note.into()))
+                Ok((title.into(), note))
             },
             cx,
         );

@@ -201,34 +201,35 @@ impl Confirm {
     /// v5's ProfileCard delete prompt for the profile called `name`.
     pub fn delete_profile(name: &str) -> Self {
         Self {
-            title: "Delete Profile".into(),
+            title: tr!("confirm.delete_profile.title"),
             description: format!(
-                "Are you sure you want to delete \"{name}\"? This cannot be undone."
+                "{} {}",
+                tr!("confirm.delete_profile.body", name = name),
+                tr!("confirm.cannot_undo")
             )
             .into(),
-            confirm_label: "Delete".into(),
-            cancel_label: "Cancel".into(),
+            confirm_label: tr!("confirm.delete"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
     /// The prompt before removing every crosshair from a profile.
     pub fn clear_profile_crosshairs() -> Self {
         Self {
-            title: "Clear Crosshairs".into(),
-            description: "Remove all crosshairs from this profile?".into(),
-            confirm_label: "Clear all".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.clear_profile_crosshairs.title"),
+            description: tr!("confirm.clear_profile_crosshairs.body"),
+            confirm_label: tr!("confirm.clear_profile_crosshairs.ok"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
     /// v5's prompt before activating a profile with no HUD, sounds or crosshairs.
     pub fn activate_empty() -> Self {
         Self {
-            title: "Activate Empty Profile".into(),
-            description: "This profile has no customizations. Activating it will remove all installed HUDs, sounds, and crosshairs."
-                .into(),
-            confirm_label: "Activate Anyway".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.activate_empty.title"),
+            description: tr!("confirm.activate_empty.body"),
+            confirm_label: tr!("confirm.activate_empty.ok"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
@@ -267,10 +268,10 @@ impl Confirm {
     /// The prompt before activating a profile while TF2 runs.
     pub fn tf2_running() -> Self {
         Self {
-            title: "TF2 is running".into(),
-            description: "TF2 is running; changes take effect after a restart.".into(),
-            confirm_label: "Continue".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.tf2_running.title"),
+            description: tr!("confirm.tf2_running.body"),
+            confirm_label: tr!("confirm.tf2_running.ok"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 }

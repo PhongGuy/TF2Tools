@@ -9,13 +9,17 @@ use tf2tools_app::i18n::{self, names};
 use tf2tools_app::ids;
 use tf2tools_app::pages::crosshairs::CrosshairsPage;
 use tf2tools_app::pages::huds::HudsPage;
+use tf2tools_app::pages::profiles::ProfilesPage;
+use tf2tools_app::pages::profiles::editor_model::{Slot, SlotState, next_profile_name, slot_text};
+use tf2tools_app::pages::profiles::model::{crosshair_count, not_applied};
+use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::pages::sounds::SoundsPage;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::confirm::Confirm;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::widgets::class_icon::class_short_name;
 use tf2tools_app::widgets::profile_menu::added_title;
-use tf2tools_core::{Provenance, SoundKind, Tf2Install, TfClass, WeaponSlot};
+use tf2tools_core::{ProfileDraft, Provenance, SoundKind, Tf2Install, TfClass, WeaponSlot};
 
 use crate::LocaleGuard;
 use crate::support;
@@ -77,6 +81,26 @@ fn search(
     })
     .unwrap();
     support::settle(cx, s.win);
+}
+
+// The Profiles page with the TF2 probe pinned to "not running", once its load is done.
+fn open_profiles(cx: &mut TestAppContext, s: &support::ShellWindow) -> Entity<ProfilesPage> {
+    cx.update(|cx| Tf2Probe::install(cx, || false));
+    support::click_id(cx, s.win, ids::nav(Page::Profiles));
+    let page = cx
+        .update(|cx| s.shell.read(cx).profiles_page())
+        .expect("a Profiles page");
+    support::wait_real(cx, "Profiles to load", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    support::settle(cx, s.win);
+    page
+}
+
+fn toast_is(cx: &mut TestAppContext, s: &support::ShellWindow, text: &str) {
+    support::wait_real(cx, text, |cx| {
+        support::label_of(cx, s.win, ids::TOAST).as_deref() == Some(text)
+    });
 }
 
 // A confirm dialog's four texts, in reading order.
@@ -351,4 +375,92 @@ fn the_crosshairs_page_reads_in_russian(cx: &mut TestAppContext) {
     assert_eq!(installed_text(2), "Установлено 2 назначения прицелов");
     assert_eq!(installed_text(5), "Установлено 5 назначений прицелов");
     assert_eq!(installed_text(21), "Установлено 21 назначение прицела");
+}
+
+#[gpui_kit::test]
+fn the_profiles_page_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let _page = open_profiles(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HEADER_TITLE).as_deref(),
+        Some("Профили")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILES_EMPTY).as_deref(),
+        Some("Профилей пока нет")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::PROFILES_NO_ACTIVE).as_deref(),
+        Some("Нет активного профиля")
+    );
+    let comp = s
+        .services
+        .library
+        .create_profile(&ProfileDraft::new("Competitive"))
+        .unwrap();
+    support::click_id(cx, s.win, ids::nav(Page::Settings));
+    let _page = open_profiles(cx, &s);
+    support::click_id(cx, s.win, ids::profile_delete(comp.id()));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_TITLE).as_deref(),
+        Some("Удалить профиль")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::CONFIRM_DESCRIPTION).as_deref(),
+        Some("Удалить «Competitive»? Это действие нельзя отменить.")
+    );
+    support::click_id(cx, s.win, ids::CONFIRM_OK);
+    toast_is(cx, &s, "Профиль удалён");
+}
+
+#[test]
+fn profile_texts_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(
+        [1, 2, 5, 21].map(crosshair_count),
+        ["1 прицел", "2 прицела", "5 прицелов", "21 прицел"]
+    );
+    assert_eq!(not_applied(), "Изменения ещё не применены");
+    assert_eq!(
+        texts(&Confirm::tf2_running())[..3],
+        [
+            "TF2 запущен",
+            "TF2 запущен; изменения вступят в силу после перезапуска.",
+            "Продолжить"
+        ]
+    );
+    let env = support::env();
+    let services = support::services(&env, support::no_steam());
+    assert_eq!(next_profile_name(&[]), "Профиль 1");
+    for name in ["профиль 1", "Profile 2"] {
+        services
+            .library
+            .create_profile(&ProfileDraft::new(name))
+            .unwrap();
+    }
+    assert_eq!(
+        next_profile_name(&services.library.profiles().unwrap()),
+        "Профиль 2"
+    );
+    let labels: Vec<String> = Slot::ALL.iter().map(|s| s.label().to_string()).collect();
+    assert_eq!(labels, ["HUD", "Хитсаунд", "Килсаунд", "Прицелы"]);
+    assert_eq!(slot_text(&SlotState::Empty, Slot::Hud), "Нет");
+    assert_eq!(
+        slot_text(&SlotState::Empty, Slot::Crosshairs),
+        "Стандартные прицелы"
+    );
+    assert_eq!(
+        slot_text(&SlotState::Missing("budhud".into()), Slot::Hud),
+        "Отсутствует: budhud"
+    );
+    assert_eq!(
+        texts(&Confirm::clear_profile_crosshairs())[..3],
+        [
+            "Очистить прицелы",
+            "Убрать все прицелы из этого профиля?",
+            "Очистить все"
+        ]
+    );
 }
