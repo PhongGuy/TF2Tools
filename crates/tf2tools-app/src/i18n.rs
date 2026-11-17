@@ -271,6 +271,7 @@ mod tests {
             "font_check",
             "header",
             "shell",
+            "install_parts",
             "activity_log",
         ]
         .map(str::to_owned)
@@ -807,6 +808,7 @@ mod tests {
         "old_v4.rs",
         "pages/placeholder.rs",
         "services.rs",
+        "payload_checklist.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).

@@ -13,6 +13,7 @@ use gpui_kit::{
     Styled as _, TestSupportExt as _, Window, div, px,
 };
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 use crate::widgets::scroll::scroll_beside;
@@ -75,7 +76,7 @@ impl Render for PayloadChecklist {
             .enumerate()
             .map(|(ix, (item, on))| {
                 let label = if item.present {
-                    format!("{} · Already in the game", item.label)
+                    tr!("install_parts.present", label = item.label).to_string()
                 } else {
                     item.label.clone()
                 };
@@ -102,11 +103,11 @@ impl Render for PayloadChecklist {
                     .child(
                         div()
                             .id(ids::PAYLOAD_CHECKLIST_TITLE)
-                            .aria_label("Choose what to install")
+                            .aria_label(tr!("install_parts.title"))
                             .test_support()
                             .text_lg()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child("Choose what to install"),
+                            .child(tr!("install_parts.title")),
                     )
                     .child(
                         div()
@@ -138,7 +139,7 @@ impl Render for PayloadChecklist {
                     .child(
                         Button::new(ids::PAYLOAD_CANCEL)
                             .outline()
-                            .label("Cancel")
+                            .label(tr!("confirm.cancel"))
                             .on_click(move |_, window, cx| {
                                 let _ = cancel.try_send(None);
                                 window.close_dialog(cx);
@@ -147,7 +148,7 @@ impl Render for PayloadChecklist {
                     .child(
                         Button::new(ids::PAYLOAD_INSTALL)
                             .primary()
-                            .label("Install")
+                            .label(tr!("install_parts.install"))
                             .disabled(nothing)
                             .on_click(move |_, window, cx| {
                                 let _ = install.try_send(Some(chosen.clone()));
@@ -170,7 +171,7 @@ pub fn open_payload_checklist(
     async_channel::Receiver<Option<Vec<String>>>,
 ) {
     let checked = (0..items.len()).map(|ix| ix == 0).collect();
-    let description = format!("{addon_name} has several parts. Pick the ones to install.");
+    let description = tr!("install_parts.addon", name = addon_name);
     open_checklist(description, items, checked, window, cx)
 }
 
@@ -188,17 +189,19 @@ pub fn open_map_checklist(
     async_channel::Receiver<Option<Vec<String>>>,
 ) {
     let checked = items.iter().map(|item| !item.present).collect();
-    let mut description = format!("{item_name} holds several maps. Pick the ones to install.");
-    if skipped {
-        description.push_str(" Some extra files in this download were skipped.");
-    }
+    // One whole sentence per case, so no translation has a clause glued onto it.
+    let description = if skipped {
+        tr!("install_parts.maps_skipped", name = item_name)
+    } else {
+        tr!("install_parts.maps", name = item_name)
+    };
     open_checklist(description, items, checked, window, cx)
 }
 
 /// Builds the checklist entity and opens it in a dialog; both openers differ only in the
 /// description and the starting ticks.
 fn open_checklist(
-    description: String,
+    description: SharedString,
     items: Vec<ChecklistItem>,
     checked: Vec<bool>,
     window: &mut Window,
@@ -209,7 +212,7 @@ fn open_checklist(
 ) {
     let (tx, rx) = async_channel::bounded(1);
     let list = cx.new(|_| PayloadChecklist {
-        description: description.into(),
+        description,
         items: items.into(),
         checked,
         answer: tx.clone(),

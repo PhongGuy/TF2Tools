@@ -1400,3 +1400,11 @@ shell:
     later: "Not now"
     failed: "Couldn't remove the old TF2Tools"
     failed_hint: "Remove it in Windows Settings > Apps instead."
+
+install_parts:
+  title: "Choose what to install"
+  present: "%{label} · Already in the game"
+  install: "Install"
+  addon: "%{name} has several parts. Pick the ones to install."
+  maps: "%{name} holds several maps. Pick the ones to install."
+  maps_skipped: "%{name} holds several maps. Pick the ones to install. Some extra files in this download were skipped."

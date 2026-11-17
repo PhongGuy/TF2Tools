@@ -3,11 +3,13 @@
 
 use std::sync::Arc;
 
+use gpui_kit::AppContext as _;
 use gpui_kit::{ElementId, TestAppContext};
 use tf2tools_app::crash::notice::CrashNotice;
 use tf2tools_app::ids;
 use tf2tools_app::old_v4::{OldV4Notice, UninstallRunner};
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
+use tf2tools_app::payload_checklist::{ChecklistItem, open_map_checklist, open_payload_checklist};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::confirm::Confirm;
 use tf2tools_core::{OldV4, StoreKind, Tf2Install, UninstallEntry, find_old_v4};
@@ -176,5 +178,70 @@ fn the_old_version_banner_and_its_confirm_read_in_russian(cx: &mut TestAppContex
     assert_eq!(
         label(cx, &s, ids::CONFIRM_TITLE).as_deref(),
         Some("Удалить старый TF2Tools")
+    );
+}
+
+fn items() -> Vec<ChecklistItem> {
+    vec![
+        ChecklistItem {
+            name: "a.vpk".into(),
+            label: "A".into(),
+            present: false,
+        },
+        ChecklistItem {
+            name: "b.vpk".into(),
+            label: "B".into(),
+            present: true,
+        },
+    ]
+}
+
+#[gpui_kit::test]
+fn the_parts_checklist_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    support::init(cx);
+    let win = support::blank_window(cx);
+    let _open = cx
+        .update_window(win, |_, w, cx| {
+            open_payload_checklist("Toon FX", items(), w, cx)
+        })
+        .unwrap();
+    support::settle(cx, win);
+    let shown = [
+        ids::PAYLOAD_CHECKLIST_TITLE,
+        ids::PAYLOAD_CHECKLIST_DESCRIPTION,
+        ids::PAYLOAD_CANCEL,
+        ids::PAYLOAD_INSTALL,
+    ]
+    .map(|id| support::label_of(cx, win, id));
+    let want = [
+        "Выберите, что установить",
+        "У Toon FX несколько частей. Выберите, какие установить.",
+        "Отмена",
+        "Установить",
+    ];
+    assert_eq!(shown, want.map(|t| Some(t.to_owned())));
+    assert_eq!(
+        support::label_of(cx, win, ids::payload_check(1)).as_deref(),
+        Some("B · Уже в игре")
+    );
+}
+
+#[gpui_kit::test]
+fn the_map_checklist_says_what_was_skipped_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    support::init(cx);
+    let win = support::blank_window(cx);
+    let _open = cx
+        .update_window(win, |_, w, cx| {
+            open_map_checklist("Pack", items(), true, w, cx)
+        })
+        .unwrap();
+    support::settle(cx, win);
+    assert_eq!(
+        support::label_of(cx, win, ids::PAYLOAD_CHECKLIST_DESCRIPTION).as_deref(),
+        Some(
+            "В Pack несколько карт. Выберите, какие установить. Некоторые лишние файлы из загрузки пропущены."
+        )
     );
 }
