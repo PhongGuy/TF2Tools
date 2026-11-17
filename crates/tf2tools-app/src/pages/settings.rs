@@ -649,17 +649,24 @@ impl SettingsPage {
         if let Some(failed) = &failed {
             label.push_str(&format!(". {failed}"));
         }
-        // The lines take the rest of the row and wrap, so a long failure never pushes Resync out.
+        // Count and last sync share one muted line that wraps at the dot, so a row stays three
+        // short lines; a failure adds its own line and never pushes Resync out.
         let lines = v_flex()
             .id(ids::settings_sync(kind))
             .aria_label(label)
             .test_support()
-            .flex_1()
             .min_w_0()
-            .gap_1()
-            .text_sm()
-            .child(items)
-            .child(div().text_color(theme.muted_foreground).child(synced))
+            .gap_0p5()
+            .text_xs()
+            .text_color(theme.muted_foreground)
+            .child(
+                h_flex()
+                    .flex_wrap()
+                    .gap_x_1()
+                    .child(items)
+                    .child("·")
+                    .child(synced),
+            )
             .children(failed.map(|failed| div().text_color(theme.danger).child(failed)));
         let resync = Button::new(ids::settings_resync(kind))
             .flex_none()
@@ -678,7 +685,7 @@ impl SettingsPage {
         let text = v_flex()
             .flex_1()
             .min_w_0()
-            .gap_1()
+            .gap_0p5()
             .child(
                 div()
                     .text_sm()

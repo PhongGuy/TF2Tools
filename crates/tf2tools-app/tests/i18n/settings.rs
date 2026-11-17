@@ -283,7 +283,13 @@ fn the_stores_card_reads_in_russian() {
     assert_eq!(ru("settings.stores.title").as_deref(), Some("Магазины"));
     assert_eq!(
         ru("settings.stores.resync_all").as_deref(),
-        Some("Синхронизировать все")
+        Some("Обновить все")
+    );
+    // The per-store button stays about as short as the English, so each row keeps its text room.
+    assert_eq!(ru("settings.sync.resync").as_deref(), Some("Обновить"));
+    assert_eq!(
+        ru("settings.sync.syncing").as_deref(),
+        Some("Обновление...")
     );
     assert_eq!(
         ru("settings.sync.curated_huds.description").as_deref(),
