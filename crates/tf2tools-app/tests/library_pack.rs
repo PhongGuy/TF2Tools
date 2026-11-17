@@ -6,7 +6,7 @@ use gpui_kit::{Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::library_pack::{self, LibraryPack};
 use tf2tools_app::services::Tf2State;
-use tf2tools_core::{HudEntry, LibraryKind, Provenance};
+use tf2tools_core::{HudEntry, LibraryKind, Provenance, StorageKind};
 
 use crate::support;
 
@@ -21,6 +21,30 @@ fn wait_passes(cx: &mut TestAppContext, job: &Entity<LibraryPack>, at_least: u64
             job.passes() >= at_least && !job.is_running()
         })
     });
+}
+
+// The library kinds only: store data and the logs cache move with any database write.
+fn assert_library_figures(
+    cx: &mut TestAppContext,
+    job: &Entity<LibraryPack>,
+    s: &support::ShellWindow,
+) {
+    let landed = cx
+        .update(|cx| job.read(cx).space())
+        .expect("a measure landed");
+    let now = s.services.library.storage().unwrap();
+    for kind in [
+        StorageKind::Huds,
+        StorageKind::Sounds,
+        StorageKind::Crosshairs,
+        StorageKind::Addons,
+    ] {
+        assert_eq!(
+            (landed.bytes(kind), landed.unpacked(kind)),
+            (now.bytes(kind), now.unpacked(kind)),
+            "{kind:?}"
+        );
+    }
 }
 
 // Imports a two-file HUD and leaves it loose, as a library from before packing holds it.
@@ -52,8 +76,7 @@ fn the_startup_pass_packs_a_loose_hud_then_measures(cx: &mut TestAppContext) {
     let job = job(cx);
     wait_passes(cx, &job, 1);
     assert!(hud_zip(&env, &hud).is_file());
-    let space = cx.update(|cx| job.read(cx).space());
-    assert_eq!(space, Some(s.services.library.space().unwrap()));
+    assert_library_figures(cx, &job, &s);
 }
 
 #[gpui_kit::test]
@@ -78,11 +101,17 @@ fn a_measure_counts_what_changed_and_converts_nothing(cx: &mut TestAppContext) {
     let job = job(cx);
     job.update(cx, |job, cx| job.measure(cx));
     wait_passes(cx, &job, 1);
-    let before = cx.update(|cx| job.read(cx).space()).unwrap().on_disk();
+    let before = cx
+        .update(|cx| job.read(cx).space())
+        .unwrap()
+        .bytes(StorageKind::Huds);
     let hud = loose_hud(&s, &env, "rayshud");
     job.update(cx, |job, cx| job.measure(cx));
     wait_passes(cx, &job, 2);
-    let after = cx.update(|cx| job.read(cx).space()).unwrap().on_disk();
+    let after = cx
+        .update(|cx| job.read(cx).space())
+        .unwrap()
+        .bytes(StorageKind::Huds);
     assert!(after > before, "{before} -> {after}");
     assert!(!hud_zip(&env, &hud).exists());
 }
@@ -121,6 +150,5 @@ fn a_conversion_asked_for_during_a_measure_runs_next(cx: &mut TestAppContext) {
     wait_passes(cx, &job, 2);
     assert_eq!(cx.update(|cx| job.read(cx).passes()), 2);
     assert!(hud_zip(&env, &hud).is_file());
-    let space = cx.update(|cx| job.read(cx).space());
-    assert_eq!(space, Some(s.services.library.space().unwrap()));
+    assert_library_figures(cx, &job, &s);
 }

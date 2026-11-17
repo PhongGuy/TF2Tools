@@ -30,9 +30,13 @@ fn open_settings(cx: &mut TestAppContext, s: &ShellWindow) -> Entity<SettingsPag
 
 /// Scrolls the page until the store's Resync button sits mid-viewport, then clicks it.
 fn click_resync(cx: &mut TestAppContext, win: AnyWindowHandle, kind: StoreKind) {
-    let id = ids::settings_resync(kind);
+    click_in_view(cx, win, ids::settings_resync(kind));
+}
+
+/// Scrolls the page until the element sits mid-viewport, then clicks it.
+fn click_in_view(cx: &mut TestAppContext, win: AnyWindowHandle, id: gpui_kit::ElementId) {
     let page = support::bounds_of(cx, win, ids::page(Page::Settings)).expect("the settings page");
-    let target = support::bounds_of(cx, win, id.clone()).expect("a resync button");
+    let target = support::bounds_of(cx, win, id.clone()).expect("a drawn element");
     // A negative delta moves the content up, as tests/settings.rs's click_save scrolls to Save.
     let dy = page.origin.y + page.size.height / 2. - target.origin.y;
     cx.update_window(win, |_, w, cx| {
@@ -94,6 +98,7 @@ fn settings_sync_ids_carry_the_store_slug() {
         ids::settings_resync(StoreKind::GameBananaHuds),
         gpui_kit::ElementId::Name("settings-resync:gamebanana-huds".into())
     );
+    assert_eq!(ids::SETTINGS_RESYNC_ALL, "settings-resync-all");
 }
 
 #[test]
@@ -123,7 +128,7 @@ fn one_cached_item_is_singular_in_english() {
 }
 
 #[gpui_kit::test]
-fn every_store_has_a_card_that_starts_never_synced(cx: &mut TestAppContext) {
+fn every_store_has_a_row_that_starts_never_synced(cx: &mut TestAppContext) {
     let env = support::env();
     let (s, _hub, _runs) = shell(cx, &env);
     open_settings(cx, &s);
@@ -327,4 +332,98 @@ fn progress_ticks_do_not_redraw_settings(cx: &mut TestAppContext) {
     assert_eq!(redraws.get(), 0, "progress alone must not redraw Settings");
     run.finish(Ok(SyncSummary::default()));
     support::wait_hub(cx, "Settings to redraw at the end", |_| redraws.get() > 0);
+}
+
+#[test]
+fn the_curated_store_names_hud_db_as_its_source() {
+    assert_eq!(
+        tf2tools_app::_rust_i18n_try_translate("en", "settings.sync.curated_huds.description")
+            .as_deref(),
+        Some("Curated HUDs from hud-db")
+    );
+    for gone in [
+        "settings.cache.title",
+        "settings.cache.description",
+        "settings.addons.title",
+        "settings.addons.description",
+    ] {
+        assert!(
+            tf2tools_app::_rust_i18n_try_translate("en", gone).is_none(),
+            "{gone} is still in en.yml"
+        );
+    }
+}
+
+#[gpui_kit::test]
+fn resync_all_forces_every_store_that_is_not_running(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, hub, runs) = shell(cx, &env);
+    open_settings(cx, &s);
+    assert!(!support::disabled_of(cx, s.win, ids::SETTINGS_RESYNC_ALL));
+    assert!(cx.update(|cx| hub.update(cx, |h, cx| h.start(StoreKind::Sounds, false, cx))));
+    let sounds = runs.try_recv().expect("the sync starts");
+    click_in_view(cx, s.win, ids::SETTINGS_RESYNC_ALL.into());
+    let started: Vec<_> = runs.try_iter().collect();
+    let kinds: Vec<StoreKind> = started.iter().map(|r| r.kind).collect();
+    assert_eq!(kinds.len(), 4, "{kinds:?}");
+    for kind in StoreKind::ALL
+        .into_iter()
+        .filter(|k| *k != StoreKind::Sounds)
+    {
+        assert!(kinds.contains(&kind), "{kind:?} not started");
+    }
+    assert!(
+        started.iter().all(|r| r.force),
+        "Resync all forces like Resync"
+    );
+    assert!(
+        support::disabled_of(cx, s.win, ids::SETTINGS_RESYNC_ALL),
+        "every store runs"
+    );
+    sounds.finish(Ok(SyncSummary::default()));
+    for run in started {
+        run.finish(Ok(SyncSummary::default()));
+    }
+    support::wait_hub(cx, "every sync to end", |cx| {
+        cx.update(|cx| StoreKind::ALL.iter().all(|k| !hub.read(cx).is_running(*k)))
+    });
+    assert!(!support::disabled_of(cx, s.win, ids::SETTINGS_RESYNC_ALL));
+}
+
+#[gpui_kit::test]
+fn resync_all_is_disabled_without_a_sync_hub(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    open_settings(cx, &s);
+    assert!(support::disabled_of(cx, s.win, ids::SETTINGS_RESYNC_ALL));
+}
+
+#[gpui_kit::test]
+fn the_stores_card_holds_the_rows_then_the_cache_and_mature_controls(cx: &mut TestAppContext) {
+    let env = support::env();
+    let (s, _hub, _runs) = shell(cx, &env);
+    open_settings(cx, &s);
+    let mut order: Vec<gpui_kit::ElementId> = vec![ids::SETTINGS_RESYNC_ALL.into()];
+    order.extend(
+        SYNC_CARDS
+            .iter()
+            .map(|(kind, ..)| ids::settings_sync(*kind)),
+    );
+    order.extend([
+        ids::SETTINGS_CACHE_LABEL.into(),
+        ids::SETTINGS_CACHE.into(),
+        ids::SETTINGS_MATURE_ADDONS.into(),
+    ]);
+    let tops: Vec<_> = order
+        .iter()
+        .map(|id| {
+            support::bounds_of(cx, s.win, id.clone())
+                .expect("drawn")
+                .top()
+        })
+        .collect();
+    assert!(
+        tops.windows(2).all(|w| w[0] < w[1]),
+        "{order:?} at {tops:?}"
+    );
 }

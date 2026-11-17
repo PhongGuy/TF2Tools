@@ -1,11 +1,11 @@
 //! The background library job: once per startup it packs loose library items, and on request
-//! it measures what the library takes. One global entity runs at most one pass at a time.
+//! it measures everything TF2Tools keeps. One global entity runs at most one pass at a time.
 
 use gpui_kit::{App, AppContext as _, Context, Entity, EventEmitter, Global};
-use tf2tools_core::{ConvertReport, LibrarySpace};
+use tf2tools_core::{ConvertReport, StorageUse};
 
 use crate::i18n::tr;
-use crate::local_messages::describe_library;
+use crate::local_messages::describe_storage;
 use crate::services::{OpError, run_blocking};
 
 /// What observers hear from the library job.
@@ -18,7 +18,7 @@ pub enum LibraryPackEvent {
 /// The library job: a conversion at most once per process, and the figures of its last pass.
 #[derive(Default)]
 pub struct LibraryPack {
-    space: Option<LibrarySpace>,
+    space: Option<StorageUse>,
     failed: bool,
     running: bool,
     queued: bool,
@@ -80,8 +80,8 @@ impl LibraryPack {
                 log_conversion(&s.library.convert_library());
             }
             s.library
-                .space()
-                .map_err(|e| describe_library(&e).into_op(tr!("messages.action.measure_library")))
+                .storage()
+                .map_err(|e| describe_storage(&e).into_op(tr!("messages.action.measure_library")))
         });
         cx.spawn(async move |job, cx| {
             let landed = pass.await;
@@ -92,7 +92,7 @@ impl LibraryPack {
 
     // A failed measure keeps the old figures, is logged and flags `failed`; it never toasts.
     // A waiting conversion runs next and measures too, so it absorbs a waiting measure.
-    fn land(&mut self, landed: Result<LibrarySpace, OpError>, cx: &mut Context<Self>) {
+    fn land(&mut self, landed: Result<StorageUse, OpError>, cx: &mut Context<Self>) {
         match landed {
             Ok(space) => {
                 self.space = Some(space);
@@ -115,8 +115,8 @@ impl LibraryPack {
         }
     }
 
-    /// What the library took at the last pass that measured.
-    pub fn space(&self) -> Option<LibrarySpace> {
+    /// What each kind of data took at the last pass that measured.
+    pub fn space(&self) -> Option<StorageUse> {
         self.space
     }
 

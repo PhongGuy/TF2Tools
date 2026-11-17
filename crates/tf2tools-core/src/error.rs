@@ -608,6 +608,26 @@ pub enum ProfileError {
     },
 }
 
+/// Why measuring what TF2Tools keeps on disk failed.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum StorageError {
+    /// A file or directory could not be read.
+    #[error("cannot read {path}: {source}")]
+    Io {
+        /// The path that failed.
+        path: PathBuf,
+        /// The underlying I/O error.
+        source: std::io::Error,
+    },
+    /// SQLite failed to measure the database.
+    #[error("cannot measure the database: {message}")]
+    Database {
+        /// SQLite's description of the failure.
+        message: String,
+    },
+}
+
 /// Why reading or writing the activity log failed.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

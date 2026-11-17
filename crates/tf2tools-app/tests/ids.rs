@@ -812,6 +812,23 @@ fn log_keep_rows_are_keyed_by_choice() {
 }
 
 #[test]
-fn the_library_space_line_has_a_stable_id() {
-    assert_eq!(ids::SETTINGS_LIBRARY_SPACE, "settings-library-space");
+fn the_storage_card_ids_carry_the_kind_slug() {
+    assert_eq!(ids::SETTINGS_STORAGE, "settings-storage");
+    assert_eq!(ids::SETTINGS_STORAGE_TOTAL, "settings-storage-total");
+    let rows: Vec<String> = tf2tools_core::StorageKind::ALL
+        .iter()
+        .map(|k| name(ids::settings_storage(*k)))
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            "settings-storage:huds",
+            "settings-storage:sounds",
+            "settings-storage:crosshairs",
+            "settings-storage:addons",
+            "settings-storage:logs-tf",
+            "settings-storage:store-data",
+            "settings-storage:image-cache",
+        ]
+    );
 }

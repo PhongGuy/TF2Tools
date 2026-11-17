@@ -183,13 +183,7 @@ impl LogsCache {
                 // One read transaction, so a pass committing between statements cannot make
                 // the figures disagree.
                 let tx = conn.unchecked_transaction()?;
-                let cache_bytes: i64 = tx.query_row(
-                    r"SELECT COALESCE(SUM(d.pgsize), 0) FROM dbstat d
-                      JOIN sqlite_schema s ON s.name = d.name
-                      WHERE s.tbl_name LIKE 'logstf\_%' ESCAPE '\'",
-                    [],
-                    |r| r.get(0),
-                )?;
+                let cache_bytes = logs_cache_bytes(&tx)?;
                 let full_bytes: i64 = tx.query_row(
                     "SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name = 'logstf_logs'",
                     [],
@@ -219,7 +213,7 @@ impl LogsCache {
                 }
                 let unsigned = |n: i64| u64::try_from(n).unwrap_or(0);
                 Ok(LogsSpace {
-                    cache_bytes: unsigned(cache_bytes),
+                    cache_bytes,
                     full_bytes: unsigned(full_bytes),
                     full_logs: unsigned(full_logs),
                     frees,
@@ -322,6 +316,18 @@ impl LogsCache {
                 .map_err(db_error)?;
         }
     }
+}
+
+/// The pages every `logstf_*` table and its indexes take, which is what the cache costs.
+pub(crate) fn logs_cache_bytes(conn: &Connection) -> rusqlite::Result<u64> {
+    let bytes: i64 = conn.query_row(
+        r"SELECT COALESCE(SUM(d.pgsize), 0) FROM dbstat d
+          JOIN sqlite_schema s ON s.name = d.name
+          WHERE s.tbl_name LIKE 'logstf\_%' ESCAPE '\'",
+        [],
+        |r| r.get(0),
+    )?;
+    Ok(u64::try_from(bytes).unwrap_or(0))
 }
 
 /// The database file's size as SQLite sees it: its page count times its page size.

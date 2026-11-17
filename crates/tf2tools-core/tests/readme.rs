@@ -493,7 +493,7 @@ fn the_logs_section_says_unopened_full_logs_are_cleared() {
 }
 
 #[test]
-fn the_settings_section_says_the_library_is_stored_compressed() {
+fn the_settings_section_says_storage_counts_the_compressed_library() {
     let readme = repo_file("README.md");
     let players = player_part(&readme);
     let at = players
@@ -503,12 +503,13 @@ fn the_settings_section_says_the_library_is_stored_compressed() {
     let settings = &settings[..settings[1..]
         .find("\n## ")
         .map_or(settings.len(), |end| end + 1)];
-    assert!(settings.contains("**Library**"), "{settings}");
+    assert!(settings.contains("**Storage**"), "{settings}");
     assert!(settings.contains("compressed"), "{settings}");
-    // The Library sentence names every kind kept compressed, crosshairs among them.
-    let library = &settings[settings.find("**Library**").expect("a Library sentence")..];
+    // The Storage sentence names the logs.tf cache and every kind kept compressed.
+    let library = &settings[settings.find("**Storage**").expect("a Storage sentence")..];
     let library = &library[..library.find('\n').unwrap_or(library.len())];
     assert!(library.contains("crosshairs"), "{library}");
+    assert!(library.contains("logs.tf"), "{library}");
 }
 
 #[test]

@@ -17,22 +17,26 @@ settings:
     description: "Громкость превью хитсаундов и килсаундов"
     volume: "Громкость: %{percent}%"
   cache:
-    title: "Кэш магазинов"
-    description: "Как часто заново синхронизировать данные магазинов"
     duration: "Срок хранения кэша: %{duration}"
     hint: "Магазины синхронизируются заново, когда истекает срок кэша. По умолчанию: 7 дней (168 часов)."
     hours: { one: "%{count} час", few: "%{count} часа", many: "%{count} часов" }
     days: { one: "%{count} день", few: "%{count} дня", many: "%{count} дней" }
     days_hours: "%{days} д %{hours} ч"
   addons:
-    title: "Дополнения"
-    description: "Скины, эффекты, интерфейсы, текстуры и игровые файлы с GameBanana"
     mature: "Показывать дополнения для взрослых"
-  library:
-    title: "Библиотека"
-    description: "Где TF2Tools хранит ваши HUD, звуки, прицелы и дополнения"
-    usage: "Библиотека занимает %{disk} на диске (%{unpacked} без сжатия)."
-    unmeasured: "Не удалось измерить размер библиотеки."
+  storage:
+    title: "Хранилище"
+    description: "Всё, что TF2Tools хранит на этом компьютере"
+    total: "Всего"
+    unpacked: "%{size} без сжатия"
+    unmeasured: "Не удалось измерить занятое место."
+    huds: "HUD"
+    sounds: "Звуки"
+    crosshairs: "Прицелы"
+    addons: "Дополнения"
+    logs_tf: "Кэш logs.tf"
+    store_data: "Данные магазинов"
+    image_cache: "Кэш изображений"
   logs_tf:
     title: "logs.tf"
     description: "Как открытые логи матчей называют игроков и сколько хранятся полные логи"
@@ -47,18 +51,22 @@ settings:
     full_logs: { one: "%{count} полный лог занимает", few: "%{count} полных лога занимают", many: "%{count} полных логов занимают" }
     measuring: "Измерение..."
     unmeasured: "Не удалось измерить размер кэша логов."
+  stores:
+    title: "Магазины"
+    description: "Кэш каждого магазина и его последняя синхронизация"
+    resync_all: "Обновить все"
   sync:
     items: { one: "%{count} элемент в кэше", few: "%{count} элемента в кэше", many: "%{count} элементов в кэше" }
     last_synced: "Последняя синхронизация: %{when}"
     failed: "Ошибка синхронизации: %{error}"
     never: "Никогда"
     unknown: "Неизвестно"
-    resync: "Синхронизировать"
-    syncing: "Синхронизация..."
+    resync: "Обновить"
+    syncing: "Обновление..."
     sounds: { title: "Магазин звуков", description: "Хитсаунды и килсаунды с GameBanana" }
     crosshairs: { title: "Магазин прицелов", description: "Моды прицелов с GameBanana" }
     gamebanana_huds: { title: "Магазин HUD с GameBanana", description: "Моды HUD с GameBanana" }
-    curated_huds: { title: "Подборка HUD", description: "HUD, отобранные mastercomfig" }
+    curated_huds: { title: "Подборка HUD", description: "HUD, отобранные hud-db" }
     addons: { title: "Магазин дополнений", description: "Дополнения mastercomfig для производительности и удобства" }
   save: "Сохранить настройки"
   licences:
