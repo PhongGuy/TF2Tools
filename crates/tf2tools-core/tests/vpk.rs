@@ -107,3 +107,60 @@ fn a_truncated_vpk_is_malformed_without_panicking() {
         );
     }
 }
+
+/// A version 2 VPK whose one entry keeps its first bytes in the tree as preload data and the
+/// rest in the embedded chunk, followed by the 48-byte checksum block TF2's paks carry.
+fn vpk_v2_with_preload(path: &str, preload: &[u8], rest: &[u8]) -> Vec<u8> {
+    let (dir, file) = path.rsplit_once('/').unwrap();
+    let (name, ext) = file.rsplit_once('.').unwrap();
+    let mut tree = Vec::new();
+    for part in [ext, dir, name] {
+        tree.extend_from_slice(part.as_bytes());
+        tree.push(0);
+    }
+    tree.extend_from_slice(&0u32.to_le_bytes());
+    tree.extend_from_slice(&(preload.len() as u16).to_le_bytes());
+    tree.extend_from_slice(&0x7fffu16.to_le_bytes());
+    tree.extend_from_slice(&0u32.to_le_bytes());
+    tree.extend_from_slice(&(rest.len() as u32).to_le_bytes());
+    tree.extend_from_slice(&0xffffu16.to_le_bytes());
+    tree.extend_from_slice(preload);
+    tree.extend_from_slice(&[0, 0, 0]);
+    let mut out = Vec::new();
+    for word in [
+        0x55aa_1234,
+        2,
+        tree.len() as u32,
+        rest.len() as u32,
+        0,
+        48,
+        0,
+    ] {
+        out.extend_from_slice(&u32::to_le_bytes(word));
+    }
+    out.extend(tree);
+    out.extend_from_slice(rest);
+    out.extend_from_slice(&[0xab; 48]);
+    out
+}
+
+#[test]
+fn a_version_2_entry_joins_its_preload_and_chunk_bytes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let vpk = write(
+        tmp.path(),
+        "v2.vpk",
+        &vpk_v2_with_preload("sound/ui/hitsound.wav", b"RIFF", b"0000WAVE"),
+    );
+    assert_eq!(first_wav_in_vpk(&vpk).unwrap(), b"RIFF0000WAVE");
+}
+
+#[test]
+fn a_version_2_vpk_with_the_wrong_hash_section_is_malformed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let mut bytes = vpk_v2_with_preload("sound/ui/hitsound.wav", b"RIFF", b"0000WAVE");
+    bytes[20..24].copy_from_slice(&47u32.to_le_bytes());
+    let vpk = write(tmp.path(), "badhash.vpk", &bytes);
+    let err = first_wav_in_vpk(&vpk).unwrap_err();
+    assert!(matches!(err, VpkError::Malformed { .. }), "{err:?}");
+}
