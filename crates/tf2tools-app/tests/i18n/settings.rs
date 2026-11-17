@@ -276,3 +276,17 @@ fn the_settings_saved_entry_is_written_in_russian(cx: &mut TestAppContext) {
     assert_eq!((row.category(), row.action()), ("settings", "update"));
     crate::messages::assert_russian(row.message());
 }
+
+#[test]
+fn the_stores_card_reads_in_russian() {
+    let ru = |key: &str| tf2tools_app::_rust_i18n_try_translate("ru", key).map(|t| t.into_owned());
+    assert_eq!(ru("settings.stores.title").as_deref(), Some("Магазины"));
+    assert_eq!(
+        ru("settings.stores.resync_all").as_deref(),
+        Some("Синхронизировать все")
+    );
+    assert_eq!(
+        ru("settings.sync.curated_huds.description").as_deref(),
+        Some("HUD, отобранные hud-db")
+    );
+}

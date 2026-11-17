@@ -102,6 +102,8 @@ pub const SETTINGS_SAVE: &str = "settings-save";
 pub const SETTINGS_SYNC: &str = "settings-sync";
 /// A store's "Resync" button, "Syncing..." and disabled while that store syncs.
 pub const SETTINGS_RESYNC: &str = "settings-resync";
+/// The Stores card's "Resync all" button, disabled with no sync hub or while every store syncs.
+pub const SETTINGS_RESYNC_ALL: &str = "settings-resync-all";
 /// The Licences card's "Show notices" / "Hide notices" button.
 pub const SETTINGS_NOTICES: &str = "settings-notices";
 /// The virtualized list of third-party notices, present while shown.

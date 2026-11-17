@@ -100,6 +100,8 @@ fn settings_draws_every_id_and_loads_the_saved_values(cx: &mut TestAppContext) {
         ids::SETTINGS_CACHE,
         ids::SETTINGS_CACHE_LABEL,
         ids::SETTINGS_STORAGE,
+        ids::SETTINGS_RESYNC_ALL,
+        ids::SETTINGS_MATURE_ADDONS,
         ids::SETTINGS_SAVE,
     ] {
         assert!(support::present(cx, s.win, id), "missing {id}");
@@ -1068,4 +1070,37 @@ impl Drop for Unlock {
         use std::os::unix::fs::PermissionsExt as _;
         let _ = std::fs::set_permissions(&self.0, std::fs::Permissions::from_mode(0o755));
     }
+}
+
+#[gpui_kit::test]
+fn storage_logs_tf_and_stores_follow_audio_in_that_order(cx: &mut TestAppContext) {
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    let page = open_settings(cx, &s);
+    support::wait_real(cx, "the store status", |cx| {
+        cx.update(|cx| page.read(cx).is_sync_loaded())
+    });
+    jobs_idle(cx);
+    support::settle(cx, s.win);
+    let order: [ElementId; 7] = [
+        ids::SETTINGS_VOLUME.into(),
+        ids::SETTINGS_STORAGE.into(),
+        ids::SETTINGS_LOG_NICKNAMES.into(),
+        ids::SETTINGS_RESYNC_ALL.into(),
+        ids::SETTINGS_MATURE_ADDONS.into(),
+        ids::SETTINGS_SAVE.into(),
+        ids::SETTINGS_NOTICES.into(),
+    ];
+    let tops: Vec<_> = order
+        .iter()
+        .map(|id| {
+            support::bounds_of(cx, s.win, id.clone())
+                .expect("drawn")
+                .top()
+        })
+        .collect();
+    assert!(
+        tops.windows(2).all(|w| w[0] < w[1]),
+        "{order:?} at {tops:?}"
+    );
 }

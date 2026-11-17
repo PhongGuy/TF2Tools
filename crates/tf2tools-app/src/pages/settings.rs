@@ -319,7 +319,7 @@ fn hub_drawn(hub: &SyncHub) -> Vec<HubDrawn> {
         .collect()
 }
 
-/// The sync cards in v5's order, as the catalogue keys of v5's titles and descriptions.
+/// The Stores card's rows in v5's order, as the catalogue keys of each store's name and source.
 pub const SYNC_CARDS: [(StoreKind, &str, &str); 5] = [
     (
         StoreKind::Sounds,
@@ -617,9 +617,9 @@ impl SettingsPage {
         .detach();
     }
 
-    // One store's card: v5's two status lines left, an outline small Resync right. The status
-    // block carries the whole status as its label, with the failure while the kind has one.
-    fn sync_card(
+    // One store's row: its name and source over v5's two status lines, an outline Resync right.
+    // The status block carries the whole status as its label, with the failure while it has one.
+    fn sync_row(
         &self,
         (kind, title, description): (StoreKind, &'static str, &'static str),
         cx: &mut Context<Self>,
@@ -674,17 +674,42 @@ impl SettingsPage {
                     hub.update(cx, |hub, cx| hub.start(kind, true, cx));
                 }
             }));
-        let content = h_flex()
+        let text = v_flex()
+            .flex_1()
+            .min_w_0()
+            .gap_1()
+            .child(
+                div()
+                    .text_sm()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(tr!(title)),
+            )
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(theme.muted_foreground)
+                    .child(tr!(description)),
+            )
+            .child(lines);
+        h_flex()
             .items_center()
             .justify_between()
-            .child(lines)
-            .child(resync);
-        card(
-            tr!(title),
-            tr!(description),
-            Some(content.into_any_element()),
-            cx,
-        )
+            .gap_4()
+            .child(text)
+            .child(resync)
+            .into_any_element()
+    }
+
+    // Forces a sync of every store that is not already syncing, as each row's Resync does.
+    fn resync_all(cx: &mut App) {
+        let Some(hub) = sync_hub(cx) else { return };
+        hub.update(cx, |hub, cx| {
+            for kind in StoreKind::ALL {
+                if !hub.is_running(kind) {
+                    hub.start(kind, true, cx);
+                }
+            }
+        });
     }
 
     // Asks for a folder and puts it in the input; a cancel leaves the input as it was.
@@ -1144,30 +1169,49 @@ fn card(
     content: Option<AnyElement>,
     cx: &App,
 ) -> AnyElement {
+    card_with_action(title, description, None, content, cx)
+}
+
+// A card whose header carries an action at the right of its title block, as Stores' Resync all.
+fn card_with_action(
+    title: impl Into<SharedString>,
+    description: impl IntoElement,
+    action: Option<AnyElement>,
+    content: Option<AnyElement>,
+    cx: &App,
+) -> AnyElement {
     let theme = cx.theme();
+    let heading = v_flex()
+        .flex_1()
+        .min_w_0()
+        .gap_1()
+        .child(
+            div()
+                .font_weight(FontWeight::SEMIBOLD)
+                .line_height(relative(1.))
+                .child(title.into()),
+        )
+        .child(
+            div()
+                .text_sm()
+                .text_color(theme.muted_foreground)
+                .child(description),
+        );
     v_flex()
-        .gap_6()
-        .p_6()
+        .gap_4()
+        .p_4()
         .rounded(theme.radius_lg)
         .border_1()
         .border_color(theme.border)
         .bg(theme.group_box)
         .shadow_sm()
         .child(
-            v_flex()
-                .gap_1p5()
-                .child(
-                    div()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .line_height(relative(1.))
-                        .child(title.into()),
-                )
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(theme.muted_foreground)
-                        .child(description),
-                ),
+            h_flex()
+                .items_start()
+                .justify_between()
+                .gap_4()
+                .child(heading)
+                .children(action),
         )
         .children(content)
         .into_any_element()
@@ -1429,6 +1473,30 @@ impl Render for SettingsPage {
                     .child(tr!("settings.cache.hint")),
             );
 
+        // The store rows wait for their status, as v5's cards did; the cache and mature controls
+        // sit below them either way.
+        let hub = sync_hub(cx);
+        let all_running = hub.as_ref().is_some_and(|hub| {
+            let hub = hub.read(cx);
+            StoreKind::ALL.iter().all(|k| hub.is_running(*k))
+        });
+        let resync_all = Button::new(ids::SETTINGS_RESYNC_ALL)
+            .flex_none()
+            .outline()
+            .label(tr!("settings.stores.resync_all"))
+            .disabled(hub.is_none() || all_running)
+            .on_click(|_, _, cx| Self::resync_all(cx));
+        let stores = v_flex()
+            .gap_4()
+            .children(
+                self.sync_status
+                    .is_some()
+                    .then(|| SYNC_CARDS.map(|c| self.sync_row(c, cx)))
+                    .into_iter()
+                    .flatten(),
+            )
+            .child(cache)
+            .child(mature_switch(cx));
         let content = v_flex()
             .id(ids::page(Page::Settings))
             .test_support()
@@ -1442,7 +1510,7 @@ impl Render for SettingsPage {
                     .max_w(px(512.))
                     .mx_auto()
                     .px_6()
-                    .gap_6()
+                    .gap_4()
                     .child(card(
                         tr!("settings.app_updates.title"),
                         version,
@@ -1468,21 +1536,9 @@ impl Render for SettingsPage {
                         cx,
                     ))
                     .child(card(
-                        tr!("settings.cache.title"),
-                        tr!("settings.cache.description"),
-                        Some(cache.into_any_element()),
-                        cx,
-                    ))
-                    .child(card(
                         tr!("settings.storage.title"),
                         tr!("settings.storage.description"),
                         Some(storage),
-                        cx,
-                    ))
-                    .child(card(
-                        tr!("settings.addons.title"),
-                        tr!("settings.addons.description"),
-                        Some(mature_switch(cx)),
                         cx,
                     ))
                     .child(card(
@@ -1491,14 +1547,13 @@ impl Render for SettingsPage {
                         Some(logs_tf.into_any_element()),
                         cx,
                     ))
-                    // v5 shows the store cards only once their status has been read.
-                    .children(
-                        self.sync_status
-                            .is_some()
-                            .then(|| SYNC_CARDS.map(|c| self.sync_card(c, cx)))
-                            .into_iter()
-                            .flatten(),
-                    )
+                    .child(card_with_action(
+                        tr!("settings.stores.title"),
+                        tr!("settings.stores.description"),
+                        Some(resync_all.into_any_element()),
+                        Some(stores.into_any_element()),
+                        cx,
+                    ))
                     // v5's default-size button (h-9 px-4), at its own width.
                     .child(
                         h_flex().child(

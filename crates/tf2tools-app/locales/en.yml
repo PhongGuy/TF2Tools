@@ -19,16 +19,12 @@ settings:
     description: "Preview volume for hitsounds and killsounds"
     volume: "Volume: %{percent}%"
   cache:
-    title: "Store Cache"
-    description: "How often to re-sync store data"
     duration: "Cache duration: %{duration}"
     hint: "Stores will re-sync automatically when cache expires. Default: 7 days (168 hours)."
     hours: { one: "%{count} hour", other: "%{count} hours" }
     days: { one: "%{count} day", other: "%{count} days" }
     days_hours: "%{days}d %{hours}h"
   addons:
-    title: "Add-ons"
-    description: "GameBanana skins, effects, GUIs, textures and game files"
     mature: "Show mature add-ons"
   storage:
     title: "Storage"
@@ -57,6 +53,10 @@ settings:
     full_logs: { one: "%{count} full log uses", other: "%{count} full logs use" }
     measuring: "Measuring..."
     unmeasured: "The logs cache size could not be measured."
+  stores:
+    title: "Stores"
+    description: "Each store's cached items and last sync"
+    resync_all: "Resync all"
   sync:
     items: { one: "%{count} item cached", other: "%{count} items cached" }
     last_synced: "Last synced: %{when}"
@@ -68,7 +68,7 @@ settings:
     sounds: { title: "Sound Store", description: "GameBanana hitsounds and killsounds" }
     crosshairs: { title: "Crosshair Store", description: "GameBanana crosshair mods" }
     gamebanana_huds: { title: "GameBanana HUD Store", description: "GameBanana HUD mods" }
-    curated_huds: { title: "Curated HUD Store", description: "Curated HUDs from mastercomfig" }
+    curated_huds: { title: "Curated HUD Store", description: "Curated HUDs from hud-db" }
     addons: { title: "Addon Store", description: "Mastercomfig performance and QoL addons" }
   save: "Save Settings"
   licences:

@@ -17,16 +17,12 @@ settings:
     description: "Громкость превью хитсаундов и килсаундов"
     volume: "Громкость: %{percent}%"
   cache:
-    title: "Кэш магазинов"
-    description: "Как часто заново синхронизировать данные магазинов"
     duration: "Срок хранения кэша: %{duration}"
     hint: "Магазины синхронизируются заново, когда истекает срок кэша. По умолчанию: 7 дней (168 часов)."
     hours: { one: "%{count} час", few: "%{count} часа", many: "%{count} часов" }
     days: { one: "%{count} день", few: "%{count} дня", many: "%{count} дней" }
     days_hours: "%{days} д %{hours} ч"
   addons:
-    title: "Дополнения"
-    description: "Скины, эффекты, интерфейсы, текстуры и игровые файлы с GameBanana"
     mature: "Показывать дополнения для взрослых"
   storage:
     title: "Хранилище"
@@ -55,6 +51,10 @@ settings:
     full_logs: { one: "%{count} полный лог занимает", few: "%{count} полных лога занимают", many: "%{count} полных логов занимают" }
     measuring: "Измерение..."
     unmeasured: "Не удалось измерить размер кэша логов."
+  stores:
+    title: "Магазины"
+    description: "Кэш каждого магазина и его последняя синхронизация"
+    resync_all: "Синхронизировать все"
   sync:
     items: { one: "%{count} элемент в кэше", few: "%{count} элемента в кэше", many: "%{count} элементов в кэше" }
     last_synced: "Последняя синхронизация: %{when}"
@@ -66,7 +66,7 @@ settings:
     sounds: { title: "Магазин звуков", description: "Хитсаунды и килсаунды с GameBanana" }
     crosshairs: { title: "Магазин прицелов", description: "Моды прицелов с GameBanana" }
     gamebanana_huds: { title: "Магазин HUD с GameBanana", description: "Моды HUD с GameBanana" }
-    curated_huds: { title: "Подборка HUD", description: "HUD, отобранные mastercomfig" }
+    curated_huds: { title: "Подборка HUD", description: "HUD, отобранные hud-db" }
     addons: { title: "Магазин дополнений", description: "Дополнения mastercomfig для производительности и удобства" }
   save: "Сохранить настройки"
   licences:
