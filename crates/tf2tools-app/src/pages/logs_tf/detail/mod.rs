@@ -25,6 +25,7 @@ use tf2tools_core::{LogDetail, LogRow, LogState, MatrixKind, SteamId, Team, Trac
 use super::sort::{MatrixSort, PlayerSort};
 use super::text::{log_loading, nickname_note, team_name};
 use super::{LogsTfPage, OpenLog, OpenState};
+use crate::i18n::tr;
 use crate::ids;
 use crate::widgets::labelled;
 use crate::widgets::scroll::sideways;
@@ -112,7 +113,7 @@ pub(super) fn name_cell(
 pub(super) fn nick_marker(id: ElementId, log_name: &str) -> impl IntoElement {
     h_flex()
         .id(id)
-        .aria_label("Nickname")
+        .aria_label(tr!("logs_tf.nickname"))
         .test_support()
         .flex_none()
         .opacity(0.6)
@@ -197,17 +198,21 @@ fn log_body(
         .when(!log.rounds().is_empty(), |el| {
             let table = rounds::rounds_table(open.id, log, &open.rounds, tracked, page.clone(), cx);
             el.child(
-                section("Rounds", table, cx)
+                section(tr!("logs_tf.detail.rounds"), table, cx)
                     .id(ids::LOGSTF_ROUNDS)
                     .test_support(),
             )
         })
         .when(!log.medics().is_empty(), |el| {
-            el.child(section("Medics", medics::medics(log, tracked, cx), cx))
+            el.child(section(
+                tr!("logs_tf.detail.medics"),
+                medics::medics(log, tracked, cx),
+                cx,
+            ))
         })
         .child(
             section(
-                "Kill matrix",
+                tr!("logs_tf.detail.kill_matrix"),
                 matrix::matrix(log, matrix, tracked, page.clone(), cx),
                 cx,
             )
@@ -228,11 +233,11 @@ where
     }
     row.bg(cx.theme().primary.opacity(0.12))
         .font_weight(FontWeight::SEMIBOLD)
-        .aria_description("Tracked player")
+        .aria_description(tr!("logs_tf.detail.tracked"))
 }
 
 // A titled part of the body.
-pub(super) fn section(title: &'static str, content: impl IntoElement, cx: &App) -> Div {
+pub(super) fn section(title: SharedString, content: impl IntoElement, cx: &App) -> Div {
     v_flex()
         .gap_2()
         .child(

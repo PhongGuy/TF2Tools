@@ -5,12 +5,13 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Selectable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
-    App, Div, FontWeight, InteractiveElement as _, ParentElement as _, Pixels, Role,
+    App, Div, FontWeight, InteractiveElement as _, ParentElement as _, Pixels, Role, SharedString,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, WeakEntity, div, px,
 };
 use tf2tools_core::{LogDetail, MatrixKind, TfClass};
 
 use super::{ICON, NUMBER, team_cell};
+use crate::i18n::{names, tr};
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::head::sortable;
@@ -26,12 +27,21 @@ const TEAM: Pixels = px(40.);
 const NAME_MIN: Pixels = px(100.);
 const MAIN: Pixels = px(24.);
 
-// Each tab's title and its total column's header, as logs.tf names them.
-const TABS: [(MatrixKind, &str, &str); 3] = [
-    (MatrixKind::Kills, "Kills", "K"),
-    (MatrixKind::KillsAssists, "Kills+Assists", "KA"),
-    (MatrixKind::Deaths, "Deaths", "D"),
+// Each tab's kind and its total column's header, logs.tf's abbreviation in every language.
+const TABS: [(MatrixKind, &str); 3] = [
+    (MatrixKind::Kills, "K"),
+    (MatrixKind::KillsAssists, "KA"),
+    (MatrixKind::Deaths, "D"),
 ];
+
+// A tab's title; a kind core adds later reads as Kills until the catalogue names it.
+fn tab_label(kind: MatrixKind) -> SharedString {
+    match kind {
+        MatrixKind::KillsAssists => tr!("logs_tf.detail.kills_assists"),
+        MatrixKind::Deaths => tr!("logs_tf.detail.deaths"),
+        MatrixKind::Kills | _ => tr!("logs_tf.weapons.kills"),
+    }
+}
 
 /// The tabs over `kind`'s matrix, a row for each player with a count, K high to low or by
 /// `sort`. A tab asks `page` to show its kind and a header to sort by its column; tracked
@@ -45,12 +55,13 @@ pub(super) fn matrix(
 ) -> Div {
     // A kit Button paints its selected state but never reports it, so each sits in a tab
     // that carries the id and says whether it is shown.
-    let tab = |(tab, title, _): (MatrixKind, &'static str, &'static str)| {
+    let tab = |(tab, _): (MatrixKind, &'static str)| {
         let page = page.clone();
+        let title = tab_label(tab);
         let button = Button::new(ids::logstf_matrix_tab_button(tab))
             .outline()
             .xsmall()
-            .label(title)
+            .label(title.clone())
             .selected(tab == kind)
             .on_click(move |_, _, cx| {
                 let _ = page.update(cx, |page, cx| page.show_matrix(tab, cx));
@@ -85,8 +96,8 @@ fn table(
 ) -> Div {
     let muted = cx.theme().muted_foreground;
     // The plain headings sit at the buttons' height, level with their titles.
-    let heading = |text: &'static str| div().flex_none().h_5().flex().items_center().child(text);
-    let total = TABS.iter().find(|t| t.0 == kind).map_or("K", |t| t.2);
+    let heading = |text: SharedString| div().flex_none().h_5().flex().items_center().child(text);
+    let total = TABS.iter().find(|t| t.0 == kind).map_or("K", |t| t.1);
     let assets = &cx.global::<Services>().assets;
     // Each count column's header is a button that sorts by it, its arrow centred under it.
     let header = |column: MatrixColumn| {
@@ -108,11 +119,9 @@ fn table(
                 let _ = page.update(cx, |page, cx| page.sort_matrix_by(column, cx));
             });
         let button = match class {
-            Some(class) => button.accessibility_label(class.name()).child(class_icon(
-                class,
-                assets.class_icon(class).as_deref(),
-                ICON,
-            )),
+            Some(class) => button
+                .accessibility_label(names::class_name(class))
+                .child(class_icon(class, assets.class_icon(class).as_deref(), ICON)),
             None => button.label(total),
         };
         sortable(
@@ -131,9 +140,13 @@ fn table(
             .py_1()
             .text_color(muted)
             .font_weight(FontWeight::MEDIUM)
-            .child(heading("Team").w(TEAM))
-            .child(heading("Player").w(NAME_MIN).flex_grow(1.))
-            .child(heading("C").w(MAIN))
+            .child(heading(tr!("logs_tf.detail.team_short")).w(TEAM))
+            .child(
+                heading(tr!("logs_tf.detail.player"))
+                    .w(NAME_MIN)
+                    .flex_grow(1.),
+            )
+            .child(heading("C".into()).w(MAIN))
             .children(TfClass::ALL.map(|class| header(MatrixColumn::Class(class))))
             .child(header(MatrixColumn::Total)),
     );

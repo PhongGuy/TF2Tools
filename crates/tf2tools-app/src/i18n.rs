@@ -822,6 +822,14 @@ mod tests {
         "pages/logs_tf/head.rs",
         "pages/logs_tf/grid.rs",
         "pages/logs_tf/class_weapons.rs",
+        "pages/logs_tf/detail/banner.rs",
+        "pages/logs_tf/detail/footer.rs",
+        "pages/logs_tf/detail/matrix.rs",
+        "pages/logs_tf/detail/medics.rs",
+        "pages/logs_tf/detail/mod.rs",
+        "pages/logs_tf/detail/players.rs",
+        "pages/logs_tf/detail/popover.rs",
+        "pages/logs_tf/detail/rounds.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1051,6 +1059,81 @@ mod tests {
         ("pages/logs_tf/sort.rs", "Dmg/min", ID_VALUE),
         ("pages/logs_tf/sort.rs", "Heals/min", ID_VALUE),
         ("pages/logs_tf/sort.rs", "Ubers/10 min", ID_VALUE),
+        ("pages/logs_tf/detail/banner.rs", "Kills", ID_VALUE),
+        ("pages/logs_tf/detail/banner.rs", "Damage", ID_VALUE),
+        ("pages/logs_tf/detail/banner.rs", "Charges", ID_VALUE),
+        ("pages/logs_tf/detail/banner.rs", "Drops", ID_VALUE),
+        ("pages/logs_tf/detail/banner.rs", "Caps", ID_VALUE),
+        ("pages/logs_tf/detail/banner.rs", "Midfights", ID_VALUE),
+        ("pages/logs_tf/detail/medics.rs", "Charges:{}", ID_VALUE),
+        ("pages/logs_tf/detail/medics.rs", "Charges", ID_VALUE),
+        ("pages/logs_tf/detail/medics.rs", "Healing", ID_VALUE),
+        ("pages/logs_tf/detail/medics.rs", "Drops", ID_VALUE),
+        (
+            "pages/logs_tf/detail/medics.rs",
+            "Avg time to build",
+            ID_VALUE,
+        ),
+        (
+            "pages/logs_tf/detail/medics.rs",
+            "Avg time before using",
+            ID_VALUE,
+        ),
+        (
+            "pages/logs_tf/detail/medics.rs",
+            "Near full charge deaths",
+            ID_VALUE,
+        ),
+        (
+            "pages/logs_tf/detail/medics.rs",
+            "Avg uber length",
+            ID_VALUE,
+        ),
+        (
+            "pages/logs_tf/detail/medics.rs",
+            "Deaths after charge",
+            ID_VALUE,
+        ),
+        (
+            "pages/logs_tf/detail/medics.rs",
+            "Major advantages lost",
+            ID_VALUE,
+        ),
+        (
+            "pages/logs_tf/detail/medics.rs",
+            "Biggest advantage lost",
+            ID_VALUE,
+        ),
+        (
+            "pages/logs_tf/detail/rounds.rs",
+            "BLU K",
+            LOGS_TF_ABBREVIATION,
+        ),
+        (
+            "pages/logs_tf/detail/rounds.rs",
+            "RED K",
+            LOGS_TF_ABBREVIATION,
+        ),
+        (
+            "pages/logs_tf/detail/rounds.rs",
+            "BLU UC",
+            LOGS_TF_ABBREVIATION,
+        ),
+        (
+            "pages/logs_tf/detail/rounds.rs",
+            "RED UC",
+            LOGS_TF_ABBREVIATION,
+        ),
+        (
+            "pages/logs_tf/detail/rounds.rs",
+            "BLU DA",
+            LOGS_TF_ABBREVIATION,
+        ),
+        (
+            "pages/logs_tf/detail/rounds.rs",
+            "RED DA",
+            LOGS_TF_ABBREVIATION,
+        ),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
@@ -1060,6 +1143,7 @@ mod tests {
     const STORE_FIELD: &str = "developer detail: the store's tracing field";
     const ID_VALUE: &str = "element id value; its label is keyed";
     const DIALOG_ELSEWHERE: &str = "dialog of an untranslated page";
+    const LOGS_TF_ABBREVIATION: &str = "logs.tf abbreviation, as logs.tf prints it";
     const STARTUP_DETAIL: &str =
         "developer detail: StartupError's log text; the view reads describe_startup";
 

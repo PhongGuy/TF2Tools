@@ -24,7 +24,10 @@ use tf2tools_core::{GbId, LogLevel, NewLogEntry, StoreItemId, StoreKind};
 use crate::LocaleGuard;
 use crate::library::{shown_text, text_width};
 use crate::support;
-use crate::support::logstf::{ARIE, SIXES, day_ago, list_body, open_page, shell};
+use crate::support::logstf::{
+    ARIE, SIXES, day_ago, list_body, open_log, open_page, scroll_to_in_log, serve_two_logs, shell,
+    sid,
+};
 
 // The kit's medium Select trigger around its title: borders, padding, gap and caret.
 const SELECT_CHROME: Pixels = px(42.);
@@ -393,5 +396,65 @@ fn the_russian_class_table_keeps_its_english_ids(cx: &mut TestAppContext) {
     assert_eq!(
         support::label_of(cx, s.win, ids::LOGSTF_RANGE).as_deref(),
         Some("Период истории")
+    );
+}
+
+// An open log keeps its English ids in Russian, its words read Russian, and the team table's
+// Russian headers fit their columns at 800x600.
+#[gpui_kit::test]
+fn an_open_russian_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let server = support::StoreServer::start();
+    serve_two_logs(&server);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    let page = open_page(cx, &s);
+    open_log(cx, &s, &page, 3);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_team_cell(Team::Blue, "Kills")).as_deref(),
+        Some("117")
+    );
+    let headers = [
+        ("Kills", "Фраги"),
+        ("Damage", "Урон"),
+        ("Charges", "Заряды"),
+        ("Drops", "Потери"),
+        ("Caps", "Захваты"),
+        ("Midfights", "Мидфайты"),
+    ];
+    for (column, russian) in headers {
+        let cell =
+            support::bounds_of(cx, s.win, ids::logstf_team_cell(Team::Red, column)).expect(column);
+        let w = text_width(cx, s.win, russian, 0.75, FontWeight::MEDIUM);
+        assert!(
+            w <= cell.size.width,
+            "{russian:?} is {w:?} in {:?}",
+            cell.size.width
+        );
+    }
+    // The Team column carries no id; its width is banner.rs's 48 px. The rounds table's
+    // Length header reads "Время" in its 52 px column.
+    assert!(text_width(cx, s.win, "Ком.", 0.75, FontWeight::MEDIUM) <= px(48.));
+    assert!(text_width(cx, s.win, "Время", 0.75, FontWeight::MEDIUM) <= px(52.));
+    let rahmed = sid(175_790_976);
+    scroll_to_in_log(cx, &s, &page, 3, ids::logstf_medic(rahmed));
+    assert_eq!(
+        support::label_of(
+            cx,
+            s.win,
+            ids::logstf_medic_fact(rahmed, "Avg time to build")
+        )
+        .as_deref(),
+        Some("63\u{a0}с")
+    );
+    scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_CHAT_TOGGLE);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_CHAT_TOGGLE).as_deref(),
+        Some("Показать чат")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_download(3)).as_deref(),
+        Some("Скачать лог")
     );
 }

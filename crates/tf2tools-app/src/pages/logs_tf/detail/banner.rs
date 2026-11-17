@@ -3,7 +3,7 @@
 
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
-    App, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
+    App, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
 use tf2tools_core::{LogDetail, LogRow, Team, TeamTotals};
@@ -11,22 +11,57 @@ use tf2tools_core::{LogDetail, LogRow, Team, TeamTotals};
 use super::super::list::open_link;
 use super::super::text::{date_text, duration_text};
 use super::team_cell;
+use crate::i18n::tr;
 use crate::ids;
 use crate::theme::team_fill;
 use crate::widgets::labelled;
 
-// One team table column: its logs.tf title, its width and how a team's cell reads. Each is
-// just wide enough for its title, so all seven fit the smallest window's 424 px panel.
-type Column = (&'static str, f32, fn(&TeamTotals) -> u32);
+// One team table column: its logs.tf title, which its cells' ids carry, the header the page
+// shows, its width and how a team's cell reads. Each is just wide enough for its header, so
+// all seven fit the smallest window's 424 px panel.
+type Column = (
+    &'static str,
+    fn() -> SharedString,
+    f32,
+    fn(&TeamTotals) -> u32,
+);
 
 const COLUMNS: [Column; 6] = [
-    ("Kills", 48., TeamTotals::kills),
-    ("Damage", 56., TeamTotals::dmg),
-    ("Charges", 56., TeamTotals::charges),
-    ("Drops", 48., TeamTotals::drops),
-    ("Caps", 48., TeamTotals::caps),
-    ("Midfights", 72., TeamTotals::midfights),
+    (
+        "Kills",
+        || tr!("logs_tf.detail.kills_short"),
+        56.,
+        TeamTotals::kills,
+    ),
+    (
+        "Damage",
+        || tr!("logs_tf.weapons.damage"),
+        56.,
+        TeamTotals::dmg,
+    ),
+    (
+        "Charges",
+        || tr!("logs_tf.detail.charges"),
+        56.,
+        TeamTotals::charges,
+    ),
+    (
+        "Drops",
+        || tr!("logs_tf.detail.drops"),
+        48.,
+        TeamTotals::drops,
+    ),
+    ("Caps", || tr!("logs_tf.detail.caps"), 56., TeamTotals::caps),
+    (
+        "Midfights",
+        || tr!("logs_tf.detail.midfights"),
+        72.,
+        TeamTotals::midfights,
+    ),
 ];
+
+// The Team column, wide enough for its header and for "BLU".
+const TEAM: f32 = 48.;
 
 /// The score banner of log `id`: BLU's half on the left, RED's on the right, each score
 /// beside the centre line, labelled "BLU 2, RED 3".
@@ -96,16 +131,21 @@ pub(super) fn team_table(log: &LogDetail, cx: &App) -> Div {
         .py_1()
         .text_color(cx.theme().muted_foreground)
         .font_weight(FontWeight::MEDIUM)
-        .child(div().w(px(40.)).flex_none().child("Team"))
-        .children(COLUMNS.map(|(title, width, _)| cell(width).child(title)));
+        .child(
+            div()
+                .w(px(TEAM))
+                .flex_none()
+                .child(tr!("logs_tf.detail.team_short")),
+        )
+        .children(COLUMNS.map(|(_, label, width, _)| cell(width).child(label())));
     let line = |team: Team, totals: &TeamTotals| {
         h_flex()
             .gap_1()
             .py_1()
             .border_t_1()
             .border_color(cx.theme().border)
-            .child(team_cell(team, cx).w(px(40.)))
-            .children(COLUMNS.map(|(title, width, read)| {
+            .child(team_cell(team, cx).w(px(TEAM)))
+            .children(COLUMNS.map(|(title, _, width, read)| {
                 let value = read(totals).to_string();
                 labelled(cell(width), ids::logstf_team_cell(team, title), value)
             }))

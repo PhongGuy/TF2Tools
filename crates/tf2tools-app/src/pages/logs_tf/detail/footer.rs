@@ -11,6 +11,7 @@ use gpui_kit::{
 use tf2tools_core::{LogDetail, SteamId, Team};
 
 use super::{team_cell, team_colour};
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::tables::ChatRow;
@@ -64,7 +65,7 @@ pub(super) fn footer(id: u64, log: &LogDetail, page: WeakEntity<LogsTfPage>) -> 
             Button::new(ids::LOGSTF_CHAT_TOGGLE)
                 .outline()
                 .small()
-                .label("Show Chat")
+                .label(tr!("logs_tf.detail.show_chat"))
                 .on_click(move |_, window, cx| {
                     let _ = chat_page.update(cx, |page, cx| page.open_chat(window, cx));
                 }),
@@ -83,7 +84,7 @@ pub(super) fn footer(id: u64, log: &LogDetail, page: WeakEntity<LogsTfPage>) -> 
             Button::new(ids::logstf_download(id))
                 .outline()
                 .small()
-                .label("Download log")
+                .label(tr!("logs_tf.detail.download"))
                 .on_click(move |_, window, cx| {
                     let _ = download_page.update(cx, |page, cx| page.download_log(id, window, cx));
                 }),
@@ -127,11 +128,17 @@ pub(in crate::pages::logs_tf) fn chat_dialog(
             .child(div().flex_1().min_w(MESSAGE_MIN).child(row.msg.clone()))
     });
     let body = if rows.is_empty() {
-        vec![muted("Nobody chatted in this log.", cx).into_any_element()]
+        vec![muted(tr!("logs_tf.detail.chat_empty"), cx).into_any_element()]
     } else {
         lines.map(IntoElement::into_any_element).collect()
     };
-    dialog_body("In-game Chat", ids::LOGSTF_CHAT, body, window, cx)
+    dialog_body(
+        tr!("logs_tf.detail.chat_title"),
+        ids::LOGSTF_CHAT,
+        body,
+        window,
+        cx,
+    )
 }
 
 /// The killstreaks dialog's content: when, who and how many, earliest first.
@@ -144,9 +151,15 @@ pub(in crate::pages::logs_tf) fn streaks_dialog(
     let header = h_flex()
         .gap_2()
         .text_color(cx.theme().muted_foreground)
-        .child(div().w(TIME).flex_none().child("Time"))
-        .child(div().flex_1().child("Player"))
-        .child(div().w(TIME).flex_none().text_right().child("Streak"));
+        .child(div().w(TIME).flex_none().child(tr!("logs_tf.detail.time")))
+        .child(div().flex_1().child(tr!("logs_tf.detail.player")))
+        .child(
+            div()
+                .w(TIME)
+                .flex_none()
+                .text_right()
+                .child(tr!("logs_tf.detail.streak")),
+        );
     let lines = rows.iter().enumerate().map(|(ix, row)| {
         let nickname = tracked.nickname(row.steam_id);
         let shown = nickname.unwrap_or(&row.name);
@@ -189,13 +202,19 @@ pub(in crate::pages::logs_tf) fn streaks_dialog(
     let body = std::iter::once(header.into_any_element())
         .chain(lines)
         .collect();
-    dialog_body("Killstreaks", ids::LOGSTF_STREAKS, body, window, cx)
+    dialog_body(
+        tr!("logs_tf.detail.killstreaks"),
+        ids::LOGSTF_STREAKS,
+        body,
+        window,
+        cx,
+    )
 }
 
 // The title over `rows`, which scroll on their own once the dialog reaches the window's cap.
 // The kit's close X floats into the top right corner, so the title keeps clear of it.
 fn dialog_body(
-    title: &'static str,
+    title: SharedString,
     id: &'static str,
     rows: Vec<AnyElement>,
     window: &Window,
@@ -244,6 +263,6 @@ fn name(text: &str, team: Option<Team>, cx: &App) -> Div {
         .child(text.to_owned())
 }
 
-fn muted(text: &'static str, cx: &App) -> Div {
+fn muted(text: SharedString, cx: &App) -> Div {
     div().text_color(cx.theme().muted_foreground).child(text)
 }
