@@ -1,13 +1,17 @@
 //! The stores, their details windows, the download toasts and the update banner, in Russian.
 
 use gpui_kit::TestAppContext;
+use tf2tools_app::gb_addon_installs::GbAddonOffer;
 use tf2tools_app::ids;
+use tf2tools_app::pages::addon_store::gamebanana_tab::{AddonTab, search_placeholder};
+use tf2tools_app::pages::addon_store::model::AddonState;
+use tf2tools_app::pages::addon_store::{InfoLink, info_text};
 use tf2tools_app::pages::hud_store::HudStorePage;
 use tf2tools_app::pages::sound_store::model::{Category, category_label};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::store_grid::{SEARCH_DEBOUNCE, StoreGridConfig, sort_label};
-use tf2tools_core::{GbId, StoreItemId, StoreKind, StoreSort};
+use tf2tools_core::{AddonSection, GbId, StoreItemId, StoreKind, StoreSort, Tf2Install};
 
 use crate::LocaleGuard;
 use crate::library::{shown_text, text_width};
@@ -312,4 +316,183 @@ fn sound_store_labels_read_in_russian() {
     assert_eq!(category_label(Some("hitsound")), "Хитсаунд");
     assert_eq!(category_label(Some("killsound")), "Килсаунд");
     assert_eq!(category_label(None), "Звук");
+}
+
+const MD: &str = "Generic_MostDownloaded";
+
+fn addon_store(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    server: &support::StoreServer,
+) -> support::AddonStoreWindow {
+    let state = Tf2State::Found(Tf2Install::from_path(&env.game).unwrap());
+    support::addon_store_window(cx, env, server, state, |_, _| {})
+}
+
+fn open_addon_tab(
+    cx: &mut TestAppContext,
+    w: &support::AddonStoreWindow,
+    key: &str,
+) -> gpui_kit::Entity<AddonTab> {
+    support::click_id(cx, w.win, ids::addon_store_tab(key));
+    let section = AddonSection::by_key(key).unwrap();
+    let tab = cx
+        .update(|cx| w.page.read(cx).gamebanana(section))
+        .expect("the tab is built on first show");
+    support::wait_real(cx, "the first step", |cx| {
+        cx.update(|cx| {
+            let t = tab.read(cx);
+            !t.is_loading() && (t.wants_load_more() || t.is_no_results() || !t.cards().is_empty())
+        })
+    });
+    tab
+}
+
+#[gpui_kit::test]
+fn the_addon_store_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (env, server) = (support::env(), support::StoreServer::start());
+    // The only GUI is a HUD, which the GUIs tab leaves out, so the listing ends empty.
+    server.mount_gb_index(
+        1644,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(1, 1644, Some(1649))], true),
+    );
+    let w = addon_store(cx, &env, &server);
+    assert_eq!(
+        support::label_of(cx, w.win, ids::STORE_EMPTY).as_deref(),
+        Some("Не удалось загрузить дополнения")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::STORE_REFRESH).as_deref(),
+        Some("Обновить")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::addon_store_tab("mastercomfig")).as_deref(),
+        Some("mastercomfig")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::addon_store_tab("skins")).as_deref(),
+        Some("Скины")
+    );
+
+    let _tab = open_addon_tab(cx, &w, "guis");
+    assert_eq!(
+        shown_text(cx, w.win, ids::ADDON_SEARCH).as_deref(),
+        Some("Поиск интерфейсов...")
+    );
+    assert_eq!(
+        shown_text(cx, w.win, ids::ADDON_SORT).as_deref(),
+        Some("Популярные")
+    );
+    assert_eq!(
+        shown_text(cx, w.win, ids::ADDON_CATEGORY).as_deref(),
+        Some("Все")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_SORT_LABEL).as_deref(),
+        Some("Сортировка:")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_EMPTY).as_deref(),
+        Some("Дополнения не найдены")
+    );
+    assert_eq!(
+        support::label_of(cx, w.win, ids::STORE_EMPTY_HINT).as_deref(),
+        Some("Попробуйте другую категорию.")
+    );
+    assert_rows_fit(
+        cx,
+        w.win,
+        ids::ADDON_SORT,
+        &["Популярные".into(), "Новые".into()],
+    );
+}
+
+#[test]
+fn addon_store_labels_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let states = [
+        AddonState::Download,
+        AddonState::InLibrary,
+        AddonState::Installed,
+        AddonState::Update,
+    ]
+    .map(|s| s.label().to_string());
+    assert_eq!(
+        states,
+        ["Скачать", "В библиотеке", "Установлено", "Обновить"]
+    );
+    let offers = [
+        GbAddonOffer::Install,
+        GbAddonOffer::Update,
+        GbAddonOffer::InstallAgain,
+        GbAddonOffer::Installed,
+    ]
+    .map(|o| o.label().to_string());
+    assert_eq!(
+        offers,
+        ["Установить", "Обновить", "Установить снова", "Установлено"]
+    );
+    assert_eq!(GbAddonOffer::Update.badge().as_deref(), Some("Обновление"));
+    assert_eq!(
+        GbAddonOffer::Installed.badge().as_deref(),
+        Some("Установлено")
+    );
+    assert_eq!(GbAddonOffer::Install.badge(), None);
+    let placeholders: Vec<String> = AddonSection::ALL
+        .iter()
+        .map(|s| search_placeholder(*s).to_string())
+        .collect();
+    assert_eq!(
+        placeholders,
+        [
+            "Поиск скинов...",
+            "Поиск эффектов...",
+            "Поиск интерфейсов...",
+            "Поиск текстур...",
+            "Поиск файлов игры..."
+        ]
+    );
+    // Each underlined word must occur in the translated sentence, or it loses its link.
+    let text = info_text();
+    for link in [InfoLink::Mastercomfig, InfoLink::Addons] {
+        assert!(
+            text.contains(&*link.word()),
+            "{text} lacks {:?}",
+            link.word()
+        );
+    }
+}
+
+// The add-on tab is kept with the Addon Store, so its search box and Selects retitle after a
+// switch and the chosen sort stays.
+#[gpui_kit::test]
+fn the_addon_tab_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let listing = |id| support::gb_listing(vec![support::gb_addon(id, 2774, None)], true);
+    server.mount_gb_index(2774, MD, 1, listing(1));
+    server.mount_gb_index(2774, "Generic_Newest", 1, listing(2));
+    let w = addon_store(cx, &env, &server);
+    let tab = open_addon_tab(cx, &w, "gamefiles");
+    support::click_id(cx, w.win, ids::ADDON_SORT);
+    support::click_id(cx, w.win, ids::select_option(ids::ADDON_SORT, "Newest"));
+    support::wait_real(cx, "the newest step", |cx| {
+        cx.update(|cx| tab.read(cx).cards().first().map(|c| c.id.get()) == Some(2))
+    });
+    let shown = |cx: &mut TestAppContext| {
+        [ids::ADDON_SEARCH, ids::ADDON_SORT, ids::ADDON_CATEGORY]
+            .map(|id| shown_text(cx, w.win, id))
+    };
+    let some = |t: [&str; 3]| t.map(|t| Some(t.to_owned()));
+    assert_eq!(shown(cx), some(["Search Game files...", "Newest", "All"]));
+    tf2tools_app::i18n::apply("ru");
+    cx.update(|cx| cx.refresh_windows());
+    assert_eq!(shown(cx), some(["Поиск файлов игры...", "Новые", "Все"]));
+    assert_eq!(
+        cx.update(|cx| tab.read(cx).sort()),
+        tf2tools_core::AddonSort::Newest
+    );
 }

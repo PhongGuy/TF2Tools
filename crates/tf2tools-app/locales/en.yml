@@ -235,6 +235,37 @@ addon_store:
   badge:
     update: "Update"
     installed: "Installed"
+  info: "These addons work best with a mastercomfig preset installed. Download addons to your library, then install them from the Addons page."
+  heading: "Mastercomfig performance and quality-of-life addons"
+  no_tf2: "Set the TF2 folder in Settings to install addons."
+  syncing: "Syncing addons..."
+  unloaded: "Could not load addons"
+  empty: "No add-ons found"
+  button:
+    refresh: "Refresh"
+    syncing: "Syncing..."
+    installing: "Installing..."
+    update: "Update"
+    load_more: "Load more"
+  offer:
+    install: "Install"
+    install_again: "Install again"
+  sort:
+    most_downloaded: "Most downloaded"
+    newest: "Newest"
+  category:
+    all: "All"
+    all_weapons: "All weapons"
+  hint:
+    category: "Try another category."
+    search: "Try another search."
+  search:
+    skins: "Search Skins..."
+    effects: "Search Effects..."
+    guis: "Search GUIs..."
+    textures: "Search Textures..."
+    gamefiles: "Search Game files..."
+    items: "Search add-ons..."
 
 hud_store:
   added: "Added %{date}"

@@ -191,8 +191,8 @@ impl AddonDetail {
             return (None, Some(line.into_any_element()));
         }
         let label = match stage {
-            Some(GbAddonStage::Removing) => "Removing...",
-            Some(_) => "Installing...",
+            Some(GbAddonStage::Removing) => SharedString::new_static("Removing..."),
+            Some(_) => SharedString::new_static("Installing..."),
             None => offer.label(),
         };
         let button = Button::new(ids::ADDON_DETAIL_INSTALL)

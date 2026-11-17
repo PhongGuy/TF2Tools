@@ -26,6 +26,7 @@ use super::card::{CardBadge, OpenAddon, card_height, gb_addon_card};
 use crate::addon_detail::open_addon_detail;
 use crate::addon_feed::{AddonFeed, Keyed, StepAfter};
 use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer};
+use crate::i18n::{self, tr};
 use crate::ids;
 use crate::mature::MatureAddons;
 use crate::pages::common::{SkeletonTop, empty_state_card, skeleton_cards};
@@ -48,16 +49,43 @@ const SKELETON_CARDS: usize = 8;
 /// Fits "Most downloaded" whole beside the kit's caret and padding, on a 4 px step.
 const SORT_WIDTH: f32 = 172.;
 
-/// The search box's placeholder for `section`, naming it as its tab does ("Search GUIs...").
-pub fn search_placeholder(section: AddonSection) -> String {
-    format!("Search {}...", section.title())
+/// The search box's placeholder for `section`, naming it as its tab does ("Search GUIs..."),
+/// in the player's language.
+pub fn search_placeholder(section: AddonSection) -> SharedString {
+    match section.key() {
+        "skins" => tr!("addon_store.search.skins"),
+        "effects" => tr!("addon_store.search.effects"),
+        "guis" => tr!("addon_store.search.guis"),
+        "textures" => tr!("addon_store.search.textures"),
+        "gamefiles" => tr!("addon_store.search.gamefiles"),
+        "maps" => tr!("maps.search"),
+        _ => tr!("addon_store.search.items"),
+    }
 }
 
-/// The sort Select's labels, in menu order.
+/// The sort Select's values, in menu order; `sort_label` names each.
 const SORTS: [(&str, AddonSort); 2] = [
     ("Most downloaded", AddonSort::MostDownloaded),
     ("Newest", AddonSort::Newest),
 ];
+
+// The sort Select's label for `sort`, in the player's language.
+fn sort_label(sort: AddonSort) -> SharedString {
+    match sort {
+        AddonSort::MostDownloaded => tr!("addon_store.sort.most_downloaded"),
+        AddonSort::Newest | _ => tr!("addon_store.sort.newest"),
+    }
+}
+
+// The sort Select's rows, titled in the current language.
+fn sort_rows() -> Vec<LabelOption> {
+    LabelOption::keyed(
+        ids::ADDON_SORT,
+        SORTS
+            .iter()
+            .map(|(value, sort)| (*value, sort_label(*sort))),
+    )
+}
 
 type Labels = Entity<SelectState<Vec<LabelOption>>>;
 type Categories = Entity<SelectState<Vec<CategoryOption>>>;
@@ -80,9 +108,9 @@ impl CategoryOption {
         }
     }
 
-    // "All" first, then `children`.
-    fn rows(select: &str, all: &str, children: &[AddonCategory]) -> Vec<CategoryOption> {
-        std::iter::once(Self::new(select, None, SharedString::new(all)))
+    // "All" first, titled `all`, then `children`.
+    fn rows(select: &str, all: SharedString, children: &[AddonCategory]) -> Vec<CategoryOption> {
+        std::iter::once(Self::new(select, None, all))
             .chain(
                 children
                     .iter()
@@ -111,6 +139,24 @@ impl SelectItem for CategoryOption {
     fn value(&self) -> &Option<u32> {
         &self.value
     }
+}
+
+// The subcategory Select's rows: "All" in the current language, then `children`.
+fn category_rows(children: &[AddonCategory]) -> Vec<CategoryOption> {
+    CategoryOption::rows(
+        ids::ADDON_CATEGORY,
+        tr!("addon_store.category.all"),
+        children,
+    )
+}
+
+// The weapon Select's rows: "All weapons" in the current language, then `children`.
+fn weapon_rows(children: &[AddonCategory]) -> Vec<CategoryOption> {
+    CategoryOption::rows(
+        ids::ADDON_WEAPON,
+        tr!("addon_store.category.all_weapons"),
+        children,
+    )
 }
 
 impl Keyed for AddonCard {
@@ -153,6 +199,8 @@ pub struct AddonTab {
     viewer: String,
     visible: Range<usize>,
     hidden: bool,
+    /// The language the search box and Selects were titled in.
+    language: &'static str,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -185,13 +233,12 @@ impl AddonTab {
         });
         let placeholder = search_placeholder(section);
         let search_input = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder));
-        let labels = LabelOption::all(ids::ADDON_SORT, SORTS.iter().map(|(label, _)| *label));
         let sort_select =
-            cx.new(|cx| SelectState::new(labels, Some(IndexPath::default()), window, cx));
-        let rows = CategoryOption::rows(ids::ADDON_CATEGORY, "All", &[]);
+            cx.new(|cx| SelectState::new(sort_rows(), Some(IndexPath::default()), window, cx));
+        let rows = category_rows(&[]);
         let category_select =
             cx.new(|cx| SelectState::new(rows, Some(IndexPath::default()), window, cx));
-        let rows = CategoryOption::rows(ids::ADDON_WEAPON, "All weapons", &[]);
+        let rows = weapon_rows(&[]);
         let weapon_select = cx.new(|cx| SelectState::new(rows, None, window, cx));
         // A finished install changes the cards' badges.
         let installs = GbAddonInstalls::global(cx);
@@ -257,6 +304,7 @@ impl AddonTab {
             viewer,
             visible: 0..0,
             hidden: false,
+            language: i18n::current(),
             _subscriptions: subscriptions,
         };
         tab.categories_task = Some(tab.load_categories(section.root_category(), window, cx));
@@ -383,12 +431,12 @@ impl AddonTab {
         cx: &mut Context<Self>,
     ) {
         if parent == self.section.root_category() {
-            let rows = CategoryOption::rows(ids::ADDON_CATEGORY, "All", &children);
+            let rows = category_rows(&children);
             self.category_select
                 .update(cx, |select, cx| select.set_items(rows, window, cx));
             self.categories = children;
         } else if self.category == Some(parent) {
-            let rows = CategoryOption::rows(ids::ADDON_WEAPON, "All weapons", &children);
+            let rows = weapon_rows(&children);
             self.weapon_select.update(cx, |select, cx| {
                 select.set_items(rows, window, cx);
                 select.set_selected_index(None, window, cx);
@@ -638,11 +686,32 @@ impl AddonTab {
         images.update(cx, |images, cx| images.want(&self.viewer, keys, cx));
     }
 
+    // The tab is kept with the Addon Store, so a language switched meanwhile retitles the search
+    // box and the Selects here; each Select keeps its chosen value.
+    fn follow_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.language == i18n::current() {
+            return;
+        }
+        self.language = i18n::current();
+        let placeholder = search_placeholder(self.section);
+        self.search_input.update(cx, |input, cx| {
+            input.set_placeholder(placeholder, window, cx)
+        });
+        self.sort_select
+            .update(cx, |select, cx| select.set_items(sort_rows(), window, cx));
+        let rows = category_rows(&self.categories);
+        self.category_select
+            .update(cx, |select, cx| select.set_items(rows, window, cx));
+        let rows = weapon_rows(&self.weapons);
+        self.weapon_select
+            .update(cx, |select, cx| select.set_items(rows, window, cx));
+    }
+
     fn load_more_button(&self, cx: &mut Context<Self>) -> Option<Button> {
         self.feed.wants_load_more().then(|| {
             Button::new(ids::ADDON_LOAD_MORE)
                 .outline()
-                .label("Load more")
+                .label(tr!("addon_store.button.load_more"))
                 .on_click(cx.listener(|tab, _, _, cx| tab.load_more(cx)))
         })
     }
@@ -677,7 +746,7 @@ impl AddonTab {
                             .font_weight(FontWeight::MEDIUM)
                             .text_color(muted),
                         ids::ADDON_SORT_LABEL,
-                        "Sort:",
+                        tr!("maps.sort.title"),
                     ))
                     .child(select(
                         ids::ADDON_SORT,
@@ -702,7 +771,7 @@ impl AddonTab {
                     192.,
                     Select::new(&self.weapon_select)
                         .h_9()
-                        .placeholder("All weapons")
+                        .placeholder(tr!("addon_store.category.all_weapons"))
                         .disabled(!enabled)
                         .into_any_element(),
                 ))
@@ -729,7 +798,7 @@ impl AddonTab {
             );
             return Some(skeleton_cards(
                 ids::ADDON_LOADING,
-                "Loading...",
+                tr!("store_grid.loading"),
                 SKELETON_CARDS,
                 columns,
                 SkeletonTop::Image,
@@ -739,14 +808,14 @@ impl AddonTab {
         if self.feed.is_no_results() {
             // Search mode disables the category, so the hint names only what can change.
             let hint = if self.selects_enabled() {
-                "Try another category."
+                tr!("addon_store.hint.category")
             } else {
-                "Try another search."
+                tr!("addon_store.hint.search")
             };
             return Some(empty_state_card(
                 ids::ADDON_EMPTY,
                 IconName::Store,
-                "No add-ons found",
+                tr!("addon_store.empty"),
                 Some(ids::STORE_EMPTY_HINT),
                 hint,
                 cx,
@@ -802,6 +871,7 @@ impl AddonTab {
 
 impl Render for AddonTab {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.follow_language(window, cx);
         // A failed step's message sits above the grid, or alone before the first card.
         let error = self.error.clone().map(|message| {
             let this = cx.entity().downgrade();

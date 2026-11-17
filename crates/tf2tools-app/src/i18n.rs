@@ -771,6 +771,10 @@ mod tests {
         "pages/sound_store/model.rs",
         "pages/sound_store/mod.rs",
         "store_preview.rs",
+        "pages/addon_store/mod.rs",
+        "pages/addon_store/model.rs",
+        "pages/addon_store/gamebanana_tab.rs",
+        "gb_addon_installs.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -805,6 +809,21 @@ mod tests {
         ("store_grid/mod.rs", "Most Liked", SELECT_VALUE),
         ("store_grid/mod.rs", "Most Viewed", SELECT_VALUE),
         ("store_grid/mod.rs", "Newest", SELECT_VALUE),
+        (
+            "pages/addon_store/gamebanana_tab.rs",
+            "Most downloaded",
+            SELECT_VALUE,
+        ),
+        (
+            "pages/addon_store/gamebanana_tab.rs",
+            "Newest",
+            SELECT_VALUE,
+        ),
+        (
+            "pages/addon_store/gamebanana_tab.rs",
+            "the add-on listing task stopped unexpectedly",
+            "developer detail of a stopped listing",
+        ),
         (
             "pages/maps/mod.rs",
             "GameBanana",
