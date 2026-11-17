@@ -1381,6 +1381,73 @@ header:
 
 activity_log:
   clear_all: "Очистить"
+  cleared: "Журнал очищен"
+  details: "Подробности"
+  empty:
+    title: "Записей нет"
+    hint: "Здесь появятся действия, которые вы выполняете в TF2Tools"
+  filter:
+    all_categories: "Все категории"
+    all_levels: "Все уровни"
+  level:
+    info: "Инфо"
+    warning: "Внимание"
+    error: "Ошибка"
+  level_name:
+    info: "инфо"
+    warning: "предупреждение"
+    error: "ошибка"
+  category:
+    hud: "HUD"
+    sound: "Звук"
+    crosshair: "Прицел"
+    addon: "Дополнение"
+    profile: "Профиль"
+    store: "Магазин"
+    system: "Система"
+  action:
+    activate: "Активация"
+    copy: "Копирование"
+    create: "Создание"
+    delete: "Удаление"
+    download: "Скачивание"
+    import: "Импорт"
+    install: "Установка"
+    install_fonts: "Установка шрифтов"
+    make: "Сборка"
+    paint: "Рисование"
+    remove: "Удаление из игры"
+    rename: "Переименование"
+    repair: "Исправление"
+    save_current: "Сохранение текущей настройки"
+    startup: "Запуск"
+    sync: "Синхронизация"
+    uninstall: "Удаление из TF2"
+    update: "Обновление"
+    update_download: "Скачивание обновления"
+    update_install: "Установка обновления"
+    update_restart: "Перезапуск после обновления"
+  row:
+    started: "TF2Tools запущен"
+    synced:
+      huds: { one: "Синхронизирован %{count} HUD с GameBanana", few: "Синхронизировано %{count} HUD с GameBanana", many: "Синхронизировано %{count} HUD с GameBanana" }
+      sounds: { one: "Синхронизирован %{count} звук с GameBanana", few: "Синхронизировано %{count} звука с GameBanana", many: "Синхронизировано %{count} звуков с GameBanana" }
+      crosshairs: { one: "Синхронизирован %{count} прицел с GameBanana", few: "Синхронизировано %{count} прицела с GameBanana", many: "Синхронизировано %{count} прицелов с GameBanana" }
+      addons: { one: "Синхронизировано %{count} дополнение из mastercomfig", few: "Синхронизировано %{count} дополнения из mastercomfig", many: "Синхронизировано %{count} дополнений из mastercomfig" }
+      curated: { one: "Синхронизирован %{count} HUD из подборки", few: "Синхронизировано %{count} HUD из подборки", many: "Синхронизировано %{count} HUD из подборки" }
+    downloaded:
+      gb_hud: "HUD скачан с GameBanana: %{name}"
+      sound: "Звук скачан из магазина: %{name}"
+      crosshair: "Прицел скачан из магазина: %{name}"
+      addon: "Дополнение скачано в библиотеку: %{name}"
+      hud: "HUD скачан: %{name}"
+    failed:
+      gb_hud: "Не удалось скачать HUD (ID на GameBanana: %{id})"
+      sound: "Не удалось скачать звук (ID на GameBanana: %{id})"
+      crosshair: "Не удалось скачать прицел (ID на GameBanana: %{id})"
+      addon: "Не удалось скачать дополнение: %{name}"
+      hud: "Не удалось скачать HUD: %{name}"
+    gamebanana_id: "ID на GameBanana: %{id}"
 
 shell:
   leave_save: "Сохранить и выйти"

@@ -809,6 +809,9 @@ mod tests {
         "pages/placeholder.rs",
         "services.rs",
         "payload_checklist.rs",
+        "pages/logs/mod.rs",
+        "pages/logs/model.rs",
+        "activity.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1006,6 +1009,18 @@ mod tests {
             "unexpected error: {raw}",
             "developer detail: OpError's log text",
         ),
+        ("pages/logs/model.rs", "All categories", SELECT_VALUE),
+        ("pages/logs/model.rs", "Sounds", SELECT_VALUE),
+        ("pages/logs/model.rs", "Crosshairs", SELECT_VALUE),
+        ("pages/logs/model.rs", "Store", SELECT_VALUE),
+        ("pages/logs/model.rs", "Settings", SELECT_VALUE),
+        ("pages/logs/model.rs", "System", SELECT_VALUE),
+        ("pages/logs/model.rs", "Profiles", SELECT_VALUE),
+        ("pages/logs/model.rs", "Addons", SELECT_VALUE),
+        ("pages/logs/model.rs", "All levels", SELECT_VALUE),
+        ("pages/logs/model.rs", "Info", SELECT_VALUE),
+        ("pages/logs/model.rs", "Warning", SELECT_VALUE),
+        ("pages/logs/model.rs", "Error", SELECT_VALUE),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";

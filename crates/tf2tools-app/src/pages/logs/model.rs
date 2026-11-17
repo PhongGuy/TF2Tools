@@ -2,14 +2,17 @@
 //! relative time and level texts.
 
 use chrono::{DateTime, Utc};
+use gpui_kit::SharedString;
 use tf2tools_core::LogLevel;
 
 use crate::i18n::{plural, tr};
+use crate::ids;
+use crate::widgets::label_option::LabelOption;
 
 /// Rows fetched per query; the next page's `before` is the last row's id.
 pub const PAGE_SIZE: u32 = 100;
 
-/// The category select: label, then the filter (`None` is every category). v5's order, then
+/// The category select: English label (the row's value and id), then the filter (`None` is every category). v5's order, then
 /// Profiles and Addons.
 pub const CATEGORIES: [(&str, Option<&str>); 9] = [
     ("All categories", None),
@@ -31,28 +34,93 @@ pub const LEVELS: [(&str, Option<LogLevel>); 4] = [
     ("Error", Some(LogLevel::Error)),
 ];
 
-/// A row's stored category in player words; an unknown one has its underscores spaced out.
-pub fn category_label(category: &str) -> String {
-    let known = match category {
-        "hud" => "HUD",
-        "sound" => "Sound",
-        "crosshair" => "Crosshair",
-        "addon" => "Addon",
-        "profile" => "Profile",
-        "hud_store" => "HUD Store",
-        "sound_store" => "Sound Store",
-        "crosshair_store" => "Crosshair Store",
-        "addon_store" => "Addon Store",
-        _ => return spaced(category),
+/// The category Select's rows: each answers its English `CATEGORIES` label, shown in the
+/// player's language.
+pub fn category_options() -> Vec<LabelOption> {
+    let label = |value: &str| match value {
+        "HUDs" => tr!("nav.huds"),
+        "Sounds" => tr!("nav.sounds"),
+        "Crosshairs" => tr!("nav.crosshairs"),
+        "Store" => tr!("activity_log.category.store"),
+        "Settings" => tr!("nav.settings"),
+        "System" => tr!("activity_log.category.system"),
+        "Profiles" => tr!("nav.profiles"),
+        "Addons" => tr!("nav.addons"),
+        _ => tr!("activity_log.filter.all_categories"),
     };
-    known.to_owned()
+    LabelOption::keyed(
+        ids::LOGS_CATEGORY,
+        CATEGORIES.iter().map(|(value, _)| (*value, label(value))),
+    )
+}
+
+/// The level Select's rows, keyed by their English `LEVELS` label like `category_options`.
+pub fn level_options() -> Vec<LabelOption> {
+    let label = |level: Option<LogLevel>| match level {
+        None => tr!("activity_log.filter.all_levels"),
+        Some(LogLevel::Warning) => tr!("activity_log.level.warning"),
+        Some(LogLevel::Error) => tr!("activity_log.level.error"),
+        Some(LogLevel::Info | _) => tr!("activity_log.level.info"),
+    };
+    LabelOption::keyed(
+        ids::LOGS_LEVEL,
+        LEVELS.iter().map(|(value, level)| (*value, label(*level))),
+    )
+}
+
+/// A row's stored category in player words; an unknown one has its underscores spaced out.
+pub fn category_label(category: &str) -> SharedString {
+    match category {
+        "hud" => tr!("activity_log.category.hud"),
+        "sound" => tr!("activity_log.category.sound"),
+        "crosshair" => tr!("activity_log.category.crosshair"),
+        "addon" => tr!("activity_log.category.addon"),
+        "profile" => tr!("activity_log.category.profile"),
+        "store" => tr!("activity_log.category.store"),
+        "system" => tr!("activity_log.category.system"),
+        "settings" => tr!("nav.settings"),
+        "hud_store" => tr!("nav.hud_store"),
+        "sound_store" => tr!("nav.sound_store"),
+        "crosshair_store" => tr!("nav.crosshair_store"),
+        "addon_store" => tr!("nav.addon_store"),
+        _ => spaced(category).into(),
+    }
 }
 
 /// A row's stored action in player words, read the same way as `category_label`.
-pub fn action_label(action: &str) -> String {
+pub fn action_label(action: &str) -> SharedString {
     match action {
-        "save_current" => "Save current setup".to_owned(),
-        _ => spaced(action),
+        "activate" => tr!("activity_log.action.activate"),
+        "copy" => tr!("activity_log.action.copy"),
+        "create" => tr!("activity_log.action.create"),
+        "delete" => tr!("activity_log.action.delete"),
+        "download" => tr!("activity_log.action.download"),
+        "import" => tr!("activity_log.action.import"),
+        "install" => tr!("activity_log.action.install"),
+        "install_fonts" => tr!("activity_log.action.install_fonts"),
+        "make" => tr!("activity_log.action.make"),
+        "paint" => tr!("activity_log.action.paint"),
+        "remove" => tr!("activity_log.action.remove"),
+        "rename" => tr!("activity_log.action.rename"),
+        "repair" => tr!("activity_log.action.repair"),
+        "save_current" => tr!("activity_log.action.save_current"),
+        "startup" => tr!("activity_log.action.startup"),
+        "sync" => tr!("activity_log.action.sync"),
+        "uninstall" => tr!("activity_log.action.uninstall"),
+        "update" => tr!("activity_log.action.update"),
+        "update-download" => tr!("activity_log.action.update_download"),
+        "update-install" => tr!("activity_log.action.update_install"),
+        "update-restart" => tr!("activity_log.action.update_restart"),
+        _ => spaced(action).into(),
+    }
+}
+
+/// A level's name for the row's level icon, in the player's language.
+pub fn level_label(level: LogLevel) -> SharedString {
+    match level {
+        LogLevel::Warning => tr!("activity_log.level_name.warning"),
+        LogLevel::Error => tr!("activity_log.level_name.error"),
+        LogLevel::Info | _ => tr!("activity_log.level_name.info"),
     }
 }
 

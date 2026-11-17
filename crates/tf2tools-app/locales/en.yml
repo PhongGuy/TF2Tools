@@ -1383,6 +1383,73 @@ header:
 
 activity_log:
   clear_all: "Clear All"
+  cleared: "Logs cleared"
+  details: "Details"
+  empty:
+    title: "No log entries found"
+    hint: "Activity will appear here as you use TF2Tools"
+  filter:
+    all_categories: "All categories"
+    all_levels: "All levels"
+  level:
+    info: "Info"
+    warning: "Warning"
+    error: "Error"
+  level_name:
+    info: "info"
+    warning: "warning"
+    error: "error"
+  category:
+    hud: "HUD"
+    sound: "Sound"
+    crosshair: "Crosshair"
+    addon: "Addon"
+    profile: "Profile"
+    store: "Store"
+    system: "System"
+  action:
+    activate: "Activate"
+    copy: "Copy"
+    create: "Create"
+    delete: "Delete"
+    download: "Download"
+    import: "Import"
+    install: "Install"
+    install_fonts: "Install fonts"
+    make: "Make"
+    paint: "Paint"
+    remove: "Remove"
+    rename: "Rename"
+    repair: "Repair"
+    save_current: "Save current setup"
+    startup: "Startup"
+    sync: "Sync"
+    uninstall: "Uninstall"
+    update: "Update"
+    update_download: "Update-download"
+    update_install: "Update-install"
+    update_restart: "Update-restart"
+  row:
+    started: "TF2Tools started"
+    synced:
+      huds: { one: "Synced %{count} HUDs from GameBanana", other: "Synced %{count} HUDs from GameBanana" }
+      sounds: { one: "Synced %{count} sounds from GameBanana", other: "Synced %{count} sounds from GameBanana" }
+      crosshairs: { one: "Synced %{count} crosshairs from GameBanana", other: "Synced %{count} crosshairs from GameBanana" }
+      addons: { one: "Synced %{count} addons from mastercomfig", other: "Synced %{count} addons from mastercomfig" }
+      curated: { one: "Synced %{count} curated HUDs", other: "Synced %{count} curated HUDs" }
+    downloaded:
+      gb_hud: "Downloaded HUD from GameBanana: %{name}"
+      sound: "Downloaded sound from store: %{name}"
+      crosshair: "Downloaded crosshair from store: %{name}"
+      addon: "Downloaded addon to library: %{name}"
+      hud: "Downloaded HUD: %{name}"
+    failed:
+      gb_hud: "HUD download failed (GameBanana ID: %{id})"
+      sound: "Sound download failed (GameBanana ID: %{id})"
+      crosshair: "Crosshair download failed (GameBanana ID: %{id})"
+      addon: "Addon download failed: %{name}"
+      hud: "HUD download failed: %{name}"
+    gamebanana_id: "GameBanana ID: %{id}"
 
 shell:
   leave_save: "Save and leave"

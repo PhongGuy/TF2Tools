@@ -23,7 +23,7 @@ use gpui_kit::{
 use tf2tools_core::{LogEntry, LogLevel, LogQuery};
 
 use super::common::{YELLOW_500, badge_of};
-use crate::i18n::tr;
+use crate::i18n::{self, tr};
 use crate::ids;
 use crate::local_messages::describe_log;
 use crate::services::run_blocking;
@@ -36,7 +36,8 @@ use crate::widgets::labelled;
 use crate::widgets::scroll::{scroll_area, scroll_beside};
 use crate::widgets::store_error::error_line;
 use model::{
-    CATEGORIES, LEVELS, PAGE_SIZE, action_label, category_label, level_name, relative_time,
+    CATEGORIES, LEVELS, PAGE_SIZE, action_label, category_label, category_options, level_label,
+    level_options, relative_time,
 };
 
 /// Tailwind green-500 and red-500, v5's info and error level icons.
@@ -67,25 +68,27 @@ pub struct LogsPage {
     list: ListState,
     category_select: Labels,
     level_select: Labels,
+    /// The language the Selects' rows were built in.
+    language: &'static str,
     _subscriptions: [Subscription; 2],
 }
 
 impl LogsPage {
     /// Builds the selects and the list, then loads the first page of every category and level.
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let categories = LabelOption::all(ids::LOGS_CATEGORY, CATEGORIES.iter().map(|(l, _)| *l));
-        let levels = LabelOption::all(ids::LOGS_LEVEL, LEVELS.iter().map(|(l, _)| *l));
+        let categories = category_options();
+        let levels = level_options();
         let category_select =
             cx.new(|cx| SelectState::new(categories, Some(IndexPath::default()), window, cx));
         let level_select =
             cx.new(|cx| SelectState::new(levels, Some(IndexPath::default()), window, cx));
-        // Each select maps its confirmed label back to its filter and re-queries.
+        // Each select maps its confirmed English value back to its filter and re-queries.
         let subscriptions = [
             cx.subscribe(
                 &category_select,
                 |page, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
-                    if let SelectEvent::Confirm(Some(label)) = event
-                        && let Some((_, category)) = CATEGORIES.iter().find(|(l, _)| l == label)
+                    if let SelectEvent::Confirm(Some(value)) = event
+                        && let Some((_, category)) = CATEGORIES.iter().find(|(v, _)| v == value)
                     {
                         page.set_category(*category, cx);
                     }
@@ -94,8 +97,8 @@ impl LogsPage {
             cx.subscribe(
                 &level_select,
                 |page, _, event: &SelectEvent<Vec<LabelOption>>, cx| {
-                    if let SelectEvent::Confirm(Some(label)) = event
-                        && let Some((_, level)) = LEVELS.iter().find(|(l, _)| l == label)
+                    if let SelectEvent::Confirm(Some(value)) = event
+                        && let Some((_, level)) = LEVELS.iter().find(|(v, _)| v == value)
                     {
                         page.set_level(*level, cx);
                     }
@@ -117,6 +120,7 @@ impl LogsPage {
             list: ListState::new(0, ListAlignment::Top, px(200.)),
             category_select,
             level_select,
+            language: i18n::current(),
             _subscriptions: subscriptions,
         };
         page.reload(cx);
@@ -232,6 +236,21 @@ impl LogsPage {
         .detach();
     }
 
+    // The page is kept while another shows, so a language switch rebuilds the Selects' rows;
+    // `set_items` keeps each chosen value, and so the filters.
+    fn follow_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.language == i18n::current() {
+            return;
+        }
+        self.language = i18n::current();
+        self.category_select.update(cx, |select, cx| {
+            select.set_items(category_options(), window, cx)
+        });
+        self.level_select.update(cx, |select, cx| {
+            select.set_items(level_options(), window, cx)
+        });
+    }
+
     // Flips one row's details and re-measures it so the rows below move with it.
     fn toggle_details(&mut self, id: i64, ix: usize, cx: &mut Context<Self>) {
         if self.expanded.remove(&id).is_none() {
@@ -260,7 +279,13 @@ impl LogsPage {
             };
             let done = clearing.await;
             let _ = win.update(cx, |_, window, cx| match done {
-                Ok(()) => toast(window, cx, ToastKind::Success, "Logs cleared", ""),
+                Ok(()) => toast(
+                    window,
+                    cx,
+                    ToastKind::Success,
+                    tr!("activity_log.cleared"),
+                    "",
+                ),
                 Err(err) => toast_error(window, cx, &err),
             });
             let _ = page.update(cx, |page, cx| {
@@ -345,7 +370,7 @@ impl LogsPage {
                 Button::new(ids::LOGS_CLEAR)
                     .outline()
                     .icon(IconName::Trash)
-                    .label("Clear All")
+                    .label(tr!("activity_log.clear_all"))
                     .disabled(self.entries.is_empty())
                     .on_click(cx.listener(|page, _, window, cx| page.clear(window, cx))),
             )
@@ -378,13 +403,9 @@ impl LogsPage {
             .child(labelled(
                 div().text_sm().font_weight(FontWeight::MEDIUM),
                 ids::LOGS_EMPTY,
-                "No log entries found",
+                tr!("activity_log.empty.title"),
             ))
-            .child(
-                div()
-                    .text_xs()
-                    .child("Activity will appear here as you use TF2Tools"),
-            )
+            .child(div().text_xs().child(tr!("activity_log.empty.hint")))
     }
 
     // Each card reads its row from the page while the list lays out, so a frame builds only
@@ -427,7 +448,11 @@ fn more_row(loading: bool, page: WeakEntity<LogsPage>) -> AnyElement {
                 .outline()
                 .loading(loading)
                 .disabled(loading)
-                .label(if loading { "Loading..." } else { "Load more" })
+                .label(if loading {
+                    tr!("store_grid.loading")
+                } else {
+                    tr!("addon_store.button.load_more")
+                })
                 .on_click(move |_, _, cx| {
                     let _ = page.update(cx, |page, cx| page.load_more(cx));
                 }),
@@ -461,7 +486,7 @@ fn details(
                 } else {
                     IconName::ChevronRight
                 })
-                .label("Details")
+                .label(tr!("activity_log.details"))
                 .on_click(move |_, _, cx| {
                     let _ = page.update(cx, |page, cx| page.toggle_details(id, ix, cx));
                 }),
@@ -541,7 +566,7 @@ fn card(
                 .child(
                     div()
                         .id(ids::log_level(id))
-                        .aria_label(level_name(entry.level()))
+                        .aria_label(level_label(entry.level()))
                         .test_support()
                         .mt_0p5()
                         .flex_none()
@@ -581,7 +606,8 @@ fn card(
 }
 
 impl Render for LogsPage {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.follow_language(window, cx);
         let body = if let Some(error) = self.error_line(cx) {
             error.into_any_element()
         } else if self.landed && self.entries.is_empty() {
