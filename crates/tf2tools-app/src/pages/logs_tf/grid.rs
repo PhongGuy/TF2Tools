@@ -35,11 +35,11 @@ const COLUMNS: [(ClassStat, Pixels); 9] = [
     (ClassStat::Played, px(72.)),
     (ClassStat::Logs, px(44.)),
     (ClassStat::KillsPerMin, px(80.)),
-    (ClassStat::AssistsPerMin, px(76.)),
+    (ClassStat::AssistsPerMin, px(80.)),
     (ClassStat::DeathsPerMin, px(76.)),
     (ClassStat::DmgPerMin, px(60.)),
     (ClassStat::Kad, px(44.)),
-    (ClassStat::HealsPerMin, px(72.)),
+    (ClassStat::HealsPerMin, px(68.)),
     (ClassStat::UbersPer10Min, px(84.)),
 ];
 

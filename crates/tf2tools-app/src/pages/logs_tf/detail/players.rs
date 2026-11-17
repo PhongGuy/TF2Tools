@@ -51,7 +51,7 @@ pub(super) fn players_table(
         let button = Button::new(ids::logstf_sort(column.title()))
             .ghost()
             .xsmall()
-            .label(column.title())
+            .label(column.label())
             .selected(sorted.is_some())
             .w_full()
             .on_click(move |_, _, cx| {

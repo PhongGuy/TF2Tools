@@ -416,7 +416,6 @@ logs_tf:
     open_profile: "Open profile on logs.tf"
     open_log: "Open on logs.tf"
   column:
-    team: "Team"
     name: "Name"
   stat:
     played: "Played"

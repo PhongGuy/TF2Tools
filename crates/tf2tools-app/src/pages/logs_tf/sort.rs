@@ -76,10 +76,11 @@ impl PlayerColumn {
         }
     }
 
-    /// The header the page shows; logs.tf's abbreviations read the same in every language.
+    /// The header the page shows; Team takes the short team header to fit its narrow column, and
+    /// logs.tf's abbreviations read the same in every language.
     pub fn label(self) -> SharedString {
         match self {
-            Self::Team => tr!("logs_tf.column.team"),
+            Self::Team => tr!("logs_tf.detail.team_short"),
             Self::Name => tr!("logs_tf.column.name"),
             Self::Class
             | Self::Kills

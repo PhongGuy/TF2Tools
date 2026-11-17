@@ -381,9 +381,11 @@ fn the_russian_class_table_keeps_its_english_ids(cx: &mut TestAppContext) {
     let heads = [
         ("Played", "Сыграно"),
         ("Logs", "Логи"),
-        ("Kills/min", "Убийства/мин"),
+        ("Kills/min", "Убийств/мин"),
+        ("Assists/min", "Помощь/мин"),
         ("Dmg/min", "Урон/мин"),
         ("KA/D", "KA/D"),
+        ("Heals/min", "Хил/мин"),
         ("Ubers/10 min", "Убер/10 мин"),
     ];
     for (id, russian) in heads {
@@ -396,6 +398,10 @@ fn the_russian_class_table_keeps_its_english_ids(cx: &mut TestAppContext) {
     assert_eq!(
         support::label_of(cx, s.win, ids::LOGSTF_RANGE).as_deref(),
         Some("Период истории")
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_class_unplayed(TfClass::Soldier)).as_deref(),
+        Some("Не играл")
     );
 }
 
@@ -411,6 +417,14 @@ fn an_open_russian_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
     cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
     let page = open_page(cx, &s);
     open_log(cx, &s, &page, 3);
+    // The players table's 40 px Team column takes the short team header.
+    for (id, russian) in [("Team", "Ком."), ("Name", "Имя"), ("K", "K")] {
+        assert_eq!(
+            support::label_of(cx, s.win, ids::logstf_sort(id)).as_deref(),
+            Some(russian),
+            "{id}"
+        );
+    }
     assert_eq!(
         support::label_of(cx, s.win, ids::logstf_team_cell(Team::Blue, "Kills")).as_deref(),
         Some("117")
