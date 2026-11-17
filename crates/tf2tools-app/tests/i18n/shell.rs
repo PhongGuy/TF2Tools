@@ -1,11 +1,16 @@
 //! The app's frame in Russian: the header and its rings, the shell's dialogs and banners and
 //! the parts checklist.
 
+use std::sync::Arc;
+
 use gpui_kit::{ElementId, TestAppContext};
+use tf2tools_app::crash::notice::CrashNotice;
 use tf2tools_app::ids;
+use tf2tools_app::old_v4::{OldV4Notice, UninstallRunner};
 use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
-use tf2tools_core::{StoreKind, Tf2Install};
+use tf2tools_app::shell::confirm::Confirm;
+use tf2tools_core::{OldV4, StoreKind, Tf2Install, UninstallEntry, find_old_v4};
 
 use crate::LocaleGuard;
 use crate::support;
@@ -67,5 +72,109 @@ fn the_sync_rings_read_in_russian(cx: &mut TestAppContext) {
     assert_eq!(
         label(cx, &s, ids::sync_ring(StoreKind::CuratedHuds)).as_deref(),
         Some("Синхронизация HUD из подборки...")
+    );
+}
+
+fn texts(c: &Confirm) -> [String; 4] {
+    [&c.title, &c.description, &c.confirm_label, &c.cancel_label].map(|t| t.to_string())
+}
+
+#[test]
+fn the_shell_dialogs_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(
+        texts(&Confirm::discard_changes()),
+        [
+            "Несохранённые изменения",
+            "Есть несохранённые изменения. Отбросить их?",
+            "Отбросить",
+            "Продолжить правку"
+        ]
+    );
+    assert_eq!(
+        Confirm::leave_unsaved(true).description,
+        "Есть несохранённые изменения. Сохранить их перед уходом?"
+    );
+    assert_eq!(
+        Confirm::leave_unsaved(false).description,
+        "Есть несохранённые изменения. Дайте HUD имя, чтобы сохранить его, или отбросьте их."
+    );
+    assert_eq!(
+        texts(&Confirm::remove_old_v4()),
+        [
+            "Удалить старый TF2Tools",
+            "TF2Tools закроется на время удаления старой версии. Откройте его снова, когда всё закончится.",
+            "Удалить и закрыть",
+            "Отмена"
+        ]
+    );
+    assert_eq!(
+        texts(&Confirm::clear_logs()),
+        [
+            "Очистить журнал",
+            "Очистить весь журнал действий? Это действие нельзя отменить.",
+            "Очистить",
+            "Отмена"
+        ]
+    );
+    assert_eq!(
+        tf2tools_app::shell::leave::save_and_leave(),
+        "Сохранить и выйти"
+    );
+}
+
+#[gpui_kit::test]
+fn the_crash_banner_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    cx.update(|cx| CrashNotice::install(cx, Some("boom".to_owned())));
+    let s = support::shell_window(cx, &env, missing());
+    let shown = [
+        ids::CRASH_BANNER_TEXT,
+        ids::CRASH_BANNER_COPY,
+        ids::CRASH_BANNER_REPORT,
+        ids::CRASH_BANNER_DISMISS,
+    ]
+    .map(|id| label(cx, &s, id));
+    let want = [
+        "В прошлый раз TF2Tools неожиданно закрылся.",
+        "Скопировать",
+        "Сообщить о проблеме",
+        "Закрыть",
+    ];
+    assert_eq!(shown, want.map(|t| Some(t.to_owned())));
+}
+
+fn v4() -> OldV4 {
+    let entry = UninstallEntry::new("v4")
+        .display_name("TF2Tools 4.8.0")
+        .display_version("4.8.0")
+        .uninstall_string(r#""C:\tf2tools\Uninstall TF2Tools.exe" /currentuser"#.to_owned());
+    find_old_v4(&[entry], |_| true).unwrap()
+}
+
+#[gpui_kit::test]
+fn the_old_version_banner_and_its_confirm_read_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let runner: UninstallRunner = Arc::new(|_: &std::path::Path, _: &[String]| Ok(()));
+    cx.update(|cx| OldV4Notice::install(cx, Some(v4()), runner));
+    let s = support::shell_window(cx, &env, missing());
+    assert_eq!(
+        label(cx, &s, ids::OLD_V4_BANNER_TEXT).as_deref(),
+        Some("Старая версия TF2Tools всё ещё установлена.")
+    );
+    assert_eq!(
+        label(cx, &s, ids::OLD_V4_BANNER_LATER).as_deref(),
+        Some("Не сейчас")
+    );
+    assert_eq!(
+        label(cx, &s, ids::OLD_V4_BANNER_REMOVE).as_deref(),
+        Some("Удалить")
+    );
+    support::click_id(cx, s.win, ids::OLD_V4_BANNER_REMOVE);
+    assert_eq!(
+        label(cx, &s, ids::CONFIRM_TITLE).as_deref(),
+        Some("Удалить старый TF2Tools")
     );
 }

@@ -270,6 +270,8 @@ mod tests {
             "confirm",
             "font_check",
             "header",
+            "shell",
+            "activity_log",
         ]
         .map(str::to_owned)
         .into()
@@ -797,6 +799,14 @@ mod tests {
         "widgets/scroll.rs",
         "shell/toast.rs",
         "shell/mod.rs",
+        "shell/confirm.rs",
+        "shell/leave.rs",
+        "shell/root.rs",
+        "shell/error_view.rs",
+        "crash/notice.rs",
+        "old_v4.rs",
+        "pages/placeholder.rs",
+        "services.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -919,12 +929,90 @@ mod tests {
         ("sync.rs", "Addons", STORE_FIELD),
         ("sync.rs", "Store", STORE_FIELD),
         ("shell/mod.rs", "Shell", "developer detail: a key context"),
+        ("shell/confirm.rs", "Shrink canvas", DIALOG_ELSEWHERE),
+        (
+            "shell/confirm.rs",
+            "Shrinking to 32x32 cuts off the edges of your drawing.",
+            DIALOG_ELSEWHERE,
+        ),
+        ("shell/confirm.rs", "Shrink", DIALOG_ELSEWHERE),
+        ("shell/confirm.rs", "Cancel", DIALOG_ELSEWHERE),
+        (
+            "shell/confirm.rs",
+            "Delete this snapshot?",
+            DIALOG_ELSEWHERE,
+        ),
+        (
+            "shell/confirm.rs",
+            "{name} will be gone for good. Your HUD stays as it is.",
+            DIALOG_ELSEWHERE,
+        ),
+        ("shell/confirm.rs", "Delete", DIALOG_ELSEWHERE),
+        ("shell/confirm.rs", "Keep", DIALOG_ELSEWHERE),
+        ("shell/confirm.rs", "Reset all options?", DIALOG_ELSEWHERE),
+        (
+            "shell/confirm.rs",
+            "Every option goes back to how the HUD came. Your other changes stay, and Undo brings the options back.",
+            DIALOG_ELSEWHERE,
+        ),
+        ("shell/confirm.rs", "Reset all", DIALOG_ELSEWHERE),
+        ("shell/confirm.rs", "Remove mastercomfig", DIALOG_ELSEWHERE),
+        (
+            "shell/confirm.rs",
+            "This removes mastercomfig and the preset you picked from TF2. Your own config files stay.",
+            DIALOG_ELSEWHERE,
+        ),
+        ("shell/confirm.rs", "Remove", DIALOG_ELSEWHERE),
+        (
+            "shell/confirm.rs",
+            "Replace your modules.cfg?",
+            DIALOG_ELSEWHERE,
+        ),
+        (
+            "shell/confirm.rs",
+            "TF2 already has a modules.cfg that TF2Tools didn't write. Your file is kept as a backup next to it.",
+            DIALOG_ELSEWHERE,
+        ),
+        ("shell/confirm.rs", "Replace it", DIALOG_ELSEWHERE),
+        (
+            "shell/root.rs",
+            "TF2Tools",
+            "a proper noun, the loading screen's title",
+        ),
+        (
+            "services.rs",
+            "Could not open the database at {}: {message}",
+            STARTUP_DETAIL,
+        ),
+        (
+            "services.rs",
+            "The database at {} is from a newer TF2Tools: {message}",
+            STARTUP_DETAIL,
+        ),
+        (
+            "services.rs",
+            "Could not load the builtin crosshairs from {}: {message}",
+            STARTUP_DETAIL,
+        ),
+        (
+            "services.rs",
+            "no TF2 folder is set",
+            "developer detail: OpError's log text",
+        ),
+        (
+            "services.rs",
+            "unexpected error: {raw}",
+            "developer detail: OpError's log text",
+        ),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
     const OS_NAME: &str = "a proper noun, the OS filter's label";
     const STOPPED_LABEL: &str = "developer detail: a stopped task's log label";
     const STORE_FIELD: &str = "developer detail: the store's tracing field";
+    const DIALOG_ELSEWHERE: &str = "dialog of an untranslated page";
+    const STARTUP_DETAIL: &str =
+        "developer detail: StartupError's log text; the view reads describe_startup";
 
     #[test]
     fn library_pages_show_no_english_literal() {

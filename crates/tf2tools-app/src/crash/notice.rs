@@ -6,17 +6,21 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex};
 use gpui_kit::{
     AnyElement, App, AppContext as _, ClipboardItem, Context, Entity, Global,
-    InteractiveElement as _, IntoElement, ParentElement as _, Styled as _, TestSupportExt as _,
-    div, px,
+    InteractiveElement as _, IntoElement, ParentElement as _, SharedString, Styled as _,
+    TestSupportExt as _, div, px,
 };
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::shell::toast::{ToastKind, toast};
 use crate::updater::view::BANNER_HEIGHT;
 use crate::widgets::Named as _;
 use crate::widgets::labelled;
 
-pub const NOTICE: &str = "TF2Tools closed unexpectedly last time.";
+/// The banner's sentence, in the player's language.
+pub fn notice() -> SharedString {
+    tr!("shell.crash.notice")
+}
 
 /// The last run's crash report, held until the player dismisses the banner.
 pub struct CrashNotice {
@@ -57,7 +61,7 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
     let copy = Button::new(ids::CRASH_BANNER_COPY)
         .outline()
         .small()
-        .label("Copy details")
+        .label(tr!("shell.crash.copy"))
         .flex_none()
         .on_click(move |_, window, cx| {
             cx.write_to_clipboard(ClipboardItem::new_string(report.clone()));
@@ -65,21 +69,22 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
                 window,
                 cx,
                 ToastKind::Success,
-                "Crash details copied",
-                "Paste them into your bug report.",
+                tr!("shell.crash.copied"),
+                tr!("shell.crash.copied_hint"),
             );
         });
+    let report_label = tr!("settings.help.report");
     let report_page = Button::new(ids::CRASH_BANNER_REPORT)
         .outline()
         .small()
-        .label("Report a problem")
-        .accessibility_label("Report a problem")
+        .label(report_label.clone())
+        .accessibility_label(report_label)
         .flex_none()
         .on_click(|_, _, cx| cx.open_url(crate::links::REPORT_PROBLEM_URL));
     let dismiss = Button::new(ids::CRASH_BANNER_DISMISS)
         .ghost()
         .icon(IconName::X)
-        .named("Close")
+        .named(tr!("shell.crash.close"))
         .small()
         .flex_none()
         .on_click(move |_, _, cx| notice.update(cx, |n, cx| n.dismiss(cx)));
@@ -111,7 +116,7 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
                     .whitespace_nowrap()
                     .text_ellipsis(),
                 ids::CRASH_BANNER_TEXT,
-                NOTICE,
+                self::notice(),
             ))
             .child(copy)
             .child(report_page)

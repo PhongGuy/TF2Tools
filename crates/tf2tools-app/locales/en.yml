@@ -670,6 +670,21 @@ confirm:
     title: "mastercomfig needed"
     body: "This addon needs mastercomfig. Install both?"
     ok: "Install both"
+  discard_changes:
+    title: "Unsaved changes"
+    body: "You have unsaved changes. Discard them?"
+    ok: "Discard"
+    keep: "Keep editing"
+  leave_unsaved:
+    can_save: "You have unsaved changes. Save them before you go?"
+    needs_name: "You have unsaved changes. Give your HUD a name to save it, or discard them."
+  remove_old_v4:
+    title: "Remove the old TF2Tools"
+    body: "TF2Tools closes while the old version is removed. Open it again when it's done."
+    ok: "Remove and close"
+  clear_logs:
+    title: "Clear All Logs"
+    body: "Are you sure you want to clear all activity logs? This cannot be undone."
 
 font_check:
   installed: { one: "Installed %{count} font for %{folder}. Restart TF2 to use them.", other: "Installed %{count} fonts for %{folder}. Restart TF2 to use them." }
@@ -1365,3 +1380,23 @@ header:
       crosshairs: "Syncing Crosshairs: %{done} / %{total}"
       gamebanana_huds: "Syncing GameBanana HUDs: %{done} / %{total}"
       store: "Syncing Store: %{done} / %{total}"
+
+activity_log:
+  clear_all: "Clear All"
+
+shell:
+  leave_save: "Save and leave"
+  startup_failed: "TF2Tools could not start"
+  placeholder: "Coming in a later version"
+  crash:
+    notice: "TF2Tools closed unexpectedly last time."
+    copy: "Copy details"
+    copied: "Crash details copied"
+    copied_hint: "Paste them into your bug report."
+    close: "Close"
+  old_v4:
+    notice: "The old version of TF2Tools is still installed."
+    remove: "Remove it"
+    later: "Not now"
+    failed: "Couldn't remove the old TF2Tools"
+    failed_hint: "Remove it in Windows Settings > Apps instead."

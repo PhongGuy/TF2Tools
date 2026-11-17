@@ -10,7 +10,8 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex};
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, Global, InteractiveElement as _,
-    IntoElement, ParentElement as _, Styled as _, TestSupportExt as _, Window, div, px,
+    IntoElement, ParentElement as _, SharedString, Styled as _, TestSupportExt as _, Window, div,
+    px,
 };
 use tf2tools_core::{OldV4, Settings};
 
@@ -24,7 +25,10 @@ use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::updater::view::BANNER_HEIGHT;
 use crate::widgets::labelled;
 
-pub const NOTICE: &str = "The old version of TF2Tools is still installed.";
+/// The banner's sentence, in the player's language.
+pub fn notice() -> SharedString {
+    tr!("shell.old_v4.notice")
+}
 
 /// Starts an uninstaller with its arguments; the app passes one that spawns the process.
 pub type UninstallRunner = Arc<dyn Fn(&Path, &[String]) -> io::Result<()> + Send + Sync>;
@@ -140,8 +144,8 @@ fn remove_and_close(notice: &Entity<OldV4Notice>, window: &mut Window, cx: &mut 
             window,
             cx,
             ToastKind::Error,
-            "Couldn't remove the old TF2Tools",
-            "Remove it in Windows Settings > Apps instead.",
+            tr!("shell.old_v4.failed"),
+            tr!("shell.old_v4.failed_hint"),
         );
         notice.update(cx, |n, cx| n.forget(window, cx));
         return;
@@ -166,7 +170,7 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
     let notice = old_v4_notice(cx)?;
     notice.read(cx).found()?;
     let theme = cx.theme();
-    let button = |id: &'static str, label: &'static str, remove: bool| {
+    let button = |id: &'static str, label: SharedString, remove: bool| {
         let notice = notice.clone();
         let button = Button::new(id).small().label(label).flex_none();
         let button = if remove {
@@ -210,10 +214,18 @@ pub fn banner(cx: &App) -> Option<AnyElement> {
                     .whitespace_nowrap()
                     .text_ellipsis(),
                 ids::OLD_V4_BANNER_TEXT,
-                NOTICE,
+                self::notice(),
             ))
-            .child(button(ids::OLD_V4_BANNER_REMOVE, "Remove it", true))
-            .child(button(ids::OLD_V4_BANNER_LATER, "Not now", false))
+            .child(button(
+                ids::OLD_V4_BANNER_REMOVE,
+                tr!("shell.old_v4.remove"),
+                true,
+            ))
+            .child(button(
+                ids::OLD_V4_BANNER_LATER,
+                tr!("shell.old_v4.later"),
+                false,
+            ))
             .into_any_element(),
     )
 }

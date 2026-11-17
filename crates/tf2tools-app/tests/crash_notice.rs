@@ -1,5 +1,5 @@
 use gpui_kit::TestAppContext;
-use tf2tools_app::crash::notice::{CrashNotice, NOTICE, crash_notice};
+use tf2tools_app::crash::notice::{CrashNotice, crash_notice, notice};
 use tf2tools_app::ids;
 use tf2tools_app::services::Tf2State;
 
@@ -30,7 +30,7 @@ fn the_banner_says_so_in_plain_words(cx: &mut TestAppContext) {
     let (_env, s) = shell_with(cx, Some(REPORT));
     assert!(support::present(cx, s.win, ids::CRASH_BANNER));
     let text = support::label_of(cx, s.win, ids::CRASH_BANNER_TEXT).unwrap();
-    assert_eq!(text, NOTICE);
+    assert_eq!(text, notice());
     assert_eq!(text, "TF2Tools closed unexpectedly last time.");
     support::assert_plain(&text);
     assert_eq!(

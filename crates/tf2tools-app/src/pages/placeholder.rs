@@ -7,6 +7,7 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::shell::CONTENT_PADDING;
 use crate::shell::route::Page;
@@ -14,6 +15,7 @@ use crate::shell::route::Page;
 /// Element `page-<slug>` holding the page title and `placeholder-message`, centred.
 pub fn render(page: Page, cx: &App) -> impl IntoElement + use<> {
     let muted = cx.theme().muted_foreground;
+    let message = tr!("shell.placeholder");
     v_flex()
         .id(ids::page(page))
         .test_support()
@@ -36,10 +38,10 @@ pub fn render(page: Page, cx: &App) -> impl IntoElement + use<> {
         .child(
             div()
                 .id(ids::PLACEHOLDER_MESSAGE)
-                .aria_label("Coming in a later version")
+                .aria_label(message.clone())
                 .test_support()
                 .text_sm()
                 .text_color(muted)
-                .child("Coming in a later version"),
+                .child(message),
         )
 }
