@@ -984,7 +984,7 @@ impl HudMakerPage {
             let tf_dir = tf2?.tf_dir();
             let load_failed = |e: HudLoadError| {
                 let failure = describe_hud_load(&e);
-                failure.log(&action);
+                failure.log("HUD Maker load");
                 failure.message.to_string()
             };
             // A copy reads its own layers over the game's; any other made HUD the game's.

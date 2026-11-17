@@ -583,4 +583,55 @@ mod tests {
         let found = literal_titles(|rel| rel.starts_with("pages/"));
         assert!(found.is_empty(), "literal action titles: {found:?}");
     }
+
+    // The 1-based lines of `code` where a developer-log label could be translated text: a
+    // `.log(` argument that is no literal, or a tracing line that opens with `{action}` or `{title}`.
+    fn translated_log_label_lines(code: &str) -> Vec<usize> {
+        let mut lines = Vec::new();
+        for (at, _) in code.match_indices(".log(") {
+            let arg = code[at + ".log(".len()..].trim_start();
+            if !(arg.starts_with('"') || arg.starts_with("&format!(\"")) {
+                lines.push(code[..at].matches('\n').count() + 1);
+            }
+        }
+        for opener in ["warn!(", "info!(", "error!(", "debug!(", "trace!("] {
+            for (at, _) in code.match_indices(opener) {
+                let arg = code[at + opener.len()..].trim_start();
+                if arg.starts_with("\"{action}") || arg.starts_with("\"{title}") {
+                    lines.push(code[..at].matches('\n').count() + 1);
+                }
+            }
+        }
+        lines.sort_unstable();
+        lines
+    }
+
+    #[test]
+    fn the_log_label_scan_finds_only_labels_that_may_be_translated() {
+        let sample = "f.log(\"HUD update\");\nf.log(&action);\nf.log(&format!(\"start {x}\"));\n\
+            tracing::warn!(\"{action}: {}\", d);\ntracing::warn!(\"save: {action}\");\n\
+            let m = format!(\"{title} found\");\nerror!(\"{title}: x\");\n";
+        assert_eq!(translated_log_label_lines(sample), [2, 4, 7]);
+    }
+
+    #[test]
+    fn no_developer_log_label_is_translated_text() {
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut found = Vec::new();
+        for file in src_files() {
+            let source = std::fs::read_to_string(&file).unwrap();
+            for line in translated_log_label_lines(shipped_part(&source)) {
+                let rel = file
+                    .strip_prefix(&src)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/");
+                found.push(format!("{rel}:{line}"));
+            }
+        }
+        assert!(
+            found.is_empty(),
+            "log labels that may be translated: {found:?}"
+        );
+    }
 }
