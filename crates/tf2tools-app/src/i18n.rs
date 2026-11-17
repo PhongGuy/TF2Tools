@@ -812,6 +812,11 @@ mod tests {
         "pages/logs/mod.rs",
         "pages/logs/model.rs",
         "activity.rs",
+        "pages/logs_tf/text.rs",
+        "pages/logs_tf/tables.rs",
+        "log_nicknames.rs",
+        "logs_sync.rs",
+        "logs_trim.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1021,10 +1026,15 @@ mod tests {
         ("pages/logs/model.rs", "Info", SELECT_VALUE),
         ("pages/logs/model.rs", "Warning", SELECT_VALUE),
         ("pages/logs/model.rs", "Error", SELECT_VALUE),
+        ("pages/logs_tf/text.rs", "Kritzkrieg", WEAPON_NAME),
+        ("pages/logs_tf/text.rs", "Quick-Fix", WEAPON_NAME),
+        ("pages/logs_tf/text.rs", "Vaccinator", WEAPON_NAME),
+        ("pages/logs_tf/text.rs", "Medigun", WEAPON_NAME),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
     const OS_NAME: &str = "a proper noun, the OS filter's label";
+    const WEAPON_NAME: &str = "weapon name, as the game and logs.tf write it";
     const STOPPED_LABEL: &str = "developer detail: a stopped task's log label";
     const STORE_FIELD: &str = "developer detail: the store's tracing field";
     const DIALOG_ELSEWHERE: &str = "dialog of an untranslated page";

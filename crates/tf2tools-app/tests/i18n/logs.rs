@@ -8,10 +8,17 @@ use tf2tools_app::pages::logs::LogsPage;
 use tf2tools_app::pages::logs::model::{
     action_label, category_label, category_options, level_options,
 };
+use tf2tools_app::pages::logs_tf::text::{
+    counting_text, download_reason, empty_text, event_text, medigun_name, player_input_error,
+    range_label, resolve_message, ring_label, streaks_label, summary_text, weapons_title,
+};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_app::store_download::{DownloadEvent, DownloadTarget};
 use tf2tools_app::sync::SyncSummary;
+use tf2tools_core::{
+    EventKind, LogsFetchError, LogsRange, Medigun, PlayerInputError, ResolveError, Team, TfClass,
+};
 use tf2tools_core::{GbId, LogLevel, NewLogEntry, StoreItemId, StoreKind};
 
 use crate::LocaleGuard;
@@ -299,4 +306,60 @@ fn the_kept_logs_page_follows_a_language_switch(cx: &mut TestAppContext) {
     );
     assert_eq!(cx.update(|cx| page.read(cx).category()), Some("sound"));
     assert_eq!(cx.update(|cx| page.read(cx).level()), Some(LogLevel::Error));
+}
+
+#[test]
+fn the_logs_tf_texts_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let counted: Vec<String> = [1, 2, 5, 21]
+        .map(|n| summary_text(LogsRange::Months3, n, None, 0))
+        .to_vec();
+    assert_eq!(
+        counted,
+        [
+            "За последние 3 месяца: 1 лог",
+            "За последние 3 месяца: 2 лога",
+            "За последние 3 месяца: 5 логов",
+            "За последние 3 месяца: 21 лог",
+        ]
+    );
+    let ranges: Vec<String> = LogsRange::STOPS
+        .into_iter()
+        .map(|r| range_label(r).to_string())
+        .collect();
+    assert_eq!(
+        ranges,
+        ["1 месяц", "3 месяца", "6 месяцев", "1 год", "2 года", "Все"]
+    );
+    assert_eq!(
+        weapons_title(TfClass::Scout, LogsRange::Months3, 1),
+        "Оружие: Разведчик · 3 месяца · 1 лог"
+    );
+    assert_eq!(
+        player_input_error(&PlayerInputError::NotSteam),
+        "Это не похоже на ссылку на профиль Steam или Steam ID."
+    );
+    assert_eq!(
+        resolve_message(&ResolveError::NotFound),
+        "Профиль Steam не найден."
+    );
+    assert_eq!(
+        download_reason(&LogsFetchError::Gone),
+        "На logs.tf больше нет этого лога."
+    );
+    assert_eq!(ring_label(None), "Синхронизация logs.tf...");
+    assert_eq!(streaks_label(13), "Показать серии (13)");
+    assert_eq!(counting_text(3), "Подсчёт старых логов, осталось: 3");
+    assert_eq!(
+        event_text(&EventKind::RoundWin { team: Team::Red }, &|_| String::new()),
+        (
+            "Конец раунда".to_owned(),
+            "Раунд выиграла команда RED".to_owned()
+        )
+    );
+    assert_eq!(medigun_name(&Medigun::QuickFix), "Quick-Fix");
+    assert_eq!(
+        empty_text(),
+        "Отслеживайте игрока, чтобы видеть его средние показатели по классам и логи с logs.tf."
+    );
 }

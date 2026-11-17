@@ -12,7 +12,7 @@ use crate::support::logstf::{
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
-use tf2tools_app::pages::logs_tf::text::{LOOKING_UP, log_url, profile_url};
+use tf2tools_app::pages::logs_tf::text::{log_url, looking_up, profile_url};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{SteamId, TfClass};
@@ -290,7 +290,7 @@ fn opening_the_page_syncs_the_active_player(cx: &mut TestAppContext) {
     assert_eq!(row_ids(cx, &page), [3, 2]);
     assert!(cx.update(|cx| page.read(cx).averages().is_some()));
     assert_eq!(
-        cx.update(|cx| page.read(cx).error(cx).map(str::to_owned)),
+        cx.update(|cx| page.read(cx).error(cx).map(|e| e.to_string())),
         None
     );
     assert!(!support::present(cx, s.win, ids::LOGSTF_PROGRESS));
@@ -1394,7 +1394,7 @@ fn the_add_button_says_it_is_looking_up(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::LOGSTF_ADD_CONFIRM);
     assert_eq!(
         support::label_of(cx, s.win, ids::LOGSTF_ADD_CONFIRM).as_deref(),
-        Some(LOOKING_UP)
+        Some(looking_up().as_ref())
     );
     support::wait_real(cx, "the new chip", |cx| {
         cx.update(|cx| page.read(cx).players().len()) == 1

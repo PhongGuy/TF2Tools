@@ -366,6 +366,58 @@ logs_tf:
     last: { one: "Last %{span}, %{count} log", other: "Last %{span}, %{count} logs" }
     up_to: { one: "%{range} up to %{date}, %{count} log", other: "%{range} up to %{date}, %{count} logs" }
   weapons_title: { one: "%{class} weapons · %{range} · %{count} log", other: "%{class} weapons · %{range} · %{count} logs" }
+  empty: "Track a player to see their class averages and logs from logs.tf."
+  steam_unreachable: "Can't reach Steam. Check your internet connection."
+  removing: "Removing..."
+  looking_up: "Looking up..."
+  not_found: "We couldn't find that Steam profile."
+  not_steam: "That doesn't look like a Steam profile link or Steam ID."
+  down: "logs.tf isn't responding right now. Try again later."
+  busy: "logs.tf is busy. Try again in a few minutes."
+  ring:
+    progress: "Syncing logs.tf: %{done} / %{total}"
+    listing: "Syncing logs.tf..."
+  sync:
+    offline_saved: "You're offline. Showing saved logs."
+    unreachable: "Couldn't reach logs.tf. Check your connection and try again."
+    malformed: "logs.tf sent something we didn't understand."
+  download:
+    done: "Log downloaded"
+    failed: "Couldn't download this log."
+    write_failed: "Couldn't write the file."
+    gone: "logs.tf no longer has this log."
+    offline: "Check your internet connection."
+    too_big: "This log is too big to download."
+  open:
+    loading: "Loading log..."
+    offline: "Can't load this log while you're offline."
+    full_gone: "logs.tf no longer has the full log; its stats stay."
+    trimmed_offline: "This full log was cleared to save space. Connect to the internet to open it."
+  range:
+    months: { one: "%{count} month", other: "%{count} months" }
+    years: { one: "%{count} year", other: "%{count} years" }
+    all: "All"
+  weapons:
+    none: "No weapon stats in these logs"
+    counting: "Counting older logs, %{left} left"
+  list:
+    no_logs: "No logs on logs.tf for this player yet."
+    gone: "This log was removed from logs.tf"
+    unreadable: "This log couldn't be read"
+  streaks: "Show Killstreaks (%{count})"
+  nickname_note: "This is your nickname for this player. Their name in this log is %{name}. You can turn this off in Settings."
+  event:
+    point_capture: "Point Capture"
+    captured: " captured point %{point}"
+    ubercharge: "Übercharge"
+    medic_death: "Medic Death"
+    killed_by: " killed by "
+    died: " died"
+    drop: "Drop"
+    dropped: " dropped a full charge"
+    round_end: "Round end"
+    round_win: "Round win for "
+    unknown: "Event"
 
 maps:
   count: { one: "%{count} map", other: "%{count} maps" }

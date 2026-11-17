@@ -364,6 +364,58 @@ logs_tf:
     last: { one: "За последние %{span}: %{count} лог", few: "За последние %{span}: %{count} лога", many: "За последние %{span}: %{count} логов" }
     up_to: { one: "%{range} до %{date}: %{count} лог", few: "%{range} до %{date}: %{count} лога", many: "%{range} до %{date}: %{count} логов" }
   weapons_title: { one: "Оружие: %{class} · %{range} · %{count} лог", few: "Оружие: %{class} · %{range} · %{count} лога", many: "Оружие: %{class} · %{range} · %{count} логов" }
+  empty: "Отслеживайте игрока, чтобы видеть его средние показатели по классам и логи с logs.tf."
+  steam_unreachable: "Нет связи со Steam. Проверьте подключение к интернету."
+  removing: "Удаление..."
+  looking_up: "Поиск..."
+  not_found: "Профиль Steam не найден."
+  not_steam: "Это не похоже на ссылку на профиль Steam или Steam ID."
+  down: "logs.tf сейчас не отвечает. Попробуйте позже."
+  busy: "logs.tf перегружен. Попробуйте через несколько минут."
+  ring:
+    progress: "Синхронизация logs.tf: %{done} / %{total}"
+    listing: "Синхронизация logs.tf..."
+  sync:
+    offline_saved: "Нет подключения. Показаны сохранённые логи."
+    unreachable: "Не удалось связаться с logs.tf. Проверьте подключение и попробуйте снова."
+    malformed: "logs.tf прислал непонятный ответ."
+  download:
+    done: "Лог скачан"
+    failed: "Не удалось скачать этот лог."
+    write_failed: "Не удалось записать файл."
+    gone: "На logs.tf больше нет этого лога."
+    offline: "Проверьте подключение к интернету."
+    too_big: "Этот лог слишком большой для скачивания."
+  open:
+    loading: "Загрузка лога..."
+    offline: "Без подключения этот лог не загрузить."
+    full_gone: "На logs.tf больше нет полного лога; его статистика сохранена."
+    trimmed_offline: "Полный лог удалён для экономии места. Подключитесь к интернету, чтобы открыть его."
+  range:
+    months: { one: "%{count} месяц", few: "%{count} месяца", many: "%{count} месяцев" }
+    years: { one: "%{count} год", few: "%{count} года", many: "%{count} лет" }
+    all: "Все"
+  weapons:
+    none: "В этих логах нет статистики оружия"
+    counting: "Подсчёт старых логов, осталось: %{left}"
+  list:
+    no_logs: "На logs.tf пока нет логов этого игрока."
+    gone: "Этот лог удалён с logs.tf"
+    unreadable: "Этот лог не удалось прочитать"
+  streaks: "Показать серии (%{count})"
+  nickname_note: "Это ваш ник для этого игрока. В этом логе его имя: %{name}. Это можно отключить в настройках."
+  event:
+    point_capture: "Захват точек"
+    captured: " захватывает точку %{point}"
+    ubercharge: "Убер-заряд"
+    medic_death: "Смерть медика"
+    killed_by: " убит игроком "
+    died: " погиб"
+    drop: "Потеря"
+    dropped: " потерял полный заряд"
+    round_end: "Конец раунда"
+    round_win: "Раунд выиграла команда "
+    unknown: "Событие"
 
 maps:
   count: { one: "%{count} карта", few: "%{count} карты", many: "%{count} карт" }

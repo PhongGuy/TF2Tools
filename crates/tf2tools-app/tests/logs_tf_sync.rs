@@ -402,7 +402,7 @@ fn two_unreachable_tries_with_nothing_saved_say_logs_tf_was_not_reached(cx: &mut
     start(cx, &sync, ARIE, LogsRange::Months3);
     idle(cx, &sync);
     assert_eq!(
-        cx.update(|cx| sync.read(cx).error(sid(ARIE))),
+        cx.update(|cx| sync.read(cx).error(sid(ARIE))).as_deref(),
         Some("Couldn't reach logs.tf. Check your connection and try again.")
     );
     assert_eq!(list_requests(&server), 2, "one retry, no more");

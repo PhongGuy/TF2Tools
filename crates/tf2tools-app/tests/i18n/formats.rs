@@ -302,7 +302,7 @@ fn logs_tf_sentences_read_in_russian() {
     );
     assert_eq!(
         summary_text(LogsRange::Months3, 87, recent, now),
-        "За последние 3 months: 87 логов"
+        "За последние 3 месяца: 87 логов"
     );
     assert_eq!(
         summary_text(LogsRange::All, 4_812, recent, now),
@@ -310,15 +310,15 @@ fn logs_tf_sentences_read_in_russian() {
     );
     let old = Some(local_unix(2022, 12, 13, 12, 0, 0));
     let up_to = summary_text(LogsRange::Year1, 274, old, now);
-    assert_eq!(up_to, "1 year до 13 дек. 2022\u{a0}г.: 274 лога");
+    assert_eq!(up_to, "1 год до 13 дек. 2022\u{a0}г.: 274 лога");
     assert_ru(&up_to);
     assert_eq!(
         weapons_title(TfClass::Scout, LogsRange::Months3, 1),
-        "Оружие: Scout · 3 months · 1 лог"
+        "Оружие: Разведчик · 3 месяца · 1 лог"
     );
     assert_eq!(
         weapons_title(TfClass::Heavy, LogsRange::All, 1234),
-        "Оружие: Heavy · All · 1\u{a0}234 лога"
+        "Оружие: Пулемётчик · Все · 1\u{a0}234 лога"
     );
 }
 

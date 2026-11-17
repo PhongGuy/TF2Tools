@@ -14,8 +14,8 @@ use gpui_kit::{
 use tf2tools_core::{LogRow, LogState, SteamId};
 
 use super::text::{
-    LOG_GONE, LOG_PENDING, LOG_UNREADABLE, NO_LOGS_TEXT, date_time_text, duration_text, kapd_text,
-    known_text, log_url, per_min_text, profile_url,
+    date_time_text, duration_text, kapd_text, known_text, log_gone, log_pending, log_unreadable,
+    log_url, no_logs_text, per_min_text, profile_url,
 };
 use super::{LogsTfPage, detail};
 use crate::ids;
@@ -209,7 +209,7 @@ pub(super) fn no_logs(id: SteamId, cx: &App) -> impl IntoElement {
         .child(labelled(
             div().text_sm().text_color(cx.theme().muted_foreground),
             ids::LOGSTF_NO_LOGS,
-            NO_LOGS_TEXT,
+            no_logs_text(),
         ))
         .child(
             Button::new(ids::LOGSTF_NO_LOGS_PROFILE)
@@ -385,9 +385,9 @@ fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
 // Why a row has no stats, muted and spanning the stats columns.
 fn note(id: u64, state: LogState, fit: Fit, cx: &App) -> impl IntoElement {
     let text = match state {
-        LogState::Gone => LOG_GONE,
-        LogState::Unreadable => LOG_UNREADABLE,
-        LogState::Pending | LogState::Ready | _ => LOG_PENDING,
+        LogState::Gone => log_gone(),
+        LogState::Unreadable => log_unreadable(),
+        LogState::Pending | LogState::Ready | _ => log_pending(),
     };
     let length = if fit.length { LENGTH + fit.gap } else { px(0.) };
     h_flex()

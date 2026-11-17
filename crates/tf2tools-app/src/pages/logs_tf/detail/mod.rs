@@ -17,13 +17,13 @@ use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Div, ElementId, FontWeight, Hsla, InteractiveElement as _, IntoElement,
-    ParentElement as _, Pixels, Stateful, StatefulInteractiveElement, Styled, TestSupportExt as _,
-    WeakEntity, Window, div, px,
+    ParentElement as _, Pixels, SharedString, Stateful, StatefulInteractiveElement, Styled,
+    TestSupportExt as _, WeakEntity, Window, div, px,
 };
 use tf2tools_core::{LogDetail, LogRow, LogState, MatrixKind, SteamId, Team, TrackedPlayer};
 
 use super::sort::{MatrixSort, PlayerSort};
-use super::text::{LOG_LOADING, nickname_note, team_name};
+use super::text::{log_loading, nickname_note, team_name};
 use super::{LogsTfPage, OpenLog, OpenState};
 use crate::ids;
 use crate::widgets::labelled;
@@ -134,7 +134,7 @@ pub(super) fn panel(
     cx: &App,
 ) -> AnyElement {
     let id = row.id();
-    let status = |text: &'static str| {
+    let status = |text: SharedString| {
         let line = div().text_sm().text_color(cx.theme().muted_foreground);
         labelled(line, ids::logstf_log_status(id), text).into_any_element()
     };
@@ -147,15 +147,16 @@ pub(super) fn panel(
         OpenState::Ready(log) => {
             log_body(open, log, tracked, sort, matrix, page, cx).into_any_element()
         }
-        OpenState::Loading => status(LOG_LOADING),
+        OpenState::Loading => status(log_loading()),
         OpenState::Failed(why) if matches!(row.state(), LogState::Pending | LogState::Trimmed) => {
             let on_retry = move |_: &mut Window, cx: &mut App| {
                 let _ = page.update(cx, |page, cx| page.retry(id, cx));
             };
             let retry = ids::logstf_log_retry(id);
-            error_line(ids::logstf_log_status(id), retry, *why, on_retry, cx).into_any_element()
+            error_line(ids::logstf_log_status(id), retry, why.clone(), on_retry, cx)
+                .into_any_element()
         }
-        OpenState::Failed(why) => status(why),
+        OpenState::Failed(why) => status(why.clone()),
     };
     v_flex()
         .id(ids::logstf_log_panel(row.id()))

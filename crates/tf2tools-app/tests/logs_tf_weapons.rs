@@ -10,7 +10,7 @@ use gpui_kit::{AppContext, ElementId, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::logs_tf::LogsTfPage;
 use tf2tools_app::pages::logs_tf::text::{
-    NO_WEAPONS_TEXT, accuracy_text, counting_text, weapons_title,
+    accuracy_text, counting_text, no_weapons_text, weapons_title,
 };
 use tf2tools_app::services::Services;
 use tf2tools_app::weapon_names::LoadedWeaponNames;
@@ -68,7 +68,7 @@ fn the_weapons_wording() {
         "Medic weapons · 1 year · 0 logs"
     );
     assert_eq!(counting_text(3), "Counting older logs, 3 left");
-    assert_eq!(NO_WEAPONS_TEXT, "No weapon stats in these logs");
+    assert_eq!(no_weapons_text(), "No weapon stats in these logs");
     let ElementId::Name(id) = ids::logstf_class_weapon(TfClass::Heavy, "long_heatmaker") else {
         panic!("a named id");
     };
@@ -461,7 +461,7 @@ fn the_note_says_when_logs_wait_or_hold_no_weapons(cx: &mut TestAppContext) {
     wait_for(cx, &page, TfClass::Heavy);
     assert_eq!(
         support::label_of(cx, s.win, ids::LOGSTF_CLASS_WEAPONS_NOTE).as_deref(),
-        Some(NO_WEAPONS_TEXT)
+        Some(no_weapons_text().as_ref())
     );
 }
 

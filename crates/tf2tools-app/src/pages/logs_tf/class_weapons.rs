@@ -9,7 +9,7 @@ use gpui_kit::{
 use tf2tools_core::{ClassWeapons, LogsRange, TfClass, WeaponNames};
 
 use super::tables::{WeaponRow, class_weapon_rows};
-use super::text::{NO_WEAPONS_TEXT, counting_text, weapons_title};
+use super::text::{counting_text, no_weapons_text, weapons_title};
 use crate::ids;
 use crate::kill_icons::{ICON_SLOT, KillIconImages, SLOT_GAP, icon_slot, weapon_icon};
 use crate::widgets::labelled;
@@ -38,7 +38,7 @@ pub(super) fn class_weapons_block(
     let note = if weapons.pending() > 0 {
         Some(counting_text(weapons.pending()))
     } else if rows.is_empty() {
-        Some(NO_WEAPONS_TEXT.to_owned())
+        Some(no_weapons_text().to_string())
     } else {
         None
     };

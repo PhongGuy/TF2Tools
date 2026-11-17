@@ -54,16 +54,10 @@ use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 use sort::{ClassSort, ClassStat, MatrixColumn, MatrixSort, PlayerColumn, PlayerSort};
 use text::{
-    DOWNLOAD_FAILED, DOWNLOADED, EMPTY_TEXT, LOG_UNREADABLE, LOGS_TF_DOWN, LOGS_TF_URL, LOOKING_UP,
-    REMOVING, SAVE_FAILED, STEAM_UNREACHABLE, TRIMMED_OFFLINE, WRITE_FAILED, download_reason,
-    fetch_message, profile_url, progress_line, resolve_message,
+    LOGS_TF_URL, download_failed, download_reason, downloaded, empty_text, fetch_message,
+    log_unreadable, logs_tf_down, looking_up, player_input_error, profile_url, progress_line,
+    resolve_message, save_failed, steam_unreachable, trimmed_offline, write_failed,
 };
-
-// The toast text for a logs.tf change that couldn't be saved; the page lines keep text's
-// SAVE_FAILED until they are translated too.
-fn save_failed() -> SharedString {
-    tr!("messages.logs_tf.save_failed")
-}
 
 // Logs counted per backfill batch: small enough that one batch's transaction stays short.
 const WEAPON_BATCH: usize = 50;
@@ -80,7 +74,7 @@ pub(super) struct OpenLog {
 pub(super) enum OpenState {
     Loading,
     Ready(Box<LogDetail>),
-    Failed(&'static str),
+    Failed(SharedString),
 }
 
 /// The logs.tf page. It reads the tracked players from the cache on creation and is kept
@@ -454,7 +448,7 @@ impl LogsTfPage {
     }
 
     /// Why the active player's last sync failed, shown under the chips.
-    pub fn error(&self, cx: &App) -> Option<&'static str> {
+    pub fn error(&self, cx: &App) -> Option<SharedString> {
         self.active.and_then(|id| self.sync.read(cx).error(id))
     }
 
@@ -686,7 +680,7 @@ impl LogsTfPage {
                     }
                     Err(error) => {
                         tracing::warn!(%error, id, "reading a logs.tf log failed");
-                        OpenState::Failed(LOG_UNREADABLE)
+                        OpenState::Failed(log_unreadable())
                     }
                 };
                 page.land(id, state, cx);
@@ -722,14 +716,14 @@ impl LogsTfPage {
                             .any(|r| r.id() == id && r.state() == LogState::Trimmed);
                         // A trimmed log offline says why its full log is not here.
                         if trimmed && matches!(error, LogsFetchError::Network { .. }) {
-                            Some(OpenState::Failed(TRIMMED_OFFLINE))
+                            Some(OpenState::Failed(trimmed_offline()))
                         } else {
                             fetch_message(&error).map(OpenState::Failed)
                         }
                     }
                     Err(error) => {
                         tracing::warn!(%error, id, "the logs.tf fetch task stopped");
-                        Some(OpenState::Failed(LOGS_TF_DOWN))
+                        Some(OpenState::Failed(logs_tf_down()))
                     }
                 };
                 // Core stored or marked the log unless the failure has a line, so its row is
@@ -918,7 +912,11 @@ impl LogsTfPage {
                             .child(
                                 Button::new(ids::LOGSTF_ADD_CONFIRM)
                                     .primary()
-                                    .label(if this.adding { LOOKING_UP } else { "Add" })
+                                    .label(if this.adding {
+                                        looking_up()
+                                    } else {
+                                        "Add".into()
+                                    })
                                     .loading(this.adding)
                                     .disabled(blank || this.adding)
                                     .on_click({
@@ -1096,11 +1094,11 @@ impl LogsTfPage {
                         Ok(Ok(())) => Ok(()),
                         Ok(Err(error)) => {
                             tracing::warn!(%error, id, "writing a logs.tf zip failed");
-                            Err(WRITE_FAILED)
+                            Err(write_failed())
                         }
                         Err(error) => {
                             tracing::warn!(%error, id, "the logs.tf zip write stopped");
-                            Err(WRITE_FAILED)
+                            Err(write_failed())
                         }
                     }
                 }
@@ -1110,7 +1108,7 @@ impl LogsTfPage {
                 }
                 Err(error) => {
                     tracing::warn!(%error, id, "the logs.tf zip download stopped");
-                    Err(LOGS_TF_DOWN)
+                    Err(logs_tf_down())
                 }
             };
             let _ = page.update_in(cx, |_, window, cx| match saved {
@@ -1120,11 +1118,11 @@ impl LogsTfPage {
                         window,
                         cx,
                         ToastKind::Success,
-                        DOWNLOADED,
+                        downloaded(),
                         name.into_owned(),
                     );
                 }
-                Err(why) => toast(window, cx, ToastKind::Error, DOWNLOAD_FAILED, why),
+                Err(why) => toast(window, cx, ToastKind::Error, download_failed(), why),
             });
         })
         .detach();
@@ -1140,7 +1138,7 @@ impl LogsTfPage {
         let input = match parse_player_input(typed.trim()) {
             Ok(input) => input,
             Err(error) => {
-                self.add_error = Some(error.to_string().into());
+                self.add_error = Some(player_input_error(&error));
                 cx.notify();
                 return;
             }
@@ -1168,7 +1166,7 @@ impl LogsTfPage {
                     match saving {
                         Ok(saving) => saving.await.map_err(|error| {
                             tracing::warn!(%error, "saving a logs.tf player failed");
-                            SAVE_FAILED
+                            save_failed()
                         }),
                         Err(_) => return,
                     }
@@ -1179,7 +1177,7 @@ impl LogsTfPage {
                 }
                 Err(error) => {
                     tracing::warn!(%error, "the Steam lookup task stopped");
-                    Err(STEAM_UNREACHABLE)
+                    Err(steam_unreachable())
                 }
             };
             let _ = page.update_in(cx, |page, window, cx| {
@@ -1195,7 +1193,7 @@ impl LogsTfPage {
                         }
                         page.load(true, cx).detach();
                     }
-                    Err(message) => page.add_error = Some(message.into()),
+                    Err(message) => page.add_error = Some(message),
                 }
                 cx.notify();
             });
@@ -1481,7 +1479,11 @@ impl LogsTfPage {
             let chip = filter_badge(
                 ids::logstf_chip(id),
                 self.active == Some(id),
-                if removing { REMOVING } else { name.as_str() }.to_owned(),
+                if removing {
+                    text::removing()
+                } else {
+                    name.clone().into()
+                },
                 window,
                 cx,
             )
@@ -1603,7 +1605,7 @@ impl LogsTfPage {
             .child(labelled(
                 div().text_sm().text_color(cx.theme().muted_foreground),
                 ids::LOGSTF_EMPTY,
-                EMPTY_TEXT,
+                empty_text(),
             ))
             .child(
                 Button::new(ids::LOGSTF_EMPTY_ADD)
