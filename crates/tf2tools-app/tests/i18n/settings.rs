@@ -290,3 +290,65 @@ fn the_stores_card_reads_in_russian() {
         Some("HUD, отобранные hud-db")
     );
 }
+
+// Every control of the Storage and Stores cards lies inside the page column; the store lines
+// end left of a one-line Resync.
+fn assert_settings_fit(cx: &mut TestAppContext, win: AnyWindowHandle, lang: &str) {
+    use tf2tools_app::widgets::scroll::BAR_WIDTH;
+    use tf2tools_core::{StorageKind, StoreKind};
+    let page = support::bounds_of(cx, win, ids::page(Page::Settings)).unwrap();
+    let mut inside: Vec<gpui_kit::ElementId> = vec![
+        ids::SETTINGS_STORAGE.into(),
+        ids::SETTINGS_STORAGE_TOTAL.into(),
+        ids::SETTINGS_RESYNC_ALL.into(),
+        ids::SETTINGS_CACHE.into(),
+        ids::SETTINGS_CACHE_LABEL.into(),
+        ids::SETTINGS_MATURE_ADDONS.into(),
+        ids::SETTINGS_LOG_KEEP.into(),
+        ids::SETTINGS_LOG_SPACE.into(),
+        ids::SETTINGS_SAVE.into(),
+    ];
+    inside.extend(StorageKind::ALL.iter().map(|k| ids::settings_storage(*k)));
+    for id in inside {
+        let b = support::bounds_of(cx, win, id.clone())
+            .unwrap_or_else(|| panic!("{lang}: {id:?} not drawn"));
+        assert!(
+            b.left() >= page.left() && b.right() <= page.right() - BAR_WIDTH,
+            "{lang}: {id:?} {b:?} runs past {page:?}"
+        );
+    }
+    for kind in StoreKind::ALL {
+        let lines = support::bounds_of(cx, win, ids::settings_sync(kind)).unwrap();
+        let resync = support::bounds_of(cx, win, ids::settings_resync(kind)).unwrap();
+        assert!(
+            lines.right() <= resync.left(),
+            "{lang}: {kind:?} {lines:?} runs under {resync:?}"
+        );
+        assert!(
+            resync.right() <= page.right() - BAR_WIDTH,
+            "{lang}: {kind:?} {resync:?}"
+        );
+        assert_eq!(resync.size.height, px(32.), "{lang}: {kind:?} Resync wraps");
+    }
+}
+
+#[gpui_kit::test]
+fn the_settings_cards_fit_at_800_by_600_in_english_and_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    let page = open_settings(cx, &s);
+    support::wait_real(cx, "the store status and the storage figures", |cx| {
+        cx.update(|cx| {
+            let pack = tf2tools_app::library_pack::LibraryPack::global(cx);
+            let pack = pack.read(cx);
+            page.read(cx).is_sync_loaded() && pack.space().is_some() && !pack.is_running()
+        })
+    });
+    support::settle(cx, s.win);
+    assert_settings_fit(cx, s.win, "en");
+    pick(cx, s.win, "ru");
+    assert_settings_fit(cx, s.win, "ru");
+}
