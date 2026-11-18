@@ -222,7 +222,7 @@ fn the_apply_action_reads_in_russian_and_portuguese() {
         action_label("apply").to_string()
     };
     assert_eq!(ru, "Применение");
-    assert_eq!(pt, "Aplicação");
+    assert_eq!(pt, "Aplicar");
 }
 
 fn info(cat: &str, action: &str, msg: &str) -> NewLogEntry {
