@@ -579,7 +579,9 @@ impl HudMakerPage {
     }
 
     // The parts enclosing the selection, outermost first, each a step that selects it and a
-    // chevron towards the part. A press stops at the step, so it never drags the panel.
+    // chevron towards the part. A press stops at the step, so it never drags the panel. When
+    // the way is too long the outer steps give way with an ellipsis and their name as a tip,
+    // while the nearest parent stays whole.
     fn crumbs(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let Some(editor) = self.editor() else {
             return Vec::new();
@@ -593,14 +595,19 @@ impl HudMakerPage {
         }
         let theme = cx.theme();
         let (muted, fg) = (theme.muted_foreground, theme.foreground);
+        let nearest = steps.first().map(|(key, _)| key.clone());
         (steps.into_iter().rev())
             .flat_map(|(key, name)| {
+                let whole = nearest.as_ref() == Some(&key);
+                let full = SharedString::from(name.clone());
                 let step = div()
                     .id(ids::hud_maker_crumb(&key))
-                    .aria_label(SharedString::from(name.clone()))
+                    .aria_label(full.clone())
                     .test_support()
-                    .flex_none()
-                    .whitespace_nowrap()
+                    .when(whole, |el| el.flex_none().whitespace_nowrap())
+                    .when(!whole, |el| {
+                        (el.min_w_0().truncate()).tooltip(tip(ids::HUD_MAKER_TIP, full))
+                    })
                     .font_weight(FontWeight::NORMAL)
                     .text_color(muted)
                     .cursor_pointer()
