@@ -5,6 +5,7 @@ use gpui_kit::App;
 use gpui_kit::AppContext as _;
 use tf2tools_core::{LOG_KEEP, LogLevel, NewLogEntry, StoreItemId, StoreKind};
 
+use crate::i18n::{plural, tr};
 use crate::services::Services;
 use crate::store_download::{DownloadEvent, StoreDownloads};
 use crate::sync::{SyncEvent, SyncSummary, sync_hub};
@@ -36,7 +37,8 @@ pub fn startup(cx: &App) {
     cx.background_spawn(async move {
         // The database path is developer detail, so it goes to tracing, not the player's log.
         tracing::info!(database = %services.data.db_path().display(), "TF2Tools started");
-        let entry = NewLogEntry::new(LogLevel::Info, "system", "startup", "TF2Tools started");
+        let message = tr!("activity_log.row.started");
+        let entry = NewLogEntry::new(LogLevel::Info, "system", "startup", message);
         write(&services, &entry);
         // Trimming after the append keeps the table at exactly the cap, newest row included.
         if let Err(err) = services.activity.trim(LOG_KEEP) {
@@ -52,24 +54,25 @@ pub fn sync_entry(kind: StoreKind, summary: SyncSummary) -> Option<NewLogEntry> 
         return None;
     }
     // GameBanana kinds count what this run fetched; the curated lists count every row, as v5.
+    let fetched = u64::from(summary.fetched);
     let (category, message) = match kind {
-        StoreKind::GameBananaHuds => (
-            "hud_store",
-            format!("Synced {} HUDs from GameBanana", summary.fetched),
-        ),
+        StoreKind::GameBananaHuds => ("hud_store", plural("activity_log.row.synced.huds", fetched)),
         StoreKind::Sounds => (
             "sound_store",
-            format!("Synced {} sounds from GameBanana", summary.fetched),
+            plural("activity_log.row.synced.sounds", fetched),
         ),
         StoreKind::Crosshairs => (
             "crosshair_store",
-            format!("Synced {} crosshairs from GameBanana", summary.fetched),
+            plural("activity_log.row.synced.crosshairs", fetched),
         ),
         StoreKind::Addons => (
             "addon_store",
-            format!("Synced {} addons from mastercomfig", summary.rows),
+            plural("activity_log.row.synced.addons", summary.rows),
         ),
-        StoreKind::CuratedHuds | _ => ("store", format!("Synced {} curated HUDs", summary.rows)),
+        StoreKind::CuratedHuds | _ => (
+            "store",
+            plural("activity_log.row.synced.curated", summary.rows),
+        ),
     };
     Some(NewLogEntry::new(LogLevel::Info, category, "sync", message))
 }
@@ -87,35 +90,38 @@ pub fn download_entry(event: &DownloadEvent) -> NewLogEntry {
         StoreItemId::Addon(asset) => asset.as_str().to_owned(),
         _ => name.clone(),
     };
+    // GameBanana kinds name the failed item by its id and add it to a finished row's details.
+    let name = name.as_str();
+    let id = id.as_str();
     let (category, done, failed, gb) = match target.kind {
         StoreKind::GameBananaHuds => (
             "hud_store",
-            format!("Downloaded HUD from GameBanana: {name}"),
-            format!("HUD download failed (GameBanana ID: {id})"),
+            tr!("activity_log.row.downloaded.gb_hud", name = name),
+            tr!("activity_log.row.failed.gb_hud", id = id),
             true,
         ),
         StoreKind::Sounds => (
             "sound_store",
-            format!("Downloaded sound from store: {name}"),
-            format!("Sound download failed (GameBanana ID: {id})"),
+            tr!("activity_log.row.downloaded.sound", name = name),
+            tr!("activity_log.row.failed.sound", id = id),
             true,
         ),
         StoreKind::Crosshairs => (
             "crosshair_store",
-            format!("Downloaded crosshair from store: {name}"),
-            format!("Crosshair download failed (GameBanana ID: {id})"),
+            tr!("activity_log.row.downloaded.crosshair", name = name),
+            tr!("activity_log.row.failed.crosshair", id = id),
             true,
         ),
         StoreKind::Addons => (
             "addon_store",
-            format!("Downloaded addon to library: {name}"),
-            format!("Addon download failed: {name}"),
+            tr!("activity_log.row.downloaded.addon", name = name),
+            tr!("activity_log.row.failed.addon", name = name),
             false,
         ),
         StoreKind::CuratedHuds | _ => (
             "store",
-            format!("Downloaded HUD: {name}"),
-            format!("HUD download failed: {name}"),
+            tr!("activity_log.row.downloaded.hud", name = name),
+            tr!("activity_log.row.failed.hud", name = name),
             false,
         ),
     };
@@ -123,7 +129,7 @@ pub fn download_entry(event: &DownloadEvent) -> NewLogEntry {
         Some(message) => NewLogEntry::new(LogLevel::Error, category, "download", failed)
             .with_details(message.clone()),
         None if gb => NewLogEntry::new(LogLevel::Info, category, "download", done)
-            .with_details(format!("GameBanana ID: {id}")),
+            .with_details(tr!("activity_log.row.gamebanana_id", id = id)),
         None => NewLogEntry::new(LogLevel::Info, category, "download", done),
     }
 }

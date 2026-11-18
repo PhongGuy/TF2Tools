@@ -7,6 +7,7 @@ use gpui_kit::{
 };
 
 use super::{Shell, error_view};
+use crate::i18n::tr;
 use crate::ids;
 use crate::services::StartupError;
 
@@ -52,7 +53,11 @@ fn loading(cx: &mut Context<AppRoot>) -> AnyElement {
                         .text_color(theme.foreground)
                         .child("TF2Tools"),
                 )
-                .child(div().text_color(theme.muted_foreground).child("Loading...")),
+                .child(
+                    div()
+                        .text_color(theme.muted_foreground)
+                        .child(tr!("store_grid.loading")),
+                ),
         )
         .into_any_element()
 }

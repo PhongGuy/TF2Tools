@@ -2,31 +2,42 @@
 
 use std::time::Duration;
 
+use gpui_kit::SharedString;
 use tf2tools_core::{
-    EventKind, LogsFetchError, LogsRange, LogsSyncError, Medigun, ResolveError, SteamId, Team,
-    TfClass,
+    EventKind, LogsFetchError, LogsRange, LogsSyncError, Medigun, PlayerInputError, ResolveError,
+    SteamId, Team, TfClass,
 };
 
-use crate::i18n::{counted_plural, format, tr};
+use crate::i18n::{counted_plural, format, names, tr};
 use crate::logs_sync::SyncProgress;
 
 /// logs.tf's front page, which the page's credit opens.
 pub const LOGS_TF_URL: &str = "https://logs.tf";
 
 /// The empty page's explanation, shown until a player is tracked.
-pub const EMPTY_TEXT: &str = "Track a player to see their class averages and logs from logs.tf.";
+pub fn empty_text() -> SharedString {
+    tr!("logs_tf.empty")
+}
 
-/// Why a logs.tf change could not be kept, in player words.
-pub const SAVE_FAILED: &str = "Couldn't save logs.tf data on this computer.";
+/// Why a logs.tf change could not be kept, in player words; the toasts say it the same way.
+pub fn save_failed() -> SharedString {
+    tr!("messages.logs_tf.save_failed")
+}
 
 /// Why a Steam lookup failed when Steam could not answer, in player words.
-pub const STEAM_UNREACHABLE: &str = "Can't reach Steam. Check your internet connection.";
+pub fn steam_unreachable() -> SharedString {
+    tr!("logs_tf.steam_unreachable")
+}
 
 /// A player's chip while their removal waits for their sync to end.
-pub const REMOVING: &str = "Removing...";
+pub fn removing() -> SharedString {
+    tr!("logs_tf.removing")
+}
 
 /// The add dialog's Add button while Steam looks the player up.
-pub const LOOKING_UP: &str = "Looking up...";
+pub fn looking_up() -> SharedString {
+    tr!("logs_tf.looking_up")
+}
 
 /// One log's page on logs.tf.
 pub fn log_url(id: u64) -> String {
@@ -39,23 +50,34 @@ pub fn profile_url(id: SteamId) -> String {
 }
 
 /// The add dialog's message for a failed lookup.
-pub fn resolve_message(error: &ResolveError) -> &'static str {
+pub fn resolve_message(error: &ResolveError) -> SharedString {
     match error {
-        ResolveError::NotFound => "We couldn't find that Steam profile.",
+        ResolveError::NotFound => tr!("logs_tf.not_found"),
         ResolveError::RateLimited { .. }
         | ResolveError::Http { .. }
         | ResolveError::Network { .. }
         | ResolveError::TooLarge { .. }
         | ResolveError::Malformed { .. }
-        | _ => STEAM_UNREACHABLE,
+        | _ => steam_unreachable(),
+    }
+}
+
+/// The add dialog's message for text that names no Steam player.
+pub fn player_input_error(error: &PlayerInputError) -> SharedString {
+    match error {
+        PlayerInputError::NotSteam | _ => tr!("logs_tf.not_steam"),
     }
 }
 
 /// Why a sync could not reach logs.tf or got an error page back, in player words.
-pub const LOGS_TF_DOWN: &str = "logs.tf isn't responding right now. Try again later.";
+pub fn logs_tf_down() -> SharedString {
+    tr!("logs_tf.down")
+}
 
 /// Why logs.tf turned a request away after every retry, in player words.
-pub const LOGS_TF_BUSY: &str = "logs.tf is busy. Try again in a few minutes.";
+pub fn logs_tf_busy() -> SharedString {
+    tr!("logs_tf.busy")
+}
 
 /// A count with thousands separators in the player's language: "4,812".
 pub fn count_text(n: usize) -> String {
@@ -95,9 +117,9 @@ pub fn progress_text(done: usize, total: usize, left: Duration) -> String {
 pub fn ring_label(progress: Option<SyncProgress>) -> String {
     match progress {
         Some(SyncProgress::Downloading { done, total, .. }) => {
-            format!("Syncing logs.tf: {done} / {total}")
+            tr!("logs_tf.ring.progress", done = done, total = total).to_string()
         }
-        _ => "Syncing logs.tf...".to_owned(),
+        _ => tr!("logs_tf.ring.listing").to_string(),
     }
 }
 
@@ -112,67 +134,78 @@ pub fn progress_line(progress: SyncProgress) -> String {
 /// The line under the chips for a failed sync, `has_saved` when the player has logs saved
 /// to fall back on. A player removed while their sync waited is no failure, so the page never
 /// asks for it.
-pub fn sync_message(error: &LogsSyncError, has_saved: bool) -> &'static str {
+pub fn sync_message(error: &LogsSyncError, has_saved: bool) -> SharedString {
     match error {
-        LogsSyncError::Network { .. } if has_saved => "You're offline. Showing saved logs.",
-        LogsSyncError::Network { .. } => {
-            "Couldn't reach logs.tf. Check your connection and try again."
-        }
-        LogsSyncError::RateLimited { .. } => LOGS_TF_BUSY,
-        LogsSyncError::Malformed { .. } => "logs.tf sent something we didn't understand.",
-        LogsSyncError::Database { .. } => SAVE_FAILED,
-        LogsSyncError::Http { .. } | LogsSyncError::TooLarge { .. } | _ => LOGS_TF_DOWN,
+        LogsSyncError::Network { .. } if has_saved => tr!("logs_tf.sync.offline_saved"),
+        LogsSyncError::Network { .. } => tr!("logs_tf.sync.unreachable"),
+        LogsSyncError::RateLimited { .. } => logs_tf_busy(),
+        LogsSyncError::Malformed { .. } => tr!("logs_tf.sync.malformed"),
+        LogsSyncError::Database { .. } => save_failed(),
+        LogsSyncError::Http { .. } | LogsSyncError::TooLarge { .. } | _ => logs_tf_down(),
     }
 }
 
 /// The toast title once a log's zip is saved; its description names the file.
-pub const DOWNLOADED: &str = "Log downloaded";
+pub fn downloaded() -> SharedString {
+    tr!("logs_tf.download.done")
+}
 
 /// The toast title when Download log fails; its description says why.
-pub const DOWNLOAD_FAILED: &str = "Couldn't download this log.";
+pub fn download_failed() -> SharedString {
+    tr!("logs_tf.download.failed")
+}
 
 /// Why Download log failed, when the save itself could not be written.
-pub const WRITE_FAILED: &str = "Couldn't write the file.";
+pub fn write_failed() -> SharedString {
+    tr!("logs_tf.download.write_failed")
+}
 
 /// Why Download log failed, in the player's words.
-pub fn download_reason(error: &LogsFetchError) -> &'static str {
+pub fn download_reason(error: &LogsFetchError) -> SharedString {
     match error {
-        LogsFetchError::Gone => "logs.tf no longer has this log.",
-        LogsFetchError::Network { .. } => "Check your internet connection.",
-        LogsFetchError::RateLimited { .. } => LOGS_TF_BUSY,
-        LogsFetchError::TooLarge { .. } => "This log is too big to download.",
+        LogsFetchError::Gone => tr!("logs_tf.download.gone"),
+        LogsFetchError::Network { .. } => tr!("logs_tf.download.offline"),
+        LogsFetchError::RateLimited { .. } => logs_tf_busy(),
+        LogsFetchError::TooLarge { .. } => tr!("logs_tf.download.too_big"),
         // The lint only wants every known variant named; a wildcard that shares a known arm's
         // text joins that arm, one with its own text stands alone.
         LogsFetchError::Unreadable
         | LogsFetchError::Http { .. }
         | LogsFetchError::Cache { .. }
-        | _ => LOGS_TF_DOWN,
+        | _ => logs_tf_down(),
     }
 }
 
 /// The open panel's line while a log not yet downloaded is fetched.
-pub const LOG_LOADING: &str = "Loading log...";
+pub fn log_loading() -> SharedString {
+    tr!("logs_tf.open.loading")
+}
 
 /// The open panel's line when a log can't be fetched for lack of a connection.
-pub const LOG_OFFLINE: &str = "Can't load this log while you're offline.";
+pub fn log_offline() -> SharedString {
+    tr!("logs_tf.open.offline")
+}
 
 /// The open panel's line when logs.tf no longer serves a trimmed log.
-pub const FULL_LOG_GONE: &str = "logs.tf no longer has the full log; its stats stay.";
+pub fn full_log_gone() -> SharedString {
+    tr!("logs_tf.open.full_gone")
+}
 
 /// The open panel's line when a trimmed log can't be downloaded for lack of a connection.
-pub const TRIMMED_OFFLINE: &str =
-    "This full log was cleared to save space. Connect to the internet to open it.";
+pub fn trimmed_offline() -> SharedString {
+    tr!("logs_tf.open.trimmed_offline")
+}
 
 /// The open panel's line for a failed fetch; None when the row's own note says it (gone,
 /// unreadable, too large).
-pub fn fetch_message(error: &LogsFetchError) -> Option<&'static str> {
+pub fn fetch_message(error: &LogsFetchError) -> Option<SharedString> {
     match error {
-        LogsFetchError::Network { .. } => Some(LOG_OFFLINE),
-        LogsFetchError::RateLimited { .. } => Some(LOGS_TF_BUSY),
-        LogsFetchError::Cache { .. } => Some(SAVE_FAILED),
-        LogsFetchError::FullLogGone => Some(FULL_LOG_GONE),
+        LogsFetchError::Network { .. } => Some(log_offline()),
+        LogsFetchError::RateLimited { .. } => Some(logs_tf_busy()),
+        LogsFetchError::Cache { .. } => Some(save_failed()),
+        LogsFetchError::FullLogGone => Some(full_log_gone()),
         LogsFetchError::Gone | LogsFetchError::Unreadable | LogsFetchError::TooLarge { .. } => None,
-        LogsFetchError::Http { .. } | _ => Some(LOGS_TF_DOWN),
+        LogsFetchError::Http { .. } | _ => Some(logs_tf_down()),
     }
 }
 
@@ -232,14 +265,16 @@ fn floor_whole(value: f64) -> u64 {
 }
 
 /// A history range's stop label under the slider: "1 month" up to "All".
-pub fn range_label(range: LogsRange) -> &'static str {
+pub fn range_label(range: LogsRange) -> SharedString {
+    let months = |n: u64| counted_plural("logs_tf.range.months", n, &n.to_string(), &[]);
+    let years = |n: u64| counted_plural("logs_tf.range.years", n, &n.to_string(), &[]);
     match range {
-        LogsRange::Month1 => "1 month",
-        LogsRange::Months3 => "3 months",
-        LogsRange::Months6 => "6 months",
-        LogsRange::Year1 => "1 year",
-        LogsRange::Years2 => "2 years",
-        LogsRange::All | _ => "All",
+        LogsRange::Month1 => months(1),
+        LogsRange::Months3 => months(3),
+        LogsRange::Months6 => months(6),
+        LogsRange::Year1 => years(1),
+        LogsRange::Years2 => years(2),
+        LogsRange::All | _ => tr!("logs_tf.range.all"),
     }
 }
 
@@ -259,7 +294,7 @@ pub fn summary_text(range: LogsRange, logs: usize, newest: Option<i64>, now: i64
             "logs_tf.summary.up_to",
             n,
             &count,
-            &[("range", range_label(range)), ("date", &day_text(newest))],
+            &[("range", &range_label(range)), ("date", &day_text(newest))],
         ),
         // "Last month" and "Last year" drop the stop label's "1", so each has its own key.
         None => match range {
@@ -270,7 +305,7 @@ pub fn summary_text(range: LogsRange, logs: usize, newest: Option<i64>, now: i64
                     "logs_tf.summary.last",
                     n,
                     &count,
-                    &[("span", range_label(other))],
+                    &[("span", &range_label(other))],
                 )
             }
         },
@@ -286,7 +321,9 @@ fn day_text(unix: i64) -> String {
 }
 
 /// The class weapons block's line when the class's logs carry no weapon stats at all.
-pub const NO_WEAPONS_TEXT: &str = "No weapon stats in these logs";
+pub fn no_weapons_text() -> SharedString {
+    tr!("logs_tf.weapons.none")
+}
 
 /// The class weapons block's title: "Scout weapons · 3 months · 1 log", "All" for every log.
 pub fn weapons_title(class: TfClass, range: LogsRange, logs: u32) -> String {
@@ -294,27 +331,38 @@ pub fn weapons_title(class: TfClass, range: LogsRange, logs: u32) -> String {
         "logs_tf.weapons_title",
         u64::from(logs),
         &count_text(usize::try_from(logs).unwrap_or(usize::MAX)),
-        &[("class", class.name()), ("range", range_label(range))],
+        &[
+            ("class", &names::class_name(class)),
+            ("range", &range_label(range)),
+        ],
     )
     .to_string()
 }
 
 /// The class weapons block's note while older logs still wait for their weapons counted.
 pub fn counting_text(left: u32) -> String {
-    format!("Counting older logs, {left} left")
+    tr!("logs_tf.weapons.counting", left = left).to_string()
 }
 
 /// The log list's line when logs.tf has no logs for the active player.
-pub const NO_LOGS_TEXT: &str = "No logs on logs.tf for this player yet.";
+pub fn no_logs_text() -> SharedString {
+    tr!("logs_tf.list.no_logs")
+}
 
 /// A row's note in place of its stats while its log downloads.
-pub const LOG_PENDING: &str = "Downloading...";
+pub fn log_pending() -> SharedString {
+    tr!("common.size.downloading")
+}
 
 /// A row's note when logs.tf no longer has its log.
-pub const LOG_GONE: &str = "This log was removed from logs.tf";
+pub fn log_gone() -> SharedString {
+    tr!("logs_tf.list.gone")
+}
 
 /// A row's note when its log's body could not be read.
-pub const LOG_UNREADABLE: &str = "This log couldn't be read";
+pub fn log_unreadable() -> SharedString {
+    tr!("logs_tf.list.unreadable")
+}
 
 /// A round's length or an event's time, minutes padded to two digits as logs.tf's rounds
 /// table writes them: "05:30", "00:50".
@@ -383,15 +431,12 @@ pub fn reads_zero(cell: &str) -> bool {
 
 /// The Show Killstreaks button's words with the log's count: "Show Killstreaks (13)".
 pub fn streaks_label(n: usize) -> String {
-    format!("Show Killstreaks ({n})")
+    tr!("logs_tf.streaks", count = n).to_string()
 }
 
 /// What a nickname marker's tooltip says, naming the player as the log does.
 pub fn nickname_note(log_name: &str) -> String {
-    format!(
-        "This is your nickname for this player. Their name in this log is {log_name}. \
-         You can turn this off in Settings."
-    )
+    tr!("logs_tf.nickname_note", name = log_name).to_string()
 }
 
 /// A team's name as the app writes it: "BLU" or "RED".
@@ -454,13 +499,13 @@ pub fn event_parts(
     name_of: &dyn Fn(SteamId) -> String,
     team_of: &dyn Fn(SteamId) -> Option<Team>,
 ) -> (String, Vec<EventPart>) {
-    let plain = |text: &str| (text.to_owned(), None);
+    let plain = |text: SharedString| (text.to_string(), None);
     let (ty, parts) = match kind {
         EventKind::PointCap { team, point } => (
-            "Point Capture",
+            tr!("logs_tf.event.point_capture"),
             vec![
                 (team_name(*team).to_owned(), Some(*team)),
-                plain(&format!(" captured point {point}")),
+                plain(tr!("logs_tf.event.captured", point = point)),
             ],
         ),
         EventKind::Charge {
@@ -470,9 +515,9 @@ pub fn event_parts(
         } => {
             let mut parts = vec![(name_of(*medic), Some(*team))];
             if *medigun != Medigun::MediGun {
-                parts.push(plain(&format!(" ({})", medigun_name(medigun))));
+                parts.push((format!(" ({})", medigun_name(medigun)), None));
             }
-            ("Übercharge", parts)
+            (tr!("logs_tf.event.ubercharge"), parts)
         }
         EventKind::MedicDeath {
             team,
@@ -482,30 +527,30 @@ pub fn event_parts(
             let mut parts = vec![(name_of(*medic), Some(*team))];
             match killer {
                 Some(killer) => {
-                    parts.push(plain(" killed by "));
+                    parts.push(plain(tr!("logs_tf.event.killed_by")));
                     parts.push((name_of(*killer), team_of(*killer)));
                 }
-                None => parts.push(plain(" died")),
+                None => parts.push(plain(tr!("logs_tf.event.died"))),
             }
-            ("Medic Death", parts)
+            (tr!("logs_tf.event.medic_death"), parts)
         }
         EventKind::Drop { team, medic } => (
-            "Drop",
+            tr!("logs_tf.event.drop"),
             vec![
                 (name_of(*medic), Some(*team)),
-                plain(" dropped a full charge"),
+                plain(tr!("logs_tf.event.dropped")),
             ],
         ),
         EventKind::RoundWin { team } => (
-            "Round end",
+            tr!("logs_tf.event.round_end"),
             vec![
-                plain("Round win for "),
+                plain(tr!("logs_tf.event.round_win")),
                 (team_name(*team).to_owned(), Some(*team)),
             ],
         ),
         EventKind::Other { name } => return (name.clone(), Vec::new()),
         // A kind added to core later still reads as an event, never as debug text.
-        _ => return ("Event".to_owned(), Vec::new()),
+        _ => return (tr!("logs_tf.event.unknown").to_string(), Vec::new()),
     };
-    (ty.to_owned(), parts)
+    (ty.to_string(), parts)
 }

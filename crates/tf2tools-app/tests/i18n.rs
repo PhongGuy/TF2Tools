@@ -19,11 +19,17 @@ mod formats;
 #[path = "i18n/library.rs"]
 mod library;
 
+#[path = "i18n/logs.rs"]
+mod logs;
+
 #[path = "i18n/messages.rs"]
 mod messages;
 
 #[path = "i18n/settings.rs"]
 mod settings;
+
+#[path = "i18n/shell.rs"]
+mod shell;
 
 #[path = "i18n/stores.rs"]
 mod stores;

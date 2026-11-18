@@ -1,8 +1,9 @@
 //! The one unsaved-changes check every way out of a maker (crosshair or HUD) goes through: the
 //! sidebar, closing the window and the update's Restart buttons.
 
-use gpui_kit::{App, Global, WeakEntity, Window};
+use gpui_kit::{App, Global, SharedString, WeakEntity, Window};
 
+use crate::i18n::tr;
 use crate::pages::crosshair_maker::CrosshairMakerPage;
 use crate::pages::hud_maker::HudMakerPage;
 use crate::shell::confirm::{Choice, Confirm, confirm, confirm_or};
@@ -90,7 +91,7 @@ pub fn leave_then(
         return;
     };
     let can_save = hud.read(cx).can_save(cx);
-    let save = can_save.then(|| "Save and leave".into());
+    let save = can_save.then(save_and_leave);
     let answer = confirm_or(Confirm::leave_unsaved(can_save), save, window, cx);
     let hud = hud.downgrade();
     cx.spawn(async move |cx| {
@@ -107,6 +108,11 @@ pub fn leave_then(
         });
     })
     .detach();
+}
+
+/// The leave prompt's Save and leave button.
+pub fn save_and_leave() -> SharedString {
+    tr!("shell.leave_save")
 }
 
 fn reclaim_maker_focus(window: &mut Window, cx: &mut App) {

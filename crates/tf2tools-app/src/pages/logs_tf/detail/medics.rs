@@ -4,11 +4,12 @@
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::{
     App, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
-    Styled as _, TestSupportExt as _, div, px,
+    SharedString, Styled as _, TestSupportExt as _, div, px,
 };
 use tf2tools_core::{LogDetail, MedicLine};
 
 use super::{ICON, NUMBER, number, team_cell};
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::logs_tf::tables::heal_rows;
 use crate::pages::logs_tf::text::{charge_text, healing_text, seconds_text, tenths_text};
@@ -34,15 +35,11 @@ pub(super) fn medics(log: &LogDetail, tracked: &super::Tracked, cx: &App) -> imp
 // The Medic's name in team colour, the ten rows logs.tf shows, then the heal-target table.
 fn medic_block(medic: &MedicLine, tracked: &super::Tracked, cx: &App) -> impl IntoElement {
     let id = medic.steam_id();
-    let fact = |label: &str, key: &str, value: String| {
+    let fact = |label: SharedString, key: &str, value: String| {
         h_flex()
             .justify_between()
             .gap_2()
-            .child(
-                div()
-                    .text_color(cx.theme().muted_foreground)
-                    .child(label.to_owned()),
-            )
+            .child(div().text_color(cx.theme().muted_foreground).child(label))
             .child(labelled(div(), ids::logstf_medic_fact(id, key), value))
     };
     // One Charges row per medigun, the label only on the first, as logs.tf lays them out.
@@ -52,13 +49,21 @@ fn medic_block(medic: &MedicLine, tracked: &super::Tracked, cx: &App) -> impl In
         .iter()
         .enumerate()
         .map(|(i, (gun, n))| {
-            let label = if i == 0 { "Charges" } else { "" };
+            let label = if i == 0 {
+                tr!("logs_tf.detail.charges")
+            } else {
+                SharedString::default()
+            };
             let key = format!("Charges:{}", gun.key());
             fact(label, &key, charge_text(gun, *n, total))
         })
         .collect();
     if charges.is_empty() {
-        charges.push(fact("Charges", "Charges", "0".to_owned()));
+        charges.push(fact(
+            tr!("logs_tf.detail.charges"),
+            "Charges",
+            "0".to_owned(),
+        ));
     }
     let count = |n: u32| n.to_string();
     v_flex()
@@ -84,29 +89,51 @@ fn medic_block(medic: &MedicLine, tracked: &super::Tracked, cx: &App) -> impl In
                 )),
         )
         .child(fact(
-            "Healing",
+            tr!("logs_tf.detail.healing"),
             "Healing",
             healing_text(medic.heal(), medic.heal_per_min()),
         ))
         .children(charges)
         .children(
             [
-                ("Drops", count(medic.drops())),
-                ("Avg time to build", seconds_text(medic.avg_time_to_build())),
+                ("Drops", tr!("logs_tf.detail.drops"), count(medic.drops())),
+                (
+                    "Avg time to build",
+                    tr!("logs_tf.detail.avg_build"),
+                    seconds_text(medic.avg_time_to_build()),
+                ),
                 (
                     "Avg time before using",
+                    tr!("logs_tf.detail.avg_before_use"),
                     seconds_text(medic.avg_time_before_using()),
                 ),
-                ("Near full charge deaths", count(medic.near_full_deaths())),
-                ("Avg uber length", tenths_text(medic.avg_uber_length())),
-                ("Deaths after charge", count(medic.deaths_after_uber())),
-                ("Major advantages lost", count(medic.advantages_lost())),
+                (
+                    "Near full charge deaths",
+                    tr!("logs_tf.detail.near_full_deaths"),
+                    count(medic.near_full_deaths()),
+                ),
+                (
+                    "Avg uber length",
+                    tr!("logs_tf.detail.avg_uber"),
+                    tenths_text(medic.avg_uber_length()),
+                ),
+                (
+                    "Deaths after charge",
+                    tr!("logs_tf.detail.deaths_after"),
+                    count(medic.deaths_after_uber()),
+                ),
+                (
+                    "Major advantages lost",
+                    tr!("logs_tf.detail.advantages_lost"),
+                    count(medic.advantages_lost()),
+                ),
                 (
                     "Biggest advantage lost",
+                    tr!("logs_tf.detail.biggest_advantage"),
                     seconds_text(f64::from(medic.biggest_advantage_lost())),
                 ),
             ]
-            .map(|(label, value)| fact(label, label, value)),
+            .map(|(key, label, value)| fact(label, key, value)),
         )
         .child(heal_table(medic, tracked, cx))
 }
@@ -120,9 +147,14 @@ fn heal_table(medic: &MedicLine, tracked: &super::Tracked, cx: &App) -> Div {
         .pb_1()
         .text_color(cx.theme().muted_foreground)
         .font_weight(FontWeight::MEDIUM)
-        .child(div().flex_1().min_w_0().child("Heal Target"))
-        .child(div().w(CLASS).flex_none().child("Class"))
-        .child(number("Heals".to_owned()))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .child(tr!("logs_tf.detail.heal_target")),
+        )
+        .child(div().w(CLASS).flex_none().child(tr!("logs_tf.list.class")))
+        .child(number(tr!("logs_tf.detail.heals").into()))
         .child(number("%".to_owned()));
     let rows = heal_rows(medic).into_iter().map(|row| {
         let icon = row

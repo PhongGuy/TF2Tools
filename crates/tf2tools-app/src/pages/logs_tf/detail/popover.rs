@@ -12,6 +12,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{PlayerLine, SteamId, TfClass, WeaponNames};
 
+use crate::i18n::{names, tr};
 use crate::ids;
 use crate::kill_icons::{ICON_SLOT, KillIconImages, SLOT_GAP, icon_slot, weapon_icon};
 use crate::pages::logs_tf::LogsTfPage;
@@ -31,7 +32,7 @@ const ACCURACY: Pixels = px(40.);
 struct Card {
     id: SteamId,
     class: TfClass,
-    facts: [(&'static str, String); 5],
+    facts: [(SharedString, String); 5],
     weapons: Vec<(WeaponRow, Option<Arc<RenderImage>>)>,
 }
 
@@ -75,11 +76,11 @@ fn card_for(
         id: player,
         class,
         facts: [
-            ("Played", duration_text(on.seconds())),
-            ("K", on.kills().to_string()),
-            ("A", on.assists().to_string()),
-            ("D", on.deaths().to_string()),
-            ("DA", on.dmg().to_string()),
+            (tr!("logs_tf.stat.played"), duration_text(on.seconds())),
+            ("K".into(), on.kills().to_string()),
+            ("A".into(), on.assists().to_string()),
+            ("D".into(), on.deaths().to_string()),
+            ("DA".into(), on.dmg().to_string()),
         ],
         weapons: weapon_rows(line, on, names)
             .into_iter()
@@ -112,7 +113,7 @@ fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
         .gap_3()
         .children(card.facts.iter().map(|(label, value)| {
             v_flex()
-                .child(div().text_xs().text_color(muted).child(*label))
+                .child(div().text_xs().text_color(muted).child(label.clone()))
                 .child(value.clone())
         }));
     let head = h_flex()
@@ -120,10 +121,10 @@ fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
         .pt_2()
         .text_color(muted)
         .font_weight(FontWeight::MEDIUM)
-        .child(div().flex_1().child("Weapon"))
+        .child(div().flex_1().child(tr!("logs_tf.weapons.weapon")))
         .child(column("K", KILLS))
         .child(column("DA", DAMAGE))
-        .child(cell(ACCURACY).child("Acc"));
+        .child(cell(ACCURACY).child(tr!("logs_tf.detail.accuracy_short")));
     let rows = card.weapons.iter().map(|(w, icon)| {
         let icon = icon
             .as_ref()
@@ -168,7 +169,7 @@ fn class_card(card: &Card, cx: &App) -> impl IntoElement + use<> {
         .child(
             div()
                 .font_weight(FontWeight::SEMIBOLD)
-                .child(card.class.name()),
+                .child(names::class_name(card.class)),
         )
         .child(facts)
         .child(head)

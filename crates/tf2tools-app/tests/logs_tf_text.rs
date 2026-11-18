@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use tf2tools_app::logs_sync::{SyncProgress, ring_fill};
 use tf2tools_app::pages::logs_tf::text::{
-    DOWNLOAD_FAILED, EMPTY_TEXT, NO_LOGS_TEXT, accuracy_text, charge_text, count_text,
-    date_time_text, download_reason, duration_text, event_parts, event_text, fetch_message,
-    finding_text, floored, floored_share_text, healing_text, kapd_text, known_text, medigun_name,
+    accuracy_text, charge_text, count_text, date_time_text, download_failed, download_reason,
+    duration_text, empty_text, event_parts, event_text, fetch_message, finding_text, floored,
+    floored_share_text, healing_text, kapd_text, known_text, medigun_name, no_logs_text,
     one_decimal, per_min_text, progress_line, progress_text, range_label, reads_zero,
     resolve_message, ring_label, round_length_text, seconds_text, share_text, streaks_label,
     summary_text, sync_message, tenths_text, time_played_text, whole,
@@ -122,14 +122,17 @@ fn the_summary_names_the_range_and_counts_its_logs() {
     assert_eq!(summary(LogsRange::Year1, 1_400), "Last year, 1,400 logs");
     assert_eq!(summary(LogsRange::Years2, 12), "Last 2 years, 12 logs");
     assert_eq!(summary(LogsRange::All, 4_812), "All logs, 4,812");
-    let labels: Vec<&str> = LogsRange::STOPS.into_iter().map(range_label).collect();
+    let labels: Vec<String> = LogsRange::STOPS
+        .into_iter()
+        .map(|r| range_label(r).to_string())
+        .collect();
     assert_eq!(
         labels,
         [
             "1 month", "3 months", "6 months", "1 year", "2 years", "All"
         ]
     );
-    assert!(!EMPTY_TEXT.contains("90 days"), "{EMPTY_TEXT}");
+    assert!(!empty_text().contains("90 days"), "{}", empty_text());
 }
 
 // Noon on a day on this computer's clock, as unix seconds.
@@ -173,9 +176,9 @@ fn an_old_newest_log_names_the_day_the_range_ends() {
 
 #[test]
 fn no_wording_promises_the_last_90_days_from_today() {
-    assert_eq!(NO_LOGS_TEXT, "No logs on logs.tf for this player yet.");
+    assert_eq!(no_logs_text(), "No logs on logs.tf for this player yet.");
     assert_eq!(
-        EMPTY_TEXT,
+        empty_text(),
         "Track a player to see their class averages and logs from logs.tf."
     );
 }
@@ -248,7 +251,7 @@ fn fetch_failures_read_in_player_words_or_leave_it_to_the_row() {
         message: "m".into(),
     };
     assert_eq!(
-        fetch_message(&network),
+        fetch_message(&network).as_deref(),
         Some("Can't load this log while you're offline.")
     );
     let server = LogsFetchError::Http {
@@ -256,19 +259,19 @@ fn fetch_failures_read_in_player_words_or_leave_it_to_the_row() {
         status: 503,
     };
     assert_eq!(
-        fetch_message(&server),
+        fetch_message(&server).as_deref(),
         Some("logs.tf isn't responding right now. Try again later.")
     );
     let busy = LogsFetchError::RateLimited { url: "u".into() };
     assert_eq!(
-        fetch_message(&busy),
+        fetch_message(&busy).as_deref(),
         Some("logs.tf is busy. Try again in a few minutes.")
     );
     let cache = LogsFetchError::Cache {
         message: "m".into(),
     };
     assert_eq!(
-        fetch_message(&cache),
+        fetch_message(&cache).as_deref(),
         Some("Couldn't save logs.tf data on this computer.")
     );
     for row_says_it in [
@@ -698,7 +701,7 @@ fn download_failures_say_why() {
         download_reason(&LogsFetchError::Unreadable),
         "logs.tf isn't responding right now. Try again later."
     );
-    assert_eq!(DOWNLOAD_FAILED, "Couldn't download this log.");
+    assert_eq!(download_failed(), "Couldn't download this log.");
 }
 
 #[test]
@@ -823,17 +826,17 @@ fn rows_with_one_shown_name_merge_into_the_first() {
 
 #[test]
 fn a_full_log_logs_tf_no_longer_has_gets_its_own_line() {
-    use tf2tools_app::pages::logs_tf::text::{FULL_LOG_GONE, TRIMMED_OFFLINE};
+    use tf2tools_app::pages::logs_tf::text::{full_log_gone, trimmed_offline};
     assert_eq!(
         fetch_message(&tf2tools_core::LogsFetchError::FullLogGone),
-        Some(FULL_LOG_GONE)
+        Some(full_log_gone())
     );
     assert_eq!(
-        FULL_LOG_GONE,
+        full_log_gone(),
         "logs.tf no longer has the full log; its stats stay."
     );
     assert_eq!(
-        TRIMMED_OFFLINE,
+        trimmed_offline(),
         "This full log was cleared to save space. Connect to the internet to open it."
     );
 }

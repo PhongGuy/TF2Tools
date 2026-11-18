@@ -374,6 +374,141 @@ logs_tf:
     last: { one: "Last %{span}, %{count} log", other: "Last %{span}, %{count} logs" }
     up_to: { one: "%{range} up to %{date}, %{count} log", other: "%{range} up to %{date}, %{count} logs" }
   weapons_title: { one: "%{class} weapons · %{range} · %{count} log", other: "%{class} weapons · %{range} · %{count} logs" }
+  empty: "Track a player to see their class averages and logs from logs.tf."
+  steam_unreachable: "Can't reach Steam. Check your internet connection."
+  removing: "Removing..."
+  looking_up: "Looking up..."
+  not_found: "We couldn't find that Steam profile."
+  not_steam: "That doesn't look like a Steam profile link or Steam ID."
+  down: "logs.tf isn't responding right now. Try again later."
+  busy: "logs.tf is busy. Try again in a few minutes."
+  ring:
+    progress: "Syncing logs.tf: %{done} / %{total}"
+    listing: "Syncing logs.tf..."
+  sync:
+    offline_saved: "You're offline. Showing saved logs."
+    unreachable: "Couldn't reach logs.tf. Check your connection and try again."
+    malformed: "logs.tf sent something we didn't understand."
+  download:
+    done: "Log downloaded"
+    failed: "Couldn't download this log."
+    write_failed: "Couldn't write the file."
+    gone: "logs.tf no longer has this log."
+    offline: "Check your internet connection."
+    too_big: "This log is too big to download."
+  open:
+    loading: "Loading log..."
+    offline: "Can't load this log while you're offline."
+    full_gone: "logs.tf no longer has the full log; its stats stay."
+    trimmed_offline: "This full log was cleared to save space. Connect to the internet to open it."
+  range:
+    months: { one: "%{count} month", other: "%{count} months" }
+    years: { one: "%{count} year", other: "%{count} years" }
+    all: "All"
+  weapons:
+    none: "No weapon stats in these logs"
+    counting: "Counting older logs, %{left} left"
+    weapon: "Weapon"
+    kills: "Kills"
+    damage: "Damage"
+    accuracy: "Accuracy"
+  list:
+    no_logs: "No logs on logs.tf for this player yet."
+    gone: "This log was removed from logs.tf"
+    unreadable: "This log couldn't be read"
+    date: "Date"
+    title: "Title"
+    map: "Map"
+    length: "Length"
+    class: "Class"
+    open_profile: "Open profile on logs.tf"
+    open_log: "Open on logs.tf"
+  column:
+    name: "Name"
+  stat:
+    played: "Played"
+    logs: "Logs"
+    kills_min: "Kills/min"
+    assists_min: "Assists/min"
+    deaths_min: "Deaths/min"
+    dmg_min: "Dmg/min"
+    heals_min: "Heals/min"
+    ubers_10min: "Ubers/10 min"
+  sort:
+    descending: "high to low"
+    ascending: "low to high"
+  range_name: "History range"
+  not_played: "Not played"
+  streaks: "Show Killstreaks (%{count})"
+  nickname_note: "This is your nickname for this player. Their name in this log is %{name}. You can turn this off in Settings."
+  nickname: "Nickname"
+  add:
+    placeholder: "Steam profile link or Steam ID"
+    nickname: "Nickname (optional)"
+    title: "Add player"
+    ok: "Add"
+    chip: "+ Add player"
+  stop:
+    title: "Stop tracking %{name}?"
+    body: "%{name}'s chip goes away. You can add them again later."
+    ok: "Stop tracking"
+    name: "Stop tracking %{name}"
+  rename:
+    title: "Nickname for %{name}"
+    hint: "Leave it empty to use their Steam name."
+    save: "Save"
+  refresh: "Refresh"
+  refreshing: "Refreshing..."
+  credit: "Stats from logs.tf"
+  detail:
+    charges: "Charges"
+    drops: "Drops"
+    kills_short: "Kills"
+    team_short: "Team"
+    caps: "Caps"
+    midfights: "Midfights"
+    show_chat: "Show Chat"
+    download: "Download log"
+    chat_empty: "Nobody chatted in this log."
+    chat_title: "In-game Chat"
+    time: "Time"
+    player: "Player"
+    streak: "Streak"
+    killstreaks: "Killstreaks"
+    kills_assists: "Kills+Assists"
+    deaths: "Deaths"
+    healing: "Healing"
+    avg_build: "Avg time to build"
+    avg_before_use: "Avg time before using"
+    near_full_deaths: "Near full charge deaths"
+    avg_uber: "Avg uber length"
+    deaths_after: "Deaths after charge"
+    advantages_lost: "Major advantages lost"
+    biggest_advantage: "Biggest advantage lost"
+    heal_target: "Heal Target"
+    heals: "Heals"
+    rounds: "Rounds"
+    medics: "Medics"
+    kill_matrix: "Kill matrix"
+    tracked: "Tracked player"
+    accuracy_short: "Acc"
+    round: "Round"
+    score: "Score"
+    type: "Type"
+    description: "Description"
+    won: "%{team} won"
+  event:
+    point_capture: "Point Capture"
+    captured: " captured point %{point}"
+    ubercharge: "Übercharge"
+    medic_death: "Medic Death"
+    killed_by: " killed by "
+    died: " died"
+    drop: "Drop"
+    dropped: " dropped a full charge"
+    round_end: "Round end"
+    round_win: "Round win for "
+    unknown: "Event"
 
 maps:
   count: { one: "%{count} map", other: "%{count} maps" }
@@ -678,6 +813,21 @@ confirm:
     title: "mastercomfig needed"
     body: "This addon needs mastercomfig. Install both?"
     ok: "Install both"
+  discard_changes:
+    title: "Unsaved changes"
+    body: "You have unsaved changes. Discard them?"
+    ok: "Discard"
+    keep: "Keep editing"
+  leave_unsaved:
+    can_save: "You have unsaved changes. Save them before you go?"
+    needs_name: "You have unsaved changes. Give your HUD a name to save it, or discard them."
+  remove_old_v4:
+    title: "Remove the old TF2Tools"
+    body: "TF2Tools closes while the old version is removed. Open it again when it's done."
+    ok: "Remove and close"
+  clear_logs:
+    title: "Clear All Logs"
+    body: "Are you sure you want to clear all activity logs? This cannot be undone."
 
 font_check:
   installed: { one: "Installed %{count} font for %{folder}. Restart TF2 to use them.", other: "Installed %{count} fonts for %{folder}. Restart TF2 to use them." }
@@ -1356,3 +1506,115 @@ messages:
     uninstall_hitsound: "Failed to uninstall hitsound"
     install_killsound: "Failed to install killsound"
     uninstall_killsound: "Failed to uninstall killsound"
+header:
+  sidebar_toggle: "Toggle Sidebar"
+  shortcuts:
+    tooltip: "Keyboard shortcuts (?)"
+    name: "Keyboard shortcuts"
+  play: "Play TF2"
+  tf2_running: "TF2 is already running"
+  badge:
+    connected: "TF2 Connected"
+    missing: "TF2 Not Found"
+  sync:
+    curated: "Syncing Curated HUDs..."
+    progress:
+      sounds: "Syncing Sounds: %{done} / %{total}"
+      crosshairs: "Syncing Crosshairs: %{done} / %{total}"
+      gamebanana_huds: "Syncing GameBanana HUDs: %{done} / %{total}"
+      store: "Syncing Store: %{done} / %{total}"
+
+activity_log:
+  clear_all: "Clear All"
+  cleared: "Logs cleared"
+  details: "Details"
+  empty:
+    title: "No log entries found"
+    hint: "Activity will appear here as you use TF2Tools"
+  filter:
+    all_categories: "All categories"
+    all_levels: "All levels"
+  level:
+    info: "Info"
+    warning: "Warning"
+    error: "Error"
+  level_name:
+    info: "info"
+    warning: "warning"
+    error: "error"
+  category:
+    hud: "HUD"
+    sound: "Sound"
+    crosshair: "Crosshair"
+    addon: "Addon"
+    profile: "Profile"
+    store: "Store"
+    system: "System"
+  action:
+    activate: "Activate"
+    copy: "Copy"
+    create: "Create"
+    delete: "Delete"
+    download: "Download"
+    import: "Import"
+    install: "Install"
+    install_fonts: "Install fonts"
+    make: "Make"
+    paint: "Paint"
+    remove: "Remove"
+    rename: "Rename"
+    repair: "Repair"
+    save_current: "Save current setup"
+    startup: "Startup"
+    sync: "Sync"
+    uninstall: "Uninstall"
+    update: "Update"
+    update_download: "Update-download"
+    update_install: "Update-install"
+    update_restart: "Update-restart"
+  row:
+    started: "TF2Tools started"
+    synced:
+      huds: { one: "Synced %{count} HUDs from GameBanana", other: "Synced %{count} HUDs from GameBanana" }
+      sounds: { one: "Synced %{count} sounds from GameBanana", other: "Synced %{count} sounds from GameBanana" }
+      crosshairs: { one: "Synced %{count} crosshairs from GameBanana", other: "Synced %{count} crosshairs from GameBanana" }
+      addons: { one: "Synced %{count} addons from mastercomfig", other: "Synced %{count} addons from mastercomfig" }
+      curated: { one: "Synced %{count} curated HUDs", other: "Synced %{count} curated HUDs" }
+    downloaded:
+      gb_hud: "Downloaded HUD from GameBanana: %{name}"
+      sound: "Downloaded sound from store: %{name}"
+      crosshair: "Downloaded crosshair from store: %{name}"
+      addon: "Downloaded addon to library: %{name}"
+      hud: "Downloaded HUD: %{name}"
+    failed:
+      gb_hud: "HUD download failed (GameBanana ID: %{id})"
+      sound: "Sound download failed (GameBanana ID: %{id})"
+      crosshair: "Crosshair download failed (GameBanana ID: %{id})"
+      addon: "Addon download failed: %{name}"
+      hud: "HUD download failed: %{name}"
+    gamebanana_id: "GameBanana ID: %{id}"
+
+shell:
+  leave_save: "Save and leave"
+  startup_failed: "TF2Tools could not start"
+  placeholder: "Coming in a later version"
+  crash:
+    notice: "TF2Tools closed unexpectedly last time."
+    copy: "Copy details"
+    copied: "Crash details copied"
+    copied_hint: "Paste them into your bug report."
+    close: "Close"
+  old_v4:
+    notice: "The old version of TF2Tools is still installed."
+    remove: "Remove it"
+    later: "Not now"
+    failed: "Couldn't remove the old TF2Tools"
+    failed_hint: "Remove it in Windows Settings > Apps instead."
+
+install_parts:
+  title: "Choose what to install"
+  present: "%{label} · Already in the game"
+  install: "Install"
+  addon: "%{name} has several parts. Pick the ones to install."
+  maps: "%{name} holds several maps. Pick the ones to install."
+  maps_skipped: "%{name} holds several maps. Pick the ones to install. Some extra files in this download were skipped."

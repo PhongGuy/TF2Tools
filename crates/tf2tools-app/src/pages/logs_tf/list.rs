@@ -14,10 +14,11 @@ use gpui_kit::{
 use tf2tools_core::{LogRow, LogState, SteamId};
 
 use super::text::{
-    LOG_GONE, LOG_PENDING, LOG_UNREADABLE, NO_LOGS_TEXT, date_time_text, duration_text, kapd_text,
-    known_text, log_url, per_min_text, profile_url,
+    date_time_text, duration_text, kapd_text, known_text, log_gone, log_pending, log_unreadable,
+    log_url, no_logs_text, per_min_text, profile_url,
 };
 use super::{LogsTfPage, detail};
+use crate::i18n::tr;
 use crate::ids;
 use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
@@ -175,7 +176,7 @@ fn stat_block(fit: Fit, cell: impl Fn(usize, &'static str, Div) -> AnyElement) -
 
 /// The column titles over the rows, in the rows' widths.
 pub(super) fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
-    let cell = |w: Pixels, text: &'static str| div().w(w).flex_none().child(text);
+    let cell = |w: Pixels, text: SharedString| div().w(w).flex_none().child(text);
     h_flex()
         .gap(fit.gap)
         .px_3()
@@ -186,13 +187,22 @@ pub(super) fn column_header(fit: Fit, cx: &App) -> impl IntoElement {
         .font_weight(FontWeight::MEDIUM)
         .text_color(cx.theme().muted_foreground)
         .child(div().w(CHEVRON).flex_none())
-        .when(fit.date_column, |el| el.child(cell(DATE, "Date")))
-        .child(div().flex_1().min_w(fit.title_min).child("Title"))
-        .when(fit.map_column, |el| el.child(cell(MAP, "Map")))
-        .when(fit.length, |el| {
-            el.child(cell(LENGTH, "Length").text_right())
+        .when(fit.date_column, |el| {
+            el.child(cell(DATE, tr!("logs_tf.list.date")))
         })
-        .child(cell(fit.classes, "Class"))
+        .child(
+            div()
+                .flex_1()
+                .min_w(fit.title_min)
+                .child(tr!("logs_tf.list.title")),
+        )
+        .when(fit.map_column, |el| {
+            el.child(cell(MAP, tr!("logs_tf.list.map")))
+        })
+        .when(fit.length, |el| {
+            el.child(cell(LENGTH, tr!("logs_tf.list.length")).text_right())
+        })
+        .child(cell(fit.classes, tr!("logs_tf.list.class")))
         .child(stat_block(fit, |_, title, base| {
             base.id(ids::logstf_head(title))
                 .test_support()
@@ -209,14 +219,14 @@ pub(super) fn no_logs(id: SteamId, cx: &App) -> impl IntoElement {
         .child(labelled(
             div().text_sm().text_color(cx.theme().muted_foreground),
             ids::LOGSTF_NO_LOGS,
-            NO_LOGS_TEXT,
+            no_logs_text(),
         ))
         .child(
             Button::new(ids::LOGSTF_NO_LOGS_PROFILE)
                 .ghost()
                 .small()
                 .icon(IconName::ExternalLink)
-                .label("Open profile on logs.tf")
+                .label(tr!("logs_tf.list.open_profile"))
                 .on_click(move |_, _, cx| cx.open_url(&profile_url(id))),
         )
 }
@@ -385,9 +395,9 @@ fn stats(row: &LogRow, fit: Fit, cx: &App) -> impl Iterator<Item = AnyElement> {
 // Why a row has no stats, muted and spanning the stats columns.
 fn note(id: u64, state: LogState, fit: Fit, cx: &App) -> impl IntoElement {
     let text = match state {
-        LogState::Gone => LOG_GONE,
-        LogState::Unreadable => LOG_UNREADABLE,
-        LogState::Pending | LogState::Ready | _ => LOG_PENDING,
+        LogState::Gone => log_gone(),
+        LogState::Unreadable => log_unreadable(),
+        LogState::Pending | LogState::Ready | _ => log_pending(),
     };
     let length = if fit.length { LENGTH + fit.gap } else { px(0.) };
     h_flex()
@@ -408,6 +418,6 @@ pub(super) fn open_link(id: u64) -> Button {
         .ghost()
         .xsmall()
         .icon(IconName::ExternalLink)
-        .label("Open on logs.tf")
+        .label(tr!("logs_tf.list.open_log"))
         .on_click(move |_, _, cx| cx.open_url(&log_url(id)))
 }

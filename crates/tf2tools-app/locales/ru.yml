@@ -191,7 +191,7 @@ common:
     hitsound: "Хитсаунд"
     killsound: "Килсаунд"
   tf2_missing:
-    title: "TF2 не найден"
+    title: "TF2 не найдена"
     open_settings: "Открыть настройки"
     needs_tf2: "Сначала укажите папку TF2 в настройках"
   list:
@@ -372,6 +372,141 @@ logs_tf:
     last: { one: "За последние %{span}: %{count} лог", few: "За последние %{span}: %{count} лога", many: "За последние %{span}: %{count} логов" }
     up_to: { one: "%{range} до %{date}: %{count} лог", few: "%{range} до %{date}: %{count} лога", many: "%{range} до %{date}: %{count} логов" }
   weapons_title: { one: "Оружие: %{class} · %{range} · %{count} лог", few: "Оружие: %{class} · %{range} · %{count} лога", many: "Оружие: %{class} · %{range} · %{count} логов" }
+  empty: "Отслеживайте игрока, чтобы видеть его средние показатели по классам и логи с logs.tf."
+  steam_unreachable: "Нет связи со Steam. Проверьте подключение к интернету."
+  removing: "Удаление..."
+  looking_up: "Поиск..."
+  not_found: "Профиль Steam не найден."
+  not_steam: "Это не похоже на ссылку на профиль Steam или Steam ID."
+  down: "logs.tf сейчас не отвечает. Попробуйте позже."
+  busy: "logs.tf перегружен. Попробуйте через несколько минут."
+  ring:
+    progress: "Синхронизация logs.tf: %{done} / %{total}"
+    listing: "Синхронизация logs.tf..."
+  sync:
+    offline_saved: "Нет подключения. Показаны сохранённые логи."
+    unreachable: "Не удалось связаться с logs.tf. Проверьте подключение и попробуйте снова."
+    malformed: "logs.tf прислал непонятный ответ."
+  download:
+    done: "Лог скачан"
+    failed: "Не удалось скачать этот лог."
+    write_failed: "Не удалось записать файл."
+    gone: "На logs.tf больше нет этого лога."
+    offline: "Проверьте подключение к интернету."
+    too_big: "Этот лог слишком большой для скачивания."
+  open:
+    loading: "Загрузка лога..."
+    offline: "Без подключения этот лог не загрузить."
+    full_gone: "На logs.tf больше нет полного лога; его статистика сохранена."
+    trimmed_offline: "Полный лог удалён для экономии места. Подключитесь к интернету, чтобы открыть его."
+  range:
+    months: { one: "%{count} месяц", few: "%{count} месяца", many: "%{count} месяцев" }
+    years: { one: "%{count} год", few: "%{count} года", many: "%{count} лет" }
+    all: "Все"
+  weapons:
+    none: "В этих логах нет статистики оружия"
+    counting: "Подсчёт старых логов, осталось: %{left}"
+    weapon: "Оружие"
+    kills: "Убийства"
+    damage: "Урон"
+    accuracy: "Точность"
+  list:
+    no_logs: "На logs.tf пока нет логов этого игрока."
+    gone: "Этот лог удалён с logs.tf"
+    unreadable: "Этот лог не удалось прочитать"
+    date: "Дата"
+    title: "Название"
+    map: "Карта"
+    length: "Время"
+    class: "Класс"
+    open_profile: "Профиль на logs.tf"
+    open_log: "Открыть на logs.tf"
+  column:
+    name: "Имя"
+  stat:
+    played: "Сыграно"
+    logs: "Логи"
+    kills_min: "Убийств/мин"
+    assists_min: "Помощь/мин"
+    deaths_min: "Смерти/мин"
+    dmg_min: "Урон/мин"
+    heals_min: "Леч./мин"
+    ubers_10min: "Убер/10 мин"
+  sort:
+    descending: "по убыванию"
+    ascending: "по возрастанию"
+  range_name: "Период истории"
+  not_played: "Не играл"
+  streaks: "Серии убийств (%{count})"
+  nickname_note: "Это ваш ник для этого игрока. В этом логе его имя: %{name}. Это можно отключить в настройках."
+  nickname: "Ник"
+  add:
+    placeholder: "Ссылка на профиль или Steam ID"
+    nickname: "Ник (по желанию)"
+    title: "Добавить игрока"
+    ok: "Добавить"
+    chip: "+ Добавить игрока"
+  stop:
+    title: "Перестать отслеживать %{name}?"
+    body: "Карточка %{name} исчезнет. Игрока можно снова добавить позже."
+    ok: "Перестать отслеживать"
+    name: "Перестать отслеживать %{name}"
+  rename:
+    title: "Ник для %{name}"
+    hint: "Оставьте пустым, чтобы использовать имя в Steam."
+    save: "Сохранить"
+  refresh: "Обновить"
+  refreshing: "Обновление..."
+  credit: "Статистика с logs.tf"
+  detail:
+    charges: "Заряды"
+    drops: "Потери"
+    kills_short: "Фраги"
+    team_short: "Ком."
+    caps: "Захв."
+    midfights: "Мидфайты"
+    show_chat: "Показать чат"
+    download: "Скачать лог"
+    chat_empty: "В этом логе никто не писал в чат."
+    chat_title: "Чат игры"
+    time: "Время"
+    player: "Игрок"
+    streak: "Серия"
+    killstreaks: "Серии убийств"
+    kills_assists: "Убийства+помощь"
+    deaths: "Смерти"
+    healing: "Лечение"
+    avg_build: "Среднее время набора"
+    avg_before_use: "Среднее время до применения"
+    near_full_deaths: "Смерти с почти полным зарядом"
+    avg_uber: "Средняя длительность убера"
+    deaths_after: "Смерти после заряда"
+    advantages_lost: "Упущенные крупные преимущества"
+    biggest_advantage: "Крупнейшее упущенное преимущество"
+    heal_target: "Цель лечения"
+    heals: "Леч."
+    rounds: "Раунды"
+    medics: "Медики"
+    kill_matrix: "Матрица убийств"
+    tracked: "Отслеживаемый игрок"
+    accuracy_short: "Точн."
+    round: "Раунд"
+    score: "Счёт"
+    type: "Тип"
+    description: "Описание"
+    won: "Победа %{team}"
+  event:
+    point_capture: "Захват точки"
+    captured: " захватил точку %{point}"
+    ubercharge: "Убер-заряд"
+    medic_death: "Смерть медика"
+    killed_by: " убит игроком "
+    died: " погиб"
+    drop: "Потеря"
+    dropped: " потерял полный заряд"
+    round_end: "Конец раунда"
+    round_win: "Раунд выиграла команда "
+    unknown: "Событие"
 
 maps:
   count: { one: "%{count} карта", few: "%{count} карты", many: "%{count} карт" }
@@ -543,7 +678,7 @@ profiles:
     installed: "Установлено: %{list}"
     nothing_new: "Ничего нового не установлено"
     kept: "%{lead}. Без изменений: %{list} (нет в библиотеке)"
-    failed_steps: "Не удалось установить: %{steps}. Убедитесь, что TF2 закрыт и TF2Tools может записывать в папку TF2, затем попробуйте снова."
+    failed_steps: "Не удалось установить: %{steps}. Убедитесь, что TF2 закрыта и TF2Tools может записывать в папку TF2, затем попробуйте снова."
     activate_failed: "Не удалось включить профиль"
     missing: "Некоторые элементы отсутствуют"
   activity:
@@ -645,8 +780,8 @@ confirm:
     body: "В этом профиле ничего нет. Если его включить, все установленные HUD, звуки и прицелы будут убраны."
     ok: "Всё равно включить"
   tf2_running:
-    title: "TF2 запущен"
-    body: "TF2 запущен; изменения вступят в силу после перезапуска."
+    title: "TF2 запущена"
+    body: "TF2 запущена; изменения вступят в силу после перезапуска."
     ok: "Продолжить"
   delete_hud:
     title: "Удалить HUD"
@@ -676,6 +811,21 @@ confirm:
     title: "Нужен mastercomfig"
     body: "Этому дополнению нужен mastercomfig. Установить оба?"
     ok: "Установить оба"
+  discard_changes:
+    title: "Несохранённые изменения"
+    body: "Есть несохранённые изменения. Отбросить их?"
+    ok: "Отбросить"
+    keep: "Продолжить редактирование"
+  leave_unsaved:
+    can_save: "Есть несохранённые изменения. Сохранить их перед уходом?"
+    needs_name: "Есть несохранённые изменения. Дайте HUD имя, чтобы сохранить его, или отбросьте их."
+  remove_old_v4:
+    title: "Удалить старый TF2Tools"
+    body: "TF2Tools закроется на время удаления старой версии. Откройте его снова, когда всё закончится."
+    ok: "Удалить и закрыть"
+  clear_logs:
+    title: "Очистить журнал"
+    body: "Очистить весь журнал действий? Это действие нельзя отменить."
 
 font_check:
   installed: { one: "Установлен %{count} шрифт для %{folder}. Перезапустите TF2, чтобы изменения вступили в силу.", few: "Установлено %{count} шрифта для %{folder}. Перезапустите TF2, чтобы применить их.", many: "Установлено %{count} шрифтов для %{folder}. Перезапустите TF2, чтобы применить их." }
@@ -1327,7 +1477,7 @@ messages:
     change_history_range: "Не удалось изменить период истории"
     read_logs_tf_log: "Не удалось прочитать лог с logs.tf"
     switch_player: "Не удалось сменить игрока"
-    stop_tracking: "Не удалось прекратить отслеживание"
+    stop_tracking: "Не удалось перестать отслеживать"
     save_nickname: "Не удалось сохранить ник"
     add_player: "Не удалось добавить игрока"
     load_logs_tf_players: "Не удалось загрузить игроков logs.tf"
@@ -1354,3 +1504,115 @@ messages:
     uninstall_hitsound: "Не удалось удалить хитсаунд из игры"
     install_killsound: "Не удалось установить килсаунд"
     uninstall_killsound: "Не удалось удалить килсаунд из игры"
+header:
+  sidebar_toggle: "Свернуть или развернуть боковую панель"
+  shortcuts:
+    tooltip: "Сочетания клавиш (?)"
+    name: "Сочетания клавиш"
+  play: "Играть в TF2"
+  tf2_running: "TF2 уже запущена"
+  badge:
+    connected: "TF2 подключена"
+    missing: "TF2 не найдена"
+  sync:
+    curated: "Синхронизация HUD из подборки..."
+    progress:
+      sounds: "Синхронизация звуков: %{done} / %{total}"
+      crosshairs: "Синхронизация прицелов: %{done} / %{total}"
+      gamebanana_huds: "Синхронизация HUD с GameBanana: %{done} / %{total}"
+      store: "Синхронизация магазина: %{done} / %{total}"
+
+activity_log:
+  clear_all: "Очистить"
+  cleared: "Журнал очищен"
+  details: "Подробности"
+  empty:
+    title: "Записей нет"
+    hint: "Здесь появятся действия, которые вы выполняете в TF2Tools"
+  filter:
+    all_categories: "Все категории"
+    all_levels: "Все уровни"
+  level:
+    info: "Инфо"
+    warning: "Внимание"
+    error: "Ошибка"
+  level_name:
+    info: "инфо"
+    warning: "предупреждение"
+    error: "ошибка"
+  category:
+    hud: "HUD"
+    sound: "Звук"
+    crosshair: "Прицел"
+    addon: "Дополнение"
+    profile: "Профиль"
+    store: "Магазин"
+    system: "Система"
+  action:
+    activate: "Активация"
+    copy: "Копирование"
+    create: "Создание"
+    delete: "Удаление"
+    download: "Скачивание"
+    import: "Импорт"
+    install: "Установка"
+    install_fonts: "Установка шрифтов"
+    make: "Сборка"
+    paint: "Рисование"
+    remove: "Удаление из игры"
+    rename: "Переименование"
+    repair: "Исправление"
+    save_current: "Сохранение текущей настройки"
+    startup: "Запуск"
+    sync: "Синхронизация"
+    uninstall: "Удаление из TF2"
+    update: "Обновление"
+    update_download: "Скачивание обновления"
+    update_install: "Установка обновления"
+    update_restart: "Перезапуск после обновления"
+  row:
+    started: "TF2Tools запущен"
+    synced:
+      huds: { one: "Синхронизирован %{count} HUD с GameBanana", few: "Синхронизировано %{count} HUD с GameBanana", many: "Синхронизировано %{count} HUD с GameBanana" }
+      sounds: { one: "Синхронизирован %{count} звук с GameBanana", few: "Синхронизировано %{count} звука с GameBanana", many: "Синхронизировано %{count} звуков с GameBanana" }
+      crosshairs: { one: "Синхронизирован %{count} прицел с GameBanana", few: "Синхронизировано %{count} прицела с GameBanana", many: "Синхронизировано %{count} прицелов с GameBanana" }
+      addons: { one: "Синхронизировано %{count} дополнение из mastercomfig", few: "Синхронизировано %{count} дополнения из mastercomfig", many: "Синхронизировано %{count} дополнений из mastercomfig" }
+      curated: { one: "Синхронизирован %{count} HUD из подборки", few: "Синхронизировано %{count} HUD из подборки", many: "Синхронизировано %{count} HUD из подборки" }
+    downloaded:
+      gb_hud: "HUD скачан с GameBanana: %{name}"
+      sound: "Звук скачан из магазина: %{name}"
+      crosshair: "Прицел скачан из магазина: %{name}"
+      addon: "Дополнение скачано в библиотеку: %{name}"
+      hud: "HUD скачан: %{name}"
+    failed:
+      gb_hud: "Не удалось скачать HUD (ID на GameBanana: %{id})"
+      sound: "Не удалось скачать звук (ID на GameBanana: %{id})"
+      crosshair: "Не удалось скачать прицел (ID на GameBanana: %{id})"
+      addon: "Не удалось скачать дополнение: %{name}"
+      hud: "Не удалось скачать HUD: %{name}"
+    gamebanana_id: "ID на GameBanana: %{id}"
+
+shell:
+  leave_save: "Сохранить и выйти"
+  startup_failed: "Не удалось запустить TF2Tools"
+  placeholder: "Появится в одной из следующих версий"
+  crash:
+    notice: "В прошлый раз TF2Tools неожиданно закрылся."
+    copy: "Скопировать"
+    copied: "Подробности сбоя скопированы"
+    copied_hint: "Вставьте их в отчёт об ошибке."
+    close: "Закрыть"
+  old_v4:
+    notice: "Старая версия TF2Tools всё ещё установлена."
+    remove: "Удалить"
+    later: "Не сейчас"
+    failed: "Не удалось удалить старый TF2Tools"
+    failed_hint: "Удалите его в «Параметры Windows» > «Приложения»."
+
+install_parts:
+  title: "Выберите, что установить"
+  present: "%{label} · Уже в игре"
+  install: "Установить"
+  addon: "У %{name} несколько частей. Выберите, какие установить."
+  maps: "В %{name} несколько карт. Выберите, какие установить."
+  maps_skipped: "В %{name} несколько карт. Выберите, какие установить. Часть дополнительных файлов из этой загрузки пропущена."

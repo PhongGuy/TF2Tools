@@ -6,6 +6,7 @@ use gpui_kit::{
     StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
 };
 
+use crate::i18n::tr;
 use crate::ids;
 use crate::local_messages::describe_startup;
 use crate::services::StartupError;
@@ -37,7 +38,7 @@ pub(crate) fn render(error: &StartupError, cx: &App) -> impl IntoElement + use<>
                     div()
                         .text_xl()
                         .font_weight(FontWeight::BOLD)
-                        .child("TF2Tools could not start"),
+                        .child(tr!("shell.startup_failed")),
                 )
                 .child(div().text_color(theme.muted_foreground).child(message)),
         )

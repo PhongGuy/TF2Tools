@@ -13,6 +13,7 @@ use gpui_kit::{
 use tf2tools_core::{LogDetail, RoundLine, SteamId, Team};
 
 use super::{NUMBER, team_cell, team_colour};
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::logs_tf::LogsTfPage;
 use crate::pages::logs_tf::text::{EventPart, event_parts, round_length_text, team_name};
@@ -87,9 +88,9 @@ pub(super) fn rounds_table(
         .py_1()
         .text_color(cx.theme().muted_foreground)
         .font_weight(FontWeight::MEDIUM)
-        .child(spread(ROUND).child("Round"))
-        .child(spread(LENGTH).child("Length"))
-        .child(spread(SCORE).child("Score"))
+        .child(spread(ROUND).child(tr!("logs_tf.detail.round")))
+        .child(spread(LENGTH).child(tr!("logs_tf.list.length")))
+        .child(spread(SCORE).child(tr!("logs_tf.detail.score")))
         .children(COLUMNS.map(|(title, _)| {
             spread(TEAM_NUMBER)
                 .id(ids::logstf_rounds_column(title))
@@ -97,7 +98,7 @@ pub(super) fn rounds_table(
                 .text_right()
                 .child(title)
         }))
-        .child(spread(MIDFIGHTS).child("Midfights"))
+        .child(spread(MIDFIGHTS).child(tr!("logs_tf.detail.midfights")))
         .child(div().w(CHEVRON).flex_none());
     let mut table = v_flex();
     let mut rows = v_flex().child(head);
@@ -137,7 +138,7 @@ fn round_row(
         .aria_label(score.clone())
         .when_some(round.winner(), |el, team| {
             el.text_color(team_colour(team, cx))
-                .aria_description(format!("{} won", team_name(team)))
+                .aria_description(tr!("logs_tf.detail.won", team = team_name(team)))
         })
         .test_support()
         .flex_1()
@@ -221,10 +222,15 @@ fn round_panel(
             head()
                 .id(ids::logstf_round_players_head(log, n))
                 .test_support()
-                .child(div().w(TEAM).flex_none().child("Team"))
-                .child(div().w(NAME).flex_none().child("Name"))
-                .child(round_number("Kills".to_owned()))
-                .child(round_number("Damage".to_owned())),
+                .child(
+                    div()
+                        .w(TEAM)
+                        .flex_none()
+                        .child(tr!("logs_tf.detail.team_short")),
+                )
+                .child(div().w(NAME).flex_none().child(tr!("logs_tf.column.name")))
+                .child(round_number(tr!("logs_tf.detail.kills_short").into()))
+                .child(round_number(tr!("logs_tf.weapons.damage").into())),
         )
         .children(round.players().iter().map(|p| {
             let name = name_of(p.steam_id());
@@ -247,9 +253,19 @@ fn round_panel(
     let events = v_flex()
         .child(
             head()
-                .child(div().w(NUMBER).flex_none().child("Time"))
-                .child(div().w(TYPE).flex_none().child("Type"))
-                .child(div().flex_1().min_w(DESCRIPTION_MIN).child("Description")),
+                .child(
+                    div()
+                        .w(NUMBER)
+                        .flex_none()
+                        .child(tr!("logs_tf.detail.time")),
+                )
+                .child(div().w(TYPE).flex_none().child(tr!("logs_tf.detail.type")))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w(DESCRIPTION_MIN)
+                        .child(tr!("logs_tf.detail.description")),
+                ),
         )
         .children(round.events().iter().enumerate().map(|(ix, event)| {
             let time = round_length_text(event.at());

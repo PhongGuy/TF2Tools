@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, TestAppContext};
 use tf2tools_app::ids;
-use tf2tools_app::old_v4::{NOTICE, OldV4Notice, UninstallRunner, pending};
+use tf2tools_app::old_v4::{OldV4Notice, UninstallRunner, notice, pending};
 use tf2tools_app::services::Tf2State;
 use tf2tools_core::{OldV4, UninstallEntry, find_old_v4};
 
@@ -64,7 +64,7 @@ fn no_banner_without_v4(cx: &mut TestAppContext) {
 fn the_banner_asks_in_plain_words(cx: &mut TestAppContext) {
     let (_env, s, _) = shell_with(cx, Some(v4()));
     let text = support::label_of(cx, s.win, ids::OLD_V4_BANNER_TEXT).unwrap();
-    assert_eq!(text, NOTICE);
+    assert_eq!(text, notice());
     assert_eq!(text, "The old version of TF2Tools is still installed.");
     support::assert_plain(&text);
     assert_eq!(

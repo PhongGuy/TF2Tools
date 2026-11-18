@@ -4,13 +4,13 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use gpui_kit::{App, AppContext as _, Context, Entity, EventEmitter, Global, Task};
+use gpui_kit::{App, AppContext as _, Context, Entity, EventEmitter, Global, SharedString, Task};
 use tf2tools_core::{
     LogState, LogsCache, LogsCancel, LogsProgress, LogsRange, LogsSyncError, LogsSyncSummary,
     SteamId,
 };
 
-use crate::pages::logs_tf::text::{LOGS_TF_DOWN, sync_message};
+use crate::pages::logs_tf::text::{logs_tf_down, sync_message};
 use crate::services::Services;
 use crate::tokio_bridge;
 
@@ -78,12 +78,12 @@ struct Run {
 }
 
 /// The one logs.tf sync the app runs, the one request waiting behind it, and the last failure
-/// kept for the page's error line.
+/// kept for the page's error line, worded in the language of the moment it failed.
 #[derive(Default)]
 pub struct LogsSync {
     run: Option<Run>,
     queued: Option<Request>,
-    error: Option<(SteamId, &'static str)>,
+    error: Option<(SteamId, SharedString)>,
     // Each player's last download count and estimate over its range, kept through a retry's
     // or a new run's listing so the time left does not blink out. Success, a stop or a run
     // over another range drops it.
@@ -182,9 +182,10 @@ impl LogsSync {
     }
 
     /// Why `id`'s last sync failed, in player words.
-    pub fn error(&self, id: SteamId) -> Option<&'static str> {
+    pub fn error(&self, id: SteamId) -> Option<SharedString> {
         self.error
-            .and_then(|(failed, message)| (failed == id).then_some(message))
+            .as_ref()
+            .and_then(|(failed, message)| (*failed == id).then(|| message.clone()))
     }
 
     fn spawn(&mut self, request: Request, cx: &mut Context<Self>) {
@@ -296,7 +297,7 @@ impl LogsSync {
     }
 
     fn clear_error(&mut self, id: SteamId) {
-        if self.error.is_some_and(|(failed, _)| failed == id) {
+        if self.error.as_ref().is_some_and(|(failed, _)| *failed == id) {
             self.error = None;
         }
     }
@@ -327,7 +328,7 @@ impl LogsSync {
             }
             Err(error) => {
                 tracing::warn!(%error, "the logs.tf sync task stopped");
-                self.error = Some((id, LOGS_TF_DOWN));
+                self.error = Some((id, logs_tf_down()));
             }
         }
         self.run = None;

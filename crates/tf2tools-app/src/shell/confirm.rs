@@ -25,10 +25,10 @@ impl Confirm {
     /// The prompt before dropping a drawing with unsaved changes.
     pub fn discard_changes() -> Self {
         Self {
-            title: "Unsaved changes".into(),
-            description: "You have unsaved changes. Discard them?".into(),
-            confirm_label: "Discard".into(),
-            cancel_label: "Keep editing".into(),
+            title: tr!("confirm.discard_changes.title"),
+            description: tr!("confirm.discard_changes.body"),
+            confirm_label: tr!("confirm.discard_changes.ok"),
+            cancel_label: tr!("confirm.discard_changes.keep"),
         }
     }
 
@@ -36,11 +36,11 @@ impl Confirm {
     /// leave" is offered, and without it the player is told a name lets them save.
     pub fn leave_unsaved(can_save: bool) -> Self {
         let description = match can_save {
-            true => "You have unsaved changes. Save them before you go?",
-            false => "You have unsaved changes. Give your HUD a name to save it, or discard them.",
+            true => tr!("confirm.leave_unsaved.can_save"),
+            false => tr!("confirm.leave_unsaved.needs_name"),
         };
         Self {
-            description: description.into(),
+            description,
             ..Self::discard_changes()
         }
     }
@@ -48,12 +48,10 @@ impl Confirm {
     /// The prompt before removing TF2Tools 4, whose uninstaller closes this app too.
     pub fn remove_old_v4() -> Self {
         Self {
-            title: "Remove the old TF2Tools".into(),
-            description:
-                "TF2Tools closes while the old version is removed. Open it again when it's done."
-                    .into(),
-            confirm_label: "Remove and close".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.remove_old_v4.title"),
+            description: tr!("confirm.remove_old_v4.body"),
+            confirm_label: tr!("confirm.remove_old_v4.ok"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
@@ -153,11 +151,10 @@ impl Confirm {
     /// v5's Activity Log "Clear All" prompt.
     pub fn clear_logs() -> Self {
         Self {
-            title: "Clear All Logs".into(),
-            description: "Are you sure you want to clear all activity logs? This cannot be undone."
-                .into(),
-            confirm_label: "Clear All".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.clear_logs.title"),
+            description: tr!("confirm.clear_logs.body"),
+            confirm_label: tr!("activity_log.clear_all"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
