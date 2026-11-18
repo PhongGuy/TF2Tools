@@ -130,7 +130,7 @@ updater:
     release_page: "Release-Seite öffnen"
     restart: "Jetzt neu starten"
   banner:
-    update: "Update"
+    update: "Aktualisieren"
     available: "Update v%{version} verfügbar"
     downloading: "Wird heruntergeladen..."
     restart: "Neu starten"
@@ -480,7 +480,7 @@ logs_tf:
     name: "%{name} nicht mehr verfolgen"
   rename:
     title: "Spitzname für %{name}"
-    hint: "Leer lassen, um den Steam-Namen zu verwenden."
+    hint: "Leer lassen, um seinen Steam-Namen zu verwenden."
     save: "Speichern"
   refresh: "Neu laden"
   refreshing: "Wird neu geladen..."
@@ -516,7 +516,7 @@ logs_tf:
     medics: "Medics"
     kill_matrix: "Kill-Matrix"
     tracked: "Verfolgter Spieler"
-    accuracy_short: "Gen."
+    accuracy_short: "Genauigk."
     round: "Runde"
     score: "Punkte"
     type: "Typ"
@@ -811,7 +811,7 @@ confirm:
     ok: "Trotzdem aktivieren"
   tf2_running:
     title: "TF2 läuft"
-    body: "TF2 läuft; Änderungen wirken nach einem Neustart."
+    body: "TF2 läuft; Änderungen werden nach einem Neustart wirksam."
     ok: "Weiter"
   delete_hud:
     title: "HUD löschen"
@@ -855,7 +855,7 @@ confirm:
     ok: "Entfernen und schließen"
   clear_logs:
     title: "Alle Logs löschen"
-    body: "Möchtest du wirklich alle Einträge des Aktivitätsprotokolls löschen? Das kann nicht rückgängig gemacht werden."
+    body: "Möchtest du wirklich alle Logs löschen? Das kann nicht rückgängig gemacht werden."
   shrink_canvas:
     title: "Leinwand verkleinern"
     body: "Beim Verkleinern auf 32x32 werden die Ränder deiner Zeichnung abgeschnitten."
@@ -1201,7 +1201,7 @@ hud_maker:
   timeline:
     time: "%{now} s von %{end} s"
     in_game: "Im Spiel geändert: %{fields}"
-    pause: "Pause"
+    pause: "Pausieren"
     play: "Abspielen"
     clear: "Beenden"
     clear_tip: "Die von dir gestarteten Animationen beenden"
@@ -2436,10 +2436,10 @@ crosshair_maker:
   mirror_y: "Oben und unten spiegeln"
   guides: "Mittellinien"
   grid_lines: "Gitterlinien"
-  zoom_in: "Vergrößern"
-  zoom_out: "Verkleinern"
-  zoom_in_tip: "Vergrößern (Strg+Plus)"
-  zoom_out_tip: "Verkleinern (Strg+Minus)"
+  zoom_in: "Hineinzoomen"
+  zoom_out: "Herauszoomen"
+  zoom_in_tip: "Hineinzoomen (Strg+Plus)"
+  zoom_out_tip: "Herauszoomen (Strg+Minus)"
   fit_tip: "An das Fenster anpassen (Strg+0)"
   undo: "Rückgängig"
   redo: "Wiederholen"
@@ -2883,7 +2883,7 @@ activity_log:
   cleared: "Logs gelöscht"
   details: "Details"
   empty:
-    title: "Keine Protokolleinträge gefunden"
+    title: "Keine Logs gefunden"
     hint: "Hier erscheinen Aktivitäten, während du TF2Tools nutzt"
   filter:
     all_categories: "Alle Bereiche"

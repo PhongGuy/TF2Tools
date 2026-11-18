@@ -830,7 +830,6 @@ mod tests {
         "hud_maker.part_name.spy",
         "hud_maker.part_name.vs",
         "hud_maker.scene.hud",
-        "hud_maker.timeline.pause",
         "hud_store.detail.os",
         "hud_store.detail.repository",
         "hud_store.filter.os",
@@ -868,7 +867,6 @@ mod tests {
         "sounds.button.kill",
         "sounds.menu.hitsound_in",
         "sounds.menu.killsound_in",
-        "updater.banner.update",
     ];
 
     #[test]
