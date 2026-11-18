@@ -23,7 +23,7 @@ use tf2tools_core::{
 
 use crate::addon_detail::open_addon_detail;
 use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer};
-use crate::i18n::{self, tr};
+use crate::i18n::{self, Phrase, tr};
 use crate::ids;
 use crate::local_messages::describe_store_status;
 use crate::maps_sync::{MapsSync, MapsSyncEvent, maps_sync};
@@ -167,7 +167,7 @@ pub struct GbMapsTab {
     revealed: HashSet<GbId>,
     /// The first page of the current query landed.
     loaded: bool,
-    error: Option<String>,
+    error: Option<Phrase>,
     /// Limits sync re-reads to one per `REQUERY_INTERVAL`, with one trailing run.
     throttle: Throttle,
     trailing: Option<Task<()>>,
@@ -383,8 +383,8 @@ impl GbMapsTab {
     }
 
     /// The last failed read in player words, until a page lands.
-    pub fn error(&self) -> Option<&str> {
-        self.error.as_deref()
+    pub fn error(&self) -> Option<SharedString> {
+        self.error.as_ref().map(Phrase::text)
     }
 
     /// Whether the player unblurred mature card `id`.
@@ -988,7 +988,7 @@ impl Render for GbMapsTab {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.follow_language(window, cx);
         // A failed read's message sits above the grid, or alone before the first card.
-        let error = self.error.clone().map(|message| {
+        let error = self.error.as_ref().map(Phrase::text).map(|message| {
             let this = cx.entity().downgrade();
             error_line(
                 ids::MAPS_GB_ERROR,

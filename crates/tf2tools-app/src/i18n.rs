@@ -1,6 +1,7 @@
 //! The app's translations: the offered languages, the process-wide locale and plural forms.
 
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::fmt;
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use gpui_kit::SharedString;
 
@@ -114,6 +115,28 @@ macro_rules! tr {
     };
 }
 pub(crate) use tr;
+
+/// A player-facing line worded when it is read, so a kept line follows a language switch.
+#[derive(Clone)]
+pub struct Phrase(Arc<dyn Fn() -> SharedString + Send + Sync>);
+
+impl Phrase {
+    /// A phrase that calls `f` for its text each time it is read.
+    pub fn new(f: impl Fn() -> SharedString + Send + Sync + 'static) -> Self {
+        Self(Arc::new(f))
+    }
+
+    /// The phrase in the current language.
+    pub fn text(&self) -> SharedString {
+        (self.0)()
+    }
+}
+
+impl fmt::Debug for Phrase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Phrase").field(&self.text()).finish()
+    }
+}
 
 /// The items joined as a list in the current language ("a", "a and b", "a, b and c").
 pub fn list(items: &[impl AsRef<str>]) -> SharedString {

@@ -25,7 +25,7 @@ use tf2tools_core::{AddonEntry, AddonName, AddonSection, StoreItem, StoreItemId,
 
 use crate::addon_updates::{AddonEvent, AddonUpdates};
 use crate::i18n::names::addon_section_name;
-use crate::i18n::tr;
+use crate::i18n::{Phrase, tr};
 use crate::ids;
 use crate::local_messages::{describe_library, describe_store_status};
 use crate::pages::common::{
@@ -115,7 +115,7 @@ pub struct AddonStorePage {
     items: Rc<[StoreItem]>,
     library: Library,
     loaded: bool,
-    error: Option<String>,
+    error: Option<Phrase>,
     reloads: usize,
     /// Whether an addon sync ran at the last hub notification, to catch the run's end.
     hub_running: bool,
@@ -452,7 +452,7 @@ impl AddonStorePage {
 
     // The same inline error as the HUD Store's Curated tab.
     fn error_line(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
-        let error = self.error.clone()?;
+        let error = self.error.as_ref()?.text();
         let this = cx.entity().downgrade();
         Some(store_error_line(
             error,

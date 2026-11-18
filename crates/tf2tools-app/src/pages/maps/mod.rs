@@ -22,10 +22,11 @@ use gpui_kit::{
 };
 use tf2tools_core::{MapState, StoreClient};
 
-use crate::i18n::{self, tr};
+use crate::i18n::{self, Phrase, tr};
 use crate::ids;
 use crate::map_messages::{
-    describe_map_download, describe_map_remove, describe_map_sync, map_stopped,
+    describe_map_download, describe_map_remove, describe_map_sync, map_stopped, map_stopped_phrase,
+    map_sync_phrase,
 };
 use crate::pages::common::no_tf2_warning;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
@@ -115,7 +116,7 @@ pub struct MapsPage {
     refreshed: bool,
     // Whether the window is too narrow for the play columns; set each render.
     compact: bool,
-    error: Option<String>,
+    error: Option<Phrase>,
     downloading: Option<Running>,
     /// Bumped by every load; a load that lands under an older generation is dropped.
     load_generation: u64,
@@ -222,8 +223,8 @@ impl MapsPage {
     }
 
     /// The player message of the last failed fetch, if any.
-    pub fn error(&self) -> Option<&str> {
-        self.error.as_deref()
+    pub fn error(&self) -> Option<SharedString> {
+        self.error.as_ref().map(Phrase::text)
     }
 
     pub fn search_input(&self) -> &Entity<InputState> {
@@ -335,14 +336,14 @@ impl MapsPage {
         self.load_generation += 1;
         let generation = self.load_generation;
         let install = tf2_state(cx).read(cx).install().cloned();
+        // A failed read comes back as `None` so its line is worded at draw; only a panic
+        // reaches the `OpError` arm.
         let loading = run_blocking(cx, move |s| {
-            s.store
+            Ok(s.store
                 .maps(install.as_ref())
                 .map(|entries| entries.iter().map(MapRow::from).collect::<Vec<_>>())
-                .map_err(|e| {
-                    tracing::warn!(error = %e, "reading the map list failed");
-                    OpError::core(tr!("messages.action.load_maps"), tr!("messages.maps.read"))
-                })
+                .inspect_err(|e| tracing::warn!(error = %e, "reading the map list failed"))
+                .ok())
         });
         cx.spawn(async move |page, cx| {
             let loaded = loading.await;
@@ -351,8 +352,9 @@ impl MapsPage {
                     return;
                 }
                 match loaded {
-                    Ok(rows) => page.rows = rows,
-                    Err(err) => page.error = Some(err.description().to_string()),
+                    Ok(Some(rows)) => page.rows = rows,
+                    Ok(None) => page.error = Some(Phrase::new(|| tr!("messages.maps.read"))),
+                    Err(err) => page.error = Some(Phrase::new(move || err.description())),
                 }
                 page.loaded = true;
                 page.refilter(cx);
@@ -392,11 +394,10 @@ impl MapsPage {
                         }
                     }
                     Ok(Err(e)) => {
-                        let failure = describe_map_sync(&e);
-                        failure.log("map list fetch");
-                        page.error = Some(failure.message);
+                        describe_map_sync(&e).log("map list fetch");
+                        page.error = Some(map_sync_phrase(&e));
                     }
-                    Err(e) => page.error = Some(map_stopped(e.to_string()).message),
+                    Err(_) => page.error = Some(map_stopped_phrase()),
                 }
                 cx.notify();
             });
@@ -588,7 +589,7 @@ impl MapsPage {
     }
 
     fn error_line(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
-        let error = self.error.clone()?;
+        let error = self.error.as_ref().map(Phrase::text)?;
         let page = cx.entity().downgrade();
         let on_retry = move |_: &mut Window, cx: &mut App| {
             let _ = page.update(cx, |page, cx| page.refresh(true, cx));
