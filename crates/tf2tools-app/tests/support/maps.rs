@@ -3,7 +3,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use gpui_kit::{Entity, TestAppContext};
+use gpui_kit::test::TestWindowExt as _;
+use gpui_kit::{AppContext as _, ElementId, Entity, ScrollDelta, TestAppContext, point};
 use tf2tools_app::ids;
 use tf2tools_app::maps_sync::{MapsRunner, MapsSync};
 use tf2tools_app::pages::maps::gb_tab::GbMapsTab;
@@ -207,4 +208,30 @@ pub fn seed_map_library(env: &super::Env) {
             rows.join(", ")
         ))
         .unwrap();
+}
+
+/// Wheels a notch at a time over the scrolling `area` until all of `id` lies inside it, as a
+/// player in a short window reaches what sits below the fold.
+pub fn wheel_into_view(
+    cx: &mut TestAppContext,
+    s: &super::ShellWindow,
+    area: impl Into<ElementId>,
+    id: impl Into<ElementId>,
+) {
+    let (area, id) = (area.into(), id.into());
+    for _ in 0..200 {
+        let view = super::bounds_of(cx, s.win, area.clone()).expect("the scrolling area");
+        if let Some(b) = super::bounds_of(cx, s.win, id.clone())
+            && b.top() >= view.top()
+            && b.bottom() <= view.bottom()
+        {
+            return;
+        }
+        let notch = ScrollDelta::Lines(point(0., -1.));
+        cx.update_window(s.win, |_, w, cx| w.scroll(area.clone(), notch, cx))
+            .unwrap();
+    }
+    let view = super::bounds_of(cx, s.win, area.clone());
+    let last = super::bounds_of(cx, s.win, id.clone());
+    panic!("{id:?} at {last:?} never scrolled into {area:?} at {view:?}");
 }

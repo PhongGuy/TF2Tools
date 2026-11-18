@@ -16,9 +16,9 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, FontWeight, Global, InteractiveElement as _,
-    IntoElement, ListAlignment, ListState, ParentElement as _, Pixels, Render, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
-    Window, div, list, px,
+    IntoElement, ListAlignment, ListState, ParentElement as _, Pixels, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
+    WeakEntity, Window, div, list, px,
 };
 use tf2tools_core::{MapState, StoreClient};
 
@@ -37,7 +37,7 @@ use crate::store_download::format_bytes;
 use crate::store_messages::{busy_text, busy_title};
 use crate::tokio_bridge;
 use crate::widgets::label_option::LabelOption;
-use crate::widgets::scroll::scroll_beside;
+use crate::widgets::scroll::{scroll_area, scroll_beside};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 use gb_tab::GbMapsTab;
@@ -120,6 +120,8 @@ pub struct MapsPage {
     /// Bumped by every load; a load that lands under an older generation is dropped.
     load_generation: u64,
     list: ListState,
+    /// The page's scroll on the GameBanana source, which moves only in a short window.
+    gb_scroll: ScrollHandle,
     search: Entity<InputState>,
     sort_select: Labels,
     source: MapsSource,
@@ -178,6 +180,7 @@ impl MapsPage {
             downloading: None,
             load_generation: 0,
             list: ListState::new(0, ListAlignment::Top, px(400.)),
+            gb_scroll: ScrollHandle::new(),
             search,
             sort_select,
             source: MapsSource::Serveme,
@@ -793,9 +796,14 @@ impl Render for MapsPage {
             .p(CONTENT_PADDING)
             .gap_4()
             .child(self.source_strip(cx));
-        // Only one source renders, so the tab's ids never meet the list's.
+        // Only one source renders, so the tab's ids never meet the list's. The tab's toolbar
+        // wraps in a short window, so the page scrolls to its Sync button or grid row, as the
+        // Sound Store does; the grid keeps its own bar in the padding beside it.
         if self.source == MapsSource::GameBanana {
-            return page
+            let page = page
+                .relative()
+                .track_scroll(&self.gb_scroll)
+                .overflow_y_scroll()
                 .child(
                     div()
                         .id(ids::MAPS_GB_INFO)
@@ -804,7 +812,10 @@ impl Render for MapsPage {
                         .text_color(cx.theme().muted_foreground)
                         .child(tr!("maps.gb.info")),
                 )
-                .child(div().flex_1().min_h_0().children(self.gamebanana.clone()));
+                .child(v_flex().flex_1().children(self.gamebanana.clone()));
+            return scroll_area(ids::page_scrollbar(Page::Maps), &self.gb_scroll, page)
+                .size_full()
+                .into_any_element();
         }
         self.compact = window.viewport_size().width < WIDE_WINDOW;
         // The box can change without an event (a value set by code), so it is compared here.
@@ -835,5 +846,6 @@ impl Render for MapsPage {
                     .child(Self::column_titles(self.compact, cx))
                     .child(body),
             )
+            .into_any_element()
     }
 }
