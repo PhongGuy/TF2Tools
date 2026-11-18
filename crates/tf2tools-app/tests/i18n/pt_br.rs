@@ -102,3 +102,21 @@ fn the_hud_maker_uses_the_client_and_toast_words() {
     assert!(text("hud_maker.history.save").contains("snapshot"));
     assert!(text("hud_maker.borrow.title").contains("emprestad"));
 }
+
+// The parts' labels and weapon meters name things as the Brazilian TF2 client does, and the
+// labels match the wording the panel's tips point at.
+#[test]
+fn the_hud_maker_parts_use_the_client_words() {
+    let text = |k: &str| {
+        tf2tools_app::_rust_i18n_try_translate("pt-BR", k)
+            .map(|t| t.into_owned())
+            .unwrap_or_default()
+    };
+    assert_eq!(text("hud_maker.label.draw_background"), "Desenhar fundo");
+    assert!(text("hud_maker.detach_first").starts_with("Solte"));
+    assert!(text("hud_maker.label.target_id").contains("ID do alvo"));
+    assert!(text("hud_maker.label.strange").contains("Estranho"));
+    assert!(text("hud_maker.meter.flamethrower").contains("Flogistinador"));
+    assert!(text("hud_maker.meter.drink").contains("Leite Louco"));
+    assert!(text("hud_maker.situation.switch.koth").contains("Rei do Pedaço"));
+}
