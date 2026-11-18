@@ -1268,6 +1268,7 @@ hud_maker:
       shift_arrows: "Shift + стрелки"
       ctrl_drag: "Ctrl + тянуть"
       hide: "H или Delete"
+      escape: "Escape"
       alt_click: "Alt + щелчок"
       shift_click: "Shift + щелчок"
       box: "Тянуть по пустому месту"

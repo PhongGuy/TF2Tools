@@ -254,3 +254,15 @@ fn french_punctuation_takes_a_no_break_space() {
         .collect();
     assert!(slips.is_empty(), "fr typography: {slips:#?}");
 }
+
+// French keyboards print "Échap" on the Escape key, so the shortcuts sheet names it that way.
+#[test]
+fn the_shortcuts_sheet_names_the_french_escape_key() {
+    let _guard = LocaleGuard::switch("fr");
+    let keys: Vec<String> = tf2tools_app::pages::hud_maker::shortcuts()
+        .iter()
+        .map(|(keys, _)| keys.to_string())
+        .collect();
+    assert!(keys.iter().any(|k| k == "Échap"), "{keys:?}");
+    assert!(!keys.iter().any(|k| k == "Escape"), "{keys:?}");
+}

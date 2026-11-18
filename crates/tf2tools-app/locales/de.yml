@@ -1293,6 +1293,7 @@ hud_maker:
       shift_arrows: "Umschalt + Pfeiltasten"
       ctrl_drag: "Strg + Ziehen"
       hide: "H oder Entf"
+      escape: "Escape"
       alt_click: "Alt + Klick"
       shift_click: "Umschalt + Klick"
       box: "Auf leerer Fläche ziehen"

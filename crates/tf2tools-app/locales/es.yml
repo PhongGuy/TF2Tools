@@ -1293,6 +1293,7 @@ hud_maker:
       shift_arrows: "Shift + flechas"
       ctrl_drag: "Ctrl + arrastrar"
       hide: "H o Supr"
+      escape: "Escape"
       alt_click: "Alt + clic"
       shift_click: "Shift + clic"
       box: "Arrastrar en un espacio vacío"

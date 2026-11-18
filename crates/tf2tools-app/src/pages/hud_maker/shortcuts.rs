@@ -32,7 +32,10 @@ pub fn shortcuts() -> [(SharedString, SharedString); 17] {
             tr!("hud_maker.shortcuts.keys.hide"),
             tr!("hud_maker.shortcuts.does.hide"),
         ),
-        ("Escape".into(), tr!("hud_maker.shortcuts.does.clear")),
+        (
+            tr!("hud_maker.shortcuts.keys.escape"),
+            tr!("hud_maker.shortcuts.does.clear"),
+        ),
         (
             tr!("hud_maker.shortcuts.keys.alt_click"),
             tr!("hud_maker.shortcuts.does.pick_inside"),

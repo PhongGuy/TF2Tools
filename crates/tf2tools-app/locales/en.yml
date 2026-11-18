@@ -1270,6 +1270,7 @@ hud_maker:
       shift_arrows: "Shift + arrow keys"
       ctrl_drag: "Ctrl + drag"
       hide: "H or Delete"
+      escape: "Escape"
       alt_click: "Alt + click"
       shift_click: "Shift + click"
       box: "Drag on empty space"

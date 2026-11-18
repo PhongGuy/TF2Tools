@@ -1294,6 +1294,7 @@ hud_maker:
       shift_arrows: "Shift + setas"
       ctrl_drag: "Ctrl + arrastar"
       hide: "H ou Delete"
+      escape: "Escape"
       alt_click: "Alt + clique"
       shift_click: "Shift + clique"
       box: "Arrastar em área vazia"
