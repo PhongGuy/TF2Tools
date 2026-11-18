@@ -56,6 +56,8 @@ pub struct Boot {
     pub font_host: Option<Arc<dyn FontHost>>,
     /// Where the update source comes from; the check runs once after the first frame.
     pub updates: UpdateBoot,
+    /// The system's preferred locales, most preferred first; startup follows them until the player picks.
+    pub locales: Vec<String>,
 }
 
 impl Boot {
@@ -72,6 +74,7 @@ impl Boot {
             offline: false,
             font_host: tf2tools_core::system_font_host(),
             updates: UpdateBoot::Environment,
+            locales: crate::i18n::system_locales(),
         })
     }
 
@@ -115,6 +118,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
         offline,
         font_host,
         updates,
+        locales,
     } = boot;
     let data_dir = data.root().to_path_buf();
     let update_endpoints = endpoints.clone();
@@ -147,7 +151,10 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
         Ok::<_, StartupError>((
             services,
             settings.sidebar_collapsed(),
-            settings.language().to_owned(),
+            settings
+                .language()
+                .unwrap_or_else(|| crate::i18n::system_language(&locales))
+                .to_owned(),
             huds,
             update_source,
             crash,
@@ -188,7 +195,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
                     mastercomfig_restore::install(cx);
                     CrashNotice::install(cx, crash);
                     OldV4Notice::install(cx, old_v4, old_v4::system_runner());
-                    // The shell's first frame is drawn in the language the player last chose.
+                    // The shell's first frame is drawn in the language the player chose, else the system's.
                     crate::i18n::apply(&language);
                     let shell = cx.new(|cx| Shell::with_huds(collapsed, huds, window, cx));
                     // The runtime and the syncs wait for the first frame, so they never delay it.
