@@ -4,7 +4,6 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::scroll::ScrollableElement as _;
 use gpui_kit::component::separator::Separator;
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, Size, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -15,6 +14,7 @@ use gpui_kit::{
 use super::route::Page;
 use super::{SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH, Shell};
 use crate::ids;
+use crate::widgets::tip::tip_box;
 
 const TOOLS: [Page; 6] = [
     Page::Huds,
@@ -178,7 +178,7 @@ fn nav_item(
         .child(Icon::new(icon(page)).with_size(Size::Size(px(16.))))
         .when(!collapsed, |item| item.child(label.clone()))
         .when(collapsed, |item| {
-            item.tooltip(move |window, cx| Tooltip::new(label.clone()).build(window, cx))
+            item.tooltip(move |window, cx| tip_box(label.clone()).build(window, cx))
         })
         .on_click(cx.listener(move |shell, _, window, cx| shell.request_navigate(page, window, cx)))
 }

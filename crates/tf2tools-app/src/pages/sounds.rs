@@ -9,7 +9,6 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::tag::Tag;
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
 };
@@ -46,6 +45,7 @@ use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::profile_menu::{OnPick, Section, added_title, profile_menu};
 use crate::widgets::scroll::scroll_area;
+use crate::widgets::tip::tip_box;
 use crate::widgets::{label_width, label_width_at, labelled};
 
 /// A library card's height; a short window scrolls the page rather than cut the grid below a row.
@@ -613,7 +613,7 @@ impl SoundsPage {
                     .text_color(muted)
                     .child(tip.clone());
                 let shown = if cut {
-                    shown.tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+                    shown.tooltip(move |window, cx| tip_box(tip.clone()).build(window, cx))
                 } else {
                     shown
                 };
@@ -806,7 +806,7 @@ fn slot_status(
         .justify_center()
         .text_color(color)
         .child(Icon::new(icon).small())
-        .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+        .tooltip(move |window, cx| tip_box(tip.clone()).build(window, cx))
 }
 
 /// The sound's name, truncated, semibold, with the VPK badge (`ids::sound_vpk`) for a VPK sound.

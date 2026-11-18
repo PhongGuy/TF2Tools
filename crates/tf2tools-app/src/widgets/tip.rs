@@ -1,13 +1,23 @@
 //! Tooltips on GPUI's own tooltip, not the kit's window-wide one: it drops on any press or
 //! scroll and whenever its control leaves the pointer, so it never stays behind when a panel
-//! scrolls or redraws under it.
+//! scrolls or redraws under it. Every tooltip box wraps at one width, so none runs off the window.
 
+use gpui_kit::component::text::Text;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::{
     AnyView, App, AppContext as _, Context, InteractiveElement as _, IntoElement,
     ParentElement as _, Pixels, Point, Render, SharedString, StatefulInteractiveElement as _,
-    Styled as _, TestSupportExt as _, Window, div,
+    Styled as _, TestSupportExt as _, Window, div, px,
 };
+
+// GPUI lays a tooltip out at its one-line width and only flips it left of the pointer, so a long
+// sentence ran off the 800 px window; past this width the words wrap instead.
+const MAX_WIDTH: Pixels = px(360.);
+
+/// The kit's tooltip box for `text`, wrapping its words past `MAX_WIDTH`.
+pub(crate) fn tip_box(text: impl Into<Text>) -> Tooltip {
+    Tooltip::new(text).max_w(MAX_WIDTH)
+}
 
 // The tooltip's content, under `id` so tests and the pilot can read its words.
 struct Tip {
@@ -22,7 +32,7 @@ impl Render for Tip {
             .id(self.id)
             .aria_label(self.text.clone())
             .test_support()
-            .child(Tooltip::new(self.text.clone()).build(window, cx));
+            .child(tip_box(self.text.clone()).build(window, cx));
         if self.shift == Point::default() {
             return content.into_any_element();
         }

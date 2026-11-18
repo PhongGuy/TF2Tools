@@ -15,7 +15,6 @@ use gpui_kit::component::color_picker::{ColorPicker, ColorPickerEvent, ColorPick
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::select::{Select, SelectState};
 use gpui_kit::component::slider::{Slider, SliderState};
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, IndexPath, Selectable as _, WindowExt as _, h_flex, v_flex,
 };
@@ -55,6 +54,7 @@ use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::crosshair_picker::IN_GAME_SIZE;
 use crate::widgets::label_option::LabelOption;
 use crate::widgets::scroll::scroll_area;
+use crate::widgets::tip::tip_box;
 use model::{
     Editor, SWATCHES, Tool, Viewport, alpha_of_percent, colour_hint, fit_note, fit_tip, hsla_of,
     hsla_of_rgba, opacity_tip, percent_of_alpha, position_text, preview_texels, redo_tip, rgb_of,
@@ -925,7 +925,7 @@ impl CrosshairMakerPage {
                             // The handle overhangs the track's ends by 11 px; the margin keeps
                             // it whole at 1% and 100% instead of clipped by the panel.
                             .mx_3()
-                            .tooltip(|window, cx| Tooltip::new(opacity_tip()).build(window, cx))
+                            .tooltip(|window, cx| tip_box(opacity_tip()).build(window, cx))
                             .child(Slider::new(&self.opacity)),
                     ),
             )

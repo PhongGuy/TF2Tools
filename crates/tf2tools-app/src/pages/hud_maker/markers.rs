@@ -2,7 +2,6 @@
 //! beside it, kept off every label's text, off the other badges and inside the canvas.
 
 use gpui_kit::assets::IconName;
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{Icon, Sizable as _};
 use gpui_kit::{
     AnyElement, Bounds, Hsla, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
@@ -13,6 +12,7 @@ use tf2tools_core::PartKey;
 
 use crate::i18n::tr;
 use crate::ids;
+use crate::widgets::tip::tip_box;
 
 /// What the marker says, in its tooltip and to a screen reader.
 pub(super) fn hard_to_read() -> SharedString {
@@ -98,7 +98,7 @@ pub(super) fn markers(
                 .bg(look.background)
                 .text_color(look.warning)
                 .child(Icon::new(IconName::TriangleAlert).xsmall())
-                .tooltip(|window, cx| Tooltip::new(hard_to_read()).build(window, cx))
+                .tooltip(|window, cx| tip_box(hard_to_read()).build(window, cx))
                 .into_any_element(),
         );
     }

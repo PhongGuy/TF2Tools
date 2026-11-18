@@ -659,3 +659,50 @@ fn the_spanish_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppConte
 fn the_german_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext) {
     start_card_clears_the_toolbar_at_800_by_600(cx, "de");
 }
+
+// At 800x600 the Minimal HUD switch's tooltip in `lang` stays inside the window, however long
+// its sentence runs.
+fn minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
+    let (_env, s, _page) = open_maker(cx);
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
+    let holder = ids::hud_maker_tip_for(&ids::HUD_MAKER_MINMODE.into());
+    cx.update_window(s.win, |_, w, cx| w.hover(holder, cx))
+        .unwrap();
+    support::settle(cx, s.win);
+    cx.executor()
+        .advance_clock(std::time::Duration::from_millis(800));
+    support::settle(cx, s.win);
+    let tip = support::bounds_of(cx, s.win, ids::HUD_MAKER_TIP).expect("the tooltip shows");
+    assert!(
+        tip.left() >= px(0.) && tip.right() <= px(800.),
+        "{lang}: the tooltip {tip:?} leaves the 800 px window"
+    );
+}
+
+#[gpui_kit::test]
+fn the_english_minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext) {
+    minmode_tip_fits_at_800_by_600(cx, "en");
+}
+
+#[gpui_kit::test]
+fn the_russian_minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext) {
+    minmode_tip_fits_at_800_by_600(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext) {
+    minmode_tip_fits_at_800_by_600(cx, "pt-BR");
+}
+
+#[gpui_kit::test]
+fn the_spanish_minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext) {
+    minmode_tip_fits_at_800_by_600(cx, "es");
+}
+
+#[gpui_kit::test]
+fn the_german_minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext) {
+    minmode_tip_fits_at_800_by_600(cx, "de");
+}
