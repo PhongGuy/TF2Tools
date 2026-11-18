@@ -2713,6 +2713,7 @@ activity_log:
     system: "Система"
   action:
     activate: "Активация"
+    apply: "Применение"
     copy: "Копирование"
     create: "Создание"
     delete: "Удаление"

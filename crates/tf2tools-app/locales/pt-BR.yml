@@ -2739,6 +2739,7 @@ activity_log:
     system: "Sistema"
   action:
     activate: "Ativar"
+    apply: "Aplicação"
     copy: "Copiar"
     create: "Criar"
     delete: "Excluir"

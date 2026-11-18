@@ -492,7 +492,7 @@ const LOG_ROWS: [LogRow; 12] = [
         45,
         "info",
         "crosshair",
-        "apply",
+        "install",
         "Applied 2 crosshair assignments",
         None,
     ),

@@ -2715,6 +2715,7 @@ activity_log:
     system: "System"
   action:
     activate: "Activate"
+    apply: "Apply"
     copy: "Copy"
     create: "Create"
     delete: "Delete"

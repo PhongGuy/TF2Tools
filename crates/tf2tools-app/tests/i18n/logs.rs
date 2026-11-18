@@ -211,6 +211,20 @@ fn categories_and_actions_read_in_russian_and_unknown_ones_stay_spaced() {
     );
 }
 
+#[test]
+fn the_apply_action_reads_in_russian_and_portuguese() {
+    let ru = {
+        let _guard = LocaleGuard::switch("ru");
+        action_label("apply").to_string()
+    };
+    let pt = {
+        let _guard = LocaleGuard::switch("pt-BR");
+        action_label("apply").to_string()
+    };
+    assert_eq!(ru, "Применение");
+    assert_eq!(pt, "Aplicação");
+}
+
 fn info(cat: &str, action: &str, msg: &str) -> NewLogEntry {
     NewLogEntry::new(LogLevel::Info, cat, action, msg)
 }
