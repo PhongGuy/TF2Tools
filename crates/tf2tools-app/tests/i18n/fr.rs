@@ -109,3 +109,16 @@ fn fr_yml_writes_no_break_spaces_as_escapes() {
     }
     assert!(text.contains("\\u202F"), "the group separator is an escape");
 }
+
+// A damaged download reads the same whichever store fetched it.
+#[test]
+fn french_says_a_damaged_download_one_way() {
+    let text = |k: &str| tf2tools_app::_rust_i18n_try_translate("fr", k).map(|t| t.into_owned());
+    let store = text("messages.store.download.damaged");
+    assert_eq!(store, text("messages.store.gb_fetch.damaged"));
+    assert_ne!(
+        store,
+        tf2tools_app::_rust_i18n_try_translate("en", "messages.store.download.damaged")
+            .map(|t| t.into_owned())
+    );
+}
