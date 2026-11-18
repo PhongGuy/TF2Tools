@@ -15,6 +15,8 @@
 #   remove = "remover"; delete = "excluir"; enable/disable = "ativar"/"desativar"; search = "buscar".
 #   Slots as the TF2 client: "Primária", "Secundária", "Corpo a corpo".
 #   Failure lines: "Não foi possível <verbo>..." ("Não foi possível remover o TF2Tools antigo").
+#   Activity Log = "Registro de atividades"; match log = "log de partida"; player = "jogador";
+#     nickname = "apelido". "log" stays English everywhere except "Registro de atividades".
 #   Plurals: only 1 takes "one"; 0 takes "other" ("0 HUDs", "há 0 dias").
 #   Formats: decimal ",", grouping ".", dates "05/03/2026" and "5 de mar. de 2026",
 #     counts "1,3 mil" / "1,2 mi"; a number and its unit are joined by a no-break space (\u00A0).
@@ -43,7 +45,7 @@ settings:
     days: { one: "%{count} dia", other: "%{count} dias" }
     days_hours: "%{days}d %{hours}h"
   addons:
-    mature: "Mostrar add-ons para adultos"
+    mature: "Mostrar add-ons com conteúdo adulto"
   storage:
     title: "Armazenamento"
     description: "Tudo o que o TF2Tools guarda neste computador"
@@ -66,7 +68,7 @@ settings:
       days: { one: "%{count} dia", other: "%{count} dias" }
       forever: "Para sempre"
       frees: "%{option}, libera cerca de %{size}"
-    cost: "Cada log completo ocupa cerca de 10 KB. O espaço cresce com a quantidade de logs dos jogadores que você acompanha, então Para sempre pode ocupar muito."
+    cost: "Cada log completo ocupa cerca de 10\u00A0KB. O espaço cresce com a quantidade de logs dos jogadores que você acompanha, então “Para sempre” pode ocupar muito espaço."
     usage: "O cache de logs usa cerca de %{cache}; %{logs} cerca de %{full}."
     full_logs: { one: "%{count} log completo usa", other: "%{count} logs completos usam" }
     measuring: "Medindo..."
@@ -96,7 +98,7 @@ settings:
     hide: "Ocultar avisos"
   help:
     title: "Ajuda e feedback"
-    description: "Travou ou achou algo quebrado? Leia a ajuda ou conte para nós."
+    description: "Precisa de ajuda ou achou algo quebrado? Leia a ajuda ou conte para nós."
     report: "Relatar um problema"
     open: "Ajuda"
   toast:
@@ -221,25 +223,25 @@ common:
     decimal: ","
     group: "."
   count:
-    thousand: "%{number} mil"
-    million: "%{number} mi"
+    thousand: "%{number}\u00A0mil"
+    million: "%{number}\u00A0mi"
   size:
-    b: "%{size} B"
-    kb: "%{size} KB"
-    mb: "%{size} MB"
-    gb: "%{size} GB"
-    tb: "%{size} TB"
+    b: "%{size}\u00A0B"
+    kb: "%{size}\u00A0KB"
+    mb: "%{size}\u00A0MB"
+    gb: "%{size}\u00A0GB"
+    tb: "%{size}\u00A0TB"
     downloading: "Baixando..."
     extracting: "Extraindo..."
     progress: "Baixando... %{done} / %{total}"
     progress_no_total: "Baixando... %{done}"
   duration:
-    played_minutes: "%{minutes} min"
-    played_hours_minutes: "%{hours} h %{minutes} min"
-    minutes: "%{minutes} min"
-    hours: "%{hours} h"
-    hours_minutes: "%{hours} h %{minutes} min"
-    seconds: "%{seconds} s"
+    played_minutes: "%{minutes}\u00A0min"
+    played_hours_minutes: "%{hours}\u00A0h %{minutes}\u00A0min"
+    minutes: "%{minutes}\u00A0min"
+    hours: "%{hours}\u00A0h"
+    hours_minutes: "%{hours}\u00A0h %{minutes}\u00A0min"
+    seconds: "%{seconds}\u00A0s"
   date:
     numeric: "%{day}/%{month}/%{year}"
     date_time: "%{date} %{time}"
