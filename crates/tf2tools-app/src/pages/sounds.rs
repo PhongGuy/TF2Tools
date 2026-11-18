@@ -1,6 +1,7 @@
 //! v5's Sounds page: the hitsound and killsound slots, conflicts, the sound library and the
 //! floating sound player.
 
+use std::cell::Cell;
 use std::rc::Rc;
 
 use gpui_kit::assets::IconName;
@@ -16,7 +17,8 @@ use gpui_kit::{
     AnyElement, AnyWindowHandle, App, AppContext as _, ClickEvent, Context, Div, ElementId, Entity,
     EventEmitter, FontWeight, Hsla, InteractiveElement as _, IntoElement, ParentElement as _,
     Pixels, Render, Role, ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _,
-    Subscription, TestSupportExt as _, WeakEntity, Window, div, px, rgb, transparent_black,
+    Subscription, TestSupportExt as _, WeakEntity, Window, canvas, div, px, rems, rgb,
+    transparent_black,
 };
 
 use tf2tools_core::{
@@ -44,7 +46,7 @@ use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
 use crate::widgets::profile_menu::{OnPick, Section, added_title, profile_menu};
 use crate::widgets::scroll::scroll_area;
-use crate::widgets::{label_width, labelled};
+use crate::widgets::{label_width, label_width_at, labelled};
 
 /// A library card's height; a short window scrolls the page rather than cut the grid below a row.
 const CARD_HEIGHT: Pixels = px(136.);
@@ -54,6 +56,13 @@ const PLAYER_CLEARANCE: Pixels = px(152.);
 /// A card's action row with Hit and Kill labelled, less the two labels: the card's border and
 /// padding (50), play and delete (68), an 8 px gap, and two labelled outline buttons (96).
 const LABELLED_ROW: Pixels = px(222.);
+/// A slot's installed row less the name and Uninstall's label: the card's border and padding
+/// (50), play and two 8 px gaps (48), and labelled Uninstall's padding, icon, gap and border (46).
+const SLOT_LABELLED_ROW: Pixels = px(144.);
+/// The same row with Uninstall an icon: its padding, icon and border (38) in place of 46.
+const SLOT_ICON_ROW: Pixels = px(136.);
+/// The space between the two slot cards.
+const SLOT_GAP: Pixels = px(16.);
 
 /// The action in flight: its button spins and the other mutating buttons disable.
 #[derive(Clone, PartialEq, Eq)]
@@ -87,6 +96,8 @@ pub struct SoundsPage {
     player: Entity<Player>,
     search: Entity<InputState>,
     grid: CardGrid,
+    /// The slot row's width at the last paint, so each slot can fit its row to its card.
+    slots_width: Rc<Cell<Pixels>>,
     scroll: ScrollHandle,
     _tf2: Subscription,
     _library: Subscription,
@@ -122,6 +133,7 @@ impl SoundsPage {
             player,
             search,
             grid: CardGrid::new(ids::SOUNDS_GRID).with_foot(PLAYER_CLEARANCE),
+            slots_width: Rc::new(Cell::new(px(1024.))),
             scroll: ScrollHandle::new(),
             _tf2: tf2,
             _library: library,
@@ -534,7 +546,7 @@ impl SoundsPage {
 
     // v5's slot card: icon and title with the badges at the right, then play, name and
     // Uninstall, or the muted empty line.
-    fn slot_card(&self, kind: SoundKind, cx: &mut Context<Self>) -> AnyElement {
+    fn slot_card(&self, kind: SoundKind, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme();
         let muted = theme.muted_foreground;
         let icon = match kind {
@@ -577,7 +589,44 @@ impl SoundsPage {
                     .is_some_and(|now| now.key == key);
                 let uninstalling = self.busy == Some(Busy::Uninstall(kind));
                 let name = slot.name.clone();
-                // The name truncates before Uninstall gives up any width.
+                // Uninstall keeps its label only while the whole name fits beside it, measured in
+                // real pixels; otherwise it is a named icon, and a name still too long truncates
+                // with a tooltip.
+                let label = if uninstalling {
+                    tr!("sounds.button.removing")
+                } else {
+                    tr!("sounds.button.uninstall")
+                };
+                let card = (self.slots_width.get() - SLOT_GAP) / 2.;
+                let tip: SharedString = slot.name.into();
+                let name_w = label_width_at(&tip, rems(0.875), window, cx);
+                let labelled_uninstall =
+                    name_w + label_width(&label, window, cx) <= card - SLOT_LABELLED_ROW;
+                let cut = !labelled_uninstall && name_w > card - SLOT_ICON_ROW;
+                let shown = div()
+                    .id(ids::sound_slot_name(kind))
+                    .aria_label(tip.clone())
+                    .test_support()
+                    .min_w_0()
+                    .truncate()
+                    .text_sm()
+                    .text_color(muted)
+                    .child(tip.clone());
+                let shown = if cut {
+                    shown.tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+                } else {
+                    shown
+                };
+                let uninstall = Button::new(ids::sound_slot_uninstall(kind))
+                    .flex_none()
+                    .outline()
+                    .px(SM_ICON_PX)
+                    .icon(IconName::Unplug);
+                let uninstall = if labelled_uninstall {
+                    uninstall.label(label)
+                } else {
+                    uninstall.named(label)
+                };
                 h_flex()
                     .justify_between()
                     .gap_2()
@@ -604,23 +653,10 @@ impl SoundsPage {
                                         page.play_slot(kind, name.clone(), window, cx)
                                     })),
                             )
-                            .child(labelled(
-                                div().min_w_0().truncate().text_sm().text_color(muted),
-                                ids::sound_slot_name(kind),
-                                slot.name,
-                            )),
+                            .child(shown),
                     )
                     .child(needs_tf2(
-                        Button::new(ids::sound_slot_uninstall(kind))
-                            .flex_none()
-                            .outline()
-                            .px(SM_ICON_PX)
-                            .icon(IconName::Unplug)
-                            .label(if uninstalling {
-                                tr!("sounds.button.removing")
-                            } else {
-                                tr!("sounds.button.uninstall")
-                            })
+                        uninstall
                             .loading(uninstalling)
                             .disabled(self.busy.is_some() && !uninstalling)
                             .on_click(cx.listener(move |page, _, window, cx| {
@@ -1062,14 +1098,30 @@ impl SoundsPage {
 }
 
 impl Render for SoundsPage {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // The canvas records the slot row's painted width; a change asks for another frame,
+        // since a refresh requested while drawing is dropped.
+        let measured = Rc::clone(&self.slots_width);
+        let watch = canvas(
+            move |bounds, window, _| {
+                if measured.get() != bounds.size.width {
+                    measured.set(bounds.size.width);
+                    window.request_animation_frame();
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .size_full();
         // Both slots stretch to the taller one, as v5's two-column grid draws them.
         let slots = h_flex()
+            .relative()
             .flex_none()
-            .gap_4()
+            .gap(SLOT_GAP)
             .items_stretch()
-            .child(self.slot_card(SoundKind::Hitsound, cx))
-            .child(self.slot_card(SoundKind::Killsound, cx));
+            .child(watch)
+            .child(self.slot_card(SoundKind::Hitsound, window, cx))
+            .child(self.slot_card(SoundKind::Killsound, window, cx));
         let conflicts = self
             .installed
             .as_ref()
