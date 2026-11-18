@@ -20,7 +20,7 @@ fn every_german_tag_maps_to_german() {
     ] {
         assert_eq!(system_language([tag]), "de", "{tag}");
     }
-    assert_eq!(system_language(["fr-FR", "de_AT.UTF-8"]), "de");
+    assert_eq!(system_language(["it-IT", "de_AT.UTF-8"]), "de");
     assert_eq!(system_language(["es-ES", "de-DE"]), "es");
     assert_eq!(system_language(["de-DE", "es-ES"]), "de");
     assert_eq!(system_language(["ru-RU", "de-DE"]), "ru");

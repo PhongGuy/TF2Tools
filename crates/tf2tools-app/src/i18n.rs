@@ -37,6 +37,10 @@ pub const LANGUAGES: &[Language] = &[
         code: "de",
         name: "Deutsch (preview)",
     },
+    Language {
+        code: "fr",
+        name: "Français (preview)",
+    },
 ];
 
 // The offered language with this code, so callers get a `'static` code back.
@@ -46,8 +50,8 @@ fn offered(code: &str) -> Option<&'static str> {
 
 /// The first of the preferred locales (most preferred first) that names an offered language,
 /// else "en". Tags like `ru_RU.UTF-8` or `ru-Cyrl-RU` reduce to their language and
-/// `pt_BR.UTF-8` maps to `pt-BR`, `es_MX.UTF-8` to `es` and `de_AT.UTF-8` to `de`; `C` and empty
-/// entries match nothing and the walk goes on.
+/// `pt_BR.UTF-8` maps to `pt-BR`, `es_MX.UTF-8` to `es`, `de_AT.UTF-8` to `de` and `fr_CA.UTF-8`
+/// to `fr`; `C` and empty entries match nothing and the walk goes on.
 pub fn system_language<S: AsRef<str>>(locales: impl IntoIterator<Item = S>) -> &'static str {
     locales
         .into_iter()
@@ -104,9 +108,16 @@ impl PluralForm {
     }
 }
 
-/// The form `n` takes in language `code`: Russian's one/few/many, English's one/other for
-/// every other code.
+/// The form `n` takes in language `code`: Russian's one/few/many, French's one for 0 and 1,
+/// English's one/other for every other code.
 pub fn plural_form(code: &str, n: u64) -> PluralForm {
+    if code == "fr" {
+        return if n <= 1 {
+            PluralForm::One
+        } else {
+            PluralForm::Other
+        };
+    }
     if code != "ru" {
         return if n == 1 {
             PluralForm::One
@@ -498,6 +509,16 @@ mod tests {
     }
 
     #[test]
+    fn french_counts_zero_and_one_as_one() {
+        for n in [0, 1] {
+            assert_eq!(plural_form("fr", n), PluralForm::One, "fr {n}");
+        }
+        for n in [2, 5, 11, 21, 101, 1000, 1_000_000] {
+            assert_eq!(plural_form("fr", n), PluralForm::Other, "fr {n}");
+        }
+    }
+
+    #[test]
     fn an_unknown_language_counts_like_english() {
         assert_eq!(plural_form("xx", 1), PluralForm::One);
         assert_eq!(plural_form("xx", 21), PluralForm::Other);
@@ -513,7 +534,8 @@ mod tests {
                 ("ru", "Русский (preview)"),
                 ("pt-BR", "Português do Brasil (preview)"),
                 ("es", "Español (preview)"),
-                ("de", "Deutsch (preview)")
+                ("de", "Deutsch (preview)"),
+                ("fr", "Français (preview)")
             ]
         );
         let offered: BTreeSet<&str> = LANGUAGES.iter().map(|l| l.code).collect();

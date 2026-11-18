@@ -22,6 +22,9 @@ mod es;
 #[path = "i18n/formats.rs"]
 mod formats;
 
+#[path = "i18n/fr.rs"]
+mod fr;
+
 #[path = "i18n/graphics.rs"]
 mod graphics;
 
