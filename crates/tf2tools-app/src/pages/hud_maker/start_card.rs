@@ -167,7 +167,8 @@ impl HudMakerPage {
                         return;
                     };
                     page.start_card.closed = true;
-                    page.start_preview(recipe, 0, window, cx);
+                    let name = starting_point_name(which).to_string();
+                    page.preview_named(recipe, 0, name, window, cx);
                 }));
             v_flex().gap_1().items_start().child(pick).child(
                 div()

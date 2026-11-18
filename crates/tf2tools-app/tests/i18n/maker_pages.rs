@@ -415,3 +415,28 @@ fn a_kill_feed_line_is_named_in_russian(cx: &mut TestAppContext) {
         Some("Market Garden убивает Rocket Jumper")
     );
 }
+
+// A starting point previews under its name in `lang`, not core's English.
+fn starting_point_bar_reads(cx: &mut TestAppContext, lang: &str, want: &str) {
+    let _guard = LocaleGuard::switch(lang);
+    let (_env, s, _page) = open_maker(cx);
+    support::click_id(cx, s.win, ids::HUD_MAKER_START_READY);
+    support::click_id(
+        cx,
+        s.win,
+        ids::hud_maker_start_card_point("Competitive minimal"),
+    );
+    let bar = support::label_of(cx, s.win, ids::HUD_MAKER_PREVIEW).expect("the preview bar");
+    assert!(bar.starts_with(want), "{bar}");
+    assert!(!bar.contains("Competitive minimal"), "{bar}");
+}
+
+#[gpui_kit::test]
+fn the_preview_bar_names_the_starting_point_in_russian(cx: &mut TestAppContext) {
+    starting_point_bar_reads(cx, "ru", "Превью: «Соревновательный минимум».");
+}
+
+#[gpui_kit::test]
+fn the_preview_bar_names_the_starting_point_in_portuguese(cx: &mut TestAppContext) {
+    starting_point_bar_reads(cx, "pt-BR", "Prévia de Competitivo minimalista.");
+}
