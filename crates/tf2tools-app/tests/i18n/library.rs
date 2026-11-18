@@ -553,6 +553,68 @@ fn the_spanish_sound_slots_fit_at_800(cx: &mut TestAppContext) {
     sound_slots_fit_at_800(cx, "es");
 }
 
+// At 800x600 an installed slot in `lang` shows its sound's name beside Uninstall: a short
+// library name whole, a long one shortened but still readable, never cut to a letter.
+fn installed_sound_names_show_at_800(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let path = env.tmp.path().join("ding.wav");
+    std::fs::write(&path, support::wav_bytes()).unwrap();
+    let ding = s
+        .services
+        .library
+        .import_sound(&path, "Ding", Provenance::Local)
+        .unwrap();
+    let tf2 = Tf2Install::from_path(&env.game).unwrap();
+    s.services
+        .library
+        .install_sound(ding.id(), SoundKind::Hitsound, &tf2)
+        .unwrap();
+    let dir = env.game.join("tf/custom/tf2tools-sounds/sound/ui");
+    std::fs::write(dir.join("killsound.wav"), support::wav_bytes()).unwrap();
+    resize_800(cx, &s);
+    let _page = open_sounds(cx, &s);
+    for kind in [SoundKind::Hitsound, SoundKind::Killsound] {
+        let card = support::bounds_of(cx, s.win, ids::sound_slot(kind)).unwrap();
+        let name = support::bounds_of(cx, s.win, ids::sound_slot_name(kind)).unwrap();
+        let text = support::label_of(cx, s.win, ids::sound_slot_name(kind)).unwrap();
+        let uninstall = support::bounds_of(cx, s.win, ids::sound_slot_uninstall(kind)).unwrap();
+        assert_inside(&format!("{lang} {kind:?} uninstall"), uninstall, card);
+        assert!(
+            name.right() <= uninstall.left(),
+            "{lang} {kind:?}: {text:?} {name:?} runs under Uninstall {uninstall:?}"
+        );
+        let whole = text_width(cx, s.win, &text, 0.875, gpui_kit::FontWeight::NORMAL);
+        let floor = whole.min(gpui_kit::px(64.));
+        assert!(
+            name.size.width + gpui_kit::px(0.5) >= floor,
+            "{lang} {kind:?}: {text:?} shows {name:?} of {whole:?}"
+        );
+    }
+    let name = support::bounds_of(cx, s.win, ids::sound_slot_name(SoundKind::Hitsound)).unwrap();
+    let whole = text_width(cx, s.win, "Ding", 0.875, gpui_kit::FontWeight::NORMAL);
+    assert!(
+        name.size.width + gpui_kit::px(0.5) >= whole,
+        "{lang}: Ding is cut to {name:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn the_english_installed_sound_names_show_at_800(cx: &mut TestAppContext) {
+    installed_sound_names_show_at_800(cx, "en");
+}
+
+#[gpui_kit::test]
+fn the_russian_installed_sound_names_show_at_800(cx: &mut TestAppContext) {
+    installed_sound_names_show_at_800(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_installed_sound_names_show_at_800(cx: &mut TestAppContext) {
+    installed_sound_names_show_at_800(cx, "pt-BR");
+}
+
 // Each slot's status is an icon whose name reads in `lang`, small enough for any word.
 fn sound_status_icon_reads(cx: &mut TestAppContext, lang: &str, installed: &str) {
     let _guard = LocaleGuard::switch(lang);

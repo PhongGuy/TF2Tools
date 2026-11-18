@@ -556,3 +556,48 @@ fn the_portuguese_toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContex
 fn the_spanish_toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContext) {
     toolbar_and_meter_row_fit_at_800_by_600(cx, "es");
 }
+
+// At 800x600 the Start from card in `lang` shows From scratch whole, and keeps clear of every
+// toolbar button and inside the canvas area, also with the ready-made HUDs listed.
+fn start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
+    let (_env, s, _page) = open_maker(cx);
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    let card = support::bounds_of(cx, s.win, ids::HUD_MAKER_START_CARD).unwrap();
+    let blank = support::bounds_of(cx, s.win, ids::HUD_MAKER_START_BLANK).unwrap();
+    assert!(
+        blank.top() >= card.top() && blank.bottom() <= card.bottom(),
+        "{lang}: From scratch {blank:?} leaves the card {card:?}"
+    );
+    support::click_id(cx, s.win, ids::HUD_MAKER_START_READY);
+    let area = support::bounds_of(cx, s.win, ids::HUD_MAKER_CANVAS_AREA).unwrap();
+    let card = support::bounds_of(cx, s.win, ids::HUD_MAKER_START_CARD).unwrap();
+    assert!(
+        card.top() >= area.top() && card.bottom() <= area.bottom(),
+        "{lang}: the start card {card:?} leaves the area {area:?}"
+    );
+    for id in TOOLBAR_BUTTONS {
+        if let Some(button) = support::bounds_of(cx, s.win, id) {
+            assert!(
+                !card.intersects(&button),
+                "{lang}: the start card {card:?} covers {id} {button:?}"
+            );
+        }
+    }
+}
+
+#[gpui_kit::test]
+fn the_english_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext) {
+    start_card_clears_the_toolbar_at_800_by_600(cx, "en");
+}
+
+#[gpui_kit::test]
+fn the_russian_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext) {
+    start_card_clears_the_toolbar_at_800_by_600(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext) {
+    start_card_clears_the_toolbar_at_800_by_600(cx, "pt-BR");
+}
