@@ -122,3 +122,17 @@ fn french_says_a_damaged_download_one_way() {
             .map(|t| t.into_owned())
     );
 }
+
+// The HUD Maker's timeline names game events as the French client does.
+#[test]
+fn the_hud_maker_timeline_uses_the_client_words() {
+    let text = |k: &str| {
+        tf2tools_app::_rust_i18n_try_translate("fr", k)
+            .map(|t| t.into_owned())
+            .unwrap_or_default()
+    };
+    let charged = text("hud_maker.timeline.event.medic_charged");
+    assert!(charged.contains("ÜberCharge"), "{charged}");
+    assert_ne!(charged, "ÜberCharge ready");
+    assert_ne!(text("hud_maker.history.save"), "Save snapshot");
+}

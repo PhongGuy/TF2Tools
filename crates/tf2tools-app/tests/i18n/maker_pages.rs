@@ -405,6 +405,11 @@ fn the_german_maker_fits_at_800_by_600(cx: &mut TestAppContext) {
     maker_fits_at_800_by_600(cx, "de");
 }
 
+#[gpui_kit::test]
+fn the_french_maker_fits_at_800_by_600(cx: &mut TestAppContext) {
+    maker_fits_at_800_by_600(cx, "fr");
+}
+
 // At 800x600 the German way down to the health value ends left of the dock buttons, with the
 // nearest parent shown whole and the outer one cut short but named in full.
 #[gpui_kit::test]
@@ -494,6 +499,11 @@ fn the_preview_bar_names_the_starting_point_in_spanish(cx: &mut TestAppContext) 
 #[gpui_kit::test]
 fn the_preview_bar_names_the_starting_point_in_german(cx: &mut TestAppContext) {
     starting_point_bar_reads(cx, "de", "Vorschau: Kompetitiv minimal.");
+}
+
+#[gpui_kit::test]
+fn the_preview_bar_names_the_starting_point_in_french(cx: &mut TestAppContext) {
+    starting_point_bar_reads(cx, "fr", "Aperçu\u{a0}: Compétitif minimal.");
 }
 
 // The toolbar's buttons a docked panel must never lie over.
@@ -605,6 +615,11 @@ fn the_german_toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContext) {
     toolbar_and_meter_row_fit_at_800_by_600(cx, "de");
 }
 
+#[gpui_kit::test]
+fn the_french_toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContext) {
+    toolbar_and_meter_row_fit_at_800_by_600(cx, "fr");
+}
+
 // At 800x600 the Start from card in `lang` shows From scratch whole, and keeps clear of every
 // toolbar button and inside the canvas area, also with the ready-made HUDs listed.
 fn start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext, lang: &str) {
@@ -658,4 +673,9 @@ fn the_spanish_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppConte
 #[gpui_kit::test]
 fn the_german_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext) {
     start_card_clears_the_toolbar_at_800_by_600(cx, "de");
+}
+
+#[gpui_kit::test]
+fn the_french_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext) {
+    start_card_clears_the_toolbar_at_800_by_600(cx, "fr");
 }
