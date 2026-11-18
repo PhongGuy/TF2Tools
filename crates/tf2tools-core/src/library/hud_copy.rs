@@ -51,13 +51,26 @@ impl Library {
 
     /// Makes an editable copy of the library HUD `base`: its folder copied byte for byte
     /// (links and `.tf2tools/` left out), a `maker.json` recording the base, and a `local` row
-    /// named "<name> (copy)" or "(copy N)". The base is never changed.
+    /// named "<name> (copy)" or "(copy N)", English by default. The base is never changed.
     ///
     /// # Errors
     /// `NotFound`, `MadeHud`, `BaseMissing` (folder gone or a link), `NoSpace` before anything
     /// is written, `NameTaken` past "(copy 99)", `Io` or `Database` when writing fails; a
     /// failure leaves no folder, no row and nothing in the library tmp dir.
     pub fn copy_hud(&self, base: &HudId) -> Result<HudEntry, CopyHudError> {
+        self.copy_hud_named(base, &english_copy_name)
+    }
+
+    /// As `copy_hud`, with the copy named by `name(base_name, n)`: n = 1 for the first try,
+    /// then 2..=99; the first name no HUD holds wins.
+    ///
+    /// # Errors
+    /// As `copy_hud`; `NameTaken` when all 99 of the caller's names are held.
+    pub fn copy_hud_named(
+        &self,
+        base: &HudId,
+        name: &dyn Fn(&str, u32) -> String,
+    ) -> Result<HudEntry, CopyHudError> {
         let _copies = self.copies_read();
         let row = self.base_row(base)?.ok_or_else(|| CopyHudError::NotFound {
             id: base.as_str().to_owned(),
@@ -84,7 +97,7 @@ impl Library {
         let base_name = row.entry.name().to_owned();
         let first = self
             .db
-            .read(|conn| free_copy_name(conn, &base_name))
+            .read(|conn| free_copy_name(conn, &base_name, name))
             .map_err(copy_db)?
             .ok_or_else(|| CopyHudError::NameTaken {
                 name: base_name.clone(),
@@ -111,7 +124,7 @@ impl Library {
         create_dir_all(&huds)?;
         let live = huds.join(&folder);
         std::fs::rename(&build, &live).map_err(io_at(&live))?;
-        let inserted = self.insert_copy_row(&id, &folder, &base_name);
+        let inserted = self.insert_copy_row(&id, &folder, &base_name, name);
         if !matches!(inserted, Ok(Some(_))) {
             let _ = super::remove_dir_if_present(&live);
         }
@@ -288,12 +301,13 @@ impl Library {
         id: &str,
         folder: &str,
         base_name: &str,
+        copy_name: &dyn Fn(&str, u32) -> String,
     ) -> Result<Option<HudEntry>, CopyHudError> {
         let timestamp = now();
         self.db
             .write(|conn| {
                 let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-                let Some(name) = free_copy_name(&tx, base_name)? else {
+                let Some(name) = free_copy_name(&tx, base_name, copy_name)? else {
                     return Ok(None);
                 };
                 tx.execute(
@@ -310,11 +324,21 @@ impl Library {
     }
 }
 
-/// "<name> (copy)", else "<name> (copy N)" for the first free N from 2 to 99.
-fn free_copy_name(conn: &rusqlite::Connection, base: &str) -> rusqlite::Result<Option<String>> {
-    let candidates = std::iter::once(format!("{base} (copy)"))
-        .chain((2..=99).map(|n| format!("{base} (copy {n})")));
-    for name in candidates {
+/// The English copy name: "<name> (copy)" for n = 1, "<name> (copy N)" after.
+fn english_copy_name(base: &str, n: u32) -> String {
+    match n {
+        1 => format!("{base} (copy)"),
+        n => format!("{base} (copy {n})"),
+    }
+}
+
+/// The first of `copy_name(base, 1..=99)` no library HUD holds.
+fn free_copy_name(
+    conn: &rusqlite::Connection,
+    base: &str,
+    copy_name: &dyn Fn(&str, u32) -> String,
+) -> rusqlite::Result<Option<String>> {
+    for name in (1..=99).map(|n| copy_name(base, n)) {
         if !name_taken(conn, &name, None)? {
             return Ok(Some(name));
         }

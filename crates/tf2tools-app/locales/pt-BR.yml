@@ -908,6 +908,9 @@ huds:
   edit_wait: "Espere o TF2Tools terminar e depois edite"
   not_reinstalled: "Atualizado, mas não foi possível atualizar a cópia instalada. Feche o TF2 e instale de novo em HUDs."
   no_tf2: "Defina a pasta do TF2 nas configurações para instalar HUDs."
+  copy_name:
+    first: "%{name} (cópia)"
+    nth: "%{name} (cópia %{n})"
   heading:
     library: "Sua biblioteca"
     installed_one: "HUD instalado"

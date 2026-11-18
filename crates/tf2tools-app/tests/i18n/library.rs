@@ -16,6 +16,7 @@ use tf2tools_app::pages::addons::AddonsPage;
 use tf2tools_app::pages::addons::model::{movement_off, movement_on_text};
 use tf2tools_app::pages::crosshairs::CrosshairsPage;
 use tf2tools_app::pages::huds::HudsPage;
+use tf2tools_app::pages::huds::copy_name;
 use tf2tools_app::pages::maps::model::{SORTS, last_played_label, sort_label};
 use tf2tools_app::pages::profiles::ProfilesPage;
 use tf2tools_app::pages::profiles::editor_model::{Slot, SlotState, next_profile_name, slot_text};
@@ -1220,4 +1221,23 @@ fn a_maps_sync_failure_follows_a_language_switch(cx: &mut TestAppContext) {
             "Не удалось подключиться к GameBanana. Проверьте подключение к интернету и попробуйте снова."
         )
     );
+}
+
+#[test]
+fn a_copied_hud_is_named_in_russian_and_portuguese() {
+    let ru = {
+        let _guard = LocaleGuard::switch("ru");
+        [copy_name("flawhud", 1), copy_name("flawhud", 3)]
+    };
+    let pt = {
+        let _guard = LocaleGuard::switch("pt-BR");
+        [copy_name("flawhud", 1), copy_name("flawhud", 3)]
+    };
+    let en = {
+        let _guard = LocaleGuard::switch("en");
+        copy_name("flawhud", 2)
+    };
+    assert_eq!(ru, ["flawhud (копия)", "flawhud (копия 3)"]);
+    assert_eq!(pt, ["flawhud (cópia)", "flawhud (cópia 3)"]);
+    assert_eq!(en, "flawhud (copy 2)");
 }

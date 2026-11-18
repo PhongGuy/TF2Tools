@@ -1702,7 +1702,7 @@ pub enum CopyHudError {
         /// The HUD's id.
         id: String,
     },
-    /// Every copy name from "(copy)" to "(copy 99)" is taken.
+    /// Every copy name from "(copy)" to "(copy 99)" is taken, in the caller's words.
     #[error("no free copy name for {name}")]
     NameTaken {
         /// The base HUD's name.
