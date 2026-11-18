@@ -78,3 +78,15 @@ fn spanish_counts_take_the_plural_from_zero() {
     assert_eq!(i18n::plural("common.time.days_ago", 0), "hace 0 días");
     assert_eq!(i18n::plural("common.time.days_ago", 3), "hace 3 días");
 }
+
+#[test]
+fn spanish_says_a_damaged_download_one_way() {
+    let text = |k: &str| tf2tools_app::_rust_i18n_try_translate("es", k).map(|t| t.into_owned());
+    let store = text("messages.store.download.damaged");
+    assert_eq!(store, text("messages.store.gb_fetch.damaged"));
+    assert_ne!(
+        store,
+        tf2tools_app::_rust_i18n_try_translate("en", "messages.store.download.damaged")
+            .map(|t| t.into_owned())
+    );
+}
