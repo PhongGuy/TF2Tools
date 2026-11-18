@@ -128,3 +128,17 @@ fn the_updater_says_a_damaged_download_as_the_stores_do() {
         tf2tools_app::_rust_i18n_try_translate("pt-BR", "messages.store.download.damaged")
     );
 }
+
+// The HUD Maker's curated part names read in Portuguese, with the client's power-up and
+// killstreak words.
+#[test]
+fn the_hud_maker_names_its_parts_in_portuguese() {
+    let text = |k: &str| {
+        tf2tools_app::_rust_i18n_try_translate("pt-BR", format!("hud_maker.part_name.{k}"))
+            .map(|t| t.into_owned())
+            .unwrap_or_default()
+    };
+    assert_eq!(text("health_value"), "Valor da vida");
+    assert_eq!(text("kill_streak_icon"), "Ícone de combo");
+    assert_eq!(text("rune_haste"), "Poder: Ímpeto");
+}
