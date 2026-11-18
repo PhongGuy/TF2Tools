@@ -17,6 +17,7 @@ use gpui_kit::{
 use tf2tools_core::{HudModel, PanelRule, Part, PartKey};
 
 use super::HudMakerPage;
+use crate::i18n::names::maker_label;
 use crate::ids;
 
 /// Every row is this tall; `uniform_list` sizes all rows by the first.
@@ -173,7 +174,8 @@ impl HudMakerPage {
                     None
                 };
                 let name = row_label(part);
-                let file = (!same_letters(&name, part.name())).then(|| part.name().to_owned());
+                let english = core_label(part).unwrap_or(&name);
+                let file = (!same_letters(english, part.name())).then(|| part.name().to_owned());
                 Row {
                     key: key.clone(),
                     name,
@@ -504,12 +506,18 @@ fn same_letters(a: &str, b: &str) -> bool {
     letters(a) == letters(b)
 }
 
-// A root part is named by its panel's rule, any other by a readable form of its element name.
+// A root part is named by its panel's rule in the player's language, any other by a readable
+// form of its element name.
 pub(super) fn row_label(part: &Part) -> String {
-    match part.owner().filter(|_| part.is_root()) {
-        Some(id) => PanelRule::get(id).label().to_owned(),
+    match core_label(part) {
+        Some(label) => maker_label(label).to_string(),
         None => plain_name(part.name()),
     }
+}
+
+// Core's English name for a root part, which the file line compares with the element name.
+fn core_label(part: &Part) -> Option<&'static str> {
+    (part.owner().filter(|_| part.is_root())).map(|id| PanelRule::get(id).label())
 }
 
 // Words that open many element names and tell a player nothing, dropped from the front.

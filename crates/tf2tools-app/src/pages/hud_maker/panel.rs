@@ -31,6 +31,7 @@ use super::parts::row_label;
 use super::tip::{Spot, record, tip_beside_row, tipped};
 use super::view::{Panel, PanelMode, PanelPlace};
 use super::{Field, FontList, HudMakerPage};
+use crate::i18n::names::maker_label;
 use crate::ids;
 use crate::pages::crosshair_maker::model::hsla_of_rgba;
 use crate::widgets::Named as _;
@@ -152,7 +153,7 @@ enum Body {
 struct Rows {
     // An editable part some of whose included files were not found, as in a HUD copy.
     base_missing: bool,
-    shows: Option<&'static str>,
+    shows: Option<SharedString>,
     // Each offered row up to Stage 5 with whether Reset has anything to drop.
     rows: Vec<(&'static PropertySpec, bool)>,
     caps: PartCaps,
@@ -746,7 +747,8 @@ impl HudMakerPage {
             base_missing: part.base_incomplete(),
             shows: (part.code_toggled().map(|toggled| toggled.shows_when()))
                 .or_else(|| situational_ancestor(model, part))
-                .or_else(|| part.owner().map(|id| PanelRule::get(id).shows_when())),
+                .or_else(|| part.owner().map(|id| PanelRule::get(id).shows_when()))
+                .map(maker_label),
             rows,
             caps,
             hidden,
@@ -798,7 +800,7 @@ impl HudMakerPage {
         };
         let shows = rows
             .shows
-            .map(|text| note(ids::HUD_MAKER_PANEL_SHOWS, text.into()));
+            .map(|text| note(ids::HUD_MAKER_PANEL_SHOWS, text));
         let missing = (rows.base_missing)
             .then(|| note(ids::HUD_MAKER_PANEL_BASE_MISSING, BASE_MISSING.into()));
         let mut out: Vec<AnyElement> = missing.into_iter().chain(shows).collect();
@@ -1510,7 +1512,7 @@ impl HudMakerPage {
                         div()
                             .text_xs()
                             .text_color(cx.theme().muted_foreground)
-                            .child(spec.label()),
+                            .child(maker_label(spec.label())),
                     )
                     .child(h_flex().gap_1().items_center().children(extra).child(reset)),
             )
@@ -1630,14 +1632,15 @@ impl HudMakerPage {
             && (self.editor())
                 .and_then(|e| e.model().part(e.selected()?))
                 .is_some_and(|part| !paints_background(part));
-        let buttons = spec.choices().iter().map(|&(label, value)| {
+        let buttons = spec.choices().iter().map(|&(english, value)| {
+            let label = maker_label(english);
             let on = value == current;
             // The kit button reports no selected state, so a wrapper carries the id and state.
             let id = ids::hud_maker_choice_button(key, value);
             let button = Button::new(id.clone())
                 .outline()
                 .small()
-                .label(label)
+                .label(label.clone())
                 .selected(on)
                 .disabled(idle)
                 .on_click(cx.listener(move |page, _, window, cx| {
@@ -1673,7 +1676,7 @@ impl HudMakerPage {
         Switch::new(ids::hud_maker_toggle(key))
             .small()
             .checked(on)
-            .label(spec.label())
+            .label(maker_label(spec.label()))
             .on_click(move |&on, window, cx| {
                 let _ = page.update(cx, |page, cx| {
                     page.edit_selected(window, cx, |e| {
@@ -1834,7 +1837,7 @@ impl HudMakerPage {
         let key = (!is_slot(spec)).then(|| spec.key().to_owned());
         div()
             .id(ids::hud_maker_colour_row(spec.key()))
-            .aria_label(spec.label())
+            .aria_label(maker_label(spec.label()))
             .test_support()
             .w_10()
             .h_6()

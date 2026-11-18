@@ -2,13 +2,13 @@
 
 use gpui_kit::{ElementId, Entity, TestAppContext};
 use tf2tools_app::i18n::names::{
-    board_mode_name, meter_name, scene_name, starting_point_about, starting_point_name,
+    board_mode_name, maker_label, meter_name, scene_name, starting_point_about, starting_point_name,
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::{BoardMode, MeterKind, Scene, StartingPoint, Tf2Install};
+use tf2tools_core::{BoardMode, MeterKind, PartKey, Scene, StartingPoint, Tf2Install};
 
 use crate::LocaleGuard;
 use crate::support;
@@ -138,5 +138,58 @@ fn a_missing_scoreboard_says_so_in_russian(cx: &mut TestAppContext) {
     assert_eq!(
         label(cx, &s, ids::HUD_MAKER_SCENE_NOTE).as_deref(),
         Some("Не удаётся показать таблицу счёта")
+    );
+}
+
+const HEALTH: &str = "HudPlayerStatus/HudPlayerHealth";
+const HV: &str = "HudPlayerStatus/HudPlayerHealth/PlayerStatusHealthValue";
+
+#[test]
+fn core_table_labels_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let shown = [
+        "Background colour",
+        "Upper case",
+        "Hide",
+        "Square",
+        "Rounded",
+        "The game keeps this hidden",
+    ]
+    .map(|t| maker_label(t).to_string());
+    assert_eq!(
+        shown,
+        [
+            "Цвет фона",
+            "Заглавные буквы",
+            "Скрыть",
+            "Прямые",
+            "Скруглённые",
+            "Игра всегда скрывает эту часть"
+        ]
+    );
+}
+
+// The part list and the side panel read core's names in Russian; rows keep their key ids.
+#[gpui_kit::test]
+fn a_part_reads_its_core_name_and_when_it_shows_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, _page) = open_hud_maker(cx, &[]);
+    support::click_id(cx, s.win, ids::HUD_MAKER_START_BLANK);
+    if !support::present(cx, s.win, ids::HUD_MAKER_PARTS) {
+        support::click_id(cx, s.win, ids::HUD_MAKER_PARTS_PANEL_COLLAPSE);
+    }
+    support::click_part_row(cx, s.win, &PartKey::new(HV));
+    assert_eq!(
+        label(cx, &s, ids::hud_maker_row(&PartKey::new(HEALTH))).as_deref(),
+        Some("Здоровье")
+    );
+    assert_eq!(
+        label(cx, &s, ids::HUD_MAKER_PANEL_SHOWS).as_deref(),
+        Some("Видна, пока вы живы")
+    );
+    support::click_part_row(cx, s.win, &PartKey::new(HEALTH));
+    assert_eq!(
+        label(cx, &s, ids::HUD_MAKER_PANEL_PART).as_deref(),
+        Some("Здоровье")
     );
 }

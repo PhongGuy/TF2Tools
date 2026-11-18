@@ -192,6 +192,8 @@ pub fn starting_point_about(point: StartingPoint) -> SharedString {
 mod tests {
     use std::collections::BTreeMap;
 
+    use tf2tools_core::{ClassSchema, PanelRule, SceneRule};
+
     use super::{maker_label, maker_label_key};
 
     // One catalogue as flat key -> value, read without switching the locale.
@@ -212,7 +214,28 @@ mod tests {
     // Every English label core's HUD Maker tables show, with the accessor it came from. Each
     // table task adds its walk here.
     fn core_labels() -> Vec<(String, &'static str)> {
-        Vec::new()
+        let mut out = Vec::new();
+        let rules = PanelRule::all()
+            .iter()
+            .chain(SceneRule::every().iter().flat_map(|r| r.rules()));
+        for rule in rules {
+            out.push((rule.label().to_owned(), "PanelRule::label"));
+            out.push((rule.shows_when().to_owned(), "PanelRule::shows_when"));
+        }
+        for scene in SceneRule::every() {
+            for toggled in scene.code_toggled() {
+                out.push((toggled.shows_when().to_owned(), "CodeToggled::shows_when"));
+            }
+        }
+        for schema in ClassSchema::all() {
+            for spec in schema.properties() {
+                out.push((spec.label().to_owned(), "PropertySpec::label"));
+                for &(choice, _) in spec.choices() {
+                    out.push((choice.to_owned(), "PropertySpec::choices"));
+                }
+            }
+        }
+        out
     }
 
     // What `labels` lack: a key missing from en.yml or worded differently, a key missing from
