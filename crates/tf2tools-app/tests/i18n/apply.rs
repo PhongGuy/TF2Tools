@@ -71,7 +71,7 @@ fn the_first_preferred_locale_with_a_catalogue_wins() {
 
 #[test]
 fn a_system_without_a_catalogue_starts_in_english() {
-    assert_eq!(system_language(["it-IT", "fr_FR.UTF-8"]), "en");
+    assert_eq!(system_language(["it-IT", "nl_NL.UTF-8"]), "en");
     assert_eq!(system_language(Vec::<String>::new()), "en");
     assert_eq!(system_language(["C", "POSIX", ""]), "en");
 }

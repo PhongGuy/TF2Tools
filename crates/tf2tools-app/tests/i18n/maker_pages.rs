@@ -405,6 +405,11 @@ fn the_german_maker_fits_at_800_by_600(cx: &mut TestAppContext) {
     maker_fits_at_800_by_600(cx, "de");
 }
 
+#[gpui_kit::test]
+fn the_french_maker_fits_at_800_by_600(cx: &mut TestAppContext) {
+    maker_fits_at_800_by_600(cx, "fr");
+}
+
 // At 800x600 the German way down to the health value ends left of the dock buttons, with the
 // nearest parent shown whole and the outer one cut short but named in full.
 #[gpui_kit::test]
@@ -435,6 +440,37 @@ fn the_german_part_crumbs_keep_clear_of_the_dock_buttons(cx: &mut TestAppContext
     assert_eq!(
         support::label_of(cx, s.win, outer).as_deref(),
         Some("Spielerstatus")
+    );
+}
+
+// At 800x600 the French way down to the health value ends left of the dock buttons.
+#[gpui_kit::test]
+fn the_french_part_crumbs_keep_clear_of_the_dock_buttons(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("fr");
+    let (_env, s, page) = open_maker(cx);
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    select(cx, &s, &page, &[VALUE]);
+    support::settle(cx, s.win);
+    if !support::present(cx, s.win, ids::HUD_MAKER_PANEL_DOCK_LEFT) {
+        support::click_id(cx, s.win, ids::HUD_MAKER_PANEL_COLLAPSE);
+    }
+    let dock = support::bounds_of(cx, s.win, ids::HUD_MAKER_PANEL_DOCK_LEFT).unwrap();
+    let outer = ids::hud_maker_crumb(&PartKey::new("HudPlayerStatus"));
+    let near = ids::hud_maker_crumb(&PartKey::new("HudPlayerStatus/HudPlayerHealth"));
+    for id in [outer.clone(), near.clone()] {
+        let crumb = support::bounds_of(cx, s.win, id.clone()).unwrap();
+        assert!(
+            crumb.right() <= dock.left(),
+            "{id:?} {crumb:?} runs under the dock buttons {dock:?}"
+        );
+    }
+    assert_eq!(support::label_of(cx, s.win, near).as_deref(), Some("Santé"));
+    let status = tf2tools_app::_rust_i18n_try_translate("fr", "hud_maker.part_name.player_status");
+    assert_ne!(status.as_deref(), Some("Player status"));
+    assert_eq!(
+        support::label_of(cx, s.win, outer).as_deref(),
+        status.as_deref()
     );
 }
 
@@ -494,6 +530,11 @@ fn the_preview_bar_names_the_starting_point_in_spanish(cx: &mut TestAppContext) 
 #[gpui_kit::test]
 fn the_preview_bar_names_the_starting_point_in_german(cx: &mut TestAppContext) {
     starting_point_bar_reads(cx, "de", "Vorschau: Kompetitiv minimal.");
+}
+
+#[gpui_kit::test]
+fn the_preview_bar_names_the_starting_point_in_french(cx: &mut TestAppContext) {
+    starting_point_bar_reads(cx, "fr", "Aperçu\u{a0}: Compétitif minimal.");
 }
 
 // The toolbar's buttons a docked panel must never lie over.
@@ -605,6 +646,11 @@ fn the_german_toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContext) {
     toolbar_and_meter_row_fit_at_800_by_600(cx, "de");
 }
 
+#[gpui_kit::test]
+fn the_french_toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContext) {
+    toolbar_and_meter_row_fit_at_800_by_600(cx, "fr");
+}
+
 // At 800x600 the Start from card in `lang` shows From scratch whole, and keeps clear of every
 // toolbar button and inside the canvas area, also with the ready-made HUDs listed.
 fn start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext, lang: &str) {
@@ -660,6 +706,11 @@ fn the_german_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContex
     start_card_clears_the_toolbar_at_800_by_600(cx, "de");
 }
 
+#[gpui_kit::test]
+fn the_french_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext) {
+    start_card_clears_the_toolbar_at_800_by_600(cx, "fr");
+}
+
 // At 800x600 the Minimal HUD switch's tooltip in `lang` stays inside the window, however long
 // its sentence runs.
 fn minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext, lang: &str) {
@@ -710,4 +761,9 @@ fn the_spanish_minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_german_minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext) {
     minmode_tip_fits_at_800_by_600(cx, "de");
+}
+
+#[gpui_kit::test]
+fn the_french_minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext) {
+    minmode_tip_fits_at_800_by_600(cx, "fr");
 }

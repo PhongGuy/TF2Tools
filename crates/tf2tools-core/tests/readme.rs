@@ -455,6 +455,9 @@ fn contributing_explains_how_to_translate() {
         "Spanish",
         "de_AT",
         "German",
+        "fr_CA",
+        "French",
+        "\"0 HUD\"",
     ] {
         assert!(
             section.contains(needle),
@@ -479,6 +482,7 @@ fn the_readme_tells_players_they_can_pick_a_language() {
     assert!(settings.contains("Brazilian Portuguese"), "{settings}");
     assert!(settings.contains("Spanish"), "{settings}");
     assert!(settings.contains("German"), "{settings}");
+    assert!(settings.contains("French"), "{settings}");
     assert!(settings.contains("your system's language"), "{settings}");
     assert!(
         settings.contains("](CONTRIBUTING.md#translations)"),
