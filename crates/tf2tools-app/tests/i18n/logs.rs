@@ -712,13 +712,11 @@ fn a_kept_logs_tf_open_error_follows_a_language_switch(cx: &mut TestAppContext) 
     let page = open_page(cx, &s);
     to_end(cx, &page);
     support::click_id(cx, s.win, ids::logstf_log(3));
+    // The status line reads "Loading log..." until the fetch fails, so wait on the failure text.
     support::wait_real(cx, "the failure line", |cx| {
-        support::present(cx, s.win, ids::logstf_log_status(3))
+        support::label_of(cx, s.win, ids::logstf_log_status(3)).as_deref()
+            == Some("logs.tf isn't responding right now. Try again later.")
     });
-    assert_eq!(
-        support::label_of(cx, s.win, ids::logstf_log_status(3)).as_deref(),
-        Some("logs.tf isn't responding right now. Try again later.")
-    );
     crate::settings::open_settings(cx, &s);
     crate::settings::pick(cx, s.win, "ru");
     let page = open_page(cx, &s);
