@@ -19,6 +19,8 @@ use crate::ids;
 use crate::shell::route::{NavigateTo, Page};
 
 const CARD_WIDTH: f32 = 380.;
+// The least space above and below the card in its room.
+const CARD_MARGIN: f32 = 8.;
 
 /// Whether the player closed the card for this page, and whether it lists the starting points.
 #[derive(Debug, Default)]
@@ -45,27 +47,24 @@ impl HudMakerPage {
     }
 
     // The card centred over the screen, in a wrapper that takes no presses, so the canvas
-    // around the card still works.
+    // around the card still works. The wrapper stops above the toolbar where the card would
+    // stand over it, and a card taller than that scrolls inside.
     pub(super) fn start_card(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         if !self.shows_start_card() {
             return None;
         }
         let room = self.screen_area();
         let at = room.origin - self.area.get().origin;
-        let theme = cx.theme();
-        let card = v_flex()
-            .id(ids::HUD_MAKER_START_CARD)
-            .test_support()
-            .occlude()
-            .w(px(CARD_WIDTH))
-            .max_w(room.size.width)
+        let width = px(CARD_WIDTH).min(room.size.width);
+        let from = at.x + (room.size.width - width) / 2.;
+        let tall = room
+            .size
+            .height
+            .min(self.column_room(from, from + width, px(0.)) - at.y)
+            .max(px(0.));
+        let body = v_flex()
             .p_4()
             .gap_3()
-            .rounded_lg()
-            .border_1()
-            .border_color(theme.border)
-            .bg(theme.background)
-            .shadow_lg()
             .child(
                 div()
                     .text_base()
@@ -103,13 +102,27 @@ impl HudMakerPage {
                 }),
                 cx,
             ));
+        let theme = cx.theme();
+        let card = div()
+            .id(ids::HUD_MAKER_START_CARD)
+            .test_support()
+            .occlude()
+            .w(width)
+            .max_h((tall - px(CARD_MARGIN * 2.)).max(px(0.)))
+            .overflow_y_scroll()
+            .rounded_lg()
+            .border_1()
+            .border_color(theme.border)
+            .bg(theme.background)
+            .shadow_lg()
+            .child(body);
         Some(
             div()
                 .absolute()
                 .left(at.x)
                 .top(at.y)
                 .w(room.size.width)
-                .h(room.size.height)
+                .h(tall)
                 .flex()
                 .items_center()
                 .justify_center()
