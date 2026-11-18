@@ -41,6 +41,7 @@ fn a_timing_boot_drops_the_font_host() {
         offline: false,
         font_host: Some(host),
         updates: tf2tools_app::updater::UpdateBoot::Off,
+        locales: Vec::new(),
     };
     assert!(boot.for_timing(None).font_host.is_none());
 }

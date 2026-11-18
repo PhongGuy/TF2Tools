@@ -205,6 +205,8 @@ fn seeded_boot(data: &Path) -> anyhow::Result<Boot> {
         offline: false,
         font_host: Some(Arc::new(PilotFontHost::new(data))),
         updates: update_boot(),
+        // A QA run launched under another LANG starts in that language, as the real app does.
+        locales: tf2tools_app::i18n::system_locales(),
     }
     // A pilot QA run never reaches the real stores; a Resync fails against a closed port.
     .offline(None))

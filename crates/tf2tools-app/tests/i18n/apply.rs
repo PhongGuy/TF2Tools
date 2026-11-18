@@ -1,5 +1,5 @@
 use gpui_kit::component as kit;
-use tf2tools_app::i18n::{apply, current};
+use tf2tools_app::i18n::{apply, current, system_language};
 
 use crate::LocaleGuard;
 
@@ -46,4 +46,37 @@ fn the_guard_puts_english_back_even_after_a_panic() {
     // The panic poisoned the lock; the next holder must still get it, in English.
     let _guard = LocaleGuard::hold();
     assert_eq!(current(), "en");
+}
+
+#[test]
+fn a_region_or_encoding_tag_maps_to_its_language() {
+    for tag in [
+        "ru",
+        "ru-RU",
+        "ru_RU.UTF-8",
+        "RU_ru",
+        "ru_RU@euro",
+        "ru-Cyrl-RU",
+    ] {
+        assert_eq!(system_language([tag]), "ru", "{tag}");
+    }
+    assert_eq!(system_language(["en-GB"]), "en");
+}
+
+#[test]
+fn the_first_preferred_locale_with_a_catalogue_wins() {
+    assert_eq!(system_language(["de-DE", "ru-RU"]), "ru");
+    assert_eq!(system_language(["en-US", "ru-RU"]), "en");
+}
+
+#[test]
+fn a_system_without_a_catalogue_starts_in_english() {
+    assert_eq!(system_language(["de-DE", "fr_FR.UTF-8"]), "en");
+    assert_eq!(system_language(Vec::<String>::new()), "en");
+    assert_eq!(system_language(["C", "POSIX", ""]), "en");
+}
+
+#[test]
+fn placeholder_locales_do_not_stop_the_walk() {
+    assert_eq!(system_language(["C", "", "ru_RU.UTF-8"]), "ru");
 }

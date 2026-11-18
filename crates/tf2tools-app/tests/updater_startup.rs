@@ -28,6 +28,7 @@ fn boot(env: &support::Env, updates: UpdateBoot) -> Boot {
         offline: false,
         font_host: None,
         updates,
+        locales: Vec::new(),
     }
 }
 

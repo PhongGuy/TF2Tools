@@ -144,6 +144,7 @@ fn startup_marks_keep_their_order_with_the_preloaded_library(cx: &mut TestAppCon
         offline: false,
         font_host: None,
         updates: tf2tools_app::updater::UpdateBoot::Off,
+        locales: Vec::new(),
     };
     let win = cx.update(|cx| start(boot, cx)).unwrap();
     support::wait_real(cx, "the first-frame mark", |cx| {
