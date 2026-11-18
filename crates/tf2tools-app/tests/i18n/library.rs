@@ -434,6 +434,11 @@ fn the_spanish_hud_card_fits_at_800(cx: &mut TestAppContext) {
     hud_card_fits_at_800(cx, "es");
 }
 
+#[gpui_kit::test]
+fn the_german_hud_card_fits_at_800(cx: &mut TestAppContext) {
+    hud_card_fits_at_800(cx, "de");
+}
+
 // At 800x600 a profile card in `lang` keeps Activate, Edit and Delete inside the card, and
 // Activate, icon-only there, keeps its name.
 fn profile_card_fits_at_800(cx: &mut TestAppContext, lang: &str) {
@@ -479,6 +484,11 @@ fn the_portuguese_profile_card_fits_at_800(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_spanish_profile_card_fits_at_800(cx: &mut TestAppContext) {
     profile_card_fits_at_800(cx, "es");
+}
+
+#[gpui_kit::test]
+fn the_german_profile_card_fits_at_800(cx: &mut TestAppContext) {
+    profile_card_fits_at_800(cx, "de");
 }
 
 // The Missing Items dialog calls a local import "Свой", as the HUD card's badge does.
@@ -553,6 +563,11 @@ fn the_spanish_sound_slots_fit_at_800(cx: &mut TestAppContext) {
     sound_slots_fit_at_800(cx, "es");
 }
 
+#[gpui_kit::test]
+fn the_german_sound_slots_fit_at_800(cx: &mut TestAppContext) {
+    sound_slots_fit_at_800(cx, "de");
+}
+
 // At 800x600 an installed slot in `lang` shows its sound's name beside Uninstall: a short
 // library name whole, a long one shortened but still readable, never cut to a letter.
 fn installed_sound_names_show_at_800(cx: &mut TestAppContext, lang: &str) {
@@ -620,6 +635,11 @@ fn the_spanish_installed_sound_names_show_at_800(cx: &mut TestAppContext) {
     installed_sound_names_show_at_800(cx, "es");
 }
 
+#[gpui_kit::test]
+fn the_german_installed_sound_names_show_at_800(cx: &mut TestAppContext) {
+    installed_sound_names_show_at_800(cx, "de");
+}
+
 // Each slot's status is an icon whose name reads in `lang`, small enough for any word.
 fn sound_status_icon_reads(cx: &mut TestAppContext, lang: &str, installed: &str) {
     let _guard = LocaleGuard::switch(lang);
@@ -657,6 +677,11 @@ fn the_portuguese_sound_status_is_an_icon(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_spanish_sound_status_is_an_icon(cx: &mut TestAppContext) {
     sound_status_icon_reads(cx, "es", "Instalado");
+}
+
+#[gpui_kit::test]
+fn the_german_sound_status_is_an_icon(cx: &mut TestAppContext) {
+    sound_status_icon_reads(cx, "de", "Installiert");
 }
 
 // At 800x600 a library sound card keeps play, delete, Hit and Kill inside the card in
@@ -719,6 +744,13 @@ fn the_spanish_sound_card_fits_at_800(cx: &mut TestAppContext) {
     let label = |key: &str| tf2tools_app::_rust_i18n_try_translate("es", key).unwrap();
     let (hit, kill) = (label("sounds.button.hit"), label("sounds.button.kill"));
     assert_sound_card_fits_at_800(cx, "es", &hit, &kill);
+}
+
+#[gpui_kit::test]
+fn the_german_sound_card_fits_at_800(cx: &mut TestAppContext) {
+    let label = |key: &str| tf2tools_app::_rust_i18n_try_translate("de", key).unwrap();
+    let (hit, kill) = (label("sounds.button.hit"), label("sounds.button.kill"));
+    assert_sound_card_fits_at_800(cx, "de", &hit, &kill);
 }
 
 // Where the card has room, at 1280x800, Hit and Kill keep their visible labels.
@@ -860,6 +892,24 @@ fn the_sounds_page_reads_in_russian(cx: &mut TestAppContext) {
     assert_eq!(
         added_title("Ding", "Comp", Some(hit), Some("Old")),
         "Добавлено в профиль Comp как хитсаунд: Ding (вместо Old)"
+    );
+}
+
+// German capitalises every noun, so the slot in a cell's title keeps its capital.
+#[gpui_kit::test]
+fn the_german_weapons_title_keeps_its_noun(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("de");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let _page = open_crosshairs(cx, &s);
+    assert_eq!(
+        support::label_of(
+            cx,
+            s.win,
+            ids::loadout_cell_menu(TfClass::Heavy, WeaponSlot::Primary)
+        )
+        .as_deref(),
+        Some("Heavy: Primärwaffe")
     );
 }
 
@@ -1007,6 +1057,11 @@ fn the_portuguese_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_spanish_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
     bulk_buttons_fit_the_narrow_picker(cx, "es");
+}
+
+#[gpui_kit::test]
+fn the_german_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
+    bulk_buttons_fit_the_narrow_picker(cx, "de");
 }
 
 #[test]
@@ -1380,6 +1435,10 @@ fn a_copied_hud_is_named_in_every_language() {
         let _guard = LocaleGuard::switch("es");
         [copy_name("flawhud", 1), copy_name("flawhud", 3)]
     };
+    let de = {
+        let _guard = LocaleGuard::switch("de");
+        [copy_name("flawhud", 1), copy_name("flawhud", 3)]
+    };
     let en = {
         let _guard = LocaleGuard::switch("en");
         copy_name("flawhud", 2)
@@ -1387,5 +1446,6 @@ fn a_copied_hud_is_named_in_every_language() {
     assert_eq!(ru, ["flawhud (копия)", "flawhud (копия 3)"]);
     assert_eq!(pt, ["flawhud (cópia)", "flawhud (cópia 3)"]);
     assert_eq!(es, ["flawhud (copia)", "flawhud (copia 3)"]);
+    assert_eq!(de, ["flawhud (Kopie)", "flawhud (Kopie 3)"]);
     assert_eq!(en, "flawhud (copy 2)");
 }

@@ -1624,12 +1624,19 @@ impl Render for CrosshairsPage {
     }
 }
 
-// The open cell's title, such as "Heavy primary weapons".
+// The open cell's title, such as "Heavy primary weapons". The slot reads mid-sentence, so it
+// goes lower case, except in German, where every noun keeps its capital.
 fn weapons_title(class: TfClass, slot: WeaponSlot) -> SharedString {
+    let slot = slot_name(slot);
+    let slot = if crate::i18n::current() == "de" {
+        slot.to_string()
+    } else {
+        slot.to_lowercase()
+    };
     tr!(
         "crosshairs_page.details.title",
         class = class_name(class),
-        slot = slot_name(slot).to_lowercase()
+        slot = slot
     )
 }
 
