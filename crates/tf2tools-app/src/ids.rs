@@ -578,7 +578,7 @@ pub const CROSSHAIR_MAKER_ZOOM: &str = "crosshair-maker-zoom";
 pub const CROSSHAIR_MAKER_ZOOM_IN: &str = "crosshair-maker-zoom-in";
 /// The Zoom out button.
 pub const CROSSHAIR_MAKER_ZOOM_OUT: &str = "crosshair-maker-zoom-out";
-/// Wraps the opacity slider; its tooltip is `model::OPACITY_TIP`.
+/// Wraps the opacity slider; its tooltip is `model::opacity_tip()`.
 pub const CROSSHAIR_MAKER_OPACITY: &str = "crosshair-maker-opacity";
 /// The "Opacity: 100%" label above the slider.
 pub const CROSSHAIR_MAKER_OPACITY_LABEL: &str = "crosshair-maker-opacity-label";
