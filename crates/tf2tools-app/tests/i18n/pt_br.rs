@@ -73,3 +73,15 @@ fn brazilian_counts_take_the_plural_from_zero() {
     assert_eq!(i18n::plural("common.time.days_ago", 0), "há 0 dias");
     assert_eq!(i18n::plural("common.time.days_ago", 3), "há 3 dias");
 }
+
+#[test]
+fn brazilian_portuguese_says_a_damaged_download_one_way() {
+    let text = |k: &str| tf2tools_app::_rust_i18n_try_translate("pt-BR", k).map(|t| t.into_owned());
+    let store = text("messages.store.download.damaged");
+    assert_eq!(store, text("messages.store.gb_fetch.damaged"));
+    assert_ne!(
+        store,
+        tf2tools_app::_rust_i18n_try_translate("en", "messages.store.download.damaged")
+            .map(|t| t.into_owned())
+    );
+}
