@@ -987,8 +987,8 @@ sounds:
     playing_hitsound: "Hitsound instalado"
     playing_killsound: "Killsound instalado"
   badge:
-    installed: "Sim"
-    none: "Não"
+    installed: "Instalado"
+    none: "Nenhum"
   button:
     play: "Tocar"
     stop: "Parar"

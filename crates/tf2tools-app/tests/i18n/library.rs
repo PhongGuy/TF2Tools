@@ -538,6 +538,40 @@ fn the_portuguese_sound_slots_fit_at_800(cx: &mut TestAppContext) {
     sound_slots_fit_at_800(cx, "pt-BR");
 }
 
+// Each slot's status is an icon whose name reads in `lang`, small enough for any word.
+fn sound_status_icon_reads(cx: &mut TestAppContext, lang: &str, installed: &str) {
+    let _guard = LocaleGuard::switch(lang);
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let dir = env.game.join("tf/custom/tf2tools-sounds/sound/ui");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("killsound.wav"), support::wav_bytes()).unwrap();
+    resize_800(cx, &s);
+    let _page = open_sounds(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::sound_slot_status(SoundKind::Killsound)).as_deref(),
+        Some(installed),
+        "{lang}: the installed status names itself"
+    );
+    for kind in [SoundKind::Hitsound, SoundKind::Killsound] {
+        let badge = support::bounds_of(cx, s.win, ids::sound_slot_status(kind)).unwrap();
+        assert!(
+            badge.size.width <= gpui_kit::px(28.),
+            "{lang} {kind:?}: {badge:?}"
+        );
+    }
+}
+
+#[gpui_kit::test]
+fn the_russian_sound_status_is_an_icon(cx: &mut TestAppContext) {
+    sound_status_icon_reads(cx, "ru", "В игре");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_sound_status_is_an_icon(cx: &mut TestAppContext) {
+    sound_status_icon_reads(cx, "pt-BR", "Instalado");
+}
+
 // At 800x600 a library sound card keeps play, delete, Hit and Kill inside the card in
 // `lang`, and Hit and Kill keep their names.
 fn assert_sound_card_fits_at_800(cx: &mut TestAppContext, lang: &str, hit: &str, kill: &str) {

@@ -8,6 +8,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::tag::Tag;
+use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, h_flex, v_flex,
 };
@@ -545,10 +546,10 @@ impl SoundsPage {
         let badges = match &slot {
             Some(slot) => h_flex()
                 .gap_2()
-                .child(badge_of(
-                    ids::sound_slot_status(kind),
-                    Tag::primary(),
-                    transparent_black(),
+                .child(slot_status(
+                    kind,
+                    IconName::CircleCheck,
+                    theme.primary,
                     tr!("sounds.badge.installed"),
                 ))
                 .children(slot.vpk.then(|| {
@@ -559,10 +560,10 @@ impl SoundsPage {
                         "VPK",
                     )
                 })),
-            None => h_flex().child(badge_of(
-                ids::sound_slot_status(kind),
-                Tag::secondary().outline().text_color(theme.foreground),
-                theme.border,
+            None => h_flex().child(slot_status(
+                kind,
+                IconName::CircleDashed,
+                muted,
                 tr!("sounds.badge.none"),
             )),
         };
@@ -748,6 +749,28 @@ fn on_card(
     move |_, window, cx| {
         let _ = page.update(cx, |page, cx| act(page, &entry, window, cx));
     }
+}
+
+/// The slot's status (`ids::sound_slot_status`): an icon named `word` for screen readers and
+/// its tooltip, so no translation has to fit beside the slot's title.
+fn slot_status(
+    kind: SoundKind,
+    icon: IconName,
+    color: Hsla,
+    word: impl Into<SharedString>,
+) -> impl IntoElement {
+    let tip: SharedString = word.into();
+    div()
+        .id(ids::sound_slot_status(kind))
+        .aria_label(tip.clone())
+        .test_support()
+        .size(px(20.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .text_color(color)
+        .child(Icon::new(icon).small())
+        .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
 }
 
 /// The sound's name, truncated, semibold, with the VPK badge (`ids::sound_vpk`) for a VPK sound.
