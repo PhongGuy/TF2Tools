@@ -25,7 +25,7 @@ use tf2tools_core::{Provenance, StoreItemId, StoreKind};
 use super::bodies::curated_body;
 use super::curated::{CuratedFilter, CuratedHud, Facet, Os, count_label, facets};
 use crate::gb_card::OpenCard;
-use crate::i18n::{self, tr};
+use crate::i18n::{self, Phrase, tr};
 use crate::ids;
 use crate::local_messages::{describe_library, describe_store_status};
 use crate::pages::common::{
@@ -76,7 +76,7 @@ pub struct CuratedTab {
     /// The `hud_id`s of curated HUDs in the library.
     downloaded: Rc<HashSet<String>>,
     loaded: bool,
-    error: Option<String>,
+    error: Option<Phrase>,
     /// A curated sync finished and its reload has not landed; the tab still reads as syncing.
     sync_reload_pending: bool,
     more: bool,
@@ -481,7 +481,7 @@ impl CuratedTab {
     }
 
     fn error_line(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
-        let error = self.error.clone()?;
+        let error = self.error.as_ref()?.text();
         let this = cx.entity().downgrade();
         Some(store_error_line(
             error,

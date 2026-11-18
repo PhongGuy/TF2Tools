@@ -8,7 +8,7 @@ use tf2tools_core::{
 
 use gpui_kit::SharedString;
 
-use crate::i18n::tr;
+use crate::i18n::{Phrase, tr};
 use crate::services::OpError;
 use crate::sync_messages::{GAMEBANANA, source_name, throttled};
 
@@ -158,24 +158,32 @@ pub fn describe_files(kind: StoreKind, err: &FilesError) -> StoreFailure {
 /// A failed GameBanana add-on listing, search, category list or profile in player words;
 /// `detail` is the error's own text.
 pub fn describe_browse(err: &BrowseError) -> StoreFailure {
-    let message = match err {
+    StoreFailure::new(browse_phrase(err).text(), err.to_string())
+}
+
+/// The player line for a failed GameBanana browse, worded each time it is read.
+pub fn browse_phrase(err: &BrowseError) -> Phrase {
+    match err {
         BrowseError::Network { .. } => {
-            tr!("messages.shared.source_unreachable", source = GAMEBANANA)
+            Phrase::new(|| tr!("messages.shared.source_unreachable", source = GAMEBANANA))
         }
-        BrowseError::Throttled { .. } => throttled(),
-        BrowseError::RateLimited { .. } => tr!("messages.shared.source_busy", source = GAMEBANANA),
+        BrowseError::Throttled { .. } => Phrase::new(throttled),
+        BrowseError::RateLimited { .. } => {
+            Phrase::new(|| tr!("messages.shared.source_busy", source = GAMEBANANA))
+        }
         // A 404 can come from a listing, a search or a category list as well as an item.
-        BrowseError::Http { status: 404, .. } => tr!("messages.store.browse.not_found"),
-        BrowseError::Gone { .. } => tr!("messages.store.browse.gone"),
+        BrowseError::Http { status: 404, .. } => {
+            Phrase::new(|| tr!("messages.store.browse.not_found"))
+        }
+        BrowseError::Gone { .. } => Phrase::new(|| tr!("messages.store.browse.gone")),
         BrowseError::Http { status, .. } if *status >= 500 => {
-            tr!("messages.shared.source_down", source = GAMEBANANA)
+            Phrase::new(|| tr!("messages.shared.source_down", source = GAMEBANANA))
         }
         BrowseError::Http { .. } | BrowseError::TooLarge { .. } | BrowseError::Malformed { .. } => {
-            tr!("messages.shared.source_unreadable", source = GAMEBANANA)
+            Phrase::new(|| tr!("messages.shared.source_unreadable", source = GAMEBANANA))
         }
-        _ => tr!("messages.store.browse.unknown"),
-    };
-    StoreFailure::new(message, err.to_string())
+        _ => Phrase::new(|| tr!("messages.store.browse.unknown")),
+    }
 }
 
 /// A failed add-on download or unpack in player words; `detail` is the error's own text.
@@ -264,7 +272,12 @@ pub fn listing_stopped(detail: String) -> StoreFailure {
 
 /// An add-on listing step that ended without an outcome, keeping `detail` for the log.
 pub fn addons_stopped(detail: String) -> StoreFailure {
-    StoreFailure::new(tr!("messages.store.browse.stopped"), detail)
+    StoreFailure::new(addons_stopped_phrase().text(), detail)
+}
+
+/// The player line for an add-on listing step that ended without an outcome.
+pub fn addons_stopped_phrase() -> Phrase {
+    Phrase::new(|| tr!("messages.store.browse.stopped"))
 }
 
 /// An add-on profile read that ended without an outcome, keeping `detail` for the log.
@@ -312,10 +325,9 @@ pub fn describe_store_read(err: &OpError) -> StoreFailure {
 }
 
 /// Logs a failed store read as "store load failed: ..." and returns the line the player reads.
-pub fn read_failed(err: &OpError) -> String {
-    let failure = describe_store_read(err);
-    failure.log("store load");
-    failure.message
+pub fn read_failed(err: &OpError) -> Phrase {
+    describe_store_read(err).log("store load");
+    Phrase::new(store_read)
 }
 
 /// A failed copy of a library item into tf/custom in player words; `detail` is the error's own text.

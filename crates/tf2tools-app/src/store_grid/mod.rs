@@ -21,7 +21,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{StoreCard, StoreKind, StoreQuery, StoreSort};
 
-use crate::i18n::{self, counted_plural, tr};
+use crate::i18n::{self, Phrase, counted_plural, tr};
 use crate::ids;
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::describe_store_status;
@@ -228,7 +228,7 @@ pub struct StoreGrid {
     total: Option<u64>,
     counting: bool,
     loaded: bool,
-    error: Option<String>,
+    error: Option<Phrase>,
     /// Which reads of the current query failed, so Retry repeats only those.
     count_failed: bool,
     page_failed: bool,
@@ -394,8 +394,8 @@ impl StoreGrid {
     }
 
     /// The last failed query's message, until Retry or a new query.
-    pub fn error(&self) -> Option<&str> {
-        self.error.as_deref()
+    pub fn error(&self) -> Option<SharedString> {
+        self.error.as_ref().map(Phrase::text)
     }
 
     pub fn card_grid(&self) -> &CardGrid {
@@ -892,7 +892,7 @@ impl StoreGrid {
     }
 
     fn error_line(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
-        let error = self.error.clone()?;
+        let error = self.error.as_ref()?.text();
         let this = cx.entity().downgrade();
         Some(store_error_line(
             error,

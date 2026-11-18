@@ -26,14 +26,14 @@ use super::card::{CardBadge, OpenAddon, card_height, gb_addon_card};
 use crate::addon_detail::open_addon_detail;
 use crate::addon_feed::{AddonFeed, Keyed, StepAfter};
 use crate::gb_addon_installs::{GbAddonInstalls, GbAddonOffer};
-use crate::i18n::{self, tr};
+use crate::i18n::{self, Phrase, tr};
 use crate::ids;
 use crate::mature::MatureAddons;
 use crate::pages::common::{SkeletonTop, empty_state_card, skeleton_cards};
 use crate::remote_images::{ImageKey, RemoteImages};
 use crate::services::Services;
 use crate::store_grid::SEARCH_DEBOUNCE;
-use crate::store_messages::{StoreFailure, addons_stopped, describe_browse};
+use crate::store_messages::{addons_stopped_phrase, browse_phrase};
 use crate::tokio_bridge;
 use crate::widgets::card_grid::{CardGrid, SHELL_CHROME_WIDTH, columns_for_store};
 use crate::widgets::label_option::LabelOption;
@@ -195,7 +195,7 @@ pub struct AddonTab {
     mature_known: bool,
     /// Mature cards the player unblurred; cleared when the setting flips.
     revealed: HashSet<GbId>,
-    error: Option<String>,
+    error: Option<Phrase>,
     step_task: Option<Task<()>>,
     /// This tab's own `RemoteImages` viewer, so tabs alive together keep separate wants.
     viewer: String,
@@ -508,8 +508,8 @@ impl AddonTab {
     }
 
     /// The last step's failure in player words, until the next query.
-    pub fn error(&self) -> Option<&str> {
-        self.error.as_deref()
+    pub fn error(&self) -> Option<SharedString> {
+        self.error.as_ref().map(Phrase::text)
     }
 
     /// Runs the step the player asked for with "Load more"; does nothing unless it is offered.
@@ -637,10 +637,11 @@ impl AddonTab {
                 StepAfter::Idle => self.grid.rearm(),
                 StepAfter::LoadMore | StepAfter::End | StepAfter::Stale => {}
             },
-            Ok(Err(err)) => self.fail(generation, describe_browse(&err)),
+            Ok(Err(err)) => self.fail(generation, browse_phrase(&err), err.to_string()),
             Err(_) => self.fail(
                 generation,
-                addons_stopped("the add-on listing task stopped unexpectedly".to_owned()),
+                addons_stopped_phrase(),
+                "the add-on listing task stopped unexpectedly".to_owned(),
             ),
         }
         self.want_thumbnails(cx);
@@ -648,13 +649,14 @@ impl AddonTab {
     }
 
     // A failure of the current query stops its step where it was, so a retry repeats it.
-    fn fail(&mut self, generation: u64, failure: StoreFailure) {
+    // The log keeps the English `detail`; the kept line is worded each time it is drawn.
+    fn fail(&mut self, generation: u64, phrase: Phrase, detail: String) {
         if generation != self.feed.generation() {
             return;
         }
         self.feed.step_failed(generation);
-        failure.log("add-on listing");
-        self.error = Some(failure.message);
+        tracing::warn!("add-on listing failed: {detail}");
+        self.error = Some(phrase);
     }
 
     fn visible_changed(&mut self, range: Range<usize>, cx: &mut Context<Self>) {
@@ -875,7 +877,7 @@ impl Render for AddonTab {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.follow_language(window, cx);
         // A failed step's message sits above the grid, or alone before the first card.
-        let error = self.error.clone().map(|message| {
+        let error = self.error.as_ref().map(Phrase::text).map(|message| {
             let this = cx.entity().downgrade();
             store_error_line(
                 message,

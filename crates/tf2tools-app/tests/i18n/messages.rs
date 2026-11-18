@@ -248,7 +248,7 @@ fn store_map_and_sync_failures_read_in_russian() {
         store::describe_preview(&PreviewError::NoPreview).message,
         store::describe_install(&InstallError::NotInLibrary { what: "x".into() }).message,
         store::describe_store_read(&OpError::NoTf2).message,
-        store::read_failed(&OpError::NoTf2),
+        store::read_failed(&OpError::NoTf2).text().to_string(),
         store::download_stopped("x").message,
         store::listing_stopped("x".into()).message,
         store::addons_stopped("x".into()).message,

@@ -171,6 +171,79 @@ fn a_kept_store_grid_follows_a_language_switch(cx: &mut TestAppContext) {
     assert_eq!(cx.update(|cx| grid.read(cx).sort()), StoreSort::MostViewed);
 }
 
+// A kept grid's failed read must be worded when it is drawn, not when it failed.
+#[gpui_kit::test]
+fn a_kept_store_grid_error_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let s = support::shell_window(cx, &env, missing());
+    rusqlite::Connection::open(env.data.db_path())
+        .unwrap()
+        .execute_batch("ALTER TABLE store_sounds RENAME TO store_sounds_hidden")
+        .unwrap();
+    support::click_id(cx, s.win, ids::nav(Page::SoundStore));
+    let page = cx
+        .update(|cx| s.shell.read(cx).sound_store_page())
+        .expect("the Sound Store");
+    let grid = cx.update(|cx| page.read(cx).grid().clone());
+    support::wait_real(cx, "the error", |cx| {
+        cx.update(|cx| grid.read(cx).error().is_some())
+    });
+    support::settle(cx, s.win);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::STORE_ERROR).as_deref(),
+        Some("TF2Tools couldn't read the store. Restart TF2Tools and try again.")
+    );
+
+    crate::settings::open_settings(cx, &s);
+    crate::settings::pick(cx, s.win, "ru");
+    support::click_id(cx, s.win, ids::nav(Page::SoundStore));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::STORE_ERROR).as_deref(),
+        Some(
+            "TF2Tools не удалось прочитать данные магазина. Перезапустите TF2Tools и попробуйте снова."
+        )
+    );
+}
+
+// The same for the Addon Store's GameBanana tab, whose listing finds nothing on the server.
+#[gpui_kit::test]
+fn a_kept_addon_gamebanana_error_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = support::shell_window(
+        cx,
+        &env,
+        Tf2State::Found(Tf2Install::from_path(&env.game).unwrap()),
+    );
+    support::store_ready(cx, &server);
+    support::click_id(cx, s.win, ids::nav(Page::AddonStore));
+    support::click_id(cx, s.win, ids::addon_store_tab("textures"));
+    let section = AddonSection::by_key("textures").unwrap();
+    let page = cx
+        .update(|cx| s.shell.read(cx).addon_store_page())
+        .expect("the Addon Store");
+    let tab = cx
+        .update(|cx| page.read(cx).gamebanana(section))
+        .expect("the textures tab");
+    support::wait_real(cx, "the failed listing", |cx| {
+        cx.update(|cx| tab.read(cx).error().is_some() && !tab.read(cx).is_loading())
+    });
+    support::settle(cx, s.win);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::STORE_ERROR).as_deref(),
+        Some("GameBanana couldn't find this. Try again later.")
+    );
+
+    crate::settings::open_settings(cx, &s);
+    crate::settings::pick(cx, s.win, "ru");
+    support::click_id(cx, s.win, ids::nav(Page::AddonStore));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::STORE_ERROR).as_deref(),
+        Some("На GameBanana этого не нашлось. Попробуйте позже.")
+    );
+}
+
 fn gb(id: u64) -> StoreItemId {
     StoreItemId::GameBanana(GbId::new(id))
 }
