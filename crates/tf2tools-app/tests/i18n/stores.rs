@@ -729,6 +729,55 @@ fn a_curated_detail_in_the_library_reads_in_russian(cx: &mut TestAppContext) {
     );
 }
 
+// Opens a curated HUD carrying a `support` and a `discord` social and reads both labels. The
+// button's accessible name is the same string its visible label child draws.
+fn curated_social_labels(cx: &mut TestAppContext) -> (Option<String>, Option<String>) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let repo = server.mount_curated("rayshud", support::hud_zip_bytes("rayshud"), Duration::ZERO);
+    let json = r#"{"social":{"support":"https://example.invalid/s","discord":"https://example.invalid/d"}}"#;
+    let (win, _) = support::store_window(
+        cx,
+        &env,
+        &server,
+        move |env| support::seed_curated(env, "rayshud", "rayshud", "raysfire", Some(&repo), json),
+        |_, _| support::Blank,
+    );
+    let item = DetailItem {
+        kind: StoreKind::CuratedHuds,
+        id: StoreItemId::Curated("rayshud".into()),
+        name: "rayshud".into(),
+        in_library: false,
+    };
+    cx.update_window(win, |_, window, cx| {
+        open_detail(item, curated_body(), window, cx)
+    })
+    .unwrap();
+    support::wait_real(cx, "the socials", |cx| {
+        support::present(cx, win, ids::store_detail_social_label("support"))
+    });
+    (
+        support::label_of(cx, win, ids::store_detail_link("social:support")),
+        support::label_of(cx, win, ids::store_detail_link("social:discord")),
+    )
+}
+
+// Support is player text and follows the language; Discord is a brand and keeps its name.
+#[gpui_kit::test]
+fn the_curated_support_social_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (help, discord) = curated_social_labels(cx);
+    assert_eq!(help.as_deref(), Some("Поддержка"));
+    assert_eq!(discord.as_deref(), Some("Discord"));
+}
+
+#[gpui_kit::test]
+fn the_curated_support_social_reads_in_english(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("en");
+    let (help, discord) = curated_social_labels(cx);
+    assert_eq!(help.as_deref(), Some("Support"));
+    assert_eq!(discord.as_deref(), Some("Discord"));
+}
+
 #[test]
 fn download_toasts_read_in_russian() {
     let _guard = LocaleGuard::switch("ru");
