@@ -147,7 +147,7 @@ pub fn start(boot: Boot, cx: &mut App) -> anyhow::Result<AnyWindowHandle> {
         Ok::<_, StartupError>((
             services,
             settings.sidebar_collapsed(),
-            settings.language().to_owned(),
+            settings.language().unwrap_or("en").to_owned(),
             huds,
             update_source,
             crash,

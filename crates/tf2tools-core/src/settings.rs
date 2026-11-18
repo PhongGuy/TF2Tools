@@ -9,7 +9,6 @@ use crate::db::{Database, read_setting, save_setting};
 use crate::error::SettingsError;
 
 const DEFAULT_THEME: &str = "dark";
-const DEFAULT_LANGUAGE: &str = "en";
 const DEFAULT_SYNC_CACHE_HOURS: u32 = 168;
 
 /// A snapshot of the user's settings, with v5's defaults for missing or unreadable keys.
@@ -19,7 +18,7 @@ pub struct Settings {
     tf2_path: Option<PathBuf>,
     volume: Volume,
     theme: String,
-    language: String,
+    language: Option<String>,
     sync_cache_hours: u32,
     sidebar_collapsed: bool,
     maker_grid_lines: bool,
@@ -46,9 +45,9 @@ impl Settings {
         &self.theme
     }
 
-    /// The UI language code as saved, `"en"` by default. Not validated here.
-    pub fn language(&self) -> &str {
-        &self.language
+    /// The UI language code the player chose, `None` when they never did. Not validated here.
+    pub fn language(&self) -> Option<&str> {
+        self.language.as_deref()
     }
 
     /// How many hours a store sync stays fresh.
@@ -98,7 +97,7 @@ impl Default for Settings {
             tf2_path: None,
             volume: Volume::default(),
             theme: DEFAULT_THEME.to_owned(),
-            language: DEFAULT_LANGUAGE.to_owned(),
+            language: None,
             sync_cache_hours: DEFAULT_SYNC_CACHE_HOURS,
             sidebar_collapsed: false,
             maker_grid_lines: false,
@@ -159,7 +158,7 @@ impl Database {
                 "tf2_path" => settings.tf2_path = (!value.is_empty()).then(|| value.into()),
                 "volume" => settings.volume = Volume::parse_lenient(&value),
                 "theme" => settings.theme = value,
-                "language" => settings.language = value,
+                "language" => settings.language = Some(value),
                 "sync_cache_hours" => {
                     settings.sync_cache_hours = value.parse().unwrap_or(DEFAULT_SYNC_CACHE_HOURS);
                 }

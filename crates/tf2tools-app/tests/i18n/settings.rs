@@ -88,7 +88,7 @@ fn picking_russian_switches_settings_at_once_and_saves_it(cx: &mut TestAppContex
     assert_eq!(placeholder(cx, &page), "/путь/к/Team Fortress 2");
     assert_eq!(i18n::current(), "ru");
     support::wait_real(cx, "Russian saved", |_| {
-        s.services.db.settings().unwrap().language() == "ru"
+        s.services.db.settings().unwrap().language() == Some("ru")
     });
 
     pick(cx, s.win, "en");
@@ -99,7 +99,7 @@ fn picking_russian_switches_settings_at_once_and_saves_it(cx: &mut TestAppContex
     );
     assert_eq!(placeholder(cx, &page), "/path/to/Team Fortress 2");
     support::wait_real(cx, "English saved", |_| {
-        s.services.db.settings().unwrap().language() == "en"
+        s.services.db.settings().unwrap().language() == Some("en")
     });
 }
 
