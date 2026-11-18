@@ -6,12 +6,13 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::{
     AnyElement, ClipboardItem, Context, InteractiveElement as _, IntoElement, ParentElement as _,
-    StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window, div,
+    SharedString, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, Window, div,
 };
 use tf2tools_core::{HudId, LogLevel, NewLogEntry, Reinstall, ReinstallError, Tf2Install};
 
 use super::HudMakerPage;
 use crate::activity;
+use crate::i18n::tr;
 use crate::ids;
 use crate::services::Services;
 use crate::shell::toast::{ToastKind, toast};
@@ -20,14 +21,9 @@ use crate::widgets::Named as _;
 /// The console command that reloads a HUD's layouts and colours in a running TF2.
 pub const RELOAD_COMMAND: &str = "hud_reloadscheme";
 /// The toolbar note after a Save updated the installed HUD.
-pub const LIVE_NOTE: &str = "Your installed HUD is updated. Type hud_reloadscheme in TF2's \
-     console to see it. Font, image and animation changes show after you restart TF2.";
-const NOT_UPDATED_TITLE: &str = "Installed copy not updated";
-const IN_USE: &str = "TF2 is using this HUD's files. Close TF2, then Save again to update it.";
-const GAME_MOVED: &str = "Saved, but TF2 wasn't found where it used to be. Check the \
-     TF2 folder in Settings.";
-const NOT_UPDATED: &str =
-    "Saved, but couldn't update the installed copy. Close TF2 and install it again from HUDs.";
+pub fn live_note() -> SharedString {
+    tr!("hud_maker.live.note")
+}
 
 /// What a Save did to the installed copy of the HUD.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,24 +33,23 @@ pub enum Live {
     /// The installed copy now matches the save.
     Updated,
     /// The installed copy is unchanged; the line says why.
-    Failed(&'static str),
+    Failed(SharedString),
 }
-
-/// The installed copy no longer matches what TF2Tools put there, so it was left alone.
-const CHANGED: &str = "Saved, but your installed HUD has changes of its own, so it wasn't updated. Install this HUD again to choose what to do.";
 
 /// The player's line for a failed live update: something holding the HUD's files means close
 /// TF2, an installed copy with its own changes asks the player to choose, anything else means
 /// install it again.
-pub fn live_failure(err: &ReinstallError) -> &'static str {
+pub fn live_failure(err: &ReinstallError) -> SharedString {
     match err {
-        ReinstallError::InUse { .. } | ReinstallError::SetAside { .. } => IN_USE,
-        ReinstallError::Changed { .. } => CHANGED,
-        ReinstallError::GameMissing { .. } => GAME_MOVED,
+        ReinstallError::InUse { .. } | ReinstallError::SetAside { .. } => {
+            tr!("hud_maker.live.in_use")
+        }
+        ReinstallError::Changed { .. } => tr!("hud_maker.live.changed"),
+        ReinstallError::GameMissing { .. } => tr!("hud_maker.live.game_moved"),
         ReinstallError::Unchanged { .. }
         | ReinstallError::NotInLibrary { .. }
         | ReinstallError::Database { .. }
-        | _ => NOT_UPDATED,
+        | _ => tr!("hud_maker.live.not_updated"),
     }
 }
 
@@ -70,7 +65,7 @@ pub(crate) fn live_job(s: &Services, id: &HudId, name: &str, tf2: &Tf2Install) -
                 LogLevel::Info,
                 "hud",
                 "install",
-                format!("Updated installed HUD: {name}"),
+                tr!("hud_maker.live.updated_row", name = name).to_string(),
             );
             activity::write(s, &entry);
             Live::Updated
@@ -97,7 +92,8 @@ impl HudMakerPage {
             Live::Updated => self.live_note = true,
             Live::Failed(line) => {
                 self.live_note = false;
-                toast(window, cx, ToastKind::Warning, NOT_UPDATED_TITLE, *line);
+                let title = tr!("hud_maker.live.not_updated_title");
+                toast(window, cx, ToastKind::Warning, title, line.clone());
             }
         }
         cx.notify();
@@ -112,7 +108,7 @@ impl HudMakerPage {
         let copy = Button::new(ids::HUD_MAKER_LIVE_COPY)
             .outline()
             .small()
-            .label("Copy")
+            .label(tr!("hud_maker.live.copy"))
             .flex_none()
             .on_click(|_, window, cx| {
                 cx.write_to_clipboard(ClipboardItem::new_string(RELOAD_COMMAND.to_owned()));
@@ -120,30 +116,31 @@ impl HudMakerPage {
                     window,
                     cx,
                     ToastKind::Info,
-                    "Copied",
-                    "Paste it into TF2's console.",
+                    tr!("hud_maker.live.copied"),
+                    tr!("hud_maker.live.paste"),
                 );
             });
         let close = Button::new(ids::HUD_MAKER_LIVE_CLOSE)
             .ghost()
             .small()
             .icon(IconName::Close)
-            .named("Close")
+            .named(tr!("hud_maker.live.close"))
             .flex_none()
             .on_click(cx.listener(|page, _, _, cx| {
                 page.live_note = false;
                 cx.notify();
             }));
         // Without `min_w_0` the sentence keeps its full width and pushes Copy off the toolbar.
+        let words = live_note();
         let note = div()
             .id(ids::HUD_MAKER_LIVE_NOTE)
-            .aria_label(LIVE_NOTE)
+            .aria_label(words.clone())
             .test_support()
             .flex_1()
             .min_w_0()
             .text_sm()
             .text_color(cx.theme().muted_foreground)
-            .child(LIVE_NOTE);
+            .child(words);
         Some(
             h_flex()
                 .w_full()

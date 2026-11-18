@@ -14,6 +14,8 @@ use gpui_kit::{
 
 use super::HudMakerPage;
 use super::parts::plain_name;
+use crate::i18n::format::decimal_point;
+use crate::i18n::tr;
 use crate::ids;
 use crate::widgets::labelled;
 
@@ -145,25 +147,30 @@ impl HudMakerPage {
         // The events' real end, though the slider runs at least a second; a hundredth is plenty.
         let end = editor.end();
         let hundredths = |t: f32| (t * 100.).round() / 100.;
-        let time = format!(
-            "{} s of {} s",
-            hundredths(editor.moment().min(end)),
-            hundredths(end)
+        let time = tr!(
+            "hud_maker.timeline.time",
+            now = decimal_point(&hundredths(editor.moment().min(end)).to_string()),
+            end = decimal_point(&hundredths(end).to_string())
         );
         let muted = cx.theme().muted_foreground;
         let playing = self.is_playing();
         // The icon set has no pause glyph, so a playing timeline says Pause in words.
         let play = Button::new(ids::HUD_MAKER_TIMELINE_PLAY).ghost().xsmall();
         let play = match playing {
-            true => play.label("Pause").tooltip("Pause"),
-            false => play.icon(IconName::Play).tooltip("Play"),
+            true => {
+                let pause = tr!("hud_maker.timeline.pause");
+                play.label(pause.clone()).tooltip(pause)
+            }
+            false => play
+                .icon(IconName::Play)
+                .tooltip(tr!("hud_maker.timeline.play")),
         }
         .on_click(cx.listener(|page, _, window, cx| page.toggle_playing(window, cx)));
         let clear = Button::new(ids::HUD_MAKER_TIMELINE_CLEAR)
             .ghost()
             .xsmall()
-            .label("Clear")
-            .tooltip("Stop the animations you started")
+            .label(tr!("hud_maker.timeline.clear"))
+            .tooltip(tr!("hud_maker.timeline.clear_tip"))
             .on_click(cx.listener(|page, _, window, cx| {
                 page.stop_playing();
                 if let Some(editor) = page.editor_mut() {
@@ -198,13 +205,13 @@ impl HudMakerPage {
                 .child(labelled(
                     div().text_xs().text_color(muted),
                     ids::HUD_MAKER_TIMELINE_TIME,
-                    SharedString::from(time),
+                    time,
                 ))
                 .children(in_game.map(|fields| {
                     labelled(
                         div().max_w_64().truncate().text_xs().text_color(muted),
                         ids::HUD_MAKER_TIMELINE_IN_GAME,
-                        SharedString::from(format!("Changes in game: {fields}")),
+                        tr!("hud_maker.timeline.in_game", fields = fields),
                     )
                 }))
                 .child(clear)
@@ -213,24 +220,37 @@ impl HudMakerPage {
     }
 }
 
-// The events the game fires on its own, in player words; any other reads as its plain name.
-const GAME_EVENTS: [(&str, &str); 9] = [
-    ("DamagedPlayer", "Taking damage"),
-    ("HudHealthBonusPulse", "Overheal pulse"),
-    ("HudHealthBonusPulseStop", "Overheal pulse ends"),
-    ("HudHealthDyingPulse", "Low health pulse"),
-    ("HudHealthDyingPulseStop", "Low health pulse ends"),
-    ("HudLowAmmoPulse", "Low ammo pulse"),
-    ("HudLowAmmoPulseStop", "Low ammo pulse ends"),
-    ("HudMedicCharged", "ÜberCharge ready"),
-    ("HudMedicChargedStop", "ÜberCharge used"),
+// The events the game fires on its own, which the timeline names in player words.
+const GAME_EVENTS: [&str; 9] = [
+    "DamagedPlayer",
+    "HudHealthBonusPulse",
+    "HudHealthBonusPulseStop",
+    "HudHealthDyingPulse",
+    "HudHealthDyingPulseStop",
+    "HudLowAmmoPulse",
+    "HudLowAmmoPulseStop",
+    "HudMedicCharged",
+    "HudMedicChargedStop",
 ];
 
-/// Event `raw` as the timeline names it to a player.
+/// Event `raw` as the timeline names it to a player; any other reads as its plain name.
 pub(super) fn event_name(raw: &str) -> String {
-    (GAME_EVENTS.iter())
-        .find(|(event, _)| event.eq_ignore_ascii_case(raw))
-        .map_or_else(|| plain_name(raw), |(_, name)| (*name).to_owned())
+    // The game matches event names in any case, so `raw` is first spelled as the list does.
+    let Some(event) = GAME_EVENTS.iter().find(|e| e.eq_ignore_ascii_case(raw)) else {
+        return plain_name(raw);
+    };
+    match *event {
+        "DamagedPlayer" => tr!("hud_maker.timeline.event.damaged_player"),
+        "HudHealthBonusPulse" => tr!("hud_maker.timeline.event.health_bonus_pulse"),
+        "HudHealthBonusPulseStop" => tr!("hud_maker.timeline.event.health_bonus_pulse_stop"),
+        "HudHealthDyingPulse" => tr!("hud_maker.timeline.event.health_dying_pulse"),
+        "HudHealthDyingPulseStop" => tr!("hud_maker.timeline.event.health_dying_pulse_stop"),
+        "HudLowAmmoPulse" => tr!("hud_maker.timeline.event.low_ammo_pulse"),
+        "HudLowAmmoPulseStop" => tr!("hud_maker.timeline.event.low_ammo_pulse_stop"),
+        "HudMedicCharged" => tr!("hud_maker.timeline.event.medic_charged"),
+        _ => tr!("hud_maker.timeline.event.medic_charged_stop"),
+    }
+    .to_string()
 }
 
 #[cfg(test)]

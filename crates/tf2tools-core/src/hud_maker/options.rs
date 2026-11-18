@@ -417,6 +417,11 @@ impl OptionSpec {
     pub fn needs(&self) -> Option<OptionNeed> {
         self.needs
     }
+
+    /// Every built-in option in the order the panel lists them, whether or not a HUD fits it.
+    pub fn built_ins() -> &'static [OptionSpec] {
+        BUILT_INS.as_slice()
+    }
 }
 
 /// A `SetKey` action on `block` (under the root) of `file`.

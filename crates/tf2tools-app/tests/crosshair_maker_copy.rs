@@ -9,8 +9,8 @@ use std::sync::Arc;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext, point};
 use tf2tools_app::ids;
-use tf2tools_app::pages::crosshair_maker::model::{CLEAR, CanvasSize, FIT_CENTRED, FIT_SHRUNK};
-use tf2tools_app::pages::crosshair_maker::{BUSY, CrosshairMakerPage};
+use tf2tools_app::pages::crosshair_maker::model::{CLEAR, CanvasSize, fit_centred, fit_shrunk};
+use tf2tools_app::pages::crosshair_maker::{CrosshairMakerPage, busy as busy_toast};
 use tf2tools_app::picker::{PickKind, Release, ScriptedPicker, file_name_for};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::leave;
@@ -361,8 +361,8 @@ fn a_picture_that_lands_while_a_save_runs_says_so(cx: &mut TestAppContext) {
         .unwrap();
     assert!(import_disabled && busy);
     let toasts = support::toast_labels(cx, s.win);
-    assert!(toasts.contains(&BUSY.to_owned()), "{toasts:?}");
-    support::assert_plain(BUSY);
+    assert!(toasts.contains(&busy_toast().to_string()), "{toasts:?}");
+    support::assert_plain(&busy_toast());
     support::wait_real(cx, "the save", |cx| {
         cx.update(|cx| !page.read(cx).is_saving())
     });
@@ -462,7 +462,7 @@ fn a_big_crosshair_is_shrunk_with_a_note(cx: &mut TestAppContext) {
         CanvasSize::Large
     );
     assert!(pixel(cx, &page, 32, 32)[3] >= 250);
-    assert_eq!(support::toast_labels(cx, s.win), [FIT_SHRUNK]);
+    assert_eq!(support::toast_labels(cx, s.win), [fit_shrunk().to_string()]);
 }
 
 #[gpui_kit::test]
@@ -476,7 +476,10 @@ fn a_small_crosshair_is_centred_with_a_note(cx: &mut TestAppContext) {
     assert_eq!(pixel(cx, &page, 39, 39), [0, 0, 255, 255]);
     assert_eq!(pixel(cx, &page, 23, 24), CLEAR);
     assert_eq!(pixel(cx, &page, 40, 39), CLEAR);
-    assert_eq!(support::toast_labels(cx, s.win), [FIT_CENTRED]);
+    assert_eq!(
+        support::toast_labels(cx, s.win),
+        [fit_centred().to_string()]
+    );
 }
 
 #[gpui_kit::test]
@@ -837,9 +840,9 @@ fn a_png_picked_while_a_save_runs_is_never_read_during_it(cx: &mut TestAppContex
     if pixel(cx, &page, 3, 4) == CLEAR {
         // Turned away on arrival: the saved drawing stays and the player is told why.
         assert_eq!(pixel(cx, &page, 1, 1), [255, 255, 255, 255]);
-        assert!(toasts.contains(&BUSY.to_owned()), "{toasts:?}");
+        assert!(toasts.contains(&busy_toast().to_string()), "{toasts:?}");
     } else {
-        assert!(!toasts.contains(&BUSY.to_owned()), "{toasts:?}");
+        assert!(!toasts.contains(&busy_toast().to_string()), "{toasts:?}");
     }
 }
 
@@ -880,7 +883,7 @@ fn a_big_png_is_shrunk_with_a_note(cx: &mut TestAppContext) {
     import(cx, &s, &page, |p| p.editor().is_dirty());
     assert_eq!(pixel(cx, &page, 10, 5), CLEAR);
     assert!(pixel(cx, &page, 32, 32)[3] >= 250);
-    assert_eq!(support::toast_labels(cx, s.win), [FIT_SHRUNK]);
+    assert_eq!(support::toast_labels(cx, s.win), [fit_shrunk().to_string()]);
 }
 
 #[gpui_kit::test]

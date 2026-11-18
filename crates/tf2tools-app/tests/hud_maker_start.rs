@@ -6,7 +6,7 @@ use crate::support;
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
-use tf2tools_app::pages::hud_maker::HudMakerPage;
+use tf2tools_app::pages::hud_maker::{HudMakerPage, shortcuts};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{PartKey, Tf2Install};
@@ -135,7 +135,7 @@ fn the_question_mark_opens_the_shortcuts(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::HUD_MAKER_START_BLANK);
     support::click_id(cx, s.win, ids::HUD_MAKER_SHORTCUTS);
     assert!(support::present(cx, s.win, ids::HUD_MAKER_SHORTCUTS_SHEET));
-    let rows: Vec<String> = (0..tf2tools_app::pages::hud_maker::SHORTCUTS.len())
+    let rows: Vec<String> = (0..shortcuts().len())
         .filter_map(|i| support::label_of(cx, s.win, ids::hud_maker_shortcut(i)))
         .collect();
     for want in [

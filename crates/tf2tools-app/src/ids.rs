@@ -578,7 +578,7 @@ pub const CROSSHAIR_MAKER_ZOOM: &str = "crosshair-maker-zoom";
 pub const CROSSHAIR_MAKER_ZOOM_IN: &str = "crosshair-maker-zoom-in";
 /// The Zoom out button.
 pub const CROSSHAIR_MAKER_ZOOM_OUT: &str = "crosshair-maker-zoom-out";
-/// Wraps the opacity slider; its tooltip is `model::OPACITY_TIP`.
+/// Wraps the opacity slider; its tooltip is `model::opacity_tip()`.
 pub const CROSSHAIR_MAKER_OPACITY: &str = "crosshair-maker-opacity";
 /// The "Opacity: 100%" label above the slider.
 pub const CROSSHAIR_MAKER_OPACITY_LABEL: &str = "crosshair-maker-opacity-label";
@@ -2192,6 +2192,11 @@ pub fn hud_maker_option_note(id: &str) -> ElementId {
 /// "hud-maker-option-need:<id>".
 pub fn hud_maker_option_need(id: &str) -> ElementId {
     keyed("hud-maker-option-need", id)
+}
+
+/// A Colour option's name beside its swatch: "hud-maker-option-label:<id>".
+pub fn hud_maker_option_label(id: &str) -> ElementId {
+    keyed("hud-maker-option-label", id)
 }
 
 /// A Number option's value beside its slider, labelled with it: "hud-maker-option-value:<id>".

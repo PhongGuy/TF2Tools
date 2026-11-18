@@ -1,9 +1,11 @@
 //! Starter shapes: a Dot, Cross, Cross with gap, Circle or Circle with dot, centred on the
 //! canvas and sized by a few sliders.
 
+use gpui_kit::SharedString;
 use tf2tools_core::RgbaImage;
 
 use super::model::{CanvasSize, square_image};
+use crate::i18n::tr;
 
 /// A shape a drawing can start from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,13 +28,13 @@ impl Starter {
     ];
 
     /// The shape's plain name.
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> SharedString {
         match self {
-            Starter::Dot => "Dot",
-            Starter::Cross => "Cross",
-            Starter::CrossWithGap => "Cross with gap",
-            Starter::Circle => "Circle",
-            Starter::CircleWithDot => "Circle with dot",
+            Starter::Dot => tr!("crosshair_maker.starter.shape.dot"),
+            Starter::Cross => tr!("crosshair_maker.starter.shape.cross"),
+            Starter::CrossWithGap => tr!("crosshair_maker.starter.shape.cross_with_gap"),
+            Starter::Circle => tr!("crosshair_maker.starter.shape.circle"),
+            Starter::CircleWithDot => tr!("crosshair_maker.starter.shape.circle_with_dot"),
         }
     }
 
@@ -100,12 +102,12 @@ impl Param {
     pub const ALL: [Param; 4] = [Param::Length, Param::Thickness, Param::Gap, Param::Size];
 
     /// The slider's plain name.
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> SharedString {
         match self {
-            Param::Length => "Length",
-            Param::Thickness => "Thickness",
-            Param::Gap => "Gap",
-            Param::Size => "Size",
+            Param::Length => tr!("crosshair_maker.starter.param.length"),
+            Param::Thickness => tr!("crosshair_maker.starter.param.thickness"),
+            Param::Gap => tr!("crosshair_maker.starter.param.gap"),
+            Param::Size => tr!("crosshair_maker.starter.param.size"),
         }
     }
 

@@ -82,7 +82,7 @@ fn starter_shapes_open_in_a_dialog_with_a_live_preview(cx: &mut TestAppContext) 
     for shape in Starter::ALL {
         assert_eq!(
             support::label_of(cx, s.win, ids::crosshair_maker_starter(shape.slug())).as_deref(),
-            Some(shape.label())
+            Some(shape.label().to_string()).as_deref()
         );
     }
     let (large, white) = (CanvasSize::Large, [255, 255, 255, 255]);

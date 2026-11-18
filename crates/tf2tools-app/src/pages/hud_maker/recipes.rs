@@ -26,6 +26,7 @@ use super::borrow::BorrowNote;
 use super::tip::tipped;
 use super::view::{Panel, PanelPlace};
 use super::{FontBytes, HudMakerPage, colour_view, register_font};
+use crate::i18n::names::{starting_point_about, starting_point_name};
 use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::picker::{PickKind, file_name_for, with_extension};
@@ -33,15 +34,15 @@ use crate::services::{OpError, Services, run_blocking};
 use crate::shell::toast::{ToastKind, toast};
 use crate::widgets::labelled;
 
-const NAME_BLANK: &str = "Give the preset a name.";
-const NAME_TAKEN: &str = "A preset with that name already exists.";
-const NO_OPTIONS: &str = "Choose some options first, then save them as a preset.";
-const PRESET_UNREADABLE: &str = "That file isn't a preset TF2Tools can read.";
-const RECIPE_UNREADABLE: &str = "That file isn't a recipe TF2Tools can read.";
-const RECIPE_SAVE_FAILED: &str = "Couldn't save the recipe.";
-const START_SAVED: &str = "Only for a new HUD. This one is already saved.";
-const START_CHANGED: &str = "Only before you change anything. Undo your changes to use it.";
-const TF2_ONLY: &str = "Some of these changes only show in TF2.";
+fn name_blank() -> SharedString {
+    tr!("hud_maker.recipes.name_blank")
+}
+fn preset_unreadable() -> SharedString {
+    tr!("hud_maker.recipes.preset_unreadable")
+}
+fn recipe_unreadable() -> SharedString {
+    tr!("hud_maker.recipes.recipe_unreadable")
+}
 
 /// What the preview bar says about the latest preview: its name and what it left out.
 #[derive(Debug, Default)]
@@ -194,8 +195,9 @@ impl HudMakerPage {
         let line = match note.borrow() {
             Some(borrow) => borrow.bar_line(),
             None => {
-                let mut line = format!("Previewing {}.", note.name);
-                let tf2_only = note.tf2_only.then(|| TF2_ONLY.to_owned());
+                let mut line = tr!("hud_maker.recipes.previewing", name = note.name).to_string();
+                let tf2_only =
+                    (note.tf2_only).then(|| tr!("hud_maker.recipes.tf2_only").to_string());
                 for part in [
                     changes_dont_fit(note.changes),
                     fonts_left_out(note.fonts),
@@ -210,12 +212,12 @@ impl HudMakerPage {
         let apply = Button::new(ids::HUD_MAKER_PREVIEW_APPLY)
             .primary()
             .small()
-            .label("Apply")
+            .label(tr!("hud_maker.recipes.apply"))
             .on_click(cx.listener(|page, _, window, cx| page.apply_preview(window, cx)));
         let cancel = Button::new(ids::HUD_MAKER_PREVIEW_CANCEL)
             .outline()
             .small()
-            .label("Cancel")
+            .label(tr!("hud_maker.recipes.cancel"))
             .on_click(cx.listener(|page, _, window, cx| page.cancel_preview(window, cx)));
         let bar = v_flex()
             .gap_2()
@@ -247,8 +249,8 @@ impl HudMakerPage {
         let trigger = Button::new(ids::HUD_MAKER_MORE)
             .ghost()
             .icon(IconName::Ellipsis)
-            .tooltip("More")
-            .accessibility_label("More");
+            .tooltip(tr!("hud_maker.more.title"))
+            .accessibility_label(tr!("hud_maker.more.title"));
         Popover::new("hud-maker-more-menu")
             .anchor(Anchor::BottomRight)
             .open(self.more_open)
@@ -274,7 +276,7 @@ impl HudMakerPage {
         let start = Button::new(ids::HUD_MAKER_START)
             .ghost()
             .small()
-            .label("Start from a ready-made HUD")
+            .label(tr!("hud_maker.more.start"))
             .disabled(!live)
             .on_click(cx.listener(|page, _, _, cx| {
                 page.start_open = true;
@@ -283,13 +285,13 @@ impl HudMakerPage {
         // An off entry says why, both on hover (the holder still hovers while the button is
         // off) and in a line under it, since a greyed-out entry alone tells a player nothing.
         let why = (!live).then(|| match self.saved_hud() {
-            Some(_) => START_SAVED,
-            None => START_CHANGED,
+            Some(_) => tr!("hud_maker.more.start_saved"),
+            None => tr!("hud_maker.more.start_changed"),
         });
         let start = match why {
             Some(why) => v_flex()
                 .items_start()
-                .child(tipped(&ids::HUD_MAKER_START.into(), why, start))
+                .child(tipped(&ids::HUD_MAKER_START.into(), why.clone(), start))
                 .child(labelled(
                     div().px_2().text_xs().text_color(muted),
                     ids::HUD_MAKER_START_WHY,
@@ -303,7 +305,7 @@ impl HudMakerPage {
                 let pick = Button::new(ids::hud_maker_start(which.label()))
                     .outline()
                     .small()
-                    .label(which.label())
+                    .label(starting_point_name(which))
                     .on_click(cx.listener(move |page, _, window, cx| {
                         // Built on the untouched HUD, so the recipe never carries the player's
                         // edits.
@@ -315,29 +317,30 @@ impl HudMakerPage {
                         page.set_more_open(false, cx);
                         page.start_preview(recipe, 0, window, cx);
                     }));
-                v_flex()
-                    .gap_1()
-                    .items_start()
-                    .child(pick)
-                    .child(div().text_xs().text_color(muted).child(which.about()))
+                v_flex().gap_1().items_start().child(pick).child(
+                    div()
+                        .text_xs()
+                        .text_color(muted)
+                        .child(starting_point_about(which)),
+                )
             })
         });
         let borrow = Button::new(ids::HUD_MAKER_BORROW_OPEN)
             .ghost()
             .small()
-            .label("Borrow a part")
-            .tooltip("Copy a part from another HUD in your library")
+            .label(tr!("hud_maker.borrow.title"))
+            .tooltip(tr!("hud_maker.more.borrow_tip"))
             .on_click(cx.listener(|page, _, window, cx| page.open_borrow(window, cx)));
         let history = Button::new(ids::HUD_MAKER_HISTORY_OPEN)
             .ghost()
             .small()
-            .label("History")
-            .tooltip("Keep copies of your HUD to compare or go back to")
+            .label(tr!("hud_maker.history.title"))
+            .tooltip(tr!("hud_maker.more.history_tip"))
             .on_click(cx.listener(|page, _, window, cx| page.open_history(window, cx)));
         let every = Button::new(ids::HUD_MAKER_EVERY_SCREEN)
             .ghost()
             .small()
-            .label("Every screen at once")
+            .label(tr!("hud_maker.more.every_screen"))
             .on_click(cx.listener(|page, _, window, cx| {
                 page.set_more_open(false, cx);
                 page.set_every_screen(true, window, cx);
@@ -345,7 +348,7 @@ impl HudMakerPage {
         let backdrop = Button::new(ids::HUD_MAKER_BACKDROP)
             .ghost()
             .small()
-            .label("Put a screenshot behind the HUD")
+            .label(tr!("hud_maker.more.backdrop"))
             .on_click(cx.listener(|page, _, _, cx| {
                 page.set_more_open(false, cx);
                 page.pick_backdrop(cx);
@@ -354,25 +357,25 @@ impl HudMakerPage {
             Button::new(ids::HUD_MAKER_BACKDROP_CLEAR)
                 .ghost()
                 .small()
-                .label("Remove the screenshot")
+                .label(tr!("hud_maker.more.backdrop_clear"))
                 .on_click(cx.listener(|page, _, _, cx| {
                     page.set_more_open(false, cx);
                     page.clear_backdrop(cx);
                 }))
         });
         let current = self.vision();
-        let views = colour_view::VIEWS.map(|(vision, word, name)| {
+        let views = colour_view::VIEWS.map(|(vision, word)| {
             let id = ids::hud_maker_vision(word);
             let button = Button::new(id.clone())
                 .ghost()
                 .small()
-                .label(word)
+                .label(colour_view::view_label(vision))
                 .selected(vision == current)
                 .on_click(cx.listener(move |page, _, _, cx| {
                     page.set_more_open(false, cx);
                     page.set_vision(vision, cx);
                 }));
-            tipped(&id, name, button)
+            tipped(&id, colour_view::view_name(vision), button)
         });
         v_flex()
             .w(px(260.))
@@ -392,7 +395,7 @@ impl HudMakerPage {
             .child(every)
             .child(backdrop)
             .children(clear)
-            .child(div().text_xs().text_color(muted).child("Colour-blind view"))
+            .child((div().text_xs().text_color(muted)).child(tr!("hud_maker.more.colour_blind")))
             .child(h_flex().flex_wrap().gap_1().children(views))
             .into_any_element()
     }
@@ -452,7 +455,7 @@ impl HudMakerPage {
                         failed => {
                             let why = failed.err().map(|e| e.to_string());
                             tracing::debug!(error = ?why, "a preset didn't load");
-                            toast(window, cx, ToastKind::Error, PRESET_UNREADABLE, "");
+                            toast(window, cx, ToastKind::Error, preset_unreadable(), "");
                         }
                     })
                 });
@@ -470,17 +473,17 @@ impl HudMakerPage {
                 .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                 .text_color(theme.foreground),
             ids::HUD_MAKER_PRESETS,
-            "Presets",
+            tr!("hud_maker.recipes.presets"),
         );
         let save = Button::new(ids::HUD_MAKER_PRESET_SAVE)
             .outline()
             .small()
             .icon(IconName::Save)
-            .label("Save as preset")
+            .label(tr!("hud_maker.recipes.save_preset"))
             .on_click(cx.listener(|page, _, window, cx| page.save_preset(window, cx)));
         let name = div()
             .id(ids::HUD_MAKER_PRESET_NAME)
-            .aria_label("Preset name")
+            .aria_label(tr!("hud_maker.placeholder.preset_label"))
             .test_support()
             .flex_1()
             .min_w_0()
@@ -500,7 +503,7 @@ impl HudMakerPage {
                 .ghost()
                 .xsmall()
                 .icon(IconName::Trash)
-                .accessibility_label(format!("Delete {}", preset.name()))
+                .accessibility_label(tr!("hud_maker.recipes.delete_named", name = preset.name()))
                 .on_click(
                     cx.listener(move |page, _, window, cx| page.delete_preset(&file, window, cx)),
                 );
@@ -508,7 +511,7 @@ impl HudMakerPage {
                 .justify_between()
                 .items_center()
                 .child(div().min_w_0().overflow_hidden().child(apply))
-                .child(tipped(&delete_id, "Delete", delete))
+                .child(tipped(&delete_id, tr!("hud_maker.recipes.delete"), delete))
         });
         let recipes = labelled(
             div()
@@ -516,19 +519,19 @@ impl HudMakerPage {
                 .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                 .text_color(theme.foreground),
             ids::HUD_MAKER_RECIPES,
-            "Recipes",
+            tr!("hud_maker.recipes.title"),
         );
         let share = Button::new(ids::HUD_MAKER_RECIPE_EXPORT)
             .outline()
             .small()
             .icon(IconName::Upload)
-            .label("Share as recipe")
+            .label(tr!("hud_maker.recipes.share"))
             .on_click(cx.listener(|page, _, _, cx| page.share_recipe(cx)));
         let import = Button::new(ids::HUD_MAKER_RECIPE_IMPORT)
             .outline()
             .small()
             .icon(IconName::Download)
-            .label("Use a recipe")
+            .label(tr!("hud_maker.recipes.use"))
             .on_click(cx.listener(|page, _, _, cx| page.use_recipe(cx)));
         v_flex()
             .gap_2()
@@ -548,7 +551,7 @@ impl HudMakerPage {
             return;
         };
         let name = match self.trimmed_name(cx) {
-            n if n.is_empty() => "My HUD".to_owned(),
+            n if n.is_empty() => tr!("hud_maker.recipes.my_hud").to_string(),
             n => n,
         };
         let (changes, assets) = (editor.changes().to_vec(), editor.assets().clone());
@@ -584,9 +587,13 @@ impl HudMakerPage {
                         Ok(Ok(Shared::Saved {
                             fonts: 0,
                             pictures: 0,
-                        })) => toast(window, cx, ToastKind::Success, "Recipe saved", ""),
+                        })) => {
+                            let saved = tr!("hud_maker.recipes.saved");
+                            toast(window, cx, ToastKind::Success, saved, "")
+                        }
                         Ok(Ok(Shared::Saved { fonts, pictures })) => {
-                            let pictures = (pictures > 0).then(|| PICTURES_LEFT_OUT.to_owned());
+                            let pictures = (pictures > 0)
+                                .then(|| tr!("hud_maker.recipes.pictures_left_out").to_string());
                             let left: Vec<String> = [fonts_left_out(fonts), pictures]
                                 .into_iter()
                                 .flatten()
@@ -595,13 +602,12 @@ impl HudMakerPage {
                                 window,
                                 cx,
                                 ToastKind::Warning,
-                                "Recipe saved",
+                                tr!("hud_maker.recipes.saved"),
                                 left.join(" "),
                             )
                         }
                         Ok(Ok(Shared::Taken(name))) => {
-                            let line =
-                                format!("A file named {name} is already there. Pick another name.");
+                            let line = tr!("hud_maker.recipes.file_taken", name = name);
                             toast(window, cx, ToastKind::Warning, line, "")
                         }
                         Ok(Err(why)) => share_failed(window, cx, why),
@@ -644,7 +650,7 @@ impl HudMakerPage {
                                 Ok(Ok(_)) => String::new(),
                             };
                             tracing::debug!(error = %why, "a recipe didn't load");
-                            toast(window, cx, ToastKind::Error, RECIPE_UNREADABLE, "");
+                            toast(window, cx, ToastKind::Error, recipe_unreadable(), "");
                         }
                     })
                 });
@@ -670,7 +676,7 @@ impl HudMakerPage {
         self.flush(cx);
         let name = self.preset_name.read(cx).value().trim().to_owned();
         if name.is_empty() {
-            return toast(window, cx, ToastKind::Error, NAME_BLANK, "");
+            return toast(window, cx, ToastKind::Error, name_blank(), "");
         }
         let Some(changes) = self.editor().map(|e| e.changes().to_vec()) else {
             return;
@@ -716,10 +722,7 @@ impl HudMakerPage {
                                     cx.notify();
                                 }
                                 done.map_err(|e| {
-                                    (
-                                        preset_message(&e).map_or(failed, SharedString::from),
-                                        e.to_string(),
-                                    )
+                                    (preset_message(&e).unwrap_or(failed), e.to_string())
                                 })
                             }
                             Err(err) => Err((failed, err.to_string())),
@@ -744,7 +747,8 @@ impl HudMakerPage {
 
 fn share_failed(window: &mut Window, cx: &mut gpui_kit::App, why: String) {
     tracing::debug!(error = %why, "a recipe didn't save");
-    toast(window, cx, ToastKind::Error, RECIPE_SAVE_FAILED, "");
+    let failed = tr!("hud_maker.recipes.save_failed");
+    toast(window, cx, ToastKind::Error, failed, "");
 }
 
 // Writes `recipe` where the player picked, as a `.json`. The dialog only vetted the name it
@@ -795,20 +799,17 @@ fn no_longer_fit(n: usize) -> Option<String> {
     (n > 0).then(|| plural("hud_maker.recipes.no_longer_fit", n).to_string())
 }
 
-const PICTURES_LEFT_OUT: &str =
-    "Pictures aren't included in shared recipes yet, so parts that use them were left out.";
-
 fn fonts_left_out(n: usize) -> Option<String> {
     let n = u64::try_from(n).unwrap_or(u64::MAX);
     (n > 0).then(|| plural("hud_maker.recipes.fonts_left_out", n).to_string())
 }
 
 // The player's line for a refusal they can fix; `None` for a read or write failure.
-fn preset_message(err: &PresetError) -> Option<&'static str> {
+fn preset_message(err: &PresetError) -> Option<SharedString> {
     match err {
-        PresetError::NameBlank => Some(NAME_BLANK),
-        PresetError::NameTaken { .. } => Some(NAME_TAKEN),
-        PresetError::NoOptions => Some(NO_OPTIONS),
+        PresetError::NameBlank => Some(name_blank()),
+        PresetError::NameTaken { .. } => Some(tr!("hud_maker.recipes.name_taken")),
+        PresetError::NoOptions => Some(tr!("hud_maker.recipes.no_options")),
         PresetError::NotFound | PresetError::Recipe(_) | PresetError::Io { .. } | _ => None,
     }
 }

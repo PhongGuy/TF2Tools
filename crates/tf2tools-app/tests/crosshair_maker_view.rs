@@ -1,6 +1,6 @@
 use gpui_kit::{Pixels, ScrollDelta, point, px, size};
 use tf2tools_app::pages::crosshair_maker::model::{
-    FIT_TIP, Viewport, ZOOM_IN_TIP, ZOOM_OUT_TIP, ZOOMS, wheel_scroll, wheel_zoom_steps,
+    Viewport, ZOOMS, fit_tip, wheel_scroll, wheel_zoom_steps, zoom_in_tip, zoom_out_tip,
 };
 
 /// A 512x448 view of a 64x64 grid: fitted cells are 7 px and the grid sits 32 px in.
@@ -189,9 +189,9 @@ fn the_wheel_scrolls_against_its_delta_and_shift_turns_it_sideways() {
     assert_eq!(wheel_scroll(p(0., -20.), true), p(20., 0.));
     assert_eq!(wheel_scroll(p(-8., 5.), false), p(8., -5.));
     assert_eq!(wheel_scroll(p(-8., 0.), true), p(8., 0.));
-    assert_eq!(ZOOM_IN_TIP, "Zoom in (Ctrl+Plus)");
-    assert_eq!(ZOOM_OUT_TIP, "Zoom out (Ctrl+Minus)");
-    assert_eq!(FIT_TIP, "Fit to the window (Ctrl+0)");
+    assert_eq!(zoom_in_tip(), "Zoom in (Ctrl+Plus)");
+    assert_eq!(zoom_out_tip(), "Zoom out (Ctrl+Minus)");
+    assert_eq!(fit_tip(), "Fit to the window (Ctrl+0)");
 }
 
 #[test]

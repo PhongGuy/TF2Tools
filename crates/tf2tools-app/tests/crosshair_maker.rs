@@ -12,7 +12,7 @@ use gpui_kit::{
 use tf2tools_app::ids;
 use tf2tools_app::pages::crosshair_maker::CrosshairMakerPage;
 use tf2tools_app::pages::crosshair_maker::model::{
-    CLEAR, CanvasSize, FOLLOWS, MIXED, Tool, hsla_of, position_text, rgb_of,
+    CLEAR, CanvasSize, Tool, follows, hsla_of, mixed, position_text, rgb_of,
 };
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::leave;
@@ -586,7 +586,7 @@ fn a_swatch_picks_a_colour_that_follows_the_crosshair(cx: &mut TestAppContext) {
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::CROSSHAIR_MAKER_COLOR_HINT).as_deref(),
-        Some(FOLLOWS)
+        Some(&*follows())
     );
     paint_cell(cx, &s, &page, 0, 0);
     assert_eq!(
@@ -624,7 +624,7 @@ fn the_colour_hint_shows_once_under_the_swatches(cx: &mut TestAppContext) {
         .update_window(s.win, |_, w, _| {
             gpui_kit::base::test_support::snapshots(w)
                 .iter()
-                .filter(|e| e.label() == Some(FOLLOWS))
+                .filter(|e| e.label() == Some(&*follows()))
                 .count()
         })
         .unwrap();
@@ -650,7 +650,7 @@ fn a_picked_colour_is_mixed_in_game(cx: &mut TestAppContext) {
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::CROSSHAIR_MAKER_COLOR_HINT).as_deref(),
-        Some(MIXED)
+        Some(&*mixed())
     );
 }
 

@@ -4,8 +4,10 @@
 
 use std::collections::VecDeque;
 
-use gpui_kit::{Hsla, Pixels, Point, Rgba, ScrollDelta, Size, point, px};
+use gpui_kit::{Hsla, Pixels, Point, Rgba, ScrollDelta, SharedString, Size, point, px};
 use tf2tools_core::{CrosshairId, FitChange, RgbaImage};
+
+use crate::i18n::tr;
 
 /// How many steps the undo and redo stacks each keep.
 pub const UNDO_LIMIT: usize = 100;
@@ -35,14 +37,14 @@ impl Tool {
     ];
 
     /// "Pencil", "Eraser", "Fill", "Line", "Rectangle", "Circle".
-    pub fn label(self) -> &'static str {
+    pub fn label(self) -> SharedString {
         match self {
-            Tool::Pencil => "Pencil",
-            Tool::Eraser => "Eraser",
-            Tool::Fill => "Fill",
-            Tool::Line => "Line",
-            Tool::Rectangle => "Rectangle",
-            Tool::Circle => "Circle",
+            Tool::Pencil => tr!("crosshair_maker.tool.pencil"),
+            Tool::Eraser => tr!("crosshair_maker.tool.eraser"),
+            Tool::Fill => tr!("crosshair_maker.tool.fill"),
+            Tool::Line => tr!("crosshair_maker.tool.line"),
+            Tool::Rectangle => tr!("crosshair_maker.tool.rectangle"),
+            Tool::Circle => tr!("crosshair_maker.tool.circle"),
         }
     }
 
@@ -75,9 +77,13 @@ impl Tool {
 }
 
 /// The Undo button's tooltip, naming its shortcut.
-pub const UNDO_TIP: &str = "Undo (Ctrl+Z)";
+pub fn undo_tip() -> SharedString {
+    tr!("crosshair_maker.undo_tip")
+}
 /// The Redo button's tooltip, naming its shortcut.
-pub const REDO_TIP: &str = "Redo (Ctrl+Y)";
+pub fn redo_tip() -> SharedString {
+    tr!("crosshair_maker.redo_tip")
+}
 
 /// The two canvas sizes a TF2 crosshair texture takes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -626,14 +632,14 @@ pub fn position_text(size: CanvasSize, x: u32, y: u32) -> String {
     // The centre falls between cells half-1 and half, so neither side has a zero.
     let half = size.side() / 2;
     let (across, h) = if x >= half {
-        (x - half + 1, "right")
+        (x - half + 1, tr!("crosshair_maker.position.right"))
     } else {
-        (half - x, "left")
+        (half - x, tr!("crosshair_maker.position.left"))
     };
     let (down, v) = if y >= half {
-        (y - half + 1, "down")
+        (y - half + 1, tr!("crosshair_maker.position.down"))
     } else {
-        (half - y, "up")
+        (half - y, tr!("crosshair_maker.position.up"))
     };
     format!("{across} {h}, {down} {v}")
 }
@@ -675,11 +681,17 @@ pub const ZOOMS: [u32; 8] = [1, 2, 3, 4, 6, 8, 12, 16];
 /// Touchpad travel per zoom level.
 pub const ZOOM_WHEEL_PIXELS: Pixels = px(50.);
 /// The Zoom in button's tooltip.
-pub const ZOOM_IN_TIP: &str = "Zoom in (Ctrl+Plus)";
+pub fn zoom_in_tip() -> SharedString {
+    tr!("crosshair_maker.zoom_in_tip")
+}
 /// The Zoom out button's tooltip.
-pub const ZOOM_OUT_TIP: &str = "Zoom out (Ctrl+Minus)";
+pub fn zoom_out_tip() -> SharedString {
+    tr!("crosshair_maker.zoom_out_tip")
+}
 /// The zoom label's tooltip; a click fits the grid.
-pub const FIT_TIP: &str = "Fit to the window (Ctrl+0)";
+pub fn fit_tip() -> SharedString {
+    tr!("crosshair_maker.fit_tip")
+}
 
 /// The grid's zoom and scroll inside the view that shows it; owns every cell lookup.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -876,29 +888,43 @@ pub const SWATCHES: [[u8; 3]; 4] = [
     [64, 64, 64],
 ];
 /// The swatches' names, in `SWATCHES` order.
-pub const SWATCH_NAMES: [&str; 4] = ["White", "Light grey", "Grey", "Dark grey"];
+pub fn swatch_names() -> [SharedString; 4] {
+    [
+        tr!("crosshair_maker.swatch.white"),
+        tr!("crosshair_maker.swatch.light_grey"),
+        tr!("crosshair_maker.swatch.grey"),
+        tr!("crosshair_maker.swatch.dark_grey"),
+    ]
+}
 
 /// The tooltip of a white or grey swatch, which keeps its meaning visible once another
 /// colour is picked.
-pub const FOLLOWS_TIP: &str = "Follows your crosshair colour in game";
+pub fn follows_tip() -> SharedString {
+    tr!("crosshair_maker.follows_tip")
+}
 
-/// The tooltip of a swatch with colour `rgb`: FOLLOWS_TIP for white and grey, else `name`.
-pub fn swatch_tooltip(rgb: [u8; 3], name: &'static str) -> &'static str {
-    if colour_hint(rgb) == FOLLOWS {
-        FOLLOWS_TIP
-    } else {
-        name
-    }
+/// The tooltip of a swatch with colour `rgb`: `follows_tip()` for white and grey, else `name`.
+pub fn swatch_tooltip(rgb: [u8; 3], name: SharedString) -> SharedString {
+    if is_grey(rgb) { follows_tip() } else { name }
 }
 
 /// The hint under a grey colour.
-pub const FOLLOWS: &str = "Follows your crosshair colour";
+pub fn follows() -> SharedString {
+    tr!("crosshair_maker.follows")
+}
 /// The hint under any other colour.
-pub const MIXED: &str = "In game this colour is mixed with your crosshair colour";
+pub fn mixed() -> SharedString {
+    tr!("crosshair_maker.mixed")
+}
 
-/// What a colour does in game: FOLLOWS when red, green and blue are equal, else MIXED.
-pub fn colour_hint([r, g, b]: [u8; 3]) -> &'static str {
-    if r == g && g == b { FOLLOWS } else { MIXED }
+// White and greys follow the player's crosshair colour; any tint mixes with it.
+fn is_grey([r, g, b]: [u8; 3]) -> bool {
+    r == g && g == b
+}
+
+/// What a colour does in game: `follows()` when red, green and blue are equal, else `mixed()`.
+pub fn colour_hint(rgb: [u8; 3]) -> SharedString {
+    if is_grey(rgb) { follows() } else { mixed() }
 }
 
 /// The picker's colour as RGB bytes, each channel rounded.
@@ -919,20 +945,24 @@ pub fn hsla_of_rgba(rgba: [u8; 4]) -> Hsla {
 }
 
 /// The opacity slider's tooltip.
-pub const OPACITY_TIP: &str =
-    "See-through paint. Painting over a pixel replaces it; colours never blend.";
+pub fn opacity_tip() -> SharedString {
+    tr!("crosshair_maker.opacity_tip")
+}
 
 /// The note when a copied or imported picture was shrunk onto the canvas.
-pub const FIT_SHRUNK: &str = "This image is bigger than the canvas, so it was shrunk to fit.";
+pub fn fit_shrunk() -> SharedString {
+    tr!("crosshair_maker.fit_shrunk")
+}
 /// The note when a copied or imported picture was placed unscaled in the middle.
-pub const FIT_CENTRED: &str =
-    "This image is smaller than the canvas, so it was placed in the middle.";
+pub fn fit_centred() -> SharedString {
+    tr!("crosshair_maker.fit_centred")
+}
 
 /// The note a fitted picture toasts; None when it was kept as it is.
-pub fn fit_note(change: FitChange) -> Option<&'static str> {
+pub fn fit_note(change: FitChange) -> Option<SharedString> {
     match change {
-        FitChange::ShrunkToFit => Some(FIT_SHRUNK),
-        FitChange::Centred => Some(FIT_CENTRED),
+        FitChange::ShrunkToFit => Some(fit_shrunk()),
+        FitChange::Centred => Some(fit_centred()),
         FitChange::AsIs | _ => None,
     }
 }

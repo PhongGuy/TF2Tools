@@ -30,7 +30,7 @@ mod tip;
 pub mod view;
 mod zoom;
 
-pub use shortcuts::SHORTCUTS;
+pub use shortcuts::shortcuts;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariants as _};
@@ -67,6 +67,7 @@ use tf2tools_core::{
 
 use crate::activity;
 use crate::hud_textures::{Decoded, crop, decode_texture};
+use crate::i18n::names::{board_mode_name, scene_name};
 use crate::i18n::tr;
 use crate::ids;
 use crate::keymap::{
@@ -77,9 +78,10 @@ use crate::keymap::{
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
     LocalFailure, ReopenNotice, describe_hud_load, describe_make_hud, describe_settings,
-    hud_base_changed, hud_files, hud_options_unreadable, left_out, reopen_notice,
+    hud_base_changed, hud_files, hud_options_unreadable, left_out, pictures_left_out,
+    reopen_notice,
 };
-use crate::pages::crosshair_maker::model::{REDO_TIP, UNDO_TIP, hsla_of_rgba, rgb_of};
+use crate::pages::crosshair_maker::model::{hsla_of_rgba, redo_tip, rgb_of, undo_tip};
 use crate::pages::huds::{install_failed, install_job, install_toast};
 use crate::picker::PickKind;
 use crate::previews::to_render_image;
@@ -96,28 +98,52 @@ pub use situation::SituationSlider;
 use tip::tipped;
 use view::{CanvasFit, Panel, PanelMode, PanelPlace, Places, Zoom};
 
-const LOADING: &str = "Loading the default HUD...";
-const ADD_REFUSED: &str = "That part can't be added here.";
-const DETACH_FIRST: &str = "Detach the parts attached to it first.";
+fn loading() -> SharedString {
+    tr!("hud_maker.loading")
+}
+fn add_refused() -> SharedString {
+    tr!("hud_maker.add_refused")
+}
+fn detach_first() -> SharedString {
+    tr!("hud_maker.detach_first")
+}
 fn save_failed() -> SharedString {
     tr!("messages.action.save_hud")
 }
-const NOT_A_FONT: &str = "That file isn't a font TF2Tools can read.";
-const FONT_BAD_NAME: &str = "TF2Tools can't use a font with that name in a HUD.";
-const FONT_HUD_FULL: &str = "This HUD can't take another font file.";
-const FONT_PART: &str = "This part's font can't be changed in this HUD, so the font wasn't added.";
+fn not_a_font() -> SharedString {
+    tr!("hud_maker.font.not_a_font")
+}
+fn font_bad_name() -> SharedString {
+    tr!("hud_maker.font.bad_name")
+}
+fn font_hud_full() -> SharedString {
+    tr!("hud_maker.font.hud_full")
+}
+fn font_part() -> SharedString {
+    tr!("hud_maker.font.part_font")
+}
 // Why an arrow key moved nothing, one line per reason the HUD Maker refuses a nudge.
-const NUDGE_GAME_PLACES: &str = "The game places this part itself, so it can't be moved.";
-const NUDGE_SIDEWAYS_SET: &str =
-    "The game sets where this part sits from side to side, so it only moves up and down.";
-const NUDGE_UP_DOWN_SET: &str =
-    "The game sets where this part sits from top to bottom, so it only moves left and right.";
-const NUDGE_ODD_PLACE: &str =
-    "This part's place is written in a way the HUD Maker can't change, so it can't be moved.";
-const NUDGE_FROM_BASE: &str =
-    "This part comes from another file the HUD includes, so it can't be moved here yet.";
-const NUDGE_UNREADABLE: &str = "This part's file couldn't be read, so it can't be moved.";
-const NUDGE_REFUSED: &str = "This part can't be moved that way.";
+fn nudge_game_places() -> SharedString {
+    tr!("hud_maker.nudge.game_places")
+}
+fn nudge_sideways_set() -> SharedString {
+    tr!("hud_maker.nudge.sideways_set")
+}
+fn nudge_up_down_set() -> SharedString {
+    tr!("hud_maker.nudge.up_down_set")
+}
+fn nudge_odd_place() -> SharedString {
+    tr!("hud_maker.nudge.odd_place")
+}
+fn nudge_from_base() -> SharedString {
+    tr!("hud_maker.nudge.from_base")
+}
+fn nudge_unreadable() -> SharedString {
+    tr!("hud_maker.nudge.unreadable")
+}
+fn nudge_refused() -> SharedString {
+    tr!("hud_maker.nudge.refused")
+}
 // A picked font file over this is refused before it is read, as core refuses one.
 const MAX_FONT_BYTES: u64 = 64 * 1024 * 1024;
 // A HUD's listed font files past either limit are skipped, so a hostile list can't fill memory.
@@ -152,16 +178,23 @@ const PARTS_MIN_ROWS: f32 = 3.;
 // its hide button, padding and border, so the whole bar fits two rows; narrower, the save row
 // moves into More.
 const TOOLBAR_TWO_ROWS: Pixels = px(416.);
-// Estimates for the scene tab row: pixels per label letter and per tab, and the least kept for
-// the note, which cuts itself short rather than push the tabs into a menu.
+// Estimates for the scene tab row: pixels per label letter (ASCII, then any wider letter such
+// as Cyrillic) and per tab, and the least kept for the note, which cuts itself short rather than
+// push the tabs into a menu.
 const SCENE_TAB_LETTER: f32 = 7.5;
+const SCENE_TAB_WIDE_LETTER: f32 = 10.;
 const SCENE_TAB_PAD: f32 = 28.;
 const SCENE_NOTE_ROOM: f32 = 40.;
-// The match mode dropdown beside the Scoreboard tab: its longest label, icon and padding.
+// The match mode dropdown beside the Scoreboard tab: its least width, and its icon and padding
+// around the widest label.
 const BOARD_MODE_WIDTH: f32 = 150.;
-// The Minimal HUD chip off the HUD tab: its label, padding and gap.
+const BOARD_MODE_CHROME: f32 = 40.;
+// The Minimal HUD chip off the HUD tab: its least width, and its padding and gap around the label.
 const MINMODE_CHIP_WIDTH: f32 = 120.;
-const MINMODE_CHIP_TIP: &str = "The minimal HUD is on. Click to turn it off.";
+const MINMODE_CHIP_CHROME: f32 = 37.5;
+fn minmode_chip_tip() -> SharedString {
+    tr!("hud_maker.minmode.chip_tip")
+}
 
 // Where the toolbar sits so it never covers the screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -531,7 +564,7 @@ pub struct HudMakerPage {
     matching_size: bool,
     // The refused nudge already toasted for the key held now; a key coming up, a new selection
     // or a new HUD forgets it.
-    nudge_refused: Option<(PartKey, &'static str)>,
+    nudge_refused: Option<(PartKey, SharedString)>,
     // Tracked on the page root, so Undo and Redo keys work while the page has focus.
     focus: FocusHandle,
     checked: Checked,
@@ -741,7 +774,9 @@ impl HudMakerPage {
         // Enter and leaving a field commit it; a picked colour applies at once.
         let fields = Field::ALL.map(|_| cx.new(|cx| InputState::new(window, cx)));
         let colour = cx.new(|cx| ColorPickerState::new(window, cx));
-        let parts_filter = cx.new(|cx| InputState::new(window, cx).placeholder("Find a part..."));
+        let parts_filter = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(tr!("hud_maker.placeholder.find_part"))
+        });
         let mut subscriptions: Vec<Subscription> = fields
             .iter()
             .map(|input| {
@@ -800,9 +835,13 @@ impl HudMakerPage {
                 }
             }),
         );
-        let name = cx.new(|cx| InputState::new(window, cx).placeholder("Name your HUD"));
-        let preset_name = cx.new(|cx| InputState::new(window, cx).placeholder("Preset name"));
-        let snapshot_name = cx.new(|cx| InputState::new(window, cx).placeholder("Snapshot name"));
+        let name =
+            cx.new(|cx| InputState::new(window, cx).placeholder(tr!("hud_maker.placeholder.name")));
+        let preset_name = cx
+            .new(|cx| InputState::new(window, cx).placeholder(tr!("hud_maker.placeholder.preset")));
+        let snapshot_name = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(tr!("hud_maker.placeholder.snapshot"))
+        });
         // Any change to the name drops the taken-name line; the next save checks the new one.
         subscriptions.push(cx.observe(&name, |page, input, cx| {
             let typed = input.read(cx).value().trim().to_owned();
@@ -1033,9 +1072,10 @@ impl HudMakerPage {
                     Some((source.to_owned(), FontBytes::new(bytes)))
                 })
                 .collect();
-            // Borrowed pictures past the caps were among the dropped; core's sentence says so.
+            // Borrowed pictures past the caps were among the dropped, so the notice says so.
             let mut notice = reopen_notice(made.dropped(), made.tf2_updated());
-            if let (Some(notice), Some(line)) = (&mut notice, made.notice()) {
+            let pictures = pictures_left_out(made.pictures_left_out());
+            if let (Some(notice), Some(line)) = (&mut notice, pictures) {
                 notice.text = format!("{} {line}", notice.text);
             }
             let entry = made.entry();
@@ -1730,7 +1770,7 @@ impl HudMakerPage {
             return;
         }
         let Some((name, font)) = read else {
-            toast(window, cx, ToastKind::Error, NOT_A_FONT, "");
+            toast(window, cx, ToastKind::Error, not_a_font(), "");
             return;
         };
         let mut added = None;
@@ -1748,10 +1788,10 @@ impl HudMakerPage {
             }
             Some(Err(refused)) => {
                 let message = match refused {
-                    FontAddRefused::NotAFont => NOT_A_FONT,
-                    FontAddRefused::BadName => FONT_BAD_NAME,
-                    FontAddRefused::HudFull => FONT_HUD_FULL,
-                    FontAddRefused::PartFont => FONT_PART,
+                    FontAddRefused::NotAFont => not_a_font(),
+                    FontAddRefused::BadName => font_bad_name(),
+                    FontAddRefused::HudFull => font_hud_full(),
+                    FontAddRefused::PartFont => font_part(),
                 };
                 toast(window, cx, ToastKind::Error, message, "");
             }
@@ -1780,7 +1820,7 @@ impl HudMakerPage {
         self.edit_selected(window, cx, |e| refused = e.add_part_selected(kind).err());
         if let Some(err) = refused {
             tracing::debug!("the HUD Maker refused adding {kind:?}: {err:?}");
-            toast(window, cx, ToastKind::Error, ADD_REFUSED, "");
+            toast(window, cx, ToastKind::Error, add_refused(), "");
         }
     }
 
@@ -1806,7 +1846,7 @@ impl HudMakerPage {
         self.edit_selected(window, cx, |e| refused = e.delete_selected().err());
         match refused {
             Some(tf2tools_core::RemoveRefused::Attached) => {
-                toast(window, cx, ToastKind::Error, DETACH_FIRST, "")
+                toast(window, cx, ToastKind::Error, detach_first(), "")
             }
             Some(err) => tracing::debug!("the HUD Maker refused a delete: {err:?}"),
             None => {}
@@ -1822,7 +1862,7 @@ impl HudMakerPage {
                 window,
                 cx,
                 ToastKind::Error,
-                animations::RUNS_GAME_COMMANDS,
+                animations::runs_game_commands(),
                 "",
             ),
             Some(err) => tracing::debug!("the HUD Maker refused the hit flash: {err:?}"),
@@ -3098,7 +3138,7 @@ impl HudMakerPage {
                             if page.history_open {
                                 page.read_snapshots(cx);
                             }
-                            let mut text = format!("{name} is in your HUDs library.");
+                            let mut text = tr!("hud_maker.saved.body", name = name).to_string();
                             if let Some(line) = left_out(dropped, false) {
                                 text = format!("{text} {line}");
                             }
@@ -3126,7 +3166,13 @@ impl HudMakerPage {
             cx.update(|cx| {
                 let _ = win.update(cx, |_, window, cx| match toast_of {
                     Some(Ok((text, live))) => {
-                        toast(window, cx, ToastKind::Success, "HUD saved", text);
+                        toast(
+                            window,
+                            cx,
+                            ToastKind::Success,
+                            tr!("hud_maker.saved.title"),
+                            text,
+                        );
                         let _ = page.update(cx, |page, cx| page.land_live(&live, window, cx));
                     }
                     Some(Err(err)) => toast_error(window, cx, &err),
@@ -3165,7 +3211,7 @@ impl HudMakerPage {
             .child(
                 div()
                     .id(ids::HUD_MAKER_NAME)
-                    .aria_label("HUD name")
+                    .aria_label(tr!("hud_maker.toolbar.name"))
                     .test_support()
                     .child(Input::new(&self.name)),
             )
@@ -3173,15 +3219,17 @@ impl HudMakerPage {
         let save = Button::new(ids::HUD_MAKER_SAVE)
             .primary()
             .icon(IconName::Save)
-            .label("Save")
-            .when(saving_over, |b| b.accessibility_label("Saving..."))
+            .label(tr!("hud_maker.toolbar.save"))
+            .when(saving_over, |b| {
+                b.accessibility_label(tr!("crosshair_maker.saving"))
+            })
             .loading(saving_over)
             .disabled(name.is_empty() || self.saving || self.installing || self.history_busy)
             .on_click(cx.listener(|page, _, window, cx| page.save(false, window, cx)));
         let install = Button::new(ids::HUD_MAKER_INSTALL)
             .primary()
             .icon(IconName::Download)
-            .label("Install")
+            .label(tr!("hud_maker.toolbar.install"))
             .when(!self.can_install(cx), |b| {
                 b.tooltip(install_tip(self.saving, require_tf2(cx).is_ok()))
             })
@@ -3204,8 +3252,10 @@ impl HudMakerPage {
             .ghost()
             .small()
             .icon(IconName::Copy)
-            .label("Save as new")
-            .when(saving_new, |b| b.accessibility_label("Saving..."))
+            .label(tr!("hud_maker.toolbar.save_as_new"))
+            .when(saving_new, |b| {
+                b.accessibility_label(tr!("crosshair_maker.saving"))
+            })
             .loading(saving_new)
             .disabled(name.is_empty() || self.saving || self.installing || self.history_busy)
             .on_click(cx.listener(|page, _, window, cx| {
@@ -3295,7 +3345,7 @@ impl HudMakerPage {
             .child(
                 Button::new(ids::HUD_MAKER_OPEN_SETTINGS)
                     .outline()
-                    .label("Settings")
+                    .label(tr!("nav.settings"))
                     .on_click(cx.listener(|_, _, _, cx| cx.emit(NavigateTo(Page::Settings)))),
             )
             .into_any_element()
@@ -3672,8 +3722,8 @@ impl HudMakerPage {
                     .zip(landed(editor, field, &shown.part))
                     .filter(|(typed, landed)| typed != landed)
                     .map(|(_, landed)| {
-                        let said =
-                            format!("Rounded to {landed}, the nearest step the HUD file can hold");
+                        let value = landed.to_string();
+                        let said = tr!("hud_maker.field.rounded", value = value).to_string();
                         (said, false)
                     }),
                 Err(Refusal::Note(said)) => Some((said, true)),
@@ -3803,7 +3853,7 @@ impl HudMakerPage {
             self.nudge_refused = None;
             return;
         };
-        let refused = Some((part, why));
+        let refused = Some((part, why.clone()));
         if self.nudge_refused != refused {
             self.nudge_refused = refused;
             toast(window, cx, ToastKind::Info, why, "");
@@ -3813,16 +3863,16 @@ impl HudMakerPage {
     /// The Undo button's tooltip, naming the step it takes back when it has a name.
     pub fn undo_tip(&self) -> String {
         match self.editor().and_then(HudEditor::undo_name) {
-            Some(name) => format!("Undo {name} (Ctrl+Z)"),
-            None => UNDO_TIP.to_owned(),
+            Some(name) => tr!("hud_maker.toolbar.undo_named", name = name).to_string(),
+            None => undo_tip().to_string(),
         }
     }
 
     /// The Redo button's tooltip, naming the step it puts back when it has a name.
     pub fn redo_tip(&self) -> String {
         match self.editor().and_then(HudEditor::redo_name) {
-            Some(name) => format!("Redo {name} (Ctrl+Y)"),
-            None => REDO_TIP.to_owned(),
+            Some(name) => tr!("hud_maker.toolbar.redo_named", name = name).to_string(),
+            None => redo_tip().to_string(),
         }
     }
 
@@ -3872,7 +3922,7 @@ impl HudMakerPage {
         let pick = |scene: Scene, cx: &mut Context<Self>| {
             Button::new(ids::hud_maker_scene(scene))
                 .small()
-                .label(SceneRule::get(scene).label())
+                .label(scene_name(scene))
                 .selected(current == Some(scene))
                 .on_click(cx.listener(move |page, _, window, cx| {
                     page.scene_open = false;
@@ -3926,10 +3976,14 @@ impl HudMakerPage {
         let chip = Button::new(ids::HUD_MAKER_MINMODE_CHIP)
             .outline()
             .small()
-            .label("Minimal HUD")
+            .label(tr!("hud_maker.minmode.chip"))
             .selected(true)
             .on_click(cx.listener(|page, _, window, cx| page.set_minmode(false, window, cx)));
-        tipped(&ids::HUD_MAKER_MINMODE_CHIP.into(), MINMODE_CHIP_TIP, chip)
+        tipped(
+            &ids::HUD_MAKER_MINMODE_CHIP.into(),
+            minmode_chip_tip(),
+            chip,
+        )
     }
 
     // Says so while the switch is on and the scene has nothing the minimal HUD changes.
@@ -3945,7 +3999,7 @@ impl HudMakerPage {
                     .text_sm()
                     .text_color(cx.theme().muted_foreground),
                 ids::HUD_MAKER_MINMODE_NOTE,
-                "This HUD looks the same with the minimal HUD on.",
+                tr!("hud_maker.minmode.looks_the_same"),
             )
             .into_any_element()
         })
@@ -3956,18 +4010,24 @@ impl HudMakerPage {
     // the strip keeps one layout per width; before the first layout it says yes.
     fn scene_tabs_fit(&self) -> bool {
         let width = f32::from(self.area.get().size.width);
-        let letters: usize = Scene::ALL
+        let labels: f32 = Scene::ALL
             .iter()
-            .map(|&s| SceneRule::get(s).label().chars().count())
+            .map(|&s| label_estimate(&scene_name(s)))
             .sum();
-        let row = letters as f32 * SCENE_TAB_LETTER + Scene::ALL.len() as f32 * SCENE_TAB_PAD;
+        let row = labels + Scene::ALL.len() as f32 * SCENE_TAB_PAD;
+        let modes = BoardMode::ALL
+            .iter()
+            .map(|&m| label_estimate(&board_mode_name(m)))
+            .fold(0., f32::max);
         // Room for the widest extras any scene adds, the Scoreboard's mode dropdown and the
         // Minimal HUD chip; the HUD tab's situation menu takes room from the note instead.
         let chip = match self.minmode {
-            true => MINMODE_CHIP_WIDTH,
+            true => MINMODE_CHIP_WIDTH
+                .max(label_estimate(&tr!("hud_maker.minmode.chip")) + MINMODE_CHIP_CHROME),
             false => 0.,
         };
-        width <= 0. || row + BOARD_MODE_WIDTH + chip + SCENE_NOTE_ROOM <= width
+        let modes = BOARD_MODE_WIDTH.max(modes + BOARD_MODE_CHROME);
+        width <= 0. || row + modes + chip + SCENE_NOTE_ROOM <= width
     }
 
     // One button named for the open mode; its menu lists the three modes and a pick switches.
@@ -3978,12 +4038,12 @@ impl HudMakerPage {
             .outline()
             .small()
             .icon(IconName::ChevronsUpDown)
-            .label(current.label());
+            .label(board_mode_name(current));
         let items = BoardMode::ALL.map(|mode| {
             Button::new(ids::hud_maker_board_mode(mode))
                 .ghost()
                 .small()
-                .label(mode.label())
+                .label(board_mode_name(mode))
                 .selected(mode == current)
                 .on_click(cx.listener(move |page, _, window, cx| {
                     page.board_mode_open = false;
@@ -4012,7 +4072,7 @@ impl HudMakerPage {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let page = cx.entity().downgrade();
-        let name = current.map_or("Scene", |s| SceneRule::get(s).label());
+        let name = current.map_or_else(|| tr!("hud_maker.scene_menu"), scene_name);
         let trigger = Button::new(ids::HUD_MAKER_SCENE_MENU)
             .outline()
             .small()
@@ -4047,7 +4107,7 @@ impl HudMakerPage {
             .outline()
             .icon(IconName::ChevronsUpDown)
             .label(current)
-            .tooltip("Screen shape");
+            .tooltip(tr!("hud_maker.toolbar.screen_shape"));
         let shapes = (Screen::PRESETS.iter().zip(SCREEN_LABELS)).map(|(&preset, label)| {
             Button::new(ids::hud_maker_screen(preset))
                 .ghost()
@@ -4090,14 +4150,14 @@ impl HudMakerPage {
             (
                 ids::HUD_MAKER_UNDO,
                 IconName::Undo2,
-                "Undo",
+                tr!("crosshair_maker.undo"),
                 self.undo_tip(),
                 can_undo,
             ),
             (
                 ids::HUD_MAKER_REDO,
                 IconName::Redo2,
-                "Redo",
+                tr!("crosshair_maker.redo"),
                 self.redo_tip(),
                 can_redo,
             ),
@@ -4121,8 +4181,8 @@ impl HudMakerPage {
         let collapse = Button::new(ids::HUD_MAKER_TOOLBAR_COLLAPSE)
             .ghost()
             .icon(IconName::ChevronDown)
-            .tooltip("Hide toolbar")
-            .accessibility_label("Hide toolbar")
+            .tooltip(tr!("hud_maker.toolbar.hide"))
+            .accessibility_label(tr!("hud_maker.toolbar.hide"))
             .on_click(cx.listener(|page, _, _, cx| page.set_toolbar_collapsed(true, cx)));
         let body = h_flex()
             .flex_1()
@@ -4164,11 +4224,11 @@ impl HudMakerPage {
 
 /// Why Install is off for a HUD that isn't saved and unchanged: a save still running, no TF2
 /// found, or else the HUD needing a save.
-pub fn install_tip(saving: bool, tf2_found: bool) -> &'static str {
+pub fn install_tip(saving: bool, tf2_found: bool) -> SharedString {
     match (saving, tf2_found) {
-        (true, _) => "Saving...",
-        (false, false) => "TF2 not found",
-        (false, true) => "Save the HUD first",
+        (true, _) => tr!("crosshair_maker.saving"),
+        (false, false) => tr!("messages.shared.no_tf2_title"),
+        (false, true) => tr!("hud_maker.install_tip.save_first"),
     }
 }
 
@@ -4214,7 +4274,7 @@ fn save_job(
         LogLevel::Info,
         "hud",
         "make",
-        format!("Saved HUD: {}", entry.name()),
+        tr!("hud_maker.activity.saved", name = entry.name()).to_string(),
     );
     activity::write(s, &row);
     Ok(Saved::Done {
@@ -4319,11 +4379,14 @@ fn typed_value(field: Field, text: &str, screen: Screen) -> Result<i32, String> 
     let digits = text.strip_prefix('-').unwrap_or(text);
     let range = number_range(field, screen)
         .filter(|_| !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()))
-        .ok_or_else(|| "Whole numbers only".to_owned())?;
+        .ok_or_else(|| tr!("hud_maker.field.whole_numbers").to_string())?;
     (text.parse::<i64>().ok())
         .filter(|v| range.contains(v))
         .and_then(|v| i32::try_from(v).ok())
-        .ok_or_else(|| format!("Must be between {} and {}", range.start(), range.end()))
+        .ok_or_else(|| {
+            let (min, max) = (range.start().to_string(), range.end().to_string());
+            tr!("hud_maker.field.between", min = min, max = max).to_string()
+        })
 }
 
 // What a whole-number field takes: a size from 1 to four screens on its axis, a position within
@@ -4349,9 +4412,9 @@ fn number_range(field: Field, screen: Screen) -> Option<std::ops::RangeInclusive
 // Why core refused a typed time on screen.
 fn time_note(text: &str) -> String {
     if text.parse::<f64>().is_ok() {
-        "Must be between 0 and 1920, with at most two decimals".to_owned()
+        tr!("hud_maker.field.time_between", min = "0", max = "1920").to_string()
     } else {
-        "Numbers only".to_owned()
+        tr!("hud_maker.field.numbers_only").to_string()
     }
 }
 
@@ -4666,7 +4729,7 @@ impl Render for HudMakerPage {
             Load::Reading => labelled(
                 div().text_color(cx.theme().muted_foreground),
                 ids::HUD_MAKER_LOADING,
-                LOADING,
+                loading(),
             )
             .into_any_element(),
             Load::NoGame => self.no_game(cx),
@@ -4738,16 +4801,16 @@ fn why_no_nudge(
     result: Result<(), EditRefused>,
     dx: i32,
     dy: i32,
-) -> Option<&'static str> {
+) -> Option<SharedString> {
     let caps = model.capabilities(part)?;
     match result {
-        Err(EditRefused::NotOffered) => Some(NUDGE_GAME_PLACES),
-        Err(EditRefused::ReadOnly) if model.part(part)?.is_from_base() => Some(NUDGE_FROM_BASE),
-        Err(EditRefused::ReadOnly) if !model.part(part)?.is_readable() => Some(NUDGE_UNREADABLE),
-        Err(EditRefused::ReadOnly) => Some(NUDGE_ODD_PLACE),
-        Err(_) => Some(NUDGE_REFUSED),
-        Ok(()) if dx != 0 && !caps.move_x() => Some(NUDGE_SIDEWAYS_SET),
-        Ok(()) if dy != 0 && !caps.move_y() => Some(NUDGE_UP_DOWN_SET),
+        Err(EditRefused::NotOffered) => Some(nudge_game_places()),
+        Err(EditRefused::ReadOnly) if model.part(part)?.is_from_base() => Some(nudge_from_base()),
+        Err(EditRefused::ReadOnly) if !model.part(part)?.is_readable() => Some(nudge_unreadable()),
+        Err(EditRefused::ReadOnly) => Some(nudge_odd_place()),
+        Err(_) => Some(nudge_refused()),
+        Ok(()) if dx != 0 && !caps.move_x() => Some(nudge_sideways_set()),
+        Ok(()) if dy != 0 && !caps.move_y() => Some(nudge_up_down_set()),
         Ok(()) => None,
     }
 }
@@ -4761,9 +4824,41 @@ fn band(lines: &[Bounds<Pixels>]) -> Option<Bounds<Pixels>> {
     Some(drawn.fold(first, |band, line| band.union(line)))
 }
 
+// A label's width in the scene strip: ASCII letters at the English estimate, any other letter
+// at the wider one, so a Cyrillic label never overflows the row it was counted into.
+fn label_estimate(text: &str) -> f32 {
+    text.chars()
+        .map(|c| match c.is_ascii() {
+            true => SCENE_TAB_LETTER,
+            false => SCENE_TAB_WIDE_LETTER,
+        })
+        .sum()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_label_estimate_covers_its_real_width_in_inter() {
+        // Inter Medium at 14 px from the font's advance widths, no kerning.
+        let real = [
+            ("Death and freeze cam", 147.4),
+            ("Смерть и стоп-кадр", 140.0),
+            ("Таблица счёта", 101.6),
+            ("Соревновательный", 134.9),
+            ("Минимальный HUD", 135.2),
+        ];
+        for (text, width) in real {
+            assert!(
+                label_estimate(text) >= width,
+                "{text}: {}",
+                label_estimate(text)
+            );
+        }
+        // An English label keeps today's estimate.
+        assert_eq!(label_estimate("Scoreboard"), 75.);
+    }
 
     #[test]
     fn a_font_file_listed_many_times_is_read_once() {

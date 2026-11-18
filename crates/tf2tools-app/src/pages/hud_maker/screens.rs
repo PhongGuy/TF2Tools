@@ -26,8 +26,6 @@ const BACK_ROW: f32 = 44.;
 const CAPTION: f32 = 22.;
 /// An edge arrow's side.
 const ARROW: f32 = 14.;
-/// An edge arrow's tooltip.
-const OFF_THIS_SCREEN: &str = "This part is off this screen";
 
 impl HudMakerPage {
     /// Whether the six-screen view takes the canvas area.
@@ -71,8 +69,8 @@ impl HudMakerPage {
             Button::new(ids::HUD_MAKER_SCREENS_BACK)
                 .outline()
                 .small()
-                .label("Back to one screen")
-                .accessibility_label("Back to one screen")
+                .label(tr!("hud_maker.screens.back"))
+                .accessibility_label(tr!("hud_maker.screens.back"))
                 .on_click(
                     cx.listener(|page, _, window, cx| page.set_every_screen(false, window, cx)),
                 ),
@@ -190,7 +188,9 @@ impl HudMakerPage {
                     .bg(danger)
                     .text_color(gpui_kit::white())
                     .child(Icon::new(icon).xsmall())
-                    .tooltip(|window, cx| Tooltip::new(OFF_THIS_SCREEN).build(window, cx)),
+                    .tooltip(|window, cx| {
+                        Tooltip::new(tr!("hud_maker.screens.off_screen")).build(window, cx)
+                    }),
             )
         });
         let screen_box = div()
@@ -273,7 +273,7 @@ fn edge_arrow(r: Bounds<Pixels>, screen: Size<Pixels>) -> Option<(Point<Pixels>,
 fn caption(index: usize, check: &ScreenCheck, flagged: usize) -> String {
     let shape = check.screen();
     let count = if check.too_crowded() {
-        "Too many overlaps to list here".to_owned()
+        tr!("hud_maker.screens.too_crowded").to_string()
     } else {
         problems_text(flagged)
     };

@@ -16,7 +16,7 @@ use gpui_kit::{
 use tf2tools_core::{ChangeTarget, HistoryError, HudId, HudSnapshot, SnapshotEntry};
 
 use super::{FontBytes, HudMakerPage, register_font};
-use crate::i18n::{counted_plural, format, tr};
+use crate::i18n::{counted_plural, format, plural, tr};
 use crate::ids;
 use crate::local_messages::left_out;
 use crate::services::{OpError, Services, run_blocking};
@@ -24,16 +24,15 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::toast::{ToastKind, toast};
 use crate::widgets::labelled;
 
-const COMPARE_OFF: &str = "Leave the six-screen view to compare";
-const NAME_BLANK: &str = "Give the snapshot a name.";
-const TOO_LARGE: &str = "This HUD has too many changes for one snapshot.";
-const SAVE_FAILED: &str = "Couldn't save the snapshot.";
-const PICTURE_NOT_STORED: &str = "The snapshot wasn't saved because a picture couldn't be stored.";
-const DELETE_FAILED: &str = "Couldn't delete the snapshot.";
-const UNREADABLE: &str = "That snapshot can't be read.";
-const LIST_FAILED: &str = "Couldn't read this HUD's snapshots.";
-const UNSAVED: &str = "Save the HUD first, then you can keep snapshots of it here.";
-const NO_SNAPSHOTS: &str = "This HUD has no snapshots yet.";
+fn compare_off() -> SharedString {
+    tr!("hud_maker.history.compare_off")
+}
+fn name_blank() -> SharedString {
+    tr!("hud_maker.history.name_blank")
+}
+fn unreadable() -> SharedString {
+    tr!("hud_maker.history.unreadable")
+}
 
 // What a snapshot job did, and the HUD's list as read right after it.
 type SnapshotJob = Task<
@@ -155,7 +154,7 @@ impl HudMakerPage {
                         failed => {
                             let why = failed.err().map(|e| e.to_string());
                             tracing::debug!(error = ?why, "a snapshot didn't load");
-                            toast(window, cx, ToastKind::Error, UNREADABLE, "");
+                            toast(window, cx, ToastKind::Error, unreadable(), "");
                         }
                     })
                 });
@@ -231,7 +230,7 @@ impl HudMakerPage {
         self.flush(cx);
         let name = self.snapshot_name.read(cx).value().trim().to_owned();
         if name.is_empty() {
-            return toast(window, cx, ToastKind::Error, NAME_BLANK, "");
+            return toast(window, cx, ToastKind::Error, name_blank(), "");
         }
         let (Some(id), Some((changes, assets))) = (
             self.saved_hud.clone(),
@@ -273,7 +272,7 @@ impl HudMakerPage {
                         failed => {
                             let why = failed.err().map(|e| e.to_string());
                             tracing::debug!(error = ?why, "a snapshot didn't load");
-                            toast(window, cx, ToastKind::Error, UNREADABLE, "");
+                            toast(window, cx, ToastKind::Error, unreadable(), "");
                         }
                     })
                 });
@@ -308,17 +307,18 @@ impl HudMakerPage {
         cx.notify();
         let name = snapshot.name();
         if !changed {
-            let line = format!("Your HUD already matches {name}.");
+            let line = tr!("hud_maker.history.already_matches", name = name);
             return toast(window, cx, ToastKind::Info, line, "");
         }
-        let line = format!("Restored {name}.");
+        let line = tr!("hud_maker.history.restored", name = name);
         let more = left_out(snapshot.skipped(), false).unwrap_or_default();
         let line = if more.is_empty() {
             line
         } else {
-            format!("{line} {more}")
+            format!("{line} {more}").into()
         };
-        toast(window, cx, ToastKind::Success, "Snapshot restored", line);
+        let title = tr!("hud_maker.history.restored_title");
+        toast(window, cx, ToastKind::Success, title, line);
     }
 
     // Asks first; only a confirmed answer deletes, and a dialog closed unanswered counts as no.
@@ -405,7 +405,13 @@ impl HudMakerPage {
                             Ok(_) => {}
                             Err(why) => {
                                 tracing::debug!(error = %why, "the snapshots didn't list");
-                                toast(window, cx, ToastKind::Error, LIST_FAILED, "");
+                                toast(
+                                    window,
+                                    cx,
+                                    ToastKind::Error,
+                                    SnapshotWork::List.failed(),
+                                    "",
+                                );
                             }
                         }
                         match done {
@@ -430,9 +436,9 @@ impl HudMakerPage {
                                     })
                                 });
                                 let words = match (work, &why) {
-                                    (SnapshotWork::Delete, _) => DELETE_FAILED.to_owned(),
+                                    (SnapshotWork::Delete, _) => SnapshotWork::Delete.failed(),
                                     (_, HistoryError::Io { .. }) if picked => {
-                                        PICTURE_NOT_STORED.to_owned()
+                                        tr!("hud_maker.history.picture_not_stored")
                                     }
                                     _ => save_message(&why),
                                 };
@@ -455,7 +461,7 @@ impl HudMakerPage {
         let back = Button::new(ids::HUD_MAKER_HISTORY_CLOSE)
             .outline()
             .small()
-            .label("Back to the HUD")
+            .label(tr!("hud_maker.history.back"))
             .on_click(cx.listener(|page, _, window, cx| page.close_history(window, cx)));
         let mut section = v_flex()
             .id(ids::HUD_MAKER_HISTORY)
@@ -466,19 +472,19 @@ impl HudMakerPage {
             let note = labelled(
                 div().text_sm().text_color(muted),
                 ids::HUD_MAKER_HISTORY_UNSAVED,
-                UNSAVED,
+                tr!("hud_maker.history.unsaved"),
             );
             return vec![section.child(note).into_any_element()];
         }
         let save = Button::new(ids::HUD_MAKER_SNAPSHOT_SAVE)
             .outline()
             .small()
-            .label("Save snapshot")
+            .label(tr!("hud_maker.history.save"))
             .disabled(self.saving || self.history_busy)
             .on_click(cx.listener(|page, _, window, cx| page.save_snapshot(window, cx)));
         let name = div()
             .id(ids::HUD_MAKER_SNAPSHOT_NAME)
-            .aria_label("Snapshot name")
+            .aria_label(tr!("hud_maker.placeholder.snapshot_label"))
             .test_support()
             .flex_1()
             .min_w_0()
@@ -488,7 +494,7 @@ impl HudMakerPage {
             let note = labelled(
                 div().text_sm().text_color(muted),
                 ids::HUD_MAKER_HISTORY_EMPTY,
-                NO_SNAPSHOTS,
+                tr!("hud_maker.history.empty"),
             );
             return vec![section.child(note).into_any_element()];
         }
@@ -511,13 +517,13 @@ impl HudMakerPage {
                 .outline()
                 .xsmall()
                 .label(if comparing_it {
-                    "Stop comparing"
+                    tr!("hud_maker.history.stop_comparing")
                 } else {
-                    "Compare"
+                    tr!("hud_maker.history.compare")
                 })
                 .selected(comparing_it)
                 .disabled(stale || self.every_screen)
-                .when(self.every_screen, |b| b.tooltip(COMPARE_OFF))
+                .when(self.every_screen, |b| b.tooltip(compare_off()))
                 .on_click({
                     let file = file.clone();
                     cx.listener(move |page, _, window, cx| {
@@ -531,7 +537,7 @@ impl HudMakerPage {
             let restore = Button::new(ids::hud_maker_snapshot_restore(&file))
                 .outline()
                 .xsmall()
-                .label("Restore")
+                .label(tr!("hud_maker.history.restore"))
                 .disabled(stale)
                 .on_click({
                     let file = file.clone();
@@ -540,7 +546,7 @@ impl HudMakerPage {
             let delete = Button::new(ids::hud_maker_snapshot_delete(&file))
                 .outline()
                 .xsmall()
-                .label("Delete")
+                .label(tr!("hud_maker.history.delete"))
                 .disabled(stale || self.saving || self.history_busy)
                 .on_click({
                     let (file, name) = (file.clone(), snap.name().to_owned());
@@ -574,20 +580,21 @@ fn is_picked(source: &str) -> bool {
 }
 
 // The player-words toast for a refused save.
-fn save_message(why: &HistoryError) -> String {
+fn save_message(why: &HistoryError) -> SharedString {
     match why {
-        HistoryError::NameBlank => NAME_BLANK.to_owned(),
+        HistoryError::NameBlank => name_blank(),
         HistoryError::Full { limit } => {
-            format!("You have {limit} snapshots. Delete one to save another.")
+            let n = u64::try_from(*limit).unwrap_or(u64::MAX);
+            plural("hud_maker.history.full", n)
         }
-        HistoryError::TooLarge => TOO_LARGE.to_owned(),
+        HistoryError::TooLarge => tr!("hud_maker.history.too_large"),
         HistoryError::NotMade { .. }
         | HistoryError::NotFound
         | HistoryError::Damaged { .. }
         | HistoryError::Newer
         | HistoryError::Io { .. }
         | HistoryError::Database { .. }
-        | _ => SAVE_FAILED.to_owned(),
+        | _ => SnapshotWork::Save.failed(),
     }
 }
 
@@ -604,7 +611,7 @@ fn when_text(at: &str, changes: usize) -> String {
             let local = at.with_timezone(&chrono::Local);
             format::date_time(local.naive_local(), true).to_string()
         })
-        .unwrap_or_else(|_| "Unknown".to_owned());
+        .unwrap_or_else(|_| tr!("hud_maker.history.unknown").to_string());
     let n = u64::try_from(changes).unwrap_or(u64::MAX);
     let vars = [("time", time.as_str())];
     counted_plural("hud_maker.history.when", n, &n.to_string(), &vars).to_string()

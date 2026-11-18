@@ -4,6 +4,7 @@
 use tf2tools_core::{Change, EditRefused, HudLayout, HudModel, PartBox, PartKey};
 
 use super::{HudEditor, Units, next_group};
+use crate::i18n::tr;
 use crate::pages::hud_maker::parts::row_label;
 
 // Each pass grows by whole file units, rounded up, and puts the parts back; a second pass
@@ -107,7 +108,8 @@ impl HudEditor {
         if next.len() == self.changes.len() {
             return Ok(());
         }
-        let name = (self.model.part(&parent)).map(|p| format!("grow {} to fit", row_label(p)));
+        let name = (self.model.part(&parent))
+            .map(|p| tr!("hud_maker.step.fit", name = row_label(p)).to_string());
         self.commit_named(next, name);
         Ok(())
     }

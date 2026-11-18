@@ -6,14 +6,18 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{Icon, Sizable as _};
 use gpui_kit::{
     AnyElement, Bounds, Hsla, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
-    Size, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, point, px, size,
+    SharedString, Size, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div,
+    point, px, size,
 };
 use tf2tools_core::PartKey;
 
+use crate::i18n::tr;
 use crate::ids;
 
 /// What the marker says, in its tooltip and to a screen reader.
-pub(super) const HARD_TO_READ: &str = "Hard to read here";
+pub(super) fn hard_to_read() -> SharedString {
+    tr!("hud_maker.markers.hard_to_read")
+}
 
 /// A badge's side, in window pixels.
 const BADGE: f32 = 16.;
@@ -65,7 +69,7 @@ pub(super) fn markers(
         out.push(
             div()
                 .id(ids::hud_maker_hard_to_read(key))
-                .aria_label(HARD_TO_READ)
+                .aria_label(hard_to_read())
                 .test_support()
                 .absolute()
                 .left(r.origin.x)
@@ -79,7 +83,7 @@ pub(super) fn markers(
         out.push(
             div()
                 .id(ids::hud_maker_hard_to_read_badge(key))
-                .aria_label(HARD_TO_READ)
+                .aria_label(hard_to_read())
                 .test_support()
                 .absolute()
                 .left(badge.origin.x)
@@ -94,7 +98,7 @@ pub(super) fn markers(
                 .bg(look.background)
                 .text_color(look.warning)
                 .child(Icon::new(IconName::TriangleAlert).xsmall())
-                .tooltip(|window, cx| Tooltip::new(HARD_TO_READ).build(window, cx))
+                .tooltip(|window, cx| Tooltip::new(hard_to_read()).build(window, cx))
                 .into_any_element(),
         );
     }

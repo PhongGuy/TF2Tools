@@ -7,11 +7,14 @@ use gpui_kit::component::button::Button;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::{
     AnyElement, Context, ElementId, FontWeight, InteractiveElement as _, IntoElement,
-    ParentElement as _, StatefulInteractiveElement as _, Styled as _, TestSupportExt as _, div, px,
+    ParentElement as _, SharedString, StatefulInteractiveElement as _, Styled as _,
+    TestSupportExt as _, div, px,
 };
 use tf2tools_core::StartingPoint;
 
 use super::HudMakerPage;
+use crate::i18n::names::{starting_point_about, starting_point_name};
+use crate::i18n::tr;
 use crate::ids;
 use crate::shell::route::{NavigateTo, Page};
 
@@ -67,13 +70,13 @@ impl HudMakerPage {
                 div()
                     .text_base()
                     .font_weight(FontWeight::SEMIBOLD)
-                    .child("Where do you want to start?"),
+                    .child(tr!("hud_maker.start_card.question")),
             )
             .child(self.start_choice(
                 ids::HUD_MAKER_START_READY.into(),
                 IconName::Sparkles,
-                "A ready-made HUD",
-                "A look to start from, which you change your way.",
+                tr!("hud_maker.start_card.ready"),
+                tr!("hud_maker.start_card.ready_about"),
                 cx.listener(|page, _, _, cx| {
                     page.start_card.points = !page.start_card.points;
                     cx.notify();
@@ -84,16 +87,16 @@ impl HudMakerPage {
             .child(self.start_choice(
                 ids::HUD_MAKER_START_MINE.into(),
                 IconName::Library,
-                "One of my HUDs",
-                "Pick a HUD in your library and press Edit in HUD Maker.",
+                tr!("hud_maker.start_card.mine"),
+                tr!("hud_maker.start_card.mine_about"),
                 cx.listener(|_, _, _, cx| cx.emit(NavigateTo(Page::Huds))),
                 cx,
             ))
             .child(self.start_choice(
                 ids::HUD_MAKER_START_BLANK.into(),
                 IconName::File,
-                "Blank",
-                "TF2's own HUD, nothing changed yet.",
+                tr!("hud_maker.start_card.blank"),
+                tr!("hud_maker.start_card.blank_about"),
                 cx.listener(|page, _, _, cx| {
                     page.start_card.closed = true;
                     cx.notify();
@@ -120,8 +123,8 @@ impl HudMakerPage {
         &self,
         id: ElementId,
         icon: IconName,
-        name: &'static str,
-        about: &'static str,
+        name: SharedString,
+        about: SharedString,
         on_click: impl Fn(&gpui_kit::ClickEvent, &mut gpui_kit::Window, &mut gpui_kit::App) + 'static,
         cx: &Context<Self>,
     ) -> AnyElement {
@@ -129,7 +132,7 @@ impl HudMakerPage {
         let (hover, muted, border) = (theme.accent, theme.muted_foreground, theme.border);
         h_flex()
             .id(id)
-            .aria_label(name)
+            .aria_label(name.clone())
             .test_support()
             .gap_3()
             .p_2()
@@ -157,7 +160,7 @@ impl HudMakerPage {
             let pick = Button::new(ids::hud_maker_start_card_point(which.label()))
                 .outline()
                 .small()
-                .label(which.label())
+                .label(starting_point_name(which))
                 .on_click(cx.listener(move |page, _, window, cx| {
                     let Some(recipe) = page.editor().map(|e| e.pristine().starting_point(which))
                     else {
@@ -166,11 +169,12 @@ impl HudMakerPage {
                     page.start_card.closed = true;
                     page.start_preview(recipe, 0, window, cx);
                 }));
-            v_flex()
-                .gap_1()
-                .items_start()
-                .child(pick)
-                .child(div().text_xs().text_color(muted).child(which.about()))
+            v_flex().gap_1().items_start().child(pick).child(
+                div()
+                    .text_xs()
+                    .text_color(muted)
+                    .child(starting_point_about(which)),
+            )
         });
         v_flex()
             .pl(px(36.))

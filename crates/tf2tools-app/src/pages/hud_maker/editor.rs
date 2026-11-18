@@ -15,10 +15,33 @@ use tf2tools_core::{
 };
 
 use super::snapping::{self, Moving, lines};
+use crate::i18n::tr;
 
 mod fit;
 pub use super::snapping::{Guide, Snapped};
 pub use fit::outside_parent;
+
+/// What a step does to several parts at once, which names it.
+#[derive(Clone, Copy)]
+enum Many {
+    Move,
+    Hide,
+    Show,
+    Align,
+    SpaceOut,
+}
+
+// The several-part step in player words; Russian counts in a colon form, so no plural is needed.
+fn many_name(many: Many, n: usize) -> String {
+    match many {
+        Many::Move => tr!("hud_maker.step.many.move", count = n),
+        Many::Hide => tr!("hud_maker.step.many.hide", count = n),
+        Many::Show => tr!("hud_maker.step.many.show", count = n),
+        Many::Align => tr!("hud_maker.step.many.align", count = n),
+        Many::SpaceOut => tr!("hud_maker.step.many.space_out", count = n),
+    }
+    .to_string()
+}
 
 /// Why an added font file did not land, by whose fault: the file, its name, the HUD's font
 /// list or the part's font.
@@ -1084,7 +1107,7 @@ impl HudEditor {
     pub fn move_selected(&mut self, dx: i32, dy: i32) -> Result<(), EditRefused> {
         let screen = self.screen;
         if self.several() {
-            return self.edit_each("move", |m, part, group| {
+            return self.edit_each(Many::Move, |m, part, group| {
                 m.move_part(part, dx, dy, screen, group)
             });
         }
@@ -1110,7 +1133,9 @@ impl HudEditor {
     /// Nudges the selection by whole HUD units as one undo step.
     pub fn nudge_selected(&mut self, dx: i32, dy: i32) -> Result<(), EditRefused> {
         if self.several() {
-            return self.edit_each("move", |m, part, group| m.nudge_part(part, dx, dy, group));
+            return self.edit_each(Many::Move, |m, part, group| {
+                m.nudge_part(part, dx, dy, group)
+            });
         }
         self.edit(|m, part, group| m.nudge_part(part, dx, dy, group))
     }
@@ -1277,7 +1302,7 @@ impl HudEditor {
                 (k.clone(), dx, dy)
             })
             .collect();
-        self.move_each("align", &moves)
+        self.move_each(Many::Align, &moves)
     }
 
     /// Spaces the selected parts out so the gaps between them are equal along `spread`; the
@@ -1320,15 +1345,14 @@ impl HudEditor {
             let i = i64::try_from(i).unwrap_or(0);
             at += i64::from(*len) + gap + i64::from(i < extra);
         }
-        self.move_each("space out", &moves)
+        self.move_each(Many::SpaceOut, &moves)
     }
 
-    // Moves each part by its own screen-pixel delta, as one undo step named
-    // "`verb` N parts".
-    fn move_each(&mut self, verb: &str, moves: &[(PartKey, i32, i32)]) -> Result<(), EditRefused> {
+    // Moves each part by its own screen-pixel delta, as one undo step named for `many`.
+    fn move_each(&mut self, many: Many, moves: &[(PartKey, i32, i32)]) -> Result<(), EditRefused> {
         let screen = self.screen;
         let parts: Vec<PartKey> = moves.iter().map(|(k, _, _)| k.clone()).collect();
-        self.build_each(verb, &parts, |m, part, group| {
+        self.build_each(many, &parts, |m, part, group| {
             match moves.iter().find(|(k, _, _)| k == part) {
                 Some(&(_, 0, 0)) | None => Ok(Vec::new()),
                 Some(&(_, dx, dy)) => m.move_part(part, dx, dy, screen, group),
@@ -1336,20 +1360,20 @@ impl HudEditor {
         })
     }
 
-    // Runs `build` on every selected part with none of its groups selected, as one undo step named "`verb` N parts". A part that refuses is left as it is; only when
+    // Runs `build` on every selected part with none of its groups selected, as one undo step named for `many`. A part that refuses is left as it is; only when
     // every part refuses is the edit refused.
     fn edit_each(
         &mut self,
-        verb: &str,
+        many: Many,
         build: impl Fn(&HudModel, &PartKey, u32) -> Result<Vec<Change>, EditRefused>,
     ) -> Result<(), EditRefused> {
         let roots = self.roots();
-        self.build_each(verb, &roots, build)
+        self.build_each(many, &roots, build)
     }
 
     fn build_each(
         &mut self,
-        verb: &str,
+        many: Many,
         parts: &[PartKey],
         build: impl Fn(&HudModel, &PartKey, u32) -> Result<Vec<Change>, EditRefused>,
     ) -> Result<(), EditRefused> {
@@ -1373,7 +1397,7 @@ impl HudEditor {
         }
         let mut next = self.changes.clone();
         next.extend(added);
-        self.commit_named(next, Some(format!("{verb} {} parts", parts.len())));
+        self.commit_named(next, Some(many_name(many, parts.len())));
         Ok(())
     }
 
@@ -1609,7 +1633,7 @@ impl HudEditor {
     pub fn hide_selected(&mut self) -> Result<(), EditRefused> {
         if self.several() {
             let changes = self.changes.clone();
-            return self.edit_each("hide", |m, part, group| {
+            return self.edit_each(Many::Hide, |m, part, group| {
                 match m.hide_groups(part, &changes).is_empty() {
                     true => m.hide_part(part, group),
                     false => Ok(Vec::new()),
@@ -1639,7 +1663,7 @@ impl HudEditor {
             .filter(|c| !groups.contains(&c.group()))
             .cloned()
             .collect();
-        let name = (roots.len() > 1).then(|| format!("show {} parts", roots.len()));
+        let name = (roots.len() > 1).then(|| many_name(Many::Show, roots.len()));
         self.commit_named(kept, name);
         true
     }
@@ -2071,7 +2095,7 @@ impl HudEditor {
         if drag.changes != self.changes {
             let mut step = self.step(drag.changes);
             if self.several() {
-                step.name = Some(format!("move {} parts", self.roots().len()));
+                step.name = Some(many_name(Many::Move, self.roots().len()));
             }
             push_capped(&mut self.undo, step);
             self.redo.clear();

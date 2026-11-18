@@ -466,9 +466,9 @@ fn the_taken_name_line_clears_when_a_save_succeeds(cx: &mut TestAppContext) {
 #[test]
 fn the_install_tip_says_why_install_waits() {
     use tf2tools_app::pages::hud_maker::install_tip;
-    assert_eq!(install_tip(true, true), "Saving...");
-    assert_eq!(install_tip(false, false), "TF2 not found");
-    assert_eq!(install_tip(false, true), "Save the HUD first");
+    assert_eq!(install_tip(true, true).to_string(), "Saving...");
+    assert_eq!(install_tip(false, false).to_string(), "TF2 not found");
+    assert_eq!(install_tip(false, true).to_string(), "Save the HUD first");
 }
 
 fn toast_boxes(

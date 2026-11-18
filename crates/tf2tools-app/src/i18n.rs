@@ -318,6 +318,7 @@ mod tests {
             "profiles",
             "crosshairs_page",
             "hud_maker",
+            "crosshair_maker",
             "hud_store",
             "addon_store",
             "store_grid",
@@ -632,6 +633,7 @@ mod tests {
         let orphans: BTreeSet<&str> = en
             .keys()
             .filter(|k| k.split('.').next().is_some_and(|s| surfaces.contains(s)))
+            .filter(|k| !k.split('.').take(2).eq(["hud_maker", "label"]))
             .map(|k| plural_part(k).map_or(k.as_str(), |(base, _)| base))
             .filter(|k| !named.contains(*k))
             .collect();
@@ -890,6 +892,40 @@ mod tests {
         "pages/logs_tf/detail/popover.rs",
         "pages/logs_tf/detail/rounds.rs",
         "pages/logs_tf/mod.rs",
+        "pages/crosshair_maker/mod.rs",
+        "pages/crosshair_maker/model.rs",
+        "pages/crosshair_maker/starter.rs",
+        "pages/crosshair_maker/starter_dialog.rs",
+        "pages/hud_maker/mod.rs",
+        "pages/hud_maker/panel.rs",
+        "pages/hud_maker/history.rs",
+        "pages/hud_maker/recipes.rs",
+        "pages/hud_maker/borrow.rs",
+        "pages/hud_maker/colour_view.rs",
+        "pages/hud_maker/animations.rs",
+        "pages/hud_maker/timeline.rs",
+        "pages/hud_maker/step_name.rs",
+        "pages/hud_maker/editor.rs",
+        "pages/hud_maker/editor/fit.rs",
+        "pages/hud_maker/canvas.rs",
+        "pages/hud_maker/situation.rs",
+        "pages/hud_maker/live.rs",
+        "pages/hud_maker/parts.rs",
+        "pages/hud_maker/pictures.rs",
+        "pages/hud_maker/shortcuts.rs",
+        "pages/hud_maker/options.rs",
+        "pages/hud_maker/screens.rs",
+        "pages/hud_maker/start_card.rs",
+        "pages/hud_maker/checks.rs",
+        "pages/hud_maker/zoom.rs",
+        "pages/hud_maker/backdrop.rs",
+        "pages/hud_maker/markers.rs",
+        "pages/hud_maker/rank_paint.rs",
+        "pages/hud_maker/view.rs",
+        "pages/hud_maker/tip.rs",
+        "pages/hud_maker/menu_art.rs",
+        "pages/hud_maker/snapping.rs",
+        "pages/hud_maker/tint.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1012,33 +1048,7 @@ mod tests {
         ("sync.rs", "Addons", STORE_FIELD),
         ("sync.rs", "Store", STORE_FIELD),
         ("shell/mod.rs", "Shell", "developer detail: a key context"),
-        ("shell/confirm.rs", "Shrink canvas", DIALOG_ELSEWHERE),
-        (
-            "shell/confirm.rs",
-            "Shrinking to 32x32 cuts off the edges of your drawing.",
-            DIALOG_ELSEWHERE,
-        ),
-        ("shell/confirm.rs", "Shrink", DIALOG_ELSEWHERE),
         ("shell/confirm.rs", "Cancel", DIALOG_ELSEWHERE),
-        (
-            "shell/confirm.rs",
-            "Delete this snapshot?",
-            DIALOG_ELSEWHERE,
-        ),
-        (
-            "shell/confirm.rs",
-            "{name} will be gone for good. Your HUD stays as it is.",
-            DIALOG_ELSEWHERE,
-        ),
-        ("shell/confirm.rs", "Delete", DIALOG_ELSEWHERE),
-        ("shell/confirm.rs", "Keep", DIALOG_ELSEWHERE),
-        ("shell/confirm.rs", "Reset all options?", DIALOG_ELSEWHERE),
-        (
-            "shell/confirm.rs",
-            "Every option goes back to how the HUD came. Your other changes stay, and Undo brings the options back.",
-            DIALOG_ELSEWHERE,
-        ),
-        ("shell/confirm.rs", "Reset all", DIALOG_ELSEWHERE),
         ("shell/confirm.rs", "Remove mastercomfig", DIALOG_ELSEWHERE),
         (
             "shell/confirm.rs",
@@ -1204,15 +1214,308 @@ mod tests {
             "no stored body",
             "developer detail of an unreadable stored log",
         ),
+        (
+            "pages/crosshair_maker/model.rs",
+            "cell ({x}, {y}) is off the canvas",
+            "developer detail: an invariant's panic message",
+        ),
+        (
+            "pages/crosshair_maker/model.rs",
+            "a canvas image is side*side*4 bytes",
+            "developer detail: an invariant's panic message",
+        ),
+        ("pages/hud_maker/mod.rs", "LineHeight", HUD_FILE_KEY),
+        ("pages/hud_maker/mod.rs", "LineSpacing", HUD_FILE_KEY),
+        (
+            "pages/hud_maker/mod.rs",
+            "a save's own arguments plus the base the page opened",
+            "developer detail: a lint reason",
+        ),
+        (
+            "pages/hud_maker/panel.rs",
+            "PaintBackgroundType",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/panel.rs",
+            "RoundedCorners",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/panel.rs", "Label", MAKER_GAME_NAME),
+        (
+            "pages/hud_maker/panel.rs",
+            "<hit flash>",
+            "developer detail: the hit flash's colour row key",
+        ),
+        (
+            "pages/hud_maker/borrow.rs",
+            "GameBanana item {}",
+            MAKER_CREDIT_FILE,
+        ),
+        (
+            "pages/hud_maker/borrow.rs",
+            "a file you imported",
+            MAKER_CREDIT_FILE,
+        ),
+        ("pages/hud_maker/colour_view.rs", "Normal", MAKER_ID_WORD),
+        ("pages/hud_maker/colour_view.rs", "Red-blind", MAKER_ID_WORD),
+        (
+            "pages/hud_maker/colour_view.rs",
+            "Green-blind",
+            MAKER_ID_WORD,
+        ),
+        (
+            "pages/hud_maker/colour_view.rs",
+            "Blue-blind",
+            MAKER_ID_WORD,
+        ),
+        (
+            "pages/hud_maker/animations.rs",
+            "TF2ToolsHitMarker",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/animations.rs", "Linear", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Accel", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Deaccel", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Spline", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Bounce", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "FgColor", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Alpha", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Position", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Size", MAKER_GAME_NAME),
+        (
+            "pages/hud_maker/animations.rs",
+            "SetInputEnabled",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/animations.rs",
+            "PlaySound",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/animations.rs",
+            "StopAnimation",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/animations.rs",
+            "StopPanelAnimations",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/animations.rs", "SetFont", MAKER_GAME_NAME),
+        (
+            "pages/hud_maker/animations.rs",
+            "SetTexture",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/animations.rs",
+            "SetString",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "DamagedPlayer",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudHealthBonusPulse",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudHealthBonusPulseStop",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudHealthDyingPulse",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudHealthDyingPulseStop",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudLowAmmoPulse",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudLowAmmoPulseStop",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudMedicCharged",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudMedicChargedStop",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/editor.rs", "FgColor", MAKER_GAME_NAME),
+        ("pages/hud_maker/editor.rs", "BgColor", MAKER_GAME_NAME),
+        (
+            "pages/hud_maker/editor.rs",
+            "TF2ToolsHitMarker",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/editor.rs",
+            r"event Lines\n{{\n{lines}\n}}",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/editor.rs", "no clip", MAKER_SHOWS_FOR),
+        ("pages/hud_maker/editor.rs", "low ammo", MAKER_SHOWS_FOR),
+        ("pages/hud_maker/editor.rs", "3D model", MAKER_SHOWS_FOR),
+        ("pages/hud_maker/editor.rs", "2D portrait", MAKER_SHOWS_FOR),
+        ("pages/hud_maker/editor.rs", "not koth", MAKER_SHOWS_FOR),
+        (
+            "pages/hud_maker/editor.rs",
+            "the start box, screen and group travel with the drag",
+            MAKER_LINT,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "SectionedListPanel",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "HudDeathNotice",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF2ToolsAnchor",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "CSpectatorTargetID/TargetNameLabel",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "CSpectatorTargetID/TargetDataLabel",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "ProgressBar.FgColor",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "BluePlayerList",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "RedPlayerList",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_Scoreboard_Name",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_Scoreboard_Score",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_Scoreboard_Ping",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Tour",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Damage",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Tank",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Healing",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Support",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Money",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/canvas.rs", "Name", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Score", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Tour", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Damage", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Tank", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Healing", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Support", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Money", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Ping", MAKER_SAMPLE),
+        ("pages/hud_maker/shortcuts.rs", "Escape", MAKER_KEY_CAP),
+        ("pages/hud_maker/shortcuts.rs", "Ctrl+Z", MAKER_KEY_CAP),
+        ("pages/hud_maker/shortcuts.rs", "Ctrl+Y", MAKER_KEY_CAP),
+        ("pages/hud_maker/shortcuts.rs", "Ctrl+0", MAKER_KEY_CAP),
+        (
+            "pages/hud_maker/options.rs",
+            "HUD crosshair",
+            "core's group name, matched; the shown heading is keyed",
+        ),
+        (
+            "pages/hud_maker/backdrop.rs",
+            "the fields are read through Debug, in the log",
+            MAKER_LINT,
+        ),
+        (
+            "pages/hud_maker/rank_paint.rs",
+            "CreditsGreen",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/view.rs",
+            "toolbar collapsed",
+            "developer detail: a saved panel-layout token",
+        ),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
     const OS_NAME: &str = "a proper noun, the OS filter's label";
     const WEAPON_NAME: &str = "weapon name, as the game and logs.tf write it";
     const STOPPED_LABEL: &str = "developer detail: a stopped task's log label";
+    const MAKER_GAME_NAME: &str = "developer detail: a VDF key, class, event or command name";
+    const MAKER_ID_WORD: &str = "an element id built from the English word; its label is keyed";
+    const MAKER_LINT: &str = "developer detail: a lint reason";
+    const MAKER_SHOWS_FOR: &str = "developer detail: core's ShowsFor value, matched";
+    const MAKER_SAMPLE: &str = "in-game sample text: the game's own fallback word";
+    const MAKER_CREDIT_FILE: &str = "the credit written into the shared HUD's files; shown keyed";
+    const MAKER_KEY_CAP: &str = "a key's name as printed on the keyboard";
     const STORE_FIELD: &str = "developer detail: the store's tracing field";
     const ID_VALUE: &str = "element id value; its label is keyed";
     const DIALOG_ELSEWHERE: &str = "dialog of an untranslated page";
+    const HUD_FILE_KEY: &str = "developer detail: a key as the HUD file spells it";
     const LOGS_TF_ABBREVIATION: &str = "logs.tf abbreviation, as logs.tf prints it";
     const STARTUP_DETAIL: &str =
         "developer detail: StartupError's log text; the view reads describe_startup";
@@ -1241,6 +1544,30 @@ mod tests {
         assert!(
             stale.is_empty(),
             "allowlist entries no file needs: {stale:?}"
+        );
+    }
+
+    // A file added to either maker later must join the English scan, or its words go unchecked.
+    #[test]
+    fn every_maker_file_is_in_the_english_scan() {
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        for dir in ["pages/hud_maker", "pages/crosshair_maker"] {
+            rust_files(&src.join(dir), &mut files);
+        }
+        let missing: Vec<String> = files
+            .iter()
+            .map(|f| {
+                f.strip_prefix(&src)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            })
+            .filter(|rel| !SCANNED.contains(&rel.as_str()))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "maker files the English scan skips: {missing:?}"
         );
     }
 

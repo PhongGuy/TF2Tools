@@ -4,25 +4,51 @@
 
 use std::sync::Arc;
 
-use gpui_kit::{App, Context, RenderImage};
+use gpui_kit::{App, Context, RenderImage, SharedString};
 use tf2tools_core::{PartKey, Rgba, Vision};
 
 use super::{HudMakerPage, Images, Load};
+use crate::i18n::tr;
 use crate::previews::to_render_image;
 use crate::services::run_blocking;
 
-/// Each view with its menu word and its condition's name.
-pub(super) const VIEWS: [(Vision, &str, &str); 4] = [
-    (Vision::Normal, "Normal", "Normal colour vision"),
-    (Vision::Protanopia, "Red-blind", "Protanopia"),
-    (Vision::Deuteranopia, "Green-blind", "Deuteranopia"),
-    (Vision::Tritanopia, "Blue-blind", "Tritanopia"),
+/// Each view with the English word its element id is built from.
+pub(super) const VIEWS: [(Vision, &str); 4] = [
+    (Vision::Normal, "Normal"),
+    (Vision::Protanopia, "Red-blind"),
+    (Vision::Deuteranopia, "Green-blind"),
+    (Vision::Tritanopia, "Blue-blind"),
 ];
+
+/// The view's menu word.
+pub(super) fn view_label(vision: Vision) -> SharedString {
+    match vision {
+        Vision::Protanopia => tr!("hud_maker.more.vision.red_blind"),
+        Vision::Deuteranopia => tr!("hud_maker.more.vision.green_blind"),
+        Vision::Tritanopia => tr!("hud_maker.more.vision.blue_blind"),
+        Vision::Normal | _ => tr!("hud_maker.more.vision.normal"),
+    }
+}
+
+/// The view's condition, as its menu button's tooltip names it.
+pub(super) fn view_name(vision: Vision) -> SharedString {
+    match vision {
+        Vision::Protanopia => tr!("hud_maker.more.vision_name.red_blind"),
+        Vision::Deuteranopia => tr!("hud_maker.more.vision_name.green_blind"),
+        Vision::Tritanopia => tr!("hud_maker.more.vision_name.blue_blind"),
+        Vision::Normal | _ => tr!("hud_maker.more.vision_name.normal"),
+    }
+}
 
 /// What the badge over the canvas says under `vision`; `None` for Normal.
 pub(super) fn badge(vision: Vision) -> Option<String> {
-    let (_, word, name) = VIEWS.iter().find(|(v, _, _)| *v == vision)?;
-    (vision != Vision::Normal).then(|| format!("{word} view ({})", name.to_lowercase()))
+    let text = match vision {
+        Vision::Protanopia => tr!("hud_maker.more.badge.red_blind"),
+        Vision::Deuteranopia => tr!("hud_maker.more.badge.green_blind"),
+        Vision::Tritanopia => tr!("hud_maker.more.badge.blue_blind"),
+        Vision::Normal | _ => return None,
+    };
+    Some(text.into())
 }
 
 /// The view, and the images simulated for each colour-blind view seen since the HUD's images or

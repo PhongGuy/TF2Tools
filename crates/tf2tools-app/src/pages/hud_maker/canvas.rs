@@ -30,6 +30,8 @@ use super::editor::{Guide, Handle};
 use super::rank_paint::{RankText, rank_paint, rank_text};
 use super::view::{CanvasFit, list_font_px};
 use super::{HudMakerPage, Images};
+use crate::i18n::names::maker_label;
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::crosshair_maker::model::hsla_of_rgba;
 use crate::widgets::labelled;
@@ -62,8 +64,6 @@ const PLACEHOLDER_TEXT: Pixels = px(9.);
 const SECTIONED_LIST: &str = "SectionedListPanel";
 /// The killfeed part, which draws sample notice lines.
 const KILLFEED: &str = "HudDeathNotice";
-/// What a scoreboard list the game cannot fill with rows says in place of its name.
-const ROWS_IN_GAME: &str = "Player rows draw in game";
 
 /// The eight resize handles, each with where it sits on the selection (0, half or 1 of each
 /// side) and the cursor it shows.
@@ -474,7 +474,7 @@ impl HudMakerPage {
             let blank = !draws(part, &look) && !paints_inside(model, layout, key, &look);
             let name = super::parts::row_label(part);
             let label = match blank {
-                true => format!("{name}, {NOTHING_SHOWN}"),
+                true => tr!("hud_maker.canvas.nothing_shown_named", name = name).to_string(),
                 false => name.clone(),
             };
             Some((name, blank, label))
@@ -567,7 +567,11 @@ impl HudMakerPage {
                     div().id(ids::hud_maker_cut_off(key)).test_support(),
                     local(fit.rect(b.x(), b.y(), b.wide(), b.tall())),
                 )
-                .aria_label(format!("{name}, cut off by {parent}"))
+                .aria_label(tr!(
+                    "hud_maker.canvas.cut_off",
+                    name = name,
+                    parent = parent
+                ))
                 .border_1()
                 .border_dashed()
                 .border_color(warning);
@@ -669,9 +673,10 @@ impl HudMakerPage {
         });
         // While the menu picture is being read, a plain line stands in for the blank screen.
         let loading = self.menu_art_loading().then(|| {
+            let words = tr!("hud_maker.canvas.menu_loading");
             div()
                 .id(ids::HUD_MAKER_MENU_LOADING)
-                .aria_label("Loading the menu picture\u{2026}")
+                .aria_label(words.clone())
                 .test_support()
                 .absolute()
                 .inset_0()
@@ -680,7 +685,7 @@ impl HudMakerPage {
                 .justify_center()
                 .text_sm()
                 .text_color(cx.theme().muted_foreground)
-                .child("Loading the menu picture\u{2026}")
+                .child(words)
         });
         let screen_div = div()
             .id(ids::HUD_MAKER_CANVAS)
@@ -866,7 +871,7 @@ impl HudMakerPage {
             .child(labelled(
                 caption(div()),
                 ids::HUD_MAKER_COMPARE_LABEL_NOW,
-                "Now",
+                tr!("hud_maker.canvas.now"),
             ));
         // The chip stays at the shown screen's top right, clear of the panel on the left. It occludes, so a
         // press on it never reaches the canvas.
@@ -874,7 +879,7 @@ impl HudMakerPage {
             Button::new(ids::HUD_MAKER_COMPARE_STOP)
                 .outline()
                 .small()
-                .label("Stop comparing")
+                .label(tr!("hud_maker.history.stop_comparing"))
                 .on_click(cx.listener(|page, _, _, cx| page.stop_comparing(cx))),
         );
         let top_right = h_flex()
@@ -928,8 +933,8 @@ impl HudMakerPage {
             Button::new(ids::HUD_MAKER_TOOLBAR_EXPAND)
                 .ghost()
                 .icon(IconName::ChevronUp)
-                .label("Show toolbar")
-                .tooltip("Show toolbar")
+                .label(tr!("hud_maker.toolbar.show"))
+                .tooltip(tr!("hud_maker.toolbar.show"))
                 .on_click(cx.listener(|page, _, _, cx| page.set_toolbar_collapsed(false, cx)))
                 .into_any_element()
         } else {
@@ -1551,9 +1556,6 @@ impl HudMakerPage {
     }
 }
 
-// What the hover tag and outline labels add for a part that paints nothing in the preview.
-const NOTHING_SHOWN: &str = "draws nothing in this preview";
-
 // The hovered part's name on a small tag just above its outline (below it at the screen's top),
 // kept on the screen's side the part sits nearer, with a note for a part that paints nothing.
 fn hover_tag(
@@ -1579,7 +1581,8 @@ fn hover_tag(
         .whitespace_nowrap()
         .child(name)
         .when(blank, |tag| {
-            tag.child(div().text_color(muted).child(capitalised(NOTHING_SHOWN)))
+            let note = tr!("hud_maker.canvas.nothing_shown");
+            tag.child(div().text_color(muted).child(note))
         });
     let tag = match r.origin.y >= tall + px(2.) {
         true => tag.bottom(screen.height - r.origin.y + px(2.)),
@@ -1594,13 +1597,6 @@ fn hover_tag(
 
 // The height of one line of the hover tag, used to tell whether it fits above the outline.
 const HOVER_TAG: Pixels = px(20.);
-
-fn capitalised(text: &str) -> String {
-    let mut chars = text.chars();
-    chars
-        .next()
-        .map_or_else(String::new, |c| c.to_uppercase().chain(chars).collect())
-}
 
 // Every part the game shows (or, for a selected hidden panel, ghosts) as elements local to the
 // screen at `screen_origin`. `selected` decides the ghosts and cut-off roots; a snapshot layer
@@ -2072,8 +2068,12 @@ fn part_element(
         Kind::Rank => el.overflow_hidden().children(rank(part, b, look)),
         Kind::Chat(chat) => el.overflow_hidden().children(chat_lines(chat, look)),
         Kind::List(list) => el.child(player_rows(part.key(), list, b.tall(), look)),
-        Kind::RowsInGame => outline(el, drawn.insert(ROWS_IN_GAME.into()).clone()),
-        Kind::GameFilled(note) => outline(el, drawn.insert(note.into()).clone()),
+        // A scoreboard list the game cannot fill with rows says so in place of its name.
+        Kind::RowsInGame => outline(
+            el,
+            drawn.insert(tr!("hud_maker.canvas.rows_in_game")).clone(),
+        ),
+        Kind::GameFilled(note) => outline(el, drawn.insert(maker_label(note)).clone()),
         Kind::StandIn => el.child(
             div()
                 .id(ids::hud_maker_stand_in(part.key()))
@@ -3044,7 +3044,11 @@ fn killfeed_lines(
         };
         let el = div()
             .id(ids::hud_maker_killfeed_line(i))
-            .aria_label(format!("{} killed {}", line.killer(), line.victim()))
+            .aria_label(tr!(
+                "hud_maker.canvas.killfeed_line",
+                killer = line.killer(),
+                victim = line.victim()
+            ))
             .test_support()
             .absolute()
             .top(at(line.y()))
@@ -3286,14 +3290,39 @@ fn text_watcher(measured: TextBounds, key: PartKey) -> impl IntoElement {
 pub(super) fn scene_note(model: &HudModel) -> Option<String> {
     let rule = model.scene_rule();
     rule.root()?;
-    let scene = rule.label().to_lowercase();
-    if !model.problems().is_empty() {
-        Some(format!("Can't show the {scene}"))
-    } else {
-        model
-            .hidden_by_hud()
-            .map(|_| format!("This HUD hides the {scene}"))
+    let cant_show = !model.problems().is_empty();
+    if !cant_show {
+        model.hidden_by_hud()?;
     }
+    Some(scene_note_text(rule.scene(), rule.label(), cant_show))
+}
+
+// The note's whole sentence for `scene`; a scene core adds later names its lowercased `label`.
+fn scene_note_text(scene: Scene, label: &str, cant_show: bool) -> String {
+    let scene_word = |label: &str| maker_label(label).to_lowercase();
+    let text = match (scene, cant_show) {
+        (Scene::Scoreboard, true) => tr!("hud_maker.scene_note.cant_show.scoreboard"),
+        (Scene::MainMenu, true) => tr!("hud_maker.scene_note.cant_show.main_menu"),
+        (Scene::FreezeCam, true) => tr!("hud_maker.scene_note.cant_show.freeze_cam"),
+        (Scene::WinPanel, true) => tr!("hud_maker.scene_note.cant_show.win_panel"),
+        (Scene::ClassSelect, true) => tr!("hud_maker.scene_note.cant_show.class_select"),
+        (Scene::Spectator, true) => tr!("hud_maker.scene_note.cant_show.spectator"),
+        (Scene::Scoreboard, false) => tr!("hud_maker.scene_note.hidden.scoreboard"),
+        (Scene::MainMenu, false) => tr!("hud_maker.scene_note.hidden.main_menu"),
+        (Scene::FreezeCam, false) => tr!("hud_maker.scene_note.hidden.freeze_cam"),
+        (Scene::WinPanel, false) => tr!("hud_maker.scene_note.hidden.win_panel"),
+        (Scene::ClassSelect, false) => tr!("hud_maker.scene_note.hidden.class_select"),
+        (Scene::Spectator, false) => tr!("hud_maker.scene_note.hidden.spectator"),
+        (_, true) => tr!(
+            "hud_maker.scene_note.cant_show.named",
+            scene = scene_word(label)
+        ),
+        (_, false) => tr!(
+            "hud_maker.scene_note.hidden.named",
+            scene = scene_word(label)
+        ),
+    };
+    text.to_string()
 }
 
 // The HUD's own crosshair label when it shows: its symbol in its font, size and colour, in
@@ -3359,4 +3388,29 @@ fn crosshair(cx: Pixels, cy: Pixels) -> impl IntoElement {
         .size(arm)
         .child(bar(arm, px(2.)))
         .child(bar(px(2.), arm))
+}
+
+#[cfg(test)]
+mod tests {
+    use tf2tools_core::SceneRule;
+
+    use super::scene_note_text;
+
+    // English keeps today's sentences, built from each rooted scene's lowercased label.
+    #[test]
+    fn the_scene_notes_read_as_before_in_english() {
+        let _lock = crate::i18n::test_lock();
+        crate::i18n::apply("en");
+        for rule in SceneRule::every().iter().filter(|r| r.root().is_some()) {
+            let scene = rule.label().to_lowercase();
+            assert_eq!(
+                scene_note_text(rule.scene(), rule.label(), true),
+                format!("Can't show the {scene}")
+            );
+            assert_eq!(
+                scene_note_text(rule.scene(), rule.label(), false),
+                format!("This HUD hides the {scene}")
+            );
+        }
+    }
 }
