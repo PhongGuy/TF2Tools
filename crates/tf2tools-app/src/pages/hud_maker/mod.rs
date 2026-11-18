@@ -78,7 +78,8 @@ use crate::keymap::{
 use crate::library_events::{LibraryChanged, LibraryEvents};
 use crate::local_messages::{
     LocalFailure, ReopenNotice, describe_hud_load, describe_make_hud, describe_settings,
-    hud_base_changed, hud_files, hud_options_unreadable, left_out, reopen_notice,
+    hud_base_changed, hud_files, hud_options_unreadable, left_out, pictures_left_out,
+    reopen_notice,
 };
 use crate::pages::crosshair_maker::model::{hsla_of_rgba, redo_tip, rgb_of, undo_tip};
 use crate::pages::huds::{install_failed, install_job, install_toast};
@@ -1071,9 +1072,10 @@ impl HudMakerPage {
                     Some((source.to_owned(), FontBytes::new(bytes)))
                 })
                 .collect();
-            // Borrowed pictures past the caps were among the dropped; core's sentence says so.
+            // Borrowed pictures past the caps were among the dropped, so the notice says so.
             let mut notice = reopen_notice(made.dropped(), made.tf2_updated());
-            if let (Some(notice), Some(line)) = (&mut notice, made.notice()) {
+            let pictures = pictures_left_out(made.pictures_left_out());
+            if let (Some(notice), Some(line)) = (&mut notice, pictures) {
                 notice.text = format!("{} {line}", notice.text);
             }
             let entry = made.entry();

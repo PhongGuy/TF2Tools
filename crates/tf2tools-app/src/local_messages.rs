@@ -309,6 +309,12 @@ pub fn reopen_notice(dropped: usize, tf2_updated: bool) -> Option<ReopenNotice> 
     })
 }
 
+/// The sentence added to the reopen notice when `count` borrowed pictures were left out, else
+/// `None`.
+pub fn pictures_left_out(count: usize) -> Option<SharedString> {
+    (count > 0).then(|| tr!("messages.local.reopen.pictures_left_out"))
+}
+
 /// What the player reads once a copy is made: it is theirs to edit, and whose work it is.
 pub fn copy_made_text(copy_name: &str, author: &str) -> String {
     let terms = terms_note(author);

@@ -1566,6 +1566,7 @@ hud_maker:
     now: "Now"
     nothing_shown: "Draws nothing in this preview"
     nothing_shown_named: "%{name}, draws nothing in this preview"
+    killfeed_line: "%{killer} killed %{victim}"
   live:
     note: "Your installed HUD is updated. Type hud_reloadscheme in TF2's console to see it. Font, image and animation changes show after you restart TF2."
     not_updated_title: "Installed copy not updated"
@@ -2025,6 +2026,7 @@ messages:
     reopen:
       tf2_updated_title: "TF2 updated its HUD files"
       tf2_updated: "Your changes still apply. Check the HUD looks right."
+      pictures_left_out: "Some borrowed pictures were left out because this HUD held more than it can keep."
     copy_made: "%{copy} is yours to edit. %{terms}"
     editing_copy: "Editing a copy of %{base}. The original stays as it is. %{terms}"
     terms:

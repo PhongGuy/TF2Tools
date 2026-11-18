@@ -5,6 +5,7 @@ use gpui_kit::{AppContext as _, ElementId, Entity, ScrollDelta, TestAppContext, 
 use tf2tools_app::i18n::names::maker_label;
 use tf2tools_app::i18n::plural;
 use tf2tools_app::ids;
+use tf2tools_app::local_messages::pictures_left_out;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::pages::hud_maker::animations::anim_sentence;
 use tf2tools_app::pages::hud_maker::editor::{Align, HudEditor};
@@ -365,4 +366,27 @@ fn the_russian_maker_fits_at_800_by_600(cx: &mut TestAppContext) {
         Some(tabs) => assert!(tabs.right() <= bar.right(), "{tabs:?} past {bar:?}"),
         None => assert!(support::present(cx, s.win, ids::HUD_MAKER_SCENE_MENU)),
     }
+}
+
+// Reopening a HUD that held too many borrowed pictures says so in the player's language.
+#[test]
+fn the_pictures_left_out_note_reads_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(pictures_left_out(0), None);
+    assert_eq!(
+        pictures_left_out(1).as_deref(),
+        Some("Часть взятых картинок не вошла: в этом HUD их было больше, чем он может хранить.")
+    );
+}
+
+// The kill feed's sample names stay as the game shows them; the sentence around them is Russian.
+#[gpui_kit::test]
+fn a_kill_feed_line_is_named_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, _page) = open_maker(cx);
+    support::put_start_card_away(cx, s.win);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::hud_maker_killfeed_line(1)).as_deref(),
+        Some("Market Garden убивает Rocket Jumper")
+    );
 }

@@ -3044,7 +3044,11 @@ fn killfeed_lines(
         };
         let el = div()
             .id(ids::hud_maker_killfeed_line(i))
-            .aria_label(format!("{} killed {}", line.killer(), line.victim()))
+            .aria_label(tr!(
+                "hud_maker.canvas.killfeed_line",
+                killer = line.killer(),
+                victim = line.victim()
+            ))
             .test_support()
             .absolute()
             .top(at(line.y()))
