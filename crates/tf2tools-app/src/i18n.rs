@@ -871,6 +871,11 @@ mod tests {
         "pages/hud_maker/step_name.rs",
         "pages/hud_maker/editor.rs",
         "pages/hud_maker/editor/fit.rs",
+        "pages/hud_maker/canvas.rs",
+        "pages/hud_maker/situation.rs",
+        "pages/hud_maker/live.rs",
+        "pages/hud_maker/parts.rs",
+        "pages/hud_maker/pictures.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1326,6 +1331,100 @@ mod tests {
             "the start box, screen and group travel with the drag",
             MAKER_LINT,
         ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "SectionedListPanel",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "HudDeathNotice",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF2ToolsAnchor",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "CSpectatorTargetID/TargetNameLabel",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "CSpectatorTargetID/TargetDataLabel",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "ProgressBar.FgColor",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "BluePlayerList",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "RedPlayerList",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_Scoreboard_Name",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_Scoreboard_Score",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_Scoreboard_Ping",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Tour",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Damage",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Tank",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Healing",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Support",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/canvas.rs",
+            "TF_MvMScoreboard_Money",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/canvas.rs", "Name", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Score", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Tour", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Damage", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Tank", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Healing", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Support", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Money", MAKER_SAMPLE),
+        ("pages/hud_maker/canvas.rs", "Ping", MAKER_SAMPLE),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
@@ -1336,6 +1435,7 @@ mod tests {
     const MAKER_ID_WORD: &str = "an element id built from the English word; its label is keyed";
     const MAKER_LINT: &str = "developer detail: a lint reason";
     const MAKER_SHOWS_FOR: &str = "developer detail: core's ShowsFor value, matched";
+    const MAKER_SAMPLE: &str = "in-game sample text: the game's own fallback word";
     const MAKER_CREDIT_FILE: &str = "the credit written into the shared HUD's files; shown keyed";
     const STORE_FIELD: &str = "developer detail: the store's tracing field";
     const ID_VALUE: &str = "element id value; its label is keyed";

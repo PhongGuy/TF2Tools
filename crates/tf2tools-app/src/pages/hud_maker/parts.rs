@@ -18,6 +18,7 @@ use tf2tools_core::{HudModel, PanelRule, Part, PartKey};
 
 use super::HudMakerPage;
 use crate::i18n::names::maker_label;
+use crate::i18n::tr;
 use crate::ids;
 
 /// Every row is this tall; `uniform_list` sizes all rows by the first.
@@ -34,12 +35,23 @@ const FILTER_HEIGHT: f32 = 32.;
 pub(super) const LIST_PADDING: f32 = 8. + FILTER_HEIGHT;
 // The fold arrow and the eye are squares this wide.
 const CONTROL: f32 = 20.;
+
 // A row's state beside the name: the game hides the part in the preview's situation, or the
 // HUD or the player does.
-const SHOWS_IN_GAME: &str = "shows in game";
-const HIDDEN: &str = "hidden";
-// "Shows in game" draws as a small icon, so the names beside it keep the row; its tooltip says it.
-const SHOWS_IN_GAME_TIP: &str = "Shows in game only when TF2 needs it";
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RowState {
+    ShowsInGame,
+    Hidden,
+}
+
+impl RowState {
+    fn words(self) -> SharedString {
+        match self {
+            RowState::ShowsInGame => tr!("hud_maker.parts.shows_in_game"),
+            RowState::Hidden => tr!("hud_maker.parts.hidden"),
+        }
+    }
+}
 
 impl HudMakerPage {
     // A `uniform_list`, so only the visible rows are built however large the HUD is. Rows fit
@@ -54,7 +66,7 @@ impl HudMakerPage {
                 .p_2()
                 .text_sm()
                 .opacity(0.7)
-                .child("No parts match");
+                .child(tr!("hud_maker.parts.no_match"));
             return match docked {
                 true => note.flex_1(),
                 false => note.h(px(LIST_HEIGHT)).flex_shrink(1.),
@@ -167,9 +179,9 @@ impl HudMakerPage {
                 let by_game =
                     super::canvas::game_hidden_root(model, editor.layout(), key).is_some();
                 let state = if by_game {
-                    Some(SHOWS_IN_GAME)
+                    Some(RowState::ShowsInGame)
                 } else if hidden {
-                    Some(HIDDEN)
+                    Some(RowState::Hidden)
                 } else {
                     None
                 };
@@ -204,7 +216,7 @@ impl HudMakerPage {
                 } = &row;
                 let (key, depth, selected) = (key.clone(), *depth, *selected);
                 let label = SharedString::from(match state {
-                    Some(state) => format!("{name} ({state})"),
+                    Some(state) => format!("{name} ({})", state.words()),
                     None => name.clone(),
                 });
                 // The name takes the room left by its state tag, pinned at the row's right in
@@ -239,15 +251,18 @@ impl HudMakerPage {
                     .child(name.clone())
                     .child(measure);
                 let state = state.map(|state| {
+                    let words = state.words();
                     let tag = div()
                         .id(ids::hud_maker_row_state(&key))
-                        .aria_label(state)
+                        .aria_label(words.clone())
                         .test_support()
                         .flex_none()
                         .ml_2()
                         .opacity(0.7);
-                    if state != SHOWS_IN_GAME {
-                        return tag.whitespace_nowrap().text_xs().child(state);
+                    // "Shows in game" draws as a small icon, so the name beside it keeps the row;
+                    // its tooltip says it.
+                    if state != RowState::ShowsInGame {
+                        return tag.whitespace_nowrap().text_xs().child(words);
                     }
                     tag.size(px(CONTROL))
                         .flex()
@@ -255,7 +270,7 @@ impl HudMakerPage {
                         .justify_center()
                         .tooltip(crate::widgets::tip::tip(
                             ids::HUD_MAKER_TIP,
-                            SHOWS_IN_GAME_TIP,
+                            tr!("hud_maker.parts.shows_in_game_tip"),
                         ))
                         .child(Icon::new(IconName::Gamepad2).small())
                 });
@@ -334,7 +349,10 @@ impl HudMakerPage {
         };
         let key = key.clone();
         slot.id(ids::hud_maker_row_fold(&key))
-            .aria_label(if folded { "Unfold" } else { "Fold" })
+            .aria_label(match folded {
+                true => tr!("hud_maker.parts.unfold"),
+                false => tr!("hud_maker.parts.fold"),
+            })
             .test_support()
             .flex()
             .items_center()
@@ -366,14 +384,13 @@ impl HudMakerPage {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let key = key.clone();
-        let words = if hidden {
-            "Show this part"
-        } else {
-            "Hide this part"
+        let words = match hidden {
+            true => tr!("hud_maker.parts.show"),
+            false => tr!("hud_maker.parts.hide"),
         };
         div()
             .id(ids::hud_maker_row_eye(&key))
-            .aria_label(words)
+            .aria_label(words.clone())
             .test_support()
             .flex_none()
             .ml_1()
@@ -416,7 +433,7 @@ struct Row {
     key: PartKey,
     name: String,
     file: Option<String>,
-    state: Option<&'static str>,
+    state: Option<RowState>,
     depth: usize,
     selected: bool,
     // `Some(folded)` for a part that holds others.
@@ -430,7 +447,7 @@ struct Row {
 fn changed_dot(key: &PartKey, colour: Hsla) -> AnyElement {
     div()
         .id(ids::hud_maker_row_changed(key))
-        .aria_label("Changed")
+        .aria_label(tr!("hud_maker.parts.changed"))
         .test_support()
         .flex_none()
         .ml_2()
@@ -439,7 +456,7 @@ fn changed_dot(key: &PartKey, colour: Hsla) -> AnyElement {
         .bg(colour)
         .tooltip(crate::widgets::tip::tip(
             ids::HUD_MAKER_TIP,
-            "Changed from the starting HUD",
+            tr!("hud_maker.parts.changed_tip"),
         ))
         .into_any_element()
 }

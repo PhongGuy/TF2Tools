@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use gpui_kit::{AppContext as _, Entity, TestAppContext};
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
-use tf2tools_app::pages::hud_maker::live::{LIVE_NOTE, live_failure};
+use tf2tools_app::pages::hud_maker::live::{live_failure, live_note};
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{LibraryKind, PartKey, ReinstallError, Tf2Install};
@@ -150,7 +150,7 @@ fn saving_the_installed_hud_updates_it_and_says_how_to_see_it(cx: &mut TestAppCo
     assert!(!staging(&env).exists());
     assert_eq!(
         support::label_of(cx, s.win, ids::HUD_MAKER_LIVE_NOTE).as_deref(),
-        Some(LIVE_NOTE)
+        Some(live_note().as_ref())
     );
     assert!(cx.update(|cx| page.read(cx).live_note_shown()));
     // The player's log names the HUD; where it landed is developer detail.

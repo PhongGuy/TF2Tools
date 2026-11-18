@@ -8,7 +8,9 @@ use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
-use gpui_kit::{AnyElement, Context, IntoElement, ParentElement as _, Styled as _, Window, div};
+use gpui_kit::{
+    AnyElement, Context, IntoElement, ParentElement as _, SharedString, Styled as _, Window, div,
+};
 use tf2tools_core::{
     HudFiles, HudImage, PartKey, PictureTarget, Platform, PngReadError, RgbaImage, Scene,
     fit_hud_texture, hud_texture_vtf, menu_textures, read_picture,
@@ -18,21 +20,33 @@ use super::editor::PictureRefused;
 use super::panel::reset_tip;
 use super::tip::tipped;
 use super::{HudMakerPage, Load, top_layer};
+use crate::i18n::tr;
 use crate::ids;
 use crate::picker::PickKind;
 use crate::services::{Services, run_blocking};
 use crate::shell::toast::{ToastKind, toast};
 use crate::widgets::labelled;
 
-const HUD_FULL: &str =
-    "This HUD can't take more pictures. Undo or reset some picture changes first.";
-const NOT_A_PICTURE: &str = "That file isn't a picture TF2Tools can read.";
-const TOO_WIDE: &str = "That picture is too big. Pick one under 4096 pixels on each side.";
-const FILE_TOO_BIG: &str = "That file is too big. Pick one under 32 MB.";
-const SHARED: &str = "This changes the game's own picture, so it changes everywhere the game shows it, not only here.";
+// The toast for a file the picker read but cannot use, worded as it is shown.
+#[derive(Clone, Copy)]
+enum Refused {
+    NotAPicture,
+    TooWide,
+    FileTooBig,
+}
+
+impl Refused {
+    fn line(self) -> SharedString {
+        match self {
+            Refused::NotAPicture => tr!("hud_maker.pictures.not_a_picture"),
+            Refused::TooWide => tr!("hud_maker.pictures.too_wide"),
+            Refused::FileTooBig => tr!("hud_maker.pictures.file_too_big"),
+        }
+    }
+}
 
 // A picked file read and encoded, or the line to toast instead.
-type Read<T> = Result<T, &'static str>;
+type Read<T> = Result<T, Refused>;
 
 impl HudMakerPage {
     /// Lands `vtf` on `part` when it is still the selection; a HudFull refusal toasts
@@ -78,7 +92,8 @@ impl HudMakerPage {
     ) {
         self.decode_shown_images(cx);
         if refused == Some(PictureRefused::HudFull) {
-            toast(window, cx, ToastKind::Error, HUD_FULL, "");
+            let line = tr!("hud_maker.pictures.hud_full");
+            toast(window, cx, ToastKind::Error, line, "");
         }
     }
 
@@ -108,7 +123,7 @@ impl HudMakerPage {
         let read = move |path: &Path| {
             let like = replaced.and_then(|name| texture_size(top, &files, &name, platform));
             let image = read_picture(path).map_err(|e| picture_line(&e))?;
-            hud_texture_vtf(&fit_hud_texture(&image, like)).map_err(|_| NOT_A_PICTURE)
+            hud_texture_vtf(&fit_hud_texture(&image, like)).map_err(|_| Refused::NotAPicture)
         };
         self.pick_and_land(
             read,
@@ -124,7 +139,8 @@ impl HudMakerPage {
         let read = |path: &Path| {
             let image = read_picture(path).map_err(|e| picture_line(&e))?;
             let (narrow, wide) = menu_textures(&image);
-            let encode = |image: &RgbaImage| hud_texture_vtf(image).map_err(|_| NOT_A_PICTURE);
+            let encode =
+                |image: &RgbaImage| hud_texture_vtf(image).map_err(|_| Refused::NotAPicture);
             Ok((encode(&narrow)?, encode(&wide)?))
         };
         self.pick_and_land(
@@ -143,13 +159,13 @@ impl HudMakerPage {
             .text_sm()
             .font_weight(gpui_kit::FontWeight::SEMIBOLD)
             .text_color(theme.foreground)
-            .child("Menu background");
+            .child(tr!("hud_maker.pictures.menu_background"));
         let reset = editor.has_menu_background().then(|| {
             let button = Button::new(ids::HUD_MAKER_MENU_PICTURE_RESET)
                 .ghost()
                 .xsmall()
                 .icon(IconName::RotateCcw)
-                .accessibility_label("Reset the menu background")
+                .accessibility_label(tr!("hud_maker.pictures.reset_menu_background"))
                 .on_click(cx.listener(|page, _, window, cx| {
                     page.edit_selected(window, cx, |e| {
                         e.reset_menu_background();
@@ -165,7 +181,7 @@ impl HudMakerPage {
         let choose = Button::new(ids::HUD_MAKER_MENU_PICTURE_PICK)
             .outline()
             .small()
-            .label("Choose picture…")
+            .label(tr!("hud_maker.pictures.choose"))
             .on_click(cx.listener(|page, _, _, cx| page.pick_menu_background(cx)));
         let rows = v_flex()
             .gap_2()
@@ -201,7 +217,7 @@ impl HudMakerPage {
                 return;
             };
             let job = cx.update(|cx| run_blocking(cx, move |_| Ok(read(&path))));
-            let read = job.await.unwrap_or(Err(NOT_A_PICTURE));
+            let read = job.await.unwrap_or(Err(Refused::NotAPicture));
             cx.update(|cx| {
                 let _ = win.update(cx, |_, window, cx| {
                     page.update(cx, |page, cx| {
@@ -210,7 +226,7 @@ impl HudMakerPage {
                         }
                         match read {
                             Ok(done) => land(page, done, window, cx),
-                            Err(line) => toast(window, cx, ToastKind::Error, line, ""),
+                            Err(why) => toast(window, cx, ToastKind::Error, why.line(), ""),
                         }
                     })
                 });
@@ -240,7 +256,7 @@ impl HudMakerPage {
         let choose = Button::new(ids::HUD_MAKER_PICTURE_PICK)
             .outline()
             .small()
-            .label("Choose picture…")
+            .label(tr!("hud_maker.pictures.choose"))
             .on_click(cx.listener(|page, _, _, cx| page.pick_picture(cx)));
         let shared = matches!(target, PictureTarget::Code { .. });
         let row = v_flex()
@@ -249,7 +265,12 @@ impl HudMakerPage {
                 h_flex()
                     .justify_between()
                     .items_center()
-                    .child(div().text_xs().text_color(muted).child("Picture"))
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(muted)
+                            .child(tr!("hud_maker.pictures.picture")),
+                    )
                     .child(tipped(
                         &ids::HUD_MAKER_PICTURE_RESET.into(),
                         reset_tip(),
@@ -261,19 +282,19 @@ impl HudMakerPage {
                 el.child(labelled(
                     div().text_xs().text_color(muted),
                     ids::HUD_MAKER_PICTURE_SHARED,
-                    SHARED,
+                    tr!("hud_maker.pictures.shared"),
                 ))
             });
         Some(row.into_any_element())
     }
 }
 
-// The player's line for a file `read_picture` refused.
-fn picture_line(err: &PngReadError) -> &'static str {
+// Why `read_picture` refused a file.
+fn picture_line(err: &PngReadError) -> Refused {
     match err {
-        PngReadError::TooLarge { .. } => TOO_WIDE,
-        PngReadError::FileTooLarge { .. } => FILE_TOO_BIG,
-        PngReadError::Io { .. } | PngReadError::Invalid { .. } | _ => NOT_A_PICTURE,
+        PngReadError::TooLarge { .. } => Refused::TooWide,
+        PngReadError::FileTooLarge { .. } => Refused::FileTooBig,
+        PngReadError::Io { .. } | PngReadError::Invalid { .. } | _ => Refused::NotAPicture,
     }
 }
 

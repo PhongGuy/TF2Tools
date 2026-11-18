@@ -8,7 +8,8 @@ use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::pages::hud_maker::animations::anim_sentence;
 use tf2tools_app::pages::hud_maker::editor::{Align, HudEditor};
-use tf2tools_core::{AnimCommand, Interp, PartKey};
+use tf2tools_app::pages::hud_maker::live::{live_failure, live_note};
+use tf2tools_core::{AnimCommand, Interp, PartKey, ReinstallError, SituationSwitch};
 
 use crate::LocaleGuard;
 use crate::support;
@@ -241,4 +242,52 @@ fn undo_steps_are_named_in_russian() {
     let mut e = holding(&[VALUE, MEDIC]);
     e.hide_selected().unwrap();
     assert_eq!(e.undo_name(), Some("скрытие частей: 2"));
+}
+
+#[test]
+fn live_update_lines_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(
+        live_note(),
+        "Установленный HUD обновлён. Введите hud_reloadscheme в консоли TF2, чтобы увидеть \
+         изменения. Шрифты, картинки и анимации обновятся после перезапуска TF2."
+    );
+    let changed = ReinstallError::Changed {
+        folder: "rayshud".into(),
+    };
+    assert_eq!(
+        live_failure(&changed),
+        "Сохранено, но в установленном HUD есть свои изменения, поэтому он не обновлён. \
+         Установите этот HUD снова, чтобы выбрать, что делать."
+    );
+}
+
+#[gpui_kit::test]
+fn the_situation_menu_and_the_parts_list_read_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, _page) = open_maker(cx);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_SITUATION).as_deref(),
+        Some("Солдат, здоровье 150")
+    );
+    support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
+    assert_eq!(
+        support::label_of(
+            cx,
+            s.win,
+            ids::hud_maker_situation_switch(SituationSwitch::Typing)
+        )
+        .as_deref(),
+        Some("Набор в чате")
+    );
+    support::press(cx, s.win, "escape");
+    if !support::present(cx, s.win, ids::HUD_MAKER_PARTS) {
+        support::click_id(cx, s.win, ids::HUD_MAKER_PARTS_PANEL_COLLAPSE);
+    }
+    let row = PartKey::new(VALUE);
+    support::reveal_part_row(cx, s.win, &row);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::hud_maker_row_eye(&row)).as_deref(),
+        Some("Скрыть эту часть")
+    );
 }

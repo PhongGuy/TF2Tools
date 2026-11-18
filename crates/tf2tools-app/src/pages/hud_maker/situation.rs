@@ -15,7 +15,7 @@ use tf2tools_core::{GameSituation, MeterKind, SituationSwitch, TfClass, WeaponKi
 
 use super::HudMakerPage;
 use super::tip::tipped;
-use crate::i18n::names::meter_name;
+use crate::i18n::names::{class_name, meter_name};
 use crate::i18n::tr;
 use crate::ids;
 use crate::widgets::labelled;
@@ -39,23 +39,39 @@ impl SituationSlider {
     }
 }
 
-const SWITCHES: [(SituationSwitch, &str); 8] = [
-    (SituationSwitch::Meter, "Weapon with a meter"),
-    (SituationSwitch::Aiming, "Aiming at a player"),
-    (SituationSwitch::Effect, "Effect on you"),
-    (SituationSwitch::Powerup, "Mannpower powerup"),
-    (SituationSwitch::Typing, "Typing in chat"),
-    (SituationSwitch::Portrait, "2D class portrait"),
-    (SituationSwitch::JustHit, "Just hit someone"),
-    (SituationSwitch::Koth, "King of the Hill map"),
+const SWITCHES: [SituationSwitch; 8] = [
+    SituationSwitch::Meter,
+    SituationSwitch::Aiming,
+    SituationSwitch::Effect,
+    SituationSwitch::Powerup,
+    SituationSwitch::Typing,
+    SituationSwitch::Portrait,
+    SituationSwitch::JustHit,
+    SituationSwitch::Koth,
 ];
 
-const MINMODE_TIP: &str = "See the HUD as it looks with TF2's minimal HUD setting on. While this is on, a part with its own minimal-HUD place changes only there.";
+const WEAPONS: [WeaponKind; 2] = [WeaponKind::Clip, WeaponKind::NoClip];
 
-const WEAPONS: [(WeaponKind, &str); 2] = [
-    (WeaponKind::Clip, "Weapon with a clip"),
-    (WeaponKind::NoClip, "Weapon without a clip"),
-];
+// A switch's words in the menu; a switch core adds later reads as the last one until keyed.
+fn switch_label(sw: SituationSwitch) -> SharedString {
+    match sw {
+        SituationSwitch::Meter => tr!("hud_maker.situation.switch.meter"),
+        SituationSwitch::Aiming => tr!("hud_maker.situation.switch.aiming"),
+        SituationSwitch::Effect => tr!("hud_maker.situation.switch.effect"),
+        SituationSwitch::Powerup => tr!("hud_maker.situation.switch.powerup"),
+        SituationSwitch::Typing => tr!("hud_maker.situation.switch.typing"),
+        SituationSwitch::Portrait => tr!("hud_maker.situation.switch.portrait"),
+        SituationSwitch::JustHit => tr!("hud_maker.situation.switch.just_hit"),
+        SituationSwitch::Koth | _ => tr!("hud_maker.situation.switch.koth"),
+    }
+}
+
+fn weapon_label(w: WeaponKind) -> SharedString {
+    match w {
+        WeaponKind::Clip => tr!("hud_maker.situation.weapon.clip"),
+        WeaponKind::NoClip | _ => tr!("hud_maker.situation.weapon.no_clip"),
+    }
+}
 
 // How far a slider's handle and its hover ring reach past the track's end.
 const THUMB_REACH: gpui_kit::Pixels = px(11.);
@@ -193,12 +209,16 @@ impl HudMakerPage {
             .outline()
             .small()
             .icon(IconName::ChevronsUpDown)
-            .label(format!("{}, {} health", s.class().name(), s.health()))
-            .tooltip("The moment in game the preview shows");
+            .label(tr!(
+                "hud_maker.situation.button",
+                class = class_name(s.class()),
+                health = s.health()
+            ))
+            .tooltip(tr!("hud_maker.situation.tip"));
         // A class or weapon pick closes the menu; a yes/no switch keeps it open, so several
         // combine in one trip.
         let pick = |id,
-                    label: &'static str,
+                    label: SharedString,
                     on: bool,
                     next: GameSituation,
                     closes: bool,
@@ -217,30 +237,30 @@ impl HudMakerPage {
             let next = s.clone().with_class(c);
             pick(
                 ids::hud_maker_situation_class(c),
-                c.name(),
+                class_name(c),
                 s.class() == c,
                 next,
                 true,
                 cx,
             )
         });
-        let weapons = WEAPONS.map(|(w, label)| {
+        let weapons = WEAPONS.map(|w| {
             let next = s.clone().with_weapon(w);
             pick(
                 ids::hud_maker_situation_weapon(w),
-                label,
+                weapon_label(w),
                 s.weapon() == w,
                 next,
                 true,
                 cx,
             )
         });
-        let switches = SWITCHES.map(|(sw, label)| {
+        let switches = SWITCHES.map(|sw| {
             let on = s.is_on(sw);
             let next = s.clone().with_switch(sw, !on);
             pick(
                 ids::hud_maker_situation_switch(sw),
-                label,
+                switch_label(sw),
                 on,
                 next,
                 false,
@@ -252,14 +272,18 @@ impl HudMakerPage {
         let minmode = Button::new(ids::HUD_MAKER_MINMODE)
             .ghost()
             .xsmall()
-            .label("Minimal HUD")
+            .label(tr!("hud_maker.minmode.chip"))
             .selected(minmode)
             .on_click(cx.listener(move |page, _, window, cx| {
                 page.set_minmode(!minmode, window, cx);
             }));
-        let minmode = tipped(&ids::HUD_MAKER_MINMODE.into(), MINMODE_TIP, minmode);
+        let minmode = tipped(
+            &ids::HUD_MAKER_MINMODE.into(),
+            tr!("hud_maker.situation.minmode_tip"),
+            minmode,
+        );
         let muted = cx.theme().muted_foreground;
-        let slider = |which: SituationSlider, label: &'static str, value: String| {
+        let slider = |which: SituationSlider, label: SharedString, value: String| {
             v_flex()
                 .gap_1()
                 .child(div().text_xs().text_color(muted).child(label))
@@ -287,7 +311,7 @@ impl HudMakerPage {
         let reset = Button::new(ids::HUD_MAKER_SITUATION_RESET)
             .ghost()
             .xsmall()
-            .label("Back to the usual moment")
+            .label(tr!("hud_maker.situation.reset"))
             .on_click(cx.listener(|page, _, window, cx| {
                 page.situation_menu.open = false;
                 page.situation_menu.meters_open = false;
@@ -345,17 +369,17 @@ impl HudMakerPage {
             .child(h_flex().flex_wrap().gap_1().children(classes))
             .child(slider(
                 SituationSlider::Health,
-                "Health",
+                tr!("hud_maker.situation.health"),
                 s.health().to_string(),
             ))
             .child(slider(
                 SituationSlider::Ammo,
-                "Ammo left",
+                tr!("hud_maker.situation.ammo"),
                 format!("{}%", s.ammo_percent()),
             ))
             .child(slider(
                 SituationSlider::Charge,
-                "Medic charge",
+                tr!("hud_maker.situation.charge"),
                 format!("{}%", s.charge()),
             ))
             .child(h_flex().flex_wrap().gap_1().children(weapons))
