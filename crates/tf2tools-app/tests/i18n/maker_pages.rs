@@ -1,7 +1,9 @@
 //! The HUD Maker's panels, menus and dialogs in Russian, read by their English ids.
 
 use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AppContext as _, ElementId, Entity, ScrollDelta, TestAppContext, point, px};
+use gpui_kit::{
+    AppContext as _, ElementId, Entity, Pixels, ScrollDelta, TestAppContext, point, px,
+};
 use tf2tools_app::i18n::plural;
 use tf2tools_app::ids;
 use tf2tools_app::local_messages::pictures_left_out;
@@ -414,4 +416,103 @@ fn a_kill_feed_line_is_named_in_russian(cx: &mut TestAppContext) {
         support::label_of(cx, s.win, ids::hud_maker_killfeed_line(1)).as_deref(),
         Some("Market Garden убивает Rocket Jumper")
     );
+}
+
+// The toolbar's buttons a docked panel must never lie over.
+const TOOLBAR_BUTTONS: [&str; 10] = [
+    ids::HUD_MAKER_SCREEN_MENU,
+    ids::HUD_MAKER_UNDO,
+    ids::HUD_MAKER_REDO,
+    ids::HUD_MAKER_NAME,
+    ids::HUD_MAKER_SAVE,
+    ids::HUD_MAKER_INSTALL,
+    ids::HUD_MAKER_ZOOM,
+    ids::HUD_MAKER_MORE,
+    ids::HUD_MAKER_TOOLBAR_COLLAPSE,
+    ids::HUD_MAKER_LIVE_NOTE,
+];
+
+// An xsmall ghost button's padding around its label, and the side of its icon-only square.
+const XS_CHROME: Pixels = px(8.);
+const XS_ICON: Pixels = px(20.);
+
+// `text` shaped as an xsmall button's label: the theme font, medium, at text-xs.
+fn xs_label_width(cx: &mut TestAppContext, s: &support::ShellWindow, text: &str) -> Pixels {
+    use gpui_kit::component::ActiveTheme as _;
+    cx.update_window(s.win, |_, w, cx| {
+        let run = gpui_kit::TextRun {
+            len: text.len(),
+            font: gpui_kit::Font {
+                weight: gpui_kit::FontWeight::MEDIUM,
+                ..gpui_kit::font(cx.theme().font_family.clone())
+            },
+            ..Default::default()
+        };
+        let size = gpui_kit::rems(0.75).to_pixels(w.rem_size());
+        w.text_system()
+            .shape_line(text.to_owned().into(), size, &[run], None)
+            .width
+    })
+    .unwrap()
+}
+
+// At 800x600 each docked panel opened from its rail keeps clear of every toolbar button, More
+// still opens with the part list open beside it, and the situation menu's meter row shows its
+// whole name or only its icon, named with it.
+fn toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
+    let (_env, s, _page) = open_maker(cx);
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
+    let row = support::bounds_of(cx, s.win, ids::HUD_MAKER_SITUATION_METER).unwrap();
+    let name = support::label_of(cx, s.win, ids::HUD_MAKER_SITUATION_METER).unwrap();
+    let whole = xs_label_width(cx, &s, &name) + XS_CHROME;
+    assert!(
+        row.size.width + px(0.5) >= whole || row.size.width <= XS_ICON,
+        "{lang}: the meter row {row:?} cuts {name:?}, {whole:?} wide"
+    );
+    support::press(cx, s.win, "escape");
+    for (rail, frame) in [
+        (ids::HUD_MAKER_PANEL_COLLAPSE, ids::HUD_MAKER_PANEL),
+        (
+            ids::HUD_MAKER_PARTS_PANEL_COLLAPSE,
+            ids::HUD_MAKER_PARTS_PANEL,
+        ),
+    ] {
+        support::click_id(cx, s.win, rail);
+        let panel = support::bounds_of(cx, s.win, frame).unwrap();
+        for id in TOOLBAR_BUTTONS {
+            if let Some(button) = support::bounds_of(cx, s.win, id) {
+                assert!(
+                    !panel.intersects(&button),
+                    "{lang}: {frame} {panel:?} covers {id} {button:?}"
+                );
+            }
+        }
+        if frame == ids::HUD_MAKER_PARTS_PANEL {
+            support::click_id(cx, s.win, ids::HUD_MAKER_MORE);
+            assert!(
+                support::present(cx, s.win, ids::HUD_MAKER_BORROW_OPEN),
+                "{lang}: More did not open beside the part list"
+            );
+            support::press(cx, s.win, "escape");
+        }
+        support::click_id(cx, s.win, rail);
+    }
+}
+
+#[gpui_kit::test]
+fn the_english_toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContext) {
+    toolbar_and_meter_row_fit_at_800_by_600(cx, "en");
+}
+
+#[gpui_kit::test]
+fn the_russian_toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContext) {
+    toolbar_and_meter_row_fit_at_800_by_600(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContext) {
+    toolbar_and_meter_row_fit_at_800_by_600(cx, "pt-BR");
 }

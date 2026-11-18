@@ -19,8 +19,8 @@ use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::button::Button;
 use gpui_kit::{
     App, Div, ElementId, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _,
-    Pixels, SharedString, StatefulInteractiveElement as _, TestSupportExt as _, TextRun, Window,
-    font, rems,
+    Pixels, Rems, SharedString, StatefulInteractiveElement as _, TestSupportExt as _, TextRun,
+    Window, font, rems,
 };
 
 /// Gives an icon-only button its words: the tooltip a player sees on hover and the name a
@@ -55,6 +55,11 @@ pub(crate) fn label_or_named(
 
 /// The width `text` shapes to as a button's label, in the theme font at a button's text size.
 pub(crate) fn label_width(text: &SharedString, window: &Window, cx: &App) -> Pixels {
+    label_width_at(text, rems(0.875), window, cx)
+}
+
+/// The width `text` shapes to as a label in the theme font's medium weight at `size`.
+pub(crate) fn label_width_at(text: &SharedString, size: Rems, window: &Window, cx: &App) -> Pixels {
     let run = TextRun {
         len: text.len(),
         font: gpui_kit::Font {
@@ -63,7 +68,7 @@ pub(crate) fn label_width(text: &SharedString, window: &Window, cx: &App) -> Pix
         },
         ..Default::default()
     };
-    let size = rems(0.875).to_pixels(window.rem_size());
+    let size = size.to_pixels(window.rem_size());
     window
         .text_system()
         .shape_line(text.clone(), size, &[run], None)
