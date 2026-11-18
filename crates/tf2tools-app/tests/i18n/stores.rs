@@ -35,7 +35,7 @@ fn missing() -> Tf2State {
 }
 
 // The widest of `labels` at the Select's text-sm fits the select `id`'s text room.
-fn assert_rows_fit(
+pub fn assert_rows_fit(
     cx: &mut TestAppContext,
     win: gpui_kit::AnyWindowHandle,
     id: &'static str,

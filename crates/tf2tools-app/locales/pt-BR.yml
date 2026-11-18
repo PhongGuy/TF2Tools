@@ -771,7 +771,10 @@ crosshairs_page:
     default: "Padrão"
     mixed: "Misto"
   details:
-    title: "%{class}: arma %{slot}"
+    title:
+      primary: "%{class}: arma primária"
+      secondary: "%{class}: arma secundária"
+      melee: "%{class}: arma corpo a corpo"
     hint: "Clique em uma arma para dar a ela a mira escolhida"
   conflict:
     title: "Conflitos detectados"

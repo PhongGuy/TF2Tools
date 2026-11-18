@@ -1624,20 +1624,16 @@ impl Render for CrosshairsPage {
     }
 }
 
-// The open cell's title, such as "Heavy primary weapons". The slot reads mid-sentence, so it
-// goes lower case, except in German, where every noun keeps its capital.
+// The open cell's title, such as "Heavy primary weapons". Each catalogue writes the slot word
+// itself, so its casing and grammar stay with the language.
 fn weapons_title(class: TfClass, slot: WeaponSlot) -> SharedString {
-    let slot = slot_name(slot);
-    let slot = if crate::i18n::current() == "de" {
-        slot.to_string()
-    } else {
-        slot.to_lowercase()
-    };
-    tr!(
-        "crosshairs_page.details.title",
-        class = class_name(class),
-        slot = slot
-    )
+    let class = class_name(class);
+    match slot {
+        WeaponSlot::Primary => tr!("crosshairs_page.details.title.primary", class = class),
+        WeaponSlot::Secondary => tr!("crosshairs_page.details.title.secondary", class = class),
+        WeaponSlot::Melee => tr!("crosshairs_page.details.title.melee", class = class),
+        _ => format!("{class}: {}", slot_name(slot)).into(),
+    }
 }
 
 /// The detail line under the picked crosshair: how many weapons it is on.

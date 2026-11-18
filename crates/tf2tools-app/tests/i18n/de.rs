@@ -81,3 +81,15 @@ fn german_counts_take_the_plural_from_zero() {
     assert_eq!(i18n::plural("common.time.days_ago", 0), "vor 0 Tagen");
     assert_eq!(i18n::plural("common.time.days_ago", 3), "vor 3 Tagen");
 }
+
+#[test]
+fn german_says_a_damaged_download_one_way() {
+    let text = |k: &str| tf2tools_app::_rust_i18n_try_translate("de", k).map(|t| t.into_owned());
+    let store = text("messages.store.download.damaged");
+    assert_eq!(store, text("messages.store.gb_fetch.damaged"));
+    assert_ne!(
+        store,
+        tf2tools_app::_rust_i18n_try_translate("en", "messages.store.download.damaged")
+            .map(|t| t.into_owned())
+    );
+}

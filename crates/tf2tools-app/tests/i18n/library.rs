@@ -825,6 +825,34 @@ fn the_german_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
     maps_empty_line_fits_at_800(cx, "de");
 }
 
+// Every maps sort label fits the 160 px sort select at 800x600.
+fn maps_sort_fits_at_800(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
+    let env = support::env();
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    resize_800(cx, &s);
+    support::click_id(cx, s.win, ids::nav(Page::Maps));
+    let page = cx.update(|cx| s.shell.read(cx).maps_page()).unwrap();
+    support::wait_real(cx, "the cached list", |cx| {
+        cx.update(|cx| page.read(cx).is_loaded())
+    });
+    let labels: Vec<String> = SORTS
+        .iter()
+        .map(|(_, sort)| sort_label(*sort).to_string())
+        .collect();
+    crate::stores::assert_rows_fit(cx, s.win, ids::MAPS_SORT, &labels);
+}
+
+#[gpui_kit::test]
+fn the_spanish_maps_sort_fits_at_800(cx: &mut TestAppContext) {
+    maps_sort_fits_at_800(cx, "es");
+}
+
+#[gpui_kit::test]
+fn the_german_maps_sort_fits_at_800(cx: &mut TestAppContext) {
+    maps_sort_fits_at_800(cx, "de");
+}
+
 #[test]
 fn hud_counts_read_in_russian() {
     let _guard = LocaleGuard::switch("ru");
@@ -893,6 +921,20 @@ fn the_sounds_page_reads_in_russian(cx: &mut TestAppContext) {
         added_title("Ding", "Comp", Some(hit), Some("Old")),
         "Добавлено в профиль Comp как хитсаунд: Ding (вместо Old)"
     );
+}
+
+// Each catalogue writes the slot word into its own cell title, so no language needs casing in code.
+#[test]
+fn every_language_titles_each_weapon_slot_itself() {
+    for lang in i18n::LANGUAGES.iter().map(|l| l.code) {
+        for slot in ["primary", "secondary", "melee"] {
+            let key = format!("crosshairs_page.details.title.{slot}");
+            let title = tf2tools_app::_rust_i18n_try_translate(lang, &key)
+                .unwrap_or_else(|| panic!("{lang} has no {key}"));
+            assert!(title.contains("%{class}"), "{lang} {key}: {title}");
+            assert!(!title.contains("%{slot}"), "{lang} {key}: {title}");
+        }
+    }
 }
 
 // German capitalises every noun, so the slot in a cell's title keeps its capital.

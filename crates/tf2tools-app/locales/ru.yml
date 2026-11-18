@@ -745,7 +745,10 @@ crosshairs_page:
     default: "Игровой"
     mixed: "Разные"
   details:
-    title: "%{class}: %{slot}"
+    title:
+      primary: "%{class}: основное"
+      secondary: "%{class}: дополнительное"
+      melee: "%{class}: ближний бой"
     hint: "Нажмите на оружие, чтобы назначить ему выбранный прицел"
   conflict:
     title: "Обнаружены конфликты"

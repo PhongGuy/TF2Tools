@@ -747,7 +747,10 @@ crosshairs_page:
     default: "Default"
     mixed: "Mixed"
   details:
-    title: "%{class} %{slot} weapons"
+    title:
+      primary: "%{class} primary weapons"
+      secondary: "%{class} secondary weapons"
+      melee: "%{class} melee weapons"
     hint: "Click a weapon to give it the picked crosshair"
   conflict:
     title: "Conflicts Detected"
