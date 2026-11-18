@@ -1511,6 +1511,30 @@ mod tests {
         );
     }
 
+    // A file added to either maker later must join the English scan, or its words go unchecked.
+    #[test]
+    fn every_maker_file_is_in_the_english_scan() {
+        let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut files = Vec::new();
+        for dir in ["pages/hud_maker", "pages/crosshair_maker"] {
+            rust_files(&src.join(dir), &mut files);
+        }
+        let missing: Vec<String> = files
+            .iter()
+            .map(|f| {
+                f.strip_prefix(&src)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/")
+            })
+            .filter(|rel| !SCANNED.contains(&rel.as_str()))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "maker files the English scan skips: {missing:?}"
+        );
+    }
+
     // A token of Rust source, as far as the English scan needs one.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     enum Tok<'a> {

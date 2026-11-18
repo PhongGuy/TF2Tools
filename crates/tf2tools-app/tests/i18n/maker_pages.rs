@@ -1,7 +1,7 @@
 //! The HUD Maker's panels, menus and dialogs in Russian, read by their English ids.
 
 use gpui_kit::test::TestWindowExt as _;
-use gpui_kit::{AppContext as _, ElementId, Entity, ScrollDelta, TestAppContext, point};
+use gpui_kit::{AppContext as _, ElementId, Entity, ScrollDelta, TestAppContext, point, px};
 use tf2tools_app::i18n::names::maker_label;
 use tf2tools_app::i18n::plural;
 use tf2tools_app::ids;
@@ -10,7 +10,7 @@ use tf2tools_app::pages::hud_maker::animations::anim_sentence;
 use tf2tools_app::pages::hud_maker::editor::{Align, HudEditor};
 use tf2tools_app::pages::hud_maker::live::{live_failure, live_note};
 use tf2tools_app::pages::hud_maker::shortcuts;
-use tf2tools_core::{AnimCommand, Interp, PartKey, ReinstallError, SituationSwitch};
+use tf2tools_core::{AnimCommand, Interp, PartKey, ReinstallError, Scene, SituationSwitch};
 
 use crate::LocaleGuard;
 use crate::support;
@@ -319,5 +319,50 @@ fn the_start_card_zoom_and_shortcuts_read_in_russian(cx: &mut TestAppContext) {
         "Тянуть по пустому месту: Выделить все части в рамке",
     ] {
         assert!(rows.iter().any(|r| r == want), "{want} not in {rows:?}");
+    }
+}
+
+// Ids are built from core's and the app's English, so the pilot and the English tests find
+// the same elements in Russian.
+#[gpui_kit::test]
+fn maker_ids_stay_english_under_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, page) = open_maker(cx);
+    support::click_id(cx, s.win, ids::HUD_MAKER_START_READY);
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::hud_maker_start_card_point("Competitive minimal")
+    ));
+    support::click_id(cx, s.win, ids::HUD_MAKER_START_BLANK);
+    support::click_scene(cx, s.win, Scene::Scoreboard);
+    assert_eq!(
+        cx.update(|cx| page.read(cx).scene()),
+        Some(Scene::Scoreboard)
+    );
+    support::click_scene(cx, s.win, Scene::Hud);
+    support::click_id(cx, s.win, ids::HUD_MAKER_MORE);
+    assert!(support::present(
+        cx,
+        s.win,
+        ids::hud_maker_vision("Green-blind")
+    ));
+    support::press(cx, s.win, "escape");
+    select(cx, &s, &page, &[VALUE]);
+    assert!(panel_label(cx, &s, ids::hud_maker_align_button("south-east")).is_some());
+}
+
+// At 800x600 the scene bar keeps its tabs inside the bar or falls back to its menu. The side
+// panel's title width is checked offline in Inter: the headless font cannot show it.
+#[gpui_kit::test]
+fn the_russian_maker_fits_at_800_by_600(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, _page) = open_maker(cx);
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    let bar = support::bounds_of(cx, s.win, ids::HUD_MAKER_SCENES).unwrap();
+    match support::bounds_of(cx, s.win, ids::HUD_MAKER_SCENE_TABS) {
+        Some(tabs) => assert!(tabs.right() <= bar.right(), "{tabs:?} past {bar:?}"),
+        None => assert!(support::present(cx, s.win, ids::HUD_MAKER_SCENE_MENU)),
     }
 }
