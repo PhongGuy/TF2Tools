@@ -1984,7 +1984,7 @@ hud_maker:
     health_cluster_icon: "Значок группы здоровья"
     health_image: "Изображение здоровья"
     health_image_background: "Фон изображения здоровья"
-    health_value: "Число здоровья"
+    health_value: "Цифры здоровья"
     health_value_shadow: "Тень числа здоровья"
     heavy_weapons_shadow: "Тень Пулемётчика"
     heavyweapons: "Пулемётчик"

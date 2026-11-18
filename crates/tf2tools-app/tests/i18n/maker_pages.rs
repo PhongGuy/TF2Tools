@@ -241,7 +241,7 @@ fn undo_steps_are_named_in_russian() {
     let mut e = holding(&[VALUE]);
     e.layer_selected(false).unwrap();
     // The health number is a curated panel, so the step names it in Russian.
-    assert_eq!(e.undo_name(), Some("смена слоя «Число здоровья»"));
+    assert_eq!(e.undo_name(), Some("смена слоя «Цифры здоровья»"));
     let mut e = holding(&[VALUE, MEDIC]);
     e.align_selected(Align::Left).unwrap();
     assert_eq!(e.undo_name(), Some("выравнивание частей: 2"));
