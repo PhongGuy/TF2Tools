@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-#[cfg(unix)]
 use tf2tools_app::i18n::Phrase;
+#[cfg(unix)]
 use tf2tools_app::updater::AfterInstall;
 use tf2tools_app::updater::backend::{Deadlines, core_backend};
 use tf2tools_app::updater::{DownloadSink, Failure, Offer, UpdateBackend};
