@@ -2385,7 +2385,6 @@ crosshair_maker:
   drop_a_png: "Drop a PNG image."
   drop_hint: "Drop a PNG to open it"
   recovered: "The saved drawing was damaged, so it was rebuilt from the crosshair file."
-  install_to_update: "Press Install on the Crosshairs page to update it in TF2."
   saved: "Saved"
   name: "Name"
   name_placeholder: "Crosshair name"

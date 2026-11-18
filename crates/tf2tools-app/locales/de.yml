@@ -2408,7 +2408,6 @@ crosshair_maker:
   drop_a_png: "Zieh ein PNG-Bild hierher."
   drop_hint: "Zieh ein PNG hierher, um es zu öffnen"
   recovered: "Die gespeicherte Zeichnung war beschädigt und wurde aus der Fadenkreuz-Datei neu erstellt."
-  install_to_update: "Drücke auf der Seite Fadenkreuze auf Installieren, um es in TF2 zu aktualisieren."
   saved: "Gespeichert"
   name: "Name"
   name_placeholder: "Fadenkreuzname"

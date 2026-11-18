@@ -4,7 +4,6 @@
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::tag::Tag;
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, Icon, Sizable as _, Size, TitleBar, h_flex,
 };
@@ -28,6 +27,7 @@ use crate::services::{Tf2State, tf2_state};
 use crate::sync::{store_slug, sync_hub};
 use crate::widgets::Named as _;
 use crate::widgets::sync_ring::{RingColors, SyncRing};
+use crate::widgets::tip::tip_box;
 
 /// Steam's link that starts TF2 (app 440).
 pub const PLAY_TF2_URL: &str = "steam://run/440";
@@ -345,7 +345,7 @@ fn ring(ring: Ring, cx: &App) -> Stateful<Div> {
         .aria_label(ring.label)
         .flex_none()
         .size(px(24.))
-        .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+        .tooltip(move |window, cx| tip_box(tip.clone()).build(window, cx))
         .child(
             SyncRing::new(ids::keyed("sync-ring-arc", ring.slug), colors)
                 .value(ring.value)

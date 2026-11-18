@@ -15,7 +15,6 @@ use gpui_kit::component::color_picker::{ColorPicker, ColorPickerEvent, ColorPick
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::select::{Select, SelectState};
 use gpui_kit::component::slider::{Slider, SliderState};
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{
     ActiveTheme as _, Disableable as _, IndexPath, Selectable as _, WindowExt as _, h_flex, v_flex,
 };
@@ -36,6 +35,7 @@ use tf2tools_core::{
 
 use crate::activity;
 use crate::assets::BACKGROUNDS;
+use crate::crosshair_sync::CrosshairSync;
 use crate::i18n::tr;
 use crate::ids;
 use crate::keymap::{
@@ -55,6 +55,7 @@ use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::crosshair_picker::IN_GAME_SIZE;
 use crate::widgets::label_option::LabelOption;
 use crate::widgets::scroll::scroll_area;
+use crate::widgets::tip::tip_box;
 use model::{
     Editor, SWATCHES, Tool, Viewport, alpha_of_percent, colour_hint, fit_note, fit_tip, hsla_of,
     hsla_of_rgba, opacity_tip, percent_of_alpha, position_text, preview_texels, redo_tip, rgb_of,
@@ -723,13 +724,16 @@ impl CrosshairMakerPage {
                         page.name_error = None;
                         cx.notify();
                     });
-                    cx.update(LibraryEvents::changed);
-                    let description = if assigned {
-                        tr!("crosshair_maker.install_to_update")
-                    } else {
-                        SharedString::default()
-                    };
-                    Ok(description)
+                    // A crosshair already on a weapon goes into TF2 the way a board change
+                    // does, through the one apply queue, so no Install step is left to name.
+                    cx.update(|cx| {
+                        LibraryEvents::changed(cx);
+                        if assigned {
+                            CrosshairSync::get_or_install(win, cx)
+                                .update(cx, |sync, cx| sync.request(cx));
+                        }
+                    });
+                    Ok(SharedString::default())
                 }
                 Ok(Saved::NameTaken(taken)) => {
                     let _ = page.update(cx, |page, cx| {
@@ -925,7 +929,7 @@ impl CrosshairMakerPage {
                             // The handle overhangs the track's ends by 11 px; the margin keeps
                             // it whole at 1% and 100% instead of clipped by the panel.
                             .mx_3()
-                            .tooltip(|window, cx| Tooltip::new(opacity_tip()).build(window, cx))
+                            .tooltip(|window, cx| tip_box(opacity_tip()).build(window, cx))
                             .child(Slider::new(&self.opacity)),
                     ),
             )
@@ -1668,7 +1672,7 @@ fn save_job(
         tr!("crosshair_maker.activity.saved", name = entry.name()).to_string(),
     );
     activity::write(s, &row);
-    // A failed read only loses the reminder to install; the save itself landed.
+    // A failed read only skips the apply into TF2; the save itself landed.
     let assigned = open.is_some()
         && s.library.assignments().is_ok_and(|rows| {
             let ours = CrosshairRef::Library(entry.id().clone());

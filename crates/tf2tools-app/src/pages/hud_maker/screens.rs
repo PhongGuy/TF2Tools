@@ -3,7 +3,6 @@
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::Button;
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _};
 use gpui_kit::{
     AnyElement, Bounds, Context, InteractiveElement as _, IntoElement, ParentElement as _, Pixels,
@@ -17,6 +16,7 @@ use super::view::CanvasFit;
 use super::{HudMakerPage, Load, SCREEN_LABELS};
 use crate::i18n::{plural, tr};
 use crate::ids;
+use crate::widgets::tip::tip_box;
 
 /// The space around the grid and between its tiles.
 const GAP: f32 = 12.;
@@ -189,7 +189,7 @@ impl HudMakerPage {
                     .text_color(gpui_kit::white())
                     .child(Icon::new(icon).xsmall())
                     .tooltip(|window, cx| {
-                        Tooltip::new(tr!("hud_maker.screens.off_screen")).build(window, cx)
+                        tip_box(tr!("hud_maker.screens.off_screen")).build(window, cx)
                     }),
             )
         });

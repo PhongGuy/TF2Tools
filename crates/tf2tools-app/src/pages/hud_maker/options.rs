@@ -13,7 +13,6 @@ use gpui_kit::component::searchable_list::SearchableListItem;
 use gpui_kit::component::select::Select;
 use gpui_kit::component::slider::Slider;
 use gpui_kit::component::switch::Switch;
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Disableable as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -38,6 +37,7 @@ use crate::services::{OpError, Services, require_tf2, run_blocking};
 use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::toast::toast_error;
 use crate::widgets::labelled;
+use crate::widgets::tip::tip_box;
 
 const VIEWMODELS: &str = "mastercomfig-addon-transparent-viewmodels.vpk";
 const HUD_CROSSHAIR_GROUP: &str = "HUD crosshair";
@@ -651,7 +651,7 @@ impl HudMakerPage {
             .border_color(theme.border)
             .bg(fill)
             .when_some(hex, |el, hex| {
-                el.tooltip(move |window, cx| Tooltip::new(hex.clone()).build(window, cx))
+                el.tooltip(move |window, cx| tip_box(hex.clone()).build(window, cx))
             })
             .when(held, |el| el.opacity(0.5))
             .when(!held, |el| {
@@ -1052,7 +1052,7 @@ impl HudMakerPage {
             .border_color(theme.border)
             .bg(fill)
             .when_some(hex, |el, hex| {
-                el.tooltip(move |window, cx| Tooltip::new(hex.clone()).build(window, cx))
+                el.tooltip(move |window, cx| tip_box(hex.clone()).build(window, cx))
             })
             .when(held, |el| el.opacity(0.5))
             .when(!held, |el| {
