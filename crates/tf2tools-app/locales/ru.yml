@@ -1166,7 +1166,7 @@ hud_maker:
   situation:
     meter: "Шкала: %{name}"
   meter:
-    plain: "Sandman, Jarate, знамёна и большинство предметов"
+    plain: "Sandman, Jarate, знамёна и прочее"
     drink: "Bonk!, Crit-a-Cola и Mad Milk"
     soda_popper: "Soda Popper и Baby Face's Blaster"
     cleaver: "Flying Guillotine"
@@ -1195,7 +1195,7 @@ hud_maker:
       name: "Крупные цифры"
       about: "Увеличивает цифры здоровья и патронов в полтора раза."
     streamer_clean:
-      name: "Чистый для стрима"
+      name: "Для стрима"
       about: "Переносит чат наверх и скрывает список друзей."
     centre_hud:
       name: "HUD по центру"

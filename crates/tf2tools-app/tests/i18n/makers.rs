@@ -67,7 +67,7 @@ fn the_maker_enum_names_read_in_russian() {
     assert_eq!(modes, ["Обычный", "Соревновательный", "MvM"]);
     assert_eq!(
         meter_name(MeterKind::Plain).to_string(),
-        "Sandman, Jarate, знамёна и большинство предметов"
+        "Sandman, Jarate, знамёна и прочее"
     );
     assert_eq!(
         starting_point_name(StartingPoint::BigNumbers).to_string(),
@@ -115,7 +115,7 @@ fn the_meter_row_reads_in_russian(cx: &mut TestAppContext) {
     support::click_id(cx, s.win, ids::HUD_MAKER_SITUATION);
     assert_eq!(
         label(cx, &s, ids::HUD_MAKER_SITUATION_METER).as_deref(),
-        Some("Шкала: Sandman, Jarate, знамёна и большинство предметов")
+        Some("Шкала: Sandman, Jarate, знамёна и прочее")
     );
 }
 

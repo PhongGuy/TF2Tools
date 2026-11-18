@@ -338,8 +338,9 @@ impl HudMakerPage {
             let body = v_flex().w_80().gap_2().child(meter_row).child(meters);
             return Some(self.situation_popover(trigger, body, cx));
         }
+        // Wide enough for the English meter row; the meter list opens wider still, at w_80.
         let body = v_flex()
-            .w_72()
+            .w(px(304.))
             .gap_2()
             .child(h_flex().flex_wrap().gap_1().children(classes))
             .child(slider(
