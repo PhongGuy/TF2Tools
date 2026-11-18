@@ -2190,6 +2190,19 @@ impl HudMakerPage {
         (self.area.get().size.height - toolbar - NARROW_MARGIN).max(px(0.))
     }
 
+    // How tall a docked column over the area's `from..to` may stand: the area less `margin`, or
+    // down to a gap above the toolbar where the two overlap, so no panel covers its buttons.
+    pub(super) fn column_room(&self, from: Pixels, to: Pixels, margin: Pixels) -> Pixels {
+        let full = self.area.get().size.height - margin;
+        let (at, bar) = (self.toolbar_shown(), self.toolbar_bounds.get().size);
+        let under = bar.width > px(0.) && from < at.x + bar.width && at.x < to;
+        let room = match under {
+            true => full.min(at.y - px(panel::STACK_GAP)),
+            false => full,
+        };
+        room.max(px(0.))
+    }
+
     // True when the area is narrower than both floating panels side by side with a 16 px
     // margin at each side and between them.
     fn too_narrow_for_both(&self) -> bool {
@@ -3904,7 +3917,7 @@ impl HudMakerPage {
 
     // A strip of one small tab per scene, the current one selected, then the scene's note at
     // the right, where no panel or the toolbar can cover it; a narrow strip cuts its text short.
-    fn scene_tabs(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn scene_tabs(&self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let current = self.scene();
         let note = self
             .editor()
@@ -3948,7 +3961,7 @@ impl HudMakerPage {
         };
         let modes = (current == Some(Scene::Scoreboard)).then(|| self.board_mode_menu(cx));
         let situation = (current == Some(Scene::Hud))
-            .then(|| self.situation_menu(cx))
+            .then(|| self.situation_menu(window, cx))
             .flatten();
         let chip = (current != Some(Scene::Hud) && self.minmode).then(|| self.minmode_chip(cx));
         let chooser = h_flex()
@@ -4214,10 +4227,10 @@ impl HudMakerPage {
 
     // A column holding the scene tabs over the canvas area, which the toolbar and panels
     // float over.
-    fn editor_layout(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    fn editor_layout(&mut self, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         v_flex()
             .size_full()
-            .child(self.scene_tabs(cx))
+            .child(self.scene_tabs(window, cx))
             .child(self.canvas_area(cx))
             .children(self.timeline(cx))
             .into_any_element()
@@ -4745,7 +4758,7 @@ impl Render for HudMakerPage {
                     line.clone(),
                 ))
                 .into_any_element(),
-            Load::Ready(_) => self.editor_layout(cx),
+            Load::Ready(_) => self.editor_layout(window, cx),
         };
         v_flex()
             .id(ids::page(Page::HudMaker))

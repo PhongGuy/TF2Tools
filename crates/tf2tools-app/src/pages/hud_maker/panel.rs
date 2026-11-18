@@ -257,9 +257,17 @@ impl HudMakerPage {
     // shows them as slim tabs, and a panel opened from its rail lies over the canvas beside them.
     pub(super) fn panels(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let mut out = Vec::new();
-        // The column runs to just short of the area's bottom, so a full panel shows its border.
-        let room = (self.area.get().size.height - px(COLUMN_MARGIN)).max(px(0.));
-        let column = |side: PanelMode, inset: Pixels, children: Vec<AnyElement>| {
+        // The column runs to just short of the area's bottom, so a full panel shows its border,
+        // or stops above the toolbar where it would stand over it.
+        let area = self.area.get().size;
+        let room = |page: &Self, side: PanelMode, inset: Pixels, width: Pixels| {
+            let from = match side {
+                PanelMode::DockLeft => inset,
+                PanelMode::Floating | PanelMode::DockRight => area.width - inset - width,
+            };
+            page.column_room(from, from + width, px(COLUMN_MARGIN))
+        };
+        let column = |side: PanelMode, inset: Pixels, room: Pixels, children: Vec<AnyElement>| {
             let column = v_flex()
                 .absolute()
                 .top_0()
@@ -285,11 +293,19 @@ impl HudMakerPage {
             };
             if !rails.is_empty() {
                 let rails = rails.into_iter().map(|p| self.rail(p, cx)).collect();
-                out.push(column(side, px(0.), rails));
+                let room = room(self, side, px(0.), RAIL_WIDTH);
+                out.push(column(side, px(0.), room, rails));
             }
             if !docked.is_empty() {
+                // The column is as wide as its open panels, which the screen keeps clear of; a
+                // wider collapsed header above them stays clear of the toolbar anyway.
+                let open = (docked.iter()).filter(|&&p| !self.panel_shown(p).collapsed);
+                let width = (open.map(|p| p.width()).max())
+                    .or_else(|| docked.iter().map(|p| p.width()).max())
+                    .unwrap_or_default();
+                let room = room(self, side, inset, width);
                 let docked = docked.into_iter().map(|p| self.panel(p, cx)).collect();
-                out.push(column(side, inset, docked));
+                out.push(column(side, inset, room, docked));
             }
         }
         for p in Panel::ALL {
