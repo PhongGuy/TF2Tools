@@ -161,3 +161,96 @@ fn the_hud_maker_names_its_parts_in_french() {
     assert_ne!(text("kill_streak_icon"), "Killstreak icon");
     assert!(text("rune_haste").contains("Rapidité"));
 }
+
+#[test]
+fn the_updater_says_a_damaged_download_as_the_stores_do() {
+    assert_eq!(
+        tf2tools_app::_rust_i18n_try_translate("fr", "updater.failure.damaged"),
+        tf2tools_app::_rust_i18n_try_translate("fr", "messages.store.download.damaged")
+    );
+}
+
+// Names the client spells with glued punctuation; the scan reads past them.
+const PUNCTUATED_NAMES: &[&str] = &["Bonk!"];
+
+// Each place a value lacks the U+00A0 French wants before : ; ! ? » and a literal %, or after «.
+// Clock times, URLs and key caps such as "(?)" are not prose and pass.
+fn typography_slips(text: &str) -> Vec<String> {
+    let mut text = text.to_owned();
+    for name in PUNCTUATED_NAMES {
+        text = text.replace(name, "");
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let digit = |c: Option<char>| c.is_some_and(|c| c.is_ascii_digit());
+    let mut slips = Vec::new();
+    for (i, &c) in chars.iter().enumerate() {
+        let prev = i.checked_sub(1).map(|j| chars[j]);
+        let next = chars.get(i + 1).copied();
+        let wants_space_before = match c {
+            ':' => !(digit(prev) && digit(next)) && next != Some('/'),
+            ';' | '!' | '?' => !matches!(prev, Some('(' | '!' | '?')),
+            '%' => next != Some('{'),
+            '»' => true,
+            _ => false,
+        };
+        if wants_space_before && prev != Some('\u{a0}') {
+            slips.push(format!("no U+00A0 before {c:?} at {i}"));
+        }
+        if c == '«' && next != Some('\u{a0}') {
+            slips.push(format!("no U+00A0 after '«' at {i}"));
+        }
+    }
+    slips
+}
+
+#[test]
+fn the_typography_scan_flags_only_missing_no_break_spaces() {
+    for ok in [
+        "Volume\u{a0}: %{percent}\u{a0}%",
+        "Supprimer le HUD %{name}\u{a0}?",
+        "\u{a0}: scripts trouvés",
+        "«\u{a0}HUD\u{a0}»",
+        "Raccourcis clavier (?)",
+        "Vraiment\u{a0}?!",
+        "à 12:30",
+        "https://logs.tf",
+        "Bonk!, Crit-a-Cola et Lait frelaté",
+        "%{name}",
+    ] {
+        assert!(
+            typography_slips(ok).is_empty(),
+            "{ok:?}: {:?}",
+            typography_slips(ok)
+        );
+    }
+    for bad in [
+        "Volume : 50",
+        "Volume: 50",
+        "%{percent}%",
+        "%{percent} %",
+        "Prêt !",
+        "Prêt!",
+        "Pourquoi ;",
+        ": scripts trouvés",
+        "« HUD\u{a0}»",
+        "«\u{a0}HUD »",
+    ] {
+        assert!(!typography_slips(bad).is_empty(), "{bad:?}");
+    }
+}
+
+#[test]
+fn french_punctuation_takes_a_no_break_space() {
+    let messages = tf2tools_app::_rust_i18n_backend()
+        .messages_for_locale("fr")
+        .unwrap_or_default();
+    assert!(!messages.is_empty(), "fr.yml is missing or empty");
+    let slips: Vec<String> = messages
+        .iter()
+        .filter_map(|(key, text)| {
+            let found = typography_slips(text);
+            (!found.is_empty()).then(|| format!("{key}: {found:?}"))
+        })
+        .collect();
+    assert!(slips.is_empty(), "fr typography: {slips:#?}");
+}
