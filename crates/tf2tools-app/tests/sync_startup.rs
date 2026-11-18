@@ -36,6 +36,7 @@ fn boot(env: &support::Env, auto_sync: bool) -> Boot {
         offline: false,
         font_host: None,
         updates: tf2tools_app::updater::UpdateBoot::Off,
+        locales: Vec::new(),
     }
 }
 

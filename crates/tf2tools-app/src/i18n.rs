@@ -46,6 +46,11 @@ pub fn system_language<S: AsRef<str>>(locales: impl IntoIterator<Item = S>) -> &
         .unwrap_or("en")
 }
 
+/// The system's preferred locales, most preferred first, as the OS reports them.
+pub fn system_locales() -> Vec<String> {
+    sys_locale::get_locales().collect()
+}
+
 /// Switches the process-wide locale, shared with the kit, to `code`; an unknown code
 /// switches to English. Returns the code applied.
 pub fn apply(code: &str) -> &'static str {
