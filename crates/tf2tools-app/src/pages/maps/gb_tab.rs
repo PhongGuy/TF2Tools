@@ -865,7 +865,6 @@ impl GbMapsTab {
             }
             // The sync's failure explains an empty catalogue, not a filter that matches nothing.
             if let Some(message) = sync.error().filter(|_| unfiltered) {
-                let message = message.to_owned();
                 let on_retry = move |_: &mut Window, cx: &mut App| start_maps_sync(cx);
                 return Some(
                     error_line(

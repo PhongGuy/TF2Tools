@@ -25,12 +25,13 @@ use tf2tools_app::pages::sounds::SoundsPage;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::confirm::Confirm;
 use tf2tools_app::shell::route::Page;
+use tf2tools_app::sync_messages::describe_sync;
 use tf2tools_app::widgets::class_icon::class_short_name;
 use tf2tools_app::widgets::profile_menu::added_title;
 use tf2tools_app::widgets::sync_banner::maps_banner_text;
 use tf2tools_core::{
-    AddonSection, DraftSlot, GbId, ProfileDraft, Provenance, SoundKind, Tf2Install, TfClass,
-    WeaponSlot,
+    AddonSection, DraftSlot, GbId, ProfileDraft, Provenance, SoundKind, StoreKind, SyncError,
+    Tf2Install, TfClass, WeaponSlot,
 };
 
 use crate::LocaleGuard;
@@ -1119,5 +1120,45 @@ fn map_texts_read_in_russian() {
             "cp_alpha будет удалена из TF2. Её можно скачать снова позже.",
             "Удалить"
         ]
+    );
+}
+
+// A failed maps sync is kept by the app-wide MapsSync, so its line on the GameBanana tab must be
+// worded when it is drawn and follow a switch made in Settings.
+#[gpui_kit::test]
+fn a_maps_sync_failure_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = support::maps::maps_shell(cx, &env, &server);
+    let (sync, runs) = support::maps::fake_maps_sync(cx);
+    let page = support::maps::open_maps(cx, &s);
+    support::maps::open_gamebanana(cx, &s, &page);
+    assert!(cx.update(|cx| sync.update(cx, |s, cx| s.start(false, cx))));
+    cx.run_until_parked();
+    let offline = SyncError::Network {
+        url: "https://gamebanana.com/apiv11".into(),
+        message: "connection refused".into(),
+    };
+    runs.try_recv()
+        .unwrap()
+        .finish(Err(describe_sync(StoreKind::GameBananaHuds, &offline)));
+    support::wait_hub(cx, "the failure line", |cx| {
+        support::settle(cx, s.win);
+        support::present(cx, s.win, ids::MAPS_GB_ERROR)
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::MAPS_GB_ERROR).as_deref(),
+        Some("Couldn't reach GameBanana. Check your internet connection and try again.")
+    );
+
+    crate::settings::open_settings(cx, &s);
+    crate::settings::pick(cx, s.win, "ru");
+    support::click_id(cx, s.win, ids::nav(Page::Maps));
+    support::settle(cx, s.win);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::MAPS_GB_ERROR).as_deref(),
+        Some(
+            "Не удалось подключиться к GameBanana. Проверьте подключение к интернету и попробуйте снова."
+        )
     );
 }

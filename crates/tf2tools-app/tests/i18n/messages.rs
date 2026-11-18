@@ -270,8 +270,11 @@ fn store_map_and_sync_failures_read_in_russian() {
         })
         .message,
         map::map_stopped("x".into()).message,
-        sync::describe_sync(kind, &SyncError::Throttled { url: "u".into() }).message,
-        sync::sync_stopped("x".into()).message,
+        sync::describe_sync(kind, &SyncError::Throttled { url: "u".into() })
+            .message
+            .text()
+            .to_string(),
+        sync::sync_stopped("x".into()).message.text().to_string(),
     ];
     for message in &messages {
         assert_russian(message);
@@ -284,7 +287,9 @@ fn store_map_and_sync_failures_read_in_russian() {
         assert_russian(&title);
     }
     // A store keeps the site name players know it by.
-    let busy = sync::describe_sync(kind, &SyncError::RateLimited { url: "u".into() }).message;
+    let busy = sync::describe_sync(kind, &SyncError::RateLimited { url: "u".into() })
+        .message
+        .text();
     assert_russian(&busy);
     assert!(busy.contains("GameBanana"), "{busy}");
 }

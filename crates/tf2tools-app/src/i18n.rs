@@ -132,6 +132,15 @@ impl Phrase {
     }
 }
 
+// Two phrases are equal when they read the same in the current language.
+impl PartialEq for Phrase {
+    fn eq(&self, other: &Self) -> bool {
+        self.text() == other.text()
+    }
+}
+
+impl Eq for Phrase {}
+
 impl fmt::Debug for Phrase {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Phrase").field(&self.text()).finish()
@@ -164,9 +173,16 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::path::{Path, PathBuf};
 
-    use super::{LANGUAGES, PluralForm, counted_plural, current, list, plural_form};
+    use super::{LANGUAGES, Phrase, PluralForm, counted_plural, current, list, plural_form};
 
     const FORMS: [&str; 4] = ["one", "few", "many", "other"];
+
+    // Phrases compare by what they read now, so kept failures keep their `assert_eq` tests.
+    #[test]
+    fn phrases_are_equal_when_they_read_the_same() {
+        assert_eq!(Phrase::new(|| "a".into()), Phrase::new(|| "a".into()));
+        assert_ne!(Phrase::new(|| "a".into()), Phrase::new(|| "b".into()));
+    }
 
     // One locale's catalogue as flat key -> value, read without touching the global locale.
     fn messages(code: &str) -> BTreeMap<String, String> {

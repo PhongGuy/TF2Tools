@@ -304,19 +304,13 @@ const NOTICE_ROW_HEIGHT: f32 = 16.;
 const NOTICE_PADDING: f32 = 12.;
 
 /// One store's running flag and failure text, the only hub state Settings draws.
-type HubDrawn = (StoreKind, bool, Option<String>);
+type HubDrawn = (StoreKind, bool, Option<SharedString>);
 
 // Reads each store's running flag and failure, in StoreKind::ALL order.
 fn hub_drawn(hub: &SyncHub) -> Vec<HubDrawn> {
     StoreKind::ALL
         .iter()
-        .map(|&kind| {
-            (
-                kind,
-                hub.is_running(kind),
-                hub.failure(kind).map(str::to_owned),
-            )
-        })
+        .map(|&kind| (kind, hub.is_running(kind), hub.failure(kind)))
         .collect()
 }
 
@@ -637,7 +631,7 @@ impl SettingsPage {
             .as_ref()
             .map(|hub| {
                 let hub = hub.read(cx);
-                (hub.is_running(kind), hub.failure(kind).map(str::to_owned))
+                (hub.is_running(kind), hub.failure(kind))
             })
             .unwrap_or((false, None));
         let (items, synced) = (
