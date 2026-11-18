@@ -145,7 +145,7 @@ updater:
     stopped: "Le téléchargement s'est arrêté. Vérifiez votre connexion Internet et réessayez."
     unserved: "Impossible de télécharger la mise à jour pour le moment. Réessayez plus tard ou obtenez-la sur la page des versions."
     busy: "Le serveur de mises à jour est occupé pour le moment. Réessayez dans quelques minutes."
-    damaged: "Le téléchargement a été endommagé en route. Réessayez."
+    damaged: "Le téléchargement a été endommagé. Réessayez."
     disk: "Impossible d'enregistrer la mise à jour. Vérifiez qu'il reste de l'espace sur votre disque, puis réessayez."
     use_page: "TF2Tools ne peut pas se mettre à jour là où il est installé. Téléchargez plutôt la nouvelle version depuis la page des versions."
     install_io: "Impossible d'installer la mise à jour. Réessayez ou téléchargez la nouvelle version depuis la page des versions."
@@ -466,7 +466,7 @@ logs_tf:
     ascending: "croissant"
   range_name: "Période de l'historique"
   not_played: "Non joué"
-  streaks: "Afficher les séries (%{count})"
+  streaks: "Afficher les séries d'éliminations (%{count})"
   nickname_note: "C'est votre pseudo pour ce joueur. Son nom dans ce log est %{name}. Vous pouvez désactiver ceci dans les Paramètres."
   nickname: "Pseudo"
   add:
@@ -574,7 +574,7 @@ maps:
     downloaded_title: "Carte téléchargée"
     downloaded: "La carte %{name} est jouable dans TF2."
     download_failed: "Échec du téléchargement"
-    removed_title: "Carte supprimée"
+    removed_title: "Carte retirée"
     removed: "La carte %{name} a été supprimée de TF2."
   gb:
     info: "Cartes communautaires de GameBanana. Ouvrez une carte pour la voir sur le site."
@@ -693,9 +693,9 @@ profiles:
       missing: "Manquant\u00A0: %{name}"
     empty:
       huds: "Aucun HUD dans votre bibliothèque"
-      browse_huds: "Parcourir le magasin de HUD"
+      browse_huds: "Parcourir le Magasin de HUD"
       sounds: "Aucun son dans votre bibliothèque"
-      browse_sounds: "Parcourir le magasin de sons"
+      browse_sounds: "Parcourir le Magasin de sons"
       no_match: "Aucun résultat"
   toast:
     created_from_setup: "Profil créé à partir de votre configuration actuelle"
@@ -847,14 +847,14 @@ confirm:
     title: "Modifications non enregistrées"
     body: "Vous avez des modifications non enregistrées. Les abandonner\u00A0?"
     ok: "Abandonner"
-    keep: "Continuer"
+    keep: "Rester"
   leave_unsaved:
     can_save: "Vous avez des modifications non enregistrées. Les enregistrer avant de partir\u00A0?"
     needs_name: "Vous avez des modifications non enregistrées. Nommez votre HUD pour les enregistrer, ou abandonnez-les."
   remove_old_v4:
-    title: "Retirer l'ancien TF2Tools"
-    body: "TF2Tools se ferme pendant le retrait de l'ancienne version. Rouvrez-le une fois terminé."
-    ok: "Retirer et fermer"
+    title: "Désinstaller l'ancien TF2Tools"
+    body: "TF2Tools se ferme pendant la désinstallation de l'ancienne version. Rouvrez-le une fois terminé."
+    ok: "Désinstaller et fermer"
   clear_logs:
     title: "Effacer tout le journal"
     body: "Voulez-vous vraiment effacer tout le journal d'activité\u00A0? Cette action est irréversible."
@@ -1053,11 +1053,11 @@ addons:
     maps: "Cartes"
   empty:
     installed_title: "Aucun add-on installé"
-    installed_body: "Installez des add-ons de votre bibliothèque ci-dessous ou parcourez le magasin d'add-ons."
+    installed_body: "Installez des add-ons de votre bibliothèque ci-dessous ou parcourez le Magasin d'add-ons."
     library_title: "Aucun add-on dans votre bibliothèque"
-    library_body: "Parcourez le magasin d'add-ons pour trouver des add-ons de performance et de confort pour TF2."
+    library_body: "Parcourez le Magasin d'add-ons pour trouver des add-ons de performance et de confort pour TF2."
   button:
-    browse: "Parcourir le magasin d'add-ons"
+    browse: "Parcourir le Magasin d'add-ons"
     update: "Mettre à jour"
     install: "Installer"
     install_again: "Réinstaller"
@@ -1262,7 +1262,7 @@ hud_maker:
     restore: "Restaurer"
     delete: "Supprimer"
     unknown: "Inconnu"
-    full: { one: "Vous avez %{count} instantanés. Supprimez-en un pour en enregistrer un autre.", other: "Vous avez %{count} instantanés. Supprimez-en un pour en enregistrer un autre." }
+    full: { one: "Vous avez %{count} instantané. Supprimez-en un pour en enregistrer un autre.", other: "Vous avez %{count} instantanés. Supprimez-en un pour en enregistrer un autre." }
   screens:
     no_problems: "Aucun problème"
     problems: { one: "%{count} élément a un problème", other: "%{count} éléments ont des problèmes" }
@@ -2676,7 +2676,7 @@ messages:
       wrong_kind: "Ce fichier n'a pas sa place dans ce magasin. Choisissez un autre fichier."
       http: "Impossible d'obtenir ce fichier depuis %{source}. Réessayez plus tard."
       too_large: "Ce fichier est trop volumineux pour TF2Tools. Choisissez un autre fichier."
-      damaged: "Le téléchargement a été endommagé en route. Réessayez."
+      damaged: "Le téléchargement a été endommagé. Réessayez."
       disk: "Impossible d'enregistrer le téléchargement. Vérifiez qu'il reste de l'espace disque et que TF2Tools peut écrire dans son dossier, puis réessayez."
       unusable: "Ce téléchargement ne contient rien que TF2Tools puisse utiliser. Choisissez un autre fichier."
       locked: "Ce téléchargement est protégé par un mot de passe, donc TF2Tools ne peut pas l'ouvrir."
@@ -2701,7 +2701,7 @@ messages:
       too_many_parts: "Ce téléchargement contient trop d'éléments pour que TF2Tools sache lesquels installer, donc il n'a pas été installé."
       unsafe: "Ce téléchargement semble dangereux et n'a pas été installé."
       cant_open: "Ce téléchargement ne peut pas être ouvert. Choisissez un autre add-on."
-      damaged: "Le téléchargement a été endommagé en route. Réessayez."
+      damaged: "Le téléchargement a été endommagé. Réessayez."
       file_not_found: "GameBanana n'a pas trouvé ce fichier. Réessayez plus tard."
     gb_map_fetch:
       no_map: "Aucune carte jouable n'a été trouvée dans ce téléchargement."
@@ -2829,7 +2829,7 @@ messages:
     clear_logs: "Impossible d'effacer les journaux"
     load_logs: "Impossible de charger les journaux"
     read_class_weapons: "Impossible de lire les armes des classes"
-    count_weapon_stats: "Impossible de compter les statistiques d'armes de logs.tf"
+    count_weapon_stats: "Impossible de compter les stats d'armes de logs.tf"
     fill_damage_taken: "Impossible de compléter les dégâts subis depuis logs.tf"
     change_history_range: "Impossible de modifier la période de l'historique"
     read_logs_tf_log: "Impossible de lire un log logs.tf"
