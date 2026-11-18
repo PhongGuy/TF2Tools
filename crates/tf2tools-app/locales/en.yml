@@ -1235,8 +1235,77 @@ hud_maker:
   screens:
     no_problems: "No problems"
     problems: { one: "%{count} part has a problem", other: "%{count} parts have problems" }
+    off_screen: "This part is off this screen"
+    back: "Back to one screen"
+    too_crowded: "Too many overlaps to list here"
   options:
     misfits: { one: "%{count} option doesn't fit this version of the HUD.", other: "%{count} options don't fit this version of the HUD." }
+    restart: "Takes effect after TF2 restarts."
+    already_on: "This HUD already does this."
+    get_viewmodels: "Get Transparent Viewmodels from the Addon store first."
+    needs_viewmodels: "Needs Transparent Viewmodels. Get it from the Addon store, then turn it on at the end of the options."
+    turn_on_viewmodels: "Needs Transparent viewmodels turned on at the end of the options."
+    no_tf2: "TF2 wasn't found. Set the TF2 folder in Settings to use Transparent viewmodels."
+    hud_crosshair_note: "This crosshair is drawn by the HUD itself. It is separate from the weapon crosshairs on the Crosshairs page."
+    two_crosshairs: "You also have weapon crosshairs on the Crosshairs page, so you may see two crosshairs in game. Turn one of them off if you want only one."
+    viewmodels: "Transparent viewmodels"
+    every_hud: "Applies to every HUD"
+    reset_all: "Reset all options"
+    reset_group: "Reset %{group}"
+    reset_group_tip: "Reset these options to the HUD's own"
+    hud_heading: "%{name}'s options"
+    this_hud: "This HUD's options"
+  shortcuts:
+    title: "Keyboard shortcuts"
+    hint: "Click a part first for the keys that change it."
+    close: "Close"
+    keys:
+      arrows: "Arrow keys"
+      shift_arrows: "Shift + arrow keys"
+      ctrl_drag: "Ctrl + drag"
+      hide: "H or Delete"
+      alt_click: "Alt + click"
+      shift_click: "Shift + click"
+      box: "Drag on empty space"
+      space_drag: "Space + drag"
+      middle_drag: "Middle mouse drag"
+      wheel: "Mouse wheel"
+      ctrl_wheel: "Ctrl + mouse wheel"
+      ctrl_plus_minus: "Ctrl + plus or minus"
+    does:
+      move: "Move the selected parts"
+      move_ten: "Move them 10 at a time"
+      free: "Move or resize without snapping"
+      hide: "Hide the selected parts"
+      clear: "Clear the selection"
+      pick_inside: "Pick a part inside a group"
+      add_or_remove: "Add a part to the selection or take it out"
+      box: "Select every part inside the box"
+      undo: "Undo"
+      redo: "Redo"
+      pan: "Move around the canvas"
+      scroll: "Scroll the canvas, sideways with Shift"
+      zoom_at_pointer: "Zoom in or out where the pointer is"
+      zoom: "Zoom in or out"
+      fit: "Fit the screen to the window"
+      show: "Show these shortcuts"
+  start_card:
+    question: "Where do you want to start?"
+    ready: "A ready-made HUD"
+    ready_about: "A look to start from, which you change your way."
+    mine: "One of my HUDs"
+    mine_about: "Pick a HUD in your library and press Edit in HUD Maker."
+    blank: "Blank"
+    blank_about: "TF2's own HUD, nothing changed yet."
+  checks:
+    overlaps: "%{part} overlaps %{other}"
+    off_screen: "%{part} goes off the screen"
+  zoom:
+    tip: "Zoom (Ctrl+wheel; middle-drag or Space+drag to pan)"
+    fit: "Fit"
+    fit_tip: "Fit the screen to the window (Ctrl+0)"
+  markers:
+    hard_to_read: "Hard to read here"
   recipes:
     changes_dont_fit: { one: "%{count} change doesn't fit this HUD.", other: "%{count} changes don't fit this HUD." }
     no_longer_fit: { one: "%{count} of your changes no longer fit and were left out.", other: "%{count} of your changes no longer fit and were left out." }

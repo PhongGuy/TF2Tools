@@ -876,6 +876,20 @@ mod tests {
         "pages/hud_maker/live.rs",
         "pages/hud_maker/parts.rs",
         "pages/hud_maker/pictures.rs",
+        "pages/hud_maker/shortcuts.rs",
+        "pages/hud_maker/options.rs",
+        "pages/hud_maker/screens.rs",
+        "pages/hud_maker/start_card.rs",
+        "pages/hud_maker/checks.rs",
+        "pages/hud_maker/zoom.rs",
+        "pages/hud_maker/backdrop.rs",
+        "pages/hud_maker/markers.rs",
+        "pages/hud_maker/rank_paint.rs",
+        "pages/hud_maker/view.rs",
+        "pages/hud_maker/tip.rs",
+        "pages/hud_maker/menu_art.rs",
+        "pages/hud_maker/snapping.rs",
+        "pages/hud_maker/tint.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1425,6 +1439,30 @@ mod tests {
         ("pages/hud_maker/canvas.rs", "Support", MAKER_SAMPLE),
         ("pages/hud_maker/canvas.rs", "Money", MAKER_SAMPLE),
         ("pages/hud_maker/canvas.rs", "Ping", MAKER_SAMPLE),
+        ("pages/hud_maker/shortcuts.rs", "Escape", MAKER_KEY_CAP),
+        ("pages/hud_maker/shortcuts.rs", "Ctrl+Z", MAKER_KEY_CAP),
+        ("pages/hud_maker/shortcuts.rs", "Ctrl+Y", MAKER_KEY_CAP),
+        ("pages/hud_maker/shortcuts.rs", "Ctrl+0", MAKER_KEY_CAP),
+        (
+            "pages/hud_maker/options.rs",
+            "HUD crosshair",
+            "core's group name, matched; the shown heading is keyed",
+        ),
+        (
+            "pages/hud_maker/backdrop.rs",
+            "the fields are read through Debug, in the log",
+            MAKER_LINT,
+        ),
+        (
+            "pages/hud_maker/rank_paint.rs",
+            "CreditsGreen",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/view.rs",
+            "toolbar collapsed",
+            "developer detail: a saved panel-layout token",
+        ),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
@@ -1437,6 +1475,7 @@ mod tests {
     const MAKER_SHOWS_FOR: &str = "developer detail: core's ShowsFor value, matched";
     const MAKER_SAMPLE: &str = "in-game sample text: the game's own fallback word";
     const MAKER_CREDIT_FILE: &str = "the credit written into the shared HUD's files; shown keyed";
+    const MAKER_KEY_CAP: &str = "a key's name as printed on the keyboard";
     const STORE_FIELD: &str = "developer detail: the store's tracing field";
     const ID_VALUE: &str = "element id value; its label is keyed";
     const DIALOG_ELSEWHERE: &str = "dialog of an untranslated page";

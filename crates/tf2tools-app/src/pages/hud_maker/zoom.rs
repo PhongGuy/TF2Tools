@@ -13,13 +13,11 @@ use tf2tools_core::Screen;
 
 use super::HudMakerPage;
 use super::view::{CanvasFit, Zoom};
+use crate::i18n::tr;
 use crate::ids;
 use crate::pages::crosshair_maker::model::{
     wheel_scroll, wheel_zoom_steps, zoom_in_tip, zoom_out_tip,
 };
-
-const FIT_TIP: &str = "Fit the screen to the window (Ctrl+0)";
-const ZOOM_TIP: &str = "Zoom (Ctrl+wheel; middle-drag or Space+drag to pan)";
 
 impl HudMakerPage {
     /// Where the screen sits on the canvas at the player's zoom. Every conversion between
@@ -149,8 +147,8 @@ impl HudMakerPage {
         let trigger = Button::new(ids::HUD_MAKER_ZOOM)
             .ghost()
             .label(zoom.label())
-            .tooltip(ZOOM_TIP);
-        let item = |id: &'static str, icon: IconName, label: &'static str, tip: SharedString| {
+            .tooltip(tr!("hud_maker.zoom.tip"));
+        let item = |id: &'static str, icon: IconName, label: SharedString, tip: SharedString| {
             Button::new(id)
                 .ghost()
                 .small()
@@ -161,7 +159,7 @@ impl HudMakerPage {
         let zoom_in = item(
             ids::HUD_MAKER_ZOOM_IN,
             IconName::ZoomIn,
-            "Zoom in",
+            tr!("crosshair_maker.zoom_in"),
             zoom_in_tip(),
         )
         .disabled(!zoom.can_zoom_in())
@@ -169,7 +167,7 @@ impl HudMakerPage {
         let zoom_out = item(
             ids::HUD_MAKER_ZOOM_OUT,
             IconName::ZoomOut,
-            "Zoom out",
+            tr!("crosshair_maker.zoom_out"),
             zoom_out_tip(),
         )
         .disabled(!zoom.can_zoom_out())
@@ -177,8 +175,8 @@ impl HudMakerPage {
         let fit = item(
             ids::HUD_MAKER_ZOOM_FIT,
             IconName::Maximize,
-            "Fit",
-            FIT_TIP.into(),
+            tr!("hud_maker.zoom.fit"),
+            tr!("hud_maker.zoom.fit_tip"),
         )
         .disabled(zoom.is_fit())
         .on_click(cx.listener(|page, _, _, cx| {

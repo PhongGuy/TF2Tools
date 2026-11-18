@@ -9,6 +9,7 @@ use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::pages::hud_maker::animations::anim_sentence;
 use tf2tools_app::pages::hud_maker::editor::{Align, HudEditor};
 use tf2tools_app::pages::hud_maker::live::{live_failure, live_note};
+use tf2tools_app::pages::hud_maker::shortcuts;
 use tf2tools_core::{AnimCommand, Interp, PartKey, ReinstallError, SituationSwitch};
 
 use crate::LocaleGuard;
@@ -290,4 +291,33 @@ fn the_situation_menu_and_the_parts_list_read_in_russian(cx: &mut TestAppContext
         support::label_of(cx, s.win, ids::hud_maker_row_eye(&row)).as_deref(),
         Some("Скрыть эту часть")
     );
+}
+
+#[gpui_kit::test]
+fn the_start_card_zoom_and_shortcuts_read_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, _page) = open_maker(cx);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_START_BLANK).as_deref(),
+        Some("С нуля")
+    );
+    support::click_id(cx, s.win, ids::HUD_MAKER_START_BLANK);
+    support::click_id(cx, s.win, ids::HUD_MAKER_ZOOM);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_ZOOM_FIT).as_deref(),
+        Some("Вписать")
+    );
+    support::press(cx, s.win, "escape");
+    support::click_id(cx, s.win, ids::HUD_MAKER_SHORTCUTS);
+    let rows: Vec<String> = (0..shortcuts().len())
+        .filter_map(|i| support::label_of(cx, s.win, ids::hud_maker_shortcut(i)))
+        .collect();
+    for want in [
+        "Стрелки: Сдвинуть выбранные части",
+        "Escape: Снять выделение",
+        "Ctrl+Z: Отменить",
+        "Тянуть по пустому месту: Выделить все части в рамке",
+    ] {
+        assert!(rows.iter().any(|r| r == want), "{want} not in {rows:?}");
+    }
 }

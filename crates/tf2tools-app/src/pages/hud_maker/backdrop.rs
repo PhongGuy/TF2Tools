@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use tf2tools_core::{Backdrop, PartKey};
 
 use super::{HudMakerPage, Load};
+use crate::i18n::tr;
 use crate::picker::PickKind;
 use crate::previews::to_render_image;
 use crate::services::{Services, run_blocking};
@@ -24,8 +25,6 @@ const MAX_SIDE: u32 = 16384;
 const MAX_ALLOC: u64 = 512 << 20;
 /// Larger pictures shrink to fit this box, aspect kept; smaller ones are never enlarged.
 const FIT: (u32, u32) = (1920, 1200);
-/// What the player sees when a picked file can't be shown.
-const UNREADABLE: &str = "That file isn't a picture TF2Tools can read.";
 
 /// The backdrop as the page holds it: what shows, and whether the saved one's read finished.
 #[derive(Default)]
@@ -197,7 +196,8 @@ impl HudMakerPage {
                         }
                         failed => {
                             tracing::debug!(?failed, "a HUD Maker backdrop didn't load");
-                            toast(window, cx, ToastKind::Error, UNREADABLE, "");
+                            let unreadable = tr!("hud_maker.pictures.not_a_picture");
+                            toast(window, cx, ToastKind::Error, unreadable, "");
                         }
                     })
                 });

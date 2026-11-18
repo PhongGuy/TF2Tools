@@ -39,18 +39,8 @@ use crate::shell::confirm::{Confirm, confirm};
 use crate::shell::toast::toast_error;
 use crate::widgets::labelled;
 
-const RESTART: &str = "Takes effect after TF2 restarts.";
-const ALREADY_ON: &str = "This HUD already does this.";
 const VIEWMODELS: &str = "mastercomfig-addon-transparent-viewmodels.vpk";
-const GET_VIEWMODELS: &str = "Get Transparent Viewmodels from the Addon store first.";
-const NEEDS_VIEWMODELS: &str = "Needs Transparent Viewmodels. Get it from the Addon store, then turn it on at the end of the options.";
-const TURN_ON_VIEWMODELS: &str =
-    "Needs Transparent viewmodels turned on at the end of the options.";
-const NO_TF2: &str =
-    "TF2 wasn't found. Set the TF2 folder in Settings to use Transparent viewmodels.";
 const HUD_CROSSHAIR_GROUP: &str = "HUD crosshair";
-const HUD_CROSSHAIR_NOTE: &str = "This crosshair is drawn by the HUD itself. It is separate from the weapon crosshairs on the Crosshairs page.";
-const TWO_CROSSHAIRS: &str = "You also have weapon crosshairs on the Crosshairs page, so you may see two crosshairs in game. Turn one of them off if you want only one.";
 /// A Choice option with more choices than this shows as a menu instead of buttons.
 pub(super) const MAX_CHOICE_BUTTONS: usize = 8;
 
@@ -140,7 +130,7 @@ impl HudMakerPage {
                     el.child(labelled(
                         div().text_xs().text_color(muted),
                         ids::hud_maker_option_group_note(group),
-                        RESTART,
+                        tr!("hud_maker.options.restart"),
                     ))
                 });
             // Colours sit two to a line, so the sixteen item colours keep the panel short
@@ -190,13 +180,13 @@ impl HudMakerPage {
         let note = labelled(
             div().text_xs().text_color(theme.muted_foreground),
             ids::HUD_MAKER_HUD_CROSSHAIR_NOTE,
-            HUD_CROSSHAIR_NOTE,
+            tr!("hud_maker.options.hud_crosshair_note"),
         );
         let warning = (crosshair.shown() && self.weapon_crosshairs).then(|| {
             labelled(
                 div().text_xs().text_color(theme.warning),
                 ids::HUD_MAKER_HUD_CROSSHAIR_WARNING,
-                TWO_CROSSHAIRS,
+                tr!("hud_maker.options.two_crosshairs"),
             )
             .into_any_element()
         });
@@ -231,10 +221,18 @@ impl HudMakerPage {
         let note = |id, text| labelled(div().text_xs().text_color(muted), id, text);
         let (on, busy) = match self.viewmodels {
             Viewmodels::Absent => {
-                return note(ids::HUD_MAKER_VIEWMODELS.into(), GET_VIEWMODELS).into_any_element();
+                return note(
+                    ids::HUD_MAKER_VIEWMODELS.into(),
+                    tr!("hud_maker.options.get_viewmodels"),
+                )
+                .into_any_element();
             }
             Viewmodels::NoTf2 => {
-                return note(ids::HUD_MAKER_VIEWMODELS.into(), NO_TF2).into_any_element();
+                return note(
+                    ids::HUD_MAKER_VIEWMODELS.into(),
+                    tr!("hud_maker.options.no_tf2"),
+                )
+                .into_any_element();
             }
             Viewmodels::Off => (false, false),
             Viewmodels::On => (true, false),
@@ -244,7 +242,7 @@ impl HudMakerPage {
         let switch = Switch::new(ids::HUD_MAKER_VIEWMODELS)
             .small()
             .checked(on)
-            .label("Transparent viewmodels")
+            .label(tr!("hud_maker.options.viewmodels"))
             .disabled(busy)
             .on_click(move |&on, window, cx| {
                 let _ = page.update(cx, |page, cx| page.toggle_viewmodels(on, window, cx));
@@ -254,7 +252,7 @@ impl HudMakerPage {
             .child(switch)
             .child(note(
                 ids::hud_maker_option_note("viewmodels"),
-                "Applies to every HUD",
+                tr!("hud_maker.options.every_hud"),
             ))
             .into_any_element()
     }
@@ -376,7 +374,7 @@ impl HudMakerPage {
             .ghost()
             .xsmall()
             .icon(IconName::RotateCcw)
-            .label("Reset all options")
+            .label(tr!("hud_maker.options.reset_all"))
             .disabled(!changed)
             .on_click(cx.listener(|page, _, window, cx| page.reset_all_options(window, cx)));
         h_flex().justify_end().child(reset).into_any_element()
@@ -426,7 +424,10 @@ impl HudMakerPage {
             .ghost()
             .xsmall()
             .icon(IconName::RotateCcw)
-            .accessibility_label(format!("Reset {group}"))
+            .accessibility_label(tr!(
+                "hud_maker.options.reset_group",
+                group = maker_label(group)
+            ))
             .disabled(!changed)
             .on_click(cx.listener(move |page, _, window, cx| {
                 page.edit_selected(window, cx, |e| {
@@ -439,7 +440,7 @@ impl HudMakerPage {
             .child(name)
             .child(tipped(
                 &reset_id,
-                "Reset these options to the HUD's own",
+                tr!("hud_maker.options.reset_group_tip"),
                 reset,
             ))
             .into_any_element()
@@ -461,14 +462,12 @@ impl HudMakerPage {
             OptionKind::Text | _ => return None,
         };
         let tooltip = spec.tooltip().map(maker_label);
-        let note = [
-            (own_restart && spec.restart()).then_some(RESTART),
-            tooltip.as_deref(),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .join(" ");
+        let restart = (own_restart && spec.restart()).then(|| tr!("hud_maker.options.restart"));
+        let note = [restart.as_deref(), tooltip.as_deref()]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .join(" ");
         let muted = cx.theme().muted_foreground;
         Some(
             v_flex()
@@ -508,7 +507,11 @@ impl HudMakerPage {
                 });
             });
         match locked {
-            true => tipped(&ids::hud_maker_option(id), ALREADY_ON, switch),
+            true => tipped(
+                &ids::hud_maker_option(id),
+                tr!("hud_maker.options.already_on"),
+                switch,
+            ),
             false => switch.into_any_element(),
         }
     }
@@ -708,7 +711,7 @@ impl HudMakerPage {
                     .text_sm()
                     .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                     .text_color(foreground)
-                    .child(format!("{}'s options", self.saved_name)),
+                    .child(tr!("hud_maker.options.hud_heading", name = self.saved_name)),
             )
             .when_some(misfit_line, |el, line| {
                 el.child(labelled(
@@ -751,7 +754,7 @@ impl HudMakerPage {
             .ghost()
             .xsmall()
             .icon(IconName::RotateCcw)
-            .accessibility_label(format!("Reset {group}"))
+            .accessibility_label(tr!("hud_maker.options.reset_group", group = group))
             .disabled(!changed)
             .on_click(cx.listener(move |page, _, window, cx| {
                 page.edit_selected(window, cx, |e| {
@@ -764,7 +767,7 @@ impl HudMakerPage {
             .child(name)
             .child(tipped(
                 &reset_id,
-                "Reset these options to the HUD's own",
+                tr!("hud_maker.options.reset_group_tip"),
                 reset,
             ))
             .into_any_element()
@@ -784,7 +787,7 @@ impl HudMakerPage {
             .text_sm()
             .font_weight(gpui_kit::FontWeight::SEMIBOLD)
             .text_color(cx.theme().foreground)
-            .child("This HUD's options");
+            .child(tr!("hud_maker.options.this_hud"));
         let rows: Vec<AnyElement> = (specs.into_iter())
             .filter_map(|spec| self.hud_option_row(spec, cx))
             .collect();
@@ -842,12 +845,14 @@ impl HudMakerPage {
 
     // What the player still has to do for an option that needs something outside the HUD;
     // none once it is in place. The switch at the end of the options turns the addon on.
-    fn need_note(&self, spec: &OptionSpec) -> Option<&'static str> {
+    fn need_note(&self, spec: &OptionSpec) -> Option<SharedString> {
         match spec.needs()? {
             OptionNeed::TransparentViewmodels => match self.viewmodels {
-                Viewmodels::Absent => Some(NEEDS_VIEWMODELS),
-                Viewmodels::NoTf2 => Some(NO_TF2),
-                Viewmodels::Off | Viewmodels::Busy { on: false } => Some(TURN_ON_VIEWMODELS),
+                Viewmodels::Absent => Some(tr!("hud_maker.options.needs_viewmodels")),
+                Viewmodels::NoTf2 => Some(tr!("hud_maker.options.no_tf2")),
+                Viewmodels::Off | Viewmodels::Busy { on: false } => {
+                    Some(tr!("hud_maker.options.turn_on_viewmodels"))
+                }
                 Viewmodels::On | Viewmodels::Busy { on: true } => None,
             },
             _ => None,

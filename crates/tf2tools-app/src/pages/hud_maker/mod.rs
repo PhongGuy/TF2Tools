@@ -30,7 +30,7 @@ mod tip;
 pub mod view;
 mod zoom;
 
-pub use shortcuts::SHORTCUTS;
+pub use shortcuts::shortcuts;
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonGroup, ButtonVariants as _};

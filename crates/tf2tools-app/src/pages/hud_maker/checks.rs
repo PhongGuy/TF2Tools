@@ -10,6 +10,8 @@ use tf2tools_core::{
 };
 
 use super::editor::HudEditor;
+use crate::i18n::names::maker_label;
+use crate::i18n::tr;
 
 type ScreensKey = (Scene, Vec<Change>);
 // Layout generation, backdrop id and view: every new layout has its own generation.
@@ -116,17 +118,25 @@ fn flag_labels(check: &ScreenCheck, model: &HudModel) -> FlagLabels {
     let name = |key: &PartKey| {
         model
             .part(key)
-            .map_or(key.as_str(), |p| p.name())
-            .to_owned()
+            .map_or_else(|| key.as_str().into(), |p| maker_label(p.name()))
     };
     let mut labels: FlagLabels = Vec::new();
     let mut at: HashMap<&PartKey, usize> = HashMap::new();
     for flag in check.flags() {
         let part = flag.part();
         let words = match flag.problem() {
-            ScreenProblem::Overlaps(other) => format!("{} overlaps {}", name(part), name(other)),
-            ScreenProblem::LeavesScreen | _ => format!("{} goes off the screen", name(part)),
-        };
+            ScreenProblem::Overlaps(other) => {
+                tr!(
+                    "hud_maker.checks.overlaps",
+                    part = name(part),
+                    other = name(other)
+                )
+            }
+            ScreenProblem::LeavesScreen | _ => {
+                tr!("hud_maker.checks.off_screen", part = name(part))
+            }
+        }
+        .to_string();
         match at.get(part) {
             Some(&i) => {
                 labels[i].1.push_str(". ");
