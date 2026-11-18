@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use tf2tools_app::i18n::Phrase;
 use tf2tools_app::updater::backend::{
     Deadlines, describe_apply, describe_check, describe_download,
 };
@@ -25,8 +26,9 @@ const INSTALLER: &str =
 const CHANGED: &str = "The update changed before it could be installed. Try again.";
 
 fn says(message: &str, use_release_page: bool) -> Failure {
+    let message = message.to_owned();
     Failure {
-        message: message.into(),
+        message: Phrase::new(move || message.clone().into()),
         use_release_page,
     }
 }
@@ -105,7 +107,7 @@ fn check_errors_read_as_player_advice() {
         let got = describe_check(&err);
         assert_eq!(got, expected, "{err}");
         assert!(
-            !got.message.contains("127.0.0.1") && !got.message.contains("http"),
+            !got.message.text().contains("127.0.0.1") && !got.message.text().contains("http"),
             "{got:?}"
         );
     }

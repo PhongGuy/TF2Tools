@@ -169,7 +169,7 @@ impl Shell {
                         cx,
                         ToastKind::Error,
                         failure_title(),
-                        failure.message.clone(),
+                        failure.message.text(),
                     );
                 }),
             ]

@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use gpui_kit::{App, Context, Entity, TestAppContext};
+use tf2tools_app::i18n::Phrase;
 use tf2tools_app::services::Services;
 use tf2tools_app::updater::{
     AfterInstall, CheckFuture, DownloadFuture, DownloadSink, Failure, Offer, Restart,
@@ -32,8 +33,9 @@ pub fn offer(version: &str, installable: bool) -> Offer {
 }
 
 pub fn failure(message: &str, use_release_page: bool) -> Failure {
+    let message = message.to_owned();
     Failure {
-        message: message.into(),
+        message: Phrase::new(move || message.clone().into()),
         use_release_page,
     }
 }

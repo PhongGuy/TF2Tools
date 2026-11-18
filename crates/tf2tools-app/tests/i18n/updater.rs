@@ -10,10 +10,11 @@ use crate::settings::open_settings;
 use crate::support::{
     self,
     update_fake::{
-        act, fake_updater, offer, reach_available, reach_ready, update_rows, with_services,
+        act, fake_updater, offer, reach_available, reach_ready, update_rows, wait_state,
+        with_services,
     },
 };
-use tf2tools_app::updater::AfterInstall;
+use tf2tools_app::updater::{AfterInstall, UpdateState};
 
 #[gpui_kit::test]
 fn the_app_updates_card_speaks_russian(cx: &mut TestAppContext) {
@@ -71,7 +72,7 @@ fn update_failures_read_in_russian() {
         describe_apply(&UpdateApplyError::Changed { path }),
     ];
     for failure in &failures {
-        assert_russian(&failure.message);
+        assert_russian(&failure.message.text());
     }
     assert_russian(&tf2tools_app::updater::reopen());
 }
@@ -122,4 +123,37 @@ fn an_installer_row_is_written_in_russian(cx: &mut TestAppContext) {
         assert_russian(text);
         assert!(text.contains("v6.0.1"), "{text}");
     }
+}
+
+// A failed check stays on the App Updates card until the next check, so its line must be worded
+// when it is drawn and follow a switch made on the same page.
+#[gpui_kit::test]
+fn a_failed_update_check_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let (u, fake) = fake_updater(cx, true);
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    open_settings(cx, &s);
+    act(cx, &u, |u, cx| u.check(cx));
+    let offline = UpdateCheckError::Network {
+        url: "https://example.invalid/latest.json".into(),
+        message: "connection refused".into(),
+    };
+    fake.next_check(cx)
+        .send(Err(describe_check(&offline)))
+        .unwrap();
+    wait_state(cx, &u, "Failed", |s| matches!(s, UpdateState::Failed(_)));
+    support::settle(cx, s.win);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::SETTINGS_UPDATE_STATUS).as_deref(),
+        Some("Couldn't reach the update server. Check your internet connection and try again.")
+    );
+
+    crate::settings::pick(cx, s.win, "ru");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::SETTINGS_UPDATE_STATUS).as_deref(),
+        Some(
+            "Не удалось связаться с сервером обновлений. Проверьте подключение к интернету и попробуйте снова."
+        )
+    );
 }

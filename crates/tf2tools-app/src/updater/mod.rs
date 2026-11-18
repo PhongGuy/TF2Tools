@@ -16,7 +16,7 @@ use gpui_kit::{App, AppContext, Context, Entity, EventEmitter, Global, SharedStr
 use tf2tools_core::{LogLevel, NewLogEntry};
 use tokio::sync::watch;
 
-use crate::i18n::tr;
+use crate::i18n::{Phrase, tr};
 use crate::services::Services;
 use crate::sync::REPAINT_INTERVAL;
 use crate::{activity, tokio_bridge};
@@ -33,7 +33,7 @@ pub struct Offer {
 /// trying again in the app will not help.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Failure {
-    pub message: SharedString,
+    pub message: Phrase,
     pub use_release_page: bool,
 }
 
@@ -460,7 +460,7 @@ impl Updater {
                 LogLevel::Error,
                 "settings",
                 action,
-                failure.message.to_string(),
+                failure.message.text().to_string(),
             ),
         );
         self.state = UpdateState::Available(offer);
@@ -473,7 +473,7 @@ impl Updater {
 fn stopped<T>(what: &str, error: &tokio_bridge::JoinError) -> Result<T, Failure> {
     tracing::warn!(%error, "{what} stopped");
     Err(Failure {
-        message: backend::unknown(),
+        message: Phrase::new(backend::unknown),
         use_release_page: false,
     })
 }

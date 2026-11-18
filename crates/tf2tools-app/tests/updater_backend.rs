@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 #[cfg(unix)]
+use tf2tools_app::i18n::Phrase;
 use tf2tools_app::updater::AfterInstall;
 use tf2tools_app::updater::backend::{Deadlines, core_backend};
 use tf2tools_app::updater::{DownloadSink, Failure, Offer, UpdateBackend};
@@ -16,8 +17,9 @@ const DAMAGED: &str = "The download was damaged. Try again.";
 const USE_PAGE: &str = "TF2Tools can't update itself where it's installed. Download the new version from the release page instead.";
 
 fn says(message: &str, use_release_page: bool) -> Failure {
+    let message = message.to_owned();
     Failure {
-        message: message.into(),
+        message: Phrase::new(move || message.clone().into()),
         use_release_page,
     }
 }
