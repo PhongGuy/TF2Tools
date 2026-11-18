@@ -160,6 +160,11 @@ fn a_saved_history_reads_in_russian_and_a_blank_name_toasts(cx: &mut TestAppCont
         support::label_of(cx, s.win, ids::HUD_MAKER_HISTORY_EMPTY).as_deref(),
         Some("У этого HUD пока нет снимков.")
     );
+    // The field keeps the full name for screen readers; only its hint is short.
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_SNAPSHOT_NAME).as_deref(),
+        Some("Название снимка")
+    );
     support::maker_page::click_in_panel(cx, &s, ids::HUD_MAKER_SNAPSHOT_SAVE.into());
     support::wait_real(cx, "a toast", |cx| {
         !support::toast_labels(cx, s.win).is_empty()
@@ -320,6 +325,15 @@ fn the_start_card_zoom_and_shortcuts_read_in_russian(cx: &mut TestAppContext) {
         "Тянуть по пустому месту: Выделить все части в рамке",
     ] {
         assert!(rows.iter().any(|r| r == want), "{want} not in {rows:?}");
+    }
+    // The longer Russian descriptions wrap inside the sheet instead of running past its edge.
+    let sheet = support::bounds_of(cx, s.win, ids::HUD_MAKER_SHORTCUTS_SHEET).expect("the sheet");
+    for i in 0..shortcuts().len() {
+        let row = support::bounds_of(cx, s.win, ids::hud_maker_shortcut(i)).expect("a row");
+        assert!(
+            row.right() <= sheet.right(),
+            "row {i} leaves the sheet: {row:?} {sheet:?}"
+        );
     }
 }
 

@@ -116,7 +116,7 @@ fn sheet(cx: &gpui_kit::App) -> impl IntoElement + use<> {
                             .child(keys),
                     ),
                 )
-                .child(div().min_w_0().child(does))
+                .child(div().flex_1().min_w_0().child(does))
         });
     v_flex()
         .id(ids::HUD_MAKER_SHORTCUTS_SHEET)
@@ -138,7 +138,8 @@ fn sheet(cx: &gpui_kit::App) -> impl IntoElement + use<> {
                         .child(tr!("hud_maker.shortcuts.hint")),
                 ),
         )
-        .child(v_flex().gap_2().items_start().children(rows))
+        // Rows span the sheet so a long description wraps in its column instead of overflowing.
+        .child(v_flex().gap_2().children(rows))
         .child(
             h_flex().justify_end().child(
                 Button::new(ids::HUD_MAKER_SHORTCUTS_CLOSE)

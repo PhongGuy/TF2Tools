@@ -1656,6 +1656,8 @@ hud_maker:
     find_part: "Find a part..."
     preset: "Preset name"
     snapshot: "Snapshot name"
+    preset_label: "Preset name"
+    snapshot_label: "Snapshot name"
   toolbar:
     name: "HUD name"
     save: "Save"

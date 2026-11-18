@@ -484,7 +484,7 @@ impl HudMakerPage {
             .on_click(cx.listener(|page, _, window, cx| page.save_snapshot(window, cx)));
         let name = div()
             .id(ids::HUD_MAKER_SNAPSHOT_NAME)
-            .aria_label(tr!("hud_maker.placeholder.snapshot"))
+            .aria_label(tr!("hud_maker.placeholder.snapshot_label"))
             .test_support()
             .flex_1()
             .min_w_0()

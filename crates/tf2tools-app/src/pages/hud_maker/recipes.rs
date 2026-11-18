@@ -483,7 +483,7 @@ impl HudMakerPage {
             .on_click(cx.listener(|page, _, window, cx| page.save_preset(window, cx)));
         let name = div()
             .id(ids::HUD_MAKER_PRESET_NAME)
-            .aria_label(tr!("hud_maker.placeholder.preset"))
+            .aria_label(tr!("hud_maker.placeholder.preset_label"))
             .test_support()
             .flex_1()
             .min_w_0()

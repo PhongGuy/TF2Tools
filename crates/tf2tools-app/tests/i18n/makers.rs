@@ -1,12 +1,12 @@
 //! The HUD Maker and the Crosshair Maker in Russian: core's labels, the pages and their dialogs.
 
-use gpui_kit::{ElementId, Entity, TestAppContext};
+use gpui_kit::{AppContext as _, ElementId, Entity, TestAppContext};
 use tf2tools_app::i18n::names::{
     board_mode_name, maker_label, meter_name, scene_name, starting_point_about, starting_point_name,
 };
 use tf2tools_app::ids;
 use tf2tools_app::pages::crosshair_maker::CrosshairMakerPage;
-use tf2tools_app::pages::crosshair_maker::model::{Tool, undo_tip};
+use tf2tools_app::pages::crosshair_maker::model::{Tool, undo_tip, zoom_in_tip, zoom_out_tip};
 use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::pages::hud_maker::install_tip;
 use tf2tools_app::services::Tf2State;
@@ -158,6 +158,7 @@ fn core_table_labels_read_in_russian() {
         "Square",
         "Rounded",
         "The game keeps this hidden",
+        "Uber meter",
     ]
     .map(|t| maker_label(t).to_string());
     assert_eq!(
@@ -168,7 +169,9 @@ fn core_table_labels_read_in_russian() {
             "Скрыть",
             "Прямые",
             "Скруглённые",
-            "Игра всегда скрывает эту часть"
+            "Игра всегда скрывает эту часть",
+            // Short enough to show whole in a top-level parts list row.
+            "Убер-заряд"
         ]
     );
 }
@@ -340,6 +343,9 @@ fn the_crosshair_maker_reads_in_russian(cx: &mut TestAppContext) {
     assert_eq!(placeholder, "Название прицела");
     assert_eq!(Tool::Pencil.tooltip(), "Карандаш (P)");
     assert_eq!(undo_tip().to_string(), "Отменить (Ctrl+Z)");
+    // The zoom tips name the keys as the HUD Maker's shortcuts sheet does.
+    assert_eq!(zoom_in_tip().to_string(), "Увеличить (Ctrl + плюс)");
+    assert_eq!(zoom_out_tip().to_string(), "Уменьшить (Ctrl + минус)");
 }
 
 #[gpui_kit::test]
@@ -382,6 +388,36 @@ fn the_crosshair_maker_reopened_after_a_switch_reads_russian(cx: &mut TestAppCon
         label(cx, &s, ids::CROSSHAIR_MAKER_SAVE).as_deref(),
         Some("Сохранить")
     );
+}
+
+// The longest Russian button row of the confirms: all three buttons stay inside the dialog.
+#[gpui_kit::test]
+fn the_unsaved_changes_buttons_fit_their_dialog_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, page) = open_hud_maker(cx, &[]);
+    let name = cx.update(|cx| page.read(cx).name_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        name.update(cx, |st, cx| st.set_value("Набросок", window, cx))
+    })
+    .unwrap();
+    cx.update(|cx| {
+        page.update(cx, |p, cx| {
+            let e = p.editor_mut().unwrap();
+            e.select(Some(PartKey::new(HV)));
+            e.nudge_selected(5, 0).unwrap();
+            cx.notify();
+        })
+    });
+    support::settle(cx, s.win);
+    support::click_id(cx, s.win, ids::nav(Page::Huds));
+    let dialog = support::bounds_of(cx, s.win, ids::CONFIRM_DIALOG).expect("the confirm");
+    for id in [ids::CONFIRM_CANCEL, ids::CONFIRM_OK, ids::CONFIRM_SAVE] {
+        let button = support::bounds_of(cx, s.win, id).expect("a button");
+        assert!(
+            button.left() >= dialog.left() && button.right() <= dialog.right(),
+            "{id} leaves the dialog: {button:?} {dialog:?}"
+        );
+    }
 }
 
 fn texts(c: &Confirm) -> [String; 4] {
@@ -434,12 +470,18 @@ fn the_hud_maker_frame_reads_in_russian(cx: &mut TestAppContext) {
     );
     let placeholders = cx.update(|cx| {
         let p = page.read(cx);
-        [p.name_input(), p.parts_filter(), p.snapshot_name_input()]
-            .map(|input| input.read(cx).presentation().placeholder().to_string())
+        [
+            p.name_input(),
+            p.parts_filter(),
+            p.snapshot_name_input(),
+            p.preset_name_input(),
+        ]
+        .map(|input| input.read(cx).presentation().placeholder().to_string())
     });
+    // The preset and snapshot hints are short enough to show whole in their narrow fields.
     assert_eq!(
         placeholders,
-        ["Назовите HUD", "Найти часть...", "Название снимка"]
+        ["Назовите HUD", "Найти часть...", "Имя снимка", "Имя"]
     );
     assert_eq!(
         install_tip(false, true).to_string(),
