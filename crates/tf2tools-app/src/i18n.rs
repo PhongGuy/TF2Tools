@@ -312,6 +312,7 @@ mod tests {
             "shell",
             "install_parts",
             "activity_log",
+            "graphics",
         ]
         .map(str::to_owned)
         .into()
