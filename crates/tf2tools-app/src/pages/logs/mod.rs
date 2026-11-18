@@ -23,9 +23,9 @@ use gpui_kit::{
 use tf2tools_core::{LogEntry, LogLevel, LogQuery};
 
 use super::common::{YELLOW_500, badge_of};
-use crate::i18n::{self, tr};
+use crate::i18n::{self, Phrase, tr};
 use crate::ids;
-use crate::local_messages::describe_log;
+use crate::local_messages::{describe_log, internal, log_phrase};
 use crate::services::run_blocking;
 use crate::shell::CONTENT_PADDING;
 use crate::shell::confirm::{Confirm, confirm};
@@ -55,7 +55,8 @@ pub struct LogsPage {
     loaded: bool,
     /// Some load has landed, so a reload keeps showing the last result's view.
     landed: bool,
-    error: Option<String>,
+    /// The failed load, worded in the current language each time it is drawn.
+    error: Option<Phrase>,
     /// The last page came back full, so the list ends in a "Load more" item.
     has_more: bool,
     loading_more: bool,
@@ -315,13 +316,16 @@ impl LogsPage {
         self.loaded = false;
         self.loading_more = false;
         let query = self.query();
+        // The English developer line is written at the failure; the player's line is a phrase
+        // worded when drawn. Only a panic surfaces as the outer OpError.
         let loading = run_blocking(cx, move |s| {
-            s.activity
-                .query(&query)
-                .map_err(|e| describe_log(&e).into_op(tr!("messages.action.load_logs")))
+            Ok(s.activity.query(&query).map_err(|e| {
+                describe_log(&e).into_op(tr!("messages.action.load_logs"));
+                log_phrase(&e)
+            }))
         });
         cx.spawn(async move |page, cx| {
-            let loaded = loading.await;
+            let loaded = loading.await.unwrap_or_else(|_| Err(Phrase::new(internal)));
             let _ = page.update(cx, |page, cx| {
                 if page.load_generation != generation {
                     return;
@@ -332,10 +336,10 @@ impl LogsPage {
                         page.entries = rows;
                         page.error = None;
                     }
-                    Err(err) => {
+                    Err(phrase) => {
                         page.has_more = false;
                         page.entries.clear();
-                        page.error = Some(err.description().to_string());
+                        page.error = Some(phrase);
                     }
                 }
                 page.list
@@ -378,7 +382,7 @@ impl LogsPage {
 
     // The same inline error as the store grid's.
     fn error_line(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
-        let error = self.error.clone()?;
+        let error = self.error.as_ref()?.text();
         let page = cx.entity().downgrade();
         let on_retry = move |_: &mut Window, cx: &mut App| {
             let _ = page.update(cx, |page, cx| page.reload(cx));

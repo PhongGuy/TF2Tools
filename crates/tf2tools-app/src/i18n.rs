@@ -32,6 +32,25 @@ fn offered(code: &str) -> Option<&'static str> {
     LANGUAGES.iter().map(|l| l.code).find(|c| *c == code)
 }
 
+/// The first of the preferred locales (most preferred first) that names an offered language,
+/// else "en". Tags like `ru_RU.UTF-8` or `ru-Cyrl-RU` reduce to their language; `C` and
+/// empty entries match nothing and the walk goes on.
+pub fn system_language<S: AsRef<str>>(locales: impl IntoIterator<Item = S>) -> &'static str {
+    locales
+        .into_iter()
+        .find_map(|tag| {
+            let tag = tag.as_ref().to_lowercase();
+            let language = tag.split(['_', '-', '.', '@']).next().unwrap_or_default();
+            offered(language)
+        })
+        .unwrap_or("en")
+}
+
+/// The system's preferred locales, most preferred first, as the OS reports them.
+pub fn system_locales() -> Vec<String> {
+    sys_locale::get_locales().collect()
+}
+
 /// Switches the process-wide locale, shared with the kit, to `code`; an unknown code
 /// switches to English. Returns the code applied.
 pub fn apply(code: &str) -> &'static str {
@@ -132,6 +151,15 @@ impl Phrase {
     }
 }
 
+// Two phrases are equal when they read the same in the current language.
+impl PartialEq for Phrase {
+    fn eq(&self, other: &Self) -> bool {
+        self.text() == other.text()
+    }
+}
+
+impl Eq for Phrase {}
+
 impl fmt::Debug for Phrase {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_tuple("Phrase").field(&self.text()).finish()
@@ -164,9 +192,16 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
     use std::path::{Path, PathBuf};
 
-    use super::{LANGUAGES, PluralForm, counted_plural, current, list, plural_form};
+    use super::{LANGUAGES, Phrase, PluralForm, counted_plural, current, list, plural_form};
 
     const FORMS: [&str; 4] = ["one", "few", "many", "other"];
+
+    // Phrases compare by what they read now, so kept failures keep their `assert_eq` tests.
+    #[test]
+    fn phrases_are_equal_when_they_read_the_same() {
+        assert_eq!(Phrase::new(|| "a".into()), Phrase::new(|| "a".into()));
+        assert_ne!(Phrase::new(|| "a".into()), Phrase::new(|| "b".into()));
+    }
 
     // One locale's catalogue as flat key -> value, read without touching the global locale.
     fn messages(code: &str) -> BTreeMap<String, String> {
@@ -297,6 +332,7 @@ mod tests {
             "shell",
             "install_parts",
             "activity_log",
+            "graphics",
         ]
         .map(str::to_owned)
         .into()

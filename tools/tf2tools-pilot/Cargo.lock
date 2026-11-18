@@ -7876,6 +7876,7 @@ dependencies = [
  "rust-embed",
  "rust-i18n",
  "serde_json",
+ "sys-locale",
  "tempfile",
  "tf2tools-core",
  "thiserror 2.0.21",

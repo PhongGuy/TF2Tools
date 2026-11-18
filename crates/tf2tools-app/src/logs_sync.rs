@@ -10,7 +10,8 @@ use tf2tools_core::{
     SteamId,
 };
 
-use crate::pages::logs_tf::text::{logs_tf_down, sync_message};
+use crate::i18n::Phrase;
+use crate::pages::logs_tf::text::{logs_tf_down_phrase, sync_message_phrase};
 use crate::services::Services;
 use crate::tokio_bridge;
 
@@ -78,12 +79,12 @@ struct Run {
 }
 
 /// The one logs.tf sync the app runs, the one request waiting behind it, and the last failure
-/// kept for the page's error line, worded in the language of the moment it failed.
+/// kept for the page's error line, worded in the current language each time it is read.
 #[derive(Default)]
 pub struct LogsSync {
     run: Option<Run>,
     queued: Option<Request>,
-    error: Option<(SteamId, SharedString)>,
+    error: Option<(SteamId, Phrase)>,
     // Each player's last download count and estimate over its range, kept through a retry's
     // or a new run's listing so the time left does not blink out. Success, a stop or a run
     // over another range drops it.
@@ -185,7 +186,7 @@ impl LogsSync {
     pub fn error(&self, id: SteamId) -> Option<SharedString> {
         self.error
             .as_ref()
-            .and_then(|(failed, message)| (*failed == id).then(|| message.clone()))
+            .and_then(|(failed, message)| (*failed == id).then(|| message.text()))
     }
 
     fn spawn(&mut self, request: Request, cx: &mut Context<Self>) {
@@ -324,11 +325,11 @@ impl LogsSync {
             }
             Ok((Err(error), has_saved)) => {
                 tracing::warn!(%error, "syncing logs.tf logs failed");
-                self.error = Some((id, sync_message(&error, has_saved)));
+                self.error = Some((id, sync_message_phrase(&error, has_saved)));
             }
             Err(error) => {
                 tracing::warn!(%error, "the logs.tf sync task stopped");
-                self.error = Some((id, logs_tf_down()));
+                self.error = Some((id, logs_tf_down_phrase()));
             }
         }
         self.run = None;

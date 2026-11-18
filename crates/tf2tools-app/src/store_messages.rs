@@ -137,22 +137,30 @@ fn archive_message(err: &ArchiveError) -> SharedString {
 
 /// A failed file listing from `kind`'s store in player words; `detail` is the error's own text.
 pub fn describe_files(kind: StoreKind, err: &FilesError) -> StoreFailure {
+    StoreFailure::new(files_phrase(kind, err).text(), err.to_string())
+}
+
+/// The player line for a failed file listing from `kind`'s store, worded each time it is read.
+pub fn files_phrase(kind: StoreKind, err: &FilesError) -> Phrase {
     let source = source_name(kind);
-    let message = match err {
-        FilesError::NotInStore { .. } => tr!("messages.store.files.not_in_store"),
-        FilesError::RateLimited { .. } => tr!("messages.shared.source_busy", source = source),
+    match err {
+        FilesError::NotInStore { .. } => Phrase::new(|| tr!("messages.store.files.not_in_store")),
+        FilesError::RateLimited { .. } => {
+            Phrase::new(move || tr!("messages.shared.source_busy", source = source))
+        }
         FilesError::Http { status, .. } if *status >= 500 => {
-            tr!("messages.shared.source_down", source = source)
+            Phrase::new(move || tr!("messages.shared.source_down", source = source))
         }
-        FilesError::Network { .. } => tr!("messages.shared.source_unreachable", source = source),
+        FilesError::Network { .. } => {
+            Phrase::new(move || tr!("messages.shared.source_unreachable", source = source))
+        }
         FilesError::Http { .. } | FilesError::TooLarge { .. } | FilesError::Malformed { .. } => {
-            tr!("messages.shared.source_unreadable", source = source)
+            Phrase::new(move || tr!("messages.shared.source_unreadable", source = source))
         }
-        FilesError::Database { .. } => store_read(),
-        FilesError::Throttled { .. } => throttled(),
-        _ => tr!("messages.store.files.unknown"),
-    };
-    StoreFailure::new(message, err.to_string())
+        FilesError::Database { .. } => Phrase::new(store_read),
+        FilesError::Throttled { .. } => Phrase::new(throttled),
+        _ => Phrase::new(|| tr!("messages.store.files.unknown")),
+    }
 }
 
 /// A failed GameBanana add-on listing, search, category list or profile in player words;
@@ -267,7 +275,12 @@ pub fn describe_gb_map_fetch(err: &GbAddonFetchError) -> StoreFailure {
 
 /// A listing task that ended without an outcome, keeping `detail` for the log.
 pub fn listing_stopped(detail: String) -> StoreFailure {
-    StoreFailure::new(tr!("messages.store.files.stopped"), detail)
+    StoreFailure::new(listing_stopped_phrase().text(), detail)
+}
+
+/// The player line for a listing task that ended without an outcome.
+pub fn listing_stopped_phrase() -> Phrase {
+    Phrase::new(|| tr!("messages.store.files.stopped"))
 }
 
 /// An add-on listing step that ended without an outcome, keeping `detail` for the log.
@@ -282,7 +295,12 @@ pub fn addons_stopped_phrase() -> Phrase {
 
 /// An add-on profile read that ended without an outcome, keeping `detail` for the log.
 pub fn addon_stopped(detail: String) -> StoreFailure {
-    StoreFailure::new(tr!("messages.store.browse.addon_stopped"), detail)
+    StoreFailure::new(addon_stopped_phrase().text(), detail)
+}
+
+/// The player line for an add-on profile read that ended without an outcome.
+pub fn addon_stopped_phrase() -> Phrase {
+    Phrase::new(|| tr!("messages.store.browse.addon_stopped"))
 }
 
 /// A failed preview fetch in player words; previews only come from GameBanana.

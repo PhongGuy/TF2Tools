@@ -145,7 +145,7 @@ fn a_finished_run_goes_idle_with_its_summary(cx: &mut TestAppContext) {
     assert_eq!(
         read(cx, &hub, |h| h
             .failure(StoreKind::Sounds)
-            .map(str::to_owned)),
+            .map(|t| t.to_string())),
         None
     );
     assert_eq!(
@@ -203,7 +203,7 @@ fn a_failure_stays_until_a_later_run_succeeds(cx: &mut TestAppContext) {
         .finish(Err(support::offline_failure()));
     let failure = |cx: &mut TestAppContext| {
         read(cx, &hub, |h| {
-            h.failure(StoreKind::Crosshairs).map(str::to_owned)
+            h.failure(StoreKind::Crosshairs).map(|t| t.to_string())
         })
     };
     support::wait_hub(cx, "the failure", |cx| failure(cx).is_some());

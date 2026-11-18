@@ -36,6 +36,7 @@ fn boot(env: &support::Env, auto_sync: bool) -> Boot {
         offline: false,
         font_host: None,
         updates: tf2tools_app::updater::UpdateBoot::Off,
+        locales: Vec::new(),
     }
 }
 
@@ -106,7 +107,11 @@ fn the_real_runner_reports_a_refused_connection_as_a_failure(cx: &mut TestAppCon
     let hub = cx.update(|cx| SyncHub::install(cx, store_runner(services.store.clone())));
     assert!(cx.update(|cx| hub.update(cx, |h, cx| h.start(StoreKind::Sounds, false, cx))));
     let failure = |cx: &mut TestAppContext| {
-        cx.update(|cx| hub.read(cx).failure(StoreKind::Sounds).map(str::to_owned))
+        cx.update(|cx| {
+            hub.read(cx)
+                .failure(StoreKind::Sounds)
+                .map(|t| t.to_string())
+        })
     };
     support::wait_hub(cx, "the sound sync to fail", |cx| failure(cx).is_some());
     assert_eq!(

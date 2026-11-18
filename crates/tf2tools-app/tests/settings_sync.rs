@@ -3,6 +3,7 @@ use std::rc::Rc;
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, ScrollDelta, TestAppContext, point, px};
+use tf2tools_app::i18n::Phrase;
 use tf2tools_app::ids;
 use tf2tools_app::pages::settings::{SYNC_CARDS, SettingsPage, format_synced};
 use tf2tools_app::services::Tf2State;
@@ -257,7 +258,7 @@ fn resync_stays_in_view_beside_the_longest_failure(cx: &mut TestAppContext) {
     open_settings(cx, &s);
     assert!(cx.update(|cx| hub.update(cx, |h, cx| h.start(StoreKind::Addons, false, cx))));
     runs.try_recv().unwrap().finish(Err(SyncFailure::new(
-        DISK,
+        Phrase::new(|| DISK.into()),
         "cannot read or write /data/store: No space left on device (os error 28)",
     )));
     support::wait_hub(cx, "the failure on the card", |cx| {

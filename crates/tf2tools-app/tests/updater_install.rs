@@ -106,7 +106,7 @@ fn a_failed_download_returns_to_available_raises_and_logs(cx: &mut TestAppContex
         [(
             LogLevel::Error,
             "update-download".to_owned(),
-            f.message.to_string()
+            f.message.text().to_string()
         )]
     );
     assert!(

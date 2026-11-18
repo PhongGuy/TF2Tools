@@ -79,19 +79,19 @@ fn progress_shows_while_running_and_a_finish_keeps_the_summary(cx: &mut TestAppC
 fn a_failure_stays_through_a_retry_until_a_run_succeeds(cx: &mut TestAppContext) {
     let (sync, runs) = fake_maps_sync(cx);
     let seen = events(cx, &sync);
-    let error = |cx: &mut TestAppContext| read(cx, &sync, |s| s.error().map(str::to_owned));
+    let error = |cx: &mut TestAppContext| read(cx, &sync, |s| s.error().map(|t| t.to_string()));
     start(cx, &sync, false);
     runs.try_recv()
         .unwrap()
         .finish(Err(support::offline_failure()));
     support::wait_hub(cx, "the failure", |cx| !read(cx, &sync, |s| s.is_running()));
     let offline = support::offline_failure();
-    assert_eq!(error(cx), Some(offline.message.clone()));
+    assert_eq!(error(cx), Some(offline.message.text().to_string()));
     assert_eq!(*seen.borrow(), vec![MapsSyncEvent::Failed(offline.clone())]);
     assert!(start(cx, &sync, false));
     assert_eq!(
         error(cx),
-        Some(offline.message),
+        Some(offline.message.text().to_string()),
         "a retry keeps the message"
     );
     cx.run_until_parked();

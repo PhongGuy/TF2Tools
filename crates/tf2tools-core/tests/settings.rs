@@ -346,16 +346,16 @@ fn log_nicknames_default_on_and_round_trip() {
 }
 
 #[test]
-fn language_defaults_to_english_and_round_trips() {
+fn a_language_is_unset_until_chosen_and_then_round_trips() {
     let (_tmp, dir) = common::temp_data_dir();
     let db = Database::open(&dir).unwrap();
-    assert_eq!(db.settings().unwrap().language(), "en");
+    assert_eq!(db.settings().unwrap().language(), None);
     db.set_language("ru").unwrap();
     assert_eq!(raw_setting(&dir, "language").as_deref(), Some("ru"));
     drop(db);
     assert_eq!(
         Database::open(&dir).unwrap().settings().unwrap().language(),
-        "ru"
+        Some("ru")
     );
 }
 
@@ -366,6 +366,6 @@ fn a_stored_language_is_read_as_written() {
     common::set_setting(&dir, "language", "xx");
     assert_eq!(
         Database::open(&dir).unwrap().settings().unwrap().language(),
-        "xx"
+        Some("xx")
     );
 }

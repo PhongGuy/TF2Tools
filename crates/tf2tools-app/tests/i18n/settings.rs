@@ -11,7 +11,8 @@ use tf2tools_app::pages::settings::{SettingsPage, format_hours, format_synced};
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::Volume;
+use tf2tools_app::sync_messages::describe_sync;
+use tf2tools_core::{StoreKind, SyncError, Volume};
 
 use crate::LocaleGuard;
 use crate::support::{self, ShellWindow};
@@ -55,6 +56,7 @@ fn boot(env: &support::Env) -> Boot {
         offline: false,
         font_host: None,
         updates: tf2tools_app::updater::UpdateBoot::Off,
+        locales: Vec::new(),
     }
 }
 
@@ -88,7 +90,7 @@ fn picking_russian_switches_settings_at_once_and_saves_it(cx: &mut TestAppContex
     assert_eq!(placeholder(cx, &page), "/путь/к/Team Fortress 2");
     assert_eq!(i18n::current(), "ru");
     support::wait_real(cx, "Russian saved", |_| {
-        s.services.db.settings().unwrap().language() == "ru"
+        s.services.db.settings().unwrap().language() == Some("ru")
     });
 
     pick(cx, s.win, "en");
@@ -99,7 +101,7 @@ fn picking_russian_switches_settings_at_once_and_saves_it(cx: &mut TestAppContex
     );
     assert_eq!(placeholder(cx, &page), "/path/to/Team Fortress 2");
     support::wait_real(cx, "English saved", |_| {
-        s.services.db.settings().unwrap().language() == "en"
+        s.services.db.settings().unwrap().language() == Some("en")
     });
 }
 
@@ -153,6 +155,62 @@ fn a_language_saved_last_time_applies_at_startup(cx: &mut TestAppContext) {
     support::wait_real(cx, "the Russian note", |cx| {
         note(cx, win).as_deref() == Some(NOTE_RU)
     });
+}
+
+// Boots the shell with `locales` as the system's preferred locales and waits for the HUDs page.
+fn start_with_locales(
+    cx: &mut TestAppContext,
+    env: &support::Env,
+    locales: &[&str],
+) -> AnyWindowHandle {
+    support::init(cx);
+    let boot = Boot {
+        locales: locales.iter().map(|l| (*l).to_owned()).collect(),
+        ..boot(env)
+    };
+    let win = cx.update(|cx| start(boot, cx)).unwrap();
+    support::wait_real(cx, "the shell", |cx| {
+        support::present(cx, win, ids::page(Page::Huds))
+    });
+    win
+}
+
+#[gpui_kit::test]
+fn a_russian_system_starts_in_russian_until_the_player_picks(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let win = start_with_locales(cx, &env, &["ru-RU"]);
+    assert_eq!(i18n::current(), "ru");
+    support::click_id(cx, win, ids::nav(Page::Settings));
+    support::wait_real(cx, "the Russian note", |cx| {
+        note(cx, win).as_deref() == Some(NOTE_RU)
+    });
+    // Following the system writes nothing, so a later pick is the only saved choice.
+    let saved = cx.update(|cx| {
+        let db = &cx.global::<tf2tools_app::services::Services>().db;
+        db.settings().unwrap().language().map(str::to_owned)
+    });
+    assert_eq!(saved, None);
+}
+
+#[gpui_kit::test]
+fn an_unsupported_system_language_starts_in_english(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    start_with_locales(cx, &env, &["de-DE"]);
+    assert_eq!(i18n::current(), "en");
+}
+
+#[gpui_kit::test]
+fn english_picked_in_settings_outlasts_a_russian_system(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    support::services(&env, support::no_steam())
+        .db
+        .set_language("en")
+        .unwrap();
+    start_with_locales(cx, &env, &["ru_RU.UTF-8"]);
+    assert_eq!(i18n::current(), "en");
 }
 
 #[test]
@@ -357,4 +415,40 @@ fn the_settings_cards_fit_at_800_by_600_in_english_and_russian(cx: &mut TestAppC
     assert_settings_fit(cx, s.win, "en");
     pick(cx, s.win, "ru");
     assert_settings_fit(cx, s.win, "ru");
+}
+
+// The hub keeps a failed sync for its card, so the Stores card must word it when drawn and take a
+// language picked on the same page.
+#[gpui_kit::test]
+fn a_store_sync_failure_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let (hub, runs) = support::fake_hub(cx);
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    open_settings(cx, &s);
+    assert!(cx.update(|cx| hub.update(cx, |h, cx| h.start(StoreKind::Sounds, false, cx))));
+    let offline = SyncError::Network {
+        url: "https://gamebanana.com/apiv11".into(),
+        message: "connection refused".into(),
+    };
+    runs.try_recv()
+        .unwrap()
+        .finish(Err(describe_sync(StoreKind::Sounds, &offline)));
+    let status = |cx: &mut TestAppContext| {
+        support::label_of(cx, s.win, ids::settings_sync(StoreKind::Sounds)).unwrap_or_default()
+    };
+    support::wait_hub(cx, "the failure on the card", |cx| {
+        status(cx).ends_with(
+            ". Sync failed: Couldn't reach GameBanana. Check your internet connection and try again.",
+        )
+    });
+
+    pick(cx, s.win, "ru");
+    let shown = status(cx);
+    assert!(
+        shown.ends_with(
+            ". Ошибка синхронизации: Не удалось подключиться к GameBanana. Проверьте подключение к интернету и попробуйте снова."
+        ),
+        "{shown}"
+    );
 }

@@ -210,7 +210,7 @@ pub fn settings_content(cx: &App) -> Option<AnyElement> {
         // The relaunch never quit the app, so the player reopens it by hand; nothing to click.
         UpdateState::Updated(_) => (tr!("updater.status.reopen"), None, [false; 3]),
         UpdateState::Failed(failure) => (
-            failure.message.clone(),
+            failure.message.text(),
             Some(theme.danger),
             [true, false, false],
         ),

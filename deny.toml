@@ -9,4 +9,7 @@ ignore = [
     # Unmaintained, no known flaw. Core reads font names with it, and GPUI's text stack needs
     # it anyway, so a swap would not drop it from the app.
     { id = "RUSTSEC-2026-0192", reason = "ttf-parser: GPUI depends on it too; no known flaw" },
+    # Unmaintained, no known flaw. Core and the app format dates with it, and GPUI depends on it
+    # too, so moving our code to jiff or time would not drop it from the app.
+    { id = "RUSTSEC-2026-0543", reason = "chrono: GPUI depends on it too; no known flaw" },
 ]

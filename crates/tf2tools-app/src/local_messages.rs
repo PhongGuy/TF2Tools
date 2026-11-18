@@ -11,7 +11,7 @@ use tf2tools_core::{
 use gpui_kit::SharedString;
 
 use crate::audio::AudioError;
-use crate::i18n::{list, plural, tr};
+use crate::i18n::{Phrase, list, plural, tr};
 use crate::pages::graphics::jobs::{close_tf2, close_tf2_text};
 use crate::services::{OpError, StartupError};
 use crate::store_messages::{library_update, store_read};
@@ -694,13 +694,15 @@ pub fn describe_audio(err: &AudioError) -> LocalFailure {
 
 /// A failed read or clear of the activity log in player words; `detail` is the error's own text.
 pub fn describe_log(err: &LogError) -> LocalFailure {
-    let message = match err {
-        LogError::Database { .. } => {
-            tr!("messages.local.log.database")
-        }
-        _ => unknown(),
-    };
-    LocalFailure::new(message, err.to_string())
+    LocalFailure::new(log_phrase(err).text(), err.to_string())
+}
+
+/// The player line for a failed read or clear of the activity log, worded each time it is read.
+pub fn log_phrase(err: &LogError) -> Phrase {
+    match err {
+        LogError::Database { .. } => Phrase::new(|| tr!("messages.local.log.database")),
+        _ => Phrase::new(unknown),
+    }
 }
 
 /// A failed read or write of the logs.tf cache; `detail` is the error's own text.

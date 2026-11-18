@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use gpui_kit::{App, AppContext as _, Context, Entity, EventEmitter, Global};
+use gpui_kit::{App, AppContext as _, Context, Entity, EventEmitter, Global, SharedString};
 use tf2tools_core::{StoreClient, StoreKind};
 
 use crate::sync::{ProgressSink, SyncFuture, SyncState, SyncSummary, SyncTick, pump};
@@ -84,12 +84,10 @@ impl MapsSync {
     }
 
     /// The player message of the last failure, kept through a retry until a run succeeds.
-    pub fn error(&self) -> Option<&str> {
+    pub fn error(&self) -> Option<SharedString> {
         match &self.state {
-            SyncState::Failed { error } => Some(&error.message),
-            SyncState::Running { last_error, .. } => {
-                last_error.as_ref().map(|e| e.message.as_str())
-            }
+            SyncState::Failed { error } => Some(error.message.text()),
+            SyncState::Running { last_error, .. } => last_error.as_ref().map(|e| e.message.text()),
             SyncState::Idle { .. } => None,
         }
     }
