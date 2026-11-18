@@ -21,7 +21,7 @@ fn every_spanish_tag_maps_to_spanish() {
     ] {
         assert_eq!(system_language([tag]), "es", "{tag}");
     }
-    assert_eq!(system_language(["de-DE", "es_MX.UTF-8"]), "es");
+    assert_eq!(system_language(["it-IT", "es_MX.UTF-8"]), "es");
     assert_eq!(system_language(["ru-RU", "es-ES"]), "ru");
     assert_eq!(system_language(["pt_BR.UTF-8", "es-ES"]), "pt-BR");
     assert_eq!(system_language(["es-ES", "pt_BR.UTF-8"]), "es");

@@ -13,6 +13,9 @@ mod support;
 #[path = "i18n/apply.rs"]
 mod apply;
 
+#[path = "i18n/de.rs"]
+mod de;
+
 #[path = "i18n/es.rs"]
 mod es;
 

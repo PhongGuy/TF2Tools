@@ -92,20 +92,20 @@ The text TF2Tools shows lives in `crates/tf2tools-app/locales/`, one file per la
 
 To add a language:
 
-1. Pick the code. The file name without `.yml` is the locale code. Use a bare language code, such as `es`, when one file serves every region, and a region tag the UI kit uses, such as `pt-BR`, when the variants differ; gpui-component's `locales/ui.yml` lists the kit's codes.
+1. Pick the code. The file name without `.yml` is the locale code. Use a bare language code, such as `es` or `de`, when one file serves every region, and a region tag the UI kit uses, such as `pt-BR`, when the variants differ; gpui-component's `locales/ui.yml` lists the kit's codes.
 2. Copy `en.yml` to `<code>.yml` and translate the values, never the keys. The file must keep exactly the keys of `en.yml`, and the tests check it.
 3. Add the code and its native name with " (preview)" to `LANGUAGES` in `crates/tf2tools-app/src/i18n.rs`, as in `Português do Brasil (preview)`, and add the same pair to the pinned list in the test `english_comes_first_and_every_catalogue_is_offered` in that file.
 4. Add a plural rule to `plural_form` in the same file only if the language counts differently from `one` for 1 and `other` for everything else.
 5. Run `cargo test -p tf2tools-app --lib i18n::` and `cargo test -p tf2tools-app --test i18n`, then open a PR.
 
-A system locale picks a language by its full tag first, then by its language alone: `pt_BR.UTF-8` and `pt-PT` both start TF2Tools in `pt-BR`, and `es_ES.UTF-8` and `es_MX` both start TF2Tools in `es`.
+A system locale picks a language by its full tag first, then by its language alone: `pt_BR.UTF-8` and `pt-PT` both start TF2Tools in `pt-BR`, `es_ES.UTF-8` and `es_MX` both start TF2Tools in `es`, and `de_DE.UTF-8` and `de_AT` both start TF2Tools in `de`.
 
 Rules for the files:
 
 - Settle the recurring words in a glossary comment at the top of the file, as `pt-BR.yml` does, and keep game terms as the TF2 client shows them in that language.
 - Wrap every value in double quotes, because YAML reads a bare `Yes`, `No` or `Off` as true or false.
 - Keep every `%{name}` exactly as it is; the tests fail a translation that drops or renames one.
-- Plural keys end in `one`, `few`, `many` or `other`, and a file has exactly the forms its language uses: English `one` and `other`, Russian `one`, `few` and `many`. Brazilian Portuguese and Spanish have `one` and `other` too, and zero takes `other` ("0 HUDs").
+- Plural keys end in `one`, `few`, `many` or `other`, and a file has exactly the forms its language uses: English `one` and `other`, Russian `one`, `few` and `many`. Brazilian Portuguese, Spanish and German have `one` and `other` too, and zero takes `other` ("0 HUDs").
 - A string literal shaped like a catalogue key (for example "settings.json") fails the key-existence test, so section names must not collide with ordinary dotted text.
 - Dates, numbers and sizes come from the keys under `common.date`, `common.number` and `common.size`. Reorder `%{day}`, `%{month}` and `%{year}` instead of writing a date pattern, and write a no-break space as `"\u00A0"` inside double quotes.
 

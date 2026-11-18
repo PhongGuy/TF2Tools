@@ -33,6 +33,10 @@ pub const LANGUAGES: &[Language] = &[
         code: "es",
         name: "Español (preview)",
     },
+    Language {
+        code: "de",
+        name: "Deutsch (preview)",
+    },
 ];
 
 // The offered language with this code, so callers get a `'static` code back.
@@ -42,8 +46,8 @@ fn offered(code: &str) -> Option<&'static str> {
 
 /// The first of the preferred locales (most preferred first) that names an offered language,
 /// else "en". Tags like `ru_RU.UTF-8` or `ru-Cyrl-RU` reduce to their language and
-/// `pt_BR.UTF-8` maps to `pt-BR` and `es_MX.UTF-8` to `es`; `C` and empty entries match nothing
-/// and the walk goes on.
+/// `pt_BR.UTF-8` maps to `pt-BR`, `es_MX.UTF-8` to `es` and `de_AT.UTF-8` to `de`; `C` and empty
+/// entries match nothing and the walk goes on.
 pub fn system_language<S: AsRef<str>>(locales: impl IntoIterator<Item = S>) -> &'static str {
     locales
         .into_iter()
@@ -486,6 +490,14 @@ mod tests {
     }
 
     #[test]
+    fn german_counts_only_one_as_one() {
+        assert_eq!(plural_form("de", 1), PluralForm::One);
+        for n in [0, 2, 5, 11, 21, 101, 1000] {
+            assert_eq!(plural_form("de", n), PluralForm::Other, "de {n}");
+        }
+    }
+
+    #[test]
     fn an_unknown_language_counts_like_english() {
         assert_eq!(plural_form("xx", 1), PluralForm::One);
         assert_eq!(plural_form("xx", 21), PluralForm::Other);
@@ -500,7 +512,8 @@ mod tests {
                 ("en", "English"),
                 ("ru", "Русский (preview)"),
                 ("pt-BR", "Português do Brasil (preview)"),
-                ("es", "Español (preview)")
+                ("es", "Español (preview)"),
+                ("de", "Deutsch (preview)")
             ]
         );
         let offered: BTreeSet<&str> = LANGUAGES.iter().map(|l| l.code).collect();
