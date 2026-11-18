@@ -770,4 +770,21 @@ mod tests {
             );
         }
     }
+
+    // The scoreboard, win panel and class selection read in Russian as the in-game panels do.
+    #[test]
+    fn the_curated_screen_panels_read_in_russian() {
+        for raw in ["ServerLabel", "BlueTeamScore", "WinReasonLabel", "MapName"] {
+            let key = crate::i18n::names::maker_part_name_key(&plain_name(raw)).unwrap();
+            assert!(
+                crate::_rust_i18n_try_translate("en", &key).is_some(),
+                "{raw}: {key} in en.yml"
+            );
+            let ru = crate::_rust_i18n_try_translate("ru", &key);
+            assert!(
+                ru.is_some_and(|r| r != crate::_rust_i18n_try_translate("en", &key).unwrap()),
+                "{raw}: {key} in ru.yml"
+            );
+        }
+    }
 }
