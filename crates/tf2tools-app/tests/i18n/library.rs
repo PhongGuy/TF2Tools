@@ -586,10 +586,9 @@ fn a_wide_sound_card_keeps_its_hit_and_kill_labels(cx: &mut TestAppContext) {
     }
 }
 
-// The Russian "no maps yet" line wraps inside the Maps column at 800x600.
-#[gpui_kit::test]
-fn the_russian_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+// The translated "no maps yet" line wraps inside the Maps column at 800x600.
+fn maps_empty_line_fits_at_800(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     resize_800(cx, &s);
@@ -605,7 +604,17 @@ fn the_russian_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
         gpui_kit::point(shell.right() - (tabs.left() - shell.left()), shell.bottom()),
     );
     let empty = support::bounds_of(cx, s.win, ids::MAPS_EMPTY).unwrap();
-    assert_inside("maps-empty", empty, column);
+    assert_inside(&format!("{lang} maps-empty"), empty, column);
+}
+
+#[gpui_kit::test]
+fn the_russian_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
+    maps_empty_line_fits_at_800(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
+    maps_empty_line_fits_at_800(cx, "pt-BR");
 }
 
 #[test]
