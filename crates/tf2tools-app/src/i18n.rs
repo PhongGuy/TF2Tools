@@ -25,6 +25,10 @@ pub const LANGUAGES: &[Language] = &[
         code: "ru",
         name: "Русский (preview)",
     },
+    Language {
+        code: "pt-BR",
+        name: "Português do Brasil (preview)",
+    },
 ];
 
 // The offered language with this code, so callers get a `'static` code back.
@@ -33,15 +37,21 @@ fn offered(code: &str) -> Option<&'static str> {
 }
 
 /// The first of the preferred locales (most preferred first) that names an offered language,
-/// else "en". Tags like `ru_RU.UTF-8` or `ru-Cyrl-RU` reduce to their language; `C` and
-/// empty entries match nothing and the walk goes on.
+/// else "en". Tags like `ru_RU.UTF-8` or `ru-Cyrl-RU` reduce to their language and
+/// `pt_BR.UTF-8` maps to `pt-BR`; `C` and empty entries match nothing and the walk goes on.
 pub fn system_language<S: AsRef<str>>(locales: impl IntoIterator<Item = S>) -> &'static str {
     locales
         .into_iter()
         .find_map(|tag| {
-            let tag = tag.as_ref().to_lowercase();
-            let language = tag.split(['_', '-', '.', '@']).next().unwrap_or_default();
-            offered(language)
+            // An offered code matching the whole tag wins; else one sharing its language,
+            // so `pt-PT` still lands on the closest offered Portuguese.
+            let tag = tag.as_ref().to_lowercase().replace('_', "-");
+            let tag = tag.split(['.', '@']).next().unwrap_or_default();
+            let primary = |code: &str| code.split('-').next().unwrap_or_default().to_owned();
+            let codes = || LANGUAGES.iter().map(|l| l.code);
+            codes()
+                .find(|c| c.to_lowercase() == tag)
+                .or_else(|| codes().find(|c| primary(&c.to_lowercase()) == primary(tag)))
         })
         .unwrap_or("en")
 }
@@ -455,6 +465,14 @@ mod tests {
     }
 
     #[test]
+    fn brazilian_portuguese_counts_only_one_as_one() {
+        assert_eq!(plural_form("pt-BR", 1), PluralForm::One);
+        for n in [0, 2, 5, 11, 21, 101, 1000] {
+            assert_eq!(plural_form("pt-BR", n), PluralForm::Other, "pt-BR {n}");
+        }
+    }
+
+    #[test]
     fn an_unknown_language_counts_like_english() {
         assert_eq!(plural_form("xx", 1), PluralForm::One);
         assert_eq!(plural_form("xx", 21), PluralForm::Other);
@@ -463,7 +481,14 @@ mod tests {
     #[test]
     fn english_comes_first_and_every_catalogue_is_offered() {
         let names: Vec<(&str, &str)> = LANGUAGES.iter().map(|l| (l.code, l.name)).collect();
-        assert_eq!(names, [("en", "English"), ("ru", "Русский (preview)")]);
+        assert_eq!(
+            names,
+            [
+                ("en", "English"),
+                ("ru", "Русский (preview)"),
+                ("pt-BR", "Português do Brasil (preview)")
+            ]
+        );
         let offered: BTreeSet<&str> = LANGUAGES.iter().map(|l| l.code).collect();
         let files: Vec<String> = crate::_rust_i18n_available_locales()
             .into_iter()

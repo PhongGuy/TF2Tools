@@ -19,6 +19,7 @@ use crate::support::{self, ShellWindow};
 
 pub const NOTE_EN: &str = "Parts of TF2Tools not yet translated stay in English.";
 pub const NOTE_RU: &str = "Ещё не переведённые части TF2Tools остаются на английском.";
+pub const NOTE_PT_BR: &str = "As partes do TF2Tools ainda não traduzidas ficam em inglês.";
 
 /// Opens Settings through the sidebar and waits for its first load.
 pub fn open_settings(cx: &mut TestAppContext, s: &ShellWindow) -> Entity<SettingsPage> {
@@ -191,6 +192,18 @@ fn a_russian_system_starts_in_russian_until_the_player_picks(cx: &mut TestAppCon
         db.settings().unwrap().language().map(str::to_owned)
     });
     assert_eq!(saved, None);
+}
+
+#[gpui_kit::test]
+fn a_brazilian_system_starts_in_portuguese(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let win = start_with_locales(cx, &env, &["pt_BR.UTF-8"]);
+    assert_eq!(i18n::current(), "pt-BR");
+    support::click_id(cx, win, ids::nav(Page::Settings));
+    support::wait_real(cx, "the Portuguese note", |cx| {
+        note(cx, win).as_deref() == Some(NOTE_PT_BR)
+    });
 }
 
 #[gpui_kit::test]
@@ -397,7 +410,7 @@ fn assert_settings_fit(cx: &mut TestAppContext, win: AnyWindowHandle, lang: &str
 }
 
 #[gpui_kit::test]
-fn the_settings_cards_fit_at_800_by_600_in_english_and_russian(cx: &mut TestAppContext) {
+fn the_settings_cards_fit_at_800_by_600_in_every_language(cx: &mut TestAppContext) {
     let _guard = LocaleGuard::hold();
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
@@ -415,6 +428,8 @@ fn the_settings_cards_fit_at_800_by_600_in_english_and_russian(cx: &mut TestAppC
     assert_settings_fit(cx, s.win, "en");
     pick(cx, s.win, "ru");
     assert_settings_fit(cx, s.win, "ru");
+    pick(cx, s.win, "pt-BR");
+    assert_settings_fit(cx, s.win, "pt-BR");
 }
 
 // The hub keeps a failed sync for its card, so the Stores card must word it when drawn and take a
