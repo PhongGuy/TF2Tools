@@ -3,7 +3,6 @@
 
 use gpui_kit::assets::IconName;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
@@ -24,6 +23,7 @@ use crate::services::Services;
 use crate::widgets::class_icon::class_icon;
 use crate::widgets::labelled;
 use crate::widgets::scroll::scroll_beside;
+use crate::widgets::tip::tip_box;
 
 /// The tracked player's own columns on each row, in logs.tf's order.
 pub const STAT_COLUMNS: [&str; 8] = ["K", "A", "D", "DA", "DA/M", "KA/D", "DT", "DT/M"];
@@ -342,7 +342,7 @@ fn map_cell(base: Div, id: u64, map: &str) -> impl IntoElement {
     base.id(ids::logstf_log_map(id))
         .aria_label(map.clone())
         .truncate()
-        .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+        .tooltip(move |window, cx| tip_box(tip.clone()).build(window, cx))
         .test_support()
         .child(map)
 }

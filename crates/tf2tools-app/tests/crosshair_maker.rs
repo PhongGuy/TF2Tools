@@ -9,16 +9,18 @@ use gpui_kit::{
     MouseDownEvent, MouseExitEvent, MouseMoveEvent, MouseUpEvent, Pixels, Point, ScrollDelta,
     ScrollEvent, TestAppContext, TouchPhase, Window, point, px,
 };
+use tf2tools_app::crosshair_sync::CrosshairSync;
 use tf2tools_app::ids;
 use tf2tools_app::pages::crosshair_maker::CrosshairMakerPage;
 use tf2tools_app::pages::crosshair_maker::model::{
     CLEAR, CanvasSize, Tool, follows, hsla_of, mixed, position_text, rgb_of,
 };
+use tf2tools_app::pages::profiles::probe::Tf2Probe;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::leave;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{
-    CrosshairEntry, CrosshairFormat, CrosshairRef, LibraryKind, PaintTarget, RgbaImage,
+    CrosshairEntry, CrosshairFormat, CrosshairRef, LibraryKind, PaintTarget, RgbaImage, Tf2Install,
 };
 
 fn shell(cx: &mut TestAppContext, env: &support::Env) -> support::ShellWindow {
@@ -766,9 +768,11 @@ fn saving_a_new_drawing_adds_a_painted_crosshair(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
-fn resaving_an_assigned_crosshair_says_to_install(cx: &mut TestAppContext) {
+fn resaving_an_assigned_crosshair_puts_it_in_tf2(cx: &mut TestAppContext) {
     let env = support::env();
-    let s = shell(cx, &env);
+    let found = Tf2State::Found(Tf2Install::from_path(&env.game).unwrap());
+    let s = support::shell_window(cx, &env, found);
+    cx.update(|cx| Tf2Probe::install(cx, || false));
     let page = open_maker(cx, &s);
     paint_cell(cx, &s, &page, 1, 1);
     set_name(cx, &s, &page, "Dot");
@@ -781,13 +785,18 @@ fn resaving_an_assigned_crosshair_says_to_install(cx: &mut TestAppContext) {
     paint_cell(cx, &s, &page, 2, 2);
     set_name(cx, &s, &page, "Big Dot");
     save(cx, &s, &page);
-    let toasts = support::toast_labels(cx, s.win);
-    assert!(
-        toasts
-            .iter()
-            .any(|t| t == "Saved. Press Install on the Crosshairs page to update it in TF2."),
-        "{toasts:?}"
-    );
+    // The Crosshairs page has no Install button; the save itself applies the board.
+    let sync = cx
+        .update(|cx| CrosshairSync::global(cx))
+        .expect("the apply queue");
+    support::wait_real(cx, "the apply", |cx| {
+        cx.update(|cx| sync.read(cx).finished() >= 1 && !sync.read(cx).is_saving())
+    });
+    let scattergun = env
+        .game
+        .join("tf/custom/tf2tools-crosshairs/scripts/tf_weapon_scattergun.txt");
+    assert!(scattergun.is_file(), "{scattergun:?}");
+    assert_eq!(support::toast_labels(cx, s.win), ["Saved", "Saved"]);
     let library = s.services.library.list_crosshairs().unwrap();
     assert_eq!(library.len(), 1);
     assert_eq!((library[0].id(), library[0].name()), (&id, "Big Dot"));

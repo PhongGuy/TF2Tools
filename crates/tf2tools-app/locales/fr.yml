@@ -2410,7 +2410,6 @@ crosshair_maker:
   drop_a_png: "Déposez une image PNG."
   drop_hint: "Déposez un PNG pour l'ouvrir"
   recovered: "Le dessin enregistré était endommagé\u00A0; il a été reconstruit à partir du fichier du viseur."
-  install_to_update: "Cliquez sur Installer dans la page Viseurs pour le mettre à jour dans TF2."
   saved: "Enregistré"
   name: "Nom"
   name_placeholder: "Nom"

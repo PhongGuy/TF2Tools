@@ -2408,7 +2408,6 @@ crosshair_maker:
   drop_a_png: "Suelta una imagen PNG."
   drop_hint: "Suelta un PNG para abrirlo"
   recovered: "El dibujo guardado estaba dañado, así que se reconstruyó a partir del archivo de la mira."
-  install_to_update: "Pulsa Instalar en la página Miras para actualizarla en TF2."
   saved: "Guardado"
   name: "Nombre"
   name_placeholder: "Nombre de la mira"
