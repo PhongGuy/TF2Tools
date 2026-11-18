@@ -2479,7 +2479,13 @@ fn assert_reaches_bottom(
             "{w}x{h}: rail {panel:?} in {area:?}"
         );
     } else if mode != PanelMode::Floating {
-        let foot = f(area.bottom()) - 16.;
+        // A panel opened from its rail over the canvas stops 8 px above the toolbar it stands over.
+        let bar = bounds(cx, s, ids::HUD_MAKER_TOOLBAR);
+        let over = panel.left() < bar.right() && bar.left() < panel.right();
+        let foot = match over {
+            true => f(bar.top()) - 8.,
+            false => f(area.bottom()) - 16.,
+        };
         assert!(
             (f(panel.bottom()) - foot).abs() <= 1.,
             "{w}x{h}: docked {panel:?} should end at {foot} in {area:?}"

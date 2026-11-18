@@ -9,7 +9,7 @@ use gpui_kit::component::{ActiveTheme as _, Selectable as _, Sizable as _, h_fle
 use gpui_kit::{
     Anchor, AnyElement, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement,
     ParentElement as _, ScrollHandle, SharedString, StatefulInteractiveElement as _, Styled as _,
-    Subscription, TestSupportExt as _, Window, div, px,
+    Subscription, TestSupportExt as _, Window, div, px, rems,
 };
 use tf2tools_core::{GameSituation, MeterKind, SituationSwitch, TfClass, WeaponKind};
 
@@ -18,8 +18,8 @@ use super::tip::tipped;
 use crate::i18n::names::{class_name, meter_name};
 use crate::i18n::tr;
 use crate::ids;
-use crate::widgets::labelled;
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
+use crate::widgets::{Named as _, label_width_at, labelled};
 
 /// A number the situation menu sets with a slider.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,6 +78,12 @@ const THUMB_REACH: gpui_kit::Pixels = px(11.);
 
 // The meter list's height cap, so 21 weapons never run the menu off a small window.
 const METERS_HEIGHT: f32 = 300.;
+
+// The menu's width, and its width with the meter list open, wider so the longest meter name
+// clears the list's bar; an xsmall button's padding around its label.
+const MENU_WIDTH: f32 = 304.;
+const METERS_MENU_WIDTH: f32 = 320.;
+const XS_PAD: f32 = 8.;
 
 /// The menu's open flags (the menu and its meter list) and its three sliders, which commit
 /// when let go.
@@ -203,7 +209,11 @@ impl HudMakerPage {
     }
 
     // One button named for the class and health shown; its menu sets the situation.
-    pub(super) fn situation_menu(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(super) fn situation_menu(
+        &self,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
         let s = self.editor()?.situation().clone();
         let trigger = Button::new(ids::HUD_MAKER_SITUATION)
             .outline()
@@ -318,11 +328,20 @@ impl HudMakerPage {
                 page.set_situation(GameSituation::default(), window, cx);
                 page.set_meter(MeterKind::Plain, false, window, cx);
             }));
+        // The meter row keeps its words only when they fit the menu's width, measured as drawn;
+        // otherwise it shows a meter icon named with them.
         let meter = self.editor()?.meter();
-        let meter_row = Button::new(ids::HUD_MAKER_SITUATION_METER)
-            .ghost()
-            .xsmall()
-            .label(tr!("hud_maker.situation.meter", name = meter_name(meter)))
+        let words = tr!("hud_maker.situation.meter", name = meter_name(meter));
+        let menu = match self.situation_menu.meters_open {
+            true => METERS_MENU_WIDTH,
+            false => MENU_WIDTH,
+        };
+        let meter_row = Button::new(ids::HUD_MAKER_SITUATION_METER).ghost().xsmall();
+        let meter_row = match label_width_at(&words, rems(0.75), window, cx) <= px(menu - XS_PAD) {
+            true => meter_row.label(words),
+            false => meter_row.icon(IconName::BatteryMedium).named(words),
+        };
+        let meter_row = meter_row
             .selected(self.situation_menu.meters_open)
             .on_click(cx.listener(|page, _, _, cx| {
                 page.situation_menu.meters_open = !page.situation_menu.meters_open;
@@ -358,13 +377,15 @@ impl HudMakerPage {
         });
         // The open meter list takes the menu's whole body, so its 21 rows have room.
         if let Some(meters) = meters {
-            // Wider than the menu, so the longest meter name clears the list's bar.
-            let body = v_flex().w_80().gap_2().child(meter_row).child(meters);
+            let body = v_flex()
+                .w(px(METERS_MENU_WIDTH))
+                .gap_2()
+                .child(meter_row)
+                .child(meters);
             return Some(self.situation_popover(trigger, body, cx));
         }
-        // Wide enough for the English meter row; the meter list opens wider still, at w_80.
         let body = v_flex()
-            .w(px(304.))
+            .w(px(MENU_WIDTH))
             .gap_2()
             .child(h_flex().flex_wrap().gap_1().children(classes))
             .child(slider(
