@@ -65,13 +65,13 @@ fn a_region_or_encoding_tag_maps_to_its_language() {
 
 #[test]
 fn the_first_preferred_locale_with_a_catalogue_wins() {
-    assert_eq!(system_language(["de-DE", "ru-RU"]), "ru");
+    assert_eq!(system_language(["it-IT", "ru-RU"]), "ru");
     assert_eq!(system_language(["en-US", "ru-RU"]), "en");
 }
 
 #[test]
 fn a_system_without_a_catalogue_starts_in_english() {
-    assert_eq!(system_language(["de-DE", "fr_FR.UTF-8"]), "en");
+    assert_eq!(system_language(["it-IT", "fr_FR.UTF-8"]), "en");
     assert_eq!(system_language(Vec::<String>::new()), "en");
     assert_eq!(system_language(["C", "POSIX", ""]), "en");
 }

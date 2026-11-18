@@ -20,7 +20,7 @@ fn a_portuguese_tag_maps_to_brazilian_portuguese() {
     ] {
         assert_eq!(system_language([tag]), "pt-BR", "{tag}");
     }
-    assert_eq!(system_language(["de-DE", "pt_BR.UTF-8"]), "pt-BR");
+    assert_eq!(system_language(["it-IT", "pt_BR.UTF-8"]), "pt-BR");
     assert_eq!(system_language(["ru-RU", "pt-BR"]), "ru");
     assert_eq!(system_language(["pt-BR", "ru-RU"]), "pt-BR");
     assert_eq!(system_language(["ptx"]), "en");

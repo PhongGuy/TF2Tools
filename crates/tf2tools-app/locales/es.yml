@@ -770,7 +770,10 @@ crosshairs_page:
     default: "Predeterminada"
     mixed: "Mixtas"
   details:
-    title: "%{class}: arma %{slot}"
+    title:
+      primary: "%{class}: arma principal"
+      secondary: "%{class}: arma secundaria"
+      melee: "%{class}: arma cuerpo a cuerpo"
     hint: "Haz clic en un arma para darle la mira elegida"
   conflict:
     title: "Conflictos detectados"

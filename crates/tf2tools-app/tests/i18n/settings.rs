@@ -21,6 +21,7 @@ pub const NOTE_EN: &str = "Parts of TF2Tools not yet translated stay in English.
 pub const NOTE_RU: &str = "Ещё не переведённые части TF2Tools остаются на английском.";
 pub const NOTE_PT_BR: &str = "As partes do TF2Tools ainda não traduzidas ficam em inglês.";
 pub const NOTE_ES: &str = "Las partes de TF2Tools aún sin traducir se muestran en inglés.";
+pub const NOTE_DE: &str = "Noch nicht übersetzte Teile von TF2Tools erscheinen auf Englisch.";
 
 /// Opens Settings through the sidebar and waits for its first load.
 pub fn open_settings(cx: &mut TestAppContext, s: &ShellWindow) -> Entity<SettingsPage> {
@@ -232,10 +233,34 @@ fn a_mexican_system_starts_in_spanish(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn a_german_system_starts_in_german(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let win = start_with_locales(cx, &env, &["de_DE.UTF-8"]);
+    assert_eq!(i18n::current(), "de");
+    support::click_id(cx, win, ids::nav(Page::Settings));
+    support::wait_real(cx, "the German note", |cx| {
+        note(cx, win).as_deref() == Some(NOTE_DE)
+    });
+}
+
+#[gpui_kit::test]
+fn an_austrian_system_starts_in_german(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let win = start_with_locales(cx, &env, &["de_AT.UTF-8"]);
+    assert_eq!(i18n::current(), "de");
+    support::click_id(cx, win, ids::nav(Page::Settings));
+    support::wait_real(cx, "the German note", |cx| {
+        note(cx, win).as_deref() == Some(NOTE_DE)
+    });
+}
+
+#[gpui_kit::test]
 fn an_unsupported_system_language_starts_in_english(cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch("ru");
     let env = support::env();
-    start_with_locales(cx, &env, &["de-DE"]);
+    start_with_locales(cx, &env, &["it-IT"]);
     assert_eq!(i18n::current(), "en");
 }
 
@@ -457,6 +482,8 @@ fn the_settings_cards_fit_at_800_by_600_in_every_language(cx: &mut TestAppContex
     assert_settings_fit(cx, s.win, "pt-BR");
     pick(cx, s.win, "es");
     assert_settings_fit(cx, s.win, "es");
+    pick(cx, s.win, "de");
+    assert_settings_fit(cx, s.win, "de");
 }
 
 // The hub keeps a failed sync for its card, so the Stores card must word it when drawn and take a
