@@ -85,3 +85,20 @@ fn brazilian_portuguese_says_a_damaged_download_one_way() {
             .map(|t| t.into_owned())
     );
 }
+
+// The HUD Maker names game ideas as the Brazilian client does and says snapshot and borrow
+// the same way its toasts do.
+#[test]
+fn the_hud_maker_uses_the_client_and_toast_words() {
+    let text = |k: &str| {
+        tf2tools_app::_rust_i18n_try_translate("pt-BR", k)
+            .map(|t| t.into_owned())
+            .unwrap_or_default()
+    };
+    assert!(text("hud_maker.timeline.event.medic_charged").contains("ÜberCarga"));
+    assert!(text("hud_maker.timeline.event.health_bonus_pulse").contains("sobrecura"));
+    assert!(text("hud_maker.scene.scoreboard").contains("Placar"));
+    assert!(text("messages.action.save_snapshot").contains("snapshot"));
+    assert!(text("hud_maker.history.save").contains("snapshot"));
+    assert!(text("hud_maker.borrow.title").contains("emprestad"));
+}

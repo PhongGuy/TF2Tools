@@ -369,17 +369,29 @@ fn maker_ids_stay_english_under_russian(cx: &mut TestAppContext) {
 
 // At 800x600 the scene bar keeps its tabs inside the bar or falls back to its menu. The side
 // panel's title width is checked offline in Inter: the headless font cannot show it.
-#[gpui_kit::test]
-fn the_russian_maker_fits_at_800_by_600(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+fn maker_fits_at_800_by_600(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let (_env, s, _page) = open_maker(cx);
     cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
     support::settle(cx, s.win);
     let bar = support::bounds_of(cx, s.win, ids::HUD_MAKER_SCENES).unwrap();
     match support::bounds_of(cx, s.win, ids::HUD_MAKER_SCENE_TABS) {
-        Some(tabs) => assert!(tabs.right() <= bar.right(), "{tabs:?} past {bar:?}"),
-        None => assert!(support::present(cx, s.win, ids::HUD_MAKER_SCENE_MENU)),
+        Some(tabs) => assert!(tabs.right() <= bar.right(), "{lang}: {tabs:?} past {bar:?}"),
+        None => assert!(
+            support::present(cx, s.win, ids::HUD_MAKER_SCENE_MENU),
+            "{lang}: no scene tabs and no scene menu"
+        ),
     }
+}
+
+#[gpui_kit::test]
+fn the_russian_maker_fits_at_800_by_600(cx: &mut TestAppContext) {
+    maker_fits_at_800_by_600(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_maker_fits_at_800_by_600(cx: &mut TestAppContext) {
+    maker_fits_at_800_by_600(cx, "pt-BR");
 }
 
 // Reopening a HUD that held too many borrowed pictures says so in the player's language.
