@@ -58,10 +58,10 @@ impl Confirm {
     /// The prompt before shrinking a crosshair drawing to 32x32 would cut paint off its edges.
     pub fn shrink_canvas() -> Self {
         Self {
-            title: "Shrink canvas".into(),
-            description: "Shrinking to 32x32 cuts off the edges of your drawing.".into(),
-            confirm_label: "Shrink".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.shrink_canvas.title"),
+            description: tr!("confirm.shrink_canvas.body"),
+            confirm_label: tr!("confirm.shrink_canvas.ok"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 
@@ -129,22 +129,20 @@ impl Confirm {
     /// The prompt before a HUD Maker history snapshot is deleted.
     pub fn delete_snapshot(name: &str) -> Self {
         Self {
-            title: "Delete this snapshot?".into(),
-            description: format!("{name} will be gone for good. Your HUD stays as it is.").into(),
-            confirm_label: "Delete".into(),
-            cancel_label: "Keep".into(),
+            title: tr!("confirm.delete_snapshot.title"),
+            description: tr!("confirm.delete_snapshot.body", name = name),
+            confirm_label: tr!("confirm.delete"),
+            cancel_label: tr!("confirm.delete_snapshot.keep"),
         }
     }
 
     /// The prompt before the HUD Maker resets every option of the open HUD.
     pub fn reset_all_options() -> Self {
         Self {
-            title: "Reset all options?".into(),
-            description:
-                "Every option goes back to how the HUD came. Your other changes stay, and Undo brings the options back."
-                    .into(),
-            confirm_label: "Reset all".into(),
-            cancel_label: "Cancel".into(),
+            title: tr!("confirm.reset_all_options.title"),
+            description: tr!("confirm.reset_all_options.body"),
+            confirm_label: tr!("confirm.reset_all_options.ok"),
+            cancel_label: tr!("confirm.cancel"),
         }
     }
 

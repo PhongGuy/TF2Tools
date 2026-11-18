@@ -860,6 +860,7 @@ mod tests {
         "pages/crosshair_maker/model.rs",
         "pages/crosshair_maker/starter.rs",
         "pages/crosshair_maker/starter_dialog.rs",
+        "pages/hud_maker/mod.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -982,33 +983,7 @@ mod tests {
         ("sync.rs", "Addons", STORE_FIELD),
         ("sync.rs", "Store", STORE_FIELD),
         ("shell/mod.rs", "Shell", "developer detail: a key context"),
-        ("shell/confirm.rs", "Shrink canvas", DIALOG_ELSEWHERE),
-        (
-            "shell/confirm.rs",
-            "Shrinking to 32x32 cuts off the edges of your drawing.",
-            DIALOG_ELSEWHERE,
-        ),
-        ("shell/confirm.rs", "Shrink", DIALOG_ELSEWHERE),
         ("shell/confirm.rs", "Cancel", DIALOG_ELSEWHERE),
-        (
-            "shell/confirm.rs",
-            "Delete this snapshot?",
-            DIALOG_ELSEWHERE,
-        ),
-        (
-            "shell/confirm.rs",
-            "{name} will be gone for good. Your HUD stays as it is.",
-            DIALOG_ELSEWHERE,
-        ),
-        ("shell/confirm.rs", "Delete", DIALOG_ELSEWHERE),
-        ("shell/confirm.rs", "Keep", DIALOG_ELSEWHERE),
-        ("shell/confirm.rs", "Reset all options?", DIALOG_ELSEWHERE),
-        (
-            "shell/confirm.rs",
-            "Every option goes back to how the HUD came. Your other changes stay, and Undo brings the options back.",
-            DIALOG_ELSEWHERE,
-        ),
-        ("shell/confirm.rs", "Reset all", DIALOG_ELSEWHERE),
         ("shell/confirm.rs", "Remove mastercomfig", DIALOG_ELSEWHERE),
         (
             "shell/confirm.rs",
@@ -1184,6 +1159,13 @@ mod tests {
             "a canvas image is side*side*4 bytes",
             "developer detail: an invariant's panic message",
         ),
+        ("pages/hud_maker/mod.rs", "LineHeight", HUD_FILE_KEY),
+        ("pages/hud_maker/mod.rs", "LineSpacing", HUD_FILE_KEY),
+        (
+            "pages/hud_maker/mod.rs",
+            "a save's own arguments plus the base the page opened",
+            "developer detail: a lint reason",
+        ),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
@@ -1193,6 +1175,7 @@ mod tests {
     const STORE_FIELD: &str = "developer detail: the store's tracing field";
     const ID_VALUE: &str = "element id value; its label is keyed";
     const DIALOG_ELSEWHERE: &str = "dialog of an untranslated page";
+    const HUD_FILE_KEY: &str = "developer detail: a key as the HUD file spells it";
     const LOGS_TF_ABBREVIATION: &str = "logs.tf abbreviation, as logs.tf prints it";
     const STARTUP_DETAIL: &str =
         "developer detail: StartupError's log text; the view reads describe_startup";

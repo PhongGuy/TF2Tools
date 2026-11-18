@@ -8,7 +8,9 @@ use tf2tools_app::ids;
 use tf2tools_app::pages::crosshair_maker::CrosshairMakerPage;
 use tf2tools_app::pages::crosshair_maker::model::{Tool, undo_tip};
 use tf2tools_app::pages::hud_maker::HudMakerPage;
+use tf2tools_app::pages::hud_maker::install_tip;
 use tf2tools_app::services::Tf2State;
+use tf2tools_app::shell::confirm::Confirm;
 use tf2tools_app::shell::route::Page;
 use tf2tools_core::{BoardMode, MeterKind, OptionSpec, PartKey, Scene, StartingPoint, Tf2Install};
 
@@ -378,6 +380,99 @@ fn the_crosshair_maker_reopened_after_a_switch_reads_russian(cx: &mut TestAppCon
     let _page = open_crosshair_maker(cx, &s);
     assert_eq!(
         label(cx, &s, ids::CROSSHAIR_MAKER_SAVE).as_deref(),
+        Some("Сохранить")
+    );
+}
+
+fn texts(c: &Confirm) -> [String; 4] {
+    [&c.title, &c.description, &c.confirm_label, &c.cancel_label].map(|t| t.to_string())
+}
+
+#[test]
+fn the_maker_confirm_dialogs_read_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(
+        texts(&Confirm::shrink_canvas()),
+        [
+            "Уменьшить холст",
+            "При уменьшении до 32x32 края рисунка обрежутся.",
+            "Уменьшить",
+            "Отмена"
+        ]
+    );
+    assert_eq!(
+        texts(&Confirm::delete_snapshot("Before")),
+        [
+            "Удалить этот снимок?",
+            "Снимок «Before» будет удалён навсегда. Ваш HUD не изменится.",
+            "Удалить",
+            "Оставить"
+        ]
+    );
+    assert_eq!(
+        texts(&Confirm::reset_all_options())[..3],
+        [
+            "Сбросить все настройки?",
+            "Все настройки вернутся к тем, что были в HUD. Остальные изменения останутся, а «Отменить» вернёт настройки.",
+            "Сбросить все",
+        ]
+    );
+}
+
+#[gpui_kit::test]
+fn the_hud_maker_frame_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, page) = open_hud_maker(cx, &[]);
+    let buttons = [ids::HUD_MAKER_SAVE, ids::HUD_MAKER_INSTALL].map(|id| label(cx, &s, id));
+    assert_eq!(
+        buttons,
+        [Some("Сохранить".to_owned()), Some("Установить".to_owned())]
+    );
+    assert_eq!(
+        cx.update(|cx| page.read(cx).undo_tip()),
+        "Отменить (Ctrl+Z)"
+    );
+    let placeholders = cx.update(|cx| {
+        let p = page.read(cx);
+        [p.name_input(), p.parts_filter(), p.snapshot_name_input()]
+            .map(|input| input.read(cx).presentation().placeholder().to_string())
+    });
+    assert_eq!(
+        placeholders,
+        ["Назовите HUD", "Найти часть...", "Название снимка"]
+    );
+    assert_eq!(
+        install_tip(false, true).to_string(),
+        "Сначала сохраните HUD"
+    );
+    assert_eq!(install_tip(false, false).to_string(), "TF2 не найдена");
+}
+
+#[gpui_kit::test]
+fn the_minimal_hud_chip_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, page) = open_hud_maker(cx, &[]);
+    support::maker_page::on_page(cx, &s, &page, |p, window, cx| {
+        p.set_minmode(true, window, cx)
+    });
+    support::click_scene(cx, s.win, Scene::Scoreboard);
+    assert_eq!(
+        label(cx, &s, ids::HUD_MAKER_MINMODE_CHIP).as_deref(),
+        Some("Минимальный HUD")
+    );
+}
+
+// The HUD Maker is dropped on leaving, so one opened after a switch is built in the new language.
+#[gpui_kit::test]
+fn the_hud_maker_reopened_after_a_switch_reads_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (_env, s, _page) = open_hud_maker(cx, &[]);
+    assert_eq!(label(cx, &s, ids::HUD_MAKER_SAVE).as_deref(), Some("Save"));
+    crate::settings::open_settings(cx, &s);
+    crate::settings::pick(cx, s.win, "ru");
+    let _page = reopen_hud_maker(cx, &s);
+    assert_eq!(
+        label(cx, &s, ids::HUD_MAKER_SAVE).as_deref(),
         Some("Сохранить")
     );
 }

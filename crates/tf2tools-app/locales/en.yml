@@ -830,6 +830,18 @@ confirm:
   clear_logs:
     title: "Clear All Logs"
     body: "Are you sure you want to clear all activity logs? This cannot be undone."
+  shrink_canvas:
+    title: "Shrink canvas"
+    body: "Shrinking to 32x32 cuts off the edges of your drawing."
+    ok: "Shrink"
+  delete_snapshot:
+    title: "Delete this snapshot?"
+    body: "%{name} will be gone for good. Your HUD stays as it is."
+    keep: "Keep"
+  reset_all_options:
+    title: "Reset all options?"
+    body: "Every option goes back to how the HUD came. Your other changes stay, and Undo brings the options back."
+    ok: "Reset all"
 
 font_check:
   installed: { one: "Installed %{count} font for %{folder}. Restart TF2 to use them.", other: "Installed %{count} fonts for %{folder}. Restart TF2 to use them." }
@@ -1204,6 +1216,53 @@ hud_maker:
     centre_hud:
       name: "Centre HUD"
       about: "Moves health and ammo next to the crosshair."
+  loading: "Loading the default HUD..."
+  add_refused: "That part can't be added here."
+  detach_first: "Detach the parts attached to it first."
+  font:
+    not_a_font: "That file isn't a font TF2Tools can read."
+    bad_name: "TF2Tools can't use a font with that name in a HUD."
+    hud_full: "This HUD can't take another font file."
+    part_font: "This part's font can't be changed in this HUD, so the font wasn't added."
+  nudge:
+    game_places: "The game places this part itself, so it can't be moved."
+    sideways_set: "The game sets where this part sits from side to side, so it only moves up and down."
+    up_down_set: "The game sets where this part sits from top to bottom, so it only moves left and right."
+    odd_place: "This part's place is written in a way the HUD Maker can't change, so it can't be moved."
+    from_base: "This part comes from another file the HUD includes, so it can't be moved here yet."
+    unreadable: "This part's file couldn't be read, so it can't be moved."
+    refused: "This part can't be moved that way."
+  placeholder:
+    name: "Name your HUD"
+    find_part: "Find a part..."
+    preset: "Preset name"
+    snapshot: "Snapshot name"
+  toolbar:
+    name: "HUD name"
+    save: "Save"
+    install: "Install"
+    save_as_new: "Save as new"
+    screen_shape: "Screen shape"
+    hide: "Hide toolbar"
+    undo_named: "Undo %{name} (Ctrl+Z)"
+    redo_named: "Redo %{name} (Ctrl+Y)"
+  install_tip:
+    save_first: "Save the HUD first"
+  saved:
+    title: "HUD saved"
+    body: "%{name} is in your HUDs library."
+  activity:
+    saved: "Saved HUD: %{name}"
+  minmode:
+    chip: "Minimal HUD"
+    chip_tip: "The minimal HUD is on. Click to turn it off."
+    looks_the_same: "This HUD looks the same with the minimal HUD on."
+  field:
+    whole_numbers: "Whole numbers only"
+    between: "Must be between %{min} and %{max}"
+    time_between: "Must be between %{min} and %{max}, with at most two decimals"
+    numbers_only: "Numbers only"
+    rounded: "Rounded to %{value}, the nearest step the HUD file can hold"
   label:
     health: "Health"
     shows_while_you_are_alive: "Shows while you are alive"
