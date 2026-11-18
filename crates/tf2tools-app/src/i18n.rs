@@ -530,6 +530,108 @@ mod tests {
         }
     }
 
+    // Values Brazilian Portuguese legitimately writes as English does: names and bare formats.
+    const PT_BR_SAME_AS_ENGLISH: &[&str] = &[
+        "activity_log.category.hud",
+        "activity_log.level.info",
+        "activity_log.level_name.info",
+        "addon_store.downloads.one",
+        "addon_store.downloads.other",
+        "addons.section.guis",
+        "addons.section.skins",
+        "common.class.demoman",
+        "common.class.engineer",
+        "common.class.heavy",
+        "common.class.medic",
+        "common.class.pyro",
+        "common.class.scout",
+        "common.class.sniper",
+        "common.class.soldier",
+        "common.class.spy",
+        "common.class_compact.demoman",
+        "common.class_compact.engineer",
+        "common.class_compact.heavy",
+        "common.class_compact.medic",
+        "common.class_compact.pyro",
+        "common.class_compact.scout",
+        "common.class_compact.sniper",
+        "common.class_compact.soldier",
+        "common.class_compact.spy",
+        "common.class_short.demoman",
+        "common.class_short.engineer",
+        "common.class_short.heavy",
+        "common.class_short.pyro",
+        "common.class_short.scout",
+        "common.date.date_time",
+        "common.list.separator",
+        "common.sound_kind.hitsound",
+        "common.sound_kind.killsound",
+        "hud_maker.board_mode.casual",
+        "hud_maker.board_mode.mvm",
+        "hud_maker.borrow.origin.curated",
+        "hud_maker.label.chat",
+        "hud_maker.label.elite",
+        "hud_maker.label.hud",
+        "hud_maker.label.killfeed",
+        "hud_maker.label.normal",
+        "hud_maker.label.valve",
+        "hud_maker.meter.pomson",
+        "hud_maker.more.vision.normal",
+        "hud_maker.more.vision_name.blue_blind",
+        "hud_maker.more.vision_name.green_blind",
+        "hud_maker.more.vision_name.red_blind",
+        "hud_maker.options.viewmodels",
+        "hud_maker.part_name.demoman",
+        "hud_maker.part_name.engineer",
+        "hud_maker.part_name.heavyweapons",
+        "hud_maker.part_name.medic",
+        "hud_maker.part_name.pyro",
+        "hud_maker.part_name.scout",
+        "hud_maker.part_name.sniper",
+        "hud_maker.part_name.soldier",
+        "hud_maker.part_name.spy",
+        "hud_maker.scene.hud",
+        "hud_store.filter.tags",
+        "huds.badge.local",
+        "logs_tf.detail.medics",
+        "logs_tf.detail.midfights",
+        "logs_tf.stat.logs",
+        "nav.huds",
+        "nav.logs",
+        "nav.logs_tf",
+        "profiles.missing.kind.hitsound",
+        "profiles.missing.kind.item",
+        "profiles.missing.kind.killsound",
+        "profiles.part.item",
+        "settings.audio.volume",
+        "settings.cache.days_hours",
+        "settings.logs_tf.title",
+        "settings.storage.addons",
+        "settings.storage.huds",
+        "settings.storage.total",
+        "sound_store.category.hitsounds",
+        "sound_store.category.killsounds",
+        "sounds.button.hit",
+        "sounds.button.kill",
+    ];
+
+    #[test]
+    fn brazilian_portuguese_leaves_nothing_in_english() {
+        let (en, pt) = (messages("en"), messages("pt-BR"));
+        let left: Vec<&str> = pt
+            .iter()
+            .filter(|(k, v)| en.get(*k) == Some(*v))
+            .map(|(k, _)| k.as_str())
+            .filter(|k| !PT_BR_SAME_AS_ENGLISH.contains(k))
+            .collect();
+        assert!(left.is_empty(), "pt-BR values still in English: {left:?}");
+        let stale: Vec<&&str> = PT_BR_SAME_AS_ENGLISH
+            .iter()
+            .filter(|k| en.get(**k) != pt.get(**k))
+            .collect();
+        assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
+    }
+
     #[test]
     fn translations_keep_the_english_variables() {
         let en = messages("en");
