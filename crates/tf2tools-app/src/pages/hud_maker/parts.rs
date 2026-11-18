@@ -802,6 +802,11 @@ mod tests {
         ]);
     }
 
+    #[test]
+    fn nested_parts_l_to_z_read_in_russian_and_portuguese() {
+        nested_parts_read(&["TeleportsLabel", "Score", "Revenge", "NameLabel", "XPBar"]);
+    }
+
     // Each raw name has a key in en.yml, and ru and pt-BR words that differ from the English.
     fn nested_parts_read(raws: &[&str]) {
         for raw in raws {
