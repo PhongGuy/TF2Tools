@@ -451,6 +451,8 @@ fn contributing_explains_how_to_translate() {
         "pt-BR",
         "ui.yml",
         "pt_BR.UTF-8",
+        "es_MX",
+        "Spanish",
     ] {
         assert!(
             section.contains(needle),
@@ -473,6 +475,7 @@ fn the_readme_tells_players_they_can_pick_a_language() {
     assert!(settings.contains("**Language**"), "{settings}");
     assert!(settings.contains("Russian"), "{settings}");
     assert!(settings.contains("Brazilian Portuguese"), "{settings}");
+    assert!(settings.contains("Spanish"), "{settings}");
     assert!(settings.contains("your system's language"), "{settings}");
     assert!(
         settings.contains("](CONTRIBUTING.md#translations)"),
