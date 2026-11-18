@@ -744,4 +744,30 @@ mod tests {
             assert_eq!(plain_name(raw), plain, "{raw}");
         }
     }
+
+    // Every curated part name has its English in en.yml and a Russian word that differs from it,
+    // except for names a player reads the same in both languages (team colours, "HUD").
+    #[test]
+    fn the_curated_in_game_panels_read_in_russian() {
+        for raw in [
+            "PlayerStatusHealthValue",
+            "AmmoInClip",
+            "ChargeMeter",
+            "TargetNameLabel",
+            "PlayerStatusClassImage",
+            "ItemEffectMeterLabel",
+            "OvertimeLabel",
+        ] {
+            let key = crate::i18n::names::maker_part_name_key(&plain_name(raw)).unwrap();
+            assert!(
+                crate::_rust_i18n_try_translate("en", &key).is_some(),
+                "{raw}: {key} in en.yml"
+            );
+            let ru = crate::_rust_i18n_try_translate("ru", &key);
+            assert!(
+                ru.is_some_and(|r| r != crate::_rust_i18n_try_translate("en", &key).unwrap()),
+                "{raw}: {key} in ru.yml"
+            );
+        }
+    }
 }
