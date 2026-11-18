@@ -866,6 +866,11 @@ mod tests {
         "pages/hud_maker/recipes.rs",
         "pages/hud_maker/borrow.rs",
         "pages/hud_maker/colour_view.rs",
+        "pages/hud_maker/animations.rs",
+        "pages/hud_maker/timeline.rs",
+        "pages/hud_maker/step_name.rs",
+        "pages/hud_maker/editor.rs",
+        "pages/hud_maker/editor/fit.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1209,6 +1214,118 @@ mod tests {
             "Blue-blind",
             MAKER_ID_WORD,
         ),
+        (
+            "pages/hud_maker/animations.rs",
+            "TF2ToolsHitMarker",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/animations.rs", "Linear", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Accel", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Deaccel", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Spline", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Bounce", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "FgColor", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Alpha", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Position", MAKER_GAME_NAME),
+        ("pages/hud_maker/animations.rs", "Size", MAKER_GAME_NAME),
+        (
+            "pages/hud_maker/animations.rs",
+            "SetInputEnabled",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/animations.rs",
+            "PlaySound",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/animations.rs",
+            "StopAnimation",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/animations.rs",
+            "StopPanelAnimations",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/animations.rs", "SetFont", MAKER_GAME_NAME),
+        (
+            "pages/hud_maker/animations.rs",
+            "SetTexture",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/animations.rs",
+            "SetString",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "DamagedPlayer",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudHealthBonusPulse",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudHealthBonusPulseStop",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudHealthDyingPulse",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudHealthDyingPulseStop",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudLowAmmoPulse",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudLowAmmoPulseStop",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudMedicCharged",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/timeline.rs",
+            "HudMedicChargedStop",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/editor.rs", "FgColor", MAKER_GAME_NAME),
+        ("pages/hud_maker/editor.rs", "BgColor", MAKER_GAME_NAME),
+        (
+            "pages/hud_maker/editor.rs",
+            "TF2ToolsHitMarker",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/editor.rs",
+            r"event Lines\n{{\n{lines}\n}}",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/editor.rs", "no clip", MAKER_SHOWS_FOR),
+        ("pages/hud_maker/editor.rs", "low ammo", MAKER_SHOWS_FOR),
+        ("pages/hud_maker/editor.rs", "3D model", MAKER_SHOWS_FOR),
+        ("pages/hud_maker/editor.rs", "2D portrait", MAKER_SHOWS_FOR),
+        ("pages/hud_maker/editor.rs", "not koth", MAKER_SHOWS_FOR),
+        (
+            "pages/hud_maker/editor.rs",
+            "the start box, screen and group travel with the drag",
+            MAKER_LINT,
+        ),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
@@ -1217,6 +1334,8 @@ mod tests {
     const STOPPED_LABEL: &str = "developer detail: a stopped task's log label";
     const MAKER_GAME_NAME: &str = "developer detail: a VDF key, class, event or command name";
     const MAKER_ID_WORD: &str = "an element id built from the English word; its label is keyed";
+    const MAKER_LINT: &str = "developer detail: a lint reason";
+    const MAKER_SHOWS_FOR: &str = "developer detail: core's ShowsFor value, matched";
     const MAKER_CREDIT_FILE: &str = "the credit written into the shared HUD's files; shown keyed";
     const STORE_FIELD: &str = "developer detail: the store's tracing field";
     const ID_VALUE: &str = "element id value; its label is keyed";

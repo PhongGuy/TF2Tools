@@ -2,10 +2,13 @@
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, ElementId, Entity, ScrollDelta, TestAppContext, point};
+use tf2tools_app::i18n::names::maker_label;
 use tf2tools_app::i18n::plural;
 use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
-use tf2tools_core::PartKey;
+use tf2tools_app::pages::hud_maker::animations::anim_sentence;
+use tf2tools_app::pages::hud_maker::editor::{Align, HudEditor};
+use tf2tools_core::{AnimCommand, Interp, PartKey};
 
 use crate::LocaleGuard;
 use crate::support;
@@ -181,4 +184,61 @@ fn the_borrow_section_reads_in_russian(cx: &mut TestAppContext) {
              Сначала скачайте HUD в магазине HUD."
         )
     );
+}
+
+// An editor over the stock HUD holding `keys`, added as Shift-clicks would.
+fn holding(keys: &[&str]) -> HudEditor {
+    let mut e = HudEditor::new(support::stock_model(), Vec::new());
+    for key in keys {
+        e.toggle_select(PartKey::new(*key));
+    }
+    e
+}
+
+#[test]
+fn animation_rows_read_as_russian_sentences() {
+    let _guard = LocaleGuard::switch("ru");
+    let fade = AnimCommand::Animate {
+        panel: "P".into(),
+        field: "Alpha".into(),
+        value: "0".into(),
+        interp: Interp::Linear,
+        start: 0.2,
+        duration: 0.2,
+    };
+    assert_eq!(
+        anim_sentence(&fade),
+        "Меняет прозрачность до 0 за 0,2\u{a0}с, начиная с 0,2\u{a0}с"
+    );
+    let run = AnimCommand::RunEvent {
+        event: "Loop".into(),
+        delay: 0.25,
+    };
+    assert_eq!(anim_sentence(&run), "Запускает Loop в 0,25\u{a0}с");
+}
+
+#[gpui_kit::test]
+fn the_animations_section_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, page) = open_maker(cx);
+    select(cx, &s, &page, &[VALUE]);
+    assert_eq!(
+        panel_label(cx, &s, ids::hud_maker_anim_row("HudHealthDyingPulse", 0)).as_deref(),
+        Some("Меняет цвет на HUDRedTeamSolid за 0,1\u{a0}с, начиная с 0\u{a0}с")
+    );
+}
+
+#[test]
+fn undo_steps_are_named_in_russian() {
+    let _guard = LocaleGuard::switch("ru");
+    let mut e = holding(&[VALUE]);
+    e.layer_selected(false).unwrap();
+    let layer = format!("смена слоя «{}»", maker_label("Health value"));
+    assert_eq!(e.undo_name(), Some(layer.as_str()));
+    let mut e = holding(&[VALUE, MEDIC]);
+    e.align_selected(Align::Left).unwrap();
+    assert_eq!(e.undo_name(), Some("выравнивание частей: 2"));
+    let mut e = holding(&[VALUE, MEDIC]);
+    e.hide_selected().unwrap();
+    assert_eq!(e.undo_name(), Some("скрытие частей: 2"));
 }

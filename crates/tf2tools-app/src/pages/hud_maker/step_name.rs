@@ -6,6 +6,39 @@ use std::cmp::Ordering;
 use tf2tools_core::{Change, ChangeTarget, HudModel, Part, PartKey, SetKey};
 
 use super::parts::row_label;
+use crate::i18n::tr;
+
+/// What a step does to its one part, which names it.
+#[derive(Clone, Copy)]
+enum Verb {
+    Hide,
+    Show,
+    Move,
+    Resize,
+    Recolour,
+    Font,
+    Text,
+    Layer,
+    Picture,
+    Change,
+}
+
+// The one-part step in player words, each verb a whole phrase around the part's name.
+fn part_step(verb: Verb, name: &str) -> String {
+    match verb {
+        Verb::Hide => tr!("hud_maker.step.part.hide", name = name),
+        Verb::Show => tr!("hud_maker.step.part.show", name = name),
+        Verb::Move => tr!("hud_maker.step.part.move", name = name),
+        Verb::Resize => tr!("hud_maker.step.part.resize", name = name),
+        Verb::Recolour => tr!("hud_maker.step.part.recolour", name = name),
+        Verb::Font => tr!("hud_maker.step.part.font", name = name),
+        Verb::Text => tr!("hud_maker.step.part.text", name = name),
+        Verb::Layer => tr!("hud_maker.step.part.layer", name = name),
+        Verb::Picture => tr!("hud_maker.step.part.picture", name = name),
+        Verb::Change => tr!("hud_maker.step.part.change", name = name),
+    }
+    .to_string()
+}
 
 /// The edit from `before` to `after` in player words; `None` when it has no short name.
 /// `model` is the HUD before the edit, `pristine` the starting HUD, which holds removed parts.
@@ -19,17 +52,17 @@ pub(super) fn name(
     let all = || removed.iter().chain(&added).map(|c| c.target());
     // Steps that bring whole parts are named for that, whatever settings came along.
     if all().any(|t| matches!(t, ChangeTarget::Credit(_))) {
-        return Some("borrow a part".to_owned());
+        return Some(tr!("hud_maker.step.borrow").to_string());
     }
     let blocks = |list: &[&Change]| {
         list.iter()
             .any(|c| matches!(c.target(), ChangeTarget::AddBlock(_)))
     };
     if blocks(&added) {
-        return Some("add a part".to_owned());
+        return Some(tr!("hud_maker.step.add").to_string());
     }
     if blocks(&removed) {
-        return Some("delete a part".to_owned());
+        return Some(tr!("hud_maker.step.delete").to_string());
     }
     let sets: Vec<&SetKey> = all()
         .filter_map(|t| match t {
@@ -48,12 +81,12 @@ pub(super) fn name(
         [] => {}
         [part] => {
             let verb = verb(model, part.key(), &sets, before, after);
-            return Some(format!("{verb} {}", row_label(part)));
+            return Some(part_step(verb, &row_label(part)));
         }
-        _ => return Some("change several parts".to_owned()),
+        _ => return Some(tr!("hud_maker.step.several").to_string()),
     }
     if all().any(|t| matches!(t, ChangeTarget::Option(_))) {
-        return Some("change a HUD option".to_owned());
+        return Some(tr!("hud_maker.step.hud_option").to_string());
     }
     if all().any(|t| {
         matches!(
@@ -61,7 +94,7 @@ pub(super) fn name(
             ChangeTarget::Animation(_) | ChangeTarget::AnimationAppend(_)
         )
     }) {
-        return Some("change an animation".to_owned());
+        return Some(tr!("hud_maker.step.animation").to_string());
     }
     None
 }
@@ -134,30 +167,30 @@ fn verb(
     sets: &[&SetKey],
     before: &[Change],
     after: &[Change],
-) -> &'static str {
+) -> Verb {
     let hides = |changes: &[Change]| model.hide_groups(part, changes).len();
     match hides(after).cmp(&hides(before)) {
-        Ordering::Greater => return "hide",
-        Ordering::Less => return "show",
+        Ordering::Greater => return Verb::Hide,
+        Ordering::Less => return Verb::Show,
         Ordering::Equal => {}
     }
     let keys: Vec<String> = sets.iter().map(|s| s.key().to_ascii_lowercase()).collect();
     let any = |names: &[&str]| keys.iter().any(|k| names.contains(&k.as_str()));
     if keys.iter().all(|k| k == "xpos" || k == "ypos") {
-        "move"
+        Verb::Move
     } else if any(&["wide", "tall"]) {
-        "resize"
+        Verb::Resize
     } else if keys.iter().any(|k| k.contains("color")) {
-        "recolour"
+        Verb::Recolour
     } else if any(&["font"]) {
-        "change the font of"
+        Verb::Font
     } else if any(&["labeltext"]) {
-        "change the text of"
+        Verb::Text
     } else if any(&["zpos"]) {
-        "change the layer of"
+        Verb::Layer
     } else if any(&["image"]) {
-        "change the picture of"
+        Verb::Picture
     } else {
-        "change"
+        Verb::Change
     }
 }

@@ -15,6 +15,8 @@ use tf2tools_core::{AnimCommand, AnimEvent, Interp};
 
 use super::HudMakerPage;
 use super::editor::{AnimEdit, AnimRefused};
+use crate::i18n::format::decimal_point;
+use crate::i18n::tr;
 use crate::ids;
 use crate::shell::toast::{ToastKind, toast};
 use crate::widgets::Named as _;
@@ -22,10 +24,9 @@ use crate::widgets::labelled;
 use gpui_kit::assets::IconName;
 
 /// What a locked event says, in player words.
-pub const RUNS_GAME_COMMANDS: &str =
-    "This animation runs game commands, so it can't be changed here.";
-const FROM_FLASH: &str = "Added by the hit flash";
-const FROM_BORROW: &str = "Added by a borrow";
+pub fn runs_game_commands() -> SharedString {
+    tr!("hud_maker.animations.runs_game_commands")
+}
 /// The event the hit flash fills, and the one that restarts it.
 const HIT_MARKER: &str = "TF2ToolsHitMarker";
 /// The curves the row editor offers.
@@ -36,13 +37,23 @@ const CURVES: [(Interp, &str); 5] = [
     (Interp::Spline, "Spline"),
     (Interp::Bounce, "Bounce"),
 ];
-/// The fields Add row offers, with their player words.
-const ADD_FIELDS: [(&str, &str); 4] = [
-    ("FgColor", "Colour"),
-    ("Alpha", "Fade"),
-    ("Position", "Move"),
-    ("Size", "Resize"),
-];
+/// The fields Add row offers, as the game names them.
+const ADD_FIELDS: [&str; 4] = ["FgColor", "Alpha", "Position", "Size"];
+
+// The Add row's button for one of `ADD_FIELDS`, in player words.
+fn add_field_label(field: &str) -> SharedString {
+    match field {
+        "FgColor" => tr!("hud_maker.animations.field.colour"),
+        "Alpha" => tr!("hud_maker.animations.field.fade"),
+        "Position" => tr!("hud_maker.animations.field.move"),
+        _ => tr!("hud_maker.animations.field.resize"),
+    }
+}
+
+// Seconds as the language writes a decimal: "0.25" in English, "0,25" in Russian.
+fn secs(t: f32) -> String {
+    decimal_point(&t.to_string())
+}
 
 /// The colour picker's row key for row `row` of `event`, which no file key can be.
 pub(super) fn anim_key(event: &str, row: usize) -> String {
@@ -65,37 +76,99 @@ pub fn anim_sentence(command: &AnimCommand) -> String {
             duration,
             ..
         } => {
-            let verb = match field.to_ascii_lowercase().as_str() {
-                "fgcolor" => "Turns colour to".to_owned(),
-                "bgcolor" => "Turns background to".to_owned(),
-                "alpha" => "Fades to".to_owned(),
-                "xpos" | "ypos" | "position" => "Moves to".to_owned(),
-                "wide" | "tall" | "size" => "Resizes to".to_owned(),
-                _ => format!("Changes {field} to"),
-            };
-            format!("{verb} {value} over {duration} s, starting at {start} s")
+            let (value, start, duration) = (value.as_str(), secs(*start), secs(*duration));
+            match field.to_ascii_lowercase().as_str() {
+                "fgcolor" => tr!(
+                    "hud_maker.animations.sentence.colour",
+                    value = value,
+                    duration = duration,
+                    start = start
+                ),
+                "bgcolor" => tr!(
+                    "hud_maker.animations.sentence.background",
+                    value = value,
+                    duration = duration,
+                    start = start
+                ),
+                "alpha" => tr!(
+                    "hud_maker.animations.sentence.fade",
+                    value = value,
+                    duration = duration,
+                    start = start
+                ),
+                "xpos" | "ypos" | "position" => {
+                    tr!(
+                        "hud_maker.animations.sentence.move",
+                        value = value,
+                        duration = duration,
+                        start = start
+                    )
+                }
+                "wide" | "tall" | "size" => {
+                    tr!(
+                        "hud_maker.animations.sentence.resize",
+                        value = value,
+                        duration = duration,
+                        start = start
+                    )
+                }
+                _ => tr!(
+                    "hud_maker.animations.sentence.field",
+                    field = field.as_str(),
+                    value = value,
+                    duration = duration,
+                    start = start
+                ),
+            }
+            .to_string()
         }
-        AnimCommand::RunEvent { event, delay } => format!("Runs {event} at {delay} s"),
-        AnimCommand::StopEvent { event, delay } => format!("Stops {event} at {delay} s"),
+        AnimCommand::RunEvent { event, delay } => tr!(
+            "hud_maker.animations.run",
+            event = event.as_str(),
+            delay = secs(*delay)
+        )
+        .to_string(),
+        AnimCommand::StopEvent { event, delay } => tr!(
+            "hud_maker.animations.stop",
+            event = event.as_str(),
+            delay = secs(*delay)
+        )
+        .to_string(),
         AnimCommand::SetVisible { visible, delay, .. } => match visible {
-            true => format!("Shows at {delay} s"),
-            false => format!("Hides at {delay} s"),
-        },
-        AnimCommand::FireCommand { delay, .. } => format!("Runs a console command at {delay} s"),
-        AnimCommand::RunEventChild { event, delay, .. } => {
-            format!("Runs {event} inside it at {delay} s")
+            true => tr!("hud_maker.animations.show", delay = secs(*delay)),
+            false => tr!("hud_maker.animations.hide", delay = secs(*delay)),
         }
-        AnimCommand::SetInputEnabled { delay, .. } => format!("SetInputEnabled at {delay} s"),
-        AnimCommand::PlaySound { delay, .. } => format!("PlaySound at {delay} s"),
-        AnimCommand::StopAnimation { delay, .. } => format!("StopAnimation at {delay} s"),
+        .to_string(),
+        AnimCommand::FireCommand { delay, .. } => {
+            tr!("hud_maker.animations.console", delay = secs(*delay)).to_string()
+        }
+        AnimCommand::RunEventChild { event, delay, .. } => tr!(
+            "hud_maker.animations.child",
+            event = event.as_str(),
+            delay = secs(*delay)
+        )
+        .to_string(),
+        // Commands with no player wording keep the game's own name.
+        AnimCommand::SetInputEnabled { delay, .. } => game_command("SetInputEnabled", *delay),
+        AnimCommand::PlaySound { delay, .. } => game_command("PlaySound", *delay),
+        AnimCommand::StopAnimation { delay, .. } => game_command("StopAnimation", *delay),
         AnimCommand::StopPanelAnimations { delay, .. } => {
-            format!("StopPanelAnimations at {delay} s")
+            game_command("StopPanelAnimations", *delay)
         }
-        AnimCommand::SetFont { delay, .. } => format!("SetFont at {delay} s"),
-        AnimCommand::SetTexture { delay, .. } => format!("SetTexture at {delay} s"),
-        AnimCommand::SetString { delay, .. } => format!("SetString at {delay} s"),
-        _ => "Changes it".to_owned(),
+        AnimCommand::SetFont { delay, .. } => game_command("SetFont", *delay),
+        AnimCommand::SetTexture { delay, .. } => game_command("SetTexture", *delay),
+        AnimCommand::SetString { delay, .. } => game_command("SetString", *delay),
+        _ => tr!("hud_maker.animations.changes_it").to_string(),
     }
+}
+
+fn game_command(command: &str, delay: f32) -> String {
+    tr!(
+        "hud_maker.animations.command",
+        command = command,
+        delay = secs(delay)
+    )
+    .to_string()
 }
 
 /// The row open in the editor and the editor's three fields.
@@ -158,7 +231,7 @@ impl HudMakerPage {
         self.edit_selected(window, cx, |e| refused = edit(e).err());
         match refused {
             Some(AnimRefused::RunsCommands) => {
-                toast(window, cx, ToastKind::Error, RUNS_GAME_COMMANDS, "")
+                toast(window, cx, ToastKind::Error, runs_game_commands(), "")
             }
             Some(err) => tracing::debug!("the HUD Maker refused an animation edit: {err:?}"),
             None => {}
@@ -248,7 +321,7 @@ impl HudMakerPage {
                 .border_color(border)
                 .text_xs()
                 .text_color(muted)
-                .child("Animations")
+                .child(tr!("hud_maker.animations.title"))
                 .into_any_element(),
         ];
         for event in &events {
@@ -278,7 +351,7 @@ impl HudMakerPage {
             rows = rows.child(labelled(
                 div().text_xs().text_color(muted),
                 ids::hud_maker_anim_locked(&name),
-                RUNS_GAME_COMMANDS,
+                runs_game_commands(),
             ));
         }
         for (i, command) in event.commands().iter().enumerate() {
@@ -292,7 +365,10 @@ impl HudMakerPage {
                 let flash = name.eq_ignore_ascii_case(HIT_MARKER)
                     || matches!(command, AnimCommand::RunEvent { event, .. }
                         | AnimCommand::StopEvent { event, .. } if event.eq_ignore_ascii_case(HIT_MARKER));
-                let from = if flash { FROM_FLASH } else { FROM_BORROW };
+                let from = match flash {
+                    true => tr!("hud_maker.animations.from_flash"),
+                    false => tr!("hud_maker.animations.from_borrow"),
+                };
                 rows = rows.child(line.child(div().text_xs().text_color(muted).child(from)));
                 continue;
             }
@@ -306,7 +382,7 @@ impl HudMakerPage {
                             .xsmall()
                             .icon(IconName::Pencil)
                             .selected(is_open)
-                            .named("Change this row")
+                            .named(tr!("hud_maker.animations.change_row"))
                             .on_click(cx.listener(move |page, _, window, cx| {
                                 page.toggle_anim_row(edit_event.clone(), i, window, cx)
                             })),
@@ -316,7 +392,7 @@ impl HudMakerPage {
                             .ghost()
                             .xsmall()
                             .icon(IconName::Trash)
-                            .named("Delete this row")
+                            .named(tr!("hud_maker.animations.delete_row"))
                             .on_click(cx.listener(move |page, _, window, cx| {
                                 page.anims.open = None;
                                 let event = delete_event.clone();
@@ -332,12 +408,12 @@ impl HudMakerPage {
             }
         }
         if !locked {
-            let adds = ADD_FIELDS.map(|(field, label)| {
+            let adds = ADD_FIELDS.map(|field| {
                 let event = name.clone();
                 Button::new(ids::hud_maker_anim_add(&name, field))
                     .ghost()
                     .xsmall()
-                    .label(label)
+                    .label(add_field_label(field))
                     .on_click(cx.listener(move |page, _, window, cx| {
                         let event = event.clone();
                         page.edit_anim(window, cx, |e| e.add_animation_row(&event, field))
@@ -347,7 +423,12 @@ impl HudMakerPage {
                 h_flex()
                     .gap_1()
                     .items_center()
-                    .child(div().text_xs().text_color(muted).child("Add"))
+                    .child(
+                        div()
+                            .text_xs()
+                            .text_color(muted)
+                            .child(tr!("hud_maker.animations.add")),
+                    )
                     .children(adds),
             );
         }
@@ -363,7 +444,7 @@ impl HudMakerPage {
         let fill = self.row_colour(&key).unwrap_or(theme.background);
         let swatch = div()
             .id(ids::hud_maker_anim_colour(event, row))
-            .aria_label("Colour")
+            .aria_label(tr!("hud_maker.panel.colour"))
             .test_support()
             .w_10()
             .h_6()
@@ -378,9 +459,12 @@ impl HudMakerPage {
         let picker = active.then(|| {
             div()
                 .id(ids::HUD_MAKER_COLOUR)
-                .aria_label("Colour")
+                .aria_label(tr!("hud_maker.panel.colour"))
                 .test_support()
-                .child(ColorPicker::new(&self.colour).accessibility_label("Colour"))
+                .child(
+                    ColorPicker::new(&self.colour)
+                        .accessibility_label(tr!("hud_maker.panel.colour")),
+                )
         });
         h_flex()
             .gap_2()
@@ -399,7 +483,7 @@ impl HudMakerPage {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let muted = cx.theme().muted_foreground;
-        let field = |label: &'static str, input: &Entity<InputState>| {
+        let field = |label: SharedString, input: &Entity<InputState>| {
             v_flex()
                 .flex_1()
                 .min_w_0()
@@ -413,7 +497,7 @@ impl HudMakerPage {
             return div()
                 .text_xs()
                 .text_color(muted)
-                .child("Only its row can be deleted here.")
+                .child(tr!("hud_maker.animations.only_delete"))
                 .into_any_element();
         };
         let curves = CURVES.map(|(curve, label)| {
@@ -432,10 +516,9 @@ impl HudMakerPage {
         });
         let colour =
             super::editor::is_colour_field(key).then(|| self.row_colour_picker(event, row, cx));
-        let to = if colour.is_some() {
-            "Colour name"
-        } else {
-            "To"
+        let to = match colour.is_some() {
+            true => tr!("hud_maker.animations.colour_name"),
+            false => tr!("hud_maker.animations.to"),
         };
         v_flex()
             .gap_1()
@@ -445,8 +528,11 @@ impl HudMakerPage {
                 h_flex()
                     .gap_1()
                     .child(field(to, &self.anims.value))
-                    .child(field("Start (s)", &self.anims.start))
-                    .child(field("Takes (s)", &self.anims.duration)),
+                    .child(field(tr!("hud_maker.animations.start"), &self.anims.start))
+                    .child(field(
+                        tr!("hud_maker.animations.takes"),
+                        &self.anims.duration,
+                    )),
             )
             .child(h_flex().flex_wrap().gap_1().children(curves))
             .into_any_element()

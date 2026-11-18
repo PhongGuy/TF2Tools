@@ -1860,7 +1860,7 @@ impl HudMakerPage {
                 window,
                 cx,
                 ToastKind::Error,
-                animations::RUNS_GAME_COMMANDS,
+                animations::runs_game_commands(),
                 "",
             ),
             Some(err) => tracing::debug!("the HUD Maker refused the hit flash: {err:?}"),
