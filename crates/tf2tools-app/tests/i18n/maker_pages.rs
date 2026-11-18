@@ -443,6 +443,37 @@ fn the_german_part_crumbs_keep_clear_of_the_dock_buttons(cx: &mut TestAppContext
     );
 }
 
+// At 800x600 the French way down to the health value ends left of the dock buttons.
+#[gpui_kit::test]
+fn the_french_part_crumbs_keep_clear_of_the_dock_buttons(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("fr");
+    let (_env, s, page) = open_maker(cx);
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    select(cx, &s, &page, &[VALUE]);
+    support::settle(cx, s.win);
+    if !support::present(cx, s.win, ids::HUD_MAKER_PANEL_DOCK_LEFT) {
+        support::click_id(cx, s.win, ids::HUD_MAKER_PANEL_COLLAPSE);
+    }
+    let dock = support::bounds_of(cx, s.win, ids::HUD_MAKER_PANEL_DOCK_LEFT).unwrap();
+    let outer = ids::hud_maker_crumb(&PartKey::new("HudPlayerStatus"));
+    let near = ids::hud_maker_crumb(&PartKey::new("HudPlayerStatus/HudPlayerHealth"));
+    for id in [outer.clone(), near.clone()] {
+        let crumb = support::bounds_of(cx, s.win, id.clone()).unwrap();
+        assert!(
+            crumb.right() <= dock.left(),
+            "{id:?} {crumb:?} runs under the dock buttons {dock:?}"
+        );
+    }
+    assert_eq!(support::label_of(cx, s.win, near).as_deref(), Some("Santé"));
+    let status = tf2tools_app::_rust_i18n_try_translate("fr", "hud_maker.part_name.player_status");
+    assert_ne!(status.as_deref(), Some("Player status"));
+    assert_eq!(
+        support::label_of(cx, s.win, outer).as_deref(),
+        status.as_deref()
+    );
+}
+
 // Reopening a HUD that held too many borrowed pictures says so in the player's language.
 #[test]
 fn the_pictures_left_out_note_reads_in_russian() {

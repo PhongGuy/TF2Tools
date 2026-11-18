@@ -148,3 +148,16 @@ fn the_hud_maker_meters_use_the_client_names() {
     assert!(text("hud_maker.meter.drink").contains("Lait frelaté"));
     assert!(text("hud_maker.situation.switch.koth").contains("roi de la colline"));
 }
+
+// The HUD Maker's part names read in French, the power-ups as the client names them.
+#[test]
+fn the_hud_maker_names_its_parts_in_french() {
+    let text = |k: &str| {
+        tf2tools_app::_rust_i18n_try_translate("fr", format!("hud_maker.part_name.{k}"))
+            .map(|t| t.into_owned())
+            .unwrap_or_default()
+    };
+    assert_ne!(text("health_value"), "Health value");
+    assert_ne!(text("kill_streak_icon"), "Killstreak icon");
+    assert!(text("rune_haste").contains("Rapidité"));
+}
