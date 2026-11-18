@@ -193,7 +193,7 @@ fn a_russian_system_starts_in_russian_until_the_player_picks(cx: &mut TestAppCon
 }
 
 #[gpui_kit::test]
-fn a_system_without_a_catalogue_starts_in_english(cx: &mut TestAppContext) {
+fn an_unsupported_system_language_starts_in_english(cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch("ru");
     let env = support::env();
     start_with_locales(cx, &env, &["de-DE"]);
