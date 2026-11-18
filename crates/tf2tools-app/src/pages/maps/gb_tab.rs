@@ -816,8 +816,16 @@ impl GbMapsTab {
     // none, a running sync leaves the banner alone, a failed one its message with Retry, and
     // an ended query says "No maps found".
     fn body(&self, window: &Window, cx: &mut Context<Self>) -> Option<AnyElement> {
+        // The grid never gets shorter than one card row; a shorter window scrolls the page.
         if !self.feed.items().is_empty() {
-            return Some(self.cards_grid(cx));
+            let row = self.grid.row_height_for(card_height);
+            return Some(
+                div()
+                    .flex_1()
+                    .min_h(row)
+                    .child(self.cards_grid(cx))
+                    .into_any_element(),
+            );
         }
         if !self.loaded {
             let columns = columns_for_store(
@@ -993,8 +1001,10 @@ impl Render for GbMapsTab {
             )
         });
         let banner = maps_sync_banner(!self.feed.items().is_empty(), cx);
+        // The tab grows to fit its toolbar and the grid's one-row floor or the empty card; the
+        // Maps page scrolls it when the window is shorter.
         v_flex()
-            .size_full()
+            .flex_1()
             .gap_6()
             .child(self.toolbar(cx))
             .children(banner)
