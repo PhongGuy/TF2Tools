@@ -575,3 +575,48 @@ fn the_kept_logs_tf_page_follows_a_language_switch(cx: &mut TestAppContext) {
         Some("Ник")
     );
 }
+
+// The page reloads when shown again, so the switch happens in place while the error is drawn.
+#[gpui_kit::test]
+fn a_kept_logs_page_error_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let s = support::shell_window(cx, &env, missing());
+    support::rename_table(&env, "logs", "logs_away");
+    let _page = open_logs(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGS_ERROR).as_deref(),
+        Some("TF2Tools couldn't open the activity log. Restart TF2Tools and try again.")
+    );
+    tf2tools_app::i18n::apply("ru");
+    cx.update(|cx| cx.refresh_windows());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGS_ERROR).as_deref(),
+        Some(
+            "TF2Tools не удалось открыть журнал действий. Перезапустите TF2Tools и попробуйте снова."
+        )
+    );
+}
+
+// Returning to logs.tf restarts the sync, which rewords the line anyway, so the switch
+// happens in place while the error is drawn.
+#[gpui_kit::test]
+fn a_kept_logs_tf_error_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let s = shell(cx, &env, "http://127.0.0.1:9", &[(ARIE, "Arie")]);
+    // The retry after an unreachable run comes at once, so the test waits on no clock.
+    let sync = cx.update(tf2tools_app::logs_sync::logs_sync);
+    cx.update(|cx| sync.update(cx, |s, _| s.set_retry_delay(std::time::Duration::ZERO)));
+    let _page = open_page(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_ERROR).as_deref(),
+        Some("Couldn't reach logs.tf. Check your connection and try again.")
+    );
+    tf2tools_app::i18n::apply("ru");
+    cx.update(|cx| cx.refresh_windows());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_ERROR).as_deref(),
+        Some("Не удалось связаться с logs.tf. Проверьте подключение и попробуйте снова.")
+    );
+}

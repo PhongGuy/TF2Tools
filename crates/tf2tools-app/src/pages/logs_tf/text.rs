@@ -8,7 +8,7 @@ use tf2tools_core::{
     SteamId, Team, TfClass,
 };
 
-use crate::i18n::{counted_plural, format, names, tr};
+use crate::i18n::{Phrase, counted_plural, format, names, tr};
 use crate::logs_sync::SyncProgress;
 
 /// logs.tf's front page, which the page's credit opens.
@@ -135,14 +135,26 @@ pub fn progress_line(progress: SyncProgress) -> String {
 /// to fall back on. A player removed while their sync waited is no failure, so the page never
 /// asks for it.
 pub fn sync_message(error: &LogsSyncError, has_saved: bool) -> SharedString {
+    sync_message_phrase(error, has_saved).text()
+}
+
+/// `sync_message` as a phrase, worded each time it is read.
+pub fn sync_message_phrase(error: &LogsSyncError, has_saved: bool) -> Phrase {
     match error {
-        LogsSyncError::Network { .. } if has_saved => tr!("logs_tf.sync.offline_saved"),
-        LogsSyncError::Network { .. } => tr!("logs_tf.sync.unreachable"),
-        LogsSyncError::RateLimited { .. } => logs_tf_busy(),
-        LogsSyncError::Malformed { .. } => tr!("logs_tf.sync.malformed"),
-        LogsSyncError::Database { .. } => save_failed(),
-        LogsSyncError::Http { .. } | LogsSyncError::TooLarge { .. } | _ => logs_tf_down(),
+        LogsSyncError::Network { .. } if has_saved => {
+            Phrase::new(|| tr!("logs_tf.sync.offline_saved"))
+        }
+        LogsSyncError::Network { .. } => Phrase::new(|| tr!("logs_tf.sync.unreachable")),
+        LogsSyncError::RateLimited { .. } => Phrase::new(logs_tf_busy),
+        LogsSyncError::Malformed { .. } => Phrase::new(|| tr!("logs_tf.sync.malformed")),
+        LogsSyncError::Database { .. } => Phrase::new(save_failed),
+        LogsSyncError::Http { .. } | LogsSyncError::TooLarge { .. } | _ => logs_tf_down_phrase(),
     }
+}
+
+/// `logs_tf_down` as a phrase, worded each time it is read.
+pub fn logs_tf_down_phrase() -> Phrase {
+    Phrase::new(logs_tf_down)
 }
 
 /// The toast title once a log's zip is saved; its description names the file.
