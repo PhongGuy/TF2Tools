@@ -519,8 +519,9 @@ pub struct HudMakerPage {
     drawn_scene: Cell<Option<Scene>>,
     // Whether each part list row's name was cut short in the last frame it drew.
     cut_names: Rc<RefCell<HashMap<PartKey, bool>>>,
-    // The part list's filter box, the groups the player folded, each part's name as the
-    // filter reads it, and the model rows the list drew last frame, in list order.
+    // The part list's filter box, the groups the player folded, each part's shown and
+    // element names as the filter reads them, and the model rows the list drew last frame, in
+    // list order.
     parts_filter: Entity<InputState>,
     folded: HashSet<PartKey>,
     filter_names: HashMap<PartKey, String>,

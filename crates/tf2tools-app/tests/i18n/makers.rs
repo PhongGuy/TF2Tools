@@ -202,6 +202,34 @@ fn a_part_reads_its_core_name_and_when_it_shows_in_russian(cx: &mut TestAppConte
     );
 }
 
+// A Russian player finds a part by the element name its HUD file gives it, as well as by the
+// Russian name the row shows.
+#[gpui_kit::test]
+fn the_part_filter_finds_a_part_by_its_file_name_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, page) = open_hud_maker(cx, &[]);
+    support::click_id(cx, s.win, ids::HUD_MAKER_START_BLANK);
+    if !support::present(cx, s.win, ids::HUD_MAKER_PARTS) {
+        support::click_id(cx, s.win, ids::HUD_MAKER_PARTS_PANEL_COLLAPSE);
+    }
+    let input = cx.update(|cx| page.read(cx).parts_filter().clone());
+    let filter = |cx: &mut TestAppContext, text: &str| {
+        cx.update_window(s.win, |_, window, cx| {
+            input.update(cx, |st, cx| st.set_value(text, window, cx))
+        })
+        .unwrap();
+        support::settle(cx, s.win);
+    };
+    let row = |k: &str| ids::hud_maker_row(&PartKey::new(k));
+    filter(cx, "HealthValue");
+    assert!(support::present(cx, s.win, row(HV)));
+    assert!(!support::present(cx, s.win, row("HudWeaponAmmo")));
+    filter(cx, "hudplayerhealth");
+    assert!(support::present(cx, s.win, row(HEALTH)));
+    filter(cx, "цифры здоровья");
+    assert!(support::present(cx, s.win, row(HV)));
+}
+
 // The option files the built-ins need, as tests/hud_maker_options.rs seeds them.
 const SCHEME: &str = r#""Scheme" { Colors { TanDark "117 107 94 255" TanLight "235 226 202 255"
   QualityColorNormal "178 178 178 255" QualityColorUnique "255 215 0 255" } }"#;

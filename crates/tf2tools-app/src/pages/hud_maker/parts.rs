@@ -106,9 +106,9 @@ impl HudMakerPage {
             .into_any_element()
     }
 
-    /// The model rows the list shows, in model order. A filter keeps the parts whose name holds
-    /// it, ignoring case, with every group above them, and ignores folds; without one, the
-    /// parts inside a folded group are left out.
+    /// The model rows the list shows, in model order. A filter keeps the parts whose shown name
+    /// or HUD file element name holds it, ignoring case, with every group above them, and
+    /// ignores folds; without one, the parts inside a folded group are left out.
     pub(super) fn list_order(&mut self, cx: &Context<Self>) -> Rc<[usize]> {
         let query = self.parts_filter.read(cx).value().trim().to_lowercase();
         let mut names = std::mem::take(&mut self.filter_names);
@@ -120,9 +120,10 @@ impl HudMakerPage {
                 if !query.is_empty() {
                     let mut keep: HashSet<&PartKey> = HashSet::new();
                     for part in parts {
-                        let name = names
-                            .entry(part.key().clone())
-                            .or_insert_with(|| row_label(part).to_lowercase());
+                        // One line per name, so a one-line query cannot match across the two.
+                        let name = names.entry(part.key().clone()).or_insert_with(|| {
+                            format!("{}\n{}", row_label(part), part.name()).to_lowercase()
+                        });
                         if name.contains(&query) {
                             keep.insert(part.key());
                             keep.extend(ancestors(model, part));
