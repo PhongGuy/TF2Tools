@@ -1583,7 +1583,7 @@ hud_maker:
     weapon:
       clip: "Waffe mit Magazin"
       no_clip: "Waffe ohne Magazin"
-    minmode_tip: "Zeigt das HUD mit TF2s Minimal-HUD. Solange das an ist, ändern sich Teile mit eigener Minimal-HUD-Position nur dort."
+    minmode_tip: "Zeigt das HUD mit TF2s Minimal-HUD. Teile mit eigener Minimal-HUD-Position ändern sich dann nur dort."
     health: "Gesundheit"
     ammo: "Übrige Munition"
     charge: "Medic-Ladung"
