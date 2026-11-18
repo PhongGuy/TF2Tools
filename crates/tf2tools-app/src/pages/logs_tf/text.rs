@@ -51,21 +51,31 @@ pub fn profile_url(id: SteamId) -> String {
 
 /// The add dialog's message for a failed lookup.
 pub fn resolve_message(error: &ResolveError) -> SharedString {
+    resolve_phrase(error).text()
+}
+
+/// `resolve_message` as a phrase, worded each time it is read.
+pub fn resolve_phrase(error: &ResolveError) -> Phrase {
     match error {
-        ResolveError::NotFound => tr!("logs_tf.not_found"),
+        ResolveError::NotFound => Phrase::new(|| tr!("logs_tf.not_found")),
         ResolveError::RateLimited { .. }
         | ResolveError::Http { .. }
         | ResolveError::Network { .. }
         | ResolveError::TooLarge { .. }
         | ResolveError::Malformed { .. }
-        | _ => steam_unreachable(),
+        | _ => Phrase::new(steam_unreachable),
     }
 }
 
 /// The add dialog's message for text that names no Steam player.
 pub fn player_input_error(error: &PlayerInputError) -> SharedString {
+    player_input_phrase(error).text()
+}
+
+/// `player_input_error` as a phrase, worded each time it is read.
+pub fn player_input_phrase(error: &PlayerInputError) -> Phrase {
     match error {
-        PlayerInputError::NotSteam | _ => tr!("logs_tf.not_steam"),
+        PlayerInputError::NotSteam | _ => Phrase::new(|| tr!("logs_tf.not_steam")),
     }
 }
 
@@ -211,13 +221,18 @@ pub fn trimmed_offline() -> SharedString {
 /// The open panel's line for a failed fetch; None when the row's own note says it (gone,
 /// unreadable, too large).
 pub fn fetch_message(error: &LogsFetchError) -> Option<SharedString> {
+    fetch_phrase(error).map(|phrase| phrase.text())
+}
+
+/// `fetch_message` as a phrase, worded each time it is read.
+pub fn fetch_phrase(error: &LogsFetchError) -> Option<Phrase> {
     match error {
-        LogsFetchError::Network { .. } => Some(log_offline()),
-        LogsFetchError::RateLimited { .. } => Some(logs_tf_busy()),
-        LogsFetchError::Cache { .. } => Some(save_failed()),
-        LogsFetchError::FullLogGone => Some(full_log_gone()),
+        LogsFetchError::Network { .. } => Some(Phrase::new(log_offline)),
+        LogsFetchError::RateLimited { .. } => Some(Phrase::new(logs_tf_busy)),
+        LogsFetchError::Cache { .. } => Some(Phrase::new(save_failed)),
+        LogsFetchError::FullLogGone => Some(Phrase::new(full_log_gone)),
         LogsFetchError::Gone | LogsFetchError::Unreadable | LogsFetchError::TooLarge { .. } => None,
-        LogsFetchError::Http { .. } | _ => Some(logs_tf_down()),
+        LogsFetchError::Http { .. } | _ => Some(logs_tf_down_phrase()),
     }
 }
 

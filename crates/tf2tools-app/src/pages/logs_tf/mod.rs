@@ -33,7 +33,7 @@ use tf2tools_core::{
     parse_player_input,
 };
 
-use crate::i18n::{self, tr};
+use crate::i18n::{self, Phrase, tr};
 use crate::ids;
 use crate::kill_icons::{KillIconImages, LoadedKillIcons};
 use crate::local_messages::{LocalFailure, describe_logs_cache};
@@ -54,9 +54,10 @@ use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 use sort::{ClassSort, ClassStat, MatrixColumn, MatrixSort, PlayerColumn, PlayerSort};
 use text::{
-    LOGS_TF_URL, download_failed, download_reason, downloaded, empty_text, fetch_message,
-    log_unreadable, logs_tf_down, looking_up, player_input_error, profile_url, progress_line,
-    resolve_message, save_failed, steam_unreachable, trimmed_offline, write_failed,
+    LOGS_TF_URL, download_failed, download_reason, downloaded, empty_text, fetch_phrase,
+    log_unreadable, logs_tf_down, logs_tf_down_phrase, looking_up, player_input_phrase,
+    profile_url, progress_line, resolve_phrase, save_failed, steam_unreachable, trimmed_offline,
+    write_failed,
 };
 
 // Logs counted per backfill batch: small enough that one batch's transaction stays short.
@@ -74,7 +75,7 @@ pub(super) struct OpenLog {
 pub(super) enum OpenState {
     Loading,
     Ready(Box<LogDetail>),
-    Failed(SharedString),
+    Failed(Phrase),
 }
 
 /// The logs.tf page. It reads the tracked players from the cache on creation and is kept
@@ -133,7 +134,7 @@ pub struct LogsTfPage {
     // dialog is still up. They live here because the dialog builder runs every frame.
     add_input: Entity<InputState>,
     add_nickname: Entity<InputState>,
-    add_error: Option<SharedString>,
+    add_error: Option<Phrase>,
     adding: bool,
     add_open: bool,
     // The rename dialog's field and the player it renames while it is up.
@@ -684,7 +685,7 @@ impl LogsTfPage {
                     }
                     Err(error) => {
                         tracing::warn!(%error, id, "reading a logs.tf log failed");
-                        OpenState::Failed(log_unreadable())
+                        OpenState::Failed(Phrase::new(log_unreadable))
                     }
                 };
                 page.land(id, state, cx);
@@ -720,14 +721,14 @@ impl LogsTfPage {
                             .any(|r| r.id() == id && r.state() == LogState::Trimmed);
                         // A trimmed log offline says why its full log is not here.
                         if trimmed && matches!(error, LogsFetchError::Network { .. }) {
-                            Some(OpenState::Failed(trimmed_offline()))
+                            Some(OpenState::Failed(Phrase::new(trimmed_offline)))
                         } else {
-                            fetch_message(&error).map(OpenState::Failed)
+                            fetch_phrase(&error).map(OpenState::Failed)
                         }
                     }
                     Err(error) => {
                         tracing::warn!(%error, id, "the logs.tf fetch task stopped");
-                        Some(OpenState::Failed(logs_tf_down()))
+                        Some(OpenState::Failed(logs_tf_down_phrase()))
                     }
                 };
                 // Core stored or marked the log unless the failure has a line, so its row is
@@ -895,11 +896,11 @@ impl LogsTfPage {
                                     .child(Input::new(&this.add_nickname)),
                             ),
                     )
-                    .children(this.add_error.clone().map(|error| {
+                    .children(this.add_error.as_ref().map(|error| {
                         labelled(
                             div().text_sm().text_color(cx.theme().danger),
                             ids::LOGSTF_ADD_ERROR,
-                            error,
+                            error.text(),
                         )
                     }))
                     .child(
@@ -1141,7 +1142,7 @@ impl LogsTfPage {
         let input = match parse_player_input(typed.trim()) {
             Ok(input) => input,
             Err(error) => {
-                self.add_error = Some(player_input_error(&error));
+                self.add_error = Some(player_input_phrase(&error));
                 cx.notify();
                 return;
             }
@@ -1169,18 +1170,18 @@ impl LogsTfPage {
                     match saving {
                         Ok(saving) => saving.await.map_err(|error| {
                             tracing::warn!(%error, "saving a logs.tf player failed");
-                            save_failed()
+                            Phrase::new(save_failed)
                         }),
                         Err(_) => return,
                     }
                 }
                 Ok(Err(error)) => {
                     tracing::warn!(%error, "looking up a Steam profile failed");
-                    Err(resolve_message(&error))
+                    Err(resolve_phrase(&error))
                 }
                 Err(error) => {
                     tracing::warn!(%error, "the Steam lookup task stopped");
-                    Err(steam_unreachable())
+                    Err(Phrase::new(steam_unreachable))
                 }
             };
             let _ = page.update_in(cx, |page, window, cx| {

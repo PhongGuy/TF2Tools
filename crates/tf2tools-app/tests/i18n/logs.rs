@@ -26,8 +26,8 @@ use crate::LocaleGuard;
 use crate::library::{shown_text, text_width};
 use crate::support;
 use crate::support::logstf::{
-    ARIE, SIXES, day_ago, list_body, open_log, open_page, scroll_to_in_log, serve_two_logs, shell,
-    sid,
+    ARIE, SIXES, day_ago, expanded, list_body, open_log, open_page, scroll_to_in_log,
+    serve_two_logs, shell, sid, to_end,
 };
 
 // The kit's medium Select trigger around its title: borders, padding, gap and caret.
@@ -618,5 +618,61 @@ fn a_kept_logs_tf_error_follows_a_language_switch(cx: &mut TestAppContext) {
     assert_eq!(
         support::label_of(cx, s.win, ids::LOGSTF_ERROR).as_deref(),
         Some("Не удалось связаться с logs.tf. Проверьте подключение и попробуйте снова.")
+    );
+}
+
+// logs.tf is kept while Settings shows, so an opened row whose fetch failed keeps its line
+// and rewords it on return.
+#[gpui_kit::test]
+fn a_kept_logs_tf_open_error_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
+    server.mount_status("/json/3", 503);
+    let s = shell(cx, &env, &server.uri(), &[(ARIE, "Arie")]);
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    support::click_id(cx, s.win, ids::logstf_log(3));
+    support::wait_real(cx, "the failure line", |cx| {
+        support::present(cx, s.win, ids::logstf_log_status(3))
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_log_status(3)).as_deref(),
+        Some("logs.tf isn't responding right now. Try again later.")
+    );
+    crate::settings::open_settings(cx, &s);
+    crate::settings::pick(cx, s.win, "ru");
+    let page = open_page(cx, &s);
+    to_end(cx, &page);
+    support::settle(cx, s.win);
+    assert_eq!(expanded(cx, &page), Some(3), "the row stays open");
+    assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_log_status(3)).as_deref(),
+        Some("logs.tf сейчас не отвечает. Попробуйте позже.")
+    );
+}
+
+// The add dialog is modal, so the switch happens in place while its error is drawn.
+#[gpui_kit::test]
+fn a_kept_add_player_error_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let server = support::StoreServer::start();
+    server.mount_bytes("/api/v1/log", list_body(&[]));
+    let s = shell(cx, &env, &server.uri(), &[(1, "a")]);
+    let page = open_page(cx, &s);
+    support::click_id(cx, s.win, ids::LOGSTF_ADD);
+    type_into_add(cx, &s, &page, "has space");
+    support::click_id(cx, s.win, ids::LOGSTF_ADD_CONFIRM);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_ADD_ERROR).as_deref(),
+        Some("That doesn't look like a Steam profile link or Steam ID.")
+    );
+    tf2tools_app::i18n::apply("ru");
+    cx.update(|cx| cx.refresh_windows());
+    assert_eq!(
+        support::label_of(cx, s.win, ids::LOGSTF_ADD_ERROR).as_deref(),
+        Some("Это не похоже на ссылку на профиль Steam или Steam ID.")
     );
 }
