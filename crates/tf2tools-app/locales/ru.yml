@@ -1875,6 +1875,9 @@ hud_maker:
     class_tips_draw_in_game: "Подсказки классов рисует игра"
     the_wave_bar_draws_in_game: "Полосу волны рисует игра"
     the_credit_tables_draw_in_game: "Таблицы кредитов рисует игра"
+  part_name:
+    health_value: "Число здоровья"
+    ammo_in_clip: "Патроны в обойме"
 
 crosshair_maker:
   busy: "Дождитесь, пока Редактор прицелов закончит, и попробуйте снова."

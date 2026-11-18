@@ -17,7 +17,7 @@ use gpui_kit::{
 use tf2tools_core::{HudModel, PanelRule, Part, PartKey};
 
 use super::HudMakerPage;
-use crate::i18n::names::maker_label;
+use crate::i18n::names::{maker_label, maker_part_english, maker_part_name};
 use crate::i18n::tr;
 use crate::ids;
 
@@ -186,8 +186,11 @@ impl HudMakerPage {
                     None
                 };
                 let name = row_label(part);
-                let english = core_label(part).unwrap_or(&name);
-                let file = (!same_letters(english, part.name())).then(|| part.name().to_owned());
+                let english = core_label(part).map_or_else(
+                    || maker_part_english(&plain_name(part.name())),
+                    SharedString::from,
+                );
+                let file = (!same_letters(&english, part.name())).then(|| part.name().to_owned());
                 Row {
                     key: key.clone(),
                     name,
@@ -528,8 +531,13 @@ fn same_letters(a: &str, b: &str) -> bool {
 pub(super) fn row_label(part: &Part) -> String {
     match core_label(part) {
         Some(label) => maker_label(label).to_string(),
-        None => plain_name(part.name()),
+        None => part_name(part.name()),
     }
+}
+
+/// A non-root part's name in the player's language, from its element name.
+pub fn part_name(raw: &str) -> String {
+    maker_part_name(&plain_name(raw)).to_string()
 }
 
 // Core's English name for a root part, which the file line compares with the element name.

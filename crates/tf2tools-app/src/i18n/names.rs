@@ -84,34 +84,57 @@ pub fn addon_section_name(section: AddonSection) -> SharedString {
     }
 }
 
-/// The catalogue key for a label from core's HUD Maker tables: its English as a lowercase slug
-/// under `hud_maker.label`, or `None` for a glyph with fewer than two ASCII letters.
-pub fn maker_label_key(english: &str) -> Option<String> {
-    if english.bytes().filter(u8::is_ascii_alphabetic).count() < 2 {
+// `text` as a lowercase slug, or `None` for a glyph with fewer than two ASCII letters.
+fn slug(text: &str) -> Option<String> {
+    if text.bytes().filter(u8::is_ascii_alphabetic).count() < 2 {
         return None;
     }
-    let mut slug = String::with_capacity(english.len());
-    for c in english.chars() {
+    let mut slug = String::with_capacity(text.len());
+    for c in text.chars() {
         if c.is_ascii_alphanumeric() {
             slug.push(c.to_ascii_lowercase());
         } else if !slug.is_empty() && !slug.ends_with('_') {
             slug.push('_');
         }
     }
-    let slug = slug.trim_end_matches('_');
+    Some(slug.trim_end_matches('_').to_owned())
+}
+
+// The message at `key` in `locale`, or `fallback` when there is no key or no message.
+fn lookup(locale: &str, key: Option<String>, fallback: &str) -> SharedString {
+    match key.and_then(|key| crate::_rust_i18n_try_translate(locale, &key)) {
+        Some(text) => text.into_owned().into(),
+        None => fallback.to_owned().into(),
+    }
+}
+
+/// The catalogue key for a label from core's HUD Maker tables: its English as a lowercase slug
+/// under `hud_maker.label`, or `None` for a glyph with fewer than two ASCII letters.
+pub fn maker_label_key(english: &str) -> Option<String> {
     // Built with format!, so the key scans never read a literal under the label prefix.
-    Some(format!("hud_maker.label.{slug}"))
+    slug(english).map(|slug| format!("hud_maker.label.{slug}"))
 }
 
 /// A label from core's HUD Maker tables in the current language; a label the catalogue lacks,
 /// and a glyph, shows as given.
 pub fn maker_label(english: &str) -> SharedString {
-    let found = maker_label_key(english)
-        .and_then(|key| crate::_rust_i18n_try_translate(super::current(), &key));
-    match found {
-        Some(text) => text.into_owned().into(),
-        None => english.to_owned().into(),
-    }
+    lookup(super::current(), maker_label_key(english), english)
+}
+
+/// `hud_maker.part_name.<slug>` for a plain part name, or None for fewer than two ASCII letters.
+pub fn maker_part_name_key(plain: &str) -> Option<String> {
+    // Its own namespace, so an element name never picks up a label's verb such as "Hide".
+    slug(plain).map(|slug| format!("hud_maker.part_name.{slug}"))
+}
+
+/// The part name in the current language; a name the catalogue lacks shows as given.
+pub fn maker_part_name(plain: &str) -> SharedString {
+    lookup(super::current(), maker_part_name_key(plain), plain)
+}
+
+/// The part name's English, which the part list's file line compares with the element name.
+pub fn maker_part_english(plain: &str) -> SharedString {
+    lookup("en", maker_part_name_key(plain), plain)
 }
 
 /// The HUD Maker scene's name, such as "Scoreboard".
@@ -290,6 +313,26 @@ mod tests {
             }
         }
         gaps
+    }
+
+    // `slug` under the part-name prefix, built so the key scans read no literal key here.
+    fn part_key(slug: &str) -> Option<String> {
+        Some(format!("{}.{slug}", ["hud_maker", "part_name"].join(".")))
+    }
+
+    #[test]
+    fn a_part_name_key_is_its_plain_name_slug_and_a_glyph_has_none() {
+        use super::maker_part_name_key;
+        assert_eq!(
+            maker_part_name_key("Health value"),
+            part_key("health_value")
+        );
+        assert_eq!(
+            maker_part_name_key("Slot 1 label"),
+            part_key("slot_1_label")
+        );
+        assert_eq!(maker_part_name_key("___"), None);
+        assert_eq!(maker_part_name_key("A"), None);
     }
 
     #[test]

@@ -1877,6 +1877,9 @@ hud_maker:
     class_tips_draw_in_game: "Class tips draw in game"
     the_wave_bar_draws_in_game: "The wave bar draws in game"
     the_credit_tables_draw_in_game: "The credit tables draw in game"
+  part_name:
+    health_value: "Health value"
+    ammo_in_clip: "Ammo in clip"
 
 crosshair_maker:
   busy: "Wait for the Crosshair Maker to finish, then try again."

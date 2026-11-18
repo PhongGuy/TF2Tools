@@ -30,6 +30,7 @@ mod tip;
 pub mod view;
 mod zoom;
 
+pub use parts::part_name;
 pub use shortcuts::shortcuts;
 
 use gpui_kit::assets::IconName;

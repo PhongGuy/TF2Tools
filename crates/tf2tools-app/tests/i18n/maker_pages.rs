@@ -2,7 +2,6 @@
 
 use gpui_kit::test::TestWindowExt as _;
 use gpui_kit::{AppContext as _, ElementId, Entity, ScrollDelta, TestAppContext, point, px};
-use tf2tools_app::i18n::names::maker_label;
 use tf2tools_app::i18n::plural;
 use tf2tools_app::ids;
 use tf2tools_app::local_messages::pictures_left_out;
@@ -241,8 +240,8 @@ fn undo_steps_are_named_in_russian() {
     let _guard = LocaleGuard::switch("ru");
     let mut e = holding(&[VALUE]);
     e.layer_selected(false).unwrap();
-    let layer = format!("смена слоя «{}»", maker_label("Health value"));
-    assert_eq!(e.undo_name(), Some(layer.as_str()));
+    // The health number is a curated panel, so the step names it in Russian.
+    assert_eq!(e.undo_name(), Some("смена слоя «Число здоровья»"));
     let mut e = holding(&[VALUE, MEDIC]);
     e.align_selected(Align::Left).unwrap();
     assert_eq!(e.undo_name(), Some("выравнивание частей: 2"));
