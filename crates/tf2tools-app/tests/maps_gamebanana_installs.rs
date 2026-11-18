@@ -186,17 +186,19 @@ fn install_progress_leaves_the_installed_list_alone(cx: &mut TestAppContext) {
         })
     });
     assert!(started);
-    // Every stage and byte count notifies; none of them changes an entry's state.
-    let mut stages = 0;
+    // The install is busy as soon as it starts; a fast run can finish before the first poll,
+    // so the requery count at the end is what proves progress never requeried.
+    assert!(
+        cx.update(|cx| installs.read(cx).is_busy()),
+        "the install is running"
+    );
     support::wait_real(cx, "the install", |cx| {
         let busy = cx.update(|cx| installs.read(cx).is_busy());
         if busy {
-            stages += 1;
             assert_eq!(cx.update(|cx| tab.read(cx).requeries()), before);
         }
         !busy
     });
-    assert!(stages > 0, "the install ran while watched");
     support::wait_real(cx, "the installed card", |cx| shown(cx, &tab) == [10]);
     assert_eq!(cx.update(|cx| tab.read(cx).requeries()), before + 1);
 }
