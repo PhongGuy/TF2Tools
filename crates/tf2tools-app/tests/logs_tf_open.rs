@@ -208,8 +208,10 @@ fn a_failed_log_shows_once_the_sync_downloads_it(cx: &mut TestAppContext) {
     let (s, page) = pending_page(cx, &env, &server);
     to_end(cx, &page);
     support::click_id(cx, s.win, ids::logstf_log(3));
+    // The status line shows while the fetch loads too, so wait until it is the failure.
     support::wait_real(cx, "the failure line", |cx| {
-        support::present(cx, s.win, ids::logstf_log_status(3))
+        support::label_of(cx, s.win, ids::logstf_log_status(3))
+            .is_some_and(|line| line != "Loading log...")
     });
     server.reset();
     server.mount_bytes("/api/v1/log", list_body(&[(3, day_ago(1))]));
