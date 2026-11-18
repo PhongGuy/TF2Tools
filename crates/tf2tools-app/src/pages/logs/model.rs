@@ -93,6 +93,7 @@ pub fn category_label(category: &str) -> SharedString {
 pub fn action_label(action: &str) -> SharedString {
     match action {
         "activate" => tr!("activity_log.action.activate"),
+        "apply" => tr!("activity_log.action.apply"),
         "copy" => tr!("activity_log.action.copy"),
         "create" => tr!("activity_log.action.create"),
         "delete" => tr!("activity_log.action.delete"),

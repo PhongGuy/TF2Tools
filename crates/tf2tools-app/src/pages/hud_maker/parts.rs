@@ -789,4 +789,35 @@ mod tests {
             );
         }
     }
+
+    // Nested and common parts read in Russian and Portuguese, not only the direct children.
+    #[test]
+    fn nested_parts_a_to_k_read_in_russian_and_portuguese() {
+        nested_parts_read(&[
+            "Kills",
+            "classmodelholder",
+            "AssistsLabel",
+            "Headshots",
+            "DuelingIcon",
+        ]);
+    }
+
+    #[test]
+    fn nested_parts_l_to_z_read_in_russian_and_portuguese() {
+        nested_parts_read(&["TeleportsLabel", "Score", "Revenge", "NameLabel", "XPBar"]);
+    }
+
+    // Each raw name has a key in en.yml, and ru and pt-BR words that differ from the English.
+    fn nested_parts_read(raws: &[&str]) {
+        for raw in raws {
+            let key = crate::i18n::names::maker_part_name_key(&plain_name(raw)).unwrap();
+            let en = crate::_rust_i18n_try_translate("en", &key);
+            assert!(en.is_some(), "{raw}: {key} in en.yml");
+            let en = en.unwrap();
+            for lang in ["ru", "pt-BR"] {
+                let word = crate::_rust_i18n_try_translate(lang, &key);
+                assert!(word.is_some_and(|w| w != en), "{raw}: {key} in {lang}");
+            }
+        }
+    }
 }

@@ -114,6 +114,20 @@ impl HudMakerPage {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        let name = recipe.name().to_owned();
+        self.preview_named(recipe, skipped, name, window, cx);
+    }
+
+    /// Previews `recipe` with the bar naming it `name`, for a recipe whose own name is core's
+    /// English, such as a starting point.
+    pub(super) fn preview_named(
+        &mut self,
+        recipe: Recipe,
+        skipped: usize,
+        name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         // Typed values commit first, since committing them later would cancel the preview.
         // An open option picker closes, as the swatches it belongs to wait for the preview.
         self.flush(cx);
@@ -133,7 +147,7 @@ impl HudMakerPage {
         self.preview_seq = self.preview_seq.wrapping_add(1);
         self.preview = PreviewNote {
             seq: self.preview_seq,
-            name: recipe.name().to_owned(),
+            name,
             changes: skipped.saturating_add(left_out.saturating_sub(fonts)),
             fonts: fonts.saturating_add(recipe.fonts_left_out()),
             tf2_only,
@@ -315,7 +329,8 @@ impl HudMakerPage {
                             return;
                         };
                         page.set_more_open(false, cx);
-                        page.start_preview(recipe, 0, window, cx);
+                        let name = starting_point_name(which).to_string();
+                        page.preview_named(recipe, 0, name, window, cx);
                     }));
                 v_flex().gap_1().items_start().child(pick).child(
                     div()

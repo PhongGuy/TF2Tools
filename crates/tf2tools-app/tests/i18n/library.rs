@@ -16,6 +16,7 @@ use tf2tools_app::pages::addons::AddonsPage;
 use tf2tools_app::pages::addons::model::{movement_off, movement_on_text};
 use tf2tools_app::pages::crosshairs::CrosshairsPage;
 use tf2tools_app::pages::huds::HudsPage;
+use tf2tools_app::pages::huds::copy_name;
 use tf2tools_app::pages::maps::model::{SORTS, last_played_label, sort_label};
 use tf2tools_app::pages::profiles::ProfilesPage;
 use tf2tools_app::pages::profiles::editor_model::{Slot, SlotState, next_profile_name, slot_text};
@@ -535,6 +536,40 @@ fn the_russian_sound_slots_fit_at_800(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_portuguese_sound_slots_fit_at_800(cx: &mut TestAppContext) {
     sound_slots_fit_at_800(cx, "pt-BR");
+}
+
+// Each slot's status is an icon whose name reads in `lang`, small enough for any word.
+fn sound_status_icon_reads(cx: &mut TestAppContext, lang: &str, installed: &str) {
+    let _guard = LocaleGuard::switch(lang);
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let dir = env.game.join("tf/custom/tf2tools-sounds/sound/ui");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("killsound.wav"), support::wav_bytes()).unwrap();
+    resize_800(cx, &s);
+    let _page = open_sounds(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::sound_slot_status(SoundKind::Killsound)).as_deref(),
+        Some(installed),
+        "{lang}: the installed status names itself"
+    );
+    for kind in [SoundKind::Hitsound, SoundKind::Killsound] {
+        let badge = support::bounds_of(cx, s.win, ids::sound_slot_status(kind)).unwrap();
+        assert!(
+            badge.size.width <= gpui_kit::px(28.),
+            "{lang} {kind:?}: {badge:?}"
+        );
+    }
+}
+
+#[gpui_kit::test]
+fn the_russian_sound_status_is_an_icon(cx: &mut TestAppContext) {
+    sound_status_icon_reads(cx, "ru", "В игре");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_sound_status_is_an_icon(cx: &mut TestAppContext) {
+    sound_status_icon_reads(cx, "pt-BR", "Instalado");
 }
 
 // At 800x600 a library sound card keeps play, delete, Hit and Kill inside the card in
@@ -1220,4 +1255,23 @@ fn a_maps_sync_failure_follows_a_language_switch(cx: &mut TestAppContext) {
             "Не удалось подключиться к GameBanana. Проверьте подключение к интернету и попробуйте снова."
         )
     );
+}
+
+#[test]
+fn a_copied_hud_is_named_in_russian_and_portuguese() {
+    let ru = {
+        let _guard = LocaleGuard::switch("ru");
+        [copy_name("flawhud", 1), copy_name("flawhud", 3)]
+    };
+    let pt = {
+        let _guard = LocaleGuard::switch("pt-BR");
+        [copy_name("flawhud", 1), copy_name("flawhud", 3)]
+    };
+    let en = {
+        let _guard = LocaleGuard::switch("en");
+        copy_name("flawhud", 2)
+    };
+    assert_eq!(ru, ["flawhud (копия)", "flawhud (копия 3)"]);
+    assert_eq!(pt, ["flawhud (cópia)", "flawhud (cópia 3)"]);
+    assert_eq!(en, "flawhud (copy 2)");
 }

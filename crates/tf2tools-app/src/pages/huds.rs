@@ -98,6 +98,15 @@ fn not_reinstalled() -> SharedString {
     tr!("huds.not_reinstalled")
 }
 
+/// A copy's name in the player's language: "<base> (copy)" for n = 1, "<base> (copy N)" after.
+pub fn copy_name(base: &str, n: u32) -> String {
+    match n {
+        1 => tr!("huds.copy_name.first", name = base),
+        n => tr!("huds.copy_name.nth", name = base, n = n),
+    }
+    .to_string()
+}
+
 /// The action in flight; its button spins and every other mutating button is disabled.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Busy {
@@ -810,7 +819,7 @@ impl HudsPage {
             move |s| {
                 let copy = s
                     .library
-                    .copy_hud(&id)
+                    .copy_hud_named(&id, &copy_name)
                     .map_err(|e| describe_copy_hud(&e).into_op(tr!("messages.action.copy_hud")))?;
                 let message = tr!("huds.activity.copied", name = copy.name()).to_string();
                 activity::write(s, &NewLogEntry::new(LogLevel::Info, "hud", "copy", message));

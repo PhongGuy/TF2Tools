@@ -187,3 +187,27 @@ fn made_hud_files_reads_a_copy_as_its_base() {
         .unwrap();
     assert_eq!(hv.value("fgcolor").unwrap().text(), "TanLight");
 }
+
+#[test]
+fn a_copy_takes_its_name_from_the_callers_words() {
+    let env = library_env();
+    let base = import_stock_hud(
+        &env,
+        RAYS,
+        &[("LICENSE", "MIT")],
+        Provenance::Curated {
+            hud_id: "rayshud".into(),
+        },
+    );
+    let words = |name: &str, n: u32| match n {
+        1 => format!("{name} (kopia)"),
+        n => format!("{name} (kopia {n})"),
+    };
+    let first = env.lib.copy_hud_named(base.id(), &words).unwrap();
+    let second = env.lib.copy_hud_named(base.id(), &words).unwrap();
+    assert_eq!(first.name(), format!("{} (kopia)", base.name()));
+    assert_eq!(second.name(), format!("{} (kopia 2)", base.name()));
+    // English copies still read "(copy)", counted apart from the other words.
+    let english = env.lib.copy_hud(base.id()).unwrap();
+    assert_eq!(english.name(), format!("{} (copy)", base.name()));
+}
