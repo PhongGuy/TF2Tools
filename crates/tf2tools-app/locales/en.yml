@@ -2087,6 +2087,7 @@ hud_maker:
     player_name_background: "Player name background"
     player_name_label: "Player name label"
     player_score_label: "Player score label"
+    player_status: "Player status"
     points_this_round_label: "Points this round label"
     pyro: "Pyro"
     pyro_shadow: "Pyro shadow"

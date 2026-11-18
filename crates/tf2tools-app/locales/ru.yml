@@ -2085,6 +2085,7 @@ hud_maker:
     player_name_background: "Фон ника игрока"
     player_name_label: "Надпись ника игрока"
     player_score_label: "Надпись счёта игрока"
+    player_status: "Состояние игрока"
     points_this_round_label: "Надпись очков за раунд"
     pyro: "Поджигатель"
     pyro_shadow: "Тень Поджигателя"

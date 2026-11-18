@@ -758,6 +758,7 @@ mod tests {
             "PlayerStatusClassImage",
             "ItemEffectMeterLabel",
             "OvertimeLabel",
+            "HudPlayerStatus",
         ] {
             let key = crate::i18n::names::maker_part_name_key(&plain_name(raw)).unwrap();
             assert!(
