@@ -127,3 +127,11 @@ fn the_hud_maker_names_its_parts_in_german() {
     assert!(text("kill_streak_icon").contains("Killserie"));
     assert_ne!(text("rune_haste"), "Rune haste");
 }
+
+#[test]
+fn the_updater_says_a_damaged_download_as_the_stores_do() {
+    assert_eq!(
+        tf2tools_app::_rust_i18n_try_translate("de", "updater.failure.damaged"),
+        tf2tools_app::_rust_i18n_try_translate("de", "messages.store.download.damaged")
+    );
+}

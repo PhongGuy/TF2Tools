@@ -756,6 +756,138 @@ mod tests {
         assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
     }
 
+    // Values German legitimately writes as English does: names, cognates and bare formats.
+    const DE_SAME_AS_ENGLISH: &[&str] = &[
+        "activity_log.category.hud",
+        "activity_log.category.sound",
+        "activity_log.category.system",
+        "activity_log.details",
+        "activity_log.level.info",
+        "addon_store.badge.update",
+        "addons.section.guis",
+        "addons.section.skins",
+        "common.class.demoman",
+        "common.class.engineer",
+        "common.class.heavy",
+        "common.class.medic",
+        "common.class.pyro",
+        "common.class.scout",
+        "common.class.sniper",
+        "common.class.soldier",
+        "common.class.spy",
+        "common.class_compact.demoman",
+        "common.class_compact.engineer",
+        "common.class_compact.heavy",
+        "common.class_compact.medic",
+        "common.class_compact.pyro",
+        "common.class_compact.scout",
+        "common.class_compact.sniper",
+        "common.class_compact.soldier",
+        "common.class_compact.spy",
+        "common.class_short.demoman",
+        "common.class_short.engineer",
+        "common.class_short.heavy",
+        "common.class_short.pyro",
+        "common.class_short.scout",
+        "common.date.date_time",
+        "common.list.separator",
+        "common.sound_kind.hitsound",
+        "common.sound_kind.killsound",
+        "crosshair_maker.name",
+        "crosshair_maker.starter.value",
+        "crosshairs_page.sync.in_game",
+        "crosshairs_page.sync.skipped",
+        "hud_maker.board_mode.mvm",
+        "hud_maker.borrow.brings.animation",
+        "hud_maker.borrow.origin.curated",
+        "hud_maker.label.chat",
+        "hud_maker.label.community",
+        "hud_maker.label.elite",
+        "hud_maker.label.hud",
+        "hud_maker.label.killfeed",
+        "hud_maker.label.normal",
+        "hud_maker.label.position",
+        "hud_maker.label.text",
+        "hud_maker.label.valve",
+        "hud_maker.meter.flamethrower",
+        "hud_maker.meter.pomson",
+        "hud_maker.meter.revolver",
+        "hud_maker.meter.sapper",
+        "hud_maker.more.vision.normal",
+        "hud_maker.part_name.assists",
+        "hud_maker.part_name.bonus",
+        "hud_maker.part_name.demoman",
+        "hud_maker.part_name.engineer",
+        "hud_maker.part_name.heavy_weapons",
+        "hud_maker.part_name.heavyweapons",
+        "hud_maker.part_name.k_d",
+        "hud_maker.part_name.kills",
+        "hud_maker.part_name.medic",
+        "hud_maker.part_name.pyro",
+        "hud_maker.part_name.scout",
+        "hud_maker.part_name.sniper",
+        "hud_maker.part_name.soldier",
+        "hud_maker.part_name.spy",
+        "hud_maker.part_name.vs",
+        "hud_maker.scene.hud",
+        "hud_maker.timeline.pause",
+        "hud_store.detail.os",
+        "hud_store.detail.repository",
+        "hud_store.filter.os",
+        "hud_store.filter.tags",
+        "logs_tf.column.name",
+        "logs_tf.detail.drops",
+        "logs_tf.detail.kills_assists",
+        "logs_tf.detail.kills_short",
+        "logs_tf.detail.medics",
+        "logs_tf.detail.midfights",
+        "logs_tf.detail.team_short",
+        "logs_tf.event.drop",
+        "logs_tf.stat.assists_min",
+        "logs_tf.stat.kills_min",
+        "logs_tf.stat.logs",
+        "logs_tf.weapons.kills",
+        "maps.badge.update",
+        "maps.sort.name",
+        "nav.huds",
+        "nav.logs",
+        "nav.logs_tf",
+        "nav.sounds",
+        "profiles.missing.kind.hitsound",
+        "profiles.missing.kind.killsound",
+        "settings.audio.title",
+        "settings.logs_tf.title",
+        "settings.storage.addons",
+        "settings.storage.huds",
+        "settings.storage.sounds",
+        "sound_store.category.hitsounds",
+        "sound_store.category.killsounds",
+        "sound_store.category.sound",
+        "sounds.activity.format",
+        "sounds.button.hit",
+        "sounds.button.kill",
+        "sounds.menu.hitsound_in",
+        "sounds.menu.killsound_in",
+        "updater.banner.update",
+    ];
+
+    #[test]
+    fn german_leaves_nothing_in_english() {
+        let (en, de) = (messages("en"), messages("de"));
+        let left: Vec<&str> = de
+            .iter()
+            .filter(|(k, v)| en.get(*k) == Some(*v))
+            .map(|(k, _)| k.as_str())
+            .filter(|k| !DE_SAME_AS_ENGLISH.contains(k))
+            .collect();
+        assert!(left.is_empty(), "de values still in English: {left:?}");
+        let stale: Vec<&&str> = DE_SAME_AS_ENGLISH
+            .iter()
+            .filter(|k| en.get(**k) != de.get(**k))
+            .collect();
+        assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
+    }
+
     #[test]
     fn translations_keep_the_english_variables() {
         let en = messages("en");
