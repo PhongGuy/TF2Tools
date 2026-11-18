@@ -177,7 +177,7 @@ impl StoreDetail {
             Ok(None) => {}
             Err(err) => {
                 let _ = this.update(cx, |d, cx| {
-                    let description = read_failed(&err);
+                    let description = read_failed(&err).text();
                     let _ = d.win.update(cx, |_, window, cx| {
                         toast(
                             window,

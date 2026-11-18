@@ -202,6 +202,17 @@ impl CardGrid {
         height: impl Fn(Pixels) -> Pixels + 'static,
         card: impl Fn(usize, &mut Window, &mut App) -> AnyElement + 'static,
     ) -> AnyElement {
+        self.render_cells(count, height, move |ix, _, window, cx| card(ix, window, cx))
+    }
+
+    /// Like `render_sized`, with each card built by `card(index, cell width, window, cx)`, so
+    /// a card can fit its contents to the width it is drawn at.
+    pub fn render_cells(
+        &self,
+        count: usize,
+        height: impl Fn(Pixels) -> Pixels + 'static,
+        card: impl Fn(usize, Pixels, &mut Window, &mut App) -> AnyElement + 'static,
+    ) -> AnyElement {
         // The canvas records the grid's painted width; a change asks for another frame,
         // since a refresh requested while drawing is dropped.
         let measured = Rc::clone(&self.width);
@@ -241,7 +252,7 @@ impl CardGrid {
                         .children((row * columns..(row + 1) * columns).map(|ix| {
                             let cell = div().flex_none().w(cell_width).h(cell_height);
                             if ix < count {
-                                cell.child(card(ix, window, cx))
+                                cell.child(card(ix, cell_width, window, cx))
                             } else {
                                 cell
                             }

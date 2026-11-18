@@ -16,16 +16,17 @@ use gpui_kit::component::{h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, AppContext as _, Context, Entity, FontWeight, Global, InteractiveElement as _,
-    IntoElement, ListAlignment, ListState, ParentElement as _, Pixels, Render, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _, WeakEntity,
-    Window, div, list, px,
+    IntoElement, ListAlignment, ListState, ParentElement as _, Pixels, Render, ScrollHandle,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Subscription, TestSupportExt as _,
+    WeakEntity, Window, div, list, px,
 };
 use tf2tools_core::{MapState, StoreClient};
 
-use crate::i18n::{self, tr};
+use crate::i18n::{self, Phrase, tr};
 use crate::ids;
 use crate::map_messages::{
-    describe_map_download, describe_map_remove, describe_map_sync, map_stopped,
+    describe_map_download, describe_map_remove, describe_map_sync, map_stopped, map_stopped_phrase,
+    map_sync_phrase,
 };
 use crate::pages::common::no_tf2_warning;
 use crate::services::{OpError, Services, Tf2State, require_tf2, run_blocking, tf2_state};
@@ -37,7 +38,7 @@ use crate::store_download::format_bytes;
 use crate::store_messages::{busy_text, busy_title};
 use crate::tokio_bridge;
 use crate::widgets::label_option::LabelOption;
-use crate::widgets::scroll::scroll_beside;
+use crate::widgets::scroll::{scroll_area, scroll_beside};
 use crate::widgets::store_error::error_line;
 use crate::widgets::{Named as _, labelled};
 use gb_tab::GbMapsTab;
@@ -115,11 +116,13 @@ pub struct MapsPage {
     refreshed: bool,
     // Whether the window is too narrow for the play columns; set each render.
     compact: bool,
-    error: Option<String>,
+    error: Option<Phrase>,
     downloading: Option<Running>,
     /// Bumped by every load; a load that lands under an older generation is dropped.
     load_generation: u64,
     list: ListState,
+    /// The page's scroll on the GameBanana source, which moves only in a short window.
+    gb_scroll: ScrollHandle,
     search: Entity<InputState>,
     sort_select: Labels,
     source: MapsSource,
@@ -178,6 +181,7 @@ impl MapsPage {
             downloading: None,
             load_generation: 0,
             list: ListState::new(0, ListAlignment::Top, px(400.)),
+            gb_scroll: ScrollHandle::new(),
             search,
             sort_select,
             source: MapsSource::Serveme,
@@ -219,8 +223,8 @@ impl MapsPage {
     }
 
     /// The player message of the last failed fetch, if any.
-    pub fn error(&self) -> Option<&str> {
-        self.error.as_deref()
+    pub fn error(&self) -> Option<SharedString> {
+        self.error.as_ref().map(Phrase::text)
     }
 
     pub fn search_input(&self) -> &Entity<InputState> {
@@ -332,14 +336,14 @@ impl MapsPage {
         self.load_generation += 1;
         let generation = self.load_generation;
         let install = tf2_state(cx).read(cx).install().cloned();
+        // A failed read comes back as `None` so its line is worded at draw; only a panic
+        // reaches the `OpError` arm.
         let loading = run_blocking(cx, move |s| {
-            s.store
+            Ok(s.store
                 .maps(install.as_ref())
                 .map(|entries| entries.iter().map(MapRow::from).collect::<Vec<_>>())
-                .map_err(|e| {
-                    tracing::warn!(error = %e, "reading the map list failed");
-                    OpError::core(tr!("messages.action.load_maps"), tr!("messages.maps.read"))
-                })
+                .inspect_err(|e| tracing::warn!(error = %e, "reading the map list failed"))
+                .ok())
         });
         cx.spawn(async move |page, cx| {
             let loaded = loading.await;
@@ -348,8 +352,9 @@ impl MapsPage {
                     return;
                 }
                 match loaded {
-                    Ok(rows) => page.rows = rows,
-                    Err(err) => page.error = Some(err.description().to_string()),
+                    Ok(Some(rows)) => page.rows = rows,
+                    Ok(None) => page.error = Some(Phrase::new(|| tr!("messages.maps.read"))),
+                    Err(err) => page.error = Some(Phrase::new(move || err.description())),
                 }
                 page.loaded = true;
                 page.refilter(cx);
@@ -389,11 +394,10 @@ impl MapsPage {
                         }
                     }
                     Ok(Err(e)) => {
-                        let failure = describe_map_sync(&e);
-                        failure.log("map list fetch");
-                        page.error = Some(failure.message);
+                        describe_map_sync(&e).log("map list fetch");
+                        page.error = Some(map_sync_phrase(&e));
                     }
-                    Err(e) => page.error = Some(map_stopped(e.to_string()).message),
+                    Err(_) => page.error = Some(map_stopped_phrase()),
                 }
                 cx.notify();
             });
@@ -585,7 +589,7 @@ impl MapsPage {
     }
 
     fn error_line(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
-        let error = self.error.clone()?;
+        let error = self.error.as_ref().map(Phrase::text)?;
         let page = cx.entity().downgrade();
         let on_retry = move |_: &mut Window, cx: &mut App| {
             let _ = page.update(cx, |page, cx| page.refresh(true, cx));
@@ -793,9 +797,14 @@ impl Render for MapsPage {
             .p(CONTENT_PADDING)
             .gap_4()
             .child(self.source_strip(cx));
-        // Only one source renders, so the tab's ids never meet the list's.
+        // Only one source renders, so the tab's ids never meet the list's. The tab's toolbar
+        // wraps in a short window, so the page scrolls to its Sync button or grid row, as the
+        // Sound Store does; the grid keeps its own bar in the padding beside it.
         if self.source == MapsSource::GameBanana {
-            return page
+            let page = page
+                .relative()
+                .track_scroll(&self.gb_scroll)
+                .overflow_y_scroll()
                 .child(
                     div()
                         .id(ids::MAPS_GB_INFO)
@@ -804,7 +813,10 @@ impl Render for MapsPage {
                         .text_color(cx.theme().muted_foreground)
                         .child(tr!("maps.gb.info")),
                 )
-                .child(div().flex_1().min_h_0().children(self.gamebanana.clone()));
+                .child(v_flex().flex_1().children(self.gamebanana.clone()));
+            return scroll_area(ids::page_scrollbar(Page::Maps), &self.gb_scroll, page)
+                .size_full()
+                .into_any_element();
         }
         self.compact = window.viewport_size().width < WIDE_WINDOW;
         // The box can change without an event (a value set by code), so it is compared here.
@@ -835,5 +847,6 @@ impl Render for MapsPage {
                     .child(Self::column_titles(self.compact, cx))
                     .child(body),
             )
+            .into_any_element()
     }
 }

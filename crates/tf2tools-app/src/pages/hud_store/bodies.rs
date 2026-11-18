@@ -28,7 +28,7 @@ pub fn curated_body() -> DetailBody {
         let socials: Vec<(String, String, String)> = hud
             .socials
             .iter()
-            .map(|(key, url)| (key.clone(), capitalize(key), url.clone()))
+            .map(|(key, url)| (key.clone(), social_label(key), url.clone()))
             .collect();
         let traits = [
             (tr!("hud_store.detail.os"), &hud.os),
@@ -182,6 +182,15 @@ fn tag_row(
                 badge_of(ids::store_detail_tag(row, ix), tag, border, v.clone())
             }))
     })
+}
+
+// A social's button label: "support" is player text from the catalogue, every other key is a
+// brand (Discord, Steam group) shown as its capitalized key.
+fn social_label(key: &str) -> String {
+    match key {
+        "support" => tr!("hud_store.detail.social.support").to_string(),
+        _ => capitalize(key),
+    }
 }
 
 fn capitalize(word: &str) -> String {

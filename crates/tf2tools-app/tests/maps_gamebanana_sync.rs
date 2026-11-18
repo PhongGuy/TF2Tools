@@ -2,12 +2,13 @@
 
 use crate::support;
 use crate::support::maps::{
-    fake_maps_sync, maps_shell, open_gamebanana, open_maps, seed_maps, shown,
+    fake_maps_sync, maps_shell, open_gamebanana, open_maps, seed_maps, shown, wheel_into_view,
 };
 
-use gpui_kit::TestAppContext;
+use gpui_kit::{TestAppContext, px};
 use tf2tools_app::ids;
 use tf2tools_app::maps_sync::MapsSync;
+use tf2tools_app::shell::route::Page;
 use tf2tools_app::store_grid::SEARCH_DEBOUNCE;
 use tf2tools_app::sync::SyncSummary;
 
@@ -257,4 +258,26 @@ fn an_empty_catalogue_with_an_idle_sync_offers_sync(cx: &mut TestAppContext) {
     support::settle(cx, s.win);
     assert!(support::present(cx, s.win, ids::MAPS_GB_EMPTY));
     assert!(!support::present(cx, s.win, ids::MAPS_GB_SYNC));
+}
+
+// The empty card's Sync button sits below the toolbar, which wraps in a short window.
+#[gpui_kit::test]
+fn at_800_by_600_the_empty_tab_scrolls_to_its_sync_button(cx: &mut TestAppContext) {
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = maps_shell(cx, &env, &server);
+    let (_sync, runs) = fake_maps_sync(cx);
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    let page = open_maps(cx, &s);
+    open_gamebanana(cx, &s, &page);
+    let maps = ids::page(Page::Maps);
+    let view = support::bounds_of(cx, s.win, maps.clone()).expect("the page");
+    let sync = support::bounds_of(cx, s.win, ids::MAPS_GB_SYNC).expect("the button");
+    assert!(
+        sync.bottom() > view.bottom(),
+        "the button starts below the fold"
+    );
+    wheel_into_view(cx, &s, maps, ids::MAPS_GB_SYNC);
+    support::click_id(cx, s.win, ids::MAPS_GB_SYNC);
+    cx.run_until_parked();
+    assert!(runs.try_recv().is_ok(), "the reached button starts a sync");
 }

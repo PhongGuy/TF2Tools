@@ -5,7 +5,7 @@ use tf2tools_core::{MapDownloadError, MapRemoveError, SyncError};
 
 use gpui_kit::SharedString;
 
-use crate::i18n::tr;
+use crate::i18n::{Phrase, tr};
 use crate::store_messages::StoreFailure;
 
 // The site the map list and the maps come from, as players know it.
@@ -21,21 +21,29 @@ fn stopped() -> SharedString {
 
 /// A failed fetch of serveme.tf's map list.
 pub fn describe_map_sync(err: &SyncError) -> StoreFailure {
-    let message = match err {
-        SyncError::Network { .. } => tr!("messages.shared.source_unreachable", source = SERVEME),
-        SyncError::RateLimited { .. } => tr!("messages.shared.source_busy", source = SERVEME),
-        SyncError::Http { status, .. } if *status >= 500 => {
-            tr!("messages.shared.source_down", source = SERVEME)
+    StoreFailure::new(map_sync_phrase(err).text(), err.to_string())
+}
+
+/// The player line for a failed fetch of serveme.tf's map list, worded each time it is read.
+pub fn map_sync_phrase(err: &SyncError) -> Phrase {
+    match err {
+        SyncError::Network { .. } => {
+            Phrase::new(|| tr!("messages.shared.source_unreachable", source = SERVEME))
         }
-        SyncError::Io { .. } | SyncError::Database { .. } => database(),
+        SyncError::RateLimited { .. } => {
+            Phrase::new(|| tr!("messages.shared.source_busy", source = SERVEME))
+        }
+        SyncError::Http { status, .. } if *status >= 500 => {
+            Phrase::new(|| tr!("messages.shared.source_down", source = SERVEME))
+        }
+        SyncError::Io { .. } | SyncError::Database { .. } => Phrase::new(database),
         SyncError::Http { .. }
         | SyncError::TooLarge { .. }
         | SyncError::Malformed { .. }
         | SyncError::Archive(_)
         | SyncError::Interrupted { .. }
-        | _ => tr!("messages.shared.source_unreadable", source = SERVEME),
-    };
-    StoreFailure::new(message, err.to_string())
+        | _ => Phrase::new(|| tr!("messages.shared.source_unreadable", source = SERVEME)),
+    }
 }
 
 /// A failed map download.
@@ -76,5 +84,10 @@ pub fn describe_map_remove(err: &MapRemoveError) -> StoreFailure {
 
 /// A map task that ended without an outcome, keeping `detail` for the log.
 pub fn map_stopped(detail: String) -> StoreFailure {
-    StoreFailure::new(stopped(), detail)
+    StoreFailure::new(map_stopped_phrase().text(), detail)
+}
+
+/// The player line for a map task that ended without an outcome.
+pub fn map_stopped_phrase() -> Phrase {
+    Phrase::new(stopped)
 }

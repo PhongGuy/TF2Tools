@@ -301,6 +301,8 @@ hud_store:
     gamemodes: "Gamemodes"
     resolutions: "Resolutions"
     repository: "Repository"
+    social:
+      support: "Support"
 
 store_download:
   button:

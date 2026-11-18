@@ -299,6 +299,8 @@ hud_store:
     gamemodes: "Режимы"
     resolutions: "Разрешения"
     repository: "Репозиторий"
+    social:
+      support: "Поддержка"
 
 store_download:
   button:

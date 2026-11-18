@@ -506,6 +506,85 @@ fn the_russian_sound_slots_fit_at_800(cx: &mut TestAppContext) {
     }
 }
 
+// At 800x600 a library sound card keeps play, delete, Hit and Kill inside the card in
+// `lang`, and Hit and Kill keep their names.
+fn assert_sound_card_fits_at_800(cx: &mut TestAppContext, lang: &str, hit: &str, kill: &str) {
+    let _guard = LocaleGuard::switch(lang);
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let path = env.tmp.path().join("ding.wav");
+    std::fs::write(&path, support::wav_bytes()).unwrap();
+    let ding = s
+        .services
+        .library
+        .import_sound(&path, "Ding", Provenance::Local)
+        .unwrap();
+    resize_800(cx, &s);
+    let _page = open_sounds(cx, &s);
+    let folder = ding.folder_name();
+    let card = support::bounds_of(cx, s.win, ids::sound_card(folder)).unwrap();
+    for button in [
+        ids::sound_play(folder),
+        ids::sound_delete(folder),
+        ids::sound_hit(folder),
+        ids::sound_kill(folder),
+    ] {
+        let b = support::bounds_of(cx, s.win, button.clone()).unwrap();
+        assert_inside(&format!("{button:?}"), b, card);
+    }
+    assert_eq!(
+        support::label_of(cx, s.win, ids::sound_hit(folder)).as_deref(),
+        Some(hit),
+        "Hit keeps its name"
+    );
+    assert_eq!(
+        support::label_of(cx, s.win, ids::sound_kill(folder)).as_deref(),
+        Some(kill),
+        "Kill keeps its name"
+    );
+}
+
+#[gpui_kit::test]
+fn the_sound_card_fits_at_800(cx: &mut TestAppContext) {
+    assert_sound_card_fits_at_800(cx, "en", "Hit", "Kill");
+}
+
+#[gpui_kit::test]
+fn the_russian_sound_card_fits_at_800(cx: &mut TestAppContext) {
+    assert_sound_card_fits_at_800(cx, "ru", "Хит", "Кил");
+}
+
+// Where the card has room, at 1280x800, Hit and Kill keep their visible labels.
+#[gpui_kit::test]
+fn a_wide_sound_card_keeps_its_hit_and_kill_labels(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let s = support::shell_window(cx, &env, found(&env));
+    let path = env.tmp.path().join("ding.wav");
+    std::fs::write(&path, support::wav_bytes()).unwrap();
+    let ding = s
+        .services
+        .library
+        .import_sound(&path, "Ding", Provenance::Local)
+        .unwrap();
+    cx.simulate_window_resize(
+        s.win,
+        gpui_kit::size(gpui_kit::px(1280.), gpui_kit::px(800.)),
+    );
+    support::settle(cx, s.win);
+    let _page = open_sounds(cx, &s);
+    let folder = ding.folder_name();
+    let card = support::bounds_of(cx, s.win, ids::sound_card(folder)).unwrap();
+    for button in [ids::sound_hit(folder), ids::sound_kill(folder)] {
+        assert!(
+            !icon_only(cx, s.win, button.clone()),
+            "{button:?} lost its label"
+        );
+        let b = support::bounds_of(cx, s.win, button.clone()).unwrap();
+        assert_inside(&format!("{button:?}"), b, card);
+    }
+}
+
 // The Russian "no maps yet" line wraps inside the Maps column at 800x600.
 #[gpui_kit::test]
 fn the_russian_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
@@ -939,6 +1018,37 @@ fn the_kept_maps_page_follows_a_language_switch(cx: &mut TestAppContext) {
     assert_eq!(
         read(cx, &[ids::MAPS_SEARCH, ids::MAPS_SORT]),
         some(&["Поиск карт...", "Название"])
+    );
+}
+
+// The kept Maps page's failed serveme.tf fetch must be worded when it is drawn, not when it failed.
+#[gpui_kit::test]
+fn a_kept_maps_error_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    let s = support::maps::maps_shell(cx, &env, &server);
+    server.reset();
+    server.mount_status("/serveme/maps", 500);
+    support::click_id(cx, s.win, ids::nav(Page::Maps));
+    let page = cx
+        .update(|cx| s.shell.read(cx).maps_page())
+        .expect("a Maps page");
+    support::wait_real(cx, "the failed fetch", |cx| {
+        cx.update(|cx| page.read(cx).error().is_some() && !page.read(cx).is_syncing())
+    });
+    support::settle(cx, s.win);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::MAPS_ERROR).as_deref(),
+        Some("serveme.tf is having problems right now. Try again later.")
+    );
+
+    crate::settings::open_settings(cx, &s);
+    crate::settings::pick(cx, s.win, "ru");
+    support::click_id(cx, s.win, ids::nav(Page::Maps));
+    support::click_id(cx, s.win, ids::maps_source("serveme"));
+    assert_eq!(
+        support::label_of(cx, s.win, ids::MAPS_ERROR).as_deref(),
+        Some("На сайте serveme.tf сейчас неполадки. Попробуйте позже.")
     );
 }
 
