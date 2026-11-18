@@ -18,7 +18,7 @@ use tf2tools_core::{AddonCard, AddonFile, AddonProfile, AddonSection, BrowseErro
 use crate::gb_addon_installs::{
     GbAddonInstalls, GbAddonOffer as Offer, GbAddonStage, install_blocker, map_install_blocker,
 };
-use crate::i18n::tr;
+use crate::i18n::{Phrase, tr};
 use crate::ids;
 use crate::links::gamebanana_page;
 use crate::pages::addon_store::model::downloads_label;
@@ -26,7 +26,7 @@ use crate::pages::common::{badge_of, needs_tf2};
 use crate::services::{Services, tf2_state};
 use crate::shell::confirm::{Confirm, confirm};
 use crate::store_download::{Progress, format_bytes, progress_label, progress_percent};
-use crate::store_messages::{addon_stopped, describe_browse};
+use crate::store_messages::{addon_stopped, addon_stopped_phrase, browse_phrase, describe_browse};
 use crate::tokio_bridge;
 use crate::widgets::carousel::Carousel;
 use crate::widgets::detail_header::detail_header;
@@ -39,11 +39,12 @@ use crate::widgets::store_error::error_line;
 pub enum ProfileState {
     /// The profile is being read, on open or after a retry.
     Loading,
-    Ready(AddonProfile),
-    /// The failure in player words.
-    Failed(String),
-    /// The item left GameBanana, so a retry cannot help; the message is in player words.
-    Gone(String),
+    /// Boxed so the failure variants do not carry the profile's size.
+    Ready(Box<AddonProfile>),
+    /// The failure in player words, worded when drawn.
+    Failed(Phrase),
+    /// The item left GameBanana, so a retry cannot help; the message is worded when drawn.
+    Gone(Phrase),
 }
 
 /// The dialog's view: the section and card that opened it, and its profile once read.
@@ -86,7 +87,7 @@ impl AddonDetail {
 
     fn ready(&self) -> Option<&AddonProfile> {
         match &self.profile {
-            ProfileState::Ready(profile) => Some(profile),
+            ProfileState::Ready(profile) => Some(profile.as_ref()),
             ProfileState::Loading | ProfileState::Failed(_) | ProfileState::Gone(_) => None,
         }
     }
@@ -109,23 +110,21 @@ impl AddonDetail {
         self.load = Some(cx.spawn(async move |this, cx| {
             let result = match job.await {
                 Ok(Ok(profile)) => Ok(profile),
-                Ok(Err(err)) => Err((
-                    describe_browse(&err),
-                    !matches!(err, BrowseError::Gone { .. }),
-                )),
-                Err(_) => Err((
-                    addon_stopped("the add-on profile task stopped unexpectedly".to_owned()),
-                    true,
-                )),
-            }
-            .map_err(|(failure, retryable)| {
-                failure.log("add-on profile");
-                if retryable {
-                    ProfileState::Failed(failure.message)
-                } else {
-                    ProfileState::Gone(failure.message)
+                Ok(Err(err)) => {
+                    describe_browse(&err).log("add-on profile");
+                    let phrase = browse_phrase(&err);
+                    Err(if matches!(err, BrowseError::Gone { .. }) {
+                        ProfileState::Gone(phrase)
+                    } else {
+                        ProfileState::Failed(phrase)
+                    })
                 }
-            });
+                Err(_) => {
+                    addon_stopped("the add-on profile task stopped unexpectedly".to_owned())
+                        .log("add-on profile");
+                    Err(ProfileState::Failed(addon_stopped_phrase()))
+                }
+            };
             let _ = this.update(cx, |d, cx| d.loaded(result, cx));
         }));
         cx.notify();
@@ -310,7 +309,7 @@ impl AddonDetail {
             Ok(profile) => {
                 let urls = profile.images().to_vec();
                 self.carousel.update(cx, |c, cx| c.set_urls(urls, cx));
-                ProfileState::Ready(profile)
+                ProfileState::Ready(Box::new(profile))
             }
             Err(failed) => failed,
         };
@@ -476,7 +475,7 @@ impl Render for AddonDetail {
                 error_line(
                     ids::ADDON_DETAIL_ERROR,
                     ids::ADDON_DETAIL_RETRY,
-                    SharedString::from(message.clone()),
+                    message.text(),
                     {
                         let this = cx.entity().downgrade();
                         move |_, cx| {
@@ -491,7 +490,7 @@ impl Render for AddonDetail {
                 labelled(
                     div().text_sm().text_color(cx.theme().danger),
                     ids::ADDON_DETAIL_ERROR,
-                    message.clone(),
+                    message.text(),
                 )
                 .into_any_element(),
             ],

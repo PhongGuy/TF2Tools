@@ -855,6 +855,77 @@ fn the_addon_detail_reads_in_russian(cx: &mut TestAppContext) {
     );
 }
 
+// The detail dialogs are dropped on close, so the language switches in place while the error shows.
+#[gpui_kit::test]
+fn a_kept_files_error_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_status("/apiv11/Mod/9", 503);
+    let (win, _) = support::store_window(
+        cx,
+        &env,
+        &server,
+        |env| support::seed_gb_huds(env, &[(9, "Down")]),
+        |_, _| support::Blank,
+    );
+    let item = DetailItem {
+        kind: StoreKind::GameBananaHuds,
+        id: gb(9),
+        name: "Down".into(),
+        in_library: false,
+    };
+    cx.update_window(win, |_, window, cx| {
+        open_detail(item, gamebanana_body(), window, cx)
+    })
+    .unwrap();
+    support::wait_real(cx, "the inline error", |cx| {
+        support::present(cx, win, ids::STORE_FILES_ERROR)
+    });
+    assert_eq!(
+        support::label_of(cx, win, ids::STORE_FILES_ERROR).as_deref(),
+        Some("GameBanana is having problems right now. Try again later.")
+    );
+
+    tf2tools_app::i18n::apply("ru");
+    cx.update(|cx| cx.refresh_windows());
+    support::settle(cx, win);
+    assert_eq!(
+        support::label_of(cx, win, ids::STORE_FILES_ERROR).as_deref(),
+        Some("На сайте GameBanana сейчас неполадки. Попробуйте позже.")
+    );
+}
+
+#[gpui_kit::test]
+fn a_kept_addon_profile_error_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let (env, server) = (support::env(), support::StoreServer::start());
+    server.mount_gb_index(
+        587,
+        MD,
+        1,
+        support::gb_listing(vec![support::gb_addon(8, 587, None)], true),
+    );
+    server.mount_status("/apiv11/Mod/8/ProfilePage", 503);
+    let w = addon_store(cx, &env, &server);
+    let _tab = open_addon_tab(cx, &w, "textures");
+    support::click_id(cx, w.win, ids::addon_gb_card("textures", GbId::new(8)));
+    support::wait_real(cx, "the failure", |cx| {
+        support::present(cx, w.win, ids::ADDON_DETAIL_ERROR)
+    });
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_ERROR).as_deref(),
+        Some("GameBanana is having problems right now. Try again later.")
+    );
+
+    tf2tools_app::i18n::apply("ru");
+    cx.update(|cx| cx.refresh_windows());
+    support::settle(cx, w.win);
+    assert_eq!(
+        support::label_of(cx, w.win, ids::ADDON_DETAIL_ERROR).as_deref(),
+        Some("На сайте GameBanana сейчас неполадки. Попробуйте позже.")
+    );
+}
+
 #[gpui_kit::test]
 fn the_update_banner_states_read_in_russian(cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch("ru");
