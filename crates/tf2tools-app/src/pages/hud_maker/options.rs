@@ -19,7 +19,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::{
     AnyElement, App, Context, InteractiveElement as _, IntoElement, ParentElement as _,
     SharedString, StatefulInteractiveElement as _, Styled as _, Task, TestSupportExt as _, Window,
-    div,
+    div, relative,
 };
 use tf2tools_core::{
     AddonName, Choice, OptionKind, OptionNeed, OptionSpec, OptionValue, Tf2Install,
@@ -144,14 +144,16 @@ impl HudMakerPage {
                     ))
                 });
             // Colours sit two to a line, so the sixteen item colours keep the panel short
-            // enough to leave the lower HUD clickable.
+            // enough to leave the lower HUD clickable; a name too long for half the panel
+            // widens its colour onto a line of its own.
             let mut swatches = h_flex().flex_wrap().gap_y_2();
             for spec in specs {
                 let Some(row) = self.option_row(spec, !shared, cx) else {
                     continue;
                 };
                 if matches!(spec.kind(), OptionKind::Colour { .. }) {
-                    swatches = swatches.child(div().w_1_2().min_w_0().child(row));
+                    let half = div().flex_none().min_w(relative(0.5)).max_w_full();
+                    swatches = swatches.child(half.child(row));
                 } else {
                     rows = rows.child(row);
                 }
@@ -677,6 +679,8 @@ impl HudMakerPage {
             .child(div().relative().child(swatch).children(picker))
             .child(
                 div()
+                    .id(ids::hud_maker_option_label(id))
+                    .test_support()
                     .text_sm()
                     .text_color(theme.foreground)
                     .child(maker_label(spec.label())),

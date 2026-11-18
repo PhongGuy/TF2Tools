@@ -8,7 +8,7 @@ use tf2tools_app::ids;
 use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::{BoardMode, MeterKind, PartKey, Scene, StartingPoint, Tf2Install};
+use tf2tools_core::{BoardMode, MeterKind, OptionSpec, PartKey, Scene, StartingPoint, Tf2Install};
 
 use crate::LocaleGuard;
 use crate::support;
@@ -242,4 +242,39 @@ fn a_part_the_game_fills_says_so_in_russian(cx: &mut TestAppContext) {
         label(cx, &s, tips).as_deref(),
         Some("Подсказки классов рисует игра")
     );
+}
+
+// The item colours sit two to a line; a Russian name too long for half the panel takes a line
+// of its own rather than running into its neighbour's swatch or past the panel.
+#[gpui_kit::test]
+fn a_long_russian_item_colour_keeps_clear_of_its_neighbour(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let files = [
+        ("resource/clientscheme.res", Some(SCHEME)),
+        ("scripts/hudlayout.res", Some(support::hud_stock::HUDLAYOUT)),
+    ];
+    let (_env, s, _page) = open_hud_maker(cx, &files);
+    let items = OptionSpec::built_ins()
+        .iter()
+        .filter(|spec| spec.group() == "Item colours")
+        .map(|spec| {
+            let swatch = support::bounds_of(cx, s.win, ids::hud_maker_option(spec.id()));
+            let name = support::bounds_of(cx, s.win, ids::hud_maker_option_label(spec.id()));
+            (spec.id(), swatch.expect("a swatch"), name.expect("a name"))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(items.len(), 16);
+    let body = support::bounds_of(cx, s.win, ids::HUD_MAKER_PANEL_BODY).unwrap();
+    for (id, _, name) in &items {
+        assert!(
+            name.right() <= body.right(),
+            "{id} leaves the panel: {name:?} {body:?}"
+        );
+    }
+    for pair in items.windows(2) {
+        let ((id, swatch, name), (next, next_swatch, _)) = (&pair[0], &pair[1]);
+        if next_swatch.top() == swatch.top() {
+            assert!(name.right() <= next_swatch.left(), "{id} runs into {next}");
+        }
+    }
 }

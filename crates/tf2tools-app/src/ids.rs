@@ -2194,6 +2194,11 @@ pub fn hud_maker_option_need(id: &str) -> ElementId {
     keyed("hud-maker-option-need", id)
 }
 
+/// A Colour option's name beside its swatch: "hud-maker-option-label:<id>".
+pub fn hud_maker_option_label(id: &str) -> ElementId {
+    keyed("hud-maker-option-label", id)
+}
+
 /// A Number option's value beside its slider, labelled with it: "hud-maker-option-value:<id>".
 pub fn hud_maker_option_value(id: &str) -> ElementId {
     keyed("hud-maker-option-value", id)
