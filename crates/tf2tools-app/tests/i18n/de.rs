@@ -115,3 +115,15 @@ fn the_hud_maker_meters_use_the_client_names() {
     assert!(text("hud_maker.meter.drink").contains("Krit-a-Cola"));
     assert!(text("hud_maker.situation.switch.koth").contains("Karte"));
 }
+
+#[test]
+fn the_hud_maker_names_its_parts_in_german() {
+    let text = |k: &str| {
+        tf2tools_app::_rust_i18n_try_translate("de", format!("hud_maker.part_name.{k}"))
+            .map(|t| t.into_owned())
+            .unwrap_or_default()
+    };
+    assert_ne!(text("health_value"), "Health value");
+    assert!(text("kill_streak_icon").contains("Killserie"));
+    assert_ne!(text("rune_haste"), "Rune haste");
+}
