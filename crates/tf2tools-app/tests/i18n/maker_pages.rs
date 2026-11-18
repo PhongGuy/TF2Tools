@@ -601,3 +601,8 @@ fn the_russian_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppConte
 fn the_portuguese_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext) {
     start_card_clears_the_toolbar_at_800_by_600(cx, "pt-BR");
 }
+
+#[gpui_kit::test]
+fn the_spanish_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext) {
+    start_card_clears_the_toolbar_at_800_by_600(cx, "es");
+}

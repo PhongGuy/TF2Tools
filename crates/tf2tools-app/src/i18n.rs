@@ -647,6 +647,102 @@ mod tests {
         assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
     }
 
+    // Values Spanish legitimately writes as English does: names, cognates and bare formats.
+    const ES_SAME_AS_ENGLISH: &[&str] = &[
+        "activity_log.category.hud",
+        "activity_log.level.error",
+        "activity_log.level.info",
+        "activity_log.level_name.error",
+        "activity_log.level_name.info",
+        "addons.section.skins",
+        "common.class.demoman",
+        "common.class.engineer",
+        "common.class.heavy",
+        "common.class.medic",
+        "common.class.pyro",
+        "common.class.scout",
+        "common.class.sniper",
+        "common.class.soldier",
+        "common.class.spy",
+        "common.class_compact.demoman",
+        "common.class_compact.engineer",
+        "common.class_compact.heavy",
+        "common.class_compact.medic",
+        "common.class_compact.pyro",
+        "common.class_compact.scout",
+        "common.class_compact.sniper",
+        "common.class_compact.soldier",
+        "common.class_compact.spy",
+        "common.class_short.demoman",
+        "common.class_short.engineer",
+        "common.class_short.heavy",
+        "common.class_short.pyro",
+        "common.class_short.scout",
+        "common.date.date_time",
+        "common.date.day_month_year",
+        "common.list.separator",
+        "common.sound_kind.hitsound",
+        "common.sound_kind.killsound",
+        "hud_maker.board_mode.casual",
+        "hud_maker.board_mode.mvm",
+        "hud_maker.borrow.origin.curated",
+        "hud_maker.label.chat",
+        "hud_maker.label.hud",
+        "hud_maker.label.normal",
+        "hud_maker.label.valve",
+        "hud_maker.meter.pomson",
+        "hud_maker.meter.revolver",
+        "hud_maker.more.vision.normal",
+        "hud_maker.part_name.demoman",
+        "hud_maker.part_name.engineer",
+        "hud_maker.part_name.heavy_weapons",
+        "hud_maker.part_name.heavyweapons",
+        "hud_maker.part_name.k_d",
+        "hud_maker.part_name.medic",
+        "hud_maker.part_name.pyro",
+        "hud_maker.part_name.scout",
+        "hud_maker.part_name.sniper",
+        "hud_maker.part_name.soldier",
+        "hud_maker.part_name.spy",
+        "hud_maker.part_name.vs",
+        "hud_maker.scene.hud",
+        "huds.badge.local",
+        "logs_tf.detail.medics",
+        "logs_tf.detail.midfights",
+        "logs_tf.stat.logs",
+        "nav.huds",
+        "nav.logs",
+        "nav.logs_tf",
+        "profiles.missing.kind.hitsound",
+        "profiles.missing.kind.killsound",
+        "settings.audio.title",
+        "settings.logs_tf.title",
+        "settings.storage.addons",
+        "settings.storage.huds",
+        "settings.storage.total",
+        "sound_store.category.hitsounds",
+        "sound_store.category.killsounds",
+        "sounds.button.hit",
+        "sounds.button.kill",
+    ];
+
+    #[test]
+    fn spanish_leaves_nothing_in_english() {
+        let (en, es) = (messages("en"), messages("es"));
+        let left: Vec<&str> = es
+            .iter()
+            .filter(|(k, v)| en.get(*k) == Some(*v))
+            .map(|(k, _)| k.as_str())
+            .filter(|k| !ES_SAME_AS_ENGLISH.contains(k))
+            .collect();
+        assert!(left.is_empty(), "es values still in English: {left:?}");
+        let stale: Vec<&&str> = ES_SAME_AS_ENGLISH
+            .iter()
+            .filter(|k| en.get(**k) != es.get(**k))
+            .collect();
+        assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
+    }
+
     #[test]
     fn translations_keep_the_english_variables() {
         let en = messages("en");

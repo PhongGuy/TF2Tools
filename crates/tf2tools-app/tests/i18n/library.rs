@@ -615,6 +615,11 @@ fn the_portuguese_installed_sound_names_show_at_800(cx: &mut TestAppContext) {
     installed_sound_names_show_at_800(cx, "pt-BR");
 }
 
+#[gpui_kit::test]
+fn the_spanish_installed_sound_names_show_at_800(cx: &mut TestAppContext) {
+    installed_sound_names_show_at_800(cx, "es");
+}
+
 // Each slot's status is an icon whose name reads in `lang`, small enough for any word.
 fn sound_status_icon_reads(cx: &mut TestAppContext, lang: &str, installed: &str) {
     let _guard = LocaleGuard::switch(lang);
