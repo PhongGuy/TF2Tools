@@ -41,7 +41,7 @@ use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
-use crate::widgets::labelled;
+use crate::widgets::{label_width, labelled};
 use crate::widgets::profile_menu::{OnPick, Section, added_title, profile_menu};
 use crate::widgets::scroll::scroll_area;
 
@@ -50,6 +50,9 @@ const CARD_HEIGHT: Pixels = px(136.);
 // Room after the grid's last row, so it scrolls clear of the floating player and one toast lifted
 // over it; the grid's floor keeps that room under one row on a short page.
 const PLAYER_CLEARANCE: Pixels = px(152.);
+/// A card's action row with Hit and Kill labelled, less the two labels: the card's border and
+/// padding (50), play and delete (68), an 8 px gap, and two labelled outline buttons (96).
+const LABELLED_ROW: Pixels = px(222.);
 
 /// The action in flight: its button spins and the other mutating buttons disable.
 #[derive(Clone, PartialEq, Eq)]
@@ -793,18 +796,27 @@ fn sound_card(
     playing: bool,
     busy: Option<&Busy>,
     page: &WeakEntity<SoundsPage>,
+    width: Pixels,
+    window: &Window,
     cx: &App,
 ) -> AnyElement {
     let folder = sound.folder_name();
+    // Hit and Kill keep their labels only when both fit the card's width; otherwise both
+    // go icon-only and keep their names, so the row never runs past the card.
+    let (hit, kill) = (tr!("sounds.button.hit"), tr!("sounds.button.kill"));
+    let labels =
+        label_width(&hit, window, cx) + label_width(&kill, window, cx) <= width - LABELLED_ROW;
     let deleting = busy == Some(&Busy::Delete(folder.to_owned()));
     let has_tf2 = tf2_state(cx).read(cx).install().is_some();
     let install = |id: ElementId, kind: SoundKind, icon: IconName, label: SharedString| {
         let installing = busy == Some(&Busy::Install(folder.to_owned(), kind));
-        let button = Button::new(id)
-            .outline()
-            .px(SM_ICON_PX)
-            .icon(icon)
-            .label(label)
+        let button = Button::new(id).outline().px(SM_ICON_PX).icon(icon);
+        let button = if labels {
+            button.label(label)
+        } else {
+            button.named(label)
+        };
+        let button = button
             .loading(installing)
             .disabled(busy.is_some() && !installing)
             .on_click(on_card(page, sound, move |page, entry, window, cx| {
@@ -836,6 +848,7 @@ fn sound_card(
                 .mt_auto()
                 .px_6()
                 .pb_6()
+                .gap_2()
                 .justify_between()
                 .child(
                     h_flex()
@@ -865,13 +878,13 @@ fn sound_card(
                             ids::sound_hit(folder),
                             SoundKind::Hitsound,
                             IconName::Crosshair,
-                            tr!("sounds.button.hit"),
+                            hit,
                         ))
                         .child(install(
                             ids::sound_kill(folder),
                             SoundKind::Killsound,
                             IconName::Target,
-                            tr!("sounds.button.kill"),
+                            kill,
                         )),
                 ),
         )
@@ -966,11 +979,15 @@ impl SoundsPage {
             let sounds = Rc::clone(&self.sounds);
             Some(
                 self.grid
-                    .render(shown.len(), CARD_HEIGHT, move |ix, _, cx| {
-                        let sound = &sounds[shown[ix]];
-                        let on = playing.as_ref() == Some(&sound_key(sound.folder_name()));
-                        sound_card(sound, on, busy.as_ref(), &page, cx)
-                    }),
+                    .render_cells(
+                        shown.len(),
+                        |_| CARD_HEIGHT,
+                        move |ix, width, window, cx| {
+                            let sound = &sounds[shown[ix]];
+                            let on = playing.as_ref() == Some(&sound_key(sound.folder_name()));
+                            sound_card(sound, on, busy.as_ref(), &page, width, window, cx)
+                        },
+                    ),
             )
         };
         let muted = cx.theme().muted_foreground;

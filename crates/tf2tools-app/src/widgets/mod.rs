@@ -46,6 +46,15 @@ pub(crate) fn label_or_named(
     window: &Window,
     cx: &App,
 ) -> Button {
+    if label_width(&text, window, cx) <= budget {
+        button.label(text)
+    } else {
+        button.named(text)
+    }
+}
+
+/// The width `text` shapes to as a button's label, in the theme font at a button's text size.
+pub(crate) fn label_width(text: &SharedString, window: &Window, cx: &App) -> Pixels {
     let run = TextRun {
         len: text.len(),
         font: gpui_kit::Font {
@@ -55,15 +64,10 @@ pub(crate) fn label_or_named(
         ..Default::default()
     };
     let size = rems(0.875).to_pixels(window.rem_size());
-    let width = window
+    window
         .text_system()
         .shape_line(text.clone(), size, &[run], None)
-        .width;
-    if width <= budget {
-        button.label(text)
-    } else {
-        button.named(text)
-    }
+        .width
 }
 
 // A text element, styled by `base`, that the tests and the pilot read back by id.
