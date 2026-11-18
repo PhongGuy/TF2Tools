@@ -546,7 +546,7 @@ maps:
     title: "Ordenar:"
     name: "Nome"
     most_played: "Mais jogados"
-    recently_played: "Jogados recentemente"
+    recently_played: "Recentes"
   table:
     map: "Mapa"
     times_played: "Vezes jogado"
@@ -1339,7 +1339,7 @@ hud_maker:
     apply: "Aplicar"
     cancel: "Cancelar"
     presets: "Predefinições"
-    save_preset: "Salvar como predefinição"
+    save_preset: "Salvar predefinição"
     delete: "Excluir"
     delete_named: "Excluir %{name}"
     title: "Receitas"
@@ -1625,7 +1625,7 @@ hud_maker:
     choose: "Escolher imagem…"
     picture: "Imagem"
   meter:
-    plain: "João Pestana, Jarratê, estandartes e a maioria dos itens"
+    plain: "João Pestana, Jarratê, estandartes e outros itens"
     drink: "Bonk! Pancada Atômica, Criti-Cola e Leite Louco"
     soda_popper: "Refrispingarda e Destruidora do Degenerado"
     cleaver: "Guilhotina Voadora"
@@ -1678,8 +1678,8 @@ hud_maker:
   placeholder:
     name: "Dê um nome ao seu HUD"
     find_part: "Buscar uma parte..."
-    preset: "Nome da predefinição"
-    snapshot: "Nome do snapshot"
+    preset: "Nome"
+    snapshot: "Nome"
     preset_label: "Nome da predefinição"
     snapshot_label: "Nome do snapshot"
   toolbar:
