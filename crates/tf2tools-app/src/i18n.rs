@@ -29,6 +29,10 @@ pub const LANGUAGES: &[Language] = &[
         code: "pt-BR",
         name: "Português do Brasil (preview)",
     },
+    Language {
+        code: "es",
+        name: "Español (preview)",
+    },
 ];
 
 // The offered language with this code, so callers get a `'static` code back.
@@ -38,7 +42,8 @@ fn offered(code: &str) -> Option<&'static str> {
 
 /// The first of the preferred locales (most preferred first) that names an offered language,
 /// else "en". Tags like `ru_RU.UTF-8` or `ru-Cyrl-RU` reduce to their language and
-/// `pt_BR.UTF-8` maps to `pt-BR`; `C` and empty entries match nothing and the walk goes on.
+/// `pt_BR.UTF-8` maps to `pt-BR` and `es_MX.UTF-8` to `es`; `C` and empty entries match nothing
+/// and the walk goes on.
 pub fn system_language<S: AsRef<str>>(locales: impl IntoIterator<Item = S>) -> &'static str {
     locales
         .into_iter()
@@ -473,6 +478,14 @@ mod tests {
     }
 
     #[test]
+    fn spanish_counts_only_one_as_one() {
+        assert_eq!(plural_form("es", 1), PluralForm::One);
+        for n in [0, 2, 5, 11, 21, 101, 1000] {
+            assert_eq!(plural_form("es", n), PluralForm::Other, "es {n}");
+        }
+    }
+
+    #[test]
     fn an_unknown_language_counts_like_english() {
         assert_eq!(plural_form("xx", 1), PluralForm::One);
         assert_eq!(plural_form("xx", 21), PluralForm::Other);
@@ -486,7 +499,8 @@ mod tests {
             [
                 ("en", "English"),
                 ("ru", "Русский (preview)"),
-                ("pt-BR", "Português do Brasil (preview)")
+                ("pt-BR", "Português do Brasil (preview)"),
+                ("es", "Español (preview)")
             ]
         );
         let offered: BTreeSet<&str> = LANGUAGES.iter().map(|l| l.code).collect();
@@ -629,6 +643,102 @@ mod tests {
         let stale: Vec<&&str> = PT_BR_SAME_AS_ENGLISH
             .iter()
             .filter(|k| en.get(**k) != pt.get(**k))
+            .collect();
+        assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
+    }
+
+    // Values Spanish legitimately writes as English does: names, cognates and bare formats.
+    const ES_SAME_AS_ENGLISH: &[&str] = &[
+        "activity_log.category.hud",
+        "activity_log.level.error",
+        "activity_log.level.info",
+        "activity_log.level_name.error",
+        "activity_log.level_name.info",
+        "addons.section.skins",
+        "common.class.demoman",
+        "common.class.engineer",
+        "common.class.heavy",
+        "common.class.medic",
+        "common.class.pyro",
+        "common.class.scout",
+        "common.class.sniper",
+        "common.class.soldier",
+        "common.class.spy",
+        "common.class_compact.demoman",
+        "common.class_compact.engineer",
+        "common.class_compact.heavy",
+        "common.class_compact.medic",
+        "common.class_compact.pyro",
+        "common.class_compact.scout",
+        "common.class_compact.sniper",
+        "common.class_compact.soldier",
+        "common.class_compact.spy",
+        "common.class_short.demoman",
+        "common.class_short.engineer",
+        "common.class_short.heavy",
+        "common.class_short.pyro",
+        "common.class_short.scout",
+        "common.date.date_time",
+        "common.date.day_month_year",
+        "common.list.separator",
+        "common.sound_kind.hitsound",
+        "common.sound_kind.killsound",
+        "hud_maker.board_mode.casual",
+        "hud_maker.board_mode.mvm",
+        "hud_maker.borrow.origin.curated",
+        "hud_maker.label.chat",
+        "hud_maker.label.hud",
+        "hud_maker.label.normal",
+        "hud_maker.label.valve",
+        "hud_maker.meter.pomson",
+        "hud_maker.meter.revolver",
+        "hud_maker.more.vision.normal",
+        "hud_maker.part_name.demoman",
+        "hud_maker.part_name.engineer",
+        "hud_maker.part_name.heavy_weapons",
+        "hud_maker.part_name.heavyweapons",
+        "hud_maker.part_name.k_d",
+        "hud_maker.part_name.medic",
+        "hud_maker.part_name.pyro",
+        "hud_maker.part_name.scout",
+        "hud_maker.part_name.sniper",
+        "hud_maker.part_name.soldier",
+        "hud_maker.part_name.spy",
+        "hud_maker.part_name.vs",
+        "hud_maker.scene.hud",
+        "huds.badge.local",
+        "logs_tf.detail.medics",
+        "logs_tf.detail.midfights",
+        "logs_tf.stat.logs",
+        "nav.huds",
+        "nav.logs",
+        "nav.logs_tf",
+        "profiles.missing.kind.hitsound",
+        "profiles.missing.kind.killsound",
+        "settings.audio.title",
+        "settings.logs_tf.title",
+        "settings.storage.addons",
+        "settings.storage.huds",
+        "settings.storage.total",
+        "sound_store.category.hitsounds",
+        "sound_store.category.killsounds",
+        "sounds.button.hit",
+        "sounds.button.kill",
+    ];
+
+    #[test]
+    fn spanish_leaves_nothing_in_english() {
+        let (en, es) = (messages("en"), messages("es"));
+        let left: Vec<&str> = es
+            .iter()
+            .filter(|(k, v)| en.get(*k) == Some(*v))
+            .map(|(k, _)| k.as_str())
+            .filter(|k| !ES_SAME_AS_ENGLISH.contains(k))
+            .collect();
+        assert!(left.is_empty(), "es values still in English: {left:?}");
+        let stale: Vec<&&str> = ES_SAME_AS_ENGLISH
+            .iter()
+            .filter(|k| en.get(**k) != es.get(**k))
             .collect();
         assert!(stale.is_empty(), "allowlisted but translated: {stale:?}");
     }

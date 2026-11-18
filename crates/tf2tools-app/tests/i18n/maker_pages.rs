@@ -395,6 +395,11 @@ fn the_portuguese_maker_fits_at_800_by_600(cx: &mut TestAppContext) {
     maker_fits_at_800_by_600(cx, "pt-BR");
 }
 
+#[gpui_kit::test]
+fn the_spanish_maker_fits_at_800_by_600(cx: &mut TestAppContext) {
+    maker_fits_at_800_by_600(cx, "es");
+}
+
 // Reopening a HUD that held too many borrowed pictures says so in the player's language.
 #[test]
 fn the_pictures_left_out_note_reads_in_russian() {
@@ -441,6 +446,11 @@ fn the_preview_bar_names_the_starting_point_in_russian(cx: &mut TestAppContext) 
 #[gpui_kit::test]
 fn the_preview_bar_names_the_starting_point_in_portuguese(cx: &mut TestAppContext) {
     starting_point_bar_reads(cx, "pt-BR", "Prévia de Competitivo minimalista.");
+}
+
+#[gpui_kit::test]
+fn the_preview_bar_names_the_starting_point_in_spanish(cx: &mut TestAppContext) {
+    starting_point_bar_reads(cx, "es", "Vista previa de Competitivo minimalista.");
 }
 
 // The toolbar's buttons a docked panel must never lie over.
@@ -542,6 +552,11 @@ fn the_portuguese_toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContex
     toolbar_and_meter_row_fit_at_800_by_600(cx, "pt-BR");
 }
 
+#[gpui_kit::test]
+fn the_spanish_toolbar_and_meter_row_fit_at_800_by_600(cx: &mut TestAppContext) {
+    toolbar_and_meter_row_fit_at_800_by_600(cx, "es");
+}
+
 // At 800x600 the Start from card in `lang` shows From scratch whole, and keeps clear of every
 // toolbar button and inside the canvas area, also with the ready-made HUDs listed.
 fn start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext, lang: &str) {
@@ -585,4 +600,9 @@ fn the_russian_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppConte
 #[gpui_kit::test]
 fn the_portuguese_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext) {
     start_card_clears_the_toolbar_at_800_by_600(cx, "pt-BR");
+}
+
+#[gpui_kit::test]
+fn the_spanish_start_card_clears_the_toolbar_at_800_by_600(cx: &mut TestAppContext) {
+    start_card_clears_the_toolbar_at_800_by_600(cx, "es");
 }

@@ -20,6 +20,7 @@ use crate::support::{self, ShellWindow};
 pub const NOTE_EN: &str = "Parts of TF2Tools not yet translated stay in English.";
 pub const NOTE_RU: &str = "Ещё не переведённые части TF2Tools остаются на английском.";
 pub const NOTE_PT_BR: &str = "As partes do TF2Tools ainda não traduzidas ficam em inglês.";
+pub const NOTE_ES: &str = "Las partes de TF2Tools aún sin traducir se muestran en inglés.";
 
 /// Opens Settings through the sidebar and waits for its first load.
 pub fn open_settings(cx: &mut TestAppContext, s: &ShellWindow) -> Entity<SettingsPage> {
@@ -203,6 +204,30 @@ fn a_brazilian_system_starts_in_portuguese(cx: &mut TestAppContext) {
     support::click_id(cx, win, ids::nav(Page::Settings));
     support::wait_real(cx, "the Portuguese note", |cx| {
         note(cx, win).as_deref() == Some(NOTE_PT_BR)
+    });
+}
+
+#[gpui_kit::test]
+fn a_spanish_system_starts_in_spanish(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let win = start_with_locales(cx, &env, &["es_ES.UTF-8"]);
+    assert_eq!(i18n::current(), "es");
+    support::click_id(cx, win, ids::nav(Page::Settings));
+    support::wait_real(cx, "the Spanish note", |cx| {
+        note(cx, win).as_deref() == Some(NOTE_ES)
+    });
+}
+
+#[gpui_kit::test]
+fn a_mexican_system_starts_in_spanish(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let win = start_with_locales(cx, &env, &["es_MX.UTF-8"]);
+    assert_eq!(i18n::current(), "es");
+    support::click_id(cx, win, ids::nav(Page::Settings));
+    support::wait_real(cx, "the Spanish note", |cx| {
+        note(cx, win).as_deref() == Some(NOTE_ES)
     });
 }
 
@@ -430,6 +455,8 @@ fn the_settings_cards_fit_at_800_by_600_in_every_language(cx: &mut TestAppContex
     assert_settings_fit(cx, s.win, "ru");
     pick(cx, s.win, "pt-BR");
     assert_settings_fit(cx, s.win, "pt-BR");
+    pick(cx, s.win, "es");
+    assert_settings_fit(cx, s.win, "es");
 }
 
 // The hub keeps a failed sync for its card, so the Stores card must word it when drawn and take a

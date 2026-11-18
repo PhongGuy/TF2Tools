@@ -13,6 +13,9 @@ mod support;
 #[path = "i18n/apply.rs"]
 mod apply;
 
+#[path = "i18n/es.rs"]
+mod es;
+
 #[path = "i18n/formats.rs"]
 mod formats;
 

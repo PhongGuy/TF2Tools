@@ -147,6 +147,11 @@ fn the_logs_page_fits_in_portuguese(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn the_logs_page_fits_in_spanish(cx: &mut TestAppContext) {
+    logs_page_reads_and_fits(cx, "es");
+}
+
+#[gpui_kit::test]
 fn a_russian_log_row_names_its_category_action_and_level(cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch("ru");
     let env = support::env();
@@ -212,7 +217,7 @@ fn categories_and_actions_read_in_russian_and_unknown_ones_stay_spaced() {
 }
 
 #[test]
-fn the_apply_action_reads_in_russian_and_portuguese() {
+fn the_apply_action_reads_in_every_language() {
     let ru = {
         let _guard = LocaleGuard::switch("ru");
         action_label("apply").to_string()
@@ -221,8 +226,13 @@ fn the_apply_action_reads_in_russian_and_portuguese() {
         let _guard = LocaleGuard::switch("pt-BR");
         action_label("apply").to_string()
     };
+    let es = {
+        let _guard = LocaleGuard::switch("es");
+        action_label("apply").to_string()
+    };
     assert_eq!(ru, "Применение");
     assert_eq!(pt, "Aplicar");
+    assert_eq!(es, "Aplicar");
 }
 
 fn info(cat: &str, action: &str, msg: &str) -> NewLogEntry {
@@ -564,6 +574,11 @@ fn an_open_russian_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn an_open_portuguese_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
     open_log_keeps_its_ids_and_fits(cx, "pt-BR");
+}
+
+#[gpui_kit::test]
+fn an_open_spanish_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
+    open_log_keeps_its_ids_and_fits(cx, "es");
 }
 
 fn type_into_add(
