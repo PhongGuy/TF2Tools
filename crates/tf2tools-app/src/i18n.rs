@@ -32,6 +32,20 @@ fn offered(code: &str) -> Option<&'static str> {
     LANGUAGES.iter().map(|l| l.code).find(|c| *c == code)
 }
 
+/// The first of the preferred locales (most preferred first) that names an offered language,
+/// else "en". Tags like `ru_RU.UTF-8` or `ru-Cyrl-RU` reduce to their language; `C` and
+/// empty entries match nothing and the walk goes on.
+pub fn system_language<S: AsRef<str>>(locales: impl IntoIterator<Item = S>) -> &'static str {
+    locales
+        .into_iter()
+        .find_map(|tag| {
+            let tag = tag.as_ref().to_lowercase();
+            let language = tag.split(['_', '-', '.', '@']).next().unwrap_or_default();
+            offered(language)
+        })
+        .unwrap_or("en")
+}
+
 /// Switches the process-wide locale, shared with the kit, to `code`; an unknown code
 /// switches to English. Returns the code applied.
 pub fn apply(code: &str) -> &'static str {
