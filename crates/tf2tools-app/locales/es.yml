@@ -259,134 +259,134 @@ common:
     days_ago: { one: "hace %{count} día", other: "hace %{count} días" }
 
 addon_store:
-  downloads: { one: "%{count} download", other: "%{count} downloads" }
+  downloads: { one: "%{count} descarga", other: "%{count} descargas" }
   card:
-    by: "by %{author}"
-    mature: "Mature"
-    outdated: "Outdated"
+    by: "por %{author}"
+    mature: "Para adultos"
+    outdated: "Desactualizado"
   badge:
-    update: "Update"
-    installed: "Installed"
-  info: "These addons work best with a mastercomfig preset installed. Download addons to your library, then install them from the Addons page."
-  heading: "Mastercomfig performance and quality-of-life addons"
-  no_tf2: "Set the TF2 folder in Settings to install addons."
-  syncing: "Syncing addons..."
-  unloaded: "Could not load addons"
-  empty: "No add-ons found"
+    update: "Actualización"
+    installed: "Instalado"
+  info: "Estos add-ons funcionan mejor con un preajuste de mastercomfig instalado. Descarga add-ons a tu biblioteca y luego instálalos desde la página Add-ons."
+  heading: "Add-ons de rendimiento y calidad de vida de mastercomfig"
+  no_tf2: "Elige la carpeta de TF2 en Ajustes para instalar add-ons."
+  syncing: "Sincronizando add-ons..."
+  unloaded: "No se pudieron cargar los add-ons"
+  empty: "No se encontraron add-ons"
   button:
-    refresh: "Refresh"
-    syncing: "Syncing..."
-    installing: "Installing..."
-    update: "Update"
-    load_more: "Load more"
+    refresh: "Recargar"
+    syncing: "Sincronizando..."
+    installing: "Instalando..."
+    update: "Actualizar"
+    load_more: "Cargar más"
   offer:
-    install: "Install"
-    install_again: "Install again"
+    install: "Instalar"
+    install_again: "Instalar de nuevo"
   sort:
-    most_downloaded: "Most downloaded"
-    newest: "Newest"
+    most_downloaded: "Más descargados"
+    newest: "Más recientes"
   category:
-    all: "All"
-    all_weapons: "All weapons"
+    all: "Todas"
+    all_weapons: "Todas las armas"
   hint:
-    category: "Try another category."
-    search: "Try another search."
+    category: "Prueba otra categoría."
+    search: "Prueba otra búsqueda."
   search:
-    skins: "Search Skins..."
-    effects: "Search Effects..."
-    guis: "Search GUIs..."
-    textures: "Search Textures..."
-    gamefiles: "Search Game files..."
-    items: "Search add-ons..."
+    skins: "Buscar skins..."
+    effects: "Buscar efectos..."
+    guis: "Buscar GUIs..."
+    textures: "Buscar texturas..."
+    gamefiles: "Buscar archivos del juego..."
+    items: "Buscar add-ons..."
 
 hud_store:
-  added: "Added %{date}"
+  added: "Añadido el %{date}"
   tab:
-    curated: "Curated"
+    curated: "Seleccionados"
   curated:
-    source: "Curated HUDs from hud-db."
-    unloaded: "Could not load store"
+    source: "HUDs seleccionados de hud-db."
+    unloaded: "No se pudo cargar la tienda"
   filter:
-    os: "OS:"
-    os_tooltip: "HUDs that work on %{os}"
-    hide_prereleases: "Hide prereleases"
-    clear: "Clear filters"
-    more: "More filters"
-    less: "Less filters"
-    features: "Features"
-    tags: "Tags"
-    gamemode: "Gamemode"
-    resolution: "Resolution"
+    os: "SO:"
+    os_tooltip: "HUDs que funcionan en %{os}"
+    hide_prereleases: "Ocultar versiones previas"
+    clear: "Quitar filtros"
+    more: "Más filtros"
+    less: "Menos filtros"
+    features: "Funciones"
+    tags: "Etiquetas"
+    gamemode: "Modo de juego"
+    resolution: "Resolución"
   card:
-    visit: "Visit the HUD's page"
+    visit: "Visitar la página del HUD"
   detail:
-    released: "Released %{date}"
-    os: "OS"
-    gamemodes: "Gamemodes"
-    resolutions: "Resolutions"
-    repository: "Repository"
+    released: "Publicado el %{date}"
+    os: "SO"
+    gamemodes: "Modos de juego"
+    resolutions: "Resoluciones"
+    repository: "Repositorio"
     social:
-      support: "Support"
+      support: "Apoyar"
 
 store_download:
   button:
-    download: "Download"
-    in_library: "In Library"
-    redownload: "Re-download"
+    download: "Descargar"
+    in_library: "En la biblioteca"
+    redownload: "Volver a descargar"
   toast:
     downloaded:
-      huds: "HUD downloaded"
-      sounds: "Sound downloaded"
-      crosshairs: "Crosshair downloaded"
-      addons: "Addon downloaded"
-      items: "Item downloaded"
+      huds: "HUD descargado"
+      sounds: "Sonido descargado"
+      crosshairs: "Mira descargada"
+      addons: "Add-on descargado"
+      items: "Objeto descargado"
     failed:
-      huds: "Failed to download HUD"
-      sounds: "Failed to download sound"
-      crosshairs: "Failed to download crosshair"
-      addons: "Failed to download addon"
-      items: "Failed to download item"
-    added: "%{name} added to your library"
-  stayed: "%{message} Still in your library: %{items}."
-  unknown_item: "an item"
+      huds: "No se pudo descargar el HUD"
+      sounds: "No se pudo descargar el sonido"
+      crosshairs: "No se pudo descargar la mira"
+      addons: "No se pudo descargar el add-on"
+      items: "No se pudo descargar el objeto"
+    added: "%{name} se añadió a tu biblioteca"
+  stayed: "%{message} Aún en tu biblioteca: %{items}."
+  unknown_item: "un objeto"
 
 store_detail:
   button:
-    update_with: "Update with this file"
+    update_with: "Actualizar con este archivo"
   files:
-    loading: "Loading files..."
-    none: "No files to download"
+    loading: "Cargando archivos..."
+    none: "No hay archivos para descargar"
   badge:
-    downloaded: "Downloaded"
+    downloaded: "Descargado"
 
 addon_detail:
-  mature: "Mature content: %{reasons}"
-  credits: "Credits"
-  files: "Files"
-  maps: "Installed maps"
-  map_unlisted: "%{name} (not listed in Create Server; type map %{name} in the console)"
-  loading: "Loading details..."
-  waiting: "Waiting for GameBanana..."
-  open: "Open on GameBanana"
+  mature: "Contenido para adultos: %{reasons}"
+  credits: "Créditos"
+  files: "Archivos"
+  maps: "Mapas instalados"
+  map_unlisted: "%{name} (no aparece en Crear servidor; escribe map %{name} en la consola)"
+  loading: "Cargando detalles..."
+  waiting: "Esperando a GameBanana..."
+  open: "Abrir en GameBanana"
   button:
-    remove: "Remove"
-    removing: "Removing..."
+    remove: "Quitar"
+    removing: "Quitando..."
   activity:
-    installed: "Installed addon: %{name}"
+    installed: "Add-on instalado: %{name}"
   toast:
-    installed: "Addon installed"
+    installed: "Add-on instalado"
 
 sound_store:
-  source: "Hitsounds and killsounds from GameBanana."
+  source: "Hitsounds y killsounds de GameBanana."
   category:
-    title: "Category:"
-    all: "All"
+    title: "Categoría:"
+    all: "Todas"
     hitsounds: "Hitsounds"
     killsounds: "Killsounds"
-    sound: "Sound"
+    sound: "Sonido"
   preview:
-    play: "Play Preview"
-    stop: "Stop Preview"
+    play: "Reproducir vista previa"
+    stop: "Detener vista previa"
 
 logs_tf:
   progress:
@@ -537,104 +537,104 @@ logs_tf:
     unknown: "Event"
 
 maps:
-  count: { one: "%{count} map", other: "%{count} maps" }
-  count_of: { one: "%{shown} of %{count} map", other: "%{shown} of %{count} maps" }
-  search: "Search maps..."
-  no_tf2: "Set the TF2 folder in Settings to download maps."
-  serveme_info: "Community maps hosted by serveme.tf. Downloads go into TF2's maps folder."
+  count: { one: "%{count} mapa", other: "%{count} mapas" }
+  count_of: { one: "%{shown} de %{count} mapa", other: "%{shown} de %{count} mapas" }
+  search: "Buscar mapas..."
+  no_tf2: "Elige la carpeta de TF2 en Ajustes para descargar mapas."
+  serveme_info: "Mapas de la comunidad alojados en serveme.tf. Las descargas van a la carpeta de mapas de TF2."
   sort:
-    title: "Sort:"
-    name: "Name"
-    most_played: "Most played"
-    recently_played: "Recently played"
+    title: "Ordenar:"
+    name: "Nombre"
+    most_played: "Más jugados"
+    recently_played: "Jugados hace poco"
   table:
-    map: "Map"
-    times_played: "Times played"
-    last_played: "Last played"
-    size: "Size"
-    never: "Never"
+    map: "Mapa"
+    times_played: "Veces jugado"
+    last_played: "Última partida"
+    size: "Tamaño"
+    never: "Nunca"
   empty:
-    loading: "Getting the map list..."
-    none: "No maps yet. Press Refresh to get the list from serveme.tf."
-    no_match: "No maps match your search"
+    loading: "Obteniendo la lista de mapas..."
+    none: "Aún no hay mapas. Pulsa Recargar para obtener la lista de serveme.tf."
+    no_match: "Ningún mapa coincide con tu búsqueda"
   badge:
-    downloaded: "Downloaded"
-    in_game: "In game"
-    gone: "No longer on GameBanana"
-    not_installed: "Not installed"
-    update: "Update"
-    installed: "Installed"
+    downloaded: "Descargado"
+    in_game: "En el juego"
+    gone: "Ya no está en GameBanana"
+    not_installed: "No instalado"
+    update: "Actualización"
+    installed: "Instalado"
   button:
-    refresh: "Refresh"
-    refreshing: "Refreshing..."
-    download: "Download"
-    remove: "Remove"
+    refresh: "Recargar"
+    refreshing: "Recargando..."
+    download: "Descargar"
+    remove: "Quitar"
   toast:
-    downloaded_title: "Map downloaded"
-    downloaded: "%{name} is ready to play in TF2."
-    download_failed: "Download failed"
-    removed_title: "Map removed"
-    removed: "%{name} was deleted from TF2."
+    downloaded_title: "Mapa descargado"
+    downloaded: "%{name} está listo para jugar en TF2."
+    download_failed: "No se pudo descargar"
+    removed_title: "Mapa quitado"
+    removed: "%{name} se eliminó de TF2."
   gb:
-    info: "Community maps from GameBanana. Open a map to see it there."
-    all_gamemodes: "All gamemodes"
-    loading: "Loading..."
-    installed_empty: "No maps installed"
-    installed_hint: "Install a map from All maps."
-    empty: "No maps found"
+    info: "Mapas de la comunidad de GameBanana. Abre un mapa para verlo allí."
+    all_gamemodes: "Todos los modos de juego"
+    loading: "Cargando..."
+    installed_empty: "No hay mapas instalados"
+    installed_hint: "Instala un mapa desde Todos los mapas."
+    empty: "No se encontraron mapas"
     sort:
-      most_downloaded: "Most downloaded"
-      newest: "Newest"
+      most_downloaded: "Más descargados"
+      newest: "Más recientes"
     show:
-      all: "All maps"
-      installed: "Installed"
+      all: "Todos los mapas"
+      installed: "Instalados"
     hint:
-      search: "Try another search."
-      gamemode: "Try another gamemode."
-      sync: "Maps appear here after a sync with GameBanana."
+      search: "Prueba otra búsqueda."
+      gamemode: "Prueba otro modo de juego."
+      sync: "Los mapas aparecen aquí tras sincronizar con GameBanana."
     button:
-      sync: "Sync"
+      sync: "Sincronizar"
 
 store_grid:
   count:
-    huds: { one: "%{shown} of %{count} HUD", other: "%{shown} of %{count} HUDs" }
-    sounds: { one: "%{shown} of %{count} sound", other: "%{shown} of %{count} sounds" }
-    crosshairs: { one: "%{shown} of %{count} crosshair", other: "%{shown} of %{count} crosshairs" }
-  loading: "Loading..."
+    huds: { one: "%{shown} de %{count} HUD", other: "%{shown} de %{count} HUDs" }
+    sounds: { one: "%{shown} de %{count} sonido", other: "%{shown} de %{count} sonidos" }
+    crosshairs: { one: "%{shown} de %{count} mira", other: "%{shown} de %{count} miras" }
+  loading: "Cargando..."
   sort:
-    most_liked: "Most Liked"
-    most_viewed: "Most Viewed"
-    newest: "Newest"
+    most_liked: "Más votados"
+    most_viewed: "Más vistos"
+    newest: "Recientes"
   search:
-    huds: "Search HUDs..."
-    sounds: "Search sounds..."
-    crosshairs: "Search crosshairs..."
-    items: "Search items..."
+    huds: "Buscar HUDs..."
+    sounds: "Buscar sonidos..."
+    crosshairs: "Buscar miras..."
+    items: "Buscar objetos..."
   syncing:
-    huds: "Syncing HUDs..."
-    sounds: "Syncing sounds..."
-    crosshairs: "Syncing crosshairs..."
-    items: "Syncing items..."
+    huds: "Sincronizando HUDs..."
+    sounds: "Sincronizando sonidos..."
+    crosshairs: "Sincronizando miras..."
+    items: "Sincronizando objetos..."
   unloaded:
-    huds: "Could not load HUDs"
-    sounds: "Could not load sounds"
-    crosshairs: "Could not load crosshairs"
-    items: "Could not load items"
+    huds: "No se pudieron cargar los HUDs"
+    sounds: "No se pudieron cargar los sonidos"
+    crosshairs: "No se pudieron cargar las miras"
+    items: "No se pudieron cargar los objetos"
   no_match:
     search:
-      huds: "No HUDs match your search"
-      sounds: "No sounds match your search"
-      crosshairs: "No crosshairs match your search"
-      items: "No items match your search"
+      huds: "Ningún HUD coincide con tu búsqueda"
+      sounds: "Ningún sonido coincide con tu búsqueda"
+      crosshairs: "Ninguna mira coincide con tu búsqueda"
+      items: "Ningún objeto coincide con tu búsqueda"
     filters:
-      huds: "No HUDs match your filters"
-      sounds: "No sounds match your filters"
-      crosshairs: "No crosshairs match your filters"
-      items: "No items match your filters"
+      huds: "Ningún HUD coincide con tus filtros"
+      sounds: "Ningún sonido coincide con tus filtros"
+      crosshairs: "Ninguna mira coincide con tus filtros"
+      items: "Ningún objeto coincide con tus filtros"
   hint:
-    offline: "Check your internet connection and try again."
-    search: "Try adjusting your search criteria."
-    filters: "Try adjusting your search or filter criteria."
+    offline: "Revisa tu conexión a internet e inténtalo de nuevo."
+    search: "Prueba a ajustar tu búsqueda."
+    filters: "Prueba a ajustar tu búsqueda o tus filtros."
 
 profiles:
   crosshairs: { one: "%{count} crosshair", other: "%{count} crosshairs" }
@@ -2965,12 +2965,12 @@ shell:
     failed_hint: "Quítalo en Configuración de Windows > Aplicaciones."
 
 install_parts:
-  title: "Choose what to install"
-  present: "%{label} · Already in the game"
-  install: "Install"
-  addon: "%{name} has several parts. Pick the ones to install."
-  maps: "%{name} holds several maps. Pick the ones to install."
-  maps_skipped: "%{name} holds several maps. Pick the ones to install. Some extra files in this download were skipped."
+  title: "Elige qué instalar"
+  present: "%{label} · Ya está en el juego"
+  install: "Instalar"
+  addon: "%{name} tiene varias partes. Elige cuáles instalar."
+  maps: "%{name} contiene varios mapas. Elige cuáles instalar."
+  maps_skipped: "%{name} contiene varios mapas. Elige cuáles instalar. Se omitieron algunos archivos extra de esta descarga."
 
 graphics:
   settings_note:

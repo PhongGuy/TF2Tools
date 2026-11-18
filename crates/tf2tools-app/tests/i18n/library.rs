@@ -689,6 +689,11 @@ fn the_portuguese_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
     maps_empty_line_fits_at_800(cx, "pt-BR");
 }
 
+#[gpui_kit::test]
+fn the_spanish_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
+    maps_empty_line_fits_at_800(cx, "es");
+}
+
 #[test]
 fn hud_counts_read_in_russian() {
     let _guard = LocaleGuard::switch("ru");
