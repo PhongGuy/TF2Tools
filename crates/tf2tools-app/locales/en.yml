@@ -1137,6 +1137,7 @@ widgets:
 
 hud_maker:
   history:
+    title: "History"
     when: { one: "%{time}, %{count} change", other: "%{time}, %{count} changes" }
   screens:
     no_problems: "No problems"
@@ -1148,9 +1149,107 @@ hud_maker:
     no_longer_fit: { one: "%{count} of your changes no longer fit and were left out.", other: "%{count} of your changes no longer fit and were left out." }
     fonts_left_out: { one: "%{count} font was left out.", other: "%{count} fonts were left out." }
   borrow:
+    title: "Borrow a part"
     animations: { one: "Animations: %{count} console command left out.", other: "Animations: %{count} console commands left out." }
     code_keys: { one: "The game sets %{count} of this part's settings itself.", other: "The game sets %{count} of this part's settings itself." }
     unresolved_pins: { one: "%{count} link to a part that isn't coming along, so it may sit in a different place.", other: "%{count} links to parts that aren't coming along, so it may sit in a different place." }
+  panel:
+    empty:
+      hud: "Click a part of the HUD to change it."
+      main_menu: "Click a part of the main menu to change it."
+      scoreboard: "Click a part of the scoreboard to change it."
+      freeze_cam: "Click a part of the death and freeze cam to change it."
+      win_panel: "Click a part of the win panel to change it."
+      class_select: "Click a part of the class select menu to change it."
+      spectator: "Click a part of the spectator bar to change it."
+    unreadable: "Can't show this part of the HUD"
+    from_base: "This part comes from another file the HUD includes, so it can't be changed here yet"
+    base_missing: "Some files this part builds on weren't found, so it may look different in the game."
+    code_text: "The game fills in this text, so the preview shows an example."
+    reset_tip: "Reset to the HUD's default"
+    mirror_tip: "Move it to the other side of the screen, left and right swapped"
+    mirror_width_tip: "This part's width follows the screen, so it can't be mirrored."
+    mirror_place_tip: "This part's place is set by the game or another part, so it can't be mirrored."
+    match_size_tip: "Copy another part's width and height"
+    corners_off_tip: "Turn on Draw background to use corners"
+    align:
+      top_left: "Top left"
+      top: "Top"
+      top_right: "Top right"
+      left: "Left"
+      centre: "Centre"
+      right: "Right"
+      bottom_left: "Bottom left"
+      bottom: "Bottom"
+      bottom_right: "Bottom right"
+    line_up:
+      left: "Align left edges"
+      centre: "Align centres across"
+      right: "Align right edges"
+      top: "Align top edges"
+      middle: "Align middles up and down"
+      bottom: "Align bottom edges"
+      across: "Space out evenly from left to right"
+      down: "Space out evenly from top to bottom"
+    align_heading: "Align"
+    distribute_heading: "Distribute"
+    remove_setting: "Remove this setting"
+    remove_setting_tip: "Use the game's default for this setting"
+    show_settings: "Show the part settings"
+    show_parts: "Show the list of parts"
+    title:
+      parts: "Parts"
+      part: "Part"
+      several: "Several parts"
+    expand: "Expand"
+    collapse: "Collapse"
+    dock_left: "Dock left"
+    float: "Float"
+    dock_right: "Dock right"
+    several: { one: "%{count} parts selected. Drag any of them to move them all.", other: "%{count} parts selected. Drag any of them to move them all." }
+    size_hidden: "Hidden"
+    all_settings: "All settings"
+    forward: "Bring forward"
+    backward: "Send back"
+    mirror: "Mirror"
+    show_it: "Show it"
+    cut_off: "Part of this is outside %{name}, so TF2 cuts it off."
+    grow_parent: "Make %{name} bigger"
+    new_part:
+      shadow: "Shadow"
+      box: "Background box"
+      anchor: "Anchor"
+      crosshair: "Crosshair"
+    add: "Add"
+    add_tip: "Add a part near this one"
+    delete: "Delete"
+    delete_tip: "Delete this part you added"
+    hit_flash: "Flash when you hit someone"
+    flash_colour: "Flash colour"
+    colour: "Colour"
+    attached_to: "Attached to %{name}"
+    attach_to: "Attach to"
+    attach_tip: "Keep this part beside another as that one moves"
+    detach: "Detach"
+    this_corner: "This corner"
+    to_its_corner: "To its corner"
+    match_size: "Match size"
+    pick_part: "Click a part"
+    hide: "Hide this part"
+    named_colours: "Named colours"
+    font:
+      this_part_only: "%{family}, size %{size} (this part only)"
+      fonts: "Fonts"
+      family: "Family"
+      size: "Size"
+      size_value: "Size %{text}"
+      outline: "Outline"
+      shadow: "Shadow"
+      add_file: "Add a font file"
+    origin:
+      full: "From %{file}, line %{line}"
+      file: "From %{file},"
+      line: "line %{line}"
   scene_menu: "Scene"
   scene:
     hud: "HUD"

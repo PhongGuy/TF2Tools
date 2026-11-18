@@ -32,6 +32,7 @@ use super::tip::{Spot, record, tip_beside_row, tipped};
 use super::view::{Panel, PanelMode, PanelPlace};
 use super::{Field, FontList, HudMakerPage};
 use crate::i18n::names::maker_label;
+use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::pages::crosshair_maker::model::hsla_of_rgba;
 use crate::widgets::Named as _;
@@ -40,42 +41,61 @@ use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 use crate::widgets::tip::tip;
 
 // The prompt with nothing selected, naming the scene whose tab is open.
-fn empty_hint(scene: Option<Scene>) -> &'static str {
+fn empty_hint(scene: Option<Scene>) -> SharedString {
     match scene {
-        Some(Scene::MainMenu) => "Click a part of the main menu to change it.",
-        Some(Scene::Scoreboard) => "Click a part of the scoreboard to change it.",
-        Some(Scene::FreezeCam) => "Click a part of the death and freeze cam to change it.",
-        Some(Scene::WinPanel) => "Click a part of the win panel to change it.",
-        Some(Scene::ClassSelect) => "Click a part of the class select menu to change it.",
-        Some(Scene::Spectator) => "Click a part of the spectator bar to change it.",
-        _ => "Click a part of the HUD to change it.",
+        Some(Scene::MainMenu) => tr!("hud_maker.panel.empty.main_menu"),
+        Some(Scene::Scoreboard) => tr!("hud_maker.panel.empty.scoreboard"),
+        Some(Scene::FreezeCam) => tr!("hud_maker.panel.empty.freeze_cam"),
+        Some(Scene::WinPanel) => tr!("hud_maker.panel.empty.win_panel"),
+        Some(Scene::ClassSelect) => tr!("hud_maker.panel.empty.class_select"),
+        Some(Scene::Spectator) => tr!("hud_maker.panel.empty.spectator"),
+        _ => tr!("hud_maker.panel.empty.hud"),
     }
 }
-const UNREADABLE: &str = "Can't show this part of the HUD";
-const FROM_BASE: &str =
-    "This part comes from another file the HUD includes, so it can't be changed here yet";
-const BASE_MISSING: &str =
-    "Some files this part builds on weren't found, so it may look different in the game.";
-const CODE_TEXT: &str = "The game fills in this text, so the preview shows an example.";
-pub(super) const RESET_TIP: &str = "Reset to the HUD's default";
-const MIRROR_TIP: &str = "Move it to the other side of the screen, left and right swapped";
-const MIRROR_WIDTH_TIP: &str = "This part's width follows the screen, so it can't be mirrored.";
-const MIRROR_PLACE_TIP: &str =
-    "This part's place is set by the game or another part, so it can't be mirrored.";
-const MATCH_SIZE_TIP: &str = "Copy another part's width and height";
-const CORNERS_OFF_TIP: &str = "Turn on Draw background to use corners";
-// The player words for `ALIGNMENTS`, in its order, and the value the engine uses when unset.
-const ALIGN_WORDS: [&str; 9] = [
-    "Top left",
-    "Top",
-    "Top right",
-    "Left",
-    "Centre",
-    "Right",
-    "Bottom left",
-    "Bottom",
-    "Bottom right",
-];
+fn unreadable() -> SharedString {
+    tr!("hud_maker.panel.unreadable")
+}
+fn from_base() -> SharedString {
+    tr!("hud_maker.panel.from_base")
+}
+fn base_missing() -> SharedString {
+    tr!("hud_maker.panel.base_missing")
+}
+fn code_text() -> SharedString {
+    tr!("hud_maker.panel.code_text")
+}
+pub(super) fn reset_tip() -> SharedString {
+    tr!("hud_maker.panel.reset_tip")
+}
+fn mirror_tip() -> SharedString {
+    tr!("hud_maker.panel.mirror_tip")
+}
+fn mirror_width_tip() -> SharedString {
+    tr!("hud_maker.panel.mirror_width_tip")
+}
+fn mirror_place_tip() -> SharedString {
+    tr!("hud_maker.panel.mirror_place_tip")
+}
+fn match_size_tip() -> SharedString {
+    tr!("hud_maker.panel.match_size_tip")
+}
+fn corners_off_tip() -> SharedString {
+    tr!("hud_maker.panel.corners_off_tip")
+}
+// The player word for `ALIGNMENTS[i]`, in its order.
+fn align_word(i: usize) -> SharedString {
+    match i {
+        0 => tr!("hud_maker.panel.align.top_left"),
+        1 => tr!("hud_maker.panel.align.top"),
+        2 => tr!("hud_maker.panel.align.top_right"),
+        3 => tr!("hud_maker.panel.align.left"),
+        4 => tr!("hud_maker.panel.align.centre"),
+        5 => tr!("hud_maker.panel.align.right"),
+        6 => tr!("hud_maker.panel.align.bottom_left"),
+        7 => tr!("hud_maker.panel.align.bottom"),
+        _ => tr!("hud_maker.panel.align.bottom_right"),
+    }
+}
 const ALIGN_ICONS: [IconName; 9] = [
     IconName::ArrowUpLeft,
     IconName::ArrowUp,
@@ -87,36 +107,29 @@ const ALIGN_ICONS: [IconName; 9] = [
     IconName::ArrowDown,
     IconName::ArrowDownRight,
 ];
+// The value the engine uses when the alignment is unset.
 const ALIGN_UNSET: &str = "west";
-// The Align buttons for several parts: id name, icon, tooltip and the line they align on.
-const LINE_UPS: [(&str, IconName, &str, Align); 6] = [
-    ("left", IconName::ArrowLeft, "Align left edges", Align::Left),
-    (
-        "centre",
-        IconName::FlipHorizontal2,
-        "Align centres across",
-        Align::Centre,
-    ),
-    (
-        "right",
-        IconName::ArrowRight,
-        "Align right edges",
-        Align::Right,
-    ),
-    ("top", IconName::ArrowUp, "Align top edges", Align::Top),
-    (
-        "middle",
-        IconName::FlipVertical2,
-        "Align middles up and down",
-        Align::Middle,
-    ),
-    (
-        "bottom",
-        IconName::ArrowDown,
-        "Align bottom edges",
-        Align::Bottom,
-    ),
+// The Align buttons for several parts: id name, icon and the line they align on.
+const LINE_UPS: [(&str, IconName, Align); 6] = [
+    ("left", IconName::ArrowLeft, Align::Left),
+    ("centre", IconName::FlipHorizontal2, Align::Centre),
+    ("right", IconName::ArrowRight, Align::Right),
+    ("top", IconName::ArrowUp, Align::Top),
+    ("middle", IconName::FlipVertical2, Align::Middle),
+    ("bottom", IconName::ArrowDown, Align::Bottom),
 ];
+
+// The tooltip of the Align button that lines parts up on `align`.
+fn line_up_tip(align: Align) -> SharedString {
+    match align {
+        Align::Left => tr!("hud_maker.panel.line_up.left"),
+        Align::Centre => tr!("hud_maker.panel.line_up.centre"),
+        Align::Right => tr!("hud_maker.panel.line_up.right"),
+        Align::Top => tr!("hud_maker.panel.line_up.top"),
+        Align::Middle => tr!("hud_maker.panel.line_up.middle"),
+        Align::Bottom => tr!("hud_maker.panel.line_up.bottom"),
+    }
+}
 
 // What one line-up button does.
 #[derive(Clone, Copy)]
@@ -126,8 +139,12 @@ enum LineUp {
 }
 // The colour-name and font lists scroll past this height.
 const NAMES_HEIGHT: f32 = 200.;
-const REMOVE_SETTING: &str = "Remove this setting";
-const REMOVE_SETTING_TIP: &str = "Use the game's default for this setting";
+fn remove_setting() -> SharedString {
+    tr!("hud_maker.panel.remove_setting")
+}
+fn remove_setting_tip() -> SharedString {
+    tr!("hud_maker.panel.remove_setting_tip")
+}
 
 /// One row of "All settings": a key the selection resolves, its value, the file and line that
 /// write it, and whether core lets the player edit and remove it.
@@ -288,8 +305,8 @@ impl HudMakerPage {
     fn rail(&self, panel: Panel, cx: &mut Context<Self>) -> AnyElement {
         let own = ids_of(panel);
         let (icon, tip) = match panel {
-            Panel::Options => (IconName::Paintbrush, "Show the part settings"),
-            Panel::Parts => (IconName::Layers, "Show the list of parts"),
+            Panel::Options => (IconName::Paintbrush, tr!("hud_maker.panel.show_settings")),
+            Panel::Parts => (IconName::Layers, tr!("hud_maker.panel.show_parts")),
         };
         let theme = cx.theme();
         v_flex()
@@ -432,10 +449,10 @@ impl HudMakerPage {
         let floating = place.mode == PanelMode::Floating;
         let own = ids_of(panel);
         let title = match panel {
-            Panel::Parts => "Parts".into_any_element(),
+            Panel::Parts => tr!("hud_maker.panel.title.parts").into_any_element(),
             Panel::Options => match self.selected_name() {
                 None if self.editor().is_some_and(|e| e.several()) => {
-                    "Several parts".into_any_element()
+                    tr!("hud_maker.panel.title.several").into_any_element()
                 }
                 // The way down sits on its own small line over the part's name, so neither
                 // is cut short in a narrow panel.
@@ -451,9 +468,9 @@ impl HudMakerPage {
                     )
                     .child(labelled(div().truncate(), ids::HUD_MAKER_PANEL_PART, name))
                     .into_any_element(),
-                None if self.borrow.open => "Borrow a part".into_any_element(),
-                None if self.history_open => "History".into_any_element(),
-                None => "Part".into_any_element(),
+                None if self.borrow.open => tr!("hud_maker.borrow.title").into_any_element(),
+                None if self.history_open => tr!("hud_maker.history.title").into_any_element(),
+                None => tr!("hud_maker.panel.title.part").into_any_element(),
             },
         };
         let grip = div()
@@ -474,7 +491,7 @@ impl HudMakerPage {
             .child(title);
         // The dock buttons show the player's choice.
         let chosen = self.place_of(panel).mode;
-        let mode_button = |id: &'static str, icon: IconName, tip: &'static str, mode: PanelMode| {
+        let mode_button = |id: &'static str, icon: IconName, tip: SharedString, mode: PanelMode| {
             Button::new(id)
                 .ghost()
                 .small()
@@ -490,9 +507,9 @@ impl HudMakerPage {
                 }))
         };
         let (collapse_icon, collapse_tip) = if place.collapsed {
-            (IconName::ChevronDown, "Expand")
+            (IconName::ChevronDown, tr!("hud_maker.panel.expand"))
         } else {
-            (IconName::ChevronUp, "Collapse")
+            (IconName::ChevronUp, tr!("hud_maker.panel.collapse"))
         };
         // The bar measures its own height, so a panel can fold to it before it was ever collapsed.
         let height = Rc::clone(&self.panels[panel as usize].title_height);
@@ -519,19 +536,19 @@ impl HudMakerPage {
             .child(mode_button(
                 own.dock_left,
                 IconName::PanelLeft,
-                "Dock left",
+                tr!("hud_maker.panel.dock_left"),
                 PanelMode::DockLeft,
             ))
             .child(mode_button(
                 own.float,
                 IconName::AppWindow,
-                "Float",
+                tr!("hud_maker.panel.float"),
                 PanelMode::Floating,
             ))
             .child(mode_button(
                 own.dock_right,
                 IconName::PanelRight,
-                "Dock right",
+                tr!("hud_maker.panel.dock_right"),
                 PanelMode::DockRight,
             ))
             .child(
@@ -768,24 +785,18 @@ impl HudMakerPage {
             Body::Empty if self.borrow.open => return self.borrow_rows(cx),
             Body::Empty if self.history_open => return self.history_rows(cx),
             Body::Empty => {
-                let mut out = vec![note(
-                    ids::HUD_MAKER_PANEL_EMPTY,
-                    empty_hint(self.scene()).into(),
-                )];
+                let mut out = vec![note(ids::HUD_MAKER_PANEL_EMPTY, empty_hint(self.scene()))];
                 out.extend(self.hud_rows(cx));
                 return out;
             }
             Body::Several(n) => {
-                let said = format!("{n} parts selected. Drag any of them to move them all.");
-                return vec![
-                    note(ids::HUD_MAKER_SEVERAL, said.into()),
-                    self.line_up_rows(cx),
-                ];
+                let said = plural("hud_maker.panel.several", n as u64);
+                return vec![note(ids::HUD_MAKER_SEVERAL, said), self.line_up_rows(cx)];
             }
             Body::FromBase { incomplete } => {
-                let mut out = vec![note(ids::HUD_MAKER_PANEL_FROM_BASE, FROM_BASE.into())];
+                let mut out = vec![note(ids::HUD_MAKER_PANEL_FROM_BASE, from_base())];
                 if incomplete {
-                    out.push(note(ids::HUD_MAKER_PANEL_BASE_MISSING, BASE_MISSING.into()));
+                    out.push(note(ids::HUD_MAKER_PANEL_BASE_MISSING, base_missing()));
                 }
                 return out;
             }
@@ -793,7 +804,7 @@ impl HudMakerPage {
                 // A scene that cannot show, or that the HUD hides, says why for every part.
                 let why = (self.editor())
                     .and_then(|e| scene_note(e.model()))
-                    .map_or(UNREADABLE.into(), SharedString::from);
+                    .map_or_else(unreadable, SharedString::from);
                 return vec![note(ids::HUD_MAKER_PANEL_UNREADABLE, why)];
             }
             Body::Rows(rows) => rows,
@@ -801,8 +812,8 @@ impl HudMakerPage {
         let shows = rows
             .shows
             .map(|text| note(ids::HUD_MAKER_PANEL_SHOWS, text));
-        let missing = (rows.base_missing)
-            .then(|| note(ids::HUD_MAKER_PANEL_BASE_MISSING, BASE_MISSING.into()));
+        let missing =
+            (rows.base_missing).then(|| note(ids::HUD_MAKER_PANEL_BASE_MISSING, base_missing()));
         let mut out: Vec<AnyElement> = missing.into_iter().chain(shows).collect();
         out.extend(self.show_it_button(cx));
         out.extend(self.cut_off_row(cx));
@@ -826,7 +837,7 @@ impl HudMakerPage {
                 PropertyKind::Size if rows.size_hidden => labelled(
                     div().text_sm().text_color(muted),
                     ids::HUD_MAKER_SIZE_HIDDEN,
-                    "Hidden",
+                    tr!("hud_maker.panel.size_hidden"),
                 )
                 .into_any_element(),
                 PropertyKind::Size => h_flex()
@@ -905,7 +916,7 @@ impl HudMakerPage {
             };
             out.push(self.row(spec, changed, extra, content, cx));
             if spec.kind() == PropertyKind::Text && rows.code_text {
-                out.push(note(ids::HUD_MAKER_PANEL_CODE_TEXT, CODE_TEXT.into()));
+                out.push(note(ids::HUD_MAKER_PANEL_CODE_TEXT, code_text()));
             }
         }
         out.extend(self.picture_row(cx));
@@ -952,7 +963,7 @@ impl HudMakerPage {
             } else {
                 IconName::ChevronRight
             })
-            .label("All settings")
+            .label(tr!("hud_maker.panel.all_settings"))
             .on_click(cx.listener(|page, _, _, cx| {
                 page.settings_open = !page.settings_open;
                 cx.notify();
@@ -998,15 +1009,15 @@ impl HudMakerPage {
                     // The kit button reports no label of its own, so a wrapper carries the id.
                     div()
                         .id(ids::hud_maker_setting_remove(&row.key))
-                        .aria_label(REMOVE_SETTING)
+                        .aria_label(remove_setting())
                         .test_support()
-                        .tooltip(tip(ids::HUD_MAKER_TIP, REMOVE_SETTING_TIP))
+                        .tooltip(tip(ids::HUD_MAKER_TIP, remove_setting_tip()))
                         .child(
                             Button::new(ids::hud_maker_setting_remove_button(&row.key))
                                 .ghost()
                                 .xsmall()
                                 .icon(IconName::Trash)
-                                .accessibility_label(REMOVE_SETTING)
+                                .accessibility_label(remove_setting())
                                 .on_click(cx.listener(move |page, _, window, cx| {
                                     page.remove_setting(&removed, window, cx)
                                 })),
@@ -1059,7 +1070,7 @@ impl HudMakerPage {
     // way; a part already drawn over or under all its siblings has that button off.
     fn layer_buttons(&self, cx: &mut Context<Self>) -> AnyElement {
         let can = |forward| self.editor().is_some_and(|e| e.can_layer(forward));
-        let button = |id: &'static str, label: &'static str, forward: bool| {
+        let button = |id: &'static str, label: SharedString, forward: bool| {
             Button::new(id)
                 .outline()
                 .xsmall()
@@ -1077,8 +1088,16 @@ impl HudMakerPage {
             .id(ids::HUD_MAKER_LAYER)
             .test_support()
             .gap_2()
-            .child(button(ids::HUD_MAKER_FORWARD, "Bring forward", true))
-            .child(button(ids::HUD_MAKER_BACKWARD, "Send back", false))
+            .child(button(
+                ids::HUD_MAKER_FORWARD,
+                tr!("hud_maker.panel.forward"),
+                true,
+            ))
+            .child(button(
+                ids::HUD_MAKER_BACKWARD,
+                tr!("hud_maker.panel.backward"),
+                false,
+            ))
             .into_any_element()
     }
 
@@ -1087,14 +1106,14 @@ impl HudMakerPage {
     fn line_up_rows(&self, cx: &mut Context<Self>) -> AnyElement {
         let muted = cx.theme().muted_foreground;
         let spreads = self.editor().is_some_and(HudEditor::can_distribute);
-        let button = |name: &'static str, icon: IconName, tip: &'static str, act: LineUp| {
+        let button = |name: &'static str, icon: IconName, tip: SharedString, act: LineUp| {
             let id = ids::hud_maker_line_up(name);
             let off = matches!(act, LineUp::Spread(_)) && !spreads;
             let button = Button::new(id.clone())
                 .outline()
                 .small()
                 .icon(icon)
-                .accessibility_label(tip)
+                .accessibility_label(tip.clone())
                 .disabled(off)
                 .on_click(cx.listener(move |page, _, window, cx| {
                     page.edit_selected(window, cx, |e| {
@@ -1109,28 +1128,28 @@ impl HudMakerPage {
                 }));
             tipped(&id, tip, button)
         };
-        let heading = |text: &'static str| div().text_xs().text_color(muted).child(text);
+        let heading = |text: SharedString| div().text_xs().text_color(muted).child(text);
         let aligns = LINE_UPS
             .iter()
-            .map(|&(name, icon, tip, a)| button(name, icon, tip, LineUp::Align(a)));
+            .map(|&(name, icon, a)| button(name, icon, line_up_tip(a), LineUp::Align(a)));
         v_flex()
             .gap_2()
-            .child(heading("Align"))
+            .child(heading(tr!("hud_maker.panel.align_heading")))
             .child(h_flex().gap_1().children(aligns))
-            .child(heading("Distribute"))
+            .child(heading(tr!("hud_maker.panel.distribute_heading")))
             .child(
                 h_flex()
                     .gap_1()
                     .child(button(
                         "across",
                         IconName::Ellipsis,
-                        "Space out evenly from left to right",
+                        tr!("hud_maker.panel.line_up.across"),
                         LineUp::Spread(Spread::Across),
                     ))
                     .child(button(
                         "down",
                         IconName::EllipsisVertical,
-                        "Space out evenly from top to bottom",
+                        tr!("hud_maker.panel.line_up.down"),
                         LineUp::Spread(Spread::Down),
                     )),
             )
@@ -1141,14 +1160,14 @@ impl HudMakerPage {
     fn mirror_button(&self, caps: PartCaps, cx: &mut Context<Self>) -> AnyElement {
         let why = (self.editor()).and_then(|e| e.model().why_not_mirrored(e.selected()?));
         let tip = match why {
-            _ if caps.mirror() => MIRROR_TIP,
-            Some(NoMirror::Width) => MIRROR_WIDTH_TIP,
-            _ => MIRROR_PLACE_TIP,
+            _ if caps.mirror() => mirror_tip(),
+            Some(NoMirror::Width) => mirror_width_tip(),
+            _ => mirror_place_tip(),
         };
         let button = Button::new(ids::HUD_MAKER_MIRROR)
             .ghost()
             .xsmall()
-            .label("Mirror")
+            .label(tr!("hud_maker.panel.mirror"))
             .disabled(!caps.mirror())
             .on_click(cx.listener(|page, _, window, cx| {
                 page.edit_selected(window, cx, |e| {
@@ -1171,7 +1190,7 @@ impl HudMakerPage {
         let button = Button::new(ids::HUD_MAKER_PANEL_SHOW_IT)
             .outline()
             .xsmall()
-            .label("Show it")
+            .label(tr!("hud_maker.panel.show_it"))
             .on_click(cx.listener(move |page, _, window, cx| {
                 let next = page
                     .editor_mut()
@@ -1189,11 +1208,11 @@ impl HudMakerPage {
         let editor = self.editor()?;
         let parent = editor.model().part(editor.selection_outside_parent()?)?;
         let name = row_label(parent);
-        let said = format!("Part of this is outside {name}, so TF2 cuts it off.");
+        let said = tr!("hud_maker.panel.cut_off", name = name);
         let button = Button::new(ids::HUD_MAKER_GROW_PARENT)
             .outline()
             .xsmall()
-            .label(format!("Make {name} bigger"))
+            .label(tr!("hud_maker.panel.grow_parent", name = name))
             .on_click(cx.listener(|page, _, window, cx| {
                 page.edit_selected(window, cx, |e| {
                     if let Err(err) = e.grow_parent_to_fit() {
@@ -1225,10 +1244,22 @@ impl HudMakerPage {
         let deletable = editor.can_delete_selected();
         let page = cx.entity().downgrade();
         let kinds = [
-            (NewPart::Shadow, "Shadow", label),
-            (NewPart::Box, "Background box", true),
-            (NewPart::Anchor, "Anchor", true),
-            (NewPart::Crosshair, "Crosshair", true),
+            (
+                NewPart::Shadow,
+                tr!("hud_maker.panel.new_part.shadow"),
+                label,
+            ),
+            (NewPart::Box, tr!("hud_maker.panel.new_part.box"), true),
+            (
+                NewPart::Anchor,
+                tr!("hud_maker.panel.new_part.anchor"),
+                true,
+            ),
+            (
+                NewPart::Crosshair,
+                tr!("hud_maker.panel.new_part.crosshair"),
+                true,
+            ),
         ];
         let items = (kinds.into_iter()).filter(|k| k.2).map(|(kind, text, _)| {
             Button::new(ids::hud_maker_add_part(kind))
@@ -1254,8 +1285,8 @@ impl HudMakerPage {
                     .outline()
                     .xsmall()
                     .icon(IconName::Plus)
-                    .label("Add")
-                    .tooltip("Add a part near this one"),
+                    .label(tr!("hud_maker.panel.add"))
+                    .tooltip(tr!("hud_maker.panel.add_tip")),
             )
             .child(v_flex().gap_1().items_start().children(items));
         let delete = deletable.then(|| {
@@ -1263,8 +1294,8 @@ impl HudMakerPage {
                 .outline()
                 .xsmall()
                 .icon(IconName::Trash)
-                .label("Delete")
-                .tooltip("Delete this part you added")
+                .label(tr!("hud_maker.panel.delete"))
+                .tooltip(tr!("hud_maker.panel.delete_tip"))
                 .on_click(cx.listener(|page, _, window, cx| page.delete_part(window, cx)))
         });
         Some(
@@ -1288,7 +1319,7 @@ impl HudMakerPage {
         let switch = Switch::new(ids::HUD_MAKER_HIT_FLASH)
             .small()
             .checked(on)
-            .label("Flash when you hit someone")
+            .label(tr!("hud_maker.panel.hit_flash"))
             .on_click(move |&on, window, cx| {
                 let _ = page.update(cx, |page, cx| page.set_hit_flash(on, window, cx));
             });
@@ -1297,7 +1328,7 @@ impl HudMakerPage {
             let fill = self.row_colour(HIT_FLASH_KEY).unwrap_or(theme.background);
             div()
                 .id(ids::HUD_MAKER_HIT_FLASH_COLOUR)
-                .aria_label("Flash colour")
+                .aria_label(tr!("hud_maker.panel.flash_colour"))
                 .test_support()
                 .w_10()
                 .h_6()
@@ -1313,9 +1344,12 @@ impl HudMakerPage {
         let picker = (on && self.active_colour() == Some(HIT_FLASH_KEY)).then(|| {
             div()
                 .id(ids::HUD_MAKER_COLOUR)
-                .aria_label("Colour")
+                .aria_label(tr!("hud_maker.panel.colour"))
                 .test_support()
-                .child(ColorPicker::new(&self.colour).accessibility_label("Colour"))
+                .child(
+                    ColorPicker::new(&self.colour)
+                        .accessibility_label(tr!("hud_maker.panel.colour")),
+                )
         });
         Some(
             v_flex()
@@ -1368,8 +1402,8 @@ impl HudMakerPage {
             })
             .collect();
         let label = match pinned_to {
-            Some(to) => format!("Attached to {}", row_label(to)),
-            None => "Attach to".to_owned(),
+            Some(to) => tr!("hud_maker.panel.attached_to", name = row_label(to)),
+            None => tr!("hud_maker.panel.attach_to"),
         };
         let page = cx.entity().downgrade();
         let menu = Popover::new("hud-maker-attach-menu")
@@ -1387,7 +1421,7 @@ impl HudMakerPage {
                     .xsmall()
                     .icon(IconName::ChevronsUpDown)
                     .label(label)
-                    .tooltip("Keep this part beside another as that one moves"),
+                    .tooltip(tr!("hud_maker.panel.attach_tip")),
             )
             .child(scroll_area(
                 ids::HUD_MAKER_ATTACH_LIST_SCROLLBAR,
@@ -1407,7 +1441,7 @@ impl HudMakerPage {
         if let Some(to) = pinned_to {
             let to = to.key().clone();
             let muted = cx.theme().muted_foreground;
-            let grid = |title: &'static str, own_side: bool, cx: &mut Context<Self>| {
+            let grid = |title: SharedString, own_side: bool, cx: &mut Context<Self>| {
                 let at = if own_side { own } else { corner };
                 let cell = |c: Option<PinCorner>, cx: &mut Context<Self>| -> AnyElement {
                     let Some(c) = c else {
@@ -1453,7 +1487,7 @@ impl HudMakerPage {
             let detach = Button::new(ids::HUD_MAKER_DETACH)
                 .ghost()
                 .xsmall()
-                .label("Detach")
+                .label(tr!("hud_maker.panel.detach"))
                 .on_click(cx.listener(|page, _, window, cx| {
                     page.edit_selected(window, cx, |e| {
                         if let Err(err) = e.unpin_selected() {
@@ -1465,8 +1499,8 @@ impl HudMakerPage {
                 h_flex()
                     .gap_3()
                     .items_end()
-                    .child(grid("This corner", true, cx))
-                    .child(grid("To its corner", false, cx))
+                    .child(grid(tr!("hud_maker.panel.this_corner"), true, cx))
+                    .child(grid(tr!("hud_maker.panel.to_its_corner"), false, cx))
                     .child(detach),
             );
         }
@@ -1480,16 +1514,16 @@ impl HudMakerPage {
             .ghost()
             .xsmall()
             .label(if picking {
-                "Click a part"
+                tr!("hud_maker.panel.pick_part")
             } else {
-                "Match size"
+                tr!("hud_maker.panel.match_size")
             })
             .selected(picking)
             .on_click(cx.listener(|page, _, _, cx| {
                 page.matching_size = !page.matching_size;
                 cx.notify();
             }));
-        tipped(&ids::HUD_MAKER_MATCH_SIZE.into(), MATCH_SIZE_TIP, button)
+        tipped(&ids::HUD_MAKER_MATCH_SIZE.into(), match_size_tip(), button)
     }
 
     // A row: its label, any title-line button and Reset over its controls.
@@ -1533,7 +1567,7 @@ impl HudMakerPage {
             .ghost()
             .xsmall()
             .icon(IconName::RotateCcw)
-            .accessibility_label(RESET_TIP)
+            .accessibility_label(reset_tip())
             .disabled(!changed)
             .on_click(cx.listener(move |page, _, window, cx| {
                 page.discard(match spec.kind() {
@@ -1564,7 +1598,7 @@ impl HudMakerPage {
                     }
                 })
             }));
-        tipped(&id, RESET_TIP, button)
+        tipped(&id, reset_tip(), button)
     }
 
     // The selection's text for `key`, trimmed; None when the part leaves it unset.
@@ -1587,7 +1621,7 @@ impl HudMakerPage {
                 .outline()
                 .small()
                 .icon(ALIGN_ICONS[i])
-                .accessibility_label(ALIGN_WORDS[i])
+                .accessibility_label(align_word(i))
                 .selected(on)
                 .on_click(cx.listener(move |page, _, window, cx| {
                     page.edit_selected(window, cx, |e| {
@@ -1596,12 +1630,12 @@ impl HudMakerPage {
                 }));
             div()
                 .id(ids::hud_maker_align(value))
-                .aria_label(ALIGN_WORDS[i])
+                .aria_label(align_word(i))
                 .aria_selected(on)
                 .test_support()
                 .tooltip(tip_beside_row(
                     ids::HUD_MAKER_ALIGN_TIP,
-                    ALIGN_WORDS[i],
+                    align_word(i),
                     Rc::clone(&spot),
                     Rc::clone(row),
                 ))
@@ -1649,7 +1683,7 @@ impl HudMakerPage {
                     })
                 }));
             let button = if idle {
-                tipped(&id, CORNERS_OFF_TIP, button)
+                tipped(&id, corners_off_tip(), button)
             } else {
                 button.into_any_element()
             };
@@ -1690,11 +1724,12 @@ impl HudMakerPage {
     fn number(
         &self,
         id: impl Into<ElementId>,
-        prefix: &'static str,
+        prefix: impl Into<SharedString>,
         field: Field,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let (muted, warning) = (cx.theme().muted_foreground, cx.theme().warning);
+        let prefix = prefix.into();
         let input = Input::new(self.field(field)).small();
         let input = if prefix.is_empty() {
             input
@@ -1724,7 +1759,7 @@ impl HudMakerPage {
         Switch::new(ids::HUD_MAKER_HIDE)
             .small()
             .checked(hidden)
-            .label("Hide this part")
+            .label(tr!("hud_maker.panel.hide"))
             .on_click(move |&on, window, cx| {
                 let _ = page.update(cx, |page, cx| {
                     page.edit_selected(window, cx, |e| {
@@ -1807,15 +1842,18 @@ impl HudMakerPage {
                     .child(
                         div()
                             .id(ids::HUD_MAKER_COLOUR)
-                            .aria_label("Colour")
+                            .aria_label(tr!("hud_maker.panel.colour"))
                             .test_support()
-                            .child(ColorPicker::new(&self.colour).accessibility_label("Colour")),
+                            .child(
+                                ColorPicker::new(&self.colour)
+                                    .accessibility_label(tr!("hud_maker.panel.colour")),
+                            ),
                     )
                     .child(
                         Button::new(ids::HUD_MAKER_COLOUR_NAME)
                             .outline()
                             .small()
-                            .label("Named colours")
+                            .label(tr!("hud_maker.panel.named_colours"))
                             .selected(self.names_open)
                             .on_click(cx.listener(|page, _, _, cx| {
                                 page.names_open = !page.names_open;
@@ -1936,14 +1974,18 @@ impl HudMakerPage {
         // A font the maker made for this part has a made-up name, so the line names it by what
         // the player chose: its family and size.
         let current = match (starts_with_ignoring_case(&current, CLONE_PREFIX), size) {
-            (true, Some(size)) => format!("{family}, size {size} (this part only)"),
-            _ => current,
+            (true, Some(size)) => tr!(
+                "hud_maker.panel.font.this_part_only",
+                family = family,
+                size = size
+            ),
+            _ => current.into(),
         };
         let open = self
             .open_font_list()
             .filter(|(at, _)| *at == key)
             .map(|(_, l)| l);
-        let list_button = |id: ElementId, label: &'static str, list: FontList| {
+        let list_button = |id: ElementId, label: SharedString, list: FontList| {
             Button::new(id)
                 .outline()
                 .small()
@@ -1951,10 +1993,14 @@ impl HudMakerPage {
                 .selected(open == Some(list))
                 .on_click(cx.listener(move |page, _, _, cx| page.toggle_font_list(key, list, cx)))
         };
-        let fonts = list_button(ids::hud_maker_font_list(key), "Fonts", FontList::Fonts);
+        let fonts = list_button(
+            ids::hud_maker_font_list(key),
+            tr!("hud_maker.panel.font.fonts"),
+            FontList::Fonts,
+        );
         let family_button = list_button(
             ids::hud_maker_font_family_list(key),
-            "Family",
+            tr!("hud_maker.panel.font.family"),
             FontList::Families,
         );
         // Each choice writes through `pick` as one undo step and closes the list.
@@ -2013,12 +2059,17 @@ impl HudMakerPage {
             row == key && self.editor().and_then(|e| e.selected()) == Some(part)
         });
         let size = if size_here {
-            self.number(ids::hud_maker_font_size(key), "Size", Field::FontSize, cx)
+            self.number(
+                ids::hud_maker_font_size(key),
+                tr!("hud_maker.panel.font.size"),
+                Field::FontSize,
+                cx,
+            )
         } else {
             let text = size.map_or_else(String::new, |s| s.to_string());
             div()
                 .id(ids::hud_maker_font_size(key))
-                .aria_label(SharedString::from(format!("Size {text}")))
+                .aria_label(tr!("hud_maker.panel.font.size_value", text = text))
                 .test_support()
                 .flex_1()
                 .min_w_0()
@@ -2032,7 +2083,12 @@ impl HudMakerPage {
                 .border_color(border)
                 .cursor_text()
                 .text_sm()
-                .child(div().text_xs().text_color(muted).child("Size"))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(muted)
+                        .child(tr!("hud_maker.panel.font.size")),
+                )
                 .child(text)
                 .on_click(
                     cx.listener(move |page, _, window, cx| page.press_font_size(key, window, cx)),
@@ -2041,13 +2097,13 @@ impl HudMakerPage {
         };
         let switch = |id: ElementId,
                       inner: &'static str,
-                      label: &'static str,
+                      label: SharedString,
                       on: bool,
                       edit: fn(bool) -> FontEdit| {
             let page = cx.entity().downgrade();
             div()
                 .id(id)
-                .aria_label(label)
+                .aria_label(label.clone())
                 .aria_selected(on)
                 .test_support()
                 .child(
@@ -2099,14 +2155,14 @@ impl HudMakerPage {
                     .child(switch(
                         ids::hud_maker_font_outline(key),
                         "hud-maker-font-outline-switch",
-                        "Outline",
+                        tr!("hud_maker.panel.font.outline"),
                         outline,
                         FontEdit::Outline,
                     ))
                     .child(switch(
                         ids::hud_maker_font_shadow(key),
                         "hud-maker-font-shadow-switch",
-                        "Shadow",
+                        tr!("hud_maker.panel.font.shadow"),
                         shadow,
                         FontEdit::Shadow,
                     )),
@@ -2115,7 +2171,7 @@ impl HudMakerPage {
                 Button::new(ids::hud_maker_font_add(key))
                     .outline()
                     .small()
-                    .label("Add a font file")
+                    .label(tr!("hud_maker.panel.font.add_file"))
                     .on_click(cx.listener(move |page, _, _, cx| page.add_font_file(key, cx))),
             )
             .into_any_element()
@@ -2266,10 +2322,14 @@ fn starts_with_ignoring_case(text: &str, prefix: &str) -> bool {
 // Where a setting is written, "From <file>, line <n>": a long path truncates, the line number
 // never does.
 fn origin(row: &SettingRow, muted: Hsla) -> AnyElement {
-    let line = format!("line {}", row.line);
+    let line = tr!("hud_maker.panel.origin.line", line = row.line);
     h_flex()
         .id(ids::hud_maker_setting_origin(&row.key))
-        .aria_label(SharedString::from(format!("From {}, {line}", row.file)))
+        .aria_label(tr!(
+            "hud_maker.panel.origin.full",
+            file = row.file,
+            line = row.line
+        ))
         .test_support()
         .gap_1()
         .text_xs()
@@ -2278,7 +2338,7 @@ fn origin(row: &SettingRow, muted: Hsla) -> AnyElement {
             div()
                 .min_w_0()
                 .truncate()
-                .child(format!("From {},", row.file)),
+                .child(tr!("hud_maker.panel.origin.file", file = row.file)),
         )
         .child(labelled(
             div().flex_none(),

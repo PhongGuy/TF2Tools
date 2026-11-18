@@ -19,6 +19,9 @@ mod formats;
 #[path = "i18n/library.rs"]
 mod library;
 
+#[path = "i18n/maker_pages.rs"]
+mod maker_pages;
+
 #[path = "i18n/makers.rs"]
 mod makers;
 

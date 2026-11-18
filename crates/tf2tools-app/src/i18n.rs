@@ -861,6 +861,7 @@ mod tests {
         "pages/crosshair_maker/starter.rs",
         "pages/crosshair_maker/starter_dialog.rs",
         "pages/hud_maker/mod.rs",
+        "pages/hud_maker/panel.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1166,12 +1167,29 @@ mod tests {
             "a save's own arguments plus the base the page opened",
             "developer detail: a lint reason",
         ),
+        (
+            "pages/hud_maker/panel.rs",
+            "PaintBackgroundType",
+            MAKER_GAME_NAME,
+        ),
+        (
+            "pages/hud_maker/panel.rs",
+            "RoundedCorners",
+            MAKER_GAME_NAME,
+        ),
+        ("pages/hud_maker/panel.rs", "Label", MAKER_GAME_NAME),
+        (
+            "pages/hud_maker/panel.rs",
+            "<hit flash>",
+            "developer detail: the hit flash's colour row key",
+        ),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
     const OS_NAME: &str = "a proper noun, the OS filter's label";
     const WEAPON_NAME: &str = "weapon name, as the game and logs.tf write it";
     const STOPPED_LABEL: &str = "developer detail: a stopped task's log label";
+    const MAKER_GAME_NAME: &str = "developer detail: a VDF key, class, event or command name";
     const STORE_FIELD: &str = "developer detail: the store's tracing field";
     const ID_VALUE: &str = "element id value; its label is keyed";
     const DIALOG_ELSEWHERE: &str = "dialog of an untranslated page";

@@ -15,7 +15,7 @@ use tf2tools_core::{
 };
 
 use super::editor::PictureRefused;
-use super::panel::RESET_TIP;
+use super::panel::reset_tip;
 use super::tip::tipped;
 use super::{HudMakerPage, Load, top_layer};
 use crate::ids;
@@ -156,7 +156,11 @@ impl HudMakerPage {
                     });
                     page.decode_shown_images(cx);
                 }));
-            tipped(&ids::HUD_MAKER_MENU_PICTURE_RESET.into(), RESET_TIP, button)
+            tipped(
+                &ids::HUD_MAKER_MENU_PICTURE_RESET.into(),
+                reset_tip(),
+                button,
+            )
         });
         let choose = Button::new(ids::HUD_MAKER_MENU_PICTURE_PICK)
             .outline()
@@ -225,7 +229,7 @@ impl HudMakerPage {
             .ghost()
             .xsmall()
             .icon(IconName::RotateCcw)
-            .accessibility_label(RESET_TIP)
+            .accessibility_label(reset_tip())
             .disabled(!editor.picture_changed())
             .on_click(cx.listener(|page, _, window, cx| {
                 page.edit_selected(window, cx, |e| {
@@ -248,7 +252,7 @@ impl HudMakerPage {
                     .child(div().text_xs().text_color(muted).child("Picture"))
                     .child(tipped(
                         &ids::HUD_MAKER_PICTURE_RESET.into(),
-                        RESET_TIP,
+                        reset_tip(),
                         reset,
                     )),
             )
