@@ -104,3 +104,81 @@ fn the_several_parts_note_counts_in_russian() {
         ]
     );
 }
+
+// Names the HUD and saves it, so it has a library folder to keep snapshots in.
+fn save_hud(cx: &mut TestAppContext, s: &support::ShellWindow, page: &Entity<HudMakerPage>) {
+    let name = cx.update(|cx| page.read(cx).name_input().clone());
+    cx.update_window(s.win, |_, window, cx| {
+        name.update(cx, |input, cx| input.set_value("Мой HUD", window, cx))
+    })
+    .unwrap();
+    support::click_id(cx, s.win, ids::HUD_MAKER_SAVE);
+    support::wait_real(cx, "the save", |cx| {
+        cx.update(|cx| !page.read(cx).is_saving() && page.read(cx).saved_hud().is_some())
+    });
+    support::settle(cx, s.win);
+}
+
+fn open_history(cx: &mut TestAppContext, s: &support::ShellWindow) {
+    support::click_id(cx, s.win, ids::HUD_MAKER_MORE);
+    support::click_id(cx, s.win, ids::HUD_MAKER_HISTORY_OPEN);
+}
+
+#[gpui_kit::test]
+fn the_more_menu_and_an_unsaved_history_read_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, _page) = open_maker(cx);
+    support::click_id(cx, s.win, ids::HUD_MAKER_MORE);
+    let shown = [
+        support::label_of(cx, s.win, ids::HUD_MAKER_BORROW_OPEN),
+        support::label_of(cx, s.win, ids::hud_maker_vision("Red-blind")),
+    ];
+    assert_eq!(
+        shown,
+        ["Взять часть", "Без красного"].map(|t| Some(t.to_owned()))
+    );
+    support::click_id(cx, s.win, ids::HUD_MAKER_HISTORY_OPEN);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_HISTORY_UNSAVED).as_deref(),
+        Some("Сначала сохраните HUD, и здесь можно будет хранить его снимки.")
+    );
+}
+
+#[gpui_kit::test]
+fn a_saved_history_reads_in_russian_and_a_blank_name_toasts(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, page) = open_maker(cx);
+    save_hud(cx, &s, &page);
+    open_history(cx, &s);
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_HISTORY_EMPTY).as_deref(),
+        Some("У этого HUD пока нет снимков.")
+    );
+    support::maker_page::click_in_panel(cx, &s, ids::HUD_MAKER_SNAPSHOT_SAVE.into());
+    support::wait_real(cx, "a toast", |cx| {
+        !support::toast_labels(cx, s.win).is_empty()
+    });
+    let toasts = support::toast_labels(cx, s.win);
+    assert!(
+        toasts.iter().any(|t| t.contains("Дайте снимку имя.")),
+        "{toasts:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn the_borrow_section_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, page) = open_maker(cx);
+    support::click_id(cx, s.win, ids::HUD_MAKER_MORE);
+    support::click_id(cx, s.win, ids::HUD_MAKER_BORROW_OPEN);
+    support::wait_real(cx, "the borrowable HUDs", |cx| {
+        cx.update(|cx| page.read(cx).borrow_listed())
+    });
+    assert_eq!(
+        support::label_of(cx, s.win, ids::HUD_MAKER_BORROW_EMPTY).as_deref(),
+        Some(
+            "В библиотеке нет другого HUD, из которого можно взять часть. \
+             Сначала скачайте HUD в магазине HUD."
+        )
+    );
+}

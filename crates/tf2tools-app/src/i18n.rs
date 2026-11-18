@@ -862,6 +862,10 @@ mod tests {
         "pages/crosshair_maker/starter_dialog.rs",
         "pages/hud_maker/mod.rs",
         "pages/hud_maker/panel.rs",
+        "pages/hud_maker/history.rs",
+        "pages/hud_maker/recipes.rs",
+        "pages/hud_maker/borrow.rs",
+        "pages/hud_maker/colour_view.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1183,6 +1187,28 @@ mod tests {
             "<hit flash>",
             "developer detail: the hit flash's colour row key",
         ),
+        (
+            "pages/hud_maker/borrow.rs",
+            "GameBanana item {}",
+            MAKER_CREDIT_FILE,
+        ),
+        (
+            "pages/hud_maker/borrow.rs",
+            "a file you imported",
+            MAKER_CREDIT_FILE,
+        ),
+        ("pages/hud_maker/colour_view.rs", "Normal", MAKER_ID_WORD),
+        ("pages/hud_maker/colour_view.rs", "Red-blind", MAKER_ID_WORD),
+        (
+            "pages/hud_maker/colour_view.rs",
+            "Green-blind",
+            MAKER_ID_WORD,
+        ),
+        (
+            "pages/hud_maker/colour_view.rs",
+            "Blue-blind",
+            MAKER_ID_WORD,
+        ),
     ];
 
     const SELECT_VALUE: &str = "Select value and row id; its label is keyed";
@@ -1190,6 +1216,8 @@ mod tests {
     const WEAPON_NAME: &str = "weapon name, as the game and logs.tf write it";
     const STOPPED_LABEL: &str = "developer detail: a stopped task's log label";
     const MAKER_GAME_NAME: &str = "developer detail: a VDF key, class, event or command name";
+    const MAKER_ID_WORD: &str = "an element id built from the English word; its label is keyed";
+    const MAKER_CREDIT_FILE: &str = "the credit written into the shared HUD's files; shown keyed";
     const STORE_FIELD: &str = "developer detail: the store's tracing field";
     const ID_VALUE: &str = "element id value; its label is keyed";
     const DIALOG_ELSEWHERE: &str = "dialog of an untranslated page";

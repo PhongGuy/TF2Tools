@@ -29,14 +29,12 @@ use crate::shell::toast::{ToastKind, toast};
 use crate::widgets::labelled;
 use crate::widgets::scroll::{BAR_WIDTH, scroll_area};
 
-const HUD_UNREADABLE: &str = "Couldn't read that HUD.";
+fn hud_unreadable() -> SharedString {
+    tr!("hud_maker.borrow.hud_unreadable")
+}
 fn list_failed() -> SharedString {
     tr!("messages.action.list_hud_library")
 }
-const NOTHING_TO_BORROW: &str =
-    "No other HUD in your library has parts to borrow. Download one from the HUD store first.";
-const PART_UNREADABLE: &str = "That HUD's file for this part can't be read.";
-const HIDDEN_THERE: &str = "hidden in that HUD";
 // How far each level of the parts list steps in, and the list's tallest.
 const INDENT: f32 = 12.;
 const PARTS_HEIGHT: f32 = 320.;
@@ -62,8 +60,6 @@ struct SourcePart {
     hidden: bool,
     readable: bool,
 }
-const ANIMATIONS_NOTE: &str =
-    "Some of its animations run console commands, so those were left out.";
 
 /// Who and what a previewed borrow credits, and what came along or stayed behind, in plain
 /// words for the preview bar and the Borrow section.
@@ -77,20 +73,21 @@ pub(super) struct BorrowNote {
     pub left_behind: Vec<String>,
     pub animations: usize,
     // One short sentence per kind of thing left behind, animations apart, for the bar.
-    pub kinds: Vec<&'static str>,
+    pub kinds: Vec<SharedString>,
 }
 
 impl BorrowNote {
     /// The preview bar's line for this borrow.
     pub fn bar_line(&self) -> String {
         let mut line = if self.author.is_empty() {
-            format!("Previewing a part from {}.", self.hud)
+            tr!("hud_maker.borrow.previewing", hud = self.hud).to_string()
         } else {
-            format!("Previewing a part from {}, by {}.", self.hud, self.author)
+            let (hud, author) = (&self.hud, &self.author);
+            tr!("hud_maker.borrow.previewing_by", hud = hud, author = author).to_string()
         };
         if self.animations > 0 {
             line.push(' ');
-            line.push_str(ANIMATIONS_NOTE);
+            line.push_str(&tr!("hud_maker.borrow.animations_note"));
         }
         for kind in &self.kinds {
             line.push(' ');
@@ -101,25 +98,34 @@ impl BorrowNote {
 
     /// The section's credit line, naming the author when the HUD has one.
     pub fn credit_line(&self) -> String {
-        let whose = if self.author.is_empty() {
-            "This copies work from".to_owned()
+        let (hud, origin) = (&self.hud, &self.origin);
+        if self.author.is_empty() {
+            tr!(
+                "hud_maker.borrow.credit.anonymous",
+                hud = hud,
+                origin = origin
+            )
+            .to_string()
         } else {
-            format!("This copies {}'s work from", self.author)
-        };
-        format!(
-            "{whose} {} ({}). Check that HUD's page for its terms before you share yours. Your HUD will list the credit.",
-            self.hud, self.origin
-        )
+            let author = &self.author;
+            let line = tr!(
+                "hud_maker.borrow.credit.by",
+                author = author,
+                hud = hud,
+                origin = origin
+            );
+            line.to_string()
+        }
     }
 
     /// What comes with the part, then what was left behind, one line each.
     pub fn comes_with(&self) -> String {
         let mut lines = self.brings.clone();
         if lines.is_empty() {
-            lines.push("Only the part itself.".to_owned());
+            lines.push(tr!("hud_maker.borrow.only_the_part").to_string());
         }
         if !self.left_behind.is_empty() {
-            lines.push("Left behind:".to_owned());
+            lines.push(tr!("hud_maker.borrow.left_behind").to_string());
             lines.extend(self.left_behind.iter().cloned());
         }
         lines.join("\n")
@@ -129,12 +135,13 @@ impl BorrowNote {
 /// The toast after Apply, saying plainly when some of the borrow could not be added.
 pub(super) fn added_text(part: &str, hud: &str, dropped: usize) -> String {
     match dropped {
-        0 => format!("Added {part} from {hud}."),
-        _ => format!("Added {part} from {hud}. Some of it couldn't be added."),
+        0 => tr!("hud_maker.borrow.added", part = part, hud = hud).to_string(),
+        _ => tr!("hud_maker.borrow.added_some", part = part, hud = hud).to_string(),
     }
 }
 
-/// The author and where the HUD came from, as its credit names them.
+/// The author and where the HUD came from, as the credit written into the player's HUD names
+/// them; that file is read by anyone the HUD is shared with, so its words stay English.
 pub(super) fn credit_of(entry: &HudEntry) -> (String, String) {
     match entry.provenance() {
         Provenance::GameBanana { gb_id, author } => {
@@ -145,18 +152,32 @@ pub(super) fn credit_of(entry: &HudEntry) -> (String, String) {
     }
 }
 
+// Where the HUD came from, as the Borrow section shows it to the player.
+fn shown_origin(entry: &HudEntry) -> String {
+    let origin = match entry.provenance() {
+        Provenance::GameBanana { gb_id, .. } => {
+            let id = gb_id.get().to_string();
+            tr!("hud_maker.borrow.origin.gamebanana", id = id)
+        }
+        Provenance::Curated { hud_id } => tr!("hud_maker.borrow.origin.curated", id = hud_id),
+        Provenance::Local | _ => tr!("hud_maker.borrow.origin.local"),
+    };
+    origin.to_string()
+}
+
 fn brings_line(brings: &Brings) -> String {
-    match brings {
-        Brings::Child(name) => format!("Part {name}"),
-        Brings::Font(name) => format!("Font {name}"),
-        Brings::FontFile(family) => format!("The font file for {family}"),
-        Brings::Colour(name) => format!("Colour {name}"),
-        Brings::Border(name) => format!("Border {name}"),
-        Brings::Image(path) => format!("Picture {path}"),
-        Brings::CodeImage(path) => format!("Picture {path}, in place of the game's"),
-        Brings::Animation(event) => format!("Animation {event}"),
-        _ => "Something else the part needs".to_owned(),
-    }
+    let line = match brings {
+        Brings::Child(name) => tr!("hud_maker.borrow.brings.part", name = name),
+        Brings::Font(name) => tr!("hud_maker.borrow.brings.font", name = name),
+        Brings::FontFile(family) => tr!("hud_maker.borrow.brings.font_file", family = family),
+        Brings::Colour(name) => tr!("hud_maker.borrow.brings.colour", name = name),
+        Brings::Border(name) => tr!("hud_maker.borrow.brings.border", name = name),
+        Brings::Image(path) => tr!("hud_maker.borrow.brings.picture", path = path),
+        Brings::CodeImage(path) => tr!("hud_maker.borrow.brings.code_picture", path = path),
+        Brings::Animation(event) => tr!("hud_maker.borrow.brings.animation", event = event),
+        _ => tr!("hud_maker.borrow.brings.anything_else"),
+    };
+    line.to_string()
 }
 
 // A left-behind count as the catalogue's plural count.
@@ -165,56 +186,52 @@ fn count(n: usize) -> u64 {
 }
 
 // The section's line for one thing left behind, and the bar's sentence for its kind.
-fn left_behind_line(left: &LeftBehind) -> (String, Option<&'static str>) {
-    match left {
-        LeftBehind::Animations(n) => (
-            plural("hud_maker.borrow.animations", count(*n)).to_string(),
-            None,
-        ),
+fn left_behind_line(left: &LeftBehind) -> (String, Option<SharedString>) {
+    let (line, kind) = match left {
+        LeftBehind::Animations(n) => (plural("hud_maker.borrow.animations", count(*n)), None),
         LeftBehind::MissingFont(family) => (
-            format!(
-                "Font {family}: that HUD does not include the file, so the game uses a stand-in."
-            ),
-            Some("Some of its fonts aren't included, so the game uses stand-ins."),
+            tr!("hud_maker.borrow.missing_font", family = family),
+            Some(tr!("hud_maker.borrow.kind.missing_fonts")),
         ),
         LeftBehind::MissingFile(path) => (
-            format!("Picture {path}: that HUD does not have it."),
-            Some("Some of its pictures are missing from that HUD."),
+            tr!("hud_maker.borrow.missing_file", path = path),
+            Some(tr!("hud_maker.borrow.kind.missing_files")),
         ),
         LeftBehind::CodeKeys(n) => (
-            plural("hud_maker.borrow.code_keys", count(*n)).to_string(),
-            Some("The game sets some of its settings itself."),
+            plural("hud_maker.borrow.code_keys", count(*n)),
+            Some(tr!("hud_maker.borrow.kind.code_keys")),
         ),
         LeftBehind::UnresolvedPins(n) => (
-            plural("hud_maker.borrow.unresolved_pins", count(*n)).to_string(),
-            Some("It may sit in a different place."),
+            plural("hud_maker.borrow.unresolved_pins", count(*n)),
+            Some(tr!("hud_maker.borrow.kind.unresolved_pins")),
         ),
         _ => (
-            "Something the part uses could not be copied.".to_owned(),
-            Some("Something it uses could not be copied."),
+            tr!("hud_maker.borrow.not_copied"),
+            Some(tr!("hud_maker.borrow.kind.not_copied")),
         ),
-    }
+    };
+    (line.to_string(), kind)
 }
 
 /// The plain sentence a refused borrow shows.
-fn refused_text(why: &BorrowRefused) -> &'static str {
+fn refused_text(why: &BorrowRefused) -> SharedString {
     match why {
-        BorrowRefused::UnknownPart => "That HUD doesn't have this part on this screen.",
-        BorrowRefused::Unreadable => "That part can't be read, so it can't be borrowed.",
-        BorrowRefused::SceneMismatch => "That part is on a different screen of the HUD.",
-        BorrowRefused::NoRoom => "There's nowhere in your HUD to put that part.",
-        BorrowRefused::TooMuch => "That part has more pictures than a HUD can hold.",
-        _ => "That part can't be borrowed.",
+        BorrowRefused::UnknownPart => tr!("hud_maker.borrow.refused.unknown_part"),
+        BorrowRefused::Unreadable => tr!("hud_maker.borrow.refused.unreadable"),
+        BorrowRefused::SceneMismatch => tr!("hud_maker.borrow.refused.scene_mismatch"),
+        BorrowRefused::NoRoom => tr!("hud_maker.borrow.refused.no_room"),
+        BorrowRefused::TooMuch => tr!("hud_maker.borrow.refused.too_much"),
+        _ => tr!("hud_maker.borrow.refused.any_other"),
     }
 }
 
 /// The note for a worked-out borrow of `part` from the HUD in `entry`.
 fn note_of(entry: &HudEntry, part: &str, borrowed: &Borrowed) -> BorrowNote {
-    let (author, origin) = credit_of(entry);
+    let (author, _) = credit_of(entry);
     let mut note = BorrowNote {
         hud: entry.name().to_owned(),
         author,
-        origin,
+        origin: shown_origin(entry),
         part: part.to_owned(),
         brings: borrowed.brings().iter().map(brings_line).collect(),
         ..BorrowNote::default()
@@ -377,7 +394,7 @@ impl HudMakerPage {
                             Ok(Some(rows)) => page.borrow.parts = Some(rows),
                             _ => {
                                 page.borrow.chosen = None;
-                                toast(window, cx, ToastKind::Error, HUD_UNREADABLE, "");
+                                toast(window, cx, ToastKind::Error, hud_unreadable(), "");
                             }
                         }
                         cx.notify();
@@ -397,9 +414,9 @@ impl HudMakerPage {
         let back = Button::new(ids::HUD_MAKER_BORROW_CLOSE)
             .outline()
             .small()
-            .label("Back to the HUD")
+            .label(tr!("hud_maker.borrow.back"))
             .on_click(cx.listener(|page, _, _, cx| page.close_borrow(cx)));
-        let heading = |text: &'static str| {
+        let heading = |text: SharedString| {
             div()
                 .text_sm()
                 .font_weight(FontWeight::SEMIBOLD)
@@ -423,7 +440,7 @@ impl HudMakerPage {
                     ids::HUD_MAKER_BORROW_CREDIT,
                     note.credit_line(),
                 ))
-                .child(heading("Comes with it"))
+                .child(heading(tr!("hud_maker.borrow.comes_with")))
                 .child(labelled(
                     div().text_sm().text_color(muted),
                     ids::HUD_MAKER_BORROW_COMES_WITH,
@@ -434,18 +451,18 @@ impl HudMakerPage {
             let reading = div()
                 .text_sm()
                 .text_color(muted)
-                .child("Reading your library...");
+                .child(tr!("hud_maker.borrow.reading_library"));
             return vec![section.child(reading).into_any_element()];
         };
         if huds.is_empty() {
             let note = labelled(
                 div().text_sm().text_color(muted),
                 ids::HUD_MAKER_BORROW_EMPTY,
-                NOTHING_TO_BORROW,
+                tr!("hud_maker.borrow.nothing"),
             );
             return vec![section.child(note).into_any_element()];
         }
-        section = section.child(heading("Borrow from"));
+        section = section.child(heading(tr!("hud_maker.borrow.borrow_from")));
         for (id, name) in huds {
             let chosen = self.borrow.chosen.as_ref() == Some(id);
             let pick = Button::new(ids::hud_maker_borrow_hud(id))
@@ -466,7 +483,7 @@ impl HudMakerPage {
             let reading = div()
                 .text_sm()
                 .text_color(muted)
-                .child("Reading that HUD...");
+                .child(tr!("hud_maker.borrow.reading_hud"));
             return vec![section.child(reading).into_any_element()];
         };
         // Only the rows in view are built, however many parts the HUD has.
@@ -483,7 +500,9 @@ impl HudMakerPage {
         .pr(BAR_WIDTH);
         let bar = ids::HUD_MAKER_BORROW_PARTS_SCROLLBAR;
         let list = scroll_area(bar, &self.borrow.parts_scroll, list);
-        section = section.child(heading("Choose a part")).child(list);
+        section = section
+            .child(heading(tr!("hud_maker.borrow.choose_part")))
+            .child(list);
         vec![section.into_any_element()]
     }
 
@@ -496,9 +515,9 @@ impl HudMakerPage {
         (rows.get(range).unwrap_or_default().iter())
             .map(|row| {
                 let id = ids::hud_maker_borrow_part(&row.key);
-                let label = match row.hidden {
-                    true => format!("{} ({HIDDEN_THERE})", row.label),
-                    false => row.label.clone(),
+                let label: SharedString = match row.hidden {
+                    true => tr!("hud_maker.borrow.hidden_there", name = row.label),
+                    false => row.label.clone().into(),
                 };
                 let (source, key) = (source.clone(), row.key.clone());
                 let pick = Button::new(id.clone())
@@ -513,7 +532,7 @@ impl HudMakerPage {
                     }));
                 let pick = match row.readable {
                     true => pick.into_any_element(),
-                    false => tipped(&id, PART_UNREADABLE, pick),
+                    false => tipped(&id, tr!("hud_maker.borrow.part_unreadable"), pick),
                 };
                 let indent = px(INDENT * row.depth as f32);
                 div()
@@ -559,7 +578,7 @@ impl HudMakerPage {
             let tf_dir = tf2?.tf_dir();
             let at = (platform, scene, mode);
             let Some((entry, source_files, model)) = open_source(s, &source_id, &tf_dir, at) else {
-                return Ok(Err(HUD_UNREADABLE));
+                return Ok(Err(hud_unreadable()));
             };
             let name = model.part(&part).map_or("", |p| p.name()).to_owned();
             let (author, origin) = credit_of(&entry);
@@ -594,7 +613,7 @@ impl HudMakerPage {
                             Ok(Err(text)) => toast(window, cx, ToastKind::Error, text, ""),
                             Err(e) => {
                                 tracing::debug!(error = %e, "a borrow didn't run");
-                                toast(window, cx, ToastKind::Error, HUD_UNREADABLE, "");
+                                toast(window, cx, ToastKind::Error, hud_unreadable(), "");
                             }
                         }
                     })
