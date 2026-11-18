@@ -1,8 +1,8 @@
 # Deutsch (de, preview). Values only; keys, %{name} and line layout follow en.yml.
 # Glossary, the reference for every surface:
-#   Voice: standard German with "ß"; informal "du", lower case ("dein"); buttons and menu items take the
-#     infinitive ("Installieren"). Case: sentence case, nouns capitalised; only 1 takes "one" ("0 HUDs");
-#     the shorter correct wording wins; hyphenated compounds ("HUD-Maker", "TF2-Ordner").
+#   Voice: standard German with "ß"; informal "du", lower case ("dein"), short du imperative (versuch, stell,
+#     schließ); buttons and menus take the infinitive ("Installieren"). Sentence case, nouns capitalised; only 1
+#     takes "one" ("0 HUDs"); shorter correct wording wins; hyphenated compounds ("HUD-Maker", "TF2-Ordner").
 #   Kept as is: HUD(s), Sound(s) (never "Geräusch"/"Klang"), Hitsound(s), Killsound(s), Add-on(s), Mod(s),
 #     Log(s), mastercomfig, logs.tf, GameBanana, hud-db, Steam, TF2Tools, Cache; class names stay English.
 #   library = "Bibliothek"; store = "Shop" (Addon Store = "Add-on-Shop"); curated = "kuratiert";
@@ -72,10 +72,10 @@ settings:
       forever: "Unbegrenzt"
       frees: "%{option}, gibt etwa %{size} frei"
     cost: "Jedes vollständige Log belegt etwa 10 KB. Der Platz wächst mit der Zahl der Logs deiner verfolgten Spieler, daher kann „Unbegrenzt“ viel Platz belegen."
-    usage: "Der Logs-Cache belegt etwa %{cache}; %{logs} etwa %{full}."
+    usage: "Der Log-Cache belegt etwa %{cache}; %{logs} etwa %{full}."
     full_logs: { one: "%{count} vollständiges Log belegt", other: "%{count} vollständige Logs belegen" }
     measuring: "Wird gemessen..."
-    unmeasured: "Die Größe des Logs-Caches konnte nicht gemessen werden."
+    unmeasured: "Die Größe des Log-Caches konnte nicht gemessen werden."
   stores:
     title: "Shops"
     description: "Zwischengespeicherte Einträge und letzte Synchronisierung jedes Shops"
@@ -123,7 +123,7 @@ updater:
     ready: "Update bereit — zum Anwenden neu starten"
     installing: "Update wird installiert..."
     unavailable: "Automatische Updates sind in dieser Version nicht verfügbar. Neue Versionen gibt es auf der Release-Seite."
-    reopen: "TF2Tools wurde aktualisiert. Schließe es und öffne es erneut, um das Update abzuschließen."
+    reopen: "TF2Tools wurde aktualisiert. Schließ es und öffne es erneut, um das Update abzuschließen."
   button:
     check: "Nach Updates suchen"
     install: "Herunterladen und installieren"
@@ -631,7 +631,7 @@ store_grid:
       crosshairs: "Keine Fadenkreuze passen zu deinen Filtern"
       items: "Keine Einträge passen zu deinen Filtern"
   hint:
-    offline: "Prüfe deine Internetverbindung und versuche es erneut."
+    offline: "Prüfe deine Internetverbindung und versuch es erneut."
     search: "Versuche, deine Suche anzupassen."
     filters: "Versuche, deine Suche oder Filter anzupassen."
 
@@ -705,7 +705,7 @@ profiles:
     installed: "Installiert: %{list}"
     nothing_new: "Nichts Neues installiert"
     kept: "%{lead}. Bisheriges behalten für: %{list} (fehlt in deiner Bibliothek)"
-    failed_steps: "Konnte nicht eingerichtet werden: %{steps}. Stelle sicher, dass TF2 geschlossen ist und TF2Tools in deinen TF2-Ordner schreiben darf, und versuche es dann erneut."
+    failed_steps: "Konnte nicht eingerichtet werden: %{steps}. Stell sicher, dass TF2 geschlossen ist und TF2Tools in deinen TF2-Ordner schreiben darf, und versuch es dann erneut."
     activate_failed: "Profil konnte nicht aktiviert werden"
     missing: "Einige Einträge fehlen"
   activity:
@@ -908,7 +908,7 @@ font_check:
 huds:
   search: "Suchen"
   edit_wait: "Warte, bis TF2Tools fertig ist, dann bearbeite es"
-  not_reinstalled: "Aktualisiert, aber die installierte Kopie konnte nicht aktualisiert werden. Schließe TF2 und installiere das HUD unter HUDs erneut."
+  not_reinstalled: "Aktualisiert, aber die installierte Kopie konnte nicht aktualisiert werden. Schließ TF2 und installiere das HUD unter HUDs erneut."
   no_tf2: "Lege den TF2-Ordner in den Einstellungen fest, um HUDs zu installieren."
   copy_name:
     first: "%{name} (Kopie)"
@@ -1244,7 +1244,7 @@ hud_maker:
     title: "Verlauf"
     when: { one: "%{time}, %{count} Änderung", other: "%{time}, %{count} Änderungen" }
     back: "Zurück zum HUD"
-    save: "Schnappschuss speichern"
+    save: "Schnappschuss machen"
     compare_off: "Verlasse zum Vergleichen die Sechs-Bildschirm-Ansicht"
     name_blank: "Gib dem Schnappschuss einen Namen."
     too_large: "Dieses HUD hat zu viele Änderungen für einen Schnappschuss."
@@ -1344,7 +1344,7 @@ hud_maker:
     apply: "Anwenden"
     cancel: "Abbrechen"
     presets: "Voreinstellungen"
-    save_preset: "Als Voreinstellung speichern"
+    save_preset: "Speichern"
     delete: "Löschen"
     delete_named: "%{name} löschen"
     title: "Rezepte"
@@ -1496,8 +1496,8 @@ hud_maker:
     several: { one: "%{count} Teile ausgewählt. Ziehe eines davon, um alle zu verschieben.", other: "%{count} Teile ausgewählt. Ziehe eines davon, um alle zu verschieben." }
     size_hidden: "Ausgeblendet"
     all_settings: "Alle Einstellungen"
-    forward: "Nach vorne holen"
-    backward: "Nach hinten schieben"
+    forward: "Nach vorne"
+    backward: "Nach hinten"
     mirror: "Spiegeln"
     show_it: "Einblenden"
     cut_off: "Ein Teil davon liegt außerhalb von %{name}, daher schneidet TF2 es ab."
@@ -1511,7 +1511,7 @@ hud_maker:
     add_tip: "Ein Teil neben diesem hinzufügen"
     delete: "Löschen"
     delete_tip: "Dieses von dir hinzugefügte Teil löschen"
-    hit_flash: "Aufblitzen, wenn du jemanden triffst"
+    hit_flash: "Bei Treffer aufblitzen"
     flash_colour: "Blitzfarbe"
     colour: "Farbe"
     attached_to: "An %{name} angehängt"
@@ -1583,7 +1583,7 @@ hud_maker:
     weapon:
       clip: "Waffe mit Magazin"
       no_clip: "Waffe ohne Magazin"
-    minmode_tip: "Zeigt das HUD so, wie es mit TF2s Minimal-HUD aussieht. Solange das an ist, ändert sich ein Teil mit eigener Minimal-HUD-Position nur dort."
+    minmode_tip: "Zeigt das HUD mit TF2s Minimal-HUD. Solange das an ist, ändern sich Teile mit eigener Minimal-HUD-Position nur dort."
     health: "Gesundheit"
     ammo: "Übrige Munition"
     charge: "Medic-Ladung"
@@ -1599,9 +1599,9 @@ hud_maker:
   live:
     note: "Dein installiertes HUD wurde aktualisiert. Gib hud_reloadscheme in die TF2-Konsole ein, um es zu sehen. Änderungen an Schriftarten, Bildern und Animationen siehst du nach einem Neustart von TF2."
     not_updated_title: "Installierte Kopie nicht aktualisiert"
-    in_use: "TF2 nutzt die Dateien dieses HUDs. Schließe TF2 und speichere dann erneut, um es zu aktualisieren."
+    in_use: "TF2 nutzt die Dateien dieses HUDs. Schließ TF2 und speichere dann erneut, um es zu aktualisieren."
     game_moved: "Gespeichert, aber TF2 wurde nicht mehr am bisherigen Ort gefunden. Prüfe den TF2-Ordner in den Einstellungen."
-    not_updated: "Gespeichert, aber die installierte Kopie konnte nicht aktualisiert werden. Schließe TF2 und installiere es unter HUDs erneut."
+    not_updated: "Gespeichert, aber die installierte Kopie konnte nicht aktualisiert werden. Schließ TF2 und installiere es unter HUDs erneut."
     changed: "Gespeichert, aber dein installiertes HUD hat eigene Änderungen, daher wurde es nicht aktualisiert. Installiere dieses HUD erneut, um zu entscheiden, was passieren soll."
     updated_row: "Installiertes HUD aktualisiert: %{name}"
     copy: "Kopieren"
@@ -1630,7 +1630,7 @@ hud_maker:
     choose: "Bild wählen…"
     picture: "Bild"
   meter:
-    plain: "Sandman, Jarate, Banner und die meisten Gegenstände"
+    plain: "Sandman, Jarate, Banner und mehr"
     drink: "Bonk!, Krit-a-Cola und Saure Milch"
     soda_popper: "Soda-Popper und Babyfaces Ballermann"
     cleaver: "Fliegende Guillotine"
@@ -1683,8 +1683,8 @@ hud_maker:
   placeholder:
     name: "Benenne dein HUD"
     find_part: "Teil suchen..."
-    preset: "Name der Voreinstellung"
-    snapshot: "Name des Schnappschusses"
+    preset: "Name"
+    snapshot: "Name"
     preset_label: "Name der Voreinstellung"
     snapshot_label: "Name des Schnappschusses"
   toolbar:
@@ -1707,7 +1707,7 @@ hud_maker:
   minmode:
     chip: "Minimal-HUD"
     chip_tip: "Das Minimal-HUD ist an. Klicke, um es auszuschalten."
-    looks_the_same: "Dieses HUD sieht mit eingeschaltetem Minimal-HUD gleich aus."
+    looks_the_same: "Das HUD bleibt mit Minimal-HUD gleich."
   field:
     whole_numbers: "Nur ganze Zahlen"
     between: "Muss zwischen %{min} und %{max} liegen"
@@ -2411,7 +2411,7 @@ crosshair_maker:
   install_to_update: "Drücke auf der Seite Fadenkreuze auf Installieren, um es in TF2 zu aktualisieren."
   saved: "Gespeichert"
   name: "Name"
-  name_placeholder: "Name des Fadenkreuzes"
+  name_placeholder: "Fadenkreuzname"
   save: "Speichern"
   save_as_new: "Als neu speichern"
   saving: "Wird gespeichert..."
@@ -2427,7 +2427,7 @@ crosshair_maker:
   preview: "Vorschau"
   preview_on: "Vorschau auf %{background}"
   preview_colour: "Vorschaufarbe des Fadenkreuzes"
-  in_game_colour: "Fadenkreuzfarbe im Spiel"
+  in_game_colour: "Farbe im Spiel"
   follows: "Folgt deiner Fadenkreuzfarbe"
   follows_tip: "Folgt deiner Fadenkreuzfarbe im Spiel"
   mixed: "Im Spiel wird diese Farbe mit deiner Fadenkreuzfarbe gemischt"
@@ -2663,7 +2663,7 @@ messages:
     read: "TF2Tools konnte seine Kartenliste nicht lesen. Starte TF2Tools neu und versuch es erneut."
   logs_tf:
     save_failed: "Die logs.tf-Daten konnten auf diesem Computer nicht gespeichert werden."
-    log_unreadable: "Dieser Log konnte nicht gelesen werden."
+    log_unreadable: "Dieses Log konnte nicht gelesen werden."
   store:
     details_failed_title: "Details konnten nicht geladen werden"
     busy_title: "Ein anderer Download läuft"
