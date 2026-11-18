@@ -260,6 +260,7 @@ mod tests {
             "profiles",
             "crosshairs_page",
             "hud_maker",
+            "crosshair_maker",
             "hud_store",
             "addon_store",
             "store_grid",
@@ -832,6 +833,10 @@ mod tests {
         "pages/logs_tf/detail/popover.rs",
         "pages/logs_tf/detail/rounds.rs",
         "pages/logs_tf/mod.rs",
+        "pages/crosshair_maker/mod.rs",
+        "pages/crosshair_maker/model.rs",
+        "pages/crosshair_maker/starter.rs",
+        "pages/crosshair_maker/starter_dialog.rs",
     ];
 
     // (file under src, exact literal, why it is not translated).
@@ -1145,6 +1150,16 @@ mod tests {
             "pages/logs_tf/mod.rs",
             "no stored body",
             "developer detail of an unreadable stored log",
+        ),
+        (
+            "pages/crosshair_maker/model.rs",
+            "cell ({x}, {y}) is off the canvas",
+            "developer detail: an invariant's panic message",
+        ),
+        (
+            "pages/crosshair_maker/model.rs",
+            "a canvas image is side*side*4 bytes",
+            "developer detail: an invariant's panic message",
         ),
     ];
 

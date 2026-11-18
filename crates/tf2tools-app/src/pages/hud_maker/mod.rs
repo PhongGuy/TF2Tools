@@ -80,7 +80,7 @@ use crate::local_messages::{
     LocalFailure, ReopenNotice, describe_hud_load, describe_make_hud, describe_settings,
     hud_base_changed, hud_files, hud_options_unreadable, left_out, reopen_notice,
 };
-use crate::pages::crosshair_maker::model::{REDO_TIP, UNDO_TIP, hsla_of_rgba, rgb_of};
+use crate::pages::crosshair_maker::model::{hsla_of_rgba, redo_tip, rgb_of, undo_tip};
 use crate::pages::huds::{install_failed, install_job, install_toast};
 use crate::picker::PickKind;
 use crate::previews::to_render_image;
@@ -3819,7 +3819,7 @@ impl HudMakerPage {
     pub fn undo_tip(&self) -> String {
         match self.editor().and_then(HudEditor::undo_name) {
             Some(name) => format!("Undo {name} (Ctrl+Z)"),
-            None => UNDO_TIP.to_owned(),
+            None => undo_tip().to_string(),
         }
     }
 
@@ -3827,7 +3827,7 @@ impl HudMakerPage {
     pub fn redo_tip(&self) -> String {
         match self.editor().and_then(HudEditor::redo_name) {
             Some(name) => format!("Redo {name} (Ctrl+Y)"),
-            None => REDO_TIP.to_owned(),
+            None => redo_tip().to_string(),
         }
     }
 

@@ -56,10 +56,10 @@ use crate::widgets::crosshair_picker::IN_GAME_SIZE;
 use crate::widgets::label_option::LabelOption;
 use crate::widgets::scroll::scroll_area;
 use model::{
-    Editor, FIT_TIP, OPACITY_TIP, REDO_TIP, SWATCH_NAMES, SWATCHES, Tool, UNDO_TIP, Viewport,
-    ZOOM_IN_TIP, ZOOM_OUT_TIP, alpha_of_percent, colour_hint, fit_note, hsla_of, hsla_of_rgba,
-    percent_of_alpha, position_text, preview_texels, rgb_of, swatch_tooltip, wheel_scroll,
-    wheel_zoom_steps,
+    Editor, SWATCHES, Tool, Viewport, alpha_of_percent, colour_hint, fit_note, fit_tip, hsla_of,
+    hsla_of_rgba, opacity_tip, percent_of_alpha, position_text, preview_texels, redo_tip, rgb_of,
+    swatch_names, swatch_tooltip, undo_tip, wheel_scroll, wheel_zoom_steps, zoom_in_tip,
+    zoom_out_tip,
 };
 use starter_dialog::StarterDialog;
 
@@ -87,11 +87,19 @@ fn png_import_failed() -> SharedString {
     tr!("messages.action.import_png")
 }
 /// The toast for a picture (starter, copy or PNG) that arrives while a save or open runs.
-pub const BUSY: &str = "Wait for the Crosshair Maker to finish, then try again.";
+pub fn busy() -> SharedString {
+    tr!("crosshair_maker.busy")
+}
 /// Shown when the files dropped on the maker hold no PNG.
-pub const DROP_A_PNG: &str = "Drop a PNG image.";
-const DROP_HINT: &str = "Drop a PNG to open it";
-const RECOVERED: &str = "The saved drawing was damaged, so it was rebuilt from the crosshair file.";
+pub fn drop_a_png() -> SharedString {
+    tr!("crosshair_maker.drop_a_png")
+}
+fn drop_hint() -> SharedString {
+    tr!("crosshair_maker.drop_hint")
+}
+fn recovered_note() -> SharedString {
+    tr!("crosshair_maker.recovered")
+}
 
 /// How a save ended, when it did not fail with a toast.
 enum Saved {
@@ -258,7 +266,9 @@ impl CrosshairMakerPage {
             outline_colour,
             outline_rgb: [0, 0, 0],
             background,
-            name: cx.new(|cx| InputState::new(window, cx).placeholder("Crosshair name")),
+            name: cx.new(|cx| {
+                InputState::new(window, cx).placeholder(tr!("crosshair_maker.name_placeholder"))
+            }),
             name_error: None,
             saving: false,
             saving_as_new: false,
@@ -356,7 +366,7 @@ impl CrosshairMakerPage {
                     Some(Ok((input, name, recovered))) => {
                         input.update(cx, |st, cx| st.set_value(name, window, cx));
                         if recovered {
-                            toast(window, cx, ToastKind::Warning, RECOVERED, "");
+                            toast(window, cx, ToastKind::Warning, recovered_note(), "");
                         }
                     }
                     Some(Err(err)) => toast_error(window, cx, &err),
@@ -456,7 +466,7 @@ impl CrosshairMakerPage {
 
     /// Puts `drawing` on the canvas through `Editor::use_starter`, asking first through
     /// `Confirm::discard_changes()` when the drawing has unsaved changes; also clears the name
-    /// field, the taken-name line and the hover readout. While `busy()` it only toasts `BUSY`.
+    /// field, the taken-name line and the hover readout. While `busy()` it only toasts `busy()`.
     pub fn use_starter(&mut self, drawing: RgbaImage, window: &mut Window, cx: &mut Context<Self>) {
         self.take_new(drawing, None, window, cx);
     }
@@ -515,7 +525,7 @@ impl CrosshairMakerPage {
             if refused.unwrap_or(false) {
                 cx.update(|cx| {
                     let _ = win.update(cx, |_, window, cx| {
-                        toast(window, cx, ToastKind::Info, BUSY, "")
+                        toast(window, cx, ToastKind::Info, busy(), "")
                     });
                 });
             }
@@ -528,11 +538,11 @@ impl CrosshairMakerPage {
         self.file_over = false;
         cx.notify();
         let Some(path) = paths.paths().iter().find(|p| is_png_name(p)) else {
-            toast(window, cx, ToastKind::Info, DROP_A_PNG, "");
+            toast(window, cx, ToastKind::Info, drop_a_png(), "");
             return;
         };
         if self.picking || !self.load_png(path.clone(), cx) {
-            toast(window, cx, ToastKind::Info, BUSY, "");
+            toast(window, cx, ToastKind::Info, busy(), "");
         }
     }
 
@@ -592,12 +602,12 @@ impl CrosshairMakerPage {
     fn take_new(
         &mut self,
         drawing: RgbaImage,
-        note: Option<&'static str>,
+        note: Option<SharedString>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         if self.busy() {
-            toast(window, cx, ToastKind::Info, BUSY, "");
+            toast(window, cx, ToastKind::Info, busy(), "");
             return;
         }
         if self.can_leave() {
@@ -621,7 +631,7 @@ impl CrosshairMakerPage {
     fn apply_new(
         &mut self,
         drawing: &RgbaImage,
-        note: Option<&'static str>,
+        note: Option<SharedString>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -715,9 +725,9 @@ impl CrosshairMakerPage {
                     });
                     cx.update(LibraryEvents::changed);
                     let description = if assigned {
-                        "Press Install on the Crosshairs page to update it in TF2."
+                        tr!("crosshair_maker.install_to_update")
                     } else {
-                        ""
+                        SharedString::default()
                     };
                     Ok(description)
                 }
@@ -742,7 +752,13 @@ impl CrosshairMakerPage {
             };
             cx.update(|cx| {
                 let _ = win.update(cx, |_, window, cx| match toast_of {
-                    Ok(description) => toast(window, cx, ToastKind::Success, "Saved", description),
+                    Ok(description) => toast(
+                        window,
+                        cx,
+                        ToastKind::Success,
+                        tr!("crosshair_maker.saved"),
+                        description,
+                    ),
                     Err(err) => toast_error(window, cx, &err),
                 });
             });
@@ -775,11 +791,11 @@ impl CrosshairMakerPage {
         let saving_over = self.saving && !self.saving_as_new;
         v_flex()
             .gap_2()
-            .child(heading("Name"))
+            .child(heading(tr!("crosshair_maker.name")))
             .child(
                 div()
                     .id(ids::CROSSHAIR_MAKER_NAME)
-                    .aria_label("Crosshair name")
+                    .aria_label(tr!("crosshair_maker.name_placeholder"))
                     .test_support()
                     .child(Input::new(&self.name)),
             )
@@ -792,8 +808,10 @@ impl CrosshairMakerPage {
                         Button::new(ids::CROSSHAIR_MAKER_SAVE)
                             .primary()
                             .icon(IconName::Save)
-                            .label("Save")
-                            .when(saving_over, |b| b.accessibility_label("Saving..."))
+                            .label(tr!("crosshair_maker.save"))
+                            .when(saving_over, |b| {
+                                b.accessibility_label(tr!("crosshair_maker.saving"))
+                            })
                             .loading(saving_over)
                             .disabled(name.is_empty() || busy)
                             .on_click(cx.listener(|page, _, _, cx| page.save(false, cx))),
@@ -802,8 +820,10 @@ impl CrosshairMakerPage {
                         Button::new(ids::CROSSHAIR_MAKER_SAVE_AS_NEW)
                             .outline()
                             .icon(IconName::Copy)
-                            .label("Save as new")
-                            .when(saving_new, |b| b.accessibility_label("Saving..."))
+                            .label(tr!("crosshair_maker.save_as_new"))
+                            .when(saving_new, |b| {
+                                b.accessibility_label(tr!("crosshair_maker.saving"))
+                            })
                             .loading(saving_new)
                             .disabled(name.is_empty() || busy)
                             .on_click(cx.listener(|page, _, _, cx| page.save(true, cx))),
@@ -818,7 +838,10 @@ impl CrosshairMakerPage {
         let (border, muted_fg) = (theme.border, theme.muted_foreground);
         let colour = self.editor.colour();
         let hint = colour_hint(colour);
-        let opacity = format!("Opacity: {}%", percent_of_alpha(self.editor.alpha()));
+        let opacity = tr!(
+            "crosshair_maker.opacity_value",
+            percent = percent_of_alpha(self.editor.alpha())
+        );
         let background = self
             .background
             .read(cx)
@@ -827,13 +850,13 @@ impl CrosshairMakerPage {
             .unwrap_or(BACKGROUNDS[0]);
         let swatches = SWATCHES
             .iter()
-            .zip(SWATCH_NAMES)
+            .zip(swatch_names())
             .enumerate()
             .map(|(ix, (&rgb, name))| {
                 Button::new(ids::crosshair_maker_swatch(ix))
                     .ghost()
                     .selected(colour == rgb)
-                    .tooltip(swatch_tooltip(rgb, name))
+                    .tooltip(swatch_tooltip(rgb, name.clone()))
                     .accessibility_label(name)
                     .child(
                         div()
@@ -862,13 +885,13 @@ impl CrosshairMakerPage {
             .child(
                 v_flex()
                     .gap_2()
-                    .child(heading("Colour"))
+                    .child(heading(tr!("crosshair_maker.colour")))
                     .child(h_flex().gap_1().children(swatches))
                     // One line under the swatches says what the current colour does in game.
                     .child(
                         div()
                             .id(ids::CROSSHAIR_MAKER_COLOR_HINT)
-                            .aria_label(hint)
+                            .aria_label(hint.clone())
                             .test_support()
                             .text_xs()
                             .text_color(muted_fg)
@@ -877,13 +900,14 @@ impl CrosshairMakerPage {
                     .child(
                         h_flex()
                             .id(ids::CROSSHAIR_MAKER_COLOR)
-                            .aria_label("Paint colour")
+                            .aria_label(tr!("crosshair_maker.paint_colour"))
                             .test_support()
                             .gap_2()
                             .child(
-                                ColorPicker::new(&self.colour).accessibility_label("Paint colour"),
+                                ColorPicker::new(&self.colour)
+                                    .accessibility_label(tr!("crosshair_maker.paint_colour")),
                             )
-                            .child(div().text_sm().child("Any colour")),
+                            .child(div().text_sm().child(tr!("crosshair_maker.any_colour"))),
                     )
                     .child(
                         div()
@@ -896,36 +920,36 @@ impl CrosshairMakerPage {
                     .child(
                         div()
                             .id(ids::CROSSHAIR_MAKER_OPACITY)
-                            .aria_label("Opacity")
+                            .aria_label(tr!("crosshair_maker.opacity"))
                             .test_support()
                             // The handle overhangs the track's ends by 11 px; the margin keeps
                             // it whole at 1% and 100% instead of clipped by the panel.
                             .mx_3()
-                            .tooltip(|window, cx| Tooltip::new(OPACITY_TIP).build(window, cx))
+                            .tooltip(|window, cx| Tooltip::new(opacity_tip()).build(window, cx))
                             .child(Slider::new(&self.opacity)),
                     ),
             )
             .child(
                 v_flex()
                     .gap_2()
-                    .child(heading("Outline"))
+                    .child(heading(tr!("crosshair_maker.outline")))
                     .child(
                         h_flex()
                             .id(ids::CROSSHAIR_MAKER_OUTLINE_COLOR)
-                            .aria_label("Outline colour")
+                            .aria_label(tr!("crosshair_maker.outline_colour"))
                             .test_support()
                             .gap_2()
                             .child(
                                 ColorPicker::new(&self.outline_colour)
-                                    .accessibility_label("Outline colour"),
+                                    .accessibility_label(tr!("crosshair_maker.outline_colour")),
                             )
-                            .child(div().text_sm().child("Outline colour")),
+                            .child(div().text_sm().child(tr!("crosshair_maker.outline_colour"))),
                     )
                     .child(
                         Button::new(ids::CROSSHAIR_MAKER_OUTLINE)
                             .outline()
                             .icon(IconName::SquareDashed)
-                            .label("Add outline")
+                            .label(tr!("crosshair_maker.add_outline"))
                             .disabled(self.busy())
                             .on_click(cx.listener(|page, _, _, cx| {
                                 let rgb = page.outline_rgb;
@@ -936,7 +960,7 @@ impl CrosshairMakerPage {
             .child(
                 v_flex()
                     .gap_2()
-                    .child(heading("Preview"))
+                    .child(heading(tr!("crosshair_maker.preview")))
                     .child(self.preview(background, cx))
                     .child(
                         div()
@@ -949,14 +973,14 @@ impl CrosshairMakerPage {
                     .child(
                         h_flex()
                             .id(ids::CROSSHAIR_MAKER_PREVIEW_COLOR)
-                            .aria_label("Preview crosshair colour")
+                            .aria_label(tr!("crosshair_maker.preview_colour"))
                             .test_support()
                             .gap_2()
                             .child(
                                 ColorPicker::new(&self.preview_colour)
-                                    .accessibility_label("Preview crosshair colour"),
+                                    .accessibility_label(tr!("crosshair_maker.preview_colour")),
                             )
-                            .child(div().text_sm().child("Crosshair colour in game")),
+                            .child(div().text_sm().child(tr!("crosshair_maker.in_game_colour"))),
                     ),
             );
         scroll_area(
@@ -995,7 +1019,7 @@ impl CrosshairMakerPage {
         let path = cx.global::<Services>().assets.background(background);
         div()
             .id(ids::CROSSHAIR_MAKER_PREVIEW)
-            .aria_label(format!("Preview on {background}"))
+            .aria_label(tr!("crosshair_maker.preview_on", background = background))
             .test_support()
             .relative()
             .flex_none()
@@ -1197,8 +1221,8 @@ impl CrosshairMakerPage {
                             icon_button(
                                 ids::CROSSHAIR_MAKER_FILLED,
                                 IconName::SquareSquare,
-                                "Filled shapes",
-                                "Filled shapes",
+                                tr!("crosshair_maker.filled"),
+                                tr!("crosshair_maker.filled"),
                             )
                             .selected(filled)
                             .toggled(filled)
@@ -1214,8 +1238,8 @@ impl CrosshairMakerPage {
                             icon_button(
                                 ids::CROSSHAIR_MAKER_MIRROR_X,
                                 IconName::FlipHorizontal2,
-                                "Mirror left and right",
-                                "Mirror left and right",
+                                tr!("crosshair_maker.mirror_x"),
+                                tr!("crosshair_maker.mirror_x"),
                             )
                             .selected(mirror_x)
                             .toggled(mirror_x)
@@ -1227,8 +1251,8 @@ impl CrosshairMakerPage {
                             icon_button(
                                 ids::CROSSHAIR_MAKER_MIRROR_Y,
                                 IconName::FlipVertical2,
-                                "Mirror top and bottom",
-                                "Mirror top and bottom",
+                                tr!("crosshair_maker.mirror_y"),
+                                tr!("crosshair_maker.mirror_y"),
                             )
                             .selected(mirror_y)
                             .toggled(mirror_y)
@@ -1243,8 +1267,8 @@ impl CrosshairMakerPage {
                             icon_button(
                                 ids::CROSSHAIR_MAKER_GUIDES,
                                 IconName::Crosshair,
-                                "Centre guides",
-                                "Centre guides",
+                                tr!("crosshair_maker.guides"),
+                                tr!("crosshair_maker.guides"),
                             )
                             .selected(guides)
                             .toggled(guides)
@@ -1259,8 +1283,8 @@ impl CrosshairMakerPage {
                             icon_button(
                                 ids::CROSSHAIR_MAKER_GRID_LINES,
                                 IconName::Grid3x3,
-                                "Grid lines",
-                                "Grid lines",
+                                tr!("crosshair_maker.grid_lines"),
+                                tr!("crosshair_maker.grid_lines"),
                             )
                             .selected(grid_lines)
                             .toggled(grid_lines)
@@ -1274,8 +1298,8 @@ impl CrosshairMakerPage {
                             icon_button(
                                 ids::CROSSHAIR_MAKER_ZOOM_OUT,
                                 IconName::ZoomOut,
-                                "Zoom out",
-                                ZOOM_OUT_TIP,
+                                tr!("crosshair_maker.zoom_out"),
+                                zoom_out_tip(),
                             )
                             .disabled(!view.can_zoom_out())
                             .on_click(
@@ -1286,7 +1310,7 @@ impl CrosshairMakerPage {
                             Button::new(ids::CROSSHAIR_MAKER_ZOOM)
                                 .ghost()
                                 .label(view.label())
-                                .tooltip(FIT_TIP)
+                                .tooltip(fit_tip())
                                 .on_click(
                                     cx.listener(|page, _, _, cx| page.zoom(cx, Viewport::fit)),
                                 ),
@@ -1295,8 +1319,8 @@ impl CrosshairMakerPage {
                             icon_button(
                                 ids::CROSSHAIR_MAKER_ZOOM_IN,
                                 IconName::ZoomIn,
-                                "Zoom in",
-                                ZOOM_IN_TIP,
+                                tr!("crosshair_maker.zoom_in"),
+                                zoom_in_tip(),
                             )
                             .disabled(!view.can_zoom_in())
                             .on_click(
@@ -1310,8 +1334,8 @@ impl CrosshairMakerPage {
                             icon_button(
                                 ids::CROSSHAIR_MAKER_UNDO,
                                 IconName::Undo2,
-                                "Undo",
-                                UNDO_TIP,
+                                tr!("crosshair_maker.undo"),
+                                undo_tip(),
                             )
                             .disabled(!e.can_undo() || busy)
                             .on_click(cx.listener(|page, _, _, cx| page.undo(cx))),
@@ -1320,8 +1344,8 @@ impl CrosshairMakerPage {
                             icon_button(
                                 ids::CROSSHAIR_MAKER_REDO,
                                 IconName::Redo2,
-                                "Redo",
-                                REDO_TIP,
+                                tr!("crosshair_maker.redo"),
+                                redo_tip(),
                             )
                             .disabled(!e.can_redo() || busy)
                             .on_click(cx.listener(|page, _, _, cx| page.redo(cx))),
@@ -1330,8 +1354,8 @@ impl CrosshairMakerPage {
                             icon_button(
                                 ids::CROSSHAIR_MAKER_CLEAR,
                                 IconName::Trash,
-                                "Clear",
-                                "Clear",
+                                tr!("crosshair_maker.clear"),
+                                tr!("crosshair_maker.clear"),
                             )
                             .disabled(busy)
                             .on_click(cx.listener(|page, _, _, cx| page.edit(cx, Editor::clear))),
@@ -1342,7 +1366,7 @@ impl CrosshairMakerPage {
                         Button::new(ids::CROSSHAIR_MAKER_SIZE)
                             .outline()
                             .label(size_label(e.size().side()))
-                            .tooltip("Switch canvas size")
+                            .tooltip(tr!("crosshair_maker.switch_size"))
                             .disabled(busy)
                             .on_click(
                                 cx.listener(|page, _, window, cx| page.switch_size(window, cx)),
@@ -1355,7 +1379,7 @@ impl CrosshairMakerPage {
                             Button::new(ids::CROSSHAIR_MAKER_NEW)
                                 .outline()
                                 .icon(IconName::FilePlus)
-                                .label("New")
+                                .label(tr!("crosshair_maker.new"))
                                 .disabled(busy)
                                 .on_click(
                                     cx.listener(|page, _, window, cx| page.new_drawing(window, cx)),
@@ -1365,8 +1389,8 @@ impl CrosshairMakerPage {
                             Button::new(ids::CROSSHAIR_MAKER_STARTERS)
                                 .outline()
                                 .icon(IconName::Shapes)
-                                .label("Starters")
-                                .tooltip("Starter shapes")
+                                .label(tr!("crosshair_maker.starters"))
+                                .tooltip(tr!("crosshair_maker.starter.title"))
                                 .disabled(busy)
                                 .on_click(cx.listener(|page, _, window, cx| {
                                     page.open_starters(window, cx)
@@ -1376,8 +1400,8 @@ impl CrosshairMakerPage {
                             Button::new(ids::CROSSHAIR_MAKER_IMPORT_PNG)
                                 .outline()
                                 .icon(IconName::ImageUp)
-                                .label("Import PNG")
-                                .tooltip("Open a PNG as a new drawing")
+                                .label(tr!("crosshair_maker.import_png"))
+                                .tooltip(tr!("crosshair_maker.import_png_tip"))
                                 .disabled(busy || self.picking)
                                 .on_click(cx.listener(|page, _, _, cx| page.import_png(cx))),
                         ),
@@ -1523,7 +1547,7 @@ impl CrosshairMakerPage {
 
         let grid = div()
             .id(ids::CROSSHAIR_MAKER_GRID)
-            .aria_label("Drawing grid")
+            .aria_label(tr!("crosshair_maker.grid"))
             .test_support()
             .absolute()
             .left(origin.x)
@@ -1641,7 +1665,7 @@ fn save_job(
         LogLevel::Info,
         "crosshair",
         "paint",
-        format!("Saved painted crosshair: {}", entry.name()),
+        tr!("crosshair_maker.activity.saved", name = entry.name()).to_string(),
     );
     activity::write(s, &row);
     // A failed read only loses the reminder to install; the save itself landed.
@@ -1691,7 +1715,7 @@ fn copy_job(s: &Services, crosshair: CrosshairRef) -> Result<(RgbaImage, FitChan
 fn icon_button(
     id: &'static str,
     icon: IconName,
-    label: &'static str,
+    label: SharedString,
     tip: impl Into<SharedString>,
 ) -> Button {
     Button::new(id)
@@ -1719,7 +1743,7 @@ fn pan_up(
     page.end_pan(cx);
 }
 
-fn heading(text: &'static str) -> impl IntoElement {
+fn heading(text: SharedString) -> impl IntoElement {
     div()
         .text_sm()
         .font_weight(FontWeight::SEMIBOLD)
@@ -1750,7 +1774,7 @@ fn drop_target(cx: &Context<CrosshairMakerPage>) -> impl IntoElement {
     let theme = cx.theme();
     div()
         .id(ids::CROSSHAIR_MAKER_DROP_TARGET)
-        .aria_label(DROP_HINT)
+        .aria_label(drop_hint())
         .test_support()
         .absolute()
         .inset_0()
@@ -1765,7 +1789,7 @@ fn drop_target(cx: &Context<CrosshairMakerPage>) -> impl IntoElement {
         .text_lg()
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(theme.foreground)
-        .child(DROP_HINT)
+        .child(drop_hint())
 }
 
 fn size_label(side: u32) -> String {

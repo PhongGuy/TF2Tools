@@ -1,6 +1,6 @@
 use tf2tools_app::pages::crosshair_maker::model::{
-    CLEAR, CanvasSize, Editor, FIT_CENTRED, FIT_SHRUNK, REDO_TIP, Tool, UNDO_LIMIT, UNDO_TIP,
-    fit_note, position_text,
+    CLEAR, CanvasSize, Editor, Tool, UNDO_LIMIT, fit_centred, fit_note, fit_shrunk, position_text,
+    redo_tip, undo_tip,
 };
 use tf2tools_core::{CrosshairId, FitChange, RgbaImage};
 
@@ -417,10 +417,10 @@ fn a_position_off_the_grid_clamps_to_the_nearest_edge_cell() {
 
 #[test]
 fn grey_follows_the_crosshair_colour_and_anything_else_is_mixed() {
-    use tf2tools_app::pages::crosshair_maker::model::{FOLLOWS, MIXED, SWATCHES, colour_hint};
-    assert_eq!(FOLLOWS, "Follows your crosshair colour");
+    use tf2tools_app::pages::crosshair_maker::model::{SWATCHES, colour_hint, follows, mixed};
+    assert_eq!(follows(), "Follows your crosshair colour");
     assert_eq!(
-        MIXED,
+        mixed(),
         "In game this colour is mixed with your crosshair colour"
     );
     assert_eq!(
@@ -433,11 +433,11 @@ fn grey_follows_the_crosshair_colour_and_anything_else_is_mixed() {
         ]
     );
     for swatch in SWATCHES {
-        assert_eq!(colour_hint(swatch), FOLLOWS);
+        assert_eq!(colour_hint(swatch), follows());
     }
-    assert_eq!(colour_hint([0, 0, 0]), FOLLOWS);
-    assert_eq!(colour_hint([255, 0, 0]), MIXED);
-    assert_eq!(colour_hint([128, 128, 129]), MIXED);
+    assert_eq!(colour_hint([0, 0, 0]), follows());
+    assert_eq!(colour_hint([255, 0, 0]), mixed());
+    assert_eq!(colour_hint([128, 128, 129]), mixed());
 }
 
 #[test]
@@ -512,8 +512,8 @@ fn each_tool_has_a_one_letter_key_shown_in_its_tooltip() {
             ("c", "Circle (C)".to_owned()),
         ]
     );
-    assert_eq!(UNDO_TIP, "Undo (Ctrl+Z)");
-    assert_eq!(REDO_TIP, "Redo (Ctrl+Y)");
+    assert_eq!(undo_tip(), "Undo (Ctrl+Z)");
+    assert_eq!(redo_tip(), "Redo (Ctrl+Y)");
 }
 
 #[test]
@@ -999,9 +999,9 @@ fn a_see_through_cell_draws_with_its_alpha() {
 
 #[test]
 fn the_opacity_tooltip_says_painting_replaces_a_pixel() {
-    use tf2tools_app::pages::crosshair_maker::model::OPACITY_TIP;
+    use tf2tools_app::pages::crosshair_maker::model::opacity_tip;
     assert_eq!(
-        OPACITY_TIP,
+        opacity_tip(),
         "See-through paint. Painting over a pixel replaces it; colours never blend."
     );
 }
@@ -1092,30 +1092,30 @@ fn see_through_paint_mirrors_and_survives_undo_and_redo() {
 #[test]
 fn a_fitted_picture_has_a_note_only_when_it_changed() {
     assert_eq!(fit_note(FitChange::AsIs), None);
-    assert_eq!(fit_note(FitChange::ShrunkToFit), Some(FIT_SHRUNK));
-    assert_eq!(fit_note(FitChange::Centred), Some(FIT_CENTRED));
+    assert_eq!(fit_note(FitChange::ShrunkToFit), Some(fit_shrunk()));
+    assert_eq!(fit_note(FitChange::Centred), Some(fit_centred()));
     assert_eq!(
-        FIT_SHRUNK,
+        fit_shrunk(),
         "This image is bigger than the canvas, so it was shrunk to fit."
     );
     assert_eq!(
-        FIT_CENTRED,
+        fit_centred(),
         "This image is smaller than the canvas, so it was placed in the middle."
     );
 }
 
 #[test]
 fn white_and_grey_swatches_say_they_follow_your_crosshair_colour() {
-    use tf2tools_app::pages::crosshair_maker::model::{SWATCH_NAMES, SWATCHES, swatch_tooltip};
-    for (&rgb, name) in SWATCHES.iter().zip(SWATCH_NAMES) {
+    use tf2tools_app::pages::crosshair_maker::model::{SWATCHES, swatch_names, swatch_tooltip};
+    for (&rgb, name) in SWATCHES.iter().zip(swatch_names()) {
         assert_eq!(
-            swatch_tooltip(rgb, name),
+            swatch_tooltip(rgb, name.clone()),
             "Follows your crosshair colour in game",
             "{name}"
         );
     }
     // A swatch that is not white or grey keeps its own name as its tooltip.
-    assert_eq!(swatch_tooltip(RED, "Red"), "Red");
+    assert_eq!(swatch_tooltip(RED, "Red".into()), "Red");
 }
 
 #[test]

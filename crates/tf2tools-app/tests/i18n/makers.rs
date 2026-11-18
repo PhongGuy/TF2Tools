@@ -5,6 +5,8 @@ use tf2tools_app::i18n::names::{
     board_mode_name, maker_label, meter_name, scene_name, starting_point_about, starting_point_name,
 };
 use tf2tools_app::ids;
+use tf2tools_app::pages::crosshair_maker::CrosshairMakerPage;
+use tf2tools_app::pages::crosshair_maker::model::{Tool, undo_tip};
 use tf2tools_app::pages::hud_maker::HudMakerPage;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
@@ -277,4 +279,105 @@ fn a_long_russian_item_colour_keeps_clear_of_its_neighbour(cx: &mut TestAppConte
             assert!(name.right() <= next_swatch.left(), "{id} runs into {next}");
         }
     }
+}
+
+fn missing() -> Tf2State {
+    Tf2State::Missing { saved: None }
+}
+
+/// Opens the Crosshair Maker from the sidebar.
+fn open_crosshair_maker(
+    cx: &mut TestAppContext,
+    s: &support::ShellWindow,
+) -> Entity<CrosshairMakerPage> {
+    support::click_id(cx, s.win, ids::nav(Page::CrosshairMaker));
+    cx.update(|cx| s.shell.read(cx).crosshair_maker_page())
+        .expect("a Crosshair Maker page")
+}
+
+#[gpui_kit::test]
+fn the_crosshair_maker_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, missing());
+    let page = open_crosshair_maker(cx, &s);
+    let shown = [
+        ids::CROSSHAIR_MAKER_SAVE,
+        ids::CROSSHAIR_MAKER_SAVE_AS_NEW,
+        ids::CROSSHAIR_MAKER_NEW,
+        ids::CROSSHAIR_MAKER_STARTERS,
+        ids::CROSSHAIR_MAKER_IMPORT_PNG,
+        ids::CROSSHAIR_MAKER_PENCIL,
+        ids::CROSSHAIR_MAKER_COLOR_HINT,
+        ids::CROSSHAIR_MAKER_OPACITY_LABEL,
+        ids::CROSSHAIR_MAKER_PREVIEW,
+        ids::CROSSHAIR_MAKER_BACKGROUND,
+    ]
+    .map(|id| label(cx, &s, id));
+    let want = [
+        "Сохранить",
+        "Сохранить копию",
+        "Новый",
+        "Заготовки",
+        "Импорт PNG",
+        "Карандаш",
+        "Принимает цвет вашего прицела",
+        "Непрозрачность: 100%",
+        "Превью на карте 2fort",
+        "2fort",
+    ];
+    assert_eq!(shown, want.map(|t| Some(t.to_owned())));
+    let placeholder = cx.update(|cx| {
+        page.read(cx)
+            .name_input()
+            .read(cx)
+            .presentation()
+            .placeholder()
+            .to_string()
+    });
+    assert_eq!(placeholder, "Название прицела");
+    assert_eq!(Tool::Pencil.tooltip(), "Карандаш (P)");
+    assert_eq!(undo_tip().to_string(), "Отменить (Ctrl+Z)");
+}
+
+#[gpui_kit::test]
+fn the_starter_dialog_reads_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let env = support::env();
+    let s = support::shell_window(cx, &env, missing());
+    let _page = open_crosshair_maker(cx, &s);
+    support::click_id(cx, s.win, ids::CROSSHAIR_MAKER_STARTERS);
+    assert_eq!(
+        label(cx, &s, ids::crosshair_maker_starter("cross-gap")).as_deref(),
+        Some("Крест с зазором")
+    );
+    assert_eq!(
+        label(cx, &s, ids::CROSSHAIR_MAKER_STARTER_USE).as_deref(),
+        Some("Использовать")
+    );
+    let length = label(cx, &s, ids::crosshair_maker_starter_value("length")).unwrap();
+    assert!(
+        length.starts_with("Длина: ") && length.ends_with(" px"),
+        "{length}"
+    );
+}
+
+// The maker is dropped on leaving, so one opened after a switch is built in the new language.
+#[gpui_kit::test]
+fn the_crosshair_maker_reopened_after_a_switch_reads_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let s = support::shell_window(cx, &env, missing());
+    let _page = open_crosshair_maker(cx, &s);
+    assert_eq!(
+        label(cx, &s, ids::CROSSHAIR_MAKER_SAVE).as_deref(),
+        Some("Save")
+    );
+    crate::settings::open_settings(cx, &s);
+    crate::settings::pick(cx, s.win, "ru");
+    let _page = open_crosshair_maker(cx, &s);
+    assert_eq!(
+        label(cx, &s, ids::CROSSHAIR_MAKER_SAVE).as_deref(),
+        Some("Сохранить")
+    );
 }

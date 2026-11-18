@@ -7,7 +7,7 @@ use gpui_kit::component::popover::Popover;
 use gpui_kit::component::{Disableable as _, Sizable as _, v_flex};
 use gpui_kit::{
     Anchor, AnyElement, Bounds, Context, IntoElement, KeyDownEvent, KeyUpEvent, MouseMoveEvent,
-    ParentElement as _, Pixels, Point, ScrollEvent, Styled as _, Window, point, px,
+    ParentElement as _, Pixels, Point, ScrollEvent, SharedString, Styled as _, Window, point, px,
 };
 use tf2tools_core::Screen;
 
@@ -15,7 +15,7 @@ use super::HudMakerPage;
 use super::view::{CanvasFit, Zoom};
 use crate::ids;
 use crate::pages::crosshair_maker::model::{
-    ZOOM_IN_TIP, ZOOM_OUT_TIP, wheel_scroll, wheel_zoom_steps,
+    wheel_scroll, wheel_zoom_steps, zoom_in_tip, zoom_out_tip,
 };
 
 const FIT_TIP: &str = "Fit the screen to the window (Ctrl+0)";
@@ -150,7 +150,7 @@ impl HudMakerPage {
             .ghost()
             .label(zoom.label())
             .tooltip(ZOOM_TIP);
-        let item = |id: &'static str, icon: IconName, label: &'static str, tip: &'static str| {
+        let item = |id: &'static str, icon: IconName, label: &'static str, tip: SharedString| {
             Button::new(id)
                 .ghost()
                 .small()
@@ -162,7 +162,7 @@ impl HudMakerPage {
             ids::HUD_MAKER_ZOOM_IN,
             IconName::ZoomIn,
             "Zoom in",
-            ZOOM_IN_TIP,
+            zoom_in_tip(),
         )
         .disabled(!zoom.can_zoom_in())
         .on_click(cx.listener(|page, _, _, cx| page.zoom_canvas(1, cx)));
@@ -170,16 +170,21 @@ impl HudMakerPage {
             ids::HUD_MAKER_ZOOM_OUT,
             IconName::ZoomOut,
             "Zoom out",
-            ZOOM_OUT_TIP,
+            zoom_out_tip(),
         )
         .disabled(!zoom.can_zoom_out())
         .on_click(cx.listener(|page, _, _, cx| page.zoom_canvas(-1, cx)));
-        let fit = item(ids::HUD_MAKER_ZOOM_FIT, IconName::Maximize, "Fit", FIT_TIP)
-            .disabled(zoom.is_fit())
-            .on_click(cx.listener(|page, _, _, cx| {
-                page.zoom_open = false;
-                page.fit_canvas(cx);
-            }));
+        let fit = item(
+            ids::HUD_MAKER_ZOOM_FIT,
+            IconName::Maximize,
+            "Fit",
+            FIT_TIP.into(),
+        )
+        .disabled(zoom.is_fit())
+        .on_click(cx.listener(|page, _, _, cx| {
+            page.zoom_open = false;
+            page.fit_canvas(cx);
+        }));
         Popover::new("hud-maker-zoom-menu")
             .anchor(Anchor::BottomLeft)
             .open(self.zoom_open)

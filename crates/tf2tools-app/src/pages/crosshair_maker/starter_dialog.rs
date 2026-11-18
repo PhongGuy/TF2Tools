@@ -15,6 +15,7 @@ use tf2tools_core::RgbaImage;
 use super::CrosshairMakerPage;
 use super::model::{CanvasSize, hsla_of_rgba};
 use super::starter::{Param, Starter, StarterParams, starter_drawing};
+use crate::i18n::tr;
 use crate::ids;
 use crate::widgets::dialog_frame::{DIALOG_WIDTH, DialogFrame};
 
@@ -194,7 +195,10 @@ impl StarterDialog {
         .size(cell * side as f32);
         div()
             .id(ids::CROSSHAIR_MAKER_STARTER_PREVIEW)
-            .aria_label(format!("{} preview", self.shape.label()))
+            .aria_label(tr!(
+                "crosshair_maker.starter.preview",
+                shape = self.shape.label()
+            ))
             .test_support()
             .flex_none()
             .size(PREVIEW_SIZE + PREVIEW_BORDER * 2.)
@@ -246,7 +250,11 @@ impl Render for StarterDialog {
             .gap_3()
             .text_sm()
             .children(self.shape.params().iter().map(|&param| {
-                let text = format!("{}: {} px", param.label(), params.get(param));
+                let text = tr!(
+                    "crosshair_maker.starter.value",
+                    param = param.label(),
+                    value = params.get(param)
+                );
                 v_flex()
                     .gap_2()
                     .child(
@@ -274,11 +282,14 @@ impl Render for StarterDialog {
                         div()
                             .text_lg()
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child("Starter shapes"),
+                            .child(tr!("crosshair_maker.starter.title")),
                     )
-                    .child(div().text_sm().text_color(muted).child(
-                        "Pick a shape and set it up. Use starts a new drawing you can keep editing.",
-                    )),
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(muted)
+                            .child(tr!("crosshair_maker.starter.about")),
+                    ),
             )
             .child(shapes)
             .child(
@@ -295,13 +306,13 @@ impl Render for StarterDialog {
                     .child(
                         Button::new(ids::CROSSHAIR_MAKER_STARTER_CANCEL)
                             .outline()
-                            .label("Cancel")
+                            .label(tr!("confirm.cancel"))
                             .on_click(|_, window, cx| window.close_dialog(cx)),
                     )
                     .child(
                         Button::new(ids::CROSSHAIR_MAKER_STARTER_USE)
                             .primary()
-                            .label("Use")
+                            .label(tr!("crosshair_maker.starter.use"))
                             .on_click(
                                 cx.listener(|this, _, window, cx| this.use_drawing(window, cx)),
                             ),
