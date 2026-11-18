@@ -315,7 +315,17 @@ impl WeaponAssigner {
                     .bg(theme.muted)
                     .children(tabs),
             )
-            .child(h_flex().flex_none().ml_auto().gap_1().children(bulk))
+            // Long labels (Spanish) wrap inside the group, right-aligned, rather than leave the picker.
+            .child(
+                h_flex()
+                    .flex_none()
+                    .flex_wrap()
+                    .justify_end()
+                    .max_w_full()
+                    .ml_auto()
+                    .gap_1()
+                    .children(bulk),
+            )
     }
 
     // The class's weapon rows, separated by dividers; compact mode scrolls them in 144 px.

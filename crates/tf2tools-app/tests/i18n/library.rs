@@ -429,6 +429,11 @@ fn the_portuguese_hud_card_fits_at_800(cx: &mut TestAppContext) {
     hud_card_fits_at_800(cx, "pt-BR");
 }
 
+#[gpui_kit::test]
+fn the_spanish_hud_card_fits_at_800(cx: &mut TestAppContext) {
+    hud_card_fits_at_800(cx, "es");
+}
+
 // At 800x600 a profile card in `lang` keeps Activate, Edit and Delete inside the card, and
 // Activate, icon-only there, keeps its name.
 fn profile_card_fits_at_800(cx: &mut TestAppContext, lang: &str) {
@@ -469,6 +474,11 @@ fn the_russian_profile_card_fits_at_800(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_portuguese_profile_card_fits_at_800(cx: &mut TestAppContext) {
     profile_card_fits_at_800(cx, "pt-BR");
+}
+
+#[gpui_kit::test]
+fn the_spanish_profile_card_fits_at_800(cx: &mut TestAppContext) {
+    profile_card_fits_at_800(cx, "es");
 }
 
 // The Missing Items dialog calls a local import "Свой", as the HUD card's badge does.
@@ -538,6 +548,11 @@ fn the_portuguese_sound_slots_fit_at_800(cx: &mut TestAppContext) {
     sound_slots_fit_at_800(cx, "pt-BR");
 }
 
+#[gpui_kit::test]
+fn the_spanish_sound_slots_fit_at_800(cx: &mut TestAppContext) {
+    sound_slots_fit_at_800(cx, "es");
+}
+
 // Each slot's status is an icon whose name reads in `lang`, small enough for any word.
 fn sound_status_icon_reads(cx: &mut TestAppContext, lang: &str, installed: &str) {
     let _guard = LocaleGuard::switch(lang);
@@ -570,6 +585,11 @@ fn the_russian_sound_status_is_an_icon(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_portuguese_sound_status_is_an_icon(cx: &mut TestAppContext) {
     sound_status_icon_reads(cx, "pt-BR", "Instalado");
+}
+
+#[gpui_kit::test]
+fn the_spanish_sound_status_is_an_icon(cx: &mut TestAppContext) {
+    sound_status_icon_reads(cx, "es", "Instalado");
 }
 
 // At 800x600 a library sound card keeps play, delete, Hit and Kill inside the card in
@@ -625,6 +645,13 @@ fn the_portuguese_sound_card_fits_at_800(cx: &mut TestAppContext) {
     let label = |key: &str| tf2tools_app::_rust_i18n_try_translate("pt-BR", key).unwrap();
     let (hit, kill) = (label("sounds.button.hit"), label("sounds.button.kill"));
     assert_sound_card_fits_at_800(cx, "pt-BR", &hit, &kill);
+}
+
+#[gpui_kit::test]
+fn the_spanish_sound_card_fits_at_800(cx: &mut TestAppContext) {
+    let label = |key: &str| tf2tools_app::_rust_i18n_try_translate("es", key).unwrap();
+    let (hit, kill) = (label("sounds.button.hit"), label("sounds.button.kill"));
+    assert_sound_card_fits_at_800(cx, "es", &hit, &kill);
 }
 
 // Where the card has room, at 1280x800, Hit and Kill keep their visible labels.
@@ -903,6 +930,11 @@ fn the_russian_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_portuguese_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
     bulk_buttons_fit_the_narrow_picker(cx, "pt-BR");
+}
+
+#[gpui_kit::test]
+fn the_spanish_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
+    bulk_buttons_fit_the_narrow_picker(cx, "es");
 }
 
 #[test]
@@ -1263,7 +1295,7 @@ fn a_maps_sync_failure_follows_a_language_switch(cx: &mut TestAppContext) {
 }
 
 #[test]
-fn a_copied_hud_is_named_in_russian_and_portuguese() {
+fn a_copied_hud_is_named_in_every_language() {
     let ru = {
         let _guard = LocaleGuard::switch("ru");
         [copy_name("flawhud", 1), copy_name("flawhud", 3)]
@@ -1272,11 +1304,16 @@ fn a_copied_hud_is_named_in_russian_and_portuguese() {
         let _guard = LocaleGuard::switch("pt-BR");
         [copy_name("flawhud", 1), copy_name("flawhud", 3)]
     };
+    let es = {
+        let _guard = LocaleGuard::switch("es");
+        [copy_name("flawhud", 1), copy_name("flawhud", 3)]
+    };
     let en = {
         let _guard = LocaleGuard::switch("en");
         copy_name("flawhud", 2)
     };
     assert_eq!(ru, ["flawhud (копия)", "flawhud (копия 3)"]);
     assert_eq!(pt, ["flawhud (cópia)", "flawhud (cópia 3)"]);
+    assert_eq!(es, ["flawhud (copia)", "flawhud (copia 3)"]);
     assert_eq!(en, "flawhud (copy 2)");
 }

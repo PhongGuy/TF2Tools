@@ -98,7 +98,7 @@ To add a language:
 4. Add a plural rule to `plural_form` in the same file only if the language counts differently from `one` for 1 and `other` for everything else.
 5. Run `cargo test -p tf2tools-app --lib i18n::` and `cargo test -p tf2tools-app --test i18n`, then open a PR.
 
-A system locale picks a language by its full tag first, then by its language alone: `pt_BR.UTF-8` and `pt-PT` both start TF2Tools in `pt-BR`, and `es_ES.UTF-8` and `es_MX` both start with `es`, so both start TF2Tools in Spanish.
+A system locale picks a language by its full tag first, then by its language alone: `pt_BR.UTF-8` and `pt-PT` both start TF2Tools in `pt-BR`, and `es_ES.UTF-8` and `es_MX` both start TF2Tools in `es`.
 
 Rules for the files:
 
