@@ -125,6 +125,11 @@ fn the_store_grid_fits_in_spanish(cx: &mut TestAppContext) {
 }
 
 #[gpui_kit::test]
+fn the_store_grid_fits_in_german(cx: &mut TestAppContext) {
+    store_grid_reads_in(cx, "de");
+}
+
+#[gpui_kit::test]
 fn an_empty_russian_store_says_it_could_not_load(cx: &mut TestAppContext) {
     let _guard = LocaleGuard::switch("ru");
     let env = support::env();
@@ -548,6 +553,11 @@ fn the_addon_store_fits_in_portuguese(cx: &mut TestAppContext) {
 #[gpui_kit::test]
 fn the_addon_store_fits_in_spanish(cx: &mut TestAppContext) {
     addon_store_reads_in(cx, "es");
+}
+
+#[gpui_kit::test]
+fn the_addon_store_fits_in_german(cx: &mut TestAppContext) {
+    addon_store_reads_in(cx, "de");
 }
 
 #[test]
