@@ -680,6 +680,11 @@ fn minmode_tip_fits_at_800_by_600(cx: &mut TestAppContext, lang: &str) {
         tip.left() >= px(0.) && tip.right() <= px(800.),
         "{lang}: the tooltip {tip:?} leaves the 800 px window"
     );
+    // One line of tooltip text with its margins is 52.5 px tall here; more means it wrapped.
+    assert!(
+        tip.size.height > px(53.),
+        "{lang}: the tooltip {tip:?} fits by clipping, not by wrapping"
+    );
 }
 
 #[gpui_kit::test]
