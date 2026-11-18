@@ -1,4 +1,5 @@
-//! The HUD Maker and the Crosshair Maker in Russian: core's labels, the pages and their dialogs.
+//! The HUD Maker and the Crosshair Maker in Russian, with the Portuguese fit checks: core's
+//! labels, the pages and their dialogs.
 
 use gpui_kit::{AppContext as _, ElementId, Entity, TestAppContext};
 use tf2tools_app::i18n::names::{
@@ -280,11 +281,10 @@ fn a_part_the_game_fills_says_so_in_russian(cx: &mut TestAppContext) {
     );
 }
 
-// The item colours sit two to a line; a Russian name too long for half the panel takes a line
+// The item colours sit two to a line; a name too long for half the panel takes a line
 // of its own rather than running into its neighbour's swatch or past the panel.
-#[gpui_kit::test]
-fn a_long_russian_item_colour_keeps_clear_of_its_neighbour(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+fn a_long_item_colour_keeps_clear_of_its_neighbour(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let files = [
         ("resource/clientscheme.res", Some(SCHEME)),
         ("scripts/hudlayout.res", Some(support::hud_stock::HUDLAYOUT)),
@@ -299,20 +299,33 @@ fn a_long_russian_item_colour_keeps_clear_of_its_neighbour(cx: &mut TestAppConte
             (spec.id(), swatch.expect("a swatch"), name.expect("a name"))
         })
         .collect::<Vec<_>>();
-    assert_eq!(items.len(), 16);
+    assert_eq!(items.len(), 16, "{lang}: the item colour rows");
     let body = support::bounds_of(cx, s.win, ids::HUD_MAKER_PANEL_BODY).unwrap();
     for (id, _, name) in &items {
         assert!(
             name.right() <= body.right(),
-            "{id} leaves the panel: {name:?} {body:?}"
+            "{lang}: {id} leaves the panel: {name:?} {body:?}"
         );
     }
     for pair in items.windows(2) {
         let ((id, swatch, name), (next, next_swatch, _)) = (&pair[0], &pair[1]);
         if next_swatch.top() == swatch.top() {
-            assert!(name.right() <= next_swatch.left(), "{id} runs into {next}");
+            assert!(
+                name.right() <= next_swatch.left(),
+                "{lang}: {id} runs into {next}"
+            );
         }
     }
+}
+
+#[gpui_kit::test]
+fn a_long_russian_item_colour_keeps_clear_of_its_neighbour(cx: &mut TestAppContext) {
+    a_long_item_colour_keeps_clear_of_its_neighbour(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn a_long_portuguese_item_colour_keeps_clear_of_its_neighbour(cx: &mut TestAppContext) {
+    a_long_item_colour_keeps_clear_of_its_neighbour(cx, "pt-BR");
 }
 
 fn missing() -> Tf2State {
@@ -419,14 +432,18 @@ fn the_crosshair_maker_reopened_after_a_switch_reads_russian(cx: &mut TestAppCon
     );
 }
 
-// The longest Russian button row of the confirms: all three buttons stay inside the dialog.
-#[gpui_kit::test]
-fn the_unsaved_changes_buttons_fit_their_dialog_in_russian(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+// The longest button row of the confirms: all three buttons stay inside the dialog.
+fn the_unsaved_changes_buttons_fit_their_dialog(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let (_env, s, page) = open_hud_maker(cx, &[]);
     let name = cx.update(|cx| page.read(cx).name_input().clone());
+    let draft = if lang == "ru" {
+        "Набросок"
+    } else {
+        "Rascunho"
+    };
     cx.update_window(s.win, |_, window, cx| {
-        name.update(cx, |st, cx| st.set_value("Набросок", window, cx))
+        name.update(cx, |st, cx| st.set_value(draft, window, cx))
     })
     .unwrap();
     cx.update(|cx| {
@@ -444,9 +461,19 @@ fn the_unsaved_changes_buttons_fit_their_dialog_in_russian(cx: &mut TestAppConte
         let button = support::bounds_of(cx, s.win, id).expect("a button");
         assert!(
             button.left() >= dialog.left() && button.right() <= dialog.right(),
-            "{id} leaves the dialog: {button:?} {dialog:?}"
+            "{lang}: {id} leaves the dialog: {button:?} {dialog:?}"
         );
     }
+}
+
+#[gpui_kit::test]
+fn the_unsaved_changes_buttons_fit_their_dialog_in_russian(cx: &mut TestAppContext) {
+    the_unsaved_changes_buttons_fit_their_dialog(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_unsaved_changes_buttons_fit_their_dialog_in_portuguese(cx: &mut TestAppContext) {
+    the_unsaved_changes_buttons_fit_their_dialog(cx, "pt-BR");
 }
 
 fn texts(c: &Confirm) -> [String; 4] {

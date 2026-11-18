@@ -34,6 +34,9 @@ mod logs;
 #[path = "i18n/messages.rs"]
 mod messages;
 
+#[path = "i18n/pt_br.rs"]
+mod pt_br;
+
 #[path = "i18n/settings.rs"]
 mod settings;
 

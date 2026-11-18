@@ -1,4 +1,5 @@
-//! The Activity Log page, the rows sync and downloads write, and the logs.tf page, in Russian.
+//! The Activity Log page, the rows sync and downloads write, and the logs.tf page, in Russian
+//! and Brazilian Portuguese.
 
 use gpui_kit::component::select::SelectItem as _;
 use gpui_kit::{AnyWindowHandle, AppContext as _, Entity, FontWeight, Pixels, TestAppContext, px};
@@ -66,49 +67,83 @@ fn assert_rows_fit(
     }
 }
 
-#[gpui_kit::test]
-fn the_logs_page_reads_in_russian(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+// The Activity Log page in `lang`: every filter option fits its Select, and the toolbar fits
+// at 800x600.
+fn logs_page_reads_and_fits(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let env = support::env();
     let s = support::shell_window(cx, &env, missing());
     let _page = open_logs(cx, &s);
-    assert_eq!(
-        support::label_of(cx, s.win, ids::LOGS_EMPTY).as_deref(),
-        Some("Записей нет")
-    );
-    assert_eq!(
-        shown_text(cx, s.win, ids::LOGS_CATEGORY).as_deref(),
-        Some("Все категории")
-    );
-    assert_eq!(
-        shown_text(cx, s.win, ids::LOGS_LEVEL).as_deref(),
-        Some("Все уровни")
-    );
+    if lang == "ru" {
+        assert_eq!(
+            support::label_of(cx, s.win, ids::LOGS_EMPTY).as_deref(),
+            Some("Записей нет"),
+            "empty list"
+        );
+        assert_eq!(
+            shown_text(cx, s.win, ids::LOGS_CATEGORY).as_deref(),
+            Some("Все категории"),
+            "category filter"
+        );
+        assert_eq!(
+            shown_text(cx, s.win, ids::LOGS_LEVEL).as_deref(),
+            Some("Все уровни"),
+            "level filter"
+        );
+    }
     let cats: Vec<String> = category_options()
         .iter()
         .map(|o| o.title().to_string())
         .collect();
-    assert_eq!(
-        cats,
-        [
-            "Все категории",
-            "HUD",
-            "Звуки",
-            "Прицелы",
-            "Магазин",
-            "Настройки",
-            "Система",
-            "Профили",
-            "Дополнения"
-        ]
-    );
+    if lang == "ru" {
+        assert_eq!(
+            cats,
+            [
+                "Все категории",
+                "HUD",
+                "Звуки",
+                "Прицелы",
+                "Магазин",
+                "Настройки",
+                "Система",
+                "Профили",
+                "Дополнения"
+            ],
+            "categories"
+        );
+    }
     let levels: Vec<String> = level_options()
         .iter()
         .map(|o| o.title().to_string())
         .collect();
-    assert_eq!(levels, ["Все уровни", "Инфо", "Внимание", "Ошибка"]);
+    if lang == "ru" {
+        assert_eq!(
+            levels,
+            ["Все уровни", "Инфо", "Внимание", "Ошибка"],
+            "levels"
+        );
+    }
     assert_rows_fit(cx, s.win, ids::LOGS_CATEGORY, &cats);
     assert_rows_fit(cx, s.win, ids::LOGS_LEVEL, &levels);
+    // At the smallest window the two filters still leave the Clear button on the page.
+    cx.simulate_window_resize(s.win, gpui_kit::size(px(800.), px(600.)));
+    support::settle(cx, s.win);
+    let page = support::bounds_of(cx, s.win, ids::page(Page::Logs)).unwrap();
+    let clear = support::bounds_of(cx, s.win, ids::LOGS_CLEAR).unwrap();
+    assert!(
+        clear.right() <= page.right(),
+        "{lang}: {clear:?} past {page:?}"
+    );
+}
+
+#[gpui_kit::test]
+fn the_logs_page_reads_in_russian(cx: &mut TestAppContext) {
+    logs_page_reads_and_fits(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_logs_page_fits_in_portuguese(cx: &mut TestAppContext) {
+    logs_page_reads_and_fits(cx, "pt-BR");
 }
 
 #[gpui_kit::test]
@@ -406,11 +441,15 @@ fn the_russian_class_table_keeps_its_english_ids(cx: &mut TestAppContext) {
     );
 }
 
-// An open log keeps its English ids in Russian, its words read Russian, and the team table's
-// Russian headers fit their columns at 800x600.
-#[gpui_kit::test]
-fn an_open_russian_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+// An open log keeps its English ids in `lang`, its words come from the catalogue, and the
+// team table's headers fit their columns at 800x600.
+fn open_log_keeps_its_ids_and_fits(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
+    let text = |key: &str| {
+        tf2tools_app::_rust_i18n_try_translate(lang, key)
+            .map(|t| t.into_owned())
+            .unwrap_or_else(|| panic!("{lang} has no {key}"))
+    };
     let env = support::env();
     let server = support::StoreServer::start();
     serve_two_logs(&server);
@@ -419,59 +458,98 @@ fn an_open_russian_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
     let page = open_page(cx, &s);
     open_log(cx, &s, &page, 3);
     // The players table's 40 px Team column takes the short team header.
-    for (id, russian) in [("Team", "Ком."), ("Name", "Имя"), ("K", "K")] {
-        assert_eq!(
-            support::label_of(cx, s.win, ids::logstf_sort(id)).as_deref(),
-            Some(russian),
-            "{id}"
-        );
+    for (id, russian, key) in [
+        ("Team", "Ком.", "logs_tf.detail.team_short"),
+        ("Name", "Имя", "logs_tf.column.name"),
+    ] {
+        let label = support::label_of(cx, s.win, ids::logstf_sort(id));
+        assert_eq!(label, Some(text(key)), "{lang} {id}");
+        if lang == "ru" {
+            assert_eq!(label.as_deref(), Some(russian), "{id}");
+        }
     }
     assert_eq!(
+        support::label_of(cx, s.win, ids::logstf_sort("K")).as_deref(),
+        Some("K"),
+        "K header"
+    );
+    assert_eq!(
         support::label_of(cx, s.win, ids::logstf_team_cell(Team::Blue, "Kills")).as_deref(),
-        Some("117")
+        Some("117"),
+        "Blue kills cell"
     );
     let headers = [
-        ("Kills", "Фраги"),
-        ("Damage", "Урон"),
-        ("Charges", "Заряды"),
-        ("Drops", "Потери"),
-        ("Caps", "Захв."),
-        ("Midfights", "Мидфайты"),
+        ("Kills", "Фраги", "logs_tf.detail.kills_short"),
+        ("Damage", "Урон", "logs_tf.weapons.damage"),
+        ("Charges", "Заряды", "logs_tf.detail.charges"),
+        ("Drops", "Потери", "logs_tf.detail.drops"),
+        ("Caps", "Захв.", "logs_tf.detail.caps"),
+        ("Midfights", "Мидфайты", "logs_tf.detail.midfights"),
     ];
-    for (column, russian) in headers {
+    for (column, russian, key) in headers {
+        let header = text(key);
+        if lang == "ru" {
+            assert_eq!(header, russian, "{column}");
+        }
         let cell =
             support::bounds_of(cx, s.win, ids::logstf_team_cell(Team::Red, column)).expect(column);
-        let w = text_width(cx, s.win, russian, 0.75, FontWeight::MEDIUM);
+        let w = text_width(cx, s.win, &header, 0.75, FontWeight::MEDIUM);
         assert!(
             w <= cell.size.width,
-            "{russian:?} is {w:?} in {:?}",
+            "{lang}: {header:?} is {w:?} in {:?}",
             cell.size.width
         );
     }
     // The Team column carries no id; its width is banner.rs's 40 px. The rounds table's
-    // Length header reads "Время" in its 52 px column.
-    assert!(text_width(cx, s.win, "Ком.", 0.75, FontWeight::MEDIUM) <= px(40.));
-    assert!(text_width(cx, s.win, "Время", 0.75, FontWeight::MEDIUM) <= px(52.));
+    // Length header sits in its 52 px column.
+    let team = text("logs_tf.detail.team_short");
+    let length = text("logs_tf.list.length");
+    if lang == "ru" {
+        assert_eq!(
+            (team.as_str(), length.as_str()),
+            ("Ком.", "Время"),
+            "short headers"
+        );
+    }
+    assert!(
+        text_width(cx, s.win, &team, 0.75, FontWeight::MEDIUM) <= px(40.),
+        "{lang}: {team:?}"
+    );
+    assert!(
+        text_width(cx, s.win, &length, 0.75, FontWeight::MEDIUM) <= px(52.),
+        "{lang}: {length:?}"
+    );
     let rahmed = sid(175_790_976);
     scroll_to_in_log(cx, &s, &page, 3, ids::logstf_medic(rahmed));
-    assert_eq!(
-        support::label_of(
-            cx,
-            s.win,
-            ids::logstf_medic_fact(rahmed, "Avg time to build")
-        )
-        .as_deref(),
-        Some("63\u{a0}с")
+    let build = support::label_of(
+        cx,
+        s.win,
+        ids::logstf_medic_fact(rahmed, "Avg time to build"),
     );
+    if lang == "ru" {
+        assert_eq!(build.as_deref(), Some("63\u{a0}с"), "medic fact");
+    } else {
+        assert!(build.is_some(), "{lang}: no medic fact");
+    }
     scroll_to_in_log(cx, &s, &page, 3, ids::LOGSTF_CHAT_TOGGLE);
-    assert_eq!(
-        support::label_of(cx, s.win, ids::LOGSTF_CHAT_TOGGLE).as_deref(),
-        Some("Показать чат")
-    );
-    assert_eq!(
-        support::label_of(cx, s.win, ids::logstf_download(3)).as_deref(),
-        Some("Скачать лог")
-    );
+    let chat = support::label_of(cx, s.win, ids::LOGSTF_CHAT_TOGGLE);
+    let download = support::label_of(cx, s.win, ids::logstf_download(3));
+    assert_eq!(chat, Some(text("logs_tf.detail.show_chat")), "{lang}");
+    assert_eq!(download, Some(text("logs_tf.detail.download")), "{lang}");
+    if lang == "ru" {
+        assert_eq!(chat.as_deref(), Some("Показать чат"), "chat toggle");
+        assert_eq!(download.as_deref(), Some("Скачать лог"), "download button");
+    }
+}
+
+#[gpui_kit::test]
+fn an_open_russian_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
+    open_log_keeps_its_ids_and_fits(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn an_open_portuguese_log_keeps_its_ids_and_fits(cx: &mut TestAppContext) {
+    open_log_keeps_its_ids_and_fits(cx, "pt-BR");
 }
 
 fn type_into_add(

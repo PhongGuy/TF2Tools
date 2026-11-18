@@ -51,9 +51,8 @@ fn assert_rows_fit(
     }
 }
 
-#[gpui_kit::test]
-fn the_store_grid_reads_in_russian(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+fn store_grid_reads_in(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let env = support::env();
     let config = StoreGridConfig::new(StoreKind::Crosshairs);
     let (win, grid) = support::store_grid_window(cx, &env, config, |env| {
@@ -62,18 +61,23 @@ fn the_store_grid_reads_in_russian(cx: &mut TestAppContext) {
     support::wait_real(cx, "the grid", |cx| {
         cx.update(|cx| grid.read(cx).is_loaded() && !grid.read(cx).is_loading())
     });
-    assert_eq!(
-        shown_text(cx, win, ids::STORE_SEARCH).as_deref(),
-        Some("Поиск прицелов...")
-    );
-    assert_eq!(
-        shown_text(cx, win, ids::STORE_SORT).as_deref(),
-        Some("Лайки")
-    );
-    assert_eq!(
-        support::label_of(cx, win, ids::STORE_SORT_LABEL).as_deref(),
-        Some("Сортировка:")
-    );
+    if lang == "ru" {
+        assert_eq!(
+            shown_text(cx, win, ids::STORE_SEARCH).as_deref(),
+            Some("Поиск прицелов..."),
+            "the Russian store search",
+        );
+        assert_eq!(
+            shown_text(cx, win, ids::STORE_SORT).as_deref(),
+            Some("Лайки"),
+            "the Russian store sort",
+        );
+        assert_eq!(
+            support::label_of(cx, win, ids::STORE_SORT_LABEL).as_deref(),
+            Some("Сортировка:"),
+            "the Russian store sort label",
+        );
+    }
     let rows: Vec<String> = [
         StoreSort::MostLiked,
         StoreSort::MostViewed,
@@ -81,7 +85,9 @@ fn the_store_grid_reads_in_russian(cx: &mut TestAppContext) {
     ]
     .map(|s| sort_label(s).to_string())
     .to_vec();
-    assert_eq!(rows, ["Лайки", "Просмотры", "Новые"]);
+    if lang == "ru" {
+        assert_eq!(rows, ["Лайки", "Просмотры", "Новые"], "the Russian rows");
+    }
     assert_rows_fit(cx, win, ids::STORE_SORT, &rows);
 
     cx.update(|cx| grid.update(cx, |g, cx| g.search_typed("zzzq".into(), cx)));
@@ -89,14 +95,28 @@ fn the_store_grid_reads_in_russian(cx: &mut TestAppContext) {
     support::wait_real(cx, "the search", |cx| {
         cx.update(|cx| grid.read(cx).shown() == Some(0) && !grid.read(cx).is_loading())
     });
-    assert_eq!(
-        support::label_of(cx, win, ids::STORE_EMPTY).as_deref(),
-        Some("Нет прицелов по этому запросу")
-    );
-    assert_eq!(
-        support::label_of(cx, win, ids::STORE_EMPTY_HINT).as_deref(),
-        Some("Попробуйте изменить запрос.")
-    );
+    if lang == "ru" {
+        assert_eq!(
+            support::label_of(cx, win, ids::STORE_EMPTY).as_deref(),
+            Some("Нет прицелов по этому запросу"),
+            "the Russian store empty",
+        );
+        assert_eq!(
+            support::label_of(cx, win, ids::STORE_EMPTY_HINT).as_deref(),
+            Some("Попробуйте изменить запрос."),
+            "the Russian store empty hint",
+        );
+    }
+}
+
+#[gpui_kit::test]
+fn the_store_grid_reads_in_russian(cx: &mut TestAppContext) {
+    store_grid_reads_in(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_store_grid_fits_in_portuguese(cx: &mut TestAppContext) {
+    store_grid_reads_in(cx, "pt-BR");
 }
 
 #[gpui_kit::test]
@@ -430,9 +450,8 @@ fn open_addon_tab(
     tab
 }
 
-#[gpui_kit::test]
-fn the_addon_store_reads_in_russian(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+fn addon_store_reads_in(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let (env, server) = (support::env(), support::StoreServer::start());
     // The only GUI is a HUD, which the GUIs tab leaves out, so the listing ends empty.
     server.mount_gb_index(
@@ -442,54 +461,83 @@ fn the_addon_store_reads_in_russian(cx: &mut TestAppContext) {
         support::gb_listing(vec![support::gb_addon(1, 1644, Some(1649))], true),
     );
     let w = addon_store(cx, &env, &server);
-    assert_eq!(
-        support::label_of(cx, w.win, ids::STORE_EMPTY).as_deref(),
-        Some("Не удалось загрузить дополнения")
-    );
-    assert_eq!(
-        support::label_of(cx, w.win, ids::STORE_REFRESH).as_deref(),
-        Some("Обновить")
-    );
-    assert_eq!(
-        support::label_of(cx, w.win, ids::addon_store_tab("mastercomfig")).as_deref(),
-        Some("mastercomfig")
-    );
-    assert_eq!(
-        support::label_of(cx, w.win, ids::addon_store_tab("skins")).as_deref(),
-        Some("Скины")
-    );
+    if lang == "ru" {
+        assert_eq!(
+            support::label_of(cx, w.win, ids::STORE_EMPTY).as_deref(),
+            Some("Не удалось загрузить дополнения"),
+            "the Russian store empty",
+        );
+        assert_eq!(
+            support::label_of(cx, w.win, ids::STORE_REFRESH).as_deref(),
+            Some("Обновить"),
+            "the Russian store refresh",
+        );
+        assert_eq!(
+            support::label_of(cx, w.win, ids::addon_store_tab("mastercomfig")).as_deref(),
+            Some("mastercomfig"),
+            "the Russian addon store tab mastercomfig",
+        );
+        assert_eq!(
+            support::label_of(cx, w.win, ids::addon_store_tab("skins")).as_deref(),
+            Some("Скины"),
+            "the Russian addon store tab skins",
+        );
+    }
 
     let _tab = open_addon_tab(cx, &w, "guis");
-    assert_eq!(
-        shown_text(cx, w.win, ids::ADDON_SEARCH).as_deref(),
-        Some("Поиск интерфейсов...")
-    );
-    assert_eq!(
-        shown_text(cx, w.win, ids::ADDON_SORT).as_deref(),
-        Some("Популярные")
-    );
-    assert_eq!(
-        shown_text(cx, w.win, ids::ADDON_CATEGORY).as_deref(),
-        Some("Все")
-    );
-    assert_eq!(
-        support::label_of(cx, w.win, ids::ADDON_SORT_LABEL).as_deref(),
-        Some("Сортировка:")
-    );
-    assert_eq!(
-        support::label_of(cx, w.win, ids::ADDON_EMPTY).as_deref(),
-        Some("Дополнения не найдены")
-    );
-    assert_eq!(
-        support::label_of(cx, w.win, ids::STORE_EMPTY_HINT).as_deref(),
-        Some("Попробуйте другую категорию.")
-    );
-    assert_rows_fit(
-        cx,
-        w.win,
-        ids::ADDON_SORT,
-        &["Популярные".into(), "Новые".into()],
-    );
+    if lang == "ru" {
+        assert_eq!(
+            shown_text(cx, w.win, ids::ADDON_SEARCH).as_deref(),
+            Some("Поиск интерфейсов..."),
+            "the Russian addon search",
+        );
+        assert_eq!(
+            shown_text(cx, w.win, ids::ADDON_SORT).as_deref(),
+            Some("Популярные"),
+            "the Russian addon sort",
+        );
+        assert_eq!(
+            shown_text(cx, w.win, ids::ADDON_CATEGORY).as_deref(),
+            Some("Все"),
+            "the Russian addon category",
+        );
+        assert_eq!(
+            support::label_of(cx, w.win, ids::ADDON_SORT_LABEL).as_deref(),
+            Some("Сортировка:"),
+            "the Russian addon sort label",
+        );
+        assert_eq!(
+            support::label_of(cx, w.win, ids::ADDON_EMPTY).as_deref(),
+            Some("Дополнения не найдены"),
+            "the Russian addon empty",
+        );
+        assert_eq!(
+            support::label_of(cx, w.win, ids::STORE_EMPTY_HINT).as_deref(),
+            Some("Попробуйте другую категорию."),
+            "the Russian store empty hint",
+        );
+    }
+    let rows: Vec<String> = ["most_downloaded", "newest"]
+        .map(|k| {
+            tf2tools_app::_rust_i18n_try_translate(lang, format!("addon_store.sort.{k}"))
+                .unwrap()
+                .into_owned()
+        })
+        .to_vec();
+    if lang == "ru" {
+        assert_eq!(rows, ["Популярные", "Новые"], "the Russian rows");
+    }
+    assert_rows_fit(cx, w.win, ids::ADDON_SORT, &rows);
+}
+
+#[gpui_kit::test]
+fn the_addon_store_reads_in_russian(cx: &mut TestAppContext) {
+    addon_store_reads_in(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_addon_store_fits_in_portuguese(cx: &mut TestAppContext) {
+    addon_store_reads_in(cx, "pt-BR");
 }
 
 #[test]

@@ -372,11 +372,10 @@ fn the_russian_hud_card_install_is_a_named_icon(cx: &mut TestAppContext) {
     assert!(icon_only(cx, s.win, install));
 }
 
-// At 800x600 a Russian library card keeps its action row inside the card and room for the
+// At 800x600 a library card in `lang` keeps its action row inside the card and room for the
 // HUD's name, and the search box shows its whole placeholder.
-#[gpui_kit::test]
-fn the_russian_hud_card_fits_at_800(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+fn hud_card_fits_at_800(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let archive = hud_zip(env.tmp.path(), "budhud");
@@ -395,13 +394,13 @@ fn the_russian_hud_card_fits_at_800(cx: &mut TestAppContext) {
         ids::hud_install("budhud"),
     ] {
         let b = support::bounds_of(cx, s.win, id.clone()).unwrap();
-        assert_inside(&format!("{id:?}"), b, card);
+        assert_inside(&format!("{lang} {id:?}"), b, card);
     }
     // The name starts after the card's 24 px padding and keeps 8 px before the badge group.
     let menu = support::bounds_of(cx, s.win, ids::hud_add_to_profile("budhud")).unwrap();
     let room = menu.left() - card.left() - gpui_kit::px(32.);
     let name = text_width(cx, s.win, "budhud", 1.0, gpui_kit::FontWeight::SEMIBOLD);
-    assert!(name <= room, "budhud needs {name:?}, has {room:?}");
+    assert!(name <= room, "{lang}: budhud needs {name:?}, has {room:?}");
     // The box's search icon and paddings take 44 px of its width.
     let placeholder = cx.update(|cx| {
         page.read(cx)
@@ -415,15 +414,24 @@ fn the_russian_hud_card_fits_at_800(cx: &mut TestAppContext) {
     let search = support::bounds_of(cx, s.win, ids::HUDS_SEARCH).unwrap();
     assert!(
         text + gpui_kit::px(44.) <= search.size.width,
-        "{placeholder} needs {text:?} in {search:?}"
+        "{lang}: {placeholder} needs {text:?} in {search:?}"
     );
 }
 
-// At 800x600 a Russian profile card keeps Activate, Edit and Delete inside the card, and
-// Activate, icon-only there, keeps its name.
 #[gpui_kit::test]
-fn the_russian_profile_card_fits_at_800(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+fn the_russian_hud_card_fits_at_800(cx: &mut TestAppContext) {
+    hud_card_fits_at_800(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_hud_card_fits_at_800(cx: &mut TestAppContext) {
+    hud_card_fits_at_800(cx, "pt-BR");
+}
+
+// At 800x600 a profile card in `lang` keeps Activate, Edit and Delete inside the card, and
+// Activate, icon-only there, keeps its name.
+fn profile_card_fits_at_800(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = s
@@ -441,12 +449,25 @@ fn the_russian_profile_card_fits_at_800(cx: &mut TestAppContext) {
         ids::profile_delete(id),
     ] {
         let b = support::bounds_of(cx, s.win, button.clone()).unwrap();
-        assert_inside(&format!("{button:?}"), b, card);
+        assert_inside(&format!("{lang} {button:?}"), b, card);
     }
-    assert_eq!(
-        support::label_of(cx, s.win, ids::profile_activate(id)).as_deref(),
-        Some("Включить")
-    );
+    if lang == "ru" {
+        assert_eq!(
+            support::label_of(cx, s.win, ids::profile_activate(id)).as_deref(),
+            Some("Включить"),
+            "Activate keeps its name"
+        );
+    }
+}
+
+#[gpui_kit::test]
+fn the_russian_profile_card_fits_at_800(cx: &mut TestAppContext) {
+    profile_card_fits_at_800(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_profile_card_fits_at_800(cx: &mut TestAppContext) {
+    profile_card_fits_at_800(cx, "pt-BR");
 }
 
 // The Missing Items dialog calls a local import "Свой", as the HUD card's badge does.
@@ -475,11 +496,10 @@ fn a_missing_local_item_reads_as_the_badge_does(cx: &mut TestAppContext) {
     );
 }
 
-// At 800x600 both Russian sound slots keep their status badge inside the card, apart from
+// At 800x600 both sound slots in `lang` keep their status badge inside the card, apart from
 // the slot's title.
-#[gpui_kit::test]
-fn the_russian_sound_slots_fit_at_800(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+fn sound_slots_fit_at_800(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let dir = env.game.join("tf/custom/tf2tools-sounds/sound/ui");
@@ -496,15 +516,25 @@ fn the_russian_sound_slots_fit_at_800(cx: &mut TestAppContext) {
             gpui_kit::point(card.left() + gpui_kit::px(24.), card.top()),
             gpui_kit::point(card.right() - gpui_kit::px(24.), card.bottom()),
         );
-        assert_inside(&format!("{kind:?} badge"), badge, inner);
+        assert_inside(&format!("{lang} {kind:?} badge"), badge, inner);
         // Icon (16) and its 8 px gap, then the title, then at least 4 px before the badge.
         let title = names::sound_kind_name(kind).to_string();
         let title_w = text_width(cx, s.win, &title, 1.0, gpui_kit::FontWeight::SEMIBOLD);
         assert!(
             inner.left() + gpui_kit::px(24.) + title_w + gpui_kit::px(4.) <= badge.left(),
-            "{title} {title_w:?} touches the badge {badge:?}"
+            "{lang}: {title} {title_w:?} touches the badge {badge:?}"
         );
     }
+}
+
+#[gpui_kit::test]
+fn the_russian_sound_slots_fit_at_800(cx: &mut TestAppContext) {
+    sound_slots_fit_at_800(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_sound_slots_fit_at_800(cx: &mut TestAppContext) {
+    sound_slots_fit_at_800(cx, "pt-BR");
 }
 
 // At 800x600 a library sound card keeps play, delete, Hit and Kill inside the card in
@@ -555,6 +585,13 @@ fn the_russian_sound_card_fits_at_800(cx: &mut TestAppContext) {
     assert_sound_card_fits_at_800(cx, "ru", "Хит", "Кил");
 }
 
+#[gpui_kit::test]
+fn the_portuguese_sound_card_fits_at_800(cx: &mut TestAppContext) {
+    let label = |key: &str| tf2tools_app::_rust_i18n_try_translate("pt-BR", key).unwrap();
+    let (hit, kill) = (label("sounds.button.hit"), label("sounds.button.kill"));
+    assert_sound_card_fits_at_800(cx, "pt-BR", &hit, &kill);
+}
+
 // Where the card has room, at 1280x800, Hit and Kill keep their visible labels.
 #[gpui_kit::test]
 fn a_wide_sound_card_keeps_its_hit_and_kill_labels(cx: &mut TestAppContext) {
@@ -586,10 +623,9 @@ fn a_wide_sound_card_keeps_its_hit_and_kill_labels(cx: &mut TestAppContext) {
     }
 }
 
-// The Russian "no maps yet" line wraps inside the Maps column at 800x600.
-#[gpui_kit::test]
-fn the_russian_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+// The translated "no maps yet" line wraps inside the Maps column at 800x600.
+fn maps_empty_line_fits_at_800(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let env = support::env();
     let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
     resize_800(cx, &s);
@@ -605,7 +641,17 @@ fn the_russian_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
         gpui_kit::point(shell.right() - (tabs.left() - shell.left()), shell.bottom()),
     );
     let empty = support::bounds_of(cx, s.win, ids::MAPS_EMPTY).unwrap();
-    assert_inside("maps-empty", empty, column);
+    assert_inside(&format!("{lang} maps-empty"), empty, column);
+}
+
+#[gpui_kit::test]
+fn the_russian_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
+    maps_empty_line_fits_at_800(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_maps_empty_line_fits_at_800(cx: &mut TestAppContext) {
+    maps_empty_line_fits_at_800(cx, "pt-BR");
 }
 
 #[test]
@@ -759,11 +805,10 @@ fn the_profiles_page_reads_in_russian(cx: &mut TestAppContext) {
     toast_is(cx, &s, "Профиль удалён");
 }
 
-// At the 800x600 minimum the editor's Crosshairs picker keeps every Russian bulk button inside
-// it, for the class with the longest Russian name too.
-#[gpui_kit::test]
-fn the_russian_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
-    let _guard = LocaleGuard::switch("ru");
+// At the 800x600 minimum the editor's Crosshairs picker keeps every bulk button in `lang`
+// inside it, for the class with the longest class name in `lang` too.
+fn bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext, lang: &str) {
+    let _guard = LocaleGuard::switch(lang);
     let env = support::env();
     let s = support::shell_window(cx, &env, found(&env));
     let comp = s
@@ -787,7 +832,11 @@ fn the_russian_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
         gpui_kit::size(gpui_kit::px(800.), gpui_kit::px(600.)),
     );
     support::settle(cx, s.win);
-    for class in [TfClass::Scout, TfClass::Heavy] {
+    let longest = TfClass::ALL
+        .into_iter()
+        .max_by_key(|c| names::class_name(*c).chars().count())
+        .unwrap();
+    for class in [TfClass::Scout, longest] {
         support::click_id(cx, s.win, ids::class_tab(&class.name().to_lowercase()));
         support::settle(cx, s.win);
         let picker = support::bounds_of(cx, s.win, ids::profile_picker("crosshairs")).unwrap();
@@ -800,10 +849,20 @@ fn the_russian_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
             let b = support::bounds_of(cx, s.win, bulk).unwrap();
             assert!(
                 b.left() >= picker.left() && b.right() <= picker.right(),
-                "{class:?}: {bulk} {b:?} runs past the picker {picker:?}"
+                "{lang} {class:?}: {bulk} {b:?} runs past the picker {picker:?}"
             );
         }
     }
+}
+
+#[gpui_kit::test]
+fn the_russian_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
+    bulk_buttons_fit_the_narrow_picker(cx, "ru");
+}
+
+#[gpui_kit::test]
+fn the_portuguese_bulk_buttons_fit_the_narrow_picker(cx: &mut TestAppContext) {
+    bulk_buttons_fit_the_narrow_picker(cx, "pt-BR");
 }
 
 #[test]
