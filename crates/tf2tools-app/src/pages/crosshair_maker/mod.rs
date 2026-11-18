@@ -35,6 +35,7 @@ use tf2tools_core::{
 
 use crate::activity;
 use crate::assets::BACKGROUNDS;
+use crate::crosshair_sync::CrosshairSync;
 use crate::i18n::tr;
 use crate::ids;
 use crate::keymap::{
@@ -723,13 +724,16 @@ impl CrosshairMakerPage {
                         page.name_error = None;
                         cx.notify();
                     });
-                    cx.update(LibraryEvents::changed);
-                    let description = if assigned {
-                        tr!("crosshair_maker.install_to_update")
-                    } else {
-                        SharedString::default()
-                    };
-                    Ok(description)
+                    // A crosshair already on a weapon goes into TF2 the way a board change
+                    // does, through the one apply queue, so no Install step is left to name.
+                    cx.update(|cx| {
+                        LibraryEvents::changed(cx);
+                        if assigned {
+                            CrosshairSync::get_or_install(win, cx)
+                                .update(cx, |sync, cx| sync.request(cx));
+                        }
+                    });
+                    Ok(SharedString::default())
                 }
                 Ok(Saved::NameTaken(taken)) => {
                     let _ = page.update(cx, |page, cx| {
@@ -1668,7 +1672,7 @@ fn save_job(
         tr!("crosshair_maker.activity.saved", name = entry.name()).to_string(),
     );
     activity::write(s, &row);
-    // A failed read only loses the reminder to install; the save itself landed.
+    // A failed read only skips the apply into TF2; the save itself landed.
     let assigned = open.is_some()
         && s.library.assignments().is_ok_and(|rows| {
             let ours = CrosshairRef::Library(entry.id().clone());
