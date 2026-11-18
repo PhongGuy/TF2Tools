@@ -154,10 +154,10 @@ pub(super) fn panel(
                 let _ = page.update(cx, |page, cx| page.retry(id, cx));
             };
             let retry = ids::logstf_log_retry(id);
-            error_line(ids::logstf_log_status(id), retry, why.clone(), on_retry, cx)
+            error_line(ids::logstf_log_status(id), retry, why.text(), on_retry, cx)
                 .into_any_element()
         }
-        OpenState::Failed(why) => status(why.clone()),
+        OpenState::Failed(why) => status(why.text()),
     };
     v_flex()
         .id(ids::logstf_log_panel(row.id()))

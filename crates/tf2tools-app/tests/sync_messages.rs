@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use tf2tools_app::i18n::Phrase;
 use tf2tools_app::sync_messages::{SyncFailure, describe_sync, sync_stopped};
 use tf2tools_core::{ArchiveError, StoreKind, SyncError};
 
@@ -118,7 +119,7 @@ fn sync_errors_read_as_player_advice() {
         let raw = err.to_string();
         assert_eq!(
             describe_sync(kind, &err),
-            SyncFailure::new(want, raw),
+            SyncFailure::new(Phrase::new(move || want.into()), raw),
             "{kind:?} {err:?}"
         );
     }
@@ -128,9 +129,14 @@ fn sync_errors_read_as_player_advice() {
 fn no_message_carries_a_url_status_or_error_text() {
     let mut messages: Vec<String> = cases()
         .iter()
-        .map(|(k, e, _)| describe_sync(*k, e).message)
+        .map(|(k, e, _)| describe_sync(*k, e).message.text().to_string())
         .collect();
-    messages.push(sync_stopped("the sync stopped: task 7 panicked".to_owned()).message);
+    messages.push(
+        sync_stopped("the sync stopped: task 7 panicked".to_owned())
+            .message
+            .text()
+            .to_string(),
+    );
     for message in messages {
         let lower = message.to_lowercase();
         for banned in [
@@ -152,7 +158,10 @@ fn no_message_carries_a_url_status_or_error_text() {
 fn a_stopped_sync_keeps_its_detail() {
     assert_eq!(
         sync_stopped("the sync stopped: task 7 panicked".to_owned()),
-        SyncFailure::new(STOPPED, "the sync stopped: task 7 panicked")
+        SyncFailure::new(
+            Phrase::new(|| STOPPED.into()),
+            "the sync stopped: task 7 panicked"
+        )
     );
 }
 
@@ -167,7 +176,7 @@ fn a_throttled_sync_says_gamebanana_is_busy() {
         assert_eq!(
             describe_sync(kind, &err),
             SyncFailure::new(
-                "GameBanana is busy, try again in a minute.",
+                Phrase::new(|| "GameBanana is busy, try again in a minute.".into()),
                 err.to_string()
             ),
             "{kind:?}"

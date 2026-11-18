@@ -1620,3 +1620,9 @@ install_parts:
   addon: "%{name} has several parts. Pick the ones to install."
   maps: "%{name} holds several maps. Pick the ones to install."
   maps_skipped: "%{name} holds several maps. Pick the ones to install. Some extra files in this download were skipped."
+
+graphics:
+  settings_note:
+    loading: "Loading the settings list..."
+    offline: "The settings list needs an internet connection the first time. Connect, then open this page again."
+    unsupported: "This mastercomfig version isn't supported yet. The presets above still work."

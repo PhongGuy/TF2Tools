@@ -8,7 +8,7 @@ use tf2tools_core::{
     SteamId, Team, TfClass,
 };
 
-use crate::i18n::{counted_plural, format, names, tr};
+use crate::i18n::{Phrase, counted_plural, format, names, tr};
 use crate::logs_sync::SyncProgress;
 
 /// logs.tf's front page, which the page's credit opens.
@@ -51,21 +51,31 @@ pub fn profile_url(id: SteamId) -> String {
 
 /// The add dialog's message for a failed lookup.
 pub fn resolve_message(error: &ResolveError) -> SharedString {
+    resolve_phrase(error).text()
+}
+
+/// `resolve_message` as a phrase, worded each time it is read.
+pub fn resolve_phrase(error: &ResolveError) -> Phrase {
     match error {
-        ResolveError::NotFound => tr!("logs_tf.not_found"),
+        ResolveError::NotFound => Phrase::new(|| tr!("logs_tf.not_found")),
         ResolveError::RateLimited { .. }
         | ResolveError::Http { .. }
         | ResolveError::Network { .. }
         | ResolveError::TooLarge { .. }
         | ResolveError::Malformed { .. }
-        | _ => steam_unreachable(),
+        | _ => Phrase::new(steam_unreachable),
     }
 }
 
 /// The add dialog's message for text that names no Steam player.
 pub fn player_input_error(error: &PlayerInputError) -> SharedString {
+    player_input_phrase(error).text()
+}
+
+/// `player_input_error` as a phrase, worded each time it is read.
+pub fn player_input_phrase(error: &PlayerInputError) -> Phrase {
     match error {
-        PlayerInputError::NotSteam | _ => tr!("logs_tf.not_steam"),
+        PlayerInputError::NotSteam | _ => Phrase::new(|| tr!("logs_tf.not_steam")),
     }
 }
 
@@ -135,14 +145,26 @@ pub fn progress_line(progress: SyncProgress) -> String {
 /// to fall back on. A player removed while their sync waited is no failure, so the page never
 /// asks for it.
 pub fn sync_message(error: &LogsSyncError, has_saved: bool) -> SharedString {
+    sync_message_phrase(error, has_saved).text()
+}
+
+/// `sync_message` as a phrase, worded each time it is read.
+pub fn sync_message_phrase(error: &LogsSyncError, has_saved: bool) -> Phrase {
     match error {
-        LogsSyncError::Network { .. } if has_saved => tr!("logs_tf.sync.offline_saved"),
-        LogsSyncError::Network { .. } => tr!("logs_tf.sync.unreachable"),
-        LogsSyncError::RateLimited { .. } => logs_tf_busy(),
-        LogsSyncError::Malformed { .. } => tr!("logs_tf.sync.malformed"),
-        LogsSyncError::Database { .. } => save_failed(),
-        LogsSyncError::Http { .. } | LogsSyncError::TooLarge { .. } | _ => logs_tf_down(),
+        LogsSyncError::Network { .. } if has_saved => {
+            Phrase::new(|| tr!("logs_tf.sync.offline_saved"))
+        }
+        LogsSyncError::Network { .. } => Phrase::new(|| tr!("logs_tf.sync.unreachable")),
+        LogsSyncError::RateLimited { .. } => Phrase::new(logs_tf_busy),
+        LogsSyncError::Malformed { .. } => Phrase::new(|| tr!("logs_tf.sync.malformed")),
+        LogsSyncError::Database { .. } => Phrase::new(save_failed),
+        LogsSyncError::Http { .. } | LogsSyncError::TooLarge { .. } | _ => logs_tf_down_phrase(),
     }
+}
+
+/// `logs_tf_down` as a phrase, worded each time it is read.
+pub fn logs_tf_down_phrase() -> Phrase {
+    Phrase::new(logs_tf_down)
 }
 
 /// The toast title once a log's zip is saved; its description names the file.
@@ -199,13 +221,18 @@ pub fn trimmed_offline() -> SharedString {
 /// The open panel's line for a failed fetch; None when the row's own note says it (gone,
 /// unreadable, too large).
 pub fn fetch_message(error: &LogsFetchError) -> Option<SharedString> {
+    fetch_phrase(error).map(|phrase| phrase.text())
+}
+
+/// `fetch_message` as a phrase, worded each time it is read.
+pub fn fetch_phrase(error: &LogsFetchError) -> Option<Phrase> {
     match error {
-        LogsFetchError::Network { .. } => Some(log_offline()),
-        LogsFetchError::RateLimited { .. } => Some(logs_tf_busy()),
-        LogsFetchError::Cache { .. } => Some(save_failed()),
-        LogsFetchError::FullLogGone => Some(full_log_gone()),
+        LogsFetchError::Network { .. } => Some(Phrase::new(log_offline)),
+        LogsFetchError::RateLimited { .. } => Some(Phrase::new(logs_tf_busy)),
+        LogsFetchError::Cache { .. } => Some(Phrase::new(save_failed)),
+        LogsFetchError::FullLogGone => Some(Phrase::new(full_log_gone)),
         LogsFetchError::Gone | LogsFetchError::Unreadable | LogsFetchError::TooLarge { .. } => None,
-        LogsFetchError::Http { .. } | _ => Some(logs_tf_down()),
+        LogsFetchError::Http { .. } | _ => Some(logs_tf_down_phrase()),
     }
 }
 

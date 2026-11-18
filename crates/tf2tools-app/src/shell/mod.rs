@@ -148,7 +148,7 @@ impl Shell {
                             cx,
                             ToastKind::Error,
                             sync_failed_title(*kind),
-                            failure.message.clone(),
+                            failure.message.text(),
                         );
                     }
                 }),
@@ -169,7 +169,7 @@ impl Shell {
                         cx,
                         ToastKind::Error,
                         failure_title(),
-                        failure.message.clone(),
+                        failure.message.text(),
                     );
                 }),
             ]

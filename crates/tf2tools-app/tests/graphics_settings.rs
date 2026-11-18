@@ -105,7 +105,7 @@ fn offline_the_list_says_it_needs_the_internet_once(cx: &mut TestAppContext) {
     let page = open(cx, &s);
     let offline = settings_note_text(SettingsNote::Offline);
     support::wait_real(cx, "the offline note", |cx| {
-        note(cx, &s).as_deref() == Some(offline)
+        note(cx, &s).as_deref() == Some(offline.as_ref())
     });
     assert!(cx.update(|cx| page.read(cx).catalog().is_none()));
     assert!(
@@ -124,7 +124,7 @@ fn an_offline_note_asks_again_on_the_next_visit(cx: &mut TestAppContext) {
     let _page = open(cx, &s);
     let offline = settings_note_text(SettingsNote::Offline);
     support::wait_real(cx, "the offline note", |cx| {
-        note(cx, &s).as_deref() == Some(offline)
+        note(cx, &s).as_deref() == Some(offline.as_ref())
     });
     server.reset();
     server.mount_mastercomfig_catalog("9.100.1");
@@ -177,7 +177,7 @@ fn a_catalog_it_cannot_read_says_the_version_is_not_supported(cx: &mut TestAppCo
     let _page = open(cx, &s);
     let unsupported = settings_note_text(SettingsNote::Unsupported);
     support::wait_real(cx, "the unsupported note", |cx| {
-        note(cx, &s).as_deref() == Some(unsupported)
+        note(cx, &s).as_deref() == Some(unsupported.as_ref())
     });
     assert!(support::present(
         cx,

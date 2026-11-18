@@ -4,7 +4,7 @@
 use gpui_kit::SharedString;
 use tf2tools_core::{StoreKind, SyncError};
 
-use crate::i18n::tr;
+use crate::i18n::{Phrase, tr};
 
 // Only GameBanana calls are paced, so a throttled call always names GameBanana.
 pub(crate) fn throttled() -> SharedString {
@@ -14,15 +14,15 @@ pub(crate) fn throttled() -> SharedString {
 /// What the player reads about a failed sync, and the raw error for the developer log.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyncFailure {
-    pub message: String,
+    pub message: Phrase,
     pub detail: String,
 }
 
 impl SyncFailure {
-    /// A failure with its player message and its raw developer detail.
-    pub fn new(message: impl Into<String>, detail: impl Into<String>) -> Self {
+    /// A failure with its player message, worded when read, and its raw developer detail.
+    pub fn new(message: Phrase, detail: impl Into<String>) -> Self {
         Self {
-            message: message.into(),
+            message,
             detail: detail.into(),
         }
     }
@@ -30,22 +30,29 @@ impl SyncFailure {
 
 /// A failed sync of `kind` in player words; `detail` is the error's own text.
 pub fn describe_sync(kind: StoreKind, err: &SyncError) -> SyncFailure {
+    // Classify now and word later: the phrase keeps only the source name, never the error.
     let source = source_name(kind);
     let message = match err {
-        SyncError::Network { .. } => tr!("messages.shared.source_unreachable", source = source),
-        SyncError::RateLimited { .. } => tr!("messages.shared.source_busy", source = source),
+        SyncError::Network { .. } => {
+            Phrase::new(move || tr!("messages.shared.source_unreachable", source = source))
+        }
+        SyncError::RateLimited { .. } => {
+            Phrase::new(move || tr!("messages.shared.source_busy", source = source))
+        }
         SyncError::Http { status, .. } if *status >= 500 => {
-            tr!("messages.shared.source_down", source = source)
+            Phrase::new(move || tr!("messages.shared.source_down", source = source))
         }
         SyncError::Http { .. }
         | SyncError::Malformed { .. }
         | SyncError::TooLarge { .. }
-        | SyncError::Archive(_) => tr!("messages.shared.source_unreadable", source = source),
-        SyncError::Io { .. } => tr!("messages.sync.disk"),
-        SyncError::Database { .. } => tr!("messages.sync.database"),
-        SyncError::Interrupted { .. } => tr!("messages.sync.stopped"),
-        SyncError::Throttled { .. } => throttled(),
-        _ => tr!("messages.sync.unknown"),
+        | SyncError::Archive(_) => {
+            Phrase::new(move || tr!("messages.shared.source_unreadable", source = source))
+        }
+        SyncError::Io { .. } => Phrase::new(|| tr!("messages.sync.disk")),
+        SyncError::Database { .. } => Phrase::new(|| tr!("messages.sync.database")),
+        SyncError::Interrupted { .. } => Phrase::new(|| tr!("messages.sync.stopped")),
+        SyncError::Throttled { .. } => Phrase::new(throttled),
+        _ => Phrase::new(|| tr!("messages.sync.unknown")),
     };
     SyncFailure::new(message, err.to_string())
 }
@@ -64,7 +71,7 @@ pub fn sync_failed_title(kind: StoreKind) -> SharedString {
 
 /// A sync whose task ended without an outcome, keeping `detail` for the log.
 pub fn sync_stopped(detail: String) -> SyncFailure {
-    SyncFailure::new(tr!("messages.sync.stopped"), detail)
+    SyncFailure::new(Phrase::new(|| tr!("messages.sync.stopped")), detail)
 }
 
 // Add-ons, maps and previews outside the sync stores always come from GameBanana.

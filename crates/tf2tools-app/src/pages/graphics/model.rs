@@ -306,16 +306,12 @@ pub enum SettingsNote {
     Unsupported,
 }
 
-/// The note's sentence.
-pub fn settings_note_text(note: SettingsNote) -> &'static str {
+/// The note's sentence, worded in the current language.
+pub fn settings_note_text(note: SettingsNote) -> SharedString {
     match note {
-        SettingsNote::Loading => "Loading the settings list...",
-        SettingsNote::Offline => {
-            "The settings list needs an internet connection the first time. Connect, then open this page again."
-        }
-        SettingsNote::Unsupported => {
-            "This mastercomfig version isn't supported yet. The presets above still work."
-        }
+        SettingsNote::Loading => tr!("graphics.settings_note.loading"),
+        SettingsNote::Offline => tr!("graphics.settings_note.offline"),
+        SettingsNote::Unsupported => tr!("graphics.settings_note.unsupported"),
     }
 }
 

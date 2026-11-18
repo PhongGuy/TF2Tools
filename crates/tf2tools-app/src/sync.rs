@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::task::Poll;
 use std::time::Duration;
 
-use gpui_kit::{App, AppContext, Context, Entity, EventEmitter, Global, Task};
+use gpui_kit::{App, AppContext, Context, Entity, EventEmitter, Global, SharedString, Task};
 use tf2tools_core::{StoreClient, StoreKind};
 
 use crate::sync_messages::{SyncFailure, describe_sync, sync_stopped};
@@ -173,12 +173,10 @@ impl SyncHub {
     }
 
     /// The player message to show: a failed kind's, or the one a running retry replaced.
-    pub fn failure(&self, kind: StoreKind) -> Option<&str> {
+    pub fn failure(&self, kind: StoreKind) -> Option<SharedString> {
         match self.state(kind) {
-            SyncState::Failed { error } => Some(&error.message),
-            SyncState::Running { last_error, .. } => {
-                last_error.as_ref().map(|e| e.message.as_str())
-            }
+            SyncState::Failed { error } => Some(error.message.text()),
+            SyncState::Running { last_error, .. } => last_error.as_ref().map(|e| e.message.text()),
             SyncState::Idle { .. } => None,
         }
     }

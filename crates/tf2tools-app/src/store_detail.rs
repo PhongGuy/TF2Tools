@@ -16,7 +16,7 @@ use gpui_kit::{
 };
 use tf2tools_core::{StoreFile, StoreItem, StoreItemId, StoreKind};
 
-use crate::i18n::tr;
+use crate::i18n::{Phrase, tr};
 use crate::ids;
 use crate::local_messages::describe_store_status;
 use crate::pages::common::badge_of;
@@ -25,7 +25,10 @@ use crate::shell::toast::{ToastKind, toast};
 use crate::store_download::{
     DownloadEvent, DownloadTarget, StoreDownloads, format_bytes, progress_label, progress_percent,
 };
-use crate::store_messages::{describe_files, details_failed_title, listing_stopped, read_failed};
+use crate::store_messages::{
+    describe_files, details_failed_title, files_phrase, listing_stopped, listing_stopped_phrase,
+    read_failed,
+};
 use crate::tokio_bridge;
 use crate::widgets::carousel::Carousel;
 use crate::widgets::detail_header::detail_header;
@@ -109,7 +112,8 @@ impl DetailBody {
 pub enum FilesState {
     Loading,
     Ready(Vec<StoreFile>),
-    Failed(String),
+    /// The failure, worded in the current language each time it is drawn.
+    Failed(Phrase),
 }
 
 /// The dialog's view: it reads the cached store row and lists the files on open.
@@ -258,24 +262,25 @@ impl StoreDetail {
         let (kind, id) = (self.item.kind, self.item.id.clone());
         let job = tokio_bridge::spawn(cx, async move { store.item_files(kind, &id).await });
         self.files_task = Some(cx.spawn(async move |this, cx| {
-            // The player reads the plain message; the raw error only reaches the developer log.
+            // The raw error reaches the developer log now; the player's line is worded when drawn.
             let result = match job.await {
                 Ok(Ok(files)) => Ok(files),
-                Ok(Err(err)) => Err(describe_files(kind, &err)),
-                Err(_) => Err(listing_stopped(
-                    "the file listing task stopped unexpectedly".to_owned(),
-                )),
-            }
-            .map_err(|failure| {
-                failure.log("store file listing");
-                failure.message
-            });
+                Ok(Err(err)) => {
+                    describe_files(kind, &err).log("store file listing");
+                    Err(files_phrase(kind, &err))
+                }
+                Err(_) => {
+                    listing_stopped("the file listing task stopped unexpectedly".to_owned())
+                        .log("store file listing");
+                    Err(listing_stopped_phrase())
+                }
+            };
             let _ = this.update(cx, |d, cx| d.files_loaded(result, cx));
         }));
         cx.notify();
     }
 
-    fn files_loaded(&mut self, result: Result<Vec<StoreFile>, String>, cx: &mut Context<Self>) {
+    fn files_loaded(&mut self, result: Result<Vec<StoreFile>, Phrase>, cx: &mut Context<Self>) {
         self.files_task = None;
         // A failure shows only inline with Retry: a toast would repeat it, or speak for a closed dialog.
         self.files = match result {
@@ -362,7 +367,7 @@ impl StoreDetail {
                 .child(labelled(
                     div().text_sm().text_color(cx.theme().danger),
                     ids::STORE_FILES_ERROR,
-                    message.clone(),
+                    message.text(),
                 ))
                 .child(
                     Button::new(ids::STORE_FILES_RETRY)

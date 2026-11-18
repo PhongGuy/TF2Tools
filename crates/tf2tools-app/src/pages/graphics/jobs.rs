@@ -266,6 +266,6 @@ async fn force_sync(store: &StoreClient, action: &SharedString) -> Result<(), Op
         .map(|_| ())
         .map_err(|e| {
             let failure = describe_sync(StoreKind::Addons, &e);
-            LocalFailure::new(failure.message, failure.detail).into_op(action.clone())
+            LocalFailure::new(failure.message.text(), failure.detail).into_op(action.clone())
         })
 }

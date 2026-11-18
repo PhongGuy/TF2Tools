@@ -88,7 +88,7 @@ fn with_no_rows_a_failed_sync_shows_its_message_and_retry_starts_another(cx: &mu
     });
     assert_eq!(
         support::label_of(cx, s.win, ids::MAPS_GB_ERROR),
-        Some(support::offline_failure().message)
+        Some(support::offline_failure().message.text().to_string())
     );
     support::click_id(cx, s.win, ids::MAPS_GB_RETRY);
     cx.run_until_parked();

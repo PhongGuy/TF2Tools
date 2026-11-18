@@ -11,7 +11,8 @@ use tf2tools_app::pages::settings::{SettingsPage, format_hours, format_synced};
 use tf2tools_app::picker::ScriptedPicker;
 use tf2tools_app::services::Tf2State;
 use tf2tools_app::shell::route::Page;
-use tf2tools_core::Volume;
+use tf2tools_app::sync_messages::describe_sync;
+use tf2tools_core::{StoreKind, SyncError, Volume};
 
 use crate::LocaleGuard;
 use crate::support::{self, ShellWindow};
@@ -414,4 +415,40 @@ fn the_settings_cards_fit_at_800_by_600_in_english_and_russian(cx: &mut TestAppC
     assert_settings_fit(cx, s.win, "en");
     pick(cx, s.win, "ru");
     assert_settings_fit(cx, s.win, "ru");
+}
+
+// The hub keeps a failed sync for its card, so the Stores card must word it when drawn and take a
+// language picked on the same page.
+#[gpui_kit::test]
+fn a_store_sync_failure_follows_a_language_switch(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::hold();
+    let env = support::env();
+    let (hub, runs) = support::fake_hub(cx);
+    let s = support::shell_window(cx, &env, Tf2State::Missing { saved: None });
+    open_settings(cx, &s);
+    assert!(cx.update(|cx| hub.update(cx, |h, cx| h.start(StoreKind::Sounds, false, cx))));
+    let offline = SyncError::Network {
+        url: "https://gamebanana.com/apiv11".into(),
+        message: "connection refused".into(),
+    };
+    runs.try_recv()
+        .unwrap()
+        .finish(Err(describe_sync(StoreKind::Sounds, &offline)));
+    let status = |cx: &mut TestAppContext| {
+        support::label_of(cx, s.win, ids::settings_sync(StoreKind::Sounds)).unwrap_or_default()
+    };
+    support::wait_hub(cx, "the failure on the card", |cx| {
+        status(cx).ends_with(
+            ". Sync failed: Couldn't reach GameBanana. Check your internet connection and try again.",
+        )
+    });
+
+    pick(cx, s.win, "ru");
+    let shown = status(cx);
+    assert!(
+        shown.ends_with(
+            ". Ошибка синхронизации: Не удалось подключиться к GameBanana. Проверьте подключение к интернету и попробуйте снова."
+        ),
+        "{shown}"
+    );
 }

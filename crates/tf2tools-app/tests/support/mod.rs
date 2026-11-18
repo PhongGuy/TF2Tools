@@ -16,6 +16,7 @@ use gpui_kit::{
 };
 use tf2tools_app::assets::AssetRoot;
 use tf2tools_app::audio::RecordingAudio;
+use tf2tools_app::i18n::Phrase;
 use tf2tools_app::pages::addon_store::AddonStorePage;
 use tf2tools_app::pages::sound_store::SoundStorePage;
 use tf2tools_app::picker::ScriptedPicker;
@@ -691,7 +692,9 @@ impl FakeRun {
 /// A GameBanana sync that could not connect, worded as `describe_sync` words it.
 pub fn offline_failure() -> SyncFailure {
     SyncFailure::new(
-        "Couldn't reach GameBanana. Check your internet connection and try again.",
+        Phrase::new(|| {
+            "Couldn't reach GameBanana. Check your internet connection and try again.".into()
+        }),
         "cannot reach https://gamebanana.com/apiv11/Util/Search/Results: connection refused",
     )
 }
