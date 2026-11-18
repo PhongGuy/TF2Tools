@@ -534,11 +534,13 @@ fn assert_sound_card_fits_at_800(cx: &mut TestAppContext, lang: &str, hit: &str,
     }
     assert_eq!(
         support::label_of(cx, s.win, ids::sound_hit(folder)).as_deref(),
-        Some(hit)
+        Some(hit),
+        "Hit keeps its name"
     );
     assert_eq!(
         support::label_of(cx, s.win, ids::sound_kill(folder)).as_deref(),
-        Some(kill)
+        Some(kill),
+        "Kill keeps its name"
     );
 }
 
@@ -574,7 +576,10 @@ fn a_wide_sound_card_keeps_its_hit_and_kill_labels(cx: &mut TestAppContext) {
     let folder = ding.folder_name();
     let card = support::bounds_of(cx, s.win, ids::sound_card(folder)).unwrap();
     for button in [ids::sound_hit(folder), ids::sound_kill(folder)] {
-        assert!(!icon_only(cx, s.win, button.clone()), "{button:?} lost its label");
+        assert!(
+            !icon_only(cx, s.win, button.clone()),
+            "{button:?} lost its label"
+        );
         let b = support::bounds_of(cx, s.win, button.clone()).unwrap();
         assert_inside(&format!("{button:?}"), b, card);
     }

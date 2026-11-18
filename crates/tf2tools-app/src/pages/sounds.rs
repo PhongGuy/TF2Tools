@@ -41,9 +41,9 @@ use crate::shell::route::{NavigateTo, Page};
 use crate::shell::toast::{ToastKind, toast, toast_error};
 use crate::widgets::Named as _;
 use crate::widgets::card_grid::CardGrid;
-use crate::widgets::{label_width, labelled};
 use crate::widgets::profile_menu::{OnPick, Section, added_title, profile_menu};
 use crate::widgets::scroll::scroll_area;
+use crate::widgets::{label_width, labelled};
 
 /// A library card's height; a short window scrolls the page rather than cut the grid below a row.
 const CARD_HEIGHT: Pixels = px(136.);
@@ -979,18 +979,15 @@ impl SoundsPage {
             let page = cx.entity().downgrade();
             let busy = self.busy.clone();
             let sounds = Rc::clone(&self.sounds);
-            Some(
-                self.grid
-                    .render_cells(
-                        shown.len(),
-                        |_| CARD_HEIGHT,
-                        move |ix, width, window, cx| {
-                            let sound = &sounds[shown[ix]];
-                            let on = playing.as_ref() == Some(&sound_key(sound.folder_name()));
-                            sound_card(sound, on, busy.as_ref(), &page, width, window, cx)
-                        },
-                    ),
-            )
+            Some(self.grid.render_cells(
+                shown.len(),
+                |_| CARD_HEIGHT,
+                move |ix, width, window, cx| {
+                    let sound = &sounds[shown[ix]];
+                    let on = playing.as_ref() == Some(&sound_key(sound.folder_name()));
+                    sound_card(sound, on, busy.as_ref(), &page, width, window, cx)
+                },
+            ))
         };
         let muted = cx.theme().muted_foreground;
         let importing = self.busy == Some(Busy::Import);
