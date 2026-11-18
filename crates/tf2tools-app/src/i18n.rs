@@ -583,6 +583,7 @@ mod tests {
         "hud_maker.options.viewmodels",
         "hud_maker.part_name.demoman",
         "hud_maker.part_name.engineer",
+        "hud_maker.part_name.heavy_weapons",
         "hud_maker.part_name.heavyweapons",
         "hud_maker.part_name.medic",
         "hud_maker.part_name.pyro",
