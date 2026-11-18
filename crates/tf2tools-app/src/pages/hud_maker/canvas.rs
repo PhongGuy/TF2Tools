@@ -30,6 +30,7 @@ use super::editor::{Guide, Handle};
 use super::rank_paint::{RankText, rank_paint, rank_text};
 use super::view::{CanvasFit, list_font_px};
 use super::{HudMakerPage, Images};
+use crate::i18n::names::maker_label;
 use crate::i18n::tr;
 use crate::ids;
 use crate::pages::crosshair_maker::model::hsla_of_rgba;
@@ -2074,7 +2075,7 @@ fn part_element(
         Kind::Chat(chat) => el.overflow_hidden().children(chat_lines(chat, look)),
         Kind::List(list) => el.child(player_rows(part.key(), list, b.tall(), look)),
         Kind::RowsInGame => outline(el, drawn.insert(ROWS_IN_GAME.into()).clone()),
-        Kind::GameFilled(note) => outline(el, drawn.insert(note.into()).clone()),
+        Kind::GameFilled(note) => outline(el, drawn.insert(maker_label(note)).clone()),
         Kind::StandIn => el.child(
             div()
                 .id(ids::hud_maker_stand_in(part.key()))

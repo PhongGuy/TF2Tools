@@ -177,3 +177,17 @@ fn only_the_class_menu_s_team_count_line_grows_to_its_text() {
     assert!(!SampleSet::ClassPick.sizes_to_text("numScout"));
     assert!(!SampleSet::Empty.sizes_to_text("CountLabel"));
 }
+
+#[test]
+fn every_part_a_sample_fills_in_game_has_its_note() {
+    let mut named = 0;
+    for sample in SampleSet::ALL {
+        for part in sample.game_filled_parts() {
+            assert!(sample.game_filled(part).is_some(), "{sample:?} {part}");
+            named += 1;
+        }
+    }
+    assert_eq!(named, 6);
+    assert_eq!(SampleSet::Mvm.game_filled_parts()[0], "WaveStatusPanel");
+    assert!(SampleSet::Casual.game_filled_parts().is_empty());
+}

@@ -27,6 +27,7 @@ use tf2tools_core::{
 
 use super::HudMakerPage;
 use super::tip::tipped;
+use crate::i18n::names::maker_label;
 use crate::i18n::{plural, tr};
 use crate::ids;
 use crate::library_events::LibraryEvents;
@@ -416,7 +417,7 @@ impl HudMakerPage {
                 .font_weight(gpui_kit::FontWeight::SEMIBOLD)
                 .text_color(theme.foreground),
             ids::hud_maker_option_group(group),
-            group,
+            maker_label(group),
         );
         let reset_id = ids::hud_maker_option_reset(group);
         let reset = Button::new(reset_id.clone())
@@ -457,9 +458,10 @@ impl HudMakerPage {
             OptionKind::Choice(choices) => self.option_choices(spec, choices, cx),
             OptionKind::Text | _ => return None,
         };
+        let tooltip = spec.tooltip().map(maker_label);
         let note = [
             (own_restart && spec.restart()).then_some(RESTART),
-            spec.tooltip(),
+            tooltip.as_deref(),
         ]
         .into_iter()
         .flatten()
@@ -494,7 +496,7 @@ impl HudMakerPage {
         let switch = Switch::new(ids::hud_maker_option(id))
             .small()
             .checked(on)
-            .label(spec.label())
+            .label(maker_label(spec.label()))
             .disabled(locked || held)
             .on_click(move |&on, window, cx| {
                 let _ = page.update(cx, |page, cx| {
@@ -527,7 +529,7 @@ impl HudMakerPage {
         let name = div()
             .text_sm()
             .text_color(cx.theme().foreground)
-            .child(spec.label());
+            .child(maker_label(spec.label()));
         let control = match self.option_select(id) {
             Some(select) => div()
                 .id(ids::hud_maker_option(id))
@@ -536,7 +538,7 @@ impl HudMakerPage {
                     Select::new(&select)
                         .small()
                         .disabled(held)
-                        .accessibility_label(spec.label()),
+                        .accessibility_label(maker_label(spec.label())),
                 )
                 .into_any_element(),
             None => {
@@ -545,7 +547,7 @@ impl HudMakerPage {
                     let picked = chosen.as_deref() == Some(key);
                     let button = Button::new(ids::hud_maker_option_choice(id, key))
                         .xsmall()
-                        .label(choice.label())
+                        .label(maker_label(choice.label()))
                         .disabled(held)
                         .on_click(cx.listener(move |page, _, window, cx| {
                             let value = OptionValue::Pick(key.to_owned());
@@ -595,7 +597,7 @@ impl HudMakerPage {
                     div()
                         .text_sm()
                         .text_color(theme.foreground)
-                        .child(spec.label()),
+                        .child(maker_label(spec.label())),
                 )
                 .child(
                     h_flex()
@@ -634,7 +636,7 @@ impl HudMakerPage {
         let held = self.editor().is_some_and(|e| e.previewing());
         let swatch = div()
             .id(ids::hud_maker_option(id))
-            .aria_label(spec.label())
+            .aria_label(maker_label(spec.label()))
             .test_support()
             .flex_none()
             .w_10()
@@ -666,7 +668,7 @@ impl HudMakerPage {
                 .child(
                     ColorPicker::new(self.option_colour_state())
                         .icon(Icon::empty())
-                        .accessibility_label(spec.label()),
+                        .accessibility_label(maker_label(spec.label())),
                 )
         });
         h_flex()
@@ -677,7 +679,7 @@ impl HudMakerPage {
                 div()
                     .text_sm()
                     .text_color(theme.foreground)
-                    .child(spec.label()),
+                    .child(maker_label(spec.label())),
             )
             .into_any_element()
     }

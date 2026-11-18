@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use common::hud_stock::{hudlayout_with_killfeed, stock_files_with};
 use tf2tools_core::{
     Change, ChangeTarget, Derived, HudFiles, HudLoadError, HudModel, MakerFile, OptionChange,
-    OptionKind, OptionSource, OptionValue, PartKey, Platform, RemoveKey, Rgba, SetKey,
+    OptionKind, OptionSource, OptionSpec, OptionValue, PartKey, Platform, RemoveKey, Rgba, SetKey,
 };
 
 fn option(group: u32, id: &str, value: OptionValue) -> Change {
@@ -576,4 +576,15 @@ fn the_hud_value_comes_from_the_block_an_option_writes() {
         m.option_value("chat_top", &[]),
         Some(OptionValue::Bool(true))
     );
+}
+
+#[test]
+fn the_built_in_table_lists_every_option_in_panel_order() {
+    let ids: Vec<&str> = OptionSpec::built_ins().iter().map(OptionSpec::id).collect();
+    assert_eq!(ids[..3], ["killfeed_rows", "chat_top", "hide_friends"]);
+    assert!(
+        ids.contains(&"hud_crosshair_symbol") && ids.contains(&"item_collectors"),
+        "{ids:?}"
+    );
+    assert_eq!(ids.len(), 3 + 4 + 16);
 }

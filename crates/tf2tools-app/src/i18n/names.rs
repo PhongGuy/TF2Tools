@@ -192,7 +192,7 @@ pub fn starting_point_about(point: StartingPoint) -> SharedString {
 mod tests {
     use std::collections::BTreeMap;
 
-    use tf2tools_core::{ClassSchema, PanelRule, SceneRule};
+    use tf2tools_core::{ClassSchema, OptionKind, OptionSpec, PanelRule, SampleSet, SceneRule};
 
     use super::{maker_label, maker_label_key};
 
@@ -233,6 +233,30 @@ mod tests {
                 for &(choice, _) in spec.choices() {
                     out.push((choice.to_owned(), "PropertySpec::choices"));
                 }
+            }
+        }
+        for spec in OptionSpec::built_ins() {
+            out.push((spec.label().to_owned(), "OptionSpec::label"));
+            out.push((spec.group().to_owned(), "OptionSpec::group"));
+            out.extend(
+                spec.tooltip()
+                    .map(|t| (t.to_owned(), "OptionSpec::tooltip")),
+            );
+            if let OptionKind::Choice(choices) = spec.kind() {
+                out.extend(
+                    choices
+                        .iter()
+                        .map(|c| (c.label().to_owned(), "Choice::label")),
+                );
+            }
+        }
+        for sample in SampleSet::ALL {
+            for part in sample.game_filled_parts() {
+                out.extend(
+                    sample
+                        .game_filled(part)
+                        .map(|n| (n.to_owned(), "SampleSet::game_filled")),
+                );
             }
         }
         out

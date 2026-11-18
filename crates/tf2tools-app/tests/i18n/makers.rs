@@ -193,3 +193,53 @@ fn a_part_reads_its_core_name_and_when_it_shows_in_russian(cx: &mut TestAppConte
         Some("Здоровье")
     );
 }
+
+// The option files the built-ins need, as tests/hud_maker_options.rs seeds them.
+const SCHEME: &str = r#""Scheme" { Colors { TanDark "117 107 94 255" TanLight "235 226 202 255"
+  QualityColorNormal "178 178 178 255" QualityColorUnique "255 215 0 255" } }"#;
+const BASECHAT: &str = r#""Resource/UI/BaseChat.res" { HudChat { xpos 10 ypos 275 } }"#;
+const MAINMENU: &str = r#""Resource/UI/MainMenuOverride.res" { FriendsContainer { visible 1 } }"#;
+
+#[test]
+fn option_labels_read_in_russian_and_glyphs_stay() {
+    let _guard = LocaleGuard::switch("ru");
+    assert_eq!(maker_label("HUD crosshair").to_string(), "Прицел HUD");
+    assert_eq!(maker_label("+").to_string(), "+");
+}
+
+// Options are found by their English ids; the group heading's id keeps core's group name.
+#[gpui_kit::test]
+fn the_built_in_options_read_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let files = [
+        ("resource/clientscheme.res", Some(SCHEME)),
+        ("scripts/hudlayout.res", Some(support::hud_stock::HUDLAYOUT)),
+        ("resource/ui/basechat.res", Some(BASECHAT)),
+        ("resource/ui/mainmenuoverride.res", Some(MAINMENU)),
+    ];
+    let (_env, s, _page) = open_hud_maker(cx, &files);
+    assert_eq!(
+        label(cx, &s, ids::hud_maker_option("chat_top")).as_deref(),
+        Some("Чат вверху")
+    );
+    assert_eq!(
+        label(cx, &s, ids::hud_maker_option_group("Item colours")).as_deref(),
+        Some("Цвета предметов")
+    );
+    assert_eq!(
+        label(cx, &s, ids::hud_maker_option("item_unique")).as_deref(),
+        Some("Уникальный")
+    );
+}
+
+#[gpui_kit::test]
+fn a_part_the_game_fills_says_so_in_russian(cx: &mut TestAppContext) {
+    let _guard = LocaleGuard::switch("ru");
+    let (_env, s, _page) = open_hud_maker(cx, &[]);
+    support::click_scene(cx, s.win, Scene::ClassSelect);
+    let tips = ids::hud_maker_part(&PartKey::new("class/ClassTipsPanel"));
+    assert_eq!(
+        label(cx, &s, tips).as_deref(),
+        Some("Подсказки классов рисует игра")
+    );
+}

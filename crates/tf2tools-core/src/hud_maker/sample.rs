@@ -635,12 +635,16 @@ static MVM_VARIABLES: [(&str, &str); 3] = [
     ("respecstatus", ""),
 ];
 
-const MVM_CREDIT_PANELS: [&str; 4] = [
+// The parts each sample leaves to the game, as game_filled names them: the MvM wave bar, then
+// its four credit tables.
+const MVM_FILLED: [&str; 5] = [
+    "WaveStatusPanel",
     "PreviousWaveCreditInfoPanel",
     "TotalGameCreditInfoPanel",
     "PreviousWaveCreditSpendPanel",
     "TotalGameCreditSpendPanel",
 ];
+const CLASS_PICK_FILLED: [&str; 1] = ["ClassTipsPanel"];
 
 // The teammates per class of the casual sample's RED team, as the class menu's count labels.
 static CLASS_VARIABLES: [(&str, &str); 9] = [
@@ -708,6 +712,18 @@ const TEAMMATE_PICTURES: [&str; 11] = [
 ];
 
 impl SampleSet {
+    /// Every sample, in declaration order.
+    pub const ALL: [SampleSet; 8] = [
+        SampleSet::Empty,
+        SampleSet::Casual,
+        SampleSet::Competitive,
+        SampleSet::Mvm,
+        SampleSet::Killed,
+        SampleSet::Won,
+        SampleSet::ClassPick,
+        SampleSet::Spectating,
+    ];
+
     /// A team's rows, highest score first; empty for [`SampleSet::Empty`].
     pub fn players(self, team: Team) -> &'static [SamplePlayer] {
         match (self, team) {
@@ -907,14 +923,28 @@ impl SampleSet {
         self == SampleSet::ClassPick && part.eq_ignore_ascii_case("CountLabel")
     }
 
+    /// The parts `game_filled` answers for in this sample, in the order it checks them.
+    pub fn game_filled_parts(self) -> &'static [&'static str] {
+        match self {
+            SampleSet::ClassPick => &CLASS_PICK_FILLED,
+            SampleSet::Mvm => &MVM_FILLED,
+            SampleSet::Empty
+            | SampleSet::Casual
+            | SampleSet::Competitive
+            | SampleSet::Killed
+            | SampleSet::Won
+            | SampleSet::Spectating => &[],
+        }
+    }
+
     /// The note for a part the game fills with content the preview cannot draw; only the
     /// class menu and MvM samples have any.
     pub fn game_filled(self, part: &str) -> Option<&'static str> {
         let is = |name: &str| part.eq_ignore_ascii_case(name);
         match self {
-            SampleSet::ClassPick if is("ClassTipsPanel") => Some("Class tips draw in game"),
-            SampleSet::Mvm if is("WaveStatusPanel") => Some("The wave bar draws in game"),
-            SampleSet::Mvm if MVM_CREDIT_PANELS.iter().any(|name| is(name)) => {
+            SampleSet::ClassPick if is(CLASS_PICK_FILLED[0]) => Some("Class tips draw in game"),
+            SampleSet::Mvm if is(MVM_FILLED[0]) => Some("The wave bar draws in game"),
+            SampleSet::Mvm if MVM_FILLED[1..].iter().any(|name| is(name)) => {
                 Some("The credit tables draw in game")
             }
             SampleSet::Empty
