@@ -810,9 +810,11 @@ fn sound_card(
     let has_tf2 = tf2_state(cx).read(cx).install().is_some();
     let install = |id: ElementId, kind: SoundKind, icon: IconName, label: SharedString| {
         let installing = busy == Some(&Busy::Install(folder.to_owned(), kind));
-        let button = Button::new(id).outline().px(SM_ICON_PX).icon(icon);
+        // The label's padding stays off the icon-only square, whose 32 px less the outline
+        // border would leave the 16 px icon only 10 px and clip it.
+        let button = Button::new(id).outline().icon(icon);
         let button = if labels {
-            button.label(label)
+            button.px(SM_ICON_PX).label(label)
         } else {
             button.named(label)
         };
