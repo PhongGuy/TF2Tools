@@ -2095,7 +2095,7 @@ hud_maker:
     invuln_label: "Rótulo de invulnerabilidades"
     item_effect_meter: "Medidor de efeito do item"
     item_effect_meter_background: "Fundo do medidor de efeito do item"
-    item_effect_meter_count: "Contagem do medidor de efeito"
+    item_effect_meter_count: "Contagem do medidor de efeito do item"
     item_effect_meter_label: "Rótulo do medidor de efeito do item"
     item_label: "Rótulo do item"
     itempanel: "Painel do item"
