@@ -104,3 +104,14 @@ fn the_hud_maker_timeline_uses_the_client_words() {
     assert!(text("hud_maker.timeline.event.medic_charged").contains("Überladung"));
     assert_ne!(text("hud_maker.history.save"), "Save snapshot");
 }
+
+#[test]
+fn the_hud_maker_meters_use_the_client_names() {
+    let text = |k: &str| {
+        tf2tools_app::_rust_i18n_try_translate("de", k)
+            .map(|t| t.into_owned())
+            .unwrap_or_default()
+    };
+    assert!(text("hud_maker.meter.drink").contains("Krit-a-Cola"));
+    assert!(text("hud_maker.situation.switch.koth").contains("Karte"));
+}
